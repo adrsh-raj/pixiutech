@@ -22,7 +22,7 @@ export default function EnquiryForm({ intent }) {
 
   const set = (id) => (e) => setValues((v) => ({ ...v, [id]: e.target.value }))
 
-  function send() {
+  async function send() {
     const missing = FIELDS.filter((f) => f.req && !values[f.id].trim())
     const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email.trim())
 
@@ -43,25 +43,32 @@ export default function EnquiryForm({ intent }) {
     }
 
     setErrors([])
+    setStatus({ kind: '', text: 'Sending your enquiry...' })
 
-    setErrors([])
-
-    // Fallback frontend submission using mailto:
-    const subject = encodeURIComponent(`New Innovation Lab Enquiry from ${values.school}`)
-    const body = encodeURIComponent(
-      `School: ${values.school}\n` +
-      `Contact Person: ${values.person}\n` +
-      `Phone: ${values.phone}\n` +
-      `Email: ${values.email}\n` +
-      `City: ${values.city}\n` +
-      `Student Strength: ${values.strength}\n\n` +
-      `Message:\n${values.message}`
-    )
-    
-    window.location.href = `mailto:hello@pixiutech.com?subject=${subject}&body=${body}`
-
-    setStatus(null)
-    setSent(true)
+    try {
+      const response = await fetch('https://formspree.io/f/xzepqjep', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          "School Name": values.school,
+          "Contact Person": values.person,
+          "Phone": values.phone,
+          "Email": values.email,
+          "City": values.city,
+          "Student Strength": values.strength,
+          "Message": values.message
+        }),
+      })
+      
+      if (response.ok) {
+        setStatus(null)
+        setSent(true)
+      } else {
+        setStatus({ kind: 'err', text: 'There was a problem sending your enquiry. Please try again.' })
+      }
+    } catch (error) {
+      setStatus({ kind: 'err', text: 'Network error. Please check your connection and try again.' })
+    }
   }
 
   if (sent) {
