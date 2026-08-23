@@ -36,88 +36,123 @@ export default function Login() {
   }
 
   return (
-    <>
+    <div style={{ background: '#f8fafc', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <PageHead
         crumb="Resource Hub Login"
         title="Secure Portal Access"
         intro="Select your portal below. Students can access view-only materials, while trainers have access to complete session packs."
       />
       
-      <section className="band">
-        <div className="shell">
+      <section style={{ padding: '4rem 1rem', flex: 1, display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
+        <div style={{ width: '100%', maxWidth: '900px' }}>
+          
           {error && (
-            <div style={{ background: '#ffebee', color: '#cc0000', padding: '1rem', borderRadius: '4px', textAlign: 'center', marginBottom: '2rem', fontWeight: 'bold' }}>
+            <div style={{ background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', padding: '1rem', borderRadius: '8px', textAlign: 'center', marginBottom: '3rem', fontWeight: '500' }}>
               {error}
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+          <div style={{ display: 'flex', gap: '3rem', flexWrap: 'wrap', justifyContent: 'center' }}>
             
             {/* Student Login Card */}
             <Reveal>
-              <form onSubmit={handleStudentLogin} style={{ flex: '1 1 350px', maxWidth: '400px', background: '#f5f5f5', padding: '2rem', borderRadius: '8px', borderTop: '4px solid #1D6EFF' }}>
-                <h3 style={{ marginBottom: '1.5rem', color: '#0A1A33' }}>Student Access</h3>
+              <form onSubmit={handleStudentLogin} style={{ 
+                flex: '1 1 380px', 
+                maxWidth: '420px', 
+                background: '#fff', 
+                padding: '2.5rem', 
+                borderRadius: '16px', 
+                boxShadow: '0 10px 25px rgba(0,0,0,0.03)',
+                border: '1px solid #eaeaea',
+                position: 'relative',
+                overflow: 'hidden'
+              }}>
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '4px', background: '#1D6EFF' }}></div>
                 
-                <div style={{ marginBottom: '1rem' }}>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>School ID</label>
+                <h3 style={{ marginBottom: '0.5rem', color: '#0A1A33', fontSize: '1.4rem' }}>Student Access</h3>
+                <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '2rem' }}>Log in with your school credentials.</p>
+                
+                <div style={{ marginBottom: '1.25rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.85rem', color: '#333', textTransform: 'uppercase', letterSpacing: '0.05em' }}>School ID</label>
                   <input 
                     type="text" 
                     value={studentId}
                     onChange={(e) => setStudentId(e.target.value)}
-                    placeholder="Enter School ID"
-                    style={{ width: '100%', padding: '0.75rem', border: '1px solid #ccc', borderRadius: '4px' }}
+                    placeholder="e.g. ZPS"
+                    style={{ width: '100%', padding: '0.85rem 1rem', border: '1px solid #ddd', borderRadius: '8px', fontSize: '1rem', transition: 'border-color 0.2s', outline: 'none' }}
+                    onFocus={(e) => e.target.style.borderColor = '#1D6EFF'}
+                    onBlur={(e) => e.target.style.borderColor = '#ddd'}
                     required
                   />
                 </div>
 
-                <div style={{ marginBottom: '1.5rem' }}>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>Password</label>
+                <div style={{ marginBottom: '2rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.85rem', color: '#333', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Password</label>
                   <input 
                     type="password" 
                     value={studentPwd}
                     onChange={(e) => setStudentPwd(e.target.value)}
                     placeholder="Enter Password"
-                    style={{ width: '100%', padding: '0.75rem', border: '1px solid #ccc', borderRadius: '4px' }}
+                    style={{ width: '100%', padding: '0.85rem 1rem', border: '1px solid #ddd', borderRadius: '8px', fontSize: '1rem', transition: 'border-color 0.2s', outline: 'none' }}
+                    onFocus={(e) => e.target.style.borderColor = '#1D6EFF'}
+                    onBlur={(e) => e.target.style.borderColor = '#ddd'}
                     required
                   />
                 </div>
 
-                <button type="submit" className="btn btn--primary" style={{ width: '100%' }}>
-                  Login as Student
+                <button type="submit" className="btn btn--primary" style={{ width: '100%', padding: '0.85rem', fontSize: '1rem', borderRadius: '8px' }}>
+                  Login to Portal
                 </button>
               </form>
             </Reveal>
 
             {/* Trainer Login Card */}
             <Reveal delay={100}>
-              <form onSubmit={handleTeacherLogin} style={{ flex: '1 1 350px', maxWidth: '400px', background: '#f5f5f5', padding: '2rem', borderRadius: '8px', borderTop: '4px solid #C9A227' }}>
-                <h3 style={{ marginBottom: '1.5rem', color: '#0A1A33' }}>Trainer Access</h3>
+              <form onSubmit={handleTeacherLogin} style={{ 
+                flex: '1 1 380px', 
+                maxWidth: '420px', 
+                background: '#fff', 
+                padding: '2.5rem', 
+                borderRadius: '16px', 
+                boxShadow: '0 10px 25px rgba(0,0,0,0.03)',
+                border: '1px solid #eaeaea',
+                position: 'relative',
+                overflow: 'hidden'
+              }}>
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '4px', background: '#C9A227' }}></div>
+
+                <h3 style={{ marginBottom: '0.5rem', color: '#0A1A33', fontSize: '1.4rem' }}>Trainer Access</h3>
+                <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '2rem' }}>Secure login for instructors.</p>
                 
-                <div style={{ marginBottom: '1rem' }}>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>Trainer ID</label>
+                <div style={{ marginBottom: '1.25rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.85rem', color: '#333', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Trainer ID</label>
                   <input 
                     type="text" 
                     value={teacherId}
                     onChange={(e) => setTeacherId(e.target.value)}
                     placeholder="Enter Trainer ID"
-                    style={{ width: '100%', padding: '0.75rem', border: '1px solid #ccc', borderRadius: '4px' }}
+                    style={{ width: '100%', padding: '0.85rem 1rem', border: '1px solid #ddd', borderRadius: '8px', fontSize: '1rem', transition: 'border-color 0.2s', outline: 'none' }}
+                    onFocus={(e) => e.target.style.borderColor = '#C9A227'}
+                    onBlur={(e) => e.target.style.borderColor = '#ddd'}
                     required
                   />
                 </div>
 
-                <div style={{ marginBottom: '1.5rem' }}>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>Password</label>
+                <div style={{ marginBottom: '2rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.85rem', color: '#333', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Password</label>
                   <input 
                     type="password" 
                     value={teacherPwd}
                     onChange={(e) => setTeacherPwd(e.target.value)}
                     placeholder="Enter Password"
-                    style={{ width: '100%', padding: '0.75rem', border: '1px solid #ccc', borderRadius: '4px' }}
+                    style={{ width: '100%', padding: '0.85rem 1rem', border: '1px solid #ddd', borderRadius: '8px', fontSize: '1rem', transition: 'border-color 0.2s', outline: 'none' }}
+                    onFocus={(e) => e.target.style.borderColor = '#C9A227'}
+                    onBlur={(e) => e.target.style.borderColor = '#ddd'}
                     required
                   />
                 </div>
 
-                <button type="submit" className="btn btn--outline" style={{ width: '100%' }}>
+                <button type="submit" className="btn btn--outline" style={{ width: '100%', padding: '0.85rem', fontSize: '1rem', borderRadius: '8px' }}>
                   Login as Trainer
                 </button>
               </form>
@@ -126,6 +161,6 @@ export default function Login() {
           </div>
         </div>
       </section>
-    </>
+    </div>
   )
 }
