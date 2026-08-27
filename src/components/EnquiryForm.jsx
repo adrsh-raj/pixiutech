@@ -77,8 +77,7 @@ export default function EnquiryForm({ intent }) {
         <div className="form__done">
           <h3>Enquiry received</h3>
           <p>
-            Thanks, {values.person.split(' ')[0]}. We'll review {values.school} and come back within two working
-            days with next steps.
+            Thanks, {values.person.split(' ')[0]}. We'll review {values.school} and come back in less than 24 hours with next steps.
           </p>
           <p style={{ marginTop: 18 }}>
             <button
@@ -129,7 +128,7 @@ export default function EnquiryForm({ intent }) {
         <button className="btn btn--primary" type="button" onClick={send}>
           Send enquiry <span className="arw">→</span>
         </button>
-        <span className="form__note">We reply within two working days.</span>
+        <span className="form__note">We reply in less than 24 hours.</span>
       </div>
 
       {status && (

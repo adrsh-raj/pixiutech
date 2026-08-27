@@ -30,7 +30,7 @@ export default function Footer() {
             <h4>Connect</h4>
             <nav className="foot__nav-col">
               <a href="https://wa.me/917985403186" target="_blank" rel="noreferrer">WhatsApp</a>
-              <a href="mailto:hello@pixiutech.com">Email Us</a>
+              <a href="mailto:director@pixiutech.com">Email Us</a>
               <Link to="/careers">Careers</Link>
             </nav>
           </div>

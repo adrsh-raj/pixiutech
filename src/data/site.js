@@ -12,7 +12,7 @@ export const STATS = [
   { number: '1', label: 'Partner School', icon: '🏫' },
   { number: '5+', label: 'Workshops Delivered', icon: '🔧' },
   { number: '500+', label: 'Students Influenced', icon: '👩‍🎓' },
-  { number: '5', label: 'Grade Levels', icon: '📚' },
+  { number: '8', label: 'Grade Levels', icon: '📚' },
 ]
 
 export const SOLUTIONS = [
@@ -84,7 +84,7 @@ export const CAREERS = [
     title: 'STEM Instructor',
     location: 'Hata, UP',
     type: 'Full-time',
-    desc: 'Deliver robotics and coding sessions in partner schools. Train students from Class 6–11 on Arduino, sensors, and project-based learning.',
+    desc: 'Deliver robotics and coding sessions in partner schools. Train students from Class 3 to 11 (except 10) on Arduino, sensors, and project-based learning.',
   },
   {
     title: 'Curriculum Developer',

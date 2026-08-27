@@ -31,7 +31,7 @@ export default function Contact() {
               </div>
               <div className="contact-info__item">
                 <strong>📧 Email</strong>
-                <span>hello@pixiutech.com</span>
+                <span>director@pixiutech.com</span>
               </div>
               <div className="contact-info__item">
                 <strong>🏢 Company</strong>
@@ -39,7 +39,7 @@ export default function Contact() {
               </div>
               <div className="contact-info__item">
                 <strong>⏰ Response Time</strong>
-                <span>Within 2 working days</span>
+                <span>Less than 24 hours</span>
               </div>
             </div>
 
