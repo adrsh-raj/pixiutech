@@ -1,119 +1,118 @@
 import { Link } from 'react-router-dom'
 import Reveal from '../components/Reveal.jsx'
-import Plate from '../components/Plate.jsx'
-import Cycle from '../components/Cycle.jsx'
 import CTAStrip from '../components/CTAStrip.jsx'
-import { CAPABILITIES, AREAS, STAGES, WHY } from '../data/site.js'
+import { STATS, SOLUTIONS, PROCESS, WHY } from '../data/site.js'
 
 export default function Home() {
   return (
     <>
-      {/* ---------------------------- HERO ---------------------------- */}
-      <section className="hero">
-        <div className="shell hero__in">
-          <div>
-            <p className="hero__tag">End-to-end STEM &amp; innovation partner for schools</p>
-            <h1>
-              Build the Future
-              <br />
-              Inside Your <em>School.</em>
+      {/* ============================= HERO ============================= */}
+      <section className="hero-v2">
+        <div className="hero-v2__bg">
+          <img src="/img/hero_lab.jpg" alt="Modern school STEM innovation lab" />
+          <div className="hero-v2__overlay" />
+        </div>
+        <div className="shell hero-v2__content">
+          <Reveal>
+            <p className="hero-v2__tag">STEM · Robotics · AI · IoT · Drones</p>
+            <h1 className="hero-v2__title">
+              Empowering Schools with<br />
+              <span className="hero-v2__accent">Future-Ready Innovation Labs</span>
             </h1>
-            <p className="hero__sub">
-              Pixiu Tech provides end-to-end STEM, Robotics, AI, IoT and Innovation solutions that transform school
-              spaces into practical, engaging learning environments.
+            <p className="hero-v2__sub">
+              End-to-end lab setup, hands-on curriculum, trained instructors, and ongoing support — everything your school needs to teach STEM, Robotics, and AI.
             </p>
-            <div className="hero__cta">
-              <Link className="btn btn--primary" to="/contact">
-                Book a school consultation <span className="arw">→</span>
+            <div className="hero-v2__cta">
+              <Link className="btn btn--primary btn--lg" to="/contact">
+                Book a Free Demo <span className="arw">→</span>
               </Link>
-              <Link className="btn btn--ghost" to="/solutions">
-                Explore our solutions
+              <Link className="btn btn--ghost-light" to="/solutions">
+                Explore Solutions
               </Link>
             </div>
-            <div className="hero__meta">
-              <span>Lab design</span>
-              <span>Curriculum</span>
-              <span>Instructors</span>
-              <span>Ongoing support</span>
-            </div>
-          </div>
+          </Reveal>
+        </div>
+      </section>
 
-          <div className="hero__art">
-            <Plate
-              src="/img/innovation_lab.jpg"
-              alt="Modern school innovation lab with 3D printers, robotics kits, and computers"
-              caption="Modern innovation lab — configured to the school's space"
-            />
+      {/* ========================== STATS BAR ========================== */}
+      <section className="stats-bar">
+        <div className="shell">
+          <div className="stats-bar__grid">
+            {STATS.map((s) => (
+              <div className="stat" key={s.label}>
+                <span className="stat__icon">{s.icon}</span>
+                <span className="stat__number">{s.number}</span>
+                <span className="stat__label">{s.label}</span>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* -------------------------- WHAT WE DO ------------------------ */}
+      {/* ====================== SOLUTIONS PREVIEW ====================== */}
       <section className="band">
         <div className="shell">
           <Reveal>
-            <p className="eyebrow">What we do</p>
-            <h2 className="h-sect">One Partner. One Complete STEM Solution.</h2>
+            <p className="eyebrow">What We Offer</p>
+            <h2 className="h-sect">Six Domains. One Innovation Lab.</h2>
             <p className="lede">
-              Schools usually have to assemble a lab from separate vendors — one for equipment, another for content,
-              another for people. Pixiu covers the whole ecosystem under a single working relationship.
+              From robotics and AI to drones and 3D printing — we cover every domain your school needs to deliver future-ready education.
             </p>
           </Reveal>
 
           <Reveal delay={80}>
-            <div className="caps">
-              {CAPABILITIES.map((c) => (
-                <article className="cap" key={c.no}>
-                  <span className="cap__no">{c.no}</span>
-                  <h3>{c.title}</h3>
-                  <p>{c.text}</p>
-                </article>
+            <div className="solutions-grid">
+              {SOLUTIONS.map((s) => (
+                <Link to="/solutions" className="sol-card" key={s.id}>
+                  <div className="sol-card__img">
+                    <img src={s.img} alt={s.title} loading="lazy" />
+                  </div>
+                  <div className="sol-card__body">
+                    <h3>{s.title}</h3>
+                    <p>{s.short}</p>
+                  </div>
+                </Link>
               ))}
             </div>
           </Reveal>
 
           <Reveal delay={140}>
-            <p style={{ marginTop: 34 }}>
+            <p style={{ marginTop: 34, textAlign: 'center' }}>
               <Link className="btn btn--outline" to="/solutions">
-                See what each part involves <span className="arw">→</span>
+                See all solutions in detail <span className="arw">→</span>
               </Link>
             </p>
           </Reveal>
         </div>
       </section>
 
-      {/* --------------------------- APPROACH ------------------------- */}
-      <section className="band on-dark gridfield">
+      {/* ====================== WORKSHOP IMAGE ======================== */}
+      <section className="band band--no-pad-top">
         <div className="shell">
           <Reveal>
-            <p className="eyebrow">Our approach</p>
-            <h2 className="h-sect">A Lab Is Only Valuable When Students Use It.</h2>
-            <p className="lede">
-              Installing infrastructure is the easy part. Pixiu stays through the harder part — getting curriculum
-              running, instructors in the room, and students building every week.
-            </p>
-          </Reveal>
-          <Reveal delay={80}>
-            <Cycle />
+            <div className="wide-img">
+              <img src="/img/workshop_action.jpg" alt="Students in an energetic STEM robotics workshop" loading="lazy" />
+              <p className="wide-img__caption">Live workshops — where students build, fail, fix, and celebrate</p>
+            </div>
           </Reveal>
         </div>
       </section>
 
-      {/* ---------------------------- AREAS --------------------------- */}
-      <section className="band band--tight">
+      {/* ======================== HOW IT WORKS ========================= */}
+      <section className="band band--gray">
         <div className="shell">
           <Reveal>
-            <p className="eyebrow">Areas of learning</p>
-            <h2 className="h-sect">Eight Domains, One Connected Lab.</h2>
+            <p className="eyebrow">How It Works</p>
+            <h2 className="h-sect">From Empty Room to Running Lab in 4 Steps</h2>
           </Reveal>
-        </div>
-        <div className="shell">
           <Reveal delay={80}>
-            <div className="areas">
-              {AREAS.map(([name, sub]) => (
-                <div className="area" key={name}>
-                  <strong>{name}</strong>
-                  <span>{sub}</span>
+            <div className="process-grid">
+              {PROCESS.map((p, i) => (
+                <div className="process-step" key={p.no}>
+                  <div className="process-step__no">{p.icon}</div>
+                  <h3>{p.name}</h3>
+                  <p>{p.text}</p>
+                  {i < PROCESS.length - 1 && <div className="process-step__arrow">→</div>}
                 </div>
               ))}
             </div>
@@ -121,84 +120,50 @@ export default function Home() {
         </div>
       </section>
 
-      {/* -------------------------- CURRICULUM ------------------------ */}
-      <section className="band band--gray">
-        <div className="shell">
+      {/* ======================== TEACHER TRAINING ===================== */}
+      <section className="band">
+        <div className="shell split">
           <Reveal>
-            <p className="eyebrow">Curriculum</p>
-            <h2 className="h-sect">Learning That Grows With the Student.</h2>
-            <p className="lede">
-              Each stage assumes what came before it, so a student who starts young keeps climbing rather than
-              repeating.
-            </p>
-          </Reveal>
-
-          <Reveal delay={80}>
-            <div className="ladder">
-              {STAGES.map((s) => (
-                <article className="rung" key={s.lvl}>
-                  <span className="rung__lvl">{s.lvl}</span>
-                  <h3>{s.name}</h3>
-                  <p>{s.short}</p>
-                </article>
-              ))}
+            <div className="split__img">
+              <img src="/img/teacher_training.jpg" alt="Teacher training workshop" loading="lazy" />
             </div>
           </Reveal>
-
-          <Reveal delay={140}>
-            <p className="lede" style={{ marginTop: 32 }}>
-              Curriculum is designed according to student age, grade and the school's own academic requirements —
-              mapped in detail during planning, not off the shelf.
-            </p>
-            <p style={{ marginTop: 26 }}>
-              <Link className="btn btn--outline" to="/curriculum">
-                See the full progression <span className="arw">→</span>
-              </Link>
-            </p>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* ------------------------- PARTNERSHIP ------------------------ */}
-      <section className="band">
-        <div className="shell split split--wide-left">
-          <Reveal>
-            <p className="eyebrow">School partnership</p>
-            <h2 className="h-sect">From an Empty Room to a Working Innovation Lab.</h2>
-            <p className="lede">
-              Consultation, planning, setup, training, classes, projects and continuous support. Pixiu works as a
-              long-term technology and STEM partner — the relationship starts before the room is built and continues
-              long after it opens.
-            </p>
-            <p style={{ marginTop: 28 }}>
-              <Link className="btn btn--outline" to="/partnership">
-                How a partnership runs <span className="arw">→</span>
-              </Link>
-            </p>
-          </Reveal>
           <Reveal delay={80}>
-            <Plate
-              src="/img/school_partnership.jpg"
-              alt="School administrator and technology expert discussing a blueprint for a modern lab"
-              caption="Partnership — from planning to a working innovation lab"
-            />
+            <div>
+              <p className="eyebrow">Teacher Training</p>
+              <h2 className="h-sect">We Train Your Teachers Too</h2>
+              <p className="lede">
+                Our instructors don't just teach students — they upskill your existing faculty. By the end of the year, your teachers can independently run STEM sessions.
+              </p>
+              <ul className="check-list">
+                <li>Hands-on Arduino & electronics training</li>
+                <li>Curriculum walkthrough & session planning</li>
+                <li>Ongoing mentorship & support</li>
+              </ul>
+              <p style={{ marginTop: 24 }}>
+                <Link className="btn btn--outline" to="/contact">
+                  Enquire about training <span className="arw">→</span>
+                </Link>
+              </p>
+            </div>
           </Reveal>
         </div>
       </section>
 
-      {/* --------------------------- WHY PIXIU ------------------------ */}
-      <section className="band band--gray">
+      {/* ========================== WHY PIXIU ========================== */}
+      <section className="band on-dark gridfield">
         <div className="shell">
           <Reveal>
-            <p className="eyebrow">Why Pixiu</p>
+            <p className="eyebrow">Why Pixiu Tech</p>
             <h2 className="h-sect">Built to Be Used, Not Just Installed.</h2>
           </Reveal>
           <Reveal delay={80}>
-            <div className="why">
-              {WHY.map(([t, d]) => (
-                <div className="why__item" key={t}>
-                  <h3>{t}</h3>
-                  <p>{d}</p>
+            <div className="why-v2">
+              {WHY.map((w) => (
+                <div className="why-v2__item" key={w.title}>
+                  <span className="why-v2__icon">{w.icon}</span>
+                  <h3>{w.title}</h3>
+                  <p>{w.desc}</p>
                 </div>
               ))}
             </div>

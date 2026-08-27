@@ -4,16 +4,23 @@ import { NAV } from '../data/site.js'
 
 export default function Nav() {
   const [open, setOpen] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
   const { pathname } = useLocation()
 
   useEffect(() => setOpen(false), [pathname])
 
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 40)
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
   return (
-    <header className="nav">
+    <header className={`nav ${scrolled ? 'nav--scrolled' : ''}`}>
       <div className="shell nav__in">
         <Link className="brand" to="/">
-          <span className="brand__mark">PIXIU</span>
-          <span className="brand__tag">Build · Learn · Innovate</span>
+          <span className="brand__mark">PIXIU TECH</span>
+          <span className="brand__tag">STEM · Robotics · AI</span>
         </Link>
 
         <nav className="nav__links" aria-label="Primary">
@@ -26,7 +33,7 @@ export default function Nav() {
 
         <div className="nav__right">
           <Link className="btn btn--primary btn--sm" to="/contact">
-            Book a consultation
+            Book a Demo
           </Link>
           <button
             className="burger"
