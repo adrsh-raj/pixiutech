@@ -12,7 +12,6 @@ export const STATS = [
   { number: '1', label: 'Partner School', icon: '🏫' },
   { number: '5+', label: 'Workshops Delivered', icon: '🔧' },
   { number: '500+', label: 'Students Influenced', icon: '👩‍🎓' },
-  { number: '8', label: 'Grade Levels', icon: '📚' },
 ]
 
 export const SOLUTIONS = [

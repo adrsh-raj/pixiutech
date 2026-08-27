@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import Reveal from '../components/Reveal.jsx'
 import CTAStrip from '../components/CTAStrip.jsx'
+import CountUp from '../components/CountUp.jsx'
 import { STATS, SOLUTIONS, PROCESS, WHY } from '../data/site.js'
 
 export default function Home() {
@@ -41,7 +42,7 @@ export default function Home() {
             {STATS.map((s) => (
               <div className="stat" key={s.label}>
                 <span className="stat__icon">{s.icon}</span>
-                <span className="stat__number">{s.number}</span>
+                <span className="stat__number"><CountUp text={s.number} /></span>
                 <span className="stat__label">{s.label}</span>
               </div>
             ))}
