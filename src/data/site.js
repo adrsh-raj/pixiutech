@@ -11,7 +11,7 @@ export const NAV = [
 export const STATS = [
   { number: '1', label: 'Partner School', icon: '🏫' },
   { number: '5+', label: 'Workshops Delivered', icon: '🔧' },
-  { number: '500+', label: 'Students Influenced', icon: '👩‍🎓' },
+  { number: '1000+', label: 'Students Influenced', icon: '👩‍🎓' },
 ]
 
 export const SOLUTIONS = [
