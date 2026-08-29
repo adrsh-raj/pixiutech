@@ -19,7 +19,7 @@ export default function Footer() {
           <div className="foot__links-group">
             <h4>Quick Links</h4>
             <nav className="foot__nav-col" aria-label="Footer">
-              {NAV.map((n) => (
+              {NAV.filter((n) => n.to !== '/contact').map((n) => (
                 <Link key={n.to} to={n.to}>{n.label}</Link>
               ))}
             </nav>
@@ -28,7 +28,7 @@ export default function Footer() {
           <div className="foot__links-group">
             <h4>Connect</h4>
             <nav className="foot__nav-col">
-              <a href="https://wa.me/917985403186" target="_blank" rel="noreferrer">WhatsApp</a>
+              <Link to="/contact">Contact Us</Link>
               <a href="mailto:director@pixiutech.com">Email Us</a>
               <Link to="/careers">Careers</Link>
             </nav>

@@ -1,10 +1,23 @@
-import { Link } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import PageHead from '../components/PageHead.jsx'
 import Reveal from '../components/Reveal.jsx'
 import CTAStrip from '../components/CTAStrip.jsx'
 import { SOLUTIONS } from '../data/site.js'
 
 export default function Solutions() {
+  const { hash } = useLocation()
+
+  // Scroll to the section matching the hash
+  useEffect(() => {
+    if (hash) {
+      setTimeout(() => {
+        const el = document.querySelector(hash)
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 100)
+    }
+  }, [hash])
+
   return (
     <>
       <PageHead
@@ -15,7 +28,7 @@ export default function Solutions() {
 
       {/* ==================== SOLUTION DEEP DIVES ==================== */}
       {SOLUTIONS.map((s, i) => (
-        <section className={`band ${i % 2 === 0 ? 'band--gray' : ''}`} key={s.id}>
+        <section className={`band ${i % 2 === 0 ? 'band--gray' : ''}`} key={s.id} id={s.id}>
           <div className="shell">
             <Reveal>
               <div className={`sol-detail ${i % 2 !== 0 ? 'sol-detail--reverse' : ''}`}>

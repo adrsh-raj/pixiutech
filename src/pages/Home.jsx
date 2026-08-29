@@ -54,8 +54,8 @@ export default function Home() {
       <section className="band">
         <div className="shell">
           <Reveal>
-            <p className="eyebrow">What We Offer</p>
-            <h2 className="h-sect">Six Domains. One Innovation Lab.</h2>
+            <p className="eyebrow">Comprehensive Tech Domains</p>
+            <h2 className="h-sect">One Managed Ecosystem. Six Innovation Domains.</h2>
             <p className="lede">
               From robotics and AI to drones and 3D printing — we cover every domain your school needs to deliver future-ready education.
             </p>
@@ -64,7 +64,7 @@ export default function Home() {
           <Reveal delay={80}>
             <div className="solutions-grid">
               {SOLUTIONS.map((s) => (
-                <Link to="/solutions" className="sol-card" key={s.id}>
+                <Link to={`/solutions#${s.id}`} className="sol-card" key={s.id}>
                   <div className="sol-card__img">
                     <img src={s.img} alt={s.title} loading="lazy" />
                   </div>
@@ -104,7 +104,7 @@ export default function Home() {
         <div className="shell">
           <Reveal>
             <p className="eyebrow">How It Works</p>
-            <h2 className="h-sect">From Empty Room to Running Lab in 4 Steps</h2>
+            <h2 className="h-sect">Deploying Your Innovation Hub in 4 Seamless Steps</h2>
           </Reveal>
           <Reveal delay={80}>
             <div className="process-grid">
@@ -132,7 +132,7 @@ export default function Home() {
           <Reveal delay={80}>
             <div>
               <p className="eyebrow">Teacher Training</p>
-              <h2 className="h-sect">We Train Your Teachers Too</h2>
+              <h2 className="h-sect">Empowering Your Teacher Faculty</h2>
               <p className="lede">
                 Our instructors don't just teach students — they upskill your existing faculty. By the end of the year, your teachers can independently run STEM sessions.
               </p>
@@ -156,7 +156,7 @@ export default function Home() {
         <div className="shell">
           <Reveal>
             <p className="eyebrow">Why Pixiu Tech</p>
-            <h2 className="h-sect">Built to Be Used, Not Just Installed.</h2>
+            <h2 className="h-sect">The Premium Corporate Approach — Engineered for Action, Not Just Exhibition.</h2>
           </Reveal>
           <Reveal delay={80}>
             <div className="why-v2">

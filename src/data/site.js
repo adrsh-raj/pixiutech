@@ -59,9 +59,9 @@ export const SOLUTIONS = [
     id: 'custom',
     title: 'Custom School Solutions',
     short: 'Your school, your lab, your way.',
-    desc: 'Every school is different. We design custom lab configurations, select hardware to match your budget, and build curriculum around your academic calendar and board requirements.',
+    desc: 'Every school is different — different budgets, different spaces, different boards, different goals. We sit with your management to understand exactly what your school needs and design a fully customised solution around it. Whether you want a small robotics corner for primary classes or a full-scale innovation lab for senior students, we tailor the hardware, curriculum, session frequency, and instructor deployment to match your specific requirements and academic calendar.',
     img: '/img/workshop_action.jpg',
-    features: ['Board-aligned curriculum', 'Budget flexibility', 'Space planning', 'Custom kit selection'],
+    features: ['Tailored to your board (CBSE / ICSE / State)', 'Budget-flexible lab configurations', 'Custom curriculum mapped to your academic calendar', 'Choose domains — mix Robotics, AI, IoT, Drones as needed', 'Space planning for any room size'],
   },
 ]
 
