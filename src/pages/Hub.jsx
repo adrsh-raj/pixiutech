@@ -77,11 +77,12 @@ export default function Hub() {
                 </div>
               </div>
 
-              <div style={{ marginTop: '2rem', padding: '1.5rem', background: '#eef4ff', borderRadius: '8px', border: '1px solid #cce0ff', textAlign: 'center' }}>
-                <h3 style={{ marginBottom: '0.5rem', color: '#1D6EFF', fontSize: '1.1rem' }}>Order Your Kit</h3>
-                <p style={{ fontSize: '0.9rem', marginBottom: '1rem', color: '#555' }}>Get the official robotics kit delivered directly to your home.</p>
-                <a href="https://wa.me/917985403186" target="_blank" rel="noreferrer" className="btn btn--primary" style={{ width: '100%', padding: '0.6rem' }}>
-                  Buy via WhatsApp
+              <div style={{ marginTop: '2rem', padding: '1.5rem', background: '#e0f7e9', borderRadius: '12px', border: '1px solid #a7dfb8', textAlign: 'center' }}>
+                <h3 style={{ marginBottom: '0.25rem', color: '#25D366', fontSize: '1.1rem' }}>🛒 Order Your Kit</h3>
+                <p style={{ fontSize: '0.8rem', fontWeight: '600', color: '#1a7a3a', marginBottom: '0.75rem' }}>At the most affordable price — built for students!</p>
+                <p style={{ fontSize: '0.85rem', marginBottom: '1rem', color: '#555' }}>Get the official Pixiu robotics kit delivered directly to your home. Everything you need to build, code, and innovate.</p>
+                <a href="https://wa.me/917985403186?text=Hi%2C%20I%20want%20to%20order%20a%20student%20robotics%20kit" target="_blank" rel="noreferrer" className="btn btn--primary" style={{ width: '100%', padding: '0.6rem', background: '#25D366', borderColor: '#25D366' }}>
+                  Order on WhatsApp
                 </a>
               </div>
             </Reveal>

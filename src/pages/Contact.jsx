@@ -42,14 +42,6 @@ export default function Contact() {
                 <span>Less than 24 hours</span>
               </div>
             </div>
-
-            <div style={{ marginTop: '2rem', padding: '1.5rem', background: '#e0f7e9', borderRadius: '12px', border: '1px solid #a7dfb8' }}>
-              <strong style={{ display: 'block', marginBottom: '0.5rem', color: '#25D366', fontSize: '1.1rem' }}>🛒 Order Student Kits</strong>
-              <p style={{ fontSize: '0.95rem', color: '#333', marginBottom: '0.75rem' }}>Get the official Pixiu robotics kit delivered to your home.</p>
-              <a href="https://wa.me/917985403186?text=Hi%2C%20I%20want%20to%20order%20a%20student%20robotics%20kit" target="_blank" rel="noreferrer" className="btn btn--primary" style={{ background: '#25D366', borderColor: '#25D366' }}>
-                Order on WhatsApp
-              </a>
-            </div>
           </Reveal>
 
           <Reveal delay={80}>
