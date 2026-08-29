@@ -1,4 +1,5 @@
-import { useSearchParams } from 'react-router-dom'
+import { useEffect } from 'react'
+import { useSearchParams, useLocation } from 'react-router-dom'
 import PageHead from '../components/PageHead.jsx'
 import Reveal from '../components/Reveal.jsx'
 import EnquiryForm from '../components/EnquiryForm.jsx'
@@ -6,6 +7,16 @@ import EnquiryForm from '../components/EnquiryForm.jsx'
 export default function Contact() {
   const [params] = useSearchParams()
   const intent = params.get('intent')
+  const { hash } = useLocation()
+
+  useEffect(() => {
+    if (hash) {
+      setTimeout(() => {
+        const el = document.querySelector(hash)
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 100)
+    }
+  }, [hash])
 
   return (
     <>
@@ -15,7 +26,7 @@ export default function Contact() {
         intro="Tell us about your school. We'll come back with a custom plan and proposal."
       />
 
-      <section className="band band--gray">
+      <section className="band band--gray" id="enquiry">
         <div className="shell contact__grid">
           <Reveal>
             <p className="eyebrow">Get In Touch</p>

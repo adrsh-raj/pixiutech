@@ -28,7 +28,7 @@ export default function Footer() {
           <div className="foot__links-group">
             <h4>Connect</h4>
             <nav className="foot__nav-col">
-              <Link to="/contact">Contact Us</Link>
+              <Link to="/contact#enquiry">Contact Us</Link>
               <a href="mailto:director@pixiutech.com">Email Us</a>
               <Link to="/careers">Careers</Link>
             </nav>

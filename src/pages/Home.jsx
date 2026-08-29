@@ -132,7 +132,7 @@ export default function Home() {
           <Reveal delay={80}>
             <div>
               <p className="eyebrow">Teacher Training</p>
-              <h2 className="h-sect">Empowering Your Teacher Faculty</h2>
+              <h2 className="h-sect">Empowering Your Teaching Faculty</h2>
               <p className="lede">
                 Our instructors don't just teach students — they upskill your existing faculty. By the end of the year, your teachers can independently run STEM sessions.
               </p>

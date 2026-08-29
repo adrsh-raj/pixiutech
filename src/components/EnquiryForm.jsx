@@ -1,7 +1,7 @@
 import { useState } from 'react'
 
 const FIELDS = [
-  { id: 'school', label: 'School name', ph: "e.g. St. Xavier's Senior Secondary School", wide: true, req: true },
+  { id: 'school', label: 'School name', ph: 'e.g. XYZ Academy', wide: true, req: true },
   { id: 'person', label: 'Contact person', ph: 'Full name', req: true, autoComplete: 'name' },
   { id: 'phone', label: 'Phone', ph: '+91', req: true, type: 'tel', autoComplete: 'tel' },
   { id: 'email', label: 'Email', ph: 'name@school.edu.in', req: true, type: 'email', autoComplete: 'email' },
