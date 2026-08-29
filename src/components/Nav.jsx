@@ -19,8 +19,7 @@ export default function Nav() {
     <header className={`nav ${scrolled ? 'nav--scrolled' : ''}`}>
       <div className="shell nav__in">
         <Link className="brand" to="/">
-          <span className="brand__mark">PIXIU TECH</span>
-          <span className="brand__tag">STEM · Robotics · AI</span>
+          <img className="brand__logo" src="/img/logo.png" alt="Pixiu Tech" />
         </Link>
 
         <nav className="nav__links" aria-label="Primary">
