@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import PageHead from '../components/PageHead.jsx'
 import Reveal from '../components/Reveal.jsx'
 import { GRADES, MATERIALS } from '../data/materials.js'
 
@@ -36,11 +35,15 @@ export default function Hub() {
 
   return (
     <div className="hub-page">
-      <PageHead
-        crumb="Resource library"
-        title="Curriculum & Mission Materials"
-        intro="Access class-wise study materials, mission bundles, and teacher packs. Filter by grade and format."
-      />
+      <div style={{ background: '#0A1A33', color: '#fff', padding: '2.5rem 0 2rem' }}>
+        <div className="shell">
+          <h1 style={{ fontSize: '1.75rem', margin: '0 0 0.5rem 0', fontWeight: '600' }}>Resource Portal</h1>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.1)', padding: '6px 14px', borderRadius: '30px', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: role === 'student' ? '#25D366' : '#C9A227' }}></span>
+            <span style={{ fontSize: '0.9rem', color: '#e2e8f0' }}>Logged in as <strong>{role === 'student' ? 'Student' : 'Trainer'}</strong></span>
+          </div>
+        </div>
+      </div>
 
       <section className="band" style={{ paddingTop: '2rem' }}>
         <div className="shell hub-container">
