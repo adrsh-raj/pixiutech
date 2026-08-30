@@ -126,34 +126,40 @@ export default function Hub() {
                         {grade.name} <span>{grade.desc}</span>
                       </h2>
 
-                      {gradeMaterials.map(m => (
-                        <article className="hub-card" key={m.id}>
-                          <div className={`hub-card-icon ${m.format}`}>
-                            {m.format.toUpperCase()}
-                          </div>
-                          
-                          <div className="hub-card-body">
-                            <h3 className="hub-card-title">{m.title}</h3>
-                            <div className="hub-card-meta">{m.meta}</div>
-                            <div className="hub-card-desc">{m.desc}</div>
-                          </div>
+                      {gradeMaterials.map(m => {
+                        const finalUrl = (role === 'teacher' && m.url) 
+                          ? m.url.replace('-student-watermarked.pdf', '-teacher.pdf') 
+                          : m.url;
 
-                          <div className="hub-card-actions">
-                            {!m.uploaded ? (
-                              <span className="hub-pill-missing">file not uploaded yet</span>
-                            ) : (
-                              <>
-                                <a href={m.url} target="_blank" rel="noreferrer" className="btn btn--outline" style={{ padding: '8px 16px' }}>
-                                  Open
-                                </a>
-                                <a href={m.url} target="_blank" rel="noreferrer" download className="btn btn--primary" style={{ padding: '8px 16px' }}>
-                                  Download
-                                </a>
-                              </>
-                            )}
-                          </div>
-                        </article>
-                      ))}
+                        return (
+                          <article className="hub-card" key={m.id}>
+                            <div className={`hub-card-icon ${m.format}`}>
+                              {m.format.toUpperCase()}
+                            </div>
+                            
+                            <div className="hub-card-body">
+                              <h3 className="hub-card-title">{m.title}</h3>
+                              <div className="hub-card-meta">{m.meta}</div>
+                              <div className="hub-card-desc">{m.desc}</div>
+                            </div>
+
+                            <div className="hub-card-actions">
+                              {!m.uploaded ? (
+                                <span className="hub-pill-missing">file not uploaded yet</span>
+                              ) : (
+                                <>
+                                  <a href={finalUrl} target="_blank" rel="noreferrer" className="btn btn--outline" style={{ padding: '8px 16px' }}>
+                                    Open
+                                  </a>
+                                  <a href={finalUrl} target="_blank" rel="noreferrer" download className="btn btn--primary" style={{ padding: '8px 16px' }}>
+                                    Download
+                                  </a>
+                                </>
+                              )}
+                            </div>
+                          </article>
+                        );
+                      })}
                     </div>
                   )
                 })
