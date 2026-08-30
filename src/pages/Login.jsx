@@ -3,6 +3,13 @@ import { useNavigate } from 'react-router-dom'
 import PageHead from '../components/PageHead.jsx'
 import Reveal from '../components/Reveal.jsx'
 
+async function hashText(text) {
+  const msgBuffer = new TextEncoder().encode(text);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 export default function Login() {
   const [studentId, setStudentId] = useState('')
   const [studentPwd, setStudentPwd] = useState('')
@@ -13,9 +20,10 @@ export default function Login() {
   const [error, setError] = useState('')
   const navigate = useNavigate()
 
-  const handleStudentLogin = (e) => {
+  const handleStudentLogin = async (e) => {
     e.preventDefault()
-    if (studentId === 'ZPS' && studentPwd === 'ZPSzenith@hata') {
+    const pwdHash = await hashText(studentPwd)
+    if (studentId === 'ZPS' && pwdHash === '09e4ad0cc22dc74036adadc2ccefd59e83cb8e17f98adae03c0e9515ec5e773f') {
       localStorage.setItem('hub_authenticated', 'true')
       localStorage.setItem('hub_role', 'student')
       navigate('/hub')
@@ -24,9 +32,14 @@ export default function Login() {
     }
   }
 
-  const handleTeacherLogin = (e) => {
+  const handleTeacherLogin = async (e) => {
     e.preventDefault()
-    if (teacherId === 'adarshraj' && (teacherPwd === 'Adarsg@123' || teacherPwd === '[Adarsg@123]')) {
+    const pwdHash = await hashText(teacherPwd)
+    const validHashes = [
+      '89170eaf160f4e77ed7d85be58c87c1c47dc82f4b34b7175938be392faa4268b',
+      'b0a7e1f40f58c51a0c87445a2b4ac470422feaf295e281e73ed360ee99dc5951'
+    ]
+    if (teacherId === 'adarshraj' && validHashes.includes(pwdHash)) {
       localStorage.setItem('hub_authenticated', 'true')
       localStorage.setItem('hub_role', 'teacher')
       navigate('/hub')
