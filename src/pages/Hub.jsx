@@ -91,20 +91,21 @@ export default function Hub() {
 
           {/* Main Content Area */}
           <main className="hub-main">
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '2rem' }}>
+              <button 
+                className="btn btn--outline" 
+                onClick={() => {
+                  localStorage.removeItem('hub_authenticated');
+                  localStorage.removeItem('hub_role');
+                  navigate('/login');
+                }}
+                style={{ fontSize: '0.9rem', color: '#cc0000', borderColor: '#cc0000', padding: '6px 16px' }}
+              >
+                Logout
+              </button>
+            </div>
+            
             <Reveal>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '2rem' }}>
-                <button 
-                  className="btn btn--outline" 
-                  onClick={() => {
-                    localStorage.removeItem('hub_authenticated');
-                    localStorage.removeItem('hub_role');
-                    navigate('/login');
-                  }}
-                  style={{ fontSize: '0.9rem', color: '#cc0000', borderColor: '#cc0000', padding: '6px 16px' }}
-                >
-                  Logout
-                </button>
-              </div>
 
               {filtered.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '4rem', background: '#fff', borderRadius: '12px', border: '1px solid #ddd' }}>
