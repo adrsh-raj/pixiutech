@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 560" width="900" height="560" role="img" aria-label="CURRICULUM / STAGE PROGRESSION">
+<defs><pattern id="g" width="30" height="30" patternUnits="userSpaceOnUse">
+<path d="M30 0H0V30" fill="none" stroke="#0A1A33" stroke-width=".6" opacity=".08"/></pattern></defs>
+<rect width="900" height="560" fill="#F3F6FA"/><rect width="900" height="560" fill="url(#g)"/>
+<g fill="none" stroke="#57697F" stroke-width="1.2" opacity=".7">
+<path d="M28 28h26M28 28v26M872 28h-26M872 28v26M28 532h26M28 532v-26M872 532h-26M872 532v-26"/></g>
+
+<g fill="none" stroke="#1D6EFF" stroke-width="1.5">
+<rect x="120" y="360" width="120" height="90"/><rect x="268" y="316" width="120" height="134"/>
+<rect x="416" y="272" width="120" height="178"/><rect x="564" y="228" width="120" height="222"/></g>
+<g fill="none" stroke="#0A1A33" stroke-width="1.8"><rect x="712" y="176" width="120" height="274"/></g>
+<g fill="none" stroke="#0A1A33" stroke-width="1.2" opacity=".55" stroke-dasharray="6 6">
+<path d="M120 470h712M120 462v16M832 462v16"/></g>
+<g fill="none" stroke="#1D6EFF" stroke-width="1.2" opacity=".6"><path d="M180 340l88-44M328 296l88-44M476 252l88-44M624 208l88-44"/></g>
+<g fill="#57697F" font-family="IBM Plex Mono, monospace" font-size="11" letter-spacing="1.8">
+<text x="122" y="344">01 FOUNDATION</text><text x="270" y="300">02 EXPLORATION</text><text x="418" y="256">03 ENGINEERING</text>
+<text x="566" y="212">04 TECHNOLOGY</text><text x="714" y="160" fill="#0A1A33">05 INNOVATION</text>
+<text x="120" y="502">AGE &amp; GRADE →</text></g>
+<g fill="#C9A227"><circle cx="772" cy="140" r="6"/></g>
+<text x="46" y="518" fill="#57697F" font-family="IBM Plex Mono, monospace" font-size="12" letter-spacing="2.4">CURRICULUM / STAGE PROGRESSION</text>
+<text x="854" y="518" fill="#57697F" font-family="IBM Plex Mono, monospace" font-size="12" letter-spacing="2.4" text-anchor="end">PIXIU TECH</text>
+</svg>

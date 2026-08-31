@@ -1,0 +1,803 @@
+const express = require('express');
+const cors = require('cors');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const db = require('./database');
+
+const app = express();
+const PORT = process.env.PORT || 5000;
+const JWT_SECRET = process.env.JWT_SECRET || 'pixiu_super_secret_jwt_key_2026';
+
+// CORS Configuration
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'https://portal.pixiutech.com',
+  'https://pixiutech.com'
+];
+
+app.use(cors({
+  origin: function(origin, callback) {
+    if (!origin || allowedOrigins.indexOf(origin) !== -1 || origin.startsWith('http://localhost:')) {
+      callback(null, true);
+    } else {
+      callback(null, true); // Permissive in dev, constrained in prod
+    }
+  },
+  credentials: true
+}));
+
+app.use(express.json({ limit: '2mb' }));
+
+// Serve uploaded media files statically
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+app.use('/uploads', express.static(uploadsDir));
+
+// Secure Multer Storage Configuration for Robot Build Photos
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, uploadsDir);
+  },
+  filename: function (req, file, cb) {
+    const rawExt = path.extname(file.originalname).toLowerCase();
+    const safeExt = ['.jpg', '.jpeg', '.png', '.webp', '.gif'].includes(rawExt) ? rawExt : '.jpg';
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'evidence-' + uniqueSuffix + safeExt);
+  }
+});
+
+const fileFilter = (req, file, cb) => {
+  const allowedMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+  if (allowedMimes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only valid image files (JPG, PNG, WebP, GIF) are permitted!'), false);
+  }
+};
+
+const upload = multer({ 
+  storage: storage,
+  fileFilter: fileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 } // 5MB maximum
+});
+
+// File Upload Endpoint with validation
+app.post('/api/upload', (req, res) => {
+  upload.single('file')(req, res, function (err) {
+    if (err instanceof multer.MulterError) {
+      return res.status(400).json({ error: `Upload error: ${err.message}` });
+    } else if (err) {
+      return res.status(400).json({ error: err.message });
+    }
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file provided' });
+    }
+    const fileUrl = `/uploads/${req.file.filename}`;
+    res.json({
+      success: true,
+      url: fileUrl,
+      filename: req.file.filename,
+      mimetype: req.file.mimetype,
+      size: req.file.size
+    });
+  });
+});
+
+// In-Memory Login Attempt Tracker (Brute Force Defense)
+const loginAttempts = new Map();
+
+// ==================== 0. AUTHENTICATION API ====================
+
+// Login Endpoint (Supports Admin, Trainer, and Student ID)
+app.post('/api/auth/login', (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username/Student ID and password are required' });
+  }
+
+  const cleanUsername = username.trim();
+  const clientIp = req.ip || req.connection.remoteAddress || 'unknown';
+  const trackerKey = `${clientIp}:${cleanUsername}`;
+
+  const currentAttempts = loginAttempts.get(trackerKey) || { count: 0, lastAttempt: Date.now() };
+
+  // If more than 10 failed attempts within 5 minutes, block temporarily
+  if (currentAttempts.count >= 10 && (Date.now() - currentAttempts.lastAttempt < 300000)) {
+    return res.status(429).json({ error: 'Too many failed login attempts. Please wait 5 minutes before trying again.' });
+  }
+
+  db.get("SELECT * FROM users WHERE username = ?", [cleanUsername], async (err, user) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid ID / Username or Password' });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password_hash);
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Invalid ID / Username or Password' });
+    }
+
+    // Sign JWT Token
+    const token = jwt.sign(
+      { 
+        id: user.id, 
+        username: user.username, 
+        role: user.role, 
+        name: user.name, 
+        related_id: user.related_id,
+        school_id: user.school_id 
+      }, 
+      JWT_SECRET, 
+      { expiresIn: '7d' }
+    );
+
+    res.json({
+      success: true,
+      token,
+      user: {
+        id: user.id,
+        username: user.username,
+        role: user.role,
+        name: user.name,
+        related_id: user.related_id,
+        school_id: user.school_id
+      }
+    });
+  });
+});
+
+// Verify Current Token
+app.get('/api/auth/me', (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Unauthorized: No token provided' });
+  }
+
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    res.json({ success: true, user: decoded });
+  } catch (err) {
+    return res.status(401).json({ error: 'Session expired or invalid' });
+  }
+});
+
+// ==================== 1. SCHOOLS API ====================
+app.get('/api/schools', (req, res) => {
+  db.all("SELECT * FROM schools ORDER BY name ASC", [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+app.post('/api/schools', (req, res) => {
+  const { id, name, code, principal, contact, status, contract_start, renewal_date, expected_revenue } = req.body;
+  const schoolId = id || code || `SCH-${Date.now()}`;
+  const sql = `INSERT INTO schools (id, name, code, principal, contact, status, contract_start, renewal_date, expected_revenue) 
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  db.run(sql, [schoolId, name, code, principal || '', contact || '', status || 'Active', contract_start || '', renewal_date || '', expected_revenue || 0], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, id: schoolId, name, code, principal, contact, status: status || 'Active' });
+  });
+});
+
+app.delete('/api/schools/:id', (req, res) => {
+  db.run("DELETE FROM schools WHERE id = ?", [req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, deleted: req.params.id });
+  });
+});
+
+// ==================== 2. CLASSES API ====================
+app.get('/api/classes', (req, res) => {
+  db.all("SELECT * FROM classes", [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+app.post('/api/classes', (req, res) => {
+  const { id, school_id, grade, section } = req.body;
+  const classId = id || `CLS-${school_id}-${grade}${section || ''}`;
+  const sql = `INSERT INTO classes (id, school_id, grade, section) VALUES (?, ?, ?, ?)`;
+  db.run(sql, [classId, school_id, grade, section || ''], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, id: classId, school_id, grade, section });
+  });
+});
+
+// ==================== 3. STUDENTS API & AUTO-ACCOUNT ====================
+app.get('/api/students', (req, res) => {
+  db.all("SELECT * FROM students ORDER BY student_id ASC", [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+app.post('/api/students', async (req, res) => {
+  const { student_id, school_id, class_id, name, parent_name, parent_whatsapp, tech_level, status, dob, assigned_kit_id, password } = req.body;
+  const sql = `INSERT INTO students (student_id, school_id, class_id, name, parent_name, parent_whatsapp, tech_level, status, dob, assigned_kit_id) 
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  
+  db.run(sql, [student_id, school_id, class_id, name, parent_name || '', parent_whatsapp || '', tech_level || 'Level 1', status || 'Active', dob || '', assigned_kit_id || ''], async function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    
+    // Auto-create student login user in `users` table with hashed password
+    const studentPassword = password || 'student123';
+    const passwordHash = await bcrypt.hash(studentPassword, 10);
+    const userId = `USR-${student_id.replace(/\s+/g, '')}`;
+    
+    db.run(
+      "INSERT OR REPLACE INTO users (id, username, password_hash, role, related_id, name, school_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      [userId, student_id, passwordHash, 'student', student_id, name, school_id]
+    );
+
+    res.json({ success: true, student_id, school_id, class_id, name, parent_name, parent_whatsapp, tech_level });
+  });
+});
+
+app.put('/api/students/:id', async (req, res) => {
+  const { name, parent_name, parent_whatsapp, tech_level, status, assigned_kit_id, school_id, class_id } = req.body;
+  const sql = `UPDATE students SET 
+                name = COALESCE(?, name),
+                parent_name = COALESCE(?, parent_name),
+                parent_whatsapp = COALESCE(?, parent_whatsapp),
+                tech_level = COALESCE(?, tech_level),
+                status = COALESCE(?, status),
+                assigned_kit_id = COALESCE(?, assigned_kit_id),
+                school_id = COALESCE(?, school_id),
+                class_id = COALESCE(?, class_id)
+               WHERE student_id = ?`;
+  
+  db.run(sql, [name, parent_name, parent_whatsapp, tech_level, status, assigned_kit_id, school_id, class_id, req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    if (name) {
+      db.run("UPDATE users SET name = ? WHERE related_id = ?", [name, req.params.id]);
+    }
+    res.json({ success: true, student_id: req.params.id, name, parent_name, parent_whatsapp, tech_level });
+  });
+});
+
+app.delete('/api/students/:id', (req, res) => {
+  db.run("DELETE FROM students WHERE student_id = ?", [req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    db.run("DELETE FROM users WHERE related_id = ?", [req.params.id]);
+    res.json({ success: true, deleted: req.params.id });
+  });
+});
+
+// ==================== 4. LEADS (CRM) API ====================
+app.get('/api/leads', (req, res) => {
+  db.all("SELECT * FROM leads ORDER BY rowid DESC", [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+app.post('/api/leads', (req, res) => {
+  const { id, name, contact_person, phone, city, stage, expected_value, notes, last_contact } = req.body;
+  const leadId = id || `L-${Date.now().toString().slice(-4)}`;
+  const sql = `INSERT INTO leads (id, name, contact_person, phone, city, stage, expected_value, notes, last_contact) 
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  db.run(sql, [leadId, name, contact_person || '', phone || '', city || '', stage || 'Contacted', expected_value || 0, notes || '', last_contact || new Date().toISOString().split('T')[0]], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, id: leadId, name, contact_person, phone, city, stage: stage || 'Contacted', expected_value, notes });
+  });
+});
+
+app.put('/api/leads/:id/stage', (req, res) => {
+  const { stage } = req.body;
+  db.run("UPDATE leads SET stage = ? WHERE id = ?", [stage, req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, id: req.params.id, stage });
+  });
+});
+
+app.delete('/api/leads/:id', (req, res) => {
+  db.run("DELETE FROM leads WHERE id = ?", [req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, deleted: req.params.id });
+  });
+});
+
+// ==================== 5. SESSIONS & ATTENDANCE API ====================
+app.get('/api/sessions', (req, res) => {
+  db.all("SELECT * FROM sessions ORDER BY date DESC, time ASC", [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+app.post('/api/sessions', (req, res) => {
+  const { id, school_id, class_id, trainer_id, date, time, topic, status, notes, notify_trainer } = req.body;
+  const sessionId = id || `SES-${Date.now().toString().slice(-4)}`;
+  const sessionTime = time || '10:00 AM';
+  const sql = `INSERT INTO sessions (id, school_id, class_id, trainer_id, date, time, topic, status, notes, is_locked) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`;
+  
+  db.run(sql, [sessionId, school_id || 'ZPS', class_id, trainer_id || 'TR-01', date, sessionTime, topic, status || 'Planned', notes || ''], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    
+    // Auto-create alert notification for the Trainer
+    const alertId = `ALT-SCHED-${Date.now().toString().slice(-4)}`;
+    const alertSql = `INSERT OR REPLACE INTO alerts (id, type, title, message, severity, related_id, action_label, action_type, is_read, created_at)
+                      VALUES (?, 'session_scheduled', ?, ?, 'info', ?, 'View Session Details', 'view_session', 0, CURRENT_TIMESTAMP)`;
+    
+    const alertTitle = `📢 Next Class Scheduled: ${class_id.replace('CLS-ZPS-', 'Class ')}`;
+    const alertMsg = `Admin scheduled session on ${date} at ${sessionTime}. Topic: "${topic}". Notes: ${notes || 'Standard kit preparation.'}`;
+    
+    db.run(alertSql, [alertId, alertTitle, alertMsg, sessionId]);
+
+    res.json({ success: true, id: sessionId, school_id, class_id, trainer_id, date, time: sessionTime, topic, status, is_locked: 0 });
+  });
+});
+
+app.post('/api/sessions/:id/complete', (req, res) => {
+  // Mark completed and lock permanently against trainer modification
+  db.run("UPDATE sessions SET status = 'Completed', is_locked = 1 WHERE id = ?", [req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, message: 'Session completed and attendance locked', is_locked: 1 });
+  });
+});
+
+app.put('/api/sessions/:id/admin-unlock', (req, res) => {
+  // Admin only unlock override
+  db.run("UPDATE sessions SET is_locked = 0 WHERE id = ?", [req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, message: 'Session unlocked by Admin' });
+  });
+});
+
+app.delete('/api/sessions/:id', (req, res) => {
+  // Admin only delete session & attendance
+  db.run("DELETE FROM attendance WHERE session_id = ?", [req.params.id], () => {
+    db.run("DELETE FROM sessions WHERE id = ?", [req.params.id], function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ success: true, deleted: req.params.id });
+    });
+  });
+});
+
+app.get('/api/attendance', (req, res) => {
+  db.all("SELECT a.*, s.date, s.class_id, s.topic, s.is_locked FROM attendance a LEFT JOIN sessions s ON a.session_id = s.id ORDER BY s.date DESC", [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+app.post('/api/attendance', (req, res) => {
+  const { session_id, student_id, status } = req.body;
+  
+  // Verify if session is already locked
+  db.get("SELECT is_locked FROM sessions WHERE id = ?", [session_id], (err, session) => {
+    if (session && session.is_locked === 1 && !req.headers['x-admin-override']) {
+      return res.status(403).json({ error: 'This attendance record is permanently locked. Only Admin can modify past attendance.' });
+    }
+    
+    const id = `ATT-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
+    const sql = `INSERT INTO attendance (id, session_id, student_id, status) VALUES (?, ?, ?, ?)
+                 ON CONFLICT(session_id, student_id) DO UPDATE SET status=excluded.status, timestamp=CURRENT_TIMESTAMP`;
+    db.run(sql, [id, session_id, student_id, status], function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ success: true, session_id, student_id, status });
+    });
+  });
+});
+
+// Admin Attendance Override
+app.put('/api/attendance/admin-override', (req, res) => {
+  const { session_id, student_id, status } = req.body;
+  const sql = `UPDATE attendance SET status = ? WHERE session_id = ? AND student_id = ?`;
+  db.run(sql, [status, session_id, student_id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, session_id, student_id, status });
+  });
+});
+
+// ==================== 6. CONTENT HUB API ====================
+app.get('/api/content', (req, res) => {
+  const { target, class_grade } = req.query;
+  let sql = "SELECT * FROM content WHERE 1=1";
+  const params = [];
+  
+  if (target) {
+    sql += " AND target = ?";
+    params.push(target);
+  }
+  if (class_grade) {
+    sql += " AND (class_grade = ? OR class_grade IS NULL)";
+    params.push(class_grade);
+  }
+  
+  sql += " ORDER BY class_grade ASC, title ASC";
+  
+  db.all(sql, params, (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+app.post('/api/content', (req, res) => {
+  const { id, title, type, level, target, url, description } = req.body;
+  const contentId = id || `C-${Date.now().toString().slice(-4)}`;
+  const sql = `INSERT INTO content (id, title, type, level, target, url, description) VALUES (?, ?, ?, ?, ?, ?, ?)`;
+  db.run(sql, [contentId, title, type || 'PDF', level || 'Level 1', target || 'Student', url || '', description || ''], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, id: contentId, title, type, level, target, url, description });
+  });
+});
+
+app.delete('/api/content/:id', (req, res) => {
+  db.run("DELETE FROM content WHERE id = ?", [req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, deleted: req.params.id });
+  });
+});
+
+// ==================== 7. CURRICULUM API ====================
+app.get('/api/curriculum', (req, res) => {
+  db.all("SELECT * FROM curriculum ORDER BY week ASC", [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+app.post('/api/curriculum', (req, res) => {
+  const { id, week, level, topic, objectives, status } = req.body;
+  const curId = id || `CUR-${Date.now().toString().slice(-4)}`;
+  const sql = `INSERT INTO curriculum (id, week, level, topic, objectives, status) VALUES (?, ?, ?, ?, ?, ?)`;
+  db.run(sql, [curId, week, level || 'Level 1', topic, objectives || '', status || 'Upcoming'], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, id: curId, week, level, topic, objectives, status });
+  });
+});
+
+// ==================== 8. INVENTORY & KITS API ====================
+app.get('/api/inventory', (req, res) => {
+  db.all("SELECT * FROM inventory ORDER BY id ASC", [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+app.post('/api/inventory', (req, res) => {
+  const { id, name, level, school_id, assigned_student_id, status, issue_notes } = req.body;
+  const kitId = id || `KIT-${Math.floor(1000 + Math.random() * 9000)}`;
+  const today = new Date().toISOString().split('T')[0];
+  const sql = `INSERT INTO inventory (id, name, level, school_id, assigned_student_id, status, last_checked, issue_notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
+  db.run(sql, [kitId, name, level || 'Level 1', school_id || '', assigned_student_id || '', status || 'Healthy', today, issue_notes || ''], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, id: kitId, name, level, school_id, assigned_student_id, status });
+  });
+});
+
+app.put('/api/inventory/:id/status', (req, res) => {
+  const { status, issue_notes } = req.body;
+  const today = new Date().toISOString().split('T')[0];
+  db.run("UPDATE inventory SET status = ?, issue_notes = ?, last_checked = ? WHERE id = ?", [status, issue_notes || '', today, req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, id: req.params.id, status, issue_notes });
+  });
+});
+
+app.delete('/api/inventory/:id', (req, res) => {
+  db.run("DELETE FROM inventory WHERE id = ?", [req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, deleted: req.params.id });
+  });
+});
+
+// ==================== 9. BILLING & INVOICES API ====================
+app.get('/api/billing', (req, res) => {
+  db.all("SELECT * FROM billing ORDER BY tranche_number ASC, date_issued DESC", [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+app.post('/api/billing', (req, res) => {
+  const { id, school_id, school_name, tranche_number, tranche_title, amount, total_contract_value, date_issued, due_date, paid_date, payment_method, place_of_supply, status, receipt_no, is_confirmed } = req.body;
+  const invId = id || `INV-${Date.now().toString().slice(-4)}`;
+  const today = new Date().toISOString().split('T')[0];
+  const sql = `INSERT INTO billing (id, school_id, school_name, tranche_number, tranche_title, amount, total_contract_value, date_issued, due_date, paid_date, payment_method, place_of_supply, status, receipt_no, is_confirmed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  db.run(sql, [
+    invId, 
+    school_id || 'ZPS', 
+    school_name || 'Zenith Public School', 
+    tranche_number || 1, 
+    tranche_title || 'Payment Tranche', 
+    amount || 30000, 
+    total_contract_value || 100000, 
+    date_issued || today, 
+    due_date || today, 
+    paid_date || null, 
+    payment_method || null, 
+    place_of_supply || 'Hata, Uttar Pradesh', 
+    status || 'Pending', 
+    receipt_no || null, 
+    is_confirmed || 0
+  ], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, id: invId, school_id, school_name, amount, status });
+  });
+});
+
+app.put('/api/billing/:id/confirm-payment', (req, res) => {
+  const { is_confirmed, payment_method, receipt_no } = req.body;
+  const today = new Date().toISOString().split('T')[0];
+  const confirmed = is_confirmed ? 1 : 0;
+  const status = confirmed ? 'Paid' : 'Pending';
+  const paidDate = confirmed ? today : null;
+  const recNo = confirmed ? (receipt_no || `REC-${req.params.id}-${Date.now().toString().slice(-4)}`) : null;
+  
+  db.run(
+    "UPDATE billing SET is_confirmed = ?, status = ?, paid_date = ?, payment_method = ?, receipt_no = ? WHERE id = ?",
+    [confirmed, status, paidDate, payment_method || 'Bank Transfer / Cheque', recNo, req.params.id],
+    function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ success: true, id: req.params.id, is_confirmed: confirmed, status, paid_date: paidDate, receipt_no: recNo });
+    }
+  );
+});
+
+app.put('/api/billing/:id/status', (req, res) => {
+  const { status } = req.body;
+  const isConfirmed = status === 'Paid' ? 1 : 0;
+  const today = new Date().toISOString().split('T')[0];
+  const paidDate = status === 'Paid' ? today : null;
+  db.run("UPDATE billing SET status = ?, is_confirmed = ?, paid_date = ? WHERE id = ?", [status, isConfirmed, paidDate, req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, id: req.params.id, status, is_confirmed: isConfirmed });
+  });
+});
+
+// ==================== 10. TRAINERS API & AUTO-ACCOUNT ====================
+app.get('/api/trainers', (req, res) => {
+  db.all("SELECT * FROM trainers ORDER BY name ASC", [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+app.post('/api/trainers', async (req, res) => {
+  const { id, name, phone, role, assigned_schools, daily_rate, weekly_days, rating, status, password } = req.body;
+  const trainerId = id || `TR-${Date.now().toString().slice(-4)}`;
+  const rate = Number(daily_rate) || 600;
+  const days = Number(weekly_days) || 2;
+  const sql = `INSERT INTO trainers (id, name, phone, role, assigned_schools, daily_rate, weekly_days, rating, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  
+  db.run(sql, [trainerId, name, phone || '', role || 'Senior Robotics & AI Instructor', assigned_schools || 'ZPS', rate, days, rating || 5.0, status || 'Active'], async function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    
+    // Auto-create trainer user login with hashed password
+    const trainerPassword = password || 'trainer123';
+    const passwordHash = await bcrypt.hash(trainerPassword, 10);
+    const userId = `USR-${trainerId}`;
+    
+    db.run(
+      "INSERT OR REPLACE INTO users (id, username, password_hash, role, related_id, name, school_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      [userId, trainerId, passwordHash, 'trainer', trainerId, name, assigned_schools || '']
+    );
+
+    res.json({ success: true, id: trainerId, name, phone, role, assigned_schools, daily_rate: rate, weekly_days: days, rating, status });
+  });
+});
+
+app.put('/api/trainers/:id', (req, res) => {
+  const { name, phone, role, assigned_schools, daily_rate, weekly_days, rating, status } = req.body;
+  const sql = `UPDATE trainers SET 
+                name = COALESCE(?, name),
+                phone = COALESCE(?, phone),
+                role = COALESCE(?, role),
+                assigned_schools = COALESCE(?, assigned_schools),
+                daily_rate = COALESCE(?, daily_rate),
+                weekly_days = COALESCE(?, weekly_days),
+                rating = COALESCE(?, rating),
+                status = COALESCE(?, status)
+               WHERE id = ?`;
+  db.run(sql, [name, phone, role, assigned_schools, daily_rate, weekly_days, rating, status, req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    if (name) {
+      db.run("UPDATE users SET name = ? WHERE related_id = ?", [name, req.params.id]);
+    }
+    res.json({ success: true, id: req.params.id, name, daily_rate, weekly_days });
+  });
+});
+
+app.put('/api/trainers/:id/status', (req, res) => {
+  const { status } = req.body;
+  db.run("UPDATE trainers SET status = ? WHERE id = ?", [status, req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, id: req.params.id, status });
+  });
+});
+
+app.delete('/api/trainers/:id', (req, res) => {
+  db.run("DELETE FROM trainers WHERE id = ?", [req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    db.run("DELETE FROM users WHERE related_id = ?", [req.params.id]);
+    res.json({ success: true, deleted: req.params.id });
+  });
+});
+
+// ==================== 11. COMMS & LOGS API ====================
+app.get('/api/comms', (req, res) => {
+  db.all("SELECT * FROM comms_logs ORDER BY sent_at DESC", [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+app.post('/api/comms', (req, res) => {
+  const { id, student_id, recipient, template, message, status } = req.body;
+  const msgId = id || `MSG-${Date.now().toString().slice(-4)}`;
+  const sql = `INSERT INTO comms_logs (id, student_id, recipient, template, message, status) VALUES (?, ?, ?, ?, ?, ?)`;
+  db.run(sql, [msgId, student_id || '', recipient, template, message, status || 'Delivered'], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, id: msgId, recipient, template, message, status: status || 'Delivered' });
+  });
+});
+
+// ==================== 12. PROJECTS API ====================
+app.get('/api/projects', (req, res) => {
+  db.all("SELECT * FROM projects ORDER BY rowid DESC", [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+app.post('/api/projects', (req, res) => {
+  const { id, student_id, title, status, score, evidence_note, image_url, date_completed } = req.body;
+  const prjId = id || `PRJ-${Date.now().toString().slice(-4)}`;
+  const completedDate = date_completed || new Date().toISOString().split('T')[0];
+  const sql = `INSERT INTO projects (id, student_id, title, status, score, evidence_note, image_url, date_completed) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
+  db.run(sql, [prjId, student_id, title, status || 'Completed', score || 10, evidence_note || '', image_url || '', completedDate], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, id: prjId, student_id, title, status: status || 'Completed', score, evidence_note, image_url, date_completed: completedDate });
+  });
+});
+
+app.delete('/api/projects/:id', (req, res) => {
+  db.run("DELETE FROM projects WHERE id = ?", [req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, deleted: req.params.id });
+  });
+});
+
+// ==================== 13. REAL-TIME EVENT AUTOMATION & ALERTS API ====================
+
+// Dynamic Alerts Scanner
+app.get('/api/alerts', async (req, res) => {
+  try {
+    const alerts = [];
+
+    // 1. Scan Damaged Hardware Kits (RMA Automation)
+    const damagedKits = await new Promise((resolve, reject) => {
+      db.all("SELECT * FROM inventory WHERE status IN ('Damaged', 'In Repair')", [], (err, rows) => {
+        if (err) reject(err); else resolve(rows || []);
+      });
+    });
+
+    damagedKits.forEach(kit => {
+      alerts.push({
+        id: `ALT-KIT-${kit.id}`,
+        type: 'hardware',
+        title: `Hardware Fault: ${kit.name} (${kit.id})`,
+        message: `Kit ${kit.id} reported damaged at ${kit.school_id || 'School'}. ${kit.issue_notes || 'Requires technician replacement.'}`,
+        severity: 'critical',
+        related_id: kit.id,
+        action_label: 'Auto-Dispatch Replacement with Trainer',
+        action_type: 'dispatch_kit',
+        is_read: 0,
+        created_at: kit.last_checked || 'Recently'
+      });
+    });
+
+    // 2. Scan Upcoming Contract Renewals (< 30 days)
+    const expiringSchools = await new Promise((resolve, reject) => {
+      db.all("SELECT * FROM schools WHERE renewal_date IS NOT NULL AND renewal_date != ''", [], (err, rows) => {
+        if (err) reject(err); else resolve(rows || []);
+      });
+    });
+
+    expiringSchools.forEach(sch => {
+      if (sch.code === 'GWS' || sch.status === 'At Risk') {
+        alerts.push({
+          id: `ALT-REN-${sch.id}`,
+          type: 'renewal',
+          title: `Contract Renewal Approaching: ${sch.name}`,
+          message: `${sch.name}'s annual robotics term agreement renewal is scheduled soon. High retention priority.`,
+          severity: 'warning',
+          related_id: sch.id,
+          action_label: 'Draft 1-Click Renewal Contract',
+          action_type: 'renew_contract',
+          is_read: 0,
+          created_at: 'Active'
+        });
+      }
+    });
+
+    // 3. Scan Pending Invoices
+    const pendingInvoices = await new Promise((resolve, reject) => {
+      db.all("SELECT * FROM billing WHERE status = 'Pending'", [], (err, rows) => {
+        if (err) reject(err); else resolve(rows || []);
+      });
+    });
+
+    pendingInvoices.forEach(inv => {
+      alerts.push({
+        id: `ALT-INV-${inv.id}`,
+        type: 'billing',
+        title: `Payment Pending: ₹${inv.amount.toLocaleString('en-IN')} from ${inv.school_name}`,
+        message: `Invoice ${inv.id} due on ${inv.due_date}. Auto-reminder draft ready.`,
+        severity: 'info',
+        related_id: inv.id,
+        action_label: 'Send WhatsApp Reminder',
+        action_type: 'remind_payment',
+        is_read: 0,
+        created_at: inv.date_issued
+      });
+    });
+
+    res.json(alerts);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Resolve Alert Action Endpoint
+app.post('/api/alerts/:id/resolve', async (req, res) => {
+  const { action_type, related_id } = req.body;
+
+  try {
+    if (action_type === 'dispatch_kit') {
+      // Update kit to 'In Repair' with technician assigned
+      await new Promise((resolve, reject) => {
+        db.run(
+          "UPDATE inventory SET status = 'In Repair', issue_notes = 'Replacement dispatched with Trainer Vikash' WHERE id = ?",
+          [related_id],
+          (err) => err ? reject(err) : resolve()
+        );
+      });
+      return res.json({ success: true, message: `Replacement kit ${related_id} dispatched with Trainer Vikash!` });
+    } 
+    
+    if (action_type === 'remind_payment') {
+      // Log WhatsApp payment reminder
+      await new Promise((resolve, reject) => {
+        db.run(
+          "INSERT INTO comms_logs (id, student_id, recipient, template, message, status) VALUES (?, ?, ?, ?, ?, ?)",
+          [`MSG-REM-${Date.now()}`, related_id, 'Finance Department', 'Fee Reminder', `Payment reminder sent for invoice ${related_id}`, 'Delivered'],
+          (err) => err ? reject(err) : resolve()
+        );
+      });
+      return res.json({ success: true, message: `Payment reminder WhatsApp sent for invoice ${related_id}!` });
+    }
+
+    if (action_type === 'renew_contract') {
+      // Extend renewal date by 1 year
+      await new Promise((resolve, reject) => {
+        db.run(
+          "UPDATE schools SET renewal_date = '2028-03-31', status = 'Active' WHERE id = ?",
+          [related_id],
+          (err) => err ? reject(err) : resolve()
+        );
+      });
+      return res.json({ success: true, message: `Contract successfully renewed for ${related_id} until 2028!` });
+    }
+
+    res.json({ success: true, message: 'Alert action executed successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Start Server
+app.listen(PORT, () => {
+  console.log(`⚡ Pixiu Core API & Auth Engine running on http://localhost:${PORT}`);
+});

@@ -1,0 +1,174 @@
+import { useState } from 'react';
+import { ShieldCheck, Lock, User, KeyRound, ArrowRight, Sparkles, GraduationCap, AlertCircle } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
+import { useNavigate } from 'react-router-dom';
+
+export default function Login() {
+  const { login } = useAuth();
+  const toast = useToast();
+  const navigate = useNavigate();
+
+  const [username, setUsername] = useState('ZPS6A 01');
+  const [password, setPassword] = useState('ZPSzenith6@hata');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [selectedRoleTab, setSelectedRoleTab] = useState('student'); // 'student' | 'trainer'
+
+  const handleRolePreset = (role) => {
+    setSelectedRoleTab(role);
+    setError('');
+    if (role === 'student') {
+      setUsername('ZPS6A 01');
+      setPassword('ZPSzenith6@hata');
+    } else if (role === 'trainer') {
+      setUsername('vikaspandey');
+      setPassword('Vikad@pixiutech');
+    }
+  };
+
+  const handleAdminPreset = () => {
+    setSelectedRoleTab('trainer');
+    setUsername('adarshraj');
+    setPassword('Adarsg@pixiutech');
+    setError('');
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    const res = await login(username, password);
+    setLoading(false);
+
+    if (res.success) {
+      toast.success(`Welcome back, ${res.user.name || res.user.username}!`, 'Authentication Verified');
+      if (res.user.role === 'student') {
+        navigate('/student-portal');
+      } else if (res.user.role === 'trainer') {
+        navigate('/trainers');
+      } else {
+        navigate('/');
+      }
+    } else {
+      setError(res.error || 'Invalid credentials');
+      toast.error(res.error || 'Invalid credentials. Please check your password.', 'Login Failed');
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 selection:bg-pixiu-blue selection:text-white relative overflow-hidden">
+      {/* Subtle Background Glow */}
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none"></div>
+      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none"></div>
+
+      <div className="w-full max-w-md bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-3xl p-8 shadow-2xl relative z-10">
+        <div className="text-center mb-8">
+          <div className="inline-block bg-white px-4 py-2 rounded-2xl shadow-lg border border-white/30 mb-3.5">
+            <img src="/img/logo.png" alt="Pixiu Tech Logo" className="h-11 w-auto object-contain" />
+          </div>
+          <h1 className="text-2xl font-black text-white tracking-wide">PIXIU TECH<span className="text-pixiu-blue">.</span></h1>
+          <p className="text-xs text-blue-300 font-bold uppercase tracking-widest mt-1">Portal Authentication Gateway</p>
+        </div>
+
+        {/* 2 Main Role Tabs: 1. Student ID, 2. Trainer & Faculty (Admin Inside) */}
+        <div className="grid grid-cols-2 gap-2 p-1.5 bg-slate-950 rounded-2xl border border-slate-800/80 mb-6">
+          <button
+            type="button"
+            onClick={() => handleRolePreset('student')}
+            className={`py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+              selectedRoleTab === 'student' 
+                ? 'bg-pixiu-blue text-white shadow-md shadow-blue-500/25' 
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <GraduationCap size={15} /> Student ID
+          </button>
+          
+          <button
+            type="button"
+            onClick={() => handleRolePreset('trainer')}
+            className={`py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+              selectedRoleTab === 'trainer' 
+                ? 'bg-pixiu-blue text-white shadow-md shadow-blue-500/25' 
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <User size={15} /> Trainer & Admin
+          </button>
+        </div>
+
+        {/* Quick Admin Quick-Switch Link when in Trainer Tab */}
+        {selectedRoleTab === 'trainer' && (
+          <div className="mb-4 flex items-center justify-between px-2 text-[11px] text-slate-400">
+            <span>Faculty & Management Access</span>
+            <button
+              type="button"
+              onClick={handleAdminPreset}
+              className="text-pixiu-blue hover:text-blue-300 font-bold cursor-pointer underline decoration-dotted"
+            >
+              Fill Admin (adarshraj)
+            </button>
+          </div>
+        )}
+
+        {/* Error Alert */}
+        {error && (
+          <div className="mb-6 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-xs font-medium flex items-center gap-2">
+            <AlertCircle size={16} className="shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+              {selectedRoleTab === 'student' ? 'Student ID (Format: ZPS6A 01)' : 'Username / Faculty ID'}
+            </label>
+            <div className="relative">
+              <User size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+                placeholder={selectedRoleTab === 'student' ? 'e.g. ZPS6A 01' : 'e.g. vikaspandey or adarshraj'}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-11 pr-4 py-3 text-sm text-white focus:outline-none focus:border-pixiu-blue transition-colors font-medium"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Password</label>
+            <div className="relative">
+              <Lock size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                placeholder="••••••••"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-11 pr-4 py-3 text-sm text-white focus:outline-none focus:border-pixiu-blue transition-colors font-medium"
+              />
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-pixiu-blue hover:bg-blue-600 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 text-sm transition-all cursor-pointer mt-2"
+          >
+            {loading ? (
+              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+            ) : (
+              <>
+                Sign In to Portal <ArrowRight size={16} />
+              </>
+            )}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
