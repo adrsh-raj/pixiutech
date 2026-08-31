@@ -256,7 +256,7 @@ export function DataProvider({ children }) {
   // 6. Curriculum
   const addCurriculumPlan = async (curData) => {
     try {
-      const res = await fetch(`${API_URL}/curriculum`, {
+      const res = await fetch(`${API_BASE}/curriculum`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(curData)
@@ -269,6 +269,24 @@ export function DataProvider({ children }) {
     } catch (e) {
       console.error(e);
     }
+  };
+
+  const updateCurriculumStatus = async (id, status) => {
+    try {
+      fetch(`${API_BASE}/curriculum/${id}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      }).catch(() => {});
+    } catch (e) {
+      console.error(e);
+    }
+    setCurriculum(prev => {
+      const updated = prev.map(c => c.id === id ? { ...c, status } : c);
+      localStorage.setItem('pixiu_curriculum', JSON.stringify(updated));
+      return updated;
+    });
+    return { success: true };
   };
 
   // 7. Inventory & Hardware RMA
@@ -607,7 +625,7 @@ export function DataProvider({ children }) {
     attendance, markAttendance, adminUpdateAttendance,
     leads, addLead, updateLeadStage, deleteLead, convertLeadToSchool,
     content, uploadContent, deleteContent,
-    curriculum, addCurriculumPlan,
+    curriculum, addCurriculumPlan, updateCurriculumStatus,
     inventory, addInventoryKit, updateKitStatus, deleteKit,
     billing, createInvoice, updateInvoiceStatus, confirmPaymentReceipt,
     comms, sendCommsMessage,

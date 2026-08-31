@@ -128,20 +128,62 @@ export const SEED_BILLING = [
 ];
 
 export const SEED_SESSIONS = [
+  // Class 6A
   { id: 'SES-001', school_id: 'ZPS', class_id: 'CLS-ZPS-6A', trainer_id: 'TR-01', date: '2026-08-28', time: '10:00 AM', topic: 'Unit 1: Introduction to Electronics & Basic Circuits', status: 'Completed', notes: 'Completed intro foundational circuit session.', is_locked: 1 },
-  { id: 'SES-002', school_id: 'ZPS', class_id: 'CLS-ZPS-6A', trainer_id: 'TR-01', date: '2026-09-02', time: '10:00 AM', topic: 'Unit 2: Sensors LDR & IR Sensor Calibration', status: 'Completed', notes: 'Sensor trigger threshold tuned.', is_locked: 1 },
-  { id: 'SES-003', school_id: 'ZPS', class_id: 'CLS-ZPS-7A', trainer_id: 'TR-01', date: '2026-08-28', time: '11:30 AM', topic: 'Unit 1: C++ Programming & Logic Gates', status: 'Completed', notes: 'Introductory microcontroller programming.', is_locked: 1 },
-  { id: 'SES-004', school_id: 'ZPS', class_id: 'CLS-ZPS-8A', trainer_id: 'TR-01', date: '2026-08-29', time: '10:00 AM', topic: 'Unit 1: Motor Control & Differential Steering', status: 'Completed', notes: 'PWM speed tuning completed.', is_locked: 1 },
-  { id: 'SES-005', school_id: 'ZPS', class_id: 'CLS-ZPS-9A', trainer_id: 'TR-01', date: '2026-08-29', time: '12:00 PM', topic: 'Unit 1: ESP32 Architecture & Wi-Fi Station', status: 'Completed', notes: 'Wi-Fi web server established.', is_locked: 1 },
-  { id: 'SES-006', school_id: 'ZPS', class_id: 'CLS-ZPS-11A', trainer_id: 'TR-01', date: '2026-08-30', time: '11:00 AM', topic: 'Unit 1: Python Video Stream Capture & Color Masking', status: 'Completed', notes: 'Intro to OpenCV vision processing.', is_locked: 1 },
+  { id: 'SES-002', school_id: 'ZPS', class_id: 'CLS-ZPS-6A', trainer_id: 'TR-01', date: '2026-09-02', time: '10:00 AM', topic: 'Unit 2: Sensors LDR & IR Sensor Calibration', status: 'Upcoming', notes: 'Prepare Level 1 Unit 2 sensor kits.', is_locked: 0 },
+
+  // Class 7A
+  { id: 'SES-003', school_id: 'ZPS', class_id: 'CLS-ZPS-7A', trainer_id: 'TR-01', date: '2026-08-28', time: '11:30 AM', topic: 'Unit 1: C++ Fundamentals & Microcontroller Architecture', status: 'Completed', notes: 'Introductory microcontroller programming.', is_locked: 1 },
+  { id: 'SES-004', school_id: 'ZPS', class_id: 'CLS-ZPS-7A', trainer_id: 'TR-01', date: '2026-09-02', time: '11:30 AM', topic: 'Unit 2: Analog vs Digital Sensors & Signal Interfacing', status: 'Upcoming', notes: 'ADC resolution and potentiometer divider.', is_locked: 0 },
+
+  // Class 8A
+  { id: 'SES-005', school_id: 'ZPS', class_id: 'CLS-ZPS-8A', trainer_id: 'TR-01', date: '2026-08-29', time: '10:00 AM', topic: 'Unit 1: PWM Motor Control & Differential Steering', status: 'Completed', notes: 'PWM speed tuning completed.', is_locked: 1 },
+  { id: 'SES-006', school_id: 'ZPS', class_id: 'CLS-ZPS-8A', trainer_id: 'TR-01', date: '2026-09-03', time: '10:00 AM', topic: 'Unit 2: Ultrasonic Echo Mapping & Collision Prevention', status: 'Upcoming', notes: 'Sonar radar sweep setup.', is_locked: 0 },
+
+  // Class 9A
+  { id: 'SES-007', school_id: 'ZPS', class_id: 'CLS-ZPS-9A', trainer_id: 'TR-01', date: '2026-08-29', time: '12:00 PM', topic: 'Unit 1: ESP32 Architecture & Wi-Fi Station Mode', status: 'Completed', notes: 'Wi-Fi web server established.', is_locked: 1 },
+  { id: 'SES-008', school_id: 'ZPS', class_id: 'CLS-ZPS-9A', trainer_id: 'TR-01', date: '2026-09-03', time: '12:00 PM', topic: 'Unit 2: Wi-Fi HTTP / MQTT Cloud Telemetry', status: 'Upcoming', notes: 'REST API & MQTT broker connection.', is_locked: 0 },
+
+  // Class 11A
+  { id: 'SES-009', school_id: 'ZPS', class_id: 'CLS-ZPS-11A', trainer_id: 'TR-01', date: '2026-08-30', time: '11:00 AM', topic: 'Unit 1: Python Video Stream Capture & Color Masking', status: 'Completed', notes: 'Intro to OpenCV vision processing.', is_locked: 1 },
+  { id: 'SES-010', school_id: 'ZPS', class_id: 'CLS-ZPS-11A', trainer_id: 'TR-01', date: '2026-09-04', time: '11:00 AM', topic: 'Unit 2: OpenCV Color Masking & Contour Object Tracking', status: 'Upcoming', notes: 'Centroid calculations & real-time bounding box.', is_locked: 0 },
 ];
 
 export const SEED_ATTENDANCE = [
+  // Class 6A Unit 1 Attendance
   { id: 'ATT-001', session_id: 'SES-001', student_id: 'ZPS6A 01', status: 'Present', timestamp: '2026-08-28 10:15:00', date: '2026-08-28', class_id: 'CLS-ZPS-6A', topic: 'Unit 1: Introduction to Electronics & Basic Circuits', is_locked: 1 },
   { id: 'ATT-002', session_id: 'SES-001', student_id: 'ZPS6A 02', status: 'Present', timestamp: '2026-08-28 10:15:00', date: '2026-08-28', class_id: 'CLS-ZPS-6A', topic: 'Unit 1: Introduction to Electronics & Basic Circuits', is_locked: 1 },
   { id: 'ATT-003', session_id: 'SES-001', student_id: 'ZPS6A 03', status: 'Present', timestamp: '2026-08-28 10:15:00', date: '2026-08-28', class_id: 'CLS-ZPS-6A', topic: 'Unit 1: Introduction to Electronics & Basic Circuits', is_locked: 1 },
   { id: 'ATT-004', session_id: 'SES-001', student_id: 'ZPS6A 04', status: 'Present', timestamp: '2026-08-28 10:15:00', date: '2026-08-28', class_id: 'CLS-ZPS-6A', topic: 'Unit 1: Introduction to Electronics & Basic Circuits', is_locked: 1 },
   { id: 'ATT-005', session_id: 'SES-001', student_id: 'ZPS6A 05', status: 'Absent', timestamp: '2026-08-28 10:15:00', date: '2026-08-28', class_id: 'CLS-ZPS-6A', topic: 'Unit 1: Introduction to Electronics & Basic Circuits', is_locked: 1 },
+
+  // Class 7A Unit 1 Attendance
+  { id: 'ATT-006', session_id: 'SES-003', student_id: 'ZPS7A 01', status: 'Present', timestamp: '2026-08-28 11:30:00', date: '2026-08-28', class_id: 'CLS-ZPS-7A', topic: 'Unit 1: C++ Fundamentals & Microcontroller Architecture', is_locked: 1 },
+  { id: 'ATT-007', session_id: 'SES-003', student_id: 'ZPS7A 02', status: 'Present', timestamp: '2026-08-28 11:30:00', date: '2026-08-28', class_id: 'CLS-ZPS-7A', topic: 'Unit 1: C++ Fundamentals & Microcontroller Architecture', is_locked: 1 },
+  { id: 'ATT-008', session_id: 'SES-003', student_id: 'ZPS7A 03', status: 'Present', timestamp: '2026-08-28 11:30:00', date: '2026-08-28', class_id: 'CLS-ZPS-7A', topic: 'Unit 1: C++ Fundamentals & Microcontroller Architecture', is_locked: 1 },
+  { id: 'ATT-009', session_id: 'SES-003', student_id: 'ZPS7A 04', status: 'Present', timestamp: '2026-08-28 11:30:00', date: '2026-08-28', class_id: 'CLS-ZPS-7A', topic: 'Unit 1: C++ Fundamentals & Microcontroller Architecture', is_locked: 1 },
+  { id: 'ATT-010', session_id: 'SES-003', student_id: 'ZPS7A 05', status: 'Present', timestamp: '2026-08-28 11:30:00', date: '2026-08-28', class_id: 'CLS-ZPS-7A', topic: 'Unit 1: C++ Fundamentals & Microcontroller Architecture', is_locked: 1 },
+
+  // Class 8A Unit 1 Attendance
+  { id: 'ATT-011', session_id: 'SES-005', student_id: 'ZPS8A 01', status: 'Present', timestamp: '2026-08-29 10:00:00', date: '2026-08-29', class_id: 'CLS-ZPS-8A', topic: 'Unit 1: PWM Motor Control & Differential Steering', is_locked: 1 },
+  { id: 'ATT-012', session_id: 'SES-005', student_id: 'ZPS8A 02', status: 'Present', timestamp: '2026-08-29 10:00:00', date: '2026-08-29', class_id: 'CLS-ZPS-8A', topic: 'Unit 1: PWM Motor Control & Differential Steering', is_locked: 1 },
+  { id: 'ATT-013', session_id: 'SES-005', student_id: 'ZPS8A 03', status: 'Present', timestamp: '2026-08-29 10:00:00', date: '2026-08-29', class_id: 'CLS-ZPS-8A', topic: 'Unit 1: PWM Motor Control & Differential Steering', is_locked: 1 },
+  { id: 'ATT-014', session_id: 'SES-005', student_id: 'ZPS8A 04', status: 'Present', timestamp: '2026-08-29 10:00:00', date: '2026-08-29', class_id: 'CLS-ZPS-8A', topic: 'Unit 1: PWM Motor Control & Differential Steering', is_locked: 1 },
+  { id: 'ATT-015', session_id: 'SES-005', student_id: 'ZPS8A 05', status: 'Present', timestamp: '2026-08-29 10:00:00', date: '2026-08-29', class_id: 'CLS-ZPS-8A', topic: 'Unit 1: PWM Motor Control & Differential Steering', is_locked: 1 },
+
+  // Class 9A Unit 1 Attendance
+  { id: 'ATT-016', session_id: 'SES-007', student_id: 'ZPS9A 01', status: 'Present', timestamp: '2026-08-29 12:00:00', date: '2026-08-29', class_id: 'CLS-ZPS-9A', topic: 'Unit 1: ESP32 Architecture & Wi-Fi Station Mode', is_locked: 1 },
+  { id: 'ATT-017', session_id: 'SES-007', student_id: 'ZPS9A 02', status: 'Present', timestamp: '2026-08-29 12:00:00', date: '2026-08-29', class_id: 'CLS-ZPS-9A', topic: 'Unit 1: ESP32 Architecture & Wi-Fi Station Mode', is_locked: 1 },
+  { id: 'ATT-018', session_id: 'SES-007', student_id: 'ZPS9A 03', status: 'Present', timestamp: '2026-08-29 12:00:00', date: '2026-08-29', class_id: 'CLS-ZPS-9A', topic: 'Unit 1: ESP32 Architecture & Wi-Fi Station Mode', is_locked: 1 },
+  { id: 'ATT-019', session_id: 'SES-007', student_id: 'ZPS9A 04', status: 'Present', timestamp: '2026-08-29 12:00:00', date: '2026-08-29', class_id: 'CLS-ZPS-9A', topic: 'Unit 1: ESP32 Architecture & Wi-Fi Station Mode', is_locked: 1 },
+  { id: 'ATT-020', session_id: 'SES-007', student_id: 'ZPS9A 05', status: 'Present', timestamp: '2026-08-29 12:00:00', date: '2026-08-29', class_id: 'CLS-ZPS-9A', topic: 'Unit 1: ESP32 Architecture & Wi-Fi Station Mode', is_locked: 1 },
+
+  // Class 11A Unit 1 Attendance
+  { id: 'ATT-021', session_id: 'SES-009', student_id: 'ZPS11A 01', status: 'Present', timestamp: '2026-08-30 11:00:00', date: '2026-08-30', class_id: 'CLS-ZPS-11A', topic: 'Unit 1: Python Video Stream Capture & Color Masking', is_locked: 1 },
+  { id: 'ATT-022', session_id: 'SES-009', student_id: 'ZPS11A 02', status: 'Present', timestamp: '2026-08-30 11:00:00', date: '2026-08-30', class_id: 'CLS-ZPS-11A', topic: 'Unit 1: Python Video Stream Capture & Color Masking', is_locked: 1 },
+  { id: 'ATT-023', session_id: 'SES-009', student_id: 'ZPS11A 03', status: 'Present', timestamp: '2026-08-30 11:00:00', date: '2026-08-30', class_id: 'CLS-ZPS-11A', topic: 'Unit 1: Python Video Stream Capture & Color Masking', is_locked: 1 },
+  { id: 'ATT-024', session_id: 'SES-009', student_id: 'ZPS11A 04', status: 'Present', timestamp: '2026-08-30 11:00:00', date: '2026-08-30', class_id: 'CLS-ZPS-11A', topic: 'Unit 1: Python Video Stream Capture & Color Masking', is_locked: 1 },
+  { id: 'ATT-025', session_id: 'SES-009', student_id: 'ZPS11A 05', status: 'Present', timestamp: '2026-08-30 11:00:00', date: '2026-08-30', class_id: 'CLS-ZPS-11A', topic: 'Unit 1: Python Video Stream Capture & Color Masking', is_locked: 1 },
 ];
 
 export const SEED_INVENTORY = [
@@ -155,247 +197,105 @@ export const SEED_INVENTORY = [
 
 export const SEED_ALERTS = [];
 
+// Structured 5-Level Syllabus (Units 1-6 across all classes: Unit 1 Taught/Completed, Units 2-6 Untaught/Upcoming)
 export const SEED_CURRICULUM = [
-  // Class 6
-  { id: 'CUR-101', week: 'Unit 1', level: null, topic: 'Introduction to Electricity & Basic Circuits', objectives: 'Understand current, voltage, breadboards and series/parallel LEDs', status: 'Completed' },
-  { id: 'CUR-102', week: 'Unit 2', level: 'Level 1', topic: 'Sensors: Light (LDR) & Obstacle (IR)', objectives: 'Analog vs digital inputs, calibration and sensor signal wiring', status: 'Completed' },
+  // ==================== LEVEL 1: CLASS 6 ====================
+  { id: 'CUR-101', week: 'Unit 1', level: 'Level 1', class_grade: '6', topic: 'Introduction to Electricity & Basic Circuits', objectives: 'Understand current, voltage, breadboards and series/parallel LEDs', status: 'Completed' },
+  { id: 'CUR-102', week: 'Unit 2', level: 'Level 1', class_grade: '6', topic: 'Sensors: Light (LDR) & Obstacle (IR)', objectives: 'Analog vs digital inputs, calibration and sensor signal wiring', status: 'Upcoming' },
+  { id: 'CUR-103', week: 'Unit 3', level: 'Level 1', class_grade: '6', topic: 'Actuators: Motors, Buzzers & Relays', objectives: 'Transistor switches, relay driver circuits, and sound actuation', status: 'Upcoming' },
+  { id: 'CUR-104', week: 'Unit 4', level: 'Level 1', class_grade: '6', topic: 'Microcontroller (Arduino) Programming Basics', objectives: 'Digital output pin modes, delay timing, and serial monitor debugging', status: 'Upcoming' },
+  { id: 'CUR-105', week: 'Unit 5', level: 'Level 1', class_grade: '6', topic: 'Project Building: Smart Obstacle Avoiding Rover', objectives: 'Assemble 2WD chassis, L298N motor driver, and ultrasonic avoidance algorithm', status: 'Upcoming' },
+  { id: 'CUR-106', week: 'Unit 6', level: 'Level 1', class_grade: '6', topic: 'Capstone Project: Automated Smart Lab Environment', objectives: 'Final end-of-term presentation and smart automation build', status: 'Upcoming' },
 
-  // Class 7
-  { id: 'CUR-201', week: 'Unit 1', level: null, topic: 'C++ Coding Fundamentals & Logic Gates', objectives: 'Microcontroller architecture, IDE setup, variables and conditional logic', status: 'Completed' },
-  { id: 'CUR-202', week: 'Unit 2', level: 'Level 1', topic: 'Analog vs Digital Sensors & Signal Interfacing', objectives: 'ADC resolution, potentiometer voltage divider and threshold comparator', status: 'Completed' },
+  // ==================== LEVEL 2: CLASS 7 ====================
+  { id: 'CUR-201', week: 'Unit 1', level: 'Level 2', class_grade: '7', topic: 'C++ Coding Fundamentals & Logic Gates', objectives: 'Microcontroller architecture, IDE setup, variables and conditional logic', status: 'Completed' },
+  { id: 'CUR-202', week: 'Unit 2', level: 'Level 2', class_grade: '7', topic: 'Analog vs Digital Sensors & Signal Interfacing', objectives: 'ADC resolution, potentiometer voltage divider and threshold comparator', status: 'Upcoming' },
+  { id: 'CUR-203', week: 'Unit 3', level: 'Level 2', class_grade: '7', topic: 'LCD Display & Sensor Data Visualization', objectives: 'I2C 16x2 LCD interface, custom character generation and live telemetry', status: 'Upcoming' },
+  { id: 'CUR-204', week: 'Unit 4', level: 'Level 2', class_grade: '7', topic: 'Autonomous Line Follower Robotics', objectives: 'Dual IR reflectance arrays, Differential drive control and track optimization', status: 'Upcoming' },
+  { id: 'CUR-205', week: 'Unit 5', level: 'Level 2', class_grade: '7', topic: 'Smart Irrigation & Environmental Telemetry', objectives: 'Soil moisture capacitive probes, submersible pump relay control', status: 'Upcoming' },
+  { id: 'CUR-206', week: 'Unit 6', level: 'Level 2', class_grade: '7', topic: 'Capstone Project: Multi-Sensor Autonomous Rover', objectives: 'Integration of ultrasonic radar, line tracking, and autonomous pathfinding', status: 'Upcoming' },
 
-  // Class 8
-  { id: 'CUR-301', week: 'Unit 1', level: null, topic: 'PWM Motor Control & High-Speed Steering', objectives: 'H-bridge motor drivers, PWM speed control and encoder feedback', status: 'Completed' },
-  { id: 'CUR-302', week: 'Unit 2', level: 'Level 1', topic: 'Ultrasonic Echo Mapping & Collision Prevention', objectives: 'HC-SR04 pulse timing, servo radar sweep and distance mapping', status: 'Completed' },
+  // ==================== LEVEL 3: CLASS 8 ====================
+  { id: 'CUR-301', week: 'Unit 1', level: 'Level 3', class_grade: '8', topic: 'PWM Motor Control & High-Speed Steering', objectives: 'H-bridge motor drivers, PWM speed control and encoder feedback', status: 'Completed' },
+  { id: 'CUR-302', week: 'Unit 2', level: 'Level 3', class_grade: '8', topic: 'Ultrasonic Echo Mapping & Collision Prevention', objectives: 'HC-SR04 pulse timing, servo radar sweep and distance mapping', status: 'Upcoming' },
+  { id: 'CUR-303', week: 'Unit 3', level: 'Level 3', class_grade: '8', topic: 'Bluetooth Wireless Remote Teleoperation', objectives: 'HC-05 serial pairing, smartphone app control and command parsing', status: 'Upcoming' },
+  { id: 'CUR-304', week: 'Unit 4', level: 'Level 3', class_grade: '8', topic: 'Advanced PID Line Follower System', objectives: 'Proportional-Integral-Derivative tuning for smooth high-speed curve navigation', status: 'Upcoming' },
+  { id: 'CUR-305', week: 'Unit 5', level: 'Level 3', class_grade: '8', topic: 'IoT Sensor Logging & Real-time Web Monitoring', objectives: 'Cloud telemetry logging, sensor dashboard, and remote threshold alerting', status: 'Upcoming' },
+  { id: 'CUR-306', week: 'Unit 6', level: 'Level 3', class_grade: '8', topic: 'Capstone Project: Bluetooth Combat / Surveillance Bot', objectives: 'High-torque 4WD chassis with wireless command link and modular payload', status: 'Upcoming' },
 
-  // Class 9
-  { id: 'CUR-401', week: 'Unit 1', level: null, topic: 'ESP32 & Wireless IoT Microcontrollers', objectives: 'ESP32 architecture, Wi-Fi station mode, web server and telemetry', status: 'Completed' },
-  { id: 'CUR-402', week: 'Unit 2', level: 'Level 1', topic: 'Wi-Fi HTTP / MQTT Cloud Telemetry', objectives: 'REST API webhooks, MQTT publish/subscribe pubsub broker integration', status: 'Completed' },
+  // ==================== LEVEL 4: CLASS 9 ====================
+  { id: 'CUR-401', week: 'Unit 1', level: 'Level 4', class_grade: '9', topic: 'ESP32 & Wireless IoT Microcontrollers', objectives: 'ESP32 architecture, Wi-Fi station mode, web server and telemetry', status: 'Completed' },
+  { id: 'CUR-402', week: 'Unit 2', level: 'Level 4', class_grade: '9', topic: 'Wi-Fi HTTP / MQTT Cloud Telemetry', objectives: 'REST API webhooks, MQTT publish/subscribe pubsub broker integration', status: 'Upcoming' },
+  { id: 'CUR-403', week: 'Unit 3', level: 'Level 4', class_grade: '9', topic: 'Advanced Sensor Fusion & Gyro / Accelerometer', objectives: 'MPU6050 I2C communication, pitch-roll angle filtering and stabilization', status: 'Upcoming' },
+  { id: 'CUR-404', week: 'Unit 4', level: 'Level 4', class_grade: '9', topic: 'Web Dashboard Integration & Remote Relay Control', objectives: 'Interactive WebSocket control interface for remote industrial actuation', status: 'Upcoming' },
+  { id: 'CUR-405', week: 'Unit 5', level: 'Level 4', class_grade: '9', topic: 'Smart Campus IoT Gateway Architecture', objectives: 'Multi-node sensor network with centralized coordinator hub', status: 'Upcoming' },
+  { id: 'CUR-406', week: 'Unit 6', level: 'Level 4', class_grade: '9', topic: 'Capstone Project: Full-Stack IoT Weather Station & Surveillance', objectives: 'Solar powered weather sensing node sending telemetry to cloud dashboard', status: 'Upcoming' },
 
-  // Class 11
-  { id: 'CUR-501', week: 'Unit 1', level: null, topic: 'Python for Computer Vision & Machine Intelligence', objectives: 'OpenCV basics, video stream capture, color masking and edge detection', status: 'Completed' },
-  { id: 'CUR-502', week: 'Unit 2', level: 'Level 1', topic: 'OpenCV Color Masking & Contour Object Tracking', objectives: 'HSV color space calibration, morphological filters and centroid calculation', status: 'Completed' }
+  // ==================== LEVEL 5: CLASS 11 ====================
+  { id: 'CUR-501', week: 'Unit 1', level: 'Level 5', class_grade: '11', topic: 'Python for Computer Vision & Machine Intelligence', objectives: 'OpenCV basics, video stream capture, color masking and edge detection', status: 'Completed' },
+  { id: 'CUR-502', week: 'Unit 2', level: 'Level 5', class_grade: '11', topic: 'OpenCV Color Masking & Contour Object Tracking', objectives: 'HSV color space calibration, morphological filters and centroid calculation', status: 'Upcoming' },
+  { id: 'CUR-503', week: 'Unit 3', level: 'Level 5', class_grade: '11', topic: 'Haar Cascade Facial Recognition & Surveillance', objectives: 'Pretrained Haar cascades, multi-face tracking and attendance logging', status: 'Upcoming' },
+  { id: 'CUR-504', week: 'Unit 4', level: 'Level 5', class_grade: '11', topic: 'YOLO Object Detection & Neural Network Inferencing', objectives: 'YOLOv8 deep learning model on edge devices, bounding box parsing', status: 'Upcoming' },
+  { id: 'CUR-505', week: 'Unit 5', level: 'Level 5', class_grade: '11', topic: 'MediaPipe Edge AI Gesture Mapping', objectives: 'Hand landmark detection and gesture-controlled robotic actuation', status: 'Upcoming' },
+  { id: 'CUR-506', week: 'Unit 6', level: 'Level 5', class_grade: '11', topic: 'Capstone Project: Autonomous Vision Surveillance Rover', objectives: 'Real-time object tracking and autonomous rover obstacle navigation', status: 'Upcoming' }
 ];
 
-// Currently Uploaded Materials: UNIT 1 (No Level Tag) & UNIT 2 (Level 1) for Classes 6, 7, 8, 9, 11
+// Content Assets: All 30 Unwatermarked Teacher Master Units (for Teachers/Trainers) + Student Editions for students
 export const SEED_CONTENT = [
-  // ==================== CLASS 6 ====================
-  // Unit 1 (Intro - No Level Tag)
-  { 
-    id: 'CNT-601-S', 
-    title: 'Class 6 - Unit 1: Basic Circuits (Student Edition)', 
-    type: 'PDF', 
-    level: null, 
-    class_grade: '6', 
-    target: 'Student', 
-    url: '/materials/class6-unit1-student-watermarked.pdf', 
-    description: 'Foundational electronics, LEDs, breadboard wiring and series/parallel circuits' 
-  },
-  { 
-    id: 'CNT-601-T', 
-    title: 'Class 6 - Unit 1: Basic Circuits (Teacher Master)', 
-    type: 'PDF', 
-    level: null, 
-    class_grade: '6', 
-    target: 'Teacher', 
-    url: '/materials/class6-unit1-teacher.pdf', 
-    description: 'Instructor lesson plan, circuit schematics & viva questions for Unit 1' 
-  },
-  // Unit 2 (Level 1)
-  { 
-    id: 'CNT-602-S', 
-    title: 'Class 6 - Unit 2: Sensors LDR & IR (Student Edition)', 
-    type: 'PDF', 
-    level: 'Level 1', 
-    class_grade: '6', 
-    target: 'Student', 
-    url: '/materials/class6-unit2-student-watermarked.pdf', 
-    description: 'Level 1 Unit 2 Light & Obstacle Sensor Manual with Circuit Schematics' 
-  },
-  { 
-    id: 'CNT-602-T', 
-    title: 'Class 6 - Unit 2: Sensors LDR & IR (Teacher Master)', 
-    type: 'PDF', 
-    level: 'Level 1', 
-    class_grade: '6', 
-    target: 'Teacher', 
-    url: '/materials/class6-unit2-teacher.pdf', 
-    description: 'Level 1 Unit 2 Instructor Calibration Guide' 
-  },
+  // ==================== TEACHER MASTER PACKS (30 UNITS - ALL CLASSES 6, 7, 8, 9, 11) ====================
+  // Class 6 (Level 1) Teacher Masters
+  { id: 'CNT-601-T', title: 'Class 6 - Unit 1: Basic Circuits (Teacher Master)', type: 'PDF', level: null, class_grade: '6', target: 'Teacher', is_watermarked: 0, url: '/materials/class6-unit1-teacher.pdf', description: 'Clean instructor guide, circuit schematics & viva questions for Unit 1' },
+  { id: 'CNT-602-T', title: 'Class 6 - Unit 2: Sensors LDR & IR (Teacher Master)', type: 'PDF', level: 'Level 1', class_grade: '6', target: 'Teacher', is_watermarked: 0, url: '/materials/class6-unit2-teacher.pdf', description: 'Level 1 Unit 2 Instructor Calibration & Sensor Circuit Guide' },
+  { id: 'CNT-603-T', title: 'Class 6 - Unit 3: Motors & Actuators (Teacher Master)', type: 'PDF', level: 'Level 2', class_grade: '6', target: 'Teacher', is_watermarked: 0, url: '/materials/class6-unit3-teacher.pdf', description: 'Level 2 Unit 3 Motors, Buzzers & Relay Driver Lesson Plan' },
+  { id: 'CNT-604-T', title: 'Class 6 - Unit 4: Microcontroller Intro (Teacher Master)', type: 'PDF', level: 'Level 3', class_grade: '6', target: 'Teacher', is_watermarked: 0, url: '/materials/class6-unit4-teacher.pdf', description: 'Level 3 Unit 4 Arduino Coding & Pin Mapping Walkthrough' },
+  { id: 'CNT-605-T', title: 'Class 6 - Unit 5: Obstacle Rover Project (Teacher Master)', type: 'PDF', level: 'Level 4', class_grade: '6', target: 'Teacher', is_watermarked: 0, url: '/materials/class6-unit5-teacher.pdf', description: 'Level 4 Unit 5 2WD Obstacle Avoiding Rover Assembly Rubric' },
+  { id: 'CNT-606-T', title: 'Class 6 - Unit 6: Smart Lab Capstone (Teacher Master)', type: 'PDF', level: 'Level 5', class_grade: '6', target: 'Teacher', is_watermarked: 0, url: '/materials/class6-unit6-teacher.pdf', description: 'Level 5 Unit 6 Capstone Evaluation & Certification Rubric' },
 
-  // ==================== CLASS 7 ====================
-  // Unit 1 (Intro - No Level Tag)
-  { 
-    id: 'CNT-701-S', 
-    title: 'Class 7 - Unit 1: C++ Fundamentals (Student Edition)', 
-    type: 'PDF', 
-    level: null, 
-    class_grade: '7', 
-    target: 'Student', 
-    url: '/materials/class7-unit1-student-watermarked.pdf', 
-    description: 'Logic structures, conditional statements, variables and microcontroller syntax' 
-  },
-  { 
-    id: 'CNT-701-T', 
-    title: 'Class 7 - Unit 1: C++ Fundamentals (Teacher Master)', 
-    type: 'PDF', 
-    level: null, 
-    class_grade: '7', 
-    target: 'Teacher', 
-    url: '/materials/class7-unit1-teacher.pdf', 
-    description: 'Instructor lesson plan and code walkthroughs for AVR microcontrollers' 
-  },
-  // Unit 2 (Level 1)
-  { 
-    id: 'CNT-702-S', 
-    title: 'Class 7 - Unit 2: Analog Sensor Interfacing (Student Edition)', 
-    type: 'PDF', 
-    level: 'Level 1', 
-    class_grade: '7', 
-    target: 'Student', 
-    url: '/materials/class7-unit2-student-watermarked.pdf', 
-    description: 'Level 1 Unit 2 Analog vs Digital Sensors & Signal Interfacing' 
-  },
-  { 
-    id: 'CNT-702-T', 
-    title: 'Class 7 - Unit 2: Analog Sensor Interfacing (Teacher Master)', 
-    type: 'PDF', 
-    level: 'Level 1', 
-    class_grade: '7', 
-    target: 'Teacher', 
-    url: '/materials/class7-unit2-teacher.pdf', 
-    description: 'Level 1 Unit 2 Instructor Calibration Lesson Plan' 
-  },
+  // Class 7 (Level 2) Teacher Masters
+  { id: 'CNT-701-T', title: 'Class 7 - Unit 1: C++ Fundamentals (Teacher Master)', type: 'PDF', level: null, class_grade: '7', target: 'Teacher', is_watermarked: 0, url: '/materials/class7-unit1-teacher.pdf', description: 'Instructor lesson plan and code walkthroughs for AVR microcontrollers' },
+  { id: 'CNT-702-T', title: 'Class 7 - Unit 2: Analog Sensor Interfacing (Teacher Master)', type: 'PDF', level: 'Level 1', class_grade: '7', target: 'Teacher', is_watermarked: 0, url: '/materials/class7-unit2-teacher.pdf', description: 'Level 1 Unit 2 Instructor Calibration & ADC Lesson Plan' },
+  { id: 'CNT-703-T', title: 'Class 7 - Unit 3: I2C LCD Display (Teacher Master)', type: 'PDF', level: 'Level 2', class_grade: '7', target: 'Teacher', is_watermarked: 0, url: '/materials/class7-unit3-teacher.pdf', description: 'Level 2 Unit 3 I2C Addressing & Telemetry Display Guide' },
+  { id: 'CNT-704-T', title: 'Class 7 - Unit 4: Line Follower Robot (Teacher Master)', type: 'PDF', level: 'Level 3', class_grade: '7', target: 'Teacher', is_watermarked: 0, url: '/materials/class7-unit4-teacher.pdf', description: 'Level 3 Unit 4 Dual IR Comparator & Line Follower Troubleshooting' },
+  { id: 'CNT-705-T', title: 'Class 7 - Unit 5: Smart Irrigation System (Teacher Master)', type: 'PDF', level: 'Level 4', class_grade: '7', target: 'Teacher', is_watermarked: 0, url: '/materials/class7-unit5-teacher.pdf', description: 'Level 4 Unit 5 Soil Moisture Probe & Submersible Pump Guide' },
+  { id: 'CNT-706-T', title: 'Class 7 - Unit 6: Multi-Sensor Capstone (Teacher Master)', type: 'PDF', level: 'Level 5', class_grade: '7', target: 'Teacher', is_watermarked: 0, url: '/materials/class7-unit6-teacher.pdf', description: 'Level 5 Unit 6 Capstone Project Evaluation & Scorecard' },
 
-  // ==================== CLASS 8 ====================
-  // Unit 1 (Intro - No Level Tag)
-  { 
-    id: 'CNT-801-S', 
-    title: 'Class 8 - Unit 1: PWM Motor Control (Student Edition)', 
-    type: 'PDF', 
-    level: null, 
-    class_grade: '8', 
-    target: 'Student', 
-    url: '/materials/class8-unit1-student-watermarked.pdf', 
-    description: 'H-bridge motor drivers, duty cycles, speed modulation and differential steering' 
-  },
-  { 
-    id: 'CNT-801-T', 
-    title: 'Class 8 - Unit 1: PWM Motor Control (Teacher Master)', 
-    type: 'PDF', 
-    level: null, 
-    class_grade: '8', 
-    target: 'Teacher', 
-    url: '/materials/class8-unit1-teacher.pdf', 
-    description: 'Instructor driver schematics and PWM waveform calibration guide' 
-  },
-  // Unit 2 (Level 1)
-  { 
-    id: 'CNT-802-S', 
-    title: 'Class 8 - Unit 2: Ultrasonic Echo Mapping (Student Edition)', 
-    type: 'PDF', 
-    level: 'Level 1', 
-    class_grade: '8', 
-    target: 'Student', 
-    url: '/materials/class8-unit2-student-watermarked.pdf', 
-    description: 'Level 1 Unit 2 Ultrasonic Echo Mapping & Collision Prevention' 
-  },
-  { 
-    id: 'CNT-802-T', 
-    title: 'Class 8 - Unit 2: Ultrasonic Echo Mapping (Teacher Master)', 
-    type: 'PDF', 
-    level: 'Level 1', 
-    class_grade: '8', 
-    target: 'Teacher', 
-    url: '/materials/class8-unit2-teacher.pdf', 
-    description: 'Level 1 Unit 2 Instructor Echo Timing Guide' 
-  },
+  // Class 8 (Level 3) Teacher Masters
+  { id: 'CNT-801-T', title: 'Class 8 - Unit 1: PWM Motor Control (Teacher Master)', type: 'PDF', level: null, class_grade: '8', target: 'Teacher', is_watermarked: 0, url: '/materials/class8-unit1-teacher.pdf', description: 'Instructor driver schematics and PWM waveform calibration guide' },
+  { id: 'CNT-802-T', title: 'Class 8 - Unit 2: Ultrasonic Echo Mapping (Teacher Master)', type: 'PDF', level: 'Level 1', class_grade: '8', target: 'Teacher', is_watermarked: 0, url: '/materials/class8-unit2-teacher.pdf', description: 'Level 1 Unit 2 Instructor Echo Timing & Sonar Radar Guide' },
+  { id: 'CNT-803-T', title: 'Class 8 - Unit 3: Bluetooth Remote Control (Teacher Master)', type: 'PDF', level: 'Level 2', class_grade: '8', target: 'Teacher', is_watermarked: 0, url: '/materials/class8-unit3-teacher.pdf', description: 'Level 2 Unit 3 HC-05 Wireless UART & App Command Parsing' },
+  { id: 'CNT-804-T', title: 'Class 8 - Unit 4: PID Line Tracking (Teacher Master)', type: 'PDF', level: 'Level 3', class_grade: '8', target: 'Teacher', is_watermarked: 0, url: '/materials/class8-unit4-teacher.pdf', description: 'Level 3 Unit 4 PID Mathematical Model & Gain Tuning Rubric' },
+  { id: 'CNT-805-T', title: 'Class 8 - Unit 5: IoT Cloud Data Logging (Teacher Master)', type: 'PDF', level: 'Level 4', class_grade: '8', target: 'Teacher', is_watermarked: 0, url: '/materials/class8-unit5-teacher.pdf', description: 'Level 4 Unit 5 Cloud Telemetry Dashboard Integration Guide' },
+  { id: 'CNT-806-T', title: 'Class 8 - Unit 6: Combat Bot Capstone (Teacher Master)', type: 'PDF', level: 'Level 5', class_grade: '8', target: 'Teacher', is_watermarked: 0, url: '/materials/class8-unit6-teacher.pdf', description: 'Level 5 Unit 6 4WD Combat Bot Final Build & Defense Rubric' },
 
-  // ==================== CLASS 9 ====================
-  // Unit 1 (Intro - No Level Tag)
-  { 
-    id: 'CNT-901-S', 
-    title: 'Class 9 - Unit 1: ESP32 IoT Microcontrollers (Student Edition)', 
-    type: 'PDF', 
-    level: null, 
-    class_grade: '9', 
-    target: 'Student', 
-    url: '/materials/class9-unit1-student-watermarked.pdf', 
-    description: 'ESP32 Dual-Core architecture, Wi-Fi station setup and embedded web server' 
-  },
-  { 
-    id: 'CNT-901-T', 
-    title: 'Class 9 - Unit 1: ESP32 IoT Microcontrollers (Teacher Master)', 
-    type: 'PDF', 
-    level: null, 
-    class_grade: '9', 
-    target: 'Teacher', 
-    url: '/materials/class9-unit1-teacher.pdf', 
-    description: 'Instructor IoT toolchain and network architecture guide' 
-  },
-  // Unit 2 (Level 1)
-  { 
-    id: 'CNT-902-S', 
-    title: 'Class 9 - Unit 2: HTTP & MQTT Cloud Protocols (Student Edition)', 
-    type: 'PDF', 
-    level: 'Level 1', 
-    class_grade: '9', 
-    target: 'Student', 
-    url: '/materials/class9-unit2-student-watermarked.pdf', 
-    description: 'Level 1 Unit 2 Wi-Fi HTTP / MQTT Cloud Telemetry' 
-  },
-  { 
-    id: 'CNT-902-T', 
-    title: 'Class 9 - Unit 2: HTTP & MQTT Cloud Protocols (Teacher Master)', 
-    type: 'PDF', 
-    level: 'Level 1', 
-    class_grade: '9', 
-    target: 'Teacher', 
-    url: '/materials/class9-unit2-teacher.pdf', 
-    description: 'Level 1 Unit 2 Cloud Telemetry Lesson Plan' 
-  },
+  // Class 9 (Level 4) Teacher Masters
+  { id: 'CNT-901-T', title: 'Class 9 - Unit 1: ESP32 IoT Microcontrollers (Teacher Master)', type: 'PDF', level: null, class_grade: '9', target: 'Teacher', is_watermarked: 0, url: '/materials/class9-unit1-teacher.pdf', description: 'Instructor IoT toolchain and ESP-IDF/Arduino network architecture' },
+  { id: 'CNT-902-T', title: 'Class 9 - Unit 2: HTTP & MQTT Cloud Protocols (Teacher Master)', type: 'PDF', level: 'Level 1', class_grade: '9', target: 'Teacher', is_watermarked: 0, url: '/materials/class9-unit2-teacher.pdf', description: 'Level 1 Unit 2 MQTT PubSub Broker & Cloud Gateway Lesson Plan' },
+  { id: 'CNT-903-T', title: 'Class 9 - Unit 3: MPU6050 Gyro Sensor Fusion (Teacher Master)', type: 'PDF', level: 'Level 2', class_grade: '9', target: 'Teacher', is_watermarked: 0, url: '/materials/class9-unit3-teacher.pdf', description: 'Level 2 Unit 3 6-DOF IMU Complementary Filter Calculations' },
+  { id: 'CNT-904-T', title: 'Class 9 - Unit 4: WebSockets & Cloud Actuation (Teacher Master)', type: 'PDF', level: 'Level 3', class_grade: '9', target: 'Teacher', is_watermarked: 0, url: '/materials/class9-unit4-teacher.pdf', description: 'Level 3 Unit 4 Bi-directional WebSocket Control Server Guide' },
+  { id: 'CNT-905-T', title: 'Class 9 - Unit 5: Smart Campus IoT Architecture (Teacher Master)', type: 'PDF', level: 'Level 4', class_grade: '9', target: 'Teacher', is_watermarked: 0, url: '/materials/class9-unit5-teacher.pdf', description: 'Level 4 Unit 5 Mesh Gateway & Webhook Alert Automation' },
+  { id: 'CNT-906-T', title: 'Class 9 - Unit 6: IoT Weather Station Capstone (Teacher Master)', type: 'PDF', level: 'Level 5', class_grade: '9', target: 'Teacher', is_watermarked: 0, url: '/materials/class9-unit6-teacher.pdf', description: 'Level 5 Unit 6 Full-Stack Industrial IoT Capstone Audit' },
 
-  // ==================== CLASS 11 ====================
-  // Unit 1 (Intro - No Level Tag)
-  { 
-    id: 'CNT-1101-S', 
-    title: 'Class 11 - Unit 1: Python OpenCV Vision (Student Edition)', 
-    type: 'PDF', 
-    level: null, 
-    class_grade: '11', 
-    target: 'Student', 
-    url: '/materials/class11-unit1-student-watermarked.pdf', 
-    description: 'OpenCV matrix operations, video stream capture, color filters and convolutions' 
-  },
-  { 
-    id: 'CNT-1101-T', 
-    title: 'Class 11 - Unit 1: Python OpenCV Vision (Teacher Master)', 
-    type: 'PDF', 
-    level: null, 
-    class_grade: '11', 
-    target: 'Teacher', 
-    url: '/materials/class11-unit1-teacher.pdf', 
-    description: 'Instructor camera pipeline, color space transforms and FPS optimization deck' 
-  },
-  // Unit 2 (Level 1)
-  { 
-    id: 'CNT-1102-S', 
-    title: 'Class 11 - Unit 2: Object Contour Tracking (Student Edition)', 
-    type: 'PDF', 
-    level: 'Level 1', 
-    class_grade: '11', 
-    target: 'Student', 
-    url: '/materials/class11-unit2-student-watermarked.pdf', 
-    description: 'Level 1 Unit 2 OpenCV Color Masking & Contour Object Tracking' 
-  },
-  { 
-    id: 'CNT-1102-T', 
-    title: 'Class 11 - Unit 2: Object Contour Tracking (Teacher Master)', 
-    type: 'PDF', 
-    level: 'Level 1', 
-    class_grade: '11', 
-    target: 'Teacher', 
-    url: '/materials/class11-unit2-teacher.pdf', 
-    description: 'Level 1 Unit 2 Contour Tracking Instructor Guide' 
-  }
+  // Class 11 (Level 5) Teacher Masters
+  { id: 'CNT-1101-T', title: 'Class 11 - Unit 1: Python OpenCV Vision (Teacher Master)', type: 'PDF', level: null, class_grade: '11', target: 'Teacher', is_watermarked: 0, url: '/materials/class11-unit1-teacher.pdf', description: 'Instructor camera pipeline, color space transforms and FPS optimization deck' },
+  { id: 'CNT-1102-T', title: 'Class 11 - Unit 2: Object Contour Tracking (Teacher Master)', type: 'PDF', level: 'Level 1', class_grade: '11', target: 'Teacher', is_watermarked: 0, url: '/materials/class11-unit2-teacher.pdf', description: 'Level 1 Unit 2 Morphological Operations & Centroid Tracking Guide' },
+  { id: 'CNT-1103-T', title: 'Class 11 - Unit 3: Haar Cascades Facial Recognition (Teacher Master)', type: 'PDF', level: 'Level 2', class_grade: '11', target: 'Teacher', is_watermarked: 0, url: '/materials/class11-unit3-teacher.pdf', description: 'Level 2 Unit 3 Haar Cascades Multi-Face Detection Pipeline Guide' },
+  { id: 'CNT-1104-T', title: 'Class 11 - Unit 4: YOLOv8 Neural Object Detection (Teacher Master)', type: 'PDF', level: 'Level 3', class_grade: '11', target: 'Teacher', is_watermarked: 0, url: '/materials/class11-unit4-teacher.pdf', description: 'Level 3 Unit 4 Edge AI Deep Learning Inferencing Lesson Plan' },
+  { id: 'CNT-1105-T', title: 'Class 11 - Unit 5: MediaPipe Edge AI Gesture Mapping (Teacher Master)', type: 'PDF', level: 'Level 4', class_grade: '11', target: 'Teacher', is_watermarked: 0, url: '/materials/class11-unit5-teacher.pdf', description: 'Level 4 Unit 5 21-Point Hand Landmark Detection & Command Mapping' },
+  { id: 'CNT-1106-T', title: 'Class 11 - Unit 6: Vision AI Rover Capstone (Teacher Master)', type: 'PDF', level: 'Level 5', class_grade: '11', target: 'Teacher', is_watermarked: 0, url: '/materials/class11-unit6-teacher.pdf', description: 'Level 5 Unit 6 Autonomous Vision Surveillance Rover Defense Rubric' },
+
+  // ==================== STUDENT STUDY GUIDES (Unit 1 & Unit 2 for Enrolled Students) ====================
+  { id: 'CNT-601-S', title: 'Class 6 - Unit 1: Basic Circuits (Student Edition)', type: 'PDF', level: null, class_grade: '6', target: 'Student', is_watermarked: 1, url: '/materials/class6-unit1-student-watermarked.pdf', description: 'Foundational electronics, LEDs, breadboard wiring and series/parallel circuits' },
+  { id: 'CNT-602-S', title: 'Class 6 - Unit 2: Sensors LDR & IR (Student Edition)', type: 'PDF', level: 'Level 1', class_grade: '6', target: 'Student', is_watermarked: 1, url: '/materials/class6-unit2-student-watermarked.pdf', description: 'Level 1 Unit 2 Light & Obstacle Sensor Manual with Circuit Schematics' },
+
+  { id: 'CNT-701-S', title: 'Class 7 - Unit 1: C++ Fundamentals (Student Edition)', type: 'PDF', level: null, class_grade: '7', target: 'Student', is_watermarked: 1, url: '/materials/class7-unit1-student-watermarked.pdf', description: 'Logic structures, conditional statements, variables and microcontroller syntax' },
+  { id: 'CNT-702-S', title: 'Class 7 - Unit 2: Analog Sensor Interfacing (Student Edition)', type: 'PDF', level: 'Level 1', class_grade: '7', target: 'Student', is_watermarked: 1, url: '/materials/class7-unit2-student-watermarked.pdf', description: 'Level 1 Unit 2 Analog vs Digital Sensors & Signal Interfacing' },
+
+  { id: 'CNT-801-S', title: 'Class 8 - Unit 1: PWM Motor Control (Student Edition)', type: 'PDF', level: null, class_grade: '8', target: 'Student', is_watermarked: 1, url: '/materials/class8-unit1-student-watermarked.pdf', description: 'H-bridge motor drivers, duty cycles, speed modulation and differential steering' },
+  { id: 'CNT-802-S', title: 'Class 8 - Unit 2: Ultrasonic Echo Mapping (Student Edition)', type: 'PDF', level: 'Level 1', class_grade: '8', target: 'Student', is_watermarked: 1, url: '/materials/class8-unit2-student-watermarked.pdf', description: 'Level 1 Unit 2 Ultrasonic Echo Mapping & Collision Prevention' },
+
+  { id: 'CNT-901-S', title: 'Class 9 - Unit 1: ESP32 IoT Microcontrollers (Student Edition)', type: 'PDF', level: null, class_grade: '9', target: 'Student', is_watermarked: 1, url: '/materials/class9-unit1-student-watermarked.pdf', description: 'ESP32 Dual-Core architecture, Wi-Fi station setup and embedded web server' },
+  { id: 'CNT-902-S', title: 'Class 9 - Unit 2: HTTP & MQTT Cloud Protocols (Student Edition)', type: 'PDF', level: 'Level 1', class_grade: '9', target: 'Student', is_watermarked: 1, url: '/materials/class9-unit2-student-watermarked.pdf', description: 'Level 1 Unit 2 Wi-Fi HTTP / MQTT Cloud Telemetry' },
+
+  { id: 'CNT-1101-S', title: 'Class 11 - Unit 1: Python OpenCV Vision (Student Edition)', type: 'PDF', level: null, class_grade: '11', target: 'Student', is_watermarked: 1, url: '/materials/class11-unit1-student-watermarked.pdf', description: 'OpenCV matrix operations, video stream capture, color filters and convolutions' },
+  { id: 'CNT-1102-S', title: 'Class 11 - Unit 2: Object Contour Tracking (Student Edition)', type: 'PDF', level: 'Level 1', class_grade: '11', target: 'Student', is_watermarked: 1, url: '/materials/class11-unit2-student-watermarked.pdf', description: 'Level 1 Unit 2 OpenCV Color Masking & Contour Object Tracking' }
 ];

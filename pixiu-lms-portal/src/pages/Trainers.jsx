@@ -41,6 +41,7 @@ export default function Trainers() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [filePreview, setFilePreview] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [historyClassFilter, setHistoryClassFilter] = useState('All');
 
   // Form State for Onboarding Trainer
   const [formData, setFormData] = useState({
@@ -183,21 +184,64 @@ export default function Trainers() {
     toast.success(`Project "${projectTitle}" certified & attached to student portfolio!`, 'Build Evidence Uploaded');
   };
 
+  const handleMarkAllPresent = async () => {
+    if (activeSession && activeSession.is_locked === 1 && !isAdmin) {
+      toast.error("This session is locked. Only Admin can edit past attendance records!");
+      return;
+    }
+    for (const student of roster) {
+      await markAttendance(activeSessionId, student.student_id, 'Present');
+    }
+    toast.success(`Marked all ${roster.length} students Present!`, 'Attendance Updated');
+  };
+
   // If in live session runner view
   if (activeSession) {
     const isLocked = activeSession.is_locked === 1;
 
     return (
-      <div className="max-w-md mx-auto bg-slate-50 min-h-[calc(100vh-8rem)] rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150">
-        <div className="bg-pixiu-dark text-white p-6 relative">
-          <button onClick={() => setActiveSessionId(null)} className="absolute top-6 left-4 text-slate-400 hover:text-white cursor-pointer">
-            <X size={24} />
+      <div className="max-w-lg mx-auto bg-slate-50 min-h-[calc(100vh-8rem)] rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150">
+        <div className="bg-pixiu-dark text-white p-5 relative">
+          <button onClick={() => setActiveSessionId(null)} className="absolute top-5 left-4 text-slate-400 hover:text-white cursor-pointer">
+            <X size={22} />
           </button>
           <div className="text-center">
-            <span className="text-[10px] font-bold tracking-widest text-pixiu-blue uppercase">Classroom Runner & Attendance</span>
-            <h2 className="font-bold text-lg text-white mt-1">{sessionSchool ? sessionSchool.name : 'Zenith Public School'}</h2>
+            <span className="text-[10px] font-bold tracking-widest text-pixiu-blue uppercase">Classroom Runner & Live Attendance</span>
+            <h2 className="font-bold text-base text-white mt-0.5">{sessionSchool ? sessionSchool.name : 'Zenith Public School'}</h2>
             <p className="text-xs text-slate-300 font-medium">{sessionClass ? `Class ${sessionClass.grade} ${sessionClass.section}` : 'General Class'}</p>
-            <p className="text-[11px] text-blue-300 mt-1 font-mono">Date: {activeSession.date} • {activeSession.time || '10:00 AM'}</p>
+            <p className="text-[11px] text-blue-300 mt-0.5 font-mono">Date: {activeSession.date} • {activeSession.time || '10:00 AM'}</p>
+          </div>
+
+          {/* Class Switcher inside Live Runner */}
+          <div className="mt-4 pt-3 border-t border-slate-700/60 flex items-center justify-center gap-1.5 overflow-x-auto">
+            <span className="text-[10px] font-bold text-slate-400 uppercase mr-1">Switch Grade:</span>
+            {[
+              { grade: '6', id: 'CLS-ZPS-6A', label: '6A' },
+              { grade: '7', id: 'CLS-ZPS-7A', label: '7A' },
+              { grade: '8', id: 'CLS-ZPS-8A', label: '8A' },
+              { grade: '9', id: 'CLS-ZPS-9A', label: '9A' },
+              { grade: '11', id: 'CLS-ZPS-11A', label: '11A' },
+            ].map(cls => {
+              const clsSession = sessions.find(s => s.class_id === cls.id);
+              const isSelected = activeSession.class_id === cls.id;
+              return (
+                <button
+                  key={cls.id}
+                  onClick={() => {
+                    if (clsSession) {
+                      setActiveSessionId(clsSession.id);
+                    }
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                    isSelected 
+                      ? 'bg-pixiu-blue text-white shadow-md shadow-blue-500/30 ring-2 ring-blue-400' 
+                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
+                  }`}
+                >
+                  Class {cls.label}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -220,7 +264,15 @@ export default function Trainers() {
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
           <div className="flex justify-between items-center mb-1">
             <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Student Roster ({roster.length})</p>
-            <span className="text-[11px] text-slate-400">Tap to mark status</span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleMarkAllPresent}
+                disabled={isLocked && !isAdmin}
+                className="text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-0.5 rounded-md cursor-pointer transition-colors"
+              >
+                ✓ Mark All Present
+              </button>
+            </div>
           </div>
           
           {roster.map(student => {
@@ -544,20 +596,34 @@ export default function Trainers() {
                     </div>
                   </div>
 
-                  <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
-                    <button 
-                      onClick={() => {
-                        const upcomingOrFirst = sessions.find(s => s.status === 'Upcoming' || s.status === 'Planned') || sessions[0];
-                        if (upcomingOrFirst) {
-                          setActiveSessionId(upcomingOrFirst.id);
-                        } else {
-                          toast.warning("No active sessions currently scheduled.");
-                        }
-                      }}
-                      className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-4 py-2 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
-                    >
-                      <Play size={13} fill="white"/> Run Live Session & Attendance
-                    </button>
+                  <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[11px] font-bold text-slate-400 uppercase mr-1">Live Attendance:</span>
+                      {[
+                        { grade: '6', id: 'CLS-ZPS-6A', label: 'Class 6A' },
+                        { grade: '7', id: 'CLS-ZPS-7A', label: 'Class 7A' },
+                        { grade: '8', id: 'CLS-ZPS-8A', label: 'Class 8A' },
+                        { grade: '9', id: 'CLS-ZPS-9A', label: 'Class 9A' },
+                        { grade: '11', id: 'CLS-ZPS-11A', label: 'Class 11A' },
+                      ].map(cls => {
+                        const clsSession = sessions.find(s => s.class_id === cls.id);
+                        return (
+                          <button
+                            key={cls.id}
+                            onClick={() => {
+                              if (clsSession) {
+                                setActiveSessionId(clsSession.id);
+                              } else {
+                                toast.warning(`No active session found for ${cls.label}.`);
+                              }
+                            }}
+                            className="bg-slate-900 hover:bg-pixiu-blue text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+                          >
+                            <Play size={11} fill="white"/> {cls.label}
+                          </button>
+                        );
+                      })}
+                    </div>
 
                     {isAdmin && (
                       <button 
@@ -565,7 +631,7 @@ export default function Trainers() {
                           setTrainerToDelete(trainer);
                           setDeleteConfirmationInput('');
                         }}
-                        className="text-slate-400 hover:text-red-600 p-2 rounded-lg hover:bg-red-50 transition-colors cursor-pointer flex items-center gap-1 text-xs font-bold"
+                        className="text-slate-400 hover:text-red-600 p-2 rounded-lg hover:bg-red-50 transition-colors cursor-pointer flex items-center gap-1 text-xs font-bold shrink-0 self-end sm:self-auto"
                         title="Remove Trainer"
                       >
                         <Trash2 size={16}/> Remove
@@ -582,60 +648,83 @@ export default function Trainers() {
       {/* Date-wise Attendance Logs Tab */}
       {activeTab === 'history' && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="p-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+          <div className="p-4 border-b border-slate-200 bg-slate-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
             <div>
               <h3 className="font-bold text-slate-800 text-sm">Past Classroom Sessions & Attendance Logs</h3>
-              <p className="text-xs text-slate-500">Immutable date-wise attendance records (Modifiable only by Super Admin)</p>
+              <p className="text-xs text-slate-500">Immutable date-wise attendance records across all grades</p>
+            </div>
+
+            {/* Class Grade Filter */}
+            <div className="flex items-center gap-1.5 overflow-x-auto">
+              <span className="text-xs font-bold text-slate-400 uppercase mr-1 shrink-0">Filter Grade:</span>
+              {['All', '6A', '7A', '8A', '9A', '11A'].map(grade => (
+                <button
+                  key={grade}
+                  onClick={() => setHistoryClassFilter(grade)}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                    historyClassFilter === grade 
+                      ? 'bg-pixiu-blue text-white shadow-xs' 
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  {grade === 'All' ? 'All Grades' : `Class ${grade}`}
+                </button>
+              ))}
             </div>
           </div>
 
           <div className="divide-y divide-slate-100">
-            {sessions.map(ses => {
-              const sessionAtt = attendance.filter(a => a.session_id === ses.id);
-              const presentCount = sessionAtt.filter(a => a.status === 'Present').length;
-              const totalCount = sessionAtt.length || 5;
-              const isLocked = ses.is_locked === 1;
+            {sessions
+              .filter(ses => {
+                if (historyClassFilter === 'All') return true;
+                return ses.class_id.includes(historyClassFilter);
+              })
+              .map(ses => {
+                const sessionAtt = attendance.filter(a => a.session_id === ses.id);
+                const presentCount = sessionAtt.filter(a => a.status === 'Present').length;
+                const totalCount = sessionAtt.length || 5;
+                const isLocked = ses.is_locked === 1;
 
-              return (
-                <div key={ses.id} className="p-5 hover:bg-slate-50 transition-colors flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs font-bold bg-blue-50 text-pixiu-blue px-2.5 py-0.5 rounded-md">
-                        {ses.date} • {ses.time || '10:00 AM'}
-                      </span>
-                      <span className="font-bold text-slate-800 text-sm">
-                        {ses.class_id.replace('CLS-ZPS-', 'Class ')}
-                      </span>
-                      {isLocked ? (
-                        <span className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full flex items-center gap-1">
-                          <Lock size={10} /> Locked
+                return (
+                  <div key={ses.id} className="p-5 hover:bg-slate-50 transition-colors flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-bold bg-blue-50 text-pixiu-blue px-2.5 py-0.5 rounded-md">
+                          {ses.date} • {ses.time || '10:00 AM'}
                         </span>
-                      ) : (
-                        <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
-                          Upcoming / Active
+                        <span className="font-bold text-slate-800 text-sm">
+                          {ses.class_id.replace('CLS-ZPS-', 'Class ')}
                         </span>
-                      )}
+                        {isLocked ? (
+                          <span className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <Lock size={10} /> Locked
+                          </span>
+                        ) : (
+                          <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                            Upcoming / Active
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs font-semibold text-slate-700">{ses.topic}</p>
+                      {ses.notes && <p className="text-xs text-slate-400">{ses.notes}</p>}
                     </div>
-                    <p className="text-xs font-semibold text-slate-700">{ses.topic}</p>
-                    {ses.notes && <p className="text-xs text-slate-400">{ses.notes}</p>}
-                  </div>
 
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase">Attendance Recorded</p>
-                      <p className="text-sm font-bold text-emerald-600">{presentCount} / {totalCount} Students Present</p>
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase">Attendance Recorded</p>
+                        <p className="text-sm font-bold text-emerald-600">{presentCount} / {totalCount} Students Present</p>
+                      </div>
+
+                      <button
+                        onClick={() => setActiveSessionId(ses.id)}
+                        className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-2 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                      >
+                        View Record <ChevronRight size={14}/>
+                      </button>
                     </div>
-
-                    <button
-                      onClick={() => setActiveSessionId(ses.id)}
-                      className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-2 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
-                    >
-                      View Record <ChevronRight size={14}/>
-                    </button>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
 
             {sessions.length === 0 && (
               <div className="p-12 text-center text-slate-400 text-xs">

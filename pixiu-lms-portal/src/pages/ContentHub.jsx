@@ -9,7 +9,7 @@ export default function ContentHub() {
   const { role } = useAuth();
   const toast = useToast();
   
-  const [filterTarget, setFilterTarget] = useState('All'); // 'All' | 'Student' | 'Trainer'
+  const [filterTarget, setFilterTarget] = useState('Trainer'); // Default to Trainer / Teacher clean packs
   const [selectedClass, setSelectedClass] = useState('All'); // 'All' | '6' | '7' | '8' | '9' | '11'
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -19,14 +19,15 @@ export default function ContentHub() {
     type: 'PDF',
     level: 'Level 1',
     class_grade: '6',
-    target: 'Student',
-    url: '/materials/class6-unit1-student-watermarked.pdf',
-    is_watermarked: 1,
+    target: 'Teacher',
+    url: '/materials/class6-unit1-teacher.pdf',
+    is_watermarked: 0,
     description: ''
   });
 
   const filteredContent = content.filter(item => {
-    const matchesTarget = filterTarget === 'All' || item.target === filterTarget;
+    const isTeacherMaster = item.target === 'Teacher' || item.target === 'Trainer';
+    const matchesTarget = filterTarget === 'All' ? isTeacherMaster : (item.target === 'Teacher' || item.target === 'Trainer');
     const matchesClass = selectedClass === 'All' || item.class_grade === selectedClass;
     const matchesSearch = item.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           (item.description && item.description.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -41,18 +42,19 @@ export default function ContentHub() {
     await uploadContent({
       ...formData,
       level: computedLevel,
-      is_watermarked: formData.target === 'Student' ? 1 : 0
+      target: 'Teacher',
+      is_watermarked: 0
     });
-    toast.success(`"${formData.title}" published to Content Hub!`, 'Study Material Uploaded');
+    toast.success(`"${formData.title}" published to Content Hub!`, 'Teacher Master Uploaded');
     setIsModalOpen(false);
     setFormData({
       title: '',
       type: 'PDF',
       level: 'Level 1',
       class_grade: '6',
-      target: 'Student',
+      target: 'Teacher',
       url: '',
-      is_watermarked: 1,
+      is_watermarked: 0,
       description: ''
     });
   };
@@ -65,68 +67,57 @@ export default function ContentHub() {
     window.open(url, '_blank');
   };
 
+  const teacherPacksCount = content.filter(c => c.target === 'Teacher' || c.target === 'Trainer').length;
+
   return (
     <div className="pb-10">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Class-wise Academic Content Hub</h1>
-          <p className="text-slate-500">Curated curriculum PDFs, unwatermarked trainer teaching packs, and student workbooks.</p>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-slate-800">Teacher Master Content Hub</h1>
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300">
+              Clean Master Edition (No Watermark)
+            </span>
+          </div>
+          <p className="text-slate-500 mt-1">Official faculty teaching guides, circuit schematics, viva questions & solution code across Classes 6 to 11.</p>
         </div>
         {role !== 'student' && (
           <button 
             onClick={() => setIsModalOpen(true)}
             className="bg-pixiu-blue text-white px-5 py-2.5 rounded-lg font-medium flex items-center gap-2 hover:bg-blue-600 transition-colors shadow-sm cursor-pointer text-sm"
           >
-            <Upload size={18} /> Upload New Material
+            <Upload size={18} /> Upload Master Guide
           </button>
         )}
       </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div 
-          onClick={() => setFilterTarget('All')}
-          className={`p-6 rounded-xl text-white shadow-sm flex justify-between items-center cursor-pointer transition-all ${
-            filterTarget === 'All' ? 'bg-gradient-to-br from-slate-900 to-slate-800 ring-2 ring-blue-400' : 'bg-slate-800 hover:bg-slate-700'
-          }`}
-        >
+        <div className="p-6 rounded-xl text-white shadow-sm flex justify-between items-center bg-gradient-to-br from-slate-900 to-slate-800">
           <div>
-            <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Total Curriculum Assets</p>
-            <p className="text-3xl font-bold">{content.length}</p>
+            <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Total Teacher Units</p>
+            <p className="text-3xl font-bold">{teacherPacksCount} Units</p>
           </div>
-          <div className="bg-white/10 p-3 rounded-xl"><Layers size={24} /></div>
+          <div className="bg-white/10 p-3 rounded-xl"><BookOpen size={24} /></div>
         </div>
 
-        <div 
-          onClick={() => setFilterTarget('Trainer')}
-          className={`bg-white border p-6 rounded-xl text-slate-800 shadow-sm flex justify-between items-center cursor-pointer transition-all ${
-            filterTarget === 'Trainer' ? 'border-amber-500 ring-2 ring-amber-200' : 'border-slate-200 hover:border-slate-300'
-          }`}
-        >
+        <div className="bg-white border border-slate-200 p-6 rounded-xl text-slate-800 shadow-sm flex justify-between items-center">
           <div>
-            <div className="flex items-center gap-1.5 mb-1">
-              <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-md uppercase">No Watermark</span>
-              <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Trainer Master Packs</p>
-            </div>
-            <p className="text-3xl font-bold text-slate-800">{content.filter(c => c.target === 'Trainer').length}</p>
+            <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Active Classes</p>
+            <p className="text-2xl font-bold text-slate-800">5 Grades (6, 7, 8, 9, 11)</p>
           </div>
-          <div className="bg-amber-50 text-amber-600 p-3 rounded-xl"><BookOpen size={24} /></div>
+          <div className="bg-blue-50 text-pixiu-blue p-3 rounded-xl"><Layers size={24} /></div>
         </div>
 
-        <div 
-          onClick={() => setFilterTarget('Student')}
-          className={`bg-white border p-6 rounded-xl text-slate-800 shadow-sm flex justify-between items-center cursor-pointer transition-all ${
-            filterTarget === 'Student' ? 'border-pixiu-blue ring-2 ring-blue-200' : 'border-slate-200 hover:border-slate-300'
-          }`}
-        >
+        <div className="bg-white border border-amber-200 p-6 rounded-xl text-slate-800 shadow-sm flex justify-between items-center bg-amber-50/20">
           <div>
             <div className="flex items-center gap-1.5 mb-1">
-              <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded-md uppercase">Watermarked</span>
-              <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Student Guides</p>
+              <ShieldCheck size={14} className="text-amber-600" />
+              <p className="text-amber-900 text-xs font-bold uppercase tracking-wider">Master Guide Format</p>
             </div>
-            <p className="text-3xl font-bold text-slate-800">{content.filter(c => c.target === 'Student').length}</p>
+            <p className="text-sm font-bold text-slate-700">100% Unwatermarked Faculty PDFs</p>
           </div>
-          <div className="bg-blue-50 text-pixiu-blue p-3 rounded-xl"><GraduationCap size={24} /></div>
+          <div className="bg-amber-100 text-amber-700 p-3 rounded-xl"><ShieldCheck size={24} /></div>
         </div>
       </div>
 

@@ -361,90 +361,103 @@ function initializeDatabase() {
         ldStmt.run('L-002', 'Mount Carmel School', 'Fr. James', '9198760001', 'Dwarka', 'Negotiation', 180000, 'Proposal sent for 120 students.', '2026-08-30');
         ldStmt.finalize();
 
-        // Content Hub (Unit 1: No Level Tag & Unit 2: Level 1 uploaded for Classes 6, 7, 8, 9, 11)
+        // Content Hub: 30 Clean Teacher Master Packs (Units 1-6 for Classes 6, 7, 8, 9, 11) + Student Watermarked Editions
         const cntStmt = db.prepare("INSERT INTO content VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
         
-        // ==================== CLASS 6 ====================
-        // Unit 1 (Intro - No Level Tag)
-        cntStmt.run('CNT-601-S', 'Class 6 - Unit 1: Basic Circuits (Student Edition)', 'PDF', null, '6', 'Student', '/materials/class6-unit1-student-watermarked.pdf', 1, 'Foundational electronics, LEDs, breadboard wiring and series/parallel circuits');
-        cntStmt.run('CNT-601-T', 'Class 6 - Unit 1: Basic Circuits (Teacher Master)', 'PDF', null, '6', 'Trainer', '/materials/class6-unit1-teacher.pdf', 0, 'Instructor lesson plan, circuit schematics & viva questions for Unit 1');
-        // Unit 2 (Level 1)
-        cntStmt.run('CNT-602-S', 'Class 6 - Unit 2: Sensors LDR & IR (Student Edition)', 'PDF', 'Level 1', '6', 'Student', '/materials/class6-unit2-student-watermarked.pdf', 1, 'Level 1 Unit 2 Light & Obstacle Sensor Manual with Circuit Schematics');
-        cntStmt.run('CNT-602-T', 'Class 6 - Unit 2: Sensors LDR & IR (Teacher Master)', 'PDF', 'Level 1', '6', 'Trainer', '/materials/class6-unit2-teacher.pdf', 0, 'Level 1 Unit 2 Instructor Calibration Guide');
+        // Class 6 Teacher Masters (Units 1 to 6)
+        cntStmt.run('CNT-601-T', 'Class 6 - Unit 1: Basic Circuits (Teacher Master)', 'PDF', null, '6', 'Trainer', '/materials/class6-unit1-teacher.pdf', 0, 'Clean instructor guide, circuit schematics & viva questions for Unit 1');
+        cntStmt.run('CNT-602-T', 'Class 6 - Unit 2: Sensors LDR & IR (Teacher Master)', 'PDF', 'Level 1', '6', 'Trainer', '/materials/class6-unit2-teacher.pdf', 0, 'Level 1 Unit 2 Instructor Calibration & Sensor Circuit Guide');
+        cntStmt.run('CNT-603-T', 'Class 6 - Unit 3: Motors & Actuators (Teacher Master)', 'PDF', 'Level 2', '6', 'Trainer', '/materials/class6-unit3-teacher.pdf', 0, 'Level 2 Unit 3 Motors, Buzzers & Relay Driver Lesson Plan');
+        cntStmt.run('CNT-604-T', 'Class 6 - Unit 4: Microcontroller Intro (Teacher Master)', 'PDF', 'Level 3', '6', 'Trainer', '/materials/class6-unit4-teacher.pdf', 0, 'Level 3 Unit 4 Arduino Coding & Pin Mapping Walkthrough');
+        cntStmt.run('CNT-605-T', 'Class 6 - Unit 5: Obstacle Rover Project (Teacher Master)', 'PDF', 'Level 4', '6', 'Trainer', '/materials/class6-unit5-teacher.pdf', 0, 'Level 4 Unit 5 2WD Obstacle Avoiding Rover Assembly Rubric');
+        cntStmt.run('CNT-606-T', 'Class 6 - Unit 6: Smart Lab Capstone (Teacher Master)', 'PDF', 'Level 5', '6', 'Trainer', '/materials/class6-unit6-teacher.pdf', 0, 'Level 5 Unit 6 Capstone Evaluation & Certification Rubric');
 
-        // ==================== CLASS 7 ====================
-        // Unit 1 (Intro - No Level Tag)
-        cntStmt.run('CNT-701-S', 'Class 7 - Unit 1: C++ Fundamentals (Student Edition)', 'PDF', null, '7', 'Student', '/materials/class7-unit1-student-watermarked.pdf', 1, 'Logic structures, conditional statements, variables and microcontroller syntax');
+        // Class 7 Teacher Masters (Units 1 to 6)
         cntStmt.run('CNT-701-T', 'Class 7 - Unit 1: C++ Fundamentals (Teacher Master)', 'PDF', null, '7', 'Trainer', '/materials/class7-unit1-teacher.pdf', 0, 'Instructor lesson plan and code walkthroughs for AVR microcontrollers');
-        // Unit 2 (Level 1)
-        cntStmt.run('CNT-702-S', 'Class 7 - Unit 2: Analog Sensor Interfacing (Student Edition)', 'PDF', 'Level 1', '7', 'Student', '/materials/class7-unit2-student-watermarked.pdf', 1, 'Level 1 Unit 2 Analog vs Digital Sensors & Signal Interfacing');
-        cntStmt.run('CNT-702-T', 'Class 7 - Unit 2: Analog Sensor Interfacing (Teacher Master)', 'PDF', 'Level 1', '7', 'Trainer', '/materials/class7-unit2-teacher.pdf', 0, 'Level 1 Unit 2 Instructor Calibration Lesson Plan');
+        cntStmt.run('CNT-702-T', 'Class 7 - Unit 2: Analog Sensor Interfacing (Teacher Master)', 'PDF', 'Level 1', '7', 'Trainer', '/materials/class7-unit2-teacher.pdf', 0, 'Level 1 Unit 2 Instructor Calibration & ADC Lesson Plan');
+        cntStmt.run('CNT-703-T', 'Class 7 - Unit 3: I2C LCD Display (Teacher Master)', 'PDF', 'Level 2', '7', 'Trainer', '/materials/class7-unit3-teacher.pdf', 0, 'Level 2 Unit 3 I2C Addressing & Telemetry Display Guide');
+        cntStmt.run('CNT-704-T', 'Class 7 - Unit 4: Line Follower Robot (Teacher Master)', 'PDF', 'Level 3', '7', 'Trainer', '/materials/class7-unit4-teacher.pdf', 0, 'Level 3 Unit 4 Dual IR Comparator & Line Follower Troubleshooting');
+        cntStmt.run('CNT-705-T', 'Class 7 - Unit 5: Smart Irrigation System (Teacher Master)', 'PDF', 'Level 4', '7', 'Trainer', '/materials/class7-unit5-teacher.pdf', 0, 'Level 4 Unit 5 Soil Moisture Probe & Submersible Pump Guide');
+        cntStmt.run('CNT-706-T', 'Class 7 - Unit 6: Multi-Sensor Capstone (Teacher Master)', 'PDF', 'Level 5', '7', 'Trainer', '/materials/class7-unit6-teacher.pdf', 0, 'Level 5 Unit 6 Capstone Project Evaluation & Scorecard');
 
-        // ==================== CLASS 8 ====================
-        // Unit 1 (Intro - No Level Tag)
-        cntStmt.run('CNT-801-S', 'Class 8 - Unit 1: PWM Motor Control (Student Edition)', 'PDF', null, '8', 'Student', '/materials/class8-unit1-student-watermarked.pdf', 1, 'H-bridge motor drivers, duty cycles, speed modulation and differential steering');
+        // Class 8 Teacher Masters (Units 1 to 6)
         cntStmt.run('CNT-801-T', 'Class 8 - Unit 1: PWM Motor Control (Teacher Master)', 'PDF', null, '8', 'Trainer', '/materials/class8-unit1-teacher.pdf', 0, 'Instructor driver schematics and PWM waveform calibration guide');
-        // Unit 2 (Level 1)
-        cntStmt.run('CNT-802-S', 'Class 8 - Unit 2: Ultrasonic Echo Mapping (Student Edition)', 'PDF', 'Level 1', '8', 'Student', '/materials/class8-unit2-student-watermarked.pdf', 1, 'Level 1 Unit 2 Ultrasonic Echo Mapping & Collision Prevention');
-        cntStmt.run('CNT-802-T', 'Class 8 - Unit 2: Ultrasonic Echo Mapping (Teacher Master)', 'PDF', 'Level 1', '8', 'Trainer', '/materials/class8-unit2-teacher.pdf', 0, 'Level 1 Unit 2 Instructor Echo Timing Guide');
+        cntStmt.run('CNT-802-T', 'Class 8 - Unit 2: Ultrasonic Echo Mapping (Teacher Master)', 'PDF', 'Level 1', '8', 'Trainer', '/materials/class8-unit2-teacher.pdf', 0, 'Level 1 Unit 2 Instructor Echo Timing & Sonar Radar Guide');
+        cntStmt.run('CNT-803-T', 'Class 8 - Unit 3: Bluetooth Remote Control (Teacher Master)', 'PDF', 'Level 2', '8', 'Trainer', '/materials/class8-unit3-teacher.pdf', 0, 'Level 2 Unit 3 HC-05 Wireless UART & App Command Parsing');
+        cntStmt.run('CNT-804-T', 'Class 8 - Unit 4: PID Line Tracking (Teacher Master)', 'PDF', 'Level 3', '8', 'Trainer', '/materials/class8-unit4-teacher.pdf', 0, 'Level 3 Unit 4 PID Mathematical Model & Gain Tuning Rubric');
+        cntStmt.run('CNT-805-T', 'Class 8 - Unit 5: IoT Cloud Data Logging (Teacher Master)', 'PDF', 'Level 4', '8', 'Trainer', '/materials/class8-unit5-teacher.pdf', 0, 'Level 4 Unit 5 Cloud Telemetry Dashboard Integration Guide');
+        cntStmt.run('CNT-806-T', 'Class 8 - Unit 6: Combat Bot Capstone (Teacher Master)', 'PDF', 'Level 5', '8', 'Trainer', '/materials/class8-unit6-teacher.pdf', 0, 'Level 5 Unit 6 4WD Combat Bot Final Build & Defense Rubric');
 
-        // ==================== CLASS 9 ====================
-        // Unit 1 (Intro - No Level Tag)
-        cntStmt.run('CNT-901-S', 'Class 9 - Unit 1: ESP32 IoT Microcontrollers (Student Edition)', 'PDF', null, '9', 'Student', '/materials/class9-unit1-student-watermarked.pdf', 1, 'ESP32 Dual-Core architecture, Wi-Fi station setup and embedded web server');
-        cntStmt.run('CNT-901-T', 'Class 9 - Unit 1: ESP32 IoT Microcontrollers (Teacher Master)', 'PDF', null, '9', 'Trainer', '/materials/class9-unit1-teacher.pdf', 0, 'Instructor IoT toolchain and network architecture guide');
-        // Unit 2 (Level 1)
-        cntStmt.run('CNT-902-S', 'Class 9 - Unit 2: HTTP & MQTT Cloud Protocols (Student Edition)', 'PDF', 'Level 1', '9', 'Student', '/materials/class9-unit2-student-watermarked.pdf', 1, 'Level 1 Unit 2 Wi-Fi HTTP / MQTT Cloud Telemetry');
-        cntStmt.run('CNT-902-T', 'Class 9 - Unit 2: HTTP & MQTT Cloud Protocols (Teacher Master)', 'PDF', 'Level 1', '9', 'Trainer', '/materials/class9-unit2-teacher.pdf', 0, 'Level 1 Unit 2 Cloud Telemetry Lesson Plan');
+        // Class 9 Teacher Masters (Units 1 to 6)
+        cntStmt.run('CNT-901-T', 'Class 9 - Unit 1: ESP32 IoT Microcontrollers (Teacher Master)', 'PDF', null, '9', 'Trainer', '/materials/class9-unit1-teacher.pdf', 0, 'Instructor IoT toolchain and ESP-IDF/Arduino network architecture');
+        cntStmt.run('CNT-902-T', 'Class 9 - Unit 2: HTTP & MQTT Cloud Protocols (Teacher Master)', 'PDF', 'Level 1', '9', 'Trainer', '/materials/class9-unit2-teacher.pdf', 0, 'Level 1 Unit 2 MQTT PubSub Broker & Cloud Gateway Lesson Plan');
+        cntStmt.run('CNT-903-T', 'Class 9 - Unit 3: MPU6050 Gyro Sensor Fusion (Teacher Master)', 'PDF', 'Level 2', '9', 'Trainer', '/materials/class9-unit3-teacher.pdf', 0, 'Level 2 Unit 3 6-DOF IMU Complementary Filter Calculations');
+        cntStmt.run('CNT-904-T', 'Class 9 - Unit 4: WebSockets & Cloud Actuation (Teacher Master)', 'PDF', 'Level 3', '9', 'Trainer', '/materials/class9-unit4-teacher.pdf', 0, 'Level 3 Unit 4 Bi-directional WebSocket Control Server Guide');
+        cntStmt.run('CNT-905-T', 'Class 9 - Unit 5: Smart Campus IoT Architecture (Teacher Master)', 'PDF', 'Level 4', '9', 'Trainer', '/materials/class9-unit5-teacher.pdf', 0, 'Level 4 Unit 5 Mesh Gateway & Webhook Alert Automation');
+        cntStmt.run('CNT-906-T', 'Class 9 - Unit 6: IoT Weather Station Capstone (Teacher Master)', 'PDF', 'Level 5', '9', 'Trainer', '/materials/class9-unit6-teacher.pdf', 0, 'Level 5 Unit 6 Full-Stack Industrial IoT Capstone Audit');
 
-        // ==================== CLASS 11 ====================
-        // Unit 1 (Intro - No Level Tag)
-        cntStmt.run('CNT-1101-S', 'Class 11 - Unit 1: Python OpenCV Vision (Student Edition)', 'PDF', null, '11', 'Student', '/materials/class11-unit1-student-watermarked.pdf', 1, 'OpenCV matrix operations, video stream capture, color filters and convolutions');
+        // Class 11 Teacher Masters (Units 1 to 6)
         cntStmt.run('CNT-1101-T', 'Class 11 - Unit 1: Python OpenCV Vision (Teacher Master)', 'PDF', null, '11', 'Trainer', '/materials/class11-unit1-teacher.pdf', 0, 'Instructor camera pipeline, color space transforms and FPS optimization deck');
-        // Unit 2 (Level 1)
+        cntStmt.run('CNT-1102-T', 'Class 11 - Unit 2: Object Contour Tracking (Teacher Master)', 'PDF', 'Level 1', '11', 'Trainer', '/materials/class11-unit2-teacher.pdf', 0, 'Level 1 Unit 2 Morphological Operations & Centroid Tracking Guide');
+        cntStmt.run('CNT-1103-T', 'Class 11 - Unit 3: Haar Cascades Facial Recognition (Teacher Master)', 'PDF', 'Level 2', '11', 'Trainer', '/materials/class11-unit3-teacher.pdf', 0, 'Level 2 Unit 3 Haar Cascades Multi-Face Detection Pipeline Guide');
+        cntStmt.run('CNT-1104-T', 'Class 11 - Unit 4: YOLOv8 Neural Object Detection (Teacher Master)', 'PDF', 'Level 3', '11', 'Trainer', '/materials/class11-unit4-teacher.pdf', 0, 'Level 3 Unit 4 Edge AI Deep Learning Inferencing Lesson Plan');
+        cntStmt.run('CNT-1105-T', 'Class 11 - Unit 5: MediaPipe Edge AI Gesture Mapping (Teacher Master)', 'PDF', 'Level 4', '11', 'Trainer', '/materials/class11-unit5-teacher.pdf', 0, 'Level 4 Unit 5 21-Point Hand Landmark Detection & Command Mapping');
+        cntStmt.run('CNT-1106-T', 'Class 11 - Unit 6: Vision AI Rover Capstone (Teacher Master)', 'PDF', 'Level 5', '11', 'Trainer', '/materials/class11-unit6-teacher.pdf', 0, 'Level 5 Unit 6 Autonomous Vision Surveillance Rover Defense Rubric');
+
+        // Student Guides (Units 1 & 2 for student portal)
+        cntStmt.run('CNT-601-S', 'Class 6 - Unit 1: Basic Circuits (Student Edition)', 'PDF', null, '6', 'Student', '/materials/class6-unit1-student-watermarked.pdf', 1, 'Foundational electronics, LEDs, breadboard wiring and series/parallel circuits');
+        cntStmt.run('CNT-602-S', 'Class 6 - Unit 2: Sensors LDR & IR (Student Edition)', 'PDF', 'Level 1', '6', 'Student', '/materials/class6-unit2-student-watermarked.pdf', 1, 'Level 1 Unit 2 Light & Obstacle Sensor Manual with Circuit Schematics');
+        cntStmt.run('CNT-701-S', 'Class 7 - Unit 1: C++ Fundamentals (Student Edition)', 'PDF', null, '7', 'Student', '/materials/class7-unit1-student-watermarked.pdf', 1, 'Logic structures, conditional statements, variables and microcontroller syntax');
+        cntStmt.run('CNT-702-S', 'Class 7 - Unit 2: Analog Sensor Interfacing (Student Edition)', 'PDF', 'Level 1', '7', 'Student', '/materials/class7-unit2-student-watermarked.pdf', 1, 'Level 1 Unit 2 Analog vs Digital Sensors & Signal Interfacing');
+        cntStmt.run('CNT-801-S', 'Class 8 - Unit 1: PWM Motor Control (Student Edition)', 'PDF', null, '8', 'Student', '/materials/class8-unit1-student-watermarked.pdf', 1, 'H-bridge motor drivers, duty cycles, speed modulation and differential steering');
+        cntStmt.run('CNT-802-S', 'Class 8 - Unit 2: Ultrasonic Echo Mapping (Student Edition)', 'PDF', 'Level 1', '8', 'Student', '/materials/class8-unit2-student-watermarked.pdf', 1, 'Level 1 Unit 2 Ultrasonic Echo Mapping & Collision Prevention');
+        cntStmt.run('CNT-901-S', 'Class 9 - Unit 1: ESP32 IoT Microcontrollers (Student Edition)', 'PDF', null, '9', 'Student', '/materials/class9-unit1-student-watermarked.pdf', 1, 'ESP32 Dual-Core architecture, Wi-Fi station setup and embedded web server');
+        cntStmt.run('CNT-902-S', 'Class 9 - Unit 2: HTTP & MQTT Cloud Protocols (Student Edition)', 'PDF', 'Level 1', '9', 'Student', '/materials/class9-unit2-student-watermarked.pdf', 1, 'Level 1 Unit 2 Wi-Fi HTTP / MQTT Cloud Telemetry');
+        cntStmt.run('CNT-1101-S', 'Class 11 - Unit 1: Python OpenCV Vision (Student Edition)', 'PDF', null, '11', 'Student', '/materials/class11-unit1-student-watermarked.pdf', 1, 'OpenCV matrix operations, video stream capture, color filters and convolutions');
         cntStmt.run('CNT-1102-S', 'Class 11 - Unit 2: Object Contour Tracking (Student Edition)', 'PDF', 'Level 1', '11', 'Student', '/materials/class11-unit2-student-watermarked.pdf', 1, 'Level 1 Unit 2 OpenCV Color Masking & Contour Object Tracking');
-        cntStmt.run('CNT-1102-T', 'Class 11 - Unit 2: Object Contour Tracking (Teacher Master)', 'PDF', 'Level 1', '11', 'Trainer', '/materials/class11-unit2-teacher.pdf', 0, 'Level 1 Unit 2 Contour Tracking Instructor Guide');
 
         cntStmt.finalize();
 
-        // 5-Level Structured Curriculum Plans (Mapping 5 Classes to 5 Levels)
+        // 5-Level Structured Curriculum Plans (All Classes 6, 7, 8, 9, 11: Unit 1 Completed, Units 2-6 Upcoming)
         const curStmt = db.prepare("INSERT INTO curriculum VALUES (?, ?, ?, ?, ?, ?)");
-        // Level 1 (Class 6)
-        curStmt.run('CUR-101', 'Unit 1', 'Level 1', 'Robotics & Electronic Sensor Logic', 'Understand breadboards, IR & light sensors, build trigger circuits', 'Completed');
-        curStmt.run('CUR-102', 'Unit 2', 'Level 1', 'Motors, Gearboxes & H-Bridge Drivers', 'Learn DC motor torque, direction switching and motor driver circuits', 'Current');
-        curStmt.run('CUR-103', 'Unit 3', 'Level 1', 'Ultrasonic Distance & Obstacle Avoidance', 'Measure sonar bounce latency and trigger autonomous steering', 'Upcoming');
-        curStmt.run('CUR-104', 'Unit 4', 'Level 1', 'Autonomous Line Tracker Construction', 'Calibrate dual IR comparators on dark tracking surfaces', 'Upcoming');
-        curStmt.run('CUR-105', 'Unit 5', 'Level 1', 'Sound & Optical Sensor Circuits', 'Acoustic mic integration and light-dependent switching relays', 'Upcoming');
-        curStmt.run('CUR-106', 'Unit 6', 'Level 1', 'Capstone Project: Smart Autonomous Rover', 'Final assembly, testing and circuit certification rubric', 'Upcoming');
+        
+        // Level 1: Class 6
+        curStmt.run('CUR-101', 'Unit 1', 'Level 1', 'Introduction to Electricity & Basic Circuits', 'Understand current, voltage, breadboards and series/parallel LEDs', 'Completed');
+        curStmt.run('CUR-102', 'Unit 2', 'Level 1', 'Sensors: Light (LDR) & Obstacle (IR)', 'Analog vs digital inputs, calibration and sensor signal wiring', 'Upcoming');
+        curStmt.run('CUR-103', 'Unit 3', 'Level 1', 'Actuators: Motors, Buzzers & Relays', 'Transistor switches, relay driver circuits, and sound actuation', 'Upcoming');
+        curStmt.run('CUR-104', 'Unit 4', 'Level 1', 'Microcontroller (Arduino) Programming Basics', 'Digital output pin modes, delay timing, and serial monitor debugging', 'Upcoming');
+        curStmt.run('CUR-105', 'Unit 5', 'Level 1', 'Project Building: Smart Obstacle Avoiding Rover', 'Assemble 2WD chassis, L298N motor driver, and ultrasonic avoidance algorithm', 'Upcoming');
+        curStmt.run('CUR-106', 'Unit 6', 'Level 1', 'Capstone Project: Automated Smart Lab Environment', 'Final end-of-term presentation and smart automation build', 'Upcoming');
 
-        // Level 2 (Class 7)
-        curStmt.run('CUR-201', 'Unit 1', 'Level 2', 'Microcontroller Architecture & C++ Fundamentals', 'AVR microcontroller anatomy, pinouts, and Arduino IDE code structure', 'Completed');
-        curStmt.run('CUR-202', 'Unit 2', 'Level 2', 'Analog-to-Digital Converter & Sensor Interfacing', 'ADC voltage dividers, analogRead resolution, and serial plotting', 'Current');
-        curStmt.run('CUR-203', 'Unit 3', 'Level 2', 'PWM Motor Speed Regulation', 'Duty cycle modulation, timer interrupts and speed ramping', 'Upcoming');
-        curStmt.run('CUR-204', 'Unit 4', 'Level 2', 'Sonar Radar with 180° Servo Sweeper', 'Servo angular indexing and distance sweep visualization', 'Upcoming');
-        curStmt.run('CUR-205', 'Unit 5', 'Level 2', 'I2C Bus Protocol & LCD Telemetry', 'I2C communication, address scanning and real-time status display', 'Upcoming');
-        curStmt.run('CUR-206', 'Unit 6', 'Level 2', 'Capstone Project: Multi-Sensor Autonomous Bot', 'Full bot logic integration with LCD telemetry diagnostics', 'Upcoming');
+        // Level 2: Class 7
+        curStmt.run('CUR-201', 'Unit 1', 'Level 2', 'C++ Coding Fundamentals & Logic Gates', 'Microcontroller architecture, IDE setup, variables and conditional logic', 'Completed');
+        curStmt.run('CUR-202', 'Unit 2', 'Level 2', 'Analog vs Digital Sensors & Signal Interfacing', 'ADC resolution, potentiometer voltage divider and threshold comparator', 'Upcoming');
+        curStmt.run('CUR-203', 'Unit 3', 'Level 2', 'LCD Display & Sensor Data Visualization', 'I2C 16x2 LCD interface, custom character generation and live telemetry', 'Upcoming');
+        curStmt.run('CUR-204', 'Unit 4', 'Level 2', 'Autonomous Line Follower Robotics', 'Dual IR reflectance arrays, Differential drive control and track optimization', 'Upcoming');
+        curStmt.run('CUR-205', 'Unit 5', 'Level 2', 'Smart Irrigation & Environmental Telemetry', 'Soil moisture capacitive probes, submersible pump relay control', 'Upcoming');
+        curStmt.run('CUR-206', 'Unit 6', 'Level 2', 'Capstone Project: Multi-Sensor Autonomous Rover', 'Integration of ultrasonic radar, line tracking, and autonomous pathfinding', 'Upcoming');
 
-        // Level 3 (Class 8)
-        curStmt.run('CUR-301', 'Unit 1', 'Level 3', 'High-Speed Multi-Channel Line Tracking', '5-channel IR sensor arrays and digital state indexing', 'Completed');
-        curStmt.run('CUR-302', 'Unit 2', 'Level 3', 'PID Closed-Loop Math Algorithms', 'Proportional, Integral, Derivative error calculations and tuning', 'Current');
-        curStmt.run('CUR-303', 'Unit 3', 'Level 3', 'Wireless UART & Bluetooth Telemetry', 'HC-05 serial handshakes, packet parsing and smartphone control', 'Upcoming');
-        curStmt.run('CUR-304', 'Unit 4', 'Level 3', '3-Axis Robotic Arm Kinematics', 'Forward kinematics, servo torque balancing and gripper payload control', 'Upcoming');
-        curStmt.run('CUR-305', 'Unit 5', 'Level 3', '6-DOF IMU Gyro & Accelerometer Filters', 'MPU6050 complementary filters for pitch and roll stabilization', 'Upcoming');
-        curStmt.run('CUR-306', 'Unit 6', 'Level 3', 'Capstone Project: Self-Balancing Inverted Pendulum', 'Two-wheel self-balancing inverted pendulum robot build', 'Upcoming');
+        // Level 3: Class 8
+        curStmt.run('CUR-301', 'Unit 1', 'Level 3', 'PWM Motor Control & High-Speed Steering', 'H-bridge motor drivers, PWM speed control and encoder feedback', 'Completed');
+        curStmt.run('CUR-302', 'Unit 2', 'Level 3', 'Ultrasonic Echo Mapping & Collision Prevention', 'HC-SR04 pulse timing, servo radar sweep and distance mapping', 'Upcoming');
+        curStmt.run('CUR-303', 'Unit 3', 'Level 3', 'Bluetooth Wireless Remote Teleoperation', 'HC-05 serial pairing, smartphone app control and command parsing', 'Upcoming');
+        curStmt.run('CUR-304', 'Unit 4', 'Level 3', 'Advanced PID Line Follower System', 'Proportional-Integral-Derivative tuning for smooth high-speed curve navigation', 'Upcoming');
+        curStmt.run('CUR-305', 'Unit 5', 'Level 3', 'IoT Sensor Logging & Real-time Web Monitoring', 'Cloud telemetry logging, sensor dashboard, and remote threshold alerting', 'Upcoming');
+        curStmt.run('CUR-306', 'Unit 6', 'Level 3', 'Capstone Project: Bluetooth Combat / Surveillance Bot', 'High-torque 4WD chassis with wireless command link and modular payload', 'Upcoming');
 
-        // Level 4 (Class 9 - IoT & Cloud)
-        curStmt.run('CUR-401', 'Unit 1', 'Level 4', 'ESP32 Dual-Core Architecture & RTOS', 'Dual-core WiFi/BLE SoC, task pinning and memory management', 'Completed');
-        curStmt.run('CUR-402', 'Unit 2', 'Level 4', 'MQTT Pub-Sub Cloud Telemetry', 'MQTT broker connection, QoS levels, and JSON telemetry transmission', 'Current');
-        curStmt.run('CUR-403', 'Unit 3', 'Level 4', 'Smart Home Relay Actuation & Isolation', 'Optocoupler relays, AC load switching and electrical safety', 'Upcoming');
-        curStmt.run('CUR-404', 'Unit 4', 'Level 4', 'Embedded Async Web Server & UI Dashboards', 'Serving HTML5/CSS dashboards directly from ESP32 flash memory', 'Upcoming');
-        curStmt.run('CUR-405', 'Unit 5', 'Level 4', 'Edge Event Webhooks & Telegram/WhatsApp Alerts', 'HTTP POST webhooks and instant cloud notification triggers', 'Upcoming');
-        curStmt.run('CUR-406', 'Unit 6', 'Level 4', 'Capstone Project: Industrial Smart Factory Node', 'Complete industrial telemetry station with remote dashboard & alerts', 'Upcoming');
+        // Level 4: Class 9
+        curStmt.run('CUR-401', 'Unit 1', 'Level 4', 'ESP32 & Wireless IoT Microcontrollers', 'ESP32 architecture, Wi-Fi station mode, web server and telemetry', 'Completed');
+        curStmt.run('CUR-402', 'Unit 2', 'Level 4', 'Wi-Fi HTTP / MQTT Cloud Telemetry', 'REST API webhooks, MQTT publish/subscribe pubsub broker integration', 'Upcoming');
+        curStmt.run('CUR-403', 'Unit 3', 'Level 4', 'Advanced Sensor Fusion & Gyro / Accelerometer', 'MPU6050 I2C communication, pitch-roll angle filtering and stabilization', 'Upcoming');
+        curStmt.run('CUR-404', 'Unit 4', 'Level 4', 'Web Dashboard Integration & Remote Relay Control', 'Interactive WebSocket control interface for remote industrial actuation', 'Upcoming');
+        curStmt.run('CUR-405', 'Unit 5', 'Level 4', 'Smart Campus IoT Gateway Architecture', 'Multi-node sensor network with centralized coordinator hub', 'Upcoming');
+        curStmt.run('CUR-406', 'Unit 6', 'Level 4', 'Capstone Project: Full-Stack IoT Weather Station & Surveillance', 'Solar powered weather sensing node sending telemetry to cloud dashboard', 'Upcoming');
 
-        // Level 5 (Class 11 - Advanced AI & Vision)
-        curStmt.run('CUR-501', 'Unit 1', 'Level 5', 'Computer Vision Matrices & OpenCV Image Pipelines', 'Color spaces, convolution kernels, Gaussian filters and edge detection', 'Completed');
-        curStmt.run('CUR-502', 'Unit 2', 'Level 5', 'HSV Object Detection & Contour Tracking', 'HSV mask thresholding, bounding boxes and spatial centroid tracking', 'Current');
-        curStmt.run('CUR-503', 'Unit 3', 'Level 5', 'Haar Cascade Classifiers & Facial Biometric Nodes', 'Feature vector extraction and real-time facial recognition verification', 'Upcoming');
-        curStmt.run('CUR-504', 'Unit 4', 'Level 5', 'Vision-Based Autonomous Steering & Lane Tracking', 'Perspective transforms, polynomial lane fitting and steering angles', 'Upcoming');
+        // Level 5: Class 11
+        curStmt.run('CUR-501', 'Unit 1', 'Level 5', 'Python for Computer Vision & Machine Intelligence', 'OpenCV basics, video stream capture, color masking and edge detection', 'Completed');
+        curStmt.run('CUR-502', 'Unit 2', 'Level 5', 'OpenCV Color Masking & Contour Object Tracking', 'HSV color space calibration, morphological filters and centroid calculation', 'Upcoming');
+        curStmt.run('CUR-503', 'Unit 3', 'Level 5', 'Haar Cascade Facial Recognition & Surveillance', 'Pretrained Haar cascades, multi-face tracking and attendance logging', 'Upcoming');
+        curStmt.run('CUR-504', 'Unit 4', 'Level 5', 'YOLO Object Detection & Neural Network Inferencing', 'YOLOv8 deep learning model on edge devices, bounding box parsing', 'Upcoming');
         curStmt.run('CUR-505', 'Unit 5', 'Level 5', 'MediaPipe Edge AI Gesture Mapping', 'Hand landmark detection and gesture-controlled robotic actuation', 'Upcoming');
         curStmt.run('CUR-506', 'Unit 6', 'Level 5', 'Capstone Project: Autonomous Vision Surveillance Rover', 'Real-time object tracking and autonomous rover obstacle navigation', 'Upcoming');
 

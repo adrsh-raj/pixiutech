@@ -1,11 +1,21 @@
 import { useState } from 'react';
-import { BookOpen, Clock, Plus, Target, CheckCircle2, X, Layers } from 'lucide-react';
+import { BookOpen, Clock, Plus, Target, CheckCircle2, X, Layers, Check, Circle } from 'lucide-react';
 import { useData } from '../context/DataContext';
+import { useToast } from '../context/ToastContext';
 
 export default function Curriculum() {
-  const { curriculum, addCurriculumPlan } = useData();
+  const { curriculum, addCurriculumPlan, updateCurriculumStatus } = useData();
+  const toast = useToast();
   const [level, setLevel] = useState('Level 1');
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const levelGradeMap = {
+    'Level 1': 'Class 6',
+    'Level 2': 'Class 7',
+    'Level 3': 'Class 8',
+    'Level 4': 'Class 9',
+    'Level 5': 'Class 11',
+  };
 
   const [formData, setFormData] = useState({
     week: 'Week 1',
@@ -16,6 +26,16 @@ export default function Curriculum() {
   });
 
   const filteredCurriculum = curriculum.filter(c => c.level === level);
+
+  const handleToggleStatus = async (session) => {
+    const newStatus = session.status === 'Completed' ? 'Upcoming' : 'Completed';
+    await updateCurriculumStatus(session.id, newStatus);
+    if (newStatus === 'Completed') {
+      toast.success(`"${session.topic}" marked as Taught!`, 'Curriculum Progress Updated');
+    } else {
+      toast.info(`"${session.topic}" set back to Untaught/Upcoming.`, 'Status Updated');
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -38,7 +58,7 @@ export default function Curriculum() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Curriculum & Session Plans</h1>
-          <p className="text-slate-500">Structured syllabus tree by level. Define session goals and trainer instructions.</p>
+          <p className="text-slate-500">Class-wise structured syllabus (Classes 6, 7, 8, 9, 11). Track taught units and lesson objectives.</p>
         </div>
         <button 
           onClick={() => setIsModalOpen(true)}
@@ -48,7 +68,7 @@ export default function Curriculum() {
         </button>
       </div>
 
-      {/* Level Tabs */}
+      {/* Level Tabs with Class Grade */}
       <div className="flex gap-2 mb-8 border-b border-slate-200 overflow-x-auto pb-1">
         {['Level 1', 'Level 2', 'Level 3', 'Level 4', 'Level 5'].map(lvl => (
           <button 
@@ -63,7 +83,7 @@ export default function Curriculum() {
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
-            {lvl} Syllabus ({curriculum.filter(c => c.level === lvl).length})
+            {lvl} ({levelGradeMap[lvl]}) • {curriculum.filter(c => c.level === lvl).length} Units
           </button>
         ))}
       </div>
@@ -74,29 +94,45 @@ export default function Curriculum() {
           <div 
             key={session.id || i} 
             className={`p-6 rounded-2xl border transition-all ${
-              session.status === 'Current' 
-                ? 'border-pixiu-blue bg-blue-50/30 shadow-md ring-1 ring-blue-200' 
-                : 'border-slate-200 bg-white shadow-xs'
+              session.status === 'Completed' 
+                ? 'border-emerald-200 bg-white shadow-xs' 
+                : 'border-slate-200 bg-white shadow-xs hover:border-slate-300'
             }`}
           >
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
               <div className="flex items-center gap-3">
                 <div className={`px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wider ${
-                  session.status === 'Completed' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 
-                  session.status === 'Current' ? 'bg-pixiu-blue text-white shadow-xs' : 'bg-slate-100 text-slate-600'
+                  session.status === 'Completed' 
+                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
+                    : 'bg-slate-100 text-slate-700'
                 }`}>
                   {session.week}
                 </div>
                 <h3 className="text-lg font-bold text-slate-800">{session.topic}</h3>
               </div>
 
-              <span className={`text-xs font-bold px-3 py-1 rounded-full ${
-                session.status === 'Completed' ? 'bg-emerald-50 text-emerald-700 flex items-center gap-1' :
-                session.status === 'Current' ? 'bg-blue-100 text-pixiu-blue flex items-center gap-1' : 'bg-slate-100 text-slate-500'
-              }`}>
-                {session.status === 'Completed' ? <><CheckCircle2 size={14}/> Taught</> : 
-                 session.status === 'Current' ? <><Clock size={14}/> Active This Week</> : 'Upcoming'}
-              </span>
+              {/* Interactive Taught Toggle Button */}
+              <button
+                onClick={() => handleToggleStatus(session)}
+                className={`text-xs font-bold px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer border ${
+                  session.status === 'Completed' 
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100 shadow-xs' 
+                    : 'bg-slate-50 text-slate-600 border-slate-300 hover:bg-slate-100 hover:border-slate-400'
+                }`}
+                title={session.status === 'Completed' ? 'Click to mark Untaught' : 'Click to mark as Taught'}
+              >
+                {session.status === 'Completed' ? (
+                  <>
+                    <CheckCircle2 size={15} className="text-emerald-600" />
+                    <span>Taught (Completed)</span>
+                  </>
+                ) : (
+                  <>
+                    <Circle size={14} className="text-slate-400" />
+                    <span>Untaught • Mark as Taught</span>
+                  </>
+                )}
+              </button>
             </div>
             
             <div className="pl-1">

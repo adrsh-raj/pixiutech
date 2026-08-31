@@ -457,6 +457,15 @@ app.post('/api/curriculum', (req, res) => {
   });
 });
 
+app.put('/api/curriculum/:id/status', (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  db.run("UPDATE curriculum SET status = ? WHERE id = ?", [status, id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, id, status });
+  });
+});
+
 // ==================== 8. INVENTORY & KITS API ====================
 app.get('/api/inventory', (req, res) => {
   db.all("SELECT * FROM inventory ORDER BY id ASC", [], (err, rows) => {
