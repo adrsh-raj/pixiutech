@@ -209,7 +209,9 @@ export default function Trainers() {
             <span className="text-[10px] font-bold tracking-widest text-pixiu-blue uppercase">Classroom Runner & Live Attendance</span>
             <h2 className="font-bold text-base text-white mt-0.5">{sessionSchool ? sessionSchool.name : 'Zenith Public School'}</h2>
             <p className="text-xs text-slate-300 font-medium">{sessionClass ? `Class ${sessionClass.grade} ${sessionClass.section}` : 'General Class'}</p>
-            <p className="text-[11px] text-blue-300 mt-0.5 font-mono">Date: {activeSession.date} • {activeSession.time || '10:00 AM'}</p>
+            <p className="text-[11px] text-blue-200 mt-0.5 font-mono">
+              Live: {new Date().toLocaleDateString('en-US', { weekday: 'long' })}, {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} • {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+            </p>
           </div>
 
           {/* Class Switcher inside Live Runner */}
@@ -675,6 +677,7 @@ export default function Trainers() {
 
           <div className="divide-y divide-slate-100">
             {sessions
+              .filter(ses => ses.is_locked === 1 || attendance.some(a => a.session_id === ses.id))
               .filter(ses => {
                 if (historyClassFilter === 'All') return true;
                 return ses.class_id.includes(historyClassFilter);
@@ -683,27 +686,20 @@ export default function Trainers() {
                 const sessionAtt = attendance.filter(a => a.session_id === ses.id);
                 const presentCount = sessionAtt.filter(a => a.status === 'Present').length;
                 const totalCount = sessionAtt.length || 5;
-                const isLocked = ses.is_locked === 1;
 
                 return (
                   <div key={ses.id} className="p-5 hover:bg-slate-50 transition-colors flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs font-bold bg-blue-50 text-pixiu-blue px-2.5 py-0.5 rounded-md">
-                          {ses.date} • {ses.time || '10:00 AM'}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono text-xs font-bold bg-blue-50 text-pixiu-blue px-2.5 py-0.5 rounded-md flex items-center gap-1">
+                          <Calendar size={12} /> {ses.date} • {ses.time}
                         </span>
                         <span className="font-bold text-slate-800 text-sm">
                           {ses.class_id.replace('CLS-ZPS-', 'Class ')}
                         </span>
-                        {isLocked ? (
-                          <span className="text-[11px] font-bold text-slate-600 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full flex items-center gap-1">
-                            <Lock size={10} /> Past Record
-                          </span>
-                        ) : (
-                          <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
-                            Upcoming / Active
-                          </span>
-                        )}
+                        <span className="text-[11px] font-bold text-slate-600 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <Lock size={10} /> Recorded
+                        </span>
                       </div>
                       <p className="text-xs font-semibold text-slate-700">{ses.topic}</p>
                       {ses.notes && <p className="text-xs text-slate-400">{ses.notes}</p>}
@@ -726,9 +722,13 @@ export default function Trainers() {
                 );
               })}
 
-            {sessions.length === 0 && (
-              <div className="p-12 text-center text-slate-400 text-xs">
-                No sessions found in history.
+            {sessions.filter(ses => ses.is_locked === 1 || attendance.some(a => a.session_id === ses.id)).length === 0 && (
+              <div className="p-12 text-center text-slate-400">
+                <Calendar size={36} className="mx-auto text-slate-300 mb-2" />
+                <p className="font-bold text-slate-700 text-sm">No Live Attendance Logged Yet</p>
+                <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+                  When trainers take live class attendance, the live day, date, and exact time will automatically be logged and locked here in real-time.
+                </p>
               </div>
             )}
           </div>

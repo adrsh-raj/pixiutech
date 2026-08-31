@@ -129,62 +129,23 @@ export const SEED_BILLING = [
 
 export const SEED_SESSIONS = [
   // Class 6A
-  { id: 'SES-001', school_id: 'ZPS', class_id: 'CLS-ZPS-6A', trainer_id: 'TR-01', date: '2026-08-28', time: '10:00 AM', topic: 'Unit 1: Introduction to Electronics & Basic Circuits', status: 'Completed', notes: 'Completed intro foundational circuit session.', is_locked: 1 },
-  { id: 'SES-002', school_id: 'ZPS', class_id: 'CLS-ZPS-6A', trainer_id: 'TR-01', date: '2026-09-02', time: '10:00 AM', topic: 'Unit 2: Sensors LDR & IR Sensor Calibration', status: 'Upcoming', notes: 'Prepare Level 1 Unit 2 sensor kits.', is_locked: 0 },
+  { id: 'SES-001', school_id: 'ZPS', class_id: 'CLS-ZPS-6A', trainer_id: 'TR-01', date: 'Upcoming', time: 'Live Session', topic: 'Unit 2: Sensors: Light (LDR) & Obstacle (IR)', status: 'Planned', notes: 'Level 1 Unit 2 Lab build.', is_locked: 0 },
 
   // Class 7A
-  { id: 'SES-003', school_id: 'ZPS', class_id: 'CLS-ZPS-7A', trainer_id: 'TR-01', date: '2026-08-28', time: '11:30 AM', topic: 'Unit 1: C++ Fundamentals & Microcontroller Architecture', status: 'Completed', notes: 'Introductory microcontroller programming.', is_locked: 1 },
-  { id: 'SES-004', school_id: 'ZPS', class_id: 'CLS-ZPS-7A', trainer_id: 'TR-01', date: '2026-09-02', time: '11:30 AM', topic: 'Unit 2: Analog vs Digital Sensors & Signal Interfacing', status: 'Upcoming', notes: 'ADC resolution and potentiometer divider.', is_locked: 0 },
+  { id: 'SES-002', school_id: 'ZPS', class_id: 'CLS-ZPS-7A', trainer_id: 'TR-01', date: 'Upcoming', time: 'Live Session', topic: 'Unit 2: Analog vs Digital Sensors & Signal Interfacing', status: 'Planned', notes: 'Level 1 Unit 2 Sensor signals.', is_locked: 0 },
 
   // Class 8A
-  { id: 'SES-005', school_id: 'ZPS', class_id: 'CLS-ZPS-8A', trainer_id: 'TR-01', date: '2026-08-29', time: '10:00 AM', topic: 'Unit 1: PWM Motor Control & Differential Steering', status: 'Completed', notes: 'PWM speed tuning completed.', is_locked: 1 },
-  { id: 'SES-006', school_id: 'ZPS', class_id: 'CLS-ZPS-8A', trainer_id: 'TR-01', date: '2026-09-03', time: '10:00 AM', topic: 'Unit 2: Ultrasonic Echo Mapping & Collision Prevention', status: 'Upcoming', notes: 'Sonar radar sweep setup.', is_locked: 0 },
+  { id: 'SES-003', school_id: 'ZPS', class_id: 'CLS-ZPS-8A', trainer_id: 'TR-01', date: 'Upcoming', time: 'Live Session', topic: 'Unit 2: Ultrasonic Echo Mapping & Collision Prevention', status: 'Planned', notes: 'Level 1 Unit 2 Distance radar sweep.', is_locked: 0 },
 
   // Class 9A
-  { id: 'SES-007', school_id: 'ZPS', class_id: 'CLS-ZPS-9A', trainer_id: 'TR-01', date: '2026-08-29', time: '12:00 PM', topic: 'Unit 1: ESP32 Architecture & Wi-Fi Station Mode', status: 'Completed', notes: 'Wi-Fi web server established.', is_locked: 1 },
-  { id: 'SES-008', school_id: 'ZPS', class_id: 'CLS-ZPS-9A', trainer_id: 'TR-01', date: '2026-09-03', time: '12:00 PM', topic: 'Unit 2: Wi-Fi HTTP / MQTT Cloud Telemetry', status: 'Upcoming', notes: 'REST API & MQTT broker connection.', is_locked: 0 },
+  { id: 'SES-004', school_id: 'ZPS', class_id: 'CLS-ZPS-9A', trainer_id: 'TR-01', date: 'Upcoming', time: 'Live Session', topic: 'Unit 2: Wi-Fi HTTP / MQTT Cloud Telemetry', status: 'Planned', notes: 'Level 1 Unit 2 Cloud teleoperation.', is_locked: 0 },
 
   // Class 11A
-  { id: 'SES-009', school_id: 'ZPS', class_id: 'CLS-ZPS-11A', trainer_id: 'TR-01', date: '2026-08-30', time: '11:00 AM', topic: 'Unit 1: Python Video Stream Capture & Color Masking', status: 'Completed', notes: 'Intro to OpenCV vision processing.', is_locked: 1 },
-  { id: 'SES-010', school_id: 'ZPS', class_id: 'CLS-ZPS-11A', trainer_id: 'TR-01', date: '2026-09-04', time: '11:00 AM', topic: 'Unit 2: OpenCV Color Masking & Contour Object Tracking', status: 'Upcoming', notes: 'Centroid calculations & real-time bounding box.', is_locked: 0 },
+  { id: 'SES-005', school_id: 'ZPS', class_id: 'CLS-ZPS-11A', trainer_id: 'TR-01', date: 'Upcoming', time: 'Live Session', topic: 'Unit 2: OpenCV Color Masking & Contour Object Tracking', status: 'Planned', notes: 'Level 1 Unit 2 Vision edge detection.', is_locked: 0 },
 ];
 
-export const SEED_ATTENDANCE = [
-  // Class 6A Unit 1 Attendance
-  { id: 'ATT-001', session_id: 'SES-001', student_id: 'ZPS6A 01', status: 'Present', timestamp: '2026-08-28 10:15:00', date: '2026-08-28', class_id: 'CLS-ZPS-6A', topic: 'Unit 1: Introduction to Electronics & Basic Circuits', is_locked: 1 },
-  { id: 'ATT-002', session_id: 'SES-001', student_id: 'ZPS6A 02', status: 'Present', timestamp: '2026-08-28 10:15:00', date: '2026-08-28', class_id: 'CLS-ZPS-6A', topic: 'Unit 1: Introduction to Electronics & Basic Circuits', is_locked: 1 },
-  { id: 'ATT-003', session_id: 'SES-001', student_id: 'ZPS6A 03', status: 'Present', timestamp: '2026-08-28 10:15:00', date: '2026-08-28', class_id: 'CLS-ZPS-6A', topic: 'Unit 1: Introduction to Electronics & Basic Circuits', is_locked: 1 },
-  { id: 'ATT-004', session_id: 'SES-001', student_id: 'ZPS6A 04', status: 'Present', timestamp: '2026-08-28 10:15:00', date: '2026-08-28', class_id: 'CLS-ZPS-6A', topic: 'Unit 1: Introduction to Electronics & Basic Circuits', is_locked: 1 },
-  { id: 'ATT-005', session_id: 'SES-001', student_id: 'ZPS6A 05', status: 'Absent', timestamp: '2026-08-28 10:15:00', date: '2026-08-28', class_id: 'CLS-ZPS-6A', topic: 'Unit 1: Introduction to Electronics & Basic Circuits', is_locked: 1 },
-
-  // Class 7A Unit 1 Attendance
-  { id: 'ATT-006', session_id: 'SES-003', student_id: 'ZPS7A 01', status: 'Present', timestamp: '2026-08-28 11:30:00', date: '2026-08-28', class_id: 'CLS-ZPS-7A', topic: 'Unit 1: C++ Fundamentals & Microcontroller Architecture', is_locked: 1 },
-  { id: 'ATT-007', session_id: 'SES-003', student_id: 'ZPS7A 02', status: 'Present', timestamp: '2026-08-28 11:30:00', date: '2026-08-28', class_id: 'CLS-ZPS-7A', topic: 'Unit 1: C++ Fundamentals & Microcontroller Architecture', is_locked: 1 },
-  { id: 'ATT-008', session_id: 'SES-003', student_id: 'ZPS7A 03', status: 'Present', timestamp: '2026-08-28 11:30:00', date: '2026-08-28', class_id: 'CLS-ZPS-7A', topic: 'Unit 1: C++ Fundamentals & Microcontroller Architecture', is_locked: 1 },
-  { id: 'ATT-009', session_id: 'SES-003', student_id: 'ZPS7A 04', status: 'Present', timestamp: '2026-08-28 11:30:00', date: '2026-08-28', class_id: 'CLS-ZPS-7A', topic: 'Unit 1: C++ Fundamentals & Microcontroller Architecture', is_locked: 1 },
-  { id: 'ATT-010', session_id: 'SES-003', student_id: 'ZPS7A 05', status: 'Present', timestamp: '2026-08-28 11:30:00', date: '2026-08-28', class_id: 'CLS-ZPS-7A', topic: 'Unit 1: C++ Fundamentals & Microcontroller Architecture', is_locked: 1 },
-
-  // Class 8A Unit 1 Attendance
-  { id: 'ATT-011', session_id: 'SES-005', student_id: 'ZPS8A 01', status: 'Present', timestamp: '2026-08-29 10:00:00', date: '2026-08-29', class_id: 'CLS-ZPS-8A', topic: 'Unit 1: PWM Motor Control & Differential Steering', is_locked: 1 },
-  { id: 'ATT-012', session_id: 'SES-005', student_id: 'ZPS8A 02', status: 'Present', timestamp: '2026-08-29 10:00:00', date: '2026-08-29', class_id: 'CLS-ZPS-8A', topic: 'Unit 1: PWM Motor Control & Differential Steering', is_locked: 1 },
-  { id: 'ATT-013', session_id: 'SES-005', student_id: 'ZPS8A 03', status: 'Present', timestamp: '2026-08-29 10:00:00', date: '2026-08-29', class_id: 'CLS-ZPS-8A', topic: 'Unit 1: PWM Motor Control & Differential Steering', is_locked: 1 },
-  { id: 'ATT-014', session_id: 'SES-005', student_id: 'ZPS8A 04', status: 'Present', timestamp: '2026-08-29 10:00:00', date: '2026-08-29', class_id: 'CLS-ZPS-8A', topic: 'Unit 1: PWM Motor Control & Differential Steering', is_locked: 1 },
-  { id: 'ATT-015', session_id: 'SES-005', student_id: 'ZPS8A 05', status: 'Present', timestamp: '2026-08-29 10:00:00', date: '2026-08-29', class_id: 'CLS-ZPS-8A', topic: 'Unit 1: PWM Motor Control & Differential Steering', is_locked: 1 },
-
-  // Class 9A Unit 1 Attendance
-  { id: 'ATT-016', session_id: 'SES-007', student_id: 'ZPS9A 01', status: 'Present', timestamp: '2026-08-29 12:00:00', date: '2026-08-29', class_id: 'CLS-ZPS-9A', topic: 'Unit 1: ESP32 Architecture & Wi-Fi Station Mode', is_locked: 1 },
-  { id: 'ATT-017', session_id: 'SES-007', student_id: 'ZPS9A 02', status: 'Present', timestamp: '2026-08-29 12:00:00', date: '2026-08-29', class_id: 'CLS-ZPS-9A', topic: 'Unit 1: ESP32 Architecture & Wi-Fi Station Mode', is_locked: 1 },
-  { id: 'ATT-018', session_id: 'SES-007', student_id: 'ZPS9A 03', status: 'Present', timestamp: '2026-08-29 12:00:00', date: '2026-08-29', class_id: 'CLS-ZPS-9A', topic: 'Unit 1: ESP32 Architecture & Wi-Fi Station Mode', is_locked: 1 },
-  { id: 'ATT-019', session_id: 'SES-007', student_id: 'ZPS9A 04', status: 'Present', timestamp: '2026-08-29 12:00:00', date: '2026-08-29', class_id: 'CLS-ZPS-9A', topic: 'Unit 1: ESP32 Architecture & Wi-Fi Station Mode', is_locked: 1 },
-  { id: 'ATT-020', session_id: 'SES-007', student_id: 'ZPS9A 05', status: 'Present', timestamp: '2026-08-29 12:00:00', date: '2026-08-29', class_id: 'CLS-ZPS-9A', topic: 'Unit 1: ESP32 Architecture & Wi-Fi Station Mode', is_locked: 1 },
-
-  // Class 11A Unit 1 Attendance
-  { id: 'ATT-021', session_id: 'SES-009', student_id: 'ZPS11A 01', status: 'Present', timestamp: '2026-08-30 11:00:00', date: '2026-08-30', class_id: 'CLS-ZPS-11A', topic: 'Unit 1: Python Video Stream Capture & Color Masking', is_locked: 1 },
-  { id: 'ATT-022', session_id: 'SES-009', student_id: 'ZPS11A 02', status: 'Present', timestamp: '2026-08-30 11:00:00', date: '2026-08-30', class_id: 'CLS-ZPS-11A', topic: 'Unit 1: Python Video Stream Capture & Color Masking', is_locked: 1 },
-  { id: 'ATT-023', session_id: 'SES-009', student_id: 'ZPS11A 03', status: 'Present', timestamp: '2026-08-30 11:00:00', date: '2026-08-30', class_id: 'CLS-ZPS-11A', topic: 'Unit 1: Python Video Stream Capture & Color Masking', is_locked: 1 },
-  { id: 'ATT-024', session_id: 'SES-009', student_id: 'ZPS11A 04', status: 'Present', timestamp: '2026-08-30 11:00:00', date: '2026-08-30', class_id: 'CLS-ZPS-11A', topic: 'Unit 1: Python Video Stream Capture & Color Masking', is_locked: 1 },
-  { id: 'ATT-025', session_id: 'SES-009', student_id: 'ZPS11A 05', status: 'Present', timestamp: '2026-08-30 11:00:00', date: '2026-08-30', class_id: 'CLS-ZPS-11A', topic: 'Unit 1: Python Video Stream Capture & Color Masking', is_locked: 1 },
-];
+// Completely cleared attendance logs (live date, day, time and timestamp will be recorded on real-time submission)
+export const SEED_ATTENDANCE = [];
 
 export const SEED_INVENTORY = [
   { id: 'KIT-ZPS-01', name: 'Standard Robotics Lab Kit (Uno + Dual Motor)', level: 'Level 1', school_id: 'ZPS', assigned_student_id: 'ZPS6A 01', status: 'Healthy', last_checked: '2026-08-28', issue_notes: 'Standard Zenith Lab Kit assigned' },

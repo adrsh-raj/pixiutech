@@ -338,10 +338,16 @@ app.post('/api/sessions', (req, res) => {
 });
 
 app.post('/api/sessions/:id/complete', (req, res) => {
-  // Mark completed and lock permanently against trainer modification
-  db.run("UPDATE sessions SET status = 'Completed', is_locked = 1 WHERE id = ?", [req.params.id], function(err) {
+  const now = new Date();
+  const liveDay = now.toLocaleDateString('en-US', { weekday: 'long' });
+  const liveDate = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  const liveTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  const formattedDate = req.body.date || `${liveDay}, ${liveDate}`;
+  const formattedTime = req.body.time || liveTime;
+
+  db.run("UPDATE sessions SET status = 'Completed', is_locked = 1, date = ?, time = ? WHERE id = ?", [formattedDate, formattedTime, req.params.id], function(err) {
     if (err) return res.status(500).json({ error: err.message });
-    res.json({ success: true, message: 'Session completed and attendance locked', is_locked: 1 });
+    res.json({ success: true, message: 'Session completed and attendance locked', is_locked: 1, date: formattedDate, time: formattedTime });
   });
 });
 

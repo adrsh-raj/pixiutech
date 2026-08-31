@@ -332,28 +332,16 @@ function initializeDatabase() {
         trStmt.run('TR-01', 'Vikas Pandey', '9811122233', 'Senior Robotics & AI Instructor', 'ZPS', 600, 2, 5.0, 'Active', 'vikas.pandey@pixiutech.com', new Date().toISOString());
         trStmt.finalize();
 
-        // Sessions (Date-wise with Lock Status)
+        // Planned Sessions (Clean slate ready for live real-time attendance)
         const sesStmt = db.prepare("INSERT INTO sessions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        sesStmt.run('SES-001', 'ZPS', 'CLS-ZPS-6A', 'TR-01', '2026-08-28', '10:00 AM', 'Unit 1: Introduction to Electronics & Sensor Logic', 'Completed', 'Breadboard wiring and sensor triggers verified.', 1);
-        sesStmt.run('SES-002', 'ZPS', 'CLS-ZPS-7A', 'TR-01', '2026-08-30', '11:30 AM', 'Unit 1: Microcontrollers & Digital Output Flow', 'Completed', 'Digital pin configuration completed.', 1);
-        sesStmt.run('SES-003', 'ZPS', 'CLS-ZPS-6A', 'TR-01', '2026-09-02', '10:30 AM', 'Unit 2: Line Follower Sensor Calibration & Tuning', 'Upcoming', 'Admin scheduled: Bring line follower test arena.', 0);
+        sesStmt.run('SES-001', 'ZPS', 'CLS-ZPS-6A', 'TR-01', 'Upcoming', 'Live Session', 'Unit 2: Sensors: Light (LDR) & Obstacle (IR)', 'Planned', 'Level 1 Unit 2 Lab build.', 0);
+        sesStmt.run('SES-002', 'ZPS', 'CLS-ZPS-7A', 'TR-01', 'Upcoming', 'Live Session', 'Unit 2: Analog vs Digital Sensors & Signal Interfacing', 'Planned', 'Level 1 Unit 2 Sensor signals.', 0);
+        sesStmt.run('SES-003', 'ZPS', 'CLS-ZPS-8A', 'TR-01', 'Upcoming', 'Live Session', 'Unit 2: Ultrasonic Echo Mapping & Collision Prevention', 'Planned', 'Level 1 Unit 2 Distance radar sweep.', 0);
+        sesStmt.run('SES-004', 'ZPS', 'CLS-ZPS-9A', 'TR-01', 'Upcoming', 'Live Session', 'Unit 2: Wi-Fi HTTP / MQTT Cloud Telemetry', 'Planned', 'Level 1 Unit 2 Cloud teleoperation.', 0);
+        sesStmt.run('SES-005', 'ZPS', 'CLS-ZPS-11A', 'TR-01', 'Upcoming', 'Live Session', 'Unit 2: OpenCV Color Masking & Contour Object Tracking', 'Planned', 'Level 1 Unit 2 Vision edge detection.', 0);
         sesStmt.finalize();
 
-        // Attendance Records (Locked for past dates)
-        const attStmt = db.prepare("INSERT INTO attendance VALUES (?, ?, ?, ?, ?)");
-        // SES-001 Attendance (Class 6A - 2026-08-28)
-        attStmt.run('ATT-001', 'SES-001', 'ZPS6A 01', 'Present', '2026-08-28 10:00:00');
-        attStmt.run('ATT-002', 'SES-001', 'ZPS6A 02', 'Present', '2026-08-28 10:00:00');
-        attStmt.run('ATT-003', 'SES-001', 'ZPS6A 03', 'Present', '2026-08-28 10:00:00');
-        attStmt.run('ATT-004', 'SES-001', 'ZPS6A 04', 'Present', '2026-08-28 10:00:00');
-        attStmt.run('ATT-005', 'SES-001', 'ZPS6A 05', 'Present', '2026-08-28 10:00:00');
-        // SES-002 Attendance (Class 7A - 2026-08-30)
-        attStmt.run('ATT-006', 'SES-002', 'ZPS7A 01', 'Present', '2026-08-30 11:30:00');
-        attStmt.run('ATT-007', 'SES-002', 'ZPS7A 02', 'Present', '2026-08-30 11:30:00');
-        attStmt.run('ATT-008', 'SES-002', 'ZPS7A 03', 'Present', '2026-08-30 11:30:00');
-        attStmt.run('ATT-009', 'SES-002', 'ZPS7A 04', 'Absent', '2026-08-30 11:30:00');
-        attStmt.run('ATT-010', 'SES-002', 'ZPS7A 05', 'Present', '2026-08-30 11:30:00');
-        attStmt.finalize();
+        // Attendance Records: Clean (0 records) - Real-time day, date, and time will be recorded upon taking live attendance.
 
         // Leads (CRM)
         const ldStmt = db.prepare("INSERT INTO leads VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");

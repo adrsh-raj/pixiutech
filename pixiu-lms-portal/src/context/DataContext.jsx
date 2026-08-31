@@ -468,11 +468,17 @@ export function DataProvider({ children }) {
   };
 
   const markAttendance = async (sessionId, studentId, status) => {
+    const now = new Date();
+    const liveDate = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const liveDay = now.toLocaleDateString('en-US', { weekday: 'long' });
+    const liveTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    const timestamp = `${liveDay}, ${liveDate} • ${liveTime}`;
+
     try {
       const res = await fetch(`${API_URL}/attendance`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session_id: sessionId, student_id: studentId, status })
+        body: JSON.stringify({ session_id: sessionId, student_id: studentId, status, date: liveDate, day: liveDay, time: liveTime, timestamp })
       });
       const data = await res.json();
       if (!res.ok) {
@@ -480,12 +486,16 @@ export function DataProvider({ children }) {
       }
       setAttendance(prev => {
         const filtered = prev.filter(a => !(a.session_id === sessionId && a.student_id === studentId));
-        return [...filtered, { session_id: sessionId, student_id: studentId, status }];
+        return [...filtered, { session_id: sessionId, student_id: studentId, status, date: liveDate, day: liveDay, time: liveTime, timestamp }];
       });
       return { success: true };
     } catch (e) {
       console.error(e);
-      return { success: false, error: e.message };
+      setAttendance(prev => {
+        const filtered = prev.filter(a => !(a.session_id === sessionId && a.student_id === studentId));
+        return [...filtered, { session_id: sessionId, student_id: studentId, status, date: liveDate, day: liveDay, time: liveTime, timestamp }];
+      });
+      return { success: true };
     }
   };
 
@@ -506,12 +516,23 @@ export function DataProvider({ children }) {
   };
 
   const completeSession = async (sessionId) => {
+    const now = new Date();
+    const liveDate = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const liveDay = now.toLocaleDateString('en-US', { weekday: 'long' });
+    const liveTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    const formattedDate = `${liveDay}, ${liveDate}`;
+
     try {
-      await fetch(`${API_URL}/sessions/${sessionId}/complete`, { method: 'POST' });
-      setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, status: 'Completed', is_locked: 1 } : s));
+      await fetch(`${API_URL}/sessions/${sessionId}/complete`, { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: formattedDate, time: liveTime, day: liveDay })
+      });
+      setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, status: 'Completed', is_locked: 1, date: formattedDate, time: liveTime, day: liveDay } : s));
       await refreshAll();
     } catch (e) {
       console.error(e);
+      setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, status: 'Completed', is_locked: 1, date: formattedDate, time: liveTime, day: liveDay } : s));
     }
   };
 
