@@ -26,6 +26,7 @@ export function DataProvider({ children }) {
   const [comms, setComms] = useState(() => JSON.parse(localStorage.getItem('pixiu_comms') || '[]'));
   const [projects, setProjects] = useState(() => JSON.parse(localStorage.getItem('pixiu_projects') || '[]'));
   const [alerts, setAlerts] = useState(() => JSON.parse(localStorage.getItem('pixiu_alerts') || 'null') || SEED_ALERTS);
+  const [notifications, setNotifications] = useState(() => JSON.parse(localStorage.getItem('pixiu_notifications') || 'null') || SEED_NOTIFICATIONS);
   const [loading, setLoading] = useState(false);
 
   // --- REFRESH ALL TABLES FROM BACKEND IF AVAILABLE ---
@@ -33,7 +34,7 @@ export function DataProvider({ children }) {
     try {
       const [
         schRes, clsRes, stuRes, trRes, sesRes, attRes, 
-        ldRes, cntRes, curRes, invRes, bilRes, comRes, prjRes, altRes
+        ldRes, cntRes, curRes, invRes, bilRes, comRes, prjRes, altRes, notifRes
       ] = await Promise.all([
         fetch(`${API_BASE}/schools`).then(r => r.ok ? r.json() : null).catch(() => null),
         fetch(`${API_BASE}/classes`).then(r => r.ok ? r.json() : null).catch(() => null),
@@ -49,6 +50,7 @@ export function DataProvider({ children }) {
         fetch(`${API_BASE}/comms`).then(r => r.ok ? r.json() : null).catch(() => null),
         fetch(`${API_BASE}/projects`).then(r => r.ok ? r.json() : null).catch(() => null),
         fetch(`${API_BASE}/alerts`).then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch(`${API_BASE}/notifications`).then(r => r.ok ? r.json() : null).catch(() => null),
       ]);
 
       if (schRes && schRes.length > 0) setSchools(schRes);
@@ -62,9 +64,10 @@ export function DataProvider({ children }) {
       if (curRes && curRes.length > 0) setCurriculum(curRes);
       if (invRes && invRes.length > 0) setInventory(invRes);
       if (bilRes && bilRes.length > 0) setBilling(bilRes);
-      if (comRes) setComms(comRes);
-      if (prjRes) setProjects(prjRes);
+      if (comRes && comRes.length > 0) setComms(comRes);
+      if (prjRes && prjRes.length > 0) setProjects(prjRes);
       if (altRes && altRes.length > 0) setAlerts(altRes);
+      if (notifRes && notifRes.length > 0) setNotifications(notifRes);
     } catch (err) {
       console.warn("Backend API unavailable, using offline seed state.");
     }
@@ -621,6 +624,66 @@ export function DataProvider({ children }) {
     }
   };
 
+  // 15. Broadcast Notifications & Class Announcements
+  const sendBroadcastNotification = async (notifData) => {
+    try {
+      const res = await fetch(`${API_URL}/notifications`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(notifData)
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setNotifications(prev => [data, ...prev]);
+        localStorage.setItem('pixiu_notifications', JSON.stringify([data, ...notifications]));
+        await refreshAll();
+        return { success: true, data };
+      }
+    } catch (e) {
+      console.error(e);
+      const localItem = {
+        ...notifData,
+        id: `NOTIF-${Date.now().toString().slice(-4)}`,
+        status: 'Active',
+        created_at: new Date().toISOString().replace('T', ' ').slice(0, 19),
+        updated_at: new Date().toISOString().replace('T', ' ').slice(0, 19)
+      };
+      setNotifications(prev => [localItem, ...prev]);
+      localStorage.setItem('pixiu_notifications', JSON.stringify([localItem, ...notifications]));
+      return { success: true, data: localItem };
+    }
+  };
+
+  const updateNotification = async (id, updatedData) => {
+    try {
+      await fetch(`${API_URL}/notifications/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedData)
+      });
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, ...updatedData, updated_at: new Date().toISOString().replace('T', ' ').slice(0, 19) } : n));
+      await refreshAll();
+      return { success: true };
+    } catch (e) {
+      console.error(e);
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, ...updatedData, updated_at: new Date().toISOString().replace('T', ' ').slice(0, 19) } : n));
+      return { success: true };
+    }
+  };
+
+  const deleteNotification = async (id) => {
+    try {
+      await fetch(`${API_URL}/notifications/${id}`, { method: 'DELETE' });
+      setNotifications(prev => prev.filter(n => n.id !== id));
+      await refreshAll();
+      return { success: true };
+    } catch (e) {
+      console.error(e);
+      setNotifications(prev => prev.filter(n => n.id !== id));
+      return { success: true };
+    }
+  };
+
   // Utilities
   const getNextRollNumber = (schoolCode, grade, section) => {
     const cohort = students.filter(s => s.school_id === schoolCode && s.class_id === `CLS-${schoolCode}-${grade}${section || ''}`);
@@ -651,7 +714,8 @@ export function DataProvider({ children }) {
     billing, createInvoice, updateInvoiceStatus, confirmPaymentReceipt,
     comms, sendCommsMessage,
     projects, addProject, deleteProject, uploadFile,
-    alerts, resolveAlertAction
+    alerts, resolveAlertAction,
+    notifications, sendBroadcastNotification, updateNotification, deleteNotification
   };
 
   return (

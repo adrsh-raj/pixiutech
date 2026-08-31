@@ -3,7 +3,7 @@ import {
   GraduationCap, Plus, Phone, Building2, Star, CheckCircle, Clock, X, Trash2, 
   Play, User, Camera, Check, FileText, Upload, Image as ImageIcon, IndianRupee, 
   Calendar, AlertTriangle, ShieldAlert, Lock, Unlock, Bell, Send, History, 
-  CheckSquare, XSquare, ChevronRight, BookOpen
+  CheckSquare, XSquare, ChevronRight, BookOpen, Megaphone
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { useToast } from '../context/ToastContext';
@@ -14,12 +14,17 @@ export default function Trainers() {
     trainers, schools, classes, students, sessions, markAttendance, 
     completeSession, attendance, addTrainer, updateTrainerStatus, 
     deleteTrainer, uploadFile, addProject, scheduleSession, 
-    adminUpdateAttendance 
+    adminUpdateAttendance, notifications 
   } = useData();
   
   const { role } = useAuth();
   const isAdmin = role === 'admin' || !role; // Default fallback to admin if not specified
   const toast = useToast();
+
+  const trainerNotifs = (notifications || []).filter(n => {
+    if (n.status === 'Archived') return false;
+    return n.target_type === 'All_Trainers' || n.target_type === 'Universal';
+  });
   
   // UI Tabs: 'trainers' | 'history' | 'schedule'
   const [activeTab, setActiveTab] = useState('trainers');
@@ -517,6 +522,40 @@ export default function Trainers() {
               </div>
             </div>
           </div>
+
+          {/* Active Admin Directives for Trainers */}
+          {trainerNotifs.length > 0 && (
+            <div className="mb-8 space-y-3">
+              <div className="flex items-center gap-2">
+                <Megaphone size={16} className="text-indigo-600" />
+                <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Admin Directives & Next Class Schedule Notices
+                </h3>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {trainerNotifs.map(notif => (
+                  <div 
+                    key={notif.id}
+                    className="p-5 rounded-2xl border border-indigo-200 bg-indigo-50/30 shadow-xs space-y-2.5"
+                  >
+                    <div className="flex justify-between items-start gap-2">
+                      <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-indigo-600 text-white uppercase tracking-wider">
+                        {notif.template_type === 'kit_prep' ? 'Hardware Prep' : 'Class Notice'}
+                      </span>
+                      <span className="text-[11px] text-slate-500 font-mono">
+                        {notif.scheduled_date} • {notif.scheduled_time}
+                      </span>
+                    </div>
+                    <h4 className="font-bold text-slate-800 text-sm">{notif.title}</h4>
+                    <p className="text-xs text-slate-600 leading-relaxed bg-white p-3.5 rounded-xl border border-indigo-100 whitespace-pre-line">
+                      {notif.message}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Main Trainers Roster Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">

@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
-import { Award, BookOpen, Activity, FileText, Download, CheckCircle, Clock, LogOut, User, Box, PlaySquare, Eye, Sparkles } from 'lucide-react';
+import { Award, BookOpen, Activity, FileText, Download, CheckCircle, Clock, LogOut, User, Box, PlaySquare, Eye, Sparkles, Megaphone } from 'lucide-react';
 
 export default function StudentPortal() {
   const { user, logout } = useAuth();
-  const { students, schools, content, projects, getStudentAttendance } = useData();
+  const { students, schools, content, projects, getStudentAttendance, notifications } = useData();
 
   // Find logged in student object
   const cleanId = (user?.username || user?.related_id || '').trim().replace(/\s+/g, ' ');
@@ -25,6 +25,17 @@ export default function StudentPortal() {
   // Extract grade from class_id (e.g. CLS-ZPS-6A -> '6', CLS-ZPS-11A -> '11')
   const studentGrade = student.class_id ? student.class_id.replace('CLS-ZPS-', '').replace('A', '') : '6';
   
+  // Active broadcast notifications for this student's grade
+  const classNotifs = (notifications || []).filter(n => {
+    if (n.status === 'Archived') return false;
+    if (n.target_type === 'Universal' || n.target_type === 'All_Students') return true;
+    if (n.target_type === 'Specific_Class') {
+      const classes = (n.target_classes || '').split(',');
+      return classes.includes(studentGrade);
+    }
+    return false;
+  });
+
   // Filter student watermarked materials for their grade
   const availableContent = content.filter(c => 
     c.target === 'Student' && (c.class_grade === studentGrade || !c.class_grade)
@@ -170,6 +181,54 @@ export default function StudentPortal() {
             </div>
           </div>
         </div>
+
+        {/* Class Announcements & Revision Notice Feed */}
+        {classNotifs.length > 0 && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Megaphone size={18} className="text-pixiu-blue" />
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
+                Class {studentGrade} Announcements & Next Session Notices
+              </h3>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {classNotifs.map(notif => (
+                <div 
+                  key={notif.id}
+                  className={`p-5 rounded-2xl border bg-white shadow-xs space-y-2.5 transition-all ${
+                    notif.severity === 'urgent' 
+                      ? 'border-rose-200 ring-1 ring-rose-100' 
+                      : notif.severity === 'important' 
+                      ? 'border-purple-200 ring-1 ring-purple-100' 
+                      : 'border-slate-200'
+                  }`}
+                >
+                  <div className="flex justify-between items-start gap-2">
+                    <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${
+                      notif.severity === 'urgent' 
+                        ? 'bg-rose-50 text-rose-700 border border-rose-200' 
+                        : notif.severity === 'important' 
+                        ? 'bg-purple-50 text-purple-700 border border-purple-200' 
+                        : 'bg-blue-50 text-pixiu-blue border border-blue-200'
+                    }`}>
+                      {notif.severity ? notif.severity.toUpperCase() : 'NOTICE'}
+                    </span>
+
+                    <span className="text-[11px] text-slate-400 font-mono flex items-center gap-1">
+                      <Clock size={11} /> {notif.scheduled_date} • {notif.scheduled_time}
+                    </span>
+                  </div>
+
+                  <h4 className="font-bold text-slate-800 text-sm">{notif.title}</h4>
+                  <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100 whitespace-pre-line">
+                    {notif.message}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Class Study Material & Workbooks (Watermarked Edition) */}
         <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm">

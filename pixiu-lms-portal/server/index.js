@@ -812,6 +812,88 @@ app.post('/api/alerts/:id/resolve', async (req, res) => {
   }
 });
 
+// ==================== 15. ADMIN BROADCAST NOTIFICATIONS & CLASS ANNOUNCEMENTS ====================
+app.get('/api/notifications', (req, res) => {
+  db.all("SELECT * FROM notifications ORDER BY created_at DESC", [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+app.post('/api/notifications', (req, res) => {
+  const { target_type, target_classes, target_trainer_id, title, message, template_type, scheduled_date, scheduled_time, severity } = req.body;
+  const id = `NOTIF-${Date.now().toString().slice(-4)}`;
+  const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
+
+  const sql = `INSERT INTO notifications (id, target_type, target_classes, target_trainer_id, title, message, template_type, scheduled_date, scheduled_time, severity, status, created_at, updated_at) 
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Active', ?, ?)`;
+
+  db.run(sql, [
+    id, 
+    target_type || 'All_Students', 
+    target_classes || '6,7,8,9,11', 
+    target_trainer_id || 'All', 
+    title, 
+    message, 
+    template_type || 'custom', 
+    scheduled_date || 'Upcoming', 
+    scheduled_time || '10:00 AM', 
+    severity || 'info', 
+    now, 
+    now
+  ], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ 
+      success: true, 
+      id, 
+      target_type: target_type || 'All_Students', 
+      target_classes: target_classes || '6,7,8,9,11', 
+      target_trainer_id: target_trainer_id || 'All', 
+      title, 
+      message, 
+      template_type: template_type || 'custom', 
+      scheduled_date: scheduled_date || 'Upcoming', 
+      scheduled_time: scheduled_time || '10:00 AM', 
+      severity: severity || 'info', 
+      status: 'Active', 
+      created_at: now, 
+      updated_at: now 
+    });
+  });
+});
+
+app.put('/api/notifications/:id', (req, res) => {
+  const { target_type, target_classes, target_trainer_id, title, message, template_type, scheduled_date, scheduled_time, severity, status } = req.body;
+  const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
+
+  const sql = `UPDATE notifications SET target_type = ?, target_classes = ?, target_trainer_id = ?, title = ?, message = ?, template_type = ?, scheduled_date = ?, scheduled_time = ?, severity = ?, status = ?, updated_at = ? WHERE id = ?`;
+
+  db.run(sql, [
+    target_type, 
+    target_classes, 
+    target_trainer_id, 
+    title, 
+    message, 
+    template_type, 
+    scheduled_date, 
+    scheduled_time, 
+    severity, 
+    status || 'Active', 
+    now, 
+    req.params.id
+  ], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, id: req.params.id, title, message, updated_at: now });
+  });
+});
+
+app.delete('/api/notifications/:id', (req, res) => {
+  db.run("DELETE FROM notifications WHERE id = ?", [req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, deleted: req.params.id });
+  });
+});
+
 // Start Server
 app.listen(PORT, () => {
   console.log(`⚡ Pixiu Core API & Auth Engine running on http://localhost:${PORT}`);

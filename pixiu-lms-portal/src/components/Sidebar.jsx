@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, FolderKanban, Settings, LogOut, Box, GraduationCap, MessageSquare, BookOpen, Building, CreditCard, PlaySquare } from 'lucide-react';
+import { LayoutDashboard, Users, FolderKanban, Settings, LogOut, Box, GraduationCap, MessageSquare, BookOpen, Building, CreditCard, PlaySquare, Megaphone } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function Sidebar() {
@@ -46,7 +46,7 @@ export default function Sidebar() {
       title: 'OPERATIONS',
       links: [
         { name: 'Hardware & Kits', path: '/inventory', icon: Box },
-        { name: 'Parent Comms', path: '/comms', icon: MessageSquare },
+        { name: 'Announcements & Comms', path: '/comms', icon: Megaphone },
         { name: 'Settings', path: '/settings', icon: Settings },
       ]
     }

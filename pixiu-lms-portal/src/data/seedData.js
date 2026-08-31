@@ -158,6 +158,52 @@ export const SEED_INVENTORY = [
 
 export const SEED_ALERTS = [];
 
+// Admin Broadcast Notifications & Class Announcements (Multi-Class 6, 7, 8, 9, 11 & Trainers with Full Editability)
+export const SEED_NOTIFICATIONS = [
+  {
+    id: 'NOTIF-001',
+    target_type: 'All_Students',
+    target_classes: '6,7,8,9,11',
+    target_trainer_id: 'All',
+    title: '📢 Next Robotics Lab Class Scheduled',
+    message: 'Dear Students & Faculty, the upcoming practical robotics session for Classes 6, 7, 8, 9, 11 will be held on Wednesday, 02 Sep 2026. Please ensure all student workbooks are brought to class.',
+    template_type: 'next_class',
+    scheduled_date: 'Wednesday, 02 Sep 2026',
+    scheduled_time: '10:00 AM',
+    severity: 'info',
+    status: 'Active',
+    created_at: '2026-08-31 22:15:00'
+  },
+  {
+    id: 'NOTIF-002',
+    target_type: 'All_Students',
+    target_classes: '6,7,8,9,11',
+    target_trainer_id: 'All',
+    title: '📝 Unit 1 Revision & Circuit Viva Notice',
+    message: 'Attention All Classes (6, 7, 8, 9, 11): Unit 1 concept revision and hands-on circuit viva checks will be held in the upcoming class. Please study the Unit 1 guides in your Student Portal.',
+    template_type: 'revision',
+    scheduled_date: 'Wednesday, 02 Sep 2026',
+    scheduled_time: '11:00 AM',
+    severity: 'important',
+    status: 'Active',
+    created_at: '2026-08-31 22:16:00'
+  },
+  {
+    id: 'NOTIF-003',
+    target_type: 'All_Trainers',
+    target_classes: '6,7,8,9,11',
+    target_trainer_id: 'TR-01',
+    title: '🛠️ Trainer Directive: Prepare Level 1 Unit 2 Sensor Kits',
+    message: 'Trainer Vikas Pandey: Please inspect and calibrate the LDR, IR and ultrasonic sensors for Classes 6A to 11A before Wednesday morning session.',
+    template_type: 'kit_prep',
+    scheduled_date: 'Wednesday, 02 Sep 2026',
+    scheduled_time: '09:30 AM',
+    severity: 'urgent',
+    status: 'Active',
+    created_at: '2026-08-31 22:17:00'
+  }
+];
+
 // Structured Class Syllabus (Units 1 to 6 mapped to Levels: Unit 1 Intro Level 0, Unit 2 Level 1, etc.)
 export const SEED_CURRICULUM = [
   // ==================== CLASS 6 ====================
