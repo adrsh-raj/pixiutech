@@ -7,6 +7,7 @@ import Solutions from './pages/Solutions.jsx'
 import Careers from './pages/Careers.jsx'
 import Login from './pages/Login.jsx'
 import Hub from './pages/Hub.jsx'
+import PortalBridge from './pages/PortalBridge.jsx'
 import Contact from './pages/Contact.jsx'
 import NotFound from './pages/NotFound.jsx'
 
@@ -20,8 +21,9 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/solutions" element={<Solutions />} />
           <Route path="/careers" element={<Careers />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/hub" element={<Hub />} />
+          <Route path="/portal" element={<PortalBridge />} />
+          <Route path="/hub" element={<PortalBridge />} />
+          <Route path="/login" element={<PortalBridge />} />
           <Route path="/contact" element={<Contact />} />
           {/* Redirects for deleted pages */}
           <Route path="/curriculum" element={<Navigate to="/solutions" replace />} />

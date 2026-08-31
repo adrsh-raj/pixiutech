@@ -45,7 +45,7 @@ export default function Contact() {
               </div>
               <div className="contact-info__item">
                 <strong>📧 Email</strong>
-                <span>director@pixiutech.com</span>
+                <a href="mailto:director@pixiutech.com">director@pixiutech.com</a>
               </div>
               <div className="contact-info__item">
                 <strong>🏢 Company</strong>

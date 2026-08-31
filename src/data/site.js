@@ -3,7 +3,7 @@
 export const NAV = [
   { to: '/', label: 'Home' },
   { to: '/solutions', label: 'Solutions' },
-  { to: '/hub', label: 'Resource Hub' },
+  { to: '/portal', label: 'Portal' },
   { to: '/careers', label: 'Careers' },
   { to: '/contact', label: 'Contact' },
 ]
