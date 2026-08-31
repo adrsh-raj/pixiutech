@@ -197,46 +197,46 @@ export const SEED_INVENTORY = [
 
 export const SEED_ALERTS = [];
 
-// Structured 5-Level Syllabus (Units 1-6 across all classes: Unit 1 Taught/Completed, Units 2-6 Untaught/Upcoming)
+// Structured Class Syllabus (Units 1 to 6 mapped to Levels: Unit 1 Intro Level 0, Unit 2 Level 1, etc.)
 export const SEED_CURRICULUM = [
-  // ==================== LEVEL 1: CLASS 6 ====================
-  { id: 'CUR-101', week: 'Unit 1', level: 'Level 1', class_grade: '6', topic: 'Introduction to Electricity & Basic Circuits', objectives: 'Understand current, voltage, breadboards and series/parallel LEDs', status: 'Completed' },
+  // ==================== CLASS 6 ====================
+  { id: 'CUR-101', week: 'Unit 1', level: 'Level 0', class_grade: '6', topic: 'Introduction to Electricity & Basic Circuits', objectives: 'Understand current, voltage, breadboards and series/parallel LEDs', status: 'Completed' },
   { id: 'CUR-102', week: 'Unit 2', level: 'Level 1', class_grade: '6', topic: 'Sensors: Light (LDR) & Obstacle (IR)', objectives: 'Analog vs digital inputs, calibration and sensor signal wiring', status: 'Upcoming' },
-  { id: 'CUR-103', week: 'Unit 3', level: 'Level 1', class_grade: '6', topic: 'Actuators: Motors, Buzzers & Relays', objectives: 'Transistor switches, relay driver circuits, and sound actuation', status: 'Upcoming' },
-  { id: 'CUR-104', week: 'Unit 4', level: 'Level 1', class_grade: '6', topic: 'Microcontroller (Arduino) Programming Basics', objectives: 'Digital output pin modes, delay timing, and serial monitor debugging', status: 'Upcoming' },
-  { id: 'CUR-105', week: 'Unit 5', level: 'Level 1', class_grade: '6', topic: 'Project Building: Smart Obstacle Avoiding Rover', objectives: 'Assemble 2WD chassis, L298N motor driver, and ultrasonic avoidance algorithm', status: 'Upcoming' },
-  { id: 'CUR-106', week: 'Unit 6', level: 'Level 1', class_grade: '6', topic: 'Capstone Project: Automated Smart Lab Environment', objectives: 'Final end-of-term presentation and smart automation build', status: 'Upcoming' },
+  { id: 'CUR-103', week: 'Unit 3', level: 'Level 2', class_grade: '6', topic: 'Actuators: Motors, Buzzers & Relays', objectives: 'Transistor switches, relay driver circuits, and sound actuation', status: 'Upcoming' },
+  { id: 'CUR-104', week: 'Unit 4', level: 'Level 3', class_grade: '6', topic: 'Microcontroller (Arduino) Programming Basics', objectives: 'Digital output pin modes, delay timing, and serial monitor debugging', status: 'Upcoming' },
+  { id: 'CUR-105', week: 'Unit 5', level: 'Level 4', class_grade: '6', topic: 'Project Building: Smart Obstacle Avoiding Rover', objectives: 'Assemble 2WD chassis, L298N motor driver, and ultrasonic avoidance algorithm', status: 'Upcoming' },
+  { id: 'CUR-106', week: 'Unit 6', level: 'Level 5', class_grade: '6', topic: 'Capstone Project: Automated Smart Lab Environment', objectives: 'Final end-of-term presentation and smart automation build', status: 'Upcoming' },
 
-  // ==================== LEVEL 2: CLASS 7 ====================
-  { id: 'CUR-201', week: 'Unit 1', level: 'Level 2', class_grade: '7', topic: 'C++ Coding Fundamentals & Logic Gates', objectives: 'Microcontroller architecture, IDE setup, variables and conditional logic', status: 'Completed' },
-  { id: 'CUR-202', week: 'Unit 2', level: 'Level 2', class_grade: '7', topic: 'Analog vs Digital Sensors & Signal Interfacing', objectives: 'ADC resolution, potentiometer voltage divider and threshold comparator', status: 'Upcoming' },
+  // ==================== CLASS 7 ====================
+  { id: 'CUR-201', week: 'Unit 1', level: 'Level 0', class_grade: '7', topic: 'C++ Coding Fundamentals & Logic Gates', objectives: 'Microcontroller architecture, IDE setup, variables and conditional logic', status: 'Completed' },
+  { id: 'CUR-202', week: 'Unit 2', level: 'Level 1', class_grade: '7', topic: 'Analog vs Digital Sensors & Signal Interfacing', objectives: 'ADC resolution, potentiometer voltage divider and threshold comparator', status: 'Upcoming' },
   { id: 'CUR-203', week: 'Unit 3', level: 'Level 2', class_grade: '7', topic: 'LCD Display & Sensor Data Visualization', objectives: 'I2C 16x2 LCD interface, custom character generation and live telemetry', status: 'Upcoming' },
-  { id: 'CUR-204', week: 'Unit 4', level: 'Level 2', class_grade: '7', topic: 'Autonomous Line Follower Robotics', objectives: 'Dual IR reflectance arrays, Differential drive control and track optimization', status: 'Upcoming' },
-  { id: 'CUR-205', week: 'Unit 5', level: 'Level 2', class_grade: '7', topic: 'Smart Irrigation & Environmental Telemetry', objectives: 'Soil moisture capacitive probes, submersible pump relay control', status: 'Upcoming' },
-  { id: 'CUR-206', week: 'Unit 6', level: 'Level 2', class_grade: '7', topic: 'Capstone Project: Multi-Sensor Autonomous Rover', objectives: 'Integration of ultrasonic radar, line tracking, and autonomous pathfinding', status: 'Upcoming' },
+  { id: 'CUR-204', week: 'Unit 4', level: 'Level 3', class_grade: '7', topic: 'Autonomous Line Follower Robotics', objectives: 'Dual IR reflectance arrays, Differential drive control and track optimization', status: 'Upcoming' },
+  { id: 'CUR-205', week: 'Unit 5', level: 'Level 4', class_grade: '7', topic: 'Smart Irrigation & Environmental Telemetry', objectives: 'Soil moisture capacitive probes, submersible pump relay control', status: 'Upcoming' },
+  { id: 'CUR-206', week: 'Unit 6', level: 'Level 5', class_grade: '7', topic: 'Capstone Project: Multi-Sensor Autonomous Rover', objectives: 'Integration of ultrasonic radar, line tracking, and autonomous pathfinding', status: 'Upcoming' },
 
-  // ==================== LEVEL 3: CLASS 8 ====================
-  { id: 'CUR-301', week: 'Unit 1', level: 'Level 3', class_grade: '8', topic: 'PWM Motor Control & High-Speed Steering', objectives: 'H-bridge motor drivers, PWM speed control and encoder feedback', status: 'Completed' },
-  { id: 'CUR-302', week: 'Unit 2', level: 'Level 3', class_grade: '8', topic: 'Ultrasonic Echo Mapping & Collision Prevention', objectives: 'HC-SR04 pulse timing, servo radar sweep and distance mapping', status: 'Upcoming' },
-  { id: 'CUR-303', week: 'Unit 3', level: 'Level 3', class_grade: '8', topic: 'Bluetooth Wireless Remote Teleoperation', objectives: 'HC-05 serial pairing, smartphone app control and command parsing', status: 'Upcoming' },
+  // ==================== CLASS 8 ====================
+  { id: 'CUR-301', week: 'Unit 1', level: 'Level 0', class_grade: '8', topic: 'PWM Motor Control & High-Speed Steering', objectives: 'H-bridge motor drivers, PWM speed control and encoder feedback', status: 'Completed' },
+  { id: 'CUR-302', week: 'Unit 2', level: 'Level 1', class_grade: '8', topic: 'Ultrasonic Echo Mapping & Collision Prevention', objectives: 'HC-SR04 pulse timing, servo radar sweep and distance mapping', status: 'Upcoming' },
+  { id: 'CUR-303', week: 'Unit 3', level: 'Level 2', class_grade: '8', topic: 'Bluetooth Wireless Remote Teleoperation', objectives: 'HC-05 serial pairing, smartphone app control and command parsing', status: 'Upcoming' },
   { id: 'CUR-304', week: 'Unit 4', level: 'Level 3', class_grade: '8', topic: 'Advanced PID Line Follower System', objectives: 'Proportional-Integral-Derivative tuning for smooth high-speed curve navigation', status: 'Upcoming' },
-  { id: 'CUR-305', week: 'Unit 5', level: 'Level 3', class_grade: '8', topic: 'IoT Sensor Logging & Real-time Web Monitoring', objectives: 'Cloud telemetry logging, sensor dashboard, and remote threshold alerting', status: 'Upcoming' },
-  { id: 'CUR-306', week: 'Unit 6', level: 'Level 3', class_grade: '8', topic: 'Capstone Project: Bluetooth Combat / Surveillance Bot', objectives: 'High-torque 4WD chassis with wireless command link and modular payload', status: 'Upcoming' },
+  { id: 'CUR-305', week: 'Unit 5', level: 'Level 4', class_grade: '8', topic: 'IoT Sensor Logging & Real-time Web Monitoring', objectives: 'Cloud telemetry logging, sensor dashboard, and remote threshold alerting', status: 'Upcoming' },
+  { id: 'CUR-306', week: 'Unit 6', level: 'Level 5', class_grade: '8', topic: 'Capstone Project: Bluetooth Combat / Surveillance Bot', objectives: 'High-torque 4WD chassis with wireless command link and modular payload', status: 'Upcoming' },
 
-  // ==================== LEVEL 4: CLASS 9 ====================
-  { id: 'CUR-401', week: 'Unit 1', level: 'Level 4', class_grade: '9', topic: 'ESP32 & Wireless IoT Microcontrollers', objectives: 'ESP32 architecture, Wi-Fi station mode, web server and telemetry', status: 'Completed' },
-  { id: 'CUR-402', week: 'Unit 2', level: 'Level 4', class_grade: '9', topic: 'Wi-Fi HTTP / MQTT Cloud Telemetry', objectives: 'REST API webhooks, MQTT publish/subscribe pubsub broker integration', status: 'Upcoming' },
-  { id: 'CUR-403', week: 'Unit 3', level: 'Level 4', class_grade: '9', topic: 'Advanced Sensor Fusion & Gyro / Accelerometer', objectives: 'MPU6050 I2C communication, pitch-roll angle filtering and stabilization', status: 'Upcoming' },
-  { id: 'CUR-404', week: 'Unit 4', level: 'Level 4', class_grade: '9', topic: 'Web Dashboard Integration & Remote Relay Control', objectives: 'Interactive WebSocket control interface for remote industrial actuation', status: 'Upcoming' },
+  // ==================== CLASS 9 ====================
+  { id: 'CUR-401', week: 'Unit 1', level: 'Level 0', class_grade: '9', topic: 'ESP32 & Wireless IoT Microcontrollers', objectives: 'ESP32 architecture, Wi-Fi station mode, web server and telemetry', status: 'Completed' },
+  { id: 'CUR-402', week: 'Unit 2', level: 'Level 1', class_grade: '9', topic: 'Wi-Fi HTTP / MQTT Cloud Telemetry', objectives: 'REST API webhooks, MQTT publish/subscribe pubsub broker integration', status: 'Upcoming' },
+  { id: 'CUR-403', week: 'Unit 3', level: 'Level 2', class_grade: '9', topic: 'Advanced Sensor Fusion & Gyro / Accelerometer', objectives: 'MPU6050 I2C communication, pitch-roll angle filtering and stabilization', status: 'Upcoming' },
+  { id: 'CUR-404', week: 'Unit 4', level: 'Level 3', class_grade: '9', topic: 'Web Dashboard Integration & Remote Relay Control', objectives: 'Interactive WebSocket control interface for remote industrial actuation', status: 'Upcoming' },
   { id: 'CUR-405', week: 'Unit 5', level: 'Level 4', class_grade: '9', topic: 'Smart Campus IoT Gateway Architecture', objectives: 'Multi-node sensor network with centralized coordinator hub', status: 'Upcoming' },
-  { id: 'CUR-406', week: 'Unit 6', level: 'Level 4', class_grade: '9', topic: 'Capstone Project: Full-Stack IoT Weather Station & Surveillance', objectives: 'Solar powered weather sensing node sending telemetry to cloud dashboard', status: 'Upcoming' },
+  { id: 'CUR-406', week: 'Unit 6', level: 'Level 5', class_grade: '9', topic: 'Capstone Project: Full-Stack IoT Weather Station & Surveillance', objectives: 'Solar powered weather sensing node sending telemetry to cloud dashboard', status: 'Upcoming' },
 
-  // ==================== LEVEL 5: CLASS 11 ====================
-  { id: 'CUR-501', week: 'Unit 1', level: 'Level 5', class_grade: '11', topic: 'Python for Computer Vision & Machine Intelligence', objectives: 'OpenCV basics, video stream capture, color masking and edge detection', status: 'Completed' },
-  { id: 'CUR-502', week: 'Unit 2', level: 'Level 5', class_grade: '11', topic: 'OpenCV Color Masking & Contour Object Tracking', objectives: 'HSV color space calibration, morphological filters and centroid calculation', status: 'Upcoming' },
-  { id: 'CUR-503', week: 'Unit 3', level: 'Level 5', class_grade: '11', topic: 'Haar Cascade Facial Recognition & Surveillance', objectives: 'Pretrained Haar cascades, multi-face tracking and attendance logging', status: 'Upcoming' },
-  { id: 'CUR-504', week: 'Unit 4', level: 'Level 5', class_grade: '11', topic: 'YOLO Object Detection & Neural Network Inferencing', objectives: 'YOLOv8 deep learning model on edge devices, bounding box parsing', status: 'Upcoming' },
-  { id: 'CUR-505', week: 'Unit 5', level: 'Level 5', class_grade: '11', topic: 'MediaPipe Edge AI Gesture Mapping', objectives: 'Hand landmark detection and gesture-controlled robotic actuation', status: 'Upcoming' },
+  // ==================== CLASS 11 ====================
+  { id: 'CUR-501', week: 'Unit 1', level: 'Level 0', class_grade: '11', topic: 'Python for Computer Vision & Machine Intelligence', objectives: 'OpenCV basics, video stream capture, color masking and edge detection', status: 'Completed' },
+  { id: 'CUR-502', week: 'Unit 2', level: 'Level 1', class_grade: '11', topic: 'OpenCV Color Masking & Contour Object Tracking', objectives: 'HSV color space calibration, morphological filters and centroid calculation', status: 'Upcoming' },
+  { id: 'CUR-503', week: 'Unit 3', level: 'Level 2', class_grade: '11', topic: 'Haar Cascade Facial Recognition & Surveillance', objectives: 'Pretrained Haar cascades, multi-face tracking and attendance logging', status: 'Upcoming' },
+  { id: 'CUR-504', week: 'Unit 4', level: 'Level 3', class_grade: '11', topic: 'YOLO Object Detection & Neural Network Inferencing', objectives: 'YOLOv8 deep learning model on edge devices, bounding box parsing', status: 'Upcoming' },
+  { id: 'CUR-505', week: 'Unit 5', level: 'Level 4', class_grade: '11', topic: 'MediaPipe Edge AI Gesture Mapping', objectives: 'Hand landmark detection and gesture-controlled robotic actuation', status: 'Upcoming' },
   { id: 'CUR-506', week: 'Unit 6', level: 'Level 5', class_grade: '11', topic: 'Capstone Project: Autonomous Vision Surveillance Rover', objectives: 'Real-time object tracking and autonomous rover obstacle navigation', status: 'Upcoming' }
 ];
 

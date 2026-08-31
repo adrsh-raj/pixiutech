@@ -418,47 +418,47 @@ function initializeDatabase() {
 
         cntStmt.finalize();
 
-        // 5-Level Structured Curriculum Plans (All Classes 6, 7, 8, 9, 11: Unit 1 Completed, Units 2-6 Upcoming)
+        // Structured Class Curriculum Plans (Units 1-6 mapped to Levels: Unit 1 Intro Level 0, Unit 2 Level 1, etc.)
         const curStmt = db.prepare("INSERT INTO curriculum VALUES (?, ?, ?, ?, ?, ?)");
         
-        // Level 1: Class 6
-        curStmt.run('CUR-101', 'Unit 1', 'Level 1', 'Introduction to Electricity & Basic Circuits', 'Understand current, voltage, breadboards and series/parallel LEDs', 'Completed');
+        // Class 6
+        curStmt.run('CUR-101', 'Unit 1', 'Level 0', 'Introduction to Electricity & Basic Circuits', 'Understand current, voltage, breadboards and series/parallel LEDs', 'Completed');
         curStmt.run('CUR-102', 'Unit 2', 'Level 1', 'Sensors: Light (LDR) & Obstacle (IR)', 'Analog vs digital inputs, calibration and sensor signal wiring', 'Upcoming');
-        curStmt.run('CUR-103', 'Unit 3', 'Level 1', 'Actuators: Motors, Buzzers & Relays', 'Transistor switches, relay driver circuits, and sound actuation', 'Upcoming');
-        curStmt.run('CUR-104', 'Unit 4', 'Level 1', 'Microcontroller (Arduino) Programming Basics', 'Digital output pin modes, delay timing, and serial monitor debugging', 'Upcoming');
-        curStmt.run('CUR-105', 'Unit 5', 'Level 1', 'Project Building: Smart Obstacle Avoiding Rover', 'Assemble 2WD chassis, L298N motor driver, and ultrasonic avoidance algorithm', 'Upcoming');
-        curStmt.run('CUR-106', 'Unit 6', 'Level 1', 'Capstone Project: Automated Smart Lab Environment', 'Final end-of-term presentation and smart automation build', 'Upcoming');
+        curStmt.run('CUR-103', 'Unit 3', 'Level 2', 'Actuators: Motors, Buzzers & Relays', 'Transistor switches, relay driver circuits, and sound actuation', 'Upcoming');
+        curStmt.run('CUR-104', 'Unit 4', 'Level 3', 'Microcontroller (Arduino) Programming Basics', 'Digital output pin modes, delay timing, and serial monitor debugging', 'Upcoming');
+        curStmt.run('CUR-105', 'Unit 5', 'Level 4', 'Project Building: Smart Obstacle Avoiding Rover', 'Assemble 2WD chassis, L298N motor driver, and ultrasonic avoidance algorithm', 'Upcoming');
+        curStmt.run('CUR-106', 'Unit 6', 'Level 5', 'Capstone Project: Automated Smart Lab Environment', 'Final end-of-term presentation and smart automation build', 'Upcoming');
 
-        // Level 2: Class 7
-        curStmt.run('CUR-201', 'Unit 1', 'Level 2', 'C++ Coding Fundamentals & Logic Gates', 'Microcontroller architecture, IDE setup, variables and conditional logic', 'Completed');
-        curStmt.run('CUR-202', 'Unit 2', 'Level 2', 'Analog vs Digital Sensors & Signal Interfacing', 'ADC resolution, potentiometer voltage divider and threshold comparator', 'Upcoming');
+        // Class 7
+        curStmt.run('CUR-201', 'Unit 1', 'Level 0', 'C++ Coding Fundamentals & Logic Gates', 'Microcontroller architecture, IDE setup, variables and conditional logic', 'Completed');
+        curStmt.run('CUR-202', 'Unit 2', 'Level 1', 'Analog vs Digital Sensors & Signal Interfacing', 'ADC resolution, potentiometer voltage divider and threshold comparator', 'Upcoming');
         curStmt.run('CUR-203', 'Unit 3', 'Level 2', 'LCD Display & Sensor Data Visualization', 'I2C 16x2 LCD interface, custom character generation and live telemetry', 'Upcoming');
-        curStmt.run('CUR-204', 'Unit 4', 'Level 2', 'Autonomous Line Follower Robotics', 'Dual IR reflectance arrays, Differential drive control and track optimization', 'Upcoming');
-        curStmt.run('CUR-205', 'Unit 5', 'Level 2', 'Smart Irrigation & Environmental Telemetry', 'Soil moisture capacitive probes, submersible pump relay control', 'Upcoming');
-        curStmt.run('CUR-206', 'Unit 6', 'Level 2', 'Capstone Project: Multi-Sensor Autonomous Rover', 'Integration of ultrasonic radar, line tracking, and autonomous pathfinding', 'Upcoming');
+        curStmt.run('CUR-204', 'Unit 4', 'Level 3', 'Autonomous Line Follower Robotics', 'Dual IR reflectance arrays, Differential drive control and track optimization', 'Upcoming');
+        curStmt.run('CUR-205', 'Unit 5', 'Level 4', 'Smart Irrigation & Environmental Telemetry', 'Soil moisture capacitive probes, submersible pump relay control', 'Upcoming');
+        curStmt.run('CUR-206', 'Unit 6', 'Level 5', 'Capstone Project: Multi-Sensor Autonomous Rover', 'Integration of ultrasonic radar, line tracking, and autonomous pathfinding', 'Upcoming');
 
-        // Level 3: Class 8
-        curStmt.run('CUR-301', 'Unit 1', 'Level 3', 'PWM Motor Control & High-Speed Steering', 'H-bridge motor drivers, PWM speed control and encoder feedback', 'Completed');
-        curStmt.run('CUR-302', 'Unit 2', 'Level 3', 'Ultrasonic Echo Mapping & Collision Prevention', 'HC-SR04 pulse timing, servo radar sweep and distance mapping', 'Upcoming');
-        curStmt.run('CUR-303', 'Unit 3', 'Level 3', 'Bluetooth Wireless Remote Teleoperation', 'HC-05 serial pairing, smartphone app control and command parsing', 'Upcoming');
+        // Class 8
+        curStmt.run('CUR-301', 'Unit 1', 'Level 0', 'PWM Motor Control & High-Speed Steering', 'H-bridge motor drivers, PWM speed control and encoder feedback', 'Completed');
+        curStmt.run('CUR-302', 'Unit 2', 'Level 1', 'Ultrasonic Echo Mapping & Collision Prevention', 'HC-SR04 pulse timing, servo radar sweep and distance mapping', 'Upcoming');
+        curStmt.run('CUR-303', 'Unit 3', 'Level 2', 'Bluetooth Wireless Remote Teleoperation', 'HC-05 serial pairing, smartphone app control and command parsing', 'Upcoming');
         curStmt.run('CUR-304', 'Unit 4', 'Level 3', 'Advanced PID Line Follower System', 'Proportional-Integral-Derivative tuning for smooth high-speed curve navigation', 'Upcoming');
-        curStmt.run('CUR-305', 'Unit 5', 'Level 3', 'IoT Sensor Logging & Real-time Web Monitoring', 'Cloud telemetry logging, sensor dashboard, and remote threshold alerting', 'Upcoming');
-        curStmt.run('CUR-306', 'Unit 6', 'Level 3', 'Capstone Project: Bluetooth Combat / Surveillance Bot', 'High-torque 4WD chassis with wireless command link and modular payload', 'Upcoming');
+        curStmt.run('CUR-305', 'Unit 5', 'Level 4', 'IoT Sensor Logging & Real-time Web Monitoring', 'Cloud telemetry logging, sensor dashboard, and remote threshold alerting', 'Upcoming');
+        curStmt.run('CUR-306', 'Unit 6', 'Level 5', 'Capstone Project: Bluetooth Combat / Surveillance Bot', 'High-torque 4WD chassis with wireless command link and modular payload', 'Upcoming');
 
-        // Level 4: Class 9
-        curStmt.run('CUR-401', 'Unit 1', 'Level 4', 'ESP32 & Wireless IoT Microcontrollers', 'ESP32 architecture, Wi-Fi station mode, web server and telemetry', 'Completed');
-        curStmt.run('CUR-402', 'Unit 2', 'Level 4', 'Wi-Fi HTTP / MQTT Cloud Telemetry', 'REST API webhooks, MQTT publish/subscribe pubsub broker integration', 'Upcoming');
-        curStmt.run('CUR-403', 'Unit 3', 'Level 4', 'Advanced Sensor Fusion & Gyro / Accelerometer', 'MPU6050 I2C communication, pitch-roll angle filtering and stabilization', 'Upcoming');
-        curStmt.run('CUR-404', 'Unit 4', 'Level 4', 'Web Dashboard Integration & Remote Relay Control', 'Interactive WebSocket control interface for remote industrial actuation', 'Upcoming');
+        // Class 9
+        curStmt.run('CUR-401', 'Unit 1', 'Level 0', 'ESP32 & Wireless IoT Microcontrollers', 'ESP32 architecture, Wi-Fi station mode, web server and telemetry', 'Completed');
+        curStmt.run('CUR-402', 'Unit 2', 'Level 1', 'Wi-Fi HTTP / MQTT Cloud Telemetry', 'REST API webhooks, MQTT publish/subscribe pubsub broker integration', 'Upcoming');
+        curStmt.run('CUR-403', 'Unit 3', 'Level 2', 'Advanced Sensor Fusion & Gyro / Accelerometer', 'MPU6050 I2C communication, pitch-roll angle filtering and stabilization', 'Upcoming');
+        curStmt.run('CUR-404', 'Unit 4', 'Level 3', 'Web Dashboard Integration & Remote Relay Control', 'Interactive WebSocket control interface for remote industrial actuation', 'Upcoming');
         curStmt.run('CUR-405', 'Unit 5', 'Level 4', 'Smart Campus IoT Gateway Architecture', 'Multi-node sensor network with centralized coordinator hub', 'Upcoming');
-        curStmt.run('CUR-406', 'Unit 6', 'Level 4', 'Capstone Project: Full-Stack IoT Weather Station & Surveillance', 'Solar powered weather sensing node sending telemetry to cloud dashboard', 'Upcoming');
+        curStmt.run('CUR-406', 'Unit 6', 'Level 5', 'Capstone Project: Full-Stack IoT Weather Station & Surveillance', 'Solar powered weather sensing node sending telemetry to cloud dashboard', 'Upcoming');
 
-        // Level 5: Class 11
-        curStmt.run('CUR-501', 'Unit 1', 'Level 5', 'Python for Computer Vision & Machine Intelligence', 'OpenCV basics, video stream capture, color masking and edge detection', 'Completed');
-        curStmt.run('CUR-502', 'Unit 2', 'Level 5', 'OpenCV Color Masking & Contour Object Tracking', 'HSV color space calibration, morphological filters and centroid calculation', 'Upcoming');
-        curStmt.run('CUR-503', 'Unit 3', 'Level 5', 'Haar Cascade Facial Recognition & Surveillance', 'Pretrained Haar cascades, multi-face tracking and attendance logging', 'Upcoming');
-        curStmt.run('CUR-504', 'Unit 4', 'Level 5', 'YOLO Object Detection & Neural Network Inferencing', 'YOLOv8 deep learning model on edge devices, bounding box parsing', 'Upcoming');
-        curStmt.run('CUR-505', 'Unit 5', 'Level 5', 'MediaPipe Edge AI Gesture Mapping', 'Hand landmark detection and gesture-controlled robotic actuation', 'Upcoming');
+        // Class 11
+        curStmt.run('CUR-501', 'Unit 1', 'Level 0', 'Python for Computer Vision & Machine Intelligence', 'OpenCV basics, video stream capture, color masking and edge detection', 'Completed');
+        curStmt.run('CUR-502', 'Unit 2', 'Level 1', 'OpenCV Color Masking & Contour Object Tracking', 'HSV color space calibration, morphological filters and centroid calculation', 'Upcoming');
+        curStmt.run('CUR-503', 'Unit 3', 'Level 2', 'Haar Cascade Facial Recognition & Surveillance', 'Pretrained Haar cascades, multi-face tracking and attendance logging', 'Upcoming');
+        curStmt.run('CUR-504', 'Unit 4', 'Level 3', 'YOLO Object Detection & Neural Network Inferencing', 'YOLOv8 deep learning model on edge devices, bounding box parsing', 'Upcoming');
+        curStmt.run('CUR-505', 'Unit 5', 'Level 4', 'MediaPipe Edge AI Gesture Mapping', 'Hand landmark detection and gesture-controlled robotic actuation', 'Upcoming');
         curStmt.run('CUR-506', 'Unit 6', 'Level 5', 'Capstone Project: Autonomous Vision Surveillance Rover', 'Real-time object tracking and autonomous rover obstacle navigation', 'Upcoming');
 
         curStmt.finalize();
