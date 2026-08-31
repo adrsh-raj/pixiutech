@@ -4,7 +4,7 @@ import { useData } from '../context/DataContext';
 import { 
   Award, BookOpen, Activity, FileText, Download, CheckCircle, 
   Clock, LogOut, User, Box, PlaySquare, Eye, Sparkles, Megaphone, 
-  Bell, Check, X, TrendingUp, Star, ShieldCheck, CheckCircle2, ChevronRight 
+  Bell, Check, X, TrendingUp, Star, ShieldCheck, CheckCircle2, ChevronRight, Send 
 } from 'lucide-react';
 import { 
   AreaChart, Area, LineChart, Line, XAxis, YAxis, 
@@ -13,7 +13,7 @@ import {
 
 export default function StudentPortal() {
   const { user, logout } = useAuth();
-  const { students, schools, content, projects, getStudentAttendance, notifications, curriculum } = useData();
+  const { students, schools, content, projects, getStudentAttendance, notifications, curriculum, studentReviews = [] } = useData();
 
   // Find logged in student object
   const cleanId = (user?.username || user?.related_id || '').trim().replace(/\s+/g, ' ');
@@ -90,75 +90,47 @@ export default function StudentPortal() {
     { session: 'S6 (Current)', attendance: attendanceRate, label: 'Session 6: Live Hands-On Lab' },
   ];
 
-  // 2. Level-by-Level Mastery & End-of-Level Trainer Reviews (Graph 2 & Review Section)
-  const levelReviewData = [
-    { 
-      level: 'Level 0', 
-      unitCode: 'Unit 1',
-      title: 'Intro to Electricity & Circuits', 
-      score: 9.5, 
-      status: 'Mastered', 
-      rating: 5,
-      review: 'Demonstrated exceptional understanding of breadboard power rails, series-parallel LEDs, and Ohm\'s Law current calculations.',
-      instructor: 'Vikas Pandey (Lead Instructor)',
-      verifiedDate: '15 Aug 2026'
-    },
-    { 
-      level: 'Level 1', 
-      unitCode: 'Unit 2',
-      title: 'Sensors: Light (LDR) & Obstacle (IR)', 
-      score: 9.2, 
-      status: 'Mastered', 
-      rating: 5,
-      review: 'Successfully calibrated analog LDR and digital IR sensors with accurate voltage divider threshold adjustments.',
-      instructor: 'Vikas Pandey (Lead Instructor)',
-      verifiedDate: '28 Aug 2026'
-    },
-    { 
-      level: 'Level 2', 
-      unitCode: 'Unit 3',
-      title: 'Actuators: Motors, Buzzers & Relays', 
-      score: 9.8, 
-      status: 'In Progress', 
-      rating: 5,
-      review: 'Accurate transistor switching circuitry wiring and high-torque DC motor driver breadboard assembly.',
-      instructor: 'Vikas Pandey (Lead Instructor)',
-      verifiedDate: 'Active Lab Unit'
-    },
-    { 
-      level: 'Level 3', 
-      unitCode: 'Unit 4',
-      title: 'Microcontroller (Arduino) Coding', 
-      score: 9.0, 
-      status: 'Upcoming', 
-      rating: 4,
-      review: 'Firmware pin modes, conditional loops, and serial monitor telemetry debugging.',
-      instructor: 'Vikas Pandey (Lead Instructor)',
-      verifiedDate: 'Upcoming'
-    },
-    { 
-      level: 'Level 4', 
-      unitCode: 'Unit 5',
-      title: 'Smart Obstacle Avoiding Rover Build', 
-      score: 9.4, 
-      status: 'Upcoming', 
-      rating: 5,
-      review: 'Integrated 2WD robotic chassis with L298N motor driver and ultrasonic avoidance algorithm.',
-      instructor: 'Vikas Pandey (Lead Instructor)',
-      verifiedDate: 'Upcoming'
-    },
-    { 
-      level: 'Level 5', 
-      unitCode: 'Unit 6',
-      title: 'Capstone: Automated Smart Environment', 
-      score: 9.7, 
-      status: 'Upcoming', 
-      rating: 5,
-      review: 'Final autonomous exhibition capstone with multi-sensor telemetry and live demonstration.',
-      instructor: 'Vikas Pandey (Lead Instructor)',
-      verifiedDate: 'Upcoming'
-    },
+  // 2. Dynamic End-of-Unit Reviews from Context (Sync with Trainer Reviews)
+  const DEFAULT_UNITS = [
+    { level: 'Level 0', unitCode: 'Unit 1', title: 'Intro to Electricity & Circuits', defaultScore: 9.5, defaultStatus: 'Mastered', defaultReview: 'Demonstrated exceptional understanding of breadboard power rails, series-parallel LEDs, and Ohm\'s Law current calculations.' },
+    { level: 'Level 1', unitCode: 'Unit 2', title: 'Sensors: Light (LDR) & Obstacle (IR)', defaultScore: 9.2, defaultStatus: 'Mastered', defaultReview: 'Successfully calibrated analog LDR and digital IR sensors with accurate voltage divider threshold adjustments.' },
+    { level: 'Level 2', unitCode: 'Unit 3', title: 'Actuators: Motors, Buzzers & Relays', defaultScore: 9.8, defaultStatus: 'In Progress', defaultReview: 'Accurate transistor switching circuitry wiring and high-torque DC motor driver breadboard assembly.' },
+    { level: 'Level 3', unitCode: 'Unit 4', title: 'Microcontroller (Arduino) Programming Basics', defaultScore: 9.0, defaultStatus: 'Upcoming', defaultReview: 'Firmware pin modes, conditional loops, and serial monitor telemetry debugging.' },
+    { level: 'Level 4', unitCode: 'Unit 5', title: 'Smart Obstacle Avoiding Rover Build', defaultScore: 9.4, defaultStatus: 'Upcoming', defaultReview: 'Integrated 2WD robotic chassis with L298N motor driver and ultrasonic avoidance algorithm.' },
+    { level: 'Level 5', unitCode: 'Unit 6', title: 'Capstone: Automated Smart Environment', defaultScore: 9.7, defaultStatus: 'Upcoming', defaultReview: 'Final autonomous exhibition capstone with multi-sensor telemetry and live demonstration.' }
   ];
+
+  const levelReviewData = useMemo(() => {
+    const studentSpecificReviews = studentReviews.filter(r => r.student_id === student.student_id || r.student_id === cleanId);
+    
+    return DEFAULT_UNITS.map(unit => {
+      const match = studentSpecificReviews.find(r => r.unit_code === unit.unitCode || r.level === unit.level);
+      if (match) {
+        return {
+          level: match.level || unit.level,
+          unitCode: match.unit_code || unit.unitCode,
+          title: match.unit_title || unit.title,
+          score: Number(match.score) || unit.defaultScore,
+          status: match.status || unit.defaultStatus,
+          rating: Number(match.rating) || 5,
+          review: match.review || unit.defaultReview,
+          instructor: match.trainer_name || 'Vikas Pandey (Lead Instructor)',
+          verifiedDate: match.verified_date || 'Recent Lab Review'
+        };
+      }
+      return {
+        level: unit.level,
+        unitCode: unit.unitCode,
+        title: unit.title,
+        score: unit.defaultScore,
+        status: unit.defaultStatus,
+        rating: 5,
+        review: unit.defaultReview,
+        instructor: 'Vikas Pandey (Lead Instructor)',
+        verifiedDate: 'Curriculum Baseline'
+      };
+    });
+  }, [studentReviews, student.student_id, cleanId]);
 
   // Custom Chart Tooltips
   const CustomAttendanceTooltip = ({ active, payload, label }) => {
@@ -530,7 +502,35 @@ export default function StudentPortal() {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 pt-8 space-y-8">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 pt-8 space-y-6">
+        {/* Official Monthly Accountability & Motivation Notice Banner */}
+        <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 rounded-2xl p-5 text-white border border-blue-500/30 shadow-lg relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-400/40 flex items-center justify-center text-blue-300 shrink-0 mt-0.5">
+              <Sparkles size={20} className="text-amber-300 animate-pulse" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-sm text-white tracking-wide">
+                  Welcome to Pixiu Tech Innovation Lab, {student.name}!
+                </h3>
+                <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  Monthly Report Active
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 mt-1 leading-relaxed max-w-3xl">
+                📢 <strong className="text-white">Institutional Accountability Notice:</strong> At the end of every month, your practical laboratory attendance records, level-by-level competency reviews, and prototype scores are compiled and dispatched directly to your <strong>School Principal</strong> and <strong>Parents</strong>. Keep innovating, building, and exploring with full dedication. <strong className="text-amber-300">Happy Studying! 🚀✨</strong>
+              </p>
+            </div>
+          </div>
+
+          <div className="shrink-0 flex items-center gap-2">
+            <span className="text-xs font-bold font-mono px-3 py-1.5 rounded-lg bg-white/10 text-blue-200 border border-white/10 flex items-center gap-1.5">
+              <Send size={12} className="text-blue-300" /> Dispatched Monthly
+            </span>
+          </div>
+        </div>
+
         {/* Hero Card */}
         <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-3xl p-8 text-white shadow-xl border border-slate-700/60 relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <div className="flex items-center gap-5">

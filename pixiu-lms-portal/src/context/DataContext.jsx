@@ -2,7 +2,8 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import { 
   SEED_SCHOOLS, SEED_CLASSES, SEED_STUDENTS, SEED_TRAINERS, 
   SEED_BILLING, SEED_SESSIONS, SEED_ATTENDANCE, SEED_INVENTORY, 
-  SEED_ALERTS, SEED_CURRICULUM, SEED_CONTENT, SEED_NOTIFICATIONS 
+  SEED_ALERTS, SEED_CURRICULUM, SEED_CONTENT, SEED_NOTIFICATIONS,
+  SEED_STUDENT_REVIEWS
 } from '../data/seedData';
 
 const DataContext = createContext();
@@ -51,6 +52,7 @@ export function DataProvider({ children }) {
   const [projects, setProjects] = useState(() => safeGetItem('pixiu_projects', []));
   const [alerts, setAlerts] = useState(() => safeGetItem('pixiu_alerts', SEED_ALERTS));
   const [notifications, setNotifications] = useState(() => safeGetItem('pixiu_notifications', SEED_NOTIFICATIONS));
+  const [studentReviews, setStudentReviews] = useState(() => safeGetItem('pixiu_student_reviews', SEED_STUDENT_REVIEWS));
   const [loading, setLoading] = useState(false);
 
   // Cross-tab / Cross-window Real-time Sync
@@ -60,6 +62,12 @@ export function DataProvider({ children }) {
         try {
           const fresh = JSON.parse(e.newValue || '[]');
           if (fresh && fresh.length > 0) setNotifications(fresh);
+        } catch (err) {}
+      }
+      if (e.key === 'pixiu_student_reviews') {
+        try {
+          const fresh = JSON.parse(e.newValue || '[]');
+          if (fresh && fresh.length > 0) setStudentReviews(fresh);
         } catch (err) {}
       }
     };
@@ -729,6 +737,41 @@ export function DataProvider({ children }) {
     return { success: true };
   };
 
+  // 16. End-of-Unit Student Reviews by Trainers
+  const saveStudentReview = (reviewData) => {
+    const reviewId = reviewData.id || `REV-${Date.now().toString().slice(-4)}`;
+    const fullReview = {
+      ...reviewData,
+      id: reviewId,
+      verified_date: reviewData.verified_date || new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+      updated_at: new Date().toISOString()
+    };
+
+    setStudentReviews(prev => {
+      // If review for same student_id + unit_code exists, update it; otherwise add new
+      const exists = prev.some(r => r.student_id === fullReview.student_id && r.unit_code === fullReview.unit_code);
+      let updated;
+      if (exists) {
+        updated = prev.map(r => (r.student_id === fullReview.student_id && r.unit_code === fullReview.unit_code) ? fullReview : r);
+      } else {
+        updated = [fullReview, ...prev];
+      }
+      try { localStorage.setItem('pixiu_student_reviews', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+
+    return { success: true, data: fullReview };
+  };
+
+  const deleteStudentReview = (id) => {
+    setStudentReviews(prev => {
+      const updated = prev.filter(r => r.id !== id);
+      try { localStorage.setItem('pixiu_student_reviews', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+    return { success: true };
+  };
+
   // Utilities
   const getNextRollNumber = (schoolCode, grade, section) => {
     const cohort = students.filter(s => s.school_id === schoolCode && s.class_id === `CLS-${schoolCode}-${grade}${section || ''}`);
@@ -760,7 +803,8 @@ export function DataProvider({ children }) {
     comms, sendCommsMessage,
     projects, addProject, deleteProject, uploadFile,
     alerts, resolveAlertAction,
-    notifications, sendBroadcastNotification, updateNotification, deleteNotification
+    notifications, sendBroadcastNotification, updateNotification, deleteNotification,
+    studentReviews, saveStudentReview, deleteStudentReview
   };
 
   return (

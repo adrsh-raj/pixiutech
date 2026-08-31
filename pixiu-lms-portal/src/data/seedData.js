@@ -306,3 +306,67 @@ export const SEED_CONTENT = [
   { id: 'CNT-1101-S', title: 'Class 11 - Unit 1: Python OpenCV Vision (Student Edition)', type: 'PDF', level: null, class_grade: '11', target: 'Student', is_watermarked: 1, url: '/materials/class11-unit1-student-watermarked.pdf', description: 'OpenCV matrix operations, video stream capture, color filters and convolutions' },
   { id: 'CNT-1102-S', title: 'Class 11 - Unit 2: Object Contour Tracking (Student Edition)', type: 'PDF', level: 'Level 1', class_grade: '11', target: 'Student', is_watermarked: 1, url: '/materials/class11-unit2-student-watermarked.pdf', description: 'Level 1 Unit 2 OpenCV Color Masking & Contour Object Tracking' }
 ];
+
+// End-of-Unit Student Reviews by Trainers
+export const SEED_STUDENT_REVIEWS = [
+  {
+    id: 'REV-001',
+    student_id: 'ZPS6A 01',
+    student_name: 'Aarav Sharma',
+    class_grade: '6',
+    level: 'Level 0',
+    unit_code: 'Unit 1',
+    unit_title: 'Intro to Electricity & Circuits',
+    score: 9.5,
+    rating: 5,
+    status: 'Mastered',
+    review: 'Demonstrated exceptional understanding of breadboard power rails, series-parallel LEDs, and Ohm\'s Law current calculations.',
+    trainer_name: 'Vikas Pandey (Lead Instructor)',
+    verified_date: '15 Aug 2026'
+  },
+  {
+    id: 'REV-002',
+    student_id: 'ZPS6A 01',
+    student_name: 'Aarav Sharma',
+    class_grade: '6',
+    level: 'Level 1',
+    unit_code: 'Unit 2',
+    unit_title: 'Sensors: Light (LDR) & Obstacle (IR)',
+    score: 9.2,
+    rating: 5,
+    status: 'Mastered',
+    review: 'Successfully calibrated analog LDR and digital IR sensors with accurate voltage divider threshold adjustments.',
+    trainer_name: 'Vikas Pandey (Lead Instructor)',
+    verified_date: '28 Aug 2026'
+  },
+  {
+    id: 'REV-003',
+    student_id: 'ZPS6A 01',
+    student_name: 'Aarav Sharma',
+    class_grade: '6',
+    level: 'Level 2',
+    unit_code: 'Unit 3',
+    unit_title: 'Actuators: Motors, Buzzers & Relays',
+    score: 9.8,
+    rating: 5,
+    status: 'In Progress',
+    review: 'Accurate transistor switching circuitry wiring and high-torque DC motor driver breadboard assembly.',
+    trainer_name: 'Vikas Pandey (Lead Instructor)',
+    verified_date: '31 Aug 2026'
+  },
+  {
+    id: 'REV-004',
+    student_id: 'ZPS7A 01',
+    student_name: 'Devansh Tiwari',
+    class_grade: '7',
+    level: 'Level 0',
+    unit_code: 'Unit 1',
+    unit_title: 'C++ Coding Fundamentals & Logic',
+    score: 9.6,
+    rating: 5,
+    status: 'Mastered',
+    review: 'Superb conditional logic and serial communication syntax understanding.',
+    trainer_name: 'Vikas Pandey (Lead Instructor)',
+    verified_date: '20 Aug 2026'
+  }
+];
