@@ -54,10 +54,20 @@ const FALLBACK_USERS = [
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem('pixiu_auth_user');
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const saved = localStorage.getItem('pixiu_auth_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return null;
+    }
   });
-  const [token, setToken] = useState(() => localStorage.getItem('pixiu_auth_token') || null);
+  const [token, setToken] = useState(() => {
+    try {
+      return localStorage.getItem('pixiu_auth_token') || null;
+    } catch (e) {
+      return null;
+    }
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

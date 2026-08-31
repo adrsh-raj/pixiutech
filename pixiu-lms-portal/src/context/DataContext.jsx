@@ -11,22 +11,32 @@ const API_BASE = typeof window !== 'undefined' && window.location.hostname === '
   ? 'http://localhost:5000/api'
   : (import.meta.env.VITE_API_URL || '/api');
 
+const safeGetItem = (key, fallback) => {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw || raw === 'null' || raw === 'undefined') return fallback;
+    return JSON.parse(raw) || fallback;
+  } catch (e) {
+    return fallback;
+  }
+};
+
 export function DataProvider({ children }) {
-  const [schools, setSchools] = useState(() => JSON.parse(localStorage.getItem('pixiu_schools') || 'null') || SEED_SCHOOLS);
-  const [classes, setClasses] = useState(() => JSON.parse(localStorage.getItem('pixiu_classes') || 'null') || SEED_CLASSES);
-  const [students, setStudents] = useState(() => JSON.parse(localStorage.getItem('pixiu_students') || 'null') || SEED_STUDENTS);
-  const [trainers, setTrainers] = useState(() => JSON.parse(localStorage.getItem('pixiu_trainers') || 'null') || SEED_TRAINERS);
-  const [sessions, setSessions] = useState(() => JSON.parse(localStorage.getItem('pixiu_sessions') || 'null') || SEED_SESSIONS);
-  const [attendance, setAttendance] = useState(() => JSON.parse(localStorage.getItem('pixiu_attendance') || 'null') || SEED_ATTENDANCE);
-  const [leads, setLeads] = useState(() => JSON.parse(localStorage.getItem('pixiu_leads') || '[]'));
-  const [content, setContent] = useState(() => JSON.parse(localStorage.getItem('pixiu_content') || 'null') || SEED_CONTENT);
-  const [curriculum, setCurriculum] = useState(() => JSON.parse(localStorage.getItem('pixiu_curriculum') || 'null') || SEED_CURRICULUM);
-  const [inventory, setInventory] = useState(() => JSON.parse(localStorage.getItem('pixiu_inventory') || 'null') || SEED_INVENTORY);
-  const [billing, setBilling] = useState(() => JSON.parse(localStorage.getItem('pixiu_billing') || 'null') || SEED_BILLING);
-  const [comms, setComms] = useState(() => JSON.parse(localStorage.getItem('pixiu_comms') || '[]'));
-  const [projects, setProjects] = useState(() => JSON.parse(localStorage.getItem('pixiu_projects') || '[]'));
-  const [alerts, setAlerts] = useState(() => JSON.parse(localStorage.getItem('pixiu_alerts') || 'null') || SEED_ALERTS);
-  const [notifications, setNotifications] = useState(() => JSON.parse(localStorage.getItem('pixiu_notifications') || 'null') || SEED_NOTIFICATIONS);
+  const [schools, setSchools] = useState(() => safeGetItem('pixiu_schools', SEED_SCHOOLS));
+  const [classes, setClasses] = useState(() => safeGetItem('pixiu_classes', SEED_CLASSES));
+  const [students, setStudents] = useState(() => safeGetItem('pixiu_students', SEED_STUDENTS));
+  const [trainers, setTrainers] = useState(() => safeGetItem('pixiu_trainers', SEED_TRAINERS));
+  const [sessions, setSessions] = useState(() => safeGetItem('pixiu_sessions', SEED_SESSIONS));
+  const [attendance, setAttendance] = useState(() => safeGetItem('pixiu_attendance', SEED_ATTENDANCE));
+  const [leads, setLeads] = useState(() => safeGetItem('pixiu_leads', []));
+  const [content, setContent] = useState(() => safeGetItem('pixiu_content', SEED_CONTENT));
+  const [curriculum, setCurriculum] = useState(() => safeGetItem('pixiu_curriculum', SEED_CURRICULUM));
+  const [inventory, setInventory] = useState(() => safeGetItem('pixiu_inventory', SEED_INVENTORY));
+  const [billing, setBilling] = useState(() => safeGetItem('pixiu_billing', SEED_BILLING));
+  const [comms, setComms] = useState(() => safeGetItem('pixiu_comms', []));
+  const [projects, setProjects] = useState(() => safeGetItem('pixiu_projects', []));
+  const [alerts, setAlerts] = useState(() => safeGetItem('pixiu_alerts', SEED_ALERTS));
+  const [notifications, setNotifications] = useState(() => safeGetItem('pixiu_notifications', SEED_NOTIFICATIONS));
   const [loading, setLoading] = useState(false);
 
   // --- REFRESH ALL TABLES FROM BACKEND IF AVAILABLE ---
