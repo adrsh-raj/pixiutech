@@ -155,7 +155,6 @@ export default function ContentHub() {
       {/* Material Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredContent.map(item => {
-          const isTrainerDoc = item.target === 'Trainer';
           return (
             <div key={item.id} className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between group">
               <div>
@@ -169,15 +168,9 @@ export default function ContentHub() {
                     </span>
                   </div>
 
-                  {isTrainerDoc ? (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
-                      <ShieldCheck size={11} /> Clean Instructor Master
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                      Student Watermarked
-                    </span>
-                  )}
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
+                    <ShieldCheck size={11} /> Teacher Master (No Watermark)
+                  </span>
                 </div>
 
                 <h3 className="font-bold text-slate-900 text-sm mb-1 group-hover:text-pixiu-blue transition-colors">
@@ -228,8 +221,8 @@ export default function ContentHub() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95">
             <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
               <div>
-                <h3 className="text-base font-bold text-slate-800">Publish Curriculum Material</h3>
-                <p className="text-xs text-slate-500">Upload clean trainer pack or watermarked student workbook</p>
+                <h3 className="text-base font-bold text-slate-800">Publish Teacher Master Material</h3>
+                <p className="text-xs text-slate-500">Upload clean unwatermarked faculty teaching guide or circuit schematic</p>
               </div>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-700 cursor-pointer"><X size={18}/></button>
             </div>
@@ -239,7 +232,7 @@ export default function ContentHub() {
                 <label className="block font-bold text-slate-500 uppercase mb-1">Document Title *</label>
                 <input 
                   type="text" 
-                  placeholder="e.g. Class 6 - Unit 3: Autonomous Obstacle Avoider" 
+                  placeholder="e.g. Class 6 - Unit 3: Motors & Actuators (Teacher Master)" 
                   value={formData.title} 
                   onChange={e => setFormData({ ...formData, title: e.target.value })} 
                   required
@@ -249,14 +242,13 @@ export default function ContentHub() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-500 uppercase mb-1">Target Audience</label>
+                  <label className="block font-bold text-slate-500 uppercase mb-1">Document Edition</label>
                   <select 
                     value={formData.target} 
                     onChange={e => setFormData({ ...formData, target: e.target.value })} 
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white font-bold"
                   >
-                    <option value="Student">Student (Watermarked Edition)</option>
-                    <option value="Trainer">Trainer (Clean Master Pack)</option>
+                    <option value="Teacher">Teacher Master (No Watermark)</option>
                   </select>
                 </div>
                 <div>
