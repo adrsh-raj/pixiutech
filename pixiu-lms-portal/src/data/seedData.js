@@ -83,13 +83,13 @@ export const SEED_BILLING = [
     amount: 40000,
     total_contract_value: 100000,
     date_issued: '2026-08-01',
-    due_date: '2026-08-15',
-    paid_date: '2026-08-05',
-    payment_method: 'NEFT Bank Transfer',
+    due_date: '2026-09-15',
+    paid_date: null,
+    payment_method: null,
     place_of_supply: 'Hata, Uttar Pradesh',
-    status: 'Paid',
-    receipt_no: 'REC-ZPS-2026-01',
-    is_confirmed: 1
+    status: 'Pending',
+    receipt_no: null,
+    is_confirmed: 0
   },
   {
     id: 'INV-ZPS-02',
@@ -100,7 +100,7 @@ export const SEED_BILLING = [
     amount: 30000,
     total_contract_value: 100000,
     date_issued: '2026-08-25',
-    due_date: '2026-09-15',
+    due_date: '2026-10-15',
     paid_date: null,
     payment_method: null,
     place_of_supply: 'Hata, Uttar Pradesh',
@@ -153,20 +153,7 @@ export const SEED_INVENTORY = [
   { id: 'KIT-ZPS-21', name: 'Standard Robotics Lab Kit (Uno + Dual Motor)', level: 'Level 5', school_id: 'ZPS', assigned_student_id: 'ZPS11A 01', status: 'Healthy', last_checked: '2026-08-28', issue_notes: 'Standard Zenith Lab Kit assigned' },
 ];
 
-export const SEED_ALERTS = [
-  {
-    id: 'ALT-BILLING-ZPS',
-    type: 'billing_due',
-    title: '💰 Tranche 1 Collected: ₹40,000 / ₹1,00,000 Reconciled',
-    message: 'Zenith Public School Tranche 1 payment of ₹40,000 received. Tranche 2 due on Sep 15, 2026.',
-    severity: 'info',
-    related_id: 'INV-ZPS-01',
-    action_label: 'View Billing Ledger',
-    action_type: 'view_billing',
-    is_read: 0,
-    created_at: '2026-08-28'
-  }
-];
+export const SEED_ALERTS = [];
 
 export const SEED_CURRICULUM = [
   // Class 6

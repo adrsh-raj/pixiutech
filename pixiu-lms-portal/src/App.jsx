@@ -82,6 +82,13 @@ function ProtectedLayout() {
     }
   };
 
+  const visibleAlerts = alerts.filter(a => {
+    if (user?.role !== 'admin' && (a.type === 'billing_due' || a.action_type === 'view_billing' || a.type === 'billing')) {
+      return false;
+    }
+    return true;
+  });
+
   return (
     <div className="flex h-screen bg-slate-50 font-sans antialiased selection:bg-blue-500 selection:text-white">
       <Sidebar />
@@ -101,7 +108,7 @@ function ProtectedLayout() {
                 title="Operational Alerts & Actions"
               >
                 <Bell size={18} />
-                {alerts.length > 0 && (
+                {visibleAlerts.length > 0 && (
                   <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white animate-pulse"></span>
                 )}
               </button>
@@ -112,13 +119,13 @@ function ProtectedLayout() {
                   <div className="p-4 bg-slate-900 text-white flex justify-between items-center">
                     <div className="flex items-center gap-2">
                       <Zap size={16} className="text-amber-400"/>
-                      <h3 className="font-bold text-xs uppercase tracking-wider">Live System Alerts ({alerts.length})</h3>
+                      <h3 className="font-bold text-xs uppercase tracking-wider">Live System Alerts ({visibleAlerts.length})</h3>
                     </div>
                     <button onClick={() => setIsAlertsOpen(false)} className="text-slate-400 hover:text-white cursor-pointer"><X size={16}/></button>
                   </div>
 
                   <div className="max-h-96 overflow-y-auto p-3 space-y-2.5">
-                    {alerts.map(alertItem => (
+                    {visibleAlerts.map(alertItem => (
                       <div key={alertItem.id} className={`p-3.5 rounded-xl border text-xs ${
                         alertItem.severity === 'critical' ? 'bg-red-50/70 border-red-200 text-red-950' :
                         alertItem.severity === 'warning' ? 'bg-amber-50/70 border-amber-200 text-amber-950' :
@@ -154,7 +161,7 @@ function ProtectedLayout() {
                       </div>
                     ))}
 
-                    {alerts.length === 0 && (
+                    {visibleAlerts.length === 0 && (
                       <div className="p-8 text-center text-slate-400 text-xs font-medium">
                         All systems operational. No critical bottlenecks or alerts!
                       </div>

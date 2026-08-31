@@ -467,9 +467,9 @@ function initializeDatabase() {
         // Billing (Zenith Public School ₹1,00,000 Total Contract in 3 Tranches: 40k, 30k, 30k)
         const billStmt = db.prepare("INSERT INTO billing (id, school_id, school_name, tranche_number, tranche_title, amount, total_contract_value, date_issued, due_date, paid_date, payment_method, place_of_supply, status, receipt_no, is_confirmed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         
-        billStmt.run('INV-ZPS-01', 'ZPS', 'Zenith Public School', 1, 'Tranche 1: Lab Setup & Hardware Kit Dispatch (40%)', 40000, 100000, '2026-08-01', '2026-08-15', '2026-08-05', 'NEFT Bank Transfer', 'Hata, Uttar Pradesh', 'Paid', 'REC-ZPS-2026-01', 1);
+        billStmt.run('INV-ZPS-01', 'ZPS', 'Zenith Public School', 1, 'Tranche 1: Lab Setup & Hardware Kit Dispatch (40%)', 40000, 100000, '2026-08-01', '2026-09-15', null, null, 'Hata, Uttar Pradesh', 'Pending', null, 0);
         
-        billStmt.run('INV-ZPS-02', 'ZPS', 'Zenith Public School', 2, 'Tranche 2: Mid-Term Curriculum Delivery & IoT Integration (30%)', 30000, 100000, '2026-08-25', '2026-09-15', null, null, 'Hata, Uttar Pradesh', 'Pending', null, 0);
+        billStmt.run('INV-ZPS-02', 'ZPS', 'Zenith Public School', 2, 'Tranche 2: Mid-Term Curriculum Delivery & IoT Integration (30%)', 30000, 100000, '2026-08-25', '2026-10-15', null, null, 'Hata, Uttar Pradesh', 'Pending', null, 0);
         
         billStmt.run('INV-ZPS-03', 'ZPS', 'Zenith Public School', 3, 'Tranche 3: Final AI Capstone, Student Exhibition & Certification (30%)', 30000, 100000, '2026-08-25', '2026-11-30', null, null, 'Hata, Uttar Pradesh', 'Pending', null, 0);
         
