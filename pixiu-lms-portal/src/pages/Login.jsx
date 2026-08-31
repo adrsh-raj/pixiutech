@@ -96,7 +96,7 @@ export default function Login() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">
-              {selectedRoleTab === 'student' ? 'Student ID (Format: ZPS6A 01)' : 'Username / Faculty ID'}
+              {selectedRoleTab === 'student' ? 'Student ID' : 'Username'}
             </label>
             <div className="relative">
               <User size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
@@ -105,7 +105,6 @@ export default function Login() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 required
-                placeholder={selectedRoleTab === 'student' ? 'e.g. ZPS6A 01' : 'e.g. vikaspandey or adarshraj'}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-11 pr-4 py-3 text-sm text-white focus:outline-none focus:border-pixiu-blue transition-colors font-medium"
               />
             </div>
@@ -120,7 +119,6 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                placeholder="••••••••"
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-11 pr-4 py-3 text-sm text-white focus:outline-none focus:border-pixiu-blue transition-colors font-medium"
               />
             </div>
