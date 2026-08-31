@@ -29,9 +29,9 @@ export default function StudentPortal() {
   const classNotifs = (notifications || []).filter(n => {
     if (n.status === 'Archived') return false;
     if (n.target_type === 'Universal' || n.target_type === 'All_Students') return true;
-    if (n.target_type === 'Specific_Class') {
-      const classes = (n.target_classes || '').split(',');
-      return classes.includes(studentGrade);
+    if (n.target_type === 'Specific_Class' || n.target_classes) {
+      const classes = (n.target_classes || '').split(',').map(c => c.trim());
+      return classes.includes(studentGrade.trim()) || classes.length === 5;
     }
     return false;
   });

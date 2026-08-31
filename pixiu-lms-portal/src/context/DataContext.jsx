@@ -11,6 +11,8 @@ const API_BASE = typeof window !== 'undefined' && window.location.hostname === '
   ? 'http://localhost:5000/api'
   : (import.meta.env.VITE_API_URL || '/api');
 
+const API_URL = API_BASE;
+
 const safeGetItem = (key, fallback) => {
   try {
     const raw = localStorage.getItem(key);
@@ -18,6 +20,18 @@ const safeGetItem = (key, fallback) => {
     return JSON.parse(raw) || fallback;
   } catch (e) {
     return fallback;
+  }
+};
+
+const safeFetch = async (url) => {
+  try {
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    const contentType = r.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) return null;
+    return await r.json();
+  } catch (e) {
+    return null;
   }
 };
 
@@ -39,6 +53,20 @@ export function DataProvider({ children }) {
   const [notifications, setNotifications] = useState(() => safeGetItem('pixiu_notifications', SEED_NOTIFICATIONS));
   const [loading, setLoading] = useState(false);
 
+  // Cross-tab / Cross-window Real-time Sync
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === 'pixiu_notifications') {
+        try {
+          const fresh = JSON.parse(e.newValue || '[]');
+          if (fresh && fresh.length > 0) setNotifications(fresh);
+        } catch (err) {}
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
   // --- REFRESH ALL TABLES FROM BACKEND IF AVAILABLE ---
   const refreshAll = useCallback(async () => {
     try {
@@ -46,21 +74,21 @@ export function DataProvider({ children }) {
         schRes, clsRes, stuRes, trRes, sesRes, attRes, 
         ldRes, cntRes, curRes, invRes, bilRes, comRes, prjRes, altRes, notifRes
       ] = await Promise.all([
-        fetch(`${API_BASE}/schools`).then(r => r.ok ? r.json() : null).catch(() => null),
-        fetch(`${API_BASE}/classes`).then(r => r.ok ? r.json() : null).catch(() => null),
-        fetch(`${API_BASE}/students`).then(r => r.ok ? r.json() : null).catch(() => null),
-        fetch(`${API_BASE}/trainers`).then(r => r.ok ? r.json() : null).catch(() => null),
-        fetch(`${API_BASE}/sessions`).then(r => r.ok ? r.json() : null).catch(() => null),
-        fetch(`${API_BASE}/attendance`).then(r => r.ok ? r.json() : null).catch(() => null),
-        fetch(`${API_BASE}/leads`).then(r => r.ok ? r.json() : null).catch(() => null),
-        fetch(`${API_BASE}/content`).then(r => r.ok ? r.json() : null).catch(() => null),
-        fetch(`${API_BASE}/curriculum`).then(r => r.ok ? r.json() : null).catch(() => null),
-        fetch(`${API_BASE}/inventory`).then(r => r.ok ? r.json() : null).catch(() => null),
-        fetch(`${API_BASE}/billing`).then(r => r.ok ? r.json() : null).catch(() => null),
-        fetch(`${API_BASE}/comms`).then(r => r.ok ? r.json() : null).catch(() => null),
-        fetch(`${API_BASE}/projects`).then(r => r.ok ? r.json() : null).catch(() => null),
-        fetch(`${API_BASE}/alerts`).then(r => r.ok ? r.json() : null).catch(() => null),
-        fetch(`${API_BASE}/notifications`).then(r => r.ok ? r.json() : null).catch(() => null),
+        safeFetch(`${API_BASE}/schools`),
+        safeFetch(`${API_BASE}/classes`),
+        safeFetch(`${API_BASE}/students`),
+        safeFetch(`${API_BASE}/trainers`),
+        safeFetch(`${API_BASE}/sessions`),
+        safeFetch(`${API_BASE}/attendance`),
+        safeFetch(`${API_BASE}/leads`),
+        safeFetch(`${API_BASE}/content`),
+        safeFetch(`${API_BASE}/curriculum`),
+        safeFetch(`${API_BASE}/inventory`),
+        safeFetch(`${API_BASE}/billing`),
+        safeFetch(`${API_BASE}/comms`),
+        safeFetch(`${API_BASE}/projects`),
+        safeFetch(`${API_BASE}/alerts`),
+        safeFetch(`${API_BASE}/notifications`),
       ]);
 
       if (schRes && schRes.length > 0) setSchools(schRes);
@@ -636,32 +664,37 @@ export function DataProvider({ children }) {
 
   // 15. Broadcast Notifications & Class Announcements
   const sendBroadcastNotification = async (notifData) => {
+    let savedItem = null;
     try {
       const res = await fetch(`${API_URL}/notifications`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(notifData)
       });
-      const data = await res.json();
-      if (res.ok) {
-        setNotifications(prev => [data, ...prev]);
-        localStorage.setItem('pixiu_notifications', JSON.stringify([data, ...notifications]));
-        await refreshAll();
-        return { success: true, data };
+      if (res.ok && res.headers.get('content-type')?.includes('application/json')) {
+        savedItem = await res.json();
       }
     } catch (e) {
-      console.error(e);
-      const localItem = {
+      console.warn("Backend unavailable, saving locally:", e);
+    }
+
+    if (!savedItem) {
+      savedItem = {
         ...notifData,
         id: `NOTIF-${Date.now().toString().slice(-4)}`,
         status: 'Active',
         created_at: new Date().toISOString().replace('T', ' ').slice(0, 19),
         updated_at: new Date().toISOString().replace('T', ' ').slice(0, 19)
       };
-      setNotifications(prev => [localItem, ...prev]);
-      localStorage.setItem('pixiu_notifications', JSON.stringify([localItem, ...notifications]));
-      return { success: true, data: localItem };
     }
+
+    setNotifications(prev => {
+      const updated = [savedItem, ...prev.filter(n => n.id !== savedItem.id)];
+      try { localStorage.setItem('pixiu_notifications', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+
+    return { success: true, data: savedItem };
   };
 
   const updateNotification = async (id, updatedData) => {
@@ -671,27 +704,29 @@ export function DataProvider({ children }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedData)
       });
-      setNotifications(prev => prev.map(n => n.id === id ? { ...n, ...updatedData, updated_at: new Date().toISOString().replace('T', ' ').slice(0, 19) } : n));
-      await refreshAll();
-      return { success: true };
-    } catch (e) {
-      console.error(e);
-      setNotifications(prev => prev.map(n => n.id === id ? { ...n, ...updatedData, updated_at: new Date().toISOString().replace('T', ' ').slice(0, 19) } : n));
-      return { success: true };
-    }
+    } catch (e) {}
+
+    setNotifications(prev => {
+      const updated = prev.map(n => n.id === id ? { ...n, ...updatedData, updated_at: new Date().toISOString().replace('T', ' ').slice(0, 19) } : n);
+      try { localStorage.setItem('pixiu_notifications', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+
+    return { success: true };
   };
 
   const deleteNotification = async (id) => {
     try {
       await fetch(`${API_URL}/notifications/${id}`, { method: 'DELETE' });
-      setNotifications(prev => prev.filter(n => n.id !== id));
-      await refreshAll();
-      return { success: true };
-    } catch (e) {
-      console.error(e);
-      setNotifications(prev => prev.filter(n => n.id !== id));
-      return { success: true };
-    }
+    } catch (e) {}
+
+    setNotifications(prev => {
+      const updated = prev.filter(n => n.id !== id);
+      try { localStorage.setItem('pixiu_notifications', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+
+    return { success: true };
   };
 
   // Utilities
