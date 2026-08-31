@@ -506,7 +506,7 @@ function initializeDatabase() {
         comStmt.finalize();
 
         // Broadcast Notifications & Class Announcements
-        const notifStmt = db.prepare("INSERT INTO notifications VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        const notifStmt = db.prepare("INSERT INTO notifications VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         notifStmt.run('NOTIF-001', 'All_Students', '6,7,8,9,11', 'All', '📢 Next Robotics Lab Class Scheduled', 'Dear Students & Faculty, the upcoming practical robotics session for Classes 6, 7, 8, 9, 11 will be held on Wednesday, 02 Sep 2026. Please ensure all student workbooks are brought to class.', 'next_class', 'Wednesday, 02 Sep 2026', '10:00 AM', 'info', 'Active', '2026-08-31 22:15:00', '2026-08-31 22:15:00');
         notifStmt.run('NOTIF-002', 'All_Students', '6,7,8,9,11', 'All', '📝 Unit 1 Revision & Circuit Viva Notice', 'Attention All Classes (6, 7, 8, 9, 11): Unit 1 concept revision and hands-on circuit viva checks will be held in the upcoming class. Please study the Unit 1 guides in your Student Portal.', 'revision', 'Wednesday, 02 Sep 2026', '11:00 AM', 'important', 'Active', '2026-08-31 22:16:00', '2026-08-31 22:16:00');
         notifStmt.run('NOTIF-003', 'All_Trainers', '6,7,8,9,11', 'TR-01', '🛠️ Trainer Directive: Prepare Level 1 Unit 2 Sensor Kits', 'Trainer Vikas Pandey: Please inspect and calibrate the LDR, IR and ultrasonic sensors for Classes 6A to 11A before Wednesday morning session.', 'kit_prep', 'Wednesday, 02 Sep 2026', '09:30 AM', 'urgent', 'Active', '2026-08-31 22:17:00', '2026-08-31 22:17:00');
