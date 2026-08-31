@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import { 
   SEED_SCHOOLS, SEED_CLASSES, SEED_STUDENTS, SEED_TRAINERS, 
   SEED_BILLING, SEED_SESSIONS, SEED_ATTENDANCE, SEED_INVENTORY, 
-  SEED_ALERTS, SEED_CURRICULUM, SEED_CONTENT 
+  SEED_ALERTS, SEED_CURRICULUM, SEED_CONTENT, SEED_NOTIFICATIONS 
 } from '../data/seedData';
 
 const DataContext = createContext();
