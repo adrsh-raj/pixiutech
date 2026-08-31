@@ -9,28 +9,14 @@ export default function Login() {
   const toast = useToast();
   const navigate = useNavigate();
 
-  const [username, setUsername] = useState('ZPS6A 01');
-  const [password, setPassword] = useState('ZPSzenith6@hata');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [selectedRoleTab, setSelectedRoleTab] = useState('student'); // 'student' | 'trainer'
 
   const handleRolePreset = (role) => {
     setSelectedRoleTab(role);
-    setError('');
-    if (role === 'student') {
-      setUsername('ZPS6A 01');
-      setPassword('ZPSzenith6@hata');
-    } else if (role === 'trainer') {
-      setUsername('vikaspandey');
-      setPassword('Vikad@pixiutech');
-    }
-  };
-
-  const handleAdminPreset = () => {
-    setSelectedRoleTab('trainer');
-    setUsername('adarshraj');
-    setPassword('Adarsg@pixiutech');
     setError('');
   };
 
@@ -98,20 +84,6 @@ export default function Login() {
             <User size={15} /> Trainer & Admin
           </button>
         </div>
-
-        {/* Quick Admin Quick-Switch Link when in Trainer Tab */}
-        {selectedRoleTab === 'trainer' && (
-          <div className="mb-4 flex items-center justify-between px-2 text-[11px] text-slate-400">
-            <span>Faculty & Management Access</span>
-            <button
-              type="button"
-              onClick={handleAdminPreset}
-              className="text-pixiu-blue hover:text-blue-300 font-bold cursor-pointer underline decoration-dotted"
-            >
-              Fill Admin (adarshraj)
-            </button>
-          </div>
-        )}
 
         {/* Error Alert */}
         {error && (
