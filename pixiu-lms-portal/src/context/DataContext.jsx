@@ -1,67 +1,72 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { 
+  SEED_SCHOOLS, SEED_CLASSES, SEED_STUDENTS, SEED_TRAINERS, 
+  SEED_BILLING, SEED_SESSIONS, SEED_ATTENDANCE, SEED_INVENTORY, 
+  SEED_ALERTS, SEED_CURRICULUM, SEED_CONTENT 
+} from '../data/seedData';
 
 const DataContext = createContext();
 
-const API_URL = 'http://localhost:5000/api';
+const API_BASE = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+  ? 'http://localhost:5000/api'
+  : (import.meta.env.VITE_API_URL || '/api');
 
 export function DataProvider({ children }) {
-  const [schools, setSchools] = useState([]);
-  const [classes, setClasses] = useState([]);
-  const [students, setStudents] = useState([]);
-  const [trainers, setTrainers] = useState([]);
-  const [sessions, setSessions] = useState([]);
-  const [attendance, setAttendance] = useState([]);
-  const [leads, setLeads] = useState([]);
-  const [content, setContent] = useState([]);
-  const [curriculum, setCurriculum] = useState([]);
-  const [inventory, setInventory] = useState([]);
-  const [billing, setBilling] = useState([]);
-  const [comms, setComms] = useState([]);
-  const [projects, setProjects] = useState([]);
-  const [alerts, setAlerts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [schools, setSchools] = useState(() => JSON.parse(localStorage.getItem('pixiu_schools') || 'null') || SEED_SCHOOLS);
+  const [classes, setClasses] = useState(() => JSON.parse(localStorage.getItem('pixiu_classes') || 'null') || SEED_CLASSES);
+  const [students, setStudents] = useState(() => JSON.parse(localStorage.getItem('pixiu_students') || 'null') || SEED_STUDENTS);
+  const [trainers, setTrainers] = useState(() => JSON.parse(localStorage.getItem('pixiu_trainers') || 'null') || SEED_TRAINERS);
+  const [sessions, setSessions] = useState(() => JSON.parse(localStorage.getItem('pixiu_sessions') || 'null') || SEED_SESSIONS);
+  const [attendance, setAttendance] = useState(() => JSON.parse(localStorage.getItem('pixiu_attendance') || 'null') || SEED_ATTENDANCE);
+  const [leads, setLeads] = useState(() => JSON.parse(localStorage.getItem('pixiu_leads') || '[]'));
+  const [content, setContent] = useState(() => JSON.parse(localStorage.getItem('pixiu_content') || 'null') || SEED_CONTENT);
+  const [curriculum, setCurriculum] = useState(() => JSON.parse(localStorage.getItem('pixiu_curriculum') || 'null') || SEED_CURRICULUM);
+  const [inventory, setInventory] = useState(() => JSON.parse(localStorage.getItem('pixiu_inventory') || 'null') || SEED_INVENTORY);
+  const [billing, setBilling] = useState(() => JSON.parse(localStorage.getItem('pixiu_billing') || 'null') || SEED_BILLING);
+  const [comms, setComms] = useState(() => JSON.parse(localStorage.getItem('pixiu_comms') || '[]'));
+  const [projects, setProjects] = useState(() => JSON.parse(localStorage.getItem('pixiu_projects') || '[]'));
+  const [alerts, setAlerts] = useState(() => JSON.parse(localStorage.getItem('pixiu_alerts') || 'null') || SEED_ALERTS);
+  const [loading, setLoading] = useState(false);
 
-  // --- REFRESH ALL TABLES FROM BACKEND ---
+  // --- REFRESH ALL TABLES FROM BACKEND IF AVAILABLE ---
   const refreshAll = useCallback(async () => {
     try {
       const [
         schRes, clsRes, stuRes, trRes, sesRes, attRes, 
         ldRes, cntRes, curRes, invRes, bilRes, comRes, prjRes, altRes
       ] = await Promise.all([
-        fetch(`${API_URL}/schools`).then(r => r.json()).catch(() => []),
-        fetch(`${API_URL}/classes`).then(r => r.json()).catch(() => []),
-        fetch(`${API_URL}/students`).then(r => r.json()).catch(() => []),
-        fetch(`${API_URL}/trainers`).then(r => r.json()).catch(() => []),
-        fetch(`${API_URL}/sessions`).then(r => r.json()).catch(() => []),
-        fetch(`${API_URL}/attendance`).then(r => r.json()).catch(() => []),
-        fetch(`${API_URL}/leads`).then(r => r.json()).catch(() => []),
-        fetch(`${API_URL}/content`).then(r => r.json()).catch(() => []),
-        fetch(`${API_URL}/curriculum`).then(r => r.json()).catch(() => []),
-        fetch(`${API_URL}/inventory`).then(r => r.json()).catch(() => []),
-        fetch(`${API_URL}/billing`).then(r => r.json()).catch(() => []),
-        fetch(`${API_URL}/comms`).then(r => r.json()).catch(() => []),
-        fetch(`${API_URL}/projects`).then(r => r.json()).catch(() => []),
-        fetch(`${API_URL}/alerts`).then(r => r.json()).catch(() => []),
+        fetch(`${API_BASE}/schools`).then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch(`${API_BASE}/classes`).then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch(`${API_BASE}/students`).then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch(`${API_BASE}/trainers`).then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch(`${API_BASE}/sessions`).then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch(`${API_BASE}/attendance`).then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch(`${API_BASE}/leads`).then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch(`${API_BASE}/content`).then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch(`${API_BASE}/curriculum`).then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch(`${API_BASE}/inventory`).then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch(`${API_BASE}/billing`).then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch(`${API_BASE}/comms`).then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch(`${API_BASE}/projects`).then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch(`${API_BASE}/alerts`).then(r => r.ok ? r.json() : null).catch(() => null),
       ]);
 
-      setSchools(schRes || []);
-      setClasses(clsRes || []);
-      setStudents(stuRes || []);
-      setTrainers(trRes || []);
-      setSessions(sesRes || []);
-      setAttendance(attRes || []);
-      setLeads(ldRes || []);
-      setContent(cntRes || []);
-      setCurriculum(curRes || []);
-      setInventory(invRes || []);
-      setBilling(bilRes || []);
-      setComms(comRes || []);
-      setProjects(prjRes || []);
-      setAlerts(altRes || []);
+      if (schRes && schRes.length > 0) setSchools(schRes);
+      if (clsRes && clsRes.length > 0) setClasses(clsRes);
+      if (stuRes && stuRes.length > 0) setStudents(stuRes);
+      if (trRes && trRes.length > 0) setTrainers(trRes);
+      if (sesRes && sesRes.length > 0) setSessions(sesRes);
+      if (attRes && attRes.length > 0) setAttendance(attRes);
+      if (ldRes) setLeads(ldRes);
+      if (cntRes && cntRes.length > 0) setContent(cntRes);
+      if (curRes && curRes.length > 0) setCurriculum(curRes);
+      if (invRes && invRes.length > 0) setInventory(invRes);
+      if (bilRes && bilRes.length > 0) setBilling(bilRes);
+      if (comRes) setComms(comRes);
+      if (prjRes) setProjects(prjRes);
+      if (altRes && altRes.length > 0) setAlerts(altRes);
     } catch (err) {
-      console.error("Error refreshing database state:", err);
-    } finally {
-      setLoading(false);
+      console.warn("Backend API unavailable, using offline seed state.");
     }
   }, []);
 
