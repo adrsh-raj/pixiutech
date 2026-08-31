@@ -361,26 +361,46 @@ function initializeDatabase() {
         ldStmt.run('L-002', 'Mount Carmel School', 'Fr. James', '9198760001', 'Dwarka', 'Negotiation', 180000, 'Proposal sent for 120 students.', '2026-08-30');
         ldStmt.finalize();
 
-        // Content Hub (ONLY Unit 2 uploaded for Classes 6, 7, 8, 9, 11 - Tagged as Level 1)
+        // Content Hub (Unit 1: No Level Tag & Unit 2: Level 1 uploaded for Classes 6, 7, 8, 9, 11)
         const cntStmt = db.prepare("INSERT INTO content VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
         
-        // Class 6 (Level 1 - Unit 2)
+        // ==================== CLASS 6 ====================
+        // Unit 1 (Intro - No Level Tag)
+        cntStmt.run('CNT-601-S', 'Class 6 - Unit 1: Basic Circuits (Student Edition)', 'PDF', null, '6', 'Student', '/materials/class6-unit1-student-watermarked.pdf', 1, 'Foundational electronics, LEDs, breadboard wiring and series/parallel circuits');
+        cntStmt.run('CNT-601-T', 'Class 6 - Unit 1: Basic Circuits (Teacher Master)', 'PDF', null, '6', 'Trainer', '/materials/class6-unit1-teacher.pdf', 0, 'Instructor lesson plan, circuit schematics & viva questions for Unit 1');
+        // Unit 2 (Level 1)
         cntStmt.run('CNT-602-S', 'Class 6 - Unit 2: Sensors LDR & IR (Student Edition)', 'PDF', 'Level 1', '6', 'Student', '/materials/class6-unit2-student-watermarked.pdf', 1, 'Level 1 Unit 2 Light & Obstacle Sensor Manual with Circuit Schematics');
         cntStmt.run('CNT-602-T', 'Class 6 - Unit 2: Sensors LDR & IR (Teacher Master)', 'PDF', 'Level 1', '6', 'Trainer', '/materials/class6-unit2-teacher.pdf', 0, 'Level 1 Unit 2 Instructor Calibration Guide');
 
-        // Class 7 (Level 1 - Unit 2)
+        // ==================== CLASS 7 ====================
+        // Unit 1 (Intro - No Level Tag)
+        cntStmt.run('CNT-701-S', 'Class 7 - Unit 1: C++ Fundamentals (Student Edition)', 'PDF', null, '7', 'Student', '/materials/class7-unit1-student-watermarked.pdf', 1, 'Logic structures, conditional statements, variables and microcontroller syntax');
+        cntStmt.run('CNT-701-T', 'Class 7 - Unit 1: C++ Fundamentals (Teacher Master)', 'PDF', null, '7', 'Trainer', '/materials/class7-unit1-teacher.pdf', 0, 'Instructor lesson plan and code walkthroughs for AVR microcontrollers');
+        // Unit 2 (Level 1)
         cntStmt.run('CNT-702-S', 'Class 7 - Unit 2: Analog Sensor Interfacing (Student Edition)', 'PDF', 'Level 1', '7', 'Student', '/materials/class7-unit2-student-watermarked.pdf', 1, 'Level 1 Unit 2 Analog vs Digital Sensors & Signal Interfacing');
         cntStmt.run('CNT-702-T', 'Class 7 - Unit 2: Analog Sensor Interfacing (Teacher Master)', 'PDF', 'Level 1', '7', 'Trainer', '/materials/class7-unit2-teacher.pdf', 0, 'Level 1 Unit 2 Instructor Calibration Lesson Plan');
 
-        // Class 8 (Level 1 - Unit 2)
+        // ==================== CLASS 8 ====================
+        // Unit 1 (Intro - No Level Tag)
+        cntStmt.run('CNT-801-S', 'Class 8 - Unit 1: PWM Motor Control (Student Edition)', 'PDF', null, '8', 'Student', '/materials/class8-unit1-student-watermarked.pdf', 1, 'H-bridge motor drivers, duty cycles, speed modulation and differential steering');
+        cntStmt.run('CNT-801-T', 'Class 8 - Unit 1: PWM Motor Control (Teacher Master)', 'PDF', null, '8', 'Trainer', '/materials/class8-unit1-teacher.pdf', 0, 'Instructor driver schematics and PWM waveform calibration guide');
+        // Unit 2 (Level 1)
         cntStmt.run('CNT-802-S', 'Class 8 - Unit 2: Ultrasonic Echo Mapping (Student Edition)', 'PDF', 'Level 1', '8', 'Student', '/materials/class8-unit2-student-watermarked.pdf', 1, 'Level 1 Unit 2 Ultrasonic Echo Mapping & Collision Prevention');
         cntStmt.run('CNT-802-T', 'Class 8 - Unit 2: Ultrasonic Echo Mapping (Teacher Master)', 'PDF', 'Level 1', '8', 'Trainer', '/materials/class8-unit2-teacher.pdf', 0, 'Level 1 Unit 2 Instructor Echo Timing Guide');
 
-        // Class 9 (Level 1 - Unit 2)
+        // ==================== CLASS 9 ====================
+        // Unit 1 (Intro - No Level Tag)
+        cntStmt.run('CNT-901-S', 'Class 9 - Unit 1: ESP32 IoT Microcontrollers (Student Edition)', 'PDF', null, '9', 'Student', '/materials/class9-unit1-student-watermarked.pdf', 1, 'ESP32 Dual-Core architecture, Wi-Fi station setup and embedded web server');
+        cntStmt.run('CNT-901-T', 'Class 9 - Unit 1: ESP32 IoT Microcontrollers (Teacher Master)', 'PDF', null, '9', 'Trainer', '/materials/class9-unit1-teacher.pdf', 0, 'Instructor IoT toolchain and network architecture guide');
+        // Unit 2 (Level 1)
         cntStmt.run('CNT-902-S', 'Class 9 - Unit 2: HTTP & MQTT Cloud Protocols (Student Edition)', 'PDF', 'Level 1', '9', 'Student', '/materials/class9-unit2-student-watermarked.pdf', 1, 'Level 1 Unit 2 Wi-Fi HTTP / MQTT Cloud Telemetry');
         cntStmt.run('CNT-902-T', 'Class 9 - Unit 2: HTTP & MQTT Cloud Protocols (Teacher Master)', 'PDF', 'Level 1', '9', 'Trainer', '/materials/class9-unit2-teacher.pdf', 0, 'Level 1 Unit 2 Cloud Telemetry Lesson Plan');
 
-        // Class 11 (Level 1 - Unit 2)
+        // ==================== CLASS 11 ====================
+        // Unit 1 (Intro - No Level Tag)
+        cntStmt.run('CNT-1101-S', 'Class 11 - Unit 1: Python OpenCV Vision (Student Edition)', 'PDF', null, '11', 'Student', '/materials/class11-unit1-student-watermarked.pdf', 1, 'OpenCV matrix operations, video stream capture, color filters and convolutions');
+        cntStmt.run('CNT-1101-T', 'Class 11 - Unit 1: Python OpenCV Vision (Teacher Master)', 'PDF', null, '11', 'Trainer', '/materials/class11-unit1-teacher.pdf', 0, 'Instructor camera pipeline, color space transforms and FPS optimization deck');
+        // Unit 2 (Level 1)
         cntStmt.run('CNT-1102-S', 'Class 11 - Unit 2: Object Contour Tracking (Student Edition)', 'PDF', 'Level 1', '11', 'Student', '/materials/class11-unit2-student-watermarked.pdf', 1, 'Level 1 Unit 2 OpenCV Color Masking & Contour Object Tracking');
         cntStmt.run('CNT-1102-T', 'Class 11 - Unit 2: Object Contour Tracking (Teacher Master)', 'PDF', 'Level 1', '11', 'Trainer', '/materials/class11-unit2-teacher.pdf', 0, 'Level 1 Unit 2 Contour Tracking Instructor Guide');
 
