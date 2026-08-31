@@ -361,78 +361,28 @@ function initializeDatabase() {
         ldStmt.run('L-002', 'Mount Carmel School', 'Fr. James', '9198760001', 'Dwarka', 'Negotiation', 180000, 'Proposal sent for 120 students.', '2026-08-30');
         ldStmt.finalize();
 
-        // Content Hub (Complete Class 6, 7, 8, 9, 11 Curriculum PDFs - Student Watermarked & Teacher Clean)
+        // Content Hub (ONLY Unit 2 uploaded for Classes 6, 7, 8, 9, 11 - Tagged as Level 1)
         const cntStmt = db.prepare("INSERT INTO content VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
         
-        // ================= CLASS 6 (Level 1) =================
-        cntStmt.run('C-601', 'Class 6 - Unit 1: Robotics & Sensor Basics (Student Edition)', 'PDF', 'Level 1', '6', 'Student', '/materials/class6-unit1-student-watermarked.pdf', 1, 'Student guide for electronic sensors, LEDs and circuit basics');
-        cntStmt.run('C-602', 'Class 6 - Unit 1: Instructor Lesson Plan & Notes (Teacher Edition)', 'PDF', 'Level 1', '6', 'Trainer', '/materials/class6-unit1-teacher.pdf', 0, 'Clean master lesson plan, circuit schematics & viva questions for Unit 1');
-        cntStmt.run('C-603', 'Class 6 - Unit 2: Motors & Motion Drivers (Student Edition)', 'PDF', 'Level 1', '6', 'Student', '/materials/class6-unit2-student-watermarked.pdf', 1, 'Student activity workbook for DC motor control and gearboxes');
-        cntStmt.run('C-604', 'Class 6 - Unit 2: Instructor Master Guide (Teacher Edition)', 'PDF', 'Level 1', '6', 'Trainer', '/materials/class6-unit2-teacher.pdf', 0, 'Clean instructor presentation slide deck & motor driver troubleshooting');
-        cntStmt.run('C-605', 'Class 6 - Unit 3: Smart Obstacle Avoidance (Student Edition)', 'PDF', 'Level 1', '6', 'Student', '/materials/class6-unit3-student-watermarked.pdf', 1, 'Student guide for ultrasonic sensor distance calculation');
-        cntStmt.run('C-606', 'Class 6 - Unit 3: Teacher Theory & Lab Manual (Teacher Edition)', 'PDF', 'Level 1', '6', 'Trainer', '/materials/class6-unit3-teacher.pdf', 0, 'Clean instructor handbook for ultrasonic trigger and echo calibration');
-        cntStmt.run('C-607', 'Class 6 - Unit 4: Autonomous Line Tracking Basics (Student Edition)', 'PDF', 'Level 1', '6', 'Student', '/materials/class6-unit4-student-watermarked.pdf', 1, 'Student workbook for IR sensor line detection circuits');
-        cntStmt.run('C-608', 'Class 6 - Unit 4: Instructor Line Following Deck (Teacher Edition)', 'PDF', 'Level 1', '6', 'Trainer', '/materials/class6-unit4-teacher.pdf', 0, 'Clean teacher guide for analog comparator threshold tuning');
-        cntStmt.run('C-609', 'Class 6 - Unit 5: Sound & Light Activated Systems (Student Edition)', 'PDF', 'Level 1', '6', 'Student', '/materials/class6-unit5-student-watermarked.pdf', 1, 'Student handbook for LDR and acoustic microphone triggers');
-        cntStmt.run('C-610', 'Class 6 - Unit 5: Master Teacher Walkthrough (Teacher Edition)', 'PDF', 'Level 1', '6', 'Trainer', '/materials/class6-unit5-teacher.pdf', 0, 'Clean instructor schematics for sound-activated switching');
-        cntStmt.run('C-611', 'Class 6 - Unit 6: Capstone Project - Autonomous Rover (Student Edition)', 'PDF', 'Level 1', '6', 'Student', '/materials/class6-unit6-student-watermarked.pdf', 1, 'Student capstone build manual for full chassis assembly');
-        cntStmt.run('C-612', 'Class 6 - Unit 6: Capstone Instructor Evaluation Rubric (Teacher Edition)', 'PDF', 'Level 1', '6', 'Trainer', '/materials/class6-unit6-teacher.pdf', 0, 'Clean trainer project evaluation scorecard & build rubric');
+        // Class 6 (Level 1 - Unit 2)
+        cntStmt.run('CNT-602-S', 'Class 6 - Unit 2: Sensors LDR & IR (Student Edition)', 'PDF', 'Level 1', '6', 'Student', '/materials/class6-unit2-student-watermarked.pdf', 1, 'Level 1 Unit 2 Light & Obstacle Sensor Manual with Circuit Schematics');
+        cntStmt.run('CNT-602-T', 'Class 6 - Unit 2: Sensors LDR & IR (Teacher Master)', 'PDF', 'Level 1', '6', 'Trainer', '/materials/class6-unit2-teacher.pdf', 0, 'Level 1 Unit 2 Instructor Calibration Guide');
 
-        // ================= CLASS 7 (Level 2) =================
-        cntStmt.run('C-701', 'Class 7 - Unit 1: Microcontroller Fundamentals (Student Edition)', 'PDF', 'Level 2', '7', 'Student', '/materials/class7-unit1-student-watermarked.pdf', 1, 'Student tutorial for Arduino programming and C++ syntax');
-        cntStmt.run('C-702', 'Class 7 - Unit 1: Instructor Guide & Architecture (Teacher Edition)', 'PDF', 'Level 2', '7', 'Trainer', '/materials/class7-unit1-teacher.pdf', 0, 'Clean master lesson plan for AVR microcontrollers and bootloaders');
-        cntStmt.run('C-703', 'Class 7 - Unit 2: Digital & Analog Sensor Interfacing (Student Edition)', 'PDF', 'Level 2', '7', 'Student', '/materials/class7-unit2-student-watermarked.pdf', 1, 'Student lab workbook for ADC readings and serial monitor debugging');
-        cntStmt.run('C-704', 'Class 7 - Unit 2: Teacher Lab Master Pack (Teacher Edition)', 'PDF', 'Level 2', '7', 'Trainer', '/materials/class7-unit2-teacher.pdf', 0, 'Clean instructor notes for ADC voltage dividers and calibration');
-        cntStmt.run('C-705', 'Class 7 - Unit 3: PWM Motor Speed Modulation (Student Edition)', 'PDF', 'Level 2', '7', 'Student', '/materials/class7-unit3-student-watermarked.pdf', 1, 'Student handbook for duty cycle and PWM motor acceleration');
-        cntStmt.run('C-706', 'Class 7 - Unit 3: Instructor PWM Control Guide (Teacher Edition)', 'PDF', 'Level 2', '7', 'Trainer', '/materials/class7-unit3-teacher.pdf', 0, 'Clean instructor guide for timer-based PWM waveforms and H-bridge drivers');
-        cntStmt.run('C-707', 'Class 7 - Unit 4: Ultrasonic Radar & Servo Sweeper (Student Edition)', 'PDF', 'Level 2', '7', 'Student', '/materials/class7-unit4-student-watermarked.pdf', 1, 'Student activity book for servo angle sweeps and sonar radar map');
-        cntStmt.run('C-708', 'Class 7 - Unit 4: Teacher Sonar Navigation Pack (Teacher Edition)', 'PDF', 'Level 2', '7', 'Trainer', '/materials/class7-unit4-teacher.pdf', 0, 'Clean master deck for 180-degree sweep obstacle mapping');
-        cntStmt.run('C-709', 'Class 7 - Unit 5: I2C LCD Display & Telemetry (Student Edition)', 'PDF', 'Level 2', '7', 'Student', '/materials/class7-unit5-student-watermarked.pdf', 1, 'Student workbook for 16x2 I2C display and telemetry status');
-        cntStmt.run('C-710', 'Class 7 - Unit 5: Instructor I2C Bus Architecture (Teacher Edition)', 'PDF', 'Level 2', '7', 'Trainer', '/materials/class7-unit5-teacher.pdf', 0, 'Clean instructor manual for I2C addresses and bus pull-ups');
-        cntStmt.run('C-711', 'Class 7 - Unit 6: Capstone Project - Multi-Sensor Bot (Student Edition)', 'PDF', 'Level 2', '7', 'Student', '/materials/class7-unit6-student-watermarked.pdf', 1, 'Student capstone project integration manual');
-        cntStmt.run('C-712', 'Class 7 - Unit 6: Master Capstone Assessment (Teacher Edition)', 'PDF', 'Level 2', '7', 'Trainer', '/materials/class7-unit6-teacher.pdf', 0, 'Clean trainer certification test and capstone grading criteria');
+        // Class 7 (Level 1 - Unit 2)
+        cntStmt.run('CNT-702-S', 'Class 7 - Unit 2: Analog Sensor Interfacing (Student Edition)', 'PDF', 'Level 1', '7', 'Student', '/materials/class7-unit2-student-watermarked.pdf', 1, 'Level 1 Unit 2 Analog vs Digital Sensors & Signal Interfacing');
+        cntStmt.run('CNT-702-T', 'Class 7 - Unit 2: Analog Sensor Interfacing (Teacher Master)', 'PDF', 'Level 1', '7', 'Trainer', '/materials/class7-unit2-teacher.pdf', 0, 'Level 1 Unit 2 Instructor Calibration Lesson Plan');
 
-        // ================= CLASS 8 (Level 3) =================
-        cntStmt.run('C-801', 'Class 8 - Unit 1: Autonomous Line Tracker Systems (Student Edition)', 'PDF', 'Level 3', '8', 'Student', '/materials/class8-unit1-student-watermarked.pdf', 1, 'Student handbook for multi-channel IR array sensors');
-        cntStmt.run('C-802', 'Class 8 - Unit 1: Teacher Master Pack & Algorithm Guide (Teacher Edition)', 'PDF', 'Level 3', '8', 'Trainer', '/materials/class8-unit1-teacher.pdf', 0, 'Clean instructor walkthrough for line tracking algorithms and error states');
-        cntStmt.run('C-803', 'Class 8 - Unit 2: PID Control Algorithms for Robotics (Student Edition)', 'PDF', 'Level 3', '8', 'Student', '/materials/class8-unit2-student-watermarked.pdf', 1, 'Student guide for Proportional, Integral & Derivative error tuning');
-        cntStmt.run('C-804', 'Class 8 - Unit 2: Instructor PID Mathematical Model (Teacher Edition)', 'PDF', 'Level 3', '8', 'Trainer', '/materials/class8-unit2-teacher.pdf', 0, 'Clean master deck for Kp, Ki, Kd coefficients tuning and oscillation dampening');
-        cntStmt.run('C-805', 'Class 8 - Unit 3: Bluetooth & Wireless Robot Control (Student Edition)', 'PDF', 'Level 3', '8', 'Student', '/materials/class8-unit3-student-watermarked.pdf', 1, 'Student manual for HC-05 module and mobile app telemetry');
-        cntStmt.run('C-806', 'Class 8 - Unit 3: Teacher Wireless UART Protocol (Teacher Edition)', 'PDF', 'Level 3', '8', 'Trainer', '/materials/class8-unit3-teacher.pdf', 0, 'Clean instructor packet for baud rate handshakes and AT commands');
-        cntStmt.run('C-807', 'Class 8 - Unit 4: Robotic Arm Kinematics & Gripper (Student Edition)', 'PDF', 'Level 3', '8', 'Student', '/materials/class8-unit4-student-watermarked.pdf', 1, 'Student activity pack for 3-axis robotic arm degrees of freedom');
-        cntStmt.run('C-808', 'Class 8 - Unit 4: Instructor Arm Kinematics Guide (Teacher Edition)', 'PDF', 'Level 3', '8', 'Trainer', '/materials/class8-unit4-teacher.pdf', 0, 'Clean instructor manual for forward kinematics and torque calculations');
-        cntStmt.run('C-809', 'Class 8 - Unit 5: Gyroscope & Accelerometer Balance Logic (Student Edition)', 'PDF', 'Level 3', '8', 'Student', '/materials/class8-unit5-student-watermarked.pdf', 1, 'Student handbook for MPU6050 6-DOF IMU sensor interfacing');
-        cntStmt.run('C-810', 'Class 8 - Unit 5: Instructor IMU Complementary Filter (Teacher Edition)', 'PDF', 'Level 3', '8', 'Trainer', '/materials/class8-unit5-teacher.pdf', 0, 'Clean trainer guide for pitch/roll complementary filters');
-        cntStmt.run('C-811', 'Class 8 - Unit 6: Capstone Project - Self-Balancing Bot (Student Edition)', 'PDF', 'Level 3', '8', 'Student', '/materials/class8-unit6-student-watermarked.pdf', 1, 'Student final build guide for inverted pendulum two-wheel balance robot');
-        cntStmt.run('C-812', 'Class 8 - Unit 6: Master Capstone Review & Rubric (Teacher Edition)', 'PDF', 'Level 3', '8', 'Trainer', '/materials/class8-unit6-teacher.pdf', 0, 'Clean trainer scorecard for balancing bot stability and speed');
+        // Class 8 (Level 1 - Unit 2)
+        cntStmt.run('CNT-802-S', 'Class 8 - Unit 2: Ultrasonic Echo Mapping (Student Edition)', 'PDF', 'Level 1', '8', 'Student', '/materials/class8-unit2-student-watermarked.pdf', 1, 'Level 1 Unit 2 Ultrasonic Echo Mapping & Collision Prevention');
+        cntStmt.run('CNT-802-T', 'Class 8 - Unit 2: Ultrasonic Echo Mapping (Teacher Master)', 'PDF', 'Level 1', '8', 'Trainer', '/materials/class8-unit2-teacher.pdf', 0, 'Level 1 Unit 2 Instructor Echo Timing Guide');
 
-        // ================= CLASS 9 (Level 4 - IoT & Edge) =================
-        cntStmt.run('C-901', 'Class 9 - Unit 1: IoT & ESP32 Microcontrollers (Student Edition)', 'PDF', 'Level 4', '9', 'Student', '/materials/class9-unit1-student-watermarked.pdf', 1, 'Student manual for ESP32 Dual-Core WiFi/BLE SoC architecture');
-        cntStmt.run('C-902', 'Class 9 - Unit 1: Instructor IoT Network Architecture (Teacher Edition)', 'PDF', 'Level 4', '9', 'Trainer', '/materials/class9-unit1-teacher.pdf', 0, 'Clean instructor guide for ESP-IDF/Arduino core wireless protocols');
-        cntStmt.run('C-903', 'Class 9 - Unit 2: MQTT Telemetry & Cloud Messaging (Student Edition)', 'PDF', 'Level 4', '9', 'Student', '/materials/class9-unit2-student-watermarked.pdf', 1, 'Student guide for Publish-Subscribe MQTT telemetry protocols');
-        cntStmt.run('C-904', 'Class 9 - Unit 2: Instructor Broker & Cloud Gateway (Teacher Edition)', 'PDF', 'Level 4', '9', 'Trainer', '/materials/class9-unit2-teacher.pdf', 0, 'Clean trainer packet for cloud brokers, QoS levels, and payload parsing');
-        cntStmt.run('C-905', 'Class 9 - Unit 3: Smart Automation & Actuator Relays (Student Edition)', 'PDF', 'Level 4', '9', 'Student', '/materials/class9-unit3-student-watermarked.pdf', 1, 'Student project guide for optocoupler relays and high-voltage isolation');
-        cntStmt.run('C-906', 'Class 9 - Unit 3: Instructor Power & Relay Safety (Teacher Edition)', 'PDF', 'Level 4', '9', 'Trainer', '/materials/class9-unit3-teacher.pdf', 0, 'Clean instructor electrical safety guide for AC/DC switching circuits');
-        cntStmt.run('C-907', 'Class 9 - Unit 4: Environmental Telemetry & Web Servers (Student Edition)', 'PDF', 'Level 4', '9', 'Student', '/materials/class9-unit4-student-watermarked.pdf', 1, 'Student workbook for hosting web dashboards on embedded webservers');
-        cntStmt.run('C-908', 'Class 9 - Unit 4: Instructor Async Web Server Deck (Teacher Edition)', 'PDF', 'Level 4', '9', 'Trainer', '/materials/class9-unit4-teacher.pdf', 0, 'Clean teacher guide for HTML/CSS frontend rendering on ESP32 flash');
-        cntStmt.run('C-909', 'Class 9 - Unit 5: Edge Event Triggers & Cloud Alerts (Student Edition)', 'PDF', 'Level 4', '9', 'Student', '/materials/class9-unit5-student-watermarked.pdf', 1, 'Student handbook for automated Telegram & WhatsApp webhook alerts');
-        cntStmt.run('C-910', 'Class 9 - Unit 5: Instructor Webhook Integration Manual (Teacher Edition)', 'PDF', 'Level 4', '9', 'Trainer', '/materials/class9-unit5-teacher.pdf', 0, 'Clean instructor walkthrough for HTTP POST webhooks and SSL/TLS handshakes');
-        cntStmt.run('C-911', 'Class 9 - Unit 6: Capstone Project - Industrial IoT Node (Student Edition)', 'PDF', 'Level 4', '9', 'Student', '/materials/class9-unit6-student-watermarked.pdf', 1, 'Student capstone build manual for industrial smart factory monitoring node');
-        cntStmt.run('C-912', 'Class 9 - Unit 6: Master Capstone Assessment & Audit (Teacher Edition)', 'PDF', 'Level 4', '9', 'Trainer', '/materials/class9-unit6-teacher.pdf', 0, 'Clean trainer certification test and cloud uptime audit scorecard');
+        // Class 9 (Level 1 - Unit 2)
+        cntStmt.run('CNT-902-S', 'Class 9 - Unit 2: HTTP & MQTT Cloud Protocols (Student Edition)', 'PDF', 'Level 1', '9', 'Student', '/materials/class9-unit2-student-watermarked.pdf', 1, 'Level 1 Unit 2 Wi-Fi HTTP / MQTT Cloud Telemetry');
+        cntStmt.run('CNT-902-T', 'Class 9 - Unit 2: HTTP & MQTT Cloud Protocols (Teacher Master)', 'PDF', 'Level 1', '9', 'Trainer', '/materials/class9-unit2-teacher.pdf', 0, 'Level 1 Unit 2 Cloud Telemetry Lesson Plan');
 
-        // ================= CLASS 11 (Level 5 - Advanced AI & Vision) =================
-        cntStmt.run('C-1101', 'Class 11 - Unit 1: AI Vision & Embedded Neural Networks (Student Edition)', 'PDF', 'Level 5', '11', 'Student', '/materials/class11-unit1-student-watermarked.pdf', 1, 'Student guide for OpenCV image matrices, filters and convolutions');
-        cntStmt.run('C-1102', 'Class 11 - Unit 1: Master Instructor Vision Toolkit (Teacher Edition)', 'PDF', 'Level 5', '11', 'Trainer', '/materials/class11-unit1-teacher.pdf', 0, 'Clean master deck for camera pipeline, color space transforms & FPS tuning');
-        cntStmt.run('C-1103', 'Class 11 - Unit 2: Object Detection & Color Tracking (Student Edition)', 'PDF', 'Level 5', '11', 'Student', '/materials/class11-unit2-student-watermarked.pdf', 1, 'Student activity book for HSV mask thresholding and contour bounding boxes');
-        cntStmt.run('C-1104', 'Class 11 - Unit 2: Instructor Contour Algorithm Guide (Teacher Edition)', 'PDF', 'Level 5', '11', 'Trainer', '/materials/class11-unit2-teacher.pdf', 0, 'Clean instructor notes for centroid calculation and spatial position tracking');
-        cntStmt.run('C-1105', 'Class 11 - Unit 3: Face Recognition & Security Nodes (Student Edition)', 'PDF', 'Level 5', '11', 'Student', '/materials/class11-unit3-student-watermarked.pdf', 1, 'Student project guide for Haar Cascade classifiers and facial biometric nodes');
-        cntStmt.run('C-1106', 'Class 11 - Unit 3: Instructor Classifier Training Pack (Teacher Edition)', 'PDF', 'Level 5', '11', 'Trainer', '/materials/class11-unit3-teacher.pdf', 0, 'Clean instructor packet for feature vector extraction and classifier weights');
-        cntStmt.run('C-1107', 'Class 11 - Unit 4: Vision-Based Autonomous Navigation (Student Edition)', 'PDF', 'Level 5', '11', 'Student', '/materials/class11-unit4-student-watermarked.pdf', 1, 'Student workbook for optical line following and lane departure steering');
-        cntStmt.run('C-1108', 'Class 11 - Unit 4: Instructor Optical Steering Model (Teacher Edition)', 'PDF', 'Level 5', '11', 'Trainer', '/materials/class11-unit4-teacher.pdf', 0, 'Clean instructor manual for perspective warping and optical vector calculation');
-        cntStmt.run('C-1109', 'Class 11 - Unit 5: Gesture Controlled Robotics via Edge AI (Student Edition)', 'PDF', 'Level 5', '11', 'Student', '/materials/class11-unit5-student-watermarked.pdf', 1, 'Student handbook for MediaPipe hand tracking and gesture command mapping');
-        cntStmt.run('C-1110', 'Class 11 - Unit 5: Instructor Edge AI Hand Tracking (Teacher Edition)', 'PDF', 'Level 5', '11', 'Trainer', '/materials/class11-unit5-teacher.pdf', 0, 'Clean trainer guide for landmark coordinates and gesture classifier state machine');
-        cntStmt.run('C-1111', 'Class 11 - Unit 6: Capstone Project - AI Autonomous Drone/Rover (Student Edition)', 'PDF', 'Level 5', '11', 'Student', '/materials/class11-unit6-student-watermarked.pdf', 1, 'Student capstone build manual for AI vision autonomous surveillance rover');
-        cntStmt.run('C-1112', 'Class 11 - Unit 6: Master Capstone Defense & Rubric (Teacher Edition)', 'PDF', 'Level 5', '11', 'Trainer', '/materials/class11-unit6-teacher.pdf', 0, 'Clean trainer evaluation rubric for latency, inference accuracy & autonomy');
+        // Class 11 (Level 1 - Unit 2)
+        cntStmt.run('CNT-1102-S', 'Class 11 - Unit 2: Object Contour Tracking (Student Edition)', 'PDF', 'Level 1', '11', 'Student', '/materials/class11-unit2-student-watermarked.pdf', 1, 'Level 1 Unit 2 OpenCV Color Masking & Contour Object Tracking');
+        cntStmt.run('CNT-1102-T', 'Class 11 - Unit 2: Object Contour Tracking (Teacher Master)', 'PDF', 'Level 1', '11', 'Trainer', '/materials/class11-unit2-teacher.pdf', 0, 'Level 1 Unit 2 Contour Tracking Instructor Guide');
 
         cntStmt.finalize();
 
