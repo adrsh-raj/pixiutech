@@ -75,8 +75,8 @@ export default function ContentHub() {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold text-slate-800">Teacher Master Content Hub</h1>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300">
-              Clean Master Edition (No Watermark)
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-pixiu-blue border border-blue-200">
+              Teacher Master Pack
             </span>
           </div>
           <p className="text-slate-500 mt-1">Official faculty teaching guides, circuit schematics, viva questions & solution code across Classes 6 to 11.</p>
@@ -103,21 +103,18 @@ export default function ContentHub() {
 
         <div className="bg-white border border-slate-200 p-6 rounded-xl text-slate-800 shadow-sm flex justify-between items-center">
           <div>
-            <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Active Classes</p>
+            <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Active Classes</p>
             <p className="text-2xl font-bold text-slate-800">5 Grades (6, 7, 8, 9, 11)</p>
           </div>
           <div className="bg-blue-50 text-pixiu-blue p-3 rounded-xl"><Layers size={24} /></div>
         </div>
 
-        <div className="bg-white border border-amber-200 p-6 rounded-xl text-slate-800 shadow-sm flex justify-between items-center bg-amber-50/20">
+        <div className="bg-white border border-slate-200 p-6 rounded-xl text-slate-800 shadow-sm flex justify-between items-center">
           <div>
-            <div className="flex items-center gap-1.5 mb-1">
-              <ShieldCheck size={14} className="text-amber-600" />
-              <p className="text-amber-900 text-xs font-bold uppercase tracking-wider">Master Guide Format</p>
-            </div>
-            <p className="text-sm font-bold text-slate-700">100% Unwatermarked Faculty PDFs</p>
+            <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Teaching Materials</p>
+            <p className="text-xl font-bold text-slate-800">Clean Master Guides</p>
           </div>
-          <div className="bg-amber-100 text-amber-700 p-3 rounded-xl"><ShieldCheck size={24} /></div>
+          <div className="bg-indigo-50 text-indigo-600 p-3 rounded-xl"><FileText size={24} /></div>
         </div>
       </div>
 
@@ -168,8 +165,8 @@ export default function ContentHub() {
                     </span>
                   </div>
 
-                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
-                    <ShieldCheck size={11} /> Teacher Master (No Watermark)
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200">
+                    <ShieldCheck size={11} className="text-pixiu-blue" /> Teacher Master
                   </span>
                 </div>
 

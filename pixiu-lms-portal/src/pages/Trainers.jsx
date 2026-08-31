@@ -247,8 +247,8 @@ export default function Trainers() {
 
         {/* Lock Warning Banner */}
         {isLocked && (
-          <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 text-[11px] text-amber-800 font-bold flex items-center justify-between">
-            <span className="flex items-center gap-1.5"><Lock size={13}/> Attendance Locked (Past Record)</span>
+          <div className="bg-slate-100 border-b border-slate-200 px-4 py-2 text-[11px] text-slate-700 font-bold flex items-center justify-between">
+            <span className="flex items-center gap-1.5"><Lock size={13} className="text-slate-500"/> Attendance Locked (Past Record)</span>
             {isAdmin && <span className="text-blue-600">Admin Editing Mode</span>}
           </div>
         )}
@@ -696,8 +696,8 @@ export default function Trainers() {
                           {ses.class_id.replace('CLS-ZPS-', 'Class ')}
                         </span>
                         {isLocked ? (
-                          <span className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full flex items-center gap-1">
-                            <Lock size={10} /> Locked
+                          <span className="text-[11px] font-bold text-slate-600 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <Lock size={10} /> Past Record
                           </span>
                         ) : (
                           <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
