@@ -1,7 +1,11 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
-import { Award, BookOpen, Activity, FileText, Download, CheckCircle, Clock, LogOut, User, Box, PlaySquare, Eye, Sparkles, Megaphone } from 'lucide-react';
+import { 
+  Award, BookOpen, Activity, FileText, Download, CheckCircle, 
+  Clock, LogOut, User, Box, PlaySquare, Eye, Sparkles, Megaphone, 
+  Bell, Check, X 
+} from 'lucide-react';
 
 export default function StudentPortal() {
   const { user, logout } = useAuth();
@@ -36,6 +40,37 @@ export default function StudentPortal() {
     return false;
   });
 
+  // Read / Unread State per student
+  const [readNotifIds, setReadNotifIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`pixiu_read_notifs_${cleanId}`);
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  const [isNotifDrawerOpen, setIsNotifDrawerOpen] = useState(false);
+
+  const markAsRead = (id) => {
+    const updated = Array.from(new Set([...readNotifIds, id]));
+    setReadNotifIds(updated);
+    try {
+      localStorage.setItem(`pixiu_read_notifs_${cleanId}`, JSON.stringify(updated));
+    } catch (e) {}
+  };
+
+  const markAllAsRead = () => {
+    const allIds = classNotifs.map(n => n.id);
+    const updated = Array.from(new Set([...readNotifIds, ...allIds]));
+    setReadNotifIds(updated);
+    try {
+      localStorage.setItem(`pixiu_read_notifs_${cleanId}`, JSON.stringify(updated));
+    } catch (e) {}
+  };
+
+  const unreadCount = classNotifs.filter(n => !readNotifIds.includes(n.id)).length;
+
   // Filter student watermarked materials for their grade
   const availableContent = content.filter(c => 
     c.target === 'Student' && (c.class_grade === studentGrade || !c.class_grade)
@@ -61,12 +96,13 @@ export default function StudentPortal() {
               <p style="margin: 4px 0; color: #475569;">Assigned Kit: <b>${student.assigned_kit_id || 'Standard Lab Kit'}</b></p>
             </div>
             <div style="text-align: right;">
-              <p style="margin: 0; font-weight: bold;">Current Level: ${student.tech_level}</p>
+              <p style="margin: 0; font-size: 14px; font-weight: bold;">Mastery Level: ${student.tech_level}</p>
               <p style="margin: 4px 0; color: #16a34a; font-weight: bold;">Attendance: ${attendanceRate}%</p>
+              <p style="margin: 4px 0; color: #64748b; font-size: 12px;">Issued: ${new Date().toLocaleDateString()}</p>
             </div>
           </div>
 
-          <h3>Hardware Projects Built & Certified:</h3>
+          <h3 style="border-bottom: 2px solid #0066FF; padding-bottom: 4px; font-size: 16px;">Completed Projects & Practical Lab Work</h3>
           <ul>
             ${studentProjects.length > 0 
               ? studentProjects.map(p => `<li><strong>${p.title}</strong> - Status: ${p.status} (Score: ${p.score}/10) - ${p.evidence_note || 'Verified'}</li>`).join('')
@@ -99,7 +135,109 @@ export default function StudentPortal() {
             </span>
           </div>
         </div>
+
         <div className="flex items-center gap-4">
+          {/* Notification Bell with Badge & Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setIsNotifDrawerOpen(!isNotifDrawerOpen)}
+              className="relative p-2 text-slate-300 hover:text-white hover:bg-slate-800 rounded-xl transition-all cursor-pointer border border-slate-700 flex items-center justify-center"
+              title="Class Announcements & Schedule Notices"
+            >
+              <Bell size={18} />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-slate-900 shadow-sm animate-pulse">
+                  {unreadCount}
+                </span>
+              )}
+            </button>
+
+            {/* Notification Drawer Dropdown */}
+            {isNotifDrawerOpen && (
+              <div className="absolute right-0 mt-3 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden z-30 animate-in fade-in zoom-in-95 text-slate-800">
+                <div className="p-4 bg-slate-900 text-white flex justify-between items-center border-b border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <Megaphone size={16} className="text-pixiu-blue"/>
+                    <h3 className="font-bold text-xs uppercase tracking-wider">
+                      Class Announcements ({unreadCount} Unread)
+                    </h3>
+                  </div>
+                  <div className="flex items-center gap-2.5">
+                    {unreadCount > 0 && (
+                      <button
+                        onClick={markAllAsRead}
+                        className="text-[10px] font-bold text-blue-400 hover:text-blue-300 cursor-pointer underline"
+                      >
+                        Mark all read
+                      </button>
+                    )}
+                    <button 
+                      onClick={() => setIsNotifDrawerOpen(false)} 
+                      className="text-slate-400 hover:text-white cursor-pointer"
+                    >
+                      <X size={16}/>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="max-h-96 overflow-y-auto p-3 space-y-2.5">
+                  {classNotifs.map(notif => {
+                    const isRead = readNotifIds.includes(notif.id);
+                    return (
+                      <div 
+                        key={notif.id}
+                        className={`p-3.5 rounded-xl border text-xs space-y-2 transition-all ${
+                          isRead 
+                            ? 'bg-slate-50 border-slate-200 opacity-75' 
+                            : 'bg-blue-50/60 border-blue-200 shadow-xs'
+                        }`}
+                      >
+                        <div className="flex justify-between items-start gap-1">
+                          <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${
+                            notif.severity === 'urgent' ? 'bg-rose-100 text-rose-800' :
+                            notif.severity === 'important' ? 'bg-purple-100 text-purple-800' :
+                            'bg-blue-100 text-blue-800'
+                          }`}>
+                            {notif.severity ? notif.severity.toUpperCase() : 'NOTICE'}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-mono flex items-center gap-1">
+                            <Clock size={10} /> {notif.scheduled_date} • {notif.scheduled_time}
+                          </span>
+                        </div>
+
+                        <h4 className="font-bold text-slate-900 text-xs">{notif.title}</h4>
+                        <p className="text-[11px] text-slate-600 leading-relaxed bg-white p-2.5 rounded-lg border border-slate-100 whitespace-pre-line">
+                          {notif.message}
+                        </p>
+
+                        <div className="flex justify-end pt-1">
+                          {isRead ? (
+                            <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
+                              <CheckCircle size={12}/> Read
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => markAsRead(notif.id)}
+                              className="px-2.5 py-1 bg-pixiu-blue hover:bg-blue-600 text-white rounded-md text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs"
+                            >
+                              <Check size={11} /> Mark as Read
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {classNotifs.length === 0 && (
+                    <div className="p-8 text-center text-slate-400 text-xs font-medium">
+                      ✨ No active class announcements!
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="text-right hidden sm:block">
             <p className="text-xs font-bold text-white">{student.name}</p>
             <p className="text-[10px] font-mono text-pixiu-blue">{student.student_id}</p>
@@ -185,47 +323,81 @@ export default function StudentPortal() {
         {/* Class Announcements & Revision Notice Feed */}
         {classNotifs.length > 0 && (
           <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Megaphone size={18} className="text-pixiu-blue" />
-              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
-                Class {studentGrade} Announcements & Next Session Notices
-              </h3>
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <Megaphone size={18} className="text-pixiu-blue" />
+                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
+                  Class {studentGrade} Announcements & Next Session Notices
+                </h3>
+              </div>
+              {unreadCount > 0 && (
+                <button 
+                  onClick={markAllAsRead}
+                  className="text-xs font-bold text-pixiu-blue hover:underline cursor-pointer flex items-center gap-1"
+                >
+                  <Check size={13} /> Mark All as Read ({unreadCount})
+                </button>
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {classNotifs.map(notif => (
-                <div 
-                  key={notif.id}
-                  className={`p-5 rounded-2xl border bg-white shadow-xs space-y-2.5 transition-all ${
-                    notif.severity === 'urgent' 
-                      ? 'border-rose-200 ring-1 ring-rose-100' 
-                      : notif.severity === 'important' 
-                      ? 'border-purple-200 ring-1 ring-purple-100' 
-                      : 'border-slate-200'
-                  }`}
-                >
-                  <div className="flex justify-between items-start gap-2">
-                    <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${
+              {classNotifs.map(notif => {
+                const isRead = readNotifIds.includes(notif.id);
+                return (
+                  <div 
+                    key={notif.id}
+                    className={`p-5 rounded-2xl border bg-white shadow-xs space-y-3 transition-all ${
+                      isRead ? 'opacity-80 border-slate-200' :
                       notif.severity === 'urgent' 
-                        ? 'bg-rose-50 text-rose-700 border border-rose-200' 
+                        ? 'border-rose-200 ring-2 ring-rose-100' 
                         : notif.severity === 'important' 
-                        ? 'bg-purple-50 text-purple-700 border border-purple-200' 
-                        : 'bg-blue-50 text-pixiu-blue border border-blue-200'
-                    }`}>
-                      {notif.severity ? notif.severity.toUpperCase() : 'NOTICE'}
-                    </span>
+                        ? 'border-purple-200 ring-2 ring-purple-100' 
+                        : 'border-blue-200 ring-2 ring-blue-50'
+                    }`}
+                  >
+                    <div className="flex justify-between items-start gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${
+                          notif.severity === 'urgent' 
+                            ? 'bg-rose-50 text-rose-700 border border-rose-200' 
+                            : notif.severity === 'important' 
+                            ? 'bg-purple-50 text-purple-700 border border-purple-200' 
+                            : 'bg-blue-50 text-pixiu-blue border border-blue-200'
+                        }`}>
+                          {notif.severity ? notif.severity.toUpperCase() : 'NOTICE'}
+                        </span>
+                        {!isRead && (
+                          <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>
+                        )}
+                      </div>
 
-                    <span className="text-[11px] text-slate-400 font-mono flex items-center gap-1">
-                      <Clock size={11} /> {notif.scheduled_date} • {notif.scheduled_time}
-                    </span>
+                      <span className="text-[11px] text-slate-400 font-mono flex items-center gap-1">
+                        <Clock size={11} /> {notif.scheduled_date} • {notif.scheduled_time}
+                      </span>
+                    </div>
+
+                    <h4 className="font-bold text-slate-800 text-sm">{notif.title}</h4>
+                    <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3.5 rounded-xl border border-slate-100 whitespace-pre-line">
+                      {notif.message}
+                    </p>
+
+                    <div className="flex justify-end pt-1">
+                      {isRead ? (
+                        <span className="text-xs text-emerald-600 font-bold flex items-center gap-1">
+                          <CheckCircle size={14}/> Read & Acknowledged
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => markAsRead(notif.id)}
+                          className="px-3 py-1.5 bg-pixiu-blue hover:bg-blue-600 text-white rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
+                        >
+                          <Check size={13} /> Mark as Read
+                        </button>
+                      )}
+                    </div>
                   </div>
-
-                  <h4 className="font-bold text-slate-800 text-sm">{notif.title}</h4>
-                  <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100 whitespace-pre-line">
-                    {notif.message}
-                  </p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -255,68 +427,57 @@ export default function StudentPortal() {
                     </span>
                   </div>
                   <h4 className="font-bold text-slate-800 text-sm mb-1">{item.title}</h4>
-                  <p className="text-xs text-slate-500 line-clamp-2">{item.description}</p>
+                  <p className="text-xs text-slate-500 mb-4">{item.topic || 'Official Curriculum Module'}</p>
                 </div>
 
-                <div className="mt-4 pt-3 border-t border-slate-200 flex justify-between items-center">
-                  <span className="text-[11px] text-slate-400 font-medium">📄 PDF Guide</span>
-                  <button 
-                    onClick={() => window.open(item.url, '_blank')}
-                    className="bg-pixiu-blue hover:bg-blue-600 text-white text-xs font-bold px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                <div className="flex items-center justify-between pt-3 border-t border-slate-200/60">
+                  <span className="text-[11px] font-mono text-slate-400">PDF Guidebook</span>
+                  <a 
+                    href={item.file_url} 
+                    target="_blank" 
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:border-pixiu-blue hover:text-pixiu-blue rounded-lg text-xs font-bold text-slate-700 transition-colors shadow-2xs"
                   >
-                    <Eye size={13} /> Read & Study
-                  </button>
+                    <Download size={13} /> View & Study
+                  </a>
                 </div>
               </div>
             ))}
-
-            {availableContent.length === 0 && (
-              <div className="col-span-2 p-8 text-center border border-dashed border-slate-200 rounded-2xl text-slate-400 text-xs">
-                No materials uploaded yet for Class {studentGrade}. Please check back after next lab session!
-              </div>
-            )}
           </div>
         </div>
 
-        {/* Project Portfolio */}
+        {/* Practical Projects & Lab Portfolio */}
         <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm">
           <div className="flex justify-between items-center mb-6">
             <div>
-              <h3 className="text-lg font-bold text-slate-800">Your Certified Hardware Builds</h3>
-              <p className="text-xs text-slate-500">Live lab project submissions certified by Trainer Vikas Pandey</p>
+              <h3 className="text-lg font-bold text-slate-800">My Lab Projects & Submissions</h3>
+              <p className="text-xs text-slate-500">Hardware prototypes and software code verified by instructor</p>
             </div>
             <span className="text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-full">
-              {studentProjects.length} Builds Verified
+              {studentProjects.length} Verified
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-            {studentProjects.map(p => (
-              <div key={p.id} className="border border-slate-200 rounded-2xl overflow-hidden shadow-xs hover:shadow-md transition-shadow bg-white">
-                {p.image_url ? (
-                  <div className="w-full h-40 bg-slate-900 overflow-hidden">
-                    <img src={p.image_url} alt={p.title} className="w-full h-full object-cover" />
-                  </div>
-                ) : (
-                  <div className="w-full h-36 bg-blue-50/60 flex items-center justify-center text-pixiu-blue font-bold text-xs uppercase">
-                    🤖 Certified Circuit Project
-                  </div>
-                )}
-                <div className="p-4">
-                  <div className="flex justify-between items-start mb-1">
-                    <h4 className="font-bold text-slate-800 text-sm">{p.title}</h4>
-                    <span className="text-xs font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-md">
-                      {p.score}/10
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-1">{p.evidence_note || 'Hardware wiring tested & verified.'}</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {studentProjects.map(proj => (
+              <div key={proj.id} className="border border-slate-200 rounded-2xl p-5 bg-slate-50">
+                <div className="flex justify-between items-start mb-2">
+                  <h4 className="font-bold text-slate-800 text-sm">{proj.title}</h4>
+                  <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                    Score: {proj.score}/10
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mb-3">{proj.evidence_note || 'Completed in lab session'}</p>
+                <div className="flex justify-between items-center text-[10px] text-slate-400">
+                  <span>Status: <strong className="text-slate-700">{proj.status}</strong></span>
+                  <span>Date: {proj.date_completed || 'Recent'}</span>
                 </div>
               </div>
             ))}
 
             {studentProjects.length === 0 && (
-              <div className="col-span-full p-8 text-center border border-dashed border-slate-200 rounded-2xl text-slate-400 text-xs">
-                No robot build photos certified yet. Your trainer will snap and verify your build during the next live lab session!
+              <div className="col-span-2 p-8 text-center text-slate-400 text-xs">
+                No individual projects submitted yet. Upcoming capstone rovers will be logged here!
               </div>
             )}
           </div>

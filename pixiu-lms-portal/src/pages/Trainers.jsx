@@ -25,6 +25,24 @@ export default function Trainers() {
     if (n.status === 'Archived') return false;
     return n.target_type === 'All_Trainers' || n.target_type === 'Universal';
   });
+
+  const [readDirectiveIds, setReadDirectiveIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem('pixiu_read_directives_trainer');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  const markDirectiveRead = (id) => {
+    const updated = Array.from(new Set([...readDirectiveIds, id]));
+    setReadDirectiveIds(updated);
+    try {
+      localStorage.setItem('pixiu_read_directives_trainer', JSON.stringify(updated));
+    } catch (e) {}
+    toast.success('Directive acknowledged & marked as read!', 'Acknowledged');
+  };
   
   // UI Tabs: 'trainers' | 'history' | 'schedule'
   const [activeTab, setActiveTab] = useState('trainers');
@@ -534,25 +552,52 @@ export default function Trainers() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {trainerNotifs.map(notif => (
-                  <div 
-                    key={notif.id}
-                    className="p-5 rounded-2xl border border-indigo-200 bg-indigo-50/30 shadow-xs space-y-2.5"
-                  >
-                    <div className="flex justify-between items-start gap-2">
-                      <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-indigo-600 text-white uppercase tracking-wider">
-                        {notif.template_type === 'kit_prep' ? 'Hardware Prep' : 'Class Notice'}
-                      </span>
-                      <span className="text-[11px] text-slate-500 font-mono">
-                        {notif.scheduled_date} • {notif.scheduled_time}
-                      </span>
+                {trainerNotifs.map(notif => {
+                  const isRead = readDirectiveIds.includes(notif.id);
+                  return (
+                    <div 
+                      key={notif.id}
+                      className={`p-5 rounded-2xl border transition-all space-y-3 ${
+                        isRead 
+                          ? 'border-slate-200 bg-white opacity-80' 
+                          : 'border-indigo-200 bg-indigo-50/40 shadow-xs'
+                      }`}
+                    >
+                      <div className="flex justify-between items-start gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-indigo-600 text-white uppercase tracking-wider">
+                            {notif.template_type === 'kit_prep' ? 'Hardware Prep' : 'Class Notice'}
+                          </span>
+                          {!isRead && (
+                            <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse"></span>
+                          )}
+                        </div>
+                        <span className="text-[11px] text-slate-500 font-mono">
+                          {notif.scheduled_date} • {notif.scheduled_time}
+                        </span>
+                      </div>
+                      <h4 className="font-bold text-slate-800 text-sm">{notif.title}</h4>
+                      <p className="text-xs text-slate-600 leading-relaxed bg-white p-3.5 rounded-xl border border-indigo-100/60 whitespace-pre-line">
+                        {notif.message}
+                      </p>
+
+                      <div className="flex justify-end pt-1">
+                        {isRead ? (
+                          <span className="text-xs text-emerald-600 font-bold flex items-center gap-1">
+                            <CheckCircle size={14}/> Read & Acknowledged
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => markDirectiveRead(notif.id)}
+                            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
+                          >
+                            <Check size={13} /> Mark as Read & Acknowledged
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <h4 className="font-bold text-slate-800 text-sm">{notif.title}</h4>
-                    <p className="text-xs text-slate-600 leading-relaxed bg-white p-3.5 rounded-xl border border-indigo-100 whitespace-pre-line">
-                      {notif.message}
-                    </p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
