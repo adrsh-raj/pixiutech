@@ -24,7 +24,7 @@ export default function Home() {
               End-to-end lab setup, hands-on curriculum, trained instructors, and ongoing support — everything your school needs to teach STEM, Robotics, and AI.
             </p>
             <div className="hero-v2__cta">
-              <Link className="btn btn--primary btn--lg" to="/contact">
+              <Link className="btn btn--primary btn--lg" to="/contact#demo-form">
                 Book a Free Demo <span className="arw">→</span>
               </Link>
               <Link className="btn btn--ghost-light" to="/solutions">
@@ -142,7 +142,7 @@ export default function Home() {
                 <li>Ongoing mentorship & support</li>
               </ul>
               <p style={{ marginTop: 24 }}>
-                <Link className="btn btn--outline" to="/contact">
+                <Link className="btn btn--outline" to="/contact#demo-form">
                   Enquire about training <span className="arw">→</span>
                 </Link>
               </p>

@@ -32,7 +32,7 @@ export default function PortalBridge() {
               className="btn btn--primary" 
               style={{ width: '100%', fontSize: '1rem', padding: '14px 24px', fontWeight: '700', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px', borderRadius: '12px', textDecoration: 'none' }}
             >
-              Open LMS Portal (portal.pixiutech.com) →
+              Login to Portal (portal.pixiutech.com) →
             </a>
 
             <div style={{ marginTop: '1.5rem' }}>

@@ -7,14 +7,18 @@ import EnquiryForm from '../components/EnquiryForm.jsx'
 export default function Contact() {
   const [params] = useSearchParams()
   const intent = params.get('intent')
-  const { hash } = useLocation()
-
   useEffect(() => {
-    if (hash) {
+    const targetHash = hash || window.location.hash
+    if (targetHash) {
       setTimeout(() => {
-        const el = document.querySelector(hash)
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      }, 100)
+        const id = targetHash.replace('#', '')
+        const el = document.getElementById(id) || document.querySelector(targetHash)
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          const firstInput = el.querySelector('input')
+          if (firstInput) firstInput.focus()
+        }
+      }, 150)
     }
   }, [hash])
 

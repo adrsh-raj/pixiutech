@@ -97,15 +97,15 @@ export default function Solutions() {
           </Reveal>
           <Reveal delay={120}>
             <p style={{ marginTop: 34 }}>
-              <Link className="btn btn--primary btn--lg" to="/contact">
-                Get a Lab Proposal for Your School <span className="arw">→</span>
+              <Link className="btn btn--primary btn--lg" to="/contact#demo-form">
+                Book a Free Demo for Your School <span className="arw">→</span>
               </Link>
             </p>
           </Reveal>
         </div>
       </section>
 
-      <CTAStrip title="Ready to Transform Your School?" primary="Book a Free Demo" secondary="Request a Proposal" />
+      <CTAStrip title="Ready to Transform Your School?" primary="Book a Free Demo" />
     </>
   )
 }
