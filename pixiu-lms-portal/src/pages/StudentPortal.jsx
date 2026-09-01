@@ -449,7 +449,7 @@ export default function StudentPortal() {
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
             <h1 className="text-sm sm:text-lg font-black tracking-wider text-white truncate">
-              PIXIU<span className="text-pixiu-blue">.</span>TECH
+              PIXIU TECH
             </h1>
             <span className="bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0">
               Class {studentGrade}A
@@ -519,29 +519,22 @@ export default function StudentPortal() {
                             notif.severity === 'important' ? 'bg-purple-100 text-purple-800' :
                             'bg-blue-100 text-blue-800'
                           }`}>
-                            {notif.severity ? notif.severity.toUpperCase() : 'NOTICE'}
+                            {notif.severity}
                           </span>
-                          <span className="text-[10px] text-slate-400 font-mono flex items-center gap-1">
-                            <Clock size={10} /> {notif.scheduled_date} • {notif.scheduled_time}
-                          </span>
+                          <span className="text-[10px] text-slate-400 font-mono">{notif.date}</span>
                         </div>
 
                         <h4 className="font-bold text-slate-900 text-xs">{notif.title}</h4>
-                        <p className="text-[11px] text-slate-600 leading-relaxed bg-white p-2.5 rounded-lg border border-slate-100 whitespace-pre-line">
-                          {notif.message}
-                        </p>
+                        <p className="text-slate-600 text-[11px] leading-relaxed whitespace-pre-line">{notif.message}</p>
 
-                        <div className="flex justify-end pt-1">
-                          {isRead ? (
-                            <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
-                              <CheckCircle size={12}/> Read
-                            </span>
-                          ) : (
+                        <div className="pt-2 border-t border-slate-100 flex justify-between items-center text-[10px] text-slate-400">
+                          <span>From: <strong>{notif.sender_name || 'Management'}</strong></span>
+                          {!isRead && (
                             <button
                               onClick={() => markAsRead(notif.id)}
-                              className="px-2.5 py-1 bg-pixiu-blue hover:bg-blue-600 text-white rounded-md text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs"
+                              className="text-pixiu-blue font-bold hover:underline cursor-pointer flex items-center gap-1"
                             >
-                              <Check size={11} /> Mark as Read
+                              <Check size={12}/> Mark Read
                             </button>
                           )}
                         </div>
@@ -550,8 +543,8 @@ export default function StudentPortal() {
                   })}
 
                   {classNotifs.length === 0 && (
-                    <div className="p-8 text-center text-slate-400 text-xs font-medium">
-                      ✨ No active class announcements!
+                    <div className="p-8 text-center text-slate-400 text-xs">
+                      No active announcements for Class {studentGrade}A.
                     </div>
                   )}
                 </div>
@@ -575,35 +568,7 @@ export default function StudentPortal() {
       </header>
 
       <main className="max-w-6xl mx-auto px-3 sm:px-6 pt-5 sm:pt-8 space-y-4 sm:space-y-6">
-        {/* Official Monthly Accountability & Motivation Notice Banner */}
-        <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 rounded-2xl p-4 sm:p-5 text-white border border-blue-500/30 shadow-lg relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-3 sm:gap-4">
-          <div className="flex items-start gap-3">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-500/20 border border-blue-400/40 flex items-center justify-center text-blue-300 shrink-0 mt-0.5">
-              <Sparkles size={18} className="text-amber-300 animate-pulse" />
-            </div>
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="font-bold text-xs sm:text-sm text-white tracking-wide">
-                  Welcome to Pixiu Tech Innovation Lab, {student.name}!
-                </h3>
-                <span className="text-[9px] sm:text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  Monthly Report Active
-                </span>
-              </div>
-              <p className="text-[11px] sm:text-xs text-slate-300 mt-1 leading-relaxed">
-                📢 <strong className="text-white">Institutional Accountability Notice:</strong> At the end of every month, your practical laboratory attendance records, level-by-level competency reviews, and prototype scores are compiled and dispatched directly to your <strong>School Principal</strong> and <strong>Parents</strong>. Keep innovating, building, and exploring with full dedication. <strong className="text-amber-300">Happy Studying! 🚀✨</strong>
-              </p>
-            </div>
-          </div>
-
-          <div className="self-end md:self-center shrink-0 flex items-center gap-2">
-            <span className="text-[10px] sm:text-xs font-bold font-mono px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-white/10 text-blue-200 border border-white/10 flex items-center gap-1.5">
-              <Send size={11} className="text-blue-300" /> Dispatched Monthly
-            </span>
-          </div>
-        </div>
-
-        {/* Hero Card */}
+        {/* 1. Student Profile Hero Card (Now First) */}
         <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-8 text-white shadow-xl border border-slate-700/60 relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-4 sm:gap-6">
           <div className="flex items-center gap-3.5 sm:gap-5 w-full md:w-auto">
             <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-xl sm:rounded-2xl bg-gradient-to-tr from-blue-600 to-blue-400 flex items-center justify-center text-white shadow-lg shadow-blue-500/20 font-bold text-lg sm:text-2xl shrink-0">
@@ -638,7 +603,7 @@ export default function StudentPortal() {
           </button>
         </div>
 
-        {/* 3 Metric Summary Cards (Mobile 3-column Grid) */}
+        {/* 2. 3 Metric Summary Cards (Mobile 3-column Grid) */}
         <div className="grid grid-cols-3 gap-2 sm:gap-6">
           <div className="bg-white p-2.5 sm:p-6 rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center sm:items-center gap-1.5 sm:gap-4 text-center sm:text-left">
             <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
@@ -668,6 +633,34 @@ export default function StudentPortal() {
               <p className="text-[9px] sm:text-xs text-slate-400 font-bold uppercase tracking-wider truncate">Lab Kit</p>
               <p className="text-[11px] sm:text-sm font-bold font-mono text-slate-800 truncate">{student.assigned_kit_id || 'KIT-ZPS-01'}</p>
             </div>
+          </div>
+        </div>
+
+        {/* 3. Official Monthly Accountability & Motivation Notice Banner (Now Underneath Profile & Metrics) */}
+        <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 rounded-2xl p-4 sm:p-5 text-white border border-blue-500/30 shadow-lg relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-3 sm:gap-4">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-500/20 border border-blue-400/40 flex items-center justify-center text-blue-300 shrink-0 mt-0.5">
+              <Sparkles size={18} className="text-amber-300 animate-pulse" />
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="font-bold text-xs sm:text-sm text-white tracking-wide">
+                  Pixiu Tech Innovation Lab • Student Intelligence
+                </h3>
+                <span className="text-[9px] sm:text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  Monthly Report Active
+                </span>
+              </div>
+              <p className="text-[11px] sm:text-xs text-slate-300 mt-1 leading-relaxed">
+                📢 <strong className="text-white">Institutional Accountability Notice:</strong> At the end of every month, your practical laboratory attendance records, level-by-level competency reviews, and prototype scores are compiled and dispatched directly to your <strong>School Principal</strong> and <strong>Parents</strong>. Keep innovating, building, and exploring with full dedication. <strong className="text-amber-300">Happy Studying! 🚀✨</strong>
+              </p>
+            </div>
+          </div>
+
+          <div className="self-end md:self-center shrink-0 flex items-center gap-2">
+            <span className="text-[10px] sm:text-xs font-bold font-mono px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-white/10 text-blue-200 border border-white/10 flex items-center gap-1.5">
+              <Send size={11} className="text-blue-300" /> Dispatched Monthly
+            </span>
           </div>
         </div>
 

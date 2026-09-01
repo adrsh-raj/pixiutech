@@ -73,7 +73,7 @@ export default function Sidebar({ mobileOpen = false, setMobileOpen = () => {} }
               <img src="/img/logo.png" alt="Pixiu Tech Logo" className="h-7 w-auto object-contain" />
             </div>
             <div>
-              <h1 className="text-base font-black tracking-wider text-white leading-none">PIXIU<span className="text-pixiu-blue">.</span>TECH</h1>
+              <h1 className="text-base font-black tracking-wider text-white leading-none">PIXIU TECH</h1>
             </div>
           </div>
           <button 
