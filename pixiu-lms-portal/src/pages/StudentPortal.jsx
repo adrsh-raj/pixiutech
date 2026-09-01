@@ -101,10 +101,19 @@ export default function StudentPortal() {
   ];
 
   const levelReviewData = useMemo(() => {
-    const studentSpecificReviews = (studentReviews || []).filter(r => 
-      (r.student_id || '').trim().replace(/\s+/g, ' ') === cleanId || 
-      r.student_id === student.student_id
-    );
+    const studentSpecificReviews = (studentReviews || []).filter(r => {
+      const matchId = (r.student_id || '').trim().replace(/\s+/g, ' ') === cleanId || r.student_id === student.student_id;
+      const isDummy = ['REV-001', 'REV-002', 'REV-003', 'REV-004'].includes(r.id) ||
+        r.verified_date === 'Curriculum Baseline' ||
+        r.review?.includes('Demonstrated exceptional understanding') ||
+        r.review?.includes('Successfully calibrated analog') ||
+        r.review?.includes('Accurate transistor switching') ||
+        r.review?.includes('Superb conditional logic') ||
+        r.review?.includes('Firmware pin modes') ||
+        r.review?.includes('Integrated 2WD robotic chassis') ||
+        r.review?.includes('Final autonomous exhibition');
+      return matchId && !isDummy;
+    });
     
     return DEFAULT_UNITS.map(unit => {
       const match = studentSpecificReviews.find(r => r.unit_code === unit.unitCode || r.level === unit.level);
@@ -128,7 +137,7 @@ export default function StudentPortal() {
         unitCode: unit.unitCode,
         title: unit.title,
         score: null,
-        status: 'Pending Review',
+        status: 'Pending Evaluation',
         rating: 0,
         review: 'Unit evaluation pending. Trainer will evaluate competency upon completion of this unit.',
         instructor: 'Vikas Pandey (Faculty)',
@@ -921,7 +930,7 @@ export default function StudentPortal() {
                 <div className="flex items-center justify-between pt-2.5 border-t border-slate-200/60">
                   <span className="text-[10px] font-mono text-slate-400">PDF Guidebook</span>
                   <a 
-                    href={item.file_url} 
+                    href={item.url || item.file_url} 
                     target="_blank" 
                     rel="noreferrer"
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:border-pixiu-blue hover:text-pixiu-blue rounded-lg text-xs font-bold text-slate-700 transition-colors shadow-2xs cursor-pointer"

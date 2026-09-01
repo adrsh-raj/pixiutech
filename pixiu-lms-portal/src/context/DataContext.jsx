@@ -44,7 +44,14 @@ export function DataProvider({ children }) {
   const [sessions, setSessions] = useState(() => safeGetItem('pixiu_sessions', SEED_SESSIONS));
   const [attendance, setAttendance] = useState(() => safeGetItem('pixiu_attendance', SEED_ATTENDANCE));
   const [leads, setLeads] = useState(() => safeGetItem('pixiu_leads', []));
-  const [content, setContent] = useState(() => safeGetItem('pixiu_content', SEED_CONTENT));
+  const [content, setContent] = useState(() => {
+    const saved = safeGetItem('pixiu_content', SEED_CONTENT);
+    if (!saved || saved.length < SEED_CONTENT.length) {
+      try { localStorage.setItem('pixiu_content', JSON.stringify(SEED_CONTENT)); } catch (e) {}
+      return SEED_CONTENT;
+    }
+    return saved;
+  });
   const [curriculum, setCurriculum] = useState(() => safeGetItem('pixiu_curriculum', SEED_CURRICULUM));
   const [inventory, setInventory] = useState(() => safeGetItem('pixiu_inventory', SEED_INVENTORY));
   const [billing, setBilling] = useState(() => safeGetItem('pixiu_billing', SEED_BILLING));
@@ -53,8 +60,24 @@ export function DataProvider({ children }) {
   const [alerts, setAlerts] = useState(() => safeGetItem('pixiu_alerts', SEED_ALERTS));
   const [notifications, setNotifications] = useState(() => safeGetItem('pixiu_notifications', SEED_NOTIFICATIONS));
   const [studentReviews, setStudentReviews] = useState(() => {
-    const raw = safeGetItem('pixiu_student_reviews', []);
-    return (raw || []).filter(r => !['REV-001', 'REV-002', 'REV-003', 'REV-004'].includes(r.id));
+    try {
+      const raw = safeGetItem('pixiu_student_reviews', []);
+      const clean = (raw || []).filter(r => 
+        !['REV-001', 'REV-002', 'REV-003', 'REV-004'].includes(r.id) &&
+        r.verified_date !== 'Curriculum Baseline' &&
+        !r.review?.includes('Demonstrated exceptional understanding') &&
+        !r.review?.includes('Successfully calibrated analog') &&
+        !r.review?.includes('Accurate transistor switching') &&
+        !r.review?.includes('Superb conditional logic') &&
+        !r.review?.includes('Firmware pin modes') &&
+        !r.review?.includes('Integrated 2WD robotic chassis') &&
+        !r.review?.includes('Final autonomous exhibition')
+      );
+      localStorage.setItem('pixiu_student_reviews', JSON.stringify(clean));
+      return clean;
+    } catch (e) {
+      return [];
+    }
   });
   const [loading, setLoading] = useState(false);
 
