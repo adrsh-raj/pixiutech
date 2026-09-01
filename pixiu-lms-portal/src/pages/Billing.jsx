@@ -337,7 +337,9 @@ export default function Billing() {
                       <span className="text-xs font-bold bg-blue-50 text-pixiu-blue px-2.5 py-0.5 rounded-md">
                         Tranche {inv.tranche_number || idx + 1}
                       </span>
-                      <h4 className="font-bold text-slate-900 text-sm">{inv.tranche_title || `Tranche ${inv.tranche_number}: STEM Lab Milestones`}</h4>
+                      <h4 className="font-bold text-slate-900 text-sm">
+                        {inv.tranche_title || `Tranche ${inv.tranche_number || idx + 1}: STEM Lab Operations`}
+                      </h4>
                       
                       {isPaid ? (
                         <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
@@ -350,8 +352,8 @@ export default function Billing() {
                       )}
                     </div>
 
-                    <p className="text-xs text-slate-500 flex items-center gap-3">
-                      <span>Issued: <strong>{inv.date_issued}</strong></span>
+                    <p className="text-xs text-slate-500 flex items-center gap-3 flex-wrap">
+                      <span>Issued: <strong>{inv.date_issued || inv.invoice_date || '2026-08-25'}</strong></span>
                       <span>Due: <strong className="text-slate-700">{inv.due_date}</strong></span>
                       <span>Place: <strong>{inv.place_of_supply || 'Hata, UP'}</strong></span>
                       {inv.receipt_no && (

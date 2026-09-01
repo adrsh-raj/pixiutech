@@ -84,7 +84,18 @@ export function DataProvider({ children }) {
     return SEED_CURRICULUM;
   });
   const [inventory, setInventory] = useState(() => safeGetItem('pixiu_inventory', SEED_INVENTORY));
-  const [billing, setBilling] = useState(() => safeGetItem('pixiu_billing', SEED_BILLING));
+  const [billing, setBilling] = useState(() => {
+    try {
+      const saved = safeGetItem('pixiu_billing', null);
+      if (!saved || saved.length < 3 || saved.some(b => b.amount === 45000)) {
+        localStorage.setItem('pixiu_billing', JSON.stringify(SEED_BILLING));
+        return SEED_BILLING;
+      }
+      return saved;
+    } catch (e) {
+      return SEED_BILLING;
+    }
+  });
   const [comms, setComms] = useState(() => safeGetItem('pixiu_comms', []));
   const [projects, setProjects] = useState(() => safeGetItem('pixiu_projects', []));
   const [alerts, setAlerts] = useState(() => safeGetItem('pixiu_alerts', SEED_ALERTS));

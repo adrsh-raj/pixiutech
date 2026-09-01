@@ -156,7 +156,51 @@ export const SEED_INVENTORY = [
 ];
 
 export const SEED_BILLING = [
-  { id: 'INV-2026-001', school_id: 'ZPS', amount: 45000, due_date: '2026-09-10', status: 'Pending', invoice_date: '2026-08-25', description: 'Term 1 STEM & Robotics Multi-Grade Lab Operations (Classes 6 to 11)' }
+  {
+    id: 'INV-2026-001',
+    school_id: 'ZPS',
+    school_name: 'Zenith Public School',
+    tranche_number: 1,
+    tranche_title: 'Tranche 1: Lab Setup & Hardware Kit Dispatch (40%)',
+    amount: 40000,
+    total_contract_value: 100000,
+    date_issued: '2026-08-25',
+    invoice_date: '2026-08-25',
+    due_date: '2026-09-10',
+    place_of_supply: 'Hata, Uttar Pradesh',
+    status: 'Pending',
+    description: 'Initial STEM Lab Hardware Kit Dispatch, Component Sourcing, and Classroom Setup (40%)'
+  },
+  {
+    id: 'INV-2026-002',
+    school_id: 'ZPS',
+    school_name: 'Zenith Public School',
+    tranche_number: 2,
+    tranche_title: 'Tranche 2: Mid-Term Curriculum Delivery & Practical Lab Sessions (30%)',
+    amount: 30000,
+    total_contract_value: 100000,
+    date_issued: '2026-08-25',
+    invoice_date: '2026-08-25',
+    due_date: '2026-11-15',
+    place_of_supply: 'Hata, Uttar Pradesh',
+    status: 'Pending',
+    description: 'Mid-Term Robotics & Embedded Curriculum Delivery, Trainer Deployments, and Practical Lab Sessions (30%)'
+  },
+  {
+    id: 'INV-2026-003',
+    school_id: 'ZPS',
+    school_name: 'Zenith Public School',
+    tranche_number: 3,
+    tranche_title: 'Tranche 3: Final Capstone Exhibition & Certification (30%)',
+    amount: 30000,
+    total_contract_value: 100000,
+    date_issued: '2026-08-25',
+    invoice_date: '2026-08-25',
+    due_date: '2027-01-20',
+    place_of_supply: 'Hata, Uttar Pradesh',
+    status: 'Pending',
+    description: 'Final Capstone Exhibition, Student Progress Certification, and Year-End Term Review (30%)'
+  }
 ];
 
 export const SEED_ALERTS = [
@@ -164,7 +208,7 @@ export const SEED_ALERTS = [
     id: 'ALT-001',
     type: 'billing_due',
     severity: 'warning',
-    message: 'Invoice INV-2026-001 for Zenith Public School (₹45,000) is scheduled for receipt follow-up.',
+    message: 'Tranche 1 Invoice INV-2026-001 for Zenith Public School (₹40,000) is scheduled for receipt follow-up.',
     action_type: 'view_billing',
     related_id: 'INV-2026-001',
     created_at: '2026-08-30'
