@@ -16,7 +16,7 @@ import StudentPortal from './pages/StudentPortal';
 import { DataProvider, useData } from './context/DataContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider, useToast } from './context/ToastContext';
-import { LogOut, Bell, Zap, AlertCircle, AlertTriangle, ShieldCheck, Sparkles, X } from 'lucide-react';
+import { LogOut, Bell, Zap, AlertCircle, AlertTriangle, ShieldCheck, Sparkles, X, Menu } from 'lucide-react';
 
 const Settings = () => (
   <div className="max-w-xl bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
@@ -52,6 +52,7 @@ function ProtectedLayout() {
   const { alerts, resolveAlertAction, notifications } = useData();
   const toast = useToast();
   const [isAlertsOpen, setIsAlertsOpen] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [activeBellTab, setActiveBellTab] = useState('announcements'); // 'announcements' | 'system'
   const [actionLoading, setActionLoading] = useState(null);
 
@@ -120,16 +121,25 @@ function ProtectedLayout() {
   const totalUnreadCount = unreadAnnouncementsCount + (visibleAlerts ? visibleAlerts.length : 0);
 
   return (
-    <div className="flex h-screen bg-slate-50 font-sans antialiased selection:bg-blue-500 selection:text-white">
-      <Sidebar />
-      <div className="flex-1 overflow-auto relative flex flex-col">
-        <header className="bg-white border-b border-slate-200 px-8 py-3.5 flex justify-between items-center sticky top-0 z-20">
-          <div>
-            <h2 className="text-base font-bold text-slate-800 tracking-tight">Pixiu Tech Enterprise Console</h2>
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Multi-Tenant Operating System</p>
+    <div className="flex h-screen bg-slate-50 font-sans antialiased selection:bg-blue-500 selection:text-white overflow-hidden">
+      <Sidebar mobileOpen={mobileSidebarOpen} setMobileOpen={setMobileSidebarOpen} />
+      <div className="flex-1 overflow-auto relative flex flex-col min-w-0">
+        <header className="bg-white border-b border-slate-200 px-3.5 sm:px-8 py-2.5 sm:py-3.5 flex justify-between items-center sticky top-0 z-20">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <button
+              onClick={() => setMobileSidebarOpen(true)}
+              className="md:hidden p-1.5 text-slate-600 hover:text-slate-900 rounded-lg hover:bg-slate-100 cursor-pointer"
+              title="Open Navigation Menu"
+            >
+              <Menu size={20} />
+            </button>
+            <div className="min-w-0">
+              <h2 className="text-sm sm:text-base font-bold text-slate-800 tracking-tight truncate">Pixiu Tech Console</h2>
+              <p className="text-[9px] sm:text-[10px] text-slate-400 font-bold uppercase tracking-wider truncate">Multi-Tenant Operating System</p>
+            </div>
           </div>
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4 shrink-0">
             {/* Live Operational & Announcements Bell */}
             <div className="relative">
               <button 
@@ -137,18 +147,18 @@ function ProtectedLayout() {
                 className="relative p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer border border-slate-200"
                 title="Announcements & System Alerts"
               >
-                <Bell size={18} />
+                <Bell size={17} />
                 {totalUnreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-white shadow-sm animate-pulse">
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center border-2 border-white shadow-sm animate-pulse">
                     {totalUnreadCount}
                   </span>
                 )}
               </button>
 
-              {/* Alerts Dropdown Drawer */}
+              {/* Alerts Dropdown Drawer (Mobile Viewport Safe) */}
               {isAlertsOpen && (
-                <div className="absolute right-0 mt-3 w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden z-30 animate-in fade-in zoom-in-95">
-                  <div className="p-4 bg-slate-900 text-white flex justify-between items-center">
+                <div className="fixed sm:absolute inset-x-3 top-14 sm:inset-auto sm:right-0 sm:top-auto sm:mt-3 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden z-30 animate-in fade-in zoom-in-95 max-h-[80vh] flex flex-col">
+                  <div className="p-3.5 bg-slate-900 text-white flex justify-between items-center shrink-0">
                     <div>
                       <h3 className="font-bold text-xs uppercase tracking-wider">Notifications & Alerts</h3>
                       <p className="text-[10px] text-slate-400">{unreadAnnouncementsCount} unread notices</p>
@@ -157,7 +167,7 @@ function ProtectedLayout() {
                   </div>
 
                   {/* Bell Tabs Switcher */}
-                  <div className="grid grid-cols-2 p-1.5 bg-slate-100 border-b border-slate-200 text-xs font-bold">
+                  <div className="grid grid-cols-2 p-1.5 bg-slate-100 border-b border-slate-200 text-xs font-bold shrink-0">
                     <button
                       onClick={() => setActiveBellTab('announcements')}
                       className={`py-1.5 rounded-lg transition-all cursor-pointer ${

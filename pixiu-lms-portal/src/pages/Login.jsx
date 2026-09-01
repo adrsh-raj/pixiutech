@@ -44,82 +44,86 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 selection:bg-pixiu-blue selection:text-white relative overflow-hidden">
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-3.5 sm:p-6 selection:bg-pixiu-blue selection:text-white relative overflow-hidden">
       {/* Subtle Background Glow */}
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none"></div>
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none"></div>
+      <div className="absolute top-1/4 left-1/4 w-72 sm:w-96 h-72 sm:h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none"></div>
+      <div className="absolute bottom-1/4 right-1/4 w-72 sm:w-96 h-72 sm:h-96 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none"></div>
 
-      <div className="w-full max-w-md bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-3xl p-8 shadow-2xl relative z-10">
-        <div className="text-center mb-8">
-          <div className="inline-block bg-white px-4 py-2 rounded-2xl shadow-lg border border-white/30 mb-3.5">
-            <img src="/img/logo.png" alt="Pixiu Tech Logo" className="h-11 w-auto object-contain" />
+      <div className="w-full max-w-md bg-slate-900/95 backdrop-blur-md border border-slate-800 rounded-2xl sm:rounded-3xl p-5 sm:p-8 shadow-2xl relative z-10">
+        <div className="text-center mb-6 sm:mb-8">
+          <div className="inline-block bg-white px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl shadow-lg border border-white/30 mb-3">
+            <img src="/img/logo.png" alt="Pixiu Tech Logo" className="h-8 sm:h-11 w-auto object-contain" />
           </div>
-          <h1 className="text-2xl font-black text-white tracking-wide">PIXIU TECH<span className="text-pixiu-blue">.</span></h1>
-          <p className="text-xs text-blue-300 font-bold uppercase tracking-widest mt-1">Portal Authentication Gateway</p>
+          <h1 className="text-xl sm:text-2xl font-black text-white tracking-wide">PIXIU TECH<span className="text-pixiu-blue">.</span></h1>
+          <p className="text-[10px] sm:text-xs text-blue-300 font-bold uppercase tracking-widest mt-0.5">Portal Authentication Gateway</p>
         </div>
 
         {/* 2 Main Role Tabs: 1. Student ID, 2. Trainer & Faculty (Admin Inside) */}
-        <div className="grid grid-cols-2 gap-2 p-1.5 bg-slate-950 rounded-2xl border border-slate-800/80 mb-6">
+        <div className="grid grid-cols-2 gap-1.5 sm:gap-2 p-1 sm:p-1.5 bg-slate-950 rounded-xl sm:rounded-2xl border border-slate-800/80 mb-5 sm:mb-6">
           <button
             type="button"
             onClick={() => handleRolePreset('student')}
-            className={`py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+            className={`py-2 sm:py-2.5 text-xs font-bold rounded-lg sm:rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
               selectedRoleTab === 'student' 
                 ? 'bg-pixiu-blue text-white shadow-md shadow-blue-500/25' 
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            <GraduationCap size={15} /> Student ID
+            <GraduationCap size={14} /> Student ID
           </button>
           
           <button
             type="button"
             onClick={() => handleRolePreset('trainer')}
-            className={`py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+            className={`py-2 sm:py-2.5 text-xs font-bold rounded-lg sm:rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
               selectedRoleTab === 'trainer' 
                 ? 'bg-pixiu-blue text-white shadow-md shadow-blue-500/25' 
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            <User size={15} /> Trainer & Admin
+            <User size={14} /> Trainer & Admin
           </button>
         </div>
 
         {/* Error Alert */}
         {error && (
-          <div className="mb-6 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-xs font-medium flex items-center gap-2">
-            <AlertCircle size={16} className="shrink-0" />
+          <div className="mb-5 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-xs font-medium flex items-center gap-2">
+            <AlertCircle size={15} className="shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3.5 sm:space-y-4">
           <div>
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">
-              {selectedRoleTab === 'student' ? 'Student ID' : 'Username'}
+            <label className="block text-[11px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+              {selectedRoleTab === 'student' ? 'Student ID (e.g. ZPS6A 01)' : 'Username'}
             </label>
             <div className="relative">
-              <User size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+              <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
               <input
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
+                placeholder={selectedRoleTab === 'student' ? 'ZPS6A 01' : 'Username'}
+                autoCapitalize="none"
+                autoCorrect="off"
                 required
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-11 pr-4 py-3 text-sm text-white focus:outline-none focus:border-pixiu-blue transition-colors font-medium"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 sm:py-3 text-xs sm:text-sm text-white focus:outline-none focus:border-pixiu-blue transition-colors font-medium placeholder:text-slate-600"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Password</label>
+            <label className="block text-[11px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Password</label>
             <div className="relative">
-              <Lock size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+              <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••••••"
                 required
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-11 pr-4 py-3 text-sm text-white focus:outline-none focus:border-pixiu-blue transition-colors font-medium"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 sm:py-3 text-xs sm:text-sm text-white focus:outline-none focus:border-pixiu-blue transition-colors font-medium placeholder:text-slate-600"
               />
             </div>
           </div>
@@ -127,13 +131,13 @@ export default function Login() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-pixiu-blue hover:bg-blue-600 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 text-sm transition-all cursor-pointer mt-2"
+            className="w-full bg-pixiu-blue hover:bg-blue-600 active:scale-98 text-white font-bold py-3 sm:py-3.5 rounded-xl shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 text-xs sm:text-sm transition-all cursor-pointer mt-2"
           >
             {loading ? (
-              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
             ) : (
               <>
-                Sign In to Portal <ArrowRight size={16} />
+                Sign In to Portal <ArrowRight size={15} />
               </>
             )}
           </button>

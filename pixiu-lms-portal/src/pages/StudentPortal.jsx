@@ -136,9 +136,9 @@ export default function StudentPortal() {
   const CustomAttendanceTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-slate-900 text-white p-3 rounded-xl shadow-xl text-xs border border-slate-700">
+        <div className="bg-slate-900 text-white p-2.5 sm:p-3 rounded-xl shadow-xl text-xs border border-slate-700">
           <p className="font-bold text-pixiu-blue">{label}</p>
-          <p className="text-slate-300 mt-0.5">{payload[0].payload.label}</p>
+          <p className="text-slate-300 mt-0.5 text-[11px]">{payload[0].payload.label}</p>
           <p className="text-emerald-400 font-bold mt-1">Attendance: {payload[0].value}%</p>
         </div>
       );
@@ -149,9 +149,9 @@ export default function StudentPortal() {
   const CustomReviewTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-slate-900 text-white p-3 rounded-xl shadow-xl text-xs border border-slate-700">
+        <div className="bg-slate-900 text-white p-2.5 sm:p-3 rounded-xl shadow-xl text-xs border border-slate-700">
           <p className="font-bold text-emerald-400">{label}</p>
-          <p className="text-slate-300 mt-0.5">{payload[0].payload.title}</p>
+          <p className="text-slate-300 mt-0.5 text-[11px]">{payload[0].payload.title}</p>
           <p className="text-amber-400 font-bold mt-1">Review Score: {payload[0].value} / 10 ★</p>
         </div>
       );
@@ -372,22 +372,24 @@ export default function StudentPortal() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans pb-12">
+    <div className="min-h-screen bg-slate-50 font-sans pb-12 antialiased selection:bg-pixiu-blue selection:text-white">
       {/* Top Navbar */}
-      <header className="bg-pixiu-dark text-white px-8 py-3.5 flex justify-between items-center sticky top-0 z-20 shadow-md">
-        <div className="flex items-center gap-3">
-          <div className="bg-white px-2.5 py-1 rounded-xl shadow-xs border border-white/20 flex items-center justify-center">
-            <img src="/img/logo.png" alt="Pixiu Tech" className="h-7 w-auto object-contain" />
+      <header className="bg-pixiu-dark text-white px-3.5 sm:px-8 py-2.5 sm:py-3.5 flex justify-between items-center sticky top-0 z-30 shadow-md">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <div className="bg-white px-2 py-1 rounded-lg sm:rounded-xl shadow-xs border border-white/20 flex items-center justify-center shrink-0">
+            <img src="/img/logo.png" alt="Pixiu Tech" className="h-5 sm:h-7 w-auto object-contain" />
           </div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-lg font-black tracking-wider text-white">PIXIU<span className="text-pixiu-blue">.</span>TECH</h1>
-            <span className="bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[11px] font-bold px-2.5 py-0.5 rounded-full">
-              Class {studentGrade}A Student Space
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+            <h1 className="text-sm sm:text-lg font-black tracking-wider text-white truncate">
+              PIXIU<span className="text-pixiu-blue">.</span>TECH
+            </h1>
+            <span className="bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0">
+              Class {studentGrade}A
             </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4 shrink-0">
           {/* Notification Bell with Badge & Dropdown */}
           <div className="relative">
             <button
@@ -395,25 +397,25 @@ export default function StudentPortal() {
               className="relative p-2 text-slate-300 hover:text-white hover:bg-slate-800 rounded-xl transition-all cursor-pointer border border-slate-700 flex items-center justify-center"
               title="Class Announcements & Schedule Notices"
             >
-              <Bell size={18} />
+              <Bell size={17} />
               {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-slate-900 shadow-sm animate-pulse">
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center border-2 border-slate-900 shadow-sm animate-pulse">
                   {unreadCount}
                 </span>
               )}
             </button>
 
-            {/* Notification Drawer Dropdown */}
+            {/* Notification Drawer Dropdown (Mobile Viewport Safe) */}
             {isNotifDrawerOpen && (
-              <div className="absolute right-0 mt-3 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden z-30 animate-in fade-in zoom-in-95 text-slate-800">
-                <div className="p-4 bg-slate-900 text-white flex justify-between items-center border-b border-slate-800">
-                  <div className="flex items-center gap-2">
-                    <Megaphone size={16} className="text-pixiu-blue"/>
-                    <h3 className="font-bold text-xs uppercase tracking-wider">
+              <div className="fixed sm:absolute inset-x-3 top-14 sm:inset-auto sm:right-0 sm:top-auto sm:mt-3 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden z-50 animate-in fade-in zoom-in-95 text-slate-800 max-h-[80vh] flex flex-col">
+                <div className="p-3.5 bg-slate-900 text-white flex justify-between items-center border-b border-slate-800 shrink-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Megaphone size={15} className="text-pixiu-blue shrink-0"/>
+                    <h3 className="font-bold text-xs uppercase tracking-wider truncate">
                       Class Announcements ({unreadCount} Unread)
                     </h3>
                   </div>
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-2 shrink-0">
                     {unreadCount > 0 && (
                       <button
                         onClick={markAllAsRead}
@@ -424,20 +426,20 @@ export default function StudentPortal() {
                     )}
                     <button 
                       onClick={() => setIsNotifDrawerOpen(false)} 
-                      className="text-slate-400 hover:text-white cursor-pointer"
+                      className="p-1 text-slate-400 hover:text-white cursor-pointer"
                     >
                       <X size={16}/>
                     </button>
                   </div>
                 </div>
 
-                <div className="max-h-96 overflow-y-auto p-3 space-y-2.5">
+                <div className="overflow-y-auto p-3 space-y-2.5 flex-1">
                   {classNotifs.map(notif => {
                     const isRead = readNotifIds.includes(notif.id);
                     return (
                       <div 
                         key={notif.id}
-                        className={`p-3.5 rounded-xl border text-xs space-y-2 transition-all ${
+                        className={`p-3 sm:p-3.5 rounded-xl border text-xs space-y-2 transition-all ${
                           isRead 
                             ? 'bg-slate-50 border-slate-200 opacity-75' 
                             : 'bg-blue-50/60 border-blue-200 shadow-xs'
@@ -489,70 +491,72 @@ export default function StudentPortal() {
             )}
           </div>
 
-          <div className="text-right hidden sm:block">
-            <p className="text-xs font-bold text-white">{student.name}</p>
+          <div className="text-right hidden md:block">
+            <p className="text-xs font-bold text-white leading-tight">{student.name}</p>
             <p className="text-[10px] font-mono text-pixiu-blue">{student.student_id}</p>
           </div>
           <button 
             onClick={logout} 
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 text-xs font-bold transition-colors cursor-pointer border border-slate-700"
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 text-xs font-bold transition-colors cursor-pointer border border-slate-700"
+            title="Logout"
           >
-            <LogOut size={14}/> Logout
+            <LogOut size={14}/>
+            <span className="hidden sm:inline">Logout</span>
           </button>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 pt-8 space-y-6">
+      <main className="max-w-6xl mx-auto px-3 sm:px-6 pt-5 sm:pt-8 space-y-4 sm:space-y-6">
         {/* Official Monthly Accountability & Motivation Notice Banner */}
-        <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 rounded-2xl p-5 text-white border border-blue-500/30 shadow-lg relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div className="flex items-start gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-400/40 flex items-center justify-center text-blue-300 shrink-0 mt-0.5">
-              <Sparkles size={20} className="text-amber-300 animate-pulse" />
+        <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 rounded-2xl p-4 sm:p-5 text-white border border-blue-500/30 shadow-lg relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-3 sm:gap-4">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-500/20 border border-blue-400/40 flex items-center justify-center text-blue-300 shrink-0 mt-0.5">
+              <Sparkles size={18} className="text-amber-300 animate-pulse" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-bold text-sm text-white tracking-wide">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="font-bold text-xs sm:text-sm text-white tracking-wide">
                   Welcome to Pixiu Tech Innovation Lab, {student.name}!
                 </h3>
-                <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                <span className="text-[9px] sm:text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                   Monthly Report Active
                 </span>
               </div>
-              <p className="text-xs text-slate-300 mt-1 leading-relaxed max-w-3xl">
+              <p className="text-[11px] sm:text-xs text-slate-300 mt-1 leading-relaxed">
                 📢 <strong className="text-white">Institutional Accountability Notice:</strong> At the end of every month, your practical laboratory attendance records, level-by-level competency reviews, and prototype scores are compiled and dispatched directly to your <strong>School Principal</strong> and <strong>Parents</strong>. Keep innovating, building, and exploring with full dedication. <strong className="text-amber-300">Happy Studying! 🚀✨</strong>
               </p>
             </div>
           </div>
 
-          <div className="shrink-0 flex items-center gap-2">
-            <span className="text-xs font-bold font-mono px-3 py-1.5 rounded-lg bg-white/10 text-blue-200 border border-white/10 flex items-center gap-1.5">
-              <Send size={12} className="text-blue-300" /> Dispatched Monthly
+          <div className="self-end md:self-center shrink-0 flex items-center gap-2">
+            <span className="text-[10px] sm:text-xs font-bold font-mono px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-white/10 text-blue-200 border border-white/10 flex items-center gap-1.5">
+              <Send size={11} className="text-blue-300" /> Dispatched Monthly
             </span>
           </div>
         </div>
 
         {/* Hero Card */}
-        <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-3xl p-8 text-white shadow-xl border border-slate-700/60 relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-          <div className="flex items-center gap-5">
-            <div className="w-20 h-20 rounded-2xl bg-gradient-to-tr from-blue-600 to-blue-400 flex items-center justify-center text-white shadow-lg shadow-blue-500/20 font-bold text-2xl">
+        <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-8 text-white shadow-xl border border-slate-700/60 relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-4 sm:gap-6">
+          <div className="flex items-center gap-3.5 sm:gap-5 w-full md:w-auto">
+            <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-xl sm:rounded-2xl bg-gradient-to-tr from-blue-600 to-blue-400 flex items-center justify-center text-white shadow-lg shadow-blue-500/20 font-bold text-lg sm:text-2xl shrink-0">
               {student.name.split(' ').map(w => w[0]).join('')}
             </div>
-            <div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-2xl sm:text-3xl font-black text-white">{student.name}</h1>
-                <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold px-2.5 py-0.5 rounded-full">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-lg sm:text-2xl md:text-3xl font-black text-white truncate">{student.name}</h1>
+                <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-full">
                   Active
                 </span>
               </div>
-              <p className="text-slate-400 text-xs mt-1">
-                Student ID: <span className="font-mono text-pixiu-blue font-bold">{student.student_id}</span> • School: <span className="text-slate-200 font-semibold">{school}</span>
+              <p className="text-slate-400 text-[11px] sm:text-xs mt-0.5 truncate">
+                ID: <span className="font-mono text-pixiu-blue font-bold">{student.student_id}</span> • School: <span className="text-slate-200 font-semibold">{school}</span>
               </p>
-              <div className="flex items-center gap-2 mt-2">
-                <span className="text-[11px] bg-slate-800 border border-slate-700 text-slate-300 px-2.5 py-0.5 rounded-md">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mt-2">
+                <span className="text-[10px] sm:text-[11px] bg-slate-800 border border-slate-700 text-slate-300 px-2 py-0.5 rounded-md">
                   Class: <strong className="text-white">{studentGrade}A</strong>
                 </span>
-                <span className="text-[11px] bg-slate-800 border border-slate-700 text-slate-300 px-2.5 py-0.5 rounded-md font-mono">
-                  Assigned Kit: <strong className="text-blue-400">{student.assigned_kit_id || 'KIT-ZPS-01'}</strong>
+                <span className="text-[10px] sm:text-[11px] bg-slate-800 border border-slate-700 text-slate-300 px-2 py-0.5 rounded-md font-mono">
+                  Kit: <strong className="text-blue-400">{student.assigned_kit_id || 'KIT-ZPS-01'}</strong>
                 </span>
               </div>
             </div>
@@ -560,71 +564,71 @@ export default function StudentPortal() {
 
           <button 
             onClick={handlePrintReport}
-            className="bg-pixiu-blue hover:bg-blue-600 text-white text-xs font-bold px-5 py-3 rounded-xl flex items-center gap-2 shadow-lg shadow-blue-500/20 transition-all cursor-pointer"
+            className="w-full md:w-auto bg-pixiu-blue hover:bg-blue-600 active:scale-98 text-white text-xs font-bold px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 transition-all cursor-pointer shrink-0"
           >
-            <FileText size={16} /> Download Progress Certificate & Transcript
+            <FileText size={15} /> Download Progress Certificate & Transcript
           </button>
         </div>
 
-        {/* 3 Metric Summary Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-              <Award size={24} />
+        {/* 3 Metric Summary Cards (Mobile 3-column Grid) */}
+        <div className="grid grid-cols-3 gap-2 sm:gap-6">
+          <div className="bg-white p-2.5 sm:p-6 rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center sm:items-center gap-1.5 sm:gap-4 text-center sm:text-left">
+            <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+              <Award className="w-4 h-4 sm:w-6 sm:h-6" />
             </div>
-            <div>
-              <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Mastery Level</p>
-              <p className="text-xl font-bold text-slate-800">{student.tech_level}</p>
-            </div>
-          </div>
-
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <Activity size={24} />
-            </div>
-            <div>
-              <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Lab Attendance</p>
-              <p className="text-xl font-bold text-slate-800">{attendanceRate}%</p>
+            <div className="min-w-0">
+              <p className="text-[9px] sm:text-xs text-slate-400 font-bold uppercase tracking-wider truncate">Mastery</p>
+              <p className="text-xs sm:text-xl font-bold text-slate-800 truncate">{student.tech_level}</p>
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-blue-50 text-pixiu-blue flex items-center justify-center">
-              <Box size={24} />
+          <div className="bg-white p-2.5 sm:p-6 rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center sm:items-center gap-1.5 sm:gap-4 text-center sm:text-left">
+            <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+              <Activity className="w-4 h-4 sm:w-6 sm:h-6" />
             </div>
-            <div>
-              <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Hardware Kit</p>
-              <p className="text-sm font-bold font-mono text-slate-800">{student.assigned_kit_id || 'KIT-ZPS-01'}</p>
+            <div className="min-w-0">
+              <p className="text-[9px] sm:text-xs text-slate-400 font-bold uppercase tracking-wider truncate">Attendance</p>
+              <p className="text-xs sm:text-xl font-bold text-emerald-600">{attendanceRate}%</p>
+            </div>
+          </div>
+
+          <div className="bg-white p-2.5 sm:p-6 rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center sm:items-center gap-1.5 sm:gap-4 text-center sm:text-left">
+            <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-blue-50 text-pixiu-blue flex items-center justify-center shrink-0">
+              <Box className="w-4 h-4 sm:w-6 sm:h-6" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[9px] sm:text-xs text-slate-400 font-bold uppercase tracking-wider truncate">Lab Kit</p>
+              <p className="text-[11px] sm:text-sm font-bold font-mono text-slate-800 truncate">{student.assigned_kit_id || 'KIT-ZPS-01'}</p>
             </div>
           </div>
         </div>
 
         {/* ==================== 2 INTERACTIVE LINE GRAPHS ==================== */}
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4">
           <div className="flex items-center gap-2">
-            <TrendingUp size={18} className="text-pixiu-blue" />
-            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
+            <TrendingUp size={16} className="text-pixiu-blue shrink-0" />
+            <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase tracking-wider">
               Student Performance & Attendance Analytics
             </h3>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
             {/* Graph 1: Attendance Consistency Line Graph */}
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div className="bg-white p-3.5 sm:p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
               <div>
-                <div className="flex justify-between items-center mb-4">
+                <div className="flex flex-wrap justify-between items-start gap-2 mb-3 sm:mb-4">
                   <div>
-                    <h4 className="font-bold text-slate-800 text-sm">📈 Lab Attendance Consistency Curve</h4>
-                    <p className="text-xs text-slate-500">Session-wise attendance rate throughout academic term</p>
+                    <h4 className="font-bold text-slate-800 text-xs sm:text-sm">📈 Lab Attendance Consistency Curve</h4>
+                    <p className="text-[10px] sm:text-xs text-slate-500">Session-wise attendance rate throughout academic term</p>
                   </div>
-                  <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-50 text-pixiu-blue border border-blue-200">
+                  <span className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold bg-blue-50 text-pixiu-blue border border-blue-200 shrink-0">
                     {attendanceRate}% Avg Rate
                   </span>
                 </div>
 
-                <div className="h-56 w-full">
+                <div className="h-44 sm:h-56 w-full -ml-2 sm:ml-0">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={attendanceTrendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <AreaChart data={attendanceTrendData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                       <defs>
                         <linearGradient id="attGradient" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#0066FF" stopOpacity={0.3}/>
@@ -632,8 +636,8 @@ export default function StudentPortal() {
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                      <XAxis dataKey="session" stroke="#94a3b8" fontSize={11} tickLine={false} />
-                      <YAxis stroke="#94a3b8" fontSize={11} domain={[70, 100]} tickLine={false} tickFormatter={v => `${v}%`} />
+                      <XAxis dataKey="session" stroke="#94a3b8" fontSize={10} tickLine={false} tickFormatter={v => v.split(' ')[0]} />
+                      <YAxis stroke="#94a3b8" fontSize={10} domain={[70, 100]} tickLine={false} tickFormatter={v => `${v}%`} />
                       <Tooltip content={<CustomAttendanceTooltip />} />
                       <Area 
                         type="monotone" 
@@ -642,36 +646,36 @@ export default function StudentPortal() {
                         strokeWidth={2.5} 
                         fillOpacity={1} 
                         fill="url(#attGradient)" 
-                        dot={{ r: 4, fill: '#0066FF', strokeWidth: 2, stroke: '#fff' }}
-                        activeDot={{ r: 6, fill: '#0066FF' }}
+                        dot={{ r: 3.5, fill: '#0066FF', strokeWidth: 2, stroke: '#fff' }}
+                        activeDot={{ r: 5.5, fill: '#0066FF' }}
                       />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
               </div>
 
-              <div className="flex justify-between items-center pt-4 border-t border-slate-100 text-xs text-slate-500 mt-2">
+              <div className="flex flex-wrap justify-between items-center pt-3 border-t border-slate-100 text-[10px] sm:text-xs text-slate-500 mt-2 gap-1">
                 <span>Status: <strong className="text-emerald-600">Gold Tier Regular</strong></span>
-                <span>Sessions Attended: <strong className="text-slate-800">6 of 6 Completed</strong></span>
+                <span>Attended: <strong className="text-slate-800">6 of 6 Labs</strong></span>
               </div>
             </div>
 
             {/* Graph 2: Level Progression & Review Score Line Graph */}
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div className="bg-white p-3.5 sm:p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
               <div>
-                <div className="flex justify-between items-center mb-4">
+                <div className="flex flex-wrap justify-between items-start gap-2 mb-3 sm:mb-4">
                   <div>
-                    <h4 className="font-bold text-slate-800 text-sm">🚀 Level Progression & Review Rating</h4>
-                    <p className="text-xs text-slate-500">Instructor evaluation score out of 10 for each level</p>
+                    <h4 className="font-bold text-slate-800 text-xs sm:text-sm">🚀 Level Progression & Review Rating</h4>
+                    <p className="text-[10px] sm:text-xs text-slate-500">Instructor evaluation score out of 10 for each level</p>
                   </div>
-                  <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <span className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
                     9.5 / 10 Avg Review
                   </span>
                 </div>
 
-                <div className="h-56 w-full">
+                <div className="h-44 sm:h-56 w-full -ml-2 sm:ml-0">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={levelReviewData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <AreaChart data={levelReviewData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                       <defs>
                         <linearGradient id="scoreGradient" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#10B981" stopOpacity={0.3}/>
@@ -679,8 +683,8 @@ export default function StudentPortal() {
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                      <XAxis dataKey="level" stroke="#94a3b8" fontSize={11} tickLine={false} />
-                      <YAxis stroke="#94a3b8" fontSize={11} domain={[7, 10]} tickLine={false} tickFormatter={v => `${v}`} />
+                      <XAxis dataKey="level" stroke="#94a3b8" fontSize={10} tickLine={false} tickFormatter={v => v.replace('Level ', 'L')} />
+                      <YAxis stroke="#94a3b8" fontSize={10} domain={[7, 10]} tickLine={false} tickFormatter={v => `${v}`} />
                       <Tooltip content={<CustomReviewTooltip />} />
                       <Area 
                         type="monotone" 
@@ -689,39 +693,39 @@ export default function StudentPortal() {
                         strokeWidth={2.5} 
                         fillOpacity={1} 
                         fill="url(#scoreGradient)" 
-                        dot={{ r: 4, fill: '#10B981', strokeWidth: 2, stroke: '#fff' }}
-                        activeDot={{ r: 6, fill: '#10B981' }}
+                        dot={{ r: 3.5, fill: '#10B981', strokeWidth: 2, stroke: '#fff' }}
+                        activeDot={{ r: 5.5, fill: '#10B981' }}
                       />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
               </div>
 
-              <div className="flex justify-between items-center pt-4 border-t border-slate-100 text-xs text-slate-500 mt-2">
-                <span>Current Rating: <strong className="text-amber-500">★★★★★ Exceptional</strong></span>
-                <span>Active Stage: <strong className="text-slate-800">Level 1 Mastered • Level 2 Active</strong></span>
+              <div className="flex flex-wrap justify-between items-center pt-3 border-t border-slate-100 text-[10px] sm:text-xs text-slate-500 mt-2 gap-1">
+                <span>Rating: <strong className="text-amber-500">★★★★★ Exceptional</strong></span>
+                <span>Stage: <strong className="text-slate-800">Level 1 Mastered</strong></span>
               </div>
             </div>
           </div>
         </div>
 
         {/* ==================== END-OF-LEVEL INSTRUCTOR REVIEWS ==================== */}
-        <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm space-y-6">
-          <div className="flex justify-between items-center">
+        <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 p-4 sm:p-8 shadow-sm space-y-4 sm:space-y-6">
+          <div className="flex flex-wrap justify-between items-center gap-2">
             <div>
-              <h3 className="text-lg font-bold text-slate-800">📝 Instructor Reviews at End of Each Level</h3>
-              <p className="text-xs text-slate-500">Verified competency feedback and technical milestone validation</p>
+              <h3 className="text-sm sm:text-lg font-bold text-slate-800">📝 Instructor Reviews at End of Each Level</h3>
+              <p className="text-[11px] sm:text-xs text-slate-500">Verified competency feedback and technical milestone validation</p>
             </div>
-            <span className="text-xs font-bold bg-slate-100 text-slate-700 px-3 py-1 rounded-full border border-slate-200">
+            <span className="text-[10px] sm:text-xs font-bold bg-slate-100 text-slate-700 px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full border border-slate-200 shrink-0">
               6 Unit Curricula
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {levelReviewData.map(l => (
               <div 
                 key={l.level}
-                className={`p-5 rounded-2xl border transition-all flex flex-col justify-between ${
+                className={`p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border transition-all flex flex-col justify-between space-y-2.5 ${
                   l.status === 'Mastered' 
                     ? 'border-emerald-200 bg-emerald-50/20 hover:border-emerald-400' 
                     : l.status === 'In Progress'
@@ -730,9 +734,9 @@ export default function StudentPortal() {
                 }`}
               >
                 <div>
-                  <div className="flex justify-between items-start mb-2">
+                  <div className="flex justify-between items-start gap-1 mb-1.5">
                     <div className="flex items-center gap-1.5">
-                      <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-slate-900 text-white uppercase">
+                      <span className="px-2 py-0.5 rounded-md text-[9px] sm:text-[10px] font-bold bg-slate-900 text-white uppercase">
                         {l.level}
                       </span>
                       <span className="text-[10px] font-mono text-slate-400">
@@ -740,7 +744,7 @@ export default function StudentPortal() {
                       </span>
                     </div>
 
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                    <span className={`px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-bold ${
                       l.status === 'Mastered' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
                       l.status === 'In Progress' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
                       'bg-slate-200 text-slate-600'
@@ -749,20 +753,20 @@ export default function StudentPortal() {
                     </span>
                   </div>
 
-                  <h4 className="font-bold text-slate-800 text-xs mb-1.5">{l.title}</h4>
-                  <div className="flex items-center gap-1 mb-3">
+                  <h4 className="font-bold text-slate-800 text-xs mb-1">{l.title}</h4>
+                  <div className="flex items-center gap-1 mb-2">
                     {[...Array(l.rating)].map((_, i) => (
-                      <Star key={i} size={11} className="text-amber-400 fill-amber-400" />
+                      <Star key={i} size={10} className="text-amber-400 fill-amber-400" />
                     ))}
-                    <span className="text-[11px] font-bold text-slate-700 ml-1">{l.score} / 10</span>
+                    <span className="text-[10px] sm:text-[11px] font-bold text-slate-700 ml-1">{l.score} / 10</span>
                   </div>
 
-                  <p className="text-xs text-slate-600 leading-relaxed bg-white p-3 rounded-xl border border-slate-100 mb-3">
+                  <p className="text-[11px] sm:text-xs text-slate-600 leading-relaxed bg-white p-2.5 sm:p-3 rounded-xl border border-slate-100">
                     💬 "{l.review}"
                   </p>
                 </div>
 
-                <div className="flex justify-between items-center text-[10px] text-slate-400 pt-2 border-t border-slate-100">
+                <div className="flex justify-between items-center text-[9px] sm:text-[10px] text-slate-400 pt-2 border-t border-slate-100">
                   <span>Faculty: <strong>{l.instructor.split(' ')[0]}</strong></span>
                   <span>{l.verifiedDate}</span>
                 </div>
@@ -774,30 +778,30 @@ export default function StudentPortal() {
         {/* Class Announcements & Revision Notice Feed */}
         {classNotifs.length > 0 && (
           <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <Megaphone size={18} className="text-pixiu-blue" />
-                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
-                  Class {studentGrade} Announcements & Next Session Notices
+            <div className="flex justify-between items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                <Megaphone size={16} className="text-pixiu-blue shrink-0" />
+                <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase tracking-wider truncate">
+                  Class {studentGrade} Notices ({unreadCount} New)
                 </h3>
               </div>
               {unreadCount > 0 && (
                 <button 
                   onClick={markAllAsRead}
-                  className="text-xs font-bold text-pixiu-blue hover:underline cursor-pointer flex items-center gap-1"
+                  className="text-[11px] sm:text-xs font-bold text-pixiu-blue hover:underline cursor-pointer flex items-center gap-1 shrink-0"
                 >
-                  <Check size={13} /> Mark All as Read ({unreadCount})
+                  <Check size={12} /> Mark All Read
                 </button>
               )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
               {classNotifs.map(notif => {
                 const isRead = readNotifIds.includes(notif.id);
                 return (
                   <div 
                     key={notif.id}
-                    className={`p-5 rounded-2xl border bg-white shadow-xs space-y-3 transition-all ${
+                    className={`p-4 sm:p-5 rounded-xl sm:rounded-2xl border bg-white shadow-xs space-y-2.5 sm:space-y-3 transition-all ${
                       isRead ? 'opacity-80 border-slate-200' :
                       notif.severity === 'urgent' 
                         ? 'border-rose-200 ring-2 ring-rose-100' 
@@ -807,8 +811,8 @@ export default function StudentPortal() {
                     }`}
                   >
                     <div className="flex justify-between items-start gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${
+                      <div className="flex items-center gap-1.5">
+                        <span className={`px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider ${
                           notif.severity === 'urgent' 
                             ? 'bg-rose-50 text-rose-700 border border-rose-200' 
                             : notif.severity === 'important' 
@@ -822,27 +826,27 @@ export default function StudentPortal() {
                         )}
                       </div>
 
-                      <span className="text-[11px] text-slate-400 font-mono flex items-center gap-1">
-                        <Clock size={11} /> {notif.scheduled_date} • {notif.scheduled_time}
+                      <span className="text-[10px] text-slate-400 font-mono flex items-center gap-1">
+                        <Clock size={10} /> {notif.scheduled_date} • {notif.scheduled_time}
                       </span>
                     </div>
 
-                    <h4 className="font-bold text-slate-800 text-sm">{notif.title}</h4>
-                    <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3.5 rounded-xl border border-slate-100 whitespace-pre-line">
+                    <h4 className="font-bold text-slate-800 text-xs sm:text-sm">{notif.title}</h4>
+                    <p className="text-[11px] sm:text-xs text-slate-600 leading-relaxed bg-slate-50 p-2.5 sm:p-3 rounded-xl border border-slate-100 whitespace-pre-line">
                       {notif.message}
                     </p>
 
                     <div className="flex justify-end pt-1">
                       {isRead ? (
-                        <span className="text-xs text-emerald-600 font-bold flex items-center gap-1">
-                          <CheckCircle size={14}/> Read & Acknowledged
+                        <span className="text-[11px] text-emerald-600 font-bold flex items-center gap-1">
+                          <CheckCircle size={13}/> Read & Acknowledged
                         </span>
                       ) : (
                         <button
                           onClick={() => markAsRead(notif.id)}
                           className="px-3 py-1.5 bg-pixiu-blue hover:bg-blue-600 text-white rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
                         >
-                          <Check size={13} /> Mark as Read
+                          <Check size={12} /> Mark as Read
                         </button>
                       )}
                     </div>
@@ -854,40 +858,40 @@ export default function StudentPortal() {
         )}
 
         {/* Class Study Material & Workbooks (Watermarked Edition) */}
-        <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm">
-          <div className="flex justify-between items-center mb-6">
+        <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 p-4 sm:p-8 shadow-sm space-y-4 sm:space-y-6">
+          <div className="flex flex-wrap justify-between items-center gap-2">
             <div>
-              <h3 className="text-lg font-bold text-slate-800">Class {studentGrade} Robotics Study Materials & Workbooks</h3>
-              <p className="text-xs text-slate-500">Official student guides with circuit schematics and build walkthroughs</p>
+              <h3 className="text-sm sm:text-lg font-bold text-slate-800">Class {studentGrade} Robotics Study Materials & Workbooks</h3>
+              <p className="text-[11px] sm:text-xs text-slate-500">Official student guides with circuit schematics and build walkthroughs</p>
             </div>
-            <span className="text-xs font-bold bg-blue-50 text-pixiu-blue border border-blue-100 px-3 py-1 rounded-full">
+            <span className="text-[10px] sm:text-xs font-bold bg-blue-50 text-pixiu-blue border border-blue-100 px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full shrink-0">
               Student Edition
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
             {availableContent.map(item => (
-              <div key={item.id} className="border border-slate-200 rounded-2xl p-5 bg-slate-50 hover:bg-white hover:border-pixiu-blue transition-all flex flex-col justify-between">
+              <div key={item.id} className="border border-slate-200 rounded-xl sm:rounded-2xl p-4 sm:p-5 bg-slate-50 hover:bg-white hover:border-pixiu-blue transition-all flex flex-col justify-between space-y-3">
                 <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded font-bold text-[10px] uppercase">
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded font-bold text-[9px] uppercase">
                       Class {item.class_grade || studentGrade}
                     </span>
-                    <span className="px-2 py-0.5 bg-slate-200 text-slate-700 rounded font-bold text-[10px]">
+                    <span className="px-2 py-0.5 bg-slate-200 text-slate-700 rounded font-bold text-[9px]">
                       {item.level}
                     </span>
                   </div>
-                  <h4 className="font-bold text-slate-800 text-sm mb-1">{item.title}</h4>
-                  <p className="text-xs text-slate-500 mb-4">{item.topic || 'Official Curriculum Module'}</p>
+                  <h4 className="font-bold text-slate-800 text-xs sm:text-sm mb-0.5">{item.title}</h4>
+                  <p className="text-[11px] sm:text-xs text-slate-500">{item.topic || 'Official Curriculum Module'}</p>
                 </div>
 
-                <div className="flex items-center justify-between pt-3 border-t border-slate-200/60">
-                  <span className="text-[11px] font-mono text-slate-400">PDF Guidebook</span>
+                <div className="flex items-center justify-between pt-2.5 border-t border-slate-200/60">
+                  <span className="text-[10px] font-mono text-slate-400">PDF Guidebook</span>
                   <a 
                     href={item.file_url} 
                     target="_blank" 
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:border-pixiu-blue hover:text-pixiu-blue rounded-lg text-xs font-bold text-slate-700 transition-colors shadow-2xs"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:border-pixiu-blue hover:text-pixiu-blue rounded-lg text-xs font-bold text-slate-700 transition-colors shadow-2xs cursor-pointer"
                   >
                     <Download size={13} /> View & Study
                   </a>
@@ -898,28 +902,28 @@ export default function StudentPortal() {
         </div>
 
         {/* Practical Projects & Lab Portfolio */}
-        <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm">
-          <div className="flex justify-between items-center mb-6">
+        <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 p-4 sm:p-8 shadow-sm space-y-4 sm:space-y-6">
+          <div className="flex flex-wrap justify-between items-center gap-2">
             <div>
-              <h3 className="text-lg font-bold text-slate-800">My Lab Projects & Submissions</h3>
-              <p className="text-xs text-slate-500">Hardware prototypes and software code verified by instructor</p>
+              <h3 className="text-sm sm:text-lg font-bold text-slate-800">My Lab Projects & Submissions</h3>
+              <p className="text-[11px] sm:text-xs text-slate-500">Hardware prototypes and software code verified by instructor</p>
             </div>
-            <span className="text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-full">
+            <span className="text-[10px] sm:text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full shrink-0">
               {studentProjects.length} Verified
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
             {studentProjects.map(proj => (
-              <div key={proj.id} className="border border-slate-200 rounded-2xl p-5 bg-slate-50">
-                <div className="flex justify-between items-start mb-2">
-                  <h4 className="font-bold text-slate-800 text-sm">{proj.title}</h4>
-                  <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+              <div key={proj.id} className="border border-slate-200 rounded-xl sm:rounded-2xl p-4 sm:p-5 bg-slate-50 space-y-2">
+                <div className="flex justify-between items-start gap-2">
+                  <h4 className="font-bold text-slate-800 text-xs sm:text-sm">{proj.title}</h4>
+                  <span className="text-[10px] sm:text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 shrink-0">
                     Score: {proj.score}/10
                   </span>
                 </div>
-                <p className="text-xs text-slate-500 mb-3">{proj.evidence_note || 'Completed in lab session'}</p>
-                <div className="flex justify-between items-center text-[10px] text-slate-400">
+                <p className="text-[11px] sm:text-xs text-slate-500">{proj.evidence_note || 'Completed in lab session'}</p>
+                <div className="flex justify-between items-center text-[10px] text-slate-400 pt-2 border-t border-slate-200/60">
                   <span>Status: <strong className="text-slate-700">{proj.status}</strong></span>
                   <span>Date: {proj.date_completed || 'Recent'}</span>
                 </div>
@@ -927,7 +931,7 @@ export default function StudentPortal() {
             ))}
 
             {studentProjects.length === 0 && (
-              <div className="col-span-2 p-8 text-center text-slate-400 text-xs">
+              <div className="col-span-2 p-6 sm:p-8 text-center text-slate-400 text-xs">
                 No individual projects submitted yet. Upcoming capstone rovers will be logged here!
               </div>
             )}
