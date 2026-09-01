@@ -52,7 +52,10 @@ export function DataProvider({ children }) {
   const [projects, setProjects] = useState(() => safeGetItem('pixiu_projects', []));
   const [alerts, setAlerts] = useState(() => safeGetItem('pixiu_alerts', SEED_ALERTS));
   const [notifications, setNotifications] = useState(() => safeGetItem('pixiu_notifications', SEED_NOTIFICATIONS));
-  const [studentReviews, setStudentReviews] = useState(() => safeGetItem('pixiu_student_reviews', SEED_STUDENT_REVIEWS));
+  const [studentReviews, setStudentReviews] = useState(() => {
+    const raw = safeGetItem('pixiu_student_reviews', []);
+    return (raw || []).filter(r => !['REV-001', 'REV-002', 'REV-003', 'REV-004'].includes(r.id));
+  });
   const [loading, setLoading] = useState(false);
 
   // Cross-tab / Cross-window Real-time Sync

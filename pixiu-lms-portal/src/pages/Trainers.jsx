@@ -95,14 +95,17 @@ export default function Trainers() {
   });
 
   const handleOpenReviewModal = (existingReview = null) => {
-    if (existingReview) {
+    if (existingReview && existingReview.id) {
       setEditingReviewId(existingReview.id);
       setReviewFormData(existingReview);
     } else {
       setEditingReviewId(null);
+      const targetStudentId = existingReview?.student_id;
+      const targetStudent = targetStudentId ? students.find(s => s.student_id === targetStudentId) : null;
       const filteredStu = students.filter(s => selectedReviewGrade === 'All' || s.class_id.includes(`-${selectedReviewGrade}A`));
-      const firstStudent = filteredStu[0] || students[0];
-      const grade = firstStudent?.class_id ? firstStudent.class_id.replace('CLS-ZPS-', '').replace('A', '') : '6';
+      const firstStudent = targetStudent || filteredStu[0] || students[0];
+      const grade = firstStudent?.class_id ? firstStudent.class_id.replace('CLS-ZPS-', '').replace('A', '') : (existingReview?.class_grade || '6');
+      
       setReviewFormData({
         student_id: firstStudent?.student_id || 'ZPS6A 01',
         class_grade: grade,
@@ -388,7 +391,20 @@ export default function Trainers() {
                   </div>
                 </div>
                 
-                <div className="flex gap-2">
+                <div className="flex gap-1.5 items-center">
+                  <button 
+                    onClick={() => {
+                      const grade = sessionClass ? sessionClass.grade : '6';
+                      handleOpenReviewModal({
+                        student_id: student.student_id,
+                        class_grade: grade
+                      });
+                    }}
+                    className="w-9 h-9 rounded-lg flex items-center justify-center text-amber-500 bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-all cursor-pointer shadow-2xs"
+                    title="Submit End-of-Unit Evaluation for this Student"
+                  >
+                    <Star size={16} className="fill-amber-400 text-amber-500"/>
+                  </button>
                   <button 
                     onClick={() => handleMarkAttendance(student.student_id, 'Present')}
                     disabled={isLocked && !isAdmin}

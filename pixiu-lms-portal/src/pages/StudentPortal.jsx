@@ -90,47 +90,62 @@ export default function StudentPortal() {
     { session: 'S6 (Current)', attendance: attendanceRate, label: 'Session 6: Live Hands-On Lab' },
   ];
 
-  // 2. Dynamic End-of-Unit Reviews from Context (Sync with Trainer Reviews)
+  // 2. Dynamic End-of-Unit Reviews from Context (Sync with Trainer Live Reviews)
   const DEFAULT_UNITS = [
-    { level: 'Level 0', unitCode: 'Unit 1', title: 'Intro to Electricity & Circuits', defaultScore: 9.5, defaultStatus: 'Mastered', defaultReview: 'Demonstrated exceptional understanding of breadboard power rails, series-parallel LEDs, and Ohm\'s Law current calculations.' },
-    { level: 'Level 1', unitCode: 'Unit 2', title: 'Sensors: Light (LDR) & Obstacle (IR)', defaultScore: 9.2, defaultStatus: 'Mastered', defaultReview: 'Successfully calibrated analog LDR and digital IR sensors with accurate voltage divider threshold adjustments.' },
-    { level: 'Level 2', unitCode: 'Unit 3', title: 'Actuators: Motors, Buzzers & Relays', defaultScore: 9.8, defaultStatus: 'In Progress', defaultReview: 'Accurate transistor switching circuitry wiring and high-torque DC motor driver breadboard assembly.' },
-    { level: 'Level 3', unitCode: 'Unit 4', title: 'Microcontroller (Arduino) Programming Basics', defaultScore: 9.0, defaultStatus: 'Upcoming', defaultReview: 'Firmware pin modes, conditional loops, and serial monitor telemetry debugging.' },
-    { level: 'Level 4', unitCode: 'Unit 5', title: 'Smart Obstacle Avoiding Rover Build', defaultScore: 9.4, defaultStatus: 'Upcoming', defaultReview: 'Integrated 2WD robotic chassis with L298N motor driver and ultrasonic avoidance algorithm.' },
-    { level: 'Level 5', unitCode: 'Unit 6', title: 'Capstone: Automated Smart Environment', defaultScore: 9.7, defaultStatus: 'Upcoming', defaultReview: 'Final autonomous exhibition capstone with multi-sensor telemetry and live demonstration.' }
+    { level: 'Level 0', unitCode: 'Unit 1', title: 'Intro to Electricity & Circuits' },
+    { level: 'Level 1', unitCode: 'Unit 2', title: 'Sensors: Light (LDR) & Obstacle (IR)' },
+    { level: 'Level 2', unitCode: 'Unit 3', title: 'Actuators: Motors, Buzzers & Relays' },
+    { level: 'Level 3', unitCode: 'Unit 4', title: 'Microcontroller (Arduino) Programming Basics' },
+    { level: 'Level 4', unitCode: 'Unit 5', title: 'Smart Obstacle Avoiding Rover Build' },
+    { level: 'Level 5', unitCode: 'Unit 6', title: 'Capstone: Automated Smart Environment' }
   ];
 
   const levelReviewData = useMemo(() => {
-    const studentSpecificReviews = studentReviews.filter(r => r.student_id === student.student_id || r.student_id === cleanId);
+    const studentSpecificReviews = (studentReviews || []).filter(r => 
+      (r.student_id || '').trim().replace(/\s+/g, ' ') === cleanId || 
+      r.student_id === student.student_id
+    );
     
     return DEFAULT_UNITS.map(unit => {
       const match = studentSpecificReviews.find(r => r.unit_code === unit.unitCode || r.level === unit.level);
       if (match) {
         return {
+          hasReview: true,
           level: match.level || unit.level,
           unitCode: match.unit_code || unit.unitCode,
           title: match.unit_title || unit.title,
-          score: Number(match.score) || unit.defaultScore,
-          status: match.status || unit.defaultStatus,
+          score: Number(match.score) || 0,
+          status: match.status || 'Mastered',
           rating: Number(match.rating) || 5,
-          review: match.review || unit.defaultReview,
+          review: match.review || 'Demonstrated strong understanding of the module objectives.',
           instructor: match.trainer_name || 'Vikas Pandey (Lead Instructor)',
           verifiedDate: match.verified_date || 'Recent Lab Review'
         };
       }
       return {
+        hasReview: false,
         level: unit.level,
         unitCode: unit.unitCode,
         title: unit.title,
-        score: unit.defaultScore,
-        status: unit.defaultStatus,
-        rating: 5,
-        review: unit.defaultReview,
-        instructor: 'Vikas Pandey (Lead Instructor)',
-        verifiedDate: 'Curriculum Baseline'
+        score: null,
+        status: 'Pending Review',
+        rating: 0,
+        review: 'Unit evaluation pending. Trainer will evaluate competency upon completion of this unit.',
+        instructor: 'Vikas Pandey (Faculty)',
+        verifiedDate: 'Awaiting Evaluation'
       };
     });
   }, [studentReviews, student.student_id, cleanId]);
+
+  const reviewedLevelsList = useMemo(() => {
+    return levelReviewData.filter(l => l.hasReview && l.score !== null);
+  }, [levelReviewData]);
+
+  const avgReviewScore = useMemo(() => {
+    if (reviewedLevelsList.length === 0) return null;
+    const total = reviewedLevelsList.reduce((acc, curr) => acc + curr.score, 0);
+    return (total / reviewedLevelsList.length).toFixed(1);
+  }, [reviewedLevelsList]);
 
   // Custom Chart Tooltips
   const CustomAttendanceTooltip = ({ active, payload, label }) => {
@@ -267,11 +282,11 @@ export default function StudentPortal() {
                 </td>
                 <td class="metric-box">
                   <div class="m-label">Cumulative Score</div>
-                  <div class="m-val" style="color: #d97706;">9.5 / 10</div>
+                  <div class="m-val" style="color: #d97706;">${avgReviewScore ? `${avgReviewScore} / 10` : 'In Progress'}</div>
                 </td>
                 <td class="metric-box">
                   <div class="m-label">Practical Aptitude</div>
-                  <div class="m-val" style="color: #4f46e5; font-size: 14px; margin-top: 4px;">★★★★★ Grade A+</div>
+                  <div class="m-val" style="color: #4f46e5; font-size: 14px; margin-top: 4px;">${reviewedLevelsList.length > 0 ? '★★★★★ Grade A+' : 'Active Learner'}</div>
                 </td>
               </tr>
             </table>
@@ -295,7 +310,7 @@ export default function StudentPortal() {
                   <tr>
                     <td><b>${l.level}</b> <span style="font-size: 9px; color: #64748b;">(${l.unitCode})</span></td>
                     <td><b>${l.title}</b></td>
-                    <td style="text-align: center; font-weight: bold; color: #0066FF;">${l.score}/10</td>
+                    <td style="text-align: center; font-weight: bold; color: #0066FF;">${l.hasReview ? `${l.score}/10` : 'Pending'}</td>
                     <td style="text-align: center;">
                       <span class="status-pill ${l.status === 'Mastered' ? 'status-mastered' : l.status === 'In Progress' ? 'status-active' : 'status-upcoming'}">
                         ${l.status}
@@ -668,42 +683,54 @@ export default function StudentPortal() {
                     <h4 className="font-bold text-slate-800 text-xs sm:text-sm">🚀 Level Progression & Review Rating</h4>
                     <p className="text-[10px] sm:text-xs text-slate-500">Instructor evaluation score out of 10 for each level</p>
                   </div>
-                  <span className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
-                    9.5 / 10 Avg Review
+                  <span className={`px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold border shrink-0 ${
+                    avgReviewScore ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-600 border-slate-200'
+                  }`}>
+                    {avgReviewScore ? `${avgReviewScore} / 10 Avg Review` : 'Awaiting Reviews'}
                   </span>
                 </div>
 
-                <div className="h-44 sm:h-56 w-full -ml-2 sm:ml-0">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={levelReviewData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="scoreGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#10B981" stopOpacity={0.3}/>
-                          <stop offset="95%" stopColor="#10B981" stopOpacity={0.0}/>
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                      <XAxis dataKey="level" stroke="#94a3b8" fontSize={10} tickLine={false} tickFormatter={v => v.replace('Level ', 'L')} />
-                      <YAxis stroke="#94a3b8" fontSize={10} domain={[7, 10]} tickLine={false} tickFormatter={v => `${v}`} />
-                      <Tooltip content={<CustomReviewTooltip />} />
-                      <Area 
-                        type="monotone" 
-                        dataKey="score" 
-                        stroke="#10B981" 
-                        strokeWidth={2.5} 
-                        fillOpacity={1} 
-                        fill="url(#scoreGradient)" 
-                        dot={{ r: 3.5, fill: '#10B981', strokeWidth: 2, stroke: '#fff' }}
-                        activeDot={{ r: 5.5, fill: '#10B981' }}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
+                {reviewedLevelsList.length > 0 ? (
+                  <div className="h-44 sm:h-56 w-full -ml-2 sm:ml-0">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={reviewedLevelsList} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="scoreGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#10B981" stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor="#10B981" stopOpacity={0.0}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                        <XAxis dataKey="level" stroke="#94a3b8" fontSize={10} tickLine={false} tickFormatter={v => v.replace('Level ', 'L')} />
+                        <YAxis stroke="#94a3b8" fontSize={10} domain={[0, 10]} tickLine={false} tickFormatter={v => `${v}`} />
+                        <Tooltip content={<CustomReviewTooltip />} />
+                        <Area 
+                          type="monotone" 
+                          dataKey="score" 
+                          stroke="#10B981" 
+                          strokeWidth={2.5} 
+                          fillOpacity={1} 
+                          fill="url(#scoreGradient)" 
+                          dot={{ r: 3.5, fill: '#10B981', strokeWidth: 2, stroke: '#fff' }}
+                          activeDot={{ r: 5.5, fill: '#10B981' }}
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div className="h-44 sm:h-56 w-full flex flex-col items-center justify-center text-center p-4 bg-slate-50/70 rounded-xl border border-dashed border-slate-200">
+                    <Star size={26} className="text-amber-400/80 mb-2" />
+                    <p className="font-bold text-slate-700 text-xs sm:text-sm">End-of-Unit Reviews Pending</p>
+                    <p className="text-[11px] text-slate-500 max-w-xs mt-1">
+                      Your progression curve will appear here in real-time as your trainer logs your hands-on lab evaluations.
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-wrap justify-between items-center pt-3 border-t border-slate-100 text-[10px] sm:text-xs text-slate-500 mt-2 gap-1">
-                <span>Rating: <strong className="text-amber-500">★★★★★ Exceptional</strong></span>
-                <span>Stage: <strong className="text-slate-800">Level 1 Mastered</strong></span>
+                <span>Rating: <strong className={avgReviewScore ? 'text-amber-500' : 'text-slate-500'}>{avgReviewScore ? `★ ${avgReviewScore}/10 Verified` : 'Pending'}</strong></span>
+                <span>Stage: <strong className="text-slate-800">{reviewedLevelsList.length} of 6 Evaluated</strong></span>
               </div>
             </div>
           </div>
@@ -726,11 +753,9 @@ export default function StudentPortal() {
               <div 
                 key={l.level}
                 className={`p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border transition-all flex flex-col justify-between space-y-2.5 ${
-                  l.status === 'Mastered' 
-                    ? 'border-emerald-200 bg-emerald-50/20 hover:border-emerald-400' 
-                    : l.status === 'In Progress'
-                    ? 'border-blue-200 bg-blue-50/20 hover:border-blue-400'
-                    : 'border-slate-200 bg-slate-50/50 opacity-80'
+                  l.hasReview 
+                    ? (l.status === 'Mastered' ? 'border-emerald-200 bg-emerald-50/20 hover:border-emerald-400' : 'border-blue-200 bg-blue-50/20 hover:border-blue-400')
+                    : 'border-slate-200 bg-slate-50/60 opacity-80'
                 }`}
               >
                 <div>
@@ -745,21 +770,29 @@ export default function StudentPortal() {
                     </div>
 
                     <span className={`px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-bold ${
-                      l.status === 'Mastered' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
-                      l.status === 'In Progress' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
-                      'bg-slate-200 text-slate-600'
+                      l.hasReview
+                        ? (l.status === 'Mastered' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-blue-100 text-blue-800 border border-blue-200')
+                        : 'bg-slate-200 text-slate-600'
                     }`}>
                       {l.status}
                     </span>
                   </div>
 
                   <h4 className="font-bold text-slate-800 text-xs mb-1">{l.title}</h4>
-                  <div className="flex items-center gap-1 mb-2">
-                    {[...Array(l.rating)].map((_, i) => (
-                      <Star key={i} size={10} className="text-amber-400 fill-amber-400" />
-                    ))}
-                    <span className="text-[10px] sm:text-[11px] font-bold text-slate-700 ml-1">{l.score} / 10</span>
-                  </div>
+                  
+                  {l.hasReview ? (
+                    <div className="flex items-center gap-1 mb-2">
+                      {[...Array(l.rating)].map((_, i) => (
+                        <Star key={i} size={10} className="text-amber-400 fill-amber-400" />
+                      ))}
+                      <span className="text-[10px] sm:text-[11px] font-bold text-slate-700 ml-1">{l.score} / 10</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1 mb-2 text-[10px] text-slate-400">
+                      <span>☆☆☆☆☆</span>
+                      <span className="italic ml-1">Pending Evaluation</span>
+                    </div>
+                  )}
 
                   <p className="text-[11px] sm:text-xs text-slate-600 leading-relaxed bg-white p-2.5 sm:p-3 rounded-xl border border-slate-100">
                     💬 "{l.review}"
