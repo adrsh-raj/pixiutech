@@ -28,7 +28,13 @@ export default function StudentPortal() {
 
   const school = schools.find(s => s.id === student.school_id)?.name || 'Zenith Public School';
   const attendanceRate = getStudentAttendance(student.student_id);
-  const studentProjects = projects.filter(p => (p.student_id || '').trim().replace(/\s+/g, ' ') === cleanId || p.student_id === student.student_id);
+  const studentProjects = projects.filter(p => {
+    if (!p || !p.student_id) return false;
+    const pid = p.student_id.trim().toLowerCase().replace(/\s+/g, '');
+    const currentId = (student.student_id || '').trim().toLowerCase().replace(/\s+/g, '');
+    const cleanCurrent = (cleanId || '').trim().toLowerCase().replace(/\s+/g, '');
+    return pid === currentId || pid === cleanCurrent || p.student_id === student.student_id;
+  });
   
   // Extract grade from class_id (e.g. CLS-ZPS-6A -> '6', CLS-ZPS-11A -> '11')
   const studentGrade = student.class_id ? student.class_id.replace('CLS-ZPS-', '').replace('A', '') : '6';
@@ -993,24 +999,45 @@ export default function StudentPortal() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
             {studentProjects.map(proj => (
-              <div key={proj.id} className="border border-slate-200 rounded-xl sm:rounded-2xl p-4 sm:p-5 bg-slate-50 space-y-2">
-                <div className="flex justify-between items-start gap-2">
-                  <h4 className="font-bold text-slate-800 text-xs sm:text-sm">{proj.title}</h4>
-                  <span className="text-[10px] sm:text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 shrink-0">
-                    Score: {proj.score}/10
-                  </span>
+              <div key={proj.id} className="border border-slate-200 rounded-xl sm:rounded-2xl p-4 sm:p-5 bg-slate-50 hover:bg-white hover:border-emerald-300 transition-all flex flex-col justify-between space-y-3 shadow-xs">
+                <div className="space-y-2.5">
+                  <div className="flex justify-between items-start gap-2">
+                    <h4 className="font-bold text-slate-800 text-xs sm:text-sm">{proj.title}</h4>
+                    <span className="text-[10px] sm:text-xs font-bold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-md border border-emerald-200 shrink-0">
+                      Score: {proj.score}/10 ★
+                    </span>
+                  </div>
+
+                  {proj.image_url && (
+                    <div className="relative rounded-xl overflow-hidden border border-slate-200 bg-slate-900 group">
+                      <img 
+                        src={proj.image_url} 
+                        alt={proj.title} 
+                        className="w-full h-44 sm:h-52 object-cover object-center group-hover:scale-105 transition-transform duration-300" 
+                      />
+                      <div className="absolute top-2 left-2 px-2 py-0.5 bg-slate-900/80 backdrop-blur-xs text-white rounded-md text-[9px] font-bold uppercase tracking-wider flex items-center gap-1">
+                        <span>📸 Verified Build Photo</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <p className="text-[11px] sm:text-xs text-slate-600 leading-relaxed bg-white/80 p-2.5 rounded-lg border border-slate-200/60">
+                    {proj.evidence_note || 'Verified hands-on hardware build completed in robotics lab.'}
+                  </p>
                 </div>
-                <p className="text-[11px] sm:text-xs text-slate-500">{proj.evidence_note || 'Completed in lab session'}</p>
-                <div className="flex justify-between items-center text-[10px] text-slate-400 pt-2 border-t border-slate-200/60">
-                  <span>Status: <strong className="text-slate-700">{proj.status}</strong></span>
-                  <span>Date: {proj.date_completed || 'Recent'}</span>
+
+                <div className="flex justify-between items-center text-[10px] text-slate-400 pt-2.5 border-t border-slate-200/60 font-mono">
+                  <span className="flex items-center gap-1 text-slate-600 font-bold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> {proj.status || 'Completed'}
+                  </span>
+                  <span>{proj.date_completed || 'Recent Lab'}</span>
                 </div>
               </div>
             ))}
 
             {studentProjects.length === 0 && (
-              <div className="col-span-2 p-6 sm:p-8 text-center text-slate-400 text-xs">
-                No individual projects submitted yet. Upcoming capstone rovers will be logged here!
+              <div className="col-span-2 p-6 sm:p-8 text-center text-slate-400 text-xs bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                No individual projects submitted yet. Upcoming capstone rovers and certified builds will be logged here!
               </div>
             )}
           </div>

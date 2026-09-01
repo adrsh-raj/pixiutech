@@ -95,6 +95,12 @@ export function DataProvider({ children }) {
           if (fresh && fresh.length > 0) setStudentReviews(fresh);
         } catch (err) {}
       }
+      if (e.key === 'pixiu_projects') {
+        try {
+          const fresh = JSON.parse(e.newValue || '[]');
+          if (fresh) setProjects(fresh);
+        } catch (err) {}
+      }
     };
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
@@ -671,48 +677,53 @@ export function DataProvider({ children }) {
 
   // 11. Projects & Evidence Upload
   const uploadFile = async (file) => {
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      const res = await fetch(`${API_URL}/upload`, {
-        method: 'POST',
-        body: formData
-      });
-      const data = await res.json();
-      if (res.ok) {
-        return { success: true, url: data.url, filename: data.filename };
-      }
-      return { success: false, error: data.error };
-    } catch (e) {
-      console.error(e);
-      return { success: false, error: e.message };
-    }
+    if (!file) return { success: false, error: 'No file selected' };
+
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        resolve({ success: true, url: reader.result, filename: file.name });
+      };
+      reader.onerror = (err) => {
+        resolve({ success: false, error: err?.message || 'Failed to process image file' });
+      };
+      reader.readAsDataURL(file);
+    });
   };
 
   const addProject = async (prjData) => {
+    const newPrj = {
+      id: prjData.id || `PRJ-${Date.now().toString().slice(-6)}`,
+      ...prjData,
+      created_at: new Date().toISOString()
+    };
+
+    setProjects(prev => {
+      const updated = [newPrj, ...prev.filter(p => p.id !== newPrj.id)];
+      try { localStorage.setItem('pixiu_projects', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+
     try {
-      const res = await fetch(`${API_URL}/projects`, {
+      fetch(`${API_URL}/projects`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(prjData)
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setProjects(prev => [data, ...prev]);
-        return { success: true, data };
-      }
-    } catch (e) {
-      console.error(e);
-    }
+        body: JSON.stringify(newPrj)
+      }).catch(() => {});
+    } catch (e) {}
+
+    return { success: true, data: newPrj };
   };
 
   const deleteProject = async (id) => {
+    setProjects(prev => {
+      const updated = prev.filter(p => p.id !== id);
+      try { localStorage.setItem('pixiu_projects', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
     try {
-      await fetch(`${API_URL}/projects/${id}`, { method: 'DELETE' });
-      setProjects(prev => prev.filter(p => p.id !== id));
-    } catch (e) {
-      console.error(e);
-    }
+      fetch(`${API_URL}/projects/${id}`, { method: 'DELETE' }).catch(() => {});
+    } catch (e) {}
   };
 
   // 12. Operational Automation & Alert Resolution

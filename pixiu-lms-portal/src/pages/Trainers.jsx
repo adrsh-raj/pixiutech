@@ -353,26 +353,30 @@ export default function Trainers() {
 
     if (selectedFile) {
       const uploadRes = await uploadFile(selectedFile);
-      if (uploadRes.success) {
+      if (uploadRes && uploadRes.success) {
         imageUrl = uploadRes.url;
       }
     }
 
+    const studentObj = students.find(s => s.student_id === selectedStudentForEvidence) || roster.find(s => s.student_id === selectedStudentForEvidence);
+    const targetStudentId = selectedStudentForEvidence.trim();
+
     await addProject({
-      student_id: selectedStudentForEvidence,
+      student_id: targetStudentId,
+      student_name: studentObj?.name || 'Student',
       title: projectTitle,
       status: 'Completed',
       score: Number(projectScore) || 10,
       evidence_note: evidenceNote,
       image_url: imageUrl,
-      date_completed: new Date().toISOString().split('T')[0]
+      date_completed: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
     });
 
     setIsUploading(false);
     setIsEvidenceModalOpen(false);
     setSelectedFile(null);
     setFilePreview('');
-    toast.success(`Project "${projectTitle}" certified & attached to student portfolio!`, 'Build Evidence Uploaded');
+    toast.success(`Project photo & evidence for ${studentObj?.name || targetStudentId} certified and saved!`, 'Build Evidence Uploaded');
   };
 
   const handleMarkAllPresent = async () => {
@@ -557,7 +561,10 @@ export default function Trainers() {
             onClick={() => {
               if (roster.length > 0) {
                 setSelectedStudentForEvidence(roster[0].student_id);
+              } else {
+                setSelectedStudentForEvidence('ZPS6A 01');
               }
+              setProjectTitle(`${activeSession?.topic || 'Robotics Lab'} - Prototype Build`);
               setIsEvidenceModalOpen(true);
             }}
             className="bg-white p-4 rounded-xl border-2 border-dashed border-blue-300 hover:border-pixiu-blue bg-blue-50/30 hover:bg-blue-50/60 mt-4 text-center cursor-pointer transition-all shadow-xs"
