@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
+import { useToast } from '../context/ToastContext';
 import { 
   Award, BookOpen, Activity, FileText, Download, CheckCircle, 
   Clock, LogOut, User, Box, PlaySquare, Eye, Sparkles, Megaphone, 
-  Bell, Check, X, TrendingUp, Star, ShieldCheck, CheckCircle2, ChevronRight, Send 
+  Bell, Check, X, TrendingUp, Star, ShieldCheck, CheckCircle2, ChevronRight, Send, Trash2 
 } from 'lucide-react';
 import { 
   AreaChart, Area, LineChart, Line, XAxis, YAxis, 
@@ -13,7 +14,8 @@ import {
 
 export default function StudentPortal() {
   const { user, logout } = useAuth();
-  const { students, schools, content, projects, getStudentAttendance, notifications, curriculum, studentReviews = [] } = useData();
+  const toast = useToast();
+  const { students, schools, content, projects, deleteProject, getStudentAttendance, notifications, curriculum, studentReviews = [] } = useData();
 
   // Find logged in student object
   const cleanId = (user?.username || user?.related_id || '').trim().replace(/\s+/g, ' ');
@@ -1030,7 +1032,21 @@ export default function StudentPortal() {
                   <span className="flex items-center gap-1 text-slate-600 font-bold">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> {proj.status || 'Completed'}
                   </span>
-                  <span>{proj.date_completed || 'Recent Lab'}</span>
+                  <div className="flex items-center gap-2">
+                    <span>{proj.date_completed || 'Recent Lab'}</span>
+                    <button
+                      onClick={() => {
+                        if (window.confirm(`Delete project submission "${proj.title}"?`)) {
+                          deleteProject(proj.id);
+                          toast.success('Project submission removed.', 'Deleted');
+                        }
+                      }}
+                      className="text-slate-400 hover:text-rose-600 p-1 rounded-md hover:bg-rose-50 cursor-pointer transition-colors"
+                      title="Delete Project Submission"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

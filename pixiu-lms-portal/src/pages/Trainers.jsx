@@ -560,6 +560,62 @@ export default function Trainers() {
             );
           })}
 
+          {/* Active Class Uploaded Build Photos with Delete */}
+          {(() => {
+            const classStudentIds = roster.map(s => s.student_id);
+            const classProjects = (projects || []).filter(p => classStudentIds.includes(p.student_id));
+            if (classProjects.length === 0) return null;
+
+            return (
+              <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs space-y-2 mt-4">
+                <div className="flex justify-between items-center">
+                  <p className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                    <Camera size={13} className="text-pixiu-blue"/> Certified Builds ({classProjects.length})
+                  </p>
+                  <span className="text-[10px] text-slate-400 font-medium">Uploaded to Profiles</span>
+                </div>
+
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {classProjects.map(proj => {
+                    const studentObj = students.find(s => s.student_id === proj.student_id);
+                    return (
+                      <div key={proj.id} className="p-2.5 rounded-lg bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-2.5">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          {proj.image_url ? (
+                            <img src={proj.image_url} alt="Build" className="w-10 h-10 rounded-md object-cover border border-slate-300 shrink-0" />
+                          ) : (
+                            <div className="w-10 h-10 rounded-md bg-blue-50 text-pixiu-blue flex items-center justify-center font-bold text-xs shrink-0">
+                              <Box size={16}/>
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <p className="font-bold text-slate-800 text-xs truncate">{proj.title}</p>
+                            <p className="text-[10px] text-slate-500 font-mono truncate">
+                              {studentObj?.name || proj.student_id} • Score: {proj.score}/10 ★
+                            </p>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => {
+                            if (window.confirm(`Delete photo build for ${studentObj?.name || proj.student_id}?`)) {
+                              deleteProject(proj.id);
+                              toast.success('Build photo deleted from student profile.', 'Deleted');
+                            }
+                          }}
+                          className="text-slate-400 hover:text-rose-600 p-1.5 rounded-md hover:bg-rose-50 cursor-pointer transition-colors shrink-0"
+                          title="Delete Uploaded Build Photo"
+                        >
+                          <Trash2 size={14}/>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Project Build Evidence Upload Button */}
           <div 
             onClick={() => {
