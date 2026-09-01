@@ -59,7 +59,9 @@ export default function Trainers() {
     class_id: 'CLS-ZPS-6A',
     class_grade: '6',
     unit_code: 'Unit 2',
-    topic: 'Unit 2: The Arduino IDE',
+    class_number: 'Class 1 of 2',
+    topic: 'Unit 2 (Class 1/2): The Arduino IDE - Setup & Syntax',
+    notes: 'Arduino IDE installation, COM port selection, and test blink sketch.',
     date: new Date().toISOString().split('T')[0],
     time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
   });
@@ -277,10 +279,12 @@ export default function Trainers() {
       school_id: 'ZPS',
       class_id: newSessionModalData.class_id,
       trainer_id: user?.id || 'TR-01',
+      unit_code: newSessionModalData.unit_code,
+      class_number: newSessionModalData.class_number,
       date: newSessionModalData.date,
       time: newSessionModalData.time,
       topic: newSessionModalData.topic,
-      notes: 'Live Interactive Session'
+      notes: newSessionModalData.notes || 'Hands-on robotics laboratory session'
     });
     setIsNewSessionModalOpen(false);
     setActiveSessionId(createdSession.id);
@@ -290,16 +294,16 @@ export default function Trainers() {
   const handleOpenStartSessionModal = (targetClassId = 'CLS-ZPS-6A') => {
     const grade = targetClassId.replace('CLS-ZPS-', '').replace('A', '');
     const gradeUnits = GRADE_UNITS_CONFIG[grade] || GRADE_UNITS_CONFIG['6'];
-    const classSessionsCount = sessions.filter(s => s.class_id === targetClassId).length;
-    const nextUnitIndex = Math.min(classSessionsCount, gradeUnits.length - 1);
-    const nextUnit = gradeUnits[nextUnitIndex];
+    const nextUnit = gradeUnits[1] || gradeUnits[0];
 
     setNewSessionModalData({
       school_id: 'ZPS',
       class_id: targetClassId,
       class_grade: grade,
       unit_code: nextUnit.unitCode,
-      topic: `${nextUnit.unitCode}: ${nextUnit.title}`,
+      class_number: 'Class 1 of 2',
+      topic: `${nextUnit.unitCode} (Class 1/2): ${nextUnit.title} - Setup & Hardware Testing`,
+      notes: `Hands-on robotics laboratory session for ${nextUnit.title}.`,
       date: new Date().toISOString().split('T')[0],
       time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
     });
@@ -971,26 +975,44 @@ export default function Trainers() {
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="p-4 border-b border-slate-200 bg-slate-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
             <div>
-              <h3 className="font-bold text-slate-800 text-sm">Past Classroom Sessions & Attendance Logs</h3>
-              <p className="text-xs text-slate-500">Immutable date-wise attendance records across all grades</p>
+              <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                <History size={16} className="text-pixiu-blue"/> Past Classroom Sessions & Date-wise Attendance Logs
+              </h3>
+              <p className="text-xs text-slate-500">Official syllabus lab classes & attendance records across all grades</p>
             </div>
 
-            {/* Class Grade Filter */}
-            <div className="flex items-center gap-1.5 overflow-x-auto">
-              <span className="text-xs font-bold text-slate-400 uppercase mr-1 shrink-0">Filter Grade:</span>
-              {['All', '6A', '7A', '8A', '9A', '11A'].map(grade => (
-                <button
-                  key={grade}
-                  onClick={() => setHistoryClassFilter(grade)}
-                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                    historyClassFilter === grade 
-                      ? 'bg-pixiu-blue text-white shadow-xs' 
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  {grade === 'All' ? 'All Grades' : `Class ${grade}`}
-                </button>
-              ))}
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Class Grade Filter */}
+              <div className="flex items-center gap-1 overflow-x-auto">
+                <span className="text-xs font-bold text-slate-400 uppercase mr-1 shrink-0">Filter Grade:</span>
+                {[
+                  { grade: 'All', label: `All (${sessions.length})` },
+                  { grade: '6A', label: `6A (${sessions.filter(s => s.class_id === 'CLS-ZPS-6A').length})` },
+                  { grade: '7A', label: `7A (${sessions.filter(s => s.class_id === 'CLS-ZPS-7A').length})` },
+                  { grade: '8A', label: `8A (${sessions.filter(s => s.class_id === 'CLS-ZPS-8A').length})` },
+                  { grade: '9A', label: `9A (${sessions.filter(s => s.class_id === 'CLS-ZPS-9A').length})` },
+                  { grade: '11A', label: `11A (${sessions.filter(s => s.class_id === 'CLS-ZPS-11A').length})` }
+                ].map(item => (
+                  <button
+                    key={item.grade}
+                    onClick={() => setHistoryClassFilter(item.grade)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                      historyClassFilter === item.grade 
+                        ? 'bg-pixiu-blue text-white shadow-xs' 
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                onClick={() => handleOpenStartSessionModal('CLS-ZPS-6A')}
+                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs"
+              >
+                <Plus size={13}/> Start Next Session
+              </button>
             </div>
           </div>
 
@@ -1005,36 +1027,43 @@ export default function Trainers() {
                 const sessionAtt = attendance.filter(a => a.session_id === ses.id);
                 const presentCount = sessionAtt.filter(a => a.status === 'Present').length;
                 const totalCount = sessionAtt.length || 5;
+                const isUnlocked = ses.is_locked === 0;
 
                 return (
-                  <div key={ses.id} className="p-5 hover:bg-slate-50 transition-colors flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                    <div className="space-y-1">
+                  <div key={ses.id} className="p-4 sm:p-5 hover:bg-slate-50 transition-colors flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div className="space-y-1.5 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-mono text-xs font-bold bg-blue-50 text-pixiu-blue px-2.5 py-0.5 rounded-md flex items-center gap-1">
+                        <span className="font-mono text-xs font-bold bg-blue-50 text-pixiu-blue px-2.5 py-0.5 rounded-md flex items-center gap-1 border border-blue-100">
                           <Calendar size={12} /> {ses.date} • {ses.time}
                         </span>
-                        <span className="font-bold text-slate-800 text-sm">
+                        <span className="font-bold text-slate-900 text-xs px-2 py-0.5 bg-slate-100 rounded-md border border-slate-200">
                           {ses.class_id.replace('CLS-ZPS-', 'Class ')}
                         </span>
-                        <span className="text-[11px] font-bold text-slate-600 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full flex items-center gap-1">
-                          <Lock size={10} /> Recorded
-                        </span>
+                        {isUnlocked ? (
+                          <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-full flex items-center gap-1 animate-pulse">
+                            <Play size={10} fill="currentColor" /> Live & Unlocked
+                          </span>
+                        ) : (
+                          <span className="text-[11px] font-bold text-slate-600 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <Lock size={10} /> Recorded & Locked
+                          </span>
+                        )}
                       </div>
-                      <p className="text-xs font-semibold text-slate-700">{ses.topic}</p>
-                      {ses.notes && <p className="text-xs text-slate-400">{ses.notes}</p>}
+                      <p className="text-xs sm:text-sm font-bold text-slate-800">{ses.topic}</p>
+                      {ses.notes && <p className="text-xs text-slate-500">{ses.notes}</p>}
                     </div>
 
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3 sm:gap-4 shrink-0">
                       <div className="text-right">
                         <p className="text-[10px] font-bold text-slate-400 uppercase">Attendance Recorded</p>
-                        <p className="text-sm font-bold text-emerald-600">{presentCount} / {totalCount} Students Present</p>
+                        <p className="text-xs sm:text-sm font-bold text-emerald-600">{presentCount} / {totalCount} Students Present</p>
                       </div>
 
                       <button
                         onClick={() => setActiveSessionId(ses.id)}
-                        className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-2 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                        className="bg-slate-900 hover:bg-pixiu-blue text-white text-xs font-bold px-3 py-2 rounded-lg transition-colors cursor-pointer flex items-center gap-1 shadow-xs"
                       >
-                        View Record <ChevronRight size={14}/>
+                        {isUnlocked ? 'Take Attendance' : 'View Record'} <ChevronRight size={14}/>
                       </button>
                     </div>
                   </div>
@@ -1584,46 +1613,76 @@ export default function Trainers() {
             </div>
 
             <form onSubmit={handleLaunchNewSession} className="p-6 space-y-4 text-xs">
-              <div>
-                <label className="block font-bold text-slate-600 uppercase mb-1">Target Class</label>
-                <select
-                  value={newSessionModalData.class_id}
-                  onChange={(e) => {
-                    const classId = e.target.value;
-                    const grade = classId.replace('CLS-ZPS-', '').replace('A', '');
-                    const gradeUnits = GRADE_UNITS_CONFIG[grade] || GRADE_UNITS_CONFIG['6'];
-                    const currentCount = sessions.filter(s => s.class_id === classId).length;
-                    const nextUnit = gradeUnits[Math.min(currentCount, gradeUnits.length - 1)];
-                    setNewSessionModalData({
-                      ...newSessionModalData,
-                      class_id: classId,
-                      class_grade: grade,
-                      unit_code: nextUnit.unitCode,
-                      topic: `${nextUnit.unitCode}: ${nextUnit.title}`
-                    });
-                  }}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold bg-white text-slate-800"
-                >
-                  <option value="CLS-ZPS-6A">Class 6A (Zenith Public School)</option>
-                  <option value="CLS-ZPS-7A">Class 7A (Zenith Public School)</option>
-                  <option value="CLS-ZPS-8A">Class 8A (Zenith Public School)</option>
-                  <option value="CLS-ZPS-9A">Class 9A (Zenith Public School)</option>
-                  <option value="CLS-ZPS-11A">Class 11A (Zenith Public School)</option>
-                </select>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-600 uppercase mb-1">Target Class</label>
+                  <select
+                    value={newSessionModalData.class_id}
+                    onChange={(e) => {
+                      const classId = e.target.value;
+                      const grade = classId.replace('CLS-ZPS-', '').replace('A', '');
+                      const gradeUnits = GRADE_UNITS_CONFIG[grade] || GRADE_UNITS_CONFIG['6'];
+                      const nextUnit = gradeUnits[1] || gradeUnits[0];
+                      setNewSessionModalData({
+                        ...newSessionModalData,
+                        class_id: classId,
+                        class_grade: grade,
+                        unit_code: nextUnit.unitCode,
+                        class_number: 'Class 1 of 2',
+                        topic: `${nextUnit.unitCode} (Class 1/2): ${nextUnit.title} - Setup & Testing`,
+                        notes: `Hands-on robotics lab session for ${nextUnit.title}.`
+                      });
+                    }}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold bg-white text-slate-800"
+                  >
+                    <option value="CLS-ZPS-6A">Class 6A (Zenith Public School)</option>
+                    <option value="CLS-ZPS-7A">Class 7A (Zenith Public School)</option>
+                    <option value="CLS-ZPS-8A">Class 8A (Zenith Public School)</option>
+                    <option value="CLS-ZPS-9A">Class 9A (Zenith Public School)</option>
+                    <option value="CLS-ZPS-11A">Class 11A (Zenith Public School)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-600 uppercase mb-1">Class / Session in Unit</label>
+                  <select
+                    value={newSessionModalData.class_number}
+                    onChange={(e) => {
+                      const classNum = e.target.value;
+                      const gradeUnits = GRADE_UNITS_CONFIG[newSessionModalData.class_grade] || GRADE_UNITS_CONFIG['6'];
+                      const selectedUnit = gradeUnits.find(u => u.unitCode === newSessionModalData.unit_code) || gradeUnits[0];
+                      const shortClass = classNum.replace(' of ', '/');
+                      setNewSessionModalData({
+                        ...newSessionModalData,
+                        class_number: classNum,
+                        topic: `${selectedUnit.unitCode} (${shortClass}): ${selectedUnit.title}`
+                      });
+                    }}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold bg-white text-slate-800"
+                  >
+                    <option value="Class 1 of 2">Class 1 of 2 (Day 1 - Intro & Setup)</option>
+                    <option value="Class 2 of 2">Class 2 of 2 (Day 2 - Build & Testing)</option>
+                    <option value="Class 1 of 3">Class 1 of 3 (Day 1 - Theory & Schematics)</option>
+                    <option value="Class 2 of 3">Class 2 of 3 (Day 2 - Hardware Assembly)</option>
+                    <option value="Class 3 of 3">Class 3 of 3 (Day 3 - Code & Project Demo)</option>
+                  </select>
+                </div>
               </div>
 
               <div>
-                <label className="block font-bold text-slate-600 uppercase mb-1">Curriculum Unit & Lesson Topic</label>
+                <label className="block font-bold text-slate-600 uppercase mb-1">Curriculum Unit</label>
                 <select
                   value={newSessionModalData.unit_code}
                   onChange={(e) => {
                     const unitCode = e.target.value;
                     const gradeUnits = GRADE_UNITS_CONFIG[newSessionModalData.class_grade] || GRADE_UNITS_CONFIG['6'];
                     const selectedUnit = gradeUnits.find(u => u.unitCode === unitCode) || gradeUnits[0];
+                    const shortClass = (newSessionModalData.class_number || 'Class 1 of 2').replace(' of ', '/');
                     setNewSessionModalData({
                       ...newSessionModalData,
                       unit_code: selectedUnit.unitCode,
-                      topic: `${selectedUnit.unitCode}: ${selectedUnit.title}`
+                      topic: `${selectedUnit.unitCode} (${shortClass}): ${selectedUnit.title}`,
+                      notes: `Hands-on robotics lab session for ${selectedUnit.title}.`
                     });
                   }}
                   className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold bg-white text-slate-800"
@@ -1636,9 +1695,21 @@ export default function Trainers() {
                 </select>
               </div>
 
+              <div>
+                <label className="block font-bold text-slate-600 uppercase mb-1">Specific Lesson Topic & Focus *</label>
+                <input
+                  type="text"
+                  value={newSessionModalData.topic}
+                  onChange={(e) => setNewSessionModalData({ ...newSessionModalData, topic: e.target.value })}
+                  required
+                  placeholder="e.g. Unit 2 (Class 1/2): The Arduino IDE - Setup & Syntax"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold bg-white text-slate-800 focus:outline-none focus:border-pixiu-blue"
+                />
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-600 uppercase mb-1">Session Date</label>
+                  <label className="block font-bold text-slate-600 uppercase mb-1">Session Date *</label>
                   <input
                     type="date"
                     value={newSessionModalData.date}
@@ -1657,6 +1728,17 @@ export default function Trainers() {
                     placeholder="10:00 AM"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-600 uppercase mb-1">Lab / Hardware Prep Notes</label>
+                <input
+                  type="text"
+                  value={newSessionModalData.notes}
+                  onChange={(e) => setNewSessionModalData({ ...newSessionModalData, notes: e.target.value })}
+                  placeholder="e.g. Bring USB-A cables, Arduino Uno boards, and sensors."
+                  className="w-full px-3 py-2 border border-slate-300 rounded-xl font-medium bg-white text-slate-800 focus:outline-none focus:border-pixiu-blue"
+                />
               </div>
 
               <div className="flex justify-end gap-3 pt-3 border-t border-slate-200">

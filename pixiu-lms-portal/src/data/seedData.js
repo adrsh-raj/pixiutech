@@ -64,48 +64,87 @@ export const SEED_TRAINERS = [
 ];
 
 export const SEED_SESSIONS = [
-  { id: 'SES-601', school_id: 'ZPS', class_id: 'CLS-ZPS-6A', trainer_id: 'TR-01', date: '2026-08-28', time: '09:00 AM - 10:30 AM', topic: 'Unit 1: Introduction to Robotics & Electronics', is_locked: 1, notes: 'Introductory lab session on breadboard wiring and series circuits.' },
-  { id: 'SES-701', school_id: 'ZPS', class_id: 'CLS-ZPS-7A', trainer_id: 'TR-01', date: '2026-08-28', time: '10:45 AM - 12:15 PM', topic: 'Unit 1: Introduction to Analog & Digital Electronics', is_locked: 1, notes: 'Logic levels, voltage dividers, and potentiometer calibration.' },
-  { id: 'SES-801', school_id: 'ZPS', class_id: 'CLS-ZPS-8A', trainer_id: 'TR-01', date: '2026-08-29', time: '09:00 AM - 10:30 AM', topic: 'Unit 1: Introduction to Distance Measurement & Waves', is_locked: 1, notes: 'Sound wave reflection and ultrasonic pulse timing foundations.' },
-  { id: 'SES-901', school_id: 'ZPS', class_id: 'CLS-ZPS-9A', trainer_id: 'TR-01', date: '2026-08-29', time: '10:45 AM - 12:15 PM', topic: 'Unit 1: Introduction to Industrial Sensors & Displays', is_locked: 1, notes: 'Flame phototransistors, 16x2 LCD bus, and sensor reliability.' },
-  { id: 'SES-1101', school_id: 'ZPS', class_id: 'CLS-ZPS-11A', trainer_id: 'TR-01', date: '2026-08-29', time: '01:00 PM - 02:30 PM', topic: 'Unit 1: Introduction to Engineering Specs & Optics', is_locked: 1, notes: 'Laser optical collimation, spec definitions, and error characterization.' }
+  // Class 6A - Unit 1 (2 Completed Classes)
+  { id: 'SES-601', school_id: 'ZPS', class_id: 'CLS-ZPS-6A', trainer_id: 'TR-01', date: '2026-08-25', time: '09:00 AM - 10:30 AM', unit_code: 'Unit 1', level: 'Level 0', session_no: 1, total_sessions: 2, topic: 'Unit 1 (Class 1/2): Introduction to Robotics & Electronics - Breadboard & Components', is_locked: 1, notes: 'Hands-on breadboard anatomy, resistor color coding, and power rail connections.' },
+  { id: 'SES-602', school_id: 'ZPS', class_id: 'CLS-ZPS-6A', trainer_id: 'TR-01', date: '2026-08-28', time: '09:00 AM - 10:30 AM', unit_code: 'Unit 1', level: 'Level 0', session_no: 2, total_sessions: 2, topic: 'Unit 1 (Class 2/2): Introduction to Robotics & Electronics - Series Circuits & LED Wiring', is_locked: 1, notes: 'Built closed-loop series circuits with LEDs, tactile push buttons, and 9V power supplies.' },
+
+  // Class 7A - Unit 1 (2 Completed Classes)
+  { id: 'SES-701', school_id: 'ZPS', class_id: 'CLS-ZPS-7A', trainer_id: 'TR-01', date: '2026-08-25', time: '10:45 AM - 12:15 PM', unit_code: 'Unit 1', level: 'Level 0', session_no: 1, total_sessions: 2, topic: 'Unit 1 (Class 1/2): Introduction to Analog & Digital Electronics - Logic Levels & Voltage Dividers', is_locked: 1, notes: 'Explored digital HIGH/LOW states, analog voltage dividers, and potentiometer calibration.' },
+  { id: 'SES-702', school_id: 'ZPS', class_id: 'CLS-ZPS-7A', trainer_id: 'TR-01', date: '2026-08-28', time: '10:45 AM - 12:15 PM', unit_code: 'Unit 1', level: 'Level 0', session_no: 2, total_sessions: 2, topic: 'Unit 1 (Class 2/2): Introduction to Analog & Digital Electronics - Sensor Voltage Measurements', is_locked: 1, notes: 'Calibrated analog LDRs and measured multi-meter voltage drops across breadboard circuits.' },
+
+  // Class 8A - Unit 1 (2 Completed Classes)
+  { id: 'SES-801', school_id: 'ZPS', class_id: 'CLS-ZPS-8A', trainer_id: 'TR-01', date: '2026-08-26', time: '09:00 AM - 10:30 AM', unit_code: 'Unit 1', level: 'Level 0', session_no: 1, total_sessions: 2, topic: 'Unit 1 (Class 1/2): Introduction to Waves & Distance Measurement - Sound Reflection Principles', is_locked: 1, notes: 'Studied ultrasonic wave propagation, speed of sound in air, and obstacle echo timing.' },
+  { id: 'SES-802', school_id: 'ZPS', class_id: 'CLS-ZPS-8A', trainer_id: 'TR-01', date: '2026-08-29', time: '09:00 AM - 10:30 AM', unit_code: 'Unit 1', level: 'Level 0', session_no: 2, total_sessions: 2, topic: 'Unit 1 (Class 2/2): Introduction to Waves & Distance Measurement - Ultrasonic Pulse & Timing Setup', is_locked: 1, notes: 'Trigger and Echo pulse wiring on breadboard with HC-SR04 ultrasonic transducer.' },
+
+  // Class 9A - Unit 1 (2 Completed Classes)
+  { id: 'SES-901', school_id: 'ZPS', class_id: 'CLS-ZPS-9A', trainer_id: 'TR-01', date: '2026-08-26', time: '10:45 AM - 12:15 PM', unit_code: 'Unit 1', level: 'Level 0', session_no: 1, total_sessions: 2, topic: 'Unit 1 (Class 1/2): Introduction to Industrial Sensors & Displays - Flame Phototransistors & Thresholds', is_locked: 1, notes: 'Explored infrared flame spectral detection, comparator thresholds, and sensitivity tuning.' },
+  { id: 'SES-902', school_id: 'ZPS', class_id: 'CLS-ZPS-9A', trainer_id: 'TR-01', date: '2026-08-29', time: '10:45 AM - 12:15 PM', unit_code: 'Unit 1', level: 'Level 0', session_no: 2, total_sessions: 2, topic: 'Unit 1 (Class 2/2): Introduction to Industrial Sensors & Displays - 16x2 LCD Parallel Bus Wiring', is_locked: 1, notes: 'Connected HD44780 16x2 LCD 4-bit data bus and potentiometer contrast circuitry.' },
+
+  // Class 11A - Unit 1 (2 Completed Classes)
+  { id: 'SES-1101', school_id: 'ZPS', class_id: 'CLS-ZPS-11A', trainer_id: 'TR-01', date: '2026-08-26', time: '01:00 PM - 02:30 PM', unit_code: 'Unit 1', level: 'Level 0', session_no: 1, total_sessions: 2, topic: 'Unit 1 (Class 1/2): Introduction to Engineering Specs & Optics - Optical Collimation & Lasers', is_locked: 1, notes: 'Focused semiconductor laser diode collimation, beam convergence, and alignment optics.' },
+  { id: 'SES-1102', school_id: 'ZPS', class_id: 'CLS-ZPS-11A', trainer_id: 'TR-01', date: '2026-08-29', time: '01:00 PM - 02:30 PM', unit_code: 'Unit 1', level: 'Level 0', session_no: 2, total_sessions: 2, topic: 'Unit 1 (Class 2/2): Introduction to Engineering Specs & Optics - Sensor Specs & Error Characterization', is_locked: 1, notes: 'Measured optical trip response time and documented engineering specification tolerances.' }
 ];
 
 export const SEED_ATTENDANCE = [
-  // Class 6A Session 1 (All Present)
+  // Class 6A (Session 1 & Session 2)
   { session_id: 'SES-601', student_id: 'ZPS6A 01', status: 'Present' },
   { session_id: 'SES-601', student_id: 'ZPS6A 02', status: 'Present' },
   { session_id: 'SES-601', student_id: 'ZPS6A 03', status: 'Present' },
   { session_id: 'SES-601', student_id: 'ZPS6A 04', status: 'Present' },
   { session_id: 'SES-601', student_id: 'ZPS6A 05', status: 'Present' },
+  { session_id: 'SES-602', student_id: 'ZPS6A 01', status: 'Present' },
+  { session_id: 'SES-602', student_id: 'ZPS6A 02', status: 'Present' },
+  { session_id: 'SES-602', student_id: 'ZPS6A 03', status: 'Present' },
+  { session_id: 'SES-602', student_id: 'ZPS6A 04', status: 'Present' },
+  { session_id: 'SES-602', student_id: 'ZPS6A 05', status: 'Present' },
 
-  // Class 7A Session 1
+  // Class 7A (Session 1 & Session 2)
   { session_id: 'SES-701', student_id: 'ZPS7A 01', status: 'Present' },
   { session_id: 'SES-701', student_id: 'ZPS7A 02', status: 'Present' },
   { session_id: 'SES-701', student_id: 'ZPS7A 03', status: 'Present' },
   { session_id: 'SES-701', student_id: 'ZPS7A 04', status: 'Present' },
   { session_id: 'SES-701', student_id: 'ZPS7A 05', status: 'Present' },
+  { session_id: 'SES-702', student_id: 'ZPS7A 01', status: 'Present' },
+  { session_id: 'SES-702', student_id: 'ZPS7A 02', status: 'Present' },
+  { session_id: 'SES-702', student_id: 'ZPS7A 03', status: 'Present' },
+  { session_id: 'SES-702', student_id: 'ZPS7A 04', status: 'Present' },
+  { session_id: 'SES-702', student_id: 'ZPS7A 05', status: 'Present' },
 
-  // Class 8A Session 1
+  // Class 8A (Session 1 & Session 2)
   { session_id: 'SES-801', student_id: 'ZPS8A 01', status: 'Present' },
   { session_id: 'SES-801', student_id: 'ZPS8A 02', status: 'Present' },
   { session_id: 'SES-801', student_id: 'ZPS8A 03', status: 'Present' },
   { session_id: 'SES-801', student_id: 'ZPS8A 04', status: 'Present' },
   { session_id: 'SES-801', student_id: 'ZPS8A 05', status: 'Present' },
+  { session_id: 'SES-802', student_id: 'ZPS8A 01', status: 'Present' },
+  { session_id: 'SES-802', student_id: 'ZPS8A 02', status: 'Present' },
+  { session_id: 'SES-802', student_id: 'ZPS8A 03', status: 'Present' },
+  { session_id: 'SES-802', student_id: 'ZPS8A 04', status: 'Present' },
+  { session_id: 'SES-802', student_id: 'ZPS8A 05', status: 'Present' },
 
-  // Class 9A Session 1
+  // Class 9A (Session 1 & Session 2)
   { session_id: 'SES-901', student_id: 'ZPS9A 01', status: 'Present' },
   { session_id: 'SES-901', student_id: 'ZPS9A 02', status: 'Present' },
   { session_id: 'SES-901', student_id: 'ZPS9A 03', status: 'Present' },
   { session_id: 'SES-901', student_id: 'ZPS9A 04', status: 'Present' },
   { session_id: 'SES-901', student_id: 'ZPS9A 05', status: 'Present' },
+  { session_id: 'SES-902', student_id: 'ZPS9A 01', status: 'Present' },
+  { session_id: 'SES-902', student_id: 'ZPS9A 02', status: 'Present' },
+  { session_id: 'SES-902', student_id: 'ZPS9A 03', status: 'Present' },
+  { session_id: 'SES-902', student_id: 'ZPS9A 04', status: 'Present' },
+  { session_id: 'SES-902', student_id: 'ZPS9A 05', status: 'Present' },
 
-  // Class 11A Session 1
+  // Class 11A (Session 1 & Session 2)
   { session_id: 'SES-1101', student_id: 'ZPS11A 01', status: 'Present' },
   { session_id: 'SES-1101', student_id: 'ZPS11A 02', status: 'Present' },
   { session_id: 'SES-1101', student_id: 'ZPS11A 03', status: 'Present' },
   { session_id: 'SES-1101', student_id: 'ZPS11A 04', status: 'Present' },
-  { session_id: 'SES-1101', student_id: 'ZPS11A 05', status: 'Present' }
+  { session_id: 'SES-1101', student_id: 'ZPS11A 05', status: 'Present' },
+  { session_id: 'SES-1102', student_id: 'ZPS11A 01', status: 'Present' },
+  { session_id: 'SES-1102', student_id: 'ZPS11A 02', status: 'Present' },
+  { session_id: 'SES-1102', student_id: 'ZPS11A 03', status: 'Present' },
+  { session_id: 'SES-1102', student_id: 'ZPS11A 04', status: 'Present' },
+  { session_id: 'SES-1102', student_id: 'ZPS11A 05', status: 'Present' }
 ];
 
 export const SEED_INVENTORY = [

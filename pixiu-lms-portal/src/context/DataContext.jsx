@@ -41,8 +41,39 @@ export function DataProvider({ children }) {
   const [classes, setClasses] = useState(() => safeGetItem('pixiu_classes', SEED_CLASSES));
   const [students, setStudents] = useState(() => safeGetItem('pixiu_students', SEED_STUDENTS));
   const [trainers, setTrainers] = useState(() => safeGetItem('pixiu_trainers', SEED_TRAINERS));
-  const [sessions, setSessions] = useState(() => safeGetItem('pixiu_sessions', SEED_SESSIONS));
-  const [attendance, setAttendance] = useState(() => safeGetItem('pixiu_attendance', SEED_ATTENDANCE));
+  const [sessions, setSessions] = useState(() => {
+    try {
+      const saved = safeGetItem('pixiu_sessions', null);
+      if (!saved || saved.length < 10) {
+        localStorage.setItem('pixiu_sessions', JSON.stringify(SEED_SESSIONS));
+        return SEED_SESSIONS;
+      }
+      const seedIds = SEED_SESSIONS.map(s => s.id);
+      const custom = saved.filter(s => !seedIds.includes(s.id));
+      const merged = [...custom, ...SEED_SESSIONS];
+      localStorage.setItem('pixiu_sessions', JSON.stringify(merged));
+      return merged;
+    } catch (e) {
+      return SEED_SESSIONS;
+    }
+  });
+
+  const [attendance, setAttendance] = useState(() => {
+    try {
+      const saved = safeGetItem('pixiu_attendance', null);
+      if (!saved || saved.length < 20) {
+        localStorage.setItem('pixiu_attendance', JSON.stringify(SEED_ATTENDANCE));
+        return SEED_ATTENDANCE;
+      }
+      const seedSessionIds = SEED_SESSIONS.map(s => s.id);
+      const custom = saved.filter(a => !seedSessionIds.includes(a.session_id));
+      const merged = [...custom, ...SEED_ATTENDANCE];
+      localStorage.setItem('pixiu_attendance', JSON.stringify(merged));
+      return merged;
+    } catch (e) {
+      return SEED_ATTENDANCE;
+    }
+  });
   const [leads, setLeads] = useState(() => safeGetItem('pixiu_leads', []));
   const [content, setContent] = useState(() => {
     try { localStorage.setItem('pixiu_content', JSON.stringify(SEED_CONTENT)); } catch (e) {}
