@@ -45,14 +45,13 @@ export function DataProvider({ children }) {
   const [attendance, setAttendance] = useState(() => safeGetItem('pixiu_attendance', SEED_ATTENDANCE));
   const [leads, setLeads] = useState(() => safeGetItem('pixiu_leads', []));
   const [content, setContent] = useState(() => {
-    const saved = safeGetItem('pixiu_content', SEED_CONTENT);
-    if (!saved || saved.length < SEED_CONTENT.length) {
-      try { localStorage.setItem('pixiu_content', JSON.stringify(SEED_CONTENT)); } catch (e) {}
-      return SEED_CONTENT;
-    }
-    return saved;
+    try { localStorage.setItem('pixiu_content', JSON.stringify(SEED_CONTENT)); } catch (e) {}
+    return SEED_CONTENT;
   });
-  const [curriculum, setCurriculum] = useState(() => safeGetItem('pixiu_curriculum', SEED_CURRICULUM));
+  const [curriculum, setCurriculum] = useState(() => {
+    try { localStorage.setItem('pixiu_curriculum', JSON.stringify(SEED_CURRICULUM)); } catch (e) {}
+    return SEED_CURRICULUM;
+  });
   const [inventory, setInventory] = useState(() => safeGetItem('pixiu_inventory', SEED_INVENTORY));
   const [billing, setBilling] = useState(() => safeGetItem('pixiu_billing', SEED_BILLING));
   const [comms, setComms] = useState(() => safeGetItem('pixiu_comms', []));

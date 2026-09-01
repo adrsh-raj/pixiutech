@@ -81,12 +81,55 @@ export default function Trainers() {
     "Completed lab objectives with good understanding, needs minor guidance on circuit debugging."
   ];
 
+  const GRADE_UNITS_CONFIG = {
+    '6': [
+      { unitCode: 'Unit 1', level: 'Level 0', title: 'Introduction to Robotics & Electronics' },
+      { unitCode: 'Unit 2', level: 'Level 1', title: 'The Arduino IDE' },
+      { unitCode: 'Unit 3', level: 'Level 2', title: 'Basic Project: Traffic Light Signal Controller' },
+      { unitCode: 'Unit 4', level: 'Level 3', title: 'Intermediate Project: Automatic Night Lamp' },
+      { unitCode: 'Unit 5', level: 'Level 4', title: 'Final Project: Smart Toll Booth' },
+      { unitCode: 'Unit 6', level: 'Level 5', title: 'Extra Challenges & Project Log' }
+    ],
+    '7': [
+      { unitCode: 'Unit 1', level: 'Level 0', title: 'Introduction to Analog & Digital Electronics' },
+      { unitCode: 'Unit 2', level: 'Level 1', title: 'The Arduino IDE & Serial Monitor' },
+      { unitCode: 'Unit 3', level: 'Level 2', title: 'Basic Project: LED Dimmer and Mood Light' },
+      { unitCode: 'Unit 4', level: 'Level 3', title: 'Intermediate Project: Temperature & Humidity Monitor' },
+      { unitCode: 'Unit 5', level: 'Level 4', title: 'Final Project: Smart Rain Alarm System' },
+      { unitCode: 'Unit 6', level: 'Level 5', title: 'Extra Challenges & Project Log' }
+    ],
+    '8': [
+      { unitCode: 'Unit 1', level: 'Level 0', title: 'Introduction to Waves & Distance Measurement' },
+      { unitCode: 'Unit 2', level: 'Level 1', title: 'The Arduino IDE & Sensor Libraries' },
+      { unitCode: 'Unit 3', level: 'Level 2', title: 'Basic Project: Height Measurement Station' },
+      { unitCode: 'Unit 4', level: 'Level 3', title: 'Intermediate Project: Smart Contactless Dustbin' },
+      { unitCode: 'Unit 5', level: 'Level 4', title: 'Final Project: Obstacle-Avoiding Robot' },
+      { unitCode: 'Unit 6', level: 'Level 5', title: 'Extra Challenges & Project Log' }
+    ],
+    '9': [
+      { unitCode: 'Unit 1', level: 'Level 0', title: 'Introduction to Industrial Sensors & Displays' },
+      { unitCode: 'Unit 2', level: 'Level 1', title: 'The Arduino IDE & Memory Architecture' },
+      { unitCode: 'Unit 3', level: 'Level 2', title: 'Basic Project: Fire Security Alarm System' },
+      { unitCode: 'Unit 4', level: 'Level 3', title: 'Intermediate Project: Smart 16x2 LCD Weather System' },
+      { unitCode: 'Unit 5', level: 'Level 4', title: 'Final Project: Line Following Robot' },
+      { unitCode: 'Unit 6', level: 'Level 5', title: 'Extra Challenges & Wiring Reference' }
+    ],
+    '11': [
+      { unitCode: 'Unit 1', level: 'Level 0', title: 'Introduction to Engineering Specs & Optics' },
+      { unitCode: 'Unit 2', level: 'Level 1', title: 'The Arduino IDE & Advanced Control' },
+      { unitCode: 'Unit 3', level: 'Level 2', title: 'Basic Project: Laser Security System' },
+      { unitCode: 'Unit 4', level: 'Level 3', title: 'Intermediate Project: Ultrasonic Calibration' },
+      { unitCode: 'Unit 5', level: 'Level 4', title: 'Capstone Project: Maze Solver Robot' },
+      { unitCode: 'Unit 6', level: 'Level 5', title: 'Engineering Reference & Log' }
+    ]
+  };
+
   const [reviewFormData, setReviewFormData] = useState({
     student_id: 'ZPS6A 01',
     class_grade: '6',
     unit_code: 'Unit 1',
     level: 'Level 0',
-    unit_title: 'Intro to Electricity & Circuits',
+    unit_title: 'Introduction to Robotics & Electronics',
     score: 9.5,
     rating: 5,
     status: 'Mastered',
@@ -105,13 +148,14 @@ export default function Trainers() {
       const filteredStu = students.filter(s => selectedReviewGrade === 'All' || s.class_id.includes(`-${selectedReviewGrade}A`));
       const firstStudent = targetStudent || filteredStu[0] || students[0];
       const grade = firstStudent?.class_id ? firstStudent.class_id.replace('CLS-ZPS-', '').replace('A', '') : (existingReview?.class_grade || '6');
+      const unitsList = GRADE_UNITS_CONFIG[grade] || GRADE_UNITS_CONFIG['6'];
       
       setReviewFormData({
         student_id: firstStudent?.student_id || 'ZPS6A 01',
         class_grade: grade,
-        unit_code: 'Unit 1',
-        level: 'Level 0',
-        unit_title: 'Intro to Electricity & Circuits',
+        unit_code: unitsList[0].unitCode,
+        level: unitsList[0].level,
+        unit_title: unitsList[0].title,
         score: 9.5,
         rating: 5,
         status: 'Mastered',
@@ -1065,10 +1109,15 @@ export default function Trainers() {
                     onChange={(e) => {
                       const grade = e.target.value;
                       const studentInGrade = students.find(s => s.class_id.includes(`-${grade}A`));
+                      const unitsList = GRADE_UNITS_CONFIG[grade] || GRADE_UNITS_CONFIG['6'];
+                      const currentOrFirstUnit = unitsList.find(u => u.unitCode === reviewFormData.unit_code) || unitsList[0];
                       setReviewFormData({
                         ...reviewFormData,
                         class_grade: grade,
-                        student_id: studentInGrade ? studentInGrade.student_id : reviewFormData.student_id
+                        student_id: studentInGrade ? studentInGrade.student_id : reviewFormData.student_id,
+                        unit_code: currentOrFirstUnit.unitCode,
+                        level: currentOrFirstUnit.level,
+                        unit_title: currentOrFirstUnit.title
                       });
                     }}
                     className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold bg-white text-slate-800"
@@ -1106,30 +1155,22 @@ export default function Trainers() {
                   value={reviewFormData.unit_code}
                   onChange={(e) => {
                     const unitCode = e.target.value;
-                    const unitTitles = {
-                      'Unit 1': { level: 'Level 0', title: 'Intro to Electricity & Basic Circuits' },
-                      'Unit 2': { level: 'Level 1', title: 'Sensors: Light (LDR) & Obstacle (IR)' },
-                      'Unit 3': { level: 'Level 2', title: 'Actuators: Motors, Buzzers & Relays' },
-                      'Unit 4': { level: 'Level 3', title: 'Microcontroller (Arduino) Programming Basics' },
-                      'Unit 5': { level: 'Level 4', title: 'Smart Obstacle Avoiding Rover Build' },
-                      'Unit 6': { level: 'Level 5', title: 'Capstone: Automated Smart Environment' },
-                    };
-                    const selectedUnit = unitTitles[unitCode] || { level: 'Level 0', title: 'Core Robotics Module' };
+                    const gradeUnits = GRADE_UNITS_CONFIG[reviewFormData.class_grade] || GRADE_UNITS_CONFIG['6'];
+                    const selectedUnit = gradeUnits.find(u => u.unitCode === unitCode) || gradeUnits[0];
                     setReviewFormData({
                       ...reviewFormData,
-                      unit_code: unitCode,
+                      unit_code: selectedUnit.unitCode,
                       level: selectedUnit.level,
                       unit_title: selectedUnit.title
                     });
                   }}
                   className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold bg-white text-slate-800"
                 >
-                  <option value="Unit 1">Unit 1 (Level 0) - Intro to Electricity & Circuits</option>
-                  <option value="Unit 2">Unit 2 (Level 1) - Sensors: Light (LDR) & Obstacle (IR)</option>
-                  <option value="Unit 3">Unit 3 (Level 2) - Actuators: Motors, Buzzers & Relays</option>
-                  <option value="Unit 4">Unit 4 (Level 3) - Microcontroller Coding & Telemetry</option>
-                  <option value="Unit 5">Unit 5 (Level 4) - Smart Obstacle Avoiding Rover</option>
-                  <option value="Unit 6">Unit 6 (Level 5) - Capstone Smart Environment</option>
+                  {(GRADE_UNITS_CONFIG[reviewFormData.class_grade] || GRADE_UNITS_CONFIG['6']).map(u => (
+                    <option key={u.unitCode} value={u.unitCode}>
+                      {u.unitCode} ({u.level}) - {u.title}
+                    </option>
+                  ))}
                 </select>
               </div>
 
