@@ -59,9 +59,9 @@ export default function Trainers() {
     class_id: 'CLS-ZPS-6A',
     class_grade: '6',
     unit_code: 'Unit 2',
-    class_number: 'Class 1 of 2',
-    topic: 'Unit 2 (Class 1/2): The Arduino IDE - Setup & Syntax',
-    notes: 'Arduino IDE installation, COM port selection, and test blink sketch.',
+    class_number: 'Class 1',
+    topic: 'Unit 2 (Class 1): The Arduino IDE - ',
+    notes: 'Hands-on robotics laboratory session.',
     date: new Date().toISOString().split('T')[0],
     time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
   });
@@ -301,8 +301,8 @@ export default function Trainers() {
       class_id: targetClassId,
       class_grade: grade,
       unit_code: nextUnit.unitCode,
-      class_number: 'Class 1 of 2',
-      topic: `${nextUnit.unitCode} (Class 1/2): ${nextUnit.title} - Setup & Hardware Testing`,
+      class_number: 'Class 1',
+      topic: `${nextUnit.unitCode} (Class 1): ${nextUnit.title} - `,
       notes: `Hands-on robotics laboratory session for ${nextUnit.title}.`,
       date: new Date().toISOString().split('T')[0],
       time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
@@ -1644,27 +1644,27 @@ export default function Trainers() {
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-600 uppercase mb-1">Class / Session in Unit</label>
+                  <label className="block font-bold text-slate-600 uppercase mb-1">Session / Class</label>
                   <select
                     value={newSessionModalData.class_number}
                     onChange={(e) => {
                       const classNum = e.target.value;
                       const gradeUnits = GRADE_UNITS_CONFIG[newSessionModalData.class_grade] || GRADE_UNITS_CONFIG['6'];
                       const selectedUnit = gradeUnits.find(u => u.unitCode === newSessionModalData.unit_code) || gradeUnits[0];
-                      const shortClass = classNum.replace(' of ', '/');
                       setNewSessionModalData({
                         ...newSessionModalData,
                         class_number: classNum,
-                        topic: `${selectedUnit.unitCode} (${shortClass}): ${selectedUnit.title}`
+                        topic: `${selectedUnit.unitCode} (${classNum}): ${selectedUnit.title} - `
                       });
                     }}
                     className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold bg-white text-slate-800"
                   >
-                    <option value="Class 1 of 2">Class 1 of 2 (Day 1 - Intro & Setup)</option>
-                    <option value="Class 2 of 2">Class 2 of 2 (Day 2 - Build & Testing)</option>
-                    <option value="Class 1 of 3">Class 1 of 3 (Day 1 - Theory & Schematics)</option>
-                    <option value="Class 2 of 3">Class 2 of 3 (Day 2 - Hardware Assembly)</option>
-                    <option value="Class 3 of 3">Class 3 of 3 (Day 3 - Code & Project Demo)</option>
+                    <option value="Class 1">Class 1</option>
+                    <option value="Class 2">Class 2</option>
+                    <option value="Class 3">Class 3</option>
+                    <option value="Class 4">Class 4</option>
+                    <option value="Class 5">Class 5</option>
+                    <option value="Class 6">Class 6</option>
                   </select>
                 </div>
               </div>
@@ -1677,11 +1677,11 @@ export default function Trainers() {
                     const unitCode = e.target.value;
                     const gradeUnits = GRADE_UNITS_CONFIG[newSessionModalData.class_grade] || GRADE_UNITS_CONFIG['6'];
                     const selectedUnit = gradeUnits.find(u => u.unitCode === unitCode) || gradeUnits[0];
-                    const shortClass = (newSessionModalData.class_number || 'Class 1 of 2').replace(' of ', '/');
+                    const classNum = newSessionModalData.class_number || 'Class 1';
                     setNewSessionModalData({
                       ...newSessionModalData,
                       unit_code: selectedUnit.unitCode,
-                      topic: `${selectedUnit.unitCode} (${shortClass}): ${selectedUnit.title}`,
+                      topic: `${selectedUnit.unitCode} (${classNum}): ${selectedUnit.title} - `,
                       notes: `Hands-on robotics lab session for ${selectedUnit.title}.`
                     });
                   }}
@@ -1702,7 +1702,7 @@ export default function Trainers() {
                   value={newSessionModalData.topic}
                   onChange={(e) => setNewSessionModalData({ ...newSessionModalData, topic: e.target.value })}
                   required
-                  placeholder="e.g. Unit 2 (Class 1/2): The Arduino IDE - Setup & Syntax"
+                  placeholder="Type lesson topic / experiment name here..."
                   className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold bg-white text-slate-800 focus:outline-none focus:border-pixiu-blue"
                 />
               </div>
