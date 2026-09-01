@@ -3,7 +3,7 @@ import {
   GraduationCap, Plus, Phone, Building2, Star, CheckCircle, Clock, X, Trash2, 
   Play, User, Camera, Check, FileText, Upload, Image as ImageIcon, IndianRupee, 
   Calendar, AlertTriangle, ShieldAlert, Lock, Unlock, Bell, Send, History, 
-  CheckSquare, XSquare, ChevronRight, BookOpen, Megaphone, Edit3, Award, MessageSquare
+  CheckSquare, XSquare, ChevronRight, BookOpen, Megaphone, Edit3, Award, MessageSquare, Box
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { useToast } from '../context/ToastContext';
@@ -13,7 +13,7 @@ export default function Trainers() {
   const { 
     trainers, schools, classes, students, sessions, markAttendance, 
     completeSession, unlockSession, startNewSession, attendance, addTrainer, updateTrainerStatus, 
-    deleteTrainer, uploadFile, addProject, scheduleSession, 
+    deleteTrainer, uploadFile, projects = [], addProject, deleteProject, scheduleSession, 
     adminUpdateAttendance, notifications, curriculum,
     studentReviews = [], saveStudentReview, deleteStudentReview
   } = useData();
