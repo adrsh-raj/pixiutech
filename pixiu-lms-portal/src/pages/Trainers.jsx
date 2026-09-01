@@ -12,7 +12,7 @@ import { useAuth } from '../context/AuthContext';
 export default function Trainers() {
   const { 
     trainers, schools, classes, students, sessions, markAttendance, 
-    completeSession, attendance, addTrainer, updateTrainerStatus, 
+    completeSession, unlockSession, startNewSession, attendance, addTrainer, updateTrainerStatus, 
     deleteTrainer, uploadFile, addProject, scheduleSession, 
     adminUpdateAttendance, notifications, curriculum,
     studentReviews = [], saveStudentReview, deleteStudentReview
@@ -52,6 +52,18 @@ export default function Trainers() {
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState(null);
   
+  // Start Next Session Modal State
+  const [isNewSessionModalOpen, setIsNewSessionModalOpen] = useState(false);
+  const [newSessionModalData, setNewSessionModalData] = useState({
+    school_id: 'ZPS',
+    class_id: 'CLS-ZPS-6A',
+    class_grade: '6',
+    unit_code: 'Unit 2',
+    topic: 'Unit 2: The Arduino IDE',
+    date: new Date().toISOString().split('T')[0],
+    time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+  });
+
   // Security Modal for Deleting Trainer ("Type Name to Confirm")
   const [trainerToDelete, setTrainerToDelete] = useState(null);
   const [deleteConfirmationInput, setDeleteConfirmationInput] = useState('');
@@ -259,6 +271,41 @@ export default function Trainers() {
     setIsScheduleModalOpen(false);
   };
 
+  const handleLaunchNewSession = async (e) => {
+    e.preventDefault();
+    const createdSession = await startNewSession({
+      school_id: 'ZPS',
+      class_id: newSessionModalData.class_id,
+      trainer_id: user?.id || 'TR-01',
+      date: newSessionModalData.date,
+      time: newSessionModalData.time,
+      topic: newSessionModalData.topic,
+      notes: 'Live Interactive Session'
+    });
+    setIsNewSessionModalOpen(false);
+    setActiveSessionId(createdSession.id);
+    toast.success(`Live session started for ${newSessionModalData.topic}! You can now mark attendance.`, 'Session Active');
+  };
+
+  const handleOpenStartSessionModal = (targetClassId = 'CLS-ZPS-6A') => {
+    const grade = targetClassId.replace('CLS-ZPS-', '').replace('A', '');
+    const gradeUnits = GRADE_UNITS_CONFIG[grade] || GRADE_UNITS_CONFIG['6'];
+    const classSessionsCount = sessions.filter(s => s.class_id === targetClassId).length;
+    const nextUnitIndex = Math.min(classSessionsCount, gradeUnits.length - 1);
+    const nextUnit = gradeUnits[nextUnitIndex];
+
+    setNewSessionModalData({
+      school_id: 'ZPS',
+      class_id: targetClassId,
+      class_grade: grade,
+      unit_code: nextUnit.unitCode,
+      topic: `${nextUnit.unitCode}: ${nextUnit.title}`,
+      date: new Date().toISOString().split('T')[0],
+      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+    });
+    setIsNewSessionModalOpen(true);
+  };
+
   // Session Runner Helpers
   const activeSession = sessions.find(s => s.id === activeSessionId);
   const sessionClass = activeSession ? classes.find(c => c.id === activeSession.class_id) : null;
@@ -391,11 +438,38 @@ export default function Trainers() {
           </div>
         </div>
 
-        {/* Lock Warning Banner */}
-        {isLocked && (
-          <div className="bg-slate-100 border-b border-slate-200 px-4 py-2 text-[11px] text-slate-700 font-bold flex items-center justify-between">
-            <span className="flex items-center gap-1.5"><Lock size={13} className="text-slate-500"/> Attendance Locked (Past Record)</span>
-            {isAdmin && <span className="text-blue-600">Admin Editing Mode</span>}
+        {/* Lock Warning & Action Banner */}
+        {isLocked ? (
+          <div className="bg-amber-50 border-b border-amber-200 px-4 py-3 text-xs text-amber-900 font-medium flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div className="flex items-center gap-1.5 font-bold text-[11px] sm:text-xs">
+              <Lock size={14} className="text-amber-600 shrink-0"/>
+              <span>Attendance Locked (Past Record)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleOpenStartSessionModal(activeSession.class_id)}
+                className="px-3 py-1.5 bg-pixiu-blue hover:bg-blue-600 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+              >
+                <Plus size={14}/> Start Next Session
+              </button>
+              <button
+                onClick={() => {
+                  if (window.confirm("Unlock this session to edit past attendance?")) {
+                    unlockSession(activeSessionId);
+                    toast.success("Session unlocked! You can now edit attendance.", "Session Unlocked");
+                  }
+                }}
+                className="px-2.5 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors"
+                title="Unlock to edit past attendance"
+              >
+                <Unlock size={13}/> Unlock Edit
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-emerald-50 border-b border-emerald-200 px-4 py-2 text-[11px] text-emerald-800 font-bold flex items-center justify-between">
+            <span className="flex items-center gap-1.5"><Play size={12} className="fill-emerald-600 text-emerald-600"/> Live Session Active • Ready for Attendance</span>
+            <span className="px-2 py-0.5 bg-emerald-200 text-emerald-900 rounded text-[10px]">Active</span>
           </div>
         )}
 
@@ -826,7 +900,7 @@ export default function Trainers() {
 
                   <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="text-[11px] font-bold text-slate-400 uppercase mr-1">Live Attendance:</span>
+                      <span className="text-[11px] font-bold text-slate-400 uppercase mr-1">Take Attendance:</span>
                       {[
                         { grade: '6', id: 'CLS-ZPS-6A', label: 'Class 6A' },
                         { grade: '7', id: 'CLS-ZPS-7A', label: 'Class 7A' },
@@ -834,23 +908,35 @@ export default function Trainers() {
                         { grade: '9', id: 'CLS-ZPS-9A', label: 'Class 9A' },
                         { grade: '11', id: 'CLS-ZPS-11A', label: 'Class 11A' },
                       ].map(cls => {
-                        const clsSession = sessions.find(s => s.class_id === cls.id);
+                        const classSessions = sessions.filter(s => s.class_id === cls.id);
+                        const activeUnlocked = classSessions.find(s => s.is_locked === 0);
+                        const targetSession = activeUnlocked || classSessions[0];
                         return (
                           <button
                             key={cls.id}
                             onClick={() => {
-                              if (clsSession) {
-                                setActiveSessionId(clsSession.id);
+                              if (targetSession) {
+                                setActiveSessionId(targetSession.id);
                               } else {
-                                toast.warning(`No active session found for ${cls.label}.`);
+                                handleOpenStartSessionModal(cls.id);
                               }
                             }}
-                            className="bg-slate-900 hover:bg-pixiu-blue text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+                            className={`text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer shadow-xs ${
+                              activeUnlocked 
+                                ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20' 
+                                : 'bg-slate-900 hover:bg-pixiu-blue text-white'
+                            }`}
                           >
                             <Play size={11} fill="white"/> {cls.label}
                           </button>
                         );
                       })}
+                      <button
+                        onClick={() => handleOpenStartSessionModal('CLS-ZPS-6A')}
+                        className="bg-pixiu-blue hover:bg-blue-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all cursor-pointer shadow-xs"
+                      >
+                        <Plus size={13}/> Start Next Session
+                      </button>
                     </div>
 
                     {isAdmin && (
@@ -1467,6 +1553,118 @@ export default function Trainers() {
                   className="px-6 py-2 font-medium text-white bg-pixiu-blue hover:bg-blue-600 rounded-lg text-sm shadow-md shadow-blue-500/20 cursor-pointer"
                 >
                   Save & Onboard Trainer
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Start Next Live Session Modal */}
+      {isNewSessionModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95">
+            <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+              <div>
+                <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                  <Play size={16} className="text-pixiu-blue fill-pixiu-blue"/> Start Next Live Session
+                </h3>
+                <p className="text-xs text-slate-500">Launch a new classroom session & take live attendance</p>
+              </div>
+              <button onClick={() => setIsNewSessionModalOpen(false)} className="text-slate-400 hover:text-slate-700 cursor-pointer">
+                <X size={18}/>
+              </button>
+            </div>
+
+            <form onSubmit={handleLaunchNewSession} className="p-6 space-y-4 text-xs">
+              <div>
+                <label className="block font-bold text-slate-600 uppercase mb-1">Target Class</label>
+                <select
+                  value={newSessionModalData.class_id}
+                  onChange={(e) => {
+                    const classId = e.target.value;
+                    const grade = classId.replace('CLS-ZPS-', '').replace('A', '');
+                    const gradeUnits = GRADE_UNITS_CONFIG[grade] || GRADE_UNITS_CONFIG['6'];
+                    const currentCount = sessions.filter(s => s.class_id === classId).length;
+                    const nextUnit = gradeUnits[Math.min(currentCount, gradeUnits.length - 1)];
+                    setNewSessionModalData({
+                      ...newSessionModalData,
+                      class_id: classId,
+                      class_grade: grade,
+                      unit_code: nextUnit.unitCode,
+                      topic: `${nextUnit.unitCode}: ${nextUnit.title}`
+                    });
+                  }}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold bg-white text-slate-800"
+                >
+                  <option value="CLS-ZPS-6A">Class 6A (Zenith Public School)</option>
+                  <option value="CLS-ZPS-7A">Class 7A (Zenith Public School)</option>
+                  <option value="CLS-ZPS-8A">Class 8A (Zenith Public School)</option>
+                  <option value="CLS-ZPS-9A">Class 9A (Zenith Public School)</option>
+                  <option value="CLS-ZPS-11A">Class 11A (Zenith Public School)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-600 uppercase mb-1">Curriculum Unit & Lesson Topic</label>
+                <select
+                  value={newSessionModalData.unit_code}
+                  onChange={(e) => {
+                    const unitCode = e.target.value;
+                    const gradeUnits = GRADE_UNITS_CONFIG[newSessionModalData.class_grade] || GRADE_UNITS_CONFIG['6'];
+                    const selectedUnit = gradeUnits.find(u => u.unitCode === unitCode) || gradeUnits[0];
+                    setNewSessionModalData({
+                      ...newSessionModalData,
+                      unit_code: selectedUnit.unitCode,
+                      topic: `${selectedUnit.unitCode}: ${selectedUnit.title}`
+                    });
+                  }}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold bg-white text-slate-800"
+                >
+                  {(GRADE_UNITS_CONFIG[newSessionModalData.class_grade] || GRADE_UNITS_CONFIG['6']).map(u => (
+                    <option key={u.unitCode} value={u.unitCode}>
+                      {u.unitCode} ({u.level}) - {u.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-600 uppercase mb-1">Session Date</label>
+                  <input
+                    type="date"
+                    value={newSessionModalData.date}
+                    onChange={(e) => setNewSessionModalData({ ...newSessionModalData, date: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold bg-white text-slate-800"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-600 uppercase mb-1">Session Time</label>
+                  <input
+                    type="text"
+                    value={newSessionModalData.time}
+                    onChange={(e) => setNewSessionModalData({ ...newSessionModalData, time: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold bg-white text-slate-800"
+                    placeholder="10:00 AM"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setIsNewSessionModalOpen(false)}
+                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl font-bold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-pixiu-blue hover:bg-blue-600 text-white rounded-xl font-bold cursor-pointer shadow-sm flex items-center gap-1.5"
+                >
+                  <Play size={14} fill="white"/> Launch & Take Attendance
                 </button>
               </div>
             </form>

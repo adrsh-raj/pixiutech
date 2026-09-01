@@ -602,12 +602,53 @@ export function DataProvider({ children }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date: formattedDate, time: liveTime, day: liveDay })
       });
-      setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, status: 'Completed', is_locked: 1, date: formattedDate, time: liveTime, day: liveDay } : s));
+      setSessions(prev => {
+        const updated = prev.map(s => s.id === sessionId ? { ...s, status: 'Completed', is_locked: 1, date: formattedDate, time: liveTime, day: liveDay } : s);
+        try { localStorage.setItem('pixiu_sessions', JSON.stringify(updated)); } catch (e) {}
+        return updated;
+      });
       await refreshAll();
     } catch (e) {
       console.error(e);
-      setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, status: 'Completed', is_locked: 1, date: formattedDate, time: liveTime, day: liveDay } : s));
+      setSessions(prev => {
+        const updated = prev.map(s => s.id === sessionId ? { ...s, status: 'Completed', is_locked: 1, date: formattedDate, time: liveTime, day: liveDay } : s);
+        try { localStorage.setItem('pixiu_sessions', JSON.stringify(updated)); } catch (e) {}
+        return updated;
+      });
     }
+  };
+
+  const unlockSession = (sessionId) => {
+    setSessions(prev => {
+      const updated = prev.map(s => s.id === sessionId ? { ...s, is_locked: 0 } : s);
+      try { localStorage.setItem('pixiu_sessions', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+    return { success: true };
+  };
+
+  const startNewSession = async (sessionData) => {
+    const now = new Date();
+    const liveDate = now.toISOString().split('T')[0];
+    const liveTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    
+    const newSession = {
+      id: `SES-${Date.now().toString().slice(-4)}`,
+      school_id: sessionData.school_id || 'ZPS',
+      class_id: sessionData.class_id,
+      trainer_id: sessionData.trainer_id || 'TR-01',
+      date: sessionData.date || liveDate,
+      time: sessionData.time || liveTime,
+      topic: sessionData.topic || 'Next Robotics Lab Session',
+      is_locked: 0,
+      notes: sessionData.notes || 'Live Hands-on Lab Session'
+    };
+    setSessions(prev => {
+      const updated = [newSession, ...prev];
+      try { localStorage.setItem('pixiu_sessions', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+    return newSession;
   };
 
   // 10. Parent Communications
@@ -818,7 +859,7 @@ export function DataProvider({ children }) {
     classes, addClass,
     students, addStudent, updateStudent, deleteStudent, getNextRollNumber, getStudentAttendance,
     trainers, addTrainer, updateTrainer, updateTrainerStatus, deleteTrainer,
-    sessions, scheduleSession, completeSession,
+    sessions, scheduleSession, completeSession, unlockSession, startNewSession,
     attendance, markAttendance, adminUpdateAttendance,
     leads, addLead, updateLeadStage, deleteLead, convertLeadToSchool,
     content, uploadContent, deleteContent,
