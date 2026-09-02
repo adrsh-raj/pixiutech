@@ -1844,47 +1844,49 @@ export default function Trainers() {
         }
         size="sm"
       >
-            <div className="p-6 space-y-4">
-              <p className="text-xs text-slate-600 leading-relaxed">
-                You are about to permanently delete <strong className="text-slate-900 font-bold">{trainerToDelete.name}</strong> ({trainerToDelete.id}). This will revoke their LMS portal access and clear assigned sessions.
-              </p>
+        {trainerToDelete && (
+          <div className="p-6 space-y-4">
+            <p className="text-xs text-slate-600 leading-relaxed">
+              You are about to permanently delete <strong className="text-slate-900 font-bold">{trainerToDelete.name}</strong> ({trainerToDelete.id}). This will revoke their LMS portal access and clear assigned sessions.
+            </p>
 
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  To confirm, type <span className="font-mono text-rose-600 font-bold select-all">"{trainerToDelete.name}"</span> below:
-                </label>
-                <input 
-                  type="text" 
-                  placeholder={`Type "${trainerToDelete.name}" to confirm`}
-                  value={deleteConfirmationInput} 
-                  onChange={e => setDeleteConfirmationInput(e.target.value)} 
-                  autoFocus
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-rose-500 font-medium"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button 
-                  type="button" 
-                  onClick={() => setTrainerToDelete(null)} 
-                  className="px-4 py-2 font-medium text-slate-600 hover:bg-slate-100 rounded-lg text-xs cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="button"
-                  onClick={handleConfirmDelete}
-                  disabled={deleteConfirmationInput.trim().toUpperCase() !== trainerToDelete.name.trim().toUpperCase()}
-                  className={`px-4 py-2 font-bold text-xs rounded-lg transition-all ${
-                    deleteConfirmationInput.trim().toUpperCase() === trainerToDelete.name.trim().toUpperCase()
-                      ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-md shadow-rose-600/20 cursor-pointer'
-                      : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                  }`}
-                >
-                  Permanently Delete Trainer
-                </button>
-              </div>
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                To confirm, type <span className="font-mono text-rose-600 font-bold select-all">"{trainerToDelete.name}"</span> below:
+              </label>
+              <input 
+                type="text" 
+                placeholder={`Type "${trainerToDelete.name}" to confirm`}
+                value={deleteConfirmationInput} 
+                onChange={e => setDeleteConfirmationInput(e.target.value)} 
+                autoFocus
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-rose-500 font-medium"
+              />
             </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button 
+                type="button" 
+                onClick={() => setTrainerToDelete(null)} 
+                className="px-4 py-2 font-medium text-slate-600 hover:bg-slate-100 rounded-lg text-xs cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button 
+                type="button" 
+                onClick={handleConfirmDelete}
+                disabled={deleteConfirmationInput.trim().toUpperCase() !== (trainerToDelete.name || '').trim().toUpperCase()}
+                className={`px-4 py-2 font-bold text-xs rounded-lg transition-all ${
+                  deleteConfirmationInput.trim().toUpperCase() === (trainerToDelete.name || '').trim().toUpperCase()
+                    ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-md shadow-rose-600/20 cursor-pointer'
+                    : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                }`}
+              >
+                Permanently Delete Trainer
+              </button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

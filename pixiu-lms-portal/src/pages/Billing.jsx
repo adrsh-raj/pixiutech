@@ -539,11 +539,13 @@ export default function Billing() {
       <Modal 
         isOpen={!!editingInvoice} 
         onClose={() => setEditingInvoice(null)}
-        title={`Edit Invoice (${editingInvoice?.id})`}
+        title={`Edit Invoice (${editingInvoice?.id || ''})`}
         size="sm"
       >
-        <p className="text-xs text-slate-500 mb-4">Update tranche description, amount, due date, or status</p>
-        <form onSubmit={handleEditSubmit} className="space-y-4 text-xs">
+        {editingInvoice && (
+          <div>
+            <p className="text-xs text-slate-500 mb-4">Update tranche description, amount, due date, or status</p>
+            <form onSubmit={handleEditSubmit} className="space-y-4 text-xs">
               <div>
                 <label className="block font-bold text-slate-500 uppercase mb-1">Tranche Title *</label>
                 <input 
@@ -626,6 +628,8 @@ export default function Billing() {
                 </button>
               </div>
             </form>
+          </div>
+        )}
       </Modal>
 
       {/* MODAL 2: CONFIRM PAYMENT RECEIPT */}
@@ -635,11 +639,13 @@ export default function Billing() {
         title="Confirm Payment Receipt" 
         size="sm"
       >
-        <div className="flex items-center gap-2 mb-4">
-          <ShieldCheck size={20} className="text-emerald-600" />
-          <p className="text-xs text-slate-500">Record transaction details and mark tranche as reconciled</p>
-        </div>
-        <form onSubmit={handleConfirmPaymentSubmit} className="space-y-4 text-xs">
+        {confirmingTranche && (
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <ShieldCheck size={20} className="text-emerald-600" />
+              <p className="text-xs text-slate-500">Record transaction details and mark tranche as reconciled</p>
+            </div>
+            <form onSubmit={handleConfirmPaymentSubmit} className="space-y-4 text-xs">
               <div className="bg-emerald-50 p-3.5 rounded-xl border border-emerald-200">
                 <p className="text-xs font-bold text-emerald-900">{confirmingTranche.tranche_title || 'Payment Tranche'}</p>
                 <p className="text-base font-bold text-emerald-700 mt-1">₹{(confirmingTranche.amount || 0).toLocaleString('en-IN')}</p>
@@ -710,6 +716,8 @@ export default function Billing() {
                 </button>
               </div>
             </form>
+          </div>
+        )}
       </Modal>
 
       {/* MODAL 3: CREATE CUSTOM TRANCHE INVOICE */}
