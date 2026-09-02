@@ -92,7 +92,7 @@ export default function Verify() {
     setIsSearching(true);
     setActiveQuery(inputStudentId.trim());
     setSearchParams({ id: inputStudentId.trim() });
-    setTimeout(() => setIsSearching(false), 200);
+    setTimeout(() => setIsSearching(false), 600);
   };
 
   const handleDownloadTranscript = () => {

@@ -292,6 +292,7 @@ export function AuthProvider({ children }) {
     setToken(null);
     localStorage.removeItem('pixiu_auth_token');
     localStorage.removeItem('pixiu_auth_user');
+    localStorage.removeItem('pixiu_last_active_timestamp');
   };
 
   const value = {

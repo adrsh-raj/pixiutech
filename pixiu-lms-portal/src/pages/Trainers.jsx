@@ -8,6 +8,7 @@ import {
 import { useData } from '../context/DataContext';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
+import Modal from '../components/ui/Modal';
 
 const REVIEW_PRESETS = [
   "Demonstrated exceptional understanding of breadboard power rails, series-parallel LEDs, and Ohm's Law current calculations.",
@@ -683,16 +684,12 @@ export default function Trainers() {
         </div>
 
         {/* Evidence Upload Modal */}
-        {isEvidenceModalOpen && (
-          <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95">
-              <div className="px-5 py-3.5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-                <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                  <Camera size={16} className="text-pixiu-blue"/> Upload Robot Build Evidence
-                </h3>
-                <button onClick={() => setIsEvidenceModalOpen(false)} className="text-slate-400 hover:text-slate-700 cursor-pointer"><X size={18}/></button>
-              </div>
-
+        <Modal
+          isOpen={isEvidenceModalOpen}
+          onClose={() => setIsEvidenceModalOpen(false)}
+          title={<span className="flex items-center gap-2"><Camera size={16} className="text-pixiu-blue"/> Upload Robot Build Evidence</span>}
+          size="sm"
+        >
               <form onSubmit={handleEvidenceSubmit} className="p-5 space-y-3.5 text-xs">
                 <div>
                   <label className="block font-bold text-slate-500 uppercase mb-1">Select Student</label>
@@ -763,9 +760,7 @@ export default function Trainers() {
                   </button>
                 </div>
               </form>
-            </div>
-          </div>
-        )}
+        </Modal>
       </div>
     );
   }
@@ -1303,19 +1298,19 @@ export default function Trainers() {
       )}
 
   {/* ==================== REVIEW MODAL ==================== */}
-  {isReviewModalOpen && (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95">
-        <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-900 text-white">
-          <div className="flex items-center gap-2">
-            <Star size={18} className="text-amber-400 fill-amber-400"/>
-            <h3 className="text-sm font-bold uppercase tracking-wider">
-              {editingReviewId ? 'Edit Student Unit Review' : 'Submit End-of-Unit Student Review'}
-            </h3>
-          </div>
-          <button onClick={() => setIsReviewModalOpen(false)} className="text-slate-400 hover:text-white cursor-pointer"><X size={18}/></button>
-        </div>
-
+  <Modal
+    isOpen={isReviewModalOpen}
+    onClose={() => setIsReviewModalOpen(false)}
+    title={
+      <div className="flex items-center gap-2">
+        <Star size={18} className="text-amber-400 fill-amber-400"/>
+        <span className="text-sm font-bold uppercase tracking-wider">
+          {editingReviewId ? 'Edit Student Unit Review' : 'Submit End-of-Unit Student Review'}
+        </span>
+      </div>
+    }
+    size="md"
+  >
         <form onSubmit={handleSaveReview} className="p-6 space-y-4 text-xs">
           {/* Class & Student Selection */}
           <div className="grid grid-cols-2 gap-3">
@@ -1455,24 +1450,22 @@ export default function Trainers() {
             </button>
           </div>
         </form>
-      </div>
-    </div>
-  )}
+  </Modal>
 
   {/* ==================== SCHEDULE NEXT CLASS MODAL ==================== */}
-  {isScheduleModalOpen && (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95">
-        <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-          <div>
-            <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-              <Bell size={18} className="text-indigo-600"/> Schedule Next Class & Notify Trainer
-            </h3>
-            <p className="text-xs text-slate-500">Sets up classroom session & triggers instant notification alert</p>
-          </div>
-          <button onClick={() => setIsScheduleModalOpen(false)} className="text-slate-400 hover:text-slate-700 cursor-pointer"><X size={18}/></button>
-        </div>
-
+  <Modal
+    isOpen={isScheduleModalOpen}
+    onClose={() => setIsScheduleModalOpen(false)}
+    title={
+      <div>
+        <span className="text-base font-bold text-slate-800 flex items-center gap-2">
+          <Bell size={18} className="text-indigo-600"/> Schedule Next Class & Notify Trainer
+        </span>
+        <p className="text-xs text-slate-500 font-normal mt-1">Sets up classroom session & triggers instant notification alert</p>
+      </div>
+    }
+    size="md"
+  >
             <form onSubmit={handleScheduleSubmit} className="p-6 space-y-4 text-xs">
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -1559,21 +1552,20 @@ export default function Trainers() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+  </Modal>
 
       {/* Onboard Trainer Modal */}
-      {isAddModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
-            <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-              <div>
-                <h2 className="text-lg font-bold text-slate-800">Add & Onboard Robotics Trainer</h2>
-                <p className="text-xs text-slate-500">Register instructor, assign schools, and configure salary payout</p>
-              </div>
-              <button onClick={() => setIsAddModalOpen(false)} className="text-slate-400 hover:text-slate-700 cursor-pointer"><X size={20}/></button>
-            </div>
+      <Modal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        title={
+          <div>
+            <span className="text-lg font-bold text-slate-800 block">Add & Onboard Robotics Trainer</span>
+            <span className="text-xs text-slate-500 font-normal mt-1 block">Register instructor, assign schools, and configure salary payout</span>
+          </div>
+        }
+        size="md"
+      >
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Trainer Full Name *</label>
@@ -1660,26 +1652,22 @@ export default function Trainers() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </Modal>
 
       {/* Start Next Live Session Modal */}
-      {isNewSessionModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95">
-            <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-              <div>
-                <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-                  <Play size={16} className="text-pixiu-blue fill-pixiu-blue"/> Start Next Live Session
-                </h3>
-                <p className="text-xs text-slate-500">Launch a new classroom session & take live attendance</p>
-              </div>
-              <button onClick={() => setIsNewSessionModalOpen(false)} className="text-slate-400 hover:text-slate-700 cursor-pointer">
-                <X size={18}/>
-              </button>
-            </div>
-
+      <Modal
+        isOpen={isNewSessionModalOpen}
+        onClose={() => setIsNewSessionModalOpen(false)}
+        title={
+          <div>
+            <span className="text-base font-bold text-slate-800 flex items-center gap-2">
+              <Play size={16} className="text-pixiu-blue fill-pixiu-blue"/> Start Next Live Session
+            </span>
+            <p className="text-xs text-slate-500 font-normal mt-1">Launch a new classroom session & take live attendance</p>
+          </div>
+        }
+        size="sm"
+      >
             <form onSubmit={handleLaunchNewSession} className="p-6 space-y-4 text-xs">
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -1842,22 +1830,20 @@ export default function Trainers() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </Modal>
 
       {/* Security Confirmation Modal ("Type Name to Confirm Delete") */}
-      {trainerToDelete && (
-        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-rose-200 animate-in fade-in zoom-in-95">
-            <div className="px-6 py-4 bg-rose-50 border-b border-rose-100 flex justify-between items-center">
-              <div className="flex items-center gap-2 text-rose-700 font-bold text-sm">
-                <ShieldAlert size={18} />
-                <span>Confirm Trainer Deletion</span>
-              </div>
-              <button onClick={() => setTrainerToDelete(null)} className="text-slate-400 hover:text-slate-700 cursor-pointer"><X size={18}/></button>
-            </div>
-
+      <Modal
+        isOpen={!!trainerToDelete}
+        onClose={() => setTrainerToDelete(null)}
+        title={
+          <div className="flex items-center gap-2 text-rose-700 font-bold text-sm">
+            <ShieldAlert size={18} />
+            <span>Confirm Trainer Deletion</span>
+          </div>
+        }
+        size="sm"
+      >
             <div className="p-6 space-y-4">
               <p className="text-xs text-slate-600 leading-relaxed">
                 You are about to permanently delete <strong className="text-slate-900 font-bold">{trainerToDelete.name}</strong> ({trainerToDelete.id}). This will revoke their LMS portal access and clear assigned sessions.
@@ -1899,9 +1885,7 @@ export default function Trainers() {
                 </button>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+      </Modal>
     </div>
   );
 }

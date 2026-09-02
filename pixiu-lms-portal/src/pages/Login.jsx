@@ -152,18 +152,28 @@ export default function Login() {
               />
             </div>
             {selectedRoleTab === 'student' && (
-              <p className="text-[11px] text-slate-400 mt-1.5 flex items-center justify-between">
-                <span>Hint: Try <button type="button" onClick={() => { setUsername('XYZ6A 01'); setPassword('XYZxyz6@hata'); }} className="text-blue-400 hover:underline font-mono font-bold cursor-pointer">XYZ6A 01</button></span>
-                <span className="text-slate-500 text-[10px] font-mono">Pass: XYZxyz6@hata</span>
+              <p className="text-[10px] text-slate-500 mt-1.5">
+                Enter your Student Roll ID assigned by your school
+              </p>
+            )}
+            {selectedRoleTab === 'school' && (
+              <p className="text-[10px] text-slate-500 mt-1.5">
+                Enter your School Partner ID provided during onboarding
+              </p>
+            )}
+            {selectedRoleTab === 'trainer' && (
+              <p className="text-[10px] text-slate-500 mt-1.5">
+                Enter your Trainer or Admin username
               </p>
             )}
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1.5">Password</label>
+            <label htmlFor="login-password" className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1.5">Password</label>
             <div className="relative">
               <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
               <input
+                id="login-password"
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -175,6 +185,7 @@ export default function Login() {
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 p-1 cursor-pointer transition-colors"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
                 title={showPassword ? 'Hide password' : 'Show password'}
               >
                 {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}

@@ -3,6 +3,8 @@ import { Users, Trophy, Activity, Building2, BookOpen, Plus, Bell, AlertCircle, 
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
 import { useData } from '../context/DataContext';
 import { useToast } from '../context/ToastContext';
+import Modal from '../components/ui/Modal';
+import KpiCard from '../components/ui/KpiCard';
 
 export default function Dashboard() {
   const { schools, classes, students, inventory, billing, leads, alerts, resolveAlertAction, addSchool, addClass } = useData();
@@ -273,37 +275,10 @@ export default function Dashboard() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600"><Users size={22} /></div>
-          <div>
-            <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-0.5">Enrolled Learners</p>
-            <p className="text-2xl font-bold text-slate-800">{stats.studentsCount}</p>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600"><Building2 size={22} /></div>
-          <div>
-            <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-0.5">Partner Schools</p>
-            <p className="text-2xl font-bold text-slate-800">{stats.schoolsCount}</p>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-600"><BookOpen size={22} /></div>
-          <div>
-            <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-0.5">Active Classrooms</p>
-            <p className="text-2xl font-bold text-slate-800">{stats.classesCount}</p>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600"><IndianRupee size={22} /></div>
-          <div>
-            <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-0.5">Invoiced Volume</p>
-            <p className="text-2xl font-bold text-slate-800">₹{stats.totalRevenue.toLocaleString('en-IN')}</p>
-          </div>
-        </div>
+        <KpiCard icon={<Users size={22} />} label="Enrolled Learners" value={stats.studentsCount} color="blue" />
+        <KpiCard icon={<Building2 size={22} />} label="Partner Schools" value={stats.schoolsCount} color="emerald" />
+        <KpiCard icon={<BookOpen size={22} />} label="Active Classrooms" value={stats.classesCount} color="violet" />
+        <KpiCard icon={<IndianRupee size={22} />} label="Invoiced Volume" value={`₹${stats.totalRevenue.toLocaleString('en-IN')}`} color="amber" />
       </div>
 
       {/* Main Charts Grid */}
@@ -365,116 +340,100 @@ export default function Dashboard() {
       </div>
 
       {/* Onboard School Modal */}
-      {isSchoolModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200">
-            <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-              <h2 className="text-lg font-bold text-slate-800">Quick Onboard School</h2>
-              <button onClick={() => setIsSchoolModalOpen(false)} className="text-slate-400 hover:text-slate-700 cursor-pointer"><X size={20}/></button>
-            </div>
-            <form onSubmit={handleSchoolSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">School Name *</label>
-                <input 
-                  type="text" 
-                  placeholder="e.g. DPS International" 
-                  value={schoolFormData.name} 
-                  onChange={e => {
-                    const name = e.target.value;
-                    const code = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 4);
-                    setSchoolFormData({ ...schoolFormData, name, code: schoolFormData.code || code });
-                  }} 
-                  required 
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-pixiu-blue"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-pixiu-blue uppercase mb-1">School Code *</label>
-                  <input 
-                    type="text" 
-                    placeholder="e.g. DPSI" 
-                    value={schoolFormData.code} 
-                    onChange={e => setSchoolFormData({ ...schoolFormData, code: e.target.value.toUpperCase() })} 
-                    required 
-                    maxLength={5}
-                    className="w-full px-3 py-2 border border-blue-300 bg-blue-50/50 font-mono font-bold text-pixiu-blue rounded-lg text-sm focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Phone</label>
-                  <input 
-                    type="text" 
-                    placeholder="e.g. 9876543210" 
-                    value={schoolFormData.contact} 
-                    onChange={e => setSchoolFormData({ ...schoolFormData, contact: e.target.value })} 
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-pixiu-blue"
-                  />
-                </div>
-              </div>
-
-              <div className="mt-6 flex justify-end gap-3 pt-2 border-t border-slate-100">
-                <button type="button" onClick={() => setIsSchoolModalOpen(false)} className="px-4 py-2 font-medium text-slate-600 hover:bg-slate-100 rounded-lg text-sm">Cancel</button>
-                <button type="submit" className="px-6 py-2 font-medium text-white bg-pixiu-blue hover:bg-blue-600 rounded-lg text-sm shadow-md">Save & Onboard</button>
-              </div>
-            </form>
+      <Modal isOpen={isSchoolModalOpen} onClose={() => setIsSchoolModalOpen(false)} title="Quick Onboard School">
+        <form onSubmit={handleSchoolSubmit} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">School Name *</label>
+            <input 
+              type="text" 
+              placeholder="e.g. DPS International" 
+              value={schoolFormData.name} 
+              onChange={e => {
+                const name = e.target.value;
+                const code = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 4);
+                setSchoolFormData({ ...schoolFormData, name, code: schoolFormData.code || code });
+              }} 
+              required 
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-pixiu-blue"
+            />
           </div>
-        </div>
-      )}
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-pixiu-blue uppercase mb-1">School Code *</label>
+              <input 
+                type="text" 
+                placeholder="e.g. DPSI" 
+                value={schoolFormData.code} 
+                onChange={e => setSchoolFormData({ ...schoolFormData, code: e.target.value.toUpperCase() })} 
+                required 
+                maxLength={5}
+                className="w-full px-3 py-2 border border-blue-300 bg-blue-50/50 font-mono font-bold text-pixiu-blue rounded-lg text-sm focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Phone</label>
+              <input 
+                type="text" 
+                placeholder="e.g. 9876543210" 
+                value={schoolFormData.contact} 
+                onChange={e => setSchoolFormData({ ...schoolFormData, contact: e.target.value })} 
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-pixiu-blue"
+              />
+            </div>
+          </div>
+
+          <div className="mt-6 flex justify-end gap-3 pt-2 border-t border-slate-100">
+            <button type="button" onClick={() => setIsSchoolModalOpen(false)} className="px-4 py-2 font-medium text-slate-600 hover:bg-slate-100 rounded-lg text-sm">Cancel</button>
+            <button type="submit" className="px-6 py-2 font-medium text-white bg-pixiu-blue hover:bg-blue-600 rounded-lg text-sm shadow-md">Save & Onboard</button>
+          </div>
+        </form>
+      </Modal>
 
       {/* New Class Modal */}
-      {isClassModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200">
-            <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-              <h2 className="text-lg font-bold text-slate-800">Add New Classroom</h2>
-              <button onClick={() => setIsClassModalOpen(false)} className="text-slate-400 hover:text-slate-700 cursor-pointer"><X size={20}/></button>
-            </div>
-            <form onSubmit={handleClassSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Target School *</label>
-                <select 
-                  value={classFormData.school_id} 
-                  onChange={e => setClassFormData({ ...classFormData, school_id: e.target.value })} 
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-pixiu-blue bg-white"
-                >
-                  {schools.map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Grade / Class *</label>
-                  <input 
-                    type="text" 
-                    placeholder="e.g. 6" 
-                    value={classFormData.grade} 
-                    onChange={e => setClassFormData({ ...classFormData, grade: e.target.value })} 
-                    required 
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-pixiu-blue"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Section</label>
-                  <input 
-                    type="text" 
-                    placeholder="e.g. A" 
-                    value={classFormData.section} 
-                    onChange={e => setClassFormData({ ...classFormData, section: e.target.value.toUpperCase() })} 
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-pixiu-blue"
-                  />
-                </div>
-              </div>
-
-              <div className="mt-6 flex justify-end gap-3 pt-2 border-t border-slate-100">
-                <button type="button" onClick={() => setIsClassModalOpen(false)} className="px-4 py-2 font-medium text-slate-600 hover:bg-slate-100 rounded-lg text-sm">Cancel</button>
-                <button type="submit" className="px-6 py-2 font-medium text-white bg-pixiu-blue hover:bg-blue-600 rounded-lg text-sm shadow-md">Create Classroom</button>
-              </div>
-            </form>
+      <Modal isOpen={isClassModalOpen} onClose={() => setIsClassModalOpen(false)} title="Add New Classroom">
+        <form onSubmit={handleClassSubmit} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Target School *</label>
+            <select 
+              value={classFormData.school_id} 
+              onChange={e => setClassFormData({ ...classFormData, school_id: e.target.value })} 
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-pixiu-blue bg-white"
+            >
+              {schools.map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
+            </select>
           </div>
-        </div>
-      )}
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Grade / Class *</label>
+              <input 
+                type="text" 
+                placeholder="e.g. 6" 
+                value={classFormData.grade} 
+                onChange={e => setClassFormData({ ...classFormData, grade: e.target.value })} 
+                required 
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-pixiu-blue"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Section</label>
+              <input 
+                type="text" 
+                placeholder="e.g. A" 
+                value={classFormData.section} 
+                onChange={e => setClassFormData({ ...classFormData, section: e.target.value.toUpperCase() })} 
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-pixiu-blue"
+              />
+            </div>
+          </div>
+
+          <div className="mt-6 flex justify-end gap-3 pt-2 border-t border-slate-100">
+            <button type="button" onClick={() => setIsClassModalOpen(false)} className="px-4 py-2 font-medium text-slate-600 hover:bg-slate-100 rounded-lg text-sm">Cancel</button>
+            <button type="submit" className="px-6 py-2 font-medium text-white bg-pixiu-blue hover:bg-blue-600 rounded-lg text-sm shadow-md">Create Classroom</button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

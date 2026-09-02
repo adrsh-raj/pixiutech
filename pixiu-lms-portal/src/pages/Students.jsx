@@ -3,6 +3,7 @@ import { Search, Plus, MoreVertical, MessageCircle, Building2, X, FileText, Chev
 import { useData } from '../context/DataContext';
 import { useToast } from '../context/ToastContext';
 import { generateStudentTranscriptPDF } from '../utils/transcriptGenerator';
+import Modal from '../components/ui/Modal';
 
 const generateId = (schoolCode, cls, sec, roll) => {
   return `${schoolCode}${cls}${sec ? sec : ''} ${roll}`;
@@ -419,18 +420,16 @@ export default function Students() {
       </div>
 
       {/* Edit Student Modal */}
-      {editingStudent && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95">
-            <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-              <div>
-                <h3 className="text-base font-bold text-slate-800">Edit Student Details</h3>
-                <p className="text-xs font-mono text-pixiu-blue font-bold">{editingStudent.student_id}</p>
-              </div>
-              <button onClick={() => setEditingStudent(null)} className="text-slate-400 hover:text-slate-700 cursor-pointer"><X size={18}/></button>
-            </div>
-
-            <form onSubmit={handleEditSubmit} className="p-6 space-y-4 text-xs">
+      <Modal 
+        isOpen={!!editingStudent} 
+        onClose={() => setEditingStudent(null)} 
+        title="Edit Student Details" 
+        size="sm"
+      >
+        {editingStudent && (
+          <div className="space-y-4">
+            <p className="text-xs font-mono text-pixiu-blue font-bold">{editingStudent.student_id}</p>
+            <form onSubmit={handleEditSubmit} className="space-y-4 text-xs">
               <div>
                 <label className="block font-bold text-slate-500 uppercase mb-1">Student Full Name *</label>
                 <input 
@@ -519,139 +518,135 @@ export default function Students() {
               </div>
             </form>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
 
       {/* Enroll Student Modal */}
-      {isAddModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95">
-            <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+      <Modal 
+        isOpen={isAddModalOpen} 
+        onClose={() => setIsAddModalOpen(false)} 
+        title="Enroll New Student" 
+        size="md"
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-slate-500">Auto-assigns canonical roll number & login account</p>
+          <form onSubmit={handleAddSubmit} className="space-y-4 text-xs">
+            <div className="grid grid-cols-3 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
               <div>
-                <h3 className="text-base font-bold text-slate-800">Enroll New Student</h3>
-                <p className="text-xs text-slate-500">Auto-assigns canonical roll number & login account</p>
+                <label className="block font-bold text-slate-500 uppercase mb-1">School</label>
+                <select 
+                  value={formData.schoolCode} 
+                  onChange={e => setFormData({ ...formData, schoolCode: e.target.value })} 
+                  className="w-full px-2 py-1.5 border border-slate-300 rounded-lg bg-white font-bold"
+                >
+                  {schools.map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
+                </select>
               </div>
-              <button onClick={() => setIsAddModalOpen(false)} className="text-slate-400 hover:text-slate-700 cursor-pointer"><X size={18}/></button>
+              <div>
+                <label className="block font-bold text-slate-500 uppercase mb-1">Grade</label>
+                <select 
+                  value={formData.class} 
+                  onChange={e => setFormData({ ...formData, class: e.target.value })} 
+                  className="w-full px-2 py-1.5 border border-slate-300 rounded-lg bg-white font-bold"
+                >
+                  <option value="6">Class 6</option>
+                  <option value="7">Class 7</option>
+                  <option value="8">Class 8</option>
+                  <option value="9">Class 9</option>
+                  <option value="11">Class 11</option>
+                </select>
+              </div>
+              <div>
+                <label className="block font-bold text-slate-500 uppercase mb-1">Section</label>
+                <select 
+                  value={formData.section} 
+                  onChange={e => setFormData({ ...formData, section: e.target.value })} 
+                  className="w-full px-2 py-1.5 border border-slate-300 rounded-lg bg-white font-bold"
+                >
+                  <option value="A">Section A</option>
+                </select>
+              </div>
             </div>
 
-            <form onSubmit={handleAddSubmit} className="p-6 space-y-4 text-xs">
-              <div className="grid grid-cols-3 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
-                <div>
-                  <label className="block font-bold text-slate-500 uppercase mb-1">School</label>
-                  <select 
-                    value={formData.schoolCode} 
-                    onChange={e => setFormData({ ...formData, schoolCode: e.target.value })} 
-                    className="w-full px-2 py-1.5 border border-slate-300 rounded-lg bg-white font-bold"
-                  >
-                    {schools.map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-500 uppercase mb-1">Grade</label>
-                  <select 
-                    value={formData.class} 
-                    onChange={e => setFormData({ ...formData, class: e.target.value })} 
-                    className="w-full px-2 py-1.5 border border-slate-300 rounded-lg bg-white font-bold"
-                  >
-                    <option value="6">Class 6</option>
-                    <option value="7">Class 7</option>
-                    <option value="8">Class 8</option>
-                    <option value="9">Class 9</option>
-                    <option value="11">Class 11</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-500 uppercase mb-1">Section</label>
-                  <select 
-                    value={formData.section} 
-                    onChange={e => setFormData({ ...formData, section: e.target.value })} 
-                    className="w-full px-2 py-1.5 border border-slate-300 rounded-lg bg-white font-bold"
-                  >
-                    <option value="A">Section A</option>
-                  </select>
-                </div>
-              </div>
+            <div>
+              <label className="block font-bold text-slate-500 uppercase mb-1">Student Full Name *</label>
+              <input 
+                type="text" 
+                placeholder="e.g. Aarav Sharma" 
+                value={formData.name} 
+                onChange={e => setFormData({ ...formData, name: e.target.value })} 
+                required
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-pixiu-blue"
+              />
+            </div>
 
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block font-bold text-slate-500 uppercase mb-1">Student Full Name *</label>
+                <label className="block font-bold text-slate-500 uppercase mb-1">Parent Name</label>
                 <input 
                   type="text" 
-                  placeholder="e.g. Aarav Sharma" 
-                  value={formData.name} 
-                  onChange={e => setFormData({ ...formData, name: e.target.value })} 
-                  required
+                  placeholder="e.g. Ravi Sharma" 
+                  value={formData.parent} 
+                  onChange={e => setFormData({ ...formData, parent: e.target.value })} 
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-pixiu-blue"
                 />
               </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-500 uppercase mb-1">Parent Name</label>
-                  <input 
-                    type="text" 
-                    placeholder="e.g. Ravi Sharma" 
-                    value={formData.parent} 
-                    onChange={e => setFormData({ ...formData, parent: e.target.value })} 
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-pixiu-blue"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-500 uppercase mb-1">WhatsApp Number</label>
-                  <input 
-                    type="text" 
-                    placeholder="e.g. 919876543210" 
-                    value={formData.phone} 
-                    onChange={e => setFormData({ ...formData, phone: e.target.value })} 
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-pixiu-blue"
-                  />
-                </div>
+              <div>
+                <label className="block font-bold text-slate-500 uppercase mb-1">WhatsApp Number</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. 919876543210" 
+                  value={formData.phone} 
+                  onChange={e => setFormData({ ...formData, phone: e.target.value })} 
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-pixiu-blue"
+                />
               </div>
+            </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-500 uppercase mb-1">Tech Level</label>
-                  <select 
-                    value={formData.level} 
-                    onChange={e => setFormData({ ...formData, level: e.target.value })} 
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white font-bold"
-                  >
-                    <option value="Level 1">Level 1</option>
-                    <option value="Level 2">Level 2</option>
-                    <option value="Level 3">Level 3</option>
-                    <option value="Level 4">Level 4</option>
-                    <option value="Level 5">Level 5</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-500 uppercase mb-1">Assigned Kit ID</label>
-                  <input 
-                    type="text" 
-                    value={formData.assigned_kit_id} 
-                    onChange={e => setFormData({ ...formData, assigned_kit_id: e.target.value })} 
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono font-bold"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
-                <button 
-                  type="button" 
-                  onClick={() => setIsAddModalOpen(false)} 
-                  className="px-4 py-2 font-medium text-slate-600 hover:bg-slate-100 rounded-lg text-xs cursor-pointer"
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block font-bold text-slate-500 uppercase mb-1">Tech Level</label>
+                <select 
+                  value={formData.level} 
+                  onChange={e => setFormData({ ...formData, level: e.target.value })} 
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white font-bold"
                 >
-                  Cancel
-                </button>
-                <button 
-                  type="submit" 
-                  className="px-5 py-2 font-bold text-white bg-pixiu-blue hover:bg-blue-600 rounded-lg text-xs shadow-md shadow-blue-500/20 cursor-pointer"
-                >
-                  Enroll Student
-                </button>
+                  <option value="Level 1">Level 1</option>
+                  <option value="Level 2">Level 2</option>
+                  <option value="Level 3">Level 3</option>
+                  <option value="Level 4">Level 4</option>
+                  <option value="Level 5">Level 5</option>
+                </select>
               </div>
-            </form>
-          </div>
+              <div>
+                <label className="block font-bold text-slate-500 uppercase mb-1">Assigned Kit ID</label>
+                <input 
+                  type="text" 
+                  value={formData.assigned_kit_id} 
+                  onChange={e => setFormData({ ...formData, assigned_kit_id: e.target.value })} 
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono font-bold"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+              <button 
+                type="button" 
+                onClick={() => setIsAddModalOpen(false)} 
+                className="px-4 py-2 font-medium text-slate-600 hover:bg-slate-100 rounded-lg text-xs cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button 
+                type="submit" 
+                className="px-5 py-2 font-bold text-white bg-pixiu-blue hover:bg-blue-600 rounded-lg text-xs shadow-md shadow-blue-500/20 cursor-pointer"
+              >
+                Enroll Student
+              </button>
+            </div>
+          </form>
         </div>
-      )}
+      </Modal>
     </div>
   );
 }

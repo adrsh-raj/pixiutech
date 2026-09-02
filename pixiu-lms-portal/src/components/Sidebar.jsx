@@ -79,6 +79,7 @@ export default function Sidebar({ mobileOpen = false, setMobileOpen = () => {} }
           <button 
             onClick={() => setMobileOpen(false)}
             className="md:hidden p-1.5 text-slate-400 hover:text-white rounded-lg cursor-pointer"
+            aria-label="Close navigation menu"
           >
             <X size={18} />
           </button>
@@ -129,6 +130,7 @@ export default function Sidebar({ mobileOpen = false, setMobileOpen = () => {} }
           <button 
             onClick={logout}
             className="flex items-center gap-3 px-3 py-2 sm:py-2.5 w-full rounded-lg text-slate-400 hover:bg-red-500 hover:text-white transition-colors cursor-pointer text-xs font-bold"
+            aria-label="Log out of your account"
           >
             <LogOut size={15} />
             <span>Secure Logout</span>
