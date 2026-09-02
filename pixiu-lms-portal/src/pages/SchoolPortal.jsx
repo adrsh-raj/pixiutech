@@ -367,38 +367,6 @@ export default function SchoolPortal() {
           </div>
         </div>
 
-        {/* Live Admin Broadcast Alerts (If Any Pushed by Admin) */}
-        {schoolNotifications && schoolNotifications.length > 0 && (
-          <div className="space-y-3">
-            {schoolNotifications.slice(0, 3).map((notif) => (
-              <div 
-                key={notif.id} 
-                className={`p-4 rounded-xl border flex items-start gap-3.5 shadow-xs transition-all ${
-                  notif.priority === 'high' 
-                    ? 'bg-rose-50/90 border-rose-200 text-rose-900' 
-                    : 'bg-blue-50/90 border-blue-200 text-blue-950'
-                }`}
-              >
-                <div className={`p-2 rounded-lg shrink-0 ${
-                  notif.priority === 'high' ? 'bg-rose-100 text-rose-700' : 'bg-blue-100 text-blue-700'
-                }`}>
-                  <Zap size={16} />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <h4 className="font-bold text-xs sm:text-sm">{notif.title}</h4>
-                    <span className="text-[10px] font-mono text-slate-400 font-bold shrink-0">{notif.created_at || 'Today'}</span>
-                  </div>
-                  <p className="text-xs mt-0.5 opacity-90 leading-relaxed">{notif.message}</p>
-                  <div className="text-[10px] font-bold text-slate-500 mt-1">
-                    From: <span className="text-slate-800">{notif.sender_name || 'Central Administration'}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
         {/* 4 KPI Cards (Exact Admin Style: Pure White, Slate-200 Border, Pastel Icons) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
