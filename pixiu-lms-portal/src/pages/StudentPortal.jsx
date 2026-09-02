@@ -698,15 +698,20 @@ export default function StudentPortal() {
             </div>
           </div>
 
-          <div className="bg-white p-2.5 sm:p-6 rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center sm:items-center gap-1.5 sm:gap-4 text-center sm:text-left">
-            <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-blue-50 text-pixiu-blue flex items-center justify-center shrink-0">
+          <a 
+            href="#hardware-kit-section"
+            className="bg-white hover:bg-blue-50/50 p-2.5 sm:p-6 rounded-xl sm:rounded-2xl border border-slate-200 hover:border-pixiu-blue shadow-sm flex flex-col sm:flex-row items-center sm:items-center gap-1.5 sm:gap-4 text-center sm:text-left transition-all group cursor-pointer"
+          >
+            <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-blue-50 group-hover:bg-blue-600 text-pixiu-blue group-hover:text-white flex items-center justify-center shrink-0 transition-colors">
               <Box className="w-4 h-4 sm:w-6 sm:h-6" />
             </div>
             <div className="min-w-0">
-              <p className="text-[9px] sm:text-xs text-slate-400 font-bold uppercase tracking-wider truncate">Lab Kit</p>
-              <p className="text-[11px] sm:text-sm font-bold font-mono text-slate-800 truncate">{student.assigned_kit_id || 'KIT-ZPS-01'}</p>
+              <p className="text-[9px] sm:text-xs text-slate-400 font-bold uppercase tracking-wider truncate">Assigned Kit (Click)</p>
+              <p className="text-[11px] sm:text-sm font-bold font-mono text-slate-800 group-hover:text-pixiu-blue truncate flex items-center gap-1">
+                {student.assigned_kit_id || 'KIT-ZPS-01'} <ChevronRight size={13} className="text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+              </p>
             </div>
-          </div>
+          </a>
         </div>
 
         {/* 3. Official Monthly Accountability & Motivation Notice Banner (Now Underneath Profile & Metrics) */}
@@ -749,7 +754,7 @@ export default function StudentPortal() {
             : kitComponents.filter(c => (c.category || 'General') === componentCategoryFilter);
 
           return (
-            <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 p-4 sm:p-8 shadow-sm space-y-5 sm:space-y-6">
+            <div id="hardware-kit-section" className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 p-4 sm:p-8 shadow-sm space-y-5 sm:space-y-6 scroll-mt-6">
               {/* Hardware Kit Box Custody Header */}
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-5">
                 <div className="space-y-1">
