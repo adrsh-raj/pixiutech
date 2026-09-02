@@ -30,7 +30,6 @@ export default function Sidebar({ mobileOpen = false, setMobileOpen = () => {} }
       links: [
         { name: 'Sales Pipeline', path: '/leads', icon: FolderKanban },
         { name: 'Partner Schools', path: '/schools', icon: Building },
-        { name: 'School Partner Portal', path: '/school-portal', icon: Building },
         { name: 'Billing & Invoices', path: '/billing', icon: CreditCard },
       ]
     },
@@ -38,7 +37,6 @@ export default function Sidebar({ mobileOpen = false, setMobileOpen = () => {} }
       title: 'ACADEMICS & LMS',
       links: [
         { name: 'Student Directory', path: '/students', icon: Users },
-        { name: 'Student Portal View', path: '/student-portal', icon: GraduationCap },
         { name: 'Content Hub', path: '/content', icon: PlaySquare },
         { name: 'Curriculum Plans', path: '/curriculum', icon: BookOpen },
         { name: 'Trainers Roster', path: '/trainers', icon: GraduationCap },
