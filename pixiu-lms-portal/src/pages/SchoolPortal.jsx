@@ -10,7 +10,7 @@ import {
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
-import { generateStudentTranscriptPDF } from '../utils/transcriptGenerator';
+import { generateStudentTranscriptPDF, generateClassCohortTranscriptPDF } from '../utils/transcriptGenerator';
 import KpiCard from '../components/ui/KpiCard';
 import Badge from '../components/ui/Badge';
 import Modal from '../components/ui/Modal';
@@ -527,18 +527,47 @@ export default function SchoolPortal() {
                 />
               </div>
 
-              <div className="flex items-center gap-2">
-                {['ALL', '6', '7', '8', '9', '11'].map(grade => (
-                  <button
-                    key={grade}
-                    onClick={() => setSelectedGradeFilter(grade)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
-                      selectedGradeFilter === grade ? 'bg-pixiu-blue text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
-                  >
-                    {grade === 'ALL' ? 'All Classes' : `Class ${grade}`}
-                  </button>
-                ))}
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+                  {['ALL', '6', '7', '8', '9', '11'].map(grade => (
+                    <button
+                      key={grade}
+                      onClick={() => setSelectedGradeFilter(grade)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                        selectedGradeFilter === grade ? 'bg-pixiu-blue text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      {grade === 'ALL' ? 'All Classes' : `Class ${grade}`}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const targetGrade = selectedGradeFilter === 'ALL' ? '6' : selectedGradeFilter;
+                    const cohortStudents = selectedGradeFilter === 'ALL'
+                      ? schoolStudents
+                      : schoolStudents.filter(s => s.class_id?.includes(selectedGradeFilter) || s.student_id?.includes(selectedGradeFilter));
+
+                    generateClassCohortTranscriptPDF({
+                      classGrade: targetGrade,
+                      classSection: 'A',
+                      school: activeSchool,
+                      students: cohortStudents,
+                      studentReviews,
+                      projects,
+                      curriculum,
+                      getStudentAttendance,
+                      userRole: 'school'
+                    });
+                  }}
+                  className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
+                  title="Download Class Cohort Progress & Laboratory Report PDF"
+                >
+                  <Download size={13} />
+                  <span>Class {selectedGradeFilter === 'ALL' ? 'Cohort' : selectedGradeFilter} Report PDF</span>
+                </button>
               </div>
             </div>
 
