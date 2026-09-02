@@ -69,7 +69,8 @@ export default function Trainers() {
     completeSession, unlockSession, startNewSession, attendance, addTrainer, updateTrainerStatus, 
     deleteTrainer, uploadFile, projects = [], addProject, deleteProject, scheduleSession, 
     adminUpdateAttendance, notifications, curriculum,
-    studentReviews = [], saveStudentReview, deleteStudentReview
+    studentReviews = [], saveStudentReview, deleteStudentReview,
+    updateStudent, pushSchoolNotification
   } = useData();
   
   const { role, user } = useAuth();
@@ -213,7 +214,7 @@ export default function Trainers() {
     setIsReviewModalOpen(true);
   };
 
-  const handleSaveReview = (e) => {
+  const handleSaveReview = async (e) => {
     e.preventDefault();
     const studentObj = students.find(s => s.student_id === reviewFormData.student_id);
     const payload = {
@@ -223,7 +224,26 @@ export default function Trainers() {
       class_grade: studentObj?.class_id ? studentObj.class_id.replace('CLS-ZPS-', '').replace('A', '') : reviewFormData.class_grade
     };
     saveStudentReview(payload);
-    toast.success(`Unit review for ${payload.student_name} (${payload.unit_code}) saved successfully!`, 'Review Published');
+
+    // If Trainer chose to authorize & issue graduation certificate
+    if (reviewFormData.issue_graduation_certificate && studentObj) {
+      await updateStudent(studentObj.id || studentObj.student_id, {
+        status: 'Certified Graduate',
+        tech_level: 'Level 5 (Certified Graduate)',
+        certificate_issued: true,
+        certificate_issued_at: new Date().toISOString()
+      });
+      await pushSchoolNotification({
+        target_school_id: studentObj.school_id,
+        title: `🎓 Graduation Certificate Issued: ${studentObj.name}`,
+        message: `Official Accredited STEM Robotics Certificate with QR Verification has been authorized and issued to ${studentObj.name} (${studentObj.student_id}) by Trainer ${reviewFormData.trainer_name}.`,
+        type: 'certificate_issued',
+        priority: 'high'
+      });
+      toast.success(`Official Accredited Certificate with QR unlocked for ${studentObj.name}! One-time credential issued.`, 'Graduate Certified');
+    } else {
+      toast.success(`Unit review for ${payload.student_name} (${payload.unit_code}) saved successfully!`, 'Review Published');
+    }
     setIsReviewModalOpen(false);
   };
 
@@ -1460,6 +1480,26 @@ export default function Trainers() {
               required
               className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold text-slate-800"
             />
+          </div>
+
+          {/* Authorize Graduation Certificate Checkbox */}
+          <div className="p-3 bg-emerald-50/80 border border-emerald-200 rounded-xl">
+            <label className="flex items-start gap-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={reviewFormData.issue_graduation_certificate || false}
+                onChange={(e) => setReviewFormData({ ...reviewFormData, issue_graduation_certificate: e.target.checked })}
+                className="mt-0.5 w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300"
+              />
+              <div>
+                <span className="font-bold text-emerald-950 text-xs flex items-center gap-1.5">
+                  🎓 Authorize & Issue Official Graduate Certificate (with QR)
+                </span>
+                <p className="text-[10.5px] text-emerald-800 mt-0.5 leading-tight">
+                  Check this when student completes syllabus / final unit with distinction. This permanently authorizes their official 1-time accredited certificate with public verification QR.
+                </p>
+              </div>
+            </label>
           </div>
 
           <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">

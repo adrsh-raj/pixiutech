@@ -1,14 +1,19 @@
-// Ultra-Professional STEM & Robotics Innovation Transcript & Progress Certificate Generator
-
 export const generateStudentTranscriptPDF = ({
   student,
   school = 'Zenith Public School',
   attendanceRate = 100,
   studentReviews = [],
   projects = [],
-  curriculum = []
+  curriculum = [],
+  isOfficialCertificate = false
 }) => {
   if (!student) return;
+
+  const isEligibleGraduate = student.status === 'Certified Graduate' || 
+                             student.tech_level?.includes('Level 5') || 
+                             student.certificate_issued === true;
+
+  const showQRCodeCertificate = isOfficialCertificate && isEligibleGraduate;
 
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
 
@@ -187,17 +192,17 @@ export const generateStudentTranscriptPDF = ({
                 <span style="font-size: 20px; font-weight: 900; color: #0066FF; letter-spacing: 0.5px; margin-left: 8px; vertical-align: middle;">PIXIU TECH</span>
               </td>
               <td style="text-align: right; vertical-align: middle;">
-                <span class="cert-badge">🛡️ Authenticated Transcript</span>
+                <span class="cert-badge">${showQRCodeCertificate ? '🎓 Accredited Graduate Certificate' : '📊 Student Progress Report'}</span>
                 <p style="margin: 3px 0 0 0; font-family: monospace; font-size: 10px; color: #0066FF; font-weight: bold;">
-                  ID: CERT-PIX-${student.student_id.replace(/\s+/g, '-')}-2026
+                  ID: ${showQRCodeCertificate ? `CERT-PIX-${student.student_id.replace(/\s+/g, '-')}-2026` : `REP-${student.student_id.replace(/\s+/g, '-')}`}
                 </p>
               </td>
             </tr>
           </table>
 
           <div style="text-align: center; margin-bottom: 14px;">
-            <h1 class="doc-title">STEM & Robotics Innovation Transcript</h1>
-            <p class="doc-sub">Official Institutional Competency & Practical Laboratory Evaluation Record</p>
+            <h1 class="doc-title">${showQRCodeCertificate ? 'STEM & Robotics Graduate Certificate & Transcript' : 'STEM & Robotics Laboratory Progress Report'}</h1>
+            <p class="doc-sub">${showQRCodeCertificate ? 'Official Accredited Institutional Graduation Credential & Laboratory Competency Record' : 'Active Student Competency & Practical Laboratory Evaluation Record'}</p>
           </div>
 
           <!-- Student Profile Grid -->
@@ -307,35 +312,57 @@ export const generateStudentTranscriptPDF = ({
             </tbody>
           </table>
 
-          <!-- Official QR Code Credential Verification Strip -->
-          <div style="margin-top: 14px; padding: 10px 14px; background: #f8fafc; border: 1.5px dashed #cbd5e1; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; gap: 14px;">
-            <div style="display: flex; align-items: center; gap: 12px;">
-              <div style="background: #ffffff; padding: 3px; border: 1px solid #e2e8f0; border-radius: 6px; display: inline-block; shrink-0;">
-                <img 
-                  src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(`https://pixiutech.com/verify?id=${student.student_id}`)}&margin=2" 
-                  alt="Scan to Verify Credential" 
-                  style="width: 68px; height: 68px; display: block;" 
-                />
+          <!-- Official QR Code Credential Verification Strip / Progress Tracker Notice -->
+          ${showQRCodeCertificate ? `
+            <div style="margin-top: 14px; padding: 10px 14px; background: #f8fafc; border: 1.5px dashed #cbd5e1; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; gap: 14px;">
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="background: #ffffff; padding: 3px; border: 1px solid #e2e8f0; border-radius: 6px; display: inline-block; shrink-0;">
+                  <img 
+                    src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(`https://pixiutech.com/verify?id=${student.student_id}`)}&margin=2" 
+                    alt="Scan to Verify Credential" 
+                    style="width: 68px; height: 68px; display: block;" 
+                  />
+                </div>
+                <div>
+                  <div style="font-size: 11px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px;">
+                    Official Credential Verification Registry
+                  </div>
+                  <div style="font-size: 9.5px; color: #475569; margin-top: 2px;">
+                    Scan QR with camera or visit <b style="color: #0066FF;">pixiutech.com/verify</b> to validate authenticity.
+                  </div>
+                  <div style="font-size: 9px; font-family: monospace; color: #64748b; margin-top: 3px;">
+                    Certificate Ref ID: <b style="color: #0f172a;">PIXIU-${(student.school_id || 'SCH').toUpperCase()}-${(student.student_id || '').replace(/\s+/g, '')}-2026</b>
+                  </div>
+                </div>
               </div>
+              <div style="text-align: right; shrink-0;">
+                <span style="display: inline-block; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; font-size: 9px; font-weight: 800; padding: 3px 8px; border-radius: 20px; text-transform: uppercase;">
+                  ✓ Authenticated & Verified
+                </span>
+                <div style="font-size: 8.5px; color: #94a3b8; margin-top: 4px; font-weight: 600;">Pixiu Tech Central Registry</div>
+              </div>
+            </div>
+          ` : `
+            <div style="margin-top: 14px; padding: 10px 14px; background: #f8fafc; border: 1.5px dashed #cbd5e1; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; gap: 14px;">
               <div>
                 <div style="font-size: 11px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px;">
-                  Official Credential Verification Registry
+                  Active Laboratory Progress Report (Course In-Progress)
                 </div>
                 <div style="font-size: 9.5px; color: #475569; margin-top: 2px;">
-                  Scan QR with camera or visit <b style="color: #0066FF;">pixiutech.com/verify</b> to validate authenticity.
+                  This document reflects current laboratory units and project builds. The Official Accredited Graduate Certificate with QR Verification is unlocked upon Level 5 course completion and faculty authorization.
                 </div>
                 <div style="font-size: 9px; font-family: monospace; color: #64748b; margin-top: 3px;">
-                  Certificate Ref ID: <b style="color: #0f172a;">PIXIU-${(student.school_id || 'SCH').toUpperCase()}-${(student.student_id || '').replace(/\s+/g, '')}-2026</b>
+                  Student ID: <b style="color: #0f172a;">${student.student_id}</b> • Status: <b style="color: #0066FF;">${student.tech_level || 'Level 0'} Active</b>
                 </div>
               </div>
+              <div style="text-align: right; shrink-0;">
+                <span style="display: inline-block; background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; font-size: 9px; font-weight: 800; padding: 3px 8px; border-radius: 20px; text-transform: uppercase;">
+                  ⚡ Active Progression
+                </span>
+                <div style="font-size: 8.5px; color: #94a3b8; margin-top: 4px; font-weight: 600;">Faculty Lab Records</div>
+              </div>
             </div>
-            <div style="text-align: right; shrink-0;">
-              <span style="display: inline-block; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; font-size: 9px; font-weight: 800; padding: 3px 8px; border-radius: 20px; text-transform: uppercase;">
-                ✓ Authenticated & Verified
-              </span>
-              <div style="font-size: 8.5px; color: #94a3b8; margin-top: 4px; font-weight: 600;">Pixiu Tech Central Registry</div>
-            </div>
-          </div>
+          `}
 
           <!-- Signatures -->
           <table class="signatures-table">

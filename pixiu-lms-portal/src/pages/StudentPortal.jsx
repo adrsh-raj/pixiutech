@@ -259,16 +259,39 @@ export default function StudentPortal() {
     return null;
   };
 
+  const isGraduateCertified = student.status === 'Certified Graduate' || 
+                              student.tech_level?.includes('Level 5') || 
+                              student.certificate_issued === true;
+
   // Ultra-Professional PDF Transcript & Certificate Generator
-  const handlePrintReport = () => {
+  const handlePrintProgressReport = () => {
     generateStudentTranscriptPDF({
       student,
       school,
       attendanceRate,
       studentReviews,
       projects: studentProjects,
-      curriculum
+      curriculum,
+      isOfficialCertificate: false
     });
+    toast.info(`Active Laboratory Progress Report generated for ${student.name}.`, 'Progress Report PDF');
+  };
+
+  const handlePrintOfficialCertificate = () => {
+    if (!isGraduateCertified) {
+      toast.warning('Official QR Certificate is locked! It will be issued one-time upon Level 5 course completion and faculty authorization.', 'Certificate Locked');
+      return;
+    }
+    generateStudentTranscriptPDF({
+      student,
+      school,
+      attendanceRate,
+      studentReviews,
+      projects: studentProjects,
+      curriculum,
+      isOfficialCertificate: true
+    });
+    toast.success(`Official Accredited Graduate Certificate with QR generated for ${student.name}!`, 'Official Certificate Issued');
   };
 
   return (
@@ -476,18 +499,41 @@ export default function StudentPortal() {
           </div>
 
           <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full md:w-auto shrink-0">
+            {/* 1. Progress Report Button: Always accessible for students to view active coursework */}
             <button 
-              onClick={handlePrintReport}
-              className="w-full sm:w-auto bg-pixiu-blue hover:bg-blue-600 active:scale-98 text-white text-xs font-bold px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 transition-all cursor-pointer shrink-0"
+              onClick={handlePrintProgressReport}
+              className="w-full sm:w-auto bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold px-4 sm:px-4 py-2.5 sm:py-3 rounded-xl flex items-center justify-center gap-2 border border-slate-700 transition-all cursor-pointer shrink-0"
+              title="Download Active Laboratory Progress & Assessment Report (No QR Certificate)"
             >
-              <FileText size={15} /> Download Transcript
+              <FileText size={15} /> Progress Report
             </button>
-            <Link
-              to={`/verify?id=${encodeURIComponent(student.student_id)}`}
-              className="w-full sm:w-auto bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold px-4 py-2.5 sm:py-3 rounded-xl flex items-center justify-center gap-2 border border-slate-700 transition-all shrink-0"
-            >
-              <ShieldCheck size={15} className="text-emerald-400" /> Verify Online (QR)
-            </Link>
+
+            {/* 2. Official Certificate with QR: Unlocked only when course completed & authorized by Trainer */}
+            {isGraduateCertified ? (
+              <>
+                <button 
+                  onClick={handlePrintOfficialCertificate}
+                  className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 active:scale-98 text-white text-xs font-bold px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 transition-all cursor-pointer shrink-0"
+                  title="Download Official Accredited Graduate Certificate with QR"
+                >
+                  <Award size={15} /> Official Certificate (with QR)
+                </button>
+                <Link
+                  to={`/verify?id=${encodeURIComponent(student.student_id)}`}
+                  className="w-full sm:w-auto bg-slate-800 hover:bg-slate-700 text-emerald-400 text-xs font-bold px-3.5 sm:px-4 py-2.5 sm:py-3 rounded-xl flex items-center justify-center gap-1.5 border border-emerald-500/30 transition-all shrink-0"
+                  title="Public Certificate Verification Registry"
+                >
+                  <ShieldCheck size={15} /> Verify (QR)
+                </Link>
+              </>
+            ) : (
+              <div 
+                className="w-full sm:w-auto bg-slate-800/80 text-slate-400 text-[11px] font-bold px-3.5 sm:px-4 py-2.5 sm:py-3 rounded-xl flex items-center justify-center gap-1.5 border border-slate-700/80 cursor-not-allowed"
+                title="Official Certificate with QR is locked. It will be issued one-time upon Level 5 course completion & faculty graduation approval."
+              >
+                <span className="text-amber-400">🔒</span> Certificate Locked (In-Progress)
+              </div>
+            )}
           </div>
         </div>
 
