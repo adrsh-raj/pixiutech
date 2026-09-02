@@ -6,7 +6,9 @@ import EnquiryForm from '../components/EnquiryForm.jsx'
 
 export default function Contact() {
   const [params] = useSearchParams()
+  const { hash } = useLocation()
   const intent = params.get('intent')
+
   useEffect(() => {
     const targetHash = hash || window.location.hash
     if (targetHash) {
