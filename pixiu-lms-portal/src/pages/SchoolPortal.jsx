@@ -123,6 +123,152 @@ export default function SchoolPortal() {
     return Math.round((present / records.length) * 100);
   };
 
+  const handlePrintInvoice = (inv) => {
+    const printWindow = window.open('', '_blank');
+    const isPaid = inv.status === 'Paid' || inv.is_confirmed === 1;
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Official Tax Invoice - ${inv.id}</title>
+          <style>
+            body { font-family: 'Segoe UI', Arial, sans-serif; padding: 40px; color: #1e293b; background: #fff; max-width: 800px; margin: 0 auto; }
+            .header { display: flex; justify-content: space-between; border-bottom: 2px solid #0A1A33; padding-bottom: 20px; margin-bottom: 25px; }
+            .brand { font-size: 24px; font-weight: 900; color: #0A1A33; letter-spacing: -0.5px; }
+            .brand span { color: #2563EB; }
+            .tagline { font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase; margin-top: 2px; }
+            .invoice-title { font-size: 22px; font-weight: 800; color: #0A1A33; text-align: right; }
+            .badge { display: inline-block; padding: 4px 12px; border-radius: 6px; font-size: 11px; font-weight: 800; text-transform: uppercase; margin-top: 5px; }
+            .badge-paid { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+            .badge-pending { background: #fef3c7; color: #b45309; border: 1px solid #fcd34d; }
+            .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 25px; font-size: 13px; }
+            .card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; }
+            .card-title { font-size: 11px; font-weight: 800; text-transform: uppercase; color: #64748b; margin-bottom: 8px; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 25px; font-size: 13px; }
+            th { background: #0A1A33; color: #fff; text-align: left; padding: 10px 12px; font-size: 11px; text-transform: uppercase; }
+            td { padding: 12px; border-bottom: 1px solid #e2e8f0; }
+            .total-box { margin-left: auto; width: 280px; font-size: 13px; margin-bottom: 30px; }
+            .total-row { display: flex; justify-content: space-between; padding: 6px 0; }
+            .total-row.final { border-top: 2px solid #0A1A33; font-size: 16px; font-weight: 900; color: #0A1A33; padding-top: 10px; margin-top: 4px; }
+            .footer { border-top: 1px solid #e2e8f0; padding-top: 20px; display: flex; justify-content: space-between; font-size: 11px; color: #64748b; }
+            .footer-note { text-align: center; margin-top: 30px; font-size: 10px; color: #94a3b8; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div>
+              <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 6px;">
+                <img src="/img/logo.png" alt="Pixiu Tech Logo" style="height: 48px; width: auto; object-fit: contain; display: block;" onerror="this.style.display='none'" />
+                <div>
+                  <div class="brand">PIXIU <span>TECH LLP</span></div>
+                  <div class="tagline">Educational Robotics & AI Lab Systems</div>
+                </div>
+              </div>
+              <p style="margin: 4px 0 0 0; font-size: 12px; color: #475569;">
+                Plot 42, Knowledge Park III, Gorakhpur / Hata Road, UP<br/>
+                GSTIN: <strong>09AAACP1234F1Z5</strong> | CIN: U72900UP2026PTC109823
+              </p>
+            </div>
+            <div>
+              <div class="invoice-title">TAX INVOICE & RECEIPT</div>
+              <div style="text-align: right;">
+                <span class="badge ${isPaid ? 'badge-paid' : 'badge-pending'}">${isPaid ? 'PAID & CONFIRMED' : 'PENDING PAYMENT'}</span>
+              </div>
+              <p style="margin: 6px 0 0 0; font-size: 12px; color: #475569; text-align: right; font-family: monospace;">
+                Invoice No: <strong>${inv.id}</strong><br/>
+                Date: <strong>${inv.date_issued || inv.invoice_date || '2026-08-25'}</strong>
+              </p>
+            </div>
+          </div>
+
+          <div class="grid">
+            <div class="card">
+              <div class="card-title">BILLED TO (CLIENT INSTITUTION)</div>
+              <p style="margin: 0; font-weight: 800; font-size: 14px; color: #0A1A33;">${activeSchool.name}</p>
+              <p style="margin: 4px 0 0 0; color: #475569;">
+                Institutional Partner Code: <strong>${activeSchool.code || activeSchool.id}</strong><br/>
+                Place of Supply: <strong>${inv.place_of_supply || 'Gorakhpur, Uttar Pradesh'}</strong>
+              </p>
+            </div>
+            <div class="card">
+              <div class="card-title">CONTRACT & PAYMENT DETAILS</div>
+              <p style="margin: 0; color: #475569;">
+                Milestone: <strong>${inv.tranche_title || 'Institutional Fee Tranche'}</strong><br/>
+                Due Date: <strong>${inv.due_date}</strong><br/>
+                Payment Ref: <strong>${inv.receipt_no || 'N/A (Pending Reconcile)'}</strong>
+              </p>
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Description</th>
+                <th>HSN/SAC</th>
+                <th>Qty</th>
+                <th style="text-align: right;">Taxable Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <strong>${inv.tranche_title || 'STEM Robotics & Hardware Lab Operations'}</strong><br/>
+                  <span style="font-size: 11px; color: #64748b;">Comprehensive robotics kits, trainer deployment, and semester examinations.</span>
+                </td>
+                <td>999293</td>
+                <td>1 Unit</td>
+                <td style="text-align: right; font-weight: 700;">₹${(inv.amount || 0).toLocaleString('en-IN')}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="total-box">
+            <div class="total-row">
+              <span>Subtotal:</span>
+              <strong>₹${(inv.amount || 0).toLocaleString('en-IN')}</strong>
+            </div>
+            <div class="total-row">
+              <span>CGST (0% Educational Exemption):</span>
+              <strong>₹0</strong>
+            </div>
+            <div class="total-row">
+              <span>SGST (0% Educational Exemption):</span>
+              <strong>₹0</strong>
+            </div>
+            <div class="total-row final">
+              <span>Total Payable:</span>
+              <span style="color: #2563EB;">₹${(inv.amount || 0).toLocaleString('en-IN')}</span>
+            </div>
+          </div>
+
+          <div class="footer">
+            <div>
+              <p style="margin: 0; font-size: 11px; font-weight: 700; text-transform: uppercase; color: #64748b;">Bank Account Details for Wire Transfer</p>
+              <p style="margin: 4px 0 0 0; color: #475569; line-height: 1.6;">
+                Account Name: <strong>PIXIU TECH LLP</strong><br/>
+                Account No: <strong>5599971440</strong> (Central Bank of India)<br/>
+                IFSC Code: <strong>CBIN0282573</strong> | Branch: Gorakhpur Main
+              </p>
+            </div>
+            <div style="text-align: right;">
+              <p style="margin: 0; font-size: 11px; font-weight: 700; text-transform: uppercase; color: #64748b;">Authorized Signatory</p>
+              <p style="margin: 4px 0 0 0; font-size: 13px; font-weight: 800; color: #0A1A33;">Adarsh Raj Singh</p>
+              <p style="margin: 0; font-size: 10px; color: #64748b;">Founder & Director, Pixiu Tech LLP</p>
+            </div>
+          </div>
+
+          <div class="footer-note">
+            This is an electronically verified Tax Invoice & Payment Receipt generated by <strong>portal.pixiutech.com</strong>.<br/>
+            Pixiu Tech LLP • Contact: billing@pixiutech.com
+          </div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
   // Unread count and mark handlers
   const unreadNotifs = useMemo(() => {
     return schoolNotifications.filter(n => !readNotifIds.includes(n.id));
@@ -741,55 +887,116 @@ export default function SchoolPortal() {
 
         {/* TAB 5: BILLING & INVOICES */}
         {activeTab === 'billing' && (
-          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-            <div className="p-6 border-b border-slate-100">
-              <h3 className="text-lg font-bold text-slate-800">Institutional Billing & Invoices</h3>
-              <p className="text-xs text-slate-500 mt-1">Official contractual milestone billing records for {activeSchool.name}.</p>
+          <div className="space-y-6">
+            {/* OFFICIAL BENEFICIARY & WIRE TRANSFER CARD */}
+            <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white p-6 rounded-2xl border border-slate-700 shadow-md">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-700 pb-4 mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center text-blue-400">
+                    <Receipt size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white tracking-wide">Official Wire Transfer & Settlement Details</h3>
+                    <p className="text-xs text-slate-400">Electronic remittance details for institutional robotics contracts</p>
+                  </div>
+                </div>
+                <span className="text-[11px] font-bold px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  Verified Commercial Account
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+                <div className="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700/60">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Beneficiary / Company</span>
+                  <span className="text-sm font-extrabold text-white">PIXIU TECH LLP</span>
+                </div>
+
+                <div className="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700/60">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Bank Account Number</span>
+                  <span className="text-sm font-mono font-extrabold text-blue-400">5599971440</span>
+                </div>
+
+                <div className="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700/60">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">IFSC Code & Bank</span>
+                  <span className="text-sm font-mono font-extrabold text-white">CBIN0282573</span>
+                  <span className="text-[10px] text-slate-400 block mt-0.5">Central Bank of India (Gorakhpur)</span>
+                </div>
+
+                <div className="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700/60">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Authorized Signatory</span>
+                  <span className="text-sm font-bold text-slate-200">Adarsh Raj Singh</span>
+                  <span className="text-[10px] text-slate-400 block mt-0.5">Founder & Director, Pixiu Tech LLP</span>
+                </div>
+              </div>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold text-[11px]">
-                    <th className="py-3.5 px-4">Invoice #</th>
-                    <th className="py-3.5 px-4">Milestone Tranche</th>
-                    <th className="py-3.5 px-4">Issued Date</th>
-                    <th className="py-3.5 px-4">Due Date</th>
-                    <th className="py-3.5 px-4">Amount</th>
-                    <th className="py-3.5 px-4">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {schoolBilling.map((inv) => (
-                    <tr key={inv.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="py-3.5 px-4 font-mono font-bold text-pixiu-blue">{inv.id}</td>
-                      <td className="py-3.5 px-4">
-                        <div className="font-bold text-slate-800">{inv.tranche_title}</div>
-                        <div className="text-[11px] text-slate-500 max-w-md truncate">{inv.description}</div>
-                      </td>
-                      <td className="py-3.5 px-4 text-slate-600 font-mono">{inv.invoice_date || inv.date_issued}</td>
-                      <td className="py-3.5 px-4 text-slate-600 font-mono">{inv.due_date}</td>
-                      <td className="py-3.5 px-4 font-bold text-slate-800 text-sm">₹{inv.amount?.toLocaleString('en-IN')}</td>
-                      <td className="py-3.5 px-4">
-                        <span className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
-                          inv.status === 'Paid' 
-                            ? 'bg-emerald-100 text-emerald-800' 
-                            : 'bg-amber-100 text-amber-800'
-                        }`}>
-                          {inv.status}
-                        </span>
-                      </td>
+            {/* Invoices Table */}
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+              <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-800">Institutional Invoices & Ledger</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Official contractual milestone billing records for {activeSchool.name}.</p>
+                </div>
+                <span className="text-xs font-bold px-3 py-1 bg-slate-100 text-slate-700 rounded-lg">
+                  {schoolBilling.length} Invoices Issued
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold text-[11px]">
+                      <th className="py-3.5 px-4 pl-6">Invoice #</th>
+                      <th className="py-3.5 px-4">Milestone Tranche</th>
+                      <th className="py-3.5 px-4">Issued Date</th>
+                      <th className="py-3.5 px-4">Due Date</th>
+                      <th className="py-3.5 px-4">Amount</th>
+                      <th className="py-3.5 px-4">Status</th>
+                      <th className="py-3.5 px-4 text-right pr-6">Official Document</th>
                     </tr>
-                  ))}
-                  {schoolBilling.length === 0 && (
-                    <tr>
-                      <td colSpan="6" className="py-12 text-center text-slate-400 text-xs font-medium">
-                        No billing invoices generated yet.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {schoolBilling.map((inv) => (
+                      <tr key={inv.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-3.5 px-4 pl-6 font-mono font-bold text-pixiu-blue">{inv.id}</td>
+                        <td className="py-3.5 px-4">
+                          <div className="font-bold text-slate-800">{inv.tranche_title}</div>
+                          <div className="text-[11px] text-slate-500 max-w-md truncate">{inv.description || 'Comprehensive robotics kits, trainer deployment & lab setup.'}</div>
+                        </td>
+                        <td className="py-3.5 px-4 text-slate-600 font-mono">{inv.invoice_date || inv.date_issued}</td>
+                        <td className="py-3.5 px-4 text-slate-600 font-mono">{inv.due_date}</td>
+                        <td className="py-3.5 px-4 font-bold text-slate-800 text-sm">₹{inv.amount?.toLocaleString('en-IN')}</td>
+                        <td className="py-3.5 px-4">
+                          <span className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                            inv.status === 'Paid' 
+                              ? 'bg-emerald-100 text-emerald-800' 
+                              : 'bg-amber-100 text-amber-800'
+                          }`}>
+                            {inv.status}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-right pr-6">
+                          <button
+                            onClick={() => handlePrintInvoice(inv)}
+                            className="px-3 py-1.5 bg-blue-50 hover:bg-pixiu-blue text-pixiu-blue hover:text-white rounded-lg text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1.5 border border-blue-200 hover:border-transparent"
+                            title="View Official Tax Invoice & Receipt"
+                          >
+                            <FileText size={13} /> View Invoice
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {schoolBilling.length === 0 && (
+                      <tr>
+                        <td colSpan="7" className="py-12 text-center text-slate-400 text-xs font-medium">
+                          No billing invoices generated yet for this institution.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}

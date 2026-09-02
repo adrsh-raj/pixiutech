@@ -215,9 +215,14 @@ export default function Billing() {
         <body>
           <div class="header">
             <div>
-              <div class="brand">PIXIU <span>TECH</span></div>
-              <div class="tagline">Educational Robotics & AI Lab Systems</div>
-              <p style="margin: 6px 0 0 0; font-size: 12px; color: #475569;">
+              <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 6px;">
+                <img src="/img/logo.png" alt="Pixiu Tech Logo" style="height: 48px; width: auto; object-fit: contain; display: block;" onerror="this.style.display='none'" />
+                <div>
+                  <div class="brand">PIXIU <span>TECH LLP</span></div>
+                  <div class="tagline">Educational Robotics & AI Lab Systems</div>
+                </div>
+              </div>
+              <p style="margin: 4px 0 0 0; font-size: 12px; color: #475569;">
                 Plot 42, Knowledge Park III, Gorakhpur / Hata Road, UP<br/>
                 GSTIN: <strong>09AAACP1234F1Z5</strong> | CIN: U72900UP2026PTC109823
               </p>
@@ -297,16 +302,16 @@ export default function Billing() {
           <div class="footer">
             <div>
               <p style="margin: 0; font-size: 11px; font-weight: 700; text-transform: uppercase; color: #64748b;">Bank Account Details for Wire Transfer</p>
-              <p style="margin: 4px 0 0 0; color: #475569;">
-                Account Name: <strong>Pixiu Tech LLP</strong><br/>
-                Account No: <strong>922020041289123</strong> (HDFC Bank Ltd)<br/>
-                IFSC Code: <strong>HDFC0001824</strong> | Branch: Gorakhpur Main
+              <p style="margin: 4px 0 0 0; color: #475569; line-height: 1.6;">
+                Account Name: <strong>PIXIU TECH LLP</strong><br/>
+                Account No: <strong>5599971440</strong> (Central Bank of India)<br/>
+                IFSC Code: <strong>CBIN0282573</strong> | Branch: Gorakhpur Main
               </p>
             </div>
             <div style="text-align: right;">
               <p style="margin: 0; font-size: 11px; font-weight: 700; text-transform: uppercase; color: #64748b;">Authorized Signatory</p>
-              <p style="margin: 4px 0 0 0; font-size: 13px; font-weight: 800; color: #0A1A33;">Adarsh Raj</p>
-              <p style="margin: 0; font-size: 10px; color: #64748b;">Founder & Director, Pixiu Tech</p>
+              <p style="margin: 4px 0 0 0; font-size: 13px; font-weight: 800; color: #0A1A33;">Adarsh Raj Singh</p>
+              <p style="margin: 0; font-size: 10px; color: #64748b;">Founder & Director, Pixiu Tech LLP</p>
             </div>
           </div>
 
