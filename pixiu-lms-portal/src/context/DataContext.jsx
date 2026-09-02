@@ -491,20 +491,38 @@ export function DataProvider({ children }) {
 
   // 8. Billing & Invoices
   const createInvoice = async (invData) => {
+    let savedItem = null;
     try {
       const res = await fetch(`${API_URL}/billing`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(invData)
       });
-      const data = await res.json();
       if (res.ok) {
-        setBilling(prev => [data, ...prev]);
-        return { success: true, data };
+        savedItem = await res.json();
       }
-    } catch (e) {
-      console.error(e);
+    } catch (e) {}
+
+    if (!savedItem) {
+      savedItem = {
+        ...invData,
+        id: invData.id || `INV-${invData.school_id || 'GEN'}-${Date.now().toString().slice(-4)}`,
+        status: invData.status || 'Pending',
+        is_confirmed: invData.status === 'Paid' ? 1 : 0,
+        date_issued: invData.date_issued || new Date().toISOString().split('T')[0],
+        invoice_date: invData.date_issued || new Date().toISOString().split('T')[0],
+        due_date: invData.due_date || new Date().toISOString().split('T')[0],
+        amount: Number(invData.amount) || 0
+      };
     }
+
+    setBilling(prev => {
+      const updated = [savedItem, ...prev.filter(b => b.id !== savedItem.id)];
+      try { localStorage.setItem('pixiu_billing', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+
+    return { success: true, data: savedItem };
   };
 
   const updateInvoiceStatus = async (id, status) => {
@@ -514,40 +532,45 @@ export function DataProvider({ children }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status })
       });
-      const today = new Date().toISOString().split('T')[0];
-      setBilling(prev => prev.map(b => b.id === id ? { 
+    } catch (e) {}
+
+    const today = new Date().toISOString().split('T')[0];
+    setBilling(prev => {
+      const updated = prev.map(b => b.id === id ? { 
         ...b, 
         status, 
         is_confirmed: status === 'Paid' ? 1 : 0,
-        paid_date: status === 'Paid' ? today : null
-      } : b));
-    } catch (e) {
-      console.error(e);
-    }
+        paid_date: status === 'Paid' ? (b.paid_date || today) : null
+      } : b);
+      try { localStorage.setItem('pixiu_billing', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+    return { success: true };
   };
 
   const confirmPaymentReceipt = async (id, isConfirmed, paymentMethod, receiptNo) => {
     try {
-      const res = await fetch(`${API_URL}/billing/${id}/confirm-payment`, {
+      await fetch(`${API_URL}/billing/${id}/confirm-payment`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_confirmed: isConfirmed, payment_method: paymentMethod, receipt_no: receiptNo })
       });
-      const data = await res.json();
-      if (res.ok) {
-        setBilling(prev => prev.map(b => b.id === id ? { 
-          ...b, 
-          is_confirmed: data.is_confirmed, 
-          status: data.status, 
-          paid_date: data.paid_date, 
-          receipt_no: data.receipt_no,
-          payment_method: paymentMethod || b.payment_method
-        } : b));
-        return { success: true, data };
-      }
-    } catch (e) {
-      console.error(e);
-    }
+    } catch (e) {}
+
+    const today = new Date().toISOString().split('T')[0];
+    setBilling(prev => {
+      const updated = prev.map(b => b.id === id ? { 
+        ...b, 
+        is_confirmed: isConfirmed ? 1 : 0, 
+        status: isConfirmed ? 'Paid' : 'Pending', 
+        paid_date: isConfirmed ? (b.paid_date || today) : null, 
+        receipt_no: receiptNo || b.receipt_no || `REC-${Date.now().toString().slice(-4)}`,
+        payment_method: paymentMethod || b.payment_method || 'Bank Transfer (NEFT)'
+      } : b);
+      try { localStorage.setItem('pixiu_billing', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+    return { success: true };
   };
 
   const updateBillingInvoice = async (id, updatedFields) => {

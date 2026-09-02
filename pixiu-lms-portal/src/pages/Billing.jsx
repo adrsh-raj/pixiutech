@@ -140,16 +140,43 @@ export default function Billing() {
     setEditingInvoice(null);
   };
 
+  const handleOpenCreateModal = () => {
+    const activeSchoolId = selectedSchool !== 'All' ? selectedSchool : (schools[0]?.id || 'ZPS');
+    const targetSchool = schools.find(s => s.id === activeSchoolId) || schools[0];
+    const existingCount = billing.filter(b => b.school_id === activeSchoolId || b.school_id === targetSchool?.code).length;
+    setFormData({
+      school_id: activeSchoolId,
+      tranche_number: existingCount + 1,
+      tranche_title: `Tranche ${existingCount + 1}: STEM Curriculum & Practical Lab Delivery`,
+      amount: 35000,
+      total_contract_value: targetSchool?.expected_revenue || 100000,
+      date_issued: new Date().toISOString().split('T')[0],
+      due_date: new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0],
+      place_of_supply: activeSchoolId === 'XYZ' ? 'Gorakhpur, Uttar Pradesh' : 'Hata, Uttar Pradesh',
+      status: 'Pending'
+    });
+    setIsModalOpen(true);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const schoolName = schools.find(s => s.id === formData.school_id)?.name || 'Partner School';
+    const targetSchool = schools.find(s => s.id === formData.school_id || s.code === formData.school_id) || schools[0];
+    const schoolName = targetSchool ? targetSchool.name : 'Partner School';
+    const invoiceId = `INV-${(formData.school_id || 'SCH').toUpperCase()}-${Date.now().toString().slice(-4)}`;
+
     await createInvoice({
       ...formData,
-      id: `INV-${formData.school_id}-${Date.now().toString().slice(-4)}`,
+      id: invoiceId,
+      school_id: targetSchool ? targetSchool.id : formData.school_id,
       school_name: schoolName,
-      amount: Number(formData.amount) || 0
+      amount: Number(formData.amount) || 0,
+      total_contract_value: Number(formData.total_contract_value) || Number(formData.amount) || 0,
+      invoice_date: formData.date_issued || new Date().toISOString().split('T')[0],
+      date_issued: formData.date_issued || new Date().toISOString().split('T')[0],
+      status: formData.status || 'Pending'
     });
-    toast.success(`Tax Invoice created for ${schoolName} (₹${Number(formData.amount).toLocaleString('en-IN')})`, 'Invoice Generated');
+
+    toast.success(`Tax Invoice ${invoiceId} created for ${schoolName} (₹${Number(formData.amount).toLocaleString('en-IN')})`, 'Invoice Generated');
     setIsModalOpen(false);
   };
 
@@ -304,7 +331,7 @@ export default function Billing() {
         </div>
         
         <button 
-          onClick={() => setIsModalOpen(true)}
+          onClick={handleOpenCreateModal}
           className="bg-pixiu-blue text-white px-5 py-2.5 rounded-lg font-medium flex items-center gap-2 hover:bg-blue-600 transition-colors shadow-sm cursor-pointer text-xs font-bold"
         >
           <Plus size={16} /> Create Custom Tranche / Invoice
