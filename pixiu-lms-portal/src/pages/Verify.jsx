@@ -179,7 +179,7 @@ export default function Verify() {
                 type="text"
                 value={inputStudentId}
                 onChange={(e) => setInputStudentId(e.target.value)}
-                placeholder="Enter Student Roll ID (e.g. XYZ6A 01, ZPS6A 01, XYZ7A 01)"
+                placeholder="Enter Student Roll ID (e.g. ABC6A 01, XYZ6A 01, ZPS6A 01)"
                 className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-mono text-sm placeholder:text-slate-400 focus:outline-none focus:border-pixiu-blue focus:bg-white transition-all uppercase font-bold"
               />
             </div>
@@ -196,7 +196,7 @@ export default function Verify() {
           {/* Quick Demo Test Pill */}
           <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100 text-[11px] text-slate-500">
             <span className="font-bold text-slate-400">Sample Candidate ID:</span>
-            {['XYZ6A 01'].map(id => (
+            {['ABC6A 01'].map(id => (
               <button
                 key={id}
                 type="button"
