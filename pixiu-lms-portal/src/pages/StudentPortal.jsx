@@ -2,11 +2,12 @@ import { useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useToast } from '../context/ToastContext';
+import { CLASS_KITS } from '../data/seedData';
 import { 
   Award, BookOpen, Activity, FileText, Download, CheckCircle, 
   Clock, LogOut, User, Box, PlaySquare, Eye, Sparkles, Megaphone, 
   Bell, Check, X, TrendingUp, Star, ShieldCheck, CheckCircle2, ChevronRight, Send, Trash2,
-  Cpu, Maximize2, Zap, Layers, Info
+  Cpu, Maximize2, Zap, Layers, Info, List, LayoutGrid, PackageCheck
 } from 'lucide-react';
 import { 
   AreaChart, Area, LineChart, Line, XAxis, YAxis, 
@@ -16,10 +17,11 @@ import {
 export default function StudentPortal() {
   const { user, logout } = useAuth();
   const toast = useToast();
-  const { students, schools, content, projects, deleteProject, getStudentAttendance, notifications, curriculum, studentReviews = [], classKits = {} } = useData();
+  const { students, schools, content, projects, deleteProject, getStudentAttendance, notifications, curriculum, studentReviews = [], classKits = {}, inventory = [] } = useData();
   const [selectedComponent, setSelectedComponent] = useState(null);
   const [componentCategoryFilter, setComponentCategoryFilter] = useState('All');
   const [isKitDiagramModalOpen, setIsKitDiagramModalOpen] = useState(false);
+  const [kitViewMode, setKitViewMode] = useState('grid'); // 'grid' | 'table'
 
   // Faculty / Admin live preview support
   const isAdminOrTrainer = user?.role === 'admin' || user?.role === 'trainer';
@@ -737,8 +739,10 @@ export default function StudentPortal() {
 
         {/* ==================== ASSIGNED HARDWARE KIT & PDF EXTRACTED COMPONENTS (NOW PROMINENTLY AT TOP) ==================== */}
         {(() => {
-          const studentKit = classKits[studentGrade] || classKits['6'] || {};
-          const kitComponents = studentKit.components || [];
+          const studentKit = (classKits && classKits[studentGrade] && classKits[studentGrade]?.components?.length > 0)
+            ? classKits[studentGrade]
+            : (CLASS_KITS[studentGrade] || CLASS_KITS['6']);
+          const kitComponents = studentKit?.components || [];
           const categories = ['All', ...new Set(kitComponents.map(c => c.category || 'General'))];
           const filteredComponents = componentCategoryFilter === 'All' 
             ? kitComponents 
@@ -746,25 +750,52 @@ export default function StudentPortal() {
 
           return (
             <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 p-4 sm:p-8 shadow-sm space-y-5 sm:space-y-6">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-100 pb-4 sm:pb-5">
-                <div>
+              {/* Hardware Kit Box Custody Header */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+                <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                    <h3 className="text-sm sm:text-lg font-bold text-slate-800">
-                      Assigned STEM Robotics Hardware Kit (Class {studentGrade} Cohort)
+                    <h3 className="text-sm sm:text-lg font-bold text-slate-800 flex items-center gap-2">
+                      <Box className="text-pixiu-blue" size={18} />
+                      Assigned STEM Hardware Kit & Parts Inventory
                     </h3>
                   </div>
-                  <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">
-                    {studentKit.name || `Class ${studentGrade} Robotics Kit`} • Tag ID: <span className="font-mono font-bold text-pixiu-blue">{student.assigned_kit_id || studentKit.kit_id}</span>
+                  <p className="text-xs text-slate-500">
+                    {studentKit.name} • Tag ID: <span className="font-mono font-bold text-pixiu-blue">{student.assigned_kit_id || studentKit.kit_id}</span> • Allocated to <strong className="text-slate-800">{student.name}</strong>
                   </p>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-[10px] sm:text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-full flex items-center gap-1.5 shadow-2xs">
-                    <CheckCircle size={13} /> Status: Lab Verified & Good
-                  </span>
-                  <span className="text-[10px] sm:text-xs font-bold bg-blue-50 text-pixiu-blue border border-blue-200 px-3 py-1 rounded-full flex items-center gap-1 shadow-2xs">
-                    <Cpu size={13} /> {kitComponents.length} Components Allocated
+                  {/* View Mode Switcher Toggle */}
+                  <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+                    <button
+                      type="button"
+                      onClick={() => setKitViewMode('grid')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                        kitViewMode === 'grid' 
+                          ? 'bg-white text-slate-900 shadow-xs' 
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                      title="Component Gallery View"
+                    >
+                      <LayoutGrid size={13} /> Cards
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setKitViewMode('table')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                        kitViewMode === 'table' 
+                          ? 'bg-white text-pixiu-blue shadow-xs' 
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                      title="Parts Inventory Table & Checklist"
+                    >
+                      <List size={13} /> Parts Ledger Table
+                    </button>
+                  </div>
+
+                  <span className="text-[10px] sm:text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-2xs">
+                    <CheckCircle size={13} /> {kitComponents.length} Parts in Box (Verified)
                   </span>
                 </div>
               </div>
@@ -776,13 +807,13 @@ export default function StudentPortal() {
                     <img 
                       src={studentKit.overview_image} 
                       alt={studentKit.name} 
-                      className="w-full h-44 sm:h-72 object-cover object-center group-hover:scale-102 transition-transform duration-500 opacity-90 group-hover:opacity-100"
+                      className="w-full h-48 sm:h-72 object-cover object-center group-hover:scale-102 transition-transform duration-500 opacity-90 group-hover:opacity-100"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-900/40 to-transparent flex flex-col justify-end p-4 sm:p-6">
                       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
                         <div>
                           <span className="px-2.5 py-0.5 rounded-md bg-blue-600/90 text-white text-[10px] font-extrabold uppercase tracking-wider mb-1.5 inline-block">
-                            Official Curriculum Blueprint • Unit 1
+                            Official Curriculum Blueprint • Unit 1 Lab Setup
                           </span>
                           <h4 className="text-white font-bold text-sm sm:text-lg">
                             {studentKit.name}
@@ -796,7 +827,7 @@ export default function StudentPortal() {
                           onClick={() => setIsKitDiagramModalOpen(true)}
                           className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white/95 hover:bg-white text-slate-900 rounded-xl text-xs font-bold shadow-lg hover:shadow-xl transition-all cursor-pointer shrink-0"
                         >
-                          <Maximize2 size={13} /> Enlarge Diagram
+                          <Maximize2 size={13} /> Enlarge Box Blueprint
                         </button>
                       </div>
                     </div>
@@ -807,7 +838,7 @@ export default function StudentPortal() {
               {/* Filter Categories */}
               <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                 <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1">Filter:</span>
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1">Filter Parts:</span>
                   {categories.map(cat => (
                     <button
                       key={cat}
@@ -824,51 +855,133 @@ export default function StudentPortal() {
                 </div>
 
                 <p className="text-[11px] text-slate-400 italic hidden sm:block">
-                  Click any component to inspect pinout & safety specifications
+                  Click any component to inspect pinout & technical specifications
                 </p>
               </div>
 
-              {/* Grid of Individual Component Cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-                {filteredComponents.map((comp) => (
-                  <div 
-                    key={comp.id}
-                    onClick={() => setSelectedComponent(comp)}
-                    className="group bg-slate-50 hover:bg-white border border-slate-200 hover:border-pixiu-blue/80 hover:shadow-md rounded-2xl p-3 sm:p-4 flex flex-col justify-between transition-all cursor-pointer relative overflow-hidden"
-                  >
-                    <div>
-                      {/* Thumbnail */}
-                      <div className="w-full aspect-4/3 rounded-xl overflow-hidden bg-white border border-slate-200/80 mb-2.5 relative flex items-center justify-center">
-                        <img 
-                          src={comp.image} 
-                          alt={comp.name} 
-                          className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-300"
-                          onError={(e) => { e.target.src = studentKit.overview_image; }}
-                        />
-                        <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded bg-slate-900/80 text-[9px] font-bold text-white uppercase tracking-wider backdrop-blur-xs">
-                          {comp.category || 'Component'}
-                        </span>
+              {/* VIEW MODE 1: GRID FLASHCARDS */}
+              {kitViewMode === 'grid' && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+                  {filteredComponents.map((comp) => (
+                    <div 
+                      key={comp.id}
+                      onClick={() => setSelectedComponent(comp)}
+                      className="group bg-slate-50 hover:bg-white border border-slate-200 hover:border-pixiu-blue/80 hover:shadow-md rounded-2xl p-3 sm:p-4 flex flex-col justify-between transition-all cursor-pointer relative overflow-hidden"
+                    >
+                      <div>
+                        {/* Thumbnail */}
+                        <div className="w-full aspect-4/3 rounded-xl overflow-hidden bg-white border border-slate-200/80 mb-2.5 relative flex items-center justify-center">
+                          <img 
+                            src={comp.image} 
+                            alt={comp.name} 
+                            className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-300"
+                            onError={(e) => { e.target.src = studentKit.overview_image; }}
+                          />
+                          <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded bg-slate-900/80 text-[9px] font-bold text-white uppercase tracking-wider backdrop-blur-xs">
+                            {comp.category || 'Component'}
+                          </span>
+                          {comp.qty && (
+                            <span className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded bg-blue-600 text-[9px] font-extrabold text-white shadow-xs">
+                              {comp.qty}
+                            </span>
+                          )}
+                        </div>
+
+                        <h4 className="font-bold text-slate-800 text-xs sm:text-sm line-clamp-2 group-hover:text-pixiu-blue transition-colors">
+                          {comp.name}
+                        </h4>
+                        <p className="text-[11px] text-slate-500 mt-1 line-clamp-2 leading-relaxed">
+                          {comp.role}
+                        </p>
                       </div>
 
-                      <h4 className="font-bold text-slate-800 text-xs sm:text-sm line-clamp-2 group-hover:text-pixiu-blue transition-colors">
-                        {comp.name}
-                      </h4>
-                      <p className="text-[11px] text-slate-500 mt-1 line-clamp-2 leading-relaxed">
-                        {comp.role}
-                      </p>
+                      <div className="flex items-center justify-between pt-2.5 mt-2 border-t border-slate-200/60 text-[10px] text-slate-400">
+                        <span className="font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
+                          {comp.session || 'Intro Unit'}
+                        </span>
+                        <span className="flex items-center gap-0.5 font-bold text-slate-600 group-hover:text-pixiu-blue">
+                          Inspect <ChevronRight size={11} />
+                        </span>
+                      </div>
                     </div>
+                  ))}
+                </div>
+              )}
 
-                    <div className="flex items-center justify-between pt-2.5 mt-2 border-t border-slate-200/60 text-[10px] text-slate-400">
-                      <span className="font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
-                        {comp.session || 'Intro Unit'}
-                      </span>
-                      <span className="flex items-center gap-0.5 font-bold text-slate-600 group-hover:text-pixiu-blue">
-                        Inspect <ChevronRight size={11} />
-                      </span>
-                    </div>
+              {/* VIEW MODE 2: ITEMIZED PARTS INVENTORY TABLE */}
+              {kitViewMode === 'table' && (
+                <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-slate-900 text-white font-bold text-[11px] uppercase tracking-wider">
+                          <th className="py-3 px-3.5 w-12 text-center">#</th>
+                          <th className="py-3 px-3.5 w-16">Photo</th>
+                          <th className="py-3 px-3.5">Component & Purpose</th>
+                          <th className="py-3 px-3.5 w-28 text-center">Allocated Qty</th>
+                          <th className="py-3 px-3.5">Category</th>
+                          <th className="py-3 px-3.5">Key Specs / Pinout</th>
+                          <th className="py-3 px-3.5 text-center">Introduced</th>
+                          <th className="py-3 px-3.5 text-center">Custody Status</th>
+                          <th className="py-3 px-3.5 text-center">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {filteredComponents.map((comp, idx) => (
+                          <tr key={comp.id} className="hover:bg-blue-50/40 transition-colors">
+                            <td className="py-3 px-3.5 font-mono font-bold text-slate-400 text-center">
+                              {String(idx + 1).padStart(2, '0')}
+                            </td>
+                            <td className="py-3 px-3.5">
+                              <div className="w-12 h-10 rounded-lg overflow-hidden border border-slate-200 bg-white flex items-center justify-center">
+                                <img 
+                                  src={comp.image} 
+                                  alt={comp.name} 
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => { e.target.src = studentKit.overview_image; }}
+                                />
+                              </div>
+                            </td>
+                            <td className="py-3 px-3.5 max-w-xs">
+                              <p className="font-bold text-slate-800 text-xs">{comp.name}</p>
+                              <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed line-clamp-1">{comp.role}</p>
+                            </td>
+                            <td className="py-3 px-3.5 text-center">
+                              <span className="font-mono font-bold px-2.5 py-1 rounded-md bg-blue-50 text-pixiu-blue border border-blue-200">
+                                {comp.qty || '1 Unit'}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3.5">
+                              <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-semibold text-[10px]">
+                                {comp.category || 'Component'}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3.5 max-w-xs text-slate-600 text-[11px] line-clamp-1">
+                              {comp.specs || 'Standard Lab Spec'}
+                            </td>
+                            <td className="py-3 px-3.5 text-center font-semibold text-slate-600 text-[11px]">
+                              {comp.session || 'Unit 1'}
+                            </td>
+                            <td className="py-3 px-3.5 text-center">
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                <CheckCircle size={11} /> In Box
+                              </span>
+                            </td>
+                            <td className="py-3 px-3.5 text-center">
+                              <button
+                                onClick={() => setSelectedComponent(comp)}
+                                className="px-2.5 py-1 bg-slate-100 hover:bg-pixiu-blue hover:text-white rounded-lg text-[10px] font-bold text-slate-700 transition-colors cursor-pointer"
+                              >
+                                Inspect
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                ))}
-              </div>
+                </div>
+              )}
 
               {/* Robotics Lab Safety & Responsibility Protocol Strip */}
               <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-slate-600">
@@ -877,8 +990,8 @@ export default function StudentPortal() {
                     ⚡
                   </div>
                   <div>
-                    <p className="font-bold text-slate-800">Robotics Lab Handling Rules:</p>
-                    <p className="text-[11px] text-slate-500">Unplug USB before rewiring • Never short 5V to GND • Count every part back into box before leaving.</p>
+                    <p className="font-bold text-slate-800">Robotics Lab Handling & Return Rules:</p>
+                    <p className="text-[11px] text-slate-500">Unplug USB before rewiring • Never short 5V to GND • Count and verify every assigned part back into your numbered box before leaving the lab.</p>
                   </div>
                 </div>
                 <span className="text-[10px] font-mono text-slate-500 uppercase tracking-wider bg-white px-2.5 py-1 rounded-lg border border-slate-200 shrink-0">
