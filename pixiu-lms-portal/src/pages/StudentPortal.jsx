@@ -51,14 +51,14 @@ export default function StudentPortal() {
     return pid === currentId || pid === cleanCurrent || p.student_id === student.student_id;
   });
   
-  // Extract grade accurately (e.g. CLS-ZPS-6A -> '6', CLS-ZPS-11A -> '11', ZPS7A 01 -> '7')
+  // Extract grade accurately (e.g. CLS-ZPS-6A -> '6', CLS-XYZ-11A -> '11', XYZ7A 01 -> '7')
   const extractGrade = (s) => {
     if (s?.class_id) {
-      const match = s.class_id.match(/CLS-ZPS-(\d+)/i);
+      const match = s.class_id.match(/CLS-(?:ZPS|XYZ)-(\d+)/i);
       if (match) return match[1];
     }
     if (s?.student_id) {
-      const match = s.student_id.match(/ZPS(\d+)/i);
+      const match = s.student_id.match(/(?:ZPS|XYZ)(\d+)/i);
       if (match) return match[1];
     }
     return '6';
