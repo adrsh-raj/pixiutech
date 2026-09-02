@@ -134,7 +134,23 @@ export const SEED_SESSIONS = [
 
   // Class 11A - Unit 1 (2 Completed Classes)
   { id: 'SES-1101', school_id: 'ZPS', class_id: 'CLS-ZPS-11A', trainer_id: 'TR-01', date: '2026-08-26', time: '01:00 PM - 02:30 PM', unit_code: 'Unit 1', level: 'Level 0', session_no: 1, total_sessions: 2, topic: 'Unit 1 (Class 1/2): Introduction to Engineering Specs & Optics - Optical Collimation & Lasers', is_locked: 1, notes: 'Focused semiconductor laser diode collimation, beam convergence, and alignment optics.' },
-  { id: 'SES-1102', school_id: 'ZPS', class_id: 'CLS-ZPS-11A', trainer_id: 'TR-01', date: '2026-08-29', time: '01:00 PM - 02:30 PM', unit_code: 'Unit 1', level: 'Level 0', session_no: 2, total_sessions: 2, topic: 'Unit 1 (Class 2/2): Introduction to Engineering Specs & Optics - Sensor Specs & Error Characterization', is_locked: 1, notes: 'Measured optical trip response time and documented engineering specification tolerances.' }
+  { id: 'SES-1102', school_id: 'ZPS', class_id: 'CLS-ZPS-11A', trainer_id: 'TR-01', date: '2026-08-29', time: '01:00 PM - 02:30 PM', unit_code: 'Unit 1', level: 'Level 0', session_no: 2, total_sessions: 2, topic: 'Unit 1 (Class 2/2): Introduction to Engineering Specs & Optics - Sensor Specs & Error Characterization', is_locked: 1, notes: 'Measured optical trip response time and documented engineering specification tolerances.' },
+
+  // ==================== XYZ ACADEMY SESSIONS (Trainer: Akash Sharma TR-02) ====================
+  { id: 'SES-XYZ-601', school_id: 'XYZ', class_id: 'CLS-XYZ-6A', trainer_id: 'TR-02', date: '2026-08-25', time: '09:00 AM - 10:30 AM', unit_code: 'Unit 1', level: 'Level 0', session_no: 1, total_sessions: 2, topic: 'Unit 1 (Class 1/2): Robotics Core Fundamentals - Breadboard Loops & Power Rails', is_locked: 1, notes: 'XYZ pilot cohort hands-on breadboard loops and polarity verification.' },
+  { id: 'SES-XYZ-602', school_id: 'XYZ', class_id: 'CLS-XYZ-6A', trainer_id: 'TR-02', date: '2026-08-28', time: '09:00 AM - 10:30 AM', unit_code: 'Unit 1', level: 'Level 0', session_no: 2, total_sessions: 2, topic: 'Unit 1 (Class 2/2): Microcontroller Basics & Traffic Signal Logic', is_locked: 1, notes: 'C++ loop sequences and digital output pin calibration.' },
+
+  { id: 'SES-XYZ-701', school_id: 'XYZ', class_id: 'CLS-XYZ-7A', trainer_id: 'TR-02', date: '2026-08-25', time: '10:45 AM - 12:15 PM', unit_code: 'Unit 1', level: 'Level 0', session_no: 1, total_sessions: 2, topic: 'Unit 1 (Class 1/2): Analog Electronics & Logic States', is_locked: 1, notes: 'Potentiometer dividers and multi-meter readings.' },
+  { id: 'SES-XYZ-702', school_id: 'XYZ', class_id: 'CLS-XYZ-7A', trainer_id: 'TR-02', date: '2026-08-28', time: '10:45 AM - 12:15 PM', unit_code: 'Unit 1', level: 'Level 0', session_no: 2, total_sessions: 2, topic: 'Unit 1 (Class 2/2): Sensor Voltage Mapping & Rain Detection Circuit', is_locked: 1, notes: 'Water conductivity sensor interfacing and buzzer alarm trigger.' },
+
+  { id: 'SES-XYZ-801', school_id: 'XYZ', class_id: 'CLS-XYZ-8A', trainer_id: 'TR-02', date: '2026-08-26', time: '09:00 AM - 10:30 AM', unit_code: 'Unit 1', level: 'Level 0', session_no: 1, total_sessions: 2, topic: 'Unit 1 (Class 1/2): Ultrasonic Acoustics & Distance Formulas', is_locked: 1, notes: 'Echo pulse timing and speed of sound calibration.' },
+  { id: 'SES-XYZ-802', school_id: 'XYZ', class_id: 'CLS-XYZ-8A', trainer_id: 'TR-02', date: '2026-08-29', time: '09:00 AM - 10:30 AM', unit_code: 'Unit 1', level: 'Level 0', session_no: 2, total_sessions: 2, topic: 'Unit 1 (Class 2/2): Obstacle Detection Algorithm & L298N Motor Driver', is_locked: 1, notes: 'Chassis assembly and 2WD motor control logic.' },
+
+  { id: 'SES-XYZ-901', school_id: 'XYZ', class_id: 'CLS-XYZ-9A', trainer_id: 'TR-02', date: '2026-08-26', time: '10:45 AM - 12:15 PM', unit_code: 'Unit 1', level: 'Level 0', session_no: 1, total_sessions: 2, topic: 'Unit 1 (Class 1/2): Industrial Sensors & Infrared Optical Detection', is_locked: 1, notes: 'Dual IR sensors and differential comparator tuning.' },
+  { id: 'SES-XYZ-902', school_id: 'XYZ', class_id: 'CLS-XYZ-9A', trainer_id: 'TR-02', date: '2026-08-29', time: '10:45 AM - 12:15 PM', unit_code: 'Unit 1', level: 'Level 0', session_no: 2, total_sessions: 2, topic: 'Unit 1 (Class 2/2): 16x2 LCD Bus & Closed-Loop Line Following Track', is_locked: 1, notes: 'High-speed line track navigation testing.' },
+
+  { id: 'SES-XYZ-1101', school_id: 'XYZ', class_id: 'CLS-XYZ-11A', trainer_id: 'TR-02', date: '2026-08-26', time: '01:00 PM - 02:30 PM', unit_code: 'Unit 1', level: 'Level 0', session_no: 1, total_sessions: 2, topic: 'Unit 1 (Class 1/2): Laser Tripwire Array & Optical Collimation', is_locked: 1, notes: '650nm laser beam alignment and photodiode latching.' },
+  { id: 'SES-XYZ-1102', school_id: 'XYZ', class_id: 'CLS-XYZ-11A', trainer_id: 'TR-02', date: '2026-08-29', time: '01:00 PM - 02:30 PM', unit_code: 'Unit 1', level: 'Level 0', session_no: 2, total_sessions: 2, topic: 'Unit 1 (Class 2/2): Autonomous Maze-Solving Logic & Wall Following', is_locked: 1, notes: 'Left-hand wall following algorithm execution.' }
 ];
 
 export const SEED_ATTENDANCE = [
@@ -149,6 +165,16 @@ export const SEED_ATTENDANCE = [
   { session_id: 'SES-602', student_id: 'ZPS6A 03', status: 'Present' },
   { session_id: 'SES-602', student_id: 'ZPS6A 04', status: 'Present' },
   { session_id: 'SES-602', student_id: 'ZPS6A 05', status: 'Present' },
+
+  // XYZ Class 6A
+  { session_id: 'SES-XYZ-601', student_id: 'XYZ6A 01', status: 'Present' },
+  { session_id: 'SES-XYZ-601', student_id: 'XYZ6A 02', status: 'Present' },
+  { session_id: 'SES-XYZ-601', student_id: 'XYZ6A 03', status: 'Present' },
+  { session_id: 'SES-XYZ-601', student_id: 'XYZ6A 04', status: 'Present' },
+  { session_id: 'SES-XYZ-602', student_id: 'XYZ6A 01', status: 'Present' },
+  { session_id: 'SES-XYZ-602', student_id: 'XYZ6A 02', status: 'Present' },
+  { session_id: 'SES-XYZ-602', student_id: 'XYZ6A 03', status: 'Present' },
+  { session_id: 'SES-XYZ-602', student_id: 'XYZ6A 04', status: 'Present' },
 
   // Class 7A (Session 1 & Session 2)
   { session_id: 'SES-701', student_id: 'ZPS7A 01', status: 'Present' },
