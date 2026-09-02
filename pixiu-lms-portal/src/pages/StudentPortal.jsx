@@ -665,16 +665,9 @@ export default function StudentPortal() {
                 <span className="text-[10px] sm:text-[11px] bg-slate-800 border border-slate-700 text-slate-300 px-2 py-0.5 rounded-md">
                   Class: <strong className="text-white">{studentGrade}A</strong>
                 </span>
-                <a 
-                  href={whatsappKitUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[10px] sm:text-[11px] bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500/40 hover:border-emerald-400 text-emerald-300 px-2.5 py-0.5 rounded-md font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
-                  title="Order personal STEM kit on WhatsApp (+91 7985403186)"
-                >
-                  <MessageCircle size={12} className="text-emerald-400" />
-                  WhatsApp Your Kit <span className="font-mono text-emerald-200">({student.assigned_kit_id || 'KIT-ZPS-01'})</span>
-                </a>
+                <span className="text-[10px] sm:text-[11px] bg-slate-800 border border-slate-700 text-slate-300 px-2.5 py-0.5 rounded-md font-mono">
+                  Kit: <strong className="text-blue-400">{student.assigned_kit_id || 'KIT-ZPS-01'}</strong>
+                </span>
               </div>
             </div>
           </div>
@@ -689,7 +682,7 @@ export default function StudentPortal() {
 
         {/* 2. 3 Metric Summary Cards (Mobile 3-column Grid) */}
         <div className="grid grid-cols-3 gap-2 sm:gap-6">
-          <div className="bg-white p-2.5 sm:p-6 rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center sm:items-center gap-1.5 sm:gap-4 text-center sm:text-left">
+          <div className="bg-white p-2.5 sm:p-6 rounded-xl sm:rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center sm:items-center gap-1.5 sm:gap-4 text-center sm:text-left">
             <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
               <Award className="w-4 h-4 sm:w-6 sm:h-6" />
             </div>
@@ -699,7 +692,7 @@ export default function StudentPortal() {
             </div>
           </div>
 
-          <div className="bg-white p-2.5 sm:p-6 rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center sm:items-center gap-1.5 sm:gap-4 text-center sm:text-left">
+          <div className="bg-white p-2.5 sm:p-6 rounded-xl sm:rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center sm:items-center gap-1.5 sm:gap-4 text-center sm:text-left">
             <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
               <Activity className="w-4 h-4 sm:w-6 sm:h-6" />
             </div>
@@ -709,131 +702,47 @@ export default function StudentPortal() {
             </div>
           </div>
 
-          <a 
-            href={whatsappKitUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="bg-gradient-to-br from-emerald-50 to-teal-50/60 hover:from-emerald-100 hover:to-teal-100 p-2.5 sm:p-6 rounded-xl sm:rounded-2xl border border-emerald-200 hover:border-emerald-500 shadow-sm flex flex-col sm:flex-row items-center sm:items-center gap-1.5 sm:gap-4 text-center sm:text-left transition-all group cursor-pointer"
-            title="Order your personal STEM kit on WhatsApp (+91 7985403186)"
-          >
-            <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-emerald-600 group-hover:bg-emerald-700 text-white flex items-center justify-center shrink-0 shadow-md group-hover:scale-105 transition-all">
-              <MessageCircle className="w-4 h-4 sm:w-6 sm:h-6" />
+          <div className="bg-white p-2.5 sm:p-6 rounded-xl sm:rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center sm:items-center gap-1.5 sm:gap-4 text-center sm:text-left">
+            <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-blue-50 text-pixiu-blue flex items-center justify-center shrink-0">
+              <Box className="w-4 h-4 sm:w-6 sm:h-6" />
             </div>
             <div className="min-w-0">
-              <p className="text-[9px] sm:text-xs text-emerald-700 font-bold uppercase tracking-wider truncate">WhatsApp Your Kit</p>
-              <p className="text-[11px] sm:text-sm font-bold text-emerald-950 group-hover:text-emerald-800 truncate flex items-center gap-1">
-                Buy Kit: +91 7985403186 <ChevronRight size={13} className="text-emerald-600 group-hover:translate-x-0.5 transition-transform" />
-              </p>
+              <p className="text-[9px] sm:text-xs text-slate-400 font-bold uppercase tracking-wider truncate">Lab Kit</p>
+              <p className="text-[11px] sm:text-sm font-bold font-mono text-slate-800 truncate">{student.assigned_kit_id || 'KIT-ZPS-01'}</p>
             </div>
-          </a>
+          </div>
         </div>
 
-        {/* 3. Official Monthly Accountability & Motivation Notice Banner (Now Underneath Profile & Metrics) */}
-        <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 rounded-2xl p-4 sm:p-5 text-white border border-blue-500/30 shadow-lg relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-3 sm:gap-4">
-          <div className="flex items-start gap-3">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-500/20 border border-blue-400/40 flex items-center justify-center text-blue-300 shrink-0 mt-0.5">
-              <Sparkles size={18} className="text-amber-300 animate-pulse" />
+        {/* 3. Clean WhatsApp Your Kit Store Callout */}
+        <div className="bg-white rounded-2xl border border-emerald-200 p-4 sm:p-5 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center shrink-0">
+              <MessageCircle size={20} />
             </div>
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <h3 className="font-bold text-xs sm:text-sm text-white tracking-wide">
-                  Pixiu Tech Innovation Lab • Student Intelligence
-                </h3>
-                <span className="text-[9px] sm:text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  Monthly Report Active
+                <h4 className="font-bold text-slate-800 text-sm sm:text-base">
+                  Want to Practice Robotics at Home?
+                </h4>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  Official Hardware Kit
                 </span>
               </div>
-              <p className="text-[11px] sm:text-xs text-slate-300 mt-1 leading-relaxed">
-                📢 <strong className="text-white">Institutional Accountability Notice:</strong> At the end of every month, your practical laboratory attendance records, level-by-level competency reviews, and prototype scores are compiled and dispatched directly to your <strong>School Principal</strong> and <strong>Parents</strong>. Keep innovating, building, and exploring with full dedication. <strong className="text-amber-300">Happy Studying! 🚀✨</strong>
+              <p className="text-slate-500 text-xs mt-0.5">
+                Order your personal <strong className="text-slate-700">Class {studentGrade} STEM Kit</strong> directly via WhatsApp at <strong className="text-emerald-700 font-mono">+91 7985403186</strong>.
               </p>
             </div>
           </div>
 
-          <div className="self-end md:self-center shrink-0 flex items-center gap-2">
-            <span className="text-[10px] sm:text-xs font-bold font-mono px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-white/10 text-blue-200 border border-white/10 flex items-center gap-1.5">
-              <Send size={11} className="text-blue-300" /> Dispatched Monthly
-            </span>
-          </div>
-        </div>
-
-        {/* ==================== WHATSAPP YOUR STEM ROBOTICS KIT (STUDENT PORTAL ONLY) ==================== */}
-        <div id="hardware-kit-section" className="bg-gradient-to-r from-emerald-950 via-slate-900 to-emerald-950 border border-emerald-500/40 rounded-2xl sm:rounded-3xl p-5 sm:p-8 text-white shadow-xl relative overflow-hidden space-y-5">
-          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
-            <div className="space-y-2.5 max-w-2xl">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold">
-                <MessageCircle size={14} className="text-emerald-400" />
-                WhatsApp Your Kit • Official Student Store (+91 7985403186)
-              </div>
-              
-              <h3 className="text-lg sm:text-2xl font-black text-white tracking-wide">
-                Want to Practice Robotics at Home? Buy Your Personal Hardware Kit!
-              </h3>
-              
-              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                If you want your own complete hardware kit for home experiments and project innovation, order directly from Pixiu Tech on WhatsApp! Contains genuine Arduino microcontroller, breadboard, sensors, motors, and jumper wires for <strong className="text-emerald-300">Class {studentGrade}</strong>.
-              </p>
-
-              <div className="flex flex-wrap items-center gap-2 pt-1 text-xs text-slate-300">
-                <span className="flex items-center gap-1.5 bg-white/5 border border-white/10 px-2.5 py-1 rounded-lg">
-                  ⚡ 100% Genuine Lab Hardware
-                </span>
-                <span className="flex items-center gap-1.5 bg-white/5 border border-white/10 px-2.5 py-1 rounded-lg">
-                  📦 Complete Microcontroller & Sensory Pack
-                </span>
-                <span className="flex items-center gap-1.5 bg-white/5 border border-white/10 px-2.5 py-1 rounded-lg">
-                  🚚 Fast Home Dispatch & Instructor Setup
-                </span>
-              </div>
-            </div>
-
-            <div className="w-full lg:w-auto flex flex-col sm:flex-row lg:flex-col items-stretch sm:items-center gap-3 shrink-0">
-              <a
-                href={whatsappKitUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-6 py-3.5 bg-emerald-500 hover:bg-emerald-400 active:scale-98 text-slate-950 font-black text-sm rounded-xl shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2.5 transition-all cursor-pointer border border-emerald-300"
-              >
-                <MessageCircle size={18} className="fill-slate-950" />
-                WhatsApp Your Kit (+91 7985403186) →
-              </a>
-
-              <a
-                href="tel:+917985403186"
-                className="px-4 py-2 bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-all text-center"
-              >
-                <PhoneCall size={13} /> Or Call: +91 7985403186
-              </a>
-            </div>
-          </div>
-
-          {/* Master Kit Layout Blueprint Card */}
-          {studentKit.overview_image && (
-            <div className="relative rounded-xl sm:rounded-2xl overflow-hidden border border-emerald-500/20 bg-slate-950/60 mt-4 group">
-              <img 
-                src={studentKit.overview_image} 
-                alt={studentKit.name} 
-                className="w-full h-44 sm:h-64 object-cover object-center group-hover:scale-101 transition-transform duration-500 opacity-90"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent flex flex-col sm:flex-row items-start sm:items-end p-4 sm:p-6 justify-between gap-3">
-                <div>
-                  <span className="px-2.5 py-0.5 rounded-md bg-emerald-600 text-white text-[10px] font-extrabold uppercase tracking-wider mb-1 inline-block">
-                    Official Class {studentGrade} Hardware Kit
-                  </span>
-                  <h4 className="text-white font-bold text-xs sm:text-base">{studentKit.name}</h4>
-                  <p className="text-slate-300 text-[11px] sm:text-xs mt-0.5 line-clamp-1">{studentKit.tagline}</p>
-                </div>
-
-                <a
-                  href={whatsappKitUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs rounded-xl shadow-lg transition-all cursor-pointer shrink-0"
-                >
-                  <MessageCircle size={14} className="fill-slate-950" /> Buy on WhatsApp
-                </a>
-              </div>
-            </div>
-          )}
+          <a
+            href={whatsappKitUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full md:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer shrink-0"
+          >
+            <MessageCircle size={15} />
+            WhatsApp Your Kit (+91 7985403186) →
+          </a>
         </div>
 
         {/* ==================== 2 INTERACTIVE LINE GRAPHS ==================== */}
