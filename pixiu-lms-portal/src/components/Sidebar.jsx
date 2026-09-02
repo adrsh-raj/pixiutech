@@ -37,7 +37,6 @@ export default function Sidebar({ mobileOpen = false, setMobileOpen = () => {} }
       title: 'ACADEMICS & LMS',
       links: [
         { name: 'Student Directory', path: '/students', icon: Users },
-        { name: 'Student Portal View', path: '/student-portal', icon: GraduationCap },
         { name: 'Content Hub', path: '/content', icon: PlaySquare },
         { name: 'Curriculum Plans', path: '/curriculum', icon: BookOpen },
         { name: 'Trainers Roster', path: '/trainers', icon: GraduationCap },

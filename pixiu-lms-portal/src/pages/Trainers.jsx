@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { 
   GraduationCap, Plus, Phone, Building2, Star, CheckCircle, Clock, X, Trash2, 
   Play, User, Camera, Check, FileText, Upload, Image as ImageIcon, IndianRupee, 
@@ -21,6 +21,37 @@ export default function Trainers() {
   const { role, user } = useAuth();
   const isAdmin = role === 'admin' || !role; // Default fallback to admin if not specified
   const toast = useToast();
+
+  const isAkash = user?.username === 'akashsharma' || user?.related_id === 'TR-02' || user?.school_id === 'XYZ';
+  const trainerSchoolId = isAkash ? 'XYZ' : 'ZPS';
+
+  // Strict isolation: Akash sees ONLY Akash; Vikas sees ONLY Vikas; Admin sees ALL
+  const visibleTrainers = useMemo(() => {
+    if (isAdmin || user?.school_id === 'ALL') {
+      return trainers;
+    }
+    if (isAkash) {
+      return trainers.filter(t => t.id === 'TR-02' || t.name.toLowerCase().includes('akash'));
+    }
+    return trainers.filter(t => t.id === 'TR-01' || t.name.toLowerCase().includes('vikas'));
+  }, [trainers, isAdmin, user, isAkash]);
+
+  const activeTrainersCount = visibleTrainers.filter(t => t.status === 'Active').length;
+
+  const visibleStudents = useMemo(() => {
+    if (isAdmin || user?.school_id === 'ALL') return students;
+    return students.filter(s => s.school_id === trainerSchoolId || (trainerSchoolId === 'XYZ' ? s.student_id.startsWith('XYZ') : s.student_id.startsWith('ZPS')));
+  }, [students, isAdmin, user, trainerSchoolId]);
+
+  const visibleStudentReviews = useMemo(() => {
+    return studentReviews.filter(r => {
+      const matchesGrade = selectedReviewGrade === 'All' || r.class_grade === selectedReviewGrade;
+      if (!matchesGrade) return false;
+      if (isAdmin || user?.school_id === 'ALL') return true;
+      const rId = (r.student_id || '').toUpperCase();
+      return trainerSchoolId === 'XYZ' ? rId.includes('XYZ') : rId.includes('ZPS');
+    });
+  }, [studentReviews, selectedReviewGrade, isAdmin, user, trainerSchoolId]);
 
   const trainerNotifs = (notifications || []).filter(n => {
     if (n.status === 'Archived') return false;
@@ -224,8 +255,6 @@ export default function Trainers() {
     notes: 'Please bring line tracking sheets and calibrate IR sensors.',
     notify_trainer: true
   });
-
-  const activeTrainersCount = trainers.filter(t => t.status === 'Active').length;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -805,7 +834,7 @@ export default function Trainers() {
               <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600"><GraduationCap size={24} /></div>
               <div>
                 <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-0.5">Faculty Instructors</p>
-                <p className="text-2xl font-bold text-slate-800">{trainers.length}</p>
+                <p className="text-2xl font-bold text-slate-800">{visibleTrainers.length}</p>
               </div>
             </div>
             <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
@@ -819,7 +848,11 @@ export default function Trainers() {
               <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600"><Building2 size={24} /></div>
               <div>
                 <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-0.5">Assigned Institution</p>
-                <p className="text-xl font-bold text-slate-800">Zenith Public School</p>
+                <p className="text-xl font-bold text-slate-800">
+                  {visibleTrainers.length === 1 
+                    ? (visibleTrainers[0].id === 'TR-02' ? 'XYZ Academy (Pilot Lab)' : 'Zenith Public School') 
+                    : 'All Partner Schools (ZPS & XYZ)'}
+                </p>
               </div>
             </div>
           </div>
@@ -839,7 +872,7 @@ export default function Trainers() {
                   const isRead = readDirectiveIds.includes(notif.id);
                   return (
                     <div 
-                      key={notif.id}
+                      key={notif.id} 
                       className={`p-5 rounded-2xl border transition-all space-y-3 ${
                         isRead 
                           ? 'border-slate-200 bg-white opacity-80' 
@@ -870,7 +903,7 @@ export default function Trainers() {
                             <CheckCircle size={14}/> Read & Acknowledged
                           </span>
                         ) : (
-                          <button
+                          <button 
                             onClick={() => markDirectiveRead(notif.id)}
                             className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
                           >
@@ -885,12 +918,18 @@ export default function Trainers() {
             </div>
           )}
 
-          {/* Main Trainers Roster Grid */}
+          {/* Main Trainers Roster Grid (Scoped so Akash only sees Akash, Vikas only sees Vikas, Admin sees all) */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            {trainers.map(trainer => {
+            {visibleTrainers.map(trainer => {
               const assignedCodes = trainer.assigned_schools 
                 ? trainer.assigned_schools.split(',').map(s => s.trim()) 
-                : ['ZPS'];
+                : [trainer.id === 'TR-02' ? 'XYZ' : 'ZPS'];
+
+              const primarySchoolCode = assignedCodes[0] || (trainer.id === 'TR-02' ? 'XYZ' : 'ZPS');
+              const targetSchool = schools.find(s => s.id === primarySchoolCode || s.code === primarySchoolCode) || {
+                name: primarySchoolCode === 'XYZ' ? 'XYZ Academy (Pilot Lab)' : 'Zenith Public School',
+                code: primarySchoolCode
+              };
 
               const dailyRate = Number(trainer.daily_rate) || 600;
               const weeklyDays = Number(trainer.weekly_days) || 2;
@@ -958,7 +997,7 @@ export default function Trainers() {
                         <div className="flex flex-wrap gap-1.5">
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-white text-slate-700 border border-slate-200 shadow-2xs">
                             <Building2 size={12} className="text-pixiu-blue"/>
-                            Zenith Public School (ZPS)
+                            {targetSchool.name} ({targetSchool.code})
                           </span>
                         </div>
                       </div>
@@ -969,17 +1008,17 @@ export default function Trainers() {
                     <div className="flex flex-wrap items-center gap-1.5">
                       <span className="text-[11px] font-bold text-slate-400 uppercase mr-1">Take Attendance:</span>
                       {[
-                        { grade: '6', id: 'CLS-ZPS-6A', label: 'Class 6A' },
-                        { grade: '7', id: 'CLS-ZPS-7A', label: 'Class 7A' },
-                        { grade: '8', id: 'CLS-ZPS-8A', label: 'Class 8A' },
-                        { grade: '9', id: 'CLS-ZPS-9A', label: 'Class 9A' },
-                        { grade: '11', id: 'CLS-ZPS-11A', label: 'Class 11A' },
+                        { grade: '6', id: `CLS-${primarySchoolCode}-6A`, label: 'Class 6A' },
+                        { grade: '7', id: `CLS-${primarySchoolCode}-7A`, label: 'Class 7A' },
+                        { grade: '8', id: `CLS-${primarySchoolCode}-8A`, label: 'Class 8A' },
+                        { grade: '9', id: `CLS-${primarySchoolCode}-9A`, label: 'Class 9A' },
+                        { grade: '11', id: `CLS-${primarySchoolCode}-11A`, label: 'Class 11A' },
                       ].map(cls => {
                         const classSessions = sessions.filter(s => s.class_id === cls.id);
                         const activeUnlocked = classSessions.find(s => s.is_locked === 0);
                         const targetSession = activeUnlocked || classSessions[0];
                         return (
-                          <button
+                          <button 
                             key={cls.id}
                             onClick={() => {
                               if (targetSession) {
@@ -998,8 +1037,8 @@ export default function Trainers() {
                           </button>
                         );
                       })}
-                      <button
-                        onClick={() => handleOpenStartSessionModal('CLS-ZPS-6A')}
+                      <button 
+                        onClick={() => handleOpenStartSessionModal(`CLS-${primarySchoolCode}-6A`)}
                         className="bg-pixiu-blue hover:bg-blue-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all cursor-pointer shadow-xs"
                       >
                         <Plus size={13}/> Start Next Session
@@ -1182,62 +1221,61 @@ export default function Trainers() {
 
           {/* Student Reviews Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {studentReviews
-              .filter(r => selectedReviewGrade === 'All' || r.class_grade === selectedReviewGrade)
-              .map(rev => (
-                <div 
-                  key={rev.id} 
-                  className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-slate-300 transition-all flex flex-col justify-between space-y-3"
-                >
-                  <div>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <span className="text-[10px] font-bold font-mono px-2 py-0.5 bg-blue-50 text-pixiu-blue rounded-md border border-blue-100">
-                          {rev.student_id}
-                        </span>
-                        <h4 className="text-sm font-bold text-slate-800 mt-1">{rev.student_name}</h4>
-                        <p className="text-[11px] text-slate-400">Class {rev.class_grade}A Cohort</p>
-                      </div>
-
-                      <div className="text-right">
-                        <span className="inline-block px-2.5 py-1 rounded-lg text-xs font-black bg-emerald-50 text-emerald-700 border border-emerald-200">
-                          {rev.score} / 10
-                        </span>
-                        <div className="flex items-center gap-0.5 justify-end mt-1">
-                          {[...Array(Number(rev.rating) || 5)].map((_, i) => (
-                            <Star key={i} size={11} className="text-amber-400 fill-amber-400" />
-                          ))}
-                        </div>
-                      </div>
+            {visibleStudentReviews.map(rev => (
+              <div 
+                key={rev.id} 
+                className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-slate-300 transition-all flex flex-col justify-between space-y-3"
+              >
+                <div>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="text-[10px] font-bold font-mono px-2 py-0.5 bg-blue-50 text-pixiu-blue rounded-md border border-blue-100">
+                        {rev.student_id}
+                      </span>
+                      <h4 className="text-sm font-bold text-slate-800 mt-1">{rev.student_name}</h4>
+                      <p className="text-[11px] text-slate-400">Class {rev.class_grade}A Cohort</p>
                     </div>
 
-                    <div className="mt-2.5 pt-2.5 border-t border-slate-100">
-                      <div className="flex items-center justify-between text-xs mb-1">
-                        <span className="font-bold text-slate-700">{rev.level} ({rev.unit_code})</span>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                          rev.status === 'Mastered' ? 'bg-emerald-100 text-emerald-800' :
-                          rev.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
-                          'bg-amber-100 text-amber-800'
-                        }`}>
-                          {rev.status}
-                        </span>
+                    <div className="text-right">
+                      <span className="inline-block px-2.5 py-1 rounded-lg text-xs font-black bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        {rev.score} / 10
+                      </span>
+                      <div className="flex items-center gap-0.5 justify-end mt-1">
+                        {[...Array(Number(rev.rating) || 5)].map((_, i) => (
+                          <Star key={i} size={11} className="text-amber-400 fill-amber-400" />
+                        ))}
                       </div>
-                      <p className="text-[11px] font-medium text-slate-600 mb-2">{rev.unit_title}</p>
-                      <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100 whitespace-pre-line italic">
-                        "{rev.review}"
-                      </p>
                     </div>
                   </div>
 
-                  <div className="flex justify-between items-center pt-2 border-t border-slate-100 text-[11px] text-slate-400">
-                    <span>By: <strong className="text-slate-700">{rev.trainer_name}</strong></span>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleOpenReviewModal(rev)}
-                        className="text-pixiu-blue hover:underline font-bold cursor-pointer flex items-center gap-1"
-                      >
-                        <Edit3 size={12} /> Edit
-                      </button>
+                  <div className="mt-2.5 pt-2.5 border-t border-slate-100">
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="font-bold text-slate-700">{rev.level} ({rev.unit_code})</span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                        rev.status === 'Mastered' ? 'bg-emerald-100 text-emerald-800' :
+                        rev.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
+                        'bg-amber-100 text-amber-800'
+                      }`}>
+                        {rev.status}
+                      </span>
+                    </div>
+                    <p className="text-[11px] font-medium text-slate-600 mb-2">{rev.unit_title}</p>
+                    <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100 whitespace-pre-line italic">
+                      "{rev.review}"
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center pt-2 border-t border-slate-100 text-[11px] text-slate-400">
+                  <span>By: <strong className="text-slate-700">{rev.trainer_name}</strong></span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleOpenReviewModal(rev)}
+                      className="text-pixiu-blue hover:underline font-bold cursor-pointer flex items-center gap-1"
+                    >
+                      <Edit3 size={12} /> Edit
+                    </button>
+                    {isAdmin && (
                       <button
                         onClick={() => handleDeleteReview(rev.id, rev.student_name)}
                         className="text-red-500 hover:text-red-700 font-bold cursor-pointer"
@@ -1245,12 +1283,13 @@ export default function Trainers() {
                       >
                         <Trash2 size={12} />
                       </button>
-                    </div>
+                    )}
                   </div>
                 </div>
-              ))}
+              </div>
+            ))}
 
-            {studentReviews.filter(r => selectedReviewGrade === 'All' || r.class_grade === selectedReviewGrade).length === 0 && (
+            {visibleStudentReviews.length === 0 && (
               <div className="col-span-full p-12 text-center text-slate-400 bg-white rounded-2xl border border-slate-200">
                 <Star size={36} className="mx-auto text-slate-300 mb-2" />
                 <p className="font-bold text-slate-700 text-sm">No Student Reviews Logged for this Class</p>
@@ -1263,203 +1302,176 @@ export default function Trainers() {
         </div>
       )}
 
-      {/* End-of-Unit Student Review Modal */}
-      {isReviewModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95">
-            <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-900 text-white">
-              <div className="flex items-center gap-2">
-                <Star size={18} className="text-amber-400 fill-amber-400"/>
-                <h3 className="text-sm font-bold uppercase tracking-wider">
-                  {editingReviewId ? 'Edit Student Unit Review' : 'Submit End-of-Unit Student Review'}
-                </h3>
-              </div>
-              <button onClick={() => setIsReviewModalOpen(false)} className="text-slate-400 hover:text-white cursor-pointer"><X size={18}/></button>
+  {/* ==================== REVIEW MODAL ==================== */}
+  {isReviewModalOpen && (
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95">
+        <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-900 text-white">
+          <div className="flex items-center gap-2">
+            <Star size={18} className="text-amber-400 fill-amber-400"/>
+            <h3 className="text-sm font-bold uppercase tracking-wider">
+              {editingReviewId ? 'Edit Student Unit Review' : 'Submit End-of-Unit Student Review'}
+            </h3>
+          </div>
+          <button onClick={() => setIsReviewModalOpen(false)} className="text-slate-400 hover:text-white cursor-pointer"><X size={18}/></button>
+        </div>
+
+        <form onSubmit={handleSaveReview} className="p-6 space-y-4 text-xs">
+          {/* Class & Student Selection */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block font-bold text-slate-600 uppercase mb-1">Select Class Grade</label>
+              <select
+                value={reviewFormData.class_grade}
+                onChange={(e) => {
+                  const grade = e.target.value;
+                  const studentInGrade = visibleStudents.find(s => s.class_id.includes(`-${grade}A`));
+                  const unitsList = GRADE_UNITS_CONFIG[grade] || GRADE_UNITS_CONFIG['6'];
+                  const currentOrFirstUnit = unitsList.find(u => u.unitCode === reviewFormData.unit_code) || unitsList[0];
+                  setReviewFormData({
+                    ...reviewFormData,
+                    class_grade: grade,
+                    student_id: studentInGrade ? studentInGrade.student_id : reviewFormData.student_id,
+                    unit_code: currentOrFirstUnit.unitCode,
+                    level: currentOrFirstUnit.level,
+                    unit_title: currentOrFirstUnit.title
+                  });
+                }}
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold bg-white text-slate-800"
+              >
+                <option value="6">Class 6A</option>
+                <option value="7">Class 7A</option>
+                <option value="8">Class 8A</option>
+                <option value="9">Class 9A</option>
+                <option value="11">Class 11A</option>
+              </select>
             </div>
 
-            <form onSubmit={handleSaveReview} className="p-6 space-y-4 text-xs">
-              {/* Class & Student Selection */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-600 uppercase mb-1">Select Class Grade</label>
-                  <select
-                    value={reviewFormData.class_grade}
-                    onChange={(e) => {
-                      const grade = e.target.value;
-                      const studentInGrade = students.find(s => s.class_id.includes(`-${grade}A`));
-                      const unitsList = GRADE_UNITS_CONFIG[grade] || GRADE_UNITS_CONFIG['6'];
-                      const currentOrFirstUnit = unitsList.find(u => u.unitCode === reviewFormData.unit_code) || unitsList[0];
-                      setReviewFormData({
-                        ...reviewFormData,
-                        class_grade: grade,
-                        student_id: studentInGrade ? studentInGrade.student_id : reviewFormData.student_id,
-                        unit_code: currentOrFirstUnit.unitCode,
-                        level: currentOrFirstUnit.level,
-                        unit_title: currentOrFirstUnit.title
-                      });
-                    }}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold bg-white text-slate-800"
-                  >
-                    <option value="6">Class 6A</option>
-                    <option value="7">Class 7A</option>
-                    <option value="8">Class 8A</option>
-                    <option value="9">Class 9A</option>
-                    <option value="11">Class 11A</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-600 uppercase mb-1">Select Student</label>
-                  <select
-                    value={reviewFormData.student_id}
-                    onChange={(e) => setReviewFormData({ ...reviewFormData, student_id: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold bg-white text-slate-800"
-                  >
-                    {students
-                      .filter(s => s.class_id.includes(`-${reviewFormData.class_grade}A`))
-                      .map(s => (
-                        <option key={s.student_id} value={s.student_id}>
-                          {s.student_id} - {s.name}
-                        </option>
-                      ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Unit & Level Selection */}
-              <div>
-                <label className="block font-bold text-slate-600 uppercase mb-1">Curriculum Unit & Tech Level</label>
-                <select
-                  value={reviewFormData.unit_code}
-                  onChange={(e) => {
-                    const unitCode = e.target.value;
-                    const gradeUnits = GRADE_UNITS_CONFIG[reviewFormData.class_grade] || GRADE_UNITS_CONFIG['6'];
-                    const selectedUnit = gradeUnits.find(u => u.unitCode === unitCode) || gradeUnits[0];
-                    setReviewFormData({
-                      ...reviewFormData,
-                      unit_code: selectedUnit.unitCode,
-                      level: selectedUnit.level,
-                      unit_title: selectedUnit.title
-                    });
-                  }}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold bg-white text-slate-800"
-                >
-                  {(GRADE_UNITS_CONFIG[reviewFormData.class_grade] || GRADE_UNITS_CONFIG['6']).map(u => (
-                    <option key={u.unitCode} value={u.unitCode}>
-                      {u.unitCode} ({u.level}) - {u.title}
+            <div>
+              <label className="block font-bold text-slate-600 uppercase mb-1">Select Student</label>
+              <select
+                value={reviewFormData.student_id}
+                onChange={(e) => setReviewFormData({ ...reviewFormData, student_id: e.target.value })}
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold bg-white text-slate-800"
+              >
+                {visibleStudents
+                  .filter(s => s.class_id.includes(`-${reviewFormData.class_grade}A`))
+                  .map(s => (
+                    <option key={s.student_id} value={s.student_id}>
+                      {s.student_id} - {s.name}
                     </option>
                   ))}
-                </select>
-              </div>
-
-              {/* Score, Rating & Competency Status */}
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-600 uppercase mb-1">Score (/10)</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    min="1"
-                    max="10"
-                    value={reviewFormData.score}
-                    onChange={(e) => setReviewFormData({ ...reviewFormData, score: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold bg-white text-slate-800"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-600 uppercase mb-1">Rating</label>
-                  <select
-                    value={reviewFormData.rating}
-                    onChange={(e) => setReviewFormData({ ...reviewFormData, rating: parseInt(e.target.value) || 5 })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold bg-white text-slate-800"
-                  >
-                    <option value="5">★★★★★ (5/5)</option>
-                    <option value="4">★★★★☆ (4/5)</option>
-                    <option value="3">★★★☆☆ (3/5)</option>
-                    <option value="2">★★☆☆☆ (2/5)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-600 uppercase mb-1">Status</label>
-                  <select
-                    value={reviewFormData.status}
-                    onChange={(e) => setReviewFormData({ ...reviewFormData, status: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold bg-white text-slate-800"
-                  >
-                    <option value="Mastered">Mastered</option>
-                    <option value="In Progress">In Progress</option>
-                    <option value="Needs Practice">Needs Practice</option>
-                    <option value="Certified">Certified</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Presets */}
-              <div>
-                <label className="block font-bold text-slate-600 uppercase mb-1.5">1-Click Quick Feedback Presets</label>
-                <div className="flex flex-wrap gap-1.5">
-                  {REVIEW_PRESETS.slice(0, 3).map((preset, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => setReviewFormData({ ...reviewFormData, review: preset })}
-                      className="text-[10px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-lg transition-all cursor-pointer border border-slate-200 text-left line-clamp-1"
-                    >
-                      {preset}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Review Text */}
-              <div>
-                <label className="block font-bold text-slate-600 uppercase mb-1">Trainer Qualitative Remarks & Feedback</label>
-                <textarea
-                  rows="3"
-                  value={reviewFormData.review}
-                  onChange={(e) => setReviewFormData({ ...reviewFormData, review: e.target.value })}
-                  placeholder="Enter detailed review of student's hands-on competency..."
-                  className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs bg-white text-slate-800 leading-relaxed"
-                  required
-                ></textarea>
-              </div>
-
-              <div className="flex justify-end gap-3 pt-3 border-t border-slate-200">
-                <button
-                  type="button"
-                  onClick={() => setIsReviewModalOpen(false)}
-                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl font-bold cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-pixiu-blue hover:bg-blue-600 text-white rounded-xl font-bold cursor-pointer shadow-sm flex items-center gap-1.5"
-                >
-                  <Check size={14} /> {editingReviewId ? 'Update Review' : 'Publish Review'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Schedule Next Class Modal (Admin Notification) */}
-      {isScheduleModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95">
-            <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-              <div>
-                <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-                  <Bell size={18} className="text-indigo-600"/> Schedule Next Class & Notify Trainer
-                </h3>
-                <p className="text-xs text-slate-500">Sets up classroom session & triggers instant notification alert</p>
-              </div>
-              <button onClick={() => setIsScheduleModalOpen(false)} className="text-slate-400 hover:text-slate-700 cursor-pointer"><X size={18}/></button>
+              </select>
             </div>
+          </div>
+
+          {/* Score & Rating */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block font-bold text-slate-600 uppercase mb-1">Competency Score (Out of 10) *</label>
+              <input
+                type="number"
+                step="0.5"
+                min="1"
+                max="10"
+                value={reviewFormData.score}
+                onChange={(e) => setReviewFormData({ ...reviewFormData, score: parseFloat(e.target.value) || 0 })}
+                required
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold text-slate-800"
+              />
+            </div>
+
+            <div>
+              <label className="block font-bold text-slate-600 uppercase mb-1">Status Classification</label>
+              <select
+                value={reviewFormData.status}
+                onChange={(e) => setReviewFormData({ ...reviewFormData, status: e.target.value })}
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold bg-white text-slate-800"
+              >
+                <option value="Mastered">Mastered (Distinction)</option>
+                <option value="In Progress">In Progress (Active)</option>
+                <option value="Needs Practice">Needs Practice</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Qualitative Remarks */}
+          <div>
+            <div className="flex justify-between items-center mb-1">
+              <label className="font-bold text-slate-600 uppercase">Qualitative Instructor Remarks *</label>
+              <span className="text-[10px] text-slate-400">Quick Remarks Preset</span>
+            </div>
+
+            {/* Quick Remarks Buttons */}
+            <div className="flex flex-wrap gap-1 mb-2">
+              {REVIEW_PRESETS.slice(0, 3).map((preset, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setReviewFormData({ ...reviewFormData, review: preset })}
+                  className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded text-[10px] truncate max-w-xs cursor-pointer"
+                  title={preset}
+                >
+                  {preset.slice(0, 35)}...
+                </button>
+              ))}
+            </div>
+
+            <textarea
+              rows={3}
+              value={reviewFormData.review}
+              onChange={(e) => setReviewFormData({ ...reviewFormData, review: e.target.value })}
+              required
+              placeholder="Enter detailed trainer remarks on hands-on practical execution, circuit wiring, and conceptual comprehension..."
+              className="w-full px-3 py-2 border border-slate-300 rounded-xl text-slate-800 font-medium"
+            />
+          </div>
+
+          {/* Verified Trainer Name */}
+          <div>
+            <label className="block font-bold text-slate-600 uppercase mb-1">Evaluating Trainer Name</label>
+            <input
+              type="text"
+              value={reviewFormData.trainer_name}
+              onChange={(e) => setReviewFormData({ ...reviewFormData, trainer_name: e.target.value })}
+              required
+              className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold text-slate-800"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={() => setIsReviewModalOpen(false)}
+              className="px-4 py-2 font-bold text-slate-500 hover:bg-slate-100 rounded-xl cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-5 py-2 font-bold text-white bg-pixiu-blue hover:bg-blue-600 rounded-xl shadow-md shadow-blue-500/20 cursor-pointer"
+            >
+              {editingReviewId ? 'Update Review' : 'Publish Student Review'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )}
+
+  {/* ==================== SCHEDULE NEXT CLASS MODAL ==================== */}
+  {isScheduleModalOpen && (
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95">
+        <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+          <div>
+            <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+              <Bell size={18} className="text-indigo-600"/> Schedule Next Class & Notify Trainer
+            </h3>
+            <p className="text-xs text-slate-500">Sets up classroom session & triggers instant notification alert</p>
+          </div>
+          <button onClick={() => setIsScheduleModalOpen(false)} className="text-slate-400 hover:text-slate-700 cursor-pointer"><X size={18}/></button>
+        </div>
 
             <form onSubmit={handleScheduleSubmit} className="p-6 space-y-4 text-xs">
               <div className="grid grid-cols-2 gap-3">
@@ -1676,11 +1688,13 @@ export default function Trainers() {
                     value={newSessionModalData.class_id}
                     onChange={(e) => {
                       const classId = e.target.value;
-                      const grade = classId.replace('CLS-ZPS-', '').replace('A', '');
+                      const grade = classId.replace(/CLS-(ZPS|XYZ)-/g, '').replace('A', '');
                       const gradeUnits = GRADE_UNITS_CONFIG[grade] || GRADE_UNITS_CONFIG['6'];
                       const nextUnit = gradeUnits[1] || gradeUnits[0];
+                      const isXYZ = classId.includes('XYZ');
                       setNewSessionModalData({
                         ...newSessionModalData,
+                        school_id: isXYZ ? 'XYZ' : 'ZPS',
                         class_id: classId,
                         class_grade: grade,
                         unit_code: nextUnit.unitCode,
@@ -1691,11 +1705,26 @@ export default function Trainers() {
                     }}
                     className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold bg-white text-slate-800"
                   >
-                    <option value="CLS-ZPS-6A">Class 6A (Zenith Public School)</option>
-                    <option value="CLS-ZPS-7A">Class 7A (Zenith Public School)</option>
-                    <option value="CLS-ZPS-8A">Class 8A (Zenith Public School)</option>
-                    <option value="CLS-ZPS-9A">Class 9A (Zenith Public School)</option>
-                    <option value="CLS-ZPS-11A">Class 11A (Zenith Public School)</option>
+                    {(isAdmin ? [
+                      { id: 'CLS-ZPS-6A', label: 'Class 6A (Zenith Public School)' },
+                      { id: 'CLS-ZPS-7A', label: 'Class 7A (Zenith Public School)' },
+                      { id: 'CLS-ZPS-8A', label: 'Class 8A (Zenith Public School)' },
+                      { id: 'CLS-ZPS-9A', label: 'Class 9A (Zenith Public School)' },
+                      { id: 'CLS-ZPS-11A', label: 'Class 11A (Zenith Public School)' },
+                      { id: 'CLS-XYZ-6A', label: 'Class 6A (XYZ Academy)' },
+                      { id: 'CLS-XYZ-7A', label: 'Class 7A (XYZ Academy)' },
+                      { id: 'CLS-XYZ-8A', label: 'Class 8A (XYZ Academy)' },
+                      { id: 'CLS-XYZ-9A', label: 'Class 9A (XYZ Academy)' },
+                      { id: 'CLS-XYZ-11A', label: 'Class 11A (XYZ Academy)' }
+                    ] : [
+                      { id: `CLS-${trainerSchoolId}-6A`, label: `Class 6A (${trainerSchoolId === 'XYZ' ? 'XYZ Academy' : 'Zenith Public School'})` },
+                      { id: `CLS-${trainerSchoolId}-7A`, label: `Class 7A (${trainerSchoolId === 'XYZ' ? 'XYZ Academy' : 'Zenith Public School'})` },
+                      { id: `CLS-${trainerSchoolId}-8A`, label: `Class 8A (${trainerSchoolId === 'XYZ' ? 'XYZ Academy' : 'Zenith Public School'})` },
+                      { id: `CLS-${trainerSchoolId}-9A`, label: `Class 9A (${trainerSchoolId === 'XYZ' ? 'XYZ Academy' : 'Zenith Public School'})` },
+                      { id: `CLS-${trainerSchoolId}-11A`, label: `Class 11A (${trainerSchoolId === 'XYZ' ? 'XYZ Academy' : 'Zenith Public School'})` },
+                    ]).map(c => (
+                      <option key={c.id} value={c.id}>{c.label}</option>
+                    ))}
                   </select>
                 </div>
 

@@ -13,6 +13,8 @@ import ContentHub from './pages/ContentHub';
 import Curriculum from './pages/Curriculum';
 import Login from './pages/Login';
 import StudentPortal from './pages/StudentPortal';
+import SchoolPortal from './pages/SchoolPortal';
+import Verify from './pages/Verify';
 import { DataProvider, useData } from './context/DataContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider, useToast } from './context/ToastContext';
@@ -357,6 +359,25 @@ function StudentRouteGuard() {
   return <StudentPortal />;
 }
 
+// School Partner Portal Route Guard
+function SchoolRouteGuard() {
+  const { isAuthenticated, user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white">
+        <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <SchoolPortal />;
+}
+
 export default function App() {
   return (
     <ToastProvider>
@@ -364,11 +385,15 @@ export default function App() {
         <DataProvider>
           <BrowserRouter>
             <Routes>
-              {/* Public Login Route */}
+              {/* Public Login & Standalone Credential Verification Routes (Unlinked) */}
               <Route path="/login" element={<Login />} />
+              <Route path="/verify" element={<Verify />} />
 
               {/* Student Protected Portal (Student Role Only) */}
               <Route path="/student-portal" element={<StudentRouteGuard />} />
+
+              {/* School Partner Portal (School Authorities & Admin) */}
+              <Route path="/school-portal" element={<SchoolRouteGuard />} />
 
               {/* Protected Enterprise Routes (Admin & Trainers) */}
               <Route path="/" element={<ProtectedLayout />}>

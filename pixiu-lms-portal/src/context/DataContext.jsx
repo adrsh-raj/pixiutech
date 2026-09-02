@@ -3,7 +3,7 @@ import {
   SEED_SCHOOLS, SEED_CLASSES, SEED_STUDENTS, SEED_TRAINERS, 
   SEED_BILLING, SEED_SESSIONS, SEED_ATTENDANCE, SEED_INVENTORY, 
   SEED_ALERTS, SEED_CURRICULUM, SEED_CONTENT, SEED_NOTIFICATIONS,
-  SEED_STUDENT_REVIEWS, CLASS_KITS
+  SEED_STUDENT_REVIEWS, SEED_PROJECTS, CLASS_KITS
 } from '../data/seedData';
 
 const DataContext = createContext();
@@ -120,27 +120,20 @@ export function DataProvider({ children }) {
     }
   });
   const [comms, setComms] = useState(() => safeGetItem('pixiu_comms', []));
-  const [projects, setProjects] = useState(() => safeGetItem('pixiu_projects', []));
+  const [projects, setProjects] = useState(() => {
+    const saved = safeGetItem('pixiu_projects', null);
+    if (!saved || !saved.length) return SEED_PROJECTS;
+    return saved;
+  });
   const [alerts, setAlerts] = useState(() => safeGetItem('pixiu_alerts', SEED_ALERTS));
   const [notifications, setNotifications] = useState(() => safeGetItem('pixiu_notifications', SEED_NOTIFICATIONS));
   const [studentReviews, setStudentReviews] = useState(() => {
     try {
-      const raw = safeGetItem('pixiu_student_reviews', []);
-      const clean = (raw || []).filter(r => 
-        !['REV-001', 'REV-002', 'REV-003', 'REV-004'].includes(r.id) &&
-        r.verified_date !== 'Curriculum Baseline' &&
-        !r.review?.includes('Demonstrated exceptional understanding') &&
-        !r.review?.includes('Successfully calibrated analog') &&
-        !r.review?.includes('Accurate transistor switching') &&
-        !r.review?.includes('Superb conditional logic') &&
-        !r.review?.includes('Firmware pin modes') &&
-        !r.review?.includes('Integrated 2WD robotic chassis') &&
-        !r.review?.includes('Final autonomous exhibition')
-      );
-      localStorage.setItem('pixiu_student_reviews', JSON.stringify(clean));
-      return clean;
+      const raw = safeGetItem('pixiu_student_reviews', null);
+      if (!raw || !raw.length) return SEED_STUDENT_REVIEWS;
+      return raw;
     } catch (e) {
-      return [];
+      return SEED_STUDENT_REVIEWS;
     }
   });
   const [loading, setLoading] = useState(false);
@@ -240,13 +233,35 @@ export function DataProvider({ children }) {
     }
   };
 
-  const deleteSchool = async (id) => {
+  const updateSchool = async (id, updatedData) => {
     try {
-      await fetch(`${API_URL}/schools/${id}`, { method: 'DELETE' });
-      setSchools(prev => prev.filter(s => s.id !== id));
+      await fetch(`${API_URL}/schools/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedData)
+      });
     } catch (e) {
       console.error(e);
     }
+    setSchools(prev => {
+      const updated = prev.map(s => (s.id === id || s.code === id) ? { ...s, ...updatedData } : s);
+      try { localStorage.setItem('pixiu_schools', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+    return { success: true };
+  };
+
+  const deleteSchool = async (id) => {
+    try {
+      await fetch(`${API_URL}/schools/${id}`, { method: 'DELETE' });
+    } catch (e) {
+      console.error(e);
+    }
+    setSchools(prev => {
+      const updated = prev.filter(s => s.id !== id);
+      try { localStorage.setItem('pixiu_schools', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
   };
 
   // 2. Classes
@@ -476,20 +491,38 @@ export function DataProvider({ children }) {
 
   // 8. Billing & Invoices
   const createInvoice = async (invData) => {
+    let savedItem = null;
     try {
       const res = await fetch(`${API_URL}/billing`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(invData)
       });
-      const data = await res.json();
       if (res.ok) {
-        setBilling(prev => [data, ...prev]);
-        return { success: true, data };
+        savedItem = await res.json();
       }
-    } catch (e) {
-      console.error(e);
+    } catch (e) {}
+
+    if (!savedItem) {
+      savedItem = {
+        ...invData,
+        id: invData.id || `INV-${invData.school_id || 'GEN'}-${Date.now().toString().slice(-4)}`,
+        status: invData.status || 'Pending',
+        is_confirmed: invData.status === 'Paid' ? 1 : 0,
+        date_issued: invData.date_issued || new Date().toISOString().split('T')[0],
+        invoice_date: invData.date_issued || new Date().toISOString().split('T')[0],
+        due_date: invData.due_date || new Date().toISOString().split('T')[0],
+        amount: Number(invData.amount) || 0
+      };
     }
+
+    setBilling(prev => {
+      const updated = [savedItem, ...prev.filter(b => b.id !== savedItem.id)];
+      try { localStorage.setItem('pixiu_billing', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+
+    return { success: true, data: savedItem };
   };
 
   const updateInvoiceStatus = async (id, status) => {
@@ -499,40 +532,83 @@ export function DataProvider({ children }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status })
       });
-      const today = new Date().toISOString().split('T')[0];
-      setBilling(prev => prev.map(b => b.id === id ? { 
+    } catch (e) {}
+
+    const today = new Date().toISOString().split('T')[0];
+    setBilling(prev => {
+      const updated = prev.map(b => b.id === id ? { 
         ...b, 
         status, 
         is_confirmed: status === 'Paid' ? 1 : 0,
-        paid_date: status === 'Paid' ? today : null
-      } : b));
-    } catch (e) {
-      console.error(e);
-    }
+        paid_date: status === 'Paid' ? (b.paid_date || today) : null
+      } : b);
+      try { localStorage.setItem('pixiu_billing', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+    return { success: true };
   };
 
   const confirmPaymentReceipt = async (id, isConfirmed, paymentMethod, receiptNo) => {
     try {
-      const res = await fetch(`${API_URL}/billing/${id}/confirm-payment`, {
+      await fetch(`${API_URL}/billing/${id}/confirm-payment`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_confirmed: isConfirmed, payment_method: paymentMethod, receipt_no: receiptNo })
       });
-      const data = await res.json();
-      if (res.ok) {
-        setBilling(prev => prev.map(b => b.id === id ? { 
-          ...b, 
-          is_confirmed: data.is_confirmed, 
-          status: data.status, 
-          paid_date: data.paid_date, 
-          receipt_no: data.receipt_no,
-          payment_method: paymentMethod || b.payment_method
-        } : b));
-        return { success: true, data };
-      }
-    } catch (e) {
-      console.error(e);
-    }
+    } catch (e) {}
+
+    const today = new Date().toISOString().split('T')[0];
+    setBilling(prev => {
+      const updated = prev.map(b => b.id === id ? { 
+        ...b, 
+        is_confirmed: isConfirmed ? 1 : 0, 
+        status: isConfirmed ? 'Paid' : 'Pending', 
+        paid_date: isConfirmed ? (b.paid_date || today) : null, 
+        receipt_no: receiptNo || b.receipt_no || `REC-${Date.now().toString().slice(-4)}`,
+        payment_method: paymentMethod || b.payment_method || 'Bank Transfer (NEFT)'
+      } : b);
+      try { localStorage.setItem('pixiu_billing', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+    return { success: true };
+  };
+
+  const updateBillingInvoice = async (id, updatedFields) => {
+    setBilling(prev => {
+      const updated = prev.map(b => b.id === id ? { ...b, ...updatedFields } : b);
+      try { localStorage.setItem('pixiu_billing', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+    return { success: true };
+  };
+
+  const deleteBillingInvoice = async (id) => {
+    setBilling(prev => {
+      const updated = prev.filter(b => b.id !== id);
+      try { localStorage.setItem('pixiu_billing', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+    return { success: true };
+  };
+
+  const pushSchoolNotification = async ({ target_school_id = 'ALL', title, message, type = 'announcement', priority = 'normal' }) => {
+    const newNotif = {
+      id: `NOTIF-${Date.now().toString().slice(-4)}`,
+      title,
+      message,
+      type,
+      target_audience: target_school_id,
+      priority,
+      created_at: new Date().toISOString().split('T')[0],
+      sender_name: 'Pixiu Central Administration'
+    };
+
+    setNotifications(prev => {
+      const updated = [newNotif, ...prev];
+      try { localStorage.setItem('pixiu_notifications', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+    return { success: true, notification: newNotif };
   };
 
   // 9. Trainers & Sessions
@@ -970,7 +1046,7 @@ export function DataProvider({ children }) {
 
   const value = {
     loading, refreshAll,
-    schools, addSchool, deleteSchool,
+    schools, addSchool, updateSchool, deleteSchool,
     classes, addClass,
     students, addStudent, updateStudent, deleteStudent, getNextRollNumber, getStudentAttendance,
     trainers, addTrainer, updateTrainer, updateTrainerStatus, deleteTrainer,
@@ -981,11 +1057,11 @@ export function DataProvider({ children }) {
     curriculum, addCurriculumPlan, updateCurriculumStatus,
     inventory, addInventoryKit, updateKitStatus, deleteKit,
     classKits, updateClassKitComponent, addComponentToClassKit,
-    billing, createInvoice, updateInvoiceStatus, confirmPaymentReceipt,
+    billing, createInvoice, updateInvoiceStatus, confirmPaymentReceipt, updateBillingInvoice, deleteBillingInvoice,
     comms, sendCommsMessage,
     projects, addProject, deleteProject, uploadFile,
     alerts, resolveAlertAction,
-    notifications, sendBroadcastNotification, updateNotification, deleteNotification,
+    notifications, sendBroadcastNotification, updateNotification, deleteNotification, pushSchoolNotification,
     studentReviews, saveStudentReview, deleteStudentReview
   };
 

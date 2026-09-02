@@ -1,18 +1,28 @@
 // Master Initial Seed Data for Multi-School Pixiu Tech OS
 
 export const SEED_SCHOOLS = [
-  { id: 'ZPS', name: 'Zenith Public School', code: 'ZPS', city: 'Hata', tier: 'Tier 2 Partner', status: 'Active', contract_type: 'Full STEM Lab Suite', principal_name: 'Dr. R.K. Mishra', principal_phone: '+91 94151 22334', lab_room: 'Block B - Innovation Lab 102', enrolled_classes: ['6A', '7A', '8A', '9A', '11A'], created_at: '2026-08-01' }
+  { id: 'ZPS', name: 'Zenith Public School', code: 'ZPS', city: 'Hata', tier: 'Tier 2 Partner', status: 'Active', contract_type: 'Full STEM Lab Suite', principal_name: 'Dr. R.K. Mishra', principal_phone: '+91 94151 22334', lab_room: 'Block B - Innovation Lab 102', enrolled_classes: ['6A', '7A', '8A', '9A', '11A'], created_at: '2026-08-01', lead_trainer: 'Vikas Pandey', trainer_id: 'TR-01' },
+  { id: 'XYZ', name: 'XYZ Academy (Pilot Lab)', code: 'XYZ', city: 'Gorakhpur', tier: 'Tier 1 Partner', status: 'Active', contract_type: 'Robotics & STEM Lab Suite', principal_name: 'Prof. S.N. Verma', principal_phone: '+91 94151 88776', lab_room: 'Block C - Advanced Robotics Lab 204', enrolled_classes: ['6A', '7A', '8A', '9A', '11A'], created_at: '2026-08-15', lead_trainer: 'Akash Sharma', trainer_id: 'TR-02' }
 ];
 
 export const SEED_CLASSES = [
+  // Zenith Public School Classes
   { id: 'CLS-ZPS-6A', school_id: 'ZPS', grade: '6', section: 'A', stream: 'Robotics & Foundation', student_count: 5, lead_trainer_id: 'TR-01', day: 'Friday', time_slot: '09:00 AM - 10:30 AM' },
   { id: 'CLS-ZPS-7A', school_id: 'ZPS', grade: '7', section: 'A', stream: 'Robotics & Logic Circuits', student_count: 5, lead_trainer_id: 'TR-01', day: 'Friday', time_slot: '10:45 AM - 12:15 PM' },
   { id: 'CLS-ZPS-8A', school_id: 'ZPS', grade: '8', section: 'A', stream: 'Robotics & Microcontrollers', student_count: 5, lead_trainer_id: 'TR-01', day: 'Saturday', time_slot: '09:00 AM - 10:30 AM' },
   { id: 'CLS-ZPS-9A', school_id: 'ZPS', grade: '9', section: 'A', stream: 'IoT & Embedded Sensors', student_count: 5, lead_trainer_id: 'TR-01', day: 'Saturday', time_slot: '10:45 AM - 12:15 PM' },
   { id: 'CLS-ZPS-11A', school_id: 'ZPS', grade: '11', section: 'A', stream: 'AI Vision & Autonomous Robotics', student_count: 5, lead_trainer_id: 'TR-01', day: 'Saturday', time_slot: '01:00 PM - 02:30 PM' },
+
+  // XYZ Academy Classes (4 Students Each)
+  { id: 'CLS-XYZ-6A', school_id: 'XYZ', grade: '6', section: 'A', stream: 'Robotics & Electronic Basics', student_count: 4, lead_trainer_id: 'TR-02', day: 'Monday', time_slot: '09:00 AM - 10:30 AM' },
+  { id: 'CLS-XYZ-7A', school_id: 'XYZ', grade: '7', section: 'A', stream: 'Robotics & Sensory Actuation', student_count: 4, lead_trainer_id: 'TR-02', day: 'Monday', time_slot: '10:45 AM - 12:15 PM' },
+  { id: 'CLS-XYZ-8A', school_id: 'XYZ', grade: '8', section: 'A', stream: 'Autonomous Mobile Robotics', student_count: 4, lead_trainer_id: 'TR-02', day: 'Tuesday', time_slot: '09:00 AM - 10:30 AM' },
+  { id: 'CLS-XYZ-9A', school_id: 'XYZ', grade: '9', section: 'A', stream: 'Opto-Electronics & Display Systems', student_count: 4, lead_trainer_id: 'TR-02', day: 'Tuesday', time_slot: '10:45 AM - 12:15 PM' },
+  { id: 'CLS-XYZ-11A', school_id: 'XYZ', grade: '11', section: 'A', stream: 'Laser Optics & Capstone Robotics', student_count: 4, lead_trainer_id: 'TR-02', day: 'Tuesday', time_slot: '01:00 PM - 02:30 PM' },
 ];
 
 export const SEED_STUDENTS = [
+  // ==================== ZENITH PUBLIC SCHOOL (ZPS) ====================
   // Class 6A
   { id: 'STU-601', student_id: 'ZPS6A 01', name: 'Aarav Sharma', school_id: 'ZPS', class_id: 'CLS-ZPS-6A', tech_level: 'Level 0', parent_name: 'Sanjay Sharma', parent_phone: '+91 98390 11221', assigned_kit_id: 'KIT-ZPS-01', status: 'Active' },
   { id: 'STU-602', student_id: 'ZPS6A 02', name: 'Priya Patel', school_id: 'ZPS', class_id: 'CLS-ZPS-6A', tech_level: 'Level 0', parent_name: 'Manoj Patel', parent_phone: '+91 98390 11222', assigned_kit_id: 'KIT-ZPS-02', status: 'Active' },
@@ -47,6 +57,37 @@ export const SEED_STUDENTS = [
   { id: 'STU-1103', student_id: 'ZPS11A 03', name: 'Harshita Malviya', school_id: 'ZPS', class_id: 'CLS-ZPS-11A', tech_level: 'Level 0', parent_name: 'S.P. Malviya', parent_phone: '+91 98390 55663', assigned_kit_id: 'KIT-ZPS-23', status: 'Active' },
   { id: 'STU-1104', student_id: 'ZPS11A 04', name: 'Shashank Shukla', school_id: 'ZPS', class_id: 'CLS-ZPS-11A', tech_level: 'Level 0', parent_name: 'Awadhesh Shukla', parent_phone: '+91 98390 55664', assigned_kit_id: 'KIT-ZPS-24', status: 'Active' },
   { id: 'STU-1105', student_id: 'ZPS11A 05', name: 'Divya Upadhyay', school_id: 'ZPS', class_id: 'CLS-ZPS-11A', tech_level: 'Level 0', parent_name: 'Radheyshyam Upadhyay', parent_phone: '+91 98390 55665', assigned_kit_id: 'KIT-ZPS-25', status: 'Active' },
+
+  // ==================== XYZ ACADEMY (DUMMY / PILOT LAB - 4 STUDENTS PER CLASS) ====================
+  // Class 6A
+  { id: 'STU-XYZ-601', student_id: 'XYZ6A 01', name: 'Manish Rawat', school_id: 'XYZ', class_id: 'CLS-XYZ-6A', tech_level: 'Level 5 (Certified Graduate)', parent_name: 'Prakash Rawat', parent_phone: '+91 98390 66111', assigned_kit_id: 'KIT-XYZ-01', status: 'Certified Graduate' },
+  { id: 'STU-XYZ-602', student_id: 'XYZ6A 02', name: 'Kavita Saxena', school_id: 'XYZ', class_id: 'CLS-XYZ-6A', tech_level: 'Level 0', parent_name: 'Sunil Saxena', parent_phone: '+91 98390 66112', assigned_kit_id: 'KIT-XYZ-02', status: 'Active' },
+  { id: 'STU-XYZ-603', student_id: 'XYZ6A 03', name: 'Ayushmann Jha', school_id: 'XYZ', class_id: 'CLS-XYZ-6A', tech_level: 'Level 0', parent_name: 'R.K. Jha', parent_phone: '+91 98390 66113', assigned_kit_id: 'KIT-XYZ-03', status: 'Active' },
+  { id: 'STU-XYZ-604', student_id: 'XYZ6A 04', name: 'Ritika Sen', school_id: 'XYZ', class_id: 'CLS-XYZ-6A', tech_level: 'Level 0', parent_name: 'Debashish Sen', parent_phone: '+91 98390 66114', assigned_kit_id: 'KIT-XYZ-04', status: 'Active' },
+
+  // Class 7A
+  { id: 'STU-XYZ-701', student_id: 'XYZ7A 01', name: 'Pranav Bhatt', school_id: 'XYZ', class_id: 'CLS-XYZ-7A', tech_level: 'Level 5 (Certified Graduate)', parent_name: 'G.S. Bhatt', parent_phone: '+91 98390 66221', assigned_kit_id: 'KIT-XYZ-05', status: 'Certified Graduate' },
+  { id: 'STU-XYZ-702', student_id: 'XYZ7A 02', name: 'Ananya Deshmukh', school_id: 'XYZ', class_id: 'CLS-XYZ-7A', tech_level: 'Level 0', parent_name: 'V.D. Deshmukh', parent_phone: '+91 98390 66222', assigned_kit_id: 'KIT-XYZ-06', status: 'Active' },
+  { id: 'STU-XYZ-703', student_id: 'XYZ7A 03', name: 'Sameer Khan', school_id: 'XYZ', class_id: 'CLS-XYZ-7A', tech_level: 'Level 0', parent_name: 'Imran Khan', parent_phone: '+91 98390 66223', assigned_kit_id: 'KIT-XYZ-07', status: 'Active' },
+  { id: 'STU-XYZ-704', student_id: 'XYZ7A 04', name: 'Pooja Hegde', school_id: 'XYZ', class_id: 'CLS-XYZ-7A', tech_level: 'Level 0', parent_name: 'K. Hegde', parent_phone: '+91 98390 66224', assigned_kit_id: 'KIT-XYZ-08', status: 'Active' },
+
+  // Class 8A
+  { id: 'STU-XYZ-801', student_id: 'XYZ8A 01', name: 'Varun Nair', school_id: 'XYZ', class_id: 'CLS-XYZ-8A', tech_level: 'Level 5 (Certified Graduate)', parent_name: 'M. Nair', parent_phone: '+91 98390 66331', assigned_kit_id: 'KIT-XYZ-09', status: 'Certified Graduate' },
+  { id: 'STU-XYZ-802', student_id: 'XYZ8A 02', name: 'Tanya Roy', school_id: 'XYZ', class_id: 'CLS-XYZ-8A', tech_level: 'Level 0', parent_name: 'Subhash Roy', parent_phone: '+91 98390 66332', assigned_kit_id: 'KIT-XYZ-10', status: 'Active' },
+  { id: 'STU-XYZ-803', student_id: 'XYZ8A 03', name: 'Aman Deep', school_id: 'XYZ', class_id: 'CLS-XYZ-8A', tech_level: 'Level 0', parent_name: 'Gurmeet Singh', parent_phone: '+91 98390 66333', assigned_kit_id: 'KIT-XYZ-11', status: 'Active' },
+  { id: 'STU-XYZ-804', student_id: 'XYZ8A 04', name: 'Nisha Pillai', school_id: 'XYZ', class_id: 'CLS-XYZ-8A', tech_level: 'Level 0', parent_name: 'R. Pillai', parent_phone: '+91 98390 66334', assigned_kit_id: 'KIT-XYZ-12', status: 'Active' },
+
+  // Class 9A
+  { id: 'STU-XYZ-901', student_id: 'XYZ9A 01', name: 'Gaurav Kulkarni', school_id: 'XYZ', class_id: 'CLS-XYZ-9A', tech_level: 'Level 5 (Certified Graduate)', parent_name: 'A. Kulkarni', parent_phone: '+91 98390 66441', assigned_kit_id: 'KIT-XYZ-13', status: 'Certified Graduate' },
+  { id: 'STU-XYZ-902', student_id: 'XYZ9A 02', name: 'Swati Chawla', school_id: 'XYZ', class_id: 'CLS-XYZ-9A', tech_level: 'Level 0', parent_name: 'D. Chawla', parent_phone: '+91 98390 66442', assigned_kit_id: 'KIT-XYZ-14', status: 'Active' },
+  { id: 'STU-XYZ-903', student_id: 'XYZ9A 03', name: 'Kunal Kapoor', school_id: 'XYZ', class_id: 'CLS-XYZ-9A', tech_level: 'Level 0', parent_name: 'S. Kapoor', parent_phone: '+91 98390 66443', assigned_kit_id: 'KIT-XYZ-15', status: 'Active' },
+  { id: 'STU-XYZ-904', student_id: 'XYZ9A 04', name: 'Shruti Iyer', school_id: 'XYZ', class_id: 'CLS-XYZ-9A', tech_level: 'Level 0', parent_name: 'N. Iyer', parent_phone: '+91 98390 66444', assigned_kit_id: 'KIT-XYZ-16', status: 'Active' },
+
+  // Class 11A
+  { id: 'STU-XYZ-1101', student_id: 'XYZ11A 01', name: 'Harshit Chauhan', school_id: 'XYZ', class_id: 'CLS-XYZ-11A', tech_level: 'Level 5 (Certified Graduate)', parent_name: 'R.P. Chauhan', parent_phone: '+91 98390 66551', assigned_kit_id: 'KIT-XYZ-17', status: 'Certified Graduate' },
+  { id: 'STU-XYZ-1102', student_id: 'XYZ11A 02', name: 'Bhavna Menon', school_id: 'XYZ', class_id: 'CLS-XYZ-11A', tech_level: 'Level 0', parent_name: 'S. Menon', parent_phone: '+91 98390 66552', assigned_kit_id: 'KIT-XYZ-18', status: 'Active' },
+  { id: 'STU-XYZ-1103', student_id: 'XYZ11A 03', name: 'Kartik Somani', school_id: 'XYZ', class_id: 'CLS-XYZ-11A', tech_level: 'Level 0', parent_name: 'M. Somani', parent_phone: '+91 98390 66553', assigned_kit_id: 'KIT-XYZ-19', status: 'Active' },
+  { id: 'STU-XYZ-1104', student_id: 'XYZ11A 04', name: 'Divyanka Rao', school_id: 'XYZ', class_id: 'CLS-XYZ-11A', tech_level: 'Level 0', parent_name: 'T. Rao', parent_phone: '+91 98390 66554', assigned_kit_id: 'KIT-XYZ-20', status: 'Active' },
 ];
 
 export const SEED_TRAINERS = [
@@ -58,6 +99,17 @@ export const SEED_TRAINERS = [
     status: 'Active', 
     assigned_schools: 'ZPS', 
     rating: 5.0, 
+    daily_rate: 600,
+    weekly_days: 2
+  },
+  { 
+    id: 'TR-02', 
+    name: 'Akash Sharma', 
+    phone: '+91 94500 77882', 
+    role: 'Senior STEM & Robotics Trainer', 
+    status: 'Active', 
+    assigned_schools: 'XYZ', 
+    rating: 4.9, 
     daily_rate: 600,
     weekly_days: 2
   }
@@ -82,7 +134,23 @@ export const SEED_SESSIONS = [
 
   // Class 11A - Unit 1 (2 Completed Classes)
   { id: 'SES-1101', school_id: 'ZPS', class_id: 'CLS-ZPS-11A', trainer_id: 'TR-01', date: '2026-08-26', time: '01:00 PM - 02:30 PM', unit_code: 'Unit 1', level: 'Level 0', session_no: 1, total_sessions: 2, topic: 'Unit 1 (Class 1/2): Introduction to Engineering Specs & Optics - Optical Collimation & Lasers', is_locked: 1, notes: 'Focused semiconductor laser diode collimation, beam convergence, and alignment optics.' },
-  { id: 'SES-1102', school_id: 'ZPS', class_id: 'CLS-ZPS-11A', trainer_id: 'TR-01', date: '2026-08-29', time: '01:00 PM - 02:30 PM', unit_code: 'Unit 1', level: 'Level 0', session_no: 2, total_sessions: 2, topic: 'Unit 1 (Class 2/2): Introduction to Engineering Specs & Optics - Sensor Specs & Error Characterization', is_locked: 1, notes: 'Measured optical trip response time and documented engineering specification tolerances.' }
+  { id: 'SES-1102', school_id: 'ZPS', class_id: 'CLS-ZPS-11A', trainer_id: 'TR-01', date: '2026-08-29', time: '01:00 PM - 02:30 PM', unit_code: 'Unit 1', level: 'Level 0', session_no: 2, total_sessions: 2, topic: 'Unit 1 (Class 2/2): Introduction to Engineering Specs & Optics - Sensor Specs & Error Characterization', is_locked: 1, notes: 'Measured optical trip response time and documented engineering specification tolerances.' },
+
+  // ==================== XYZ ACADEMY SESSIONS (Trainer: Akash Sharma TR-02) ====================
+  { id: 'SES-XYZ-601', school_id: 'XYZ', class_id: 'CLS-XYZ-6A', trainer_id: 'TR-02', date: '2026-08-25', time: '09:00 AM - 10:30 AM', unit_code: 'Unit 1', level: 'Level 0', session_no: 1, total_sessions: 2, topic: 'Unit 1 (Class 1/2): Robotics Core Fundamentals - Breadboard Loops & Power Rails', is_locked: 1, notes: 'XYZ pilot cohort hands-on breadboard loops and polarity verification.' },
+  { id: 'SES-XYZ-602', school_id: 'XYZ', class_id: 'CLS-XYZ-6A', trainer_id: 'TR-02', date: '2026-08-28', time: '09:00 AM - 10:30 AM', unit_code: 'Unit 1', level: 'Level 0', session_no: 2, total_sessions: 2, topic: 'Unit 1 (Class 2/2): Microcontroller Basics & Traffic Signal Logic', is_locked: 1, notes: 'C++ loop sequences and digital output pin calibration.' },
+
+  { id: 'SES-XYZ-701', school_id: 'XYZ', class_id: 'CLS-XYZ-7A', trainer_id: 'TR-02', date: '2026-08-25', time: '10:45 AM - 12:15 PM', unit_code: 'Unit 1', level: 'Level 0', session_no: 1, total_sessions: 2, topic: 'Unit 1 (Class 1/2): Analog Electronics & Logic States', is_locked: 1, notes: 'Potentiometer dividers and multi-meter readings.' },
+  { id: 'SES-XYZ-702', school_id: 'XYZ', class_id: 'CLS-XYZ-7A', trainer_id: 'TR-02', date: '2026-08-28', time: '10:45 AM - 12:15 PM', unit_code: 'Unit 1', level: 'Level 0', session_no: 2, total_sessions: 2, topic: 'Unit 1 (Class 2/2): Sensor Voltage Mapping & Rain Detection Circuit', is_locked: 1, notes: 'Water conductivity sensor interfacing and buzzer alarm trigger.' },
+
+  { id: 'SES-XYZ-801', school_id: 'XYZ', class_id: 'CLS-XYZ-8A', trainer_id: 'TR-02', date: '2026-08-26', time: '09:00 AM - 10:30 AM', unit_code: 'Unit 1', level: 'Level 0', session_no: 1, total_sessions: 2, topic: 'Unit 1 (Class 1/2): Ultrasonic Acoustics & Distance Formulas', is_locked: 1, notes: 'Echo pulse timing and speed of sound calibration.' },
+  { id: 'SES-XYZ-802', school_id: 'XYZ', class_id: 'CLS-XYZ-8A', trainer_id: 'TR-02', date: '2026-08-29', time: '09:00 AM - 10:30 AM', unit_code: 'Unit 1', level: 'Level 0', session_no: 2, total_sessions: 2, topic: 'Unit 1 (Class 2/2): Obstacle Detection Algorithm & L298N Motor Driver', is_locked: 1, notes: 'Chassis assembly and 2WD motor control logic.' },
+
+  { id: 'SES-XYZ-901', school_id: 'XYZ', class_id: 'CLS-XYZ-9A', trainer_id: 'TR-02', date: '2026-08-26', time: '10:45 AM - 12:15 PM', unit_code: 'Unit 1', level: 'Level 0', session_no: 1, total_sessions: 2, topic: 'Unit 1 (Class 1/2): Industrial Sensors & Infrared Optical Detection', is_locked: 1, notes: 'Dual IR sensors and differential comparator tuning.' },
+  { id: 'SES-XYZ-902', school_id: 'XYZ', class_id: 'CLS-XYZ-9A', trainer_id: 'TR-02', date: '2026-08-29', time: '10:45 AM - 12:15 PM', unit_code: 'Unit 1', level: 'Level 0', session_no: 2, total_sessions: 2, topic: 'Unit 1 (Class 2/2): 16x2 LCD Bus & Closed-Loop Line Following Track', is_locked: 1, notes: 'High-speed line track navigation testing.' },
+
+  { id: 'SES-XYZ-1101', school_id: 'XYZ', class_id: 'CLS-XYZ-11A', trainer_id: 'TR-02', date: '2026-08-26', time: '01:00 PM - 02:30 PM', unit_code: 'Unit 1', level: 'Level 0', session_no: 1, total_sessions: 2, topic: 'Unit 1 (Class 1/2): Laser Tripwire Array & Optical Collimation', is_locked: 1, notes: '650nm laser beam alignment and photodiode latching.' },
+  { id: 'SES-XYZ-1102', school_id: 'XYZ', class_id: 'CLS-XYZ-11A', trainer_id: 'TR-02', date: '2026-08-29', time: '01:00 PM - 02:30 PM', unit_code: 'Unit 1', level: 'Level 0', session_no: 2, total_sessions: 2, topic: 'Unit 1 (Class 2/2): Autonomous Maze-Solving Logic & Wall Following', is_locked: 1, notes: 'Left-hand wall following algorithm execution.' }
 ];
 
 export const SEED_ATTENDANCE = [
@@ -97,6 +165,16 @@ export const SEED_ATTENDANCE = [
   { session_id: 'SES-602', student_id: 'ZPS6A 03', status: 'Present' },
   { session_id: 'SES-602', student_id: 'ZPS6A 04', status: 'Present' },
   { session_id: 'SES-602', student_id: 'ZPS6A 05', status: 'Present' },
+
+  // XYZ Class 6A
+  { session_id: 'SES-XYZ-601', student_id: 'XYZ6A 01', status: 'Present' },
+  { session_id: 'SES-XYZ-601', student_id: 'XYZ6A 02', status: 'Present' },
+  { session_id: 'SES-XYZ-601', student_id: 'XYZ6A 03', status: 'Present' },
+  { session_id: 'SES-XYZ-601', student_id: 'XYZ6A 04', status: 'Present' },
+  { session_id: 'SES-XYZ-602', student_id: 'XYZ6A 01', status: 'Present' },
+  { session_id: 'SES-XYZ-602', student_id: 'XYZ6A 02', status: 'Present' },
+  { session_id: 'SES-XYZ-602', student_id: 'XYZ6A 03', status: 'Present' },
+  { session_id: 'SES-XYZ-602', student_id: 'XYZ6A 04', status: 'Present' },
 
   // Class 7A (Session 1 & Session 2)
   { session_id: 'SES-701', student_id: 'ZPS7A 01', status: 'Present' },
@@ -405,15 +483,47 @@ export const SEED_INVENTORY = [
   { id: 'KIT-ZPS-19', school_id: 'ZPS', class_grade: '9', name: 'Pixiu Industrial Flame & Line Rover Kit #19', assigned_to: 'ZPS9A 04', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
   { id: 'KIT-ZPS-20', school_id: 'ZPS', class_grade: '9', name: 'Pixiu Industrial Flame & Line Rover Kit #20', assigned_to: 'ZPS9A 05', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
 
-  // Class 11 Kits
+  // Class 11 Kits (ZPS)
   { id: 'KIT-ZPS-21', school_id: 'ZPS', class_grade: '11', name: 'Pixiu Photonics & Maze Solver Rover Kit #21', assigned_to: 'ZPS11A 01', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
   { id: 'KIT-ZPS-22', school_id: 'ZPS', class_grade: '11', name: 'Pixiu Photonics & Maze Solver Rover Kit #22', assigned_to: 'ZPS11A 02', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
   { id: 'KIT-ZPS-23', school_id: 'ZPS', class_grade: '11', name: 'Pixiu Photonics & Maze Solver Rover Kit #23', assigned_to: 'ZPS11A 03', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
   { id: 'KIT-ZPS-24', school_id: 'ZPS', class_grade: '11', name: 'Pixiu Photonics & Maze Solver Rover Kit #24', assigned_to: 'ZPS11A 04', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
   { id: 'KIT-ZPS-25', school_id: 'ZPS', class_grade: '11', name: 'Pixiu Photonics & Maze Solver Rover Kit #25', assigned_to: 'ZPS11A 05', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+
+  // ==================== XYZ ACADEMY KITS (KIT-XYZ-01 to KIT-XYZ-20) ====================
+  // Class 6 Kits (XYZ)
+  { id: 'KIT-XYZ-01', school_id: 'XYZ', class_grade: '6', name: 'Pixiu Discovery STEM Hardware Kit #01', assigned_to: 'XYZ6A 01', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-XYZ-02', school_id: 'XYZ', class_grade: '6', name: 'Pixiu Discovery STEM Hardware Kit #02', assigned_to: 'XYZ6A 02', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-XYZ-03', school_id: 'XYZ', class_grade: '6', name: 'Pixiu Discovery STEM Hardware Kit #03', assigned_to: 'XYZ6A 03', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-XYZ-04', school_id: 'XYZ', class_grade: '6', name: 'Pixiu Discovery STEM Hardware Kit #04', assigned_to: 'XYZ6A 04', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+
+  // Class 7 Kits (XYZ)
+  { id: 'KIT-XYZ-05', school_id: 'XYZ', class_grade: '7', name: 'Pixiu Environmental & Sensor Kit #05', assigned_to: 'XYZ7A 01', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-XYZ-06', school_id: 'XYZ', class_grade: '7', name: 'Pixiu Environmental & Sensor Kit #06', assigned_to: 'XYZ7A 02', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-XYZ-07', school_id: 'XYZ', class_grade: '7', name: 'Pixiu Environmental & Sensor Kit #07', assigned_to: 'XYZ7A 03', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-XYZ-08', school_id: 'XYZ', class_grade: '7', name: 'Pixiu Environmental & Sensor Kit #08', assigned_to: 'XYZ7A 04', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+
+  // Class 8 Kits (XYZ)
+  { id: 'KIT-XYZ-09', school_id: 'XYZ', class_grade: '8', name: 'Pixiu Mobility & Obstacle Rover Kit #09', assigned_to: 'XYZ8A 01', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-XYZ-10', school_id: 'XYZ', class_grade: '8', name: 'Pixiu Mobility & Obstacle Rover Kit #10', assigned_to: 'XYZ8A 02', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-XYZ-11', school_id: 'XYZ', class_grade: '8', name: 'Pixiu Mobility & Obstacle Rover Kit #11', assigned_to: 'XYZ8A 03', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-XYZ-12', school_id: 'XYZ', class_grade: '8', name: 'Pixiu Mobility & Obstacle Rover Kit #12', assigned_to: 'XYZ8A 04', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+
+  // Class 9 Kits (XYZ)
+  { id: 'KIT-XYZ-13', school_id: 'XYZ', class_grade: '9', name: 'Pixiu Industrial Flame & Line Rover Kit #13', assigned_to: 'XYZ9A 01', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-XYZ-14', school_id: 'XYZ', class_grade: '9', name: 'Pixiu Industrial Flame & Line Rover Kit #14', assigned_to: 'XYZ9A 02', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-XYZ-15', school_id: 'XYZ', class_grade: '9', name: 'Pixiu Industrial Flame & Line Rover Kit #15', assigned_to: 'XYZ9A 03', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-XYZ-16', school_id: 'XYZ', class_grade: '9', name: 'Pixiu Industrial Flame & Line Rover Kit #16', assigned_to: 'XYZ9A 04', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+
+  // Class 11 Kits (XYZ)
+  { id: 'KIT-XYZ-17', school_id: 'XYZ', class_grade: '11', name: 'Pixiu Photonics & Maze Solver Rover Kit #17', assigned_to: 'XYZ11A 01', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-XYZ-18', school_id: 'XYZ', class_grade: '11', name: 'Pixiu Photonics & Maze Solver Rover Kit #18', assigned_to: 'XYZ11A 02', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-XYZ-19', school_id: 'XYZ', class_grade: '11', name: 'Pixiu Photonics & Maze Solver Rover Kit #19', assigned_to: 'XYZ11A 03', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-XYZ-20', school_id: 'XYZ', class_grade: '11', name: 'Pixiu Photonics & Maze Solver Rover Kit #20', assigned_to: 'XYZ11A 04', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
 ];
 
 export const SEED_BILLING = [
+  // Zenith Public School Invoices
   {
     id: 'INV-2026-001',
     school_id: 'ZPS',
@@ -458,6 +568,38 @@ export const SEED_BILLING = [
     place_of_supply: 'Hata, Uttar Pradesh',
     status: 'Pending',
     description: 'Final Capstone Exhibition, Student Progress Certification, and Year-End Term Review (30%)'
+  },
+
+  // XYZ Academy Invoices
+  {
+    id: 'INV-XYZ-001',
+    school_id: 'XYZ',
+    school_name: 'XYZ Academy (Pilot Lab)',
+    tranche_number: 1,
+    tranche_title: 'Tranche 1: Lab Deployment & Pilot Hardware Suite (50%)',
+    amount: 35000,
+    total_contract_value: 70000,
+    date_issued: '2026-08-20',
+    invoice_date: '2026-08-20',
+    due_date: '2026-09-05',
+    place_of_supply: 'Gorakhpur, Uttar Pradesh',
+    status: 'Paid',
+    description: 'Initial Lab Setup, 20x Modular Microcontroller Kits & Pilot Orientation Session'
+  },
+  {
+    id: 'INV-XYZ-002',
+    school_id: 'XYZ',
+    school_name: 'XYZ Academy (Pilot Lab)',
+    tranche_number: 2,
+    tranche_title: 'Tranche 2: Mid-Term Curriculum Evaluation & Robotics Trainer Delivery (50%)',
+    amount: 35000,
+    total_contract_value: 70000,
+    date_issued: '2026-08-20',
+    invoice_date: '2026-08-20',
+    due_date: '2026-11-20',
+    place_of_supply: 'Gorakhpur, Uttar Pradesh',
+    status: 'Pending',
+    description: 'Term 1 Mid-Term Robotics Engineering Curriculum Delivery and Practical Assessments'
   }
 ];
 
@@ -646,5 +788,71 @@ export const SEED_CONTENT = [
   { id: 'CNT-1106-S', title: 'Class 11 - Unit 6: Engineering Reference & Log', type: 'PDF', level: 'Level 5', class_grade: '11', target: 'Student', is_watermarked: 1, url: '/materials/class11-unit6-student-watermarked.pdf', file_url: '/materials/class11-unit6-student-watermarked.pdf', description: 'System wiring reference, component pinouts, and formal engineering log' }
 ];
 
-// End-of-Unit Student Reviews by Trainers (Initialized Empty - Evaluated live by Trainers)
-export const SEED_STUDENT_REVIEWS = [];
+// End-of-Unit Student Reviews by Trainers (Complete Evaluations for Certified Graduates)
+export const SEED_STUDENT_REVIEWS = [
+  // ==================== XYZ ACADEMY GRADUATES ====================
+  // 1. Manish Rawat (XYZ6A 01 - Class 6)
+  { id: 'REV-XYZ-601-1', student_id: 'XYZ6A 01', level: 'Level 0', unit_code: 'Unit 1', unit_title: 'Introduction to Robotics & Electronics', score: 10, rating: 5, status: 'Mastered', review: 'Exemplary mastery of breadboard loops, Ohm\'s law voltage dividers and LED circuit polarity.', trainer_name: 'Akash Sharma (Senior STEM Trainer)', verified_date: '2026-08-28' },
+  { id: 'REV-XYZ-601-2', student_id: 'XYZ6A 01', level: 'Level 1', unit_code: 'Unit 2', unit_title: 'The Arduino IDE & Firmware Upload', score: 10, rating: 5, status: 'Mastered', review: 'Flawlessly configured Arduino IDE COM ports, compiled sketches, and understood C++ syntax loop structures.', trainer_name: 'Akash Sharma (Senior STEM Trainer)', verified_date: '2026-08-28' },
+  { id: 'REV-XYZ-601-3', student_id: 'XYZ6A 01', level: 'Level 2', unit_code: 'Unit 3', unit_title: 'Basic Project: Traffic Light Signal Controller', score: 10, rating: 5, status: 'Mastered', review: 'Constructed an automated 3-phase traffic controller circuit with accurate millisecond timing sequence.', trainer_name: 'Akash Sharma (Senior STEM Trainer)', verified_date: '2026-08-28' },
+  { id: 'REV-XYZ-601-4', student_id: 'XYZ6A 01', level: 'Level 3', unit_code: 'Unit 4', unit_title: 'Intermediate Project: Automatic Night Lamp', score: 9, rating: 5, status: 'Mastered', review: 'Calibrated analog LDR lux thresholds and successfully implemented automated dark-triggered switching.', trainer_name: 'Akash Sharma (Senior STEM Trainer)', verified_date: '2026-08-28' },
+  { id: 'REV-XYZ-601-5', student_id: 'XYZ6A 01', level: 'Level 4', unit_code: 'Unit 5', unit_title: 'Final Project: Smart Toll Booth', score: 10, rating: 5, status: 'Mastered', review: 'Built complete working ultrasonic vehicle counter with SG90 servo automated boom barrier integration.', trainer_name: 'Akash Sharma (Senior STEM Trainer)', verified_date: '2026-08-28' },
+  { id: 'REV-XYZ-601-6', student_id: 'XYZ6A 01', level: 'Level 5', unit_code: 'Unit 6', unit_title: 'Extra Challenges & Capstone Project Log', score: 10, rating: 5, status: 'Mastered', review: 'Completed advanced hardware debouncing challenges and maintained an exceptional engineering journal.', trainer_name: 'Akash Sharma (Senior STEM Trainer)', verified_date: '2026-08-28' },
+
+  // 2. Pranav Bhatt (XYZ7A 01 - Class 7)
+  { id: 'REV-XYZ-701-1', student_id: 'XYZ7A 01', level: 'Level 0', unit_code: 'Unit 1', unit_title: 'Introduction to Analog & Digital Electronics', score: 10, rating: 5, status: 'Mastered', review: 'Demonstrated precise mathematical understanding of analog-to-digital conversions and potentiometer dividers.', trainer_name: 'Akash Sharma (Senior STEM Trainer)', verified_date: '2026-08-28' },
+  { id: 'REV-XYZ-701-2', student_id: 'XYZ7A 01', level: 'Level 1', unit_code: 'Unit 2', unit_title: 'The Arduino IDE & Serial Monitor', score: 10, rating: 5, status: 'Mastered', review: 'Live serial telemetry stream debugged and plotted with 9600 baud rate communication.', trainer_name: 'Akash Sharma (Senior STEM Trainer)', verified_date: '2026-08-28' },
+  { id: 'REV-XYZ-701-3', student_id: 'XYZ7A 01', level: 'Level 2', unit_code: 'Unit 3', unit_title: 'Basic Project: LED Dimmer & Mood Light', score: 10, rating: 5, status: 'Mastered', review: 'Engineered smooth PWM 8-bit duty cycle brightness control using analogRead mapping functions.', trainer_name: 'Akash Sharma (Senior STEM Trainer)', verified_date: '2026-08-28' },
+  { id: 'REV-XYZ-701-4', student_id: 'XYZ7A 01', level: 'Level 3', unit_code: 'Unit 4', unit_title: 'Intermediate Project: Temp & Humidity Monitor', score: 9, rating: 5, status: 'Mastered', review: 'Interfaced DHT11 environmental sensor and outputted real-time climatic data onto serial terminal.', trainer_name: 'Akash Sharma (Senior STEM Trainer)', verified_date: '2026-08-28' },
+  { id: 'REV-XYZ-701-5', student_id: 'XYZ7A 01', level: 'Level 4', unit_code: 'Unit 5', unit_title: 'Final Project: Smart Rain Alarm System', score: 10, rating: 5, status: 'Mastered', review: 'Water conductivity detection plate circuit assembled with active piezoelectric warning siren.', trainer_name: 'Akash Sharma (Senior STEM Trainer)', verified_date: '2026-08-28' },
+  { id: 'REV-XYZ-701-6', student_id: 'XYZ7A 01', level: 'Level 5', unit_code: 'Unit 6', unit_title: 'Extra Challenges & Capstone Project Log', score: 10, rating: 5, status: 'Mastered', review: 'High distinction in capstone debugging and environmental telemetry optimization.', trainer_name: 'Akash Sharma (Senior STEM Trainer)', verified_date: '2026-08-28' },
+
+  // 3. Varun Nair (XYZ8A 01 - Class 8)
+  { id: 'REV-XYZ-801-1', student_id: 'XYZ8A 01', level: 'Level 0', unit_code: 'Unit 1', unit_title: 'Introduction to Distance Measurement & Waves', score: 10, rating: 5, status: 'Mastered', review: 'Mastered acoustic reflection mathematics, pulse duration timing, and speed-of-sound physics.', trainer_name: 'Akash Sharma (Senior STEM Trainer)', verified_date: '2026-08-28' },
+  { id: 'REV-XYZ-801-2', student_id: 'XYZ8A 01', level: 'Level 1', unit_code: 'Unit 2', unit_title: 'The Arduino IDE & Sensor Libraries', score: 10, rating: 5, status: 'Mastered', review: 'Implemented microsecond pulse timing algorithms and modular distance computation functions.', trainer_name: 'Akash Sharma (Senior STEM Trainer)', verified_date: '2026-08-28' },
+  { id: 'REV-XYZ-801-3', student_id: 'XYZ8A 01', level: 'Level 2', unit_code: 'Unit 3', unit_title: 'Basic Project: Height Measurement Station', score: 10, rating: 5, status: 'Mastered', review: 'Built stand-mounted ultrasonic digital stadiometer with sub-centimeter readout accuracy.', trainer_name: 'Akash Sharma (Senior STEM Trainer)', verified_date: '2026-08-28' },
+  { id: 'REV-XYZ-801-4', student_id: 'XYZ8A 01', level: 'Level 3', unit_code: 'Unit 4', unit_title: 'Intermediate Project: Smart Contactless Dustbin', score: 10, rating: 5, status: 'Mastered', review: 'Programmed automated servo angular motion triggered by hand proximity detection.', trainer_name: 'Akash Sharma (Senior STEM Trainer)', verified_date: '2026-08-28' },
+  { id: 'REV-XYZ-801-5', student_id: 'XYZ8A 01', level: 'Level 4', unit_code: 'Unit 5', unit_title: 'Final Project: Obstacle-Avoiding Robot', score: 10, rating: 5, status: 'Mastered', review: 'Assembled full 2WD mobile rover, wired L298N H-bridge driver, and verified collision-free navigation.', trainer_name: 'Akash Sharma (Senior STEM Trainer)', verified_date: '2026-08-28' },
+  { id: 'REV-XYZ-801-6', student_id: 'XYZ8A 01', level: 'Level 5', unit_code: 'Unit 6', unit_title: 'Extra Challenges & Capstone Project Log', score: 10, rating: 5, status: 'Mastered', review: 'Excellence in robotics motor chassis balancing and ultrasonic sweeping servo head calibration.', trainer_name: 'Akash Sharma (Senior STEM Trainer)', verified_date: '2026-08-28' },
+
+  // 4. Gaurav Kulkarni (XYZ9A 01 - Class 9)
+  { id: 'REV-XYZ-901-1', student_id: 'XYZ9A 01', level: 'Level 0', unit_code: 'Unit 1', unit_title: 'Introduction to Industrial Sensors & Displays', score: 10, rating: 5, status: 'Mastered', review: 'Understood infrared optical absorption, liquid crystal display controllers, and sensor cross-talk.', trainer_name: 'Akash Sharma (Senior STEM Trainer)', verified_date: '2026-08-28' },
+  { id: 'REV-XYZ-901-2', student_id: 'XYZ9A 01', level: 'Level 1', unit_code: 'Unit 2', unit_title: 'The Arduino IDE & Memory Architecture', score: 10, rating: 5, status: 'Mastered', review: 'Optimized RAM heap allocation, bitwise register manipulation, and memory management.', trainer_name: 'Akash Sharma (Senior STEM Trainer)', verified_date: '2026-08-28' },
+  { id: 'REV-XYZ-901-3', student_id: 'XYZ9A 01', level: 'Level 2', unit_code: 'Unit 3', unit_title: 'Basic Project: Fire Security Alarm System', score: 10, rating: 5, status: 'Mastered', review: 'Constructed dual-stage infrared phototransistor flame detection circuit with security latching.', trainer_name: 'Akash Sharma (Senior STEM Trainer)', verified_date: '2026-08-28' },
+  { id: 'REV-XYZ-901-4', student_id: 'XYZ9A 01', level: 'Level 3', unit_code: 'Unit 4', unit_title: 'Intermediate Project: Smart 16x2 LCD Weather System', score: 10, rating: 5, status: 'Mastered', review: 'Wired 4-bit parallel LCD bus and generated custom weather animation glyphs on display.', trainer_name: 'Akash Sharma (Senior STEM Trainer)', verified_date: '2026-08-28' },
+  { id: 'REV-XYZ-901-5', student_id: 'XYZ9A 01', level: 'Level 4', unit_code: 'Unit 5', unit_title: 'Final Project: Line Following Robot', score: 10, rating: 5, status: 'Mastered', review: 'Developed closed-loop proportional steering differential algorithm for high-speed track navigation.', trainer_name: 'Akash Sharma (Senior STEM Trainer)', verified_date: '2026-08-28' },
+  { id: 'REV-XYZ-901-6', student_id: 'XYZ9A 01', level: 'Level 5', unit_code: 'Unit 6', unit_title: 'Extra Challenges & Capstone Project Log', score: 10, rating: 5, status: 'Mastered', review: 'Awarded High Honors for robotics circuit neatness and PID loop stability.', trainer_name: 'Akash Sharma (Senior STEM Trainer)', verified_date: '2026-08-28' },
+
+  // 5. Harshit Chauhan (XYZ11A 01 - Class 11)
+  { id: 'REV-XYZ-1101-1', student_id: 'XYZ11A 01', level: 'Level 0', unit_code: 'Unit 1', unit_title: 'Introduction to Engineering Specs & Optics', score: 10, rating: 5, status: 'Mastered', review: 'Expert optical beam collimation, semiconductor laser tolerances, and error budget analysis.', trainer_name: 'Akash Sharma (Senior STEM Trainer)', verified_date: '2026-08-28' },
+  { id: 'REV-XYZ-1101-2', student_id: 'XYZ11A 01', level: 'Level 1', unit_code: 'Unit 2', unit_title: 'The Arduino IDE & Advanced Microcontroller Control', score: 10, rating: 5, status: 'Mastered', review: 'Programmed non-blocking hardware timer interrupts and finite state machine control logic.', trainer_name: 'Akash Sharma (Senior STEM Trainer)', verified_date: '2026-08-28' },
+  { id: 'REV-XYZ-1101-3', student_id: 'XYZ11A 01', level: 'Level 2', unit_code: 'Unit 3', unit_title: 'Basic Project: Laser Security System', score: 10, rating: 5, status: 'Mastered', review: 'Precision-aligned 650nm optical tripwire array with sub-millisecond intrusion trigger response.', trainer_name: 'Akash Sharma (Senior STEM Trainer)', verified_date: '2026-08-28' },
+  { id: 'REV-XYZ-1101-4', student_id: 'XYZ11A 01', level: 'Level 3', unit_code: 'Unit 4', unit_title: 'Intermediate Project: Ultrasonic Calibration & Telemetry', score: 10, rating: 5, status: 'Mastered', review: 'Calculated temperature-compensated acoustic propagation speed with millimeter accuracy calibration.', trainer_name: 'Akash Sharma (Senior STEM Trainer)', verified_date: '2026-08-28' },
+  { id: 'REV-XYZ-1101-5', student_id: 'XYZ11A 01', level: 'Level 4', unit_code: 'Unit 5', unit_title: 'Capstone Project: Maze Solver Robot', score: 10, rating: 5, status: 'Mastered', review: 'Built advanced multi-sensor autonomous maze-solving rover using left-hand wall-following algorithm.', trainer_name: 'Akash Sharma (Senior STEM Trainer)', verified_date: '2026-08-28' },
+  { id: 'REV-XYZ-1101-6', student_id: 'XYZ11A 01', level: 'Level 5', unit_code: 'Unit 6', unit_title: 'Engineering Reference & Formal Capstone Log', score: 10, rating: 5, status: 'Mastered', review: 'Master level engineering documentation, formal schematic CAD mapping, and oral viva distinction.', trainer_name: 'Akash Sharma (Senior STEM Trainer)', verified_date: '2026-08-28' },
+
+  // ==================== ZENITH PUBLIC SCHOOL GRADUATES ====================
+  { id: 'REV-ZPS-601-1', student_id: 'ZPS6A 01', level: 'Level 0', unit_code: 'Unit 1', unit_title: 'Introduction to Robotics & Electronics', score: 10, rating: 5, status: 'Mastered', review: 'Excellent breadboard wiring and complete understanding of basic electronic components.', trainer_name: 'Vikas Pandey (Lead STEM Trainer)', verified_date: '2026-08-25' },
+  { id: 'REV-ZPS-601-2', student_id: 'ZPS6A 01', level: 'Level 1', unit_code: 'Unit 2', unit_title: 'The Arduino IDE & Firmware Upload', score: 10, rating: 5, status: 'Mastered', review: 'Skilled at code compilation and firmware upload across different microcontroller boards.', trainer_name: 'Vikas Pandey (Lead STEM Trainer)', verified_date: '2026-08-25' },
+  { id: 'REV-ZPS-601-3', student_id: 'ZPS6A 01', level: 'Level 2', unit_code: 'Unit 3', unit_title: 'Basic Project: Traffic Light Signal Controller', score: 10, rating: 5, status: 'Mastered', review: 'Successfully programmed sequential LED timing signals with zero circuit errors.', trainer_name: 'Vikas Pandey (Lead STEM Trainer)', verified_date: '2026-08-25' },
+  { id: 'REV-ZPS-601-4', student_id: 'ZPS6A 01', level: 'Level 3', unit_code: 'Unit 4', unit_title: 'Intermediate Project: Automatic Night Lamp', score: 10, rating: 5, status: 'Mastered', review: 'Accurately calibrated LDR resistance thresholds for smooth dusk-to-dawn lighting control.', trainer_name: 'Vikas Pandey (Lead STEM Trainer)', verified_date: '2026-08-25' },
+  { id: 'REV-ZPS-601-5', student_id: 'ZPS6A 01', level: 'Level 4', unit_code: 'Unit 5', unit_title: 'Final Project: Smart Toll Booth', score: 10, rating: 5, status: 'Mastered', review: 'Assembled autonomous toll booth with ultrasonic range detection and servo boom gate.', trainer_name: 'Vikas Pandey (Lead STEM Trainer)', verified_date: '2026-08-25' },
+  { id: 'REV-ZPS-601-6', student_id: 'ZPS6A 01', level: 'Level 5', unit_code: 'Unit 6', unit_title: 'Extra Challenges & Capstone Project Log', score: 10, rating: 5, status: 'Mastered', review: 'Comprehensive capstone log maintained with high distinction in practical robotics evaluation.', trainer_name: 'Vikas Pandey (Lead STEM Trainer)', verified_date: '2026-08-25' }
+];
+
+export const SEED_PROJECTS = [
+  // XYZ Academy Projects
+  { id: 'PRJ-XYZ-601', student_id: 'XYZ6A 01', title: 'Autonomous Smart Toll Booth & Vehicle Counter', score: 10, status: 'Verified Master', date_completed: '2026-08-28', evidence_note: 'HC-SR04 ultrasonic echo timing with SG90 servo boom barrier and automated vehicle counter logic.' },
+  { id: 'PRJ-XYZ-701', student_id: 'XYZ7A 01', title: 'Smart Rain Warning & Soil Conductivity Monitor', score: 10, status: 'Verified Master', date_completed: '2026-08-28', evidence_note: 'Raindrop water sensor plate with transistorized piezoelectric siren alarm.' },
+  { id: 'PRJ-XYZ-801', student_id: 'XYZ8A 01', title: '2WD Autonomous Obstacle-Avoiding Robot Rover', score: 10, status: 'Verified Master', date_completed: '2026-08-28', evidence_note: 'L298N dual H-bridge motor driver, microsecond ultrasonic range sweeping and collision avoidance.' },
+  { id: 'PRJ-XYZ-901', student_id: 'XYZ9A 01', title: 'High-Precision Dual IR Optical Line Following Rover', score: 10, status: 'Verified Master', date_completed: '2026-08-28', evidence_note: 'Infrared reflectance sensor array, differential steering PID control and high-speed track navigation.' },
+  { id: 'PRJ-XYZ-1101', student_id: 'XYZ11A 01', title: 'Autonomous Left-Hand Wall Following Maze Solver Robot', score: 10, status: 'Verified Master', date_completed: '2026-08-28', evidence_note: 'Multi-ultrasonic sensor fusion, non-blocking interrupt state machine and autonomous maze navigation.' },
+
+  // Zenith Public School Projects
+  { id: 'PRJ-ZPS-601', student_id: 'ZPS6A 01', title: 'Autonomous Smart Toll Booth & Vehicle Counter', score: 10, status: 'Verified Master', date_completed: '2026-08-25', evidence_note: 'HC-SR04 ultrasonic sensor with SG90 servo boom gate and automated vehicle counter.' },
+  { id: 'PRJ-ZPS-701', student_id: 'ZPS7A 01', title: 'Smart Rain Warning & Environmental Sensor Station', score: 10, status: 'Verified Master', date_completed: '2026-08-25', evidence_note: 'Water conductivity detection plate circuit assembled with active piezoelectric warning siren.' },
+  { id: 'PRJ-ZPS-801', student_id: 'ZPS8A 01', title: '2WD Autonomous Obstacle-Avoiding Mobile Rover', score: 10, status: 'Verified Master', date_completed: '2026-08-25', evidence_note: 'L298N H-bridge motor driver, ultrasonic rangefinder and autonomous obstacle avoidance.' },
+  { id: 'PRJ-ZPS-901', student_id: 'ZPS9A 01', title: 'Dual-Sensor Optical Line Following Autonomous Rover', score: 10, status: 'Verified Master', date_completed: '2026-08-25', evidence_note: 'Differential steer PID algorithm, high-contrast IR optical line tracking validated.' },
+  { id: 'PRJ-ZPS-1101', student_id: 'ZPS11A 01', title: 'Autonomous Left-Hand Wall Following Maze Solver', score: 10, status: 'Verified Master', date_completed: '2026-08-25', evidence_note: 'Triple ultrasonic sensor fusion with state machine maze exit algorithm.' }
+];
+
