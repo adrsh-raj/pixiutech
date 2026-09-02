@@ -13,7 +13,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [selectedRoleTab, setSelectedRoleTab] = useState('student'); // 'student' | 'trainer'
+  const [selectedRoleTab, setSelectedRoleTab] = useState('student'); // 'student' | 'trainer' | 'admin'
 
   const handleRolePreset = (role) => {
     setSelectedRoleTab(role);
@@ -25,7 +25,7 @@ export default function Login() {
     setError('');
     setLoading(true);
 
-    const res = await login(username, password);
+    const res = await login(username, password, selectedRoleTab);
     setLoading(false);
 
     if (res.success) {
@@ -54,35 +54,56 @@ export default function Login() {
           <div className="inline-block bg-white px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl shadow-lg border border-white/30 mb-3">
             <img src="/img/logo.png" alt="Pixiu Tech Logo" className="h-8 sm:h-11 w-auto object-contain" />
           </div>
-          <h1 className="text-xl sm:text-2xl font-black text-white tracking-wide">PIXIU TECH<span className="text-pixiu-blue">.</span></h1>
+          <h1 className="text-xl sm:text-2xl font-black text-white tracking-wide">PIXIU TECH</h1>
           <p className="text-[10px] sm:text-xs text-blue-300 font-bold uppercase tracking-widest mt-0.5">Portal Authentication Gateway</p>
         </div>
 
-        {/* 2 Main Role Tabs: 1. Student ID, 2. Trainer & Faculty (Admin Inside) */}
-        <div className="grid grid-cols-2 gap-1.5 sm:gap-2 p-1 sm:p-1.5 bg-slate-950 rounded-xl sm:rounded-2xl border border-slate-800/80 mb-5 sm:mb-6">
+        {/* 3 Dedicated Role Tabs: Student, Trainer, Admin */}
+        <div className="grid grid-cols-3 gap-1 sm:gap-1.5 p-1 sm:p-1.5 bg-slate-950 rounded-xl sm:rounded-2xl border border-slate-800/80 mb-5 sm:mb-6">
           <button
             type="button"
             onClick={() => handleRolePreset('student')}
-            className={`py-2 sm:py-2.5 text-xs font-bold rounded-lg sm:rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+            className={`py-2 sm:py-2.5 text-[11px] sm:text-xs font-bold rounded-lg sm:rounded-xl transition-all cursor-pointer flex flex-col sm:flex-row items-center justify-center gap-1 ${
               selectedRoleTab === 'student' 
                 ? 'bg-pixiu-blue text-white shadow-md shadow-blue-500/25' 
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            <GraduationCap size={14} /> Student ID
+            <GraduationCap size={14} /> <span>Student</span>
           </button>
           
           <button
             type="button"
             onClick={() => handleRolePreset('trainer')}
-            className={`py-2 sm:py-2.5 text-xs font-bold rounded-lg sm:rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+            className={`py-2 sm:py-2.5 text-[11px] sm:text-xs font-bold rounded-lg sm:rounded-xl transition-all cursor-pointer flex flex-col sm:flex-row items-center justify-center gap-1 ${
               selectedRoleTab === 'trainer' 
                 ? 'bg-pixiu-blue text-white shadow-md shadow-blue-500/25' 
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            <User size={14} /> Trainer & Admin
+            <User size={14} /> <span>Trainer</span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => handleRolePreset('admin')}
+            className={`py-2 sm:py-2.5 text-[11px] sm:text-xs font-bold rounded-lg sm:rounded-xl transition-all cursor-pointer flex flex-col sm:flex-row items-center justify-center gap-1 ${
+              selectedRoleTab === 'admin' 
+                ? 'bg-pixiu-blue text-white shadow-md shadow-blue-500/25' 
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <ShieldCheck size={14} /> <span>Admin</span>
+          </button>
+        </div>
+
+        {/* Role Portal Header Description */}
+        <div className="mb-4 text-center">
+          <span className="text-[10px] sm:text-[11px] font-bold px-3 py-1 rounded-full bg-slate-800/80 text-blue-300 border border-slate-700/60 inline-flex items-center gap-1.5">
+            {selectedRoleTab === 'student' && <>🎓 Enrolled Student Learning Portal</>}
+            {selectedRoleTab === 'trainer' && <>👨‍🏫 Certified Trainer & Faculty Console</>}
+            {selectedRoleTab === 'admin' && <>🛡️ Institutional Executive & Director Console</>}
+          </span>
         </div>
 
         {/* Error Alert */}
@@ -96,7 +117,7 @@ export default function Login() {
         <form onSubmit={handleSubmit} className="space-y-3.5 sm:space-y-4">
           <div>
             <label className="block text-[11px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
-              {selectedRoleTab === 'student' ? 'Student ID (e.g. ZPS6A 01)' : 'Username'}
+              {selectedRoleTab === 'student' ? 'Student Enrollment ID' : selectedRoleTab === 'trainer' ? 'Trainer Username / ID' : 'Admin Username'}
             </label>
             <div className="relative">
               <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
@@ -104,7 +125,7 @@ export default function Login() {
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder={selectedRoleTab === 'student' ? 'ZPS6A 01' : 'Username'}
+                placeholder={selectedRoleTab === 'student' ? 'e.g. ZPS6A 01' : selectedRoleTab === 'trainer' ? 'e.g. vikaspandey' : 'e.g. adarshraj'}
                 autoCapitalize="none"
                 autoCorrect="off"
                 required
@@ -137,7 +158,7 @@ export default function Login() {
               <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
             ) : (
               <>
-                Sign In to Portal <ArrowRight size={15} />
+                Sign In to {selectedRoleTab === 'student' ? 'Student Portal' : selectedRoleTab === 'trainer' ? 'Trainer Portal' : 'Admin Console'} <ArrowRight size={15} />
               </>
             )}
           </button>

@@ -105,7 +105,7 @@ export function AuthProvider({ children }) {
     verifySession();
   }, [token]);
 
-  const login = async (username, password) => {
+  const login = async (username, password, expectedRole = null) => {
     const cleanUsername = username?.trim();
     const cleanPassword = password?.trim();
 
@@ -114,11 +114,17 @@ export function AuthProvider({ children }) {
       const res = await fetch(`${API_BASE}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: cleanUsername, password: cleanPassword })
+        body: JSON.stringify({ username: cleanUsername, password: cleanPassword, role: expectedRole })
       });
       
       if (res.ok && res.headers.get('content-type')?.includes('application/json')) {
         const data = await res.json();
+        if (expectedRole && data.user.role !== expectedRole) {
+          return {
+            success: false,
+            error: `Access Denied: You are attempting to log in as ${expectedRole.toUpperCase()}, but this account is registered as ${data.user.role.toUpperCase()}. Please switch to the ${data.user.role.toUpperCase()} tab.`
+          };
+        }
         setToken(data.token);
         setUser(data.user);
         localStorage.setItem('pixiu_auth_token', data.token);
@@ -145,6 +151,13 @@ export function AuthProvider({ children }) {
     );
 
     if (match) {
+      if (expectedRole && match.role !== expectedRole) {
+        return {
+          success: false,
+          error: `Access Denied: You are trying to log in under the ${expectedRole.toUpperCase()} tab, but account "${match.username}" belongs to ${match.role.toUpperCase()}. Please switch to the ${match.role.toUpperCase()} tab.`
+        };
+      }
+
       const clientUser = {
         id: match.id,
         username: match.username,

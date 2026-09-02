@@ -329,9 +329,18 @@ function ProtectedLayout() {
   );
 }
 
+// Admin Route Guard Component
+function AdminOnly({ children }) {
+  const { user } = useAuth();
+  if (user?.role !== 'admin') {
+    return <Navigate to="/trainers" replace />;
+  }
+  return children;
+}
+
 // Student Route Guard
 function StudentRouteGuard() {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, user, loading } = useAuth();
 
   if (loading) {
     return (
@@ -345,10 +354,20 @@ function StudentRouteGuard() {
     return <Navigate to="/login" replace />;
   }
 
+  // Prevent Admins and Trainers from masquerading or getting stuck in Student Portal
+  if (user?.role === 'admin') {
+    return <Navigate to="/" replace />;
+  }
+  if (user?.role === 'trainer') {
+    return <Navigate to="/trainers" replace />;
+  }
+
   return <StudentPortal />;
 }
 
 export default function App() {
+  const { user } = useAuth();
+
   return (
     <ToastProvider>
       <AuthProvider>
@@ -358,28 +377,31 @@ export default function App() {
               {/* Public Login Route */}
               <Route path="/login" element={<Login />} />
 
-              {/* Student Protected Portal */}
+              {/* Student Protected Portal (Student Role Only) */}
               <Route path="/student-portal" element={<StudentRouteGuard />} />
 
               {/* Protected Enterprise Routes (Admin & Trainers) */}
               <Route path="/" element={<ProtectedLayout />}>
-                <Route index element={<Dashboard />} />
+                {/* Default Index Route: Admin sees Dashboard, Trainer redirected to Live Classrooms */}
+                <Route index element={
+                  <AdminOnly>
+                    <Dashboard />
+                  </AdminOnly>
+                } />
                 
-                {/* BUSINESS & CRM */}
-                <Route path="leads" element={<Leads />} />
-                <Route path="schools" element={<Schools />} />
-                <Route path="billing" element={<Billing />} />
+                {/* BUSINESS & CRM (Admin Only) */}
+                <Route path="leads" element={<AdminOnly><Leads /></AdminOnly>} />
+                <Route path="schools" element={<AdminOnly><Schools /></AdminOnly>} />
+                <Route path="billing" element={<AdminOnly><Billing /></AdminOnly>} />
+                <Route path="settings" element={<AdminOnly><Settings /></AdminOnly>} />
+                <Route path="students" element={<AdminOnly><Students /></AdminOnly>} />
+                <Route path="comms" element={<AdminOnly><Comms /></AdminOnly>} />
 
-                {/* ACADEMICS & LMS */}
-                <Route path="students" element={<Students />} />
+                {/* ACADEMICS & OPERATIONS (Shared Trainer & Admin) */}
+                <Route path="trainers" element={<Trainers />} />
                 <Route path="content" element={<ContentHub />} />
                 <Route path="curriculum" element={<Curriculum />} />
-                <Route path="trainers" element={<Trainers />} />
-
-                {/* OPERATIONS */}
                 <Route path="inventory" element={<Inventory />} />
-                <Route path="comms" element={<Comms />} />
-                <Route path="settings" element={<Settings />} />
               </Route>
 
               {/* Catch-all fallback */}
