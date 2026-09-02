@@ -147,12 +147,270 @@ export const SEED_ATTENDANCE = [
   { session_id: 'SES-1102', student_id: 'ZPS11A 05', status: 'Present' }
 ];
 
+export const CLASS_KITS = {
+  '6': {
+    class_grade: '6',
+    kit_id: 'KIT-ZPS-6',
+    name: 'Pixiu Discovery STEM & Robotics Core Kit (Class 6)',
+    overview_image: '/img/kits/class6_p2_img1_1536x1024.jpeg',
+    tagline: 'Microcontrollers, Traffic Signals, Light Sensors & Servo Barrier Systems',
+    total_components: 12,
+    components: [
+      {
+        id: 'C6-01',
+        name: 'Arduino Uno R3 Microcontroller Board',
+        image: '/img/kits/components/class6_part_1.jpg',
+        qty: '1 Unit',
+        role: 'The Brain. It remembers your program and runs it forever, even after power has been turned off.',
+        session: 'Session 3',
+        category: 'Controller',
+        specs: 'ATmega328P, 5V Operating Voltage, 14 Digital I/O Pins, 6 Analog Inputs'
+      },
+      {
+        id: 'C6-02',
+        name: 'USB Type A-B Programming Cable',
+        image: '/img/kits/components/class6_part_2.jpg',
+        qty: '1 Pc',
+        role: 'Carries your program from the laptop into the board, and powers the board while you test.',
+        session: 'Session 3',
+        category: 'Interface',
+        specs: 'High-speed shielded USB-A to USB-B data interface'
+      },
+      {
+        id: 'C6-03',
+        name: '400-Point Solderless Breadboard',
+        image: '/img/kits/components/class6_part_3.jpg',
+        qty: '1 Pc',
+        role: 'A plastic block full of holes that joins parts together without any soldering.',
+        session: 'Session 2',
+        category: 'Prototyping',
+        specs: '400 tie points with central divider channel and twin power distribution rails'
+      },
+      {
+        id: 'C6-04',
+        name: 'Multi-Color Jumper Wire Harness',
+        image: '/img/kits/components/class6_part_4.jpg',
+        qty: '1 Set (30 Pcs)',
+        role: 'The roads between parts. Male-to-male, male-to-female, and female-to-female jumpers.',
+        session: 'Session 2',
+        category: 'Wiring',
+        specs: '20cm multi-colored ribbon jumpers with molded pin headers'
+      },
+      {
+        id: 'C6-05',
+        name: '5mm Diffused LEDs (Red, Yellow, Green)',
+        image: '/img/kits/components/class6_part_5.jpg',
+        qty: '5 Pcs',
+        role: 'Tiny lamps. They glow only one way round (long leg anode towards +).',
+        session: 'Session 2',
+        category: 'Visual Output',
+        specs: '5mm round diffused lens, 2.0V forward voltage drop, 20mA max'
+      },
+      {
+        id: 'C6-06',
+        name: '220Ω & 10KΩ Carbon Film Resistors',
+        image: '/img/kits/components/class6_part_6.jpg',
+        qty: '10 Pcs',
+        role: 'Slow the current down so LEDs and sensors are protected from electrical damage.',
+        session: 'Session 2',
+        category: 'Passive Component',
+        specs: '1/4 Watt, 5% tolerance with 4-band color code identification'
+      },
+      {
+        id: 'C6-07',
+        name: 'Integrated Traffic Light Signal Module',
+        image: '/img/kits/components/class6_part_7.jpg',
+        qty: '1 Unit',
+        role: 'Red, yellow and green lamps built onto one ready-made PCB for automated signal logic.',
+        session: 'Session 7',
+        category: 'Actuator / Display',
+        specs: 'Common cathode configuration with dedicated onboard current resistors'
+      },
+      {
+        id: 'C6-08',
+        name: 'LDR Ambient Light Sensor Module',
+        image: '/img/kits/components/class6_part_8.jpg',
+        qty: '1 Unit',
+        role: 'Feels how bright the room is and turns ambient light into an analog number.',
+        session: 'Session 9',
+        category: 'Sensor',
+        specs: 'Photoresistor with onboard LM393 voltage comparator and sensitivity dial'
+      },
+      {
+        id: 'C6-09',
+        name: 'HC-SR04 Ultrasonic Sonar Sensor',
+        image: '/img/kits/components/class6_part_9.jpg',
+        qty: '1 Unit',
+        role: 'Measures how far away an object is non-contact by timing high-frequency acoustic echo waves.',
+        session: 'Session 12',
+        category: 'Sensor',
+        specs: '2cm to 400cm range, 3mm resolution, 5V DC trigger & echo logic'
+      },
+      {
+        id: 'C6-10',
+        name: 'SG90 Micro Servo Motor 90-180°',
+        image: '/img/kits/components/class6_part_10.jpg',
+        qty: '1 Unit',
+        role: 'Turns to an exact angle and holds it. Operates as the automated barrier arm.',
+        session: 'Session 12',
+        category: 'Mechanical Actuator',
+        specs: '9g mini servo, 1.8 kg/cm torque at 4.8V, PWM duty cycle positioning'
+      },
+      {
+        id: 'C6-11',
+        name: 'Piezoelectric Audio Buzzer Module',
+        image: '/img/kits/components/class6_part_11.jpg',
+        qty: '1 Unit',
+        role: 'Makes acoustic sound so your machine can warn people during emergency alerts.',
+        session: 'Session 13',
+        category: 'Audio Output',
+        specs: '5V active buzzer module with internal oscillating circuit'
+      },
+      {
+        id: 'C6-12',
+        name: 'Tactile Momentary Push Switch',
+        image: '/img/kits/components/class6_part_12.jpg',
+        qty: '2 Pcs',
+        role: 'Lets human operator send a digital ON/OFF pulse input to trigger operations.',
+        session: 'Challenge Work',
+        category: 'Input Switch',
+        specs: '12mm x 12mm 4-pin breadboard-friendly tactile button switch'
+      }
+    ]
+  },
+  '7': {
+    class_grade: '7',
+    kit_id: 'KIT-ZPS-7',
+    name: 'Pixiu Environmental & Smart Automation Lab Kit (Class 7)',
+    overview_image: '/img/kits/class7_p3_img1_1536x1024.jpeg',
+    tagline: 'Climate Telemetry, Raindrop Sensors, Potentiometers & Servos',
+    total_components: 12,
+    components: [
+      { id: 'C7-01', name: 'Arduino Uno R3 Board', image: '/img/kits/components/class7_part_1.jpg', qty: '1 Unit', role: 'The Brain controller for environmental and smart automation logic.', session: 'Session 3', category: 'Controller', specs: 'ATmega328P, 16 MHz crystal oscillator, 5V regulated' },
+      { id: 'C7-02', name: 'USB A-B Cable', image: '/img/kits/components/class7_part_2.jpg', qty: '1 Pc', role: 'Carries code program into the board and powers it during lab sessions.', session: 'Session 3', category: 'Interface', specs: 'Standard USB 2.0 A-B data lead' },
+      { id: 'C7-03', name: '400-Point Breadboard', image: '/img/kits/components/class7_part_3.jpg', qty: '1 Pc', role: 'Solderless prototyping circuit base with dual power rails.', session: 'Session 2', category: 'Prototyping', specs: 'ABS thermoplastic block with nickel-plated spring contacts' },
+      { id: 'C7-04', name: 'Jumper Wire Set', image: '/img/kits/components/class7_part_4.jpg', qty: '1 Set (30 Pcs)', role: 'Circuit links for sensor modules, potentiometers and actuators.', session: 'Session 2', category: 'Wiring', specs: 'Male-to-Male and Male-to-Female flexible jumpers' },
+      { id: 'C7-05', name: '5mm LED Indicators', image: '/img/kits/components/class7_part_5.jpg', qty: '5 Pcs', role: 'Status indicator lamps for alarm thresholds and environmental indicators.', session: 'Session 2', category: 'Visual Output', specs: '5mm high-efficiency semiconductor LEDs' },
+      { id: 'C7-06', name: '220Ω Resistors', image: '/img/kits/components/class7_part_6.jpg', qty: '10 Pcs', role: 'Current limiters protecting indicator diodes from burn-out.', session: 'Session 2', category: 'Passive', specs: '220 Ohm, 0.25W metal film resistor pack' },
+      { id: 'C7-07', name: '10KΩ Rotary Potentiometer', image: '/img/kits/components/class7_part_7.jpg', qty: '1 Unit', role: 'A knob that gives a smoothly changing 0-5V voltage level - your first analog input.', session: 'Session 6', category: 'Analog Input', specs: 'Linear taper 10K Ohm pot with 3-pin solderless headers' },
+      { id: 'C7-08', name: 'DHT11 Temperature & Humidity Sensor', image: '/img/kits/components/class7_part_8.jpg', qty: '1 Unit', role: 'Measures ambient room temperature (0-50°C) and relative humidity (20-90%), both from one sensor.', session: 'Session 9', category: 'Sensor', specs: 'Single-bus digital signal output, calibrated NTC thermistor & capacitive polymer' },
+      { id: 'C7-09', name: 'Active Piezo Buzzer Module', image: '/img/kits/components/class7_part_9.jpg', qty: '1 Unit', role: 'Produces high-pitch acoustic sirens when environmental thresholds trigger.', session: 'Session 11', category: 'Audio Output', specs: 'Active 5V audio transducer with onboard drive transistor' },
+      { id: 'C7-10', name: 'Raindrop & Moisture Detection Plate', image: '/img/kits/components/class7_part_10.jpg', qty: '1 Unit', role: 'Dual-sided conductive nickel grid tracking rain droplets and surface moisture.', session: 'Session 12', category: 'Sensor', specs: 'FR-04 gold-plated rain sensor board + LM393 comparator module' },
+      { id: 'C7-11', name: 'LDR Ambient Light Sensor Module', image: '/img/kits/components/class7_part_11.jpg', qty: '1 Unit', role: 'Light dependent resistor module detecting sunrise, dusk and illumination levels.', session: 'Session 13', category: 'Sensor', specs: 'Photo-conductive cadmium sulfide sensor with analog/digital output' },
+      { id: 'C7-12', name: 'SG90 Micro Servo Actuator', image: '/img/kits/components/class7_part_12.jpg', qty: '1 Unit', role: 'Geared motor rotating to precise angular positions for automated smart wipers & flaps.', session: 'Session 15', category: 'Actuator', specs: '9g servo, nylon gear train, 180° rotation angle' }
+    ]
+  },
+  '8': {
+    class_grade: '8',
+    kit_id: 'KIT-ZPS-8',
+    name: 'Pixiu Autonomous Robotics & Mobility Kit (Class 8)',
+    overview_image: '/img/kits/class8_p2_img1_1536x1024.jpeg',
+    tagline: 'Ultrasonic Sonar Scanning, Motor Drivers, BO Motors & Robotic Chassis',
+    total_components: 12,
+    components: [
+      { id: 'C8-01', name: 'Arduino Uno R3 Board', image: '/img/kits/components/class8_part_1.jpg', qty: '1 Unit', role: 'Central robotics controller running navigation and motor algorithms.', session: 'Session 3', category: 'Controller', specs: 'Microchip ATmega328P with 32KB flash memory' },
+      { id: 'C8-02', name: 'USB A-B Cable', image: '/img/kits/components/class8_part_2.jpg', qty: '1 Pc', role: 'High-speed interface for firmware upload and debugging.', session: 'Session 3', category: 'Interface', specs: 'Shielded USB-A to USB-B cable' },
+      { id: 'C8-03', name: '400-Point Breadboard', image: '/img/kits/components/class8_part_3.jpg', qty: '1 Pc', role: 'Wiring board for sonar sensor and motor driver connections.', session: 'Session 2', category: 'Prototyping', specs: '400 tie-point prototyping platform' },
+      { id: 'C8-04', name: 'Jumper Wire Set', image: '/img/kits/components/class8_part_4.jpg', qty: '1 Set (30 Pcs)', role: 'Signal interconnect cables between Arduino, motor driver and sensors.', session: 'Session 2', category: 'Wiring', specs: 'Ribbon jumper pack with durable male/female crimped pins' },
+      { id: 'C8-05', name: '5mm LED Bar Array', image: '/img/kits/components/class8_part_5.jpg', qty: '5 Pcs', role: 'Visual distance gauge indicating approaching obstacles in real-time.', session: 'Session 2', category: 'Visual Output', specs: '5mm diffused colored diodes' },
+      { id: 'C8-06', name: '220Ω Resistors', image: '/img/kits/components/class8_part_6.jpg', qty: '10 Pcs', role: 'Limits drive current to status indicators.', session: 'Session 2', category: 'Passive', specs: '220 Ohm metal film resistors' },
+      { id: 'C8-07', name: 'HC-SR04 Sonar Ultrasonic Sensor', image: '/img/kits/components/class8_part_7.jpg', qty: '1 Unit', role: 'Measures spatial distance by timing high-frequency acoustic echo pulses. The star of this book.', session: 'Session 6', category: 'Sensor', specs: '40 kHz ultrasound transducer pair, 2cm-400cm sensing distance' },
+      { id: 'C8-08', name: 'SG90 Sonar Turret Servo Motor', image: '/img/kits/components/class8_part_8.jpg', qty: '1 Unit', role: 'Rotates the ultrasonic sensor across 180° to scan for obstacles left and right.', session: 'Session 9', category: 'Actuator', specs: 'Micro servo with horns and mounting screws' },
+      { id: 'C8-09', name: 'Buzzer Warning Module', image: '/img/kits/components/class8_part_9.jpg', qty: '1 Unit', role: 'Emits proximity warning tone as obstacles get closer.', session: 'Session 10', category: 'Audio Output', specs: 'Piezo buzzer unit' },
+      { id: 'C8-10', name: 'L298N Dual H-Bridge Motor Driver', image: '/img/kits/components/class8_part_10.jpg', qty: '1 Unit', role: 'High-current power amplifier driving dual DC gear motors with direction & speed PWM.', session: 'Session 12', category: 'Motor Driver', specs: 'Dual full-bridge driver, 2A peak per channel, heavy aluminum heatsink' },
+      { id: 'C8-11', name: '100 RPM Geared BO Motors & Wheels (x2)', image: '/img/kits/components/class8_part_11.jpg', qty: '2 Motors + 2 Wheels', role: 'Dual drive motors delivering high torque for robot movement.', session: 'Session 13', category: 'Motors & Wheels', specs: 'Dual-shaft 3-6V DC gear motors with rubber grip traction wheels' },
+      { id: 'C8-12', name: 'Robot Chassis, Caster Wheel & Battery Pack', image: '/img/kits/components/class8_part_12.jpg', qty: '1 Set', role: 'Laser-cut acrylic robot chassis, omni caster, switch & battery holder.', session: 'Session 13', category: 'Mechanical Chassis', specs: 'Acrylic base, metal ball caster wheel, 4xAA battery enclosure' }
+    ]
+  },
+  '9': {
+    class_grade: '9',
+    kit_id: 'KIT-ZPS-9',
+    name: 'Pixiu Industrial Sensors & Autonomous Line Rover Kit (Class 9)',
+    overview_image: '/img/kits/class9_p2_img1_1536x1024.jpeg',
+    tagline: 'Infrared Flame Detectors, 16x2 LCD Telemetry, Dual IR Line Trackers & Rover',
+    total_components: 16,
+    components: [
+      { id: 'C9-01', name: 'Arduino Uno R3 Board', image: '/img/kits/components/class9_part_1.jpg', qty: '1 Unit', role: 'Central processing unit executing multi-sensor arbitration and line tracking loops.', session: 'Session 3', category: 'Controller', specs: 'ATmega328P 8-bit RISC processor' },
+      { id: 'C9-02', name: 'USB A-B Cable', image: '/img/kits/components/class9_part_2.jpg', qty: '1 Pc', role: 'High integrity programming and serial data communication cable.', session: 'Session 3', category: 'Interface', specs: 'Full speed USB 2.0 interface' },
+      { id: 'C9-03', name: '400-Point Breadboard', image: '/img/kits/components/class9_part_3.jpg', qty: '1 Pc', role: 'High quality solderless platform for LCD and sensor wiring.', session: 'Session 2', category: 'Prototyping', specs: '400 tie-points' },
+      { id: 'C9-04', name: 'Jumper Wire Harness', image: '/img/kits/components/class9_part_4.jpg', qty: '1 Set (40 Pcs)', role: 'Interconnection ribbon with multi-pin jumper connections.', session: 'Session 2', category: 'Wiring', specs: 'Premium jumper wires' },
+      { id: 'C9-05', name: '5mm Status LEDs', image: '/img/kits/components/class9_part_5.jpg', qty: '5 Pcs', role: 'Fire, line tracking, and operational status indication.', session: 'Session 2', category: 'Visual Output', specs: 'Diffused 5mm LEDs' },
+      { id: 'C9-06', name: '220Ω & 10KΩ Resistors', image: '/img/kits/components/class9_part_6.jpg', qty: '10 Pcs', role: 'Current limiters and pull-down network for manual switches.', session: 'Session 2', category: 'Passive', specs: 'Metal film resistors' },
+      { id: 'C9-07', name: 'Optical Infrared Flame Sensor Module', image: '/img/kits/components/class9_part_7.jpg', qty: '1 Unit', role: 'Detects 760nm - 1100nm infrared radiation emitted by real flame sources.', session: 'Session 6', category: 'Sensor', specs: 'High-sensitivity phototransistor with LM393 threshold comparator' },
+      { id: 'C9-08', name: 'DHT11 Temp & Humidity Module', image: '/img/kits/components/class9_part_8.jpg', qty: '1 Unit', role: 'Secondary environmental confirmation telemetry to verify what the flame sensor saw.', session: 'Session 7', category: 'Sensor', specs: 'Digital temperature & relative humidity sensor' },
+      { id: 'C9-09', name: 'Active Alarm Buzzer Module', image: '/img/kits/components/class9_part_9.jpg', qty: '1 Unit', role: 'Acoustic siren alerting emergency conditions.', session: 'Session 7', category: 'Audio Output', specs: 'Active 5V piezo sounder' },
+      { id: 'C9-10', name: '2-Pin Reset Push Switch', image: '/img/kits/components/class9_part_10.jpg', qty: '2 Pcs', role: 'Human override switch to clear latched alarms and start runs.', session: 'Session 8', category: 'Input Switch', specs: 'Tactile switch' },
+      { id: 'C9-11', name: '16x2 Alphanumeric LCD Display', image: '/img/kits/components/class9_part_11.jpg', qty: '1 Unit', role: 'Displays real-time sensor readings and robot telemetry without needing a laptop.', session: 'Session 9', category: 'Display', specs: 'HD44780 standard parallel LCD, 16 characters x 2 rows, blue backlight' },
+      { id: 'C9-12', name: '10K LCD Contrast Potentiometer', image: '/img/kits/components/class9_part_12.jpg', qty: '1 Unit', role: 'Calibrates the LCD V0 bias contrast voltage for razor-sharp character visibility.', session: 'Session 10', category: 'Analog Input', specs: '10K rotary trimmer potentiometer' },
+      { id: 'C9-13', name: 'LDR Ambient Light Sensor', image: '/img/kits/components/class9_part_13.jpg', qty: '1 Unit', role: 'Evaluates ambient lux and room lighting conditions.', session: 'Session 11', category: 'Sensor', specs: 'Cadmium sulfide photoresistor module' },
+      { id: 'C9-14', name: 'Dual TCRT5000 IR Line Sensor Modules', image: '/img/kits/components/class9_part_14.jpg', qty: '2 Units (L & R)', role: 'Infrared reflective sensors tracking black/white track contrast on the ground.', session: 'Session 12', category: 'Navigation Sensor', specs: 'TCRT5000 infrared emitter-phototransistor pair with comparator' },
+      { id: 'C9-15', name: 'L298N Dual Motor Driver Module', image: '/img/kits/components/class9_part_15.jpg', qty: '1 Unit', role: 'H-bridge motor driver managing forward, reverse, and differential steering.', session: 'Session 12', category: 'Motor Driver', specs: 'Dual H-Bridge driver with 5V onboard regulator' },
+      { id: 'C9-16', name: 'Line Follower Robot Chassis, Wheels & Power', image: '/img/kits/components/class9_part_16.jpg', qty: '1 Set', role: 'Mobile robot base with twin drive motors, wheels, and battery harness.', session: 'Session 13', category: 'Chassis & Power', specs: 'Acrylic platform, 2x BO motors, caster & 4xAA battery pack' }
+    ]
+  },
+  '11': {
+    class_grade: '11',
+    kit_id: 'KIT-ZPS-11',
+    name: 'Pixiu Advanced Photonics & Autonomous Maze Rover Kit (Class 11)',
+    overview_image: '/img/kits/class11_p2_img1_1536x1024.jpeg',
+    tagline: 'Collimated Laser Tripwires, Sonar Characterization, 3-Way Maze Array & Precision Rover',
+    total_components: 16,
+    components: [
+      { id: 'C11-01', name: 'Arduino Uno R3 Microcontroller', image: '/img/kits/components/class11_part_1.jpg', qty: '1 Unit', role: 'Industrial-grade MCU managing laser trip timing, characterization, and maze solver algorithms.', session: 'Session 3', category: 'Controller', specs: 'ATmega328P 16MHz processor' },
+      { id: 'C11-02', name: 'USB A-B Interface Cable', image: '/img/kits/components/class11_part_2.jpg', qty: '1 Pc', role: 'Serial telemetry transmission and programming lead.', session: 'Session 3', category: 'Interface', specs: 'High-speed shielded A-B cable' },
+      { id: 'C11-03', name: '400-Point Breadboard', image: '/img/kits/components/class11_part_3.jpg', qty: '1 Pc', role: 'Prototyping platform with high contact reliability.', session: 'Session 2', category: 'Prototyping', specs: '400 tie points' },
+      { id: 'C11-04', name: 'Precision Jumper Wire Harness', image: '/img/kits/components/class11_part_4.jpg', qty: '1 Set (40 Pcs)', role: 'Interconnect wires for sensor arrays and logic stages.', session: 'Session 2', category: 'Wiring', specs: 'Male-Male, Male-Female, Female-Female' },
+      { id: 'C11-05', name: '5mm Multi-State Indication LEDs', image: '/img/kits/components/class11_part_5.jpg', qty: '5 Pcs', role: 'System status indicators: Armed, Warning, Alarm and Running.', session: 'Session 2', category: 'Visual Output', specs: '5mm high brightness LEDs' },
+      { id: 'C11-06', name: '220Ω & 10KΩ Precision Resistors', image: '/img/kits/components/class11_part_6.jpg', qty: '10 Pcs', role: 'Current limiting and pull-down network resistors.', session: 'Session 2', category: 'Passive', specs: '1% metal film precision resistors' },
+      { id: 'C11-07', name: '5V 650nm Red Laser Dot Diode Module', image: '/img/kits/components/class11_part_7.jpg', qty: '1 Unit', role: 'Emits a tight, collimated 650nm coherent red optical beam for perimeter tripwire defense.', session: 'Session 6', category: 'Optics / Emitter', specs: '650nm red semiconductor laser diode, 5mW, adjustable brass collimating lens' },
+      { id: 'C11-08', name: 'High-Sensitivity Optical LDR Receiver', image: '/img/kits/components/class11_part_8.jpg', qty: '1 Unit', role: 'High-speed light sensor aligned with the laser beam to instantly detect tripwire breaks.', session: 'Session 6', category: 'Optics / Sensor', specs: 'Photoresistor module with adjustable comparator threshold' },
+      { id: 'C11-09', name: '16x2 Telemetry LCD Display', image: '/img/kits/components/class11_part_9.jpg', qty: '1 Unit', role: 'Live engineering screen displaying trip counts, response time in milliseconds & distance.', session: 'Session 7', category: 'Display', specs: '16x2 HD44780 LCD module' },
+      { id: 'C11-10', name: '10K Contrast Potentiometer', image: '/img/kits/components/class11_part_10.jpg', qty: '1 Unit', role: 'Fine-tunes display contrast voltage.', session: 'Session 7', category: 'Analog Input', specs: 'Precision 10K pot' },
+      { id: 'C11-11', name: 'High-Decibel Siren Buzzer', image: '/img/kits/components/class11_part_11.jpg', qty: '1 Unit', role: 'Acoustic intrusion and alarm annunciator.', session: 'Session 7', category: 'Audio Output', specs: 'Active 5V piezo siren' },
+      { id: 'C11-12', name: 'Tactile Latch Clear Switch', image: '/img/kits/components/class11_part_12.jpg', qty: '2 Pcs', role: 'Human push button to reset latched alarm states.', session: 'Session 8', category: 'Input Switch', specs: '12mm tactile button' },
+      { id: 'C11-13', name: 'HC-SR04 Sonar Distance Sensor', image: '/img/kits/components/class11_part_13.jpg', qty: '1 Unit', role: 'Instrument characterised in Unit 4 for error, precision, systematic drift, and uncertainty.', session: 'Session 9', category: 'Sensor', specs: 'Precision ultrasonic sensor module' },
+      { id: 'C11-14', name: 'Triple IR Maze Sensor Array (Left, Centre, Right)', image: '/img/kits/components/class11_part_14.jpg', qty: '1 Set (3 Array)', role: 'Three dedicated infrared reflective sensors that detect maze walls and paths in real-time.', session: 'Session 12', category: 'Navigation Sensor Array', specs: '3x TCRT5000 sensors with independent sensitivity adjustments' },
+      { id: 'C11-15', name: 'L298N High-Torque Motor Driver', image: '/img/kits/components/class11_part_15.jpg', qty: '1 Unit', role: 'Power stage providing bidirectional PWM speed and direction control to drive motors.', session: 'Session 13', category: 'Motor Driver', specs: 'Dual H-bridge driver with thermal overload protection' },
+      { id: 'C11-16', name: 'Autonomous Maze Solver Chassis & Battery Power', image: '/img/kits/components/class11_part_16.jpg', qty: '1 Set', role: 'High-rigidity chassis, dual DC motors, precision caster wheel & high-capacity battery holder.', session: 'Session 13', category: 'Chassis & Power', specs: 'Heavy-duty acrylic chassis, 2x gear motors, rubber wheels, 4xAA power unit' }
+    ]
+  }
+};
+
 export const SEED_INVENTORY = [
-  { id: 'KIT-ZPS-01', school_id: 'ZPS', name: 'Pixiu Discovery STEM Hardware Kit #01', assigned_to: 'ZPS6A 01', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
-  { id: 'KIT-ZPS-02', school_id: 'ZPS', name: 'Pixiu Discovery STEM Hardware Kit #02', assigned_to: 'ZPS6A 02', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
-  { id: 'KIT-ZPS-03', school_id: 'ZPS', name: 'Pixiu Discovery STEM Hardware Kit #03', assigned_to: 'ZPS6A 03', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
-  { id: 'KIT-ZPS-04', school_id: 'ZPS', name: 'Pixiu Discovery STEM Hardware Kit #04', assigned_to: 'ZPS6A 04', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
-  { id: 'KIT-ZPS-05', school_id: 'ZPS', name: 'Pixiu Discovery STEM Hardware Kit #05', assigned_to: 'ZPS6A 05', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  // Class 6 Kits
+  { id: 'KIT-ZPS-01', school_id: 'ZPS', class_grade: '6', name: 'Pixiu Discovery STEM Hardware Kit #01', assigned_to: 'ZPS6A 01', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-ZPS-02', school_id: 'ZPS', class_grade: '6', name: 'Pixiu Discovery STEM Hardware Kit #02', assigned_to: 'ZPS6A 02', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-ZPS-03', school_id: 'ZPS', class_grade: '6', name: 'Pixiu Discovery STEM Hardware Kit #03', assigned_to: 'ZPS6A 03', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-ZPS-04', school_id: 'ZPS', class_grade: '6', name: 'Pixiu Discovery STEM Hardware Kit #04', assigned_to: 'ZPS6A 04', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-ZPS-05', school_id: 'ZPS', class_grade: '6', name: 'Pixiu Discovery STEM Hardware Kit #05', assigned_to: 'ZPS6A 05', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+
+  // Class 7 Kits
+  { id: 'KIT-ZPS-06', school_id: 'ZPS', class_grade: '7', name: 'Pixiu Environmental & Sensor Kit #06', assigned_to: 'ZPS7A 01', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-ZPS-07', school_id: 'ZPS', class_grade: '7', name: 'Pixiu Environmental & Sensor Kit #07', assigned_to: 'ZPS7A 02', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-ZPS-08', school_id: 'ZPS', class_grade: '7', name: 'Pixiu Environmental & Sensor Kit #08', assigned_to: 'ZPS7A 03', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-ZPS-09', school_id: 'ZPS', class_grade: '7', name: 'Pixiu Environmental & Sensor Kit #09', assigned_to: 'ZPS7A 04', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-ZPS-10', school_id: 'ZPS', class_grade: '7', name: 'Pixiu Environmental & Sensor Kit #10', assigned_to: 'ZPS7A 05', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+
+  // Class 8 Kits
+  { id: 'KIT-ZPS-11', school_id: 'ZPS', class_grade: '8', name: 'Pixiu Mobility & Obstacle Rover Kit #11', assigned_to: 'ZPS8A 01', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-ZPS-12', school_id: 'ZPS', class_grade: '8', name: 'Pixiu Mobility & Obstacle Rover Kit #12', assigned_to: 'ZPS8A 02', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-ZPS-13', school_id: 'ZPS', class_grade: '8', name: 'Pixiu Mobility & Obstacle Rover Kit #13', assigned_to: 'ZPS8A 03', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-ZPS-14', school_id: 'ZPS', class_grade: '8', name: 'Pixiu Mobility & Obstacle Rover Kit #14', assigned_to: 'ZPS8A 04', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-ZPS-15', school_id: 'ZPS', class_grade: '8', name: 'Pixiu Mobility & Obstacle Rover Kit #15', assigned_to: 'ZPS8A 05', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+
+  // Class 9 Kits
+  { id: 'KIT-ZPS-16', school_id: 'ZPS', class_grade: '9', name: 'Pixiu Industrial Flame & Line Rover Kit #16', assigned_to: 'ZPS9A 01', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-ZPS-17', school_id: 'ZPS', class_grade: '9', name: 'Pixiu Industrial Flame & Line Rover Kit #17', assigned_to: 'ZPS9A 02', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-ZPS-18', school_id: 'ZPS', class_grade: '9', name: 'Pixiu Industrial Flame & Line Rover Kit #18', assigned_to: 'ZPS9A 03', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-ZPS-19', school_id: 'ZPS', class_grade: '9', name: 'Pixiu Industrial Flame & Line Rover Kit #19', assigned_to: 'ZPS9A 04', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-ZPS-20', school_id: 'ZPS', class_grade: '9', name: 'Pixiu Industrial Flame & Line Rover Kit #20', assigned_to: 'ZPS9A 05', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+
+  // Class 11 Kits
+  { id: 'KIT-ZPS-21', school_id: 'ZPS', class_grade: '11', name: 'Pixiu Photonics & Maze Solver Rover Kit #21', assigned_to: 'ZPS11A 01', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-ZPS-22', school_id: 'ZPS', class_grade: '11', name: 'Pixiu Photonics & Maze Solver Rover Kit #22', assigned_to: 'ZPS11A 02', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-ZPS-23', school_id: 'ZPS', class_grade: '11', name: 'Pixiu Photonics & Maze Solver Rover Kit #23', assigned_to: 'ZPS11A 03', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-ZPS-24', school_id: 'ZPS', class_grade: '11', name: 'Pixiu Photonics & Maze Solver Rover Kit #24', assigned_to: 'ZPS11A 04', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-ZPS-25', school_id: 'ZPS', class_grade: '11', name: 'Pixiu Photonics & Maze Solver Rover Kit #25', assigned_to: 'ZPS11A 05', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
 ];
 
 export const SEED_BILLING = [

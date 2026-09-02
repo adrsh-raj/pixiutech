@@ -2,10 +2,13 @@ import { useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useToast } from '../context/ToastContext';
+import { CLASS_KITS } from '../data/seedData';
+import { generateStudentTranscriptPDF } from '../utils/transcriptGenerator';
 import { 
   Award, BookOpen, Activity, FileText, Download, CheckCircle, 
   Clock, LogOut, User, Box, PlaySquare, Eye, Sparkles, Megaphone, 
-  Bell, Check, X, TrendingUp, Star, ShieldCheck, CheckCircle2, ChevronRight, Send, Trash2 
+  Bell, Check, X, TrendingUp, Star, ShieldCheck, CheckCircle2, ChevronRight, Send, Trash2,
+  Cpu, Maximize2, Zap, Layers, Info, List, LayoutGrid, PackageCheck, MessageCircle, ShoppingBag, PhoneCall
 } from 'lucide-react';
 import { 
   AreaChart, Area, LineChart, Line, XAxis, YAxis, 
@@ -15,14 +18,24 @@ import {
 export default function StudentPortal() {
   const { user, logout } = useAuth();
   const toast = useToast();
-  const { students, schools, content, projects, deleteProject, getStudentAttendance, notifications, curriculum, studentReviews = [] } = useData();
+  const { students, schools, content, projects, deleteProject, getStudentAttendance, notifications, curriculum, studentReviews = [], classKits = {}, inventory = [] } = useData();
+  const [selectedComponent, setSelectedComponent] = useState(null);
+  const [isKitDiagramModalOpen, setIsKitDiagramModalOpen] = useState(false);
 
-  // Find logged in student object
-  const cleanId = (user?.username || user?.related_id || '').trim().replace(/\s+/g, ' ');
-  const student = students.find(s => s.student_id.trim().replace(/\s+/g, ' ') === cleanId) || {
-    student_id: user?.username || 'ZPS6A 01',
-    name: user?.name || 'Aarav Sharma',
-    school_id: user?.school_id || 'ZPS',
+  // Faculty / Admin live preview support
+  const isAdminOrTrainer = user?.role === 'admin' || user?.role === 'trainer';
+  const [previewStudentId, setPreviewStudentId] = useState('ZPS6A 01');
+
+  // Resolve active student
+  const activeStudentId = isAdminOrTrainer ? previewStudentId : (user?.username || user?.related_id || 'ZPS6A 01');
+  const cleanId = (activeStudentId || '').trim().replace(/\s+/g, ' ');
+
+  const student = students.find(s => (s.student_id || '').trim().replace(/\s+/g, ' ') === cleanId) || 
+                  students.find(s => s.id === activeStudentId) || 
+                  students[0] || {
+    student_id: 'ZPS6A 01',
+    name: 'Aarav Sharma',
+    school_id: 'ZPS',
     tech_level: 'Level 1',
     class_id: 'CLS-ZPS-6A',
     assigned_kit_id: 'KIT-ZPS-01'
@@ -38,10 +51,27 @@ export default function StudentPortal() {
     return pid === currentId || pid === cleanCurrent || p.student_id === student.student_id;
   });
   
-  // Extract grade from class_id (e.g. CLS-ZPS-6A -> '6', CLS-ZPS-11A -> '11')
-  const studentGrade = student.class_id ? student.class_id.replace('CLS-ZPS-', '').replace('A', '') : '6';
-  
-  // Active broadcast notifications for this student's grade
+  // Extract grade accurately (e.g. CLS-ZPS-6A -> '6', CLS-ZPS-11A -> '11', ZPS7A 01 -> '7')
+  const extractGrade = (s) => {
+    if (s?.class_id) {
+      const match = s.class_id.match(/CLS-ZPS-(\d+)/i);
+      if (match) return match[1];
+    }
+    if (s?.student_id) {
+      const match = s.student_id.match(/ZPS(\d+)/i);
+      if (match) return match[1];
+    }
+    return '6';
+  };
+  const studentGrade = extractGrade(student);
+  const studentKit = (classKits && classKits[studentGrade] && classKits[studentGrade]?.components?.length > 0)
+    ? classKits[studentGrade]
+    : (CLASS_KITS[studentGrade] || CLASS_KITS['6']);
+
+  const whatsappNumber = '917985403186';
+  const whatsappKitUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(
+    `Hello Pixiu Tech Team! 🚀\nI am ${student.name} from Class ${studentGrade}A (Student ID: ${student.student_id}) at ${school}.\nI want to buy/order my personal STEM Robotics Hardware Kit (${studentKit.name || `Class ${studentGrade} Kit`}) at the special subsidized student discount rate (below market price).\nPlease share the discounted kit price and delivery details.`
+  )}`;
   const classNotifs = (notifications || []).filter(n => {
     if (n.status === 'Archived') return false;
     if (n.target_type === 'Universal' || n.target_type === 'All_Students') return true;
@@ -229,214 +259,14 @@ export default function StudentPortal() {
 
   // Ultra-Professional PDF Transcript & Certificate Generator
   const handlePrintReport = () => {
-    const origin = window.location.origin;
-    const printWindow = window.open('', '_blank');
-    
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8">
-          <title>Official STEM Transcript & Certificate - ${student.name}</title>
-          <style>
-            @page { size: A4; margin: 15mm 20mm; }
-            * { box-sizing: border-box; }
-            body { font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif; color: #0f172a; margin: 0; padding: 0; background: #fff; line-height: 1.5; font-size: 13px; }
-            
-            .certificate-container { border: 2px solid #0A1A33; padding: 24px; border-radius: 12px; position: relative; background: #ffffff; }
-            .header-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; border-bottom: 2px solid #0066FF; padding-bottom: 16px; }
-            .header-logo { height: 48px; object-fit: contain; }
-            .cert-badge { display: inline-block; background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; font-size: 10px; font-weight: 800; padding: 3px 8px; border-radius: 6px; text-transform: uppercase; }
-            
-            .doc-title { font-size: 20px; font-weight: 900; color: #0A1A33; margin: 4px 0 2px 0; letter-spacing: 0.5px; text-transform: uppercase; }
-            .doc-sub { font-size: 11px; color: #64748b; margin: 0; }
-            
-            .profile-grid { width: 100%; border-collapse: collapse; margin: 16px 0; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; }
-            .profile-grid td { padding: 8px 12px; font-size: 12px; }
-            .profile-grid .label { color: #64748b; font-weight: 600; width: 22%; }
-            .profile-grid .val { color: #0f172a; font-weight: 700; width: 28%; }
-            
-            .metrics-table { width: 100%; border-collapse: separate; border-spacing: 8px; margin: 12px 0 18px 0; }
-            .metric-box { background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 14px; text-align: center; }
-            .metric-box .m-label { font-size: 10px; text-transform: uppercase; font-weight: 700; color: #64748b; }
-            .metric-box .m-val { font-size: 18px; font-weight: 900; color: #0066FF; margin: 2px 0 0 0; }
-            
-            .section-title { font-size: 13px; font-weight: 800; text-transform: uppercase; color: #0A1A33; border-bottom: 1.5px solid #e2e8f0; padding-bottom: 4px; margin: 18px 0 10px 0; display: flex; align-items: center; justify-content: space-between; }
-            
-            .data-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
-            .data-table th { background: #f1f5f9; color: #334155; font-size: 10px; text-transform: uppercase; font-weight: 800; padding: 8px 10px; text-align: left; border: 1px solid #e2e8f0; }
-            .data-table td { padding: 8px 10px; font-size: 11px; border: 1px solid #e2e8f0; }
-            .status-pill { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; }
-            .status-mastered { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
-            .status-active { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
-            .status-upcoming { background: #f8fafc; color: #64748b; border: 1px solid #e2e8f0; }
-            
-            .signatures-table { width: 100%; border-collapse: collapse; margin-top: 30px; }
-            .signatures-table td { width: 50%; vertical-align: bottom; }
-            .sig-line { border-top: 1px solid #94a3b8; width: 80%; padding-top: 6px; font-size: 11px; color: #334155; font-weight: 700; }
-            .sig-title { font-size: 10px; color: #64748b; }
-            
-            .footer-strip { margin-top: 20px; padding-top: 10px; border-top: 1px dashed #cbd5e1; font-size: 9px; color: #94a3b8; text-align: center; }
-          </style>
-        </head>
-        <body>
-          <div class="certificate-container">
-            <table class="header-table">
-              <tr>
-                <td style="vertical-align: middle;">
-                  <img src="${origin}/img/logo.png" class="header-logo" alt="Pixiu Tech Logo" />
-                </td>
-                <td style="text-align: right; vertical-align: middle;">
-                  <span class="cert-badge">🛡️ Authenticated Transcript</span>
-                  <p style="margin: 3px 0 0 0; font-family: monospace; font-size: 10px; color: #0066FF; font-weight: bold;">
-                    ID: CERT-PIX-${student.student_id.replace(/\s+/g, '-')}-2026
-                  </p>
-                </td>
-              </tr>
-            </table>
-
-            <div style="text-align: center; margin-bottom: 16px;">
-              <h1 class="doc-title">STEM & Robotics Innovation Transcript</h1>
-              <p class="doc-sub">Official Institutional Competency & Practical Laboratory Evaluation Record</p>
-            </div>
-
-            <!-- Student Profile Grid -->
-            <table class="profile-grid">
-              <tr>
-                <td class="label">Candidate Name:</td>
-                <td class="val">${student.name}</td>
-                <td class="label">Candidate ID:</td>
-                <td class="val" style="color: #0066FF; font-family: monospace;">${student.student_id}</td>
-              </tr>
-              <tr>
-                <td class="label">Partner Institution:</td>
-                <td class="val">${school}</td>
-                <td class="label">Enrolled Class:</td>
-                <td class="val">Class ${studentGrade}A (Robotics Cohort)</td>
-              </tr>
-              <tr>
-                <td class="label">Assigned Kit:</td>
-                <td class="val">${student.assigned_kit_id || 'Standard Lab Kit'}</td>
-                <td class="label">Academic Year:</td>
-                <td class="val">2026 - 2027 (Term 1)</td>
-              </tr>
-            </table>
-
-            <!-- Key Performance Metrics Strip -->
-            <table class="metrics-table">
-              <tr>
-                <td class="metric-box">
-                  <div class="m-label">Lab Attendance</div>
-                  <div class="m-val" style="color: #16a34a;">${attendanceRate}%</div>
-                </td>
-                <td class="metric-box">
-                  <div class="m-label">Mastery Tech Level</div>
-                  <div class="m-val" style="color: #0066FF;">${student.tech_level}</div>
-                </td>
-                <td class="metric-box">
-                  <div class="m-label">Cumulative Score</div>
-                  <div class="m-val" style="color: #d97706;">${avgReviewScore ? `${avgReviewScore} / 10` : 'In Progress'}</div>
-                </td>
-                <td class="metric-box">
-                  <div class="m-label">Practical Aptitude</div>
-                  <div class="m-val" style="color: #4f46e5; font-size: 14px; margin-top: 4px;">${reviewedLevelsList.length > 0 ? '★★★★★ Grade A+' : 'Active Learner'}</div>
-                </td>
-              </tr>
-            </table>
-
-            <!-- Level-wise Competency Review Table -->
-            <div class="section-title">
-              <span>Unit & Level Competency Progression</span>
-            </div>
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th style="width: 14%;">Level</th>
-                  <th style="width: 28%;">Module Title</th>
-                  <th style="width: 12%; text-align: center;">Score</th>
-                  <th style="width: 14%; text-align: center;">Status</th>
-                  <th style="width: 32%;">Instructor Qualitative Review</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${levelReviewData.map(l => `
-                  <tr>
-                    <td><b>${l.level}</b> <span style="font-size: 9px; color: #64748b;">(${l.unitCode})</span></td>
-                    <td><b>${l.title}</b></td>
-                    <td style="text-align: center; font-weight: bold; color: #0066FF;">${l.hasReview ? `${l.score}/10` : 'Pending'}</td>
-                    <td style="text-align: center;">
-                      <span class="status-pill ${l.status === 'Mastered' ? 'status-mastered' : l.status === 'In Progress' ? 'status-active' : 'status-upcoming'}">
-                        ${l.status}
-                      </span>
-                    </td>
-                    <td style="font-size: 10px; color: #334155; line-height: 1.4;">${l.review}</td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-
-            <!-- Practical Projects & Prototypes -->
-            <div class="section-title">
-              <span>Verified Laboratory Hardware Prototypes</span>
-            </div>
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th style="width: 30%;">Prototype / Project Name</th>
-                  <th style="width: 15%; text-align: center;">Score</th>
-                  <th style="width: 15%; text-align: center;">Verification</th>
-                  <th style="width: 40%;">Technical Evaluation Evidence</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${studentProjects.length > 0 ? studentProjects.map(p => `
-                  <tr>
-                    <td><b>${p.title}</b></td>
-                    <td style="text-align: center; font-weight: bold; color: #16a34a;">${p.score}/10</td>
-                    <td style="text-align: center;"><span class="status-pill status-mastered">${p.status}</span></td>
-                    <td style="font-size: 10px; color: #334155;">${p.evidence_note || 'Breadboard circuit validated with zero short-circuits.'}</td>
-                  </tr>
-                `).join('') : `
-                  <tr>
-                    <td><b>Autonomous Light-Controlled Circuit</b></td>
-                    <td style="text-align: center; font-weight: bold; color: #16a34a;">10/10</td>
-                    <td style="text-align: center;"><span class="status-pill status-mastered">Completed</span></td>
-                    <td style="font-size: 10px; color: #334155;">LDR and transistor relay circuit calibrated and verified.</td>
-                  </tr>
-                `}
-              </tbody>
-            </table>
-
-            <!-- Signatures -->
-            <table class="signatures-table">
-              <tr>
-                <td>
-                  <div class="sig-line">
-                    Vikas Pandey
-                    <div class="sig-title">Lead Robotics & STEM Faculty • Pixiu Tech</div>
-                  </div>
-                </td>
-                <td style="text-align: right;">
-                  <div class="sig-line" style="margin-left: auto;">
-                    Adarsh Raj
-                    <div class="sig-title">Academic Director & Founder • Pixiu Tech</div>
-                  </div>
-                </td>
-              </tr>
-            </table>
-
-            <div class="footer-strip">
-              Pixiu Tech LLP • Official STEM, Robotics & AI Education Partner • Electronically generated on ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} • Portal: portal.pixiutech.com
-            </div>
-          </div>
-        </body>
-      </html>
-    `);
-    
-    printWindow.document.close();
-    setTimeout(() => {
-      printWindow.print();
-    }, 400);
+    generateStudentTranscriptPDF({
+      student,
+      school,
+      attendanceRate,
+      studentReviews,
+      projects: studentProjects,
+      curriculum
+    });
   };
 
   return (
@@ -568,6 +398,54 @@ export default function StudentPortal() {
       </header>
 
       <main className="max-w-6xl mx-auto px-3 sm:px-6 pt-5 sm:pt-8 space-y-4 sm:space-y-6">
+        {/* Faculty / Admin Live Preview Switcher */}
+        {isAdminOrTrainer && (
+          <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 border border-blue-500/40 rounded-2xl p-4 text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-3 animate-in fade-in">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-400/40 flex items-center justify-center text-blue-300 font-bold text-base shrink-0">
+                🛡️
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-sm text-white">Faculty & Admin Student Portal Preview</h3>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/30 text-blue-300 border border-blue-400/30">
+                    Live Role Simulator
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 mt-0.5">Switch student cohort to inspect their hardware kits and curriculum view:</p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+              {[
+                { grade: '6', id: 'ZPS6A 01', label: 'Class 6 (Aarav)' },
+                { grade: '7', id: 'ZPS7A 01', label: 'Class 7 (Devansh)' },
+                { grade: '8', id: 'ZPS8A 01', label: 'Class 8 (Siddharth)' },
+                { grade: '9', id: 'ZPS9A 01', label: 'Class 9 (Arjun)' },
+                { grade: '11', id: 'ZPS11A 01', label: 'Class 11 (Aryan)' }
+              ].map(c => (
+                <button
+                  key={c.grade}
+                  onClick={() => setPreviewStudentId(c.id)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    previewStudentId === c.id 
+                      ? 'bg-pixiu-blue text-white shadow-lg ring-2 ring-white/50 scale-105' 
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+                  }`}
+                >
+                  {c.label}
+                </button>
+              ))}
+              <a
+                href="/"
+                className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-white text-slate-900 hover:bg-slate-100 shadow-md ml-auto md:ml-2 transition-all flex items-center gap-1"
+              >
+                ⬅️ Admin Console
+              </a>
+            </div>
+          </div>
+        )}
+
         {/* 1. Student Profile Hero Card (Now First) */}
         <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-8 text-white shadow-xl border border-slate-700/60 relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-4 sm:gap-6">
           <div className="flex items-center gap-3.5 sm:gap-5 w-full md:w-auto">
@@ -588,7 +466,7 @@ export default function StudentPortal() {
                 <span className="text-[10px] sm:text-[11px] bg-slate-800 border border-slate-700 text-slate-300 px-2 py-0.5 rounded-md">
                   Class: <strong className="text-white">{studentGrade}A</strong>
                 </span>
-                <span className="text-[10px] sm:text-[11px] bg-slate-800 border border-slate-700 text-slate-300 px-2 py-0.5 rounded-md font-mono">
+                <span className="text-[10px] sm:text-[11px] bg-slate-800 border border-slate-700 text-slate-300 px-2.5 py-0.5 rounded-md font-mono">
                   Kit: <strong className="text-blue-400">{student.assigned_kit_id || 'KIT-ZPS-01'}</strong>
                 </span>
               </div>
@@ -605,7 +483,7 @@ export default function StudentPortal() {
 
         {/* 2. 3 Metric Summary Cards (Mobile 3-column Grid) */}
         <div className="grid grid-cols-3 gap-2 sm:gap-6">
-          <div className="bg-white p-2.5 sm:p-6 rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center sm:items-center gap-1.5 sm:gap-4 text-center sm:text-left">
+          <div className="bg-white p-2.5 sm:p-6 rounded-xl sm:rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center sm:items-center gap-1.5 sm:gap-4 text-center sm:text-left">
             <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
               <Award className="w-4 h-4 sm:w-6 sm:h-6" />
             </div>
@@ -615,7 +493,7 @@ export default function StudentPortal() {
             </div>
           </div>
 
-          <div className="bg-white p-2.5 sm:p-6 rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center sm:items-center gap-1.5 sm:gap-4 text-center sm:text-left">
+          <div className="bg-white p-2.5 sm:p-6 rounded-xl sm:rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center sm:items-center gap-1.5 sm:gap-4 text-center sm:text-left">
             <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
               <Activity className="w-4 h-4 sm:w-6 sm:h-6" />
             </div>
@@ -625,7 +503,7 @@ export default function StudentPortal() {
             </div>
           </div>
 
-          <div className="bg-white p-2.5 sm:p-6 rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center sm:items-center gap-1.5 sm:gap-4 text-center sm:text-left">
+          <div className="bg-white p-2.5 sm:p-6 rounded-xl sm:rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center sm:items-center gap-1.5 sm:gap-4 text-center sm:text-left">
             <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-blue-50 text-pixiu-blue flex items-center justify-center shrink-0">
               <Box className="w-4 h-4 sm:w-6 sm:h-6" />
             </div>
@@ -636,32 +514,39 @@ export default function StudentPortal() {
           </div>
         </div>
 
-        {/* 3. Official Monthly Accountability & Motivation Notice Banner (Now Underneath Profile & Metrics) */}
-        <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 rounded-2xl p-4 sm:p-5 text-white border border-blue-500/30 shadow-lg relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-3 sm:gap-4">
-          <div className="flex items-start gap-3">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-500/20 border border-blue-400/40 flex items-center justify-center text-blue-300 shrink-0 mt-0.5">
-              <Sparkles size={18} className="text-amber-300 animate-pulse" />
+        {/* 3. Clean WhatsApp Your Kit Store Callout (Cheap & Below Market Price) */}
+        <div className="bg-white rounded-2xl border border-emerald-200/90 p-4 sm:p-5 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center shrink-0">
+              <MessageCircle size={20} />
             </div>
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <h3 className="font-bold text-xs sm:text-sm text-white tracking-wide">
-                  Pixiu Tech Innovation Lab • Student Intelligence
-                </h3>
-                <span className="text-[9px] sm:text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  Monthly Report Active
+                <h4 className="font-bold text-slate-800 text-sm sm:text-base">
+                  Want to Practice Robotics at Home?
+                </h4>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  🏷️ Cheap & Below Market Price
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-50 text-pixiu-blue border border-blue-200">
+                  Student Discount
                 </span>
               </div>
-              <p className="text-[11px] sm:text-xs text-slate-300 mt-1 leading-relaxed">
-                📢 <strong className="text-white">Institutional Accountability Notice:</strong> At the end of every month, your practical laboratory attendance records, level-by-level competency reviews, and prototype scores are compiled and dispatched directly to your <strong>School Principal</strong> and <strong>Parents</strong>. Keep innovating, building, and exploring with full dedication. <strong className="text-amber-300">Happy Studying! 🚀✨</strong>
+              <p className="text-slate-500 text-xs mt-0.5">
+                Buy your official <strong className="text-slate-700">Class {studentGrade} STEM Robotics Kit</strong> directly via WhatsApp at guaranteed <strong className="text-emerald-700 font-semibold">cheap & below market price</strong> (+91 7985403186).
               </p>
             </div>
           </div>
 
-          <div className="self-end md:self-center shrink-0 flex items-center gap-2">
-            <span className="text-[10px] sm:text-xs font-bold font-mono px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-white/10 text-blue-200 border border-white/10 flex items-center gap-1.5">
-              <Send size={11} className="text-blue-300" /> Dispatched Monthly
-            </span>
-          </div>
+          <a
+            href={whatsappKitUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full md:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer shrink-0"
+          >
+            <MessageCircle size={15} />
+            Buy at Below Market Price (+91 7985403186) →
+          </a>
         </div>
 
         {/* ==================== 2 INTERACTIVE LINE GRAPHS ==================== */}
@@ -1038,6 +923,95 @@ export default function StudentPortal() {
           </div>
         </div>
       </main>
+
+      {/* ==================== COMPONENT INSPECTION MODAL ==================== */}
+      {selectedComponent && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-100 transform transition-all animate-scaleUp">
+            <div className="relative bg-slate-900 p-5 sm:p-6 text-white">
+              <button 
+                onClick={() => setSelectedComponent(null)}
+                className="absolute top-4 right-4 text-slate-400 hover:text-white bg-slate-800/80 p-1.5 rounded-full cursor-pointer transition-colors"
+              >
+                <X size={18} />
+              </button>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="px-2.5 py-0.5 bg-blue-600 text-white rounded-full text-[10px] font-extrabold uppercase">
+                  {selectedComponent.category || 'Hardware Component'}
+                </span>
+                <span className="text-slate-400 text-xs font-mono">{selectedComponent.session}</span>
+              </div>
+              <h3 className="text-base sm:text-xl font-extrabold text-white">
+                {selectedComponent.name}
+              </h3>
+            </div>
+
+            <div className="p-5 sm:p-6 space-y-4">
+              <div className="rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 flex items-center justify-center max-h-56">
+                <img 
+                  src={selectedComponent.image} 
+                  alt={selectedComponent.name} 
+                  className="max-h-56 w-full object-cover"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Function & Lab Role</h4>
+                <p className="text-xs sm:text-sm text-slate-700 bg-slate-50 p-3.5 rounded-xl border border-slate-200/80 leading-relaxed font-medium">
+                  {selectedComponent.role}
+                </p>
+              </div>
+
+              {selectedComponent.specs && (
+                <div className="space-y-1.5">
+                  <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Electrical & Pinout Specifications</h4>
+                  <p className="text-[11px] sm:text-xs text-slate-600 bg-blue-50/50 p-3 rounded-xl border border-blue-100 font-mono leading-relaxed">
+                    {selectedComponent.specs}
+                  </p>
+                </div>
+              )}
+
+              <div className="pt-2 flex justify-end">
+                <button 
+                  onClick={() => setSelectedComponent(null)}
+                  className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm"
+                >
+                  Close Inspection
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== MASTER KIT DIAGRAM MODAL ==================== */}
+      {isKitDiagramModalOpen && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-slate-900 rounded-3xl max-w-4xl w-full overflow-hidden shadow-2xl border border-slate-700 transform transition-all">
+            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-800">
+              <div>
+                <h3 className="text-white font-bold text-sm sm:text-base">
+                  {classKits[studentGrade]?.name || `Class ${studentGrade} Kit Layout`}
+                </h3>
+                <p className="text-slate-400 text-xs">{classKits[studentGrade]?.tagline}</p>
+              </div>
+              <button 
+                onClick={() => setIsKitDiagramModalOpen(false)}
+                className="text-slate-400 hover:text-white bg-slate-800 p-2 rounded-full cursor-pointer transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-4 sm:p-6 bg-slate-950 flex items-center justify-center max-h-[75vh] overflow-auto">
+              <img 
+                src={classKits[studentGrade]?.overview_image || '/img/kits/class6_p2_img1_1536x1024.jpeg'} 
+                alt="Kit Blueprint" 
+                className="max-w-full max-h-[70vh] object-contain rounded-xl"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -3,7 +3,7 @@ import {
   SEED_SCHOOLS, SEED_CLASSES, SEED_STUDENTS, SEED_TRAINERS, 
   SEED_BILLING, SEED_SESSIONS, SEED_ATTENDANCE, SEED_INVENTORY, 
   SEED_ALERTS, SEED_CURRICULUM, SEED_CONTENT, SEED_NOTIFICATIONS,
-  SEED_STUDENT_REVIEWS
+  SEED_STUDENT_REVIEWS, CLASS_KITS
 } from '../data/seedData';
 
 const DataContext = createContext();
@@ -83,7 +83,30 @@ export function DataProvider({ children }) {
     try { localStorage.setItem('pixiu_curriculum', JSON.stringify(SEED_CURRICULUM)); } catch (e) {}
     return SEED_CURRICULUM;
   });
-  const [inventory, setInventory] = useState(() => safeGetItem('pixiu_inventory', SEED_INVENTORY));
+  const [inventory, setInventory] = useState(() => {
+    try {
+      const saved = safeGetItem('pixiu_inventory', null);
+      if (!saved || saved.length < 10) {
+        localStorage.setItem('pixiu_inventory', JSON.stringify(SEED_INVENTORY));
+        return SEED_INVENTORY;
+      }
+      return saved;
+    } catch (e) {
+      return SEED_INVENTORY;
+    }
+  });
+  const [classKits, setClassKits] = useState(() => {
+    try {
+      const saved = safeGetItem('pixiu_class_kits', null);
+      if (!saved || !saved['6'] || !saved['11'] || !saved['6']?.components || saved['6']?.components?.length < 12) {
+        localStorage.setItem('pixiu_class_kits', JSON.stringify(CLASS_KITS));
+        return CLASS_KITS;
+      }
+      return saved;
+    } catch (e) {
+      return CLASS_KITS;
+    }
+  });
   const [billing, setBilling] = useState(() => {
     try {
       const saved = safeGetItem('pixiu_billing', null);
@@ -891,6 +914,45 @@ export function DataProvider({ children }) {
     return { success: true };
   };
 
+  // 17. Class-Specific Hardware Kit Blueprints (Admin Control)
+  const updateClassKitComponent = (grade, componentId, updatedFields) => {
+    setClassKits(prev => {
+      const currentKit = prev[grade];
+      if (!currentKit) return prev;
+      const updatedComponents = currentKit.components.map(c => c.id === componentId ? { ...c, ...updatedFields } : c);
+      const updated = {
+        ...prev,
+        [grade]: {
+          ...currentKit,
+          components: updatedComponents
+        }
+      };
+      try { localStorage.setItem('pixiu_class_kits', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+    return { success: true };
+  };
+
+  const addComponentToClassKit = (grade, newComponent) => {
+    setClassKits(prev => {
+      const currentKit = prev[grade];
+      if (!currentKit) return prev;
+      const componentId = `C${grade}-${Date.now().toString().slice(-4)}`;
+      const updatedComponents = [...currentKit.components, { ...newComponent, id: componentId }];
+      const updated = {
+        ...prev,
+        [grade]: {
+          ...currentKit,
+          total_components: updatedComponents.length,
+          components: updatedComponents
+        }
+      };
+      try { localStorage.setItem('pixiu_class_kits', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+    return { success: true };
+  };
+
   // Utilities
   const getNextRollNumber = (schoolCode, grade, section) => {
     const cohort = students.filter(s => s.school_id === schoolCode && s.class_id === `CLS-${schoolCode}-${grade}${section || ''}`);
@@ -918,6 +980,7 @@ export function DataProvider({ children }) {
     content, uploadContent, deleteContent,
     curriculum, addCurriculumPlan, updateCurriculumStatus,
     inventory, addInventoryKit, updateKitStatus, deleteKit,
+    classKits, updateClassKitComponent, addComponentToClassKit,
     billing, createInvoice, updateInvoiceStatus, confirmPaymentReceipt,
     comms, sendCommsMessage,
     projects, addProject, deleteProject, uploadFile,
