@@ -3,11 +3,11 @@ import {
   Building2, Users, Award, BookOpen, Receipt, FileText, 
   CheckCircle2, Clock, Phone, MessageSquare, Search, Filter, 
   Download, ArrowUpRight, ShieldCheck, Sparkles, LogOut, ChevronRight,
-  GraduationCap, Calendar, Check
+  GraduationCap, Calendar, Check, Zap, ArrowRight
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { generateStudentTranscriptPDF } from '../utils/transcriptGenerator';
 
 export default function SchoolPortal() {
@@ -119,35 +119,33 @@ export default function SchoolPortal() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 selection:bg-blue-600 selection:text-white pb-20 font-sans">
-      {/* Top Header Bar - Clean White & Subtle Border */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-8 py-3 flex items-center justify-between shadow-xs">
-        <div className="flex items-center gap-3">
-          <div className="bg-slate-50 p-1.5 rounded-xl border border-slate-200 shadow-xs flex items-center">
-            <img src="/img/logo.png" alt="Pixiu Tech" className="h-6 w-auto object-contain" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-black tracking-wider text-blue-600 uppercase">School Partner Portal</span>
-              <span className="text-[10px] px-2 py-0.5 bg-emerald-50 text-emerald-700 font-bold rounded-full border border-emerald-200">
-                Institutional Access
-              </span>
+    <div className="min-h-screen bg-slate-50 text-slate-800 pb-20">
+      {/* Header - Identical to Admin Console Header */}
+      <header className="bg-white border-b border-slate-200 h-16 px-4 sm:px-8 flex items-center justify-between sticky top-0 z-40 shadow-xs">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <div className="bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs flex items-center">
+              <img src="/img/logo.png" alt="Pixiu Tech" className="h-6 w-auto object-contain" />
             </div>
-            <h1 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight leading-tight">
-              {activeSchool.name}
-            </h1>
+            <div>
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-pixiu-blue block leading-none">School Partner Portal</span>
+              <h1 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight leading-tight mt-0.5">
+                {activeSchool.name}
+              </h1>
+            </div>
           </div>
         </div>
 
-        {/* Right Actions / Switcher */}
         <div className="flex items-center gap-3">
+          {/* Admin Live Switcher */}
           {(!user || user.role === 'admin' || user.school_id === 'ALL') && (
-            <div className="flex items-center gap-1.5 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200 text-xs shadow-2xs">
-              <span className="text-[10px] text-slate-500 font-bold uppercase">Switch School:</span>
+            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg text-xs">
+              <Building2 size={14} className="text-pixiu-blue" />
+              <span className="text-[11px] font-bold text-slate-500 uppercase">Scope:</span>
               <select
                 value={selectedSchoolId}
                 onChange={(e) => setSelectedSchoolId(e.target.value)}
-                className="bg-transparent text-slate-800 font-bold text-xs focus:outline-none cursor-pointer"
+                className="bg-transparent font-bold text-slate-800 text-xs focus:outline-none cursor-pointer"
               >
                 <option value="ZPS">Zenith Public School</option>
                 <option value="XYZ">XYZ Academy (Pilot Lab)</option>
@@ -155,212 +153,217 @@ export default function SchoolPortal() {
             </div>
           )}
 
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-600 border border-slate-200 hover:border-rose-200 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs"
+          <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Institutional Live
+          </span>
+
+          <button 
+            onClick={handleLogout} 
+            className="text-slate-400 hover:text-red-600 p-2 rounded-lg hover:bg-red-50 transition-colors cursor-pointer flex items-center gap-1 text-xs font-bold"
+            title="Logout"
           >
-            <LogOut size={13} />
+            <LogOut size={16}/>
             <span className="hidden sm:inline">Sign Out</span>
           </button>
         </div>
       </header>
 
-      {/* Main Content Shell */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-8 pt-6 space-y-6">
+      {/* Main Content Area */}
+      <main className="p-4 sm:p-8 max-w-7xl mx-auto space-y-6">
         
-        {/* Soft Modern Institutional Hero Card */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-blue-50/90 via-indigo-50/50 to-white border border-blue-200/70 rounded-3xl p-6 sm:p-8 shadow-xs">
-          <div className="absolute top-0 right-0 w-80 h-80 bg-blue-400/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20"></div>
-          
+        {/* Institutional Intelligence Banner (Exact Dark Slate Style from Admin Dashboard) */}
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-7 text-white shadow-sm relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-pixiu-blue/10 rounded-full blur-3xl pointer-events-none"></div>
+
           <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <Building2 size={16} className="text-blue-600" />
-                <span className="text-[11px] font-black uppercase tracking-widest text-blue-700">
+                <span className="text-[11px] font-black uppercase tracking-widest text-pixiu-blue px-2.5 py-0.5 bg-blue-500/10 border border-blue-500/20 rounded-md">
                   Institutional STEM & Robotics Center
                 </span>
+                <span className="text-[11px] text-emerald-400 font-bold flex items-center gap-1">
+                  <CheckCircle2 size={13} /> Active Partner School
+                </span>
               </div>
-              <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+              <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
                 {activeSchool.name}
               </h2>
-              <p className="text-xs sm:text-sm text-slate-600 mt-1 max-w-2xl leading-relaxed">
-                Empowering students with hands-on electronics, robotics prototyping, and embedded systems under the Pixiu Tech Institutional Excellence Program.
+              <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-2xl leading-relaxed">
+                Empowering students with hands-on robotics prototyping, sensor circuits, and embedded programming under the Pixiu Tech Institutional Excellence Suite.
               </p>
-              
-              <div className="flex flex-wrap gap-2.5 mt-4 text-xs font-medium text-slate-700">
-                <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-2xs">
-                  <ShieldCheck size={14} className="text-emerald-600" />
-                  <span>Principal: <b className="text-slate-900">{activeSchool.principal_name}</b></span>
+
+              <div className="flex flex-wrap gap-3 mt-4 text-xs">
+                <div className="bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800 flex items-center gap-2">
+                  <ShieldCheck size={14} className="text-emerald-400" />
+                  <span className="text-slate-300">Principal: <b className="text-white">{activeSchool.principal_name}</b></span>
                 </div>
-                <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-2xs">
-                  <Building2 size={14} className="text-blue-600" />
-                  <span>Lab Room: <b className="text-slate-900">{activeSchool.lab_room}</b></span>
+                <div className="bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800 flex items-center gap-2">
+                  <Building2 size={14} className="text-pixiu-blue" />
+                  <span className="text-slate-300">Lab: <b className="text-white">{activeSchool.lab_room}</b></span>
                 </div>
-                <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-2xs">
-                  <Phone size={14} className="text-indigo-600" />
-                  <span>Direct: <b className="text-slate-900 font-mono">{activeSchool.principal_phone}</b></span>
+                <div className="bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800 flex items-center gap-2">
+                  <Phone size={14} className="text-indigo-400" />
+                  <span className="text-slate-300">Phone: <b className="text-white font-mono">{activeSchool.principal_phone}</b></span>
                 </div>
               </div>
             </div>
 
-            {/* Academic Session Card */}
-            <div className="shrink-0 bg-white border border-blue-100 rounded-2xl p-4 sm:p-5 flex items-center gap-4 shadow-sm">
-              <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
+            {/* Session Pill */}
+            <div className="shrink-0 bg-slate-950/90 border border-slate-800 rounded-xl p-4 flex items-center gap-4 shadow-inner">
+              <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-pixiu-blue">
                 <Sparkles size={22} />
               </div>
               <div>
-                <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Academic Session</div>
-                <div className="text-base sm:text-lg font-black text-slate-900">2026 - 2027</div>
-                <div className="text-[11px] text-emerald-600 font-bold flex items-center gap-1 mt-0.5">
-                  <CheckCircle2 size={12} /> Term 1 Live In-Progress
+                <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Academic Session</div>
+                <div className="text-lg font-black text-white">2026 - 2027</div>
+                <div className="text-[11px] text-emerald-400 font-bold flex items-center gap-1 mt-0.5">
+                  <Check size={12} /> Term 1 In-Progress
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* 4 Clean Metric Cards (Soft Light Theme) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs hover:shadow-sm transition-shadow">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Enrolled Students</span>
-              <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                <Users size={16} />
-              </div>
+        {/* 4 KPI Cards (Exact Admin Style: Pure White, Slate-200 Border, Pastel Icons) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600">
+              <Users size={22} />
             </div>
-            <div className="text-2xl sm:text-3xl font-black text-slate-900">{schoolStudents.length}</div>
-            <div className="text-[11px] text-slate-500 mt-1">Across 5 academic classes</div>
+            <div>
+              <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-0.5">Enrolled Students</p>
+              <p className="text-2xl font-bold text-slate-800">{schoolStudents.length}</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">5 active grades</p>
+            </div>
           </div>
 
-          <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs hover:shadow-sm transition-shadow">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Assigned Faculty</span>
-              <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                <Award size={16} />
-              </div>
+          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-600">
+              <Award size={22} />
             </div>
-            <div className="text-lg font-black text-slate-900 truncate">{assignedTrainer.name}</div>
-            <div className="text-[11px] text-indigo-600 font-semibold mt-1 truncate">{assignedTrainer.role}</div>
+            <div>
+              <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-0.5">Assigned Trainer</p>
+              <p className="text-lg font-bold text-slate-800 truncate">{assignedTrainer.name}</p>
+              <p className="text-[11px] text-indigo-600 font-bold mt-0.5 truncate">{assignedTrainer.role}</p>
+            </div>
           </div>
 
-          <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs hover:shadow-sm transition-shadow">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Lab Attendance</span>
-              <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                <CheckCircle2 size={16} />
-              </div>
+          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600">
+              <CheckCircle2 size={22} />
             </div>
-            <div className="text-2xl sm:text-3xl font-black text-emerald-600">{schoolAttendanceRate}%</div>
-            <div className="text-[11px] text-slate-500 mt-1">Hands-on practical rate</div>
+            <div>
+              <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-0.5">Lab Attendance</p>
+              <p className="text-2xl font-bold text-emerald-600">{schoolAttendanceRate}%</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">Practical lab average</p>
+            </div>
           </div>
 
-          <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs hover:shadow-sm transition-shadow">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Fee & Invoices</span>
-              <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-                <Receipt size={16} />
-              </div>
+          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600">
+              <Receipt size={22} />
             </div>
-            <div className="text-2xl sm:text-3xl font-black text-slate-900">
-              ₹{(schoolBilling.reduce((acc, b) => acc + (b.amount || 0), 0)).toLocaleString('en-IN')}
-            </div>
-            <div className="text-[11px] text-amber-600 font-semibold mt-1">
-              {schoolBilling.filter(b => b.status === 'Paid').length} Paid / {schoolBilling.length} Total Invoices
+            <div>
+              <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-0.5">Fee & Invoices</p>
+              <p className="text-2xl font-bold text-slate-800">₹{(schoolBilling.reduce((acc, b) => acc + (b.amount || 0), 0)).toLocaleString('en-IN')}</p>
+              <p className="text-[11px] text-amber-600 font-bold mt-0.5">
+                {schoolBilling.filter(b => b.status === 'Paid').length} Paid / {schoolBilling.length} Total
+              </p>
             </div>
           </div>
         </div>
 
-        {/* Clean Segmented Navigation Tabs */}
-        <div className="flex border-b border-slate-200 gap-1.5 sm:gap-3 overflow-x-auto pb-0">
+        {/* Tab Navigation (Exact Admin Style: Pill Tabs) */}
+        <div className="flex items-center gap-2 border-b border-slate-200 pb-3 overflow-x-auto">
           <button
             onClick={() => setActiveTab('students')}
-            className={`px-4 py-2.5 text-xs sm:text-sm font-bold rounded-t-xl transition-all cursor-pointer flex items-center gap-2 shrink-0 border-b-2 ${
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
               activeTab === 'students' 
-                ? 'bg-white text-blue-600 border-blue-600 shadow-2xs' 
-                : 'text-slate-600 hover:text-slate-900 border-transparent hover:bg-slate-100/70'
+                ? 'bg-slate-900 text-white shadow-xs' 
+                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
             }`}
           >
-            <Users size={15} /> Student Directory & Transcripts ({schoolStudents.length})
+            <Users size={14} /> Student Directory & Transcripts ({schoolStudents.length})
           </button>
 
           <button
             onClick={() => setActiveTab('trainer')}
-            className={`px-4 py-2.5 text-xs sm:text-sm font-bold rounded-t-xl transition-all cursor-pointer flex items-center gap-2 shrink-0 border-b-2 ${
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
               activeTab === 'trainer' 
-                ? 'bg-white text-blue-600 border-blue-600 shadow-2xs' 
-                : 'text-slate-600 hover:text-slate-900 border-transparent hover:bg-slate-100/70'
+                ? 'bg-slate-900 text-white shadow-xs' 
+                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
             }`}
           >
-            <Award size={15} /> Assigned Faculty Profile
+            <Award size={14} /> Assigned Faculty Profile
           </button>
 
           <button
             onClick={() => setActiveTab('curriculum')}
-            className={`px-4 py-2.5 text-xs sm:text-sm font-bold rounded-t-xl transition-all cursor-pointer flex items-center gap-2 shrink-0 border-b-2 ${
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
               activeTab === 'curriculum' 
-                ? 'bg-white text-blue-600 border-blue-600 shadow-2xs' 
-                : 'text-slate-600 hover:text-slate-900 border-transparent hover:bg-slate-100/70'
+                ? 'bg-slate-900 text-white shadow-xs' 
+                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
             }`}
           >
-            <BookOpen size={15} /> Syllabus & Practical Modules
+            <BookOpen size={14} /> Syllabus & Practical Modules
           </button>
 
           <button
             onClick={() => setActiveTab('billing')}
-            className={`px-4 py-2.5 text-xs sm:text-sm font-bold rounded-t-xl transition-all cursor-pointer flex items-center gap-2 shrink-0 border-b-2 ${
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
               activeTab === 'billing' 
-                ? 'bg-white text-blue-600 border-blue-600 shadow-2xs' 
-                : 'text-slate-600 hover:text-slate-900 border-transparent hover:bg-slate-100/70'
+                ? 'bg-slate-900 text-white shadow-xs' 
+                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
             }`}
           >
-            <Receipt size={15} /> Billing & Invoices ({schoolBilling.length})
+            <Receipt size={14} /> Invoices & Ledger ({schoolBilling.length})
           </button>
         </div>
 
         {/* TAB 1: STUDENT DIRECTORY */}
         {activeTab === 'students' && (
           <div className="space-y-4">
-            {/* Filter Bar */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-xs">
-              {/* Grade Buttons */}
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+            {/* Filter and Search Bar (Exact Admin Students.jsx Style) */}
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
+              {/* Class Filter Tabs */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 w-full md:w-auto">
                 {['ALL', '6', '7', '8', '9', '11'].map((grade) => (
                   <button
                     key={grade}
                     onClick={() => setSelectedGradeFilter(grade)}
-                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer shrink-0 ${
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                       selectedGradeFilter === grade 
-                        ? 'bg-slate-900 text-white shadow-2xs' 
+                        ? 'bg-pixiu-blue text-white shadow-xs' 
                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
                   >
-                    {grade === 'ALL' ? 'All Classes' : `Class ${grade}`}
+                    {grade === 'ALL' ? 'All Grades' : `Class ${grade}`}
                   </button>
                 ))}
               </div>
 
               {/* Search Bar */}
-              <div className="relative min-w-[260px]">
-                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <div className="relative w-full md:w-72">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search student, ID, or kit..."
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:bg-white transition-colors"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-4 py-2 text-xs focus:outline-none focus:border-pixiu-blue focus:bg-white transition-all font-medium"
                 />
               </div>
             </div>
 
-            {/* Students Table */}
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+            {/* Students Table (Exact Admin Students.jsx Table Style) */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
-                    <tr className="bg-slate-50/90 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold text-[11px]">
-                      <th className="py-3.5 px-4">Student & ID</th>
+                    <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold text-[11px]">
+                      <th className="py-3.5 px-4">Student & Canonical ID</th>
                       <th className="py-3.5 px-4">Assigned Hardware Kit</th>
-                      <th className="py-3.5 px-4">Parent Contact</th>
+                      <th className="py-3.5 px-4">Parent Details</th>
                       <th className="py-3.5 px-4">Lab Attendance</th>
                       <th className="py-3.5 px-4">Mastery Level</th>
                       <th className="py-3.5 px-4 text-right">Official Transcript</th>
@@ -370,34 +373,34 @@ export default function SchoolPortal() {
                     {filteredStudents.map((student) => {
                       const att = getStudentAttendance(student.student_id);
                       return (
-                        <tr key={student.id} className="hover:bg-blue-50/30 transition-colors">
+                        <tr key={student.id} className="hover:bg-slate-50/80 transition-colors">
                           <td className="py-3.5 px-4">
-                            <div className="font-bold text-slate-900 text-sm">{student.name}</div>
-                            <div className="text-[11px] text-blue-600 font-mono font-bold">{student.student_id}</div>
+                            <div className="font-bold text-slate-800 text-sm">{student.name}</div>
+                            <div className="text-[11px] text-pixiu-blue font-mono font-bold mt-0.5">{student.student_id}</div>
                           </td>
                           <td className="py-3.5 px-4">
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-700 font-mono text-[11px] rounded-lg font-bold">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 text-slate-700 font-mono text-[11px] rounded-lg font-bold border border-slate-200">
                               📦 {student.assigned_kit_id || 'KIT-01'}
                             </span>
                           </td>
                           <td className="py-3.5 px-4">
-                            <div className="text-slate-700 font-semibold">{student.parent_name}</div>
+                            <div className="text-slate-700 font-medium">{student.parent_name}</div>
                             <div className="text-[11px] text-slate-400 font-mono">{student.parent_phone}</div>
                           </td>
                           <td className="py-3.5 px-4">
                             <span className={`inline-block px-2.5 py-0.5 rounded-full font-bold text-[11px] ${
-                              att >= 90 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-blue-50 text-blue-700 border border-blue-200'
+                              att >= 90 ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'
                             }`}>
-                              {att}% Present
+                              {att}% Attendance
                             </span>
                           </td>
                           <td className="py-3.5 px-4">
-                            <span className="font-bold text-indigo-700">{student.tech_level || 'Level 0'}</span>
+                            <span className="font-bold text-indigo-600">{student.tech_level || 'Level 0'}</span>
                           </td>
                           <td className="py-3.5 px-4 text-right">
                             <button
                               onClick={(e) => handlePrintStudentPDF(e, student)}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold rounded-xl text-xs transition-all shadow-xs shadow-blue-500/20 cursor-pointer"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-pixiu-blue hover:bg-blue-600 active:scale-95 text-white font-bold rounded-lg text-xs transition-all shadow-xs shadow-blue-500/20 cursor-pointer"
                             >
                               <Download size={13} />
                               <span>Download PDF</span>
@@ -409,8 +412,8 @@ export default function SchoolPortal() {
 
                     {filteredStudents.length === 0 && (
                       <tr>
-                        <td colSpan="6" className="py-12 text-center text-slate-400 text-xs">
-                          No students found matching your search.
+                        <td colSpan="6" className="py-12 text-center text-slate-400 text-xs font-medium">
+                          No students found matching the selected filters.
                         </td>
                       </tr>
                     )}
@@ -423,33 +426,33 @@ export default function SchoolPortal() {
 
         {/* TAB 2: ASSIGNED TRAINER PROFILE */}
         {activeTab === 'trainer' && (
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 space-y-6 shadow-xs">
+          <div className="bg-white border border-slate-200 rounded-xl p-6 sm:p-8 space-y-6 shadow-sm">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 pb-6 border-b border-slate-100">
-              <div className="w-20 h-20 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white text-3xl font-black shadow-md shadow-blue-500/20">
+              <div className="w-20 h-20 rounded-2xl bg-gradient-to-tr from-pixiu-blue to-indigo-600 flex items-center justify-center text-white text-3xl font-black shadow-md shadow-blue-500/20">
                 {assignedTrainer.name.charAt(0)}
               </div>
               <div className="flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 px-2.5 py-0.5 bg-emerald-50 border border-emerald-200 rounded-full">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 px-2.5 py-0.5 bg-emerald-100 rounded-full">
                     Active Faculty In-Charge
                   </span>
-                  <span className="text-xs font-bold text-amber-500">★ {assignedTrainer.rating} Institutional Rating</span>
+                  <span className="text-xs font-bold text-amber-500">★ {assignedTrainer.rating} Faculty Rating</span>
                 </div>
-                <h3 className="text-2xl font-black text-slate-900 mt-1">{assignedTrainer.name}</h3>
-                <p className="text-sm text-slate-500 font-medium">{assignedTrainer.role} • Pixiu Tech Academic Team</p>
+                <h3 className="text-2xl font-bold text-slate-900 mt-1">{assignedTrainer.name}</h3>
+                <p className="text-xs sm:text-sm text-slate-500">{assignedTrainer.role} • Pixiu Tech Academic Faculty</p>
                 
                 <div className="flex flex-wrap gap-2.5 mt-3">
                   <a
                     href={`tel:${assignedTrainer.phone.replace(/\s+/g, '')}`}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors shadow-2xs"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors"
                   >
-                    <Phone size={13} className="text-blue-600" /> {assignedTrainer.phone}
+                    <Phone size={13} className="text-pixiu-blue" /> {assignedTrainer.phone}
                   </a>
                   <a
                     href={`https://wa.me/${assignedTrainer.phone.replace(/[^0-9]/g, '')}?text=Hello%20${encodeURIComponent(assignedTrainer.name)},%20reaching%20out%20from%20${encodeURIComponent(activeSchool.name)}.`}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-colors shadow-xs shadow-emerald-600/20"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-colors shadow-xs shadow-emerald-600/20"
                   >
                     <MessageSquare size={13} /> WhatsApp Faculty
                   </a>
@@ -459,17 +462,17 @@ export default function SchoolPortal() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Weekly Schedule</div>
-                <div className="text-base font-bold text-slate-900 mt-1">{assignedTrainer.weekly_days || 2} Days / Week</div>
+                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Weekly Schedule</div>
+                <div className="text-base font-bold text-slate-800 mt-1">{assignedTrainer.weekly_days || 2} Days / Week</div>
                 <div className="text-xs text-slate-500 mt-0.5">Laboratory Batches & Practical Sprints</div>
               </div>
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Assigned Lab Room</div>
-                <div className="text-base font-bold text-slate-900 mt-1">{activeSchool.lab_room}</div>
+                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Assigned Lab Room</div>
+                <div className="text-base font-bold text-slate-800 mt-1">{activeSchool.lab_room}</div>
                 <div className="text-xs text-slate-500 mt-0.5">Dedicated STEM & Hardware Suite</div>
               </div>
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Faculty Accreditation</div>
+                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Faculty Accreditation</div>
                 <div className="text-base font-bold text-emerald-600 mt-1">Verified STEM Instructor</div>
                 <div className="text-xs text-slate-500 mt-0.5">Certified Embedded & Robotics Engineer</div>
               </div>
@@ -480,8 +483,8 @@ export default function SchoolPortal() {
         {/* TAB 3: CURRICULUM & SYLLABUS */}
         {activeTab === 'curriculum' && (
           <div className="space-y-4">
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs">
-              <h3 className="text-lg font-black text-slate-900 mb-1">Institutional Syllabus Progression</h3>
+            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+              <h3 className="text-lg font-bold text-slate-800 mb-1">Institutional Syllabus Progression</h3>
               <p className="text-xs text-slate-500 mb-6">
                 Modular progression aligned with National Education Policy (NEP 2020) & Atal Tinkering Lab standards.
               </p>
@@ -505,15 +508,15 @@ export default function SchoolPortal() {
                         {idx + 1}
                       </div>
                       <div>
-                        <div className="font-bold text-slate-900 text-xs sm:text-sm">{mod.title}</div>
+                        <div className="font-bold text-slate-800 text-xs sm:text-sm">{mod.title}</div>
                         <div className="text-[11px] text-slate-500 font-medium">{mod.unit}</div>
                       </div>
                     </div>
                     <div className="text-right">
                       <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                        mod.status.includes('Completed') ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
-                        mod.status.includes('In Progress') ? 'bg-blue-50 text-blue-700 border border-blue-200' :
-                        'bg-slate-100 text-slate-600 border border-slate-200'
+                        mod.status.includes('Completed') ? 'bg-emerald-100 text-emerald-800' :
+                        mod.status.includes('In Progress') ? 'bg-blue-100 text-blue-800' :
+                        'bg-slate-200 text-slate-600'
                       }`}>
                         {mod.status}
                       </span>
@@ -528,16 +531,16 @@ export default function SchoolPortal() {
 
         {/* TAB 4: BILLING & INVOICES */}
         {activeTab === 'billing' && (
-          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
             <div className="p-6 border-b border-slate-100">
-              <h3 className="text-lg font-black text-slate-900">Institutional Billing & Invoices</h3>
+              <h3 className="text-lg font-bold text-slate-800">Institutional Billing & Invoices</h3>
               <p className="text-xs text-slate-500 mt-1">Official contractual milestone billing records for {activeSchool.name}.</p>
             </div>
 
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="bg-slate-50/90 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold text-[11px]">
+                  <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold text-[11px]">
                     <th className="py-3.5 px-4">Invoice #</th>
                     <th className="py-3.5 px-4">Milestone Tranche</th>
                     <th className="py-3.5 px-4">Issued Date</th>
@@ -548,20 +551,20 @@ export default function SchoolPortal() {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {schoolBilling.map((inv) => (
-                    <tr key={inv.id} className="hover:bg-blue-50/30 transition-colors">
-                      <td className="py-3.5 px-4 font-mono font-bold text-blue-600">{inv.id}</td>
+                    <tr key={inv.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="py-3.5 px-4 font-mono font-bold text-pixiu-blue">{inv.id}</td>
                       <td className="py-3.5 px-4">
-                        <div className="font-bold text-slate-900">{inv.tranche_title}</div>
+                        <div className="font-bold text-slate-800">{inv.tranche_title}</div>
                         <div className="text-[11px] text-slate-500 max-w-md truncate">{inv.description}</div>
                       </td>
                       <td className="py-3.5 px-4 text-slate-600 font-mono">{inv.invoice_date || inv.date_issued}</td>
                       <td className="py-3.5 px-4 text-slate-600 font-mono">{inv.due_date}</td>
-                      <td className="py-3.5 px-4 font-black text-slate-900 text-sm">₹{inv.amount?.toLocaleString('en-IN')}</td>
+                      <td className="py-3.5 px-4 font-bold text-slate-800 text-sm">₹{inv.amount?.toLocaleString('en-IN')}</td>
                       <td className="py-3.5 px-4">
                         <span className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
                           inv.status === 'Paid' 
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
-                            : 'bg-amber-50 text-amber-700 border border-amber-200'
+                            ? 'bg-emerald-100 text-emerald-800' 
+                            : 'bg-amber-100 text-amber-800'
                         }`}>
                           {inv.status}
                         </span>
@@ -570,7 +573,7 @@ export default function SchoolPortal() {
                   ))}
                   {schoolBilling.length === 0 && (
                     <tr>
-                      <td colSpan="6" className="py-12 text-center text-slate-400 text-xs">
+                      <td colSpan="6" className="py-12 text-center text-slate-400 text-xs font-medium">
                         No billing invoices generated yet.
                       </td>
                     </tr>
@@ -580,7 +583,7 @@ export default function SchoolPortal() {
             </div>
           </div>
         )}
-      </div>
+      </main>
     </div>
   );
 }
