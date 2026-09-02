@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { 
-  Play, CheckCircle, Clock, CheckSquare, XSquare, 
+  Play, CheckCircle, Clock, CheckSquare, XSquare, Check,
   Camera, Star, Award, BookOpen, AlertCircle, Sparkles, Building2, User, ChevronRight, Lock, Unlock,
   Calendar, History, Eye, ArrowLeft
 } from 'lucide-react';
