@@ -109,7 +109,7 @@ export default function Login() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1.5">
-              {selectedRoleTab === 'student' ? 'Student ID' : selectedRoleTab === 'trainer' ? 'Trainer ID / Username' : 'Username'}
+              {selectedRoleTab === 'student' ? 'Student ID' : selectedRoleTab === 'trainer' ? 'Trainer ID' : 'Username'}
             </label>
             <div className="relative">
               <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
@@ -117,7 +117,7 @@ export default function Login() {
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder={selectedRoleTab === 'student' ? 'e.g. ZPS6A 01' : selectedRoleTab === 'trainer' ? 'e.g. vikaspandey' : 'e.g. adarshraj'}
+                placeholder={selectedRoleTab === 'student' ? 'Enter Student ID' : selectedRoleTab === 'trainer' ? 'Enter Trainer ID' : 'Enter Username'}
                 autoCapitalize="none"
                 autoCorrect="off"
                 required
