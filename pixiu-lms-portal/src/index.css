@@ -1,0 +1,13 @@
+@import "tailwindcss";
+
+@theme {
+  --color-pixiu-dark: #0A1A33;
+  --color-pixiu-blue: #1D6EFF;
+  --color-pixiu-gold: #C9A227;
+  --color-pixiu-gray: #F8FAFC;
+}
+
+body {
+  background-color: var(--color-pixiu-gray);
+  color: #1e293b;
+}
