@@ -39,6 +39,7 @@ const HASHED_USERS = [
   
   // School 2: XYZ Academy (ID: XYZ2026, Pass: XYZxyz@hata)
   { username: 'XYZ2026', hash: '1d37fcab06a387c6a5746e3414e90bbcb8136974300d83f18c910d242abf194b', role: 'school', name: 'XYZ Academy Administration', id: 'USR-SCH-XYZ', related_id: 'XYZ', school_id: 'XYZ' },
+  { username: 'XZY2026', hash: '1d37fcab06a387c6a5746e3414e90bbcb8136974300d83f18c910d242abf194b', role: 'school', name: 'XYZ Academy Administration', id: 'USR-SCH-XYZ-ALT', related_id: 'XYZ', school_id: 'XYZ' },
 
   // ==================== ZENITH PUBLIC SCHOOL (ZPS) STUDENTS ====================
   // Class 6 Students
