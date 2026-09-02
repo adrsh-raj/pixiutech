@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { useToast } from '../context/ToastContext';
+import Modal from '../components/ui/Modal';
 
 export default function Billing() {
   const { 
@@ -189,6 +190,7 @@ export default function Billing() {
       <html>
         <head>
           <title>Official Tax Invoice - ${inv.id}</title>
+          <base href="${window.location.origin}/" />
           <style>
             body { font-family: 'Segoe UI', Arial, sans-serif; padding: 40px; color: #1e293b; background: #fff; max-width: 800px; margin: 0 auto; }
             .header { display: flex; justify-content: space-between; border-bottom: 2px solid #0A1A33; padding-bottom: 20px; margin-bottom: 25px; }
@@ -216,7 +218,7 @@ export default function Billing() {
           <div class="header">
             <div>
               <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 6px;">
-                <img src="/img/logo.png" alt="Pixiu Tech Logo" style="height: 48px; width: auto; object-fit: contain; display: block;" onerror="this.style.display='none'" />
+                <img src="${window.location.origin}/img/logo.png" alt="Pixiu Tech Logo" style="height: 48px; width: auto; object-fit: contain; display: block;" onerror="this.src='/img/logo.png'" />
                 <div>
                   <div class="brand">PIXIU <span>TECH LLP</span></div>
                   <div class="tagline">Educational Robotics & AI Lab Systems</div>
@@ -534,18 +536,14 @@ export default function Billing() {
       </div>
 
       {/* MODAL 1: EDIT INVOICE */}
-      {editingInvoice && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95">
-            <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-              <div>
-                <h3 className="text-base font-bold text-slate-800">Edit Invoice ({editingInvoice.id})</h3>
-                <p className="text-xs text-slate-500">Update tranche description, amount, due date, or status</p>
-              </div>
-              <button onClick={() => setEditingInvoice(null)} className="text-slate-400 hover:text-slate-700 cursor-pointer"><X size={18}/></button>
-            </div>
-
-            <form onSubmit={handleEditSubmit} className="p-6 space-y-4 text-xs">
+      <Modal 
+        isOpen={!!editingInvoice} 
+        onClose={() => setEditingInvoice(null)}
+        title={`Edit Invoice (${editingInvoice?.id})`}
+        size="sm"
+      >
+        <p className="text-xs text-slate-500 mb-4">Update tranche description, amount, due date, or status</p>
+        <form onSubmit={handleEditSubmit} className="space-y-4 text-xs">
               <div>
                 <label className="block font-bold text-slate-500 uppercase mb-1">Tranche Title *</label>
                 <input 
@@ -628,26 +626,20 @@ export default function Billing() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </Modal>
 
       {/* MODAL 2: CONFIRM PAYMENT RECEIPT */}
-      {confirmingTranche && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95">
-            <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-              <div className="flex items-center gap-2">
-                <ShieldCheck size={20} className="text-emerald-600" />
-                <div>
-                  <h3 className="text-base font-bold text-slate-800">Confirm Payment Receipt</h3>
-                  <p className="text-xs text-slate-500">Record transaction details and mark tranche as reconciled</p>
-                </div>
-              </div>
-              <button onClick={() => setConfirmingTranche(null)} className="text-slate-400 hover:text-slate-700 cursor-pointer"><X size={18}/></button>
-            </div>
-
-            <form onSubmit={handleConfirmPaymentSubmit} className="p-6 space-y-4 text-xs">
+      <Modal 
+        isOpen={!!confirmingTranche} 
+        onClose={() => setConfirmingTranche(null)} 
+        title="Confirm Payment Receipt" 
+        size="sm"
+      >
+        <div className="flex items-center gap-2 mb-4">
+          <ShieldCheck size={20} className="text-emerald-600" />
+          <p className="text-xs text-slate-500">Record transaction details and mark tranche as reconciled</p>
+        </div>
+        <form onSubmit={handleConfirmPaymentSubmit} className="space-y-4 text-xs">
               <div className="bg-emerald-50 p-3.5 rounded-xl border border-emerald-200">
                 <p className="text-xs font-bold text-emerald-900">{confirmingTranche.tranche_title || 'Payment Tranche'}</p>
                 <p className="text-base font-bold text-emerald-700 mt-1">₹{(confirmingTranche.amount || 0).toLocaleString('en-IN')}</p>
@@ -718,23 +710,17 @@ export default function Billing() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </Modal>
 
       {/* MODAL 3: CREATE CUSTOM TRANCHE INVOICE */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
-            <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-              <div>
-                <h2 className="text-base font-bold text-slate-800">Create Custom Tranche Invoice</h2>
-                <p className="text-xs text-slate-500">Configure new installment or bill for partner school</p>
-              </div>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-700 cursor-pointer"><X size={18}/></button>
-            </div>
-            
-            <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs">
+      <Modal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        title="Create Custom Tranche Invoice" 
+        size="sm"
+      >
+        <p className="text-xs text-slate-500 mb-4">Configure new installment or bill for partner school</p>
+        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
               <div>
                 <label className="block font-bold text-slate-500 uppercase mb-1">Select School *</label>
                 <select 
@@ -816,9 +802,7 @@ export default function Billing() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </Modal>
     </div>
   );
 }

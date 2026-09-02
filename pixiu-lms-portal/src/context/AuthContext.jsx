@@ -39,6 +39,7 @@ const HASHED_USERS = [
   
   // School 2: XYZ Academy (ID: XYZ2026, Pass: XYZxyz@hata)
   { username: 'XYZ2026', hash: '1d37fcab06a387c6a5746e3414e90bbcb8136974300d83f18c910d242abf194b', role: 'school', name: 'XYZ Academy Administration', id: 'USR-SCH-XYZ', related_id: 'XYZ', school_id: 'XYZ' },
+  { username: 'XZY2026', hash: '1d37fcab06a387c6a5746e3414e90bbcb8136974300d83f18c910d242abf194b', role: 'school', name: 'XYZ Academy Administration', id: 'USR-SCH-XYZ-ALT', related_id: 'XYZ', school_id: 'XYZ' },
 
   // ==================== ZENITH PUBLIC SCHOOL (ZPS) STUDENTS ====================
   // Class 6 Students
@@ -149,6 +150,61 @@ export function AuthProvider({ children }) {
     verifySession();
   }, [token]);
 
+  // ==================== AUTO LOGOUT AFTER 30 MIN INACTIVITY ====================
+  useEffect(() => {
+    if (!user) return;
+
+    const INACTIVITY_LIMIT_MS = 30 * 60 * 1000; // 30 minutes
+    const CHECK_INTERVAL_MS = 10 * 1000; // Check every 10 seconds
+
+    const updateActivity = () => {
+      try {
+        localStorage.setItem('pixiu_last_active_timestamp', Date.now().toString());
+      } catch (e) {}
+    };
+
+    // Initialize activity timestamp if not set
+    if (!localStorage.getItem('pixiu_last_active_timestamp')) {
+      updateActivity();
+    }
+
+    const activityEvents = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
+    
+    // Throttle event listeners to avoid excessive localStorage writes
+    let throttleTimeout = null;
+    const handleUserActivity = () => {
+      if (!throttleTimeout) {
+        updateActivity();
+        throttleTimeout = setTimeout(() => {
+          throttleTimeout = null;
+        }, 2000);
+      }
+    };
+
+    activityEvents.forEach(evt => window.addEventListener(evt, handleUserActivity, { passive: true }));
+
+    // Periodic check interval
+    const interval = setInterval(() => {
+      try {
+        const lastActive = parseInt(localStorage.getItem('pixiu_last_active_timestamp') || '0', 10);
+        const elapsed = Date.now() - lastActive;
+
+        if (lastActive > 0 && elapsed >= INACTIVITY_LIMIT_MS) {
+          // Auto logout on 30 min idle
+          logout();
+          sessionStorage.setItem('pixiu_idle_logout_msg', 'Session Expired: You have been automatically logged out after 30 minutes of inactivity for security.');
+          window.location.href = '/login';
+        }
+      } catch (e) {}
+    }, CHECK_INTERVAL_MS);
+
+    return () => {
+      activityEvents.forEach(evt => window.removeEventListener(evt, handleUserActivity));
+      clearInterval(interval);
+      if (throttleTimeout) clearTimeout(throttleTimeout);
+    };
+  }, [user]);
+
   const login = async (username, password, expectedRole = null) => {
     const cleanUsername = username?.trim();
     const cleanPassword = password?.trim();
@@ -236,6 +292,7 @@ export function AuthProvider({ children }) {
     setToken(null);
     localStorage.removeItem('pixiu_auth_token');
     localStorage.removeItem('pixiu_auth_user');
+    localStorage.removeItem('pixiu_last_active_timestamp');
   };
 
   const value = {

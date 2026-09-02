@@ -92,7 +92,7 @@ export default function Verify() {
     setIsSearching(true);
     setActiveQuery(inputStudentId.trim());
     setSearchParams({ id: inputStudentId.trim() });
-    setTimeout(() => setIsSearching(false), 200);
+    setTimeout(() => setIsSearching(false), 600);
   };
 
   const handleDownloadTranscript = () => {
@@ -193,10 +193,10 @@ export default function Verify() {
             </button>
           </form>
 
-          {/* Quick Demo Test Pills */}
-          <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-slate-100 text-[11px] text-slate-500">
-            <span className="font-bold text-slate-400">Sample Candidate IDs:</span>
-            {['XYZ6A 01', 'XYZ7A 01', 'XYZ8A 01', 'XYZ9A 01', 'XYZ11A 01', 'ZPS6A 01'].map(id => (
+          {/* Quick Demo Test Pill */}
+          <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100 text-[11px] text-slate-500">
+            <span className="font-bold text-slate-400">Sample Candidate ID:</span>
+            {['XYZ6A 01'].map(id => (
               <button
                 key={id}
                 type="button"
