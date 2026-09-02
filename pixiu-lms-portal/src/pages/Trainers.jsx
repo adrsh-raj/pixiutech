@@ -77,6 +77,69 @@ export default function Trainers() {
   const isAkash = user?.username === 'akashsharma' || user?.related_id === 'TR-02' || user?.school_id === 'XYZ';
   const trainerSchoolId = isAkash ? 'XYZ' : 'ZPS';
 
+  // ==================== ALL REACT STATE HOOKS (DECLARED FIRST) ====================
+  const [activeTab, setActiveTab] = useState('trainers');
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [activeSessionId, setActiveSessionId] = useState(null);
+  
+  // End-of-Unit Student Reviews State
+  const [selectedReviewGrade, setSelectedReviewGrade] = useState('All');
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [editingReviewId, setEditingReviewId] = useState(null);
+  const [historyClassFilter, setHistoryClassFilter] = useState('All');
+
+  // Start Next Session Modal State
+  const [isNewSessionModalOpen, setIsNewSessionModalOpen] = useState(false);
+  const [newSessionModalData, setNewSessionModalData] = useState({
+    school_id: 'ZPS',
+    class_id: 'CLS-ZPS-6A',
+    class_grade: '6',
+    unit_code: 'Unit 2',
+    class_number: 'Class 1',
+    topic: 'Unit 2 (Class 1): The Arduino IDE - ',
+    notes: 'Hands-on robotics laboratory session.',
+    date: new Date().toISOString().split('T')[0],
+    time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+  });
+
+  // Security Modal for Deleting Trainer ("Type Name to Confirm")
+  const [trainerToDelete, setTrainerToDelete] = useState(null);
+  const [deleteConfirmationInput, setDeleteConfirmationInput] = useState('');
+  
+  // Project Evidence Upload Modal in Session
+  const [isEvidenceModalOpen, setIsEvidenceModalOpen] = useState(false);
+  const [selectedStudentForEvidence, setSelectedStudentForEvidence] = useState('');
+  const [projectTitle, setProjectTitle] = useState('Smart Obstacle Avoidance Robot');
+  const [projectScore, setProjectScore] = useState(10);
+  const [evidenceNote, setEvidenceNote] = useState('Clean breadboard wiring with ultrasonic sensor.');
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [filePreview, setFilePreview] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+
+  const [readDirectiveIds, setReadDirectiveIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem('pixiu_read_directives_trainer');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  const [reviewFormData, setReviewFormData] = useState({
+    student_id: 'ZPS6A 01',
+    class_grade: '6',
+    unit_code: 'Unit 1',
+    level: 'Level 0',
+    unit_title: 'Introduction to Robotics & Electronics',
+    score: 9.5,
+    rating: 5,
+    status: 'Mastered',
+    review: REVIEW_PRESETS[0],
+    trainer_name: user?.name || 'Vikas Pandey (Lead Instructor)'
+  });
+
+  // ==================== COMPUTED / MEMOIZED DATA ====================
   // Strict isolation: Akash sees ONLY Akash; Vikas sees ONLY Vikas; Admin sees ALL
   const visibleTrainers = useMemo(() => {
     if (isAdmin || user?.school_id === 'ALL') {
@@ -110,15 +173,6 @@ export default function Trainers() {
     return n.target_type === 'All_Trainers' || n.target_type === 'Universal';
   });
 
-  const [readDirectiveIds, setReadDirectiveIds] = useState(() => {
-    try {
-      const saved = localStorage.getItem('pixiu_read_directives_trainer');
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      return [];
-    }
-  });
-
   const markDirectiveRead = (id) => {
     const updated = Array.from(new Set([...readDirectiveIds, id]));
     setReadDirectiveIds(updated);
@@ -127,60 +181,6 @@ export default function Trainers() {
     } catch (e) {}
     toast.success('Directive acknowledged & marked as read!', 'Acknowledged');
   };
-  
-  // UI Tabs: 'trainers' | 'reviews' | 'history' | 'schedule'
-  const [activeTab, setActiveTab] = useState('trainers');
-  
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
-  const [activeSessionId, setActiveSessionId] = useState(null);
-  
-  // Start Next Session Modal State
-  const [isNewSessionModalOpen, setIsNewSessionModalOpen] = useState(false);
-  const [newSessionModalData, setNewSessionModalData] = useState({
-    school_id: 'ZPS',
-    class_id: 'CLS-ZPS-6A',
-    class_grade: '6',
-    unit_code: 'Unit 2',
-    class_number: 'Class 1',
-    topic: 'Unit 2 (Class 1): The Arduino IDE - ',
-    notes: 'Hands-on robotics laboratory session.',
-    date: new Date().toISOString().split('T')[0],
-    time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
-  });
-
-  // Security Modal for Deleting Trainer ("Type Name to Confirm")
-  const [trainerToDelete, setTrainerToDelete] = useState(null);
-  const [deleteConfirmationInput, setDeleteConfirmationInput] = useState('');
-  
-  // Project Evidence Upload Modal in Session
-  const [isEvidenceModalOpen, setIsEvidenceModalOpen] = useState(false);
-  const [selectedStudentForEvidence, setSelectedStudentForEvidence] = useState('');
-  const [projectTitle, setProjectTitle] = useState('Smart Obstacle Avoidance Robot');
-  const [projectScore, setProjectScore] = useState(10);
-  const [evidenceNote, setEvidenceNote] = useState('Clean breadboard wiring with ultrasonic sensor.');
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [filePreview, setFilePreview] = useState('');
-  const [isUploading, setIsUploading] = useState(false);
-  const [historyClassFilter, setHistoryClassFilter] = useState('All');
-
-  // ==================== END-OF-UNIT STUDENT REVIEWS STATE ====================
-  const [selectedReviewGrade, setSelectedReviewGrade] = useState('All');
-  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
-  const [editingReviewId, setEditingReviewId] = useState(null);
-
-  const [reviewFormData, setReviewFormData] = useState({
-    student_id: 'ZPS6A 01',
-    class_grade: '6',
-    unit_code: 'Unit 1',
-    level: 'Level 0',
-    unit_title: 'Introduction to Robotics & Electronics',
-    score: 9.5,
-    rating: 5,
-    status: 'Mastered',
-    review: REVIEW_PRESETS[0],
-    trainer_name: user?.name || 'Vikas Pandey (Lead Instructor)'
-  });
 
   const handleOpenReviewModal = (existingReview = null) => {
     if (existingReview && existingReview.id) {
