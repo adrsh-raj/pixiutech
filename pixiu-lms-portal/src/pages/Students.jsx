@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Search, Plus, MoreVertical, MessageCircle, Building2, X, FileText, ChevronRight, User, Award, Activity, Box, Trash2, Edit, Check, Phone, GraduationCap } from 'lucide-react';
+import { Search, Plus, MoreVertical, MessageCircle, Building2, X, FileText, ChevronRight, User, Award, Activity, Box, Trash2, Edit, Check, Phone, GraduationCap, Download } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { useToast } from '../context/ToastContext';
-import { generateStudentTranscriptPDF } from '../utils/transcriptGenerator';
+import { generateStudentTranscriptPDF, generateClassCohortTranscriptPDF } from '../utils/transcriptGenerator';
 import Modal from '../components/ui/Modal';
 
 const generateId = (schoolCode, cls, sec, roll) => {
@@ -245,12 +245,43 @@ export default function Students() {
           <h1 className="text-2xl font-bold text-slate-800">Student Directory & Academic Records</h1>
           <p className="text-slate-500">Manage enrolled student rosters, edit details, and track hands-on kit allocations.</p>
         </div>
-        <button 
-          onClick={() => setIsAddModalOpen(true)}
-          className="bg-pixiu-blue text-white px-5 py-2.5 rounded-lg font-medium flex items-center gap-2 hover:bg-blue-600 transition-colors shadow-sm cursor-pointer"
-        >
-          <Plus size={18} /> Enroll New Student
-        </button>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => {
+              const activeGrade = selectedClassFilter === 'All' ? '6' : selectedClassFilter.replace(/CLS-(?:ZPS|XYZ)-/i, '').replace('A', '');
+              const targetSchoolObj = schools.find(s => s.id === selectedSchool) || schools[0];
+              const cohortStudents = students.filter(s => {
+                const matchesSchool = selectedSchool === 'All' || s.school_id === selectedSchool;
+                const matchesClass = selectedClassFilter === 'All' || s.class_id === selectedClassFilter || s.class_id?.includes(selectedClassFilter);
+                return matchesSchool && matchesClass;
+              });
+
+              generateClassCohortTranscriptPDF({
+                classGrade: activeGrade,
+                classSection: 'A',
+                school: targetSchoolObj,
+                students: cohortStudents.length > 0 ? cohortStudents : students,
+                studentReviews,
+                projects,
+                curriculum,
+                getStudentAttendance,
+                userRole: 'admin'
+              });
+            }}
+            className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 rounded-lg font-bold flex items-center gap-2 transition-colors shadow-sm cursor-pointer text-xs"
+            title="Download Whole Class Cohort Progress & Assessment Report PDF"
+          >
+            <Download size={15} /> Download Class Report PDF
+          </button>
+
+          <button 
+            onClick={() => setIsAddModalOpen(true)}
+            className="bg-pixiu-blue text-white px-5 py-2.5 rounded-lg font-bold flex items-center gap-2 hover:bg-blue-600 transition-colors shadow-sm cursor-pointer text-xs"
+          >
+            <Plus size={16} /> Enroll New Student
+          </button>
+        </div>
       </div>
 
       {/* Filter and Search Bar */}

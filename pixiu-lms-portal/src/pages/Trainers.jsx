@@ -3,12 +3,13 @@ import {
   GraduationCap, Plus, Phone, Building2, Star, CheckCircle, Clock, X, Trash2, 
   Play, User, Users, Camera, Check, FileText, Upload, Image as ImageIcon, IndianRupee, 
   Calendar, AlertTriangle, ShieldAlert, Lock, Unlock, Bell, Send, History, 
-  CheckSquare, XSquare, ChevronRight, BookOpen, Megaphone, Edit3, Award, MessageSquare, Box
+  CheckSquare, XSquare, ChevronRight, BookOpen, Megaphone, Edit3, Award, MessageSquare, Box, Download
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import Modal from '../components/ui/Modal';
+import { generateClassCohortTranscriptPDF } from '../utils/transcriptGenerator';
 
 const REVIEW_PRESETS = [
   "Demonstrated exceptional understanding of breadboard power rails, series-parallel LEDs, and Ohm's Law current calculations.",
@@ -523,6 +524,33 @@ export default function Trainers() {
           <div className="flex justify-between items-center mb-1">
             <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Student Roster ({roster.length})</p>
             <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const grade = sessionClass ? sessionClass.grade : '6';
+                  generateClassCohortTranscriptPDF({
+                    classGrade: grade,
+                    classSection: sessionClass ? sessionClass.section : 'A',
+                    school: sessionSchool || 'Zenith Public School',
+                    students: roster,
+                    studentReviews,
+                    projects,
+                    curriculum,
+                    getStudentAttendance: (id) => {
+                      const records = (attendance || []).filter(a => a.student_id === id);
+                      if (!records.length) return 100;
+                      const present = records.filter(r => r.status === 'Present').length;
+                      return Math.round((present / records.length) * 100);
+                    },
+                    userRole: 'trainer'
+                  });
+                }}
+                className="text-[11px] font-bold text-pixiu-blue bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2.5 py-0.5 rounded-md cursor-pointer transition-colors inline-flex items-center gap-1"
+                title="Download whole class cohort progress & assessment report PDF"
+              >
+                <Download size={12} /> Class Report PDF
+              </button>
+
               <button
                 onClick={handleMarkAllPresent}
                 disabled={isLocked && !isAdmin}
