@@ -3,7 +3,7 @@ import { useSearchParams, Link } from 'react-router-dom';
 import { 
   ShieldCheck, CheckCircle2, AlertTriangle, Search, Download, 
   Award, Building2, User, Calendar, BookOpen, Sparkles, ExternalLink,
-  Cpu, Check, ArrowRight, ShieldAlert, FileText, Lock
+  Cpu, Check, ArrowRight, ShieldAlert, FileText, Lock, QrCode
 } from 'lucide-react';
 import { SEED_STUDENTS, SEED_SCHOOLS, SEED_STUDENT_REVIEWS, SEED_PROJECTS } from '../data/seedData';
 import { generateStudentTranscriptPDF } from '../utils/transcriptGenerator';
@@ -107,76 +107,95 @@ export default function Verify() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-blue-600 selection:text-white">
-      {/* Background Glow */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-96 bg-gradient-to-b from-blue-600/15 via-indigo-600/5 to-transparent blur-3xl pointer-events-none"></div>
-
-      {/* Official Header */}
-      <header className="border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-md sticky top-0 z-30 px-4 sm:px-8 py-4">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
+    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans selection:bg-blue-600 selection:text-white">
+      
+      {/* Official Top Header (Identical to Admin Console & School Portal) */}
+      <header className="bg-white border-b border-slate-200 h-16 px-4 sm:px-8 flex items-center justify-between sticky top-0 z-40 shadow-xs">
+        <div className="max-w-6xl w-full mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="bg-white px-2.5 py-1 rounded-lg border border-slate-700 shadow-sm flex items-center">
+            <div className="bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs flex items-center">
               <img src="/img/logo.png" alt="Pixiu Tech" className="h-6 w-auto object-contain" />
             </div>
             <div>
-              <span className="text-[10px] font-black uppercase tracking-widest text-pixiu-blue block leading-tight">
-                Central Registry • Credential Verification
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-pixiu-blue block leading-none">
+                Central Registry Verification
               </span>
-              <h1 className="text-sm font-bold text-white tracking-tight">
-                Pixiu Tech Institutional Excellence Suite
+              <h1 className="text-sm font-bold text-slate-900 tracking-tight leading-tight mt-0.5">
+                Official Credential Authentication
               </h1>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 text-xs text-slate-400 font-mono">
+          <div className="flex items-center gap-2 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span className="hidden sm:inline">Registry Online: </span>2026-27
+            <span>Registry Live • Session 2026-27</span>
           </div>
         </div>
       </header>
 
       {/* Main Container */}
-      <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 py-10 relative z-10 space-y-8">
+      <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 py-8 relative z-10 space-y-6">
         
-        {/* Verification Hero Banner */}
-        <div className="text-center space-y-3">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-400 text-xs font-bold uppercase tracking-wider">
-            <ShieldCheck size={14} /> Official Credential Registry
+        {/* Verification Hero Banner (Exact Dark Slate Institutional Style) */}
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-7 text-white shadow-sm relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-80 h-80 bg-pixiu-blue/10 rounded-full blur-3xl pointer-events-none"></div>
+
+          <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-[11px] font-black uppercase tracking-widest text-pixiu-blue px-2.5 py-0.5 bg-blue-500/10 border border-blue-500/20 rounded-md">
+                  Institutional Registry
+                </span>
+                <span className="text-[11px] text-emerald-400 font-bold flex items-center gap-1">
+                  <ShieldCheck size={13} /> Official Cryptographic Verification
+                </span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                Verify STEM & Robotics Certificate
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-xl leading-relaxed">
+                Validate accredited candidate transcripts, hardware capstone evaluations, and certified instructor signatures in real time.
+              </p>
+            </div>
+
+            <div className="shrink-0 bg-slate-950/80 border border-slate-800 rounded-xl p-3 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-pixiu-blue">
+                <QrCode size={20} />
+              </div>
+              <div>
+                <div className="text-[9px] uppercase tracking-wider text-slate-400 font-bold">QR Scanned Portal</div>
+                <div className="text-xs font-bold text-white font-mono">pixiutech.com/verify</div>
+              </div>
+            </div>
           </div>
-          <h2 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
-            Verify Student STEM & Robotics Certificate
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-400 max-w-xl mx-auto leading-relaxed">
-            Enter candidate Student Roll ID or Certificate Reference Number to authenticate formal STEM competency accreditation and practical lab transcripts.
-          </p>
         </div>
 
-        {/* Search Box */}
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-2xl backdrop-blur-sm">
+        {/* Search Box (Clean White Card, Slate Border, Soft Eye Engineering) */}
+        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
           <form onSubmit={handleSearchSubmit} className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
-              <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+              <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
                 value={inputStudentId}
                 onChange={(e) => setInputStudentId(e.target.value)}
-                placeholder="Enter Student ID (e.g. XYZ6A 01, ZPS6A 01, XYZ7A 01)"
-                className="w-full pl-10 pr-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-white font-mono text-sm placeholder:text-slate-600 focus:outline-none focus:border-blue-500 transition-colors uppercase font-bold"
+                placeholder="Enter Student Roll ID (e.g. XYZ6A 01, ZPS6A 01, XYZ7A 01)"
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-mono text-sm placeholder:text-slate-400 focus:outline-none focus:border-pixiu-blue focus:bg-white transition-all uppercase font-bold"
               />
             </div>
             <button
               type="submit"
               disabled={isSearching}
-              className="px-6 py-3 bg-pixiu-blue hover:bg-blue-600 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 active:scale-98 shrink-0"
+              className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs uppercase tracking-wider rounded-lg transition-all cursor-pointer flex items-center justify-center gap-2 shadow-xs active:scale-98 shrink-0"
             >
               <ShieldCheck size={16} />
               {isSearching ? 'Verifying...' : 'Verify Credential'}
             </button>
           </form>
 
-          {/* Quick Demo Student Pills */}
-          <div className="flex flex-wrap items-center gap-2 mt-4 pt-3 border-t border-slate-800/80 text-[11px] text-slate-400">
-            <span className="font-semibold text-slate-500">Quick Test IDs:</span>
+          {/* Quick Demo Test Pills */}
+          <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-slate-100 text-[11px] text-slate-500">
+            <span className="font-bold text-slate-400">Sample Candidate IDs:</span>
             {['XYZ6A 01', 'XYZ7A 01', 'XYZ8A 01', 'XYZ9A 01', 'XYZ11A 01', 'ZPS6A 01'].map(id => (
               <button
                 key={id}
@@ -186,10 +205,10 @@ export default function Verify() {
                   setActiveQuery(id);
                   setSearchParams({ id });
                 }}
-                className={`px-2 py-0.5 rounded font-mono font-bold transition-all cursor-pointer ${
+                className={`px-2.5 py-1 rounded-md font-mono font-bold transition-all cursor-pointer text-xs ${
                   canonicalQuery === id.toLowerCase().replace(/[^a-z0-9]/g, '')
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                    ? 'bg-pixiu-blue text-white shadow-xs'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
                 }`}
               >
                 {id}
@@ -198,92 +217,92 @@ export default function Verify() {
           </div>
         </div>
 
-        {/* RESULT SECTION: MATCH FOUND */}
+        {/* RESULT SECTION: MATCH FOUND (Clean White Card, Emerald Accents) */}
         {matchedStudent && (
-          <div className="bg-slate-900 border-2 border-emerald-500/50 rounded-2xl overflow-hidden shadow-2xl shadow-emerald-500/10 animate-in fade-in zoom-in-95 duration-300">
+          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm animate-in fade-in duration-200">
             
             {/* Verified Header Strip */}
-            <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-slate-900 p-5 sm:p-6 border-b border-emerald-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="bg-emerald-50/70 border-b border-emerald-100 p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-center gap-3.5">
-                <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0">
+                <div className="w-12 h-12 rounded-xl bg-emerald-100 border border-emerald-200 flex items-center justify-center text-emerald-600 shrink-0">
                   <ShieldCheck size={26} />
                 </div>
                 <div>
-                  <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400 flex items-center gap-1">
-                    <CheckCircle2 size={12} /> Authentic Verified Credential
+                  <span className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-800 flex items-center gap-1">
+                    <CheckCircle2 size={12} /> Official Accredited Credential
                   </span>
-                  <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                  <h3 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
                     {matchedStudent.name}
                   </h3>
-                  <p className="text-xs text-slate-400 font-mono mt-0.5">
-                    ID: <b className="text-white font-bold">{matchedStudent.student_id}</b> • Class {matchedStudent.class_id ? matchedStudent.class_id.replace('CLS-', '') : 'Robotics Cohort'}
+                  <p className="text-xs text-slate-600 font-mono mt-0.5">
+                    Candidate ID: <b className="text-slate-900 font-bold">{matchedStudent.student_id}</b> • Class {matchedStudent.class_id ? matchedStudent.class_id.replace('CLS-', '') : 'Robotics Cohort'}
                   </p>
                 </div>
               </div>
 
-              <div className="flex sm:flex-col items-end justify-between sm:justify-center border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-800">
-                <span className="px-3 py-1 rounded-full text-xs font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 uppercase">
+              <div className="flex sm:flex-col items-end justify-between sm:justify-center border-t sm:border-t-0 pt-2 sm:pt-0 border-emerald-200/60">
+                <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 uppercase">
                   {matchedStudent.status || 'Certified Graduate'}
                 </span>
                 <span className="text-[10px] text-slate-500 font-mono mt-1">
-                  Cert ID: PIXIU-{(matchedStudent.school_id || 'SCH').toUpperCase()}-{(matchedStudent.student_id || '').replace(/\s+/g, '')}-2026
+                  Cert Ref: PIXIU-{(matchedStudent.school_id || 'SCH').toUpperCase()}-{(matchedStudent.student_id || '').replace(/\s+/g, '')}-2026
                 </span>
               </div>
             </div>
 
-            {/* Credential Data Grid */}
+            {/* Credential 4 KPI Tiles (Exact Admin Style) */}
             <div className="p-6 space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 
-                <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800">
-                  <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Partner School</div>
-                  <div className="text-sm font-bold text-white mt-1 flex items-center gap-1.5 truncate">
-                    <Building2 size={14} className="text-pixiu-blue shrink-0" />
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Partner School</div>
+                  <div className="text-sm font-bold text-slate-800 mt-1 flex items-center gap-1.5 truncate">
+                    <Building2 size={15} className="text-pixiu-blue shrink-0" />
                     <span className="truncate">{matchedSchool?.name}</span>
                   </div>
                 </div>
 
-                <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800">
-                  <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Accredited Level</div>
-                  <div className="text-sm font-bold text-pixiu-blue mt-1 flex items-center gap-1.5">
-                    <Award size={14} className="shrink-0" />
+                <div className="bg-blue-50/60 p-4 rounded-xl border border-blue-100">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-blue-600">Accredited Level</div>
+                  <div className="text-sm font-bold text-blue-900 mt-1 flex items-center gap-1.5">
+                    <Award size={15} className="shrink-0 text-blue-600" />
                     <span>{matchedStudent.tech_level || 'Level 5 Master'}</span>
                   </div>
                 </div>
 
-                <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800">
-                  <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Practical Score</div>
-                  <div className="text-sm font-bold text-emerald-400 mt-1 flex items-center gap-1.5">
-                    <Sparkles size={14} className="shrink-0" />
+                <div className="bg-emerald-50/60 p-4 rounded-xl border border-emerald-100">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">Practical Score</div>
+                  <div className="text-sm font-bold text-emerald-900 mt-1 flex items-center gap-1.5">
+                    <Sparkles size={15} className="shrink-0 text-emerald-600" />
                     <span>10 / 10 (Distinction)</span>
                   </div>
                 </div>
 
-                <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800">
-                  <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Lab Attendance</div>
-                  <div className="text-sm font-bold text-indigo-400 mt-1 flex items-center gap-1.5">
-                    <Check size={14} className="shrink-0" />
+                <div className="bg-indigo-50/60 p-4 rounded-xl border border-indigo-100">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-600">Lab Attendance</div>
+                  <div className="text-sm font-bold text-indigo-900 mt-1 flex items-center gap-1.5">
+                    <Check size={15} className="shrink-0 text-indigo-600" />
                     <span>100% Practical</span>
                   </div>
                 </div>
 
               </div>
 
-              {/* Verified Hardware Prototypes Built */}
+              {/* Verified Hardware Builds */}
               {studentProjects.length > 0 && (
                 <div className="space-y-3">
-                  <div className="text-xs font-extrabold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                  <div className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
                     <Cpu size={14} className="text-pixiu-blue" />
                     <span>Verified Laboratory Hardware Builds</span>
                   </div>
                   <div className="space-y-2">
                     {studentProjects.map(prj => (
-                      <div key={prj.id} className="p-3.5 bg-slate-950 border border-slate-800 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div key={prj.id} className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         <div>
-                          <h4 className="font-bold text-white text-xs sm:text-sm">{prj.title}</h4>
-                          <p className="text-[11px] text-slate-400 mt-0.5">{prj.evidence_note}</p>
+                          <h4 className="font-bold text-slate-800 text-xs sm:text-sm">{prj.title}</h4>
+                          <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">{prj.evidence_note}</p>
                         </div>
-                        <span className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 uppercase self-start sm:self-auto shrink-0">
+                        <span className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 uppercase self-start sm:self-auto shrink-0">
                           Score: {prj.score || 10}/10 • {prj.status || 'Verified'}
                         </span>
                       </div>
@@ -292,21 +311,21 @@ export default function Verify() {
                 </div>
               )}
 
-              {/* Verification Authority Strip */}
-              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs">
-                <div className="space-y-1">
-                  <div className="text-slate-400 font-medium">
-                    Assigned Trainer / Faculty: <b className="text-white">{matchedStudent.school_id === 'XYZ' ? 'Akash Sharma' : 'Vikas Pandey'}</b>
+              {/* Authority Verification Bar & PDF Action */}
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs">
+                <div className="space-y-0.5">
+                  <div className="text-slate-600 font-medium">
+                    Assigned Trainer / Faculty: <b className="text-slate-900">{matchedStudent.school_id === 'XYZ' ? 'Akash Sharma' : 'Vikas Pandey'}</b>
                   </div>
-                  <div className="text-[11px] text-slate-500 font-mono">
-                    Official Registry Status: <b>CRYPTOGRAPHICALLY AUTHENTICATED</b>
+                  <div className="text-[11px] text-slate-400 font-mono">
+                    Security Seal: <b>CRYPTOGRAPHICALLY SIGNED & VERIFIED</b>
                   </div>
                 </div>
 
                 {/* Download PDF Button */}
                 <button
                   onClick={handleDownloadTranscript}
-                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 active:scale-98 shrink-0"
+                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 shadow-xs active:scale-98 shrink-0"
                 >
                   <Download size={15} />
                   <span>Download Verified Transcript (PDF)</span>
@@ -318,50 +337,50 @@ export default function Verify() {
           </div>
         )}
 
-        {/* RESULT SECTION: NOT FOUND */}
+        {/* RESULT SECTION: NOT FOUND (Clean Light Card) */}
         {activeQuery && !matchedStudent && !isSearching && (
-          <div className="bg-slate-900 border border-rose-500/40 rounded-2xl p-6 sm:p-8 text-center space-y-4 shadow-xl">
-            <div className="w-14 h-14 mx-auto rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400">
+          <div className="bg-white border border-rose-200 rounded-2xl p-6 sm:p-8 text-center space-y-4 shadow-sm">
+            <div className="w-14 h-14 mx-auto rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600">
               <ShieldAlert size={28} />
             </div>
             <div className="space-y-1">
-              <h3 className="text-xl font-bold text-white">No Credential Record Found</h3>
-              <p className="text-xs text-slate-400 max-w-md mx-auto">
-                No active student certificate matches <b className="text-rose-400 font-mono uppercase">"{activeQuery}"</b> in the Pixiu Tech Central Registry.
+              <h3 className="text-lg font-bold text-slate-900">No Credential Record Found</h3>
+              <p className="text-xs text-slate-500 max-w-md mx-auto">
+                No active student certificate matches <b className="text-rose-600 font-mono uppercase">"{activeQuery}"</b> in the Pixiu Tech Central Registry.
               </p>
             </div>
-            <p className="text-[11px] text-slate-500 max-w-lg mx-auto leading-relaxed">
-              Please double check the Student ID on the printed badge or transcript. For student credential inquiries, contact Pixiu Central Administration at <b>support@pixiutech.com</b>.
+            <p className="text-[11px] text-slate-400 max-w-lg mx-auto leading-relaxed">
+              Please check the Student ID printed on the physical badge or certificate. For student record assistance, contact <b>support@pixiutech.com</b>.
             </p>
           </div>
         )}
 
-        {/* Instructions / Institutional Trust Info */}
+        {/* Instructions / Trust Info Cards */}
         {!matchedStudent && !activeQuery && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-slate-400">
-            <div className="bg-slate-900/60 border border-slate-800 p-5 rounded-xl space-y-2">
-              <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-pixiu-blue flex items-center justify-center font-bold">1</div>
-              <h4 className="font-bold text-white text-sm">Scan Certificate QR</h4>
-              <p className="leading-relaxed">Scan the official QR code located at the bottom of the student transcript using any mobile camera.</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-slate-600">
+            <div className="bg-white border border-slate-200 p-5 rounded-xl space-y-2 shadow-2xs">
+              <div className="w-8 h-8 rounded-lg bg-blue-100 text-pixiu-blue flex items-center justify-center font-bold">1</div>
+              <h4 className="font-bold text-slate-800 text-sm">Scan Certificate QR</h4>
+              <p className="leading-relaxed text-slate-500">Scan the official QR code located at the bottom of the student certificate with any mobile camera.</p>
             </div>
-            <div className="bg-slate-900/60 border border-slate-800 p-5 rounded-xl space-y-2">
-              <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center font-bold">2</div>
-              <h4 className="font-bold text-white text-sm">Instant Authentication</h4>
-              <p className="leading-relaxed">Our registry queries the central database in real time to verify candidate identity and lab scores.</p>
+            <div className="bg-white border border-slate-200 p-5 rounded-xl space-y-2 shadow-2xs">
+              <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold">2</div>
+              <h4 className="font-bold text-slate-800 text-sm">Instant Authentication</h4>
+              <p className="leading-relaxed text-slate-500">The registry queries our institutional database in real time to verify candidate identity and lab scores.</p>
             </div>
-            <div className="bg-slate-900/60 border border-slate-800 p-5 rounded-xl space-y-2">
-              <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-bold">3</div>
-              <h4 className="font-bold text-white text-sm">Download Verified PDF</h4>
-              <p className="leading-relaxed">Generate official watermarked and signed transcripts directly from the authenticated verification record.</p>
+            <div className="bg-white border border-slate-200 p-5 rounded-xl space-y-2 shadow-2xs">
+              <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold">3</div>
+              <h4 className="font-bold text-slate-800 text-sm">Download Verified PDF</h4>
+              <p className="leading-relaxed text-slate-500">Generate official signed transcripts directly from the authenticated registry record.</p>
             </div>
           </div>
         )}
 
       </main>
 
-      {/* Unlinked Footer */}
-      <footer className="border-t border-slate-800/80 py-6 text-center text-xs text-slate-500 font-medium">
-        Pixiu Tech LLP • Official STEM, Robotics & AI Institutional Certification Registry • Unauthorized duplication is prohibited.
+      {/* Unlinked Light Footer */}
+      <footer className="border-t border-slate-200 py-6 text-center text-xs text-slate-400 font-medium">
+        Pixiu Tech LLP • Official STEM, Robotics & AI Institutional Certification Registry • Verified Credential Portal
       </footer>
     </div>
   );
