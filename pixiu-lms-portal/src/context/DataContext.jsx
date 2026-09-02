@@ -3,7 +3,7 @@ import {
   SEED_SCHOOLS, SEED_CLASSES, SEED_STUDENTS, SEED_TRAINERS, 
   SEED_BILLING, SEED_SESSIONS, SEED_ATTENDANCE, SEED_INVENTORY, 
   SEED_ALERTS, SEED_CURRICULUM, SEED_CONTENT, SEED_NOTIFICATIONS,
-  SEED_STUDENT_REVIEWS, CLASS_KITS
+  SEED_STUDENT_REVIEWS, SEED_PROJECTS, CLASS_KITS
 } from '../data/seedData';
 
 const DataContext = createContext();
@@ -120,27 +120,20 @@ export function DataProvider({ children }) {
     }
   });
   const [comms, setComms] = useState(() => safeGetItem('pixiu_comms', []));
-  const [projects, setProjects] = useState(() => safeGetItem('pixiu_projects', []));
+  const [projects, setProjects] = useState(() => {
+    const saved = safeGetItem('pixiu_projects', null);
+    if (!saved || !saved.length) return SEED_PROJECTS;
+    return saved;
+  });
   const [alerts, setAlerts] = useState(() => safeGetItem('pixiu_alerts', SEED_ALERTS));
   const [notifications, setNotifications] = useState(() => safeGetItem('pixiu_notifications', SEED_NOTIFICATIONS));
   const [studentReviews, setStudentReviews] = useState(() => {
     try {
-      const raw = safeGetItem('pixiu_student_reviews', []);
-      const clean = (raw || []).filter(r => 
-        !['REV-001', 'REV-002', 'REV-003', 'REV-004'].includes(r.id) &&
-        r.verified_date !== 'Curriculum Baseline' &&
-        !r.review?.includes('Demonstrated exceptional understanding') &&
-        !r.review?.includes('Successfully calibrated analog') &&
-        !r.review?.includes('Accurate transistor switching') &&
-        !r.review?.includes('Superb conditional logic') &&
-        !r.review?.includes('Firmware pin modes') &&
-        !r.review?.includes('Integrated 2WD robotic chassis') &&
-        !r.review?.includes('Final autonomous exhibition')
-      );
-      localStorage.setItem('pixiu_student_reviews', JSON.stringify(clean));
-      return clean;
+      const raw = safeGetItem('pixiu_student_reviews', null);
+      if (!raw || !raw.length) return SEED_STUDENT_REVIEWS;
+      return raw;
     } catch (e) {
-      return [];
+      return SEED_STUDENT_REVIEWS;
     }
   });
   const [loading, setLoading] = useState(false);

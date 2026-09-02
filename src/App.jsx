@@ -9,6 +9,7 @@ import Login from './pages/Login.jsx'
 import Hub from './pages/Hub.jsx'
 import PortalBridge from './pages/PortalBridge.jsx'
 import Contact from './pages/Contact.jsx'
+import Verify from './pages/Verify.jsx'
 import NotFound from './pages/NotFound.jsx'
 
 export default function App() {
@@ -24,6 +25,7 @@ export default function App() {
           <Route path="/portal" element={<PortalBridge />} />
           <Route path="/hub" element={<PortalBridge />} />
           <Route path="/login" element={<PortalBridge />} />
+          <Route path="/verify" element={<Verify />} />
           <Route path="/contact" element={<Contact />} />
           {/* Redirects for deleted pages */}
           <Route path="/curriculum" element={<Navigate to="/solutions" replace />} />
