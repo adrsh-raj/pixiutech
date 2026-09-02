@@ -244,46 +244,46 @@ function initializeDatabase() {
       if (row && row.count === 0) {
         console.log("🔐 Seeding Authentication Users with BCrypt Password Hashes...");
 
-        // Generate BCrypt Hashes for Requested Credentials
-        const adminHash = await bcrypt.hash('Adarsg@pixiutech', 10);
-        const trainerHash = await bcrypt.hash('Vikad@pixiutech', 10);
-        
-        const studentHash6 = await bcrypt.hash('ZPSzenith6@hata', 10);
-        const studentHash7 = await bcrypt.hash('ZPSzenith7@hata', 10);
-        const studentHash8 = await bcrypt.hash('ZPSzenith8@hata', 10);
-        const studentHash9 = await bcrypt.hash('ZPSzenith9@hata', 10);
-        const studentHash11 = await bcrypt.hash('ZPSzenith11@hata', 10);
+        // Generate BCrypt Hashes using environment variables
+        const adminPass = process.env.ADMIN_SEED_PASS || 'Adarsg@pixiutech';
+        const trainerPass = process.env.TRAINER_SEED_PASS || 'Vikad@pixiutech';
+        const s6Pass = process.env.STUDENT_SEED_PASS_6 || 'ZPSzenith6@hata';
+        const s7Pass = process.env.STUDENT_SEED_PASS_7 || 'ZPSzenith7@hata';
+        const s8Pass = process.env.STUDENT_SEED_PASS_8 || 'ZPSzenith8@hata';
+        const s9Pass = process.env.STUDENT_SEED_PASS_9 || 'ZPSzenith9@hata';
+        const s11Pass = process.env.STUDENT_SEED_PASS_11 || 'ZPSzenith11@hata';
+
+        const adminHash = await bcrypt.hash(adminPass, 10);
+        const trainerHash = await bcrypt.hash(trainerPass, 10);
+        const studentHash6 = await bcrypt.hash(s6Pass, 10);
+        const studentHash7 = await bcrypt.hash(s7Pass, 10);
+        const studentHash8 = await bcrypt.hash(s8Pass, 10);
+        const studentHash9 = await bcrypt.hash(s9Pass, 10);
+        const studentHash11 = await bcrypt.hash(s11Pass, 10);
 
         const uStmt = db.prepare("INSERT INTO users VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
         
-        // 1. Super Admin (Username: adarshraj / Password: Adarsg@pixiutech)
+        // 1. Super Admin
         uStmt.run('USR-ADMIN', 'adarshraj', adminHash, 'admin', 'ADM-01', 'Adarsh Raj (Founder & Admin)', 'ALL', new Date().toISOString());
-        // Also keep 'admin' alias
         uStmt.run('USR-ADMIN-ALT', 'admin', adminHash, 'admin', 'ADM-01', 'Adarsh Raj (Founder & Admin)', 'ALL', new Date().toISOString());
 
-        // 2. Primary Trainer Vikas Pandey (Username: vikaspandey / Password: Vikad@pixiutech)
+        // 2. Primary Trainer Vikas Pandey
         uStmt.run('USR-TR01', 'vikaspandey', trainerHash, 'trainer', 'TR-01', 'Vikas Pandey', 'ZPS', new Date().toISOString());
-        // Also keep 'TR-01' alias
         uStmt.run('USR-TR01-ALT', 'TR-01', trainerHash, 'trainer', 'TR-01', 'Vikas Pandey', 'ZPS', new Date().toISOString());
         
-        // 3. Seed student logins for ALL 25 students with class-specific passwords
-        // Class 6: ZPSzenith6@hata
+        // 3. Seed student logins for ALL 25 students
         ['ZPS6A 01', 'ZPS6A 02', 'ZPS6A 03', 'ZPS6A 04', 'ZPS6A 05'].forEach(sId => {
           uStmt.run(`USR-${sId.replace(/\s+/g, '')}`, sId, studentHash6, 'student', sId, `Student ${sId}`, 'ZPS', new Date().toISOString());
         });
-        // Class 7: ZPSzenith7@hata
         ['ZPS7A 01', 'ZPS7A 02', 'ZPS7A 03', 'ZPS7A 04', 'ZPS7A 05'].forEach(sId => {
           uStmt.run(`USR-${sId.replace(/\s+/g, '')}`, sId, studentHash7, 'student', sId, `Student ${sId}`, 'ZPS', new Date().toISOString());
         });
-        // Class 8: ZPSzenith8@hata
         ['ZPS8A 01', 'ZPS8A 02', 'ZPS8A 03', 'ZPS8A 04', 'ZPS8A 05'].forEach(sId => {
           uStmt.run(`USR-${sId.replace(/\s+/g, '')}`, sId, studentHash8, 'student', sId, `Student ${sId}`, 'ZPS', new Date().toISOString());
         });
-        // Class 9: ZPSzenith9@hata
         ['ZPS9A 01', 'ZPS9A 02', 'ZPS9A 03', 'ZPS9A 04', 'ZPS9A 05'].forEach(sId => {
           uStmt.run(`USR-${sId.replace(/\s+/g, '')}`, sId, studentHash9, 'student', sId, `Student ${sId}`, 'ZPS', new Date().toISOString());
         });
-        // Class 11: ZPSzenith11@hata
         ['ZPS11A 01', 'ZPS11A 02', 'ZPS11A 03', 'ZPS11A 04', 'ZPS11A 05'].forEach(sId => {
           uStmt.run(`USR-${sId.replace(/\s+/g, '')}`, sId, studentHash11, 'student', sId, `Student ${sId}`, 'ZPS', new Date().toISOString());
         });
