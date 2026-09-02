@@ -661,9 +661,13 @@ export default function StudentPortal() {
                 <span className="text-[10px] sm:text-[11px] bg-slate-800 border border-slate-700 text-slate-300 px-2 py-0.5 rounded-md">
                   Class: <strong className="text-white">{studentGrade}A</strong>
                 </span>
-                <span className="text-[10px] sm:text-[11px] bg-slate-800 border border-slate-700 text-slate-300 px-2 py-0.5 rounded-md font-mono">
-                  Kit: <strong className="text-blue-400">{student.assigned_kit_id || 'KIT-ZPS-01'}</strong>
-                </span>
+                <a 
+                  href="#hardware-kit-section" 
+                  className="text-[10px] sm:text-[11px] bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-blue-400 text-slate-300 px-2.5 py-0.5 rounded-md font-mono transition-colors flex items-center gap-1 cursor-pointer"
+                  title="Click to view assigned kit & component parts"
+                >
+                  Kit: <strong className="text-blue-400">{student.assigned_kit_id || 'KIT-ZPS-01'}</strong> 📦
+                </a>
               </div>
             </div>
           </div>
