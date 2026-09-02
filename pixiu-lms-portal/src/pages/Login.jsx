@@ -14,7 +14,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [selectedRoleTab, setSelectedRoleTab] = useState('student'); // 'student' | 'trainer' | 'admin'
+  const [selectedRoleTab, setSelectedRoleTab] = useState('student'); // 'student' | 'trainer' | 'school'
 
   const handleRolePreset = (role) => {
     setSelectedRoleTab(role);
@@ -33,6 +33,8 @@ export default function Login() {
       toast.success(`Welcome back, ${res.user.name || res.user.username}!`, 'Authenticated');
       if (res.user.role === 'student') {
         navigate('/student-portal');
+      } else if (res.user.role === 'school') {
+        navigate('/school-portal');
       } else if (res.user.role === 'trainer') {
         navigate('/trainers');
       } else {
@@ -59,7 +61,7 @@ export default function Login() {
           <p className="text-[11px] text-slate-400 font-medium mt-0.5">Sign in to your learning & management portal</p>
         </div>
 
-        {/* Clean 3 Role Selector Tabs */}
+        {/* Clean 3 Role Selector Tabs: Student, Trainer/Faculty, School Portal */}
         <div className="grid grid-cols-3 gap-1 p-1 bg-slate-950 rounded-xl border border-slate-800 mb-5">
           <button
             type="button"
@@ -82,19 +84,19 @@ export default function Login() {
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            <User size={14} /> Trainer
+            <User size={14} /> Trainer / Faculty
           </button>
 
           <button
             type="button"
-            onClick={() => handleRolePreset('admin')}
+            onClick={() => handleRolePreset('school')}
             className={`py-2 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-              selectedRoleTab === 'admin' 
+              selectedRoleTab === 'school' 
                 ? 'bg-pixiu-blue text-white shadow-sm' 
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            <ShieldCheck size={14} /> Admin
+            <ShieldCheck size={14} /> School
           </button>
         </div>
 
@@ -109,7 +111,7 @@ export default function Login() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1.5">
-              {selectedRoleTab === 'student' ? 'Student ID' : selectedRoleTab === 'trainer' ? 'Trainer ID' : 'Username'}
+              {selectedRoleTab === 'student' ? 'Student ID' : selectedRoleTab === 'school' ? 'School ID' : 'Trainer / Admin ID'}
             </label>
             <div className="relative">
               <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
@@ -117,7 +119,13 @@ export default function Login() {
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder={selectedRoleTab === 'student' ? 'Enter Student ID' : selectedRoleTab === 'trainer' ? 'Enter Trainer ID' : 'Enter Username'}
+                placeholder={
+                  selectedRoleTab === 'student' 
+                    ? 'e.g. ZPS6A 01 or XYZ6A 01' 
+                    : selectedRoleTab === 'school'
+                    ? 'e.g. ZPS2026 or XYZ2026'
+                    : 'e.g. vikaspandey, akashsharma, or admin'
+                }
                 autoCapitalize="none"
                 autoCorrect="off"
                 required

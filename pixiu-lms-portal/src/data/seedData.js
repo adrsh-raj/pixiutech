@@ -1,18 +1,28 @@
 // Master Initial Seed Data for Multi-School Pixiu Tech OS
 
 export const SEED_SCHOOLS = [
-  { id: 'ZPS', name: 'Zenith Public School', code: 'ZPS', city: 'Hata', tier: 'Tier 2 Partner', status: 'Active', contract_type: 'Full STEM Lab Suite', principal_name: 'Dr. R.K. Mishra', principal_phone: '+91 94151 22334', lab_room: 'Block B - Innovation Lab 102', enrolled_classes: ['6A', '7A', '8A', '9A', '11A'], created_at: '2026-08-01' }
+  { id: 'ZPS', name: 'Zenith Public School', code: 'ZPS', city: 'Hata', tier: 'Tier 2 Partner', status: 'Active', contract_type: 'Full STEM Lab Suite', principal_name: 'Dr. R.K. Mishra', principal_phone: '+91 94151 22334', lab_room: 'Block B - Innovation Lab 102', enrolled_classes: ['6A', '7A', '8A', '9A', '11A'], created_at: '2026-08-01', lead_trainer: 'Vikas Pandey', trainer_id: 'TR-01' },
+  { id: 'XYZ', name: 'XYZ Academy (Pilot Lab)', code: 'XYZ', city: 'Gorakhpur', tier: 'Tier 1 Partner', status: 'Active', contract_type: 'Robotics & STEM Lab Suite', principal_name: 'Prof. S.N. Verma', principal_phone: '+91 94151 88776', lab_room: 'Block C - Advanced Robotics Lab 204', enrolled_classes: ['6A', '7A', '8A', '9A', '11A'], created_at: '2026-08-15', lead_trainer: 'Akash Sharma', trainer_id: 'TR-02' }
 ];
 
 export const SEED_CLASSES = [
+  // Zenith Public School Classes
   { id: 'CLS-ZPS-6A', school_id: 'ZPS', grade: '6', section: 'A', stream: 'Robotics & Foundation', student_count: 5, lead_trainer_id: 'TR-01', day: 'Friday', time_slot: '09:00 AM - 10:30 AM' },
   { id: 'CLS-ZPS-7A', school_id: 'ZPS', grade: '7', section: 'A', stream: 'Robotics & Logic Circuits', student_count: 5, lead_trainer_id: 'TR-01', day: 'Friday', time_slot: '10:45 AM - 12:15 PM' },
   { id: 'CLS-ZPS-8A', school_id: 'ZPS', grade: '8', section: 'A', stream: 'Robotics & Microcontrollers', student_count: 5, lead_trainer_id: 'TR-01', day: 'Saturday', time_slot: '09:00 AM - 10:30 AM' },
   { id: 'CLS-ZPS-9A', school_id: 'ZPS', grade: '9', section: 'A', stream: 'IoT & Embedded Sensors', student_count: 5, lead_trainer_id: 'TR-01', day: 'Saturday', time_slot: '10:45 AM - 12:15 PM' },
   { id: 'CLS-ZPS-11A', school_id: 'ZPS', grade: '11', section: 'A', stream: 'AI Vision & Autonomous Robotics', student_count: 5, lead_trainer_id: 'TR-01', day: 'Saturday', time_slot: '01:00 PM - 02:30 PM' },
+
+  // XYZ Academy Classes (4 Students Each)
+  { id: 'CLS-XYZ-6A', school_id: 'XYZ', grade: '6', section: 'A', stream: 'Robotics & Electronic Basics', student_count: 4, lead_trainer_id: 'TR-02', day: 'Monday', time_slot: '09:00 AM - 10:30 AM' },
+  { id: 'CLS-XYZ-7A', school_id: 'XYZ', grade: '7', section: 'A', stream: 'Robotics & Sensory Actuation', student_count: 4, lead_trainer_id: 'TR-02', day: 'Monday', time_slot: '10:45 AM - 12:15 PM' },
+  { id: 'CLS-XYZ-8A', school_id: 'XYZ', grade: '8', section: 'A', stream: 'Autonomous Mobile Robotics', student_count: 4, lead_trainer_id: 'TR-02', day: 'Tuesday', time_slot: '09:00 AM - 10:30 AM' },
+  { id: 'CLS-XYZ-9A', school_id: 'XYZ', grade: '9', section: 'A', stream: 'Opto-Electronics & Display Systems', student_count: 4, lead_trainer_id: 'TR-02', day: 'Tuesday', time_slot: '10:45 AM - 12:15 PM' },
+  { id: 'CLS-XYZ-11A', school_id: 'XYZ', grade: '11', section: 'A', stream: 'Laser Optics & Capstone Robotics', student_count: 4, lead_trainer_id: 'TR-02', day: 'Tuesday', time_slot: '01:00 PM - 02:30 PM' },
 ];
 
 export const SEED_STUDENTS = [
+  // ==================== ZENITH PUBLIC SCHOOL (ZPS) ====================
   // Class 6A
   { id: 'STU-601', student_id: 'ZPS6A 01', name: 'Aarav Sharma', school_id: 'ZPS', class_id: 'CLS-ZPS-6A', tech_level: 'Level 0', parent_name: 'Sanjay Sharma', parent_phone: '+91 98390 11221', assigned_kit_id: 'KIT-ZPS-01', status: 'Active' },
   { id: 'STU-602', student_id: 'ZPS6A 02', name: 'Priya Patel', school_id: 'ZPS', class_id: 'CLS-ZPS-6A', tech_level: 'Level 0', parent_name: 'Manoj Patel', parent_phone: '+91 98390 11222', assigned_kit_id: 'KIT-ZPS-02', status: 'Active' },
@@ -47,6 +57,37 @@ export const SEED_STUDENTS = [
   { id: 'STU-1103', student_id: 'ZPS11A 03', name: 'Harshita Malviya', school_id: 'ZPS', class_id: 'CLS-ZPS-11A', tech_level: 'Level 0', parent_name: 'S.P. Malviya', parent_phone: '+91 98390 55663', assigned_kit_id: 'KIT-ZPS-23', status: 'Active' },
   { id: 'STU-1104', student_id: 'ZPS11A 04', name: 'Shashank Shukla', school_id: 'ZPS', class_id: 'CLS-ZPS-11A', tech_level: 'Level 0', parent_name: 'Awadhesh Shukla', parent_phone: '+91 98390 55664', assigned_kit_id: 'KIT-ZPS-24', status: 'Active' },
   { id: 'STU-1105', student_id: 'ZPS11A 05', name: 'Divya Upadhyay', school_id: 'ZPS', class_id: 'CLS-ZPS-11A', tech_level: 'Level 0', parent_name: 'Radheyshyam Upadhyay', parent_phone: '+91 98390 55665', assigned_kit_id: 'KIT-ZPS-25', status: 'Active' },
+
+  // ==================== XYZ ACADEMY (DUMMY / PILOT LAB - 4 STUDENTS PER CLASS) ====================
+  // Class 6A
+  { id: 'STU-XYZ-601', student_id: 'XYZ6A 01', name: 'Manish Rawat', school_id: 'XYZ', class_id: 'CLS-XYZ-6A', tech_level: 'Level 0', parent_name: 'Prakash Rawat', parent_phone: '+91 98390 66111', assigned_kit_id: 'KIT-XYZ-01', status: 'Active' },
+  { id: 'STU-XYZ-602', student_id: 'XYZ6A 02', name: 'Kavita Saxena', school_id: 'XYZ', class_id: 'CLS-XYZ-6A', tech_level: 'Level 0', parent_name: 'Sunil Saxena', parent_phone: '+91 98390 66112', assigned_kit_id: 'KIT-XYZ-02', status: 'Active' },
+  { id: 'STU-XYZ-603', student_id: 'XYZ6A 03', name: 'Ayushmann Jha', school_id: 'XYZ', class_id: 'CLS-XYZ-6A', tech_level: 'Level 0', parent_name: 'R.K. Jha', parent_phone: '+91 98390 66113', assigned_kit_id: 'KIT-XYZ-03', status: 'Active' },
+  { id: 'STU-XYZ-604', student_id: 'XYZ6A 04', name: 'Ritika Sen', school_id: 'XYZ', class_id: 'CLS-XYZ-6A', tech_level: 'Level 0', parent_name: 'Debashish Sen', parent_phone: '+91 98390 66114', assigned_kit_id: 'KIT-XYZ-04', status: 'Active' },
+
+  // Class 7A
+  { id: 'STU-XYZ-701', student_id: 'XYZ7A 01', name: 'Pranav Bhatt', school_id: 'XYZ', class_id: 'CLS-XYZ-7A', tech_level: 'Level 0', parent_name: 'G.S. Bhatt', parent_phone: '+91 98390 66221', assigned_kit_id: 'KIT-XYZ-05', status: 'Active' },
+  { id: 'STU-XYZ-702', student_id: 'XYZ7A 02', name: 'Ananya Deshmukh', school_id: 'XYZ', class_id: 'CLS-XYZ-7A', tech_level: 'Level 0', parent_name: 'V.D. Deshmukh', parent_phone: '+91 98390 66222', assigned_kit_id: 'KIT-XYZ-06', status: 'Active' },
+  { id: 'STU-XYZ-703', student_id: 'XYZ7A 03', name: 'Sameer Khan', school_id: 'XYZ', class_id: 'CLS-XYZ-7A', tech_level: 'Level 0', parent_name: 'Imran Khan', parent_phone: '+91 98390 66223', assigned_kit_id: 'KIT-XYZ-07', status: 'Active' },
+  { id: 'STU-XYZ-704', student_id: 'XYZ7A 04', name: 'Pooja Hegde', school_id: 'XYZ', class_id: 'CLS-XYZ-7A', tech_level: 'Level 0', parent_name: 'K. Hegde', parent_phone: '+91 98390 66224', assigned_kit_id: 'KIT-XYZ-08', status: 'Active' },
+
+  // Class 8A
+  { id: 'STU-XYZ-801', student_id: 'XYZ8A 01', name: 'Varun Nair', school_id: 'XYZ', class_id: 'CLS-XYZ-8A', tech_level: 'Level 0', parent_name: 'M. Nair', parent_phone: '+91 98390 66331', assigned_kit_id: 'KIT-XYZ-09', status: 'Active' },
+  { id: 'STU-XYZ-802', student_id: 'XYZ8A 02', name: 'Tanya Roy', school_id: 'XYZ', class_id: 'CLS-XYZ-8A', tech_level: 'Level 0', parent_name: 'Subhash Roy', parent_phone: '+91 98390 66332', assigned_kit_id: 'KIT-XYZ-10', status: 'Active' },
+  { id: 'STU-XYZ-803', student_id: 'XYZ8A 03', name: 'Aman Deep', school_id: 'XYZ', class_id: 'CLS-XYZ-8A', tech_level: 'Level 0', parent_name: 'Gurmeet Singh', parent_phone: '+91 98390 66333', assigned_kit_id: 'KIT-XYZ-11', status: 'Active' },
+  { id: 'STU-XYZ-804', student_id: 'XYZ8A 04', name: 'Nisha Pillai', school_id: 'XYZ', class_id: 'CLS-XYZ-8A', tech_level: 'Level 0', parent_name: 'R. Pillai', parent_phone: '+91 98390 66334', assigned_kit_id: 'KIT-XYZ-12', status: 'Active' },
+
+  // Class 9A
+  { id: 'STU-XYZ-901', student_id: 'XYZ9A 01', name: 'Gaurav Kulkarni', school_id: 'XYZ', class_id: 'CLS-XYZ-9A', tech_level: 'Level 0', parent_name: 'A. Kulkarni', parent_phone: '+91 98390 66441', assigned_kit_id: 'KIT-XYZ-13', status: 'Active' },
+  { id: 'STU-XYZ-902', student_id: 'XYZ9A 02', name: 'Swati Chawla', school_id: 'XYZ', class_id: 'CLS-XYZ-9A', tech_level: 'Level 0', parent_name: 'D. Chawla', parent_phone: '+91 98390 66442', assigned_kit_id: 'KIT-XYZ-14', status: 'Active' },
+  { id: 'STU-XYZ-903', student_id: 'XYZ9A 03', name: 'Kunal Kapoor', school_id: 'XYZ', class_id: 'CLS-XYZ-9A', tech_level: 'Level 0', parent_name: 'S. Kapoor', parent_phone: '+91 98390 66443', assigned_kit_id: 'KIT-XYZ-15', status: 'Active' },
+  { id: 'STU-XYZ-904', student_id: 'XYZ9A 04', name: 'Shruti Iyer', school_id: 'XYZ', class_id: 'CLS-XYZ-9A', tech_level: 'Level 0', parent_name: 'N. Iyer', parent_phone: '+91 98390 66444', assigned_kit_id: 'KIT-XYZ-16', status: 'Active' },
+
+  // Class 11A
+  { id: 'STU-XYZ-1101', student_id: 'XYZ11A 01', name: 'Harshit Chauhan', school_id: 'XYZ', class_id: 'CLS-XYZ-11A', tech_level: 'Level 0', parent_name: 'R.P. Chauhan', parent_phone: '+91 98390 66551', assigned_kit_id: 'KIT-XYZ-17', status: 'Active' },
+  { id: 'STU-XYZ-1102', student_id: 'XYZ11A 02', name: 'Bhavna Menon', school_id: 'XYZ', class_id: 'CLS-XYZ-11A', tech_level: 'Level 0', parent_name: 'S. Menon', parent_phone: '+91 98390 66552', assigned_kit_id: 'KIT-XYZ-18', status: 'Active' },
+  { id: 'STU-XYZ-1103', student_id: 'XYZ11A 03', name: 'Kartik Somani', school_id: 'XYZ', class_id: 'CLS-XYZ-11A', tech_level: 'Level 0', parent_name: 'M. Somani', parent_phone: '+91 98390 66553', assigned_kit_id: 'KIT-XYZ-19', status: 'Active' },
+  { id: 'STU-XYZ-1104', student_id: 'XYZ11A 04', name: 'Divyanka Rao', school_id: 'XYZ', class_id: 'CLS-XYZ-11A', tech_level: 'Level 0', parent_name: 'T. Rao', parent_phone: '+91 98390 66554', assigned_kit_id: 'KIT-XYZ-20', status: 'Active' },
 ];
 
 export const SEED_TRAINERS = [
@@ -58,6 +99,17 @@ export const SEED_TRAINERS = [
     status: 'Active', 
     assigned_schools: 'ZPS', 
     rating: 5.0, 
+    daily_rate: 600,
+    weekly_days: 2
+  },
+  { 
+    id: 'TR-02', 
+    name: 'Akash Sharma', 
+    phone: '+91 94500 77882', 
+    role: 'Senior STEM & Robotics Trainer', 
+    status: 'Active', 
+    assigned_schools: 'XYZ', 
+    rating: 4.9, 
     daily_rate: 600,
     weekly_days: 2
   }
@@ -405,15 +457,47 @@ export const SEED_INVENTORY = [
   { id: 'KIT-ZPS-19', school_id: 'ZPS', class_grade: '9', name: 'Pixiu Industrial Flame & Line Rover Kit #19', assigned_to: 'ZPS9A 04', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
   { id: 'KIT-ZPS-20', school_id: 'ZPS', class_grade: '9', name: 'Pixiu Industrial Flame & Line Rover Kit #20', assigned_to: 'ZPS9A 05', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
 
-  // Class 11 Kits
+  // Class 11 Kits (ZPS)
   { id: 'KIT-ZPS-21', school_id: 'ZPS', class_grade: '11', name: 'Pixiu Photonics & Maze Solver Rover Kit #21', assigned_to: 'ZPS11A 01', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
   { id: 'KIT-ZPS-22', school_id: 'ZPS', class_grade: '11', name: 'Pixiu Photonics & Maze Solver Rover Kit #22', assigned_to: 'ZPS11A 02', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
   { id: 'KIT-ZPS-23', school_id: 'ZPS', class_grade: '11', name: 'Pixiu Photonics & Maze Solver Rover Kit #23', assigned_to: 'ZPS11A 03', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
   { id: 'KIT-ZPS-24', school_id: 'ZPS', class_grade: '11', name: 'Pixiu Photonics & Maze Solver Rover Kit #24', assigned_to: 'ZPS11A 04', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
   { id: 'KIT-ZPS-25', school_id: 'ZPS', class_grade: '11', name: 'Pixiu Photonics & Maze Solver Rover Kit #25', assigned_to: 'ZPS11A 05', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+
+  // ==================== XYZ ACADEMY KITS (KIT-XYZ-01 to KIT-XYZ-20) ====================
+  // Class 6 Kits (XYZ)
+  { id: 'KIT-XYZ-01', school_id: 'XYZ', class_grade: '6', name: 'Pixiu Discovery STEM Hardware Kit #01', assigned_to: 'XYZ6A 01', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-XYZ-02', school_id: 'XYZ', class_grade: '6', name: 'Pixiu Discovery STEM Hardware Kit #02', assigned_to: 'XYZ6A 02', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-XYZ-03', school_id: 'XYZ', class_grade: '6', name: 'Pixiu Discovery STEM Hardware Kit #03', assigned_to: 'XYZ6A 03', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-XYZ-04', school_id: 'XYZ', class_grade: '6', name: 'Pixiu Discovery STEM Hardware Kit #04', assigned_to: 'XYZ6A 04', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+
+  // Class 7 Kits (XYZ)
+  { id: 'KIT-XYZ-05', school_id: 'XYZ', class_grade: '7', name: 'Pixiu Environmental & Sensor Kit #05', assigned_to: 'XYZ7A 01', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-XYZ-06', school_id: 'XYZ', class_grade: '7', name: 'Pixiu Environmental & Sensor Kit #06', assigned_to: 'XYZ7A 02', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-XYZ-07', school_id: 'XYZ', class_grade: '7', name: 'Pixiu Environmental & Sensor Kit #07', assigned_to: 'XYZ7A 03', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-XYZ-08', school_id: 'XYZ', class_grade: '7', name: 'Pixiu Environmental & Sensor Kit #08', assigned_to: 'XYZ7A 04', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+
+  // Class 8 Kits (XYZ)
+  { id: 'KIT-XYZ-09', school_id: 'XYZ', class_grade: '8', name: 'Pixiu Mobility & Obstacle Rover Kit #09', assigned_to: 'XYZ8A 01', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-XYZ-10', school_id: 'XYZ', class_grade: '8', name: 'Pixiu Mobility & Obstacle Rover Kit #10', assigned_to: 'XYZ8A 02', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-XYZ-11', school_id: 'XYZ', class_grade: '8', name: 'Pixiu Mobility & Obstacle Rover Kit #11', assigned_to: 'XYZ8A 03', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-XYZ-12', school_id: 'XYZ', class_grade: '8', name: 'Pixiu Mobility & Obstacle Rover Kit #12', assigned_to: 'XYZ8A 04', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+
+  // Class 9 Kits (XYZ)
+  { id: 'KIT-XYZ-13', school_id: 'XYZ', class_grade: '9', name: 'Pixiu Industrial Flame & Line Rover Kit #13', assigned_to: 'XYZ9A 01', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-XYZ-14', school_id: 'XYZ', class_grade: '9', name: 'Pixiu Industrial Flame & Line Rover Kit #14', assigned_to: 'XYZ9A 02', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-XYZ-15', school_id: 'XYZ', class_grade: '9', name: 'Pixiu Industrial Flame & Line Rover Kit #15', assigned_to: 'XYZ9A 03', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-XYZ-16', school_id: 'XYZ', class_grade: '9', name: 'Pixiu Industrial Flame & Line Rover Kit #16', assigned_to: 'XYZ9A 04', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+
+  // Class 11 Kits (XYZ)
+  { id: 'KIT-XYZ-17', school_id: 'XYZ', class_grade: '11', name: 'Pixiu Photonics & Maze Solver Rover Kit #17', assigned_to: 'XYZ11A 01', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-XYZ-18', school_id: 'XYZ', class_grade: '11', name: 'Pixiu Photonics & Maze Solver Rover Kit #18', assigned_to: 'XYZ11A 02', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-XYZ-19', school_id: 'XYZ', class_grade: '11', name: 'Pixiu Photonics & Maze Solver Rover Kit #19', assigned_to: 'XYZ11A 03', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
+  { id: 'KIT-XYZ-20', school_id: 'XYZ', class_grade: '11', name: 'Pixiu Photonics & Maze Solver Rover Kit #20', assigned_to: 'XYZ11A 04', status: 'Assigned', condition: 'Good', last_audit: '2026-08-28' },
 ];
 
 export const SEED_BILLING = [
+  // Zenith Public School Invoices
   {
     id: 'INV-2026-001',
     school_id: 'ZPS',
@@ -458,6 +542,38 @@ export const SEED_BILLING = [
     place_of_supply: 'Hata, Uttar Pradesh',
     status: 'Pending',
     description: 'Final Capstone Exhibition, Student Progress Certification, and Year-End Term Review (30%)'
+  },
+
+  // XYZ Academy Invoices
+  {
+    id: 'INV-XYZ-001',
+    school_id: 'XYZ',
+    school_name: 'XYZ Academy (Pilot Lab)',
+    tranche_number: 1,
+    tranche_title: 'Tranche 1: Lab Deployment & Pilot Hardware Suite (50%)',
+    amount: 35000,
+    total_contract_value: 70000,
+    date_issued: '2026-08-20',
+    invoice_date: '2026-08-20',
+    due_date: '2026-09-05',
+    place_of_supply: 'Gorakhpur, Uttar Pradesh',
+    status: 'Paid',
+    description: 'Initial Lab Setup, 20x Modular Microcontroller Kits & Pilot Orientation Session'
+  },
+  {
+    id: 'INV-XYZ-002',
+    school_id: 'XYZ',
+    school_name: 'XYZ Academy (Pilot Lab)',
+    tranche_number: 2,
+    tranche_title: 'Tranche 2: Mid-Term Curriculum Evaluation & Robotics Trainer Delivery (50%)',
+    amount: 35000,
+    total_contract_value: 70000,
+    date_issued: '2026-08-20',
+    invoice_date: '2026-08-20',
+    due_date: '2026-11-20',
+    place_of_supply: 'Gorakhpur, Uttar Pradesh',
+    status: 'Pending',
+    description: 'Term 1 Mid-Term Robotics Engineering Curriculum Delivery and Practical Assessments'
   }
 ];
 

@@ -20,48 +20,92 @@ const sha256Hex = async (text) => {
 
 // Cryptographic SHA-256 Hashed Credentials (Zero Plaintext Passwords in Public Repository)
 const HASHED_USERS = [
-  // Super Admin
+  // Super Admin (Can log in from Trainer / Faculty tab)
   { username: 'adarshraj', hash: '9487735ec001b72cf0e8731c988d8c57268bade0f8ece96a4d305a6fef5941e0', role: 'admin', name: 'Adarsh Raj (Founder & Admin)', id: 'USR-ADMIN', related_id: 'ADM-01', school_id: 'ALL' },
   { username: 'admin', hash: '9487735ec001b72cf0e8731c988d8c57268bade0f8ece96a4d305a6fef5941e0', role: 'admin', name: 'Adarsh Raj (Founder & Admin)', id: 'USR-ADMIN-ALT', related_id: 'ADM-01', school_id: 'ALL' },
   
-  // Primary Trainer Vikas Pandey
+  // ==================== TRAINERS ====================
+  // Trainer 1: Vikas Pandey (ZPS)
   { username: 'vikaspandey', hash: '38ed815a1bbd69f7b4b03a628831e229d6a221a8565ae32459ec5a95f3f2d591', role: 'trainer', name: 'Vikas Pandey', id: 'USR-TR01', related_id: 'TR-01', school_id: 'ZPS' },
   { username: 'TR-01', hash: '38ed815a1bbd69f7b4b03a628831e229d6a221a8565ae32459ec5a95f3f2d591', role: 'trainer', name: 'Vikas Pandey', id: 'USR-TR01-ALT', related_id: 'TR-01', school_id: 'ZPS' },
+
+  // Trainer 2: Akash Sharma (XYZ Academy)
+  { username: 'akashsharma', hash: 'b1ca657a40b5435c6b546ff68e686e4ff077877d1d5f26f42299797a64d20c44', role: 'trainer', name: 'Akash Sharma', id: 'USR-TR02', related_id: 'TR-02', school_id: 'XYZ' },
+  { username: 'TR-02', hash: 'b1ca657a40b5435c6b546ff68e686e4ff077877d1d5f26f42299797a64d20c44', role: 'trainer', name: 'Akash Sharma', id: 'USR-TR02-ALT', related_id: 'TR-02', school_id: 'XYZ' },
+
+  // ==================== SCHOOL PARTNER PORTALS ====================
+  // School 1: Zenith Public School (ID: ZPS2026, Pass: ZPSzenith@hata)
+  { username: 'ZPS2026', hash: '09e4ad0cc22dc74036adadc2ccefd59e83cb8e17f98adae03c0e9515ec5e773f', role: 'school', name: 'Zenith Public School Administration', id: 'USR-SCH-ZPS', related_id: 'ZPS', school_id: 'ZPS' },
   
+  // School 2: XYZ Academy (ID: XYZ2026, Pass: XYZxyz@hata)
+  { username: 'XYZ2026', hash: '1d37fcab06a387c6a5746e3414e90bbcb8136974300d83f18c910d242abf194b', role: 'school', name: 'XYZ Academy Administration', id: 'USR-SCH-XYZ', related_id: 'XYZ', school_id: 'XYZ' },
+
+  // ==================== ZENITH PUBLIC SCHOOL (ZPS) STUDENTS ====================
   // Class 6 Students
   { username: 'ZPS6A 01', hash: '2889a1f33fae28601c792389ca47967b576587d3449ee1400324fc6dce55ef13', role: 'student', name: 'Aarav Sharma', id: 'USR-ZPS6A01', related_id: 'ZPS6A 01', school_id: 'ZPS' },
-  { username: 'ZPS6A 02', hash: '2889a1f33fae28601c792389ca47967b576587d3449ee1400324fc6dce55ef13', role: 'student', name: 'Ananya Verma', id: 'USR-ZPS6A02', related_id: 'ZPS6A 02', school_id: 'ZPS' },
+  { username: 'ZPS6A 02', hash: '2889a1f33fae28601c792389ca47967b576587d3449ee1400324fc6dce55ef13', role: 'student', name: 'Priya Patel', id: 'USR-ZPS6A02', related_id: 'ZPS6A 02', school_id: 'ZPS' },
   { username: 'ZPS6A 03', hash: '2889a1f33fae28601c792389ca47967b576587d3449ee1400324fc6dce55ef13', role: 'student', name: 'Rohan Gupta', id: 'USR-ZPS6A03', related_id: 'ZPS6A 03', school_id: 'ZPS' },
-  { username: 'ZPS6A 04', hash: '2889a1f33fae28601c792389ca47967b576587d3449ee1400324fc6dce55ef13', role: 'student', name: 'Ishita Singh', id: 'USR-ZPS6A04', related_id: 'ZPS6A 04', school_id: 'ZPS' },
-  { username: 'ZPS6A 05', hash: '2889a1f33fae28601c792389ca47967b576587d3449ee1400324fc6dce55ef13', role: 'student', name: 'Kabir Mehta', id: 'USR-ZPS6A05', related_id: 'ZPS6A 05', school_id: 'ZPS' },
+  { username: 'ZPS6A 04', hash: '2889a1f33fae28601c792389ca47967b576587d3449ee1400324fc6dce55ef13', role: 'student', name: 'Ananya Verma', id: 'USR-ZPS6A04', related_id: 'ZPS6A 04', school_id: 'ZPS' },
+  { username: 'ZPS6A 05', hash: '2889a1f33fae28601c792389ca47967b576587d3449ee1400324fc6dce55ef13', role: 'student', name: 'Kabir Singh', id: 'USR-ZPS6A05', related_id: 'ZPS6A 05', school_id: 'ZPS' },
 
   // Class 7 Students
   { username: 'ZPS7A 01', hash: 'd46d25414c3321b4f07c022d41132a8b38eeefbe1f2cecf3dd77bd1462195269', role: 'student', name: 'Devansh Tiwari', id: 'USR-ZPS7A01', related_id: 'ZPS7A 01', school_id: 'ZPS' },
-  { username: 'ZPS7A 02', hash: 'd46d25414c3321b4f07c022d41132a8b38eeefbe1f2cecf3dd77bd1462195269', role: 'student', name: 'Meera Nair', id: 'USR-ZPS7A02', related_id: 'ZPS7A 02', school_id: 'ZPS' },
-  { username: 'ZPS7A 03', hash: 'd46d25414c3321b4f07c022d41132a8b38eeefbe1f2cecf3dd77bd1462195269', role: 'student', name: 'Aditya Patel', id: 'USR-ZPS7A03', related_id: 'ZPS7A 03', school_id: 'ZPS' },
-  { username: 'ZPS7A 04', hash: 'd46d25414c3321b4f07c022d41132a8b38eeefbe1f2cecf3dd77bd1462195269', role: 'student', name: 'Saanvi Joshi', id: 'USR-ZPS7A04', related_id: 'ZPS7A 04', school_id: 'ZPS' },
-  { username: 'ZPS7A 05', hash: 'd46d25414c3321b4f07c022d41132a8b38eeefbe1f2cecf3dd77bd1462195269', role: 'student', name: 'Yash Vardhan', id: 'USR-ZPS7A05', related_id: 'ZPS7A 05', school_id: 'ZPS' },
+  { username: 'ZPS7A 02', hash: 'd46d25414c3321b4f07c022d41132a8b38eeefbe1f2cecf3dd77bd1462195269', role: 'student', name: 'Ishita Mishra', id: 'USR-ZPS7A02', related_id: 'ZPS7A 02', school_id: 'ZPS' },
+  { username: 'ZPS7A 03', hash: 'd46d25414c3321b4f07c022d41132a8b38eeefbe1f2cecf3dd77bd1462195269', role: 'student', name: 'Atharva Dubey', id: 'USR-ZPS7A03', related_id: 'ZPS7A 03', school_id: 'ZPS' },
+  { username: 'ZPS7A 04', hash: 'd46d25414c3321b4f07c022d41132a8b38eeefbe1f2cecf3dd77bd1462195269', role: 'student', name: 'Suhani Rao', id: 'USR-ZPS7A04', related_id: 'ZPS7A 04', school_id: 'ZPS' },
+  { username: 'ZPS7A 05', hash: 'd46d25414c3321b4f07c022d41132a8b38eeefbe1f2cecf3dd77bd1462195269', role: 'student', name: 'Aryan Chaurasia', id: 'USR-ZPS7A05', related_id: 'ZPS7A 05', school_id: 'ZPS' },
 
   // Class 8 Students
-  { username: 'ZPS8A 01', hash: 'cb804189c1cbedf183e9b7fb9fd3cac7df67085703b4f7418b45d946ead749b7', role: 'student', name: 'Siddharth Roy', id: 'USR-ZPS8A01', related_id: 'ZPS8A 01', school_id: 'ZPS' },
-  { username: 'ZPS8A 02', hash: 'cb804189c1cbedf183e9b7fb9fd3cac7df67085703b4f7418b45d946ead749b7', role: 'student', name: 'Diya Kapoor', id: 'USR-ZPS8A02', related_id: 'ZPS8A 02', school_id: 'ZPS' },
-  { username: 'ZPS8A 03', hash: 'cb804189c1cbedf183e9b7fb9fd3cac7df67085703b4f7418b45d946ead749b7', role: 'student', name: 'Harsh Agarwal', id: 'USR-ZPS8A03', related_id: 'ZPS8A 03', school_id: 'ZPS' },
-  { username: 'ZPS8A 04', hash: 'cb804189c1cbedf183e9b7fb9fd3cac7df67085703b4f7418b45d946ead749b7', role: 'student', name: 'Tanvi Saxena', id: 'USR-ZPS8A04', related_id: 'ZPS8A 04', school_id: 'ZPS' },
-  { username: 'ZPS8A 05', hash: 'cb804189c1cbedf183e9b7fb9fd3cac7df67085703b4f7418b45d946ead749b7', role: 'student', name: 'Reyansh Dubey', id: 'USR-ZPS8A05', related_id: 'ZPS8A 05', school_id: 'ZPS' },
+  { username: 'ZPS8A 01', hash: 'cb804189c1cbedf183e9b7fb9fd3cac7df67085703b4f7418b45d946ead749b7', role: 'student', name: 'Yash Srivastava', id: 'USR-ZPS8A01', related_id: 'ZPS8A 01', school_id: 'ZPS' },
+  { username: 'ZPS8A 02', hash: 'cb804189c1cbedf183e9b7fb9fd3cac7df67085703b4f7418b45d946ead749b7', role: 'student', name: 'Tanvi Pandey', id: 'USR-ZPS8A02', related_id: 'ZPS8A 02', school_id: 'ZPS' },
+  { username: 'ZPS8A 03', hash: 'cb804189c1cbedf183e9b7fb9fd3cac7df67085703b4f7418b45d946ead749b7', role: 'student', name: 'Aditya Yadav', id: 'USR-ZPS8A03', related_id: 'ZPS8A 03', school_id: 'ZPS' },
+  { username: 'ZPS8A 04', hash: 'cb804189c1cbedf183e9b7fb9fd3cac7df67085703b4f7418b45d946ead749b7', role: 'student', name: 'Kavya Jaiswal', id: 'USR-ZPS8A04', related_id: 'ZPS8A 04', school_id: 'ZPS' },
+  { username: 'ZPS8A 05', hash: 'cb804189c1cbedf183e9b7fb9fd3cac7df67085703b4f7418b45d946ead749b7', role: 'student', name: 'Manish Gond', id: 'USR-ZPS8A05', related_id: 'ZPS8A 05', school_id: 'ZPS' },
 
   // Class 9 Students
-  { username: 'ZPS9A 01', hash: '6c76872e2885598736e71c070a4db6b1844383132ad602a0a83cb8356a1163da', role: 'student', name: 'Arjun Reddy', id: 'USR-ZPS9A01', related_id: 'ZPS9A 01', school_id: 'ZPS' },
-  { username: 'ZPS9A 02', hash: '6c76872e2885598736e71c070a4db6b1844383132ad602a0a83cb8356a1163da', role: 'student', name: 'Sneha Kulkarni', id: 'USR-ZPS9A02', related_id: 'ZPS9A 02', school_id: 'ZPS' },
-  { username: 'ZPS9A 03', hash: '6c76872e2885598736e71c070a4db6b1844383132ad602a0a83cb8356a1163da', role: 'student', name: 'Varun Malhotra', id: 'USR-ZPS9A03', related_id: 'ZPS9A 03', school_id: 'ZPS' },
-  { username: 'ZPS9A 04', hash: '6c76872e2885598736e71c070a4db6b1844383132ad602a0a83cb8356a1163da', role: 'student', name: 'Riya Sen', id: 'USR-ZPS9A04', related_id: 'ZPS9A 04', school_id: 'ZPS' },
-  { username: 'ZPS9A 05', hash: '6c76872e2885598736e71c070a4db6b1844383132ad602a0a83cb8356a1163da', role: 'student', name: 'Dhruv Chauhan', id: 'USR-ZPS9A05', related_id: 'ZPS9A 05', school_id: 'ZPS' },
+  { username: 'ZPS9A 01', hash: '6c76872e2885598736e71c070a4db6b1844383132ad602a0a83cb8356a1163da', role: 'student', name: 'Ayush Kushwaha', id: 'USR-ZPS9A01', related_id: 'ZPS9A 01', school_id: 'ZPS' },
+  { username: 'ZPS9A 02', hash: '6c76872e2885598736e71c070a4db6b1844383132ad602a0a83cb8356a1163da', role: 'student', name: 'Sneha Shahi', id: 'USR-ZPS9A02', related_id: 'ZPS9A 02', school_id: 'ZPS' },
+  { username: 'ZPS9A 03', hash: '6c76872e2885598736e71c070a4db6b1844383132ad602a0a83cb8356a1163da', role: 'student', name: 'Rishi Vishwakarma', id: 'USR-ZPS9A03', related_id: 'ZPS9A 03', school_id: 'ZPS' },
+  { username: 'ZPS9A 04', hash: '6c76872e2885598736e71c070a4db6b1844383132ad602a0a83cb8356a1163da', role: 'student', name: 'Riya Tripathi', id: 'USR-ZPS9A04', related_id: 'ZPS9A 04', school_id: 'ZPS' },
+  { username: 'ZPS9A 05', hash: '6c76872e2885598736e71c070a4db6b1844383132ad602a0a83cb8356a1163da', role: 'student', name: 'Utkarsh Singh', id: 'USR-ZPS9A05', related_id: 'ZPS9A 05', school_id: 'ZPS' },
 
   // Class 11 Students
-  { username: 'ZPS11A 01', hash: 'a37d842d7195c49e40929482fed9c96e1f75eabc501987e8c354be95316f1355', role: 'student', name: 'Aryan Srivastava', id: 'USR-ZPS11A01', related_id: 'ZPS11A 01', school_id: 'ZPS' },
-  { username: 'ZPS11A 02', hash: 'a37d842d7195c49e40929482fed9c96e1f75eabc501987e8c354be95316f1355', role: 'student', name: 'Pooja Bhatt', id: 'USR-ZPS11A02', related_id: 'ZPS11A 02', school_id: 'ZPS' },
-  { username: 'ZPS11A 03', hash: 'a37d842d7195c49e40929482fed9c96e1f75eabc501987e8c354be95316f1355', role: 'student', name: 'Nikhil Kashyap', id: 'USR-ZPS11A03', related_id: 'ZPS11A 03', school_id: 'ZPS' },
-  { username: 'ZPS11A 04', hash: 'a37d842d7195c49e40929482fed9c96e1f75eabc501987e8c354be95316f1355', role: 'student', name: 'Kavya Pandey', id: 'USR-ZPS11A04', related_id: 'ZPS11A 04', school_id: 'ZPS' },
-  { username: 'ZPS11A 05', hash: 'a37d842d7195c49e40929482fed9c96e1f75eabc501987e8c354be95316f1355', role: 'student', name: 'Shaurya Mishra', id: 'USR-ZPS11A05', related_id: 'ZPS11A 05', school_id: 'ZPS' },
+  { username: 'ZPS11A 01', hash: 'a37d842d7195c49e40929482fed9c96e1f75eabc501987e8c354be95316f1355', role: 'student', name: 'Siddharth Pandey', id: 'USR-ZPS11A01', related_id: 'ZPS11A 01', school_id: 'ZPS' },
+  { username: 'ZPS11A 02', hash: 'a37d842d7195c49e40929482fed9c96e1f75eabc501987e8c354be95316f1355', role: 'student', name: 'Anushka Roy', id: 'USR-ZPS11A02', related_id: 'ZPS11A 02', school_id: 'ZPS' },
+  { username: 'ZPS11A 03', hash: 'a37d842d7195c49e40929482fed9c96e1f75eabc501987e8c354be95316f1355', role: 'student', name: 'Harshita Malviya', id: 'USR-ZPS11A03', related_id: 'ZPS11A 03', school_id: 'ZPS' },
+  { username: 'ZPS11A 04', hash: 'a37d842d7195c49e40929482fed9c96e1f75eabc501987e8c354be95316f1355', role: 'student', name: 'Shashank Shukla', id: 'USR-ZPS11A04', related_id: 'ZPS11A 04', school_id: 'ZPS' },
+  { username: 'ZPS11A 05', hash: 'a37d842d7195c49e40929482fed9c96e1f75eabc501987e8c354be95316f1355', role: 'student', name: 'Divya Upadhyay', id: 'USR-ZPS11A05', related_id: 'ZPS11A 05', school_id: 'ZPS' },
+
+  // ==================== XYZ ACADEMY (XYZ) STUDENTS ====================
+  // Class 6 Students (Pass: XYZxyz6@hata)
+  { username: 'XYZ6A 01', hash: '075a0bf4857af0992c5d27942be01607e031e2a8ea38bc6bd86e55c693374d94', role: 'student', name: 'Manish Rawat', id: 'USR-XYZ6A01', related_id: 'XYZ6A 01', school_id: 'XYZ' },
+  { username: 'XYZ6A 02', hash: '075a0bf4857af0992c5d27942be01607e031e2a8ea38bc6bd86e55c693374d94', role: 'student', name: 'Kavita Saxena', id: 'USR-XYZ6A02', related_id: 'XYZ6A 02', school_id: 'XYZ' },
+  { username: 'XYZ6A 03', hash: '075a0bf4857af0992c5d27942be01607e031e2a8ea38bc6bd86e55c693374d94', role: 'student', name: 'Ayushmann Jha', id: 'USR-XYZ6A03', related_id: 'XYZ6A 03', school_id: 'XYZ' },
+  { username: 'XYZ6A 04', hash: '075a0bf4857af0992c5d27942be01607e031e2a8ea38bc6bd86e55c693374d94', role: 'student', name: 'Ritika Sen', id: 'USR-XYZ6A04', related_id: 'XYZ6A 04', school_id: 'XYZ' },
+
+  // Class 7 Students (Pass: XYZxyz7@hata)
+  { username: 'XYZ7A 01', hash: '8b7311671695bcca74da84df8120714e4b6841b3f867860a2a2ef1eaee83d657', role: 'student', name: 'Pranav Bhatt', id: 'USR-XYZ7A01', related_id: 'XYZ7A 01', school_id: 'XYZ' },
+  { username: 'XYZ7A 02', hash: '8b7311671695bcca74da84df8120714e4b6841b3f867860a2a2ef1eaee83d657', role: 'student', name: 'Ananya Deshmukh', id: 'USR-XYZ7A02', related_id: 'XYZ7A 02', school_id: 'XYZ' },
+  { username: 'XYZ7A 03', hash: '8b7311671695bcca74da84df8120714e4b6841b3f867860a2a2ef1eaee83d657', role: 'student', name: 'Sameer Khan', id: 'USR-XYZ7A03', related_id: 'XYZ7A 03', school_id: 'XYZ' },
+  { username: 'XYZ7A 04', hash: '8b7311671695bcca74da84df8120714e4b6841b3f867860a2a2ef1eaee83d657', role: 'student', name: 'Pooja Hegde', id: 'USR-XYZ7A04', related_id: 'XYZ7A 04', school_id: 'XYZ' },
+
+  // Class 8 Students (Pass: XYZxyz8@hata)
+  { username: 'XYZ8A 01', hash: 'ab72bfff9e68f422ae79606c04d1f83edeb0d375229a9ac1a153745a06acc151', role: 'student', name: 'Varun Nair', id: 'USR-XYZ8A01', related_id: 'XYZ8A 01', school_id: 'XYZ' },
+  { username: 'XYZ8A 02', hash: 'ab72bfff9e68f422ae79606c04d1f83edeb0d375229a9ac1a153745a06acc151', role: 'student', name: 'Tanya Roy', id: 'USR-XYZ8A02', related_id: 'XYZ8A 02', school_id: 'XYZ' },
+  { username: 'XYZ8A 03', hash: 'ab72bfff9e68f422ae79606c04d1f83edeb0d375229a9ac1a153745a06acc151', role: 'student', name: 'Aman Deep', id: 'USR-XYZ8A03', related_id: 'XYZ8A 03', school_id: 'XYZ' },
+  { username: 'XYZ8A 04', hash: 'ab72bfff9e68f422ae79606c04d1f83edeb0d375229a9ac1a153745a06acc151', role: 'student', name: 'Nisha Pillai', id: 'USR-XYZ8A04', related_id: 'XYZ8A 04', school_id: 'XYZ' },
+
+  // Class 9 Students (Pass: XYZxyz9@hata)
+  { username: 'XYZ9A 01', hash: 'efffdd130d494ecdbe04803e9ebc5f8294181fc4c56e7b74dd2224e947ad50e5', role: 'student', name: 'Gaurav Kulkarni', id: 'USR-XYZ9A01', related_id: 'XYZ9A 01', school_id: 'XYZ' },
+  { username: 'XYZ9A 02', hash: 'efffdd130d494ecdbe04803e9ebc5f8294181fc4c56e7b74dd2224e947ad50e5', role: 'student', name: 'Swati Chawla', id: 'USR-XYZ9A02', related_id: 'XYZ9A 02', school_id: 'XYZ' },
+  { username: 'XYZ9A 03', hash: 'efffdd130d494ecdbe04803e9ebc5f8294181fc4c56e7b74dd2224e947ad50e5', role: 'student', name: 'Kunal Kapoor', id: 'USR-XYZ9A03', related_id: 'XYZ9A 03', school_id: 'XYZ' },
+  { username: 'XYZ9A 04', hash: 'efffdd130d494ecdbe04803e9ebc5f8294181fc4c56e7b74dd2224e947ad50e5', role: 'student', name: 'Shruti Iyer', id: 'USR-XYZ9A04', related_id: 'XYZ9A 04', school_id: 'XYZ' },
+
+  // Class 11 Students (Pass: XYZxyz11@hata)
+  { username: 'XYZ11A 01', hash: '195d8a4847443035b6c3aa2819fefdf8da3837ea2e6618425b5181188da2fabe', role: 'student', name: 'Harshit Chauhan', id: 'USR-XYZ11A01', related_id: 'XYZ11A 01', school_id: 'XYZ' },
+  { username: 'XYZ11A 02', hash: '195d8a4847443035b6c3aa2819fefdf8da3837ea2e6618425b5181188da2fabe', role: 'student', name: 'Bhavna Menon', id: 'USR-XYZ11A02', related_id: 'XYZ11A 02', school_id: 'XYZ' },
+  { username: 'XYZ11A 03', hash: '195d8a4847443035b6c3aa2819fefdf8da3837ea2e6618425b5181188da2fabe', role: 'student', name: 'Kartik Somani', id: 'USR-XYZ11A03', related_id: 'XYZ11A 03', school_id: 'XYZ' },
+  { username: 'XYZ11A 04', hash: '195d8a4847443035b6c3aa2819fefdf8da3837ea2e6618425b5181188da2fabe', role: 'student', name: 'Divyanka Rao', id: 'USR-XYZ11A04', related_id: 'XYZ11A 04', school_id: 'XYZ' },
 ];
 
 export function AuthProvider({ children }) {
@@ -119,7 +163,12 @@ export function AuthProvider({ children }) {
       
       if (res.ok && res.headers.get('content-type')?.includes('application/json')) {
         const data = await res.json();
-        if (expectedRole && data.user.role !== expectedRole) {
+        // Allow Admin to log in via Trainer / Faculty tab
+        const roleAllowed = !expectedRole || 
+          data.user.role === expectedRole || 
+          (expectedRole === 'trainer' && data.user.role === 'admin');
+
+        if (!roleAllowed) {
           return {
             success: false,
             error: `Access Denied: You are attempting to log in as ${expectedRole.toUpperCase()}, but this account is registered as ${data.user.role.toUpperCase()}. Please switch to the ${data.user.role.toUpperCase()} tab.`
@@ -151,7 +200,12 @@ export function AuthProvider({ children }) {
     );
 
     if (match) {
-      if (expectedRole && match.role !== expectedRole) {
+      // Allow Admin to log in via Trainer / Faculty tab
+      const isRoleAllowed = !expectedRole || 
+        match.role === expectedRole || 
+        (expectedRole === 'trainer' && match.role === 'admin');
+
+      if (!isRoleAllowed) {
         return {
           success: false,
           error: `Access Denied: You are trying to log in under the ${expectedRole.toUpperCase()} tab, but account "${match.username}" belongs to ${match.role.toUpperCase()}. Please switch to the ${match.role.toUpperCase()} tab.`

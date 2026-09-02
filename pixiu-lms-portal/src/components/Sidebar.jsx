@@ -30,6 +30,7 @@ export default function Sidebar({ mobileOpen = false, setMobileOpen = () => {} }
       links: [
         { name: 'Sales Pipeline', path: '/leads', icon: FolderKanban },
         { name: 'Partner Schools', path: '/schools', icon: Building },
+        { name: 'School Partner Portal', path: '/school-portal', icon: Building },
         { name: 'Billing & Invoices', path: '/billing', icon: CreditCard },
       ]
     },
