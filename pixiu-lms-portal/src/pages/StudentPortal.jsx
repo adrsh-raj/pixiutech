@@ -7,7 +7,7 @@ import {
   Award, BookOpen, Activity, FileText, Download, CheckCircle, 
   Clock, LogOut, User, Box, PlaySquare, Eye, Sparkles, Megaphone, 
   Bell, Check, X, TrendingUp, Star, ShieldCheck, CheckCircle2, ChevronRight, Send, Trash2,
-  Cpu, Maximize2, Zap, Layers, Info, List, LayoutGrid, PackageCheck
+  Cpu, Maximize2, Zap, Layers, Info, List, LayoutGrid, PackageCheck, MessageCircle, ShoppingBag, PhoneCall
 } from 'lucide-react';
 import { 
   AreaChart, Area, LineChart, Line, XAxis, YAxis, 
@@ -19,9 +19,7 @@ export default function StudentPortal() {
   const toast = useToast();
   const { students, schools, content, projects, deleteProject, getStudentAttendance, notifications, curriculum, studentReviews = [], classKits = {}, inventory = [] } = useData();
   const [selectedComponent, setSelectedComponent] = useState(null);
-  const [componentCategoryFilter, setComponentCategoryFilter] = useState('All');
   const [isKitDiagramModalOpen, setIsKitDiagramModalOpen] = useState(false);
-  const [kitViewMode, setKitViewMode] = useState('grid'); // 'grid' | 'table'
 
   // Faculty / Admin live preview support
   const isAdminOrTrainer = user?.role === 'admin' || user?.role === 'trainer';
@@ -662,11 +660,14 @@ export default function StudentPortal() {
                   Class: <strong className="text-white">{studentGrade}A</strong>
                 </span>
                 <a 
-                  href="#hardware-kit-section" 
-                  className="text-[10px] sm:text-[11px] bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-blue-400 text-slate-300 px-2.5 py-0.5 rounded-md font-mono transition-colors flex items-center gap-1 cursor-pointer"
-                  title="Click to view assigned kit & component parts"
+                  href={whatsappKitUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] sm:text-[11px] bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500/40 hover:border-emerald-400 text-emerald-300 px-2.5 py-0.5 rounded-md font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  title="Order personal STEM kit on WhatsApp (+91 7985403186)"
                 >
-                  Kit: <strong className="text-blue-400">{student.assigned_kit_id || 'KIT-ZPS-01'}</strong> 📦
+                  <MessageCircle size={12} className="text-emerald-400" />
+                  WhatsApp Your Kit <span className="font-mono text-emerald-200">({student.assigned_kit_id || 'KIT-ZPS-01'})</span>
                 </a>
               </div>
             </div>
@@ -703,16 +704,19 @@ export default function StudentPortal() {
           </div>
 
           <a 
-            href="#hardware-kit-section"
-            className="bg-white hover:bg-blue-50/50 p-2.5 sm:p-6 rounded-xl sm:rounded-2xl border border-slate-200 hover:border-pixiu-blue shadow-sm flex flex-col sm:flex-row items-center sm:items-center gap-1.5 sm:gap-4 text-center sm:text-left transition-all group cursor-pointer"
+            href={whatsappKitUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-gradient-to-br from-emerald-50 to-teal-50/60 hover:from-emerald-100 hover:to-teal-100 p-2.5 sm:p-6 rounded-xl sm:rounded-2xl border border-emerald-200 hover:border-emerald-500 shadow-sm flex flex-col sm:flex-row items-center sm:items-center gap-1.5 sm:gap-4 text-center sm:text-left transition-all group cursor-pointer"
+            title="Order your personal STEM kit on WhatsApp (+91 7985403186)"
           >
-            <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-blue-50 group-hover:bg-blue-600 text-pixiu-blue group-hover:text-white flex items-center justify-center shrink-0 transition-colors">
-              <Box className="w-4 h-4 sm:w-6 sm:h-6" />
+            <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-emerald-600 group-hover:bg-emerald-700 text-white flex items-center justify-center shrink-0 shadow-md group-hover:scale-105 transition-all">
+              <MessageCircle className="w-4 h-4 sm:w-6 sm:h-6" />
             </div>
             <div className="min-w-0">
-              <p className="text-[9px] sm:text-xs text-slate-400 font-bold uppercase tracking-wider truncate">Assigned Kit (Click)</p>
-              <p className="text-[11px] sm:text-sm font-bold font-mono text-slate-800 group-hover:text-pixiu-blue truncate flex items-center gap-1">
-                {student.assigned_kit_id || 'KIT-ZPS-01'} <ChevronRight size={13} className="text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+              <p className="text-[9px] sm:text-xs text-emerald-700 font-bold uppercase tracking-wider truncate">WhatsApp Your Kit</p>
+              <p className="text-[11px] sm:text-sm font-bold text-emerald-950 group-hover:text-emerald-800 truncate flex items-center gap-1">
+                Buy Kit: +91 7985403186 <ChevronRight size={13} className="text-emerald-600 group-hover:translate-x-0.5 transition-transform" />
               </p>
             </div>
           </a>
@@ -746,270 +750,85 @@ export default function StudentPortal() {
           </div>
         </div>
 
-        {/* ==================== ASSIGNED HARDWARE KIT & PDF EXTRACTED COMPONENTS (NOW PROMINENTLY AT TOP) ==================== */}
-        {(() => {
-          const studentKit = (classKits && classKits[studentGrade] && classKits[studentGrade]?.components?.length > 0)
-            ? classKits[studentGrade]
-            : (CLASS_KITS[studentGrade] || CLASS_KITS['6']);
-          const kitComponents = studentKit?.components || [];
-          const categories = ['All', ...new Set(kitComponents.map(c => c.category || 'General'))];
-          const filteredComponents = componentCategoryFilter === 'All' 
-            ? kitComponents 
-            : kitComponents.filter(c => (c.category || 'General') === componentCategoryFilter);
-
-          return (
-            <div id="hardware-kit-section" className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 p-4 sm:p-8 shadow-sm space-y-5 sm:space-y-6 scroll-mt-6">
-              {/* Hardware Kit Box Custody Header */}
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-5">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                    <h3 className="text-sm sm:text-lg font-bold text-slate-800 flex items-center gap-2">
-                      <Box className="text-pixiu-blue" size={18} />
-                      Assigned STEM Hardware Kit & Parts Inventory
-                    </h3>
-                  </div>
-                  <p className="text-xs text-slate-500">
-                    {studentKit.name} • Tag ID: <span className="font-mono font-bold text-pixiu-blue">{student.assigned_kit_id || studentKit.kit_id}</span> • Allocated to <strong className="text-slate-800">{student.name}</strong>
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  {/* View Mode Switcher Toggle */}
-                  <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
-                    <button
-                      type="button"
-                      onClick={() => setKitViewMode('grid')}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                        kitViewMode === 'grid' 
-                          ? 'bg-white text-slate-900 shadow-xs' 
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                      title="Component Gallery View"
-                    >
-                      <LayoutGrid size={13} /> Cards
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setKitViewMode('table')}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                        kitViewMode === 'table' 
-                          ? 'bg-white text-pixiu-blue shadow-xs' 
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                      title="Parts Inventory Table & Checklist"
-                    >
-                      <List size={13} /> Parts Ledger Table
-                    </button>
-                  </div>
-
-                  <span className="text-[10px] sm:text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-2xs">
-                    <CheckCircle size={13} /> {kitComponents.length} Parts in Box (Verified)
-                  </span>
-                </div>
+        {/* ==================== WHATSAPP YOUR STEM ROBOTICS KIT (STUDENT PORTAL ONLY) ==================== */}
+        <div id="hardware-kit-section" className="bg-gradient-to-r from-emerald-950 via-slate-900 to-emerald-950 border border-emerald-500/40 rounded-2xl sm:rounded-3xl p-5 sm:p-8 text-white shadow-xl relative overflow-hidden space-y-5">
+          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+            <div className="space-y-2.5 max-w-2xl">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold">
+                <MessageCircle size={14} className="text-emerald-400" />
+                WhatsApp Your Kit • Official Student Store (+91 7985403186)
               </div>
+              
+              <h3 className="text-lg sm:text-2xl font-black text-white tracking-wide">
+                Want to Practice Robotics at Home? Buy Your Personal Hardware Kit!
+              </h3>
+              
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                If you want your own complete hardware kit for home experiments and project innovation, order directly from Pixiu Tech on WhatsApp! Contains genuine Arduino microcontroller, breadboard, sensors, motors, and jumper wires for <strong className="text-emerald-300">Class {studentGrade}</strong>.
+              </p>
 
-              {/* Master Kit Layout Diagram Banner */}
-              {studentKit.overview_image && (
-                <div className="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-900 shadow-inner group">
-                  <div className="relative">
-                    <img 
-                      src={studentKit.overview_image} 
-                      alt={studentKit.name} 
-                      className="w-full h-48 sm:h-72 object-cover object-center group-hover:scale-102 transition-transform duration-500 opacity-90 group-hover:opacity-100"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-900/40 to-transparent flex flex-col justify-end p-4 sm:p-6">
-                      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-                        <div>
-                          <span className="px-2.5 py-0.5 rounded-md bg-blue-600/90 text-white text-[10px] font-extrabold uppercase tracking-wider mb-1.5 inline-block">
-                            Official Curriculum Blueprint • Unit 1 Lab Setup
-                          </span>
-                          <h4 className="text-white font-bold text-sm sm:text-lg">
-                            {studentKit.name}
-                          </h4>
-                          <p className="text-slate-300 text-xs sm:text-sm mt-0.5 line-clamp-1">
-                            {studentKit.tagline}
-                          </p>
-                        </div>
-
-                        <button 
-                          onClick={() => setIsKitDiagramModalOpen(true)}
-                          className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white/95 hover:bg-white text-slate-900 rounded-xl text-xs font-bold shadow-lg hover:shadow-xl transition-all cursor-pointer shrink-0"
-                        >
-                          <Maximize2 size={13} /> Enlarge Box Blueprint
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Filter Categories */}
-              <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1">Filter Parts:</span>
-                  {categories.map(cat => (
-                    <button
-                      key={cat}
-                      onClick={() => setComponentCategoryFilter(cat)}
-                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                        componentCategoryFilter === cat 
-                          ? 'bg-slate-900 text-white shadow-xs' 
-                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                      }`}
-                    >
-                      {cat} {cat === 'All' ? `(${kitComponents.length})` : ''}
-                    </button>
-                  ))}
-                </div>
-
-                <p className="text-[11px] text-slate-400 italic hidden sm:block">
-                  Click any component to inspect pinout & technical specifications
-                </p>
-              </div>
-
-              {/* VIEW MODE 1: GRID FLASHCARDS */}
-              {kitViewMode === 'grid' && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-                  {filteredComponents.map((comp) => (
-                    <div 
-                      key={comp.id}
-                      onClick={() => setSelectedComponent(comp)}
-                      className="group bg-slate-50 hover:bg-white border border-slate-200 hover:border-pixiu-blue/80 hover:shadow-md rounded-2xl p-3 sm:p-4 flex flex-col justify-between transition-all cursor-pointer relative overflow-hidden"
-                    >
-                      <div>
-                        {/* Thumbnail */}
-                        <div className="w-full aspect-4/3 rounded-xl overflow-hidden bg-white border border-slate-200/80 mb-2.5 relative flex items-center justify-center">
-                          <img 
-                            src={comp.image} 
-                            alt={comp.name} 
-                            className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-300"
-                            onError={(e) => { e.target.src = studentKit.overview_image; }}
-                          />
-                          <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded bg-slate-900/80 text-[9px] font-bold text-white uppercase tracking-wider backdrop-blur-xs">
-                            {comp.category || 'Component'}
-                          </span>
-                          {comp.qty && (
-                            <span className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded bg-blue-600 text-[9px] font-extrabold text-white shadow-xs">
-                              {comp.qty}
-                            </span>
-                          )}
-                        </div>
-
-                        <h4 className="font-bold text-slate-800 text-xs sm:text-sm line-clamp-2 group-hover:text-pixiu-blue transition-colors">
-                          {comp.name}
-                        </h4>
-                        <p className="text-[11px] text-slate-500 mt-1 line-clamp-2 leading-relaxed">
-                          {comp.role}
-                        </p>
-                      </div>
-
-                      <div className="flex items-center justify-between pt-2.5 mt-2 border-t border-slate-200/60 text-[10px] text-slate-400">
-                        <span className="font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
-                          {comp.session || 'Intro Unit'}
-                        </span>
-                        <span className="flex items-center gap-0.5 font-bold text-slate-600 group-hover:text-pixiu-blue">
-                          Inspect <ChevronRight size={11} />
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* VIEW MODE 2: ITEMIZED PARTS INVENTORY TABLE */}
-              {kitViewMode === 'table' && (
-                <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse text-xs">
-                      <thead>
-                        <tr className="bg-slate-900 text-white font-bold text-[11px] uppercase tracking-wider">
-                          <th className="py-3 px-3.5 w-12 text-center">#</th>
-                          <th className="py-3 px-3.5 w-16">Photo</th>
-                          <th className="py-3 px-3.5">Component & Purpose</th>
-                          <th className="py-3 px-3.5 w-28 text-center">Allocated Qty</th>
-                          <th className="py-3 px-3.5">Category</th>
-                          <th className="py-3 px-3.5">Key Specs / Pinout</th>
-                          <th className="py-3 px-3.5 text-center">Introduced</th>
-                          <th className="py-3 px-3.5 text-center">Custody Status</th>
-                          <th className="py-3 px-3.5 text-center">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {filteredComponents.map((comp, idx) => (
-                          <tr key={comp.id} className="hover:bg-blue-50/40 transition-colors">
-                            <td className="py-3 px-3.5 font-mono font-bold text-slate-400 text-center">
-                              {String(idx + 1).padStart(2, '0')}
-                            </td>
-                            <td className="py-3 px-3.5">
-                              <div className="w-12 h-10 rounded-lg overflow-hidden border border-slate-200 bg-white flex items-center justify-center">
-                                <img 
-                                  src={comp.image} 
-                                  alt={comp.name} 
-                                  className="w-full h-full object-cover"
-                                  onError={(e) => { e.target.src = studentKit.overview_image; }}
-                                />
-                              </div>
-                            </td>
-                            <td className="py-3 px-3.5 max-w-xs">
-                              <p className="font-bold text-slate-800 text-xs">{comp.name}</p>
-                              <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed line-clamp-1">{comp.role}</p>
-                            </td>
-                            <td className="py-3 px-3.5 text-center">
-                              <span className="font-mono font-bold px-2.5 py-1 rounded-md bg-blue-50 text-pixiu-blue border border-blue-200">
-                                {comp.qty || '1 Unit'}
-                              </span>
-                            </td>
-                            <td className="py-3 px-3.5">
-                              <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-semibold text-[10px]">
-                                {comp.category || 'Component'}
-                              </span>
-                            </td>
-                            <td className="py-3 px-3.5 max-w-xs text-slate-600 text-[11px] line-clamp-1">
-                              {comp.specs || 'Standard Lab Spec'}
-                            </td>
-                            <td className="py-3 px-3.5 text-center font-semibold text-slate-600 text-[11px]">
-                              {comp.session || 'Unit 1'}
-                            </td>
-                            <td className="py-3 px-3.5 text-center">
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                <CheckCircle size={11} /> In Box
-                              </span>
-                            </td>
-                            <td className="py-3 px-3.5 text-center">
-                              <button
-                                onClick={() => setSelectedComponent(comp)}
-                                className="px-2.5 py-1 bg-slate-100 hover:bg-pixiu-blue hover:text-white rounded-lg text-[10px] font-bold text-slate-700 transition-colors cursor-pointer"
-                              >
-                                Inspect
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {/* Robotics Lab Safety & Responsibility Protocol Strip */}
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-slate-600">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 font-bold">
-                    ⚡
-                  </div>
-                  <div>
-                    <p className="font-bold text-slate-800">Robotics Lab Handling & Return Rules:</p>
-                    <p className="text-[11px] text-slate-500">Unplug USB before rewiring • Never short 5V to GND • Count and verify every assigned part back into your numbered box before leaving the lab.</p>
-                  </div>
-                </div>
-                <span className="text-[10px] font-mono text-slate-500 uppercase tracking-wider bg-white px-2.5 py-1 rounded-lg border border-slate-200 shrink-0">
-                  Protocol: Unit 1 ISO
+              <div className="flex flex-wrap items-center gap-2 pt-1 text-xs text-slate-300">
+                <span className="flex items-center gap-1.5 bg-white/5 border border-white/10 px-2.5 py-1 rounded-lg">
+                  ⚡ 100% Genuine Lab Hardware
+                </span>
+                <span className="flex items-center gap-1.5 bg-white/5 border border-white/10 px-2.5 py-1 rounded-lg">
+                  📦 Complete Microcontroller & Sensory Pack
+                </span>
+                <span className="flex items-center gap-1.5 bg-white/5 border border-white/10 px-2.5 py-1 rounded-lg">
+                  🚚 Fast Home Dispatch & Instructor Setup
                 </span>
               </div>
             </div>
-          );
-        })()}
+
+            <div className="w-full lg:w-auto flex flex-col sm:flex-row lg:flex-col items-stretch sm:items-center gap-3 shrink-0">
+              <a
+                href={whatsappKitUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-6 py-3.5 bg-emerald-500 hover:bg-emerald-400 active:scale-98 text-slate-950 font-black text-sm rounded-xl shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2.5 transition-all cursor-pointer border border-emerald-300"
+              >
+                <MessageCircle size={18} className="fill-slate-950" />
+                WhatsApp Your Kit (+91 7985403186) →
+              </a>
+
+              <a
+                href="tel:+917985403186"
+                className="px-4 py-2 bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-all text-center"
+              >
+                <PhoneCall size={13} /> Or Call: +91 7985403186
+              </a>
+            </div>
+          </div>
+
+          {/* Master Kit Layout Blueprint Card */}
+          {studentKit.overview_image && (
+            <div className="relative rounded-xl sm:rounded-2xl overflow-hidden border border-emerald-500/20 bg-slate-950/60 mt-4 group">
+              <img 
+                src={studentKit.overview_image} 
+                alt={studentKit.name} 
+                className="w-full h-44 sm:h-64 object-cover object-center group-hover:scale-101 transition-transform duration-500 opacity-90"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent flex flex-col sm:flex-row items-start sm:items-end p-4 sm:p-6 justify-between gap-3">
+                <div>
+                  <span className="px-2.5 py-0.5 rounded-md bg-emerald-600 text-white text-[10px] font-extrabold uppercase tracking-wider mb-1 inline-block">
+                    Official Class {studentGrade} Hardware Kit
+                  </span>
+                  <h4 className="text-white font-bold text-xs sm:text-base">{studentKit.name}</h4>
+                  <p className="text-slate-300 text-[11px] sm:text-xs mt-0.5 line-clamp-1">{studentKit.tagline}</p>
+                </div>
+
+                <a
+                  href={whatsappKitUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs rounded-xl shadow-lg transition-all cursor-pointer shrink-0"
+                >
+                  <MessageCircle size={14} className="fill-slate-950" /> Buy on WhatsApp
+                </a>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* ==================== 2 INTERACTIVE LINE GRAPHS ==================== */}
         <div className="space-y-3 sm:space-y-4">
