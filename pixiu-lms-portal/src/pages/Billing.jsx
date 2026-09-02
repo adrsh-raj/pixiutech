@@ -16,7 +16,8 @@ export default function Billing() {
     updateInvoiceStatus, 
     confirmPaymentReceipt,
     updateBillingInvoice,
-    deleteBillingInvoice
+    deleteBillingInvoice,
+    pushSchoolNotification
   } = useData();
   const toast = useToast();
 
@@ -76,7 +77,7 @@ export default function Billing() {
     setConfirmingTranche(inv);
     setPaymentConfirmationData({
       payment_method: inv.payment_method || 'NEFT Bank Transfer',
-      receipt_no: inv.receipt_no || `REC-${inv.school_id || 'ZPS'}-2026-0${inv.tranche_number || 1}`,
+      receipt_no: inv.transaction_id || inv.receipt_no || `REC-${inv.school_id || 'ZPS'}-2026-0${inv.tranche_number || 1}`,
       place_of_supply: inv.place_of_supply || 'Hata, Uttar Pradesh',
       paid_date: inv.paid_date || new Date().toISOString().split('T')[0]
     });
@@ -93,9 +94,18 @@ export default function Billing() {
       paymentConfirmationData.receipt_no
     );
 
+    // Automatically send Reconciled / Confirmed Notification back to the school!
+    await pushSchoolNotification({
+      target_school_id: confirmingTranche.school_id,
+      title: `✅ Payment Verified & Reconciled!`,
+      message: `Payment for Invoice #${confirmingTranche.id} (${confirmingTranche.tranche_title || 'Tranche'} - ₹${Number(confirmingTranche.amount).toLocaleString('en-IN')}) with Ref: ${paymentConfirmationData.receipt_no} has been verified & matched by Pixiu Finance. Official Tax Invoice is updated.`,
+      type: 'payment_matched',
+      priority: 'high'
+    });
+
     toast.success(
-      `Payment of ₹${(confirmingTranche.amount || 0).toLocaleString('en-IN')} confirmed for ${confirmingTranche.tranche_title}! Receipt ${paymentConfirmationData.receipt_no} generated.`,
-      'Payment Verified & Recorded'
+      `Payment of ₹${(confirmingTranche.amount || 0).toLocaleString('en-IN')} confirmed for ${confirmingTranche.tranche_title}! Verified notification dispatched to ${confirmingTranche.school_name || confirmingTranche.school_id}.`,
+      'Payment Matched & Reconciled'
     );
     setConfirmingTranche(null);
   };
@@ -454,6 +464,10 @@ export default function Billing() {
                         <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
                           <CheckCircle size={11} /> Paid & Confirmed
                         </span>
+                      ) : (inv.status === 'Pending Verification' || inv.school_claimed_payment) ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-300 animate-pulse">
+                          <Clock size={11} className="animate-spin" /> School Submitted (UTR: {inv.transaction_id || inv.receipt_no || 'Proof Logged'})
+                        </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
                           <Clock size={11} /> Pending Receipt
@@ -699,6 +713,21 @@ export default function Billing() {
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono font-bold focus:outline-none focus:border-pixiu-blue"
                 />
               </div>
+
+              {confirmingTranche.proof_url && (
+                <div>
+                  <label className="block font-bold text-slate-500 uppercase mb-1">School Uploaded Payment Screenshot</label>
+                  <div className="rounded-xl overflow-hidden border border-slate-200 max-h-40 flex items-center justify-center bg-slate-50">
+                    <img src={confirmingTranche.proof_url} alt="Proof" className="max-h-40 object-contain" />
+                  </div>
+                </div>
+              )}
+
+              {confirmingTranche.payment_notes && (
+                <div className="p-2.5 bg-blue-50/70 border border-blue-200 rounded-xl text-blue-900 text-[11px]">
+                  <strong>School Remark:</strong> {confirmingTranche.payment_notes}
+                </div>
+              )}
 
               <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
                 <button 

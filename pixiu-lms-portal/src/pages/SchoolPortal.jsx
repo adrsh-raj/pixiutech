@@ -4,7 +4,8 @@ import {
   CheckCircle2, Clock, Phone, MessageSquare, Search, Filter, 
   Download, ArrowUpRight, ShieldCheck, Sparkles, LogOut, ChevronRight,
   GraduationCap, Calendar, Check, Zap, ArrowRight, Bell, X, Megaphone,
-  Box, AlertTriangle, RefreshCw, Send, Printer, IndianRupee, ShieldAlert
+  Box, AlertTriangle, RefreshCw, Send, Printer, IndianRupee, ShieldAlert,
+  CheckSquare, Square, Upload, Image as ImageIcon
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
@@ -32,7 +33,10 @@ export default function SchoolPortal() {
     curriculum,
     inventory = [],
     notifications,
-    updateInventoryStatus
+    updateInventoryStatus,
+    updateBillingInvoice,
+    pushSchoolNotification,
+    uploadFile
   } = useData();
 
   // Determine active school (Scoped to school login, or selectable for admin preview)
@@ -42,6 +46,19 @@ export default function SchoolPortal() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('students'); // 'students' | 'curriculum' | 'billing' | 'hardware' | 'trainer'
   
+  // Payment Submission Modal State (For School claiming payment with UTR / Screenshot)
+  const [submittingPaymentInvoice, setSubmittingPaymentInvoice] = useState(null);
+  const [paymentFormData, setPaymentFormData] = useState({
+    transaction_id: '',
+    payment_method: 'NEFT / RTGS Bank Transfer',
+    payment_date: new Date().toISOString().split('T')[0],
+    proof_url: '',
+    notes: ''
+  });
+  const [selectedProofFile, setSelectedProofFile] = useState(null);
+  const [proofFilePreview, setProofFilePreview] = useState('');
+  const [isUploadingProof, setIsUploadingProof] = useState(false);
+
   // RMA Modal State
   const [isRmaModalOpen, setIsRmaModalOpen] = useState(false);
   const [rmaData, setRmaData] = useState({
@@ -145,9 +162,98 @@ export default function SchoolPortal() {
     return Math.round((present / records.length) * 100);
   };
 
+  // Payment Confirmation Handlers
+  const handleOpenPaymentModal = (inv) => {
+    setSubmittingPaymentInvoice(inv);
+    setPaymentFormData({
+      transaction_id: inv.transaction_id || inv.receipt_no || '',
+      payment_method: inv.payment_method || 'NEFT / RTGS Bank Transfer',
+      payment_date: inv.paid_date || new Date().toISOString().split('T')[0],
+      proof_url: inv.proof_url || '',
+      notes: inv.payment_notes || ''
+    });
+    setSelectedProofFile(null);
+    setProofFilePreview(inv.proof_url || '');
+  };
+
+  const handleProofFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setSelectedProofFile(file);
+      setProofFilePreview(URL.createObjectURL(file));
+    }
+  };
+
+  const handlePaymentFormSubmit = async (e) => {
+    e.preventDefault();
+    if (!submittingPaymentInvoice) return;
+
+    setIsUploadingProof(true);
+    let uploadedUrl = paymentFormData.proof_url;
+
+    if (selectedProofFile) {
+      const uploadRes = await uploadFile(selectedProofFile);
+      if (uploadRes && uploadRes.success) {
+        uploadedUrl = uploadRes.url;
+      }
+    }
+
+    const updatedFields = {
+      status: 'Pending Verification',
+      school_claimed_payment: true,
+      transaction_id: paymentFormData.transaction_id,
+      receipt_no: paymentFormData.transaction_id,
+      payment_method: paymentFormData.payment_method,
+      paid_date: paymentFormData.payment_date,
+      proof_url: uploadedUrl,
+      payment_notes: paymentFormData.notes,
+      claimed_at: new Date().toISOString()
+    };
+
+    await updateBillingInvoice(submittingPaymentInvoice.id, updatedFields);
+
+    // Push high-priority notification to Admin
+    await pushSchoolNotification({
+      target_school_id: 'ALL',
+      title: `💰 Payment Proof Submitted: ${activeSchool.name}`,
+      message: `${activeSchool.name} submitted payment proof for ${submittingPaymentInvoice.tranche_title || 'Robotics Tranche'} (₹${Number(submittingPaymentInvoice.amount).toLocaleString('en-IN')}) with UTR: ${paymentFormData.transaction_id}. Please match and reconcile.`,
+      type: 'payment_claim',
+      priority: 'high'
+    });
+
+    setIsUploadingProof(false);
+    setSubmittingPaymentInvoice(null);
+    setSelectedProofFile(null);
+    setProofFilePreview('');
+
+    toast.success(
+      `Payment proof for ${submittingPaymentInvoice.id} logged! Notification dispatched to Pixiu Finance Admin for matching.`,
+      'Payment Submitted'
+    );
+  };
+
+  const handleUntickPayment = async (inv) => {
+    if (inv.status === 'Paid' || inv.is_confirmed === 1) {
+      toast.info('This invoice is already verified and reconciled by Pixiu Finance.');
+      return;
+    }
+
+    await updateBillingInvoice(inv.id, {
+      status: 'Pending',
+      school_claimed_payment: false,
+      transaction_id: '',
+      receipt_no: '',
+      proof_url: '',
+      payment_notes: ''
+    });
+
+    toast.info(`Payment submission for ${inv.id} reverted to unpaid.`, 'Claim Reverted');
+  };
+
   const handlePrintInvoice = (inv) => {
     const printWindow = window.open('', '_blank');
     const isPaid = inv.status === 'Paid' || inv.is_confirmed === 1;
+    const isPendingVerification = inv.status === 'Pending Verification' || inv.school_claimed_payment;
 
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -164,7 +270,8 @@ export default function SchoolPortal() {
             .invoice-title { font-size: 22px; font-weight: 800; color: #0A1A33; text-align: right; }
             .badge { display: inline-block; padding: 4px 12px; border-radius: 6px; font-size: 11px; font-weight: 800; text-transform: uppercase; margin-top: 5px; }
             .badge-paid { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
-            .badge-pending { background: #fef3c7; color: #b45309; border: 1px solid #fcd34d; }
+            .badge-pending-verify { background: #eff6ff; color: #1d4ed8; border: 1px solid #93c5fd; }
+            .badge-due { background: #fef3c7; color: #b45309; border: 1px solid #fcd34d; }
             .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 25px; font-size: 13px; }
             .card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; }
             .card-title { font-size: 11px; font-weight: 800; text-transform: uppercase; color: #64748b; margin-bottom: 8px; }
@@ -190,7 +297,9 @@ export default function SchoolPortal() {
             <div>
               <div class="invoice-title">TAX INVOICE</div>
               <div style="font-family: monospace; font-size: 12px; font-weight: bold; color: #64748b; margin-top: 2px;">#${inv.id}</div>
-              <div class="badge ${isPaid ? 'badge-paid' : 'badge-pending'}">${isPaid ? 'PAID & RECONCILED' : 'PAYMENT DUE'}</div>
+              <div class="badge ${isPaid ? 'badge-paid' : (isPendingVerification ? 'badge-pending-verify' : 'badge-due')}">
+                ${isPaid ? 'PAID & RECONCILED' : (isPendingVerification ? 'PAYMENT SUBMITTED (PENDING RECONCILIATION)' : 'PAYMENT DUE')}
+              </div>
             </div>
           </div>
 
@@ -203,10 +312,12 @@ export default function SchoolPortal() {
               <p style="margin: 2px 0 0; color: #475569;">Phone: ${activeSchool.principal_phone || 'N/A'}</p>
             </div>
             <div class="card">
-              <div class="card-title">Invoice Details:</div>
+              <div class="card-title">Invoice & Transaction Details:</div>
               <p style="margin: 0; color: #475569;">Date Issued: <strong>${inv.date_issued || '2026-08-01'}</strong></p>
               <p style="margin: 4px 0 0; color: #475569;">Due Date: <strong style="color: ${isPaid ? '#15803d' : '#b45309'};">${inv.due_date || '2026-08-15'}</strong></p>
               <p style="margin: 4px 0 0; color: #475569;">Payment Status: <strong>${inv.status}</strong></p>
+              ${inv.transaction_id ? `<p style="margin: 4px 0 0; color: #1e40af; font-family: monospace;">Transaction Ref/UTR: <strong>${inv.transaction_id}</strong></p>` : ''}
+              ${inv.paid_date ? `<p style="margin: 2px 0 0; color: #15803d;">Payment Date: <strong>${inv.paid_date}</strong></p>` : ''}
             </div>
           </div>
 
@@ -238,7 +349,7 @@ export default function SchoolPortal() {
           </div>
 
           <div class="footer">
-            <p style="margin: 0; font-weight: 600;">This is a computer-generated tax invoice issued by Pixiu Tech LLP.</p>
+            <p style="margin: 0; font-weight: 600;">This is an official computer-generated tax invoice issued by Pixiu Tech LLP.</p>
           </div>
         </body>
       </html>
@@ -477,7 +588,7 @@ export default function SchoolPortal() {
           </div>
         )}
 
-        {/* TAB 2: FINANCIAL LEDGER */}
+        {/* TAB 2: FINANCIAL LEDGER WITH TICK / UNTICK RECONCILIATION */}
         {activeTab === 'billing' && (
           <div className="space-y-6">
             <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-8 space-y-6">
@@ -485,7 +596,7 @@ export default function SchoolPortal() {
                 <div>
                   <h2 className="text-xl font-bold text-slate-900">Institutional Milestone Financial Ledger</h2>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Official contractual tranche invoice records and automated reconciliation.
+                    Tick to mark payment done, submit UTR/screenshot proof for instant admin reconciliation.
                   </p>
                 </div>
 
@@ -500,27 +611,88 @@ export default function SchoolPortal() {
               <div className="space-y-4">
                 {schoolBilling.map(inv => {
                   const isPaid = inv.status === 'Paid' || inv.is_confirmed === 1;
+                  const isPendingVerification = inv.status === 'Pending Verification' || inv.school_claimed_payment;
+
                   return (
                     <div
                       key={inv.id}
-                      className="p-5 rounded-2xl border border-slate-200 bg-slate-50/50 flex flex-col md:flex-row md:items-center justify-between gap-4"
+                      className={`p-5 rounded-2xl border transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 ${
+                        isPaid 
+                          ? 'bg-emerald-50/30 border-emerald-200' 
+                          : isPendingVerification 
+                            ? 'bg-blue-50/30 border-blue-200' 
+                            : 'bg-slate-50/60 border-slate-200'
+                      }`}
                     >
-                      <div>
-                        <div className="flex items-center gap-2 mb-1.5">
-                          <span className="font-mono text-xs font-bold text-pixiu-blue">#{inv.id}</span>
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                            isPaid ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'
-                          }`}>
-                            {isPaid ? '✓ PAID & CONFIRMED' : '⏳ PAYMENT DUE'}
-                          </span>
+                      <div className="flex items-start gap-3.5">
+                        {/* Interactive Payment Checkbox / Tick Icon */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isPaid) {
+                              toast.info('This invoice is already verified and confirmed by Pixiu Finance Admin.');
+                            } else if (isPendingVerification) {
+                              handleUntickPayment(inv);
+                            } else {
+                              handleOpenPaymentModal(inv);
+                            }
+                          }}
+                          className="mt-0.5 text-slate-400 hover:text-pixiu-blue cursor-pointer transition-transform active:scale-90"
+                          title={
+                            isPaid 
+                              ? "Payment Verified & Reconciled" 
+                              : isPendingVerification 
+                                ? "Click to untick / revoke submission" 
+                                : "Click to mark payment done and enter UTR"
+                          }
+                        >
+                          {isPaid ? (
+                            <CheckSquare size={24} className="text-emerald-600 fill-emerald-100" />
+                          ) : isPendingVerification ? (
+                            <CheckSquare size={24} className="text-blue-600 fill-blue-100 animate-pulse" />
+                          ) : (
+                            <Square size={24} className="text-slate-300 hover:text-emerald-600" />
+                          )}
+                        </button>
+
+                        <div>
+                          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                            <span className="font-mono text-xs font-bold text-pixiu-blue">#{inv.id}</span>
+                            
+                            {isPaid ? (
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
+                                <CheckCircle2 size={11} /> PAID & RECONCILED
+                              </span>
+                            ) : isPendingVerification ? (
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-300 flex items-center gap-1">
+                                <Clock size={11} className="animate-spin" /> SUBMITTED (Awaiting Admin Match)
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1">
+                                ⏳ PAYMENT DUE
+                              </span>
+                            )}
+                          </div>
+
+                          <h3 className="font-bold text-slate-900 text-sm">{inv.tranche_title || 'Robotics Lab Tranche'}</h3>
+                          <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-3 flex-wrap">
+                            <span>Date Issued: <strong>{inv.date_issued || '2026-08-01'}</strong></span>
+                            <span>Due Date: <strong className="text-slate-700">{inv.due_date || '2026-08-15'}</strong></span>
+                            {inv.transaction_id && (
+                              <span className="font-mono text-blue-700 font-bold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                                UTR: {inv.transaction_id}
+                              </span>
+                            )}
+                            {inv.paid_date && (
+                              <span className="text-emerald-700 font-bold">
+                                Paid on: {inv.paid_date}
+                              </span>
+                            )}
+                          </p>
                         </div>
-                        <h3 className="font-bold text-slate-900 text-sm">{inv.tranche_title || 'Robotics Lab Tranche'}</h3>
-                        <p className="text-xs text-slate-500 mt-0.5">
-                          Date Issued: {inv.date_issued || '2026-08-01'} • Due Date: {inv.due_date || '2026-08-15'}
-                        </p>
                       </div>
 
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-3 self-end md:self-center">
                         <div className="text-right">
                           <span className="text-lg font-black text-slate-900">
                             ₹{Number(inv.amount).toLocaleString('en-IN')}
@@ -528,12 +700,32 @@ export default function SchoolPortal() {
                           <span className="block text-[10px] text-slate-400 font-medium">Net Amount (INR)</span>
                         </div>
 
+                        {!isPaid && !isPendingVerification && (
+                          <button
+                            onClick={() => handleOpenPaymentModal(inv)}
+                            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-sm shadow-emerald-600/20"
+                          >
+                            <CheckSquare size={14} />
+                            <span>Mark Paid</span>
+                          </button>
+                        )}
+
+                        {isPendingVerification && (
+                          <button
+                            onClick={() => handleUntickPayment(inv)}
+                            className="px-3 py-2 bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-700 font-bold text-xs rounded-xl transition-all cursor-pointer border border-slate-200"
+                            title="Revert payment submission"
+                          >
+                            Untick
+                          </button>
+                        )}
+
                         <button
                           onClick={() => handlePrintInvoice(inv)}
                           className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
                         >
                           <Printer size={14} />
-                          <span>Print Tax Invoice</span>
+                          <span>Tax Invoice</span>
                         </button>
                       </div>
                     </div>
@@ -637,7 +829,126 @@ export default function SchoolPortal() {
         )}
       </main>
 
-      {/* RMA Ticket Modal */}
+      {/* ==================== MODAL 1: PAYMENT SUBMISSION MODAL ==================== */}
+      <Modal
+        isOpen={!!submittingPaymentInvoice}
+        onClose={() => setSubmittingPaymentInvoice(null)}
+        title={`Confirm Payment Submission - #${submittingPaymentInvoice?.id || ''}`}
+        size="md"
+      >
+        {submittingPaymentInvoice && (
+          <form onSubmit={handlePaymentFormSubmit} className="space-y-4 text-xs">
+            <div className="bg-emerald-50/80 border border-emerald-200 rounded-xl p-3.5">
+              <span className="text-[10px] font-bold text-emerald-800 uppercase block">Tranche Details</span>
+              <h4 className="font-bold text-emerald-950 text-sm">{submittingPaymentInvoice.tranche_title}</h4>
+              <p className="text-base font-black text-emerald-700 mt-0.5">
+                ₹{Number(submittingPaymentInvoice.amount).toLocaleString('en-IN')}
+              </p>
+            </div>
+
+            <div>
+              <label className="block font-bold text-slate-600 uppercase mb-1">
+                Transaction ID / UTR / Reference Number *
+              </label>
+              <input
+                type="text"
+                required
+                value={paymentFormData.transaction_id}
+                onChange={e => setPaymentFormData({ ...paymentFormData, transaction_id: e.target.value })}
+                placeholder="e.g. UTR984719283719 or IMPS/UPI Ref No"
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono font-bold text-slate-800 focus:outline-none focus:border-pixiu-blue"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block font-bold text-slate-600 uppercase mb-1">Payment Method *</label>
+                <select
+                  value={paymentFormData.payment_method}
+                  onChange={e => setPaymentFormData({ ...paymentFormData, payment_method: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold bg-white focus:outline-none focus:border-pixiu-blue"
+                >
+                  <option value="NEFT / RTGS Bank Transfer">NEFT / RTGS Bank Transfer</option>
+                  <option value="UPI / Instant QR Payment">UPI / Instant QR Payment</option>
+                  <option value="Account Payee Cheque">Account Payee Cheque</option>
+                  <option value="Direct Bank Wire">Direct Bank Wire</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-600 uppercase mb-1">Payment Date *</label>
+                <input
+                  type="date"
+                  required
+                  value={paymentFormData.payment_date}
+                  onChange={e => setPaymentFormData({ ...paymentFormData, payment_date: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold text-slate-800 focus:outline-none focus:border-pixiu-blue"
+                />
+              </div>
+            </div>
+
+            {/* Optional Screenshot / Payment Proof Upload */}
+            <div>
+              <label className="block font-bold text-slate-600 uppercase mb-1">
+                Payment Screenshot / Receipt Proof (Optional)
+              </label>
+              <div className="border border-dashed border-slate-300 rounded-xl p-3 text-center bg-slate-50/60 hover:bg-slate-50 transition-colors">
+                <input
+                  type="file"
+                  accept="image/*,.pdf"
+                  onChange={handleProofFileChange}
+                  className="hidden"
+                  id="proof-upload"
+                />
+                <label htmlFor="proof-upload" className="cursor-pointer block space-y-1">
+                  <Upload size={18} className="mx-auto text-slate-400" />
+                  <span className="text-[11px] font-bold text-pixiu-blue block">
+                    {selectedProofFile ? selectedProofFile.name : "Click to attach payment receipt screenshot"}
+                  </span>
+                  <span className="text-[10px] text-slate-400 block">PNG, JPG, or PDF up to 5MB</span>
+                </label>
+              </div>
+
+              {proofFilePreview && (
+                <div className="mt-2 rounded-xl overflow-hidden border border-slate-200 max-h-36 flex items-center justify-center bg-slate-100">
+                  <img src={proofFilePreview} alt="Proof Preview" className="max-h-36 object-contain" />
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="block font-bold text-slate-600 uppercase mb-1">Additional Notes / Remarks</label>
+              <textarea
+                rows="2"
+                value={paymentFormData.notes}
+                onChange={e => setPaymentFormData({ ...paymentFormData, notes: e.target.value })}
+                placeholder="e.g. Paid via Central Bank corporate netbanking..."
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl font-medium focus:outline-none focus:border-pixiu-blue"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setSubmittingPaymentInvoice(null)}
+                className="px-4 py-2 font-medium text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isUploadingProof}
+                className="px-5 py-2 font-bold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 rounded-xl shadow-md shadow-emerald-600/20 cursor-pointer flex items-center gap-1.5"
+              >
+                <CheckSquare size={14} />
+                <span>{isUploadingProof ? "Uploading Proof..." : "Confirm & Submit Payment Proof"}</span>
+              </button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      {/* ==================== MODAL 2: RMA TICKET MODAL ==================== */}
       <Modal
         isOpen={isRmaModalOpen}
         onClose={() => setIsRmaModalOpen(false)}
