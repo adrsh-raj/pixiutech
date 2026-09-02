@@ -3,7 +3,7 @@ import {
   Building2, Users, Award, BookOpen, Receipt, FileText, 
   CheckCircle2, Clock, Phone, MessageSquare, Search, Filter, 
   Download, ArrowUpRight, ShieldCheck, Sparkles, LogOut, ChevronRight,
-  GraduationCap, Calendar, Check, Zap, ArrowRight
+  GraduationCap, Calendar, Check, Zap, ArrowRight, Bell, X, Megaphone
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
@@ -33,6 +33,16 @@ export default function SchoolPortal() {
   const [selectedGradeFilter, setSelectedGradeFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('students'); // 'students' | 'curriculum' | 'billing' | 'trainer'
+  
+  // Notification Flyout & Read State
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [readNotifIds, setReadNotifIds] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem(`pixiu_school_read_${defaultSchoolId}`) || '[]');
+    } catch (e) {
+      return [];
+    }
+  });
 
   const activeSchool = useMemo(() => {
     return schools.find(s => s.id === selectedSchoolId) || schools[0] || {
@@ -113,6 +123,26 @@ export default function SchoolPortal() {
     return Math.round((present / records.length) * 100);
   };
 
+  // Unread count and mark handlers
+  const unreadNotifs = useMemo(() => {
+    return schoolNotifications.filter(n => !readNotifIds.includes(n.id));
+  }, [schoolNotifications, readNotifIds]);
+  const unreadCount = unreadNotifs.length;
+
+  const markAsRead = (id) => {
+    setReadNotifIds(prev => {
+      const updated = [...prev, id];
+      try { localStorage.setItem(`pixiu_school_read_${selectedSchoolId}`, JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+  };
+
+  const markAllAsRead = () => {
+    const allIds = schoolNotifications.map(n => n.id);
+    setReadNotifIds(allIds);
+    try { localStorage.setItem(`pixiu_school_read_${selectedSchoolId}`, JSON.stringify(allIds)); } catch (e) {}
+  };
+
   const handlePrintStudentPDF = (e, student) => {
     e.stopPropagation();
     const attendanceRate = getStudentAttendance(student.student_id);
@@ -133,7 +163,7 @@ export default function SchoolPortal() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 pb-20">
-      {/* Header - Identical to Admin Console Header */}
+      {/* Header - Identical to Admin Console Header with Notification Bell */}
       <header className="bg-white border-b border-slate-200 h-16 px-4 sm:px-8 flex items-center justify-between sticky top-0 z-40 shadow-xs">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
@@ -165,6 +195,106 @@ export default function SchoolPortal() {
               </select>
             </div>
           )}
+
+          {/* Interactive Notification Bell with Red Badge & Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setIsNotifOpen(!isNotifOpen)}
+              className="relative p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-all cursor-pointer border border-slate-200 flex items-center justify-center"
+              title="Institutional Announcements & Directives"
+            >
+              <Bell size={18} />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-white shadow-xs animate-pulse">
+                  {unreadCount}
+                </span>
+              )}
+            </button>
+
+            {/* Flyout Notification Drawer / Dropdown */}
+            {isNotifOpen && (
+              <div className="absolute right-0 mt-3 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden z-50 animate-in fade-in zoom-in-95 text-slate-800 max-h-[80vh] flex flex-col">
+                <div className="p-3.5 bg-slate-900 text-white flex justify-between items-center border-b border-slate-800 shrink-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Megaphone size={15} className="text-pixiu-blue shrink-0 animate-bounce"/>
+                    <h3 className="font-bold text-xs uppercase tracking-wider truncate">
+                      Official Notices ({unreadCount} Unread)
+                    </h3>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {unreadCount > 0 && (
+                      <button
+                        onClick={markAllAsRead}
+                        className="text-[10px] font-bold text-blue-400 hover:text-blue-300 cursor-pointer underline"
+                      >
+                        Mark all read
+                      </button>
+                    )}
+                    <button 
+                      onClick={() => setIsNotifOpen(false)} 
+                      className="p-1 text-slate-400 hover:text-white cursor-pointer"
+                    >
+                      <X size={16}/>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="overflow-y-auto p-3 space-y-2.5 flex-1 divide-y divide-slate-100">
+                  {schoolNotifications.map(notif => {
+                    const isRead = readNotifIds.includes(notif.id);
+                    return (
+                      <div 
+                        key={notif.id}
+                        className={`p-3 rounded-xl border text-xs space-y-2 transition-all ${
+                          isRead 
+                            ? 'bg-slate-50 border-slate-200 opacity-70' 
+                            : 'bg-blue-50/60 border-blue-200 shadow-xs'
+                        }`}
+                      >
+                        <div className="flex justify-between items-start gap-1">
+                          <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${
+                            notif.priority === 'high' || notif.severity === 'urgent' 
+                              ? 'bg-rose-100 text-rose-800' 
+                              : 'bg-blue-100 text-blue-800'
+                          }`}>
+                            {notif.priority || notif.severity || 'Notice'}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            {notif.scheduled_date || notif.created_at || 'Today'}
+                          </span>
+                        </div>
+
+                        <h4 className="font-bold text-slate-900 text-xs">{notif.title}</h4>
+                        <p className="text-slate-600 text-[11px] leading-relaxed whitespace-pre-line bg-white p-2 rounded-lg border border-slate-100">{notif.message}</p>
+
+                        <div className="pt-1 flex justify-between items-center text-[10px]">
+                          <span className="text-slate-400 font-medium">Authority: <b>{notif.sender_name || 'Central Admin'}</b></span>
+                          {isRead ? (
+                            <span className="text-emerald-600 font-bold flex items-center gap-1">
+                              <Check size={12}/> Read
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => markAsRead(notif.id)}
+                              className="px-2 py-0.5 bg-pixiu-blue hover:bg-blue-600 text-white rounded text-[10px] font-bold cursor-pointer transition-all shadow-xs"
+                            >
+                              ✓ Mark as Read
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {schoolNotifications.length === 0 && (
+                    <div className="p-8 text-center text-slate-400 text-xs font-medium">
+                      No announcements published yet.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
 
           <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Institutional Live
