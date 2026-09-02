@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react';
 import { Search, Plus, MoreVertical, MessageCircle, Building2, X, FileText, ChevronRight, User, Award, Activity, Box, Trash2, Edit, Check, Phone, GraduationCap } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { useToast } from '../context/ToastContext';
+import { generateStudentTranscriptPDF } from '../utils/transcriptGenerator';
 
 const generateId = (schoolCode, cls, sec, roll) => {
   return `${schoolCode}${cls}${sec ? sec : ''} ${roll}`;
 };
 
 export default function Students() {
-  const { schools, classes, students, projects, addStudent, updateStudent, deleteStudent, getNextRollNumber, getStudentAttendance } = useData();
+  const { schools, classes, students, projects, studentReviews, curriculum, addStudent, updateStudent, deleteStudent, getNextRollNumber, getStudentAttendance } = useData();
   const toast = useToast();
   
   const [selectedSchool, setSelectedSchool] = useState('ZPS');
@@ -99,73 +100,19 @@ export default function Students() {
   };
 
   const handlePrintPDF = (e, student) => {
-    e.stopPropagation();
+    if (e && e.stopPropagation) e.stopPropagation();
     const schoolName = schools.find(s => s.id === student.school_id)?.name || 'Zenith Public School';
     const studentProjects = projects.filter(p => p.student_id === student.student_id);
     const attendancePercentage = getStudentAttendance(student.student_id);
 
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Progress Report - ${student.name}</title>
-          <style>
-            body { font-family: 'Segoe UI', Arial, sans-serif; padding: 40px; color: #1e293b; }
-            .header { border-bottom: 3px solid #3b82f6; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; }
-            .title { font-size: 24px; font-weight: bold; color: #0f172a; }
-            .badge { display: inline-block; padding: 4px 12px; background: #dbeafe; color: #1d4ed8; border-radius: 999px; font-weight: bold; font-size: 12px; }
-            .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 30px; }
-            .card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; }
-            .table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-            .table th { text-align: left; padding: 10px; background: #f1f5f9; font-size: 12px; }
-            .table td { padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 13px; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div>
-              <div class="title">Pixiu Tech</div>
-              <div style="color: #64748b; font-size: 13px; margin-top: 4px;">Student Hardware Build Transcript & Assessment</div>
-            </div>
-            <span class="badge">ZENITH PUBLIC SCHOOL</span>
-          </div>
-
-          <div class="grid">
-            <div class="card">
-              <div style="font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: bold;">Student Name</div>
-              <div style="font-size: 20px; font-weight: bold; margin-top: 4px;">${student.name}</div>
-              <p style="font-size: 13px; color: #475569; margin-top: 4px;">ID: <b>${student.student_id}</b> | School: <b>${schoolName}</b></p>
-            </div>
-            <div class="card">
-              <div style="font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: bold;">Lab Attendance & Mastery</div>
-              <div style="font-size: 20px; font-weight: bold; margin-top: 4px; color: #16a34a;">${attendancePercentage}% Attendance</div>
-              <p style="font-size: 13px; color: #475569; margin-top: 4px;">Level: <b>${student.tech_level}</b> | Kit: <b>${student.assigned_kit_id || 'Lab Kit'}</b></p>
-            </div>
-          </div>
-
-          <div class="card">
-            <div style="font-size: 12px; font-weight: bold; color: #0f172a; text-transform: uppercase;">Certified Projects</div>
-            <table class="table">
-              <thead><tr><th>Project Title</th><th>Status</th><th>Score</th><th>Notes</th></tr></thead>
-              <tbody>
-                ${studentProjects.map(p => `
-                  <tr>
-                    <td><b>${p.title}</b></td>
-                    <td><span style="color: #16a34a; font-weight: bold;">${p.status}</span></td>
-                    <td><b>${p.score || 10}/10</b></td>
-                    <td>${p.evidence_note || 'Verified in lab'}</td>
-                  </tr>
-                `).join('')}
-                ${studentProjects.length === 0 ? '<tr><td colspan="4" style="text-align:center; color:#94a3b8;">No projects completed yet</td></tr>' : ''}
-              </tbody>
-            </table>
-          </div>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => printWindow.print(), 300);
+    generateStudentTranscriptPDF({
+      student,
+      school: schoolName,
+      attendanceRate: attendancePercentage,
+      studentReviews: studentReviews || [],
+      projects: studentProjects,
+      curriculum: curriculum || []
+    });
   };
 
   // View: Single Student Profile Detailed Screen
