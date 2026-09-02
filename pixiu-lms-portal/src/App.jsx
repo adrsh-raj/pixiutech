@@ -366,8 +366,6 @@ function StudentRouteGuard() {
 }
 
 export default function App() {
-  const { user } = useAuth();
-
   return (
     <ToastProvider>
       <AuthProvider>
