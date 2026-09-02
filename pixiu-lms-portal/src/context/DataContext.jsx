@@ -98,7 +98,7 @@ export function DataProvider({ children }) {
   const [classKits, setClassKits] = useState(() => {
     try {
       const saved = safeGetItem('pixiu_class_kits', null);
-      if (!saved || !saved['6'] || !saved['11']) {
+      if (!saved || !saved['6'] || !saved['11'] || !saved['6']?.components || saved['6']?.components?.length < 12) {
         localStorage.setItem('pixiu_class_kits', JSON.stringify(CLASS_KITS));
         return CLASS_KITS;
       }

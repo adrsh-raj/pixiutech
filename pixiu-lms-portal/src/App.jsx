@@ -354,14 +354,6 @@ function StudentRouteGuard() {
     return <Navigate to="/login" replace />;
   }
 
-  // Prevent Admins and Trainers from masquerading or getting stuck in Student Portal
-  if (user?.role === 'admin') {
-    return <Navigate to="/" replace />;
-  }
-  if (user?.role === 'trainer') {
-    return <Navigate to="/trainers" replace />;
-  }
-
   return <StudentPortal />;
 }
 

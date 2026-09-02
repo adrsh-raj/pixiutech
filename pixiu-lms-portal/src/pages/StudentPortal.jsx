@@ -21,12 +21,20 @@ export default function StudentPortal() {
   const [componentCategoryFilter, setComponentCategoryFilter] = useState('All');
   const [isKitDiagramModalOpen, setIsKitDiagramModalOpen] = useState(false);
 
-  // Find logged in student object
-  const cleanId = (user?.username || user?.related_id || '').trim().replace(/\s+/g, ' ');
-  const student = students.find(s => s.student_id.trim().replace(/\s+/g, ' ') === cleanId) || {
-    student_id: user?.username || 'ZPS6A 01',
-    name: user?.name || 'Aarav Sharma',
-    school_id: user?.school_id || 'ZPS',
+  // Faculty / Admin live preview support
+  const isAdminOrTrainer = user?.role === 'admin' || user?.role === 'trainer';
+  const [previewStudentId, setPreviewStudentId] = useState('ZPS6A 01');
+
+  // Resolve active student
+  const activeStudentId = isAdminOrTrainer ? previewStudentId : (user?.username || user?.related_id || 'ZPS6A 01');
+  const cleanId = (activeStudentId || '').trim().replace(/\s+/g, ' ');
+
+  const student = students.find(s => (s.student_id || '').trim().replace(/\s+/g, ' ') === cleanId) || 
+                  students.find(s => s.id === activeStudentId) || 
+                  students[0] || {
+    student_id: 'ZPS6A 01',
+    name: 'Aarav Sharma',
+    school_id: 'ZPS',
     tech_level: 'Level 1',
     class_id: 'CLS-ZPS-6A',
     assigned_kit_id: 'KIT-ZPS-01'
@@ -42,8 +50,19 @@ export default function StudentPortal() {
     return pid === currentId || pid === cleanCurrent || p.student_id === student.student_id;
   });
   
-  // Extract grade from class_id (e.g. CLS-ZPS-6A -> '6', CLS-ZPS-11A -> '11')
-  const studentGrade = student.class_id ? student.class_id.replace('CLS-ZPS-', '').replace('A', '') : '6';
+  // Extract grade accurately (e.g. CLS-ZPS-6A -> '6', CLS-ZPS-11A -> '11', ZPS7A 01 -> '7')
+  const extractGrade = (s) => {
+    if (s?.class_id) {
+      const match = s.class_id.match(/CLS-ZPS-(\d+)/i);
+      if (match) return match[1];
+    }
+    if (s?.student_id) {
+      const match = s.student_id.match(/ZPS(\d+)/i);
+      if (match) return match[1];
+    }
+    return '6';
+  };
+  const studentGrade = extractGrade(student);
   
   // Active broadcast notifications for this student's grade
   const classNotifs = (notifications || []).filter(n => {
@@ -572,6 +591,54 @@ export default function StudentPortal() {
       </header>
 
       <main className="max-w-6xl mx-auto px-3 sm:px-6 pt-5 sm:pt-8 space-y-4 sm:space-y-6">
+        {/* Faculty / Admin Live Preview Switcher */}
+        {isAdminOrTrainer && (
+          <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 border border-blue-500/40 rounded-2xl p-4 text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-3 animate-in fade-in">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-400/40 flex items-center justify-center text-blue-300 font-bold text-base shrink-0">
+                🛡️
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-sm text-white">Faculty & Admin Student Portal Preview</h3>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/30 text-blue-300 border border-blue-400/30">
+                    Live Role Simulator
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 mt-0.5">Switch student cohort to inspect their hardware kits and curriculum view:</p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+              {[
+                { grade: '6', id: 'ZPS6A 01', label: 'Class 6 (Aarav)' },
+                { grade: '7', id: 'ZPS7A 01', label: 'Class 7 (Devansh)' },
+                { grade: '8', id: 'ZPS8A 01', label: 'Class 8 (Siddharth)' },
+                { grade: '9', id: 'ZPS9A 01', label: 'Class 9 (Arjun)' },
+                { grade: '11', id: 'ZPS11A 01', label: 'Class 11 (Aryan)' }
+              ].map(c => (
+                <button
+                  key={c.grade}
+                  onClick={() => setPreviewStudentId(c.id)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    previewStudentId === c.id 
+                      ? 'bg-pixiu-blue text-white shadow-lg ring-2 ring-white/50 scale-105' 
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+                  }`}
+                >
+                  {c.label}
+                </button>
+              ))}
+              <a
+                href="/"
+                className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-white text-slate-900 hover:bg-slate-100 shadow-md ml-auto md:ml-2 transition-all flex items-center gap-1"
+              >
+                ⬅️ Admin Console
+              </a>
+            </div>
+          </div>
+        )}
+
         {/* 1. Student Profile Hero Card (Now First) */}
         <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-8 text-white shadow-xl border border-slate-700/60 relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-4 sm:gap-6">
           <div className="flex items-center gap-3.5 sm:gap-5 w-full md:w-auto">
@@ -667,6 +734,160 @@ export default function StudentPortal() {
             </span>
           </div>
         </div>
+
+        {/* ==================== ASSIGNED HARDWARE KIT & PDF EXTRACTED COMPONENTS (NOW PROMINENTLY AT TOP) ==================== */}
+        {(() => {
+          const studentKit = classKits[studentGrade] || classKits['6'] || {};
+          const kitComponents = studentKit.components || [];
+          const categories = ['All', ...new Set(kitComponents.map(c => c.category || 'General'))];
+          const filteredComponents = componentCategoryFilter === 'All' 
+            ? kitComponents 
+            : kitComponents.filter(c => (c.category || 'General') === componentCategoryFilter);
+
+          return (
+            <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 p-4 sm:p-8 shadow-sm space-y-5 sm:space-y-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-100 pb-4 sm:pb-5">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <h3 className="text-sm sm:text-lg font-bold text-slate-800">
+                      Assigned STEM Robotics Hardware Kit (Class {studentGrade} Cohort)
+                    </h3>
+                  </div>
+                  <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">
+                    {studentKit.name || `Class ${studentGrade} Robotics Kit`} • Tag ID: <span className="font-mono font-bold text-pixiu-blue">{student.assigned_kit_id || studentKit.kit_id}</span>
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[10px] sm:text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-full flex items-center gap-1.5 shadow-2xs">
+                    <CheckCircle size={13} /> Status: Lab Verified & Good
+                  </span>
+                  <span className="text-[10px] sm:text-xs font-bold bg-blue-50 text-pixiu-blue border border-blue-200 px-3 py-1 rounded-full flex items-center gap-1 shadow-2xs">
+                    <Cpu size={13} /> {kitComponents.length} Components Allocated
+                  </span>
+                </div>
+              </div>
+
+              {/* Master Kit Layout Diagram Banner */}
+              {studentKit.overview_image && (
+                <div className="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-900 shadow-inner group">
+                  <div className="relative">
+                    <img 
+                      src={studentKit.overview_image} 
+                      alt={studentKit.name} 
+                      className="w-full h-44 sm:h-72 object-cover object-center group-hover:scale-102 transition-transform duration-500 opacity-90 group-hover:opacity-100"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-900/40 to-transparent flex flex-col justify-end p-4 sm:p-6">
+                      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+                        <div>
+                          <span className="px-2.5 py-0.5 rounded-md bg-blue-600/90 text-white text-[10px] font-extrabold uppercase tracking-wider mb-1.5 inline-block">
+                            Official Curriculum Blueprint • Unit 1
+                          </span>
+                          <h4 className="text-white font-bold text-sm sm:text-lg">
+                            {studentKit.name}
+                          </h4>
+                          <p className="text-slate-300 text-xs sm:text-sm mt-0.5 line-clamp-1">
+                            {studentKit.tagline}
+                          </p>
+                        </div>
+
+                        <button 
+                          onClick={() => setIsKitDiagramModalOpen(true)}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white/95 hover:bg-white text-slate-900 rounded-xl text-xs font-bold shadow-lg hover:shadow-xl transition-all cursor-pointer shrink-0"
+                        >
+                          <Maximize2 size={13} /> Enlarge Diagram
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Filter Categories */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1">Filter:</span>
+                  {categories.map(cat => (
+                    <button
+                      key={cat}
+                      onClick={() => setComponentCategoryFilter(cat)}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        componentCategoryFilter === cat 
+                          ? 'bg-slate-900 text-white shadow-xs' 
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      {cat} {cat === 'All' ? `(${kitComponents.length})` : ''}
+                    </button>
+                  ))}
+                </div>
+
+                <p className="text-[11px] text-slate-400 italic hidden sm:block">
+                  Click any component to inspect pinout & safety specifications
+                </p>
+              </div>
+
+              {/* Grid of Individual Component Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+                {filteredComponents.map((comp) => (
+                  <div 
+                    key={comp.id}
+                    onClick={() => setSelectedComponent(comp)}
+                    className="group bg-slate-50 hover:bg-white border border-slate-200 hover:border-pixiu-blue/80 hover:shadow-md rounded-2xl p-3 sm:p-4 flex flex-col justify-between transition-all cursor-pointer relative overflow-hidden"
+                  >
+                    <div>
+                      {/* Thumbnail */}
+                      <div className="w-full aspect-4/3 rounded-xl overflow-hidden bg-white border border-slate-200/80 mb-2.5 relative flex items-center justify-center">
+                        <img 
+                          src={comp.image} 
+                          alt={comp.name} 
+                          className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-300"
+                          onError={(e) => { e.target.src = studentKit.overview_image; }}
+                        />
+                        <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded bg-slate-900/80 text-[9px] font-bold text-white uppercase tracking-wider backdrop-blur-xs">
+                          {comp.category || 'Component'}
+                        </span>
+                      </div>
+
+                      <h4 className="font-bold text-slate-800 text-xs sm:text-sm line-clamp-2 group-hover:text-pixiu-blue transition-colors">
+                        {comp.name}
+                      </h4>
+                      <p className="text-[11px] text-slate-500 mt-1 line-clamp-2 leading-relaxed">
+                        {comp.role}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2.5 mt-2 border-t border-slate-200/60 text-[10px] text-slate-400">
+                      <span className="font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
+                        {comp.session || 'Intro Unit'}
+                      </span>
+                      <span className="flex items-center gap-0.5 font-bold text-slate-600 group-hover:text-pixiu-blue">
+                        Inspect <ChevronRight size={11} />
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Robotics Lab Safety & Responsibility Protocol Strip */}
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-slate-600">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 font-bold">
+                    ⚡
+                  </div>
+                  <div>
+                    <p className="font-bold text-slate-800">Robotics Lab Handling Rules:</p>
+                    <p className="text-[11px] text-slate-500">Unplug USB before rewiring • Never short 5V to GND • Count every part back into box before leaving.</p>
+                  </div>
+                </div>
+                <span className="text-[10px] font-mono text-slate-500 uppercase tracking-wider bg-white px-2.5 py-1 rounded-lg border border-slate-200 shrink-0">
+                  Protocol: Unit 1 ISO
+                </span>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* ==================== 2 INTERACTIVE LINE GRAPHS ==================== */}
         <div className="space-y-3 sm:space-y-4">
@@ -857,160 +1078,6 @@ export default function StudentPortal() {
             ))}
           </div>
         </div>
-
-        {/* ==================== ASSIGNED HARDWARE KIT & PDF EXTRACTED COMPONENTS ==================== */}
-        {(() => {
-          const studentKit = classKits[studentGrade] || classKits['6'] || {};
-          const kitComponents = studentKit.components || [];
-          const categories = ['All', ...new Set(kitComponents.map(c => c.category || 'General'))];
-          const filteredComponents = componentCategoryFilter === 'All' 
-            ? kitComponents 
-            : kitComponents.filter(c => (c.category || 'General') === componentCategoryFilter);
-
-          return (
-            <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 p-4 sm:p-8 shadow-sm space-y-5 sm:space-y-6">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-100 pb-4 sm:pb-5">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                    <h3 className="text-sm sm:text-lg font-bold text-slate-800">
-                      Assigned STEM Robotics Hardware Kit (Class {studentGrade} Cohort)
-                    </h3>
-                  </div>
-                  <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">
-                    {studentKit.name || `Class ${studentGrade} Robotics Kit`} • Tag ID: <span className="font-mono font-bold text-pixiu-blue">{student.assigned_kit_id || studentKit.kit_id}</span>
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-[10px] sm:text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-full flex items-center gap-1.5 shadow-2xs">
-                    <CheckCircle size={13} /> Status: Lab Verified & Good
-                  </span>
-                  <span className="text-[10px] sm:text-xs font-bold bg-blue-50 text-pixiu-blue border border-blue-200 px-3 py-1 rounded-full flex items-center gap-1 shadow-2xs">
-                    <Cpu size={13} /> {kitComponents.length} Components Allocated
-                  </span>
-                </div>
-              </div>
-
-              {/* Master Kit Layout Diagram Banner */}
-              {studentKit.overview_image && (
-                <div className="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-900 shadow-inner group">
-                  <div className="relative">
-                    <img 
-                      src={studentKit.overview_image} 
-                      alt={studentKit.name} 
-                      className="w-full h-44 sm:h-72 object-cover object-center group-hover:scale-102 transition-transform duration-500 opacity-90 group-hover:opacity-100"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-900/40 to-transparent flex flex-col justify-end p-4 sm:p-6">
-                      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-                        <div>
-                          <span className="px-2.5 py-0.5 rounded-md bg-blue-600/90 text-white text-[10px] font-extrabold uppercase tracking-wider mb-1.5 inline-block">
-                            Official Curriculum Blueprint • Unit 1
-                          </span>
-                          <h4 className="text-white font-bold text-sm sm:text-lg">
-                            {studentKit.name}
-                          </h4>
-                          <p className="text-slate-300 text-xs sm:text-sm mt-0.5 line-clamp-1">
-                            {studentKit.tagline}
-                          </p>
-                        </div>
-
-                        <button 
-                          onClick={() => setIsKitDiagramModalOpen(true)}
-                          className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white/95 hover:bg-white text-slate-900 rounded-xl text-xs font-bold shadow-lg hover:shadow-xl transition-all cursor-pointer shrink-0"
-                        >
-                          <Maximize2 size={13} /> Enlarge Diagram
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Filter Categories */}
-              <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1">Filter:</span>
-                  {categories.map(cat => (
-                    <button
-                      key={cat}
-                      onClick={() => setComponentCategoryFilter(cat)}
-                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                        componentCategoryFilter === cat 
-                          ? 'bg-slate-900 text-white shadow-xs' 
-                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                      }`}
-                    >
-                      {cat} {cat === 'All' ? `(${kitComponents.length})` : ''}
-                    </button>
-                  ))}
-                </div>
-
-                <p className="text-[11px] text-slate-400 italic hidden sm:block">
-                  Click any component to inspect pinout & safety specifications
-                </p>
-              </div>
-
-              {/* Grid of Individual Component Cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-                {filteredComponents.map((comp) => (
-                  <div 
-                    key={comp.id}
-                    onClick={() => setSelectedComponent(comp)}
-                    className="group bg-slate-50 hover:bg-white border border-slate-200 hover:border-pixiu-blue/80 hover:shadow-md rounded-2xl p-3 sm:p-4 flex flex-col justify-between transition-all cursor-pointer relative overflow-hidden"
-                  >
-                    <div>
-                      {/* Thumbnail */}
-                      <div className="w-full aspect-4/3 rounded-xl overflow-hidden bg-white border border-slate-200/80 mb-2.5 relative flex items-center justify-center">
-                        <img 
-                          src={comp.image} 
-                          alt={comp.name} 
-                          className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-300"
-                          onError={(e) => { e.target.src = studentKit.overview_image; }}
-                        />
-                        <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded bg-slate-900/80 text-[9px] font-bold text-white uppercase tracking-wider backdrop-blur-xs">
-                          {comp.category || 'Component'}
-                        </span>
-                      </div>
-
-                      <h4 className="font-bold text-slate-800 text-xs sm:text-sm line-clamp-2 group-hover:text-pixiu-blue transition-colors">
-                        {comp.name}
-                      </h4>
-                      <p className="text-[11px] text-slate-500 mt-1 line-clamp-2 leading-relaxed">
-                        {comp.role}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center justify-between pt-2.5 mt-2 border-t border-slate-200/60 text-[10px] text-slate-400">
-                      <span className="font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
-                        {comp.session || 'Intro Unit'}
-                      </span>
-                      <span className="flex items-center gap-0.5 font-bold text-slate-600 group-hover:text-pixiu-blue">
-                        Inspect <ChevronRight size={11} />
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Robotics Lab Safety & Responsibility Protocol Strip */}
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-slate-600">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 font-bold">
-                    ⚡
-                  </div>
-                  <div>
-                    <p className="font-bold text-slate-800">Robotics Lab Handling Rules:</p>
-                    <p className="text-[11px] text-slate-500">Unplug USB before rewiring • Never short 5V to GND • Count every part back into box before leaving.</p>
-                  </div>
-                </div>
-                <span className="text-[10px] font-mono text-slate-500 uppercase tracking-wider bg-white px-2.5 py-1 rounded-lg border border-slate-200 shrink-0">
-                  Protocol: Unit 1 ISO
-                </span>
-              </div>
-            </div>
-          );
-        })()}
 
         {/* Class Announcements & Revision Notice Feed */}
         {classNotifs.length > 0 && (
