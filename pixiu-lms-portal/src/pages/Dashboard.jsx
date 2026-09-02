@@ -72,10 +72,12 @@ export default function Dashboard() {
       : students.filter(s => s.school_id === selectedSchool);
 
     return [
-      { level: 'Level 1', students: activeStudents.filter(s => s.tech_level === 'Level 1').length },
-      { level: 'Level 2', students: activeStudents.filter(s => s.tech_level === 'Level 2').length },
-      { level: 'Level 3', students: activeStudents.filter(s => s.tech_level === 'Level 3').length },
-      { level: 'Level 4', students: activeStudents.filter(s => s.tech_level === 'Level 4').length },
+      { level: 'Level 0 (Beginner)', students: activeStudents.filter(s => (s.tech_level || '').includes('Level 0')).length },
+      { level: 'Level 1 (Foundation)', students: activeStudents.filter(s => (s.tech_level || '').includes('Level 1')).length },
+      { level: 'Level 2 (Applied)', students: activeStudents.filter(s => (s.tech_level || '').includes('Level 2')).length },
+      { level: 'Level 3 (Intermediate)', students: activeStudents.filter(s => (s.tech_level || '').includes('Level 3')).length },
+      { level: 'Level 4 (Advanced)', students: activeStudents.filter(s => (s.tech_level || '').includes('Level 4')).length },
+      { level: 'Level 5 (Graduates)', students: activeStudents.filter(s => (s.tech_level || '').includes('Level 5') || s.status === 'Certified Graduate' || s.status === 'Completed').length },
     ];
   }, [students, selectedSchool]);
 

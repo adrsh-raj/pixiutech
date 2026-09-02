@@ -12,7 +12,7 @@ export default function Students() {
   const { schools, classes, students, projects, studentReviews, curriculum, addStudent, updateStudent, deleteStudent, getNextRollNumber, getStudentAttendance } = useData();
   const toast = useToast();
   
-  const [selectedSchool, setSelectedSchool] = useState('ZPS');
+  const [selectedSchool, setSelectedSchool] = useState('All');
   const [selectedClassFilter, setSelectedClassFilter] = useState('All');
   const [activeStudent, setActiveStudent] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');

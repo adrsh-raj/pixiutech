@@ -37,10 +37,73 @@ const safeFetch = async (url) => {
 };
 
 export function DataProvider({ children }) {
-  const [schools, setSchools] = useState(() => safeGetItem('pixiu_schools', SEED_SCHOOLS));
-  const [classes, setClasses] = useState(() => safeGetItem('pixiu_classes', SEED_CLASSES));
-  const [students, setStudents] = useState(() => safeGetItem('pixiu_students', SEED_STUDENTS));
-  const [trainers, setTrainers] = useState(() => safeGetItem('pixiu_trainers', SEED_TRAINERS));
+  const [schools, setSchools] = useState(() => {
+    try {
+      const saved = safeGetItem('pixiu_schools', null);
+      if (!saved || saved.length < 2) {
+        localStorage.setItem('pixiu_schools', JSON.stringify(SEED_SCHOOLS));
+        return SEED_SCHOOLS;
+      }
+      const seedIds = new Set(SEED_SCHOOLS.map(s => s.id));
+      const custom = saved.filter(s => !seedIds.has(s.id));
+      const merged = [...SEED_SCHOOLS, ...custom];
+      localStorage.setItem('pixiu_schools', JSON.stringify(merged));
+      return merged;
+    } catch (e) {
+      return SEED_SCHOOLS;
+    }
+  });
+
+  const [classes, setClasses] = useState(() => {
+    try {
+      const saved = safeGetItem('pixiu_classes', null);
+      if (!saved || saved.length < 10) {
+        localStorage.setItem('pixiu_classes', JSON.stringify(SEED_CLASSES));
+        return SEED_CLASSES;
+      }
+      const seedIds = new Set(SEED_CLASSES.map(c => c.id));
+      const custom = saved.filter(c => !seedIds.has(c.id));
+      const merged = [...SEED_CLASSES, ...custom];
+      localStorage.setItem('pixiu_classes', JSON.stringify(merged));
+      return merged;
+    } catch (e) {
+      return SEED_CLASSES;
+    }
+  });
+
+  const [students, setStudents] = useState(() => {
+    try {
+      const saved = safeGetItem('pixiu_students', null);
+      if (!saved || saved.length < 25) {
+        localStorage.setItem('pixiu_students', JSON.stringify(SEED_STUDENTS));
+        return SEED_STUDENTS;
+      }
+      const seedIds = new Set(SEED_STUDENTS.map(s => s.id || s.student_id));
+      const custom = saved.filter(s => !seedIds.has(s.id) && !seedIds.has(s.student_id));
+      const merged = [...SEED_STUDENTS, ...custom];
+      localStorage.setItem('pixiu_students', JSON.stringify(merged));
+      return merged;
+    } catch (e) {
+      return SEED_STUDENTS;
+    }
+  });
+
+  const [trainers, setTrainers] = useState(() => {
+    try {
+      const saved = safeGetItem('pixiu_trainers', null);
+      if (!saved || saved.length < 2) {
+        localStorage.setItem('pixiu_trainers', JSON.stringify(SEED_TRAINERS));
+        return SEED_TRAINERS;
+      }
+      const seedIds = new Set(SEED_TRAINERS.map(t => t.id));
+      const custom = saved.filter(t => !seedIds.has(t.id));
+      const merged = [...SEED_TRAINERS, ...custom];
+      localStorage.setItem('pixiu_trainers', JSON.stringify(merged));
+      return merged;
+    } catch (e) {
+      return SEED_TRAINERS;
+    }
+  });
   const [sessions, setSessions] = useState(() => {
     try {
       const saved = safeGetItem('pixiu_sessions', null);
