@@ -63,8 +63,14 @@ export default function StudentPortal() {
     return '6';
   };
   const studentGrade = extractGrade(student);
-  
-  // Active broadcast notifications for this student's grade
+  const studentKit = (classKits && classKits[studentGrade] && classKits[studentGrade]?.components?.length > 0)
+    ? classKits[studentGrade]
+    : (CLASS_KITS[studentGrade] || CLASS_KITS['6']);
+
+  const whatsappNumber = '917985403186';
+  const whatsappKitUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(
+    `Hello Pixiu Tech Team! 🚀\nI am ${student.name} from Class ${studentGrade}A (Student ID: ${student.student_id}) at ${school}.\nI want to buy/order my personal STEM Robotics Hardware Kit (${studentKit.name || `Class ${studentGrade} Kit`}) for practice at home.\nPlease share the kit price, payment details and delivery timeframe.`
+  )}`;
   const classNotifs = (notifications || []).filter(n => {
     if (n.status === 'Archived') return false;
     if (n.target_type === 'Universal' || n.target_type === 'All_Students') return true;
