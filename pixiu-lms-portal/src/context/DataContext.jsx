@@ -240,13 +240,35 @@ export function DataProvider({ children }) {
     }
   };
 
-  const deleteSchool = async (id) => {
+  const updateSchool = async (id, updatedData) => {
     try {
-      await fetch(`${API_URL}/schools/${id}`, { method: 'DELETE' });
-      setSchools(prev => prev.filter(s => s.id !== id));
+      await fetch(`${API_URL}/schools/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedData)
+      });
     } catch (e) {
       console.error(e);
     }
+    setSchools(prev => {
+      const updated = prev.map(s => (s.id === id || s.code === id) ? { ...s, ...updatedData } : s);
+      try { localStorage.setItem('pixiu_schools', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+    return { success: true };
+  };
+
+  const deleteSchool = async (id) => {
+    try {
+      await fetch(`${API_URL}/schools/${id}`, { method: 'DELETE' });
+    } catch (e) {
+      console.error(e);
+    }
+    setSchools(prev => {
+      const updated = prev.filter(s => s.id !== id);
+      try { localStorage.setItem('pixiu_schools', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
   };
 
   // 2. Classes
@@ -533,6 +555,44 @@ export function DataProvider({ children }) {
     } catch (e) {
       console.error(e);
     }
+  };
+
+  const updateBillingInvoice = async (id, updatedFields) => {
+    setBilling(prev => {
+      const updated = prev.map(b => b.id === id ? { ...b, ...updatedFields } : b);
+      try { localStorage.setItem('pixiu_billing', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+    return { success: true };
+  };
+
+  const deleteBillingInvoice = async (id) => {
+    setBilling(prev => {
+      const updated = prev.filter(b => b.id !== id);
+      try { localStorage.setItem('pixiu_billing', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+    return { success: true };
+  };
+
+  const pushSchoolNotification = async ({ target_school_id = 'ALL', title, message, type = 'announcement', priority = 'normal' }) => {
+    const newNotif = {
+      id: `NOTIF-${Date.now().toString().slice(-4)}`,
+      title,
+      message,
+      type,
+      target_audience: target_school_id,
+      priority,
+      created_at: new Date().toISOString().split('T')[0],
+      sender_name: 'Pixiu Central Administration'
+    };
+
+    setNotifications(prev => {
+      const updated = [newNotif, ...prev];
+      try { localStorage.setItem('pixiu_notifications', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+    return { success: true, notification: newNotif };
   };
 
   // 9. Trainers & Sessions
@@ -970,7 +1030,7 @@ export function DataProvider({ children }) {
 
   const value = {
     loading, refreshAll,
-    schools, addSchool, deleteSchool,
+    schools, addSchool, updateSchool, deleteSchool,
     classes, addClass,
     students, addStudent, updateStudent, deleteStudent, getNextRollNumber, getStudentAttendance,
     trainers, addTrainer, updateTrainer, updateTrainerStatus, deleteTrainer,
@@ -981,11 +1041,11 @@ export function DataProvider({ children }) {
     curriculum, addCurriculumPlan, updateCurriculumStatus,
     inventory, addInventoryKit, updateKitStatus, deleteKit,
     classKits, updateClassKitComponent, addComponentToClassKit,
-    billing, createInvoice, updateInvoiceStatus, confirmPaymentReceipt,
+    billing, createInvoice, updateInvoiceStatus, confirmPaymentReceipt, updateBillingInvoice, deleteBillingInvoice,
     comms, sendCommsMessage,
     projects, addProject, deleteProject, uploadFile,
     alerts, resolveAlertAction,
-    notifications, sendBroadcastNotification, updateNotification, deleteNotification,
+    notifications, sendBroadcastNotification, updateNotification, deleteNotification, pushSchoolNotification,
     studentReviews, saveStudentReview, deleteStudentReview
   };
 
