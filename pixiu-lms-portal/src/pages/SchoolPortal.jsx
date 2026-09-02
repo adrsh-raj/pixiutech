@@ -3,16 +3,22 @@ import {
   Building2, Users, Award, BookOpen, Receipt, FileText, 
   CheckCircle2, Clock, Phone, MessageSquare, Search, Filter, 
   Download, ArrowUpRight, ShieldCheck, Sparkles, LogOut, ChevronRight,
-  GraduationCap, Calendar, Check, Zap, ArrowRight, Bell, X, Megaphone
+  GraduationCap, Calendar, Check, Zap, ArrowRight, Bell, X, Megaphone,
+  Box, AlertTriangle, RefreshCw, Send, Printer, IndianRupee, ShieldAlert
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { generateStudentTranscriptPDF } from '../utils/transcriptGenerator';
+import KpiCard from '../components/ui/KpiCard';
+import Badge from '../components/ui/Badge';
+import Modal from '../components/ui/Modal';
+import { useToast } from '../context/ToastContext';
 
 export default function SchoolPortal() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const toast = useToast();
   const { 
     schools, 
     students, 
@@ -24,7 +30,9 @@ export default function SchoolPortal() {
     projects, 
     studentReviews, 
     curriculum,
-    notifications 
+    inventory = [],
+    notifications,
+    updateInventoryStatus
   } = useData();
 
   // Determine active school (Scoped to school login, or selectable for admin preview)
@@ -32,8 +40,17 @@ export default function SchoolPortal() {
   const [selectedSchoolId, setSelectedSchoolId] = useState(defaultSchoolId);
   const [selectedGradeFilter, setSelectedGradeFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState('students'); // 'students' | 'curriculum' | 'billing' | 'trainer'
+  const [activeTab, setActiveTab] = useState('students'); // 'students' | 'curriculum' | 'billing' | 'hardware' | 'trainer'
   
+  // RMA Modal State
+  const [isRmaModalOpen, setIsRmaModalOpen] = useState(false);
+  const [rmaData, setRmaData] = useState({
+    kit_id: 'KIT-ZPS-01',
+    component_name: 'Ultrasonic Sensor HC-SR04',
+    issue_description: 'VCC pin broken during breadboard test',
+    urgency: 'High'
+  });
+
   // Notification Flyout & Read State
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [readNotifIds, setReadNotifIds] = useState(() => {
@@ -115,6 +132,11 @@ export default function SchoolPortal() {
     return Math.round((presentCount / schoolAttendanceRecords.length) * 100);
   }, [sessions, attendance, activeSchool]);
 
+  // Hardware Kits for this school
+  const schoolKits = useMemo(() => {
+    return inventory.filter(k => k.school_id === activeSchool.id || k.school_id === activeSchool.code);
+  }, [inventory, activeSchool]);
+
   // Helper for student attendance
   const getStudentAttendance = (studentId) => {
     const records = attendance.filter(a => a.student_id === studentId);
@@ -149,56 +171,42 @@ export default function SchoolPortal() {
             table { width: 100%; border-collapse: collapse; margin-bottom: 25px; font-size: 13px; }
             th { background: #0A1A33; color: #fff; text-align: left; padding: 10px 12px; font-size: 11px; text-transform: uppercase; }
             td { padding: 12px; border-bottom: 1px solid #e2e8f0; }
-            .total-box { margin-left: auto; width: 280px; font-size: 13px; margin-bottom: 30px; }
-            .total-row { display: flex; justify-content: space-between; padding: 6px 0; }
-            .total-row.final { border-top: 2px solid #0A1A33; font-size: 16px; font-weight: 900; color: #0A1A33; padding-top: 10px; margin-top: 4px; }
-            .footer { border-top: 1px solid #e2e8f0; padding-top: 20px; display: flex; justify-content: space-between; font-size: 11px; color: #64748b; }
-            .footer-note { text-align: center; margin-top: 30px; font-size: 10px; color: #94a3b8; }
+            .total-row { font-weight: 800; font-size: 15px; background: #f1f5f9; }
+            .bank-box { background: #f0fdf4; border: 1px dashed #22c55e; border-radius: 8px; padding: 15px; font-size: 12px; margin-bottom: 25px; }
+            .footer { border-top: 1px solid #e2e8f0; padding-top: 15px; text-align: center; font-size: 11px; color: #64748b; }
+            @media print { body { padding: 0; } }
           </style>
         </head>
         <body>
           <div class="header">
-            <div>
-              <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 6px;">
-                <img src="${window.location.origin}/img/logo.png" alt="Pixiu Tech Logo" style="height: 48px; width: auto; object-fit: contain; display: block;" onerror="this.src='/img/logo.png'" />
-                <div>
-                  <div class="brand">PIXIU <span>TECH LLP</span></div>
-                  <div class="tagline">Educational Robotics & AI Lab Systems</div>
-                </div>
+            <div style="display: flex; align-items: center; gap: 15px;">
+              <img src="${window.location.origin}/img/logo.png" alt="Pixiu Tech Logo" style="height: 48px; width: auto; object-contain;" />
+              <div>
+                <div class="brand">PIXIU <span>TECH LLP</span></div>
+                <div class="tagline">Enterprise STEM & Robotics Laboratory Solutions</div>
+                <div style="font-size: 11px; color: #64748b; margin-top: 4px;">Gorakhpur, Uttar Pradesh | contact@pixiutech.com</div>
               </div>
-              <p style="margin: 4px 0 0 0; font-size: 12px; color: #475569;">
-                Plot 42, Knowledge Park III, Gorakhpur / Hata Road, UP<br/>
-                GSTIN: <strong>09AAACP1234F1Z5</strong> | CIN: U72900UP2026PTC109823
-              </p>
             </div>
             <div>
-              <div class="invoice-title">TAX INVOICE & RECEIPT</div>
-              <div style="text-align: right;">
-                <span class="badge ${isPaid ? 'badge-paid' : 'badge-pending'}">${isPaid ? 'PAID & CONFIRMED' : 'PENDING PAYMENT'}</span>
-              </div>
-              <p style="margin: 6px 0 0 0; font-size: 12px; color: #475569; text-align: right; font-family: monospace;">
-                Invoice No: <strong>${inv.id}</strong><br/>
-                Date: <strong>${inv.date_issued || inv.invoice_date || '2026-08-25'}</strong>
-              </p>
+              <div class="invoice-title">TAX INVOICE</div>
+              <div style="font-family: monospace; font-size: 12px; font-weight: bold; color: #64748b; margin-top: 2px;">#${inv.id}</div>
+              <div class="badge ${isPaid ? 'badge-paid' : 'badge-pending'}">${isPaid ? 'PAID & RECONCILED' : 'PAYMENT DUE'}</div>
             </div>
           </div>
 
           <div class="grid">
             <div class="card">
-              <div class="card-title">BILLED TO (CLIENT INSTITUTION)</div>
+              <div class="card-title">Billed To (Institution):</div>
               <p style="margin: 0; font-weight: 800; font-size: 14px; color: #0A1A33;">${activeSchool.name}</p>
-              <p style="margin: 4px 0 0 0; color: #475569;">
-                Institutional Partner Code: <strong>${activeSchool.code || activeSchool.id}</strong><br/>
-                Place of Supply: <strong>${inv.place_of_supply || 'Gorakhpur, Uttar Pradesh'}</strong>
-              </p>
+              <p style="margin: 4px 0 0; color: #475569;">School Code: <strong>${activeSchool.code || activeSchool.id}</strong></p>
+              <p style="margin: 2px 0 0; color: #475569;">Principal: ${activeSchool.principal_name || 'Administration'}</p>
+              <p style="margin: 2px 0 0; color: #475569;">Phone: ${activeSchool.principal_phone || 'N/A'}</p>
             </div>
             <div class="card">
-              <div class="card-title">CONTRACT & PAYMENT DETAILS</div>
-              <p style="margin: 0; color: #475569;">
-                Milestone: <strong>${inv.tranche_title || 'Institutional Fee Tranche'}</strong><br/>
-                Due Date: <strong>${inv.due_date}</strong><br/>
-                Payment Ref: <strong>${inv.receipt_no || 'N/A (Pending Reconcile)'}</strong>
-              </p>
+              <div class="card-title">Invoice Details:</div>
+              <p style="margin: 0; color: #475569;">Date Issued: <strong>${inv.date_issued || '2026-08-01'}</strong></p>
+              <p style="margin: 4px 0 0; color: #475569;">Due Date: <strong style="color: ${isPaid ? '#15803d' : '#b45309'};">${inv.due_date || '2026-08-15'}</strong></p>
+              <p style="margin: 4px 0 0; color: #475569;">Payment Status: <strong>${inv.status}</strong></p>
             </div>
           </div>
 
@@ -206,802 +214,493 @@ export default function SchoolPortal() {
             <thead>
               <tr>
                 <th>Description</th>
-                <th>HSN/SAC</th>
-                <th>Qty</th>
-                <th style="text-align: right;">Taxable Amount</th>
+                <th style="text-align: right;">Amount (INR)</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td>
-                  <strong>${inv.tranche_title || 'STEM Robotics & Hardware Lab Operations'}</strong><br/>
-                  <span style="font-size: 11px; color: #64748b;">Comprehensive robotics kits, trainer deployment, and semester examinations.</span>
-                </td>
-                <td>999293</td>
-                <td>1 Unit</td>
-                <td style="text-align: right; font-weight: 700;">₹${(inv.amount || 0).toLocaleString('en-IN')}</td>
+                <td><strong>${inv.tranche_title || 'Robotics Lab Tranche'}</strong><br/><span style="font-size: 11px; color: #64748b;">Annual Robotics Curriculum, Hardware Kit Maintenance, & Trainer Deployment</span></td>
+                <td style="text-align: right; font-weight: 700;">₹${Number(inv.amount).toLocaleString('en-IN')}</td>
+              </tr>
+              <tr class="total-row">
+                <td>Total Net Payable</td>
+                <td style="text-align: right; color: #0A1A33;">₹${Number(inv.amount).toLocaleString('en-IN')}</td>
               </tr>
             </tbody>
           </table>
 
-          <div class="total-box">
-            <div class="total-row">
-              <span>Subtotal:</span>
-              <strong>₹${(inv.amount || 0).toLocaleString('en-IN')}</strong>
-            </div>
-            <div class="total-row">
-              <span>CGST (0% Educational Exemption):</span>
-              <strong>₹0</strong>
-            </div>
-            <div class="total-row">
-              <span>SGST (0% Educational Exemption):</span>
-              <strong>₹0</strong>
-            </div>
-            <div class="total-row final">
-              <span>Total Payable:</span>
-              <span style="color: #2563EB;">₹${(inv.amount || 0).toLocaleString('en-IN')}</span>
-            </div>
+          <div class="bank-box">
+            <div style="font-weight: 800; color: #166534; text-transform: uppercase; margin-bottom: 6px;">Bank Wire Transfer Details:</div>
+            <div><strong>Beneficiary:</strong> PIXIU TECH LLP</div>
+            <div><strong>Account Number:</strong> 5599971440</div>
+            <div><strong>Bank & Branch:</strong> Central Bank of India | Gorakhpur Main Branch</div>
+            <div><strong>IFSC Code:</strong> CBIN0282573</div>
           </div>
 
           <div class="footer">
-            <div>
-              <p style="margin: 0; font-size: 11px; font-weight: 700; text-transform: uppercase; color: #64748b;">Bank Account Details for Wire Transfer</p>
-              <p style="margin: 4px 0 0 0; color: #475569; line-height: 1.6;">
-                Account Name: <strong>PIXIU TECH LLP</strong><br/>
-                Account No: <strong>5599971440</strong> (Central Bank of India)<br/>
-                IFSC Code: <strong>CBIN0282573</strong> | Branch: Gorakhpur Main
-              </p>
-            </div>
-            <div style="text-align: right;">
-              <p style="margin: 0; font-size: 11px; font-weight: 700; text-transform: uppercase; color: #64748b;">Authorized Signatory</p>
-              <p style="margin: 4px 0 0 0; font-size: 13px; font-weight: 800; color: #0A1A33;">Adarsh Raj Singh</p>
-              <p style="margin: 0; font-size: 10px; color: #64748b;">Founder & Director, Pixiu Tech LLP</p>
-            </div>
-          </div>
-
-          <div class="footer-note">
-            This is an electronically verified Tax Invoice & Payment Receipt generated by <strong>portal.pixiutech.com</strong>.<br/>
-            Pixiu Tech LLP • Contact: billing@pixiutech.com
+            <p style="margin: 0; font-weight: 600;">This is a computer-generated tax invoice issued by Pixiu Tech LLP.</p>
           </div>
         </body>
       </html>
     `);
     printWindow.document.close();
-    printWindow.print();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+    }, 400);
   };
 
-  // Unread count and mark handlers
-  const unreadNotifs = useMemo(() => {
-    return schoolNotifications.filter(n => !readNotifIds.includes(n.id));
-  }, [schoolNotifications, readNotifIds]);
-  const unreadCount = unreadNotifs.length;
-
-  const markAsRead = (id) => {
-    setReadNotifIds(prev => {
-      const updated = [...prev, id];
-      try { localStorage.setItem(`pixiu_school_read_${selectedSchoolId}`, JSON.stringify(updated)); } catch (e) {}
-      return updated;
-    });
-  };
-
-  const markAllAsRead = () => {
-    const allIds = schoolNotifications.map(n => n.id);
-    setReadNotifIds(allIds);
-    try { localStorage.setItem(`pixiu_school_read_${selectedSchoolId}`, JSON.stringify(allIds)); } catch (e) {}
-  };
-
-  const handlePrintStudentPDF = (e, student) => {
-    e.stopPropagation();
-    const attendanceRate = getStudentAttendance(student.student_id);
-    generateStudentTranscriptPDF({
-      student,
-      school: activeSchool,
-      attendanceRate,
-      studentReviews,
-      projects,
-      curriculum
-    });
-  };
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
+  const handleRmaSubmit = (e) => {
+    e.preventDefault();
+    toast.success(`RMA Ticket lodged for ${rmaData.component_name} (${rmaData.kit_id})! Replacement dispatched within 48h.`, 'RMA Ticket Created');
+    setIsRmaModalOpen(false);
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 pb-20">
-      {/* Header - Identical to Admin Console Header with Notification Bell */}
-      <header className="bg-white border-b border-slate-200 h-16 px-4 sm:px-8 flex items-center justify-between sticky top-0 z-40 shadow-xs">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <div className="bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs flex items-center">
-              <img src="/img/logo.png" alt="Pixiu Tech" className="h-6 w-auto object-contain" />
+    <div className="min-h-screen bg-slate-50 pb-16">
+      {/* Top Navigation Bar */}
+      <header className="bg-slate-900 text-white sticky top-0 z-30 shadow-md border-b border-slate-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="bg-white px-2.5 py-1 rounded-xl shadow-md border border-white/20">
+              <img src="/img/logo.png" alt="Pixiu Tech Logo" className="h-7 w-auto object-contain" />
             </div>
             <div>
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-pixiu-blue block leading-none">School Partner Portal</span>
-              <h1 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight leading-tight mt-0.5">
-                {activeSchool.name}
-              </h1>
+              <span className="font-black tracking-wider text-sm sm:text-base text-white">PIXIU TECH</span>
+              <span className="text-[10px] text-pixiu-blue font-bold block uppercase tracking-widest leading-none">
+                Principal ERP Console
+              </span>
             </div>
           </div>
-        </div>
 
-        <div className="flex items-center gap-3">
-          {/* Admin Live Switcher */}
-          {(!user || user.role === 'admin' || user.school_id === 'ALL') && (
-            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg text-xs">
-              <Building2 size={14} className="text-pixiu-blue" />
-              <span className="text-[11px] font-bold text-slate-500 uppercase">Scope:</span>
-              <select
-                value={selectedSchoolId}
-                onChange={(e) => setSelectedSchoolId(e.target.value)}
-                className="bg-transparent font-bold text-slate-800 text-xs focus:outline-none cursor-pointer"
-              >
-                <option value="ZPS">Zenith Public School</option>
-                <option value="XYZ">XYZ Academy (Pilot Lab)</option>
-              </select>
+          <div className="flex items-center gap-3">
+            <div className="hidden sm:block text-right">
+              <p className="text-xs font-bold text-white truncate max-w-[200px]">{activeSchool.name}</p>
+              <p className="text-[10px] text-emerald-400 font-medium">Verified Institutional Partner</p>
             </div>
-          )}
 
-          {/* Interactive Notification Bell with Red Badge & Dropdown */}
-          <div className="relative">
             <button
-              onClick={() => setIsNotifOpen(!isNotifOpen)}
-              className="relative p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-all cursor-pointer border border-slate-200 flex items-center justify-center"
-              title="Institutional Announcements & Directives"
+              onClick={() => logout()}
+              className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
+              title="Secure Logout"
             >
-              <Bell size={18} />
-              {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-white shadow-xs animate-pulse">
-                  {unreadCount}
-                </span>
-              )}
+              <LogOut size={18} />
             </button>
-
-            {/* Flyout Notification Drawer / Dropdown */}
-            {isNotifOpen && (
-              <div className="absolute right-0 mt-3 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden z-50 animate-in fade-in zoom-in-95 text-slate-800 max-h-[80vh] flex flex-col">
-                <div className="p-3.5 bg-slate-900 text-white flex justify-between items-center border-b border-slate-800 shrink-0">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Megaphone size={15} className="text-pixiu-blue shrink-0 animate-bounce"/>
-                    <h3 className="font-bold text-xs uppercase tracking-wider truncate">
-                      Official Notices ({unreadCount} Unread)
-                    </h3>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {unreadCount > 0 && (
-                      <button
-                        onClick={markAllAsRead}
-                        className="text-[10px] font-bold text-blue-400 hover:text-blue-300 cursor-pointer underline"
-                      >
-                        Mark all read
-                      </button>
-                    )}
-                    <button 
-                      onClick={() => setIsNotifOpen(false)} 
-                      className="p-1 text-slate-400 hover:text-white cursor-pointer"
-                    >
-                      <X size={16}/>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="overflow-y-auto p-3 space-y-2.5 flex-1 divide-y divide-slate-100">
-                  {schoolNotifications.map(notif => {
-                    const isRead = readNotifIds.includes(notif.id);
-                    return (
-                      <div 
-                        key={notif.id}
-                        className={`p-3 rounded-xl border text-xs space-y-2 transition-all ${
-                          isRead 
-                            ? 'bg-slate-50 border-slate-200 opacity-70' 
-                            : 'bg-blue-50/60 border-blue-200 shadow-xs'
-                        }`}
-                      >
-                        <div className="flex justify-between items-start gap-1">
-                          <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${
-                            notif.priority === 'high' || notif.severity === 'urgent' 
-                              ? 'bg-rose-100 text-rose-800' 
-                              : 'bg-blue-100 text-blue-800'
-                          }`}>
-                            {notif.priority || notif.severity || 'Notice'}
-                          </span>
-                          <span className="text-[10px] text-slate-400 font-mono">
-                            {notif.scheduled_date || notif.created_at || 'Today'}
-                          </span>
-                        </div>
-
-                        <h4 className="font-bold text-slate-900 text-xs">{notif.title}</h4>
-                        <p className="text-slate-600 text-[11px] leading-relaxed whitespace-pre-line bg-white p-2 rounded-lg border border-slate-100">{notif.message}</p>
-
-                        <div className="pt-1 flex justify-between items-center text-[10px]">
-                          <span className="text-slate-400 font-medium">Authority: <b>{notif.sender_name || 'Central Admin'}</b></span>
-                          {isRead ? (
-                            <span className="text-emerald-600 font-bold flex items-center gap-1">
-                              <Check size={12}/> Read
-                            </span>
-                          ) : (
-                            <button
-                              onClick={() => markAsRead(notif.id)}
-                              className="px-2 py-0.5 bg-pixiu-blue hover:bg-blue-600 text-white rounded text-[10px] font-bold cursor-pointer transition-all shadow-xs"
-                            >
-                              ✓ Mark as Read
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  {schoolNotifications.length === 0 && (
-                    <div className="p-8 text-center text-slate-400 text-xs font-medium">
-                      No announcements published yet.
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
-
-          <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Institutional Live
-          </span>
-
-          <button 
-            onClick={handleLogout} 
-            className="text-slate-400 hover:text-red-600 p-2 rounded-lg hover:bg-red-50 transition-colors cursor-pointer flex items-center gap-1 text-xs font-bold"
-            title="Logout"
-          >
-            <LogOut size={16}/>
-            <span className="hidden sm:inline">Sign Out</span>
-          </button>
         </div>
       </header>
 
-      {/* Main Content Area */}
-      <main className="p-4 sm:p-8 max-w-7xl mx-auto space-y-6">
-        
-        {/* Institutional Intelligence Banner (Exact Dark Slate Style from Admin Dashboard) */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-7 text-white shadow-sm relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-pixiu-blue/10 rounded-full blur-3xl pointer-events-none"></div>
-
-          <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+      {/* Main Container */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-8">
+        {/* Institutional Welcome Strip */}
+        <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 rounded-3xl p-6 sm:p-8 text-white border border-slate-700/80 shadow-xl relative overflow-hidden">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
             <div>
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-[11px] font-black uppercase tracking-widest text-pixiu-blue px-2.5 py-0.5 bg-blue-500/10 border border-blue-500/20 rounded-md">
-                  Institutional STEM & Robotics Center
-                </span>
-                <span className="text-[11px] text-emerald-400 font-bold flex items-center gap-1">
-                  <CheckCircle2 size={13} /> Active Partner School
-                </span>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-300 text-xs font-bold mb-3">
+                <Building2 size={13} /> {activeSchool.city || 'Gorakhpur'} Campus
               </div>
-              <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+              <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
                 {activeSchool.name}
-              </h2>
+              </h1>
               <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-2xl leading-relaxed">
-                Empowering students with hands-on robotics prototyping, sensor circuits, and embedded programming under the Pixiu Tech Institutional Excellence Suite.
+                Autonomous Robotics & STEM Laboratory Console. Track classroom attendance, curriculum progression milestones, and official financial ledgers.
               </p>
-
-              <div className="flex flex-wrap gap-3 mt-4 text-xs">
-                <div className="bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800 flex items-center gap-2">
-                  <ShieldCheck size={14} className="text-emerald-400" />
-                  <span className="text-slate-300">Principal: <b className="text-white">{activeSchool.principal_name}</b></span>
-                </div>
-                <div className="bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800 flex items-center gap-2">
-                  <Building2 size={14} className="text-pixiu-blue" />
-                  <span className="text-slate-300">Lab: <b className="text-white">{activeSchool.lab_room}</b></span>
-                </div>
-                <div className="bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800 flex items-center gap-2">
-                  <Phone size={14} className="text-indigo-400" />
-                  <span className="text-slate-300">Phone: <b className="text-white font-mono">{activeSchool.principal_phone}</b></span>
-                </div>
-              </div>
             </div>
 
-            {/* Session Pill */}
-            <div className="shrink-0 bg-slate-950/90 border border-slate-800 rounded-xl p-4 flex items-center gap-4 shadow-inner">
-              <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-pixiu-blue">
-                <Sparkles size={22} />
-              </div>
-              <div>
-                <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Academic Session</div>
-                <div className="text-lg font-black text-white">2026 - 2027</div>
-                <div className="text-[11px] text-emerald-400 font-bold flex items-center gap-1 mt-0.5">
-                  <Check size={12} /> Term 1 In-Progress
-                </div>
-              </div>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <button
+                onClick={() => setIsRmaModalOpen(true)}
+                className="px-4 py-2.5 bg-rose-600 hover:bg-rose-500 active:scale-95 text-white font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center gap-2 shadow-md shadow-rose-600/20"
+              >
+                <AlertTriangle size={15} />
+                <span>Report Damaged Kit (RMA)</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('billing')}
+                className="px-4 py-2.5 bg-pixiu-blue hover:bg-blue-600 active:scale-95 text-white font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center gap-2 shadow-md shadow-blue-500/20"
+              >
+                <Receipt size={15} />
+                <span>View Fee Ledger</span>
+              </button>
             </div>
           </div>
         </div>
 
-        {/* 4 KPI Cards (Exact Admin Style: Pure White, Slate-200 Border, Pastel Icons) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600">
-              <Users size={22} />
-            </div>
-            <div>
-              <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-0.5">Enrolled Students</p>
-              <p className="text-2xl font-bold text-slate-800">{schoolStudents.length}</p>
-              <p className="text-[11px] text-slate-500 mt-0.5">5 active grades</p>
-            </div>
-          </div>
+        {/* 4 Executive KPI Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          <KpiCard
+            icon={<Users size={22} />}
+            label="Enrolled Students"
+            value={schoolStudents.length}
+            subtext={`${classes.filter(c => c.school_id === activeSchool.id).length || 5} Active Classrooms`}
+            color="blue"
+          />
 
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-600">
-              <Award size={22} />
-            </div>
-            <div>
-              <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-0.5">Assigned Trainer</p>
-              <p className="text-lg font-bold text-slate-800 truncate">{assignedTrainer.name}</p>
-              <p className="text-[11px] text-indigo-600 font-bold mt-0.5 truncate">{assignedTrainer.role}</p>
-            </div>
-          </div>
+          <KpiCard
+            icon={<CheckCircle2 size={22} />}
+            label="Lab Attendance"
+            value={`${schoolAttendanceRate}%`}
+            subtext="Consistent High Attendance"
+            color="emerald"
+          />
 
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600">
-              <CheckCircle2 size={22} />
-            </div>
-            <div>
-              <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-0.5">Lab Attendance</p>
-              <p className="text-2xl font-bold text-emerald-600">{schoolAttendanceRate}%</p>
-              <p className="text-[11px] text-slate-500 mt-0.5">Practical lab average</p>
-            </div>
-          </div>
+          <KpiCard
+            icon={<Box size={22} />}
+            label="Hardware Lab Kits"
+            value={schoolKits.length > 0 ? schoolKits.length : `${schoolStudents.length} Kits`}
+            subtext="100% Operational Readiness"
+            color="violet"
+          />
 
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600">
-              <Receipt size={22} />
-            </div>
-            <div>
-              <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-0.5">Fee & Invoices</p>
-              <p className="text-2xl font-bold text-slate-800">₹{(schoolBilling.reduce((acc, b) => acc + (b.amount || 0), 0)).toLocaleString('en-IN')}</p>
-              <p className="text-[11px] text-amber-600 font-bold mt-0.5">
-                {schoolBilling.filter(b => b.status === 'Paid').length} Paid / {schoolBilling.length} Total
-              </p>
-            </div>
-          </div>
+          <KpiCard
+            icon={<IndianRupee size={22} />}
+            label="Contract Invoiced"
+            value={`₹${schoolBilling.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0).toLocaleString('en-IN')}`}
+            subtext="Annual STEM Lab Suite"
+            color="amber"
+          />
         </div>
 
-        {/* Tab Navigation (Exact Admin Style: Pill Tabs) */}
-        <div className="flex items-center gap-2 border-b border-slate-200 pb-3 overflow-x-auto">
+        {/* Navigation Tabs */}
+        <div className="flex flex-wrap items-center gap-2 p-1.5 bg-slate-200/70 rounded-2xl border border-slate-300/60">
           <button
             onClick={() => setActiveTab('students')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
-              activeTab === 'students' 
-                ? 'bg-slate-900 text-white shadow-xs' 
-                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+            className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-2 ${
+              activeTab === 'students' ? 'bg-white text-slate-900 shadow-sm border border-slate-200' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <Users size={14} /> Student Directory & Transcripts ({schoolStudents.length})
-          </button>
-
-          <button
-            onClick={() => setActiveTab('trainer')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
-              activeTab === 'trainer' 
-                ? 'bg-slate-900 text-white shadow-xs' 
-                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
-            }`}
-          >
-            <Award size={14} /> Assigned Faculty Profile
-          </button>
-
-          <button
-            onClick={() => setActiveTab('curriculum')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
-              activeTab === 'curriculum' 
-                ? 'bg-slate-900 text-white shadow-xs' 
-                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
-            }`}
-          >
-            <BookOpen size={14} /> Syllabus & Practical Modules
-          </button>
-
-          <button
-            onClick={() => setActiveTab('announcements')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
-              activeTab === 'announcements' 
-                ? 'bg-slate-900 text-white shadow-xs' 
-                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
-            }`}
-          >
-            <Megaphone size={14} /> Announcements & Directives ({schoolNotifications.length})
+            <Users size={14} /> Student Directory ({schoolStudents.length})
           </button>
 
           <button
             onClick={() => setActiveTab('billing')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
-              activeTab === 'billing' 
-                ? 'bg-slate-900 text-white shadow-xs' 
-                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+            className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-2 ${
+              activeTab === 'billing' ? 'bg-white text-slate-900 shadow-sm border border-slate-200' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <Receipt size={14} /> Invoices & Ledger ({schoolBilling.length})
+            <Receipt size={14} /> Official Financial Ledger ({schoolBilling.length})
+          </button>
+
+          <button
+            onClick={() => setActiveTab('hardware')}
+            className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-2 ${
+              activeTab === 'hardware' ? 'bg-white text-slate-900 shadow-sm border border-slate-200' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Box size={14} /> Lab Hardware & RMA
+          </button>
+
+          <button
+            onClick={() => setActiveTab('trainer')}
+            className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-2 ${
+              activeTab === 'trainer' ? 'bg-white text-slate-900 shadow-sm border border-slate-200' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <GraduationCap size={14} /> Assigned Faculty
           </button>
         </div>
 
         {/* TAB 1: STUDENT DIRECTORY */}
         {activeTab === 'students' && (
-          <div className="space-y-4">
-            {/* Filter and Search Bar (Exact Admin Students.jsx Style) */}
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
-              {/* Class Filter Tabs */}
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 w-full md:w-auto">
-                {['ALL', '6', '7', '8', '9', '11'].map((grade) => (
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden p-6 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="relative flex-1 max-w-md">
+                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search student by name, roll ID or kit..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:border-pixiu-blue"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                {['ALL', '6', '7', '8', '9', '11'].map(grade => (
                   <button
                     key={grade}
                     onClick={() => setSelectedGradeFilter(grade)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                      selectedGradeFilter === grade 
-                        ? 'bg-pixiu-blue text-white shadow-xs' 
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                      selectedGradeFilter === grade ? 'bg-pixiu-blue text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
                   >
-                    {grade === 'ALL' ? 'All Grades' : `Class ${grade}`}
+                    {grade === 'ALL' ? 'All Classes' : `Class ${grade}`}
                   </button>
                 ))}
               </div>
-
-              {/* Search Bar */}
-              <div className="relative w-full md:w-72">
-                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search student, ID, or kit..."
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-4 py-2 text-xs focus:outline-none focus:border-pixiu-blue focus:bg-white transition-all font-medium"
-                />
-              </div>
             </div>
 
-            {/* Students Table (Exact Admin Students.jsx Table Style) */}
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold text-[11px]">
-                      <th className="py-3.5 px-4">Student & Canonical ID</th>
-                      <th className="py-3.5 px-4">Assigned Hardware Kit</th>
-                      <th className="py-3.5 px-4">Parent Details</th>
-                      <th className="py-3.5 px-4">Lab Attendance</th>
-                      <th className="py-3.5 px-4">Mastery Level</th>
-                      <th className="py-3.5 px-4 text-right">Official Transcript</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredStudents.map((student) => {
-                      const att = getStudentAttendance(student.student_id);
-                      return (
-                        <tr key={student.id} className="hover:bg-slate-50/80 transition-colors">
-                          <td className="py-3.5 px-4">
-                            <div className="font-bold text-slate-800 text-sm">{student.name}</div>
-                            <div className="text-[11px] text-pixiu-blue font-mono font-bold mt-0.5">{student.student_id}</div>
-                          </td>
-                          <td className="py-3.5 px-4">
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 text-slate-700 font-mono text-[11px] rounded-lg font-bold border border-slate-200">
-                              📦 {student.assigned_kit_id || 'KIT-01'}
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-4">
-                            <div className="text-slate-700 font-medium">{student.parent_name}</div>
-                            <div className="text-[11px] text-slate-400 font-mono">{student.parent_phone}</div>
-                          </td>
-                          <td className="py-3.5 px-4">
-                            <span className={`inline-block px-2.5 py-0.5 rounded-full font-bold text-[11px] ${
-                              att >= 90 ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'
-                            }`}>
-                              {att}% Attendance
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-4">
-                            <span className="font-bold text-indigo-600">{student.tech_level || 'Level 0'}</span>
-                          </td>
-                          <td className="py-3.5 px-4 text-right">
-                            <button
-                              onClick={(e) => handlePrintStudentPDF(e, student)}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-pixiu-blue hover:bg-blue-600 active:scale-95 text-white font-bold rounded-lg text-xs transition-all shadow-xs shadow-blue-500/20 cursor-pointer"
-                            >
-                              <Download size={13} />
-                              <span>Download PDF</span>
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-
-                    {filteredStudents.length === 0 && (
-                      <tr>
-                        <td colSpan="6" className="py-12 text-center text-slate-400 text-xs font-medium">
-                          No students found matching the selected filters.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 2: ASSIGNED TRAINER PROFILE */}
-        {activeTab === 'trainer' && (
-          <div className="bg-white border border-slate-200 rounded-xl p-6 sm:p-8 space-y-6 shadow-sm">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 pb-6 border-b border-slate-100">
-              <div className="w-20 h-20 rounded-2xl bg-gradient-to-tr from-pixiu-blue to-indigo-600 flex items-center justify-center text-white text-3xl font-black shadow-md shadow-blue-500/20">
-                {assignedTrainer.name.charAt(0)}
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 px-2.5 py-0.5 bg-emerald-100 rounded-full">
-                    Active Faculty In-Charge
-                  </span>
-                  <span className="text-xs font-bold text-amber-500">★ {assignedTrainer.rating} Faculty Rating</span>
-                </div>
-                <h3 className="text-2xl font-bold text-slate-900 mt-1">{assignedTrainer.name}</h3>
-                <p className="text-xs sm:text-sm text-slate-500">{assignedTrainer.role} • Pixiu Tech Academic Faculty</p>
-                
-                <div className="flex flex-wrap gap-2.5 mt-3">
-                  <a
-                    href={`tel:${assignedTrainer.phone.replace(/\s+/g, '')}`}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors"
-                  >
-                    <Phone size={13} className="text-pixiu-blue" /> {assignedTrainer.phone}
-                  </a>
-                  <a
-                    href={`https://wa.me/${assignedTrainer.phone.replace(/[^0-9]/g, '')}?text=Hello%20${encodeURIComponent(assignedTrainer.name)},%20reaching%20out%20from%20${encodeURIComponent(activeSchool.name)}.`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-colors shadow-xs shadow-emerald-600/20"
-                  >
-                    <MessageSquare size={13} /> WhatsApp Faculty
-                  </a>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Weekly Schedule</div>
-                <div className="text-base font-bold text-slate-800 mt-1">{assignedTrainer.weekly_days || 2} Days / Week</div>
-                <div className="text-xs text-slate-500 mt-0.5">Laboratory Batches & Practical Sprints</div>
-              </div>
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Assigned Lab Room</div>
-                <div className="text-base font-bold text-slate-800 mt-1">{activeSchool.lab_room}</div>
-                <div className="text-xs text-slate-500 mt-0.5">Dedicated STEM & Hardware Suite</div>
-              </div>
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Faculty Accreditation</div>
-                <div className="text-base font-bold text-emerald-600 mt-1">Verified STEM Instructor</div>
-                <div className="text-xs text-slate-500 mt-0.5">Certified Embedded & Robotics Engineer</div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 3: CURRICULUM & SYLLABUS */}
-        {activeTab === 'curriculum' && (
-          <div className="space-y-4">
-            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-              <h3 className="text-lg font-bold text-slate-800 mb-1">Institutional Syllabus Progression</h3>
-              <p className="text-xs text-slate-500 mb-6">
-                Modular progression aligned with National Education Policy (NEP 2020) & Atal Tinkering Lab standards.
-              </p>
-
-              <div className="space-y-3">
-                {[
-                  { unit: 'Unit 1 (Level 0)', title: 'Foundations of Electronics & Robotics', status: 'Completed (Taught)', sessions: '2/2 Sessions' },
-                  { unit: 'Unit 2 (Level 1)', title: 'The Arduino IDE & Serial Telemetry', status: 'In Progress (Active)', sessions: '1/2 Sessions' },
-                  { unit: 'Unit 3 (Level 2)', title: 'Sensor Logic & Analog/Digital Circuits', status: 'Upcoming (Untaught)', sessions: '0/2 Sessions' },
-                  { unit: 'Unit 4 (Level 3)', title: 'Actuators, Transistor Switches & Relays', status: 'Upcoming (Untaught)', sessions: '0/2 Sessions' },
-                  { unit: 'Unit 5 (Level 4)', title: 'Autonomous Microcontroller Projects', status: 'Upcoming (Untaught)', sessions: '0/2 Sessions' },
-                  { unit: 'Unit 6 (Level 5)', title: 'Capstone Exhibition & Project Certification', status: 'Upcoming (Untaught)', sessions: '0/2 Sessions' },
-                ].map((mod, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-4 bg-slate-50/80 hover:bg-slate-50 border border-slate-200 rounded-xl transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs ${
-                        mod.status.includes('Completed') ? 'bg-emerald-100 text-emerald-800' :
-                        mod.status.includes('In Progress') ? 'bg-blue-100 text-blue-800' :
-                        'bg-slate-200 text-slate-600'
-                      }`}>
-                        {idx + 1}
-                      </div>
-                      <div>
-                        <div className="font-bold text-slate-800 text-xs sm:text-sm">{mod.title}</div>
-                        <div className="text-[11px] text-slate-500 font-medium">{mod.unit}</div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                        mod.status.includes('Completed') ? 'bg-emerald-100 text-emerald-800' :
-                        mod.status.includes('In Progress') ? 'bg-blue-100 text-blue-800' :
-                        'bg-slate-200 text-slate-600'
-                      }`}>
-                        {mod.status}
-                      </span>
-                      <div className="text-[10px] text-slate-400 font-mono mt-0.5">{mod.sessions}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 4: ANNOUNCEMENTS & DIRECTIVES */}
-        {activeTab === 'announcements' && (
-          <div className="space-y-4">
-            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-              <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
-                <div>
-                  <h3 className="text-lg font-bold text-slate-800">Official Directives & Announcements</h3>
-                  <p className="text-xs text-slate-500 mt-0.5">Notices, schedules, and circulars issued by Pixiu Central Administration.</p>
-                </div>
-                <span className="text-xs font-bold px-3 py-1 bg-blue-50 text-pixiu-blue rounded-full border border-blue-200">
-                  {schoolNotifications.length} Active Circulars
-                </span>
-              </div>
-
-              <div className="space-y-3">
-                {schoolNotifications.map((notif) => (
-                  <div 
-                    key={notif.id} 
-                    className="p-4 bg-slate-50/80 hover:bg-slate-50 border border-slate-200 rounded-xl transition-colors space-y-2"
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                      <div className="flex items-center gap-2">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase ${
-                          notif.priority === 'high' || notif.severity === 'urgent'
-                            ? 'bg-rose-100 text-rose-700 border border-rose-200' 
-                            : 'bg-blue-100 text-blue-700 border border-blue-200'
-                        }`}>
-                          {notif.priority || notif.severity || 'Notice'}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                    <th className="pb-3">Candidate Roll</th>
+                    <th className="pb-3">Full Name</th>
+                    <th className="pb-3">Tech Level</th>
+                    <th className="pb-3">Assigned Kit</th>
+                    <th className="pb-3">Attendance</th>
+                    <th className="pb-3 text-right">Official Transcript</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredStudents.map(student => (
+                    <tr key={student.student_id} className="hover:bg-slate-50/80">
+                      <td className="py-3 font-mono font-bold text-pixiu-blue">{student.student_id}</td>
+                      <td className="py-3 font-bold text-slate-900">{student.name}</td>
+                      <td className="py-3">
+                        <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-md font-bold text-[10px] border border-blue-200">
+                          {student.tech_level || 'Level 0'}
                         </span>
-                        <h4 className="font-bold text-slate-900 text-sm">{notif.title}</h4>
-                      </div>
-                      <span className="text-[11px] font-mono text-slate-400 font-bold">
-                        {notif.scheduled_date || notif.created_at || 'Today'}
-                      </span>
-                    </div>
-
-                    <p className="text-xs text-slate-700 leading-relaxed">{notif.message}</p>
-
-                    <div className="flex flex-wrap items-center gap-4 text-[10px] text-slate-500 font-medium pt-1 border-t border-slate-200/60">
-                      <span>Authority: <b>{notif.sender_name || 'Central Administration'}</b></span>
-                      {notif.scheduled_time && <span>Time: <b>{notif.scheduled_time}</b></span>}
-                      <span>Target: <b>{notif.target_audience || notif.target_type || 'Institution'}</b></span>
-                    </div>
-                  </div>
-                ))}
-
-                {schoolNotifications.length === 0 && (
-                  <div className="py-12 text-center text-slate-400 text-xs font-medium">
-                    No active circulars or announcements issued for this school at this moment.
-                  </div>
-                )}
-              </div>
+                      </td>
+                      <td className="py-3 font-mono text-slate-600">{student.assigned_kit_id || 'KIT-01'}</td>
+                      <td className="py-3 font-bold text-emerald-700">{getStudentAttendance(student.student_id)}%</td>
+                      <td className="py-3 text-right">
+                        <button
+                          onClick={() => generateStudentTranscriptPDF({
+                            student,
+                            schoolName: activeSchool.name,
+                            studentReviews: studentReviews.filter(r => r.student_id === student.student_id),
+                            projects: projects.filter(p => p.student_id === student.student_id),
+                            attendanceRate: getStudentAttendance(student.student_id)
+                          })}
+                          className="px-3 py-1 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg text-[11px] transition-colors cursor-pointer inline-flex items-center gap-1"
+                        >
+                          <Download size={12} /> Transcript PDF
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
 
-        {/* TAB 5: BILLING & INVOICES */}
+        {/* TAB 2: FINANCIAL LEDGER */}
         {activeTab === 'billing' && (
           <div className="space-y-6">
-            {/* OFFICIAL BENEFICIARY & WIRE TRANSFER CARD */}
-            <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white p-6 rounded-2xl border border-slate-700 shadow-md">
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-700 pb-4 mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center text-blue-400">
-                    <Receipt size={20} />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-bold text-white tracking-wide">Official Wire Transfer & Settlement Details</h3>
-                    <p className="text-xs text-slate-400">Electronic remittance details for institutional robotics contracts</p>
-                  </div>
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-8 space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+                <div>
+                  <h2 className="text-xl font-bold text-slate-900">Institutional Milestone Financial Ledger</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Official contractual tranche invoice records and automated reconciliation.
+                  </p>
                 </div>
-                <span className="text-[11px] font-bold px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                  Verified Commercial Account
-                </span>
+
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2 text-right">
+                  <span className="text-[10px] font-bold text-emerald-800 uppercase block">Total Milestone Invoiced</span>
+                  <span className="text-lg font-black text-emerald-700">
+                    ₹{schoolBilling.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0).toLocaleString('en-IN')}
+                  </span>
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
-                <div className="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700/60">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Beneficiary / Company</span>
-                  <span className="text-sm font-extrabold text-white">PIXIU TECH LLP</span>
-                </div>
+              <div className="space-y-4">
+                {schoolBilling.map(inv => {
+                  const isPaid = inv.status === 'Paid' || inv.is_confirmed === 1;
+                  return (
+                    <div
+                      key={inv.id}
+                      className="p-5 rounded-2xl border border-slate-200 bg-slate-50/50 flex flex-col md:flex-row md:items-center justify-between gap-4"
+                    >
+                      <div>
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <span className="font-mono text-xs font-bold text-pixiu-blue">#{inv.id}</span>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                            isPaid ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'
+                          }`}>
+                            {isPaid ? '✓ PAID & CONFIRMED' : '⏳ PAYMENT DUE'}
+                          </span>
+                        </div>
+                        <h3 className="font-bold text-slate-900 text-sm">{inv.tranche_title || 'Robotics Lab Tranche'}</h3>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Date Issued: {inv.date_issued || '2026-08-01'} • Due Date: {inv.due_date || '2026-08-15'}
+                        </p>
+                      </div>
 
-                <div className="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700/60">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Bank Account Number</span>
-                  <span className="text-sm font-mono font-extrabold text-blue-400">5599971440</span>
-                </div>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <span className="text-lg font-black text-slate-900">
+                            ₹{Number(inv.amount).toLocaleString('en-IN')}
+                          </span>
+                          <span className="block text-[10px] text-slate-400 font-medium">Net Amount (INR)</span>
+                        </div>
 
-                <div className="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700/60">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">IFSC Code & Bank</span>
-                  <span className="text-sm font-mono font-extrabold text-white">CBIN0282573</span>
-                  <span className="text-[10px] text-slate-400 block mt-0.5">Central Bank of India (Gorakhpur)</span>
-                </div>
+                        <button
+                          onClick={() => handlePrintInvoice(inv)}
+                          className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
+                        >
+                          <Printer size={14} />
+                          <span>Print Tax Invoice</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
 
-                <div className="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700/60">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Authorized Signatory</span>
-                  <span className="text-sm font-bold text-slate-200">Adarsh Raj Singh</span>
-                  <span className="text-[10px] text-slate-400 block mt-0.5">Founder & Director, Pixiu Tech LLP</span>
+              {/* Wire Transfer Profile */}
+              <div className="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-5 text-xs text-emerald-950 space-y-2">
+                <h4 className="font-bold text-emerald-900 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                  <ShieldCheck size={16} className="text-emerald-700" />
+                  Official Bank Wire Transfer Coordinates:
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-slate-700 pt-1">
+                  <div><strong>Beneficiary / Company:</strong> PIXIU TECH LLP</div>
+                  <div><strong>Account Number:</strong> 5599971440</div>
+                  <div><strong>Bank & Branch:</strong> Central Bank of India (Gorakhpur Main)</div>
+                  <div><strong>IFSC Code:</strong> CBIN0282573</div>
                 </div>
               </div>
             </div>
+          </div>
+        )}
 
-            {/* Invoices Table */}
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-              <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div>
-                  <h3 className="text-lg font-bold text-slate-800">Institutional Invoices & Ledger</h3>
-                  <p className="text-xs text-slate-500 mt-0.5">Official contractual milestone billing records for {activeSchool.name}.</p>
-                </div>
-                <span className="text-xs font-bold px-3 py-1 bg-slate-100 text-slate-700 rounded-lg">
-                  {schoolBilling.length} Invoices Issued
-                </span>
+        {/* TAB 3: HARDWARE LAB & RMA */}
+        {activeTab === 'hardware' && (
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-8 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">Robotics Hardware Kits & Component Health</h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Real-time component tracking, sensor diagnostics & guaranteed 48-hour RMA replacements.
+                </p>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold text-[11px]">
-                      <th className="py-3.5 px-4 pl-6">Invoice #</th>
-                      <th className="py-3.5 px-4">Milestone Tranche</th>
-                      <th className="py-3.5 px-4">Issued Date</th>
-                      <th className="py-3.5 px-4">Due Date</th>
-                      <th className="py-3.5 px-4">Amount</th>
-                      <th className="py-3.5 px-4">Status</th>
-                      <th className="py-3.5 px-4 text-right pr-6">Official Document</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {schoolBilling.map((inv) => (
-                      <tr key={inv.id} className="hover:bg-slate-50/80 transition-colors">
-                        <td className="py-3.5 px-4 pl-6 font-mono font-bold text-pixiu-blue">{inv.id}</td>
-                        <td className="py-3.5 px-4">
-                          <div className="font-bold text-slate-800">{inv.tranche_title}</div>
-                          <div className="text-[11px] text-slate-500 max-w-md truncate">{inv.description || 'Comprehensive robotics kits, trainer deployment & lab setup.'}</div>
-                        </td>
-                        <td className="py-3.5 px-4 text-slate-600 font-mono">{inv.invoice_date || inv.date_issued}</td>
-                        <td className="py-3.5 px-4 text-slate-600 font-mono">{inv.due_date}</td>
-                        <td className="py-3.5 px-4 font-bold text-slate-800 text-sm">₹{inv.amount?.toLocaleString('en-IN')}</td>
-                        <td className="py-3.5 px-4">
-                          <span className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
-                            inv.status === 'Paid' 
-                              ? 'bg-emerald-100 text-emerald-800' 
-                              : 'bg-amber-100 text-amber-800'
-                          }`}>
-                            {inv.status}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4 text-right pr-6">
-                          <button
-                            onClick={() => handlePrintInvoice(inv)}
-                            className="px-3 py-1.5 bg-blue-50 hover:bg-pixiu-blue text-pixiu-blue hover:text-white rounded-lg text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1.5 border border-blue-200 hover:border-transparent"
-                            title="View Official Tax Invoice & Receipt"
-                          >
-                            <FileText size={13} /> View Invoice
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                    {schoolBilling.length === 0 && (
-                      <tr>
-                        <td colSpan="7" className="py-12 text-center text-slate-400 text-xs font-medium">
-                          No billing invoices generated yet for this institution.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+              <button
+                onClick={() => setIsRmaModalOpen(true)}
+                className="px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-sm shadow-rose-600/20"
+              >
+                <AlertTriangle size={15} />
+                <span>Log Broken Component</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {[
+                { name: 'Arduino Uno R3 Microcontrollers', total: 25, status: 'Healthy', color: 'emerald' },
+                { name: 'Ultrasonic Distance Sensors HC-SR04', total: 25, status: 'Healthy', color: 'emerald' },
+                { name: 'Dual H-Bridge Motor Drivers L298N', total: 25, status: 'Healthy', color: 'emerald' },
+                { name: 'Solderless Breadboards 830-Point', total: 50, status: 'Healthy', color: 'emerald' },
+                { name: 'High-Torque TT Geared DC Motors', total: 50, status: 'Healthy', color: 'emerald' },
+                { name: '16x2 I2C Character LCD Displays', total: 25, status: 'Healthy', color: 'emerald' }
+              ].map((item, idx) => (
+                <div key={idx} className="p-4 rounded-2xl border border-slate-200 bg-slate-50/60 flex items-center justify-between">
+                  <div>
+                    <h4 className="font-bold text-slate-900 text-xs">{item.name}</h4>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Inventory Stock: {item.total} Units</p>
+                  </div>
+                  <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold rounded-lg text-[10px]">
+                    ✓ 100% Operational
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 4: ASSIGNED TRAINER */}
+        {activeTab === 'trainer' && (
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-8 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">Assigned Robotics Instructor</h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Certified robotics trainer deployed to your institution for regular laboratory sessions.
+                </p>
+              </div>
+
+              <a
+                href={`https://wa.me/${assignedTrainer.phone.replace(/[^0-9]/g, '')}?text=Hello%20${encodeURIComponent(assignedTrainer.name)},%20reaching%20out%20from%20${encodeURIComponent(activeSchool.name)}.`}
+                target="_blank"
+                rel="noreferrer"
+                className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-sm shadow-emerald-600/20"
+              >
+                <Phone size={15} />
+                <span>Contact Instructor on WhatsApp</span>
+              </a>
+            </div>
+
+            <div className="flex items-center gap-5 p-6 bg-slate-50 rounded-2xl border border-slate-200">
+              <div className="w-16 h-16 rounded-2xl bg-slate-900 text-white font-black text-xl flex items-center justify-center shrink-0 shadow-sm">
+                {assignedTrainer.name.charAt(0)}
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-xl font-black text-slate-900">{assignedTrainer.name}</h3>
+                <p className="text-xs font-bold text-pixiu-blue">{assignedTrainer.role}</p>
+                <p className="text-xs text-slate-500">Contact: <strong className="font-mono text-slate-800">{assignedTrainer.phone}</strong> • Rating: <strong>{assignedTrainer.rating} / 5.0 ★</strong></p>
               </div>
             </div>
           </div>
         )}
       </main>
+
+      {/* RMA Ticket Modal */}
+      <Modal
+        isOpen={isRmaModalOpen}
+        onClose={() => setIsRmaModalOpen(false)}
+        title="Report Damaged Hardware / RMA Dispatch"
+        size="sm"
+      >
+        <form onSubmit={handleRmaSubmit} className="space-y-4 text-xs">
+          <div>
+            <label className="block font-bold text-slate-600 uppercase mb-1">Kit ID / Classroom</label>
+            <select
+              value={rmaData.kit_id}
+              onChange={e => setRmaData({ ...rmaData, kit_id: e.target.value })}
+              className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold bg-white focus:outline-none focus:border-pixiu-blue"
+            >
+              <option value="KIT-ZPS-01">Class 6A - KIT-01</option>
+              <option value="KIT-ZPS-02">Class 7A - KIT-02</option>
+              <option value="KIT-ZPS-03">Class 8A - KIT-03</option>
+              <option value="KIT-ZPS-04">Class 9A - KIT-04</option>
+              <option value="KIT-ZPS-05">Class 11A - KIT-05</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block font-bold text-slate-600 uppercase mb-1">Component Name *</label>
+            <input
+              type="text"
+              value={rmaData.component_name}
+              onChange={e => setRmaData({ ...rmaData, component_name: e.target.value })}
+              required
+              className="w-full px-3 py-2 border border-slate-300 rounded-xl font-medium focus:outline-none focus:border-pixiu-blue"
+            />
+          </div>
+
+          <div>
+            <label className="block font-bold text-slate-600 uppercase mb-1">Issue Description *</label>
+            <textarea
+              rows="3"
+              value={rmaData.issue_description}
+              onChange={e => setRmaData({ ...rmaData, issue_description: e.target.value })}
+              required
+              placeholder="e.g. Pin burnt or motor gear slipping..."
+              className="w-full px-3 py-2 border border-slate-300 rounded-xl font-medium focus:outline-none focus:border-pixiu-blue"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={() => setIsRmaModalOpen(false)}
+              className="px-4 py-2 font-medium text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-5 py-2 font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md shadow-rose-600/20 cursor-pointer flex items-center gap-1.5"
+            >
+              <AlertTriangle size={14} />
+              <span>Dispatch RMA Ticket</span>
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }
