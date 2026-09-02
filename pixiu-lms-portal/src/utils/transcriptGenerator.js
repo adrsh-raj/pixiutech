@@ -308,8 +308,8 @@ export const generateStudentTranscriptPDF = ({
               </td>
               <td style="text-align: right;">
                 <div class="sig-line" style="margin-left: auto;">
-                  Adarsh Raj
-                  <div class="sig-title">Academic Director & Founder • Pixiu Tech</div>
+                  Authorized Signatory
+                  <div class="sig-title">STEM Innovation Lab • Institutional Certification</div>
                 </div>
               </td>
             </tr>
