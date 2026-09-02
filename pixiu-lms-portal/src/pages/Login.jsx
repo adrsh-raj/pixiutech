@@ -16,6 +16,17 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [selectedRoleTab, setSelectedRoleTab] = useState('student'); // 'student' | 'trainer' | 'school'
 
+  const [idleNotice, setIdleNotice] = useState(() => {
+    try {
+      const msg = sessionStorage.getItem('pixiu_idle_logout_msg');
+      if (msg) {
+        sessionStorage.removeItem('pixiu_idle_logout_msg');
+        return msg;
+      }
+    } catch (e) {}
+    return '';
+  });
+
   const handleRolePreset = (role) => {
     setSelectedRoleTab(role);
     setError('');
@@ -100,6 +111,14 @@ export default function Login() {
           </button>
         </div>
 
+        {/* Inactivity Auto-Logout Notification */}
+        {idleNotice && (
+          <div className="mb-4 p-3.5 bg-amber-500/15 border border-amber-500/30 rounded-xl text-amber-300 text-xs font-medium flex items-center gap-2.5">
+            <Lock size={16} className="shrink-0 text-amber-400" />
+            <span>{idleNotice}</span>
+          </div>
+        )}
+
         {/* Error Alert */}
         {error && (
           <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-xs font-medium flex items-center gap-2">
@@ -132,6 +151,12 @@ export default function Login() {
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:border-pixiu-blue transition-colors font-medium placeholder:text-slate-600"
               />
             </div>
+            {selectedRoleTab === 'student' && (
+              <p className="text-[11px] text-slate-400 mt-1.5 flex items-center justify-between">
+                <span>Hint: Try <button type="button" onClick={() => { setUsername('XYZ6A 01'); setPassword('XYZxyz6@hata'); }} className="text-blue-400 hover:underline font-mono font-bold cursor-pointer">XYZ6A 01</button></span>
+                <span className="text-slate-500 text-[10px] font-mono">Pass: XYZxyz6@hata</span>
+              </p>
+            )}
           </div>
 
           <div>

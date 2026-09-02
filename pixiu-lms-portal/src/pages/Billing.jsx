@@ -189,6 +189,7 @@ export default function Billing() {
       <html>
         <head>
           <title>Official Tax Invoice - ${inv.id}</title>
+          <base href="${window.location.origin}/" />
           <style>
             body { font-family: 'Segoe UI', Arial, sans-serif; padding: 40px; color: #1e293b; background: #fff; max-width: 800px; margin: 0 auto; }
             .header { display: flex; justify-content: space-between; border-bottom: 2px solid #0A1A33; padding-bottom: 20px; margin-bottom: 25px; }
@@ -216,7 +217,7 @@ export default function Billing() {
           <div class="header">
             <div>
               <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 6px;">
-                <img src="/img/logo.png" alt="Pixiu Tech Logo" style="height: 48px; width: auto; object-fit: contain; display: block;" onerror="this.style.display='none'" />
+                <img src="${window.location.origin}/img/logo.png" alt="Pixiu Tech Logo" style="height: 48px; width: auto; object-fit: contain; display: block;" onerror="this.src='/img/logo.png'" />
                 <div>
                   <div class="brand">PIXIU <span>TECH LLP</span></div>
                   <div class="tagline">Educational Robotics & AI Lab Systems</div>
