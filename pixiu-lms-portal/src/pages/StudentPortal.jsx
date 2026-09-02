@@ -69,7 +69,7 @@ export default function StudentPortal() {
 
   const whatsappNumber = '917985403186';
   const whatsappKitUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(
-    `Hello Pixiu Tech Team! 🚀\nI am ${student.name} from Class ${studentGrade}A (Student ID: ${student.student_id}) at ${school}.\nI want to buy/order my personal STEM Robotics Hardware Kit (${studentKit.name || `Class ${studentGrade} Kit`}) for practice at home.\nPlease share the kit price, payment details and delivery timeframe.`
+    `Hello Pixiu Tech Team! 🚀\nI am ${student.name} from Class ${studentGrade}A (Student ID: ${student.student_id}) at ${school}.\nI want to buy/order my personal STEM Robotics Hardware Kit (${studentKit.name || `Class ${studentGrade} Kit`}) at the special subsidized student discount rate (below market price).\nPlease share the discounted kit price and delivery details.`
   )}`;
   const classNotifs = (notifications || []).filter(n => {
     if (n.status === 'Archived') return false;
@@ -713,8 +713,8 @@ export default function StudentPortal() {
           </div>
         </div>
 
-        {/* 3. Clean WhatsApp Your Kit Store Callout */}
-        <div className="bg-white rounded-2xl border border-emerald-200 p-4 sm:p-5 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        {/* 3. Clean WhatsApp Your Kit Store Callout (Cheap & Below Market Price) */}
+        <div className="bg-white rounded-2xl border border-emerald-200/90 p-4 sm:p-5 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">
             <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center shrink-0">
               <MessageCircle size={20} />
@@ -725,11 +725,14 @@ export default function StudentPortal() {
                   Want to Practice Robotics at Home?
                 </h4>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  Official Hardware Kit
+                  🏷️ Cheap & Below Market Price
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-50 text-pixiu-blue border border-blue-200">
+                  Student Discount
                 </span>
               </div>
               <p className="text-slate-500 text-xs mt-0.5">
-                Order your personal <strong className="text-slate-700">Class {studentGrade} STEM Kit</strong> directly via WhatsApp at <strong className="text-emerald-700 font-mono">+91 7985403186</strong>.
+                Buy your official <strong className="text-slate-700">Class {studentGrade} STEM Robotics Kit</strong> directly via WhatsApp at guaranteed <strong className="text-emerald-700 font-semibold">cheap & below market price</strong> (+91 7985403186).
               </p>
             </div>
           </div>
@@ -741,7 +744,7 @@ export default function StudentPortal() {
             className="w-full md:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer shrink-0"
           >
             <MessageCircle size={15} />
-            WhatsApp Your Kit (+91 7985403186) →
+            Buy at Below Market Price (+91 7985403186) →
           </a>
         </div>
 
