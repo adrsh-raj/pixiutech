@@ -9,6 +9,58 @@ import { useData } from '../context/DataContext';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 
+const REVIEW_PRESETS = [
+  "Demonstrated exceptional understanding of breadboard power rails, series-parallel LEDs, and Ohm's Law current calculations.",
+  "Successfully calibrated analog LDR and digital IR sensors with accurate voltage divider threshold adjustments.",
+  "Accurate transistor switching circuitry wiring and high-torque DC motor driver breadboard assembly.",
+  "Strong grasp of digital pin modes, conditional loops, and serial monitor telemetry debugging.",
+  "Excellent hands-on prototype assembly with neat wiring and active problem-solving.",
+  "Completed lab objectives with good understanding, needs minor guidance on circuit debugging."
+];
+
+const GRADE_UNITS_CONFIG = {
+  '6': [
+    { unitCode: 'Unit 1', level: 'Level 0', title: 'Introduction to Robotics & Electronics' },
+    { unitCode: 'Unit 2', level: 'Level 1', title: 'The Arduino IDE' },
+    { unitCode: 'Unit 3', level: 'Level 2', title: 'Basic Project: Traffic Light Signal Controller' },
+    { unitCode: 'Unit 4', level: 'Level 3', title: 'Intermediate Project: Automatic Night Lamp' },
+    { unitCode: 'Unit 5', level: 'Level 4', title: 'Final Project: Smart Toll Booth' },
+    { unitCode: 'Unit 6', level: 'Level 5', title: 'Extra Challenges & Project Log' }
+  ],
+  '7': [
+    { unitCode: 'Unit 1', level: 'Level 0', title: 'Introduction to Analog & Digital Electronics' },
+    { unitCode: 'Unit 2', level: 'Level 1', title: 'The Arduino IDE & Serial Monitor' },
+    { unitCode: 'Unit 3', level: 'Level 2', title: 'Basic Project: LED Dimmer and Mood Light' },
+    { unitCode: 'Unit 4', level: 'Level 3', title: 'Intermediate Project: Temperature & Humidity Monitor' },
+    { unitCode: 'Unit 5', level: 'Level 4', title: 'Final Project: Smart Rain Alarm System' },
+    { unitCode: 'Unit 6', level: 'Level 5', title: 'Extra Challenges & Project Log' }
+  ],
+  '8': [
+    { unitCode: 'Unit 1', level: 'Level 0', title: 'Introduction to Waves & Distance Measurement' },
+    { unitCode: 'Unit 2', level: 'Level 1', title: 'The Arduino IDE & Sensor Libraries' },
+    { unitCode: 'Unit 3', level: 'Level 2', title: 'Basic Project: Height Measurement Station' },
+    { unitCode: 'Unit 4', level: 'Level 3', title: 'Intermediate Project: Smart Contactless Dustbin' },
+    { unitCode: 'Unit 5', level: 'Level 4', title: 'Final Project: Obstacle-Avoiding Robot' },
+    { unitCode: 'Unit 6', level: 'Level 5', title: 'Extra Challenges & Project Log' }
+  ],
+  '9': [
+    { unitCode: 'Unit 1', level: 'Level 0', title: 'Introduction to Industrial Sensors & Displays' },
+    { unitCode: 'Unit 2', level: 'Level 1', title: 'The Arduino IDE & Memory Architecture' },
+    { unitCode: 'Unit 3', level: 'Level 2', title: 'Basic Project: Fire Security Alarm System' },
+    { unitCode: 'Unit 4', level: 'Level 3', title: 'Intermediate Project: Smart 16x2 LCD Weather System' },
+    { unitCode: 'Unit 5', level: 'Level 4', title: 'Final Project: Line Following Robot' },
+    { unitCode: 'Unit 6', level: 'Level 5', title: 'Extra Challenges & Wiring Reference' }
+  ],
+  '11': [
+    { unitCode: 'Unit 1', level: 'Level 0', title: 'Introduction to Engineering Specs & Optics' },
+    { unitCode: 'Unit 2', level: 'Level 1', title: 'The Arduino IDE & Advanced Control' },
+    { unitCode: 'Unit 3', level: 'Level 2', title: 'Basic Project: Laser Security System' },
+    { unitCode: 'Unit 4', level: 'Level 3', title: 'Intermediate Project: Ultrasonic Calibration' },
+    { unitCode: 'Unit 5', level: 'Level 4', title: 'Capstone Project: Maze Solver Robot' },
+    { unitCode: 'Unit 6', level: 'Level 5', title: 'Engineering Reference & Log' }
+  ]
+};
+
 export default function Trainers() {
   const { 
     trainers, schools, classes, students, sessions, markAttendance, 
@@ -116,58 +168,6 @@ export default function Trainers() {
   const [selectedReviewGrade, setSelectedReviewGrade] = useState('All');
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [editingReviewId, setEditingReviewId] = useState(null);
-  
-  const REVIEW_PRESETS = [
-    "Demonstrated exceptional understanding of breadboard power rails, series-parallel LEDs, and Ohm's Law current calculations.",
-    "Successfully calibrated analog LDR and digital IR sensors with accurate voltage divider threshold adjustments.",
-    "Accurate transistor switching circuitry wiring and high-torque DC motor driver breadboard assembly.",
-    "Strong grasp of digital pin modes, conditional loops, and serial monitor telemetry debugging.",
-    "Excellent hands-on prototype assembly with neat wiring and active problem-solving.",
-    "Completed lab objectives with good understanding, needs minor guidance on circuit debugging."
-  ];
-
-  const GRADE_UNITS_CONFIG = {
-    '6': [
-      { unitCode: 'Unit 1', level: 'Level 0', title: 'Introduction to Robotics & Electronics' },
-      { unitCode: 'Unit 2', level: 'Level 1', title: 'The Arduino IDE' },
-      { unitCode: 'Unit 3', level: 'Level 2', title: 'Basic Project: Traffic Light Signal Controller' },
-      { unitCode: 'Unit 4', level: 'Level 3', title: 'Intermediate Project: Automatic Night Lamp' },
-      { unitCode: 'Unit 5', level: 'Level 4', title: 'Final Project: Smart Toll Booth' },
-      { unitCode: 'Unit 6', level: 'Level 5', title: 'Extra Challenges & Project Log' }
-    ],
-    '7': [
-      { unitCode: 'Unit 1', level: 'Level 0', title: 'Introduction to Analog & Digital Electronics' },
-      { unitCode: 'Unit 2', level: 'Level 1', title: 'The Arduino IDE & Serial Monitor' },
-      { unitCode: 'Unit 3', level: 'Level 2', title: 'Basic Project: LED Dimmer and Mood Light' },
-      { unitCode: 'Unit 4', level: 'Level 3', title: 'Intermediate Project: Temperature & Humidity Monitor' },
-      { unitCode: 'Unit 5', level: 'Level 4', title: 'Final Project: Smart Rain Alarm System' },
-      { unitCode: 'Unit 6', level: 'Level 5', title: 'Extra Challenges & Project Log' }
-    ],
-    '8': [
-      { unitCode: 'Unit 1', level: 'Level 0', title: 'Introduction to Waves & Distance Measurement' },
-      { unitCode: 'Unit 2', level: 'Level 1', title: 'The Arduino IDE & Sensor Libraries' },
-      { unitCode: 'Unit 3', level: 'Level 2', title: 'Basic Project: Height Measurement Station' },
-      { unitCode: 'Unit 4', level: 'Level 3', title: 'Intermediate Project: Smart Contactless Dustbin' },
-      { unitCode: 'Unit 5', level: 'Level 4', title: 'Final Project: Obstacle-Avoiding Robot' },
-      { unitCode: 'Unit 6', level: 'Level 5', title: 'Extra Challenges & Project Log' }
-    ],
-    '9': [
-      { unitCode: 'Unit 1', level: 'Level 0', title: 'Introduction to Industrial Sensors & Displays' },
-      { unitCode: 'Unit 2', level: 'Level 1', title: 'The Arduino IDE & Memory Architecture' },
-      { unitCode: 'Unit 3', level: 'Level 2', title: 'Basic Project: Fire Security Alarm System' },
-      { unitCode: 'Unit 4', level: 'Level 3', title: 'Intermediate Project: Smart 16x2 LCD Weather System' },
-      { unitCode: 'Unit 5', level: 'Level 4', title: 'Final Project: Line Following Robot' },
-      { unitCode: 'Unit 6', level: 'Level 5', title: 'Extra Challenges & Wiring Reference' }
-    ],
-    '11': [
-      { unitCode: 'Unit 1', level: 'Level 0', title: 'Introduction to Engineering Specs & Optics' },
-      { unitCode: 'Unit 2', level: 'Level 1', title: 'The Arduino IDE & Advanced Control' },
-      { unitCode: 'Unit 3', level: 'Level 2', title: 'Basic Project: Laser Security System' },
-      { unitCode: 'Unit 4', level: 'Level 3', title: 'Intermediate Project: Ultrasonic Calibration' },
-      { unitCode: 'Unit 5', level: 'Level 4', title: 'Capstone Project: Maze Solver Robot' },
-      { unitCode: 'Unit 6', level: 'Level 5', title: 'Engineering Reference & Log' }
-    ]
-  };
 
   const [reviewFormData, setReviewFormData] = useState({
     student_id: 'ZPS6A 01',
