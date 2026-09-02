@@ -26,42 +26,47 @@ export const generateStudentTranscriptPDF = ({
   };
   const studentGrade = extractGrade(student);
 
-  // Grade-Specific Default Units
+  // Grade-Specific Default Units (Level 0 - Level 5)
   const GRADE_UNITS = {
     '6': [
-      { level: 'Level 1', unitCode: 'UNIT-601', title: 'Foundations of Electronics & Breadboard Mastery' },
-      { level: 'Level 2', unitCode: 'UNIT-602', title: 'Sensory Logic: LDRs, Ultrasonic Sonar & Buzzers' },
-      { level: 'Level 3', unitCode: 'UNIT-603', title: 'Transistors as Electronic Switches & Barrier Servos' },
-      { level: 'Level 4', unitCode: 'UNIT-604', title: 'Embedded Microcontroller Logic & Traffic Signals' },
-      { level: 'Level 5', unitCode: 'UNIT-605', title: 'Robotics Engineering & Autonomous Smart Automation' }
+      { level: 'Level 0', unitCode: 'Unit 1', title: 'Introduction to Robotics & Electronics' },
+      { level: 'Level 1', unitCode: 'Unit 2', title: 'The Arduino IDE' },
+      { level: 'Level 2', unitCode: 'Unit 3', title: 'Basic Project: Traffic Light Signal Controller' },
+      { level: 'Level 3', unitCode: 'Unit 4', title: 'Intermediate Project: Automatic Night Lamp' },
+      { level: 'Level 4', unitCode: 'Unit 5', title: 'Final Project: Smart Toll Booth' },
+      { level: 'Level 5', unitCode: 'Unit 6', title: 'Extra Challenges & Project Log' }
     ],
     '7': [
-      { level: 'Level 1', unitCode: 'UNIT-701', title: 'Environmental Telemetry & Climate Monitoring' },
-      { level: 'Level 2', unitCode: 'UNIT-702', title: 'Analog Potentiometers & Precision Voltage Dividers' },
-      { level: 'Level 3', unitCode: 'UNIT-703', title: 'Raindrop Conductive Sensing & Soil Moisture Thresholds' },
-      { level: 'Level 4', unitCode: 'UNIT-704', title: 'Micro-Servo Actuation & Automated Wiper Systems' },
-      { level: 'Level 5', unitCode: 'UNIT-705', title: 'Smart Greenhouse Ecosystem & Disaster Alerts' }
+      { level: 'Level 0', unitCode: 'Unit 1', title: 'Introduction to Analog & Digital Electronics' },
+      { level: 'Level 1', unitCode: 'Unit 2', title: 'The Arduino IDE & Serial Monitor' },
+      { level: 'Level 2', unitCode: 'Unit 3', title: 'Basic Project: LED Dimmer and Mood Light' },
+      { level: 'Level 3', unitCode: 'Unit 4', title: 'Intermediate Project: Temperature & Humidity Monitor' },
+      { level: 'Level 4', unitCode: 'Unit 5', title: 'Final Project: Smart Rain Alarm System' },
+      { level: 'Level 5', unitCode: 'Unit 6', title: 'Extra Challenges & Project Log' }
     ],
     '8': [
-      { level: 'Level 1', unitCode: 'UNIT-801', title: 'Spatial Mapping & 180° Sonar Turret Radar' },
-      { level: 'Level 2', unitCode: 'UNIT-802', title: 'Dual H-Bridge Motor Drivers & PWM Speed Regulation' },
-      { level: 'Level 3', unitCode: 'UNIT-803', title: 'Robotic Chassis Assembly & Differential Steering' },
-      { level: 'Level 4', unitCode: 'UNIT-804', title: 'Obstacle Avoidance Autonomous Navigation Algorithms' },
-      { level: 'Level 5', unitCode: 'UNIT-805', title: 'Mobility Telemetry & Competition Rover Optimization' }
+      { level: 'Level 0', unitCode: 'Unit 1', title: 'Introduction to Waves & Distance Measurement' },
+      { level: 'Level 1', unitCode: 'Unit 2', title: 'The Arduino IDE & Sensor Libraries' },
+      { level: 'Level 2', unitCode: 'Unit 3', title: 'Basic Project: Height Measurement Station' },
+      { level: 'Level 3', unitCode: 'Unit 4', title: 'Intermediate Project: Smart Contactless Dustbin' },
+      { level: 'Level 4', unitCode: 'Unit 5', title: 'Final Project: Obstacle-Avoiding Robot' },
+      { level: 'Level 5', unitCode: 'Unit 6', title: 'Extra Challenges & Project Log' }
     ],
     '9': [
-      { level: 'Level 1', unitCode: 'UNIT-901', title: 'Optical Infrared Flame & Thermal Radiation Detection' },
-      { level: 'Level 2', unitCode: 'UNIT-902', title: '16x2 Parallel LCD Telemetry & Bus Protocol Interface' },
-      { level: 'Level 3', unitCode: 'UNIT-903', title: 'TCRT5000 Dual IR High-Contrast Line Tracking Arrays' },
-      { level: 'Level 4', unitCode: 'UNIT-904', title: 'H-Bridge Motor Arbitration & Industrial Safety Alarms' },
-      { level: 'Level 5', unitCode: 'UNIT-905', title: 'Autonomous Line-Following Industrial Transport Rover' }
+      { level: 'Level 0', unitCode: 'Unit 1', title: 'Introduction to Industrial Sensors & Displays' },
+      { level: 'Level 1', unitCode: 'Unit 2', title: 'The Arduino IDE & Memory Architecture' },
+      { level: 'Level 2', unitCode: 'Unit 3', title: 'Basic Project: Fire Security Alarm System' },
+      { level: 'Level 3', unitCode: 'Unit 4', title: 'Intermediate Project: Smart 16x2 LCD Weather System' },
+      { level: 'Level 4', unitCode: 'Unit 5', title: 'Final Project: Line Following Robot' },
+      { level: 'Level 5', unitCode: 'Unit 6', title: 'Extra Challenges & Wiring Reference' }
     ],
     '11': [
-      { level: 'Level 1', unitCode: 'UNIT-1101', title: 'Coherent Photonics: 650nm Laser Diode Optical Tripwire' },
-      { level: 'Level 2', unitCode: 'UNIT-1102', title: 'Millisecond Intrusion Response Timing & LCD Telemetry' },
-      { level: 'Level 3', unitCode: 'UNIT-1103', title: 'Sonar Uncertainty Analysis & Sensor Characterization' },
-      { level: 'Level 4', unitCode: 'UNIT-1104', title: '3-Way IR Maze Array & Autonomous Decision Trees' },
-      { level: 'Level 5', unitCode: 'UNIT-1105', title: 'Autonomous Micro-Mouse Maze Navigation & Robotics' }
+      { level: 'Level 0', unitCode: 'Unit 1', title: 'Introduction to Engineering Specs & Optics' },
+      { level: 'Level 1', unitCode: 'Unit 2', title: 'The Arduino IDE & Advanced Control' },
+      { level: 'Level 2', unitCode: 'Unit 3', title: 'Basic Project: Laser Security System' },
+      { level: 'Level 3', unitCode: 'Unit 4', title: 'Intermediate Project: Ultrasonic Calibration' },
+      { level: 'Level 4', unitCode: 'Unit 5', title: 'Capstone Project: Maze Solver Robot' },
+      { level: 'Level 5', unitCode: 'Unit 6', title: 'Engineering Reference & Log' }
     ]
   };
 
