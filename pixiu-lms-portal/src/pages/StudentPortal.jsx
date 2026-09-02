@@ -14,6 +14,8 @@ import {
   AreaChart, Area, LineChart, Line, XAxis, YAxis, 
   CartesianGrid, Tooltip, ResponsiveContainer 
 } from 'recharts';
+import { Link } from 'react-router-dom';
+import Modal from '../components/ui/Modal';
 
 export default function StudentPortal() {
   const { user, logout } = useAuth();
@@ -473,12 +475,20 @@ export default function StudentPortal() {
             </div>
           </div>
 
-          <button 
-            onClick={handlePrintReport}
-            className="w-full md:w-auto bg-pixiu-blue hover:bg-blue-600 active:scale-98 text-white text-xs font-bold px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 transition-all cursor-pointer shrink-0"
-          >
-            <FileText size={15} /> Download Progress Certificate & Transcript
-          </button>
+          <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full md:w-auto shrink-0">
+            <button 
+              onClick={handlePrintReport}
+              className="w-full sm:w-auto bg-pixiu-blue hover:bg-blue-600 active:scale-98 text-white text-xs font-bold px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 transition-all cursor-pointer shrink-0"
+            >
+              <FileText size={15} /> Download Transcript
+            </button>
+            <Link
+              to={`/verify?id=${encodeURIComponent(student.student_id)}`}
+              className="w-full sm:w-auto bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold px-4 py-2.5 sm:py-3 rounded-xl flex items-center justify-center gap-2 border border-slate-700 transition-all shrink-0"
+            >
+              <ShieldCheck size={15} className="text-emerald-400" /> Verify Online (QR)
+            </Link>
+          </div>
         </div>
 
         {/* 2. 3 Metric Summary Cards (Mobile 3-column Grid) */}
@@ -925,93 +935,65 @@ export default function StudentPortal() {
       </main>
 
       {/* ==================== COMPONENT INSPECTION MODAL ==================== */}
-      {selectedComponent && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-100 transform transition-all animate-scaleUp">
-            <div className="relative bg-slate-900 p-5 sm:p-6 text-white">
-              <button 
-                onClick={() => setSelectedComponent(null)}
-                className="absolute top-4 right-4 text-slate-400 hover:text-white bg-slate-800/80 p-1.5 rounded-full cursor-pointer transition-colors"
-              >
-                <X size={18} />
-              </button>
-              <div className="flex items-center gap-2 mb-2">
-                <span className="px-2.5 py-0.5 bg-blue-600 text-white rounded-full text-[10px] font-extrabold uppercase">
-                  {selectedComponent.category || 'Hardware Component'}
-                </span>
-                <span className="text-slate-400 text-xs font-mono">{selectedComponent.session}</span>
-              </div>
-              <h3 className="text-base sm:text-xl font-extrabold text-white">
-                {selectedComponent.name}
-              </h3>
-            </div>
-
-            <div className="p-5 sm:p-6 space-y-4">
-              <div className="rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 flex items-center justify-center max-h-56">
-                <img 
-                  src={selectedComponent.image} 
-                  alt={selectedComponent.name} 
-                  className="max-h-56 w-full object-cover"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Function & Lab Role</h4>
-                <p className="text-xs sm:text-sm text-slate-700 bg-slate-50 p-3.5 rounded-xl border border-slate-200/80 leading-relaxed font-medium">
-                  {selectedComponent.role}
-                </p>
-              </div>
-
-              {selectedComponent.specs && (
-                <div className="space-y-1.5">
-                  <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Electrical & Pinout Specifications</h4>
-                  <p className="text-[11px] sm:text-xs text-slate-600 bg-blue-50/50 p-3 rounded-xl border border-blue-100 font-mono leading-relaxed">
-                    {selectedComponent.specs}
-                  </p>
-                </div>
-              )}
-
-              <div className="pt-2 flex justify-end">
-                <button 
-                  onClick={() => setSelectedComponent(null)}
-                  className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm"
-                >
-                  Close Inspection
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ==================== MASTER KIT DIAGRAM MODAL ==================== */}
-      {isKitDiagramModalOpen && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="bg-slate-900 rounded-3xl max-w-4xl w-full overflow-hidden shadow-2xl border border-slate-700 transform transition-all">
-            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-800">
-              <div>
-                <h3 className="text-white font-bold text-sm sm:text-base">
-                  {classKits[studentGrade]?.name || `Class ${studentGrade} Kit Layout`}
-                </h3>
-                <p className="text-slate-400 text-xs">{classKits[studentGrade]?.tagline}</p>
-              </div>
-              <button 
-                onClick={() => setIsKitDiagramModalOpen(false)}
-                className="text-slate-400 hover:text-white bg-slate-800 p-2 rounded-full cursor-pointer transition-colors"
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <div className="p-4 sm:p-6 bg-slate-950 flex items-center justify-center max-h-[75vh] overflow-auto">
+      <Modal
+        isOpen={!!selectedComponent}
+        onClose={() => setSelectedComponent(null)}
+        title={selectedComponent ? `${selectedComponent.name} (${selectedComponent.category || 'Hardware'})` : ''}
+        size="md"
+      >
+        {selectedComponent && (
+          <div className="space-y-4 text-xs">
+            <div className="rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 flex items-center justify-center max-h-56">
               <img 
-                src={classKits[studentGrade]?.overview_image || '/img/kits/class6_p2_img1_1536x1024.jpeg'} 
-                alt="Kit Blueprint" 
-                className="max-w-full max-h-[70vh] object-contain rounded-xl"
+                src={selectedComponent.image} 
+                alt={selectedComponent.name} 
+                className="max-h-56 w-full object-cover"
               />
             </div>
+
+            <div className="space-y-1">
+              <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Function & Lab Role</h4>
+              <p className="text-xs text-slate-700 bg-slate-50 p-3.5 rounded-xl border border-slate-200/80 leading-relaxed font-medium">
+                {selectedComponent.role}
+              </p>
+            </div>
+
+            {selectedComponent.specs && (
+              <div className="space-y-1">
+                <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Electrical & Pinout Specifications</h4>
+                <p className="text-[11px] text-slate-600 bg-blue-50/50 p-3 rounded-xl border border-blue-100 font-mono leading-relaxed">
+                  {selectedComponent.specs}
+                </p>
+              </div>
+            )}
+
+            <div className="pt-2 flex justify-end">
+              <button 
+                onClick={() => setSelectedComponent(null)}
+                className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm"
+              >
+                Close Inspection
+              </button>
+            </div>
           </div>
+        )}
+      </Modal>
+
+      {/* ==================== MASTER KIT DIAGRAM MODAL ==================== */}
+      <Modal
+        isOpen={isKitDiagramModalOpen}
+        onClose={() => setIsKitDiagramModalOpen(false)}
+        title={classKits[studentGrade]?.name || `Class ${studentGrade} Kit Layout`}
+        size="lg"
+      >
+        <div className="p-2 bg-slate-950 flex items-center justify-center rounded-2xl overflow-hidden">
+          <img 
+            src={classKits[studentGrade]?.overview_image || '/img/kits/class6_p2_img1_1536x1024.jpeg'} 
+            alt="Kit Blueprint" 
+            className="max-w-full max-h-[70vh] object-contain rounded-xl"
+          />
         </div>
-      )}
+      </Modal>
     </div>
   );
 }

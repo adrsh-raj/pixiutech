@@ -2,7 +2,8 @@
 
 export const SEED_SCHOOLS = [
   { id: 'ZPS', name: 'Zenith Public School', code: 'ZPS', city: 'Hata', tier: 'Tier 2 Partner', status: 'Active', contract_type: 'Full STEM Lab Suite', principal_name: 'Dr. R.K. Mishra', principal_phone: '+91 94151 22334', lab_room: 'Block B - Innovation Lab 102', enrolled_classes: ['6A', '7A', '8A', '9A', '11A'], created_at: '2026-08-01', lead_trainer: 'Vikas Pandey', trainer_id: 'TR-01' },
-  { id: 'XYZ', name: 'XYZ Academy (Pilot Lab)', code: 'XYZ', city: 'Gorakhpur', tier: 'Tier 1 Partner', status: 'Active', contract_type: 'Robotics & STEM Lab Suite', principal_name: 'Prof. S.N. Verma', principal_phone: '+91 94151 88776', lab_room: 'Block C - Advanced Robotics Lab 204', enrolled_classes: ['6A', '7A', '8A', '9A', '11A'], created_at: '2026-08-15', lead_trainer: 'Akash Sharma', trainer_id: 'TR-02' }
+  { id: 'XYZ', name: 'XYZ Academy (Pilot Lab)', code: 'XYZ', city: 'Gorakhpur', tier: 'Tier 1 Partner', status: 'Active', contract_type: 'Robotics & STEM Lab Suite', principal_name: 'Prof. S.N. Verma', principal_phone: '+91 94151 88776', lab_room: 'Block C - Advanced Robotics Lab 204', enrolled_classes: ['6A', '7A', '8A', '9A', '11A'], created_at: '2026-08-15', lead_trainer: 'Akash Sharma', trainer_id: 'TR-02' },
+  { id: 'ABC', name: 'ABC Public School & Robotics Lab', code: 'ABC', city: 'Gorakhpur', tier: 'Tier 1 Partner', status: 'Active', contract_type: 'Advanced STEM & AI Lab Suite', principal_name: 'Dr. A.K. Singhania', principal_phone: '+91 94151 77665', lab_room: 'Innovation & Robotics Lab 101', enrolled_classes: ['6A'], created_at: '2026-08-01', lead_trainer: 'Akash Sharma', trainer_id: 'TR-02' }
 ];
 
 export const SEED_CLASSES = [
@@ -19,9 +20,15 @@ export const SEED_CLASSES = [
   { id: 'CLS-XYZ-8A', school_id: 'XYZ', grade: '8', section: 'A', stream: 'Autonomous Mobile Robotics', student_count: 4, lead_trainer_id: 'TR-02', day: 'Tuesday', time_slot: '09:00 AM - 10:30 AM' },
   { id: 'CLS-XYZ-9A', school_id: 'XYZ', grade: '9', section: 'A', stream: 'Opto-Electronics & Display Systems', student_count: 4, lead_trainer_id: 'TR-02', day: 'Tuesday', time_slot: '10:45 AM - 12:15 PM' },
   { id: 'CLS-XYZ-11A', school_id: 'XYZ', grade: '11', section: 'A', stream: 'Laser Optics & Capstone Robotics', student_count: 4, lead_trainer_id: 'TR-02', day: 'Tuesday', time_slot: '01:00 PM - 02:30 PM' },
+
+  // ABC School Class
+  { id: 'CLS-ABC-6A', school_id: 'ABC', grade: '6', section: 'A', stream: 'Robotics & Embedded Systems', student_count: 1, lead_trainer_id: 'TR-02', day: 'Wednesday', time_slot: '09:00 AM - 10:30 AM' },
 ];
 
 export const SEED_STUDENTS = [
+  // ==================== ABC PUBLIC SCHOOL ====================
+  { id: 'STU-ABC-601', student_id: 'ABC6A 01', name: 'Manish Rawat', school_id: 'ABC', class_id: 'CLS-ABC-6A', tech_level: 'Level 5 (Certified Graduate)', parent_name: 'Prakash Rawat', parent_phone: '+91 98390 66111', assigned_kit_id: 'KIT-ABC-01', status: 'Certified Graduate' },
+
   // ==================== ZENITH PUBLIC SCHOOL (ZPS) ====================
   // Class 6A
   { id: 'STU-601', student_id: 'ZPS6A 01', name: 'Aarav Sharma', school_id: 'ZPS', class_id: 'CLS-ZPS-6A', tech_level: 'Level 0', parent_name: 'Sanjay Sharma', parent_phone: '+91 98390 11221', assigned_kit_id: 'KIT-ZPS-01', status: 'Active' },

@@ -140,10 +140,10 @@ export default function Login() {
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder={
                   selectedRoleTab === 'student' 
-                    ? 'e.g. ZPS6A 01 or XYZ6A 01' 
+                    ? 'Enter Student Roll ID' 
                     : selectedRoleTab === 'school'
-                    ? 'e.g. ZPS2026 or XYZ2026'
-                    : 'e.g. vikaspandey, akashsharma, or admin'
+                    ? 'Enter School Partner ID'
+                    : 'Enter Username / ID'
                 }
                 autoCapitalize="none"
                 autoCorrect="off"
@@ -151,21 +151,6 @@ export default function Login() {
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:border-pixiu-blue transition-colors font-medium placeholder:text-slate-600"
               />
             </div>
-            {selectedRoleTab === 'student' && (
-              <p className="text-[10px] text-slate-500 mt-1.5">
-                Enter your Student Roll ID assigned by your school
-              </p>
-            )}
-            {selectedRoleTab === 'school' && (
-              <p className="text-[10px] text-slate-500 mt-1.5">
-                Enter your School Partner ID provided during onboarding
-              </p>
-            )}
-            {selectedRoleTab === 'trainer' && (
-              <p className="text-[10px] text-slate-500 mt-1.5">
-                Enter your Trainer or Admin username
-              </p>
-            )}
           </div>
 
           <div>
