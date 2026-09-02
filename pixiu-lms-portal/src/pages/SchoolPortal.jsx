@@ -48,12 +48,14 @@ export default function SchoolPortal() {
 
   // Relevant School Announcements from Central Admin
   const schoolNotifications = useMemo(() => {
-    if (!notifications) return [];
-    return notifications.filter(n => 
-      n.target_audience === 'ALL' || 
-      n.target_audience === activeSchool.id || 
-      n.target_audience === activeSchool.code
-    );
+    if (!notifications || !Array.isArray(notifications)) return [];
+    return notifications.filter(n => {
+      const aud = n.target_audience || n.target_school_id || n.target_type;
+      if (!aud || aud === 'ALL' || aud === 'Universal' || aud === 'All_Students' || aud === 'All_Trainers') return true;
+      if (aud === activeSchool.id || aud === activeSchool.code) return true;
+      if (n.target_type === 'School' && (n.target_school_id === activeSchool.id || n.target_school_id === activeSchool.code)) return true;
+      return false;
+    });
   }, [notifications, activeSchool]);
 
   // Filter students for this school
@@ -352,6 +354,17 @@ export default function SchoolPortal() {
           </button>
 
           <button
+            onClick={() => setActiveTab('announcements')}
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+              activeTab === 'announcements' 
+                ? 'bg-slate-900 text-white shadow-xs' 
+                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+            }`}
+          >
+            <Megaphone size={14} /> Announcements & Directives ({schoolNotifications.length})
+          </button>
+
+          <button
             onClick={() => setActiveTab('billing')}
             className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
               activeTab === 'billing' 
@@ -572,7 +585,63 @@ export default function SchoolPortal() {
           </div>
         )}
 
-        {/* TAB 4: BILLING & INVOICES */}
+        {/* TAB 4: ANNOUNCEMENTS & DIRECTIVES */}
+        {activeTab === 'announcements' && (
+          <div className="space-y-4">
+            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+              <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-800">Official Directives & Announcements</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Notices, schedules, and circulars issued by Pixiu Central Administration.</p>
+                </div>
+                <span className="text-xs font-bold px-3 py-1 bg-blue-50 text-pixiu-blue rounded-full border border-blue-200">
+                  {schoolNotifications.length} Active Circulars
+                </span>
+              </div>
+
+              <div className="space-y-3">
+                {schoolNotifications.map((notif) => (
+                  <div 
+                    key={notif.id} 
+                    className="p-4 bg-slate-50/80 hover:bg-slate-50 border border-slate-200 rounded-xl transition-colors space-y-2"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase ${
+                          notif.priority === 'high' || notif.severity === 'urgent'
+                            ? 'bg-rose-100 text-rose-700 border border-rose-200' 
+                            : 'bg-blue-100 text-blue-700 border border-blue-200'
+                        }`}>
+                          {notif.priority || notif.severity || 'Notice'}
+                        </span>
+                        <h4 className="font-bold text-slate-900 text-sm">{notif.title}</h4>
+                      </div>
+                      <span className="text-[11px] font-mono text-slate-400 font-bold">
+                        {notif.scheduled_date || notif.created_at || 'Today'}
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-slate-700 leading-relaxed">{notif.message}</p>
+
+                    <div className="flex flex-wrap items-center gap-4 text-[10px] text-slate-500 font-medium pt-1 border-t border-slate-200/60">
+                      <span>Authority: <b>{notif.sender_name || 'Central Administration'}</b></span>
+                      {notif.scheduled_time && <span>Time: <b>{notif.scheduled_time}</b></span>}
+                      <span>Target: <b>{notif.target_audience || notif.target_type || 'Institution'}</b></span>
+                    </div>
+                  </div>
+                ))}
+
+                {schoolNotifications.length === 0 && (
+                  <div className="py-12 text-center text-slate-400 text-xs font-medium">
+                    No active circulars or announcements issued for this school at this moment.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 5: BILLING & INVOICES */}
         {activeTab === 'billing' && (
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
             <div className="p-6 border-b border-slate-100">
