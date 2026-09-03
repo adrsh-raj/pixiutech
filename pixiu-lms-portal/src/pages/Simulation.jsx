@@ -1,11 +1,11 @@
 import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
-  Cpu, Play, Square, RotateCcw, ShieldAlert, Lock, ArrowLeft, 
+  Cpu, Square, RotateCcw, ShieldAlert, Lock, ArrowLeft, 
   CheckCircle2, Eye, Zap, Plus, Trash2, Code, Puzzle, 
   X, Clock, Layers, Wrench, Volume2, VolumeX, Hand,
   BellRing, Sun, Moon, Copy, Check, ChevronUp, ChevronDown, CopyPlus,
-  GraduationCap, Maximize2, Minimize2
+  GraduationCap, Maximize2, Minimize2, Flag, Monitor
 } from 'lucide-react';
 
 export default function Simulation() {
@@ -205,7 +205,7 @@ export default function Simulation() {
     return Math.min(1, Math.max(0.32, availableWidth / 990));
   }, [windowWidth, mobileZoomMode]);
 
-  // ==================== DYNAMIC COORDINATE TRACKER ====================
+  // ==================== ULTRA-FAST SELECTIVE COORDINATE ENGINE ====================
   const [terminalCoords, setTerminalCoords] = useState({});
 
   const updateCoordinates = () => {
@@ -213,15 +213,29 @@ export default function Simulation() {
     const wbRect = workbenchRef.current.getBoundingClientRect();
     const s = mobileScale || 1;
     const coords = {};
-    const elements = workbenchRef.current.querySelectorAll('[id^="term-"]');
 
-    elements.forEach(el => {
-      const rect = el.getBoundingClientRect();
-      const id = el.id.replace('term-', '');
-      coords[id] = {
-        x: (rect.left - wbRect.left + rect.width / 2) / s,
-        y: (rect.top - wbRect.top + rect.height / 2) / s
-      };
+    // Collect ONLY the terminal IDs that are currently active in wires, components, or active wiring
+    const neededIds = new Set();
+    wires.forEach(w => {
+      if (w.fromId) neededIds.add(w.fromId);
+      if (w.toId) neededIds.add(w.toId);
+    });
+    components.forEach(c => {
+      if (c.lead1) neededIds.add(`BB_${c.lead1.row}_${c.lead1.col}`);
+      if (c.lead2) neededIds.add(`BB_${c.lead2.row}_${c.lead2.col}`);
+    });
+    if (activeWiringStart?.id) neededIds.add(activeWiringStart.id);
+    if (placementPending?.tempLead1) neededIds.add(`BB_${placementPending.tempLead1.row}_${placementPending.tempLead1.col}`);
+
+    neededIds.forEach(id => {
+      const el = document.getElementById('term-' + id);
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        coords[id] = {
+          x: (rect.left - wbRect.left + rect.width / 2) / s,
+          y: (rect.top - wbRect.top + rect.height / 2) / s
+        };
+      }
     });
 
     setTerminalCoords(coords);
@@ -231,16 +245,14 @@ export default function Simulation() {
     updateCoordinates();
     const timer1 = setTimeout(updateCoordinates, 50);
     const timer2 = setTimeout(updateCoordinates, 200);
-    const timer3 = setTimeout(updateCoordinates, 500);
 
     window.addEventListener('resize', updateCoordinates);
     return () => {
       clearTimeout(timer1);
       clearTimeout(timer2);
-      clearTimeout(timer3);
       window.removeEventListener('resize', updateCoordinates);
     };
-  }, [wires, components, mobileTab, mobileScale]);
+  }, [wires, components, mobileTab, mobileScale, activeWiringStart, placementPending]);
 
   // Click any hole or pin
   const handleTerminalClick = (terminalId, terminalLabel, rowNum = null, colName = null) => {
@@ -1225,87 +1237,136 @@ ${loopCode}}`;
           </div>
         </div>
 
-        {/* Master Action Controls */}
-        <div className="flex items-center gap-1.5 sm:gap-2 ml-auto">
-          {/* 💡 ROOM LIGHT SWITCH */}
-          <button
-            onClick={() => {
-              setIsRoomLightOn(!isRoomLightOn);
-              showToast(!isRoomLightOn ? 'Room light turned ON (Daylight Lux).' : 'Room light turned OFF! Dark Lab mode active.', 'Room Light', 'info');
-            }}
-            className={`p-1.5 sm:p-2 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-              isRoomLightOn 
-                ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm' 
-                : 'bg-indigo-950/80 text-cyan-300 border-cyan-500/40 shadow-[0_0_12px_rgba(6,182,212,0.3)]'
-            }`}
-            title={isRoomLightOn ? 'Switch to Dark Room' : 'Turn Room Lights ON'}
-          >
-            {isRoomLightOn ? <Sun size={13} className="text-amber-400" /> : <Moon size={13} className="text-cyan-400 animate-pulse" />}
-            <span className="hidden md:inline text-[11px]">{isRoomLightOn ? 'Light: ON' : 'Dark Lab'}</span>
-          </button>
+        {/* PictoBlox Mode Switcher: Stage vs Upload */}
+        <div className="flex items-center gap-1.5 sm:gap-3 ml-auto flex-wrap">
+          <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800">
+            <button
+              onClick={() => {
+                setShowCppCode(false);
+                setMobileTab('workbench');
+              }}
+              className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                !showCppCode
+                  ? 'bg-[#4C97FF] text-white shadow-sm shadow-blue-500/30'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+              title="Stage Mode: Interactive Visual Blocks & Circuit"
+            >
+              <Monitor size={13} />
+              <span className="hidden sm:inline">Stage Mode</span>
+              <span className="sm:hidden">Stage</span>
+            </button>
+            <button
+              onClick={() => {
+                setShowCppCode(true);
+                setMobileTab('blocks');
+              }}
+              className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                showCppCode
+                  ? 'bg-purple-600 text-white shadow-sm shadow-purple-500/30'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+              title="Upload Mode: Arduino C++ sketch.ino Editor"
+            >
+              <Code size={13} />
+              <span className="hidden sm:inline">Upload (C++)</span>
+              <span className="sm:hidden">C++</span>
+            </button>
+          </div>
 
-          {/* 🔔 TEST BUZZER BEEP */}
-          <button
-            onClick={testBuzzerBeep}
-            className="px-2 sm:px-2.5 py-1.5 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 rounded-xl border border-yellow-500/40 text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow-sm active:scale-95"
-            title="Click to test 2,400 Hz Piezo Buzzer sound directly"
-          >
-            <BellRing size={12} className="text-yellow-400" />
-            <span className="text-[11px] hidden sm:inline">Beep</span>
-          </button>
+          {/* PictoBlox Iconic Run (Green Flag) & Stop (Red Octagon) Controls */}
+          <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+            <button
+              onClick={() => {
+                if (!isRunning) handleToggleRun();
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
+                isRunning
+                  ? 'bg-[#0FBD8C] text-white shadow-[0_0_14px_rgba(15,189,140,0.6)] ring-2 ring-emerald-300 animate-pulse'
+                  : 'bg-[#0FBD8C]/20 hover:bg-[#0FBD8C] text-emerald-300 hover:text-white active:scale-95'
+              }`}
+              title="Run Simulation (PictoBlox Green Flag)"
+            >
+              <Flag size={14} className={isRunning ? 'fill-white' : 'fill-emerald-400 text-emerald-400'} />
+              <span>Run</span>
+            </button>
 
-          {/* Sound Mute / Unmute */}
-          <button
-            onClick={() => {
-              setIsSoundMuted(!isSoundMuted);
-              if (!isSoundMuted) stopBuzzerContinuous();
-              showToast(!isSoundMuted ? 'Audio muted.' : 'Audio unmuted.', 'Sound Setting', 'info');
-            }}
-            className={`p-1.5 sm:p-2 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
-              isSoundMuted 
-                ? 'bg-rose-500/20 text-rose-300 border-rose-500/40' 
-                : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-            }`}
-            title={isSoundMuted ? 'Unmute Audio Beeps' : 'Mute Audio Beeps'}
-          >
-            {isSoundMuted ? <VolumeX size={13} /> : <Volume2 size={13} />}
-          </button>
+            <button
+              onClick={() => {
+                if (isRunning) handleToggleRun();
+              }}
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-black flex items-center gap-1 transition-all cursor-pointer ${
+                !isRunning
+                  ? 'bg-slate-800/60 text-slate-600 cursor-not-allowed'
+                  : 'bg-[#FF4D4D] hover:bg-[#E04343] text-white shadow-[0_0_12px_rgba(255,77,77,0.5)] active:scale-95'
+              }`}
+              title="Stop Simulation"
+            >
+              <Square size={13} className={isRunning ? 'fill-white' : 'fill-slate-600 text-slate-600'} />
+              <span className="hidden sm:inline">Stop</span>
+            </button>
 
-          <button
-            onClick={handleClearAllWires}
-            className="p-1.5 sm:p-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 rounded-xl border border-slate-700 text-xs font-bold transition-all cursor-pointer"
-            title="Clear all wires"
-          >
-            <Trash2 size={13} />
-          </button>
+            <button
+              onClick={handleReset}
+              className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+              title="Reset Circuit & Arduino"
+            >
+              <RotateCcw size={13} />
+            </button>
+          </div>
 
-          <button
-            onClick={handleReset}
-            className="hidden sm:flex p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl border border-slate-700 text-xs font-bold transition-colors cursor-pointer"
-            title="Reset simulation"
-          >
-            <RotateCcw size={13} />
-          </button>
+          {/* Utilities: Room Light, Sound, Clear Wires */}
+          <div className="flex items-center gap-1">
+            {/* 💡 ROOM LIGHT SWITCH */}
+            <button
+              onClick={() => {
+                setIsRoomLightOn(!isRoomLightOn);
+                showToast(!isRoomLightOn ? 'Room light turned ON (Daylight Lux).' : 'Room light turned OFF! Dark Lab mode active.', 'Room Light', 'info');
+              }}
+              className={`p-1.5 sm:p-2 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                isRoomLightOn 
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' 
+                  : 'bg-indigo-950/80 text-cyan-300 border-cyan-500/40 shadow-[0_0_12px_rgba(6,182,212,0.3)]'
+              }`}
+              title={isRoomLightOn ? 'Switch to Dark Room' : 'Turn Room Lights ON'}
+            >
+              {isRoomLightOn ? <Sun size={13} className="text-amber-400" /> : <Moon size={13} className="text-cyan-400 animate-pulse" />}
+            </button>
 
-          {/* Desktop Run Button */}
-          <button
-            onClick={handleToggleRun}
-            className={`hidden lg:flex px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider items-center gap-1.5 transition-all shadow-lg cursor-pointer ${
-              isRunning 
-                ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-600/30 animate-pulse' 
-                : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/30'
-            }`}
-          >
-            {isRunning ? (
-              <>
-                <Square size={13} fill="currentColor" /> Stop
-              </>
-            ) : (
-              <>
-                <Play size={13} fill="currentColor" /> Run Simulation
-              </>
-            )}
-          </button>
+            {/* 🔔 TEST BUZZER BEEP */}
+            <button
+              onClick={testBuzzerBeep}
+              className="p-1.5 sm:p-2 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 rounded-xl border border-yellow-500/40 text-xs font-bold transition-all cursor-pointer flex items-center shadow-sm active:scale-95"
+              title="Click to test 2,400 Hz Piezo Buzzer sound directly"
+            >
+              <BellRing size={13} className="text-yellow-400" />
+            </button>
+
+            {/* Sound Mute / Unmute */}
+            <button
+              onClick={() => {
+                setIsSoundMuted(!isSoundMuted);
+                if (!isSoundMuted) stopBuzzerContinuous();
+                showToast(!isSoundMuted ? 'Audio muted.' : 'Audio unmuted.', 'Sound Setting', 'info');
+              }}
+              className={`p-1.5 sm:p-2 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center ${
+                isSoundMuted 
+                  ? 'bg-rose-500/20 text-rose-300 border-rose-500/40' 
+                  : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+              }`}
+              title={isSoundMuted ? 'Unmute Audio Beeps' : 'Mute Audio Beeps'}
+            >
+              {isSoundMuted ? <VolumeX size={13} /> : <Volume2 size={13} />}
+            </button>
+
+            <button
+              onClick={handleClearAllWires}
+              className="p-1.5 sm:p-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 rounded-xl border border-slate-700 text-xs font-bold transition-all cursor-pointer"
+              title="Clear all wires"
+            >
+              <Trash2 size={13} />
+            </button>
+          </div>
         </div>
       </header>
 
@@ -1676,37 +1737,29 @@ ${loopCode}}`;
                     <g key={wire.id} className="pointer-events-auto cursor-pointer group" onClick={() => removeWire(wire.id)}>
                       <title>Click to pull wire ({wire.fromLabel} ➔ {wire.toLabel})</title>
 
+                      {/* Subtle soft ground shadow */}
                       <path 
                         d={pathD} 
                         fill="none" 
-                        stroke="rgba(0,0,0,0.55)" 
-                        strokeWidth="8" 
+                        stroke="rgba(0,0,0,0.22)" 
+                        strokeWidth="4" 
                         strokeLinecap="round" 
-                        transform="translate(0, 8)"
+                        transform="translate(0, 3)"
                       />
 
+                      {/* Crisp Dupont Insulated Core */}
                       <path 
                         d={pathD} 
                         fill="none" 
                         stroke={wire.color} 
-                        strokeWidth="5" 
+                        strokeWidth="3.5" 
                         strokeLinecap="round" 
-                        className="transition-all group-hover:stroke-white group-hover:stroke-[6px]"
+                        className="transition-all group-hover:stroke-white group-hover:stroke-[4.5px]"
                       />
 
-                      <path 
-                        d={pathD} 
-                        fill="none" 
-                        stroke="rgba(255, 255, 255, 0.4)" 
-                        strokeWidth="1.6" 
-                        strokeLinecap="round" 
-                        transform="translate(0, -1)"
-                      />
-
-                      <circle cx={p1.x} cy={p1.y} r="5" fill="#0F172A" stroke="#64748B" strokeWidth="1.5" />
-                      <circle cx={p1.x} cy={p1.y} r="2" fill="#E2E8F0" />
-                      <circle cx={p2.x} cy={p2.y} r="5" fill="#0F172A" stroke="#64748B" strokeWidth="1.5" />
-                      <circle cx={p2.x} cy={p2.y} r="2" fill="#E2E8F0" />
+                      {/* Silver Dupont Header Pin Plugs */}
+                      <circle cx={p1.x} cy={p1.y} r="3.5" fill="#E2E8F0" stroke="#475569" strokeWidth="1" />
+                      <circle cx={p2.x} cy={p2.y} r="3.5" fill="#E2E8F0" stroke="#475569" strokeWidth="1" />
                     </g>
                   );
                 })}
@@ -2507,20 +2560,23 @@ ${loopCode}}`;
                 </button>
               </div>
 
-              <div className="bg-[#EAB308]/20 border-2 border-[#EAB308] rounded-2xl p-2.5 sm:p-3 shadow-md">
-                <div className="flex items-center justify-between font-bold text-xs text-yellow-300">
+              {/* PictoBlox Scratch 3.0 Hat Block */}
+              <div className="select-none">
+                <div className="bg-[#FFBF00] text-[#78350F] font-black text-xs px-4 py-2.5 rounded-t-2xl rounded-br-2xl shadow-sm border-b-2 border-[#D97706] flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full bg-yellow-400 animate-pulse"></div>
-                    <span>🟢 WHEN SIMULATION STARTS</span>
+                    <div className="w-5 h-5 rounded-full bg-[#0FBD8C] flex items-center justify-center text-white shadow-xs">
+                      <Flag size={11} className="fill-white" />
+                    </div>
+                    <span className="font-extrabold text-[12px] text-[#422006]">when 🏁 green flag clicked</span>
                   </div>
-                  <span className="text-[10px] text-yellow-400/80 font-mono">{blocks.length} Blocks</span>
+                  <span className="text-[10px] text-amber-900/80 font-mono font-bold">{blocks.length} blocks</span>
                 </div>
               </div>
 
               {/* Empty state if user clears everything */}
               {blocks.length === 0 && (
                 <div className="py-8 text-center border-2 border-dashed border-slate-800 rounded-2xl p-5 bg-slate-950/40 space-y-2">
-                  <Code className="mx-auto text-slate-600" size={32} />
+                  <Puzzle className="mx-auto text-[#4C97FF]" size={32} />
                   <p className="text-xs font-bold text-white">Write Your Own Program!</p>
                   <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
                     Click <strong>+ Pin Block</strong> or <strong>+ Wait Block</strong> below to add your own custom steps from scratch.
@@ -2528,232 +2584,232 @@ ${loopCode}}`;
                 </div>
               )}
 
-              <div className="space-y-2 pl-2 sm:pl-3 border-l-2 border-yellow-500/40">
+              <div className="space-y-2 pl-2 sm:pl-3 border-l-3 border-[#FFBF00]/50">
                 {blocks.map((block, idx) => {
                   const isActive = activeBlockIndex === idx;
 
+                  // 1. PIN BLOCK (PictoBlox Arduino / Pins: Vibrant Blue #4C97FF)
                   if (block.type === 'set_pin') {
                     return (
                       <div 
                         key={block.id}
-                        className={`rounded-2xl p-2.5 sm:p-3 text-xs font-bold border-2 transition-all flex items-center justify-between gap-2 shadow-md ${
+                        className={`relative bg-[#4C97FF] hover:bg-[#3884F5] text-white font-bold text-xs p-2.5 rounded-xl shadow-md border-b-2 border-[#2563EB] flex items-center justify-between gap-2 transition-all select-none ${
                           isActive 
-                            ? 'bg-blue-600 border-cyan-300 text-white shadow-[0_0_20px_#38BDF8] scale-[1.02]' 
-                            : 'bg-blue-600/90 hover:bg-blue-600 border-blue-400/80 text-white'
+                            ? 'ring-4 ring-yellow-300 shadow-[0_0_18px_rgba(250,204,21,0.8)] scale-[1.02]' 
+                            : ''
                         }`}
                       >
                         <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                          <Zap size={14} className={isActive ? 'text-yellow-300 animate-bounce' : 'text-white'} />
-                          <span>Set Pin</span>
+                          <Zap size={14} className={isActive ? 'text-yellow-200 animate-bounce' : 'text-white/80'} />
+                          <span className="font-extrabold text-[11px]">set digital pin</span>
                           
-                          <select 
-                            value={block.pin}
-                            onChange={(e) => updateBlock(block.id, 'pin', e.target.value)}
-                            className="bg-blue-900 border border-blue-400 rounded-lg px-2 py-1 text-white font-bold cursor-pointer text-xs"
-                          >
-                            <option value="13">Pin 13 (Built-in LED)</option>
-                            <option value="11">Pin 11 (LED Bulb)</option>
-                            <option value="9">Pin 9 (KY-008 Laser)</option>
-                            <option value="8">Pin 8 (Piezo Buzzer)</option>
-                            <option value="12">Pin 12 (LED 2)</option>
-                            <option value="10">Pin 10</option>
-                          </select>
+                          <div className="bg-white px-2 py-0.5 rounded-full shadow-inner flex items-center">
+                            <select 
+                              value={block.pin}
+                              onChange={(e) => updateBlock(block.id, 'pin', e.target.value)}
+                              className="bg-transparent text-blue-900 font-black cursor-pointer text-xs outline-none"
+                            >
+                              <option value="11">Pin 11 (LED Bulb)</option>
+                              <option value="13">Pin 13 (Built-in)</option>
+                              <option value="9">Pin 9 (KY-008 Laser)</option>
+                              <option value="8">Pin 8 (Piezo Buzzer)</option>
+                              <option value="12">Pin 12 (LED 2)</option>
+                              <option value="10">Pin 10</option>
+                            </select>
+                          </div>
 
-                          <span>to</span>
+                          <span className="font-extrabold text-[11px]">to</span>
 
-                          <select 
-                            value={block.state}
-                            onChange={(e) => updateBlock(block.id, 'state', e.target.value)}
-                            className="bg-blue-900 border border-blue-400 rounded-lg px-2 py-1 text-white font-bold cursor-pointer text-xs"
-                          >
-                            <option value="HIGH">HIGH (💡 ON / BEEP)</option>
-                            <option value="LOW">LOW (🌑 OFF / SILENT)</option>
-                          </select>
+                          <div className="bg-white px-2 py-0.5 rounded-full shadow-inner flex items-center">
+                            <select 
+                              value={block.state}
+                              onChange={(e) => updateBlock(block.id, 'state', e.target.value)}
+                              className="bg-transparent text-blue-900 font-black cursor-pointer text-xs outline-none"
+                            >
+                              <option value="HIGH">HIGH (💡 ON / BEEP)</option>
+                              <option value="LOW">LOW (🌑 OFF / SILENT)</option>
+                            </select>
+                          </div>
                         </div>
 
                         {/* Block Action Controls */}
-                        <div className="flex items-center gap-1 shrink-0">
+                        <div className="flex items-center gap-0.5 shrink-0 bg-blue-700/40 p-0.5 rounded-lg">
                           {idx > 0 && (
                             <button
                               onClick={() => moveBlock(idx, -1)}
-                              className="p-1 text-blue-200 hover:text-white rounded hover:bg-blue-800 transition-colors cursor-pointer"
+                              className="p-1 text-blue-100 hover:text-white rounded hover:bg-blue-600 transition-colors cursor-pointer"
                               title="Move Block Up"
                             >
-                              <ChevronUp size={13} />
+                              <ChevronUp size={12} />
                             </button>
                           )}
                           {idx < blocks.length - 1 && (
                             <button
                               onClick={() => moveBlock(idx, 1)}
-                              className="p-1 text-blue-200 hover:text-white rounded hover:bg-blue-800 transition-colors cursor-pointer"
+                              className="p-1 text-blue-100 hover:text-white rounded hover:bg-blue-600 transition-colors cursor-pointer"
                               title="Move Block Down"
                             >
-                              <ChevronDown size={13} />
+                              <ChevronDown size={12} />
                             </button>
                           )}
                           <button
                             onClick={() => duplicateBlock(block.id)}
-                            className="p-1 text-blue-200 hover:text-white rounded hover:bg-blue-800 transition-colors cursor-pointer"
+                            className="p-1 text-blue-100 hover:text-white rounded hover:bg-blue-600 transition-colors cursor-pointer"
                             title="Duplicate Block"
                           >
-                            <CopyPlus size={13} />
+                            <CopyPlus size={12} />
                           </button>
                           <button 
                             onClick={() => deleteBlock(block.id)}
-                            className="p-1 text-blue-200 hover:text-rose-300 rounded hover:bg-rose-900/50 transition-colors cursor-pointer"
+                            className="p-1 text-blue-100 hover:text-rose-200 rounded hover:bg-rose-600 transition-colors cursor-pointer"
                             title="Delete Block"
                           >
-                            <Trash2 size={13} />
+                            <Trash2 size={12} />
                           </button>
                         </div>
                       </div>
                     );
                   }
 
+                  // 2. WAIT BLOCK (PictoBlox Control: Vibrant Orange #FFAB19)
                   if (block.type === 'wait') {
                     return (
                       <div 
                         key={block.id}
-                        className={`rounded-2xl p-2.5 sm:p-3 text-xs font-bold border-2 transition-all flex items-center justify-between gap-2 shadow-md ${
+                        className={`relative bg-[#FFAB19] hover:bg-[#F59E0B] text-white font-bold text-xs p-2.5 rounded-xl shadow-md border-b-2 border-[#D97706] flex items-center justify-between gap-2 transition-all select-none ${
                           isActive 
-                            ? 'bg-amber-600 border-yellow-300 text-white shadow-[0_0_20px_#F59E0B] scale-[1.02]' 
-                            : 'bg-amber-600/90 hover:bg-amber-600 border-amber-400/80 text-white'
+                            ? 'ring-4 ring-yellow-300 shadow-[0_0_18px_rgba(250,204,21,0.8)] scale-[1.02]' 
+                            : ''
                         }`}
                       >
                         <div className="flex items-center gap-2">
-                          <Clock size={14} className={isActive ? 'text-white animate-spin' : 'text-white'} />
-                          <span>Wait</span>
+                          <Clock size={14} className={isActive ? 'text-yellow-100 animate-spin' : 'text-white/80'} />
+                          <span className="font-extrabold text-[11px]">wait</span>
 
-                          <input 
-                            type="number"
-                            min="0.1"
-                            max="10"
-                            step="0.2"
-                            value={block.duration}
-                            onChange={(e) => updateBlock(block.id, 'duration', parseFloat(e.target.value) || 1)}
-                            className="w-14 sm:w-16 bg-amber-900 border border-amber-400 rounded-lg px-2 py-1 text-white text-center font-bold text-xs"
-                          />
+                          <div className="bg-white px-2 py-0.5 rounded-full shadow-inner flex items-center">
+                            <input 
+                              type="number"
+                              min="0.1"
+                              max="10"
+                              step="0.2"
+                              value={block.duration}
+                              onChange={(e) => updateBlock(block.id, 'duration', parseFloat(e.target.value) || 1)}
+                              className="w-12 bg-transparent text-amber-950 text-center font-black text-xs outline-none"
+                            />
+                          </div>
 
-                          <span>Seconds</span>
+                          <span className="font-extrabold text-[11px]">seconds</span>
                         </div>
 
                         {/* Block Action Controls */}
-                        <div className="flex items-center gap-1 shrink-0">
+                        <div className="flex items-center gap-0.5 shrink-0 bg-amber-700/40 p-0.5 rounded-lg">
                           {idx > 0 && (
                             <button
                               onClick={() => moveBlock(idx, -1)}
-                              className="p-1 text-amber-200 hover:text-white rounded hover:bg-amber-800 transition-colors cursor-pointer"
+                              className="p-1 text-amber-100 hover:text-white rounded hover:bg-amber-600 transition-colors cursor-pointer"
                               title="Move Block Up"
                             >
-                              <ChevronUp size={13} />
+                              <ChevronUp size={12} />
                             </button>
                           )}
                           {idx < blocks.length - 1 && (
                             <button
                               onClick={() => moveBlock(idx, 1)}
-                              className="p-1 text-amber-200 hover:text-white rounded hover:bg-amber-800 transition-colors cursor-pointer"
+                              className="p-1 text-amber-100 hover:text-white rounded hover:bg-amber-600 transition-colors cursor-pointer"
                               title="Move Block Down"
                             >
-                              <ChevronDown size={13} />
+                              <ChevronDown size={12} />
                             </button>
                           )}
                           <button
                             onClick={() => duplicateBlock(block.id)}
-                            className="p-1 text-amber-200 hover:text-white rounded hover:bg-amber-800 transition-colors cursor-pointer"
+                            className="p-1 text-amber-100 hover:text-white rounded hover:bg-amber-600 transition-colors cursor-pointer"
                             title="Duplicate Block"
                           >
-                            <CopyPlus size={13} />
+                            <CopyPlus size={12} />
                           </button>
                           <button 
                             onClick={() => deleteBlock(block.id)}
-                            className="p-1 text-amber-200 hover:text-rose-300 rounded hover:bg-rose-900/50 transition-colors cursor-pointer"
+                            className="p-1 text-amber-100 hover:text-rose-200 rounded hover:bg-rose-600 transition-colors cursor-pointer"
                             title="Delete Block"
                           >
-                            <Trash2 size={13} />
+                            <Trash2 size={12} />
                           </button>
                         </div>
                       </div>
                     );
                   }
 
+                  // 3. AUTHENTIC SCRATCH C-BLOCK (If-Else Condition Block)
                   if (block.type === 'tripwire_logic') {
                     return (
                       <div 
                         key={block.id}
-                        className={`rounded-2xl p-3 sm:p-3.5 text-xs font-bold border-2 transition-all shadow-xl space-y-2.5 ${
+                        className={`relative rounded-2xl p-3 text-xs font-bold border-2 transition-all shadow-md space-y-2 select-none ${
                           isBeamBlocked 
-                            ? 'bg-gradient-to-br from-rose-950/95 to-slate-950 border-rose-500 shadow-[0_0_25px_rgba(239,68,68,0.4)] animate-pulse' 
-                            : 'bg-gradient-to-br from-indigo-950/90 to-purple-950/90 border-indigo-500/70'
+                            ? 'bg-[#FFAB19] border-[#D97706] ring-4 ring-rose-400 shadow-[0_0_20px_rgba(239,68,68,0.5)]' 
+                            : 'bg-[#FFAB19] border-[#D97706]'
                         }`}
                       >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2 font-black text-xs text-yellow-300">
-                            <Zap size={15} className={isBeamBlocked ? 'text-rose-400 animate-bounce' : 'text-yellow-400'} />
-                            <span>⚡ IF Obstacle Breaks Laser Beam (LDR &lt; 400):</span>
+                        {/* C-Block Header */}
+                        <div className="flex items-center justify-between text-white">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-black text-[12px] text-white">if</span>
+                            <div className="bg-[#422006]/30 border border-white/40 px-2 py-0.5 rounded-full text-white font-mono text-[11px] flex items-center gap-1">
+                              <Hand size={12} className={isBeamBlocked ? 'text-rose-300 animate-bounce' : 'text-amber-200'} />
+                              <span>&lt; obstacle cuts laser beam &gt;</span>
+                            </div>
+                            <span className="font-black text-[12px] text-white">then</span>
                           </div>
                           <div className="flex items-center gap-1.5">
-                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold ${
-                              isBeamBlocked ? 'bg-rose-500 text-white animate-pulse' : 'bg-indigo-500/20 text-indigo-300'
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                              isBeamBlocked ? 'bg-rose-600 text-white animate-pulse' : 'bg-black/20 text-white/90'
                             }`}>
-                              {isBeamBlocked ? '🚨 BREACH ACTIVE' : '🛡️ MONITORING'}
+                              {isBeamBlocked ? '🚨 BREACH!' : '🛡️ SECURE'}
                             </span>
                             <button
                               onClick={() => deleteBlock(block.id)}
-                              className="p-1 text-slate-400 hover:text-rose-400 rounded hover:bg-rose-950 transition-colors cursor-pointer"
+                              className="p-1 text-amber-100 hover:text-rose-200 rounded hover:bg-rose-600 transition-colors cursor-pointer"
                               title="Delete Condition Block"
                             >
-                              <Trash2 size={13} />
+                              <Trash2 size={12} />
                             </button>
                           </div>
                         </div>
 
-                        {/* THEN Branch */}
-                        <div className={`pl-3.5 border-l-2 space-y-1.5 py-1 text-xs transition-colors ${
-                          isBeamBlocked ? 'border-rose-400 bg-rose-950/40 rounded-r-xl pr-2' : 'border-rose-500/50'
-                        }`}>
-                          <div className="flex items-center justify-between text-rose-200 font-bold flex-wrap gap-1">
-                            <div className="flex items-center gap-1.5">
-                              <span>💡 Set Pin</span>
-                              <select
-                                value={block.thenPin1 || '11'}
-                                onChange={(e) => updateBlock(block.id, 'thenPin1', e.target.value)}
-                                className="bg-rose-950 border border-rose-700 text-white rounded px-1.5 py-0.5 text-xs font-bold"
-                              >
+                        {/* Indented THEN Mouth */}
+                        <div className="ml-3 pl-3 border-l-4 border-white/60 bg-black/15 p-2 rounded-r-xl space-y-1.5 text-white">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-[11px] font-bold">set digital pin</span>
+                            <div className="bg-white px-2 py-0.5 rounded-full text-amber-950 font-black text-xs">
+                              <select value={block.thenPin1 || '11'} onChange={(e) => updateBlock(block.id, 'thenPin1', e.target.value)} className="bg-transparent outline-none cursor-pointer">
                                 <option value="11">Pin 11 (LED)</option>
                                 <option value="13">Pin 13</option>
                                 <option value="12">Pin 12</option>
-                                <option value="8">Pin 8 (Buzzer)</option>
+                                <option value="8">Pin 8</option>
                               </select>
-                              <span>to</span>
-                              <select
-                                value={block.thenState1 || 'HIGH'}
-                                onChange={(e) => updateBlock(block.id, 'thenState1', e.target.value)}
-                                className="bg-rose-950 border border-rose-700 text-white rounded px-1.5 py-0.5 text-xs font-bold"
-                              >
+                            </div>
+                            <span>to</span>
+                            <div className="bg-white px-2 py-0.5 rounded-full text-amber-950 font-black text-xs">
+                              <select value={block.thenState1 || 'HIGH'} onChange={(e) => updateBlock(block.id, 'thenState1', e.target.value)} className="bg-transparent outline-none cursor-pointer">
                                 <option value="HIGH">HIGH (ON)</option>
                                 <option value="LOW">LOW (OFF)</option>
                               </select>
                             </div>
                           </div>
 
-                          <div className="flex items-center justify-between text-yellow-200 font-bold flex-wrap gap-1">
-                            <div className="flex items-center gap-1.5">
-                              <span>🔊 Set Pin</span>
-                              <select
-                                value={block.thenPin2 || '8'}
-                                onChange={(e) => updateBlock(block.id, 'thenPin2', e.target.value)}
-                                className="bg-amber-950 border border-amber-700 text-white rounded px-1.5 py-0.5 text-xs font-bold"
-                              >
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-[11px] font-bold">set digital pin</span>
+                            <div className="bg-white px-2 py-0.5 rounded-full text-amber-950 font-black text-xs">
+                              <select value={block.thenPin2 || '8'} onChange={(e) => updateBlock(block.id, 'thenPin2', e.target.value)} className="bg-transparent outline-none cursor-pointer">
                                 <option value="8">Pin 8 (Buzzer)</option>
                                 <option value="11">Pin 11 (LED)</option>
                                 <option value="13">Pin 13</option>
                               </select>
-                              <span>to</span>
-                              <select
-                                value={block.thenState2 || 'HIGH'}
-                                onChange={(e) => updateBlock(block.id, 'thenState2', e.target.value)}
-                                className="bg-amber-950 border border-amber-700 text-white rounded px-1.5 py-0.5 text-xs font-bold"
-                              >
+                            </div>
+                            <span>to</span>
+                            <div className="bg-white px-2 py-0.5 rounded-full text-amber-950 font-black text-xs">
+                              <select value={block.thenState2 || 'HIGH'} onChange={(e) => updateBlock(block.id, 'thenState2', e.target.value)} className="bg-transparent outline-none cursor-pointer">
                                 <option value="HIGH">HIGH (BEEP)</option>
                                 <option value="LOW">LOW (SILENT)</option>
                               </select>
@@ -2761,57 +2817,41 @@ ${loopCode}}`;
                           </div>
                         </div>
 
-                        {/* ELSE Branch */}
-                        <div className="font-black text-xs text-emerald-400 pt-1 flex items-center justify-between">
-                          <span>🛡️ ELSE (Laser Beam Intact on LDR):</span>
-                          <span className="text-[10px] text-slate-400 font-mono">Analog: 980</span>
-                        </div>
+                        {/* C-Block Mid-Divider: else */}
+                        <div className="font-black text-[12px] text-white px-1">else</div>
 
-                        <div className={`pl-3.5 border-l-2 space-y-1.5 py-1 text-xs transition-colors ${
-                          !isBeamBlocked ? 'border-emerald-400 bg-emerald-950/20 rounded-r-xl pr-2' : 'border-emerald-500/40'
-                        }`}>
-                          <div className="text-slate-300 font-medium flex items-center justify-between flex-wrap gap-1">
-                            <div className="flex items-center gap-1.5">
-                              <span>🌑 Set Pin</span>
-                              <select
-                                value={block.elsePin1 || '11'}
-                                onChange={(e) => updateBlock(block.id, 'elsePin1', e.target.value)}
-                                className="bg-slate-900 border border-slate-700 text-slate-200 rounded px-1.5 py-0.5 text-xs"
-                              >
+                        {/* Indented ELSE Mouth */}
+                        <div className="ml-3 pl-3 border-l-4 border-white/60 bg-black/15 p-2 rounded-r-xl space-y-1.5 text-white">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-[11px] font-bold">set digital pin</span>
+                            <div className="bg-white px-2 py-0.5 rounded-full text-amber-950 font-black text-xs">
+                              <select value={block.elsePin1 || '11'} onChange={(e) => updateBlock(block.id, 'elsePin1', e.target.value)} className="bg-transparent outline-none cursor-pointer">
                                 <option value="11">Pin 11 (LED)</option>
                                 <option value="13">Pin 13</option>
-                                <option value="8">Pin 8 (Buzzer)</option>
+                                <option value="8">Pin 8</option>
                               </select>
-                              <span>to</span>
-                              <select
-                                value={block.elseState1 || 'LOW'}
-                                onChange={(e) => updateBlock(block.id, 'elseState1', e.target.value)}
-                                className="bg-slate-900 border border-slate-700 text-slate-200 rounded px-1.5 py-0.5 text-xs"
-                              >
+                            </div>
+                            <span>to</span>
+                            <div className="bg-white px-2 py-0.5 rounded-full text-amber-950 font-black text-xs">
+                              <select value={block.elseState1 || 'LOW'} onChange={(e) => updateBlock(block.id, 'elseState1', e.target.value)} className="bg-transparent outline-none cursor-pointer">
                                 <option value="LOW">LOW (OFF)</option>
                                 <option value="HIGH">HIGH (ON)</option>
                               </select>
                             </div>
                           </div>
 
-                          <div className="text-slate-300 font-medium flex items-center justify-between flex-wrap gap-1">
-                            <div className="flex items-center gap-1.5">
-                              <span>🔇 Set Pin</span>
-                              <select
-                                value={block.elsePin2 || '8'}
-                                onChange={(e) => updateBlock(block.id, 'elsePin2', e.target.value)}
-                                className="bg-slate-900 border border-slate-700 text-slate-200 rounded px-1.5 py-0.5 text-xs"
-                              >
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-[11px] font-bold">set digital pin</span>
+                            <div className="bg-white px-2 py-0.5 rounded-full text-amber-950 font-black text-xs">
+                              <select value={block.elsePin2 || '8'} onChange={(e) => updateBlock(block.id, 'elsePin2', e.target.value)} className="bg-transparent outline-none cursor-pointer">
                                 <option value="8">Pin 8 (Buzzer)</option>
                                 <option value="11">Pin 11 (LED)</option>
                                 <option value="13">Pin 13</option>
                               </select>
-                              <span>to</span>
-                              <select
-                                value={block.elseState2 || 'LOW'}
-                                onChange={(e) => updateBlock(block.id, 'elseState2', e.target.value)}
-                                className="bg-slate-900 border border-slate-700 text-slate-200 rounded px-1.5 py-0.5 text-xs"
-                              >
+                            </div>
+                            <span>to</span>
+                            <div className="bg-white px-2 py-0.5 rounded-full text-amber-950 font-black text-xs">
+                              <select value={block.elseState2 || 'LOW'} onChange={(e) => updateBlock(block.id, 'elseState2', e.target.value)} className="bg-transparent outline-none cursor-pointer">
                                 <option value="LOW">LOW (SILENT)</option>
                                 <option value="HIGH">HIGH (BEEP)</option>
                               </select>
@@ -2827,39 +2867,39 @@ ${loopCode}}`;
               </div>
 
               {/* Loop Repeat Toggle */}
-              <div className="p-2.5 sm:p-3 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-between text-xs">
+              <div className="p-2.5 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-between text-xs select-none">
                 <div className="flex items-center gap-2">
-                  <RotateCcw size={13} className="text-cyan-400" />
+                  <RotateCcw size={13} className="text-[#0FBD8C]" />
                   <span className="font-bold text-slate-300">Repeat in Infinite Loop</span>
                 </div>
                 <input 
                   type="checkbox"
                   checked={repeatLoop}
                   onChange={(e) => setRepeatLoop(e.target.checked)}
-                  className="w-4 h-4 accent-pixiu-blue cursor-pointer"
+                  className="w-4 h-4 accent-[#0FBD8C] cursor-pointer"
                 />
               </div>
 
-              {/* Add Blocks Toolbar */}
+              {/* PictoBlox Palette Block Adders */}
               <div className="pt-1 flex items-center gap-2 flex-wrap">
                 <button
                   onClick={() => addBlock('set_pin')}
-                  className="flex-1 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/40 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                  className="flex-1 py-2 bg-[#4C97FF] hover:bg-[#3884F5] text-white font-black text-xs rounded-xl shadow-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 border-b-2 border-[#2563EB]"
                 >
-                  <Plus size={13} /> + Pin Block
+                  <Zap size={13} /> + Pin Block
                 </button>
                 <button
                   onClick={() => addBlock('wait')}
-                  className="flex-1 py-2 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/40 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                  className="flex-1 py-2 bg-[#FFAB19] hover:bg-[#F59E0B] text-white font-black text-xs rounded-xl shadow-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 border-b-2 border-[#D97706]"
                 >
-                  <Plus size={13} /> + Wait Block
+                  <Clock size={13} /> + Wait Block
                 </button>
                 {(currentProjectId === 'class7_laser' || components.some(c => c.type === 'laser')) && (
                   <button
                     onClick={() => addBlock('tripwire_logic')}
-                    className="w-full py-2 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/40 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-95"
+                    className="w-full py-2 bg-[#FFAB19] hover:bg-[#F59E0B] text-white font-black text-xs rounded-xl shadow-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 border-b-2 border-[#D97706]"
                   >
-                    <Zap size={13} className="text-yellow-400" /> + IF/ELSE Condition Block
+                    <Zap size={13} className="text-yellow-200" /> + IF/ELSE Condition Block
                   </button>
                 )}
               </div>
@@ -2943,7 +2983,7 @@ ${loopCode}}`;
       </main>
 
       {/* ==================== MOBILE FLOATING ACTION BAR (< 1024px) ==================== */}
-      <div className="lg:hidden fixed bottom-0 inset-x-0 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 px-4 py-2.5 flex items-center justify-between gap-3 z-40 shadow-2xl">
+      <div className="lg:hidden fixed bottom-0 inset-x-0 bg-slate-950/95 backdrop-blur-md border-t border-slate-800 px-4 py-2.5 flex items-center justify-between gap-3 z-40 shadow-2xl">
         <button
           onClick={handleReset}
           className="p-2.5 bg-slate-800 text-slate-300 rounded-xl border border-slate-700 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 shrink-0"
@@ -2956,8 +2996,8 @@ ${loopCode}}`;
           onClick={handleToggleRun}
           className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-lg cursor-pointer ${
             isRunning 
-              ? 'bg-rose-600 text-white shadow-rose-600/30 animate-pulse' 
-              : 'bg-emerald-600 text-white shadow-emerald-600/30'
+              ? 'bg-[#FF4D4D] text-white shadow-[0_0_12px_rgba(255,77,77,0.5)] animate-pulse' 
+              : 'bg-[#0FBD8C] text-white shadow-[0_0_12px_rgba(15,189,140,0.4)]'
           }`}
         >
           {isRunning ? (
@@ -2966,7 +3006,7 @@ ${loopCode}}`;
             </>
           ) : (
             <>
-              <Play size={14} fill="currentColor" /> Run Simulation
+              <Flag size={14} fill="currentColor" /> Run (Green Flag)
             </>
           )}
         </button>
