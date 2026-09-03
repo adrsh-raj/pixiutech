@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import React, { useState, useMemo } from "react"
 import type { PartType } from "@/lib/circuit-types"
@@ -50,7 +50,13 @@ const PART_CATEGORIES: Record<string, string> = {
   "tmp36": "sensors",
 }
 
-export function Palette({ onQuickAdd }: { onQuickAdd: (type: PartType) => void }) {
+interface Props {
+  onQuickAdd: (type: PartType) => void
+  isOpen?: boolean
+  onClose?: () => void
+}
+
+export function Palette({ onQuickAdd, isOpen = false, onClose }: Props) {
   const [search, setSearch] = useState("")
   const [activeCategory, setActiveCategory] = useState<string>("all")
 
@@ -73,12 +79,34 @@ export function Palette({ onQuickAdd }: { onQuickAdd: (type: PartType) => void }
   }, [search, activeCategory])
 
   return (
-    <aside className="flex h-full w-72 shrink-0 flex-col border-r border-border bg-sidebar">
-      {/* Header & Search */}
-      <div className="border-b border-border p-3 space-y-2.5">
-        <div className="flex items-center justify-between">
-          <h2 className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Components ({PALETTE_ORDER.length})</h2>
-        </div>
+    <>
+      {/* Mobile Drawer Backdrop */}
+      {isOpen && (
+        <div
+          onClick={onClose}
+          className="fixed inset-0 bg-background/80 backdrop-blur-xs z-30 md:hidden animate-in fade-in"
+        />
+      )}
+
+      <aside
+        className={`fixed md:static inset-y-0 left-0 z-40 md:z-10 flex h-full w-72 shrink-0 flex-col border-r border-border bg-sidebar transition-transform duration-200 ease-in-out ${
+          isOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full md:translate-x-0"
+        }`}
+      >
+        {/* Header & Search */}
+        <div className="border-b border-border p-3 space-y-2.5">
+          <div className="flex items-center justify-between">
+            <h2 className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Components ({PALETTE_ORDER.length})</h2>
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="md:hidden p-1 text-muted-foreground hover:text-foreground rounded hover:bg-secondary cursor-pointer"
+                title="Close Components"
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
 
         {/* Search bar */}
         <div className="relative">
@@ -147,5 +175,6 @@ export function Palette({ onQuickAdd }: { onQuickAdd: (type: PartType) => void }
         )}
       </div>
     </aside>
-  )
+  </>
+)
 }

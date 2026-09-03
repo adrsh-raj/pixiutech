@@ -97,6 +97,7 @@ export function Workbench() {
   const [lastSaved, setLastSaved] = useState<string | null>(null)
   const [isTemplatesOpen, setIsTemplatesOpen] = useState(false)
   const [isAiCameraOpen, setIsAiCameraOpen] = useState(true)
+  const [mobilePaletteOpen, setMobilePaletteOpen] = useState(false)
   const [aiState, setAiState] = useState<AiVisionState>({
     enabled: true,
     detectedClass: "none",
@@ -519,9 +520,26 @@ export function Workbench() {
         </div>
       ) : (
         <div className="flex min-h-0 flex-1 relative">
-          <Palette onQuickAdd={(t) => addPart(t)} />
+          <Palette
+            onQuickAdd={(t) => {
+              addPart(t)
+              setMobilePaletteOpen(false)
+            }}
+            isOpen={mobilePaletteOpen}
+            onClose={() => setMobilePaletteOpen(false)}
+          />
           <main className="relative min-w-0 flex-1 flex flex-col overflow-hidden">
             <div className="flex-1 relative">
+              {/* Mobile Quick-Add Components Trigger */}
+              <button
+                onClick={() => setMobilePaletteOpen(true)}
+                className="md:hidden absolute top-3 left-3 z-20 flex items-center gap-1.5 rounded-xl bg-card/90 backdrop-blur-sm border border-border px-3 py-1.5 text-xs font-bold shadow-md text-foreground hover:bg-secondary cursor-pointer"
+                title="Open Components Palette"
+              >
+                <span className="text-primary text-sm font-black">+</span>
+                <span>Components</span>
+              </button>
+
               <CircuitCanvas
                 parts={state.parts}
                 wires={state.wires}

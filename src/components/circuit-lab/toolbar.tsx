@@ -68,7 +68,7 @@ export function Toolbar({
   onDeleteSelectedWire,
 }: Props) {
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-card px-4 gap-2">
+    <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-card px-2 sm:px-4 gap-1.5 sm:gap-2 overflow-x-auto min-w-0">
       <div className="flex items-center gap-2 sm:gap-3">
         <Link
           to="/"
