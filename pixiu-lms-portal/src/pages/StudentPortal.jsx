@@ -499,6 +499,15 @@ export default function StudentPortal() {
           </div>
 
           <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full md:w-auto shrink-0">
+            {/* 0. Virtual Arduino Simulation Workbench Button */}
+            <Link
+              to="/simulation"
+              className="w-full sm:w-auto bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 hover:from-blue-500 hover:to-indigo-400 text-white text-xs font-black px-4 sm:px-4 py-2.5 sm:py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25 transition-all cursor-pointer shrink-0"
+              title="Launch Virtual Arduino Simulation Workbench & Practice Circuit Wiring"
+            >
+              <Cpu size={15} /> ⚡ Virtual Arduino Lab
+            </Link>
+
             {/* 1. Progress Report Button: Always accessible for students to view active coursework */}
             <button 
               onClick={handlePrintProgressReport}

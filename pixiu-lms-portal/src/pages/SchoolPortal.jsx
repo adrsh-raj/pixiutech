@@ -5,7 +5,7 @@ import {
   Download, ArrowUpRight, ShieldCheck, Sparkles, LogOut, ChevronRight,
   GraduationCap, Calendar, Check, Zap, ArrowRight, Bell, X, Megaphone,
   Box, AlertTriangle, RefreshCw, Send, Printer, IndianRupee, ShieldAlert,
-  CheckSquare, Square, Upload, Image as ImageIcon
+  CheckSquare, Square, Upload, Image as ImageIcon, Cpu
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
@@ -385,6 +385,14 @@ export default function SchoolPortal() {
           </div>
 
           <div className="flex items-center gap-3">
+            <Link
+              to="/simulation"
+              className="px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+              title="Launch Virtual Arduino Simulation Workbench"
+            >
+              <Cpu size={14} /> ⚡ Virtual Lab Simulator
+            </Link>
+
             <div className="hidden sm:block text-right">
               <p className="text-xs font-bold text-white truncate max-w-[200px]">{activeSchool.name}</p>
               <p className="text-[10px] text-emerald-400 font-medium">Verified Institutional Partner</p>
