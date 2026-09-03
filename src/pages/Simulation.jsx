@@ -236,6 +236,35 @@ export default function Simulation() {
     showToast('Standard 220Ω LED Blink circuit auto-configured.', 'Auto-Setup Complete', 'success');
   };
 
+  // ==================== OVERCURRENT BLAST & BURNOUT STATE ====================
+  const [isLedBlown, setIsLedBlown] = useState(false);
+  const [isBlasting, setIsBlasting] = useState(false);
+
+  const playBlastSound = () => {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(360, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(30, ctx.currentTime + 0.35);
+
+      gain.gain.setValueAtTime(0.5, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start();
+      osc.stop(ctx.currentTime + 0.35);
+    } catch {
+      // Audio suppressed or blocked by browser policy
+    }
+  };
+
   // ==================== UNIVERSAL BREADBOARD GRAPH CIRCUIT SOLVER ====================
   const getElectricalNode = (termId) => {
     if (termId.startsWith('ARD_')) return termId;
@@ -258,18 +287,9 @@ export default function Simulation() {
   };
 
   const circuitAnalysis = useMemo(() => {
-    if (!resistor.isPlaced && !led.isPlaced) {
-      return { isComplete: false, sourcePin: null, message: '⚠️ Both Resistor & LED are in tray. Click "Place" to insert them.', reason: 'no_components' };
-    }
-    if (!resistor.isPlaced) {
-      return { isComplete: false, sourcePin: null, message: '⚠️ 220Ω Resistor missing! Click "Place Resistor" to insert into breadboard.', reason: 'no_resistor' };
-    }
     if (!led.isPlaced) {
-      return { isComplete: false, sourcePin: null, message: '⚠️ LED Bulb missing! Click "Place LED" to insert into breadboard.', reason: 'no_led' };
+      return { isComplete: false, sourcePin: null, isOvercurrent: false, message: '⚠️ LED Bulb missing! Click "Place LED" to insert into breadboard.', reason: 'no_led' };
     }
-
-    const resNode1 = getElectricalNode(`BB_${resistor.lead1.row}_${resistor.lead1.col}`);
-    const resNode2 = getElectricalNode(`BB_${resistor.lead2.row}_${resistor.lead2.col}`);
 
     const ledAnodeNode = getElectricalNode(`BB_${led.anode.row}_${led.anode.col}`);
     const ledCathodeNode = getElectricalNode(`BB_${led.cathode.row}_${led.cathode.col}`);
@@ -315,53 +335,102 @@ export default function Simulation() {
       'ARD_5V', 'ARD_3V3'
     ];
 
+    const cathodeToGnd = isConnected(ledCathodeNode, 'ARD_GND') || isConnected(ledCathodeNode, 'ARD_GND2') || isConnected(ledCathodeNode, 'ARD_GND_TOP');
+
+    // CASE 1: DIRECT OVERCURRENT CONNECTION (Pin -> LED Anode directly without resistor!)
+    let directPowerPin = null;
+    for (const p of possiblePowerPins) {
+      if (isConnected(p, ledAnodeNode)) {
+        directPowerPin = p.replace('ARD_', '');
+        break;
+      }
+    }
+
+    if (directPowerPin) {
+      if (!cathodeToGnd) {
+        return {
+          isComplete: false,
+          sourcePin: directPowerPin,
+          isOvercurrent: true,
+          message: `⚠️ Missing Ground: Pin ${directPowerPin} reaches LED Anode, but Cathode (Row ${led.cathode.row}) is not connected to GND.`,
+          reason: 'no_gnd_wire'
+        };
+      }
+
+      return {
+        isComplete: true,
+        sourcePin: directPowerPin,
+        isOvercurrent: true,
+        message: `💥 OVERCURRENT HAZARD! Pin ${directPowerPin} (5V) wired directly to LED without 220Ω resistor (~125mA will blow the LED)!`,
+        reason: 'direct_overcurrent'
+      };
+    }
+
+    // CASE 2: PROTECTED CONNECTION VIA 220Ω RESISTOR
+    if (!resistor.isPlaced) {
+      return { 
+        isComplete: false, 
+        sourcePin: null, 
+        isOvercurrent: false, 
+        message: '⚠️ Circuit Open: Connect a digital power wire to your LED or insert the 220Ω Resistor.', 
+        reason: 'no_power_wire' 
+      };
+    }
+
+    const resNode1 = getElectricalNode(`BB_${resistor.lead1.row}_${resistor.lead1.col}`);
+    const resNode2 = getElectricalNode(`BB_${resistor.lead2.row}_${resistor.lead2.col}`);
+
     let activeSourcePin = null;
-    let resPowerNode = null;
     let resOutputNode = null;
 
     for (const p of possiblePowerPins) {
       if (isConnected(p, resNode1)) {
         activeSourcePin = p.replace('ARD_', '');
-        resPowerNode = resNode1;
         resOutputNode = resNode2;
         break;
       } else if (isConnected(p, resNode2)) {
         activeSourcePin = p.replace('ARD_', '');
-        resPowerNode = resNode2;
         resOutputNode = resNode1;
         break;
       }
     }
 
     if (!activeSourcePin) {
-      // Check if user connected directly to LED without resistor!
-      for (const p of possiblePowerPins) {
-        if (isConnected(p, ledAnodeNode)) {
-          return { 
-            isComplete: false, 
-            sourcePin: p.replace('ARD_', ''), 
-            message: `⚠️ Overcurrent Warning! Pin ${p.replace('ARD_', '')} connected directly to LED without 220Ω resistor!`, 
-            reason: 'no_resistor_protection' 
-          };
-        }
-      }
-      return { isComplete: false, sourcePin: null, message: '⚠️ Missing Power Wire: Connect an Arduino Pin (e.g. Pin 11 or 13) to the Resistor row.', reason: 'no_power_wire' };
+      return { 
+        isComplete: false, 
+        sourcePin: null, 
+        isOvercurrent: false, 
+        message: '⚠️ Missing Power Wire: Connect an Arduino Pin (e.g. Pin 11 or 13) to the Resistor or LED.', 
+        reason: 'no_power_wire' 
+      };
     }
 
     const resToAnode = isConnected(resOutputNode, ledAnodeNode);
     if (!resToAnode) {
-      return { isComplete: false, sourcePin: activeSourcePin, message: `⚠️ Resistor does not reach LED! Connect Row ${resistor.lead2.row} to Row ${led.anode.row}.`, reason: 'res_not_to_led' };
+      return { 
+        isComplete: false, 
+        sourcePin: activeSourcePin, 
+        isOvercurrent: false, 
+        message: `⚠️ Resistor does not reach LED! Connect Row ${resistor.lead2.row} to Row ${led.anode.row}.`, 
+        reason: 'res_not_to_led' 
+      };
     }
 
-    const cathodeToGnd = isConnected(ledCathodeNode, 'ARD_GND') || isConnected(ledCathodeNode, 'ARD_GND2') || isConnected(ledCathodeNode, 'ARD_GND_TOP');
     if (!cathodeToGnd) {
-      return { isComplete: false, sourcePin: activeSourcePin, message: `⚠️ Missing Ground Wire: Connect LED Cathode (Row ${led.cathode.row}) to Arduino GND.`, reason: 'no_gnd_wire' };
+      return { 
+        isComplete: false, 
+        sourcePin: activeSourcePin, 
+        isOvercurrent: false, 
+        message: `⚠️ Missing Ground Wire: Connect LED Cathode (Row ${led.cathode.row}) to Arduino GND.`, 
+        reason: 'no_gnd_wire' 
+      };
     }
 
     return {
       isComplete: true,
       sourcePin: activeSourcePin,
-      message: `✅ Closed Loop: Current flows from Pin ${activeSourcePin} ➔ Resistor ➔ LED ➔ GND.`,
+      isOvercurrent: false,
+      message: `✅ Closed Loop (Safe ~14mA): Current flows Pin ${activeSourcePin} ➔ 220Ω Resistor ➔ LED ➔ GND.`,
       reason: 'ok'
     };
   }, [resistor, led, wires]);
@@ -416,10 +485,10 @@ export default function Simulation() {
   const [_runTimeSec, setRunTimeSec] = useState(0);
   const [serialLogs, setSerialLogs] = useState([]);
 
-  // Computed: LED only glows if the connected pin is HIGH and circuit loop is closed!
+  // Computed: LED only glows if the connected pin is HIGH, circuit is closed, NOT blown, and NOT in overcurrent blast!
   const activeConnectedPin = circuitAnalysis.sourcePin;
   const isConnectedPinHigh = activeConnectedPin ? Boolean(pinStates[activeConnectedPin]) : false;
-  const isLedGlowing = isRunning && isCircuitClosed && isConnectedPinHigh;
+  const isLedGlowing = isRunning && isCircuitClosed && isConnectedPinHigh && !isLedBlown && !circuitAnalysis.isOvercurrent;
 
   useEffect(() => {
     let timeoutId = null;
@@ -458,7 +527,38 @@ export default function Simulation() {
           }));
 
           if (isHigh && isCircuitClosed && circuitAnalysis.sourcePin === targetPin) {
-            setSerialLogs(prev => [...prev.slice(-30), `[Step ${currentStep + 1}] Pin ${targetPin} HIGH ➔ 💡 LED Bulb Glows!`]);
+            if (circuitAnalysis.isOvercurrent) {
+              // OVERCURRENT BURNOUT BLAST!
+              if (!isLedBlown) {
+                setIsBlasting(true);
+                setIsLedBlown(true);
+                playBlastSound();
+                setTimeout(() => setIsBlasting(false), 900);
+                setSerialLogs(prev => [
+                  ...prev.slice(-30),
+                  `[💥 POP/BLAST!] Pin ${targetPin} HIGH ➔ 125mA surged without 220Ω resistor! LED DIE EXPLODED & BURNT OUT!`
+                ]);
+                showToast('💥 BURNOUT! LED blown due to 125mA overcurrent! Add a 220Ω resistor to protect it.', 'LED Burnout Blast!', 'error');
+              } else {
+                setSerialLogs(prev => [
+                  ...prev.slice(-30),
+                  `[Step ${currentStep + 1}] Pin ${targetPin} HIGH, but LED is blown/burnt (Open circuit).`
+                ]);
+              }
+            } else {
+              // Protected safe circuit via 220Ω resistor
+              if (isLedBlown) {
+                setSerialLogs(prev => [
+                  ...prev.slice(-30),
+                  `[Step ${currentStep + 1}] Pin ${targetPin} HIGH, but LED is damaged. Click "Replace LED".`
+                ]);
+              } else {
+                setSerialLogs(prev => [
+                  ...prev.slice(-30),
+                  `[Step ${currentStep + 1}] Pin ${targetPin} HIGH ➔ 💡 Safe ~14mA (220Ω protected) ➔ LED Glows!`
+                ]);
+              }
+            }
           } else if (isHigh && !isCircuitClosed) {
             setSerialLogs(prev => [...prev.slice(-30), `[Step ${currentStep + 1}] Pin ${targetPin} HIGH, but circuit OPEN (no current)`]);
           } else if (isHigh && isCircuitClosed && circuitAnalysis.sourcePin !== targetPin) {
@@ -488,7 +588,7 @@ export default function Simulation() {
       if (timeoutId) clearTimeout(timeoutId);
       if (timerId) clearInterval(timerId);
     };
-  }, [isRunning, blocks, repeatLoop, isCircuitClosed, circuitAnalysis.sourcePin]);
+  }, [isRunning, blocks, repeatLoop, isCircuitClosed, circuitAnalysis.sourcePin, circuitAnalysis.isOvercurrent, isLedBlown]);
 
   const handleToggleRun = () => {
     if (!isRunning) {
@@ -871,6 +971,20 @@ ${loopCode}}`;
                   >
                     {led.isPlaced ? 'Pull' : 'Plug ➔'}
                   </button>
+                  {/* If Blown, show Replace Bulb Button */}
+                  {isLedBlown && (
+                    <button
+                      onClick={() => {
+                        setIsLedBlown(false);
+                        setIsBlasting(false);
+                        showToast('Burnt LED replaced with fresh 5mm Red LED!', 'Bulb Replaced', 'success');
+                      }}
+                      className="px-2 py-0.5 rounded-md bg-amber-500 hover:bg-amber-400 text-slate-950 text-[10px] font-black uppercase tracking-wider flex items-center gap-1 shadow-md shadow-amber-500/30 animate-pulse cursor-pointer"
+                      title="Replace Blown Bulb with fresh LED"
+                    >
+                      <Sparkles size={11} /> Replace Blown
+                    </button>
+                  )}
                   <button
                     onClick={() => setXrayModalComponent('bulb')}
                     className="text-slate-400 hover:text-red-400 cursor-pointer"
@@ -921,6 +1035,12 @@ ${loopCode}}`;
                     <stop offset="60%" stopColor="#EF4444" stopOpacity="0.5" />
                     <stop offset="100%" stopColor="#EF4444" stopOpacity="0" />
                   </radialGradient>
+                  {/* Blown/Burnt LED Charred Gradient */}
+                  <linearGradient id="led-blown-clean" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#3F3F46" />
+                    <stop offset="50%" stopColor="#27272A" />
+                    <stop offset="100%" stopColor="#18181B" />
+                  </linearGradient>
                 </defs>
 
                 {/* ---------------- 1. REAL DUPONT JUMPER WIRES ---------------- */}
@@ -1035,7 +1155,13 @@ ${loopCode}}`;
                           <path d={`M ${ledAnodeCoord.x} ${ledAnodeCoord.y} L ${lx - 4} ${ly - 10}`} stroke="#CBD5E1" strokeWidth="2.5" strokeLinecap="round" />
                           <path d={`M ${ledCathodeCoord.x} ${ledCathodeCoord.y} L ${lx + 4} ${ly - 10}`} stroke="#94A3B8" strokeWidth="2.5" strokeLinecap="round" />
 
+                          {/* Soot mark on breadboard if blown */}
+                          {isLedBlown && (
+                            <ellipse cx={lx} cy={ly - 2} rx="18" ry="7" fill="rgba(0,0,0,0.65)" />
+                          )}
+
                           <g transform={`translate(${lx}, ${ly - 32})`}>
+                            {/* Normal Healthy Photon Bloom */}
                             {isLedGlowing && (
                               <>
                                 <circle cx="0" cy="0" r="50" fill="url(#led-bloom-clean)" opacity="0.85" className="animate-pulse" />
@@ -1043,38 +1169,74 @@ ${loopCode}}`;
                               </>
                             )}
 
+                            {/* BLAST SHOCKWAVE ANIMATION */}
+                            {isBlasting && (
+                              <g className="animate-ping pointer-events-none">
+                                <circle cx="0" cy="0" r="55" fill="rgba(239, 68, 68, 0.9)" />
+                                <circle cx="0" cy="0" r="35" fill="#F59E0B" />
+                                <circle cx="0" cy="0" r="18" fill="#FFFFFF" />
+                              </g>
+                            )}
+
+                            {/* Rising Smoke Particles during/after blast */}
+                            {(isBlasting || isLedBlown) && (
+                              <g className="pointer-events-none">
+                                <circle cx="-12" cy="-22" r="11" fill="rgba(100, 116, 139, 0.7)" className="animate-pulse" />
+                                <circle cx="12" cy="-30" r="14" fill="rgba(71, 85, 105, 0.8)" className="animate-bounce" />
+                                <circle cx="0" cy="-42" r="16" fill="rgba(39, 39, 42, 0.9)" />
+                                <text x="0" y="-48" textAnchor="middle" fontSize="13" fill="#F87171" fontWeight="900">💥 BURNOUT!</text>
+                              </g>
+                            )}
+
+                            {/* Base Rim Flange */}
                             <ellipse 
                               cx="0" cy="14" rx="12" ry="4" 
-                              fill={isLedGlowing ? "#EF4444" : "#7F1D1D"} 
-                              stroke={isLedGlowing ? "#FCA5A5" : "#991B1B"} 
+                              fill={isLedBlown ? "#1C1917" : isLedGlowing ? "#EF4444" : "#7F1D1D"} 
+                              stroke={isLedBlown ? "#44403C" : isLedGlowing ? "#FCA5A5" : "#991B1B"} 
                               strokeWidth="1.2" 
                             />
 
+                            {/* Epoxy Dome Body */}
                             <path 
                               d="M -11 14 L -11 0 C -11 -16, 11 -16, 11 0 L 11 14 Z" 
-                              fill={isLedGlowing ? "url(#led-glow-clean)" : "url(#led-off-clean)"} 
-                              stroke={isLedGlowing ? "#FECACA" : "#991B1B"} 
+                              fill={isLedBlown ? "url(#led-blown-clean)" : isLedGlowing ? "url(#led-glow-clean)" : "url(#led-off-clean)"} 
+                              stroke={isLedBlown ? "#57534E" : isLedGlowing ? "#FECACA" : "#991B1B"} 
                               strokeWidth="1.5" 
                             />
 
-                            <path d="M -6 6 L -2 -3 L -6 -3 Z" fill="#E2E8F0" />
+                            {/* Internal Leadframe & Die */}
+                            <path d="M -6 6 L -2 -3 L -6 -3 Z" fill={isLedBlown ? "#52525B" : "#E2E8F0"} />
                             <circle 
                               cx="-4" cy="-3" 
                               r={isLedGlowing ? "3.5" : "1.5"} 
-                              fill={isLedGlowing ? "#FFFFFF" : "#450A0A"} 
+                              fill={isLedBlown ? "#000000" : isLedGlowing ? "#FFFFFF" : "#450A0A"} 
                               className={isLedGlowing ? "animate-ping" : ""} 
                             />
-                            <line x1="4" y1="6" x2="4" y2="-1" stroke="#CBD5E1" strokeWidth="1.5" />
-                            <path d="M 4 -1 Q 0 -5 -3 -3" fill="none" stroke="#FDE047" strokeWidth="0.8" />
 
-                            <path 
-                              d="M -8 -8 C -8 -13, -3 -15, 0 -15" 
-                              fill="none" 
-                              stroke="white" 
-                              strokeWidth="2" 
-                              strokeLinecap="round" 
-                              opacity="0.75" 
-                            />
+                            {/* Whisker wire: Intact if healthy, burnt gap if blown */}
+                            {!isLedBlown ? (
+                              <>
+                                <line x1="4" y1="6" x2="4" y2="-1" stroke="#CBD5E1" strokeWidth="1.5" />
+                                <path d="M 4 -1 Q 0 -5 -3 -3" fill="none" stroke="#FDE047" strokeWidth="0.8" />
+                                <path 
+                                  d="M -8 -8 C -8 -13, -3 -15, 0 -15" 
+                                  fill="none" 
+                                  stroke="white" 
+                                  strokeWidth="2" 
+                                  strokeLinecap="round" 
+                                  opacity="0.75" 
+                                />
+                              </>
+                            ) : (
+                              <>
+                                <line x1="4" y1="6" x2="4" y2="1" stroke="#52525B" strokeWidth="1.5" />
+                                {/* Burn scar inside die */}
+                                <circle cx="-2" cy="-4" r="5" fill="#000000" opacity="0.9" />
+                                {/* Glass cracks */}
+                                <path d="M -7 4 L -2 -5 L 3 -2 L 7 -10" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="1.2" />
+                                <path d="M 1 -3 L 6 7" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="0.8" />
+                              </>
+                            )}
                           </g>
                         </>
                       );
