@@ -136,23 +136,23 @@ export default function Dashboard() {
   const [showIntelligence, setShowIntelligence] = useState(true);
 
   return (
-    <div className="pb-10">
+    <div className="pb-10 bg-grid-tech min-h-full">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Super Admin Control Center</h1>
-          <p className="text-slate-500">Zenith Public School unified robotics ERP & LMS console.</p>
+          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Command Center</h1>
+          <p className="text-sm text-slate-500">Network-wide robotics ERP & LMS operations console.</p>
         </div>
         
         <div className="flex gap-3">
           <button 
             onClick={() => setIsClassModalOpen(true)}
-            className="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg font-medium flex items-center gap-2 hover:bg-slate-50 transition-colors shadow-xs text-sm cursor-pointer"
+            className="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-xl font-semibold flex items-center gap-2 hover:bg-slate-50 transition-all shadow-xs text-sm cursor-pointer hover:shadow-sm"
           >
             <Plus size={16} /> New Class
           </button>
           <button 
             onClick={() => setIsSchoolModalOpen(true)}
-            className="bg-pixiu-blue text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 hover:bg-blue-600 transition-colors shadow-sm text-sm cursor-pointer"
+            className="bg-pixiu-blue text-white px-4 py-2 rounded-xl font-semibold flex items-center gap-2 hover:bg-blue-600 transition-all shadow-md shadow-blue-500/15 text-sm cursor-pointer"
           >
             <Plus size={16} /> Onboard School
           </button>
@@ -258,10 +258,10 @@ export default function Dashboard() {
       )}
 
       {/* Filter Bar */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 mb-8">
+      <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex items-center gap-4 mb-8">
         <Building2 size={18} className="text-pixiu-blue" />
         <div className="flex flex-col flex-1 max-w-xs">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Live Scope Filter</span>
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Scope Filter</span>
           <select 
             className="bg-transparent focus:outline-none cursor-pointer text-sm font-semibold text-slate-700 w-full"
             value={selectedSchool}
@@ -282,23 +282,29 @@ export default function Dashboard() {
       </div>
 
       {/* Main Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-        <div className="lg:col-span-2 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
           <h3 className="font-bold text-slate-800 text-sm mb-4">Rolling Attendance Trend (%)</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={attendanceGraph}>
+                <defs>
+                  <linearGradient id="attendanceFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#1D6EFF" stopOpacity={0.15} />
+                    <stop offset="95%" stopColor="#1D6EFF" stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="name" stroke="#94a3b8" />
-                <YAxis stroke="#94a3b8" domain={[60, 100]} />
-                <Tooltip />
-                <Area type="monotone" dataKey="attendance" stroke="#0066FF" fill="#0066FF" fillOpacity={0.15} strokeWidth={2} />
+                <XAxis dataKey="name" stroke="#94a3b8" tick={{ fontSize: 12 }} />
+                <YAxis stroke="#94a3b8" domain={[60, 100]} tick={{ fontSize: 12 }} />
+                <Tooltip contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12px', fontWeight: 600 }} />
+                <Area type="monotone" dataKey="attendance" stroke="#1D6EFF" fill="url(#attendanceFill)" strokeWidth={2.5} dot={{ r: 3, fill: '#1D6EFF', strokeWidth: 0 }} activeDot={{ r: 5, fill: '#1D6EFF', strokeWidth: 2, stroke: '#fff' }} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+        <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
           <h3 className="font-bold text-slate-800 text-sm mb-4">Hardware Kits Condition</h3>
           <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
@@ -308,7 +314,7 @@ export default function Dashboard() {
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip />
+                <Tooltip contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12px', fontWeight: 600 }} />
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -324,16 +330,22 @@ export default function Dashboard() {
       </div>
 
       {/* Tech Level Distribution */}
-      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+      <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
         <h3 className="font-bold text-slate-800 text-sm mb-4">Students by Robotics Tech Level</h3>
         <div className="h-56">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={performanceData}>
+              <defs>
+                <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#1D6EFF" stopOpacity={1} />
+                  <stop offset="100%" stopColor="#3B82F6" stopOpacity={0.7} />
+                </linearGradient>
+              </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-              <XAxis dataKey="level" stroke="#94a3b8" />
-              <YAxis stroke="#94a3b8" />
-              <Tooltip />
-              <Bar dataKey="students" fill="#3B82F6" radius={[6, 6, 0, 0]} />
+              <XAxis dataKey="level" stroke="#94a3b8" tick={{ fontSize: 11 }} />
+              <YAxis stroke="#94a3b8" tick={{ fontSize: 12 }} />
+              <Tooltip contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12px', fontWeight: 600 }} />
+              <Bar dataKey="students" fill="url(#barGrad)" radius={[8, 8, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>

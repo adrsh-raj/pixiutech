@@ -58,22 +58,24 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 selection:bg-pixiu-blue selection:text-white relative overflow-hidden">
+    <div className="min-h-screen bg-[#040810] flex items-center justify-center p-4 selection:bg-pixiu-blue selection:text-white relative overflow-hidden">
       {/* Subtle Background Glow */}
-      <div className="absolute top-1/4 left-1/4 w-72 sm:w-96 h-72 sm:h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none"></div>
-      <div className="absolute bottom-1/4 right-1/4 w-72 sm:w-96 h-72 sm:h-96 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none"></div>
+      <div className="absolute top-1/4 left-1/4 w-72 sm:w-96 h-72 sm:h-96 bg-blue-600/8 rounded-full blur-3xl pointer-events-none"></div>
+      <div className="absolute bottom-1/4 right-1/4 w-72 sm:w-96 h-72 sm:h-96 bg-indigo-600/6 rounded-full blur-3xl pointer-events-none"></div>
+      {/* Subtle grid */}
+      <div className="absolute inset-0 bg-grid-tech opacity-[0.03] pointer-events-none"></div>
 
-      <div className="w-full max-w-md bg-slate-900/95 backdrop-blur-md border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-2xl relative z-10">
+      <div className="w-full max-w-md bg-[#0A0F1A]/95 backdrop-blur-xl border border-slate-800/60 rounded-2xl p-6 sm:p-8 shadow-2xl relative z-10">
         <div className="text-center mb-6">
           <div className="inline-block bg-white px-3.5 py-1.5 rounded-xl shadow-md border border-white/20 mb-3">
             <img src="/img/logo.png" alt="Pixiu Tech Logo" className="h-8 sm:h-9 w-auto object-contain" />
           </div>
-          <h1 className="text-xl sm:text-2xl font-black text-white tracking-wide">PIXIU TECH</h1>
-          <p className="text-[11px] text-slate-400 font-medium mt-0.5">Sign in to your learning & management portal</p>
+          <h1 className="text-xl sm:text-2xl font-extrabold text-white tracking-wide">PIXIU TECH</h1>
+          <p className="text-[11px] text-slate-500 font-medium mt-0.5">Robotics & AI Learning Management System</p>
         </div>
 
         {/* Clean 3 Role Selector Tabs: Student, Trainer/Faculty, School Portal */}
-        <div className="grid grid-cols-3 gap-1 p-1 bg-slate-950 rounded-xl border border-slate-800 mb-5">
+        <div className="grid grid-cols-3 gap-1 p-1 bg-[#040810] rounded-xl border border-slate-800/60 mb-5">
           <button
             type="button"
             onClick={() => handleRolePreset('student')}

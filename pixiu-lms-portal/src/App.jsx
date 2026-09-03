@@ -126,7 +126,7 @@ function ProtectedLayout() {
     <div className="flex h-screen bg-slate-50 font-sans antialiased selection:bg-blue-500 selection:text-white overflow-hidden">
       <Sidebar mobileOpen={mobileSidebarOpen} setMobileOpen={setMobileSidebarOpen} />
       <div className="flex-1 overflow-auto relative flex flex-col min-w-0">
-        <header className="bg-white border-b border-slate-200 px-3.5 sm:px-8 py-2.5 sm:py-3.5 flex justify-between items-center sticky top-0 z-20">
+        <header className="bg-white/80 backdrop-blur-md border-b border-slate-200/60 px-3.5 sm:px-8 py-2.5 sm:py-3.5 flex justify-between items-center sticky top-0 z-20">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <button
               onClick={() => setMobileSidebarOpen(true)}
@@ -137,7 +137,7 @@ function ProtectedLayout() {
             </button>
             <div className="min-w-0">
               <h2 className="text-sm sm:text-base font-bold text-slate-800 tracking-tight truncate">Pixiu Tech Console</h2>
-              <p className="text-[9px] sm:text-[10px] text-slate-400 font-bold uppercase tracking-wider truncate">Multi-Tenant Operating System</p>
+              <p className="text-[9px] sm:text-[10px] text-slate-400 font-medium uppercase tracking-wider truncate">Robotics & AI Operating System</p>
             </div>
           </div>
           
