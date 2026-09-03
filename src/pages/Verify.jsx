@@ -3,7 +3,7 @@ import { useSearchParams, Link } from 'react-router-dom';
 import { 
   ShieldCheck, CheckCircle2, AlertTriangle, Search, Download, 
   Award, Building2, User, Calendar, BookOpen, Sparkles, ExternalLink,
-  Cpu, Check, ArrowRight, ShieldAlert, FileText, Lock, QrCode
+  Cpu, Check, ArrowRight, ShieldAlert, FileText, Lock, QrCode, Clock
 } from 'lucide-react';
 import { SEED_STUDENTS, SEED_SCHOOLS, SEED_STUDENT_REVIEWS, SEED_PROJECTS } from '../data/seedData';
 import { generateStudentTranscriptPDF } from '../utils/transcriptGenerator';
@@ -57,20 +57,37 @@ export default function Verify() {
     });
   }, [canonicalQuery]);
 
-  // Matched school
+  // Matched school with localStorage fallback
   const matchedSchool = useMemo(() => {
     if (!matchedStudent) return null;
     const sId = matchedStudent.school_id;
-    return SEED_SCHOOLS.find(s => s.id === sId || s.code === sId) || {
-      name: sId === 'XYZ' ? 'XYZ Academy (Pilot Lab)' : 'Zenith Public School',
-      code: sId || 'ZPS'
+    let allSchools = SEED_SCHOOLS;
+    try {
+      const stored = localStorage.getItem('pixiu_schools');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) allSchools = parsed;
+      }
+    } catch (e) {}
+    return allSchools.find(s => s.id === sId || s.code === sId) || {
+      name: sId === 'XYZ' ? 'XYZ Academy (Pilot Lab)' : sId === 'ABC' ? 'ABC Public School & Robotics Lab' : 'Zenith Public School',
+      code: sId || 'ZPS',
+      lead_trainer: sId === 'XYZ' || sId === 'ABC' ? 'Akash Sharma' : 'Vikas Pandey'
     };
   }, [matchedStudent]);
 
-  // Matched projects & reviews
+  // Matched projects & reviews with localStorage fallback
   const studentProjects = useMemo(() => {
     if (!matchedStudent) return [];
-    return SEED_PROJECTS.filter(p => {
+    let allProjects = SEED_PROJECTS;
+    try {
+      const stored = localStorage.getItem('pixiu_projects');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) allProjects = parsed;
+      }
+    } catch (e) {}
+    return allProjects.filter(p => {
       const pId = (p.student_id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
       const sId = (matchedStudent.student_id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
       return pId === sId;
@@ -79,7 +96,15 @@ export default function Verify() {
 
   const studentReviews = useMemo(() => {
     if (!matchedStudent) return [];
-    return SEED_STUDENT_REVIEWS.filter(r => {
+    let allReviews = SEED_STUDENT_REVIEWS;
+    try {
+      const stored = localStorage.getItem('pixiu_student_reviews');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) allReviews = parsed;
+      }
+    } catch (e) {}
+    return allReviews.filter(r => {
       const rId = (r.student_id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
       const sId = (matchedStudent.student_id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
       return rId === sId;
@@ -92,8 +117,14 @@ export default function Verify() {
     setIsSearching(true);
     setActiveQuery(inputStudentId.trim());
     setSearchParams({ id: inputStudentId.trim() });
-    setTimeout(() => setIsSearching(false), 200);
+    setTimeout(() => setIsSearching(false), 600);
   };
+
+  const isGraduate = matchedStudent && (
+    matchedStudent.status === 'Certified Graduate' || 
+    matchedStudent.tech_level?.includes('Level 5') || 
+    matchedStudent.certificate_issued === true
+  );
 
   const handleDownloadTranscript = () => {
     if (!matchedStudent) return;
@@ -102,7 +133,8 @@ export default function Verify() {
       school: matchedSchool,
       attendanceRate: 100,
       studentReviews,
-      projects: studentProjects
+      projects: studentProjects,
+      isOfficialCertificate: isGraduate
     });
   };
 
@@ -217,40 +249,77 @@ export default function Verify() {
           </div>
         </div>
 
-        {/* RESULT SECTION: MATCH FOUND (Clean White Card, Emerald Accents) */}
+        {/* RESULT SECTION: MATCH FOUND */}
         {matchedStudent && (
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm animate-in fade-in duration-200">
             
-            {/* Verified Header Strip */}
-            <div className="bg-emerald-50/70 border-b border-emerald-100 p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex items-center gap-3.5">
-                <div className="w-12 h-12 rounded-xl bg-emerald-100 border border-emerald-200 flex items-center justify-center text-emerald-600 shrink-0">
-                  <ShieldCheck size={26} />
+            {/* Header Strip: Differentiates between Certified Graduate vs In-Progress Student */}
+            {isGraduate ? (
+              <div className="bg-emerald-50/80 border-b border-emerald-100 p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-xl bg-emerald-100 border border-emerald-200 flex items-center justify-center text-emerald-600 shrink-0">
+                    <ShieldCheck size={26} />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-800 flex items-center gap-1">
+                      <CheckCircle2 size={12} /> Official Accredited Credential Verified
+                    </span>
+                    <h3 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                      {matchedStudent.name}
+                    </h3>
+                    <p className="text-xs text-slate-600 font-mono mt-0.5">
+                      Candidate ID: <b className="text-slate-900 font-bold">{matchedStudent.student_id}</b> • Class {matchedStudent.class_id ? matchedStudent.class_id.replace('CLS-', '') : 'Robotics Cohort'}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-800 flex items-center gap-1">
-                    <CheckCircle2 size={12} /> Official Accredited Credential
+
+                <div className="flex sm:flex-col items-end justify-between sm:justify-center border-t sm:border-t-0 pt-2 sm:pt-0 border-emerald-200/60">
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 uppercase">
+                    {matchedStudent.status || 'Certified Graduate'}
                   </span>
-                  <h3 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-                    {matchedStudent.name}
-                  </h3>
-                  <p className="text-xs text-slate-600 font-mono mt-0.5">
-                    Candidate ID: <b className="text-slate-900 font-bold">{matchedStudent.student_id}</b> • Class {matchedStudent.class_id ? matchedStudent.class_id.replace('CLS-', '') : 'Robotics Cohort'}
-                  </p>
+                  <span className="text-[10px] text-slate-500 font-mono mt-1">
+                    Cert Ref: PIXIU-{(matchedStudent.school_id || 'SCH').toUpperCase()}-{(matchedStudent.student_id || '').replace(/\s+/g, '')}-2026
+                  </span>
                 </div>
               </div>
+            ) : (
+              <div className="bg-amber-50/80 border-b border-amber-200 p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-xl bg-amber-100 border border-amber-200 flex items-center justify-center text-amber-600 shrink-0">
+                    <AlertTriangle size={26} />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-extrabold uppercase tracking-widest text-amber-800 flex items-center gap-1">
+                      <Clock size={12} /> Active Enrollment • Course In-Progress
+                    </span>
+                    <h3 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                      {matchedStudent.name}
+                    </h3>
+                    <p className="text-xs text-slate-600 font-mono mt-0.5">
+                      Candidate ID: <b className="text-slate-900 font-bold">{matchedStudent.student_id}</b> • Class {matchedStudent.class_id ? matchedStudent.class_id.replace('CLS-', '') : 'Robotics Cohort'}
+                    </p>
+                  </div>
+                </div>
 
-              <div className="flex sm:flex-col items-end justify-between sm:justify-center border-t sm:border-t-0 pt-2 sm:pt-0 border-emerald-200/60">
-                <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 uppercase">
-                  {matchedStudent.status || 'Certified Graduate'}
-                </span>
-                <span className="text-[10px] text-slate-500 font-mono mt-1">
-                  Cert Ref: PIXIU-{(matchedStudent.school_id || 'SCH').toUpperCase()}-{(matchedStudent.student_id || '').replace(/\s+/g, '')}-2026
-                </span>
+                <div className="flex sm:flex-col items-end justify-between sm:justify-center border-t sm:border-t-0 pt-2 sm:pt-0 border-amber-200/60">
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300 uppercase">
+                    {matchedStudent.tech_level || 'Level 0 (In-Progress)'}
+                  </span>
+                  <span className="text-[10px] text-amber-700 font-bold mt-1">
+                    🔒 Certificate Not Issued Yet
+                  </span>
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* Credential 4 KPI Tiles (Exact Admin Style) */}
+            {/* In-Progress Student Notice Alert */}
+            {!isGraduate && (
+              <div className="mx-6 mt-6 p-4 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 leading-relaxed">
+                <strong>⚠️ Official Graduate Certificate Notice:</strong> Candidate <strong>{matchedStudent.name}</strong> is an active enrolled learner currently undergoing hands-on practical lab modules ({matchedStudent.tech_level || 'Level 0'}). The official accredited certificate with QR verification code is unlocked only upon <strong>Level 5 curriculum completion & faculty graduation approval</strong>.
+              </div>
+            )}
+
+            {/* Credential 4 KPI Tiles */}
             <div className="p-6 space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 
@@ -263,10 +332,10 @@ export default function Verify() {
                 </div>
 
                 <div className="bg-blue-50/60 p-4 rounded-xl border border-blue-100">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-blue-600">Accredited Level</div>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-blue-600">Current Level</div>
                   <div className="text-sm font-bold text-blue-900 mt-1 flex items-center gap-1.5">
                     <Award size={15} className="shrink-0 text-blue-600" />
-                    <span>{matchedStudent.tech_level || 'Level 5 Master'}</span>
+                    <span>{matchedStudent.tech_level || 'Level 0'}</span>
                   </div>
                 </div>
 
@@ -315,20 +384,24 @@ export default function Verify() {
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs">
                 <div className="space-y-0.5">
                   <div className="text-slate-600 font-medium">
-                    Assigned Trainer / Faculty: <b className="text-slate-900">{matchedStudent.school_id === 'XYZ' ? 'Akash Sharma' : 'Vikas Pandey'}</b>
+                    Assigned Trainer / Faculty: <b className="text-slate-900">{matchedSchool?.lead_trainer || (matchedStudent.school_id === 'XYZ' || matchedStudent.school_id === 'ABC' ? 'Akash Sharma' : 'Vikas Pandey')}</b>
                   </div>
                   <div className="text-[11px] text-slate-400 font-mono">
-                    Security Seal: <b>CRYPTOGRAPHICALLY SIGNED & VERIFIED</b>
+                    Security Registry: <b>{isGraduate ? 'CRYPTOGRAPHICALLY SIGNED GRADUATE RECORD' : 'ACTIVE LAB ATTENDANCE RECORD'}</b>
                   </div>
                 </div>
 
                 {/* Download PDF Button */}
                 <button
                   onClick={handleDownloadTranscript}
-                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 shadow-xs active:scale-98 shrink-0"
+                  className={`px-5 py-2.5 font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 shadow-xs active:scale-98 shrink-0 ${
+                    isGraduate 
+                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white' 
+                      : 'bg-slate-900 hover:bg-slate-800 text-white'
+                  }`}
                 >
                   <Download size={15} />
-                  <span>Download Verified Transcript (PDF)</span>
+                  <span>{isGraduate ? 'Download Verified Certificate (PDF)' : 'Download Active Progress Report (PDF)'}</span>
                 </button>
               </div>
 

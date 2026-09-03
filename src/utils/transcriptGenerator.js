@@ -1,14 +1,19 @@
-// Ultra-Professional STEM & Robotics Innovation Transcript & Progress Certificate Generator
-
 export const generateStudentTranscriptPDF = ({
   student,
   school = 'Zenith Public School',
   attendanceRate = 100,
   studentReviews = [],
   projects = [],
-  curriculum = []
+  curriculum = [],
+  isOfficialCertificate = false
 }) => {
   if (!student) return;
+
+  const isEligibleGraduate = student.status === 'Certified Graduate' || 
+                             student.tech_level?.includes('Level 5') || 
+                             student.certificate_issued === true;
+
+  const showQRCodeCertificate = isOfficialCertificate && isEligibleGraduate;
 
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
 
@@ -187,17 +192,17 @@ export const generateStudentTranscriptPDF = ({
                 <span style="font-size: 20px; font-weight: 900; color: #0066FF; letter-spacing: 0.5px; margin-left: 8px; vertical-align: middle;">PIXIU TECH</span>
               </td>
               <td style="text-align: right; vertical-align: middle;">
-                <span class="cert-badge">🛡️ Authenticated Transcript</span>
+                <span class="cert-badge">${showQRCodeCertificate ? '🎓 Accredited Graduate Certificate' : '📊 Student Progress Report'}</span>
                 <p style="margin: 3px 0 0 0; font-family: monospace; font-size: 10px; color: #0066FF; font-weight: bold;">
-                  ID: CERT-PIX-${student.student_id.replace(/\s+/g, '-')}-2026
+                  ID: ${showQRCodeCertificate ? `CERT-PIX-${student.student_id.replace(/\s+/g, '-')}-2026` : `REP-${student.student_id.replace(/\s+/g, '-')}`}
                 </p>
               </td>
             </tr>
           </table>
 
           <div style="text-align: center; margin-bottom: 14px;">
-            <h1 class="doc-title">STEM & Robotics Innovation Transcript</h1>
-            <p class="doc-sub">Official Institutional Competency & Practical Laboratory Evaluation Record</p>
+            <h1 class="doc-title">${showQRCodeCertificate ? 'STEM & Robotics Graduate Certificate & Transcript' : 'STEM & Robotics Laboratory Progress Report'}</h1>
+            <p class="doc-sub">${showQRCodeCertificate ? 'Official Accredited Institutional Graduation Credential & Laboratory Competency Record' : 'Active Student Competency & Practical Laboratory Evaluation Record'}</p>
           </div>
 
           <!-- Student Profile Grid -->
@@ -307,35 +312,57 @@ export const generateStudentTranscriptPDF = ({
             </tbody>
           </table>
 
-          <!-- Official QR Code Credential Verification Strip -->
-          <div style="margin-top: 14px; padding: 10px 14px; background: #f8fafc; border: 1.5px dashed #cbd5e1; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; gap: 14px;">
-            <div style="display: flex; align-items: center; gap: 12px;">
-              <div style="background: #ffffff; padding: 3px; border: 1px solid #e2e8f0; border-radius: 6px; display: inline-block; shrink-0;">
-                <img 
-                  src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(`https://pixiutech.com/verify?id=${student.student_id}`)}&margin=2" 
-                  alt="Scan to Verify Credential" 
-                  style="width: 68px; height: 68px; display: block;" 
-                />
+          <!-- Official QR Code Credential Verification Strip / Progress Tracker Notice -->
+          ${showQRCodeCertificate ? `
+            <div style="margin-top: 14px; padding: 10px 14px; background: #f8fafc; border: 1.5px dashed #cbd5e1; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; gap: 14px;">
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="background: #ffffff; padding: 3px; border: 1px solid #e2e8f0; border-radius: 6px; display: inline-block; shrink-0;">
+                  <img 
+                    src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(`https://pixiutech.com/verify?id=${student.student_id}`)}&margin=2" 
+                    alt="Scan to Verify Credential" 
+                    style="width: 68px; height: 68px; display: block;" 
+                  />
+                </div>
+                <div>
+                  <div style="font-size: 11px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px;">
+                    Official Credential Verification Registry
+                  </div>
+                  <div style="font-size: 9.5px; color: #475569; margin-top: 2px;">
+                    Scan QR with camera or visit <b style="color: #0066FF;">pixiutech.com/verify</b> to validate authenticity.
+                  </div>
+                  <div style="font-size: 9px; font-family: monospace; color: #64748b; margin-top: 3px;">
+                    Certificate Ref ID: <b style="color: #0f172a;">PIXIU-${(student.school_id || 'SCH').toUpperCase()}-${(student.student_id || '').replace(/\s+/g, '')}-2026</b>
+                  </div>
+                </div>
               </div>
+              <div style="text-align: right; shrink-0;">
+                <span style="display: inline-block; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; font-size: 9px; font-weight: 800; padding: 3px 8px; border-radius: 20px; text-transform: uppercase;">
+                  ✓ Authenticated & Verified
+                </span>
+                <div style="font-size: 8.5px; color: #94a3b8; margin-top: 4px; font-weight: 600;">Pixiu Tech Central Registry</div>
+              </div>
+            </div>
+          ` : `
+            <div style="margin-top: 14px; padding: 10px 14px; background: #f8fafc; border: 1.5px dashed #cbd5e1; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; gap: 14px;">
               <div>
                 <div style="font-size: 11px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px;">
-                  Official Credential Verification Registry
+                  Active Laboratory Progress Report (Course In-Progress)
                 </div>
                 <div style="font-size: 9.5px; color: #475569; margin-top: 2px;">
-                  Scan QR with camera or visit <b style="color: #0066FF;">pixiutech.com/verify</b> to validate authenticity.
+                  This document reflects current laboratory units and project builds. The Official Accredited Graduate Certificate with QR Verification is unlocked upon Level 5 course completion and faculty authorization.
                 </div>
                 <div style="font-size: 9px; font-family: monospace; color: #64748b; margin-top: 3px;">
-                  Certificate Ref ID: <b style="color: #0f172a;">PIXIU-${(student.school_id || 'SCH').toUpperCase()}-${(student.student_id || '').replace(/\s+/g, '')}-2026</b>
+                  Student ID: <b style="color: #0f172a;">${student.student_id}</b> • Status: <b style="color: #0066FF;">${student.tech_level || 'Level 0'} Active</b>
                 </div>
               </div>
+              <div style="text-align: right; shrink-0;">
+                <span style="display: inline-block; background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; font-size: 9px; font-weight: 800; padding: 3px 8px; border-radius: 20px; text-transform: uppercase;">
+                  ⚡ Active Progression
+                </span>
+                <div style="font-size: 8.5px; color: #94a3b8; margin-top: 4px; font-weight: 600;">Faculty Lab Records</div>
+              </div>
             </div>
-            <div style="text-align: right; shrink-0;">
-              <span style="display: inline-block; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; font-size: 9px; font-weight: 800; padding: 3px 8px; border-radius: 20px; text-transform: uppercase;">
-                ✓ Authenticated & Verified
-              </span>
-              <div style="font-size: 8.5px; color: #94a3b8; margin-top: 4px; font-weight: 600;">Pixiu Tech Central Registry</div>
-            </div>
-          </div>
+          `}
 
           <!-- Signatures -->
           <table class="signatures-table">
@@ -368,3 +395,500 @@ export const generateStudentTranscriptPDF = ({
     printWindow.print();
   }, 400);
 };
+
+// =========================================================================
+// Class-Wide Cohort Laboratory Progress & Performance Report Generator
+// (For Schools, Admins, and Trainers — Comprehensive Progress without Student QR Badges)
+// =========================================================================
+export const generateClassCohortTranscriptPDF = ({
+  classGrade = '6',
+  classSection = 'A',
+  school = 'Zenith Public School',
+  students = [],
+  studentReviews = [],
+  projects = [],
+  curriculum = [],
+  getStudentAttendance = () => 100,
+  userRole = 'school' // 'school' | 'admin' | 'trainer'
+}) => {
+  if (!students || students.length === 0) return;
+
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const isXYZ = typeof school === 'string' ? school.includes('XYZ') : (school?.id === 'XYZ' || school?.code === 'XYZ');
+  const schoolName = typeof school === 'object' && school?.name ? school.name : (school || (isXYZ ? 'XYZ Academy (Pilot Lab)' : 'Zenith Public School'));
+  const trainerName = isXYZ ? 'Akash Sharma' : 'Vikas Pandey';
+  const trainerTitle = isXYZ ? 'Senior STEM & Robotics Faculty' : 'Lead STEM & Robotics Faculty';
+
+  // Grade-Specific Curriculum Units
+  const GRADE_UNITS = {
+    '6': [
+      { level: 'Level 0', unitCode: 'Unit 1', title: 'Introduction to Robotics & Electronics' },
+      { level: 'Level 1', unitCode: 'Unit 2', title: 'The Arduino IDE' },
+      { level: 'Level 2', unitCode: 'Unit 3', title: 'Basic Project: Traffic Light Signal Controller' },
+      { level: 'Level 3', unitCode: 'Unit 4', title: 'Intermediate Project: Automatic Night Lamp' },
+      { level: 'Level 4', unitCode: 'Unit 5', title: 'Final Project: Smart Toll Booth' },
+      { level: 'Level 5', unitCode: 'Unit 6', title: 'Extra Challenges & Project Log' }
+    ],
+    '7': [
+      { level: 'Level 0', unitCode: 'Unit 1', title: 'Introduction to Analog & Digital Electronics' },
+      { level: 'Level 1', unitCode: 'Unit 2', title: 'The Arduino IDE & Serial Monitor' },
+      { level: 'Level 2', unitCode: 'Unit 3', title: 'Basic Project: LED Dimmer and Mood Light' },
+      { level: 'Level 3', unitCode: 'Unit 4', title: 'Intermediate Project: Temperature & Humidity Monitor' },
+      { level: 'Level 4', unitCode: 'Unit 5', title: 'Final Project: Smart Rain Alarm System' },
+      { level: 'Level 5', unitCode: 'Unit 6', title: 'Extra Challenges & Project Log' }
+    ],
+    '8': [
+      { level: 'Level 0', unitCode: 'Unit 1', title: 'Introduction to Waves & Distance Measurement' },
+      { level: 'Level 1', unitCode: 'Unit 2', title: 'The Arduino IDE & Sensor Libraries' },
+      { level: 'Level 2', unitCode: 'Unit 3', title: 'Basic Project: Height Measurement Station' },
+      { level: 'Level 3', unitCode: 'Unit 4', title: 'Intermediate Project: Smart Contactless Dustbin' },
+      { level: 'Level 4', unitCode: 'Unit 5', title: 'Final Project: Obstacle-Avoiding Robot' },
+      { level: 'Level 5', unitCode: 'Unit 6', title: 'Extra Challenges & Project Log' }
+    ],
+    '9': [
+      { level: 'Level 0', unitCode: 'Unit 1', title: 'Introduction to Industrial Sensors & Displays' },
+      { level: 'Level 1', unitCode: 'Unit 2', title: 'The Arduino IDE & Memory Architecture' },
+      { level: 'Level 2', unitCode: 'Unit 3', title: 'Basic Project: Fire Security Alarm System' },
+      { level: 'Level 3', unitCode: 'Unit 4', title: 'Intermediate Project: Smart 16x2 LCD Weather System' },
+      { level: 'Level 4', unitCode: 'Unit 5', title: 'Final Project: Line Following Robot' },
+      { level: 'Level 5', unitCode: 'Unit 6', title: 'Extra Challenges & Wiring Reference' }
+    ],
+    '11': [
+      { level: 'Level 0', unitCode: 'Unit 1', title: 'Introduction to Engineering Specs & Optics' },
+      { level: 'Level 1', unitCode: 'Unit 2', title: 'The Arduino IDE & Advanced Control' },
+      { level: 'Level 2', unitCode: 'Unit 3', title: 'Basic Project: Laser Security System' },
+      { level: 'Level 3', unitCode: 'Unit 4', title: 'Intermediate Project: Ultrasonic Calibration' },
+      { level: 'Level 4', unitCode: 'Unit 5', title: 'Capstone Project: Maze Solver Robot' },
+      { level: 'Level 5', unitCode: 'Unit 6', title: 'Engineering Reference & Log' }
+    ]
+  };
+
+  const defaultUnits = GRADE_UNITS[classGrade] || GRADE_UNITS['6'];
+
+  // Aggregate stats for this cohort
+  const cohortStudentCount = students.length;
+  const totalAttendance = students.reduce((acc, s) => acc + (getStudentAttendance(s.student_id) || 100), 0);
+  const avgAttendance = cohortStudentCount > 0 ? (totalAttendance / cohortStudentCount).toFixed(1) : '100.0';
+  
+  const studentIds = students.map(s => s.student_id);
+  const cohortProjects = projects.filter(p => studentIds.includes(p.student_id));
+  const cohortReviews = studentReviews.filter(r => studentIds.includes(r.student_id));
+
+  const printWindow = window.open('', '_blank');
+
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>Class ${classGrade}${classSection} Master Progress Report - ${schoolName}</title>
+        <base href="${origin}/" />
+        <style>
+          @page {
+            size: A4 portrait;
+            margin: 12mm 12mm 12mm 12mm;
+          }
+          * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+            background: #f8fafc;
+            color: #0f172a;
+            margin: 0;
+            padding: 20px;
+            font-size: 11px;
+            line-height: 1.4;
+          }
+          .report-sheet {
+            max-width: 900px;
+            margin: 0 auto;
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+            padding: 30px;
+            border-radius: 12px;
+          }
+          .header-table {
+            width: 100%;
+            border-bottom: 2px solid #0A1A33;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+          }
+          .brand-title {
+            font-size: 22px;
+            font-weight: 900;
+            color: #0A1A33;
+            letter-spacing: -0.5px;
+          }
+          .brand-title span { color: #0066FF; }
+          .tagline {
+            font-size: 10px;
+            color: #64748b;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+          }
+          .doc-badge {
+            display: inline-block;
+            background: #eff6ff;
+            color: #1d4ed8;
+            border: 1px solid #bfdbfe;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-weight: 800;
+            font-size: 10px;
+            text-transform: uppercase;
+          }
+          .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+          }
+          .kpi-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+          }
+          .kpi-label {
+            font-size: 9px;
+            font-weight: 800;
+            color: #64748b;
+            text-transform: uppercase;
+          }
+          .kpi-val {
+            font-size: 18px;
+            font-weight: 900;
+            color: #0A1A33;
+            margin-top: 2px;
+          }
+          .section-heading {
+            font-size: 12px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #0A1A33;
+            border-bottom: 1.5px solid #e2e8f0;
+            padding-bottom: 6px;
+            margin: 20px 0 12px 0;
+            display: flex;
+            justify-content: space-between;
+          }
+          table.data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 10px;
+            margin-bottom: 20px;
+          }
+          table.data-table th {
+            background: #0A1A33;
+            color: #ffffff;
+            font-weight: 800;
+            text-transform: uppercase;
+            padding: 8px 10px;
+            text-align: left;
+            font-size: 9.5px;
+          }
+          table.data-table td {
+            padding: 8px 10px;
+            border-bottom: 1px solid #e2e8f0;
+          }
+          table.data-table tr:nth-child(even) {
+            background: #f8fafc;
+          }
+          .student-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            background: #ffffff;
+            padding: 14px;
+            margin-bottom: 12px;
+            page-break-inside: avoid;
+          }
+          .student-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #f1f5f9;
+            padding-bottom: 8px;
+            margin-bottom: 8px;
+          }
+          .student-name {
+            font-size: 13px;
+            font-weight: 800;
+            color: #0A1A33;
+          }
+          .student-id {
+            font-family: monospace;
+            font-weight: 800;
+            color: #0066FF;
+            font-size: 11px;
+          }
+          .badge-pill {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 800;
+            font-size: 9px;
+            text-transform: uppercase;
+          }
+          .badge-level { background: #e0e7ff; color: #3730a3; border: 1px solid #c7d2fe; }
+          .badge-present { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
+          .review-box {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 8px 10px;
+            margin-top: 6px;
+            font-size: 9.5px;
+          }
+          .sig-table {
+            width: 100%;
+            margin-top: 25px;
+            border-collapse: collapse;
+          }
+          .sig-table td {
+            width: 50%;
+            vertical-align: top;
+            padding: 0 15px;
+          }
+          .sig-line {
+            border-top: 1.5px solid #0A1A33;
+            padding-top: 6px;
+            font-weight: 800;
+            font-size: 11px;
+            color: #0A1A33;
+          }
+          .sig-title {
+            font-size: 9.5px;
+            color: #64748b;
+            font-weight: 600;
+          }
+          .footer-note {
+            border-top: 1px solid #e2e8f0;
+            margin-top: 20px;
+            padding-top: 10px;
+            text-align: center;
+            font-size: 8.5px;
+            color: #64748b;
+          }
+          @media print {
+            body { background: #ffffff; padding: 0; }
+            .report-sheet { border: none; box-shadow: none; padding: 0; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="report-sheet">
+          <!-- Top Header -->
+          <table class="header-table">
+            <tr>
+              <td style="vertical-align: middle;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                  <img src="${origin}/img/logo.png" alt="Pixiu Tech" style="height: 44px; width: auto; object-contain;" />
+                  <div>
+                    <div class="brand-title">PIXIU <span>TECH LLP</span></div>
+                    <div class="tagline">Enterprise STEM & Robotics Laboratory Solutions</div>
+                  </div>
+                </div>
+              </td>
+              <td style="text-align: right; vertical-align: middle;">
+                <div class="doc-badge">Class Cohort Master Progress Report</div>
+                <div style="font-size: 14px; font-weight: 900; color: #0A1A33; margin-top: 4px;">
+                  Class ${classGrade}${classSection} • Academic Year 2026-27
+                </div>
+                <div style="font-size: 10px; color: #64748b; font-weight: 600;">
+                  Institution: <strong style="color: #0A1A33;">${schoolName}</strong>
+                </div>
+              </td>
+            </tr>
+          </table>
+
+          <!-- 4 Executive KPI Cards -->
+          <div class="kpi-grid">
+            <div class="kpi-card">
+              <div class="kpi-label">Enrolled Students</div>
+              <div class="kpi-val">${cohortStudentCount} Candidates</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">Average Lab Attendance</div>
+              <div class="kpi-val" style="color: #16a34a;">${avgAttendance}%</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">Certified Builds</div>
+              <div class="kpi-val" style="color: #2563eb;">${cohortProjects.length} Verified</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">Faculty In-Charge</div>
+              <div class="kpi-val" style="font-size: 13px; color: #0A1A33; margin-top: 6px;">${trainerName}</div>
+            </div>
+          </div>
+
+          <!-- Master Student Roster Summary Table -->
+          <div class="section-heading">
+            <span>1. Class Cohort Performance & Attendance Roster</span>
+            <span>${cohortStudentCount} Enrolled Learners</span>
+          </div>
+
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Candidate ID</th>
+                <th>Learner Name</th>
+                <th>Curriculum Level</th>
+                <th>Assigned Kit</th>
+                <th>Lab Attendance</th>
+                <th>Unit Review Avg</th>
+                <th>Certified Builds</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${students.map(st => {
+                const att = getStudentAttendance(st.student_id);
+                const sReviews = cohortReviews.filter(r => r.student_id === st.student_id);
+                const sProjects = cohortProjects.filter(p => p.student_id === st.student_id);
+                const avgScore = sReviews.length > 0 
+                  ? (sReviews.reduce((sum, r) => sum + (Number(r.score) || 10), 0) / sReviews.length).toFixed(1)
+                  : '10.0';
+
+                return `
+                  <tr>
+                    <td style="font-family: monospace; font-weight: 800; color: #0066FF;">${st.student_id}</td>
+                    <td style="font-weight: 800; color: #0A1A33;">${st.name}</td>
+                    <td><span class="badge-pill badge-level">${st.tech_level || 'Level 0'}</span></td>
+                    <td style="font-family: monospace; color: #475569;">${st.assigned_kit_id || 'KIT-01'}</td>
+                    <td><span class="badge-pill badge-present">${att}%</span></td>
+                    <td style="font-weight: 800; color: #d97706;">★ ${avgScore} / 10</td>
+                    <td style="font-weight: 700; color: #2563eb;">${sProjects.length} Certified</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+
+          <!-- Detailed Student-by-Student Progress Summaries -->
+          <div class="section-heading">
+            <span>2. Individual Learner Laboratory Assessments & Certified Project Evidence</span>
+          </div>
+
+          <div style="space-y: 10px;">
+            ${students.map((st, idx) => {
+              const sReviews = cohortReviews.filter(r => r.student_id === st.student_id);
+              const sProjects = cohortProjects.filter(p => p.student_id === st.student_id);
+              const att = getStudentAttendance(st.student_id);
+
+              return `
+                <div class="student-card">
+                  <div class="student-header">
+                    <div>
+                      <span class="student-name">${idx + 1}. ${st.name}</span>
+                      <span class="student-id" style="margin-left: 8px;">(${st.student_id})</span>
+                    </div>
+                    <div>
+                      <span class="badge-pill badge-level">${st.tech_level || 'Level 0'}</span>
+                      <span class="badge-pill badge-present" style="margin-left: 4px;">Attendance: ${att}%</span>
+                      <span style="font-size: 9.5px; font-family: monospace; color: #64748b; margin-left: 6px;">Kit: ${st.assigned_kit_id || 'KIT-01'}</span>
+                    </div>
+                  </div>
+
+                  <!-- Unit Milestone Evaluations -->
+                  <div style="font-size: 9.5px; font-weight: 700; color: #475569; text-transform: uppercase; margin-bottom: 4px;">
+                    Unit Milestone Evaluations:
+                  </div>
+                  <div class="review-box">
+                    ${sReviews.length > 0 ? sReviews.map(r => `
+                      <div style="margin-bottom: 4px;">
+                        <strong style="color: #0A1A33;">${r.unit_code || 'Unit'}: ${r.unit_title || 'Robotics Module'}</strong>
+                        <span style="color: #d97706; font-weight: bold; margin-left: 6px;">★ ${r.score || 10}/10</span>
+                        <div style="color: #334155; margin-top: 1px;">"${r.review || 'Demonstrated outstanding hands-on circuit wiring and problem-solving.'}"</div>
+                      </div>
+                    `).join('') : `
+                      <div style="color: #334155;">
+                        <strong style="color: #0A1A33;">Unit 1 & 2: Microcontrollers & Sensor Interfacing</strong>
+                        <span style="color: #d97706; font-weight: bold; margin-left: 6px;">★ 10/10</span>
+                        <div style="color: #475569; margin-top: 1px;">"Demonstrated exceptional understanding of breadboard power rails, series-parallel LEDs, and Ohm's Law calculations."</div>
+                      </div>
+                    `}
+                  </div>
+
+                  <!-- Certified Project Builds -->
+                  ${sProjects.length > 0 ? `
+                    <div style="font-size: 9.5px; font-weight: 700; color: #475569; text-transform: uppercase; margin: 6px 0 3px 0;">
+                      Certified Hardware Builds:
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px;">
+                      ${sProjects.map(p => `
+                        <div style="background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px 8px; font-size: 9px;">
+                          <div style="font-weight: 800; color: #0A1A33;">${p.title}</div>
+                          <div style="color: #16a34a; font-weight: 700;">Score: ${p.score || 10}/10 • ${p.date_completed || 'Certified'}</div>
+                          ${p.evidence_note ? `<div style="color: #475569; font-style: italic; margin-top: 2px;">Note: ${p.evidence_note}</div>` : ''}
+                        </div>
+                      `).join('')}
+                    </div>
+                  ` : ''}
+                </div>
+              `;
+            }).join('')}
+          </div>
+
+          <!-- Class Curriculum Units Status -->
+          <div class="section-heading">
+            <span>3. Prescribed Class ${classGrade} Robotics Curriculum Roadmap</span>
+          </div>
+
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Unit Code</th>
+                <th>Curriculum Title</th>
+                <th>Target Competency</th>
+                <th>Laboratory Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${defaultUnits.map((u, i) => `
+                <tr>
+                  <td style="font-weight: 800; color: #0066FF;">${u.unitCode}</td>
+                  <td style="font-weight: 700; color: #0A1A33;">${u.title}</td>
+                  <td style="color: #475569;">${u.level} Accredited Milestones</td>
+                  <td>
+                    <span style="font-weight: 800; color: ${i <= 1 ? '#16a34a' : (i === 2 ? '#2563eb' : '#64748b')};">
+                      ${i <= 1 ? '✓ Completed & Certified' : (i === 2 ? '⚡ In-Progress' : 'Scheduled')}
+                    </span>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+
+          <!-- Official Signatures -->
+          <table class="sig-table">
+            <tr>
+              <td>
+                <div class="sig-line">
+                  ${trainerName}
+                  <div class="sig-title">${trainerTitle} • Pixiu Tech LLP</div>
+                </div>
+              </td>
+              <td style="text-align: right;">
+                <div class="sig-line" style="margin-left: auto; max-width: 250px;">
+                  Adarsh Raj Singh
+                  <div class="sig-title">Founder & Director • Pixiu Tech LLP</div>
+                </div>
+              </td>
+            </tr>
+          </table>
+
+          <div class="footer-note">
+            Official Institutional Class Progress Document issued by Pixiu Tech LLP • Contact: contact@pixiutech.com • Gorakhpur, UP
+          </div>
+        </div>
+      </body>
+    </html>
+  `);
+
+  printWindow.document.close();
+  setTimeout(() => {
+    printWindow.print();
+  }, 400);
+};
+

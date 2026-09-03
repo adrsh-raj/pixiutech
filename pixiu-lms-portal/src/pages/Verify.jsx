@@ -57,20 +57,37 @@ export default function Verify() {
     });
   }, [canonicalQuery]);
 
-  // Matched school
+  // Matched school with localStorage fallback
   const matchedSchool = useMemo(() => {
     if (!matchedStudent) return null;
     const sId = matchedStudent.school_id;
-    return SEED_SCHOOLS.find(s => s.id === sId || s.code === sId) || {
-      name: sId === 'XYZ' ? 'XYZ Academy (Pilot Lab)' : 'Zenith Public School',
-      code: sId || 'ZPS'
+    let allSchools = SEED_SCHOOLS;
+    try {
+      const stored = localStorage.getItem('pixiu_schools');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) allSchools = parsed;
+      }
+    } catch (e) {}
+    return allSchools.find(s => s.id === sId || s.code === sId) || {
+      name: sId === 'XYZ' ? 'XYZ Academy (Pilot Lab)' : sId === 'ABC' ? 'ABC Public School & Robotics Lab' : 'Zenith Public School',
+      code: sId || 'ZPS',
+      lead_trainer: sId === 'XYZ' || sId === 'ABC' ? 'Akash Sharma' : 'Vikas Pandey'
     };
   }, [matchedStudent]);
 
-  // Matched projects & reviews
+  // Matched projects & reviews with localStorage fallback
   const studentProjects = useMemo(() => {
     if (!matchedStudent) return [];
-    return SEED_PROJECTS.filter(p => {
+    let allProjects = SEED_PROJECTS;
+    try {
+      const stored = localStorage.getItem('pixiu_projects');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) allProjects = parsed;
+      }
+    } catch (e) {}
+    return allProjects.filter(p => {
       const pId = (p.student_id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
       const sId = (matchedStudent.student_id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
       return pId === sId;
@@ -79,7 +96,15 @@ export default function Verify() {
 
   const studentReviews = useMemo(() => {
     if (!matchedStudent) return [];
-    return SEED_STUDENT_REVIEWS.filter(r => {
+    let allReviews = SEED_STUDENT_REVIEWS;
+    try {
+      const stored = localStorage.getItem('pixiu_student_reviews');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) allReviews = parsed;
+      }
+    } catch (e) {}
+    return allReviews.filter(r => {
       const rId = (r.student_id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
       const sId = (matchedStudent.student_id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
       return rId === sId;
@@ -359,7 +384,7 @@ export default function Verify() {
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs">
                 <div className="space-y-0.5">
                   <div className="text-slate-600 font-medium">
-                    Assigned Trainer / Faculty: <b className="text-slate-900">{matchedStudent.school_id === 'XYZ' ? 'Akash Sharma' : 'Vikas Pandey'}</b>
+                    Assigned Trainer / Faculty: <b className="text-slate-900">{matchedSchool?.lead_trainer || (matchedStudent.school_id === 'XYZ' || matchedStudent.school_id === 'ABC' ? 'Akash Sharma' : 'Vikas Pandey')}</b>
                   </div>
                   <div className="text-[11px] text-slate-400 font-mono">
                     Security Registry: <b>{isGraduate ? 'CRYPTOGRAPHICALLY SIGNED GRADUATE RECORD' : 'ACTIVE LAB ATTENDANCE RECORD'}</b>
