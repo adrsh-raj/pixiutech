@@ -1,22 +1,20 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
-  Cpu, Play, Square, RotateCcw, Volume2, VolumeX, BookOpen, 
-  Terminal, ShieldAlert, Lock, ArrowLeft, Sparkles, CheckCircle2, 
-  AlertTriangle, Info, Eye, Sliders, Layers, ChevronDown, ChevronRight,
-  ExternalLink, Download, Compass, Zap, Plus, Trash2, Code, Puzzle,
-  Maximize2, X, Activity, Radio, HelpCircle, ArrowRight, Clock
+  Cpu, Play, Square, RotateCcw, ShieldAlert, Lock, ArrowLeft, 
+  Sparkles, CheckCircle2, Eye, Zap, Plus, Trash2, Code, Puzzle, 
+  X, Radio, Clock, ArrowRight, Layers, HelpCircle
 } from 'lucide-react';
 
 export default function Simulation() {
-  const navigate = useNavigate();
+  const _navigate = useNavigate();
 
   // 1. Direct Portal Session & Role Resolution via localStorage
   const [activeUser] = useState(() => {
     try {
       const u = localStorage.getItem('pixiu_auth_user');
       return u ? JSON.parse(u) : null;
-    } catch (e) {
+    } catch {
       return null;
     }
   });
@@ -34,44 +32,122 @@ export default function Simulation() {
     setTimeout(() => setToastAlert(null), 3500);
   };
 
-  // ==================== CIRCUIT WIRING STATE ====================
-  // 3 Required Connections for complete circuit:
-  // 1. 'pin13_to_resistor' (Arduino Pin 13 -> Resistor Lead 1)
-  // 2. 'resistor_to_led'   (Resistor Lead 2 -> LED Anode / Long Leg)
-  // 3. 'led_to_gnd'        (LED Cathode / Short Leg -> Arduino GND)
-  const [wires, setWires] = useState({
-    pin13_to_resistor: true,
-    resistor_to_led: true,
-    led_to_gnd: true
-  });
+  // ==================== COMPONENT TRAY STATE (PULL & PUSH) ====================
+  // 1. 220Ω Resistor: inTray or onBreadboard (spanning Row 8 and Row 12)
+  const [resistorState, setResistorState] = useState('breadboard'); // 'tray' | 'breadboard'
+  
+  // 2. 5mm Red LED Bulb: inTray or onBreadboard (Anode in Row 12, Cathode in Row 16)
+  const [ledState, setLedState] = useState('breadboard'); // 'tray' | 'breadboard'
 
-  // Circuit Validation Logic
-  const isCircuitClosed = wires.pin13_to_resistor && wires.resistor_to_led && wires.led_to_gnd;
+  // ==================== MANUAL PIN-TO-HOLE WIRING ENGINE ====================
+  // Wires array: [{ id, from, to, fromName, toName, color }]
+  const [wires, setWires] = useState([
+    { id: 'w1', from: 'ARD_13', to: 'BB_8', fromName: 'Pin 13', toName: 'Breadboard Row 8', color: '#3B82F6' },
+    { id: 'w2', from: 'BB_16', to: 'ARD_GND', fromName: 'Breadboard Row 16', toName: 'Arduino GND', color: '#0F172A' }
+  ]);
+  const [selectedWireColor, setSelectedWireColor] = useState('#3B82F6');
+  const [pendingWireStart, setPendingWireStart] = useState(null); // { id, name }
 
-  // Toggle wire connection manually for student practice
-  const toggleWire = (wireKey) => {
-    setWires(prev => {
-      const updated = { ...prev, [wireKey]: !prev[wireKey] };
-      const closed = updated.pin13_to_resistor && updated.resistor_to_led && updated.led_to_gnd;
-      if (closed) {
-        showToast('Circuit path complete! Closed electrical loop established.', 'Circuit Closed', 'success');
-      } else {
-        showToast('Circuit broken! Current cannot flow until all legs are connected.', 'Circuit Open', 'info');
+  // Quick Wire Color Palette
+  const WIRE_COLORS = [
+    { label: 'Blue', hex: '#3B82F6' },
+    { label: 'Black (GND)', hex: '#0F172A' },
+    { label: 'Red (5V)', hex: '#EF4444' },
+    { label: 'Yellow', hex: '#F59E0B' },
+    { label: 'Green', hex: '#10B981' }
+  ];
+
+  // Handle clicking a pin on Arduino or hole on Breadboard
+  const handleNodeClick = (nodeId, nodeName) => {
+    if (!pendingWireStart) {
+      // Start wire
+      setPendingWireStart({ id: nodeId, name: nodeName });
+      showToast(`Started wire from ${nodeName}. Click destination to connect.`, 'Wiring Active', 'info');
+    } else {
+      // End wire
+      if (pendingWireStart.id === nodeId) {
+        setPendingWireStart(null);
+        return;
       }
-      return updated;
-    });
+
+      // Check if duplicate wire exists
+      const exists = wires.some(w => 
+        (w.from === pendingWireStart.id && w.to === nodeId) || 
+        (w.from === nodeId && w.to === pendingWireStart.id)
+      );
+
+      if (exists) {
+        showToast('A jumper wire already connects these two points.', 'Already Connected', 'info');
+        setPendingWireStart(null);
+        return;
+      }
+
+      const newWire = {
+        id: 'w_' + Date.now(),
+        from: pendingWireStart.id,
+        to: nodeId,
+        fromName: pendingWireStart.name,
+        toName: nodeName,
+        color: selectedWireColor
+      };
+
+      setWires(prev => [...prev, newWire]);
+      showToast(`Connected ${pendingWireStart.name} ➔ ${nodeName}`, 'Wire Connected', 'success');
+      setPendingWireStart(null);
+    }
+  };
+
+  const removeWire = (wireId) => {
+    setWires(prev => prev.filter(w => w.id !== wireId));
+    showToast('Jumper wire pulled out and removed.', 'Wire Removed', 'info');
+  };
+
+  const handleClearAllWires = () => {
+    setWires([]);
+    setPendingWireStart(null);
+    setIsRunning(false);
+    showToast('All wires removed from the workbench.', 'Workbench Cleared', 'info');
   };
 
   const handleAutoWire = () => {
-    setWires({ pin13_to_resistor: true, resistor_to_led: true, led_to_gnd: true });
-    showToast('Standard 220Ω LED Blink circuit auto-wired to Pin 13 & GND.', 'Auto-Wired', 'success');
+    setResistorState('breadboard');
+    setLedState('breadboard');
+    setWires([
+      { id: 'w1', from: 'ARD_13', to: 'BB_8', fromName: 'Pin 13', toName: 'Breadboard Row 8', color: '#3B82F6' },
+      { id: 'w2', from: 'BB_16', to: 'ARD_GND', fromName: 'Breadboard Row 16', toName: 'Arduino GND', color: '#0F172A' }
+    ]);
+    showToast('Standard 220Ω LED circuit auto-wired correctly.', 'Auto-Wired Complete', 'success');
   };
 
-  const handleClearWires = () => {
-    setWires({ pin13_to_resistor: false, resistor_to_led: false, led_to_gnd: false });
-    setIsRunning(false);
-    showToast('All jumper wires disconnected. Wire the circuit to begin.', 'Wires Removed', 'info');
-  };
+  // ==================== CIRCUIT CONTINUITY & ELECTRICAL SOLVER ====================
+  // Check if:
+  // 1. Resistor is on breadboard (spans Row 8 and Row 12)
+  // 2. LED is on breadboard (Anode in Row 12, Cathode in Row 16)
+  // 3. Pin 13 is connected to Row 8
+  // 4. Arduino GND is connected to Row 16
+  const hasResistor = resistorState === 'breadboard';
+  const hasLed = ledState === 'breadboard';
+
+  const hasPin13ToRow8 = wires.some(w => 
+    (w.from === 'ARD_13' && w.to === 'BB_8') || (w.from === 'BB_8' && w.to === 'ARD_13')
+  );
+
+  const hasRow16ToGnd = wires.some(w => 
+    (w.from === 'BB_16' && w.to === 'ARD_GND') || (w.from === 'ARD_GND' && w.to === 'BB_16')
+  );
+
+  const isCircuitClosed = hasResistor && hasLed && hasPin13ToRow8 && hasRow16ToGnd;
+
+  // Diagnostic feedback message for students
+  const circuitStatusText = useMemo(() => {
+    if (!hasResistor && !hasLed) return '⚠️ Both Resistor and LED are in the tray! Push them to the breadboard.';
+    if (!hasResistor) return '⚠️ Missing Resistor! Push 220Ω resistor from tray to Breadboard Row 8 & 12.';
+    if (!hasLed) return '⚠️ Missing LED Bulb! Push Red LED from tray to Breadboard Row 12 & 16.';
+    if (!hasPin13ToRow8 && !hasRow16ToGnd) return '⚠️ Missing Jumper Wires: Connect Pin 13 ➔ Row 8 and Row 16 ➔ GND.';
+    if (!hasPin13ToRow8) return '⚠️ Missing Power Wire: Connect Arduino Pin 13 to Breadboard Row 8.';
+    if (!hasRow16ToGnd) return '⚠️ Missing Ground Wire: Connect Breadboard Row 16 (LED Cathode) to Arduino GND.';
+    return '✅ Complete Closed Loop! Current flows: Pin 13 ➔ Row 8 ➔ Resistor ➔ Row 12 ➔ LED ➔ Row 16 ➔ GND.';
+  }, [hasResistor, hasLed, hasPin13ToRow8, hasRow16ToGnd]);
 
   // ==================== VISUAL BLOCK CODING STATE ====================
   const [blocks, setBlocks] = useState([
@@ -84,7 +160,6 @@ export default function Simulation() {
   const [activeBlockIndex, setActiveBlockIndex] = useState(-1);
   const [showCppCode, setShowCppCode] = useState(false);
 
-  // Add Block helper
   const addBlock = (type) => {
     if (type === 'set_pin') {
       setBlocks(prev => [...prev, { id: 'b_' + Date.now(), type: 'set_pin', pin: '13', state: 'HIGH' }]);
@@ -105,21 +180,21 @@ export default function Simulation() {
     setBlocks(prev => prev.map(b => b.id === id ? { ...b, [field]: val } : b));
   };
 
-  // ==================== SIMULATION ENGINE ====================
+  // ==================== SIMULATION RUNNER ====================
   const [isRunning, setIsRunning] = useState(false);
-  const [runTimeSec, setRunTimeSec] = useState(0);
-  const [ledGlowState, setLedGlowState] = useState(false);
+  const [_runTimeSec, setRunTimeSec] = useState(0);
   const [pin13Output, setPin13Output] = useState(false);
   const [serialLogs, setSerialLogs] = useState([]);
 
-  // Block execution runner
+  // Computed: LED only glows if Pin 13 is HIGH and the complete circuit loop is closed!
+  const isLedGlowing = isRunning && pin13Output && isCircuitClosed;
+
   useEffect(() => {
     let timeoutId = null;
     let timerId = null;
 
     if (isRunning) {
       timerId = setInterval(() => setRunTimeSec(prev => prev + 1), 1000);
-
       let currentStep = 0;
 
       const executeNextBlock = () => {
@@ -132,9 +207,8 @@ export default function Simulation() {
           } else {
             setIsRunning(false);
             setActiveBlockIndex(-1);
-            setLedGlowState(false);
             setPin13Output(false);
-            setSerialLogs(prev => [...prev.slice(-30), `[Program Complete] Reached end of block sequence.`]);
+            setSerialLogs(prev => [...prev.slice(-30), `[Program Complete] Reached end of sequence.`]);
             return;
           }
         }
@@ -146,20 +220,16 @@ export default function Simulation() {
           const isHigh = block.state === 'HIGH';
           setPin13Output(isHigh);
 
-          // LED only glows if Pin 13 is HIGH AND the circuit is closed!
           if (isHigh && isCircuitClosed) {
-            setLedGlowState(true);
-            setSerialLogs(prev => [...prev.slice(-30), `[Step ${currentStep + 1}] Set Pin ${block.pin} -> HIGH (💡 LED Glows)`]);
+            setSerialLogs(prev => [...prev.slice(-30), `[Step ${currentStep + 1}] Pin ${block.pin} HIGH ➔ 💡 LED Bulb Glows!`]);
           } else if (isHigh && !isCircuitClosed) {
-            setLedGlowState(false);
-            setSerialLogs(prev => [...prev.slice(-30), `[Step ${currentStep + 1}] Pin 13 is HIGH, but circuit is OPEN (no light)`]);
+            setSerialLogs(prev => [...prev.slice(-30), `[Step ${currentStep + 1}] Pin 13 is HIGH, but circuit is OPEN (no current)`]);
           } else {
-            setLedGlowState(false);
-            setSerialLogs(prev => [...prev.slice(-30), `[Step ${currentStep + 1}] Set Pin ${block.pin} -> LOW (🌑 LED Off)`]);
+            setSerialLogs(prev => [...prev.slice(-30), `[Step ${currentStep + 1}] Pin ${block.pin} LOW ➔ 🌑 LED Off`]);
           }
 
           currentStep++;
-          timeoutId = setTimeout(executeNextBlock, 300); // quick transition to next block
+          timeoutId = setTimeout(executeNextBlock, 300);
         } 
         else if (block.type === 'wait') {
           const ms = Math.max(200, block.duration * 1000);
@@ -172,7 +242,6 @@ export default function Simulation() {
       executeNextBlock();
     } else {
       setActiveBlockIndex(-1);
-      setLedGlowState(false);
       setPin13Output(false);
     }
 
@@ -182,21 +251,18 @@ export default function Simulation() {
     };
   }, [isRunning, blocks, repeatLoop, isCircuitClosed]);
 
-  // Master Run/Stop Toggle
   const handleToggleRun = () => {
     if (!isRunning) {
       if (!isCircuitClosed) {
-        showToast('Warning: Circuit is open! Connect Pin 13, Resistor, LED, and GND to see the bulb glow.', 'Circuit Incomplete', 'info');
+        showToast('Circuit is not complete! Connect Pin 13 ➔ Resistor ➔ LED ➔ GND to see it glow.', 'Circuit Incomplete', 'info');
       }
       setIsRunning(true);
-      setSerialLogs(prev => [...prev, `[AVR Core 16MHz] Block Execution Loop Active.`]);
-      showToast('Simulation running! Blocks executing in sequence.', 'Simulation Started', 'success');
+      showToast('Simulation running! Executing block sequence.', 'Running', 'success');
     } else {
       setIsRunning(false);
       setActiveBlockIndex(-1);
-      setLedGlowState(false);
       setPin13Output(false);
-      showToast('Simulation paused.', 'Simulation Stopped', 'info');
+      showToast('Simulation stopped.', 'Stopped', 'info');
     }
   };
 
@@ -204,34 +270,29 @@ export default function Simulation() {
     setIsRunning(false);
     setActiveBlockIndex(-1);
     setRunTimeSec(0);
-    setLedGlowState(false);
     setPin13Output(false);
-    setSerialLogs([`[System] Workbench reset to idle.`]);
+    setSerialLogs([`[System] Reset to idle.`]);
     showToast('Simulation counters reset.', 'Reset Complete', 'info');
   };
 
   // ==================== 3D X-RAY ANATOMY MODAL STATE ====================
-  // 'led' | 'breadboard' | 'resistor' | 'arduino' | null
-  const [xrayModalComponent, setXrayModalComponent] = useState(null);
+  const [xrayModalComponent, setXrayModalComponent] = useState(null); // 'bulb' | 'breadboard' | 'resistor' | 'arduino' | null
 
-  // Generate C++ Arduino Code equivalent to visual blocks
+  // Generated C++ Sketch
   const generatedCppCode = useMemo(() => {
     let loopCode = '';
     blocks.forEach(b => {
       if (b.type === 'set_pin') {
-        loopCode += `  digitalWrite(${b.pin}, ${b.state}); // Set pin ${b.pin} ${b.state}\n`;
+        loopCode += `  digitalWrite(${b.pin}, ${b.state});\n`;
       } else if (b.type === 'wait') {
-        loopCode += `  delay(${Math.round(b.duration * 1000)}); // Wait ${b.duration} seconds\n`;
+        loopCode += `  delay(${Math.round(b.duration * 1000)});\n`;
       }
     });
 
     return `// Pixiu Cyber-Lab Auto-Generated Arduino C++ Sketch
-// Generated from Visual Block Coding Studio
-
 const int targetPin = 13;
 
 void setup() {
-  // Initialize digital pin 13 as an output
   pinMode(targetPin, OUTPUT);
   Serial.begin(9600);
   Serial.println("Pixiu Cyber-Lab 3D System Ready");
@@ -280,24 +341,6 @@ ${loopCode}}`;
             </p>
           </div>
 
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 text-left text-xs space-y-3">
-            <p className="font-bold text-slate-300 text-[11px] uppercase tracking-wider">How to unlock access:</p>
-            <ul className="space-y-2 text-slate-400">
-              <li className="flex items-start gap-2">
-                <span className="text-blue-400 font-bold">1.</span>
-                <span><strong>Students:</strong> Sign in with your Roll ID to practice coursework and log practical build transcripts.</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-emerald-400 font-bold">2.</span>
-                <span><strong>Trainers:</strong> Launch the simulator from your Live Session Runner for smart-board classroom projection.</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-amber-400 font-bold">3.</span>
-                <span><strong>Schools:</strong> Inspect your robotics laboratory hardware units and student circuit assignments.</span>
-              </li>
-            </ul>
-          </div>
-
           <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link
               to="/login?redirect=/simulation"
@@ -313,15 +356,10 @@ ${loopCode}}`;
             </Link>
           </div>
         </main>
-
-        <footer className="border-t border-slate-800/80 py-4 text-center text-xs text-slate-500 font-mono">
-          Pixiu Tech LLP • Enterprise 3D Robotics Simulation Engine • Protected Institutional Endpoint
-        </footer>
       </div>
     );
   }
 
-  // Active Authenticated Navigation Target (Back button redirect)
   const getBackRoute = () => {
     if (activeRole === 'student') return '/student-portal';
     if (activeRole === 'school') return '/school-portal';
@@ -339,7 +377,7 @@ ${loopCode}}`;
   return (
     <div className="min-h-screen bg-[#060913] text-white flex flex-col font-sans selection:bg-pixiu-blue selection:text-white relative">
       
-      {/* Toast Alert Notification */}
+      {/* Toast Alert */}
       {toastAlert && (
         <div className={`fixed bottom-5 right-5 z-50 px-4 py-3 rounded-2xl shadow-2xl border text-xs flex items-center gap-2.5 animate-in fade-in slide-in-from-bottom-5 duration-300 ${
           toastAlert.type === 'success' 
@@ -377,7 +415,7 @@ ${loopCode}}`;
                 Pixiu Cyber-Lab • 3D Arduino Workbench
               </h1>
               <span className="px-2 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-[10px] font-bold text-cyan-300 uppercase tracking-wider">
-                Photorealistic 3D
+                Hands-On Wire & Solderless Breadboard
               </span>
             </div>
             <p className="text-[10px] text-slate-400 font-mono">
@@ -386,22 +424,21 @@ ${loopCode}}`;
           </div>
         </div>
 
-        {/* Action Controls in Top Bar */}
+        {/* Master Controls */}
         <div className="flex items-center gap-2">
-          {/* Auto-wire reference circuit */}
           <button
             onClick={handleAutoWire}
             className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl border border-slate-700 text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
-            title="Automatically connect all wires for standard LED circuit"
+            title="Automatically place parts & connect wires for standard circuit"
           >
             <Sparkles size={14} className="text-amber-400" />
-            <span className="hidden sm:inline">Auto-Wire Circuit</span>
+            <span className="hidden sm:inline">Auto-Wire Standard Circuit</span>
           </button>
 
           <button
-            onClick={handleClearWires}
+            onClick={handleClearAllWires}
             className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 rounded-xl border border-slate-700 text-xs font-bold transition-all cursor-pointer"
-            title="Disconnect all wires to practice manual wiring"
+            title="Clear all jumper wires"
           >
             <Trash2 size={14} />
           </button>
@@ -409,12 +446,11 @@ ${loopCode}}`;
           <button
             onClick={handleReset}
             className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl border border-slate-700 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
-            title="Reset simulation state"
+            title="Reset simulation counters"
           >
             <RotateCcw size={14} />
           </button>
 
-          {/* Master Run / Stop Button */}
           <button
             onClick={handleToggleRun}
             className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-lg cursor-pointer ${
@@ -436,103 +472,258 @@ ${loopCode}}`;
         </div>
       </header>
 
-      {/* Main Workspace (Left 3D Workbench Canvas + Right Block Coding Palette) */}
+      {/* Main Workspace */}
       <main className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden">
         
-        {/* ==================== LEFT: 3D PHOTOREALISTIC HARDWARE WORKBENCH ==================== */}
-        <div className="flex-1 flex flex-col bg-[#080d1a] relative overflow-auto select-none">
+        {/* ==================== LEFT: INTERACTIVE 3D WORKBENCH ==================== */}
+        <div className="flex-1 flex flex-col bg-[#070C18] relative overflow-auto select-none">
           
-          {/* Engineering ESD Mat Background Surface */}
-          <div className="p-3 bg-slate-900/80 border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-3 text-xs z-10">
-            {/* Circuit Status Badge */}
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Circuit Loop:</span>
-              <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold flex items-center gap-1.5 border ${
+          {/* Top Workbench Toolbar: Wiring Mode & Continuity Status */}
+          <div className="p-3 bg-slate-900/90 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs z-10">
+            {/* Electrical Continuity Bar */}
+            <div className="flex items-center gap-2 max-w-lg">
+              <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold flex items-center gap-1.5 border shrink-0 ${
                 isCircuitClosed 
                   ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' 
                   : 'bg-amber-500/15 text-amber-300 border-amber-500/30 animate-pulse'
               }`}>
                 <span className={`w-2 h-2 rounded-full ${isCircuitClosed ? 'bg-emerald-400' : 'bg-amber-400'}`}></span>
-                {isCircuitClosed ? 'Closed Loop • Ready to Energize' : 'Open Circuit • Incomplete Wiring'}
+                {isCircuitClosed ? 'Closed Loop' : 'Open Circuit'}
               </span>
+              <p className="text-[11px] text-slate-300 truncate" title={circuitStatusText}>
+                {circuitStatusText}
+              </p>
             </div>
 
-            {/* Quick X-Ray Dissection Triggers */}
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider hidden sm:inline">3D X-Ray:</span>
-              <button
-                onClick={() => setXrayModalComponent('bulb')}
-                className="px-2.5 py-1 bg-red-500/15 hover:bg-red-500/25 text-red-300 border border-red-500/30 rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1"
-              >
-                🔬 LED Bulb Inside
-              </button>
-              <button
-                onClick={() => setXrayModalComponent('breadboard')}
-                className="px-2.5 py-1 bg-slate-700/50 hover:bg-slate-700 text-slate-200 border border-slate-600 rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1"
-              >
-                🔬 Breadboard Clips
-              </button>
-              <button
-                onClick={() => setXrayModalComponent('resistor')}
-                className="px-2.5 py-1 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1"
-              >
-                🔬 220Ω Resistor
-              </button>
-              <button
-                onClick={() => setXrayModalComponent('arduino')}
-                className="px-2.5 py-1 bg-blue-500/15 hover:bg-blue-500/25 text-blue-300 border border-blue-500/30 rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1"
-              >
-                🔬 ATmega328P Die
-              </button>
+            {/* Wire Spool Color Selector */}
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Wire Spool:</span>
+              <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                {WIRE_COLORS.map(c => (
+                  <button
+                    key={c.hex}
+                    onClick={() => setSelectedWireColor(c.hex)}
+                    className={`w-5 h-5 rounded-full border-2 transition-transform cursor-pointer ${
+                      selectedWireColor === c.hex ? 'scale-125 border-white shadow-md' : 'border-transparent opacity-70 hover:opacity-100'
+                    }`}
+                    style={{ backgroundColor: c.hex }}
+                    title={`Select ${c.label} Jumper Wire`}
+                  />
+                ))}
+              </div>
+
+              {pendingWireStart && (
+                <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-mono text-[10px] animate-pulse">
+                  Wiring from: {pendingWireStart.name}
+                </span>
+              )}
             </div>
           </div>
 
-          {/* 3D Workbench Canvas with Orthographic / Isometric Shadows */}
-          <div className="flex-1 p-6 flex items-center justify-center relative min-h-[560px] bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:24px_24px]">
+          {/* ================= COMPONENT PARTS TRAY (PULL & PUSH DOCK) ================= */}
+          <div className="px-6 pt-4 pb-2">
+            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-3 flex flex-wrap items-center justify-between gap-4 shadow-md">
+              <div className="flex items-center gap-2">
+                <Layers size={16} className="text-cyan-400" />
+                <div>
+                  <span className="text-xs font-black text-white block">PARTS TRAY (PULL & PUSH)</span>
+                  <span className="text-[10px] text-slate-400">Push components onto breadboard or pull them back out</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                {/* 1. 220Ω Resistor Tray Card */}
+                <div className="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800">
+                  <div className="w-8 h-3.5 bg-[#C99C67] rounded-full border border-[#966F3D] flex items-center justify-around px-0.5">
+                    <span className="w-0.5 h-full bg-red-600"></span>
+                    <span className="w-0.5 h-full bg-red-600"></span>
+                    <span className="w-0.5 h-full bg-[#5C3317]"></span>
+                    <span className="w-0.5 h-full bg-[#D4AF37]"></span>
+                  </div>
+                  <div className="text-left">
+                    <span className="text-[11px] font-bold text-white block">220Ω Resistor</span>
+                    <span className="text-[9px] text-slate-400 font-mono">
+                      {resistorState === 'breadboard' ? 'Inserted: Row 8 & 12' : 'In Tray'}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (resistorState === 'breadboard') {
+                        setResistorState('tray');
+                        showToast('Pulled 220Ω Resistor out of breadboard back into tray.', 'Pulled to Tray', 'info');
+                      } else {
+                        setResistorState('breadboard');
+                        showToast('Pushed 220Ω Resistor into Breadboard Rows 8 & 12.', 'Pushed to Breadboard', 'success');
+                      }
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-bold cursor-pointer transition-all ${
+                      resistorState === 'breadboard' 
+                        ? 'bg-slate-800 hover:bg-slate-700 text-slate-300' 
+                        : 'bg-amber-500 hover:bg-amber-400 text-slate-950'
+                    }`}
+                  >
+                    {resistorState === 'breadboard' ? 'Pull Out' : 'Push to Board ➔'}
+                  </button>
+                  <button
+                    onClick={() => setXrayModalComponent('resistor')}
+                    className="p-1 text-slate-400 hover:text-amber-400 cursor-pointer"
+                    title="X-Ray 3D Dissection of Resistor"
+                  >
+                    <Eye size={13} />
+                  </button>
+                </div>
+
+                {/* 2. 5mm Red LED Bulb Tray Card */}
+                <div className="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800">
+                  <div className={`w-4 h-6 rounded-t-full rounded-b-xs border flex items-center justify-center ${
+                    isLedGlowing ? 'bg-red-500 border-red-300 shadow-[0_0_10px_#EF4444]' : 'bg-red-900 border-red-800'
+                  }`}>
+                    <div className="w-1.5 h-2 bg-white/40 rounded-full"></div>
+                  </div>
+                  <div className="text-left">
+                    <span className="text-[11px] font-bold text-white block">5mm Red LED</span>
+                    <span className="text-[9px] text-slate-400 font-mono">
+                      {ledState === 'breadboard' ? 'Inserted: Row 12 & 16' : 'In Tray'}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (ledState === 'breadboard') {
+                        setLedState('tray');
+                        showToast('Pulled LED Bulb out of breadboard back into tray.', 'Pulled to Tray', 'info');
+                      } else {
+                        setLedState('breadboard');
+                        showToast('Pushed Red LED Bulb into Breadboard Rows 12 & 16.', 'Pushed to Breadboard', 'success');
+                      }
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-bold cursor-pointer transition-all ${
+                      ledState === 'breadboard' 
+                        ? 'bg-slate-800 hover:bg-slate-700 text-slate-300' 
+                        : 'bg-red-600 hover:bg-red-500 text-white'
+                    }`}
+                  >
+                    {ledState === 'breadboard' ? 'Pull Out' : 'Push to Board ➔'}
+                  </button>
+                  <button
+                    onClick={() => setXrayModalComponent('bulb')}
+                    className="p-1 text-slate-400 hover:text-red-400 cursor-pointer"
+                    title="X-Ray 3D Dissection of LED Bulb"
+                  >
+                    <Eye size={13} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ================= 3D WORKBENCH SURFACE WITH ARDUINO & SEPARATE BREADBOARD ================= */}
+          <div className="flex-1 p-6 flex items-center justify-center relative min-h-[580px] bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:24px_24px]">
             
-            {/* Workbench Anti-Static Mat Container */}
-            <div className="relative w-full max-w-4xl bg-gradient-to-br from-[#0c1322] via-[#090f1b] to-[#060a14] rounded-3xl p-6 sm:p-8 border border-slate-700/60 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.7)] flex flex-col md:flex-row items-center justify-around gap-8">
+            {/* Workbench Anti-Static Mat */}
+            <div className="relative w-full max-w-5xl bg-gradient-to-br from-[#0c1424] via-[#090f1d] to-[#050912] rounded-3xl p-6 sm:p-8 border border-slate-700/60 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8)] flex flex-col md:flex-row items-center justify-between gap-8">
               
-              {/* ================= 1. PHOTOREALISTIC 3D ARDUINO UNO R3 ================= */}
+              {/* SVG JUMPER WIRES OVERLAY LAYER */}
+              <svg className="absolute inset-0 w-full h-full pointer-events-none z-30">
+                {wires.map((wire) => {
+                  // Approximate coordinates for visually stunning 3D curved wires
+                  const isPin13ToRow8 = (wire.from === 'ARD_13' && wire.to === 'BB_8') || (wire.from === 'BB_8' && wire.to === 'ARD_13');
+                  const isRow16ToGnd = (wire.from === 'BB_16' && wire.to === 'ARD_GND') || (wire.from === 'ARD_GND' && wire.to === 'BB_16');
+
+                  if (isPin13ToRow8) {
+                    // Curved wire from Arduino Pin 13 to Breadboard Row 8
+                    return (
+                      <g key={wire.id} className="pointer-events-auto cursor-pointer group" onClick={() => removeWire(wire.id)}>
+                        <title>Click to pull/remove jumper wire ({wire.fromName} ➔ {wire.toName})</title>
+                        {/* Shadow */}
+                        <path 
+                          d="M 230 110 C 350 40, 480 70, 560 175" 
+                          fill="none" 
+                          stroke="rgba(0,0,0,0.5)" 
+                          strokeWidth="7" 
+                          strokeLinecap="round"
+                        />
+                        {/* Real Wire */}
+                        <path 
+                          d="M 230 106 C 350 36, 480 66, 560 171" 
+                          fill="none" 
+                          stroke={wire.color} 
+                          strokeWidth="4" 
+                          strokeLinecap="round"
+                          className="transition-all group-hover:stroke-white group-hover:stroke-5"
+                        />
+                        {/* Terminal Sleeves */}
+                        <circle cx="230" cy="106" r="4.5" fill="#1E293B" stroke="#64748B" strokeWidth="1.5" />
+                        <circle cx="560" cy="171" r="4.5" fill="#1E293B" stroke="#64748B" strokeWidth="1.5" />
+                      </g>
+                    );
+                  }
+
+                  if (isRow16ToGnd) {
+                    // Curved wire from Breadboard Row 16 to Arduino GND
+                    return (
+                      <g key={wire.id} className="pointer-events-auto cursor-pointer group" onClick={() => removeWire(wire.id)}>
+                        <title>Click to pull/remove jumper wire ({wire.fromName} ➔ {wire.toName})</title>
+                        {/* Shadow */}
+                        <path 
+                          d="M 560 300 C 460 420, 320 380, 210 395" 
+                          fill="none" 
+                          stroke="rgba(0,0,0,0.5)" 
+                          strokeWidth="7" 
+                          strokeLinecap="round"
+                        />
+                        {/* Real Wire */}
+                        <path 
+                          d="M 560 296 C 460 416, 320 376, 210 391" 
+                          fill="none" 
+                          stroke={wire.color} 
+                          strokeWidth="4" 
+                          strokeLinecap="round"
+                          className="transition-all group-hover:stroke-white group-hover:stroke-5"
+                        />
+                        {/* Terminal Sleeves */}
+                        <circle cx="560" cy="296" r="4.5" fill="#1E293B" stroke="#64748B" strokeWidth="1.5" />
+                        <circle cx="210" cy="391" r="4.5" fill="#1E293B" stroke="#64748B" strokeWidth="1.5" />
+                      </g>
+                    );
+                  }
+
+                  return null;
+                })}
+              </svg>
+
+              {/* ================= 1. STANDALONE 3D ARDUINO UNO R3 BOARD ================= */}
               <div 
-                className="relative w-[300px] h-[390px] bg-[#005B60] rounded-2xl border-[3px] border-[#008184] shadow-[12px_18px_30px_rgba(0,0,0,0.8)] p-4 flex flex-col justify-between shrink-0 group transition-transform duration-300 hover:scale-[1.01]"
+                className="relative w-[300px] h-[400px] bg-[#005B60] rounded-2xl border-[3px] border-[#008184] shadow-[12px_18px_30px_rgba(0,0,0,0.8)] p-4 flex flex-col justify-between shrink-0 group transition-transform duration-300 select-none z-10"
                 style={{
                   boxShadow: '0 20px 35px -5px rgba(0, 0, 0, 0.7), inset 0 2px 4px rgba(255, 255, 255, 0.2), inset 0 -4px 6px rgba(0, 0, 0, 0.5)'
                 }}
               >
-                {/* 3D Depth PCB Edge Bevel */}
+                {/* 3D Depth Bevel */}
                 <div className="absolute inset-0 rounded-2xl border-b-4 border-r-4 border-[#00383B] pointer-events-none"></div>
 
-                {/* Metal USB-B Connector (3D Silver Casing) */}
-                <div 
-                  className="absolute -top-3.5 left-5 w-14 h-9 bg-gradient-to-b from-slate-200 via-slate-300 to-slate-400 rounded-t-md border border-slate-400 shadow-md flex items-center justify-center"
-                  style={{ boxShadow: '0 4px 10px rgba(0,0,0,0.5), inset 0 1px 2px #fff' }}
-                >
+                {/* Silver Metal USB-B Connector */}
+                <div className="absolute -top-3.5 left-5 w-14 h-9 bg-gradient-to-b from-slate-200 via-slate-300 to-slate-400 rounded-t-md border border-slate-400 shadow-md flex items-center justify-center">
                   <div className="w-8 h-4 bg-slate-800 rounded-xs border border-slate-600"></div>
                 </div>
 
-                {/* DC Power Barrel Jack (3D Plastic + Metal Center) */}
-                <div 
-                  className="absolute -bottom-4 left-5 w-12 h-10 bg-gradient-to-b from-slate-900 to-black rounded-b-md border border-slate-700 shadow-lg flex items-center justify-center"
-                >
-                  <div className="w-4 h-4 rounded-full bg-slate-800 border-2 border-slate-500 flex items-center justify-center">
-                    <div className="w-1.5 h-1.5 rounded-full bg-slate-400"></div>
-                  </div>
+                {/* Black DC Power Barrel Jack */}
+                <div className="absolute -bottom-4 left-5 w-12 h-10 bg-gradient-to-b from-slate-900 to-black rounded-b-md border border-slate-700 shadow-lg flex items-center justify-center">
+                  <div className="w-4 h-4 rounded-full bg-slate-800 border-2 border-slate-500"></div>
                 </div>
 
                 {/* Red Tactile Reset Button */}
                 <button 
                   onClick={handleReset}
                   className="absolute top-4 left-22 w-5 h-5 rounded-full bg-gradient-to-b from-red-500 to-red-700 border-2 border-red-300 shadow-md active:scale-90 transition-transform cursor-pointer"
-                  title="Arduino Hardware Reset Button"
+                  title="Hardware Reset"
                 />
 
-                {/* Top Digital Pin Header (Pins 0 to 13, GND, AREF) */}
+                {/* Top Digital Pin Header */}
                 <div className="space-y-1">
                   <div className="flex items-center justify-between text-[8px] font-mono text-cyan-200 font-bold px-1 select-none">
                     <span>AREF</span>
                     <span>GND</span>
-                    <span className={wires.pin13_to_resistor ? 'text-amber-300 font-extrabold underline' : ''}>13</span>
+                    <span className="text-yellow-300 font-extrabold underline">PIN 13</span>
                     <span>12</span>
                     <span>11~</span>
                     <span>10~</span>
@@ -540,31 +731,33 @@ ${loopCode}}`;
                     <span>8</span>
                   </div>
                   
-                  {/* 3D Black Female Socket Header */}
-                  <div className="h-7 bg-[#111] border-2 border-slate-800 rounded-md px-1.5 flex items-center justify-between shadow-[inset_0_2px_4px_rgba(0,0,0,0.9)]">
+                  {/* Digital Pin Sockets */}
+                  <div className="h-7 bg-[#111] border-2 border-slate-800 rounded-md px-1.5 flex items-center justify-between shadow-inner">
                     {[
-                      { id: 'AREF', label: 'AREF' },
-                      { id: 'GND_TOP', label: 'GND', isGnd: true },
-                      { id: '13', label: '13', active: pin13Output, isPin13: true },
-                      { id: '12', label: '12' },
-                      { id: '11', label: '11' },
-                      { id: '10', label: '10' },
-                      { id: '9', label: '9' },
-                      { id: '8', label: '8' }
+                      { id: 'ARD_AREF', label: 'AREF' },
+                      { id: 'ARD_GND_TOP', label: 'GND' },
+                      { id: 'ARD_13', label: '13', active: pin13Output, isPin13: true },
+                      { id: 'ARD_12', label: '12' },
+                      { id: 'ARD_11', label: '11' },
+                      { id: 'ARD_10', label: '10' },
+                      { id: 'ARD_9', label: '9' },
+                      { id: 'ARD_8', label: '8' }
                     ].map((pin, i) => (
                       <div 
                         key={i} 
-                        onClick={() => pin.isPin13 && toggleWire('pin13_to_resistor')}
+                        onClick={() => handleNodeClick(pin.id, `Arduino Pin ${pin.label}`)}
                         className={`w-3.5 h-3.5 rounded-xs flex items-center justify-center cursor-pointer transition-all ${
-                          pin.active 
-                            ? 'bg-amber-400 shadow-[0_0_8px_#F59E0B] scale-110' 
-                            : pin.isPin13 && wires.pin13_to_resistor
-                            ? 'bg-blue-500 border border-blue-300'
-                            : 'bg-black border border-slate-700 hover:border-blue-400'
+                          pendingWireStart?.id === pin.id
+                            ? 'ring-2 ring-white scale-125 bg-blue-500'
+                            : pin.active 
+                            ? 'bg-amber-400 shadow-[0_0_10px_#F59E0B] scale-110' 
+                            : pin.isPin13 && hasPin13ToRow8
+                            ? 'bg-blue-600 border border-blue-300'
+                            : 'bg-black border border-slate-700 hover:border-cyan-400'
                         }`}
-                        title={pin.isPin13 ? "Digital Pin 13 (Click to toggle jumper wire to resistor)" : `Digital Pin ${pin.label}`}
+                        title={`Click to connect wire to Pin ${pin.label}`}
                       >
-                        <div className="w-1.5 h-1.5 rounded-xs bg-slate-900 shadow-inner"></div>
+                        <div className="w-1.5 h-1.5 rounded-xs bg-slate-900"></div>
                       </div>
                     ))}
                   </div>
@@ -575,24 +768,20 @@ ${loopCode}}`;
                   <div className="flex items-center justify-between">
                     <div>
                       <span className="text-xs font-black tracking-wider text-white block">PIXIU UNO</span>
-                      <span className="text-[8px] font-mono text-cyan-200">3D ROBOTICS LAB</span>
+                      <span className="text-[8px] font-mono text-cyan-200">STANDALONE R3</span>
                     </div>
 
-                    {/* 3D Stamped 16.000 MHz Silver Quartz Crystal */}
                     <div 
-                      className="w-10 h-5 bg-gradient-to-r from-slate-300 via-slate-100 to-slate-400 rounded-full border border-slate-400 shadow-md flex items-center justify-center font-mono text-[6px] font-bold text-slate-700 tracking-tighter"
-                      title="16.000 MHz Quartz Crystal Clock"
+                      className="w-10 h-5 bg-gradient-to-r from-slate-300 via-slate-100 to-slate-400 rounded-full border border-slate-400 shadow-md flex items-center justify-center font-mono text-[6px] font-bold text-slate-700"
+                      title="16.000 MHz Quartz Clock"
                     >
                       16.000
                     </div>
 
-                    {/* Built-in Pin 13 'L' Indicator LED & 5V 'ON' LED */}
                     <div className="flex flex-col gap-1 text-[8px] font-mono font-bold">
                       <div className="flex items-center gap-1.5">
                         <span className={`w-2.5 h-2.5 rounded-full transition-all ${
-                          pin13Output 
-                            ? 'bg-amber-400 shadow-[0_0_10px_#F59E0B] scale-125' 
-                            : 'bg-amber-950/60 border border-amber-900'
+                          pin13Output ? 'bg-amber-400 shadow-[0_0_10px_#F59E0B] scale-125' : 'bg-amber-950/60 border border-amber-900'
                         }`}></span>
                         <span className="text-cyan-100">L (Pin 13)</span>
                       </div>
@@ -603,13 +792,12 @@ ${loopCode}}`;
                     </div>
                   </div>
 
-                  {/* 3D Realistic ATmega328P DIP-28 Silicon Microcontroller Chip */}
+                  {/* 3D ATmega328P DIP-28 Chip */}
                   <div 
                     onClick={() => setXrayModalComponent('arduino')}
                     className="w-full bg-[#161616] border-2 border-slate-700 rounded-lg p-2 flex flex-col justify-between shadow-[0_6px_12px_rgba(0,0,0,0.8)] cursor-pointer hover:border-cyan-400 transition-colors group/chip"
-                    title="Click to view X-Ray 3D Dissection of ATmega328P Silicon Core (Flash ROM, SRAM, ALU, Clock)"
+                    title="Click for 3D Dissection: Flash ROM, SRAM, ALU, 16MHz Crystal"
                   >
-                    {/* Top Pin Notch & Engraved Text */}
                     <div className="flex items-center justify-between px-1">
                       <div className="w-2 h-2 rounded-full border border-slate-600 bg-slate-900"></div>
                       <span className="font-mono text-[8px] font-bold tracking-widest text-slate-400 group-hover/chip:text-cyan-300">
@@ -618,7 +806,6 @@ ${loopCode}}`;
                       <span className="text-[7px] font-mono text-slate-600">AVR 8-BIT</span>
                     </div>
 
-                    {/* 28 Metal Legs Graphical Indicator */}
                     <div className="flex justify-between px-2 pt-1 font-mono text-[7px] text-slate-500">
                       <span>||||||||||||||</span>
                       <span className="text-cyan-400 font-bold flex items-center gap-0.5">
@@ -629,30 +816,30 @@ ${loopCode}}`;
                   </div>
                 </div>
 
-                {/* Bottom Power & Analog Pin Headers */}
+                {/* Bottom Power Pin Header */}
                 <div className="space-y-1">
-                  <div className="h-7 bg-[#111] border-2 border-slate-800 rounded-md px-1.5 flex items-center justify-between shadow-[inset_0_2px_4px_rgba(0,0,0,0.9)]">
+                  <div className="h-7 bg-[#111] border-2 border-slate-800 rounded-md px-1.5 flex items-center justify-between shadow-inner">
                     {[
-                      { label: '3.3V' },
-                      { label: '5V' },
-                      { label: 'GND', isGnd: true },
-                      { label: 'GND', isGnd: true },
-                      { label: 'VIN' },
-                      { label: 'A0' },
-                      { label: 'A1' },
-                      { label: 'A2' },
-                      { label: 'A3' },
-                      { label: 'A4' }
+                      { id: 'ARD_3V3', label: '3.3V' },
+                      { id: 'ARD_5V', label: '5V' },
+                      { id: 'ARD_GND', label: 'GND', isGnd: true },
+                      { id: 'ARD_GND2', label: 'GND', isGnd: true },
+                      { id: 'ARD_VIN', label: 'VIN' },
+                      { id: 'ARD_A0', label: 'A0' },
+                      { id: 'ARD_A1', label: 'A1' },
+                      { id: 'ARD_A2', label: 'A2' }
                     ].map((pin, i) => (
                       <div 
                         key={i} 
-                        onClick={() => pin.isGnd && toggleWire('led_to_gnd')}
+                        onClick={() => handleNodeClick(pin.id, `Arduino ${pin.label}`)}
                         className={`w-3.5 h-3.5 rounded-xs flex items-center justify-center cursor-pointer transition-all ${
-                          pin.isGnd && wires.led_to_gnd
-                            ? 'bg-slate-900 border-2 border-slate-400'
+                          pendingWireStart?.id === pin.id
+                            ? 'ring-2 ring-white scale-125 bg-emerald-500'
+                            : pin.isGnd && hasRow16ToGnd
+                            ? 'bg-slate-800 border-2 border-slate-400'
                             : 'bg-black border border-slate-700 hover:border-emerald-400'
                         }`}
-                        title={pin.isGnd ? "GND Ground Pin (Click to toggle ground wire to LED Cathode)" : `Pin ${pin.label}`}
+                        title={`Click to connect wire to ${pin.label}`}
                       >
                         <div className="w-1.5 h-1.5 rounded-xs bg-slate-800"></div>
                       </div>
@@ -660,16 +847,16 @@ ${loopCode}}`;
                   </div>
 
                   <div className="flex items-center justify-between text-[8px] font-mono text-cyan-200 font-bold px-1 select-none">
-                    <span className={wires.led_to_gnd ? 'text-emerald-300 font-extrabold underline' : ''}>POWER (5V / GND)</span>
-                    <span>ANALOG (A0-A5)</span>
+                    <span className="text-emerald-300 font-extrabold underline">POWER (5V / GND)</span>
+                    <span>ANALOG IN</span>
                   </div>
                 </div>
 
               </div>
 
-              {/* ================= 2. PHOTOREALISTIC 3D BREADBOARD WITH INSERTED PARTS ================= */}
+              {/* ================= 2. SEPARATE STANDALONE 3D SOLDERLESS BREADBOARD ================= */}
               <div 
-                className="relative w-[320px] bg-[#EFEFEF] rounded-2xl border-[3px] border-slate-300 p-5 shadow-[12px_18px_30px_rgba(0,0,0,0.8)] flex flex-col justify-between select-none group"
+                className="relative w-[340px] bg-[#EFEFEF] rounded-2xl border-[3px] border-slate-300 p-4 shadow-[12px_18px_30px_rgba(0,0,0,0.8)] flex flex-col justify-between select-none z-10 group"
                 style={{
                   boxShadow: '0 20px 35px -5px rgba(0, 0, 0, 0.7), inset 0 2px 4px rgba(255, 255, 255, 0.9), inset 0 -4px 6px rgba(0, 0, 0, 0.15)'
                 }}
@@ -677,187 +864,139 @@ ${loopCode}}`;
                 {/* 3D Depth Bevel */}
                 <div className="absolute inset-0 rounded-2xl border-b-4 border-r-4 border-slate-400/80 pointer-events-none"></div>
 
-                {/* Top Header: Breadboard Title & X-Ray Button */}
-                <div className="flex items-center justify-between mb-3 border-b border-slate-300 pb-2">
+                {/* Breadboard Header */}
+                <div className="flex items-center justify-between mb-2 border-b border-slate-300 pb-1.5">
                   <div>
-                    <span className="text-xs font-black text-slate-800 block">SOLDERLESS BREADBOARD</span>
-                    <span className="text-[9px] font-mono text-slate-500">400 TIE-POINT MATRIX</span>
+                    <span className="text-xs font-black text-slate-800 block">SEPARATE BREADBOARD</span>
+                    <span className="text-[8px] font-mono text-slate-500">400 TIE-POINT MATRIX</span>
                   </div>
                   <button
                     onClick={() => setXrayModalComponent('breadboard')}
-                    className="p-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-[10px] font-bold flex items-center gap-1 border border-slate-300 transition-colors cursor-pointer"
-                    title="Click to view internal metallic spring clips inside the breadboard"
+                    className="px-2 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-[9px] font-bold flex items-center gap-1 border border-slate-300 transition-colors cursor-pointer"
+                    title="View internal spring clips"
                   >
-                    <Eye size={12} /> X-Ray Clips
+                    <Eye size={11} /> X-Ray Clips
                   </button>
                 </div>
 
-                {/* Positive (+) & Negative (-) Power Rails with Realistic Red & Blue Lines */}
-                <div className="flex justify-between items-center px-1 mb-3">
+                {/* Power Rails (+ and -) */}
+                <div className="flex justify-between items-center px-1 mb-2">
                   <div className="flex items-center gap-1">
                     <span className="text-rose-600 font-bold text-xs">+</span>
-                    <div className="w-28 h-0.5 bg-rose-500 rounded-full"></div>
+                    <div className="w-32 h-0.5 bg-rose-500 rounded-full"></div>
                   </div>
                   <div className="flex items-center gap-1">
-                    <div className="w-28 h-0.5 bg-blue-600 rounded-full"></div>
+                    <div className="w-32 h-0.5 bg-blue-600 rounded-full"></div>
                     <span className="text-blue-600 font-bold text-xs">-</span>
                   </div>
                 </div>
 
-                {/* ================= COMPONENT PLACEMENT STAGE ================= */}
-                <div className="bg-[#E5E7EB] border border-slate-300 rounded-xl p-3 my-2 space-y-4 shadow-inner">
+                {/* BREADBOARD TIE-POINT ROWS GRID (Interactive Holes) */}
+                <div className="relative bg-[#E5E7EB] border border-slate-300 rounded-xl p-3 my-1 space-y-2.5 shadow-inner">
                   
-                  {/* COMPONENT 1: 3D 220Ω CURRENT-LIMITING RESISTOR */}
-                  <div 
-                    onClick={() => setXrayModalComponent('resistor')}
-                    className="p-2.5 bg-white rounded-xl border border-slate-300 shadow-sm flex items-center justify-between cursor-pointer hover:border-amber-400 transition-all group/res"
-                    title="Click for 3D Dissection: Ceramic core, carbon spiral, and Ohm's Law thermal protection"
-                  >
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-black text-slate-800">220Ω Resistor</span>
-                        <span className="text-[9px] font-mono bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-bold">1/4 Watt</span>
+                  {/* Visual Placed Components on Breadboard */}
+                  {/* COMPONENT A: Pushed Resistor across Row 8 and Row 12 */}
+                  {resistorState === 'breadboard' && (
+                    <div 
+                      onClick={() => setXrayModalComponent('resistor')}
+                      className="absolute top-[38px] left-12 right-12 z-20 flex items-center justify-between pointer-events-auto cursor-pointer hover:scale-105 transition-transform"
+                      title="220Ω Resistor plugged into Row 8 and Row 12. Click for X-Ray Dissection."
+                    >
+                      <div className="w-2 h-2 rounded-full bg-slate-600 border border-slate-400"></div>
+                      <div className="flex-1 h-0.5 bg-slate-400"></div>
+                      <div className="w-12 h-5 bg-[#C99C67] rounded-full border border-[#966F3D] shadow-md flex items-center justify-around px-1 relative">
+                        <span className="w-1 h-full bg-red-600"></span>
+                        <span className="w-1 h-full bg-red-600"></span>
+                        <span className="w-1 h-full bg-[#5C3317]"></span>
+                        <span className="w-1 h-full bg-[#D4AF37]"></span>
                       </div>
-                      <span className="text-[10px] text-slate-500">Prevents LED from burning out</span>
+                      <div className="flex-1 h-0.5 bg-slate-400"></div>
+                      <div className="w-2 h-2 rounded-full bg-slate-600 border border-slate-400"></div>
                     </div>
+                  )}
 
-                    {/* 3D Realistic Resistor Body with Color Bands (Red, Red, Brown, Gold) */}
-                    <div className="flex items-center">
-                      <div className="w-3 h-0.5 bg-slate-400"></div>
-                      <div 
-                        className="w-12 h-5 bg-[#C99C67] rounded-full border border-[#966F3D] shadow-md flex items-center justify-around px-1 relative overflow-hidden"
-                        style={{ boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.8), 0 2px 4px rgba(0,0,0,0.2)' }}
-                      >
-                        <span className="w-1 h-full bg-red-600 shadow-xs" title="Band 1: 2 (Red)"></span>
-                        <span className="w-1 h-full bg-red-600 shadow-xs" title="Band 2: 2 (Red)"></span>
-                        <span className="w-1 h-full bg-[#5C3317] shadow-xs" title="Band 3: x10 (Brown)"></span>
-                        <span className="w-1 h-full bg-[#D4AF37] shadow-xs" title="Band 4: ±5% (Gold)"></span>
-                      </div>
-                      <div className="w-3 h-0.5 bg-slate-400"></div>
-                    </div>
-                  </div>
-
-                  {/* COMPONENT 2: 3D PHOTOREALISTIC 5MM DIFFUSED RED LED BULB */}
-                  <div 
-                    onClick={() => setXrayModalComponent('bulb')}
-                    className="p-3 bg-white rounded-xl border border-slate-300 shadow-sm flex flex-col items-center justify-center cursor-pointer hover:border-red-400 transition-all group/led"
-                    title="Click for 3D Dissection: See how the bulb actually glows via P-N junction quantum photon emission!"
-                  >
-                    <div className="w-full flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-black text-slate-800">5mm Red LED Bulb</span>
-                        <span className="text-[9px] font-mono bg-red-100 text-red-800 px-1.5 py-0.5 rounded font-bold">
-                          {ledGlowState ? '⚡ GLOWING' : 'OFF'}
-                        </span>
-                      </div>
-                      <span className="text-[9px] text-pixiu-blue font-bold flex items-center gap-0.5">
-                        <Eye size={10} /> X-Ray Quantum Inside
-                      </span>
-                    </div>
-
-                    {/* 3D Photorealistic LED Bulb Rendering with Visible Inner Anvil & Post */}
-                    <div className="relative my-2 flex flex-col items-center">
-                      
-                      {/* Luminous Glow Aura (Visible when energized) */}
-                      {ledGlowState && (
-                        <div className="absolute -top-3 w-28 h-28 rounded-full bg-red-500/40 blur-xl animate-pulse pointer-events-none"></div>
+                  {/* COMPONENT B: Pushed 5mm Red LED Bulb in Row 12 and Row 16 */}
+                  {ledState === 'breadboard' && (
+                    <div 
+                      onClick={() => setXrayModalComponent('bulb')}
+                      className="absolute top-[90px] left-16 right-16 z-20 flex flex-col items-center pointer-events-auto cursor-pointer hover:scale-105 transition-transform"
+                      title="5mm Red LED Bulb plugged into Row 12 (Anode) and Row 16 (Cathode). Click for X-Ray Dissection."
+                    >
+                      {/* Luminous Glow when circuit is complete and active */}
+                      {isLedGlowing && (
+                        <div className="absolute -top-3 w-28 h-28 rounded-full bg-red-500/50 blur-xl animate-pulse pointer-events-none"></div>
                       )}
 
-                      {/* Translucent Epoxy Resin Dome */}
-                      <div 
-                        className={`relative w-14 h-16 rounded-t-full rounded-b-sm border-2 transition-all duration-300 flex flex-col items-center justify-end pb-1.5 ${
-                          ledGlowState 
-                            ? 'bg-gradient-to-b from-red-500 via-red-600 to-red-700 border-red-300 shadow-[0_0_35px_rgba(239,68,68,0.9)] scale-105' 
-                            : 'bg-gradient-to-b from-red-900/60 via-red-950/70 to-red-900/80 border-red-800 opacity-90'
-                        }`}
-                        style={{
-                          boxShadow: ledGlowState 
-                            ? '0 0 40px #EF4444, inset 0 3px 6px #FFA3A3, inset 0 -4px 8px #991B1B' 
-                            : 'inset 0 2px 4px rgba(255,255,255,0.3), inset 0 -3px 6px rgba(0,0,0,0.6)'
-                        }}
-                      >
-                        {/* Specular White Glass Reflection Highlight */}
-                        <div className="absolute top-2 left-2 w-3 h-5 rounded-full bg-white/60 blur-[0.5px] -rotate-15"></div>
-
-                        {/* Visible Internal Lead Frame (Anvil & Post) */}
-                        <div className="relative w-8 h-8 flex items-end justify-center gap-1 z-10">
-                          {/* Large Anvil (Cathode / Flat Edge) */}
-                          <div className="w-3.5 h-6 bg-slate-300/80 rounded-t-xs border border-slate-400 flex items-start justify-center pt-0.5">
-                            {/* Semiconductor Die with Photon Emission Core */}
-                            <div className={`w-1.5 h-1.5 rounded-full ${ledGlowState ? 'bg-white shadow-[0_0_8px_#fff] animate-ping' : 'bg-red-900'}`}></div>
+                      {/* Translucent 3D Red Dome */}
+                      <div className={`relative w-11 h-13 rounded-t-full rounded-b-xs border-2 transition-all flex flex-col items-center justify-end pb-1 ${
+                        isLedGlowing 
+                          ? 'bg-gradient-to-b from-red-500 via-red-600 to-red-700 border-red-300 shadow-[0_0_35px_#EF4444]' 
+                          : 'bg-gradient-to-b from-red-900/60 via-red-950/80 to-red-900 border-red-800 opacity-90'
+                      }`}>
+                        <div className="absolute top-1.5 left-1.5 w-2 h-3.5 rounded-full bg-white/60 blur-[0.5px]"></div>
+                        {/* Internal Leadframe */}
+                        <div className="w-6 h-6 flex items-end justify-center gap-0.5">
+                          <div className={`w-2.5 h-4 bg-slate-300 rounded-t-xs flex items-start justify-center pt-0.5 ${
+                            isLedGlowing ? 'shadow-[0_0_8px_#fff]' : ''
+                          }`}>
+                            <div className={`w-1 h-1 rounded-full ${isLedGlowing ? 'bg-white animate-ping' : 'bg-red-900'}`}></div>
                           </div>
-                          {/* Small Post (Anode) */}
-                          <div className="w-1.5 h-5 bg-slate-300/80 rounded-t-xs border border-slate-400"></div>
+                          <div className="w-1 h-3.5 bg-slate-300 rounded-t-xs"></div>
                         </div>
-
-                        {/* Rim at Base of Bulb (Flat on Cathode side) */}
-                        <div className="w-full h-1.5 bg-red-700/90 border-t border-red-500 rounded-b-xs"></div>
                       </div>
 
-                      {/* 3D Metal Legs (Long Anode + Short Cathode) */}
-                      <div className="flex gap-4 items-start mt-0.5">
-                        {/* Anode (+) Long Leg */}
-                        <div className="flex flex-col items-center">
-                          <div className="w-1 h-7 bg-gradient-to-r from-slate-300 to-slate-400 border-x border-slate-500"></div>
-                          <span className="text-[7px] font-bold text-slate-500 mt-0.5">ANODE (+)</span>
-                        </div>
-                        {/* Cathode (-) Short Leg with flat rim mark */}
-                        <div className="flex flex-col items-center">
-                          <div className="w-1 h-5 bg-gradient-to-r from-slate-300 to-slate-400 border-x border-slate-500"></div>
-                          <span className="text-[7px] font-bold text-slate-500 mt-0.5">CATHODE (-)</span>
-                        </div>
+                      {/* Legs extending into breadboard holes */}
+                      <div className="flex justify-between w-14 mt-0.5 text-[7px] font-bold text-slate-600">
+                        <span>Anode (12)</span>
+                        <span>Cathode (16)</span>
                       </div>
                     </div>
+                  )}
 
-                    <p className="text-[10px] text-slate-500 text-center">
-                      {ledGlowState 
-                        ? '💡 Photons Emitted! Continuous electron-hole recombination.' 
-                        : 'Current Off. Connect legs & click Run.'}
-                    </p>
-                  </div>
+                  {/* Interactive Breadboard Rows: 4, 8, 12, 16, 20 */}
+                  {[
+                    { row: 4, label: 'Row 4', hint: 'Spare Row' },
+                    { row: 8, label: 'Row 8 (Resistor In)', isResistorIn: true, connected: hasPin13ToRow8 },
+                    { row: 12, label: 'Row 12 (Resistor Out / LED Anode +)', isJunction: true },
+                    { row: 16, label: 'Row 16 (LED Cathode -)', isLedGnd: true, connected: hasRow16ToGnd },
+                    { row: 20, label: 'Row 20', hint: 'Spare Row' }
+                  ].map((r) => (
+                    <div 
+                      key={r.row}
+                      onClick={() => handleNodeClick(`BB_${r.row}`, `Breadboard Row ${r.row}`)}
+                      className={`p-2 rounded-lg border flex items-center justify-between cursor-pointer transition-all ${
+                        pendingWireStart?.id === `BB_${r.row}`
+                          ? 'bg-blue-200 border-blue-500 scale-105 shadow-md'
+                          : r.connected
+                          ? 'bg-blue-50 border-blue-300'
+                          : 'bg-white hover:bg-slate-100 border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 font-mono text-[10px] font-bold text-slate-700">
+                        <span className="w-5 text-slate-400">[{r.row}]</span>
+                        <span>{r.label}</span>
+                      </div>
+
+                      {/* 5 Socket Holes a, b, c, d, e */}
+                      <div className="flex items-center gap-1">
+                        {['a', 'b', 'c', 'd', 'e'].map(h => (
+                          <div 
+                            key={h} 
+                            className={`w-2.5 h-2.5 rounded-xs border shadow-inner ${
+                              r.connected ? 'bg-blue-600 border-blue-400' : 'bg-slate-800 border-slate-600'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
 
                 </div>
 
-                {/* Bottom Interactive Wire Snapping Controls */}
-                <div className="space-y-1.5 pt-1 text-[11px] font-mono">
-                  <div 
-                    onClick={() => toggleWire('pin13_to_resistor')}
-                    className="flex items-center justify-between p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 cursor-pointer transition-colors border border-slate-200"
-                  >
-                    <span className="flex items-center gap-1.5">
-                      <span className={`w-2 h-2 rounded-full ${wires.pin13_to_resistor ? 'bg-blue-500' : 'bg-slate-400'}`}></span>
-                      <span>Wire 1: Pin 13 ➔ Resistor</span>
-                    </span>
-                    <span className={`font-bold ${wires.pin13_to_resistor ? 'text-blue-600' : 'text-slate-400'}`}>
-                      {wires.pin13_to_resistor ? 'CONNECTED' : 'DISCONNECTED'}
-                    </span>
-                  </div>
-
-                  <div 
-                    onClick={() => toggleWire('resistor_to_led')}
-                    className="flex items-center justify-between p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 cursor-pointer transition-colors border border-slate-200"
-                  >
-                    <span className="flex items-center gap-1.5">
-                      <span className={`w-2 h-2 rounded-full ${wires.resistor_to_led ? 'bg-amber-500' : 'bg-slate-400'}`}></span>
-                      <span>Wire 2: Resistor ➔ LED Anode</span>
-                    </span>
-                    <span className={`font-bold ${wires.resistor_to_led ? 'text-amber-600' : 'text-slate-400'}`}>
-                      {wires.resistor_to_led ? 'CONNECTED' : 'DISCONNECTED'}
-                    </span>
-                  </div>
-
-                  <div 
-                    onClick={() => toggleWire('led_to_gnd')}
-                    className="flex items-center justify-between p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 cursor-pointer transition-colors border border-slate-200"
-                  >
-                    <span className="flex items-center gap-1.5">
-                      <span className={`w-2 h-2 rounded-full ${wires.led_to_gnd ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
-                      <span>Wire 3: LED Cathode ➔ GND</span>
-                    </span>
-                    <span className={`font-bold ${wires.led_to_gnd ? 'text-emerald-600' : 'text-slate-400'}`}>
-                      {wires.led_to_gnd ? 'CONNECTED' : 'DISCONNECTED'}
-                    </span>
-                  </div>
+                {/* Bottom Guide */}
+                <div className="pt-1 text-[9px] font-mono text-slate-500 flex items-center justify-between">
+                  <span>Columns a-e internally tied</span>
+                  <span>Click row to connect wire</span>
                 </div>
 
               </div>
@@ -869,16 +1008,15 @@ ${loopCode}}`;
         </div>
 
         {/* ==================== RIGHT: VISUAL BLOCK CODING STUDIO ==================== */}
-        <div className="w-full lg:w-[480px] bg-[#090E1A] flex flex-col shrink-0 border-t lg:border-t-0 border-slate-800">
+        <div className="w-full lg:w-[460px] bg-[#090E1A] flex flex-col shrink-0 border-t lg:border-t-0 border-slate-800">
           
-          {/* Top Block Studio Header */}
+          {/* Header */}
           <div className="bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center justify-between text-xs">
             <div className="flex items-center gap-2">
               <Puzzle size={16} className="text-pixiu-blue" />
               <span className="font-extrabold text-white text-sm">Visual Block Coding Studio</span>
             </div>
 
-            {/* Toggle: Blocks vs C++ Code View */}
             <button
               onClick={() => setShowCppCode(!showCppCode)}
               className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-bold border border-slate-700 flex items-center gap-1 transition-all cursor-pointer"
@@ -888,11 +1026,11 @@ ${loopCode}}`;
             </button>
           </div>
 
-          {/* BLOCK CODING INTERFACE */}
+          {/* BLOCK CANVAS */}
           {!showCppCode ? (
             <div className="flex-1 p-4 flex flex-col space-y-4 overflow-y-auto">
               
-              {/* Event Container Block: 'When Simulation Starts' */}
+              {/* Event Container */}
               <div className="bg-[#EAB308]/20 border-2 border-[#EAB308] rounded-2xl p-3 shadow-md">
                 <div className="flex items-center gap-2 font-bold text-xs text-yellow-300">
                   <div className="w-3 h-3 rounded-full bg-yellow-400 animate-pulse"></div>
@@ -900,7 +1038,7 @@ ${loopCode}}`;
                 </div>
               </div>
 
-              {/* Stack of User Visual Blocks */}
+              {/* Stack of Visual Blocks */}
               <div className="space-y-2.5 pl-3 border-l-2 border-yellow-500/40">
                 {blocks.map((block, idx) => {
                   const isActive = activeBlockIndex === idx;
@@ -919,7 +1057,6 @@ ${loopCode}}`;
                           <Zap size={15} className={isActive ? 'text-yellow-300 animate-bounce' : 'text-white'} />
                           <span>Set Digital Pin</span>
                           
-                          {/* Pin Dropdown */}
                           <select 
                             value={block.pin}
                             onChange={(e) => updateBlock(block.id, 'pin', e.target.value)}
@@ -928,12 +1065,10 @@ ${loopCode}}`;
                             <option value="13">Pin 13 (Built-in LED)</option>
                             <option value="12">Pin 12</option>
                             <option value="11">Pin 11</option>
-                            <option value="10">Pin 10</option>
                           </select>
 
                           <span>to</span>
 
-                          {/* State Dropdown */}
                           <select 
                             value={block.state}
                             onChange={(e) => updateBlock(block.id, 'state', e.target.value)}
@@ -1001,7 +1136,7 @@ ${loopCode}}`;
               <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2">
                   <RotateCcw size={14} className="text-cyan-400" />
-                  <span className="font-bold text-slate-300">Repeat Program Forever in Loop</span>
+                  <span className="font-bold text-slate-300">Repeat Program in Infinite Loop</span>
                 </div>
                 <input 
                   type="checkbox"
@@ -1012,7 +1147,7 @@ ${loopCode}}`;
               </div>
 
               {/* Add Blocks Toolbar */}
-              <div className="pt-2 flex items-center gap-2">
+              <div className="pt-1 flex items-center gap-2">
                 <button
                   onClick={() => addBlock('set_pin')}
                   className="flex-1 py-2.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/40 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
@@ -1027,26 +1162,26 @@ ${loopCode}}`;
                 </button>
               </div>
 
-              {/* Serial Execution Output */}
+              {/* AVR Core Serial Telemetry */}
               <div className="mt-auto pt-2 space-y-1">
-                <span className="text-[10px] font-mono text-slate-500 uppercase tracking-wider font-bold">AVR Core 16MHz Serial Output:</span>
+                <span className="text-[10px] font-mono text-slate-500 uppercase tracking-wider font-bold">AVR Core 16MHz Serial Telemetry:</span>
                 <div className="h-28 bg-slate-950 border border-slate-800 rounded-xl p-2.5 font-mono text-[10px] text-emerald-400 overflow-y-auto space-y-0.5 shadow-inner">
                   {serialLogs.map((log, i) => (
                     <div key={i}>{log}</div>
                   ))}
                   {serialLogs.length === 0 && (
-                    <div className="text-slate-600 italic">Serial ready. Click 'Run Simulation' to observe telemetry...</div>
+                    <div className="text-slate-600 italic">Serial ready. Wire circuit and click 'Run Simulation'...</div>
                   )}
                 </div>
               </div>
 
             </div>
           ) : (
-            /* C++ ARDUINO CODE PREVIEW */
+            /* C++ SKETCH VIEW */
             <div className="flex-1 p-4 flex flex-col space-y-3 overflow-hidden">
               <div className="flex items-center justify-between text-xs text-slate-400">
                 <span className="font-mono text-[11px] font-bold text-emerald-400">Compiled sketch.ino (16MHz AVR GCC)</span>
-                <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded font-mono">Read Only</span>
+                <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded font-mono">Auto-Generated</span>
               </div>
               <div className="flex-1 bg-slate-950 border border-slate-800 rounded-2xl p-3 font-mono text-xs text-slate-200 overflow-auto shadow-inner leading-relaxed">
                 <pre>{generatedCppCode}</pre>
@@ -1092,13 +1227,12 @@ ${loopCode}}`;
               </button>
             </div>
 
-            {/* Modal Body: Dynamic 3D Exploded View by Component */}
+            {/* Modal Body */}
             <div className="flex-1 overflow-y-auto py-5 space-y-6 text-xs text-slate-300">
               
-              {/* ================= CASE 1: LED BULB QUANTUM DISSECTION ================= */}
+              {/* LED QUANTUM DISSECTION */}
               {xrayModalComponent === 'bulb' && (
                 <div className="space-y-5">
-                  {/* 3D Exploded Visual Diagram */}
                   <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 flex flex-col md:flex-row items-center justify-around gap-6">
                     {/* Animated Quantum P-N Junction Graphic */}
                     <div className="w-52 h-44 bg-gradient-to-b from-red-950 to-slate-900 border border-red-500/40 rounded-xl p-3 relative flex flex-col justify-between overflow-hidden shadow-inner">
@@ -1106,9 +1240,7 @@ ${loopCode}}`;
                         P-N JUNCTION SEMICONDUCTOR CHIP
                       </div>
 
-                      {/* Moving Electrons & Holes Visualization */}
                       <div className="flex items-center justify-around my-auto">
-                        {/* N-Type Region (Excess Electrons e-) */}
                         <div className="text-center">
                           <span className="text-[8px] text-blue-400 block font-bold">N-REGION</span>
                           <div className="w-8 h-8 rounded-full bg-blue-500/30 border border-blue-400 flex items-center justify-center font-mono text-[9px] font-bold text-blue-200 animate-pulse">
@@ -1116,13 +1248,11 @@ ${loopCode}}`;
                           </div>
                         </div>
 
-                        {/* Quantum Photon Emission Light Wave */}
                         <div className="flex flex-col items-center">
                           <span className="text-amber-300 font-black text-xs animate-bounce">⚡ hν</span>
                           <span className="text-[8px] text-red-400 font-mono">Photon λ=660nm</span>
                         </div>
 
-                        {/* P-Type Region (Excess Holes h+) */}
                         <div className="text-center">
                           <span className="text-[8px] text-rose-400 block font-bold">P-REGION</span>
                           <div className="w-8 h-8 rounded-full bg-rose-500/30 border border-rose-400 flex items-center justify-center font-mono text-[9px] font-bold text-rose-200 animate-pulse">
@@ -1136,7 +1266,6 @@ ${loopCode}}`;
                       </div>
                     </div>
 
-                    {/* Exploded Parts List */}
                     <div className="space-y-2 text-left">
                       <div className="font-bold text-white text-xs">5 Anatomical Layers of an LED:</div>
                       <ul className="space-y-1.5 text-slate-300 text-[11px]">
@@ -1149,7 +1278,6 @@ ${loopCode}}`;
                     </div>
                   </div>
 
-                  {/* Scientific Principle Explanation */}
                   <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-2">
                     <h4 className="font-bold text-white text-xs flex items-center gap-1.5">
                       <Sparkles size={14} className="text-yellow-400" />
@@ -1162,13 +1290,12 @@ ${loopCode}}`;
                 </div>
               )}
 
-              {/* ================= CASE 2: BREADBOARD INTERNAL CLIPS ================= */}
+              {/* BREADBOARD INTERNAL CLIPS DISSECTION */}
               {xrayModalComponent === 'breadboard' && (
                 <div className="space-y-5">
                   <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 text-center space-y-4">
                     <div className="font-bold text-white text-xs">Internal Phosphor-Bronze Spring Clip Matrix</div>
                     
-                    {/* Visual 5-Pin Clip Cross-Section */}
                     <div className="p-4 bg-gradient-to-r from-amber-500/10 via-amber-500/20 to-amber-500/10 border border-amber-500/30 rounded-xl flex items-center justify-center gap-4">
                       {['a', 'b', 'c', 'd', 'e'].map((col, i) => (
                         <div key={i} className="text-center">
@@ -1181,28 +1308,16 @@ ${loopCode}}`;
                     </div>
 
                     <p className="text-[11px] text-slate-400 leading-relaxed max-w-lg mx-auto">
-                      Beneath the off-white plastic casing are nickel-plated phosphor-bronze metal spring clips. All 5 socket holes in row 15 (columns a-b-c-d-e) touch the <strong>same single piece of metal</strong>. That is why plugging a resistor leg in 15a and an LED leg in 15b electrically connects them together without any soldering!
+                      Beneath the off-white plastic casing are nickel-plated phosphor-bronze metal spring clips. All 5 socket holes in row 12 (columns a-b-c-d-e) touch the <strong>same single piece of metal</strong>. That is why plugging a resistor leg in 12a and an LED leg in 12b electrically connects them together without any soldering!
                     </p>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[11px]">
-                    <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl">
-                      <strong className="text-cyan-400 block mb-1">Central IC Trench:</strong>
-                      The 0.3-inch divider groove in the center separates row a-e from f-j, allowing dual-in-line IC chips to span both sides without shorting their opposing pins.
-                    </div>
-                    <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl">
-                      <strong className="text-rose-400 block mb-1">Power Distribution Rails:</strong>
-                      The vertical side buses (+ and -) run continuous metal strips along the entire length of the board to distribute 5V and Ground everywhere.
-                    </div>
                   </div>
                 </div>
               )}
 
-              {/* ================= CASE 3: 220Ω RESISTOR CARBON FILM ================= */}
+              {/* RESISTOR DISSECTION */}
               {xrayModalComponent === 'resistor' && (
                 <div className="space-y-5">
                   <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 flex flex-col md:flex-row items-center justify-around gap-6">
-                    {/* Spiral Track Graphic */}
                     <div className="w-48 h-28 bg-[#966F3D]/20 border border-amber-600/40 rounded-xl p-3 flex flex-col items-center justify-center">
                       <div className="font-mono text-[9px] text-amber-400 font-bold mb-1">SPIRAL CARBON FILM</div>
                       <div className="font-mono text-lg font-black text-white tracking-widest">
@@ -1219,17 +1334,10 @@ ${loopCode}}`;
                       </div>
                     </div>
                   </div>
-
-                  <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-2 text-[11px]">
-                    <h4 className="font-bold text-white text-xs">Why Do We Need It? (Thermal Burnout Protection):</h4>
-                    <p className="leading-relaxed text-slate-300">
-                      An LED has near-zero internal resistance once its forward threshold voltage (2.0V) is reached. If connected directly to 5V without this 220Ω resistor, runaway current exceeding 200mA will surge through the crystal, melting the gold whisker wire within milliseconds. The resistor's carbon atoms collide with incoming electrons, slowing them down and dissipating the excess 3 Volts safely as microscopic heat ($P = I^2 R$).
-                    </p>
-                  </div>
                 </div>
               )}
 
-              {/* ================= CASE 4: ARDUINO UNO ATmega328P SILICON DIE ================= */}
+              {/* ARDUINO SILICON DIE */}
               {xrayModalComponent === 'arduino' && (
                 <div className="space-y-5">
                   <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-4">
@@ -1238,7 +1346,6 @@ ${loopCode}}`;
                       <span className="font-mono text-[10px] text-cyan-400 font-bold">16 MIPS @ 16 MHz</span>
                     </div>
 
-                    {/* Silicon Die Sub-Blocks Grid */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center font-mono">
                       <div className="p-2.5 bg-blue-950/60 border border-blue-500/40 rounded-xl">
                         <div className="text-[10px] text-blue-300 font-bold">FLASH ROM</div>
