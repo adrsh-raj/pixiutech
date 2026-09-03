@@ -4,7 +4,8 @@ import {
   Cpu, Play, Square, RotateCcw, ShieldAlert, Lock, ArrowLeft, 
   CheckCircle2, Eye, Zap, Plus, Trash2, Code, Puzzle, 
   X, Clock, Layers, Wrench, Volume2, VolumeX, Hand,
-  Crosshair, BellRing, Sun, Moon, Copy, Check, ChevronUp, ChevronDown, CopyPlus
+  BellRing, Sun, Moon, Copy, Check, ChevronUp, ChevronDown, CopyPlus,
+  GraduationCap, Maximize2, Minimize2
 } from 'lucide-react';
 
 export default function Simulation() {
@@ -199,12 +200,30 @@ export default function Simulation() {
     { label: 'Orange', hex: '#F97316' }
   ];
 
+  // ==================== MOBILE RESPONSIVENESS & ZOOM STATE ====================
+  const [mobileZoomMode, setMobileZoomMode] = useState('fit'); // 'fit' | 'full'
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
+
+  useEffect(() => {
+    const handleWinResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleWinResize);
+    return () => window.removeEventListener('resize', handleWinResize);
+  }, []);
+
+  const mobileScale = useMemo(() => {
+    if (windowWidth >= 1024) return 1;
+    if (mobileZoomMode === 'full') return 1;
+    const availableWidth = Math.max(300, windowWidth - 20);
+    return Math.min(1, Math.max(0.32, availableWidth / 990));
+  }, [windowWidth, mobileZoomMode]);
+
   // ==================== DYNAMIC COORDINATE TRACKER ====================
   const [terminalCoords, setTerminalCoords] = useState({});
 
   const updateCoordinates = () => {
     if (!workbenchRef.current) return;
     const wbRect = workbenchRef.current.getBoundingClientRect();
+    const s = mobileScale || 1;
     const coords = {};
     const elements = workbenchRef.current.querySelectorAll('[id^="term-"]');
 
@@ -212,8 +231,8 @@ export default function Simulation() {
       const rect = el.getBoundingClientRect();
       const id = el.id.replace('term-', '');
       coords[id] = {
-        x: rect.left - wbRect.left + rect.width / 2,
-        y: rect.top - wbRect.top + rect.height / 2
+        x: (rect.left - wbRect.left + rect.width / 2) / s,
+        y: (rect.top - wbRect.top + rect.height / 2) / s
       };
     });
 
@@ -233,7 +252,7 @@ export default function Simulation() {
       clearTimeout(timer3);
       window.removeEventListener('resize', updateCoordinates);
     };
-  }, [wires, components, mobileTab]);
+  }, [wires, components, mobileTab, mobileScale]);
 
   // Click any hole or pin
   const handleTerminalClick = (terminalId, terminalLabel, rowNum = null, colName = null) => {
@@ -350,7 +369,7 @@ export default function Simulation() {
   };
 
   // Preset: Laser Tripwire Security System
-  const handleLoadLaserTripwirePreset = () => {
+  const _handleLoadLaserTripwirePreset = () => {
     getAudioContext();
     setComponents([
       { id: 'res_1', type: 'resistor', name: '220Ω Resistor', lead1: { row: 10, col: 'c' }, lead2: { row: 15, col: 'c' } },
@@ -571,6 +590,36 @@ export default function Simulation() {
     };
   }, [wires, components, isBeamBlocked]);
 
+  const DEFAULT_CLASS6_SKETCH = `// ================================================================
+// Pixiu Cyber-Lab • Class 6: Simple Light Bulb Circuit
+// Microcontroller: ATmega328P @ 16 MHz (Arduino Uno R3)
+// Objective: Learn current flow, series resistance, and digital output
+// ================================================================
+
+const int PIN_BULB = 11; // Connected to Red LED via 220Ω resistor
+
+void setup() {
+  // Set Pin 11 as an OUTPUT pin
+  pinMode(PIN_BULB, OUTPUT);
+
+  Serial.begin(9600);
+  Serial.println("=========================================");
+  Serial.println("   CLASS 6: SIMPLE LIGHT BULB CIRCUIT    ");
+  Serial.println("=========================================");
+}
+
+void loop() {
+  // 1. Turn ON the Light Bulb
+  digitalWrite(PIN_BULB, HIGH);
+  Serial.println("💡 Bulb is ON (5V High)");
+  delay(1000); // Wait 1 second
+
+  // 2. Turn OFF the Light Bulb
+  digitalWrite(PIN_BULB, LOW);
+  Serial.println("🌑 Bulb is OFF (0V Low)");
+  delay(1000); // Wait 1 second
+}`;
+
   const DEFAULT_TRIPWIRE_SKETCH = `// ================================================================
 // Pixiu Cyber-Lab: Laser Security Tripwire Alarm System
 // Microcontroller: ATmega328P @ 16 MHz (Arduino Uno R3)
@@ -619,6 +668,89 @@ void loop() {
 
   delay(100);
 }`;
+
+  const LAB_PROJECTS = {
+    class6_bulb: {
+      id: 'class6_bulb',
+      grade: 'Class 6',
+      title: 'Class 6: Simple Light Bulb Circuit',
+      subtitle: 'Digital Pin 11 • 220Ω Resistor • 5mm LED Bulb Blink',
+      badge: '📘 Class 6 Basics',
+      components: [
+        { id: 'res_1', type: 'resistor', name: '220Ω Resistor', lead1: { row: 10, col: 'c' }, lead2: { row: 15, col: 'c' } },
+        { id: 'led_1', type: 'led', name: '5mm Red LED', color: 'red', lead1: { row: 15, col: 'd' }, lead2: { row: 16, col: 'd' }, isBlown: false }
+      ],
+      wires: [
+        { id: 'w1', fromId: 'ARD_11', toId: 'BB_10_a', fromLabel: 'Pin 11', toLabel: 'Row 10', color: '#3B82F6' },
+        { id: 'w2', fromId: 'BB_16_e', toId: 'ARD_GND', fromLabel: 'Row 16', toLabel: 'GND', color: '#0F172A' }
+      ],
+      blocks: [
+        { id: 'b1', type: 'set_pin', pin: '11', state: 'HIGH' },
+        { id: 'b2', type: 'wait', duration: 1.0 },
+        { id: 'b3', type: 'set_pin', pin: '11', state: 'LOW' },
+        { id: 'b4', type: 'wait', duration: 1.0 }
+      ],
+      cppCode: DEFAULT_CLASS6_SKETCH
+    },
+    class7_laser: {
+      id: 'class7_laser',
+      grade: 'Class 7',
+      title: 'Class 7: Laser Security Tripwire Alarm',
+      subtitle: 'KY-008 Laser • CdS Photoresistor • Piezo Buzzer • Red Warning Light',
+      badge: '🚀 Class 7 Advanced',
+      components: [
+        { id: 'res_1', type: 'resistor', name: '220Ω Resistor', lead1: { row: 10, col: 'c' }, lead2: { row: 15, col: 'c' } },
+        { id: 'led_1', type: 'led', name: '5mm Red LED', color: 'red', lead1: { row: 15, col: 'd' }, lead2: { row: 16, col: 'd' }, isBlown: false },
+        { id: 'laser_1', type: 'laser', name: 'KY-008 Laser', lead1: { row: 6, col: 'b' }, lead2: { row: 7, col: 'b' } },
+        { id: 'ldr_1', type: 'ldr', name: 'CdS LDR Sensor', lead1: { row: 6, col: 'i' }, lead2: { row: 7, col: 'i' } },
+        { id: 'buzzer_1', type: 'buzzer', name: 'Piezo Buzzer', lead1: { row: 22, col: 'c' }, lead2: { row: 24, col: 'c' } }
+      ],
+      wires: [
+        { id: 'w1', fromId: 'ARD_11', toId: 'BB_10_a', fromLabel: 'Pin 11', toLabel: 'Row 10', color: '#3B82F6' },
+        { id: 'w2', fromId: 'BB_16_e', toId: 'ARD_GND', fromLabel: 'Row 16', toLabel: 'GND', color: '#0F172A' },
+        { id: 'w3', fromId: 'ARD_9', toId: 'BB_6_a', fromLabel: 'Pin 9', toLabel: 'Row 6', color: '#EF4444' },
+        { id: 'w4', fromId: 'BB_7_a', toId: 'ARD_GND', fromLabel: 'Row 7', toLabel: 'GND', color: '#0F172A' },
+        { id: 'w5', fromId: 'ARD_8', toId: 'BB_22_b', fromLabel: 'Pin 8', toLabel: 'Row 22', color: '#F59E0B' },
+        { id: 'w6', fromId: 'BB_24_b', toId: 'ARD_GND', fromLabel: 'Row 24', toLabel: 'GND', color: '#0F172A' }
+      ],
+      blocks: [
+        { id: 'b1', type: 'set_pin', pin: '9', state: 'HIGH' },
+        { 
+          id: 'b_tripwire', 
+          type: 'tripwire_logic', 
+          laserPin: '9', 
+          ldrPin: 'A0', 
+          thenPin1: '11', thenState1: 'HIGH', 
+          thenPin2: '8', thenState2: 'HIGH', 
+          elsePin1: '11', elseState1: 'LOW', 
+          elsePin2: '8', elseState2: 'LOW' 
+        }
+      ],
+      cppCode: DEFAULT_TRIPWIRE_SKETCH
+    }
+  };
+
+  const [currentProjectId, setCurrentProjectId] = useState('class7_laser');
+
+  const loadProject = (projId) => {
+    getAudioContext();
+    const proj = LAB_PROJECTS[projId];
+    if (!proj) return;
+    setIsRunning(false);
+    setActiveBlockIndex(-1);
+    setRunTimeSec(0);
+    setPinStates(prev => ({ ...prev, '13': false, '12': false, '11': false, '10': false, '9': false, '8': false }));
+    stopBuzzerContinuous();
+    setIsBeamBlocked(false);
+
+    setCurrentProjectId(projId);
+    setComponents(proj.components);
+    setWires(proj.wires);
+    setBlocks(proj.blocks);
+    setEditableCppCode(proj.cppCode);
+    setSerialLogs([`[System] Loaded ${proj.title}`]);
+    showToast(`Loaded ${proj.title}!`, `${proj.grade} Project Active`, 'success');
+  };
 
   // ==================== VISUAL BLOCK CODING STATE ====================
   const [blocks, setBlocks] = useState([
@@ -1097,11 +1229,11 @@ ${loopCode}}`;
       )}
 
       {/* ==================== CLEAN TOP NAVIGATION NAVBAR ==================== */}
-      <header className="bg-slate-900/95 border-b border-slate-800 px-3 sm:px-6 py-2.5 flex items-center justify-between sticky top-0 z-40 backdrop-blur-md">
-        <div className="flex items-center gap-2.5">
+      <header className="bg-slate-900/95 border-b border-slate-800 px-3 sm:px-6 py-2 flex flex-wrap items-center justify-between sticky top-0 z-40 backdrop-blur-md gap-2">
+        <div className="flex items-center gap-2">
           <Link 
             to={activeRole === 'student' ? '/student-portal' : activeRole === 'school' ? '/school-portal' : activeRole === 'trainer' ? '/trainers' : '/'}
-            className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl border border-slate-700 transition-colors flex items-center gap-1 text-xs font-bold mr-1 cursor-pointer"
+            className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl border border-slate-700 transition-colors flex items-center gap-1 text-xs font-bold cursor-pointer"
           >
             <ArrowLeft size={14} />
             <span className="hidden sm:inline">Portal</span>
@@ -1112,20 +1244,19 @@ ${loopCode}}`;
           </div>
 
           <div>
-            <h1 className="text-xs sm:text-sm font-black text-white tracking-tight flex items-center gap-1.5">
-              <Cpu size={15} className="text-pixiu-blue" />
-              Pixiu Cyber-Lab • Multi-Component Studio
+            <h1 className="text-xs sm:text-sm font-black text-white tracking-tight flex items-center gap-1.5 truncate">
+              <Cpu size={14} className="text-pixiu-blue shrink-0" />
+              <span className="truncate">{LAB_PROJECTS[currentProjectId]?.title || 'Pixiu Cyber-Lab Studio'}</span>
             </h1>
-            <p className="text-[9px] sm:text-[10px] text-slate-400 font-mono truncate max-w-[160px] sm:max-w-none">
-              Laser Tripwire • Piezo Buzzer • Dual-Lead Sockets
+            <p className="text-[9px] sm:text-[10px] text-slate-400 font-mono truncate max-w-[170px] sm:max-w-none">
+              {LAB_PROJECTS[currentProjectId]?.subtitle || 'Multi-Component Robotics Lab'}
             </p>
           </div>
         </div>
 
         {/* Master Action Controls */}
-        <div className="flex items-center gap-2">
-          
-          {/* 💡 ROOM LIGHT SWITCH (DAY / DARK ROOM) */}
+        <div className="flex items-center gap-1.5 sm:gap-2 ml-auto">
+          {/* 💡 ROOM LIGHT SWITCH */}
           <button
             onClick={() => {
               setIsRoomLightOn(!isRoomLightOn);
@@ -1136,23 +1267,23 @@ ${loopCode}}`;
                 ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm' 
                 : 'bg-indigo-950/80 text-cyan-300 border-cyan-500/40 shadow-[0_0_12px_rgba(6,182,212,0.3)]'
             }`}
-            title={isRoomLightOn ? 'Switch to Dark Room (Enhances Laser & LED Glow)' : 'Turn Room Lights ON'}
+            title={isRoomLightOn ? 'Switch to Dark Room' : 'Turn Room Lights ON'}
           >
-            {isRoomLightOn ? <Sun size={14} className="text-amber-400" /> : <Moon size={14} className="text-cyan-400 animate-pulse" />}
+            {isRoomLightOn ? <Sun size={13} className="text-amber-400" /> : <Moon size={13} className="text-cyan-400 animate-pulse" />}
             <span className="hidden md:inline text-[11px]">{isRoomLightOn ? 'Light: ON' : 'Dark Lab'}</span>
           </button>
 
-          {/* 🔔 TEST BUZZER BEEP BUTTON */}
+          {/* 🔔 TEST BUZZER BEEP */}
           <button
             onClick={testBuzzerBeep}
-            className="px-2.5 sm:px-3 py-1.5 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 rounded-xl border border-yellow-500/40 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-sm active:scale-95"
+            className="px-2 sm:px-2.5 py-1.5 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 rounded-xl border border-yellow-500/40 text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow-sm active:scale-95"
             title="Click to test 2,400 Hz Piezo Buzzer sound directly"
           >
-            <BellRing size={13} className="text-yellow-400" />
-            <span className="text-[11px]">Test Beep</span>
+            <BellRing size={12} className="text-yellow-400" />
+            <span className="text-[11px] hidden sm:inline">Beep</span>
           </button>
 
-          {/* Sound Mute / Unmute Toggle */}
+          {/* Sound Mute / Unmute */}
           <button
             onClick={() => {
               setIsSoundMuted(!isSoundMuted);
@@ -1166,17 +1297,7 @@ ${loopCode}}`;
             }`}
             title={isSoundMuted ? 'Unmute Audio Beeps' : 'Mute Audio Beeps'}
           >
-            {isSoundMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
-          </button>
-
-          {/* Preset Switcher */}
-          <button
-            onClick={handleLoadLaserTripwirePreset}
-            className="px-2 sm:px-2.5 py-1.5 bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 rounded-xl border border-indigo-500/40 text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
-            title="Load Laser Security Tripwire System (Laser + LDR + Buzzer)"
-          >
-            <Crosshair size={13} className="text-cyan-400" />
-            <span className="hidden md:inline text-[11px]">Preset</span>
+            {isSoundMuted ? <VolumeX size={13} /> : <Volume2 size={13} />}
           </button>
 
           <button
@@ -1217,30 +1338,88 @@ ${loopCode}}`;
         </div>
       </header>
 
+      {/* ==================== MULTI-PROJECT CURRICULUM SELECTOR ==================== */}
+      <div className="bg-[#0b101f] border-b border-slate-800 px-3 sm:px-6 py-2 flex flex-wrap items-center justify-between gap-2 z-30">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 shrink-0">
+            <GraduationCap size={14} className="text-pixiu-blue" />
+            <span>Select Project:</span>
+          </span>
+
+          <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800 flex-wrap">
+            <button
+              onClick={() => loadProject('class6_bulb')}
+              className={`px-3 py-1 rounded-lg text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
+                currentProjectId === 'class6_bulb'
+                  ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 scale-100'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <span>💡 Class 6: Light Bulb</span>
+            </button>
+
+            <button
+              onClick={() => loadProject('class7_laser')}
+              className={`px-3 py-1 rounded-lg text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
+                currentProjectId === 'class7_laser'
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/30 scale-100'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <span>🚨 Class 7: Laser Security</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-mono font-bold text-cyan-300 bg-cyan-950/60 border border-cyan-800/40 px-2.5 py-0.5 rounded-full hidden sm:inline">
+            {LAB_PROJECTS[currentProjectId]?.grade || 'Class 7'} Standard Curriculum
+          </span>
+        </div>
+      </div>
+
       {/* ==================== MOBILE SCREEN SWITCHER TABS (< 1024px) ==================== */}
-      <div className="lg:hidden bg-slate-950 border-b border-slate-800 px-3 py-2 flex items-center justify-center gap-2 sticky top-[49px] z-30">
+      <div className="lg:hidden bg-slate-950 border-b border-slate-800 px-2.5 py-1.5 flex items-center justify-center gap-1.5 sticky top-[48px] z-30">
         <button
           onClick={() => setMobileTab('workbench')}
-          className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+          className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer ${
             mobileTab === 'workbench'
               ? 'bg-pixiu-blue text-white shadow-md shadow-blue-500/20'
               : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
           }`}
         >
           <Wrench size={13} />
-          <span>3D Hardware Workbench</span>
+          <span>Circuit</span>
         </button>
 
         <button
-          onClick={() => setMobileTab('blocks')}
-          className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-            mobileTab === 'blocks'
+          onClick={() => {
+            setMobileTab('blocks');
+            setShowCppCode(false);
+          }}
+          className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer ${
+            mobileTab === 'blocks' && !showCppCode
               ? 'bg-pixiu-blue text-white shadow-md shadow-blue-500/20'
               : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
           }`}
         >
           <Puzzle size={13} />
-          <span>Visual Block Studio</span>
+          <span>Blocks</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setMobileTab('blocks');
+            setShowCppCode(true);
+          }}
+          className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer ${
+            mobileTab === 'blocks' && showCppCode
+              ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20'
+              : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+          }`}
+        >
+          <Code size={13} />
+          <span>C++ Code</span>
         </button>
       </div>
 
@@ -1421,10 +1600,41 @@ ${loopCode}}`;
           </div>
 
           {/* ================= WORKBENCH CANVAS ================= */}
-          <div className="flex-1 p-3 sm:p-6 overflow-x-auto">
-            <div 
-              ref={workbenchRef}
-              className={`relative min-w-[980px] min-h-[640px] flex items-center justify-around gap-8 p-6 rounded-3xl border transition-all duration-500 ${
+          <div className="flex-1 p-2 sm:p-6 overflow-auto flex flex-col items-center">
+            {/* Mobile View Mode Controller */}
+            <div className="lg:hidden w-full max-w-md flex items-center justify-between px-3 py-1.5 mb-2 bg-slate-900/90 border border-slate-800 rounded-xl text-xs z-20">
+              <span className="text-[11px] text-slate-300 font-bold flex items-center gap-1.5">
+                <span>📱 Phone View:</span>
+                <span className="text-cyan-400 font-mono">
+                  {mobileZoomMode === 'fit' ? `Fit to Screen (${Math.round(mobileScale * 100)}%)` : '100% Full Scale'}
+                </span>
+              </span>
+              <button
+                onClick={() => {
+                  const next = mobileZoomMode === 'fit' ? 'full' : 'fit';
+                  setMobileZoomMode(next);
+                  showToast(next === 'fit' ? 'Workbench fitted to screen.' : '100% full scale enabled. Pan/scroll to explore.', 'Display Mode', 'info');
+                }}
+                className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-cyan-300 rounded-lg border border-slate-700 font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+              >
+                {mobileZoomMode === 'fit' ? <Maximize2 size={12} /> : <Minimize2 size={12} />}
+                <span>{mobileZoomMode === 'fit' ? '🔍 1:1 Zoom' : '📱 Fit Screen'}</span>
+              </button>
+            </div>
+
+            {/* Responsive Scale Wrapper */}
+            <div
+              style={{
+                transform: windowWidth < 1024 && mobileZoomMode === 'fit' ? `scale(${mobileScale})` : 'none',
+                transformOrigin: 'top center',
+                width: windowWidth < 1024 && mobileZoomMode === 'fit' ? `${980 * mobileScale}px` : undefined,
+                height: windowWidth < 1024 && mobileZoomMode === 'fit' ? `${640 * mobileScale}px` : undefined
+              }}
+              className="transition-all duration-300 overflow-visible shrink-0"
+            >
+              <div 
+                ref={workbenchRef}
+                className={`relative min-w-[980px] min-h-[640px] flex items-center justify-around gap-8 p-6 rounded-3xl border transition-all duration-500 ${
                 isRoomLightOn 
                   ? 'border-slate-800/80 bg-slate-950/40 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:24px_24px]' 
                   : 'border-cyan-900/40 bg-[#02050E] shadow-[inset_0_0_80px_rgba(0,0,0,0.9)] bg-[radial-gradient(#0f172a_1px,transparent_1px)] [background-size:24px_24px]'
@@ -2186,6 +2396,8 @@ ${loopCode}}`;
               </div>
 
             </div>
+
+          </div>
 
           </div>
 
