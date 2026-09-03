@@ -6,6 +6,22 @@
   --color-pixiu-cyan: #00D2FF;
   --color-pixiu-gold: #C9A227;
   --color-pixiu-gray: #F7F8FA;
+  --color-background: #0f172a;
+  --color-foreground: #f8fafc;
+  --color-card: #1e293b;
+  --color-card-foreground: #f8fafc;
+  --color-border: #334155;
+  --color-sidebar: #131d31;
+  --color-sidebar-foreground: #f8fafc;
+  --color-muted: #1e293b;
+  --color-muted-foreground: #94a3b8;
+  --color-accent: #38bdf8;
+  --color-accent-foreground: #0f172a;
+  --color-primary: #00878F;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #253349;
+  --color-secondary-foreground: #f8fafc;
+  --color-destructive: #ef4444;
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 }

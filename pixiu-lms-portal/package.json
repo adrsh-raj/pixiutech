@@ -11,6 +11,9 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
+    "@tensorflow-models/coco-ssd": "^2.2.3",
+    "@tensorflow/tfjs": "^4.22.0",
+    "blockly": "^13.2.1",
     "lucide-react": "^1.37.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
