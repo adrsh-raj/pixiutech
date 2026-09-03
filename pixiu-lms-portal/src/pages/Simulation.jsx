@@ -5,7 +5,7 @@ import {
   Terminal, ShieldAlert, Lock, ArrowLeft, Sparkles, CheckCircle2, 
   AlertTriangle, Info, Eye, Sliders, Layers, ChevronDown, ChevronRight,
   ExternalLink, Download, Compass, Zap, Plus, Trash2, Code, Puzzle,
-  Maximize2, X, Activity, Radio, HelpCircle, ArrowRight
+  Maximize2, X, Activity, Radio, HelpCircle, ArrowRight, Clock
 } from 'lucide-react';
 
 export default function Simulation() {
