@@ -1,24 +1,16 @@
 import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
+
 const colorMapping = {
-  blue: 'bg-blue-50 text-blue-600 border-blue-100',
-  emerald: 'bg-emerald-50 text-emerald-600 border-emerald-100',
-  amber: 'bg-amber-50 text-amber-600 border-amber-100',
-  rose: 'bg-rose-50 text-rose-600 border-rose-100',
-  violet: 'bg-violet-50 text-violet-600 border-violet-100',
-  slate: 'bg-slate-100 text-slate-600 border-slate-200'
+  blue:    { icon: 'bg-blue-500/10 text-blue-600 ring-1 ring-blue-500/20', accent: 'from-blue-500 to-cyan-400' },
+  emerald: { icon: 'bg-emerald-500/10 text-emerald-600 ring-1 ring-emerald-500/20', accent: 'from-emerald-500 to-teal-400' },
+  amber:   { icon: 'bg-amber-500/10 text-amber-600 ring-1 ring-amber-500/20', accent: 'from-amber-500 to-orange-400' },
+  rose:    { icon: 'bg-rose-500/10 text-rose-600 ring-1 ring-rose-500/20', accent: 'from-rose-500 to-pink-400' },
+  violet:  { icon: 'bg-violet-500/10 text-violet-600 ring-1 ring-violet-500/20', accent: 'from-violet-500 to-purple-400' },
+  slate:   { icon: 'bg-slate-100 text-slate-600 ring-1 ring-slate-200', accent: 'from-slate-400 to-slate-300' }
 };
 
 /**
  * Reusable KPI Card Component
- * 
- * @param {React.ReactNode} icon - Icon to display
- * @param {string} label - The label/title of the KPI
- * @param {string|number} value - The main value to display
- * @param {string} subtext - Optional secondary text below value
- * @param {'up'|'down'} trend - Optional trend direction
- * @param {string} trendValue - Optional trend value (e.g., "12%")
- * @param {'blue'|'emerald'|'amber'|'rose'|'violet'|'slate'} color - The color theme for the icon badge
- * @param {function} onClick - Optional click handler
  */
 export default function KpiCard({
   icon,
@@ -31,29 +23,38 @@ export default function KpiCard({
   onClick
 }) {
   const isClickable = typeof onClick === 'function';
-  
+  const theme = colorMapping[color] || colorMapping.blue;
+
   return (
-    <div 
-      className={`bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 ${isClickable ? 'cursor-pointer hover:shadow-md transition-all hover:-translate-y-0.5' : ''}`}
+    <div
+      className={`relative bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden group ${
+        isClickable ? 'cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all duration-200' : ''
+      }`}
       onClick={isClickable ? onClick : undefined}
     >
-      <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 border ${colorMapping[color]}`}>
-        {icon}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-0.5 truncate">{label}</p>
-        <div className="flex items-baseline gap-2">
-          <p className="text-2xl font-bold text-slate-800 truncate">{value}</p>
-          {trend && trendValue && (
-            <span className={`text-[10px] font-bold flex items-center ${trend === 'up' ? 'text-emerald-600' : 'text-rose-600'}`}>
-              {trend === 'up' ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
-              {trendValue}
-            </span>
-          )}
+      {/* Top accent gradient line */}
+      <div className={`absolute top-0 inset-x-0 h-[2px] bg-gradient-to-r ${theme.accent} opacity-80`} />
+      
+      <div className="p-5 sm:p-6 flex items-center gap-4">
+        <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${theme.icon}`}>
+          {icon}
         </div>
-        {subtext && <p className="text-[11px] text-slate-500 mt-0.5 truncate">{subtext}</p>}
+        <div className="flex-1 min-w-0">
+          <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider mb-1 truncate">{label}</p>
+          <div className="flex items-baseline gap-2">
+            <p className="text-2xl font-extrabold text-slate-800 tracking-tight truncate">{value}</p>
+            {trend && trendValue && (
+              <span className={`text-[10px] font-bold flex items-center gap-0.5 px-1.5 py-0.5 rounded-md ${
+                trend === 'up' ? 'text-emerald-700 bg-emerald-50' : 'text-rose-700 bg-rose-50'
+              }`}>
+                {trend === 'up' ? <ArrowUpRight size={11} /> : <ArrowDownRight size={11} />}
+                {trendValue}
+              </span>
+            )}
+          </div>
+          {subtext && <p className="text-[11px] text-slate-500 mt-0.5 truncate">{subtext}</p>}
+        </div>
       </div>
     </div>
   );
 }
-
