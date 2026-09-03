@@ -574,7 +574,7 @@ export default function Simulation() {
   // ==================== VISUAL BLOCK CODING STATE ====================
   const [blocks, setBlocks] = useState([
     { id: 'b1', type: 'set_pin', pin: '9', state: 'HIGH' },   // Laser ON (Arm Tripwire)
-    { id: 'b2', type: 'wait', duration: 1.0 }
+    { id: 'b_tripwire', type: 'tripwire_logic', laserPin: '9', ldrPin: 'A0', ledPin: '11', buzzerPin: '8' }
   ]);
   const [repeatLoop, setRepeatLoop] = useState(true);
   const [activeBlockIndex, setActiveBlockIndex] = useState(-1);
@@ -583,8 +583,10 @@ export default function Simulation() {
   const addBlock = (type) => {
     if (type === 'set_pin') {
       setBlocks(prev => [...prev, { id: 'b_' + Date.now(), type: 'set_pin', pin: '11', state: 'HIGH' }]);
-    } else {
+    } else if (type === 'wait') {
       setBlocks(prev => [...prev, { id: 'b_' + Date.now(), type: 'wait', duration: 1.0 }]);
+    } else if (type === 'tripwire_logic') {
+      setBlocks(prev => [...prev, { id: 'b_tripwire_' + Date.now(), type: 'tripwire_logic', laserPin: '9', ldrPin: 'A0', ledPin: '11', buzzerPin: '8' }]);
     }
   };
 
@@ -613,12 +615,12 @@ export default function Simulation() {
 
     // 1. LED (Red Light)
     if (comp.type === 'led') {
-      // In laser security tripwire mode: if beam is aligned & blocked, RED LIGHT TURNS ON!
-      if (circuitAnalysis.opticalAligned && isBeamBlocked && comp.color === 'red') {
+      // In laser security tripwire mode: if beam is blocked, RED LIGHT TURNS ON!
+      if (isBeamBlocked && comp.color === 'red') {
         return true;
       }
-      // If beam is not blocked and optical security is active, Red Light stays OFF (Perimeter secure)
-      if (circuitAnalysis.opticalAligned && !isBeamBlocked && comp.color === 'red') {
+      // If beam is not blocked, Red Light stays OFF (Perimeter secure)
+      if (!isBeamBlocked && comp.color === 'red') {
         return false;
       }
       return Boolean(pinStates[stat.sourcePin]) && !comp.isBlown && !stat.isOvercurrent;
@@ -626,17 +628,17 @@ export default function Simulation() {
 
     // 2. KY-008 Laser Diode
     if (comp.type === 'laser') {
-      return Boolean(pinStates[stat.sourcePin]);
+      return Boolean(pinStates[stat.sourcePin]) || true; // Laser emits while simulation is active
     }
 
     // 3. Piezo Buzzer
     if (comp.type === 'buzzer') {
       // If tripwire beam is blocked: BUZZER BEEPS!
-      if (circuitAnalysis.opticalAligned && isBeamBlocked) {
+      if (isBeamBlocked) {
         return true;
       }
       // If tripwire beam is NOT blocked: Buzzer stays silent
-      if (circuitAnalysis.opticalAligned && !isBeamBlocked) {
+      if (!isBeamBlocked) {
         return false;
       }
       return Boolean(pinStates[stat.sourcePin]);
@@ -728,6 +730,15 @@ export default function Simulation() {
           currentStep++;
           timeoutId = setTimeout(executeNextBlock, ms);
         }
+        else if (block.type === 'tripwire_logic') {
+          if (isBeamBlocked) {
+            setSerialLogs(prev => [...prev.slice(-30), `[🚨 TRIPWIRE ALARM] Obstacle detected! Red Light ON, Piezo Buzzer BEEPING at 2400Hz!`]);
+          } else {
+            setSerialLogs(prev => [...prev.slice(-30), `[🟢 PERIMETER SECURE] Laser beam intact on LDR (100Ω). Red Light OFF, Buzzer Silent.`]);
+          }
+          currentStep++;
+          timeoutId = setTimeout(executeNextBlock, 500);
+        }
       };
 
       executeNextBlock();
@@ -741,7 +752,7 @@ export default function Simulation() {
       if (timeoutId) clearTimeout(timeoutId);
       if (timerId) clearInterval(timerId);
     };
-  }, [isRunning, blocks, repeatLoop, circuitAnalysis]);
+  }, [isRunning, blocks, repeatLoop, circuitAnalysis, isBeamBlocked]);
 
   const handleToggleRun = () => {
     getAudioContext();
@@ -772,6 +783,59 @@ export default function Simulation() {
 
   // Generated C++ Sketch
   const generatedCppCode = useMemo(() => {
+    const hasTripwireBlock = blocks.some(b => b.type === 'tripwire_logic');
+
+    if (hasTripwireBlock) {
+      return `// ================================================================
+// Pixiu Cyber-Lab: Laser Security Tripwire Alarm System
+// Microcontroller: ATmega328P @ 16 MHz (Arduino Uno R3)
+// ================================================================
+
+const int PIN_LASER = 9;   // KY-008 Laser Diode Emitter
+const int PIN_LDR   = A0;  // CdS Photoresistor Sensor
+const int PIN_LED   = 11;  // Red Warning Light (with 220Ω Resistor)
+const int PIN_BUZZER = 8;  // Piezo Buzzer Transducer (2400Hz)
+
+const int LIGHT_THRESHOLD = 400; // Threshold between light and shadow
+
+void setup() {
+  pinMode(PIN_LASER, OUTPUT);
+  pinMode(PIN_LED, OUTPUT);
+  pinMode(PIN_BUZZER, OUTPUT);
+  pinMode(PIN_LDR, INPUT);
+
+  // Turn ON Laser Diode, aiming directly at the Photoresistor
+  digitalWrite(PIN_LASER, HIGH);
+
+  Serial.begin(9600);
+  Serial.println("=========================================");
+  Serial.println("   PIXIU LASER SECURITY SYSTEM ARMED    ");
+  Serial.println("=========================================");
+}
+
+void loop() {
+  // Read analog light level from CdS Photoresistor (0 to 1023)
+  int ldrValue = analogRead(PIN_LDR);
+
+  // IF an obstacle/intruder blocks the laser beam:
+  if (ldrValue < LIGHT_THRESHOLD) {
+    digitalWrite(PIN_LED, HIGH);  // Turn ON Red Light
+    tone(PIN_BUZZER, 2400);       // Sound Piezo Buzzer Alarm (2400Hz BEEP)
+    Serial.print("[🚨 ALARM] Obstacle Detected! LDR: ");
+    Serial.println(ldrValue);
+  } 
+  // ELSE (Laser beam is intact and pointing into Photoresistor):
+  else {
+    digitalWrite(PIN_LED, LOW);   // Turn OFF Red Light
+    noTone(PIN_BUZZER);           // Silence Buzzer
+    Serial.print("[🟢 SECURE] Beam Intact. LDR: ");
+    Serial.println(ldrValue);
+  }
+
+  delay(100);
+}`;
+    }
+
     let loopCode = '';
     blocks.forEach(b => {
       if (b.type === 'set_pin') {
@@ -787,6 +851,7 @@ void setup() {
   pinMode(11, OUTPUT);
   pinMode(9, OUTPUT);  // KY-008 Laser Diode
   pinMode(8, OUTPUT);  // Piezo Buzzer
+  digitalWrite(9, HIGH);
   Serial.begin(9600);
 }
 
@@ -1479,15 +1544,25 @@ ${loopCode}}`;
 
                   // ==================== COMPONENT: KY-008 LASER DIODE (2 PHYSICAL LEGS!) ====================
                   if (comp.type === 'laser') {
+                    // Calculate aim angle directly pointing to LDR
+                    const targetLdr = components.find(c => c.type === 'ldr');
+                    const tLdrP1 = targetLdr ? terminalCoords[`BB_${targetLdr.lead1.row}_${targetLdr.lead1.col}`] : null;
+                    const tLdrP2 = targetLdr ? terminalCoords[`BB_${targetLdr.lead2.row}_${targetLdr.lead2.col}`] : null;
+                    const tLdrX = tLdrP1 && tLdrP2 ? (tLdrP1.x + tLdrP2.x) / 2 : tLdrP1 ? tLdrP1.x : midX + 150;
+                    const tLdrY = tLdrP1 && tLdrP2 ? (tLdrP1.y + tLdrP2.y) / 2 - 24 : tLdrP1 ? tLdrP1.y - 24 : midY - 22;
+
+                    const aimAngleDeg = Math.atan2(tLdrY - (midY - 22), tLdrX - midX) * (180 / Math.PI);
+
                     return (
                       <g key={comp.id} className="pointer-events-auto cursor-pointer group" onClick={() => removeComponent(comp.id)}>
-                        <title>KY-008 Laser Diode (Anode Row {comp.lead1.row}, Cathode Row {comp.lead2.row}). Click to pull.</title>
+                        <title>KY-008 Laser Diode (Pointing directly to LDR). Click to pull.</title>
 
                         {/* TRUE 2 PHYSICAL SILVER LEADS */}
                         <path d={`M ${p1.x} ${p1.y} L ${midX - 8} ${midY - 12}`} stroke="#CBD5E1" strokeWidth="2.5" strokeLinecap="round" />
                         <path d={`M ${p2.x} ${p2.y} L ${midX + 8} ${midY - 12}`} stroke="#94A3B8" strokeWidth="2.5" strokeLinecap="round" />
 
-                        <g transform={`translate(${midX}, ${midY - 22})`}>
+                        {/* Oriented Barrel Pointing directly towards LDR! */}
+                        <g transform={`translate(${midX}, ${midY - 22}) rotate(${aimAngleDeg})`}>
                           {/* Brass Cylindrical Barrel */}
                           <rect x="-16" y="-10" width="32" height="20" rx="5" fill="#92400E" stroke="#78350F" strokeWidth="1.5" />
                           <circle cx="16" cy="0" r="9" fill="#B45309" stroke="#78350F" strokeWidth="1.5" />
@@ -1513,28 +1588,39 @@ ${loopCode}}`;
                   const p2 = terminalCoords[`BB_${laserComp.lead2.row}_${laserComp.lead2.col}`];
                   if (!p1 || !p2) return null;
 
-                  const midX = (p1.x + p2.x) / 2;
-                  const midY = (p1.y + p2.y) / 2;
-                  const startX = midX + 16;
-                  const startY = midY - 22;
+                  const laserMidX = (p1.x + p2.x) / 2;
+                  const laserMidY = (p1.y + p2.y) / 2;
 
-                  // Find if any LDR is on the same row (Optical Grid Alignment)
-                  const matchingLdr = components.find(c => c.type === 'ldr' && c.lead1.row === laserComp.lead1.row);
-                  const ldrP1 = matchingLdr ? terminalCoords[`BB_${matchingLdr.lead1.row}_${matchingLdr.lead1.col}`] : null;
+                  // Find LDR on board
+                  const targetLdr = components.find(c => c.type === 'ldr');
+                  const tLdrP1 = targetLdr ? terminalCoords[`BB_${targetLdr.lead1.row}_${targetLdr.lead1.col}`] : null;
+                  const tLdrP2 = targetLdr ? terminalCoords[`BB_${targetLdr.lead2.row}_${targetLdr.lead2.col}`] : null;
 
-                  const endX = ldrP1 ? ldrP1.x - 6 : startX + 460;
-                  const endY = startY;
+                  const ldrCenterX = tLdrP1 && tLdrP2 ? (tLdrP1.x + tLdrP2.x) / 2 : tLdrP1 ? tLdrP1.x : laserMidX + 350;
+                  const ldrCenterY = tLdrP1 && tLdrP2 ? (tLdrP1.y + tLdrP2.y) / 2 - 24 : tLdrP1 ? tLdrP1.y - 24 : laserMidY - 22;
 
-                  // Obstacle position if beam is blocked
+                  const dx = ldrCenterX - laserMidX;
+                  const dy = ldrCenterY - (laserMidY - 22);
+                  const angleRad = Math.atan2(dy, dx);
+
+                  const startX = laserMidX + 16 * Math.cos(angleRad);
+                  const startY = (laserMidY - 22) + 16 * Math.sin(angleRad);
+
+                  const endX = ldrCenterX - 10 * Math.cos(angleRad);
+                  const endY = ldrCenterY - 10 * Math.sin(angleRad);
+
                   const blockX = (startX + endX) / 2;
+                  const blockY = (startY + endY) / 2;
+
                   const targetEndX = isBeamBlocked ? blockX : endX;
+                  const targetEndY = isBeamBlocked ? blockY : endY;
 
                   return (
                     <g key={`beam_${laserComp.id}`} className="pointer-events-none">
                       {/* Volumetric Radial Glow (Amplified in Dark Lab Mode) */}
                       <line 
                         x1={startX} y1={startY} 
-                        x2={targetEndX} y2={endY} 
+                        x2={targetEndX} y2={targetEndY} 
                         stroke={isRoomLightOn ? "rgba(239, 68, 68, 0.45)" : "rgba(239, 68, 68, 0.85)"} 
                         strokeWidth={isRoomLightOn ? "9" : "16"} 
                         strokeLinecap="round" 
@@ -1543,7 +1629,7 @@ ${loopCode}}`;
                       {/* Intense Coherent Laser Core */}
                       <line 
                         x1={startX} y1={startY} 
-                        x2={targetEndX} y2={endY} 
+                        x2={targetEndX} y2={targetEndY} 
                         stroke="url(#laser-beam-volumetric)" 
                         strokeWidth="4" 
                         strokeLinecap="round" 
@@ -1552,7 +1638,7 @@ ${loopCode}}`;
                       {/* Razor-sharp White Centerline */}
                       <line 
                         x1={startX} y1={startY} 
-                        x2={targetEndX} y2={endY} 
+                        x2={targetEndX} y2={targetEndY} 
                         stroke="#FFFFFF" 
                         strokeWidth="1.2" 
                         strokeLinecap="round" 
@@ -1564,7 +1650,7 @@ ${loopCode}}`;
 
                       {/* Interactive 3D Physical Obstacle Barrier (when beam is blocked) */}
                       {isBeamBlocked && (
-                        <g transform={`translate(${blockX}, ${endY - 26})`} className="pointer-events-auto cursor-pointer" onClick={() => setIsBeamBlocked(false)}>
+                        <g transform={`translate(${blockX}, ${blockY - 26})`} className="pointer-events-auto cursor-pointer" onClick={() => setIsBeamBlocked(false)}>
                           <title>Obstacle Barrier in Laser Path. Click to remove.</title>
                           {/* Drop shadow */}
                           <rect x="-24" y="-18" width="48" height="52" rx="8" fill="rgba(0,0,0,0.7)" transform="translate(0, 6)" />
@@ -1573,8 +1659,8 @@ ${loopCode}}`;
                           {/* Hazard caution bar */}
                           <rect x="-20" y="-14" width="40" height="8" rx="2" fill="#F59E0B" />
                           {/* Laser hit spark on barrier left face */}
-                          <circle cx="-24" cy="26" r="6" fill="#EF4444" className="animate-ping" />
-                          <circle cx="-24" cy="26" r="2.5" fill="#FFFFFF" />
+                          <circle cx="-16" cy="26" r="6" fill="#EF4444" className="animate-ping" />
+                          <circle cx="-16" cy="26" r="2.5" fill="#FFFFFF" />
                           {/* Hand icon */}
                           <text x="0" y="10" textAnchor="middle" fontSize="18">✋</text>
                           <text x="0" y="26" textAnchor="middle" fontSize="8" fill="#EF4444" fontWeight="black" fontFamily="monospace">BLOCKED</text>
@@ -2067,6 +2153,62 @@ ${loopCode}}`;
                     );
                   }
 
+                  if (block.type === 'tripwire_logic') {
+                    return (
+                      <div 
+                        key={block.id}
+                        className={`rounded-2xl p-3.5 text-xs font-bold border-2 transition-all shadow-xl space-y-2.5 ${
+                          isBeamBlocked 
+                            ? 'bg-gradient-to-br from-rose-950/95 to-slate-950 border-rose-500 shadow-[0_0_25px_rgba(239,68,68,0.4)] animate-pulse' 
+                            : 'bg-gradient-to-br from-indigo-950/90 to-purple-950/90 border-indigo-500/70'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 font-black text-xs text-yellow-300">
+                            <Zap size={15} className={isBeamBlocked ? 'text-rose-400 animate-bounce' : 'text-yellow-400'} />
+                            <span>⚡ IF Obstacle Cuts Laser Beam (LDR &lt; 400):</span>
+                          </div>
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold ${
+                            isBeamBlocked ? 'bg-rose-500 text-white animate-pulse' : 'bg-indigo-500/20 text-indigo-300'
+                          }`}>
+                            {isBeamBlocked ? '🚨 BREACH ACTIVE' : '🛡️ MONITORING'}
+                          </span>
+                        </div>
+
+                        <div className={`pl-3.5 border-l-2 space-y-1.5 py-1 text-xs transition-colors ${
+                          isBeamBlocked ? 'border-rose-400 bg-rose-950/40 rounded-r-xl pr-2' : 'border-rose-500/50'
+                        }`}>
+                          <div className="flex items-center justify-between text-rose-200 font-bold">
+                            <span>💡 Turn ON Red Light (Pin 11)</span>
+                            <span className="px-2 py-0.5 bg-rose-600 text-white rounded text-[10px] font-mono shadow-sm">HIGH (ON)</span>
+                          </div>
+                          <div className="flex items-center justify-between text-yellow-200 font-bold">
+                            <span>🔊 Sound Piezo Buzzer (Pin 8)</span>
+                            <span className="px-2 py-0.5 bg-amber-500 text-slate-950 rounded text-[10px] font-mono shadow-sm font-black">2400Hz BEEP</span>
+                          </div>
+                        </div>
+
+                        <div className="font-black text-xs text-emerald-400 pt-1 flex items-center justify-between">
+                          <span>🛡️ ELSE (Laser Beam Intact on LDR):</span>
+                          <span className="text-[10px] text-slate-400 font-mono">Analog: 980</span>
+                        </div>
+
+                        <div className={`pl-3.5 border-l-2 space-y-1 py-1 text-xs transition-colors ${
+                          !isBeamBlocked ? 'border-emerald-400 bg-emerald-950/20 rounded-r-xl pr-2' : 'border-emerald-500/40'
+                        }`}>
+                          <div className="text-slate-300 font-medium flex items-center justify-between">
+                            <span>🌑 Turn OFF Red Light (Pin 11)</span>
+                            <span className="text-[10px] text-slate-400 font-mono">LOW (OFF)</span>
+                          </div>
+                          <div className="text-slate-300 font-medium flex items-center justify-between">
+                            <span>🔇 Silence Piezo Buzzer (Pin 8)</span>
+                            <span className="text-[10px] text-slate-400 font-mono">LOW (SILENT)</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+
                   return null;
                 })}
               </div>
@@ -2086,7 +2228,7 @@ ${loopCode}}`;
               </div>
 
               {/* Add Blocks Toolbar */}
-              <div className="pt-1 flex items-center gap-2">
+              <div className="pt-1 flex items-center gap-2 flex-wrap">
                 <button
                   onClick={() => addBlock('set_pin')}
                   className="flex-1 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/40 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
@@ -2098,6 +2240,12 @@ ${loopCode}}`;
                   className="flex-1 py-2 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/40 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                 >
                   <Plus size={13} /> + Wait Block
+                </button>
+                <button
+                  onClick={() => addBlock('tripwire_logic')}
+                  className="w-full py-2 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/40 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                >
+                  <Zap size={13} className="text-yellow-400" /> + Tripwire IF/ELSE Logic Block
                 </button>
               </div>
 
