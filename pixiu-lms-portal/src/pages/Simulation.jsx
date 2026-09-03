@@ -4,7 +4,7 @@ import {
   Cpu, Play, Square, RotateCcw, ShieldAlert, Lock, ArrowLeft, 
   CheckCircle2, Eye, Zap, Plus, Trash2, Code, Puzzle, 
   X, Clock, Layers, Wrench, Volume2, VolumeX, Hand,
-  Crosshair, BellRing, Sun, Moon
+  Crosshair, BellRing, Sun, Moon, Copy, Check
 } from 'lucide-react';
 
 export default function Simulation() {
@@ -571,6 +571,55 @@ export default function Simulation() {
     };
   }, [wires, components, isBeamBlocked]);
 
+  const DEFAULT_TRIPWIRE_SKETCH = `// ================================================================
+// Pixiu Cyber-Lab: Laser Security Tripwire Alarm System
+// Microcontroller: ATmega328P @ 16 MHz (Arduino Uno R3)
+// ================================================================
+
+const int PIN_LASER  = 9;   // KY-008 Laser Diode Emitter
+const int PIN_LDR    = A0;  // CdS Photoresistor Sensor
+const int PIN_LED    = 11;  // Red Warning Light (with 220Ω Resistor)
+const int PIN_BUZZER = 8;   // Piezo Buzzer Transducer (2400Hz)
+
+const int LIGHT_THRESHOLD = 400; // Threshold between light and shadow
+
+void setup() {
+  pinMode(PIN_LASER, OUTPUT);
+  pinMode(PIN_LED, OUTPUT);
+  pinMode(PIN_BUZZER, OUTPUT);
+  pinMode(PIN_LDR, INPUT);
+
+  // Turn ON Laser Diode, aiming directly at the Photoresistor
+  digitalWrite(PIN_LASER, HIGH);
+
+  Serial.begin(9600);
+  Serial.println("=========================================");
+  Serial.println("   PIXIU LASER SECURITY SYSTEM ARMED    ");
+  Serial.println("=========================================");
+}
+
+void loop() {
+  // Read analog light level from CdS Photoresistor (0 to 1023)
+  int ldrValue = analogRead(PIN_LDR);
+
+  // IF an obstacle/intruder blocks the laser beam:
+  if (ldrValue < LIGHT_THRESHOLD) {
+    digitalWrite(PIN_LED, HIGH);  // Turn ON Red Light
+    tone(PIN_BUZZER, 2400);       // Sound Piezo Buzzer Alarm (2400Hz BEEP)
+    Serial.print("[🚨 ALARM] Obstacle Detected! LDR: ");
+    Serial.println(ldrValue);
+  } 
+  // ELSE (Laser beam is intact and pointing into Photoresistor):
+  else {
+    digitalWrite(PIN_LED, LOW);   // Turn OFF Red Light
+    noTone(PIN_BUZZER);           // Silence Buzzer
+    Serial.print("[🟢 SECURE] Beam Intact. LDR: ");
+    Serial.println(ldrValue);
+  }
+
+  delay(100);
+}`;
+
   // ==================== VISUAL BLOCK CODING STATE ====================
   const [blocks, setBlocks] = useState([
     { id: 'b1', type: 'set_pin', pin: '9', state: 'HIGH' },   // Laser ON (Arm Tripwire)
@@ -579,6 +628,9 @@ export default function Simulation() {
   const [repeatLoop, setRepeatLoop] = useState(true);
   const [activeBlockIndex, setActiveBlockIndex] = useState(-1);
   const [showCppCode, setShowCppCode] = useState(false);
+  const [editableCppCode, setEditableCppCode] = useState(DEFAULT_TRIPWIRE_SKETCH);
+  const [isCopied, setIsCopied] = useState(false);
+  const [isFlashing, setIsFlashing] = useState(false);
 
   const addBlock = (type) => {
     if (type === 'set_pin') {
@@ -782,7 +834,7 @@ export default function Simulation() {
   const [xrayModalComponent, setXrayModalComponent] = useState(null);
 
   // Generated C++ Sketch
-  const generatedCppCode = useMemo(() => {
+  const _generatedCppCode = useMemo(() => {
     const hasTripwireBlock = blocks.some(b => b.type === 'tripwire_logic');
 
     if (hasTripwireBlock) {
@@ -2088,19 +2140,63 @@ ${loopCode}}`;
           mobileTab === 'blocks' ? 'flex flex-1' : 'hidden lg:flex'
         }`}>
           
-          <div className="bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center justify-between text-xs">
-            <div className="flex items-center gap-2">
-              <Puzzle size={16} className="text-pixiu-blue" />
-              <span className="font-extrabold text-white text-sm">Visual Block Studio</span>
+          <div className="bg-slate-900 border-b border-slate-800 px-3 py-2 flex items-center justify-between text-xs">
+            {/* Dual Tabs: Visual Blocks vs C++ sketch.ino */}
+            <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+              <button
+                onClick={() => setShowCppCode(false)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                  !showCppCode
+                    ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/30'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`}
+              >
+                <Puzzle size={14} />
+                <span>Visual Blocks</span>
+              </button>
+
+              <button
+                onClick={() => setShowCppCode(true)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                  showCppCode
+                    ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-500/30'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`}
+              >
+                <Code size={14} />
+                <span>Arduino C++ (sketch.ino)</span>
+              </button>
             </div>
 
-            <button
-              onClick={() => setShowCppCode(!showCppCode)}
-              className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-bold border border-slate-700 flex items-center gap-1 transition-all cursor-pointer"
-            >
-              <Code size={13} />
-              <span>{showCppCode ? 'Blocks' : 'C++ Code'}</span>
-            </button>
+            {/* If in C++ mode: Copy & Reset tools */}
+            {showCppCode && (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(editableCppCode);
+                    setIsCopied(true);
+                    showToast('Arduino sketch copied to clipboard!', 'Code Copied', 'success');
+                    setTimeout(() => setIsCopied(false), 2000);
+                  }}
+                  className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-[11px] font-bold border border-slate-700 flex items-center gap-1 transition-all cursor-pointer"
+                  title="Copy full Arduino C++ sketch"
+                >
+                  {isCopied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                  <span>{isCopied ? 'Copied' : 'Copy'}</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setEditableCppCode(DEFAULT_TRIPWIRE_SKETCH);
+                    showToast('Reset code to Laser Tripwire Security System template.', 'Template Restored', 'info');
+                  }}
+                  className="p-1 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 rounded-lg border border-slate-700 transition-all cursor-pointer"
+                  title="Reset to default Laser Tripwire sketch"
+                >
+                  <RotateCcw size={12} />
+                </button>
+              </div>
+            )}
           </div>
 
           {!showCppCode ? (
@@ -2314,13 +2410,61 @@ ${loopCode}}`;
 
             </div>
           ) : (
-            <div className="flex-1 p-4 flex flex-col space-y-3 overflow-hidden">
-              <div className="flex items-center justify-between text-xs text-slate-400">
-                <span className="font-mono text-[11px] font-bold text-emerald-400">Auto-Generated sketch.ino</span>
-                <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded font-mono">16MHz AVR GCC</span>
+            <div className="flex-1 p-3 sm:p-4 flex flex-col space-y-2.5 overflow-hidden">
+              {/* Editor Sub-Header */}
+              <div className="flex items-center justify-between text-xs text-slate-400 bg-slate-950 px-3 py-2 rounded-xl border border-slate-800">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span className="font-mono text-[11px] font-bold text-white">sketch.ino (Editable)</span>
+                  <span className="text-[10px] bg-slate-900 border border-slate-700 px-1.5 py-0.5 rounded text-slate-300 font-mono">C++</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-slate-400 font-mono hidden sm:inline">ATmega328P @ 16MHz</span>
+                  <button
+                    onClick={() => {
+                      setIsFlashing(true);
+                      showToast('Compiling sketch with avr-gcc...', 'Compiling...', 'info');
+                      setTimeout(() => {
+                        setIsFlashing(false);
+                        showToast('✓ Binary sketch verified: 2,148 bytes (6% of flash memory). Flashed to ATmega328P!', 'Upload Complete', 'success');
+                        setSerialLogs(prev => [...prev.slice(-30), `[AVR-GCC] Compilation successful: 2148 bytes ROM, 184 bytes RAM.`]);
+                      }, 1000);
+                    }}
+                    disabled={isFlashing}
+                    className="px-2.5 py-1 bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 border border-emerald-500/50 rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+                    title="Simulate verifying & compiling sketch"
+                  >
+                    <Zap size={12} className={isFlashing ? 'animate-spin' : 'text-emerald-400'} />
+                    <span>{isFlashing ? 'Compiling...' : '⚡ Verify & Flash'}</span>
+                  </button>
+                </div>
               </div>
-              <div className="flex-1 bg-slate-950 border border-slate-800 rounded-2xl p-3 font-mono text-xs text-slate-200 overflow-auto shadow-inner leading-relaxed">
-                <pre>{generatedCppCode}</pre>
+
+              {/* IDE Code Editor */}
+              <div className="flex-1 bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden shadow-inner flex flex-col relative group">
+                <textarea
+                  value={editableCppCode}
+                  onChange={(e) => setEditableCppCode(e.target.value)}
+                  spellCheck={false}
+                  className="flex-1 w-full p-4 bg-slate-950/90 font-mono text-[11px] sm:text-xs text-emerald-300 leading-relaxed resize-none focus:outline-none focus:ring-1 focus:ring-emerald-500/50 select-text overflow-auto"
+                  placeholder="// Enter Arduino C++ sketch here..."
+                />
+              </div>
+
+              {/* Serial Output Console */}
+              <div className="pt-1 space-y-1">
+                <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 font-bold uppercase tracking-wider">
+                  <span>Serial Monitor (9600 Baud):</span>
+                  <span className="text-emerald-400 lowercase">connected /dev/ttyACM0</span>
+                </div>
+                <div className="h-20 sm:h-24 bg-slate-950 border border-slate-800 rounded-xl p-2.5 font-mono text-[10px] text-emerald-400 overflow-y-auto space-y-0.5 shadow-inner">
+                  {serialLogs.map((log, i) => (
+                    <div key={i}>{log}</div>
+                  ))}
+                  {serialLogs.length === 0 && (
+                    <div className="text-slate-600 italic">Serial monitor active. Press 'Run Simulation' or 'Place Obstacle'...</div>
+                  )}
+                </div>
               </div>
             </div>
           )}
