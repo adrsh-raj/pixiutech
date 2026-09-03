@@ -3,12 +3,18 @@ import { Link, useNavigate } from 'react-router-dom';
 import { 
   Cpu, Play, Square, RotateCcw, ShieldAlert, Lock, ArrowLeft, 
   Sparkles, CheckCircle2, Eye, Zap, Plus, Trash2, Code, Puzzle, 
-  X, Radio, Clock, Layers, Wrench
+  X, Clock, Layers, Wrench, Volume2, VolumeX, Hand,
+  Crosshair, BellRing
 } from 'lucide-react';
 
 export default function Simulation() {
   const _navigate = useNavigate();
   const workbenchRef = useRef(null);
+
+  // Audio Context references for Piezo Buzzer & Overcurrent Blast
+  const audioCtxRef = useRef(null);
+  const buzzerOscRef = useRef(null);
+  const [isSoundMuted, setIsSoundMuted] = useState(false);
 
   // 1. Direct Portal Session & Role Resolution via localStorage
   const [activeUser] = useState(() => {
@@ -42,27 +48,131 @@ export default function Simulation() {
   const BOT_COLS = useMemo(() => ['f', 'g', 'h', 'i', 'j'], []);
   const POWER_GROUPS = useMemo(() => Array.from({ length: 25 }, (_, i) => i + 1), []);
 
-  // ==================== PLACED COMPONENTS (FREE PLACEMENT ANYWHERE) ====================
+  // ==================== HARDWARE COMPONENTS ====================
+  // 1. Resistor
   const [resistor, setResistor] = useState({
     isPlaced: true,
     lead1: { row: 10, col: 'c' },
     lead2: { row: 15, col: 'c' }
   });
 
+  // 2. 5mm Red LED Bulb
   const [led, setLed] = useState({
     isPlaced: true,
-    anode: { row: 15, col: 'd' },   // Connected to row 15 (shared with resistor!)
-    cathode: { row: 16, col: 'd' }  // Connected to row 16
+    anode: { row: 15, col: 'd' },
+    cathode: { row: 16, col: 'd' }
   });
 
-  // Active Placement Interaction Mode
+  // 3. KY-008 Red Laser Diode Module
+  const [laser, setLaser] = useState({
+    isPlaced: true,
+    pos: { row: 6, col: 'b' }, // Row 6 top
+    gnd: { row: 7, col: 'b' }
+  });
+
+  // 4. CdS Photodetector / LDR (Photoresistor)
+  const [ldr, setLdr] = useState({
+    isPlaced: true,
+    lead1: { row: 6, col: 'i' }, // Row 6 bottom (Aligned with Laser!)
+    lead2: { row: 7, col: 'i' }
+  });
+
+  // 5. Piezo Buzzer (Active Transducer)
+  const [buzzer, setBuzzer] = useState({
+    isPlaced: true,
+    pos: { row: 22, col: 'c' },
+    neg: { row: 22, col: 'd' }
+  });
+
+  // Laser Tripwire Obstacle State (Human Hand / Beam Break)
+  const [isBeamBlocked, setIsBeamBlocked] = useState(false);
+
+  // Active Placement Mode
   const [placementMode, setPlacementMode] = useState(null);
   const [tempPlacementData, setTempPlacementData] = useState(null);
 
+  // ==================== OVERCURRENT BURNOUT & BLAST STATE ====================
+  const [isLedBlown, setIsLedBlown] = useState(false);
+  const [isBlasting, setIsBlasting] = useState(false);
+
+  // Web Audio Pop Sound
+  const playBlastSound = () => {
+    if (isSoundMuted) return;
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(360, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(30, ctx.currentTime + 0.35);
+
+      gain.gain.setValueAtTime(0.5, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start();
+      osc.stop(ctx.currentTime + 0.35);
+    } catch {
+      // Audio suppressed
+    }
+  };
+
+  // Web Audio Piezo Buzzer Tone (2400Hz resonant frequency)
+  const startBuzzerBeep = () => {
+    if (isSoundMuted) return;
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      if (!audioCtxRef.current) {
+        audioCtxRef.current = new AudioCtx();
+      }
+      if (audioCtxRef.current.state === 'suspended') {
+        audioCtxRef.current.resume();
+      }
+      if (!buzzerOscRef.current) {
+        const osc = audioCtxRef.current.createOscillator();
+        const gain = audioCtxRef.current.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(2400, audioCtxRef.current.currentTime);
+        gain.gain.setValueAtTime(0.15, audioCtxRef.current.currentTime);
+        osc.connect(gain);
+        gain.connect(audioCtxRef.current.destination);
+        osc.start();
+        buzzerOscRef.current = osc;
+      }
+    } catch {
+      // Audio suppressed
+    }
+  };
+
+  const stopBuzzerBeep = () => {
+    try {
+      if (buzzerOscRef.current) {
+        buzzerOscRef.current.stop();
+        buzzerOscRef.current.disconnect();
+        buzzerOscRef.current = null;
+      }
+    } catch {
+      // ignore
+    }
+  };
+
   // ==================== FREE PIN-TO-HOLE WIRING ENGINE ====================
   const [wires, setWires] = useState([
-    { id: 'w1', fromId: 'ARD_13', toId: 'BB_10_a', fromLabel: 'Arduino Pin 13', toLabel: 'Breadboard Row 10 (a)', color: '#3B82F6' },
-    { id: 'w2', fromId: 'BB_16_e', toId: 'ARD_GND', fromLabel: 'Breadboard Row 16 (e)', toLabel: 'Arduino GND', color: '#0F172A' }
+    // LED circuit wires
+    { id: 'w1', fromId: 'ARD_11', toId: 'BB_10_a', fromLabel: 'Arduino Pin 11', toLabel: 'Breadboard Row 10 (a)', color: '#3B82F6' },
+    { id: 'w2', fromId: 'BB_16_e', toId: 'ARD_GND', fromLabel: 'Breadboard Row 16 (e)', toLabel: 'Arduino GND', color: '#0F172A' },
+    // Laser wires (Pin 9 -> Laser Row 6, GND -> Row 7)
+    { id: 'w3', fromId: 'ARD_9', toId: 'BB_6_a', fromLabel: 'Arduino Pin 9', toLabel: 'Laser Row 6 (a)', color: '#EF4444' },
+    { id: 'w4', fromId: 'BB_7_a', toId: 'ARD_GND', fromLabel: 'Laser GND Row 7 (a)', toLabel: 'Arduino GND', color: '#0F172A' },
+    // Buzzer wires (Pin 8 -> Buzzer Row 22, GND -> Row 22)
+    { id: 'w5', fromId: 'ARD_8', toId: 'BB_22_b', fromLabel: 'Arduino Pin 8', toLabel: 'Buzzer (+) Row 22 (b)', color: '#F59E0B' },
+    { id: 'w6', fromId: 'BB_22_f', toId: 'ARD_GND', fromLabel: 'Buzzer (-) Row 22 (f)', toLabel: 'Arduino GND', color: '#0F172A' }
   ]);
 
   const [selectedWireColor, setSelectedWireColor] = useState('#3B82F6');
@@ -71,8 +181,8 @@ export default function Simulation() {
   const WIRE_COLORS = [
     { label: 'Blue', hex: '#3B82F6' },
     { label: 'Black (GND)', hex: '#0F172A' },
-    { label: 'Red (5V)', hex: '#EF4444' },
-    { label: 'Yellow', hex: '#F59E0B' },
+    { label: 'Red (5V/Laser)', hex: '#EF4444' },
+    { label: 'Yellow (Buzzer)', hex: '#F59E0B' },
     { label: 'Green', hex: '#10B981' },
     { label: 'Orange', hex: '#F97316' }
   ];
@@ -111,24 +221,25 @@ export default function Simulation() {
       clearTimeout(timer3);
       window.removeEventListener('resize', updateCoordinates);
     };
-  }, [wires, resistor, led, mobileTab]);
+  }, [wires, resistor, led, laser, ldr, buzzer, mobileTab]);
 
   // Click any hole or pin
   const handleTerminalClick = (terminalId, terminalLabel, rowNum = null, colName = null) => {
+    // 1. Resistor placement
     if (placementMode === 'placing_resistor_1') {
       if (!rowNum || !colName) {
-        showToast('Click a breadboard socket hole to plug Resistor Lead 1.', 'Select Hole', 'info');
+        showToast('Click a breadboard hole for Resistor Lead 1.', 'Select Hole', 'info');
         return;
       }
       setTempPlacementData({ row: rowNum, col: colName });
       setPlacementMode('placing_resistor_2');
-      showToast(`Lead 1 set in Row ${rowNum} (${colName}). Now click hole for Lead 2.`, 'Lead 1 Set', 'info');
+      showToast(`Lead 1 placed at Row ${rowNum} (${colName}). Now click hole for Lead 2.`, 'Lead 1 Set', 'info');
       return;
     }
 
     if (placementMode === 'placing_resistor_2') {
       if (!rowNum || !colName) {
-        showToast('Click a breadboard socket hole for Lead 2.', 'Select Hole', 'info');
+        showToast('Click a breadboard hole for Lead 2.', 'Select Hole', 'info');
         return;
       }
       setResistor({
@@ -138,24 +249,25 @@ export default function Simulation() {
       });
       setPlacementMode(null);
       setTempPlacementData(null);
-      showToast(`220Ω Resistor plugged across Row ${tempPlacementData.row} and Row ${rowNum}!`, 'Resistor Placed', 'success');
+      showToast(`220Ω Resistor placed across Row ${tempPlacementData.row} and Row ${rowNum}!`, 'Resistor Placed', 'success');
       return;
     }
 
+    // 2. LED placement
     if (placementMode === 'placing_led_anode') {
       if (!rowNum || !colName) {
-        showToast('Click a breadboard hole for LED Anode (+ long leg).', 'Select Hole', 'info');
+        showToast('Click a breadboard hole for LED Anode (+).', 'Select Hole', 'info');
         return;
       }
       setTempPlacementData({ row: rowNum, col: colName });
       setPlacementMode('placing_led_cathode');
-      showToast(`Anode (+) set in Row ${rowNum} (${colName}). Now click hole for Cathode (- short leg).`, 'Anode Placed', 'info');
+      showToast(`Anode (+) set in Row ${rowNum}. Click hole for Cathode (-).`, 'Anode Set', 'info');
       return;
     }
 
     if (placementMode === 'placing_led_cathode') {
       if (!rowNum || !colName) {
-        showToast('Click a breadboard hole for LED Cathode (- short leg).', 'Select Hole', 'info');
+        showToast('Click a breadboard hole for LED Cathode (-).', 'Select Hole', 'info');
         return;
       }
       setLed({
@@ -163,13 +275,86 @@ export default function Simulation() {
         anode: tempPlacementData,
         cathode: { row: rowNum, col: colName }
       });
+      setIsLedBlown(false);
       setPlacementMode(null);
       setTempPlacementData(null);
-      showToast(`Red LED Bulb plugged: Anode in Row ${tempPlacementData.row}, Cathode in Row ${rowNum}!`, 'LED Placed', 'success');
+      showToast(`LED plugged across Row ${tempPlacementData.row} and Row ${rowNum}!`, 'LED Placed', 'success');
       return;
     }
 
-    // Wiring Mode
+    // 3. Laser placement
+    if (placementMode === 'placing_laser_pos') {
+      if (!rowNum || !colName) {
+        showToast('Click hole for Laser (+/Signal).', 'Select Hole', 'info');
+        return;
+      }
+      setTempPlacementData({ row: rowNum, col: colName });
+      setPlacementMode('placing_laser_gnd');
+      showToast(`Laser (+) placed at Row ${rowNum}. Click hole for GND pin.`, 'Laser Signal Set', 'info');
+      return;
+    }
+
+    if (placementMode === 'placing_laser_gnd') {
+      if (!rowNum || !colName) return;
+      setLaser({
+        isPlaced: true,
+        pos: tempPlacementData,
+        gnd: { row: rowNum, col: colName }
+      });
+      setPlacementMode(null);
+      setTempPlacementData(null);
+      showToast(`Laser Module placed at Row ${tempPlacementData.row}!`, 'Laser Placed', 'success');
+      return;
+    }
+
+    // 4. LDR placement
+    if (placementMode === 'placing_ldr_1') {
+      if (!rowNum || !colName) {
+        showToast('Click hole for LDR Lead 1.', 'Select Hole', 'info');
+        return;
+      }
+      setTempPlacementData({ row: rowNum, col: colName });
+      setPlacementMode('placing_ldr_2');
+      showToast(`LDR Lead 1 at Row ${rowNum}. Click hole for Lead 2 (Match row with Laser for alignment!).`, 'LDR Lead 1 Set', 'info');
+      return;
+    }
+
+    if (placementMode === 'placing_ldr_2') {
+      if (!rowNum || !colName) return;
+      setLdr({
+        isPlaced: true,
+        lead1: tempPlacementData,
+        lead2: { row: rowNum, col: colName }
+      });
+      setPlacementMode(null);
+      setTempPlacementData(null);
+      showToast(`Photodetector placed at Row ${tempPlacementData.row}!`, 'LDR Placed', 'success');
+      return;
+    }
+
+    // 5. Buzzer placement
+    if (placementMode === 'placing_buzzer_pos') {
+      if (!rowNum || !colName) return;
+      setTempPlacementData({ row: rowNum, col: colName });
+      setPlacementMode('placing_buzzer_neg');
+      showToast(`Buzzer (+) at Row ${rowNum}. Click hole for GND.`, 'Buzzer (+) Set', 'info');
+      return;
+    }
+
+    if (placementMode === 'placing_buzzer_neg') {
+      if (!rowNum || !colName) return;
+      setBuzzer({
+        isPlaced: true,
+        pos: tempPlacementData,
+        neg: { row: rowNum, col: colName }
+      });
+      setPlacementMode(null);
+      setTempPlacementData(null);
+      showToast(`Piezo Buzzer placed at Row ${tempPlacementData.row}!`, 'Buzzer Placed', 'success');
+      return;
+    }
+
+    // Standard Wiring Mode
     if (!activeWiringStart) {
       setActiveWiringStart({ id: terminalId, label: terminalLabel });
       showToast(`Wiring from ${terminalLabel}. Click destination terminal.`, 'Wiring Active', 'info');
@@ -214,55 +399,40 @@ export default function Simulation() {
     setWires([]);
     setActiveWiringStart(null);
     setIsRunning(false);
+    stopBuzzerBeep();
     showToast('All wires cleared from workbench.', 'Wires Cleared', 'info');
   };
 
-  const handleAutoWirePreset = () => {
-    setResistor({
-      isPlaced: true,
-      lead1: { row: 10, col: 'c' },
-      lead2: { row: 15, col: 'c' }
-    });
-    setLed({
-      isPlaced: true,
-      anode: { row: 15, col: 'd' },
-      cathode: { row: 16, col: 'd' }
-    });
+  // Presets
+  const handleLoadLaserTripwirePreset = () => {
+    setResistor({ isPlaced: true, lead1: { row: 10, col: 'c' }, lead2: { row: 15, col: 'c' } });
+    setLed({ isPlaced: true, anode: { row: 15, col: 'd' }, cathode: { row: 16, col: 'd' } });
+    setLaser({ isPlaced: true, pos: { row: 6, col: 'b' }, gnd: { row: 7, col: 'b' } });
+    setLdr({ isPlaced: true, lead1: { row: 6, col: 'i' }, lead2: { row: 7, col: 'i' } });
+    setBuzzer({ isPlaced: true, pos: { row: 22, col: 'c' }, neg: { row: 22, col: 'd' } });
+
     setWires([
-      { id: 'w1', fromId: 'ARD_13', toId: 'BB_10_a', fromLabel: 'Arduino Pin 13', toLabel: 'Breadboard Row 10 (a)', color: '#3B82F6' },
-      { id: 'w2', fromId: 'BB_16_e', toId: 'ARD_GND', fromLabel: 'Breadboard Row 16 (e)', toLabel: 'Arduino GND', color: '#0F172A' }
+      { id: 'w1', fromId: 'ARD_11', toId: 'BB_10_a', fromLabel: 'Arduino Pin 11', toLabel: 'Resistor Row 10', color: '#3B82F6' },
+      { id: 'w2', fromId: 'BB_16_e', toId: 'ARD_GND', fromLabel: 'LED Cathode Row 16', toLabel: 'Arduino GND', color: '#0F172A' },
+      { id: 'w3', fromId: 'ARD_9', toId: 'BB_6_a', fromLabel: 'Arduino Pin 9', toLabel: 'Laser (+) Row 6', color: '#EF4444' },
+      { id: 'w4', fromId: 'BB_7_a', toId: 'ARD_GND', fromLabel: 'Laser (-) Row 7', toLabel: 'Arduino GND', color: '#0F172A' },
+      { id: 'w5', fromId: 'ARD_8', toId: 'BB_22_b', fromLabel: 'Arduino Pin 8', toLabel: 'Buzzer (+) Row 22', color: '#F59E0B' },
+      { id: 'w6', fromId: 'BB_22_f', toId: 'ARD_GND', fromLabel: 'Buzzer (-) Row 22', toLabel: 'Arduino GND', color: '#0F172A' }
     ]);
-    setPlacementMode(null);
-    showToast('Standard 220Ω LED Blink circuit auto-configured.', 'Auto-Setup Complete', 'success');
-  };
 
-  // ==================== OVERCURRENT BLAST & BURNOUT STATE ====================
-  const [isLedBlown, setIsLedBlown] = useState(false);
-  const [isBlasting, setIsBlasting] = useState(false);
+    setBlocks([
+      { id: 'b1', type: 'set_pin', pin: '9', state: 'HIGH' },  // Laser ON
+      { id: 'b2', type: 'set_pin', pin: '11', state: 'HIGH' }, // LED ON
+      { id: 'b3', type: 'wait', duration: 1.0 },
+      { id: 'b4', type: 'set_pin', pin: '8', state: 'HIGH' },  // Buzzer BEEP
+      { id: 'b5', type: 'wait', duration: 0.5 },
+      { id: 'b6', type: 'set_pin', pin: '8', state: 'LOW' },   // Buzzer OFF
+      { id: 'b7', type: 'wait', duration: 1.0 }
+    ]);
 
-  const playBlastSound = () => {
-    try {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (!AudioCtx) return;
-      const ctx = new AudioCtx();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(360, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(30, ctx.currentTime + 0.35);
-
-      gain.gain.setValueAtTime(0.5, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-
-      osc.start();
-      osc.stop(ctx.currentTime + 0.35);
-    } catch {
-      // Audio suppressed or blocked by browser policy
-    }
+    setIsBeamBlocked(false);
+    setIsLedBlown(false);
+    showToast('Laser Security Tripwire System loaded (Laser + LDR + Buzzer + LED).', 'Preset Loaded', 'success');
   };
 
   // ==================== UNIVERSAL BREADBOARD GRAPH CIRCUIT SOLVER ====================
@@ -286,14 +456,19 @@ export default function Simulation() {
     return termId;
   };
 
+  // Dynamic Pin Output States
+  const [pinStates, setPinStates] = useState({
+    '13': false,
+    '12': false,
+    '11': false,
+    '10': false,
+    '9': false, // Laser pin default
+    '8': false, // Buzzer pin default
+    '5V': true,
+    '3V3': true
+  });
+
   const circuitAnalysis = useMemo(() => {
-    if (!led.isPlaced) {
-      return { isComplete: false, sourcePin: null, isOvercurrent: false, message: '⚠️ LED Bulb missing! Click "Place LED" to insert into breadboard.', reason: 'no_led' };
-    }
-
-    const ledAnodeNode = getElectricalNode(`BB_${led.anode.row}_${led.anode.col}`);
-    const ledCathodeNode = getElectricalNode(`BB_${led.cathode.row}_${led.cathode.col}`);
-
     const adj = {};
     const addEdge = (u, v) => {
       if (!adj[u]) adj[u] = [];
@@ -328,121 +503,132 @@ export default function Simulation() {
       return false;
     };
 
-    // Dynamic Power Source Pins (Pin 0 to 13, 5V, 3.3V)
-    const possiblePowerPins = [
-      'ARD_13', 'ARD_12', 'ARD_11', 'ARD_10', 'ARD_9', 'ARD_8',
-      'ARD_7', 'ARD_6', 'ARD_5', 'ARD_4', 'ARD_3', 'ARD_2', 'ARD_1', 'ARD_0',
-      'ARD_5V', 'ARD_3V3'
-    ];
+    const powerPins = ['ARD_13', 'ARD_12', 'ARD_11', 'ARD_10', 'ARD_9', 'ARD_8', 'ARD_5V', 'ARD_3V3'];
 
-    const cathodeToGnd = isConnected(ledCathodeNode, 'ARD_GND') || isConnected(ledCathodeNode, 'ARD_GND2') || isConnected(ledCathodeNode, 'ARD_GND_TOP');
+    // 1. LED Circuit Analysis
+    let ledConnectedPin = null;
+    let isLedOvercurrent = false;
+    let isLedLoopClosed = false;
 
-    // CASE 1: DIRECT OVERCURRENT CONNECTION (Pin -> LED Anode directly without resistor!)
-    let directPowerPin = null;
-    for (const p of possiblePowerPins) {
-      if (isConnected(p, ledAnodeNode)) {
-        directPowerPin = p.replace('ARD_', '');
-        break;
+    if (led.isPlaced) {
+      const ledAnodeNode = getElectricalNode(`BB_${led.anode.row}_${led.anode.col}`);
+      const ledCathodeNode = getElectricalNode(`BB_${led.cathode.row}_${led.cathode.col}`);
+      const cathodeToGnd = isConnected(ledCathodeNode, 'ARD_GND') || isConnected(ledCathodeNode, 'ARD_GND2') || isConnected(ledCathodeNode, 'ARD_GND_TOP');
+
+      // Check Direct connection (No resistor)
+      for (const p of powerPins) {
+        if (isConnected(p, ledAnodeNode)) {
+          ledConnectedPin = p.replace('ARD_', '');
+          isLedOvercurrent = true;
+          if (cathodeToGnd) isLedLoopClosed = true;
+          break;
+        }
+      }
+
+      // Check Protected connection via Resistor
+      if (!ledConnectedPin && resistor.isPlaced) {
+        const resNode1 = getElectricalNode(`BB_${resistor.lead1.row}_${resistor.lead1.col}`);
+        const resNode2 = getElectricalNode(`BB_${resistor.lead2.row}_${resistor.lead2.col}`);
+
+        let resPowerPin = null;
+        let resOutNode = null;
+
+        for (const p of powerPins) {
+          if (isConnected(p, resNode1)) {
+            resPowerPin = p.replace('ARD_', '');
+            resOutNode = resNode2;
+            break;
+          } else if (isConnected(p, resNode2)) {
+            resPowerPin = p.replace('ARD_', '');
+            resOutNode = resNode1;
+            break;
+          }
+        }
+
+        if (resPowerPin && isConnected(resOutNode, ledAnodeNode) && cathodeToGnd) {
+          ledConnectedPin = resPowerPin;
+          isLedLoopClosed = true;
+          isLedOvercurrent = false;
+        }
       }
     }
 
-    if (directPowerPin) {
-      if (!cathodeToGnd) {
-        return {
-          isComplete: false,
-          sourcePin: directPowerPin,
-          isOvercurrent: true,
-          message: `⚠️ Missing Ground: Pin ${directPowerPin} reaches LED Anode, but Cathode (Row ${led.cathode.row}) is not connected to GND.`,
-          reason: 'no_gnd_wire'
-        };
-      }
+    // 2. Laser Module Circuit Analysis
+    let laserConnectedPin = null;
+    let isLaserLoopClosed = false;
+    if (laser.isPlaced) {
+      const laserPosNode = getElectricalNode(`BB_${laser.pos.row}_${laser.pos.col}`);
+      const laserGndNode = getElectricalNode(`BB_${laser.gnd.row}_${laser.gnd.col}`);
+      const gndToArduino = isConnected(laserGndNode, 'ARD_GND') || isConnected(laserGndNode, 'ARD_GND2') || isConnected(laserGndNode, 'ARD_GND_TOP');
 
-      return {
-        isComplete: true,
-        sourcePin: directPowerPin,
-        isOvercurrent: true,
-        message: `💥 OVERCURRENT HAZARD! Pin ${directPowerPin} (5V) wired directly to LED without 220Ω resistor (~125mA will blow the LED)!`,
-        reason: 'direct_overcurrent'
-      };
-    }
-
-    // CASE 2: PROTECTED CONNECTION VIA 220Ω RESISTOR
-    if (!resistor.isPlaced) {
-      return { 
-        isComplete: false, 
-        sourcePin: null, 
-        isOvercurrent: false, 
-        message: '⚠️ Circuit Open: Connect a digital power wire to your LED or insert the 220Ω Resistor.', 
-        reason: 'no_power_wire' 
-      };
-    }
-
-    const resNode1 = getElectricalNode(`BB_${resistor.lead1.row}_${resistor.lead1.col}`);
-    const resNode2 = getElectricalNode(`BB_${resistor.lead2.row}_${resistor.lead2.col}`);
-
-    let activeSourcePin = null;
-    let resOutputNode = null;
-
-    for (const p of possiblePowerPins) {
-      if (isConnected(p, resNode1)) {
-        activeSourcePin = p.replace('ARD_', '');
-        resOutputNode = resNode2;
-        break;
-      } else if (isConnected(p, resNode2)) {
-        activeSourcePin = p.replace('ARD_', '');
-        resOutputNode = resNode1;
-        break;
+      for (const p of powerPins) {
+        if (isConnected(p, laserPosNode)) {
+          laserConnectedPin = p.replace('ARD_', '');
+          if (gndToArduino) isLaserLoopClosed = true;
+          break;
+        }
       }
     }
 
-    if (!activeSourcePin) {
-      return { 
-        isComplete: false, 
-        sourcePin: null, 
-        isOvercurrent: false, 
-        message: '⚠️ Missing Power Wire: Connect an Arduino Pin (e.g. Pin 11 or 13) to the Resistor or LED.', 
-        reason: 'no_power_wire' 
-      };
+    // 3. Buzzer Circuit Analysis
+    let buzzerConnectedPin = null;
+    let isBuzzerLoopClosed = false;
+    if (buzzer.isPlaced) {
+      const buzPosNode = getElectricalNode(`BB_${buzzer.pos.row}_${buzzer.pos.col}`);
+      const buzNegNode = getElectricalNode(`BB_${buzzer.neg.row}_${buzzer.neg.col}`);
+      const buzGndToArduino = isConnected(buzNegNode, 'ARD_GND') || isConnected(buzNegNode, 'ARD_GND2') || isConnected(buzNegNode, 'ARD_GND_TOP');
+
+      for (const p of powerPins) {
+        if (isConnected(p, buzPosNode)) {
+          buzzerConnectedPin = p.replace('ARD_', '');
+          if (buzGndToArduino) isBuzzerLoopClosed = true;
+          break;
+        }
+      }
     }
 
-    const resToAnode = isConnected(resOutputNode, ledAnodeNode);
-    if (!resToAnode) {
-      return { 
-        isComplete: false, 
-        sourcePin: activeSourcePin, 
-        isOvercurrent: false, 
-        message: `⚠️ Resistor does not reach LED! Connect Row ${resistor.lead2.row} to Row ${led.anode.row}.`, 
-        reason: 'res_not_to_led' 
-      };
-    }
+    // 4. Optical Alignment Check (Grid Alignment: Same Row)
+    const isLaserLdrAligned = laser.isPlaced && ldr.isPlaced && laser.pos.row === ldr.lead1.row;
 
-    if (!cathodeToGnd) {
-      return { 
-        isComplete: false, 
-        sourcePin: activeSourcePin, 
-        isOvercurrent: false, 
-        message: `⚠️ Missing Ground Wire: Connect LED Cathode (Row ${led.cathode.row}) to Arduino GND.`, 
-        reason: 'no_gnd_wire' 
-      };
+    // Overall status message
+    let message = 'Ready to simulate.';
+    if (isLedOvercurrent && isLedLoopClosed) {
+      message = `💥 OVERCURRENT HAZARD! Pin ${ledConnectedPin} (5V) directly on LED without 220Ω resistor (~125mA will blow LED)!`;
+    } else if (isLedLoopClosed && isLaserLoopClosed && isBuzzerLoopClosed) {
+      message = `✅ Multi-Circuit Ready: LED on Pin ${ledConnectedPin}, Laser on Pin ${laserConnectedPin}, Buzzer on Pin ${buzzerConnectedPin}.`;
+    } else if (isLaserLoopClosed && isLaserLdrAligned) {
+      message = `🎯 Laser Aligned with LDR (Row ${laser.pos.row})! Tripwire security active.`;
+    } else if (isLaserLoopClosed && !isLaserLdrAligned) {
+      message = `⚠️ Laser Unaligned: Laser at Row ${laser.pos.row}, LDR at Row ${ldr.lead1.row}. Put both in same row to align beam!`;
+    } else if (isLedLoopClosed) {
+      message = `✅ Closed Loop (Safe ~14mA): Pin ${ledConnectedPin} ➔ Resistor ➔ LED ➔ GND.`;
     }
 
     return {
-      isComplete: true,
-      sourcePin: activeSourcePin,
-      isOvercurrent: false,
-      message: `✅ Closed Loop (Safe ~14mA): Current flows Pin ${activeSourcePin} ➔ 220Ω Resistor ➔ LED ➔ GND.`,
-      reason: 'ok'
+      isComplete: isLedLoopClosed || isLaserLoopClosed || isBuzzerLoopClosed,
+      ledPin: ledConnectedPin,
+      isLedLoopClosed,
+      isLedOvercurrent,
+      laserPin: laserConnectedPin,
+      isLaserLoopClosed,
+      buzzerPin: buzzerConnectedPin,
+      isBuzzerLoopClosed,
+      isLaserLdrAligned,
+      message
     };
-  }, [resistor, led, wires]);
+  }, [resistor, led, laser, ldr, buzzer, wires]);
 
   const isCircuitClosed = circuitAnalysis.isComplete;
 
   // ==================== VISUAL BLOCK CODING STATE ====================
   const [blocks, setBlocks] = useState([
-    { id: 'b1', type: 'set_pin', pin: '11', state: 'HIGH' },
-    { id: 'b2', type: 'wait', duration: 1.0 },
-    { id: 'b3', type: 'set_pin', pin: '11', state: 'LOW' },
-    { id: 'b4', type: 'wait', duration: 1.0 }
+    { id: 'b1', type: 'set_pin', pin: '9', state: 'HIGH' },   // Laser ON
+    { id: 'b2', type: 'set_pin', pin: '11', state: 'HIGH' },  // LED ON
+    { id: 'b3', type: 'wait', duration: 1.0 },
+    { id: 'b4', type: 'set_pin', pin: '8', state: 'HIGH' },   // Buzzer ON
+    { id: 'b5', type: 'wait', duration: 0.5 },
+    { id: 'b6', type: 'set_pin', pin: '8', state: 'LOW' },    // Buzzer OFF
+    { id: 'b7', type: 'wait', duration: 1.0 }
   ]);
   const [repeatLoop, setRepeatLoop] = useState(true);
   const [activeBlockIndex, setActiveBlockIndex] = useState(-1);
@@ -468,27 +654,32 @@ export default function Simulation() {
     setBlocks(prev => prev.map(b => b.id === id ? { ...b, [field]: val } : b));
   };
 
-  // ==================== DYNAMIC PIN OUTPUT STATES ====================
-  const [pinStates, setPinStates] = useState({
-    '13': false,
-    '12': false,
-    '11': false,
-    '10': false,
-    '9': false,
-    '8': false,
-    '5V': true,
-    '3V3': true
-  });
-
   // ==================== SIMULATION RUNNER ====================
   const [isRunning, setIsRunning] = useState(false);
   const [_runTimeSec, setRunTimeSec] = useState(0);
   const [serialLogs, setSerialLogs] = useState([]);
 
-  // Computed: LED only glows if the connected pin is HIGH, circuit is closed, NOT blown, and NOT in overcurrent blast!
-  const activeConnectedPin = circuitAnalysis.sourcePin;
-  const isConnectedPinHigh = activeConnectedPin ? Boolean(pinStates[activeConnectedPin]) : false;
-  const isLedGlowing = isRunning && isCircuitClosed && isConnectedPinHigh && !isLedBlown && !circuitAnalysis.isOvercurrent;
+  // Computed Component States
+  const isLaserActive = isRunning && circuitAnalysis.isLaserLoopClosed && Boolean(pinStates[circuitAnalysis.laserPin]);
+  const isBuzzerActive = isRunning && (
+    (circuitAnalysis.isBuzzerLoopClosed && Boolean(pinStates[circuitAnalysis.buzzerPin])) ||
+    (isLaserActive && isBeamBlocked && circuitAnalysis.isBuzzerLoopClosed) // Tripwire alarm trigger!
+  );
+
+  const isLedPinHigh = circuitAnalysis.ledPin ? Boolean(pinStates[circuitAnalysis.ledPin]) : false;
+  const isLedGlowing = isRunning && circuitAnalysis.isLedLoopClosed && isLedPinHigh && !isLedBlown && !circuitAnalysis.isLedOvercurrent;
+
+  // Sound Engine Synchronization
+  useEffect(() => {
+    if (isBuzzerActive) {
+      startBuzzerBeep();
+    } else {
+      stopBuzzerBeep();
+    }
+    return () => {
+      stopBuzzerBeep();
+    };
+  }, [isBuzzerActive, isSoundMuted]);
 
   useEffect(() => {
     let timeoutId = null;
@@ -526,9 +717,9 @@ export default function Simulation() {
             [targetPin]: isHigh
           }));
 
-          if (isHigh && isCircuitClosed && circuitAnalysis.sourcePin === targetPin) {
-            if (circuitAnalysis.isOvercurrent) {
-              // OVERCURRENT BURNOUT BLAST!
+          // 1. LED check
+          if (circuitAnalysis.ledPin === targetPin && isHigh && circuitAnalysis.isLedLoopClosed) {
+            if (circuitAnalysis.isLedOvercurrent) {
               if (!isLedBlown) {
                 setIsBlasting(true);
                 setIsLedBlown(true);
@@ -536,35 +727,23 @@ export default function Simulation() {
                 setTimeout(() => setIsBlasting(false), 900);
                 setSerialLogs(prev => [
                   ...prev.slice(-30),
-                  `[💥 POP/BLAST!] Pin ${targetPin} HIGH ➔ 125mA surged without 220Ω resistor! LED DIE EXPLODED & BURNT OUT!`
+                  `[💥 BURNOUT BLAST!] Pin ${targetPin} HIGH ➔ 125mA surged without 220Ω resistor! LED DIE EXPLODED!`
                 ]);
-                showToast('💥 BURNOUT! LED blown due to 125mA overcurrent! Add a 220Ω resistor to protect it.', 'LED Burnout Blast!', 'error');
-              } else {
-                setSerialLogs(prev => [
-                  ...prev.slice(-30),
-                  `[Step ${currentStep + 1}] Pin ${targetPin} HIGH, but LED is blown/burnt (Open circuit).`
-                ]);
+                showToast('💥 BURNOUT! LED blown due to 125mA overcurrent! Add 220Ω resistor.', 'LED Burnout Blast!', 'error');
               }
             } else {
-              // Protected safe circuit via 220Ω resistor
-              if (isLedBlown) {
-                setSerialLogs(prev => [
-                  ...prev.slice(-30),
-                  `[Step ${currentStep + 1}] Pin ${targetPin} HIGH, but LED is damaged. Click "Replace LED".`
-                ]);
-              } else {
-                setSerialLogs(prev => [
-                  ...prev.slice(-30),
-                  `[Step ${currentStep + 1}] Pin ${targetPin} HIGH ➔ 💡 Safe ~14mA (220Ω protected) ➔ LED Glows!`
-                ]);
-              }
+              setSerialLogs(prev => [...prev.slice(-30), `[Step ${currentStep + 1}] Pin ${targetPin} HIGH ➔ 💡 LED Bulb Glows!`]);
             }
-          } else if (isHigh && !isCircuitClosed) {
-            setSerialLogs(prev => [...prev.slice(-30), `[Step ${currentStep + 1}] Pin ${targetPin} HIGH, but circuit OPEN (no current)`]);
-          } else if (isHigh && isCircuitClosed && circuitAnalysis.sourcePin !== targetPin) {
-            setSerialLogs(prev => [...prev.slice(-30), `[Step ${currentStep + 1}] Pin ${targetPin} HIGH (Circuit is wired to Pin ${circuitAnalysis.sourcePin})`]);
+          } 
+          // 2. Laser check
+          else if (circuitAnalysis.laserPin === targetPin && isHigh && circuitAnalysis.isLaserLoopClosed) {
+            setSerialLogs(prev => [...prev.slice(-30), `[Step ${currentStep + 1}] Pin ${targetPin} HIGH ➔ 🔴 Red Laser Beam Active (650nm)!`]);
+          } 
+          // 3. Buzzer check
+          else if (circuitAnalysis.buzzerPin === targetPin && isHigh && circuitAnalysis.isBuzzerLoopClosed) {
+            setSerialLogs(prev => [...prev.slice(-30), `[Step ${currentStep + 1}] Pin ${targetPin} HIGH ➔ 🔊 Piezo Buzzer Sounding BEEP!`]);
           } else {
-            setSerialLogs(prev => [...prev.slice(-30), `[Step ${currentStep + 1}] Pin ${targetPin} LOW ➔ 🌑 LED Off`]);
+            setSerialLogs(prev => [...prev.slice(-30), `[Step ${currentStep + 1}] Pin ${targetPin} set to ${block.state}`]);
           }
 
           currentStep++;
@@ -582,25 +761,24 @@ export default function Simulation() {
     } else {
       setActiveBlockIndex(-1);
       setPinStates(prev => ({ ...prev, '13': false, '12': false, '11': false, '10': false, '9': false, '8': false }));
+      stopBuzzerBeep();
     }
 
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
       if (timerId) clearInterval(timerId);
     };
-  }, [isRunning, blocks, repeatLoop, isCircuitClosed, circuitAnalysis.sourcePin, circuitAnalysis.isOvercurrent, isLedBlown]);
+  }, [isRunning, blocks, repeatLoop, isCircuitClosed, circuitAnalysis, isLedBlown]);
 
   const handleToggleRun = () => {
     if (!isRunning) {
-      if (!isCircuitClosed) {
-        showToast(circuitAnalysis.message, 'Circuit Incomplete', 'info');
-      }
       setIsRunning(true);
       showToast('Simulation running! Executing block sequence.', 'Running', 'success');
     } else {
       setIsRunning(false);
       setActiveBlockIndex(-1);
       setPinStates(prev => ({ ...prev, '13': false, '12': false, '11': false, '10': false, '9': false, '8': false }));
+      stopBuzzerBeep();
       showToast('Simulation stopped.', 'Stopped', 'info');
     }
   };
@@ -610,6 +788,7 @@ export default function Simulation() {
     setActiveBlockIndex(-1);
     setRunTimeSec(0);
     setPinStates(prev => ({ ...prev, '13': false, '12': false, '11': false, '10': false, '9': false, '8': false }));
+    stopBuzzerBeep();
     setSerialLogs([`[System] Reset to idle.`]);
     showToast('Simulation counters reset.', 'Reset Complete', 'info');
   };
@@ -629,22 +808,38 @@ export default function Simulation() {
     });
 
     return `// Pixiu Cyber-Lab Auto-Generated Arduino C++ Sketch
-const int targetPin = 13;
-
 void setup() {
-  pinMode(targetPin, OUTPUT);
+  pinMode(13, OUTPUT);
+  pinMode(11, OUTPUT);
+  pinMode(9, OUTPUT);  // KY-008 Laser Diode
+  pinMode(8, OUTPUT);  // Piezo Buzzer
   Serial.begin(9600);
-  Serial.println("Pixiu Cyber-Lab 3D System Ready");
 }
 
 void loop() {
 ${loopCode}}`;
   }, [blocks]);
 
+  // Coordinates for Components
+  const resLead1Coord = resistor.isPlaced ? terminalCoords[`BB_${resistor.lead1.row}_${resistor.lead1.col}`] : null;
+  const resLead2Coord = resistor.isPlaced ? terminalCoords[`BB_${resistor.lead2.row}_${resistor.lead2.col}`] : null;
+
+  const ledAnodeCoord = led.isPlaced ? terminalCoords[`BB_${led.anode.row}_${led.anode.col}`] : null;
+  const ledCathodeCoord = led.isPlaced ? terminalCoords[`BB_${led.cathode.row}_${led.cathode.col}`] : null;
+
+  const laserPosCoord = laser.isPlaced ? terminalCoords[`BB_${laser.pos.row}_${laser.pos.col}`] : null;
+  const _laserGndCoord = laser.isPlaced ? terminalCoords[`BB_${laser.gnd.row}_${laser.gnd.col}`] : null;
+
+  const ldrLead1Coord = ldr.isPlaced ? terminalCoords[`BB_${ldr.lead1.row}_${ldr.lead1.col}`] : null;
+  const _ldrLead2Coord = ldr.isPlaced ? terminalCoords[`BB_${ldr.lead2.row}_${ldr.lead2.col}`] : null;
+
+  const buzzerPosCoord = buzzer.isPlaced ? terminalCoords[`BB_${buzzer.pos.row}_${buzzer.pos.col}`] : null;
+  const _buzzerNegCoord = buzzer.isPlaced ? terminalCoords[`BB_${buzzer.neg.row}_${buzzer.neg.col}`] : null;
+
   // ==================== 403 AUTHORIZATION GUARD ====================
   if (!isAuthorized) {
     return (
-      <div className="min-h-screen bg-[#070B14] text-white flex flex-col justify-between font-sans selection:bg-pixiu-blue selection:text-white">
+      <div className="min-h-screen bg-[#070B14] text-white flex flex-col justify-between font-sans">
         <header className="border-b border-slate-800/80 px-6 py-4 flex items-center justify-between bg-slate-900/50 backdrop-blur-md">
           <div className="flex items-center gap-3">
             <div className="bg-white px-2.5 py-1 rounded-xl shadow-md border border-white/20">
@@ -657,39 +852,39 @@ ${loopCode}}`;
           </div>
           <Link 
             to="/login?redirect=/simulation" 
-            className="px-4 py-2 bg-pixiu-blue hover:bg-blue-600 text-white text-xs font-bold rounded-xl shadow-md shadow-blue-500/20 transition-all cursor-pointer"
+            className="px-4 py-2 bg-pixiu-blue hover:bg-blue-600 text-white text-xs font-bold rounded-xl shadow-md cursor-pointer"
           >
             Sign In to Access ➔
           </Link>
         </header>
 
         <main className="max-w-xl mx-auto px-4 py-16 text-center space-y-6">
-          <div className="w-20 h-20 mx-auto rounded-3xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shadow-2xl shadow-amber-500/10 animate-pulse">
+          <div className="w-20 h-20 mx-auto rounded-3xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shadow-2xl animate-pulse">
             <Lock size={38} />
           </div>
 
           <div className="space-y-2">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold uppercase tracking-wider">
-              <ShieldAlert size={14} /> Institutional Laboratory Security Guard
+              <ShieldAlert size={14} /> Laboratory Security Guard
             </div>
             <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
               Authorized Portal Session Required
             </h1>
             <p className="text-xs sm:text-sm text-slate-400 leading-relaxed max-w-md mx-auto">
-              The <strong>Pixiu Cyber-Lab 3D Virtual Arduino Simulation Workbench</strong> is an enterprise hardware laboratory reserved exclusively for enrolled students, partner schools, certified faculty, and administrators.
+              The <strong>Pixiu Cyber-Lab Virtual Simulation Workbench</strong> is reserved exclusively for enrolled students, partner schools, and instructors.
             </p>
           </div>
 
           <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link
               to="/login?redirect=/simulation"
-              className="w-full sm:w-auto px-6 py-3 bg-pixiu-blue hover:bg-blue-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-blue-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full sm:w-auto px-6 py-3 bg-pixiu-blue hover:bg-blue-600 text-white text-xs font-bold rounded-xl shadow-lg cursor-pointer"
             >
-              Sign In with Portal Credentials ➔
+              Sign In with Credentials ➔
             </Link>
             <Link
               to="/"
-              className="w-full sm:w-auto px-5 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl border border-slate-700 transition-all flex items-center justify-center gap-1.5"
+              className="w-full sm:w-auto px-5 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl border border-slate-700 flex items-center justify-center gap-1.5"
             >
               <ArrowLeft size={14} /> Back to Homepage
             </Link>
@@ -699,38 +894,19 @@ ${loopCode}}`;
     );
   }
 
-  const getBackRoute = () => {
-    if (activeRole === 'student') return '/student-portal';
-    if (activeRole === 'school') return '/school-portal';
-    if (activeRole === 'trainer') return '/trainers';
-    return '/';
-  };
-
-  const getBackLabel = () => {
-    if (activeRole === 'student') return 'Student Space';
-    if (activeRole === 'school') return 'School ERP';
-    if (activeRole === 'trainer') return 'Trainer Console';
-    return 'Admin Console';
-  };
-
-  // Coordinates for Resistor & LED
-  const resLead1Coord = resistor.isPlaced ? terminalCoords[`BB_${resistor.lead1.row}_${resistor.lead1.col}`] : null;
-  const resLead2Coord = resistor.isPlaced ? terminalCoords[`BB_${resistor.lead2.row}_${resistor.lead2.col}`] : null;
-
-  const ledAnodeCoord = led.isPlaced ? terminalCoords[`BB_${led.anode.row}_${led.anode.col}`] : null;
-  const ledCathodeCoord = led.isPlaced ? terminalCoords[`BB_${led.cathode.row}_${led.cathode.col}`] : null;
-
   return (
-    <div className="min-h-screen bg-[#060913] text-white flex flex-col font-sans selection:bg-pixiu-blue selection:text-white relative pb-16 lg:pb-0">
+    <div className="min-h-screen bg-[#060913] text-white flex flex-col font-sans select-none relative pb-16 lg:pb-0">
       
       {/* Toast Alert */}
       {toastAlert && (
         <div className={`fixed bottom-20 lg:bottom-5 right-5 z-50 px-4 py-3 rounded-2xl shadow-2xl border text-xs flex items-center gap-2.5 animate-in fade-in slide-in-from-bottom-5 duration-300 ${
-          toastAlert.type === 'success' 
+          toastAlert.type === 'error'
+            ? 'bg-rose-950/95 border-rose-500/50 text-rose-200'
+            : toastAlert.type === 'success' 
             ? 'bg-emerald-950/95 border-emerald-500/50 text-emerald-200' 
             : 'bg-slate-900/95 border-blue-500/50 text-slate-200'
         }`}>
-          <CheckCircle2 size={16} className={toastAlert.type === 'success' ? 'text-emerald-400' : 'text-blue-400'} />
+          <CheckCircle2 size={16} className={toastAlert.type === 'error' ? 'text-rose-400' : toastAlert.type === 'success' ? 'text-emerald-400' : 'text-blue-400'} />
           <div>
             <div className="font-bold">{toastAlert.title}</div>
             <div className="text-[11px] opacity-80">{toastAlert.msg}</div>
@@ -742,12 +918,11 @@ ${loopCode}}`;
       <header className="bg-slate-900/95 border-b border-slate-800 px-3 sm:px-6 py-2.5 flex items-center justify-between sticky top-0 z-40 backdrop-blur-md">
         <div className="flex items-center gap-2.5">
           <Link 
-            to={getBackRoute()}
+            to={activeRole === 'student' ? '/student-portal' : activeRole === 'school' ? '/school-portal' : activeRole === 'trainer' ? '/trainers' : '/'}
             className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl border border-slate-700 transition-colors flex items-center gap-1 text-xs font-bold mr-1 cursor-pointer"
-            title={`Return to ${getBackLabel()}`}
           >
             <ArrowLeft size={14} />
-            <span className="hidden sm:inline">{getBackLabel()}</span>
+            <span className="hidden sm:inline">Portal</span>
           </Link>
 
           <div className="bg-white px-2 py-0.5 rounded-lg shadow-sm border border-white/20 shrink-0">
@@ -755,41 +930,58 @@ ${loopCode}}`;
           </div>
 
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xs sm:text-sm font-black text-white tracking-tight flex items-center gap-1.5">
-                <Cpu size={15} className="text-pixiu-blue" />
-                Pixiu Cyber-Lab • Arduino & Breadboard
-              </h1>
-            </div>
+            <h1 className="text-xs sm:text-sm font-black text-white tracking-tight flex items-center gap-1.5">
+              <Cpu size={15} className="text-pixiu-blue" />
+              Pixiu Cyber-Lab • Advanced Robotics
+            </h1>
             <p className="text-[9px] sm:text-[10px] text-slate-400 font-mono truncate max-w-[160px] sm:max-w-none">
-              User: <strong className="text-slate-200">{activeUser?.name || 'Student'}</strong> ({activeRole?.toUpperCase()})
+              Laser Tripwire & Piezo Buzzer Studio
             </p>
           </div>
         </div>
 
-        {/* Master Action Controls (Desktop) */}
+        {/* Master Action Controls */}
         <div className="flex items-center gap-2">
+          {/* Sound Mute / Unmute Toggle */}
           <button
-            onClick={handleAutoWirePreset}
-            className="px-2.5 sm:px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl border border-slate-700 text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
-            title="Auto-setup 220Ω LED Blink circuit"
+            onClick={() => {
+              setIsSoundMuted(!isSoundMuted);
+              if (!isSoundMuted) stopBuzzerBeep();
+              showToast(!isSoundMuted ? 'Audio muted.' : 'Audio unmuted.', 'Sound Setting', 'info');
+            }}
+            className={`p-1.5 sm:p-2 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+              isSoundMuted 
+                ? 'bg-rose-500/20 text-rose-300 border-rose-500/40' 
+                : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+            }`}
+            title={isSoundMuted ? 'Unmute Audio Beeps' : 'Mute Audio Beeps'}
           >
-            <Sparkles size={13} className="text-amber-400" />
-            <span className="hidden md:inline">Auto-Setup</span>
+            {isSoundMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+            <span className="hidden md:inline text-[11px]">{isSoundMuted ? 'Muted' : 'Sound On'}</span>
+          </button>
+
+          {/* Preset Switcher */}
+          <button
+            onClick={handleLoadLaserTripwirePreset}
+            className="px-2.5 sm:px-3 py-1.5 bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 rounded-xl border border-indigo-500/40 text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
+            title="Load Laser Security Tripwire System (Laser + LDR + Buzzer)"
+          >
+            <Crosshair size={13} className="text-cyan-400" />
+            <span className="hidden md:inline">Laser Preset</span>
           </button>
 
           <button
             onClick={handleClearAllWires}
             className="p-1.5 sm:p-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 rounded-xl border border-slate-700 text-xs font-bold transition-all cursor-pointer"
-            title="Clear all jumper wires"
+            title="Clear all wires"
           >
             <Trash2 size={13} />
           </button>
 
           <button
             onClick={handleReset}
-            className="hidden sm:flex p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl border border-slate-700 text-xs font-bold transition-colors cursor-pointer items-center gap-1"
-            title="Reset simulation counters"
+            className="hidden sm:flex p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl border border-slate-700 text-xs font-bold transition-colors cursor-pointer"
+            title="Reset simulation"
           >
             <RotateCcw size={13} />
           </button>
@@ -816,7 +1008,7 @@ ${loopCode}}`;
         </div>
       </header>
 
-      {/* ==================== MOBILE LAB VIEW SWITCHER TABS (< 1024px) ==================== */}
+      {/* ==================== MOBILE SCREEN SWITCHER TABS (< 1024px) ==================== */}
       <div className="lg:hidden bg-slate-950 border-b border-slate-800 px-3 py-2 flex items-center justify-center gap-2 sticky top-[49px] z-30">
         <button
           onClick={() => setMobileTab('workbench')}
@@ -847,31 +1039,52 @@ ${loopCode}}`;
       <main className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden">
         
         {/* ==================== LEFT: INTERACTIVE 3D WORKBENCH ==================== */}
-        <div className={`flex-1 flex-col bg-[#070C18] relative overflow-y-auto select-none ${
+        <div className={`flex-1 flex-col bg-[#070C18] relative overflow-y-auto ${
           mobileTab === 'workbench' ? 'flex' : 'hidden lg:flex'
         }`}>
           
-          {/* Streamlined Sub-Toolbar: Circuit Status & Wire Spool */}
+          {/* Sub-Toolbar: Status & Wire Spool */}
           <div className="p-2.5 sm:p-3 bg-slate-900/90 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs z-20">
             
             {/* Status Pill */}
             <div className="flex items-center gap-2">
               <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold flex items-center gap-1.5 border shrink-0 ${
-                isCircuitClosed 
+                circuitAnalysis.isLedOvercurrent
+                  ? 'bg-rose-500/15 text-rose-300 border-rose-500/40 animate-pulse'
+                  : isCircuitClosed 
                   ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' 
                   : 'bg-amber-500/15 text-amber-300 border-amber-500/30 animate-pulse'
               }`}>
-                <span className={`w-2 h-2 rounded-full ${isCircuitClosed ? 'bg-emerald-400' : 'bg-amber-400'}`}></span>
-                {isCircuitClosed ? 'Closed Loop' : 'Open Circuit'}
+                <span className={`w-2 h-2 rounded-full ${circuitAnalysis.isLedOvercurrent ? 'bg-rose-500' : isCircuitClosed ? 'bg-emerald-400' : 'bg-amber-400'}`}></span>
+                {circuitAnalysis.isLedOvercurrent ? 'Overcurrent Hazard' : isCircuitClosed ? 'Circuit Active' : 'Circuit Open'}
               </span>
               <p className="text-[11px] text-slate-300 truncate max-w-xs sm:max-w-md hidden sm:block" title={circuitAnalysis.message}>
                 {circuitAnalysis.message}
               </p>
             </div>
 
-            {/* Wire Spool Color Selector */}
+            {/* Wire Spool & Wave Hand Button */}
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider hidden sm:inline">Wire:</span>
+              {/* Wave Hand / Break Laser Beam Button */}
+              {laser.isPlaced && ldr.isPlaced && (
+                <button
+                  onClick={() => {
+                    setIsBeamBlocked(!isBeamBlocked);
+                    showToast(!isBeamBlocked ? 'Hand placed in front of Laser: BEAM BROKEN!' : 'Hand removed: Beam restored.', 'Laser Tripwire', 'info');
+                  }}
+                  className={`px-2.5 py-1 rounded-xl border text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    isBeamBlocked 
+                      ? 'bg-rose-600 text-white border-rose-400 shadow-md shadow-rose-500/30 animate-pulse' 
+                      : 'bg-slate-800 hover:bg-slate-700 text-cyan-300 border-slate-700'
+                  }`}
+                  title="Simulate object/hand blocking the laser beam to test security alarm"
+                >
+                  <Hand size={13} />
+                  <span>{isBeamBlocked ? 'Beam Broken!' : 'Wave Hand (Block)'}</span>
+                </button>
+              )}
+
+              {/* Wire Spool */}
               <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
                 {WIRE_COLORS.map(c => (
                   <button
@@ -885,18 +1098,6 @@ ${loopCode}}`;
                   />
                 ))}
               </div>
-
-              {activeWiringStart && (
-                <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-mono text-[10px] animate-pulse">
-                  Wiring: {activeWiringStart.label}
-                </span>
-              )}
-
-              {placementMode && (
-                <span className="px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-300 font-mono text-[10px] font-bold border border-yellow-500/30 animate-pulse">
-                  {placementMode.includes('resistor') ? 'Click holes to plug Resistor' : 'Click holes to plug LED'}
-                </span>
-              )}
             </div>
           </div>
 
@@ -905,73 +1106,56 @@ ${loopCode}}`;
             <div className="bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-2xl p-2.5 sm:p-3 flex flex-wrap items-center justify-between gap-3 shadow-md">
               <div className="flex items-center gap-2">
                 <Layers size={15} className="text-cyan-400" />
-                <span className="text-xs font-extrabold text-white">Parts Dock:</span>
+                <span className="text-xs font-extrabold text-white">Parts Tray:</span>
               </div>
 
-              <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
-                {/* 1. Resistor Mini Badge */}
-                <div className="flex items-center gap-2 bg-slate-950 px-2.5 py-1.5 rounded-xl border border-slate-800">
-                  <div className="w-6 h-3 bg-[#C99C67] rounded-full border border-[#966F3D] flex items-center justify-around px-0.5">
-                    <span className="w-0.5 h-full bg-red-600"></span>
-                    <span className="w-0.5 h-full bg-red-600"></span>
-                    <span className="w-0.5 h-full bg-[#5C3317]"></span>
-                    <span className="w-0.5 h-full bg-[#D4AF37]"></span>
-                  </div>
-                  <span className="text-[11px] font-bold text-white">220Ω Resistor</span>
+              <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                {/* 1. 220Ω Resistor */}
+                <div className="flex items-center gap-1.5 bg-slate-950 px-2.5 py-1.5 rounded-xl border border-slate-800">
+                  <div className="w-5 h-2.5 bg-[#C99C67] rounded-full border border-[#966F3D]"></div>
+                  <span className="text-[11px] font-bold text-white">220Ω</span>
                   <button
                     onClick={() => {
                       if (resistor.isPlaced) {
                         setResistor({ isPlaced: false, lead1: null, lead2: null });
-                        showToast('Pulled Resistor body back to tray.', 'Pulled to Tray', 'info');
                       } else {
                         setPlacementMode('placing_resistor_1');
-                        showToast('Click any breadboard hole to insert Resistor Lead 1.', 'Place Resistor', 'info');
+                        showToast('Click hole for Resistor Lead 1.', 'Place Resistor', 'info');
                       }
                     }}
-                    className={`px-2 py-0.5 rounded-md text-[10px] font-bold cursor-pointer transition-all ${
-                      resistor.isPlaced 
-                        ? 'bg-slate-800 hover:bg-slate-700 text-slate-300' 
-                        : 'bg-amber-500 hover:bg-amber-400 text-slate-950'
+                    className={`px-1.5 py-0.5 rounded text-[10px] font-bold cursor-pointer ${
+                      resistor.isPlaced ? 'bg-slate-800 text-slate-300' : 'bg-amber-500 text-slate-950'
                     }`}
                   >
                     {resistor.isPlaced ? 'Pull' : 'Plug ➔'}
                   </button>
-                  <button
-                    onClick={() => setXrayModalComponent('resistor')}
-                    className="text-slate-400 hover:text-amber-400 cursor-pointer"
-                    title="X-Ray 3D Dissection"
-                  >
+                  <button onClick={() => setXrayModalComponent('resistor')} className="text-slate-400 hover:text-amber-400 cursor-pointer">
                     <Eye size={12} />
                   </button>
                 </div>
 
-                {/* 2. LED Mini Badge */}
-                <div className="flex items-center gap-2 bg-slate-950 px-2.5 py-1.5 rounded-xl border border-slate-800">
-                  <div className={`w-3.5 h-5 rounded-t-full rounded-b-xs border flex items-center justify-center ${
-                    isLedGlowing ? 'bg-red-500 border-red-300 shadow-[0_0_8px_#EF4444]' : 'bg-red-900 border-red-800'
-                  }`}>
-                    <div className="w-1 h-1.5 bg-white/40 rounded-full"></div>
-                  </div>
-                  <span className="text-[11px] font-bold text-white">5mm Red LED</span>
+                {/* 2. 5mm Red LED */}
+                <div className="flex items-center gap-1.5 bg-slate-950 px-2.5 py-1.5 rounded-xl border border-slate-800">
+                  <div className={`w-3 h-4 rounded-t-full rounded-b-xs border ${
+                    isLedBlown ? 'bg-stone-800 border-stone-700' : isLedGlowing ? 'bg-red-500 shadow-[0_0_8px_#EF4444]' : 'bg-red-900 border-red-800'
+                  }`}></div>
+                  <span className="text-[11px] font-bold text-white">LED</span>
                   <button
                     onClick={() => {
                       if (led.isPlaced) {
                         setLed({ isPlaced: false, anode: null, cathode: null });
-                        showToast('Pulled LED Bulb back to tray.', 'Pulled to Tray', 'info');
                       } else {
                         setPlacementMode('placing_led_anode');
-                        showToast('Click any breadboard hole to insert LED Anode (+ long leg).', 'Place LED', 'info');
+                        showToast('Click hole for LED Anode (+).', 'Place LED', 'info');
                       }
                     }}
-                    className={`px-2 py-0.5 rounded-md text-[10px] font-bold cursor-pointer transition-all ${
-                      led.isPlaced 
-                        ? 'bg-slate-800 hover:bg-slate-700 text-slate-300' 
-                        : 'bg-red-600 hover:bg-red-500 text-white'
+                    className={`px-1.5 py-0.5 rounded text-[10px] font-bold cursor-pointer ${
+                      led.isPlaced ? 'bg-slate-800 text-slate-300' : 'bg-red-600 text-white'
                     }`}
                   >
                     {led.isPlaced ? 'Pull' : 'Plug ➔'}
                   </button>
-                  {/* If Blown, show Replace Bulb Button */}
+
                   {isLedBlown && (
                     <button
                       onClick={() => {
@@ -979,17 +1163,91 @@ ${loopCode}}`;
                         setIsBlasting(false);
                         showToast('Burnt LED replaced with fresh 5mm Red LED!', 'Bulb Replaced', 'success');
                       }}
-                      className="px-2 py-0.5 rounded-md bg-amber-500 hover:bg-amber-400 text-slate-950 text-[10px] font-black uppercase tracking-wider flex items-center gap-1 shadow-md shadow-amber-500/30 animate-pulse cursor-pointer"
-                      title="Replace Blown Bulb with fresh LED"
+                      className="px-1.5 py-0.5 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 text-[10px] font-black uppercase flex items-center gap-1 shadow-md animate-pulse cursor-pointer"
+                      title="Replace Blown Bulb"
                     >
-                      <Sparkles size={11} /> Replace Blown
+                      <Sparkles size={10} /> Replace
                     </button>
                   )}
+                  <button onClick={() => setXrayModalComponent('bulb')} className="text-slate-400 hover:text-red-400 cursor-pointer">
+                    <Eye size={12} />
+                  </button>
+                </div>
+
+                {/* 3. KY-008 Laser Diode */}
+                <div className="flex items-center gap-1.5 bg-slate-950 px-2.5 py-1.5 rounded-xl border border-slate-800">
+                  <div className={`w-4 h-3 bg-amber-700 rounded-sm border border-amber-500 ${isLaserActive ? 'shadow-[0_0_8px_#EF4444]' : ''}`}></div>
+                  <span className="text-[11px] font-bold text-white">KY-008 Laser</span>
                   <button
-                    onClick={() => setXrayModalComponent('bulb')}
-                    className="text-slate-400 hover:text-red-400 cursor-pointer"
-                    title="X-Ray 3D Dissection"
+                    onClick={() => {
+                      if (laser.isPlaced) {
+                        setLaser({ isPlaced: false, pos: null, gnd: null });
+                      } else {
+                        setPlacementMode('placing_laser_pos');
+                        showToast('Click hole for Laser (+).', 'Place Laser', 'info');
+                      }
+                    }}
+                    className={`px-1.5 py-0.5 rounded text-[10px] font-bold cursor-pointer ${
+                      laser.isPlaced ? 'bg-slate-800 text-slate-300' : 'bg-red-600 text-white'
+                    }`}
                   >
+                    {laser.isPlaced ? 'Pull' : 'Plug ➔'}
+                  </button>
+                  <button onClick={() => setXrayModalComponent('laser')} className="text-slate-400 hover:text-red-400 cursor-pointer">
+                    <Eye size={12} />
+                  </button>
+                </div>
+
+                {/* 4. Photodetector (LDR) */}
+                <div className="flex items-center gap-1.5 bg-slate-950 px-2.5 py-1.5 rounded-xl border border-slate-800">
+                  <div className="w-3.5 h-3.5 rounded-full bg-[#D4D4D8] border border-amber-600 flex items-center justify-center">
+                    <div className="w-1.5 h-1.5 bg-amber-700 rounded-full"></div>
+                  </div>
+                  <span className="text-[11px] font-bold text-white">LDR Sensor</span>
+                  <button
+                    onClick={() => {
+                      if (ldr.isPlaced) {
+                        setLdr({ isPlaced: false, lead1: null, lead2: null });
+                      } else {
+                        setPlacementMode('placing_ldr_1');
+                        showToast('Click hole for LDR Lead 1 (Match Laser row!).', 'Place LDR', 'info');
+                      }
+                    }}
+                    className={`px-1.5 py-0.5 rounded text-[10px] font-bold cursor-pointer ${
+                      ldr.isPlaced ? 'bg-slate-800 text-slate-300' : 'bg-cyan-600 text-white'
+                    }`}
+                  >
+                    {ldr.isPlaced ? 'Pull' : 'Plug ➔'}
+                  </button>
+                  <button onClick={() => setXrayModalComponent('ldr')} className="text-slate-400 hover:text-cyan-400 cursor-pointer">
+                    <Eye size={12} />
+                  </button>
+                </div>
+
+                {/* 5. Piezo Buzzer */}
+                <div className="flex items-center gap-1.5 bg-slate-950 px-2.5 py-1.5 rounded-xl border border-slate-800">
+                  <div className={`w-3.5 h-3.5 rounded-full bg-slate-900 border border-slate-600 flex items-center justify-center ${
+                    isBuzzerActive ? 'ring-2 ring-yellow-400 animate-pulse' : ''
+                  }`}>
+                    <div className="w-1 h-1 bg-black rounded-full"></div>
+                  </div>
+                  <span className="text-[11px] font-bold text-white">Piezo Buzzer</span>
+                  <button
+                    onClick={() => {
+                      if (buzzer.isPlaced) {
+                        setBuzzer({ isPlaced: false, pos: null, neg: null });
+                      } else {
+                        setPlacementMode('placing_buzzer_pos');
+                        showToast('Click hole for Buzzer (+).', 'Place Buzzer', 'info');
+                      }
+                    }}
+                    className={`px-1.5 py-0.5 rounded text-[10px] font-bold cursor-pointer ${
+                      buzzer.isPlaced ? 'bg-slate-800 text-slate-300' : 'bg-yellow-500 text-slate-950'
+                    }`}
+                  >
+                    {buzzer.isPlaced ? 'Pull' : 'Plug ➔'}
+                  </button>
+                  <button onClick={() => setXrayModalComponent('buzzer')} className="text-slate-400 hover:text-yellow-400 cursor-pointer">
                     <Eye size={12} />
                   </button>
                 </div>
@@ -997,16 +1255,14 @@ ${loopCode}}`;
             </div>
           </div>
 
-          {/* ================= WORKBENCH CANVAS: ARDUINO + BREADBOARD WITH REAL WIRES ================= */}
+          {/* ================= WORKBENCH CANVAS ================= */}
           <div className="flex-1 p-3 sm:p-6 overflow-x-auto">
-            
-            {/* Scrollable Canvas Area */}
             <div 
               ref={workbenchRef}
               className="relative min-w-[980px] min-h-[640px] flex items-center justify-around gap-8 p-6 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:24px_24px] rounded-3xl border border-slate-800/80 bg-slate-950/40"
             >
               
-              {/* SVG OVERLAY: REAL 3D JUMPER WIRES, 3D RESISTOR BODY, AND 3D LED BULB */}
+              {/* SVG OVERLAY: REAL 3D WIRES, COMPONENTS, AND OPTICAL LASER BEAM */}
               <svg className="absolute inset-0 w-full h-full pointer-events-none z-30 overflow-visible">
                 <defs>
                   {/* Resistor ceramic body gradient */}
@@ -1041,6 +1297,12 @@ ${loopCode}}`;
                     <stop offset="50%" stopColor="#27272A" />
                     <stop offset="100%" stopColor="#18181B" />
                   </linearGradient>
+                  {/* Laser Beam Glow */}
+                  <linearGradient id="laser-beam-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#FF4D4D" stopOpacity="0.9" />
+                    <stop offset="50%" stopColor="#EF4444" stopOpacity="1" />
+                    <stop offset="100%" stopColor="#FF1E1E" stopOpacity="0.9" />
+                  </linearGradient>
                 </defs>
 
                 {/* ---------------- 1. REAL DUPONT JUMPER WIRES ---------------- */}
@@ -1064,9 +1326,8 @@ ${loopCode}}`;
 
                   return (
                     <g key={wire.id} className="pointer-events-auto cursor-pointer group" onClick={() => removeWire(wire.id)}>
-                      <title>Click to pull/remove jumper wire ({wire.fromLabel} ➔ {wire.toLabel})</title>
+                      <title>Click to remove wire ({wire.fromLabel} ➔ {wire.toLabel})</title>
 
-                      {/* Drop shadow */}
                       <path 
                         d={pathD} 
                         fill="none" 
@@ -1076,7 +1337,6 @@ ${loopCode}}`;
                         transform="translate(0, 8)"
                       />
 
-                      {/* Insulated PVC Cable */}
                       <path 
                         d={pathD} 
                         fill="none" 
@@ -1086,7 +1346,6 @@ ${loopCode}}`;
                         className="transition-all group-hover:stroke-white group-hover:stroke-[6px]"
                       />
 
-                      {/* Specular Highlight */}
                       <path 
                         d={pathD} 
                         fill="none" 
@@ -1096,7 +1355,6 @@ ${loopCode}}`;
                         transform="translate(0, -1)"
                       />
 
-                      {/* End Terminal Sleeves */}
                       <circle cx={p1.x} cy={p1.y} r="5" fill="#0F172A" stroke="#64748B" strokeWidth="1.5" />
                       <circle cx={p1.x} cy={p1.y} r="2" fill="#E2E8F0" />
                       <circle cx={p2.x} cy={p2.y} r="5" fill="#0F172A" stroke="#64748B" strokeWidth="1.5" />
@@ -1108,9 +1366,8 @@ ${loopCode}}`;
                 {/* ---------------- 2. 3D 220Ω RESISTOR BODY ---------------- */}
                 {resistor.isPlaced && resLead1Coord && resLead2Coord && (
                   <g className="pointer-events-auto cursor-pointer group" onClick={() => setXrayModalComponent('resistor')}>
-                    <title>220Ω Resistor Body. Click for 3D X-Ray Dissection.</title>
+                    <title>220Ω Resistor Body. Click for 3D Dissection.</title>
 
-                    {/* Silver Leads */}
                     <line 
                       x1={resLead1Coord.x} y1={resLead1Coord.y} 
                       x2={resLead2Coord.x} y2={resLead2Coord.y} 
@@ -1129,7 +1386,6 @@ ${loopCode}}`;
                           <circle cx="-20" cy="0" r="7.5" fill="#C99C67" />
                           <circle cx="20" cy="0" r="7.5" fill="#C99C67" />
 
-                          {/* Color Bands (Red-Red-Brown-Gold) */}
                           <rect x="-14" y="-8" width="4" height="16" fill="#DC2626" />
                           <rect x="-6" y="-8" width="4" height="16" fill="#DC2626" />
                           <rect x="2" y="-8" width="4" height="16" fill="#78350F" />
@@ -1155,13 +1411,12 @@ ${loopCode}}`;
                           <path d={`M ${ledAnodeCoord.x} ${ledAnodeCoord.y} L ${lx - 4} ${ly - 10}`} stroke="#CBD5E1" strokeWidth="2.5" strokeLinecap="round" />
                           <path d={`M ${ledCathodeCoord.x} ${ledCathodeCoord.y} L ${lx + 4} ${ly - 10}`} stroke="#94A3B8" strokeWidth="2.5" strokeLinecap="round" />
 
-                          {/* Soot mark on breadboard if blown */}
                           {isLedBlown && (
                             <ellipse cx={lx} cy={ly - 2} rx="18" ry="7" fill="rgba(0,0,0,0.65)" />
                           )}
 
                           <g transform={`translate(${lx}, ${ly - 32})`}>
-                            {/* Normal Healthy Photon Bloom */}
+                            {/* Healthy Photon Bloom */}
                             {isLedGlowing && (
                               <>
                                 <circle cx="0" cy="0" r="50" fill="url(#led-bloom-clean)" opacity="0.85" className="animate-pulse" />
@@ -1178,7 +1433,7 @@ ${loopCode}}`;
                               </g>
                             )}
 
-                            {/* Rising Smoke Particles during/after blast */}
+                            {/* Smoke Particles */}
                             {(isBlasting || isLedBlown) && (
                               <g className="pointer-events-none">
                                 <circle cx="-12" cy="-22" r="11" fill="rgba(100, 116, 139, 0.7)" className="animate-pulse" />
@@ -1213,7 +1468,6 @@ ${loopCode}}`;
                               className={isLedGlowing ? "animate-ping" : ""} 
                             />
 
-                            {/* Whisker wire: Intact if healthy, burnt gap if blown */}
                             {!isLedBlown ? (
                               <>
                                 <line x1="4" y1="6" x2="4" y2="-1" stroke="#CBD5E1" strokeWidth="1.5" />
@@ -1230,9 +1484,7 @@ ${loopCode}}`;
                             ) : (
                               <>
                                 <line x1="4" y1="6" x2="4" y2="1" stroke="#52525B" strokeWidth="1.5" />
-                                {/* Burn scar inside die */}
                                 <circle cx="-2" cy="-4" r="5" fill="#000000" opacity="0.9" />
-                                {/* Glass cracks */}
                                 <path d="M -7 4 L -2 -5 L 3 -2 L 7 -10" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="1.2" />
                                 <path d="M 1 -3 L 6 7" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="0.8" />
                               </>
@@ -1244,14 +1496,161 @@ ${loopCode}}`;
                   </g>
                 )}
 
+                {/* ---------------- 4. 3D KY-008 LASER MODULE ---------------- */}
+                {laser.isPlaced && laserPosCoord && (
+                  <g className="pointer-events-auto cursor-pointer group" onClick={() => setXrayModalComponent('laser')}>
+                    <title>KY-008 Red Laser Diode. Click for 3D Dissection.</title>
+                    {(() => {
+                      const lx = laserPosCoord.x;
+                      const ly = laserPosCoord.y;
+
+                      return (
+                        <g transform={`translate(${lx}, ${ly - 16})`}>
+                          {/* Cylindrical Brass Housing */}
+                          <rect x="-14" y="-8" width="28" height="16" rx="4" fill="#B45309" stroke="#78350F" strokeWidth="1" />
+                          <circle cx="14" cy="0" r="7" fill="#D97706" stroke="#92400E" strokeWidth="1" />
+                          {/* Laser Aperture */}
+                          <circle cx="14" cy="0" r="3" fill="#18181B" />
+                          {isLaserActive && (
+                            <circle cx="14" cy="0" r="3.5" fill="#EF4444" className="animate-pulse" />
+                          )}
+                          <text x="0" y="3" textAnchor="middle" fontSize="6" fill="#FDE68A" fontWeight="bold" fontFamily="monospace">LASER</text>
+                        </g>
+                      );
+                    })()}
+                  </g>
+                )}
+
+                {/* ---------------- 5. 3D CdS PHOTODETECTOR (LDR) ---------------- */}
+                {ldr.isPlaced && ldrLead1Coord && (
+                  <g className="pointer-events-auto cursor-pointer group" onClick={() => setXrayModalComponent('ldr')}>
+                    <title>CdS Photodetector (LDR). Click for 3D Dissection.</title>
+                    {(() => {
+                      const dx = ldrLead1Coord.x;
+                      const dy = ldrLead1Coord.y;
+
+                      return (
+                        <g transform={`translate(${dx}, ${dy - 16})`}>
+                          <circle cx="0" cy="0" r="11" fill="#E4E4E7" stroke="#71717A" strokeWidth="1.5" />
+                          {/* Serpentine CdS track */}
+                          <path 
+                            d="M -6 -5 Q -2 -7 2 -5 T 6 -1 Q 2 3 -2 1 T -6 5" 
+                            fill="none" 
+                            stroke="#D97706" 
+                            strokeWidth="1.8" 
+                            strokeLinecap="round" 
+                          />
+                          {/* Target focal spot if laser hits */}
+                          {isLaserActive && circuitAnalysis.isLaserLdrAligned && !isBeamBlocked && (
+                            <circle cx="0" cy="0" r="4.5" fill="#EF4444" className="animate-ping" />
+                          )}
+                        </g>
+                      );
+                    })()}
+                  </g>
+                )}
+
+                {/* ---------------- 6. ACTIVE LASER BEAM RAY-CASTING ---------------- */}
+                {laser.isPlaced && ldr.isPlaced && laserPosCoord && ldrLead1Coord && isLaserActive && (
+                  <g className="pointer-events-none">
+                    {(() => {
+                      const startX = laserPosCoord.x + 14;
+                      const startY = laserPosCoord.y - 16;
+                      
+                      // End point: If aligned, hits LDR! If unaligned, shoots across the board!
+                      const endX = circuitAnalysis.isLaserLdrAligned ? ldrLead1Coord.x : startX + 450;
+                      const endY = circuitAnalysis.isLaserLdrAligned ? ldrLead1Coord.y - 16 : startY;
+
+                      const midX = (startX + endX) / 2;
+
+                      // If beam blocked by hand, stop beam at obstacle!
+                      const targetEndX = isBeamBlocked ? midX : endX;
+
+                      return (
+                        <>
+                          {/* Diffused outer red glow halo */}
+                          <line 
+                            x1={startX} y1={startY} 
+                            x2={targetEndX} y2={endY} 
+                            stroke="rgba(239, 68, 68, 0.4)" 
+                            strokeWidth="8" 
+                            strokeLinecap="round" 
+                          />
+                          {/* Intense red laser beam core */}
+                          <line 
+                            x1={startX} y1={startY} 
+                            x2={targetEndX} y2={endY} 
+                            stroke="url(#laser-beam-grad)" 
+                            strokeWidth="3.5" 
+                            strokeLinecap="round" 
+                          />
+                          {/* White hot beam center */}
+                          <line 
+                            x1={startX} y1={startY} 
+                            x2={targetEndX} y2={endY} 
+                            stroke="#FFFFFF" 
+                            strokeWidth="1.2" 
+                            strokeLinecap="round" 
+                          />
+
+                          {/* Optical Emitter Lens Flare */}
+                          <circle cx={startX} cy={startY} r="8" fill="#EF4444" opacity="0.8" className="animate-pulse" />
+                          <circle cx={startX} cy={startY} r="3" fill="#FFFFFF" />
+
+                          {/* Target Focal Spot on LDR when unblocked */}
+                          {circuitAnalysis.isLaserLdrAligned && !isBeamBlocked && (
+                            <>
+                              <circle cx={endX} cy={endY} r="12" fill="rgba(239, 68, 68, 0.5)" className="animate-ping" />
+                              <circle cx={endX} cy={endY} r="4" fill="#FFFFFF" />
+                            </>
+                          )}
+
+                          {/* Hand Obstacle Barrier Icon */}
+                          {isBeamBlocked && (
+                            <g transform={`translate(${midX}, ${endY - 20})`} className="pointer-events-auto cursor-pointer" onClick={() => setIsBeamBlocked(false)}>
+                              <rect x="-18" y="-12" width="36" height="24" rx="6" fill="#DC2626" stroke="#FECACA" strokeWidth="1" />
+                              <text x="0" y="4" textAnchor="middle" fontSize="12" fill="white">✋</text>
+                            </g>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </g>
+                )}
+
+                {/* ---------------- 7. 3D PIEZO BUZZER TRANSDUCER ---------------- */}
+                {buzzer.isPlaced && buzzerPosCoord && (
+                  <g className="pointer-events-auto cursor-pointer group" onClick={() => setXrayModalComponent('buzzer')}>
+                    <title>Piezoelectric Buzzer Transducer. Click for 3D Dissection.</title>
+                    {(() => {
+                      const bx = buzzerPosCoord.x;
+                      const by = buzzerPosCoord.y;
+
+                      return (
+                        <g transform={`translate(${bx}, ${by - 18})`}>
+                          {/* Animated Acoustic Sound Waves when beeping */}
+                          {isBuzzerActive && (
+                            <>
+                              <circle cx="0" cy="0" r="35" fill="none" stroke="#FBBF24" strokeWidth="2" opacity="0.8" className="animate-ping" />
+                              <circle cx="0" cy="0" r="50" fill="none" stroke="#F59E0B" strokeWidth="1.5" opacity="0.6" className="animate-ping" />
+                            </>
+                          )}
+
+                          {/* Cylindrical Buzzer Body */}
+                          <circle cx="0" cy="0" r="16" fill="#0F172A" stroke="#475569" strokeWidth="2" />
+                          <circle cx="0" cy="0" r="6" fill="#020617" />
+                          <text x="9" y="-6" fontSize="9" fill="#F8FAFC" fontWeight="bold">+</text>
+                        </g>
+                      );
+                    })()}
+                  </g>
+                )}
+
               </svg>
 
               {/* 1. ARDUINO UNO R3 BOARD */}
               <div 
-                className="relative w-[280px] h-[390px] bg-[#005B60] rounded-2xl border-[3px] border-[#008184] shadow-[12px_18px_30px_rgba(0,0,0,0.8)] p-4 flex flex-col justify-between shrink-0 group select-none z-10"
-                style={{
-                  boxShadow: '0 20px 35px -5px rgba(0, 0, 0, 0.7), inset 0 2px 4px rgba(255, 255, 255, 0.2), inset 0 -4px 6px rgba(0, 0, 0, 0.5)'
-                }}
+                className="relative w-[280px] h-[390px] bg-[#005B60] rounded-2xl border-[3px] border-[#008184] shadow-[12px_18px_30px_rgba(0,0,0,0.8)] p-4 flex flex-col justify-between shrink-0 select-none z-10"
               >
                 <div className="absolute inset-0 rounded-2xl border-b-4 border-r-4 border-[#00383B] pointer-events-none"></div>
 
@@ -1269,17 +1668,17 @@ ${loopCode}}`;
                   title="Hardware Reset"
                 />
 
-                {/* Top Pins */}
+                {/* Top Digital Pins */}
                 <div className="space-y-1">
                   <div className="flex items-center justify-between text-[8px] font-mono text-cyan-200 font-bold px-1 select-none">
                     <span>AREF</span>
                     <span>GND</span>
-                    <span className="text-yellow-300 font-extrabold underline">PIN 13</span>
+                    <span className="text-yellow-300 font-extrabold underline">13</span>
                     <span>12</span>
-                    <span>11~</span>
-                    <span>10~</span>
-                    <span>9~</span>
-                    <span>8</span>
+                    <span className="text-blue-300 font-bold">11</span>
+                    <span>10</span>
+                    <span className="text-red-400 font-bold">9~</span>
+                    <span className="text-amber-400 font-bold">8</span>
                   </div>
                   
                   <div className="h-7 bg-[#111] border-2 border-slate-800 rounded-md px-1.5 flex items-center justify-between shadow-inner">
@@ -1341,7 +1740,6 @@ ${loopCode}}`;
                   <div 
                     onClick={() => setXrayModalComponent('arduino')}
                     className="w-full bg-[#161616] border-2 border-slate-700 rounded-lg p-2 flex flex-col justify-between shadow-[0_6px_12px_rgba(0,0,0,0.8)] cursor-pointer hover:border-cyan-400 transition-colors"
-                    title="Click for 3D Dissection"
                   >
                     <div className="flex items-center justify-between px-1">
                       <div className="w-2 h-2 rounded-full border border-slate-600 bg-slate-900"></div>
@@ -1360,7 +1758,7 @@ ${loopCode}}`;
                   </div>
                 </div>
 
-                {/* Bottom Pins */}
+                {/* Bottom Power Pins */}
                 <div className="space-y-1">
                   <div className="h-7 bg-[#111] border-2 border-slate-800 rounded-md px-1.5 flex items-center justify-between shadow-inner">
                     {[
@@ -1398,9 +1796,6 @@ ${loopCode}}`;
               {/* 2. 1:1 REAL 30-ROW BREADBOARD */}
               <div 
                 className="relative w-full max-w-[680px] bg-[#F7F7F8] rounded-xl border-4 border-[#E2E4E8] p-4 shadow-[0_25px_50px_rgba(0,0,0,0.85)] flex flex-col justify-between select-none z-10"
-                style={{
-                  boxShadow: '0 20px 40px -10px rgba(0,0,0,0.8), inset 0 2px 4px #FFFFFF, inset 0 -3px 6px #D1D5DB'
-                }}
               >
                 {/* Dovetail Tabs */}
                 <div className="absolute -left-2.5 top-12 w-2.5 h-6 bg-[#E5E7EB] rounded-l-xs border-y border-l border-slate-300"></div>
@@ -1588,7 +1983,7 @@ ${loopCode}}`;
 
           </div>
 
-          {/* Connected Jumper Wires Tag Bar */}
+          {/* Connected Wires List Bar */}
           <div className="p-2.5 bg-slate-950/80 border-t border-slate-800 flex items-center justify-between gap-4 text-xs font-mono overflow-x-auto z-20">
             <div className="flex items-center gap-1.5 shrink-0 text-slate-400 font-bold text-[10px] uppercase">
               <span>Wires ({wires.length}):</span>
@@ -1604,15 +1999,11 @@ ${loopCode}}`;
                   <button 
                     onClick={() => removeWire(w.id)}
                     className="text-slate-500 hover:text-red-400 cursor-pointer ml-1"
-                    title="Remove wire"
                   >
                     ×
                   </button>
                 </div>
               ))}
-              {wires.length === 0 && (
-                <span className="text-slate-600 italic text-[11px]">No wires. Click pins & holes to connect.</span>
-              )}
             </div>
           </div>
 
@@ -1623,7 +2014,6 @@ ${loopCode}}`;
           mobileTab === 'blocks' ? 'flex flex-1' : 'hidden lg:flex'
         }`}>
           
-          {/* Header */}
           <div className="bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center justify-between text-xs">
             <div className="flex items-center gap-2">
               <Puzzle size={16} className="text-pixiu-blue" />
@@ -1639,11 +2029,9 @@ ${loopCode}}`;
             </button>
           </div>
 
-          {/* BLOCK CANVAS */}
           {!showCppCode ? (
             <div className="flex-1 p-4 flex flex-col space-y-3.5 overflow-y-auto">
               
-              {/* Event Block */}
               <div className="bg-[#EAB308]/20 border-2 border-[#EAB308] rounded-2xl p-3 shadow-md">
                 <div className="flex items-center gap-2 font-bold text-xs text-yellow-300">
                   <div className="w-2.5 h-2.5 rounded-full bg-yellow-400 animate-pulse"></div>
@@ -1651,7 +2039,6 @@ ${loopCode}}`;
                 </div>
               </div>
 
-              {/* Stack of Blocks */}
               <div className="space-y-2.5 pl-3 border-l-2 border-yellow-500/40">
                 {blocks.map((block, idx) => {
                   const isActive = activeBlockIndex === idx;
@@ -1668,19 +2055,19 @@ ${loopCode}}`;
                       >
                         <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                           <Zap size={14} className={isActive ? 'text-yellow-300 animate-bounce' : 'text-white'} />
-                          <span>Set Digital Pin</span>
+                          <span>Set Pin</span>
                           
                           <select 
                             value={block.pin}
                             onChange={(e) => updateBlock(block.id, 'pin', e.target.value)}
                             className="bg-blue-900 border border-blue-400 rounded-lg px-2 py-1 text-white font-bold cursor-pointer text-xs"
                           >
-                            <option value="13">Pin 13</option>
+                            <option value="13">Pin 13 (Built-in LED)</option>
+                            <option value="11">Pin 11 (LED Bulb)</option>
+                            <option value="9">Pin 9 (KY-008 Laser)</option>
+                            <option value="8">Pin 8 (Piezo Buzzer)</option>
                             <option value="12">Pin 12</option>
-                            <option value="11">Pin 11</option>
                             <option value="10">Pin 10</option>
-                            <option value="9">Pin 9</option>
-                            <option value="8">Pin 8</option>
                           </select>
 
                           <span>to</span>
@@ -1690,15 +2077,14 @@ ${loopCode}}`;
                             onChange={(e) => updateBlock(block.id, 'state', e.target.value)}
                             className="bg-blue-900 border border-blue-400 rounded-lg px-2 py-1 text-white font-bold cursor-pointer text-xs"
                           >
-                            <option value="HIGH">HIGH (💡 5V)</option>
-                            <option value="LOW">LOW (🌑 0V)</option>
+                            <option value="HIGH">HIGH (💡 ON)</option>
+                            <option value="LOW">LOW (🌑 OFF)</option>
                           </select>
                         </div>
 
                         <button 
                           onClick={() => deleteBlock(block.id)}
                           className="p-1 text-blue-200 hover:text-white rounded hover:bg-blue-800 transition-colors cursor-pointer"
-                          title="Delete Block"
                         >
                           <Trash2 size={13} />
                         </button>
@@ -1736,7 +2122,6 @@ ${loopCode}}`;
                         <button 
                           onClick={() => deleteBlock(block.id)}
                           className="p-1 text-amber-200 hover:text-white rounded hover:bg-amber-800 transition-colors cursor-pointer"
-                          title="Delete Block"
                         >
                           <Trash2 size={13} />
                         </button>
@@ -1808,12 +2193,11 @@ ${loopCode}}`;
 
       </main>
 
-      {/* ==================== MOBILE FLOATING RUN ACTION BAR (< 1024px) ==================== */}
+      {/* ==================== MOBILE FLOATING ACTION BAR (< 1024px) ==================== */}
       <div className="lg:hidden fixed bottom-0 inset-x-0 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 px-4 py-2.5 flex items-center justify-between gap-3 z-40 shadow-2xl">
         <button
           onClick={handleReset}
           className="p-2.5 bg-slate-800 text-slate-300 rounded-xl border border-slate-700 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 shrink-0"
-          title="Reset"
         >
           <RotateCcw size={14} />
           <span className="text-[11px]">Reset</span>
@@ -1851,9 +2235,11 @@ ${loopCode}}`;
                 <div>
                   <h3 className="text-sm sm:text-base font-black text-white">
                     {xrayModalComponent === 'bulb' && '3D LED Bulb Anatomy & Quantum Electroluminescence'}
-                    {xrayModalComponent === 'breadboard' && '3D Breadboard Internal Spring-Clip Architecture'}
                     {xrayModalComponent === 'resistor' && "3D 220Ω Resistor Spiral Core & Ohm's Law Physics"}
-                    {xrayModalComponent === 'arduino' && 'ATmega328P Silicon Micro-Architecture (Die, RAM, ROM, Clock)'}
+                    {xrayModalComponent === 'laser' && 'KY-008 Laser Diode Stimulated Emission Cavity (650nm)'}
+                    {xrayModalComponent === 'ldr' && 'CdS Photodetector Photo-Conductivity & Bandgap Physics'}
+                    {xrayModalComponent === 'buzzer' && 'Piezoelectric Ceramic Crystal Acoustic Resonance (2.4kHz)'}
+                    {xrayModalComponent === 'arduino' && 'ATmega328P Silicon Micro-Architecture (Die, RAM, ROM)'}
                   </h3>
                   <span className="text-[9px] sm:text-[10px] font-mono text-cyan-300 uppercase tracking-widest">
                     Interactive Deep-Dive Dissection
@@ -1870,85 +2256,70 @@ ${loopCode}}`;
             </div>
 
             <div className="flex-1 overflow-y-auto py-4 sm:py-5 space-y-5 text-xs text-slate-300">
-              {/* LED BULB */}
-              {xrayModalComponent === 'bulb' && (
+              {/* LASER MODAL */}
+              {xrayModalComponent === 'laser' && (
                 <div className="space-y-4">
                   <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 flex flex-col md:flex-row items-center justify-around gap-5">
-                    <div className="w-48 sm:w-52 h-40 sm:h-44 bg-gradient-to-b from-red-950 to-slate-900 border border-red-500/40 rounded-xl p-3 relative flex flex-col justify-between overflow-hidden shadow-inner shrink-0">
-                      <div className="text-[9px] font-mono font-bold text-red-400 text-center">
-                        P-N JUNCTION SEMICONDUCTOR CHIP
-                      </div>
-
-                      <div className="flex items-center justify-around my-auto">
-                        <div className="text-center">
-                          <span className="text-[8px] text-blue-400 block font-bold">N-REGION</span>
-                          <div className="w-7 h-7 rounded-full bg-blue-500/30 border border-blue-400 flex items-center justify-center font-mono text-[8px] font-bold text-blue-200 animate-pulse">
-                            e⁻ e⁻
-                          </div>
-                        </div>
-
-                        <div className="flex flex-col items-center">
-                          <span className="text-amber-300 font-black text-xs animate-bounce">⚡ hν</span>
-                          <span className="text-[7px] text-red-400 font-mono">Photon λ=660nm</span>
-                        </div>
-
-                        <div className="text-center">
-                          <span className="text-[8px] text-rose-400 block font-bold">P-REGION</span>
-                          <div className="w-7 h-7 rounded-full bg-rose-500/30 border border-rose-400 flex items-center justify-center font-mono text-[8px] font-bold text-rose-200 animate-pulse">
-                            h⁺ h⁺
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="text-[8px] font-mono text-center text-slate-400">
-                        Electrons drop into holes ➔ Emits light photon!
-                      </div>
+                    <div className="w-48 h-36 bg-gradient-to-r from-amber-950 to-red-950 border border-red-500/40 rounded-xl p-3 flex flex-col justify-between items-center shadow-inner">
+                      <span className="text-[9px] font-mono text-amber-300 font-bold">STIMULATED EMISSION CAVITY</span>
+                      <div className="w-full h-1 bg-red-500 shadow-[0_0_12px_#EF4444] animate-pulse my-auto"></div>
+                      <span className="text-[8px] font-mono text-red-400">Coherent Photons λ = 650nm</span>
                     </div>
 
                     <div className="space-y-1.5 text-left">
-                      <div className="font-bold text-white text-xs">5 Anatomical Layers of an LED:</div>
+                      <div className="font-bold text-white text-xs">How the KY-008 Laser Works:</div>
                       <ul className="space-y-1 text-slate-300 text-[11px]">
-                        <li><strong className="text-red-400">1. Epoxy Dome:</strong> Optical lens focusing emitted light.</li>
-                        <li><strong className="text-amber-400">2. Anvil (Cathode -):</strong> Reflective cup holding semiconductor die.</li>
-                        <li><strong className="text-blue-400">3. Post (Anode +):</strong> Connects longer positive lead.</li>
-                        <li><strong className="text-yellow-400">4. Gold Whisker Wire:</strong> Ultra-fine gold wire passing current.</li>
-                        <li><strong className="text-emerald-400">5. GaAsP Crystal Die:</strong> Quantum electroluminescence source.</li>
+                        <li><strong className="text-red-400">1. Optical Resonator:</strong> High-reflectivity mirrors amplify photons.</li>
+                        <li><strong className="text-amber-400">2. Population Inversion:</strong> Electrons pumped to excited state by 5V.</li>
+                        <li><strong className="text-cyan-400">3. Collimating Lens:</strong> Focuses beam into a razor-sharp parallel ray.</li>
                       </ul>
                     </div>
-                  </div>
-
-                  <div className="p-3.5 bg-slate-900 border border-slate-800 rounded-2xl space-y-1.5">
-                    <h4 className="font-bold text-white text-xs flex items-center gap-1.5">
-                      <Sparkles size={13} className="text-yellow-400" />
-                      How It Actually Glows Behind the Scenes:
-                    </h4>
-                    <p className="leading-relaxed text-[11px] text-slate-300">
-                      Unlike an incandescent bulb that burns a filament with heat, an LED uses <strong>cold solid-state electroluminescence</strong>. When voltage is applied, electrons cross the energy bandgap into the holes of the P-region and release energy as <strong>Photons of Light</strong> (E = h × c / λ).
-                    </p>
                   </div>
                 </div>
               )}
 
-              {/* BREADBOARD CLIPS */}
-              {xrayModalComponent === 'breadboard' && (
+              {/* LDR MODAL */}
+              {xrayModalComponent === 'ldr' && (
                 <div className="space-y-4">
-                  <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 text-center space-y-3">
-                    <div className="font-bold text-white text-xs">Internal Phosphor-Bronze Spring Clip Matrix</div>
-                    
-                    <div className="p-3 bg-gradient-to-r from-amber-500/10 via-amber-500/20 to-amber-500/10 border border-amber-500/30 rounded-xl flex items-center justify-center gap-3">
-                      {['a', 'b', 'c', 'd', 'e'].map((col, i) => (
-                        <div key={i} className="text-center">
-                          <div className="w-7 h-7 rounded-lg bg-amber-400 border border-amber-200 text-black font-mono font-black text-xs flex items-center justify-center shadow-md">
-                            {col}
-                          </div>
-                          <span className="text-[8px] font-mono text-amber-300 mt-0.5 block">Tied</span>
-                        </div>
-                      ))}
+                  <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 flex flex-col md:flex-row items-center justify-around gap-5">
+                    <div className="w-44 h-32 bg-slate-900 border border-amber-500/40 rounded-xl p-3 flex flex-col justify-between items-center">
+                      <span className="text-[9px] font-mono text-amber-400 font-bold">Cadmium Sulfide (CdS)</span>
+                      <div className="text-center">
+                        <div className="text-lg font-black text-white">100 Ω ➔ 1 MΩ</div>
+                        <span className="text-[8px] text-slate-400 font-mono">Resistance drops when laser hits</span>
+                      </div>
+                      <span className="text-[8px] text-emerald-400 font-mono">Photon-generated charge carriers</span>
                     </div>
 
-                    <p className="text-[11px] text-slate-400 leading-relaxed max-w-lg mx-auto">
-                      Beneath the off-white plastic casing are nickel-plated phosphor-bronze metal spring clips. All 5 socket holes in row 15 (columns a-b-c-d-e) touch the <strong>same single piece of metal</strong>, connecting components together without soldering!
-                    </p>
+                    <div className="space-y-1.5">
+                      <div className="font-bold text-white text-xs">Photoelectric Conduction:</div>
+                      <p className="text-[11px] text-slate-300 leading-relaxed">
+                        In the dark, few free electrons exist, so resistance is high (~1,000,000Ω). When the laser beam hits the CdS track, photons knock electrons into the conduction band, slashing resistance to ~100Ω!
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* BUZZER MODAL */}
+              {xrayModalComponent === 'buzzer' && (
+                <div className="space-y-4">
+                  <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 flex flex-col md:flex-row items-center justify-around gap-5">
+                    <div className="w-44 h-32 bg-slate-900 border border-yellow-500/40 rounded-xl p-3 flex flex-col justify-between items-center">
+                      <span className="text-[9px] font-mono text-yellow-400 font-bold">PIEZO CERAMIC DISC</span>
+                      <div className="flex items-center gap-1">
+                        <BellRing size={20} className="text-yellow-400 animate-bounce" />
+                        <span className="text-lg font-black text-white">2.400 kHz</span>
+                      </div>
+                      <span className="text-[8px] text-slate-400 font-mono">Inverse Piezoelectric Effect</span>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <div className="font-bold text-white text-xs">Acoustic Sound Wave Physics:</div>
+                      <p className="text-[11px] text-slate-300 leading-relaxed">
+                        When voltage is applied to the piezoelectric crystal (PZT disc), it expands and contracts mechanically 2,400 times per second, vibrating the metal diaphragm to create an audible, high-pitch square-wave BEEP!
+                      </p>
+                    </div>
                   </div>
                 </div>
               )}
@@ -1959,16 +2330,13 @@ ${loopCode}}`;
                   <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 flex flex-col md:flex-row items-center justify-around gap-5">
                     <div className="w-44 h-24 bg-[#966F3D]/20 border border-amber-600/40 rounded-xl p-3 flex flex-col items-center justify-center">
                       <div className="font-mono text-[9px] text-amber-400 font-bold mb-1">SPIRAL CARBON FILM</div>
-                      <div className="font-mono text-base font-black text-white tracking-widest">
-                        220 Ω
-                      </div>
-                      <span className="text-[8px] text-slate-400 font-mono">Laser-cut spiral determines resistance</span>
+                      <div className="font-mono text-base font-black text-white tracking-widest">220 Ω</div>
+                      <span className="text-[8px] text-slate-400 font-mono">Drops 3V to protect 20mA LED</span>
                     </div>
 
                     <div className="space-y-1.5">
                       <div className="font-bold text-white text-xs">Ohm's Law Calculation:</div>
                       <div className="font-mono text-[11px] bg-slate-900 p-2.5 rounded-lg border border-slate-800 text-amber-300">
-                        R = (V_supply - V_led) / I_desired<br />
                         R = (5.0V - 2.0V) / 0.014A = 214Ω ➔ Standard 220Ω
                       </div>
                     </div>
@@ -1976,7 +2344,30 @@ ${loopCode}}`;
                 </div>
               )}
 
-              {/* ARDUINO SILICON DIE */}
+              {/* BULB */}
+              {xrayModalComponent === 'bulb' && (
+                <div className="space-y-4">
+                  <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 flex flex-col md:flex-row items-center justify-around gap-5">
+                    <div className="w-48 h-36 bg-gradient-to-b from-red-950 to-slate-900 border border-red-500/40 rounded-xl p-3 flex flex-col justify-between items-center shadow-inner">
+                      <span className="text-[9px] font-mono text-red-400 font-bold">P-N JUNCTION SEMICONDUCTOR</span>
+                      <span className="text-amber-300 font-black text-xs animate-bounce">⚡ hν Photon</span>
+                      <span className="text-[8px] font-mono text-slate-400">Electroluminescence @ 20mA max</span>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <div className="font-bold text-white text-xs">5 Anatomical Parts of an LED:</div>
+                      <ul className="space-y-1 text-slate-300 text-[11px]">
+                        <li><strong className="text-red-400">1. Epoxy Dome:</strong> Optical lens focusing light.</li>
+                        <li><strong className="text-amber-400">2. Anvil (Cathode -):</strong> Holds semiconductor die.</li>
+                        <li><strong className="text-blue-400">3. Post (Anode +):</strong> Connects positive lead.</li>
+                        <li><strong className="text-yellow-400">4. Whisker Wire:</strong> Passes current into die.</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ARDUINO */}
               {xrayModalComponent === 'arduino' && (
                 <div className="space-y-4">
                   <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-3">
@@ -2006,20 +2397,9 @@ ${loopCode}}`;
                         <div className="text-sm font-black text-white">8-BIT</div>
                       </div>
                     </div>
-
-                    <div className="p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-left space-y-1 text-[11px]">
-                      <div className="font-bold text-white flex items-center gap-1.5">
-                        <Radio size={13} className="text-cyan-400 animate-pulse" />
-                        16.000 MHz Quartz Clock:
-                      </div>
-                      <p className="text-slate-300 leading-relaxed">
-                        Vibrates exactly 16,000,000 times per second to fetch and execute block code instructions in 62.5 nanoseconds!
-                      </p>
-                    </div>
                   </div>
                 </div>
               )}
-
             </div>
 
             <div className="pt-3 border-t border-slate-700/80 flex justify-end">
