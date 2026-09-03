@@ -1038,6 +1038,31 @@ ${loopCode}}`;
             <RotateCcw size={13} />
           </button>
 
+          {/* Top Bar Obstacle Trigger Button */}
+          <button
+            onClick={() => {
+              getAudioContext();
+              const nextBlocked = !isBeamBlocked;
+              setIsBeamBlocked(nextBlocked);
+              if (nextBlocked) {
+                showToast('🚨 OBSTACLE DETECTED! Laser beam cut ➔ Red Light ON & Buzzer Alarm BEEPING!', 'Tripwire Breach!', 'error');
+                setSerialLogs(prev => [...prev.slice(-30), `[🚨 ALARM TRIGGERED] Obstacle placed! Beam broken ➔ Red Light ON, Piezo Buzzer BEEPING (2400Hz)!`]);
+              } else {
+                showToast('Perimeter restored: Obstacle removed. Red Light OFF & Buzzer silent.', 'Perimeter Secure', 'success');
+                setSerialLogs(prev => [...prev.slice(-30), `[🟢 PERIMETER RESTORED] Obstacle removed ➔ Laser beam intact on LDR (100Ω). Alarm Armed.`]);
+              }
+            }}
+            className={`px-2.5 sm:px-3.5 py-1.5 rounded-xl border text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer shadow-md active:scale-95 ${
+              isBeamBlocked 
+                ? 'bg-rose-600 hover:bg-rose-500 text-white border-rose-400 shadow-rose-600/40 animate-pulse' 
+                : 'bg-indigo-600 hover:bg-indigo-500 text-white border-indigo-400 shadow-indigo-600/30'
+            }`}
+            title="Click to place/remove an obstacle in front of the laser beam"
+          >
+            <Hand size={14} className={isBeamBlocked ? 'animate-bounce' : ''} />
+            <span>{isBeamBlocked ? '🚨 Remove Obstacle' : '🖐️ Place Obstacle'}</span>
+          </button>
+
           {/* Desktop Run Button */}
           <button
             onClick={handleToggleRun}
@@ -1218,6 +1243,31 @@ ${loopCode}}`;
                   className="px-2 py-1 bg-yellow-600/20 hover:bg-yellow-600/30 text-yellow-300 border border-yellow-500/40 rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-all"
                 >
                   <Plus size={12} /> Piezo Buzzer
+                </button>
+
+                {/* Obstacle Barrier Placement Toggle */}
+                <button
+                  onClick={() => {
+                    getAudioContext();
+                    const nextBlocked = !isBeamBlocked;
+                    setIsBeamBlocked(nextBlocked);
+                    if (nextBlocked) {
+                      showToast('🚨 OBSTACLE DETECTED! Laser beam cut ➔ Red Light ON & Buzzer Alarm BEEPING!', 'Tripwire Breach!', 'error');
+                      setSerialLogs(prev => [...prev.slice(-30), `[🚨 ALARM TRIGGERED] Obstacle placed! Beam broken ➔ Red Light ON, Piezo Buzzer BEEPING (2400Hz)!`]);
+                    } else {
+                      showToast('Perimeter restored: Obstacle removed. Red Light OFF & Buzzer silent.', 'Perimeter Secure', 'success');
+                      setSerialLogs(prev => [...prev.slice(-30), `[🟢 PERIMETER RESTORED] Obstacle removed ➔ Laser beam intact on LDR (100Ω). Alarm Armed.`]);
+                    }
+                  }}
+                  className={`px-2.5 py-1 rounded-lg border text-[11px] font-black uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-all ${
+                    isBeamBlocked
+                      ? 'bg-rose-600 text-white border-rose-400 shadow-md animate-pulse'
+                      : 'bg-indigo-600/40 hover:bg-indigo-600/60 text-indigo-200 border-indigo-500/50'
+                  }`}
+                  title="Simulate obstacle placed right in front of the laser beam"
+                >
+                  <Hand size={12} className={isBeamBlocked ? 'animate-bounce' : ''} />
+                  <span>{isBeamBlocked ? '🚨 Remove Obstacle' : '🖐️ Place Obstacle (Cut Beam)'}</span>
                 </button>
               </div>
             </div>
