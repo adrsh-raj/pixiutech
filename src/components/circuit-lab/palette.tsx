@@ -4,7 +4,7 @@ import React, { useState, useMemo } from "react"
 import type { PartType } from "@/lib/circuit-types"
 import { CATALOG, PALETTE_ORDER } from "@/lib/components-catalog"
 import { PartArt } from "./part-art"
-import { Search } from "lucide-react"
+import { Search, X } from "lucide-react"
 
 /** A scaled, non-interactive thumbnail of a part for the palette. */
 function Thumb({ type }: { type: PartType }) {
