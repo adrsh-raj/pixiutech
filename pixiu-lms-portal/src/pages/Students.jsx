@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Search, Plus, MoreVertical, MessageCircle, Building2, X, FileText, ChevronRight, User, Award, Activity, Box, Trash2, Edit, Check, Phone, GraduationCap, Download } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { useToast } from '../context/ToastContext';
@@ -37,13 +37,74 @@ export default function Students() {
     }
   }, [formData.schoolCode, formData.class, formData.section, isAddModalOpen]);
 
-  const filteredStudents = students.filter(s => {
-    const matchesSchool = selectedSchool === 'All' || s.school_id === selectedSchool;
-    const matchesClass = selectedClassFilter === 'All' || s.class_id === selectedClassFilter;
-    const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          s.student_id.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesSchool && matchesClass && matchesSearch;
-  });
+  // Helper to extract clean grade + section string from student or class (e.g. '6A', '7A')
+  const getGradeSection = (item) => {
+    if (!item) return '';
+    if (item.grade && item.section) return `${item.grade}${item.section}`;
+    const classObj = classes.find(c => c.id === item.class_id);
+    if (classObj) return `${classObj.grade}${classObj.section}`;
+    const match = item.class_id?.match(/(\d+[A-Za-z]?)$/);
+    if (match) return match[1];
+    const stuIdMatch = item.student_id?.match(/[A-Za-z]+(\d+[A-Za-z]?)\s+\d+/);
+    if (stuIdMatch) return stuIdMatch[1];
+    return '';
+  };
+
+  // Available class filter tabs based on selected school (deduplicated across schools)
+  const availableClassTabs = useMemo(() => {
+    const relevantClasses = classes.filter(c => selectedSchool === 'All' || c.school_id === selectedSchool);
+    const seen = new Set();
+    const uniqueTabs = [];
+    
+    // From classes table
+    for (const c of relevantClasses) {
+      const key = `${c.grade}${c.section}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        uniqueTabs.push({
+          key,
+          label: `Class ${c.grade}${c.section}`,
+          grade: c.grade,
+          section: c.section
+        });
+      }
+    }
+
+    // From students table
+    const relevantStudents = students.filter(s => selectedSchool === 'All' || s.school_id === selectedSchool);
+    for (const s of relevantStudents) {
+      const gradeSec = getGradeSection(s);
+      if (gradeSec && !seen.has(gradeSec)) {
+        seen.add(gradeSec);
+        const gradeMatch = gradeSec.match(/\d+/);
+        const secMatch = gradeSec.match(/[A-Za-z]+/);
+        uniqueTabs.push({
+          key: gradeSec,
+          label: `Class ${gradeSec}`,
+          grade: gradeMatch ? gradeMatch[0] : '6',
+          section: secMatch ? secMatch[0] : 'A'
+        });
+      }
+    }
+
+    return uniqueTabs.sort((a, b) => (parseInt(a.grade, 10) || 0) - (parseInt(b.grade, 10) || 0));
+  }, [classes, students, selectedSchool]);
+
+  const filteredStudents = useMemo(() => {
+    return students.filter(s => {
+      const matchesSchool = selectedSchool === 'All' || s.school_id === selectedSchool;
+      const sGradeSec = getGradeSection(s);
+      const matchesClass = selectedClassFilter === 'All' || 
+                           sGradeSec === selectedClassFilter || 
+                           s.class_id === selectedClassFilter ||
+                           s.class_id?.endsWith(`-${selectedClassFilter}`) ||
+                           s.class_id?.includes(selectedClassFilter);
+      const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                            s.student_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            (s.parent_name && s.parent_name.toLowerCase().includes(searchTerm.toLowerCase()));
+      return matchesSchool && matchesClass && matchesSearch;
+    });
+  }, [students, classes, selectedSchool, selectedClassFilter, searchTerm]);
 
   const handleAddSubmit = async (e) => {
     e.preventDefault();
@@ -249,19 +310,19 @@ export default function Students() {
           <button
             type="button"
             onClick={() => {
-              const activeGrade = selectedClassFilter === 'All' ? '6' : selectedClassFilter.replace(/CLS-(?:ZPS|XYZ)-/i, '').replace('A', '');
-              const targetSchoolObj = schools.find(s => s.id === selectedSchool) || schools[0];
-              const cohortStudents = students.filter(s => {
-                const matchesSchool = selectedSchool === 'All' || s.school_id === selectedSchool;
-                const matchesClass = selectedClassFilter === 'All' || s.class_id === selectedClassFilter || s.class_id?.includes(selectedClassFilter);
-                return matchesSchool && matchesClass;
-              });
+              const activeGrade = selectedClassFilter === 'All' ? '6' : selectedClassFilter.replace(/[^\d]/g, '') || '6';
+              const activeSection = selectedClassFilter === 'All' ? 'A' : selectedClassFilter.replace(/[^A-Za-z]/g, '') || 'A';
+              const targetSchoolObj = selectedSchool === 'All' 
+                ? { name: 'All Partner Schools Network', code: 'ALL', city: 'Hata & Gorakhpur' }
+                : schools.find(s => s.id === selectedSchool) || schools[0];
+
+              const cohortStudents = filteredStudents.length > 0 ? filteredStudents : students;
 
               generateClassCohortTranscriptPDF({
                 classGrade: activeGrade,
-                classSection: 'A',
+                classSection: activeSection,
                 school: targetSchoolObj,
-                students: cohortStudents.length > 0 ? cohortStudents : students,
+                students: cohortStudents,
                 studentReviews,
                 projects,
                 curriculum,
@@ -310,20 +371,20 @@ export default function Students() {
             <button 
               onClick={() => setSelectedClassFilter('All')}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                selectedClassFilter === 'All' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                selectedClassFilter === 'All' ? 'bg-slate-900 text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
               All Grades
             </button>
-            {classes.filter(c => selectedSchool === 'All' || c.school_id === selectedSchool).map(c => (
+            {availableClassTabs.map(tab => (
               <button 
-                key={c.id}
-                onClick={() => setSelectedClassFilter(c.id)}
+                key={tab.key}
+                onClick={() => setSelectedClassFilter(tab.key)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
-                  selectedClassFilter === c.id ? 'bg-pixiu-blue text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  selectedClassFilter === tab.key ? 'bg-pixiu-blue text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
-                Class {c.grade}{c.section}
+                {tab.label}
               </button>
             ))}
           </div>
@@ -376,7 +437,16 @@ export default function Students() {
                       </div>
                     </td>
                     <td className="p-4 font-medium text-slate-700">
-                      {schoolObj ? schoolObj.name : student.school_id}
+                      <div className="flex flex-col">
+                        <span className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                          <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-bold text-[10px] border border-blue-200">
+                            Class {getGradeSection(student) || '6A'}
+                          </span>
+                        </span>
+                        <span className="text-[11px] text-slate-500 font-medium mt-0.5">
+                          {schoolObj ? schoolObj.name : student.school_id}
+                        </span>
+                      </div>
                     </td>
                     <td className="p-4">
                       <div className="flex items-center gap-2">
