@@ -259,13 +259,13 @@ export default function Simulation() {
 
   const circuitAnalysis = useMemo(() => {
     if (!resistor.isPlaced && !led.isPlaced) {
-      return { isComplete: false, message: '⚠️ Both Resistor & LED are in tray. Click "Place" to insert them.', reason: 'no_components' };
+      return { isComplete: false, sourcePin: null, message: '⚠️ Both Resistor & LED are in tray. Click "Place" to insert them.', reason: 'no_components' };
     }
     if (!resistor.isPlaced) {
-      return { isComplete: false, message: '⚠️ 220Ω Resistor missing! Click "Place Resistor" to insert into breadboard.', reason: 'no_resistor' };
+      return { isComplete: false, sourcePin: null, message: '⚠️ 220Ω Resistor missing! Click "Place Resistor" to insert into breadboard.', reason: 'no_resistor' };
     }
     if (!led.isPlaced) {
-      return { isComplete: false, message: '⚠️ LED Bulb missing! Click "Place LED" to insert into breadboard.', reason: 'no_led' };
+      return { isComplete: false, sourcePin: null, message: '⚠️ LED Bulb missing! Click "Place LED" to insert into breadboard.', reason: 'no_led' };
     }
 
     const resNode1 = getElectricalNode(`BB_${resistor.lead1.row}_${resistor.lead1.col}`);
@@ -308,37 +308,60 @@ export default function Simulation() {
       return false;
     };
 
-    const pin13ToRes1 = isConnected('ARD_13', resNode1);
-    const pin13ToRes2 = isConnected('ARD_13', resNode2);
+    // Dynamic Power Source Pins (Pin 0 to 13, 5V, 3.3V)
+    const possiblePowerPins = [
+      'ARD_13', 'ARD_12', 'ARD_11', 'ARD_10', 'ARD_9', 'ARD_8',
+      'ARD_7', 'ARD_6', 'ARD_5', 'ARD_4', 'ARD_3', 'ARD_2', 'ARD_1', 'ARD_0',
+      'ARD_5V', 'ARD_3V3'
+    ];
 
+    let activeSourcePin = null;
     let resPowerNode = null;
     let resOutputNode = null;
 
-    if (pin13ToRes1) {
-      resPowerNode = resNode1;
-      resOutputNode = resNode2;
-    } else if (pin13ToRes2) {
-      resPowerNode = resNode2;
-      resOutputNode = resNode1;
+    for (const p of possiblePowerPins) {
+      if (isConnected(p, resNode1)) {
+        activeSourcePin = p.replace('ARD_', '');
+        resPowerNode = resNode1;
+        resOutputNode = resNode2;
+        break;
+      } else if (isConnected(p, resNode2)) {
+        activeSourcePin = p.replace('ARD_', '');
+        resPowerNode = resNode2;
+        resOutputNode = resNode1;
+        break;
+      }
     }
 
-    if (!resPowerNode) {
-      return { isComplete: false, message: '⚠️ Missing Power Wire: Connect Pin 13 to the Resistor row.', reason: 'no_power_wire' };
+    if (!activeSourcePin) {
+      // Check if user connected directly to LED without resistor!
+      for (const p of possiblePowerPins) {
+        if (isConnected(p, ledAnodeNode)) {
+          return { 
+            isComplete: false, 
+            sourcePin: p.replace('ARD_', ''), 
+            message: `⚠️ Overcurrent Warning! Pin ${p.replace('ARD_', '')} connected directly to LED without 220Ω resistor!`, 
+            reason: 'no_resistor_protection' 
+          };
+        }
+      }
+      return { isComplete: false, sourcePin: null, message: '⚠️ Missing Power Wire: Connect an Arduino Pin (e.g. Pin 11 or 13) to the Resistor row.', reason: 'no_power_wire' };
     }
 
     const resToAnode = isConnected(resOutputNode, ledAnodeNode);
     if (!resToAnode) {
-      return { isComplete: false, message: `⚠️ Resistor does not reach LED! Connect Row ${resistor.lead2.row} to Row ${led.anode.row}.`, reason: 'res_not_to_led' };
+      return { isComplete: false, sourcePin: activeSourcePin, message: `⚠️ Resistor does not reach LED! Connect Row ${resistor.lead2.row} to Row ${led.anode.row}.`, reason: 'res_not_to_led' };
     }
 
-    const cathodeToGnd = isConnected(ledCathodeNode, 'ARD_GND') || isConnected(ledCathodeNode, 'ARD_GND_TOP');
+    const cathodeToGnd = isConnected(ledCathodeNode, 'ARD_GND') || isConnected(ledCathodeNode, 'ARD_GND2') || isConnected(ledCathodeNode, 'ARD_GND_TOP');
     if (!cathodeToGnd) {
-      return { isComplete: false, message: `⚠️ Missing Ground Wire: Connect LED Cathode (Row ${led.cathode.row}) to Arduino GND.`, reason: 'no_gnd_wire' };
+      return { isComplete: false, sourcePin: activeSourcePin, message: `⚠️ Missing Ground Wire: Connect LED Cathode (Row ${led.cathode.row}) to Arduino GND.`, reason: 'no_gnd_wire' };
     }
 
     return {
       isComplete: true,
-      message: `✅ Closed Loop: Current flows Pin 13 ➔ Resistor ➔ LED ➔ GND.`,
+      sourcePin: activeSourcePin,
+      message: `✅ Closed Loop: Current flows from Pin ${activeSourcePin} ➔ Resistor ➔ LED ➔ GND.`,
       reason: 'ok'
     };
   }, [resistor, led, wires]);
@@ -347,9 +370,9 @@ export default function Simulation() {
 
   // ==================== VISUAL BLOCK CODING STATE ====================
   const [blocks, setBlocks] = useState([
-    { id: 'b1', type: 'set_pin', pin: '13', state: 'HIGH' },
+    { id: 'b1', type: 'set_pin', pin: '11', state: 'HIGH' },
     { id: 'b2', type: 'wait', duration: 1.0 },
-    { id: 'b3', type: 'set_pin', pin: '13', state: 'LOW' },
+    { id: 'b3', type: 'set_pin', pin: '11', state: 'LOW' },
     { id: 'b4', type: 'wait', duration: 1.0 }
   ]);
   const [repeatLoop, setRepeatLoop] = useState(true);
@@ -358,7 +381,7 @@ export default function Simulation() {
 
   const addBlock = (type) => {
     if (type === 'set_pin') {
-      setBlocks(prev => [...prev, { id: 'b_' + Date.now(), type: 'set_pin', pin: '13', state: 'HIGH' }]);
+      setBlocks(prev => [...prev, { id: 'b_' + Date.now(), type: 'set_pin', pin: '11', state: 'HIGH' }]);
     } else {
       setBlocks(prev => [...prev, { id: 'b_' + Date.now(), type: 'wait', duration: 1.0 }]);
     }
@@ -376,14 +399,27 @@ export default function Simulation() {
     setBlocks(prev => prev.map(b => b.id === id ? { ...b, [field]: val } : b));
   };
 
+  // ==================== DYNAMIC PIN OUTPUT STATES ====================
+  const [pinStates, setPinStates] = useState({
+    '13': false,
+    '12': false,
+    '11': false,
+    '10': false,
+    '9': false,
+    '8': false,
+    '5V': true,
+    '3V3': true
+  });
+
   // ==================== SIMULATION RUNNER ====================
   const [isRunning, setIsRunning] = useState(false);
   const [_runTimeSec, setRunTimeSec] = useState(0);
-  const [pin13Output, setPin13Output] = useState(false);
   const [serialLogs, setSerialLogs] = useState([]);
 
-  // Computed: LED only glows if Pin 13 is HIGH and circuit loop is closed!
-  const isLedGlowing = isRunning && pin13Output && isCircuitClosed;
+  // Computed: LED only glows if the connected pin is HIGH and circuit loop is closed!
+  const activeConnectedPin = circuitAnalysis.sourcePin;
+  const isConnectedPinHigh = activeConnectedPin ? Boolean(pinStates[activeConnectedPin]) : false;
+  const isLedGlowing = isRunning && isCircuitClosed && isConnectedPinHigh;
 
   useEffect(() => {
     let timeoutId = null;
@@ -403,7 +439,7 @@ export default function Simulation() {
           } else {
             setIsRunning(false);
             setActiveBlockIndex(-1);
-            setPin13Output(false);
+            setPinStates(prev => ({ ...prev, '13': false, '12': false, '11': false, '10': false, '9': false, '8': false }));
             setSerialLogs(prev => [...prev.slice(-30), `[Program Complete] Reached end of sequence.`]);
             return;
           }
@@ -414,14 +450,21 @@ export default function Simulation() {
 
         if (block.type === 'set_pin') {
           const isHigh = block.state === 'HIGH';
-          setPin13Output(isHigh);
+          const targetPin = String(block.pin);
 
-          if (isHigh && isCircuitClosed) {
-            setSerialLogs(prev => [...prev.slice(-30), `[Step ${currentStep + 1}] Pin ${block.pin} HIGH ➔ 💡 LED Bulb Glows!`]);
+          setPinStates(prev => ({
+            ...prev,
+            [targetPin]: isHigh
+          }));
+
+          if (isHigh && isCircuitClosed && circuitAnalysis.sourcePin === targetPin) {
+            setSerialLogs(prev => [...prev.slice(-30), `[Step ${currentStep + 1}] Pin ${targetPin} HIGH ➔ 💡 LED Bulb Glows!`]);
           } else if (isHigh && !isCircuitClosed) {
-            setSerialLogs(prev => [...prev.slice(-30), `[Step ${currentStep + 1}] Pin 13 HIGH, but circuit OPEN (no current)`]);
+            setSerialLogs(prev => [...prev.slice(-30), `[Step ${currentStep + 1}] Pin ${targetPin} HIGH, but circuit OPEN (no current)`]);
+          } else if (isHigh && isCircuitClosed && circuitAnalysis.sourcePin !== targetPin) {
+            setSerialLogs(prev => [...prev.slice(-30), `[Step ${currentStep + 1}] Pin ${targetPin} HIGH (Circuit is wired to Pin ${circuitAnalysis.sourcePin})`]);
           } else {
-            setSerialLogs(prev => [...prev.slice(-30), `[Step ${currentStep + 1}] Pin ${block.pin} LOW ➔ 🌑 LED Off`]);
+            setSerialLogs(prev => [...prev.slice(-30), `[Step ${currentStep + 1}] Pin ${targetPin} LOW ➔ 🌑 LED Off`]);
           }
 
           currentStep++;
@@ -438,14 +481,14 @@ export default function Simulation() {
       executeNextBlock();
     } else {
       setActiveBlockIndex(-1);
-      setPin13Output(false);
+      setPinStates(prev => ({ ...prev, '13': false, '12': false, '11': false, '10': false, '9': false, '8': false }));
     }
 
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
       if (timerId) clearInterval(timerId);
     };
-  }, [isRunning, blocks, repeatLoop, isCircuitClosed]);
+  }, [isRunning, blocks, repeatLoop, isCircuitClosed, circuitAnalysis.sourcePin]);
 
   const handleToggleRun = () => {
     if (!isRunning) {
@@ -457,7 +500,7 @@ export default function Simulation() {
     } else {
       setIsRunning(false);
       setActiveBlockIndex(-1);
-      setPin13Output(false);
+      setPinStates(prev => ({ ...prev, '13': false, '12': false, '11': false, '10': false, '9': false, '8': false }));
       showToast('Simulation stopped.', 'Stopped', 'info');
     }
   };
@@ -466,7 +509,7 @@ export default function Simulation() {
     setIsRunning(false);
     setActiveBlockIndex(-1);
     setRunTimeSec(0);
-    setPin13Output(false);
+    setPinStates(prev => ({ ...prev, '13': false, '12': false, '11': false, '10': false, '9': false, '8': false }));
     setSerialLogs([`[System] Reset to idle.`]);
     showToast('Simulation counters reset.', 'Reset Complete', 'info');
   };
@@ -1081,12 +1124,12 @@ ${loopCode}}`;
                     {[
                       { id: 'ARD_AREF', label: 'AREF' },
                       { id: 'ARD_GND_TOP', label: 'GND' },
-                      { id: 'ARD_13', label: '13', active: pin13Output },
-                      { id: 'ARD_12', label: '12' },
-                      { id: 'ARD_11', label: '11' },
-                      { id: 'ARD_10', label: '10' },
-                      { id: 'ARD_9', label: '9' },
-                      { id: 'ARD_8', label: '8' }
+                      { id: 'ARD_13', label: '13', active: pinStates['13'] },
+                      { id: 'ARD_12', label: '12', active: pinStates['12'] },
+                      { id: 'ARD_11', label: '11', active: pinStates['11'] },
+                      { id: 'ARD_10', label: '10', active: pinStates['10'] },
+                      { id: 'ARD_9', label: '9', active: pinStates['9'] },
+                      { id: 'ARD_8', label: '8', active: pinStates['8'] }
                     ].map((pin, i) => (
                       <div 
                         key={i} 
@@ -1122,7 +1165,7 @@ ${loopCode}}`;
                     <div className="flex flex-col gap-1 text-[8px] font-mono font-bold">
                       <div className="flex items-center gap-1.5">
                         <span className={`w-2.5 h-2.5 rounded-full transition-all ${
-                          pin13Output ? 'bg-amber-400 shadow-[0_0_10px_#F59E0B] scale-125' : 'bg-amber-950/60 border border-amber-900'
+                          pinStates['13'] ? 'bg-amber-400 shadow-[0_0_10px_#F59E0B] scale-125' : 'bg-amber-950/60 border border-amber-900'
                         }`}></span>
                         <span className="text-cyan-100">L (Pin 13)</span>
                       </div>
@@ -1473,6 +1516,9 @@ ${loopCode}}`;
                             <option value="13">Pin 13</option>
                             <option value="12">Pin 12</option>
                             <option value="11">Pin 11</option>
+                            <option value="10">Pin 10</option>
+                            <option value="9">Pin 9</option>
+                            <option value="8">Pin 8</option>
                           </select>
 
                           <span>to</span>
