@@ -370,17 +370,12 @@ export default function Simulation() {
     ]);
 
     setBlocks([
-      { id: 'b1', type: 'set_pin', pin: '9', state: 'HIGH' },  // Laser ON
-      { id: 'b2', type: 'set_pin', pin: '11', state: 'HIGH' }, // LED ON
-      { id: 'b3', type: 'wait', duration: 1.0 },
-      { id: 'b4', type: 'set_pin', pin: '8', state: 'HIGH' },  // Buzzer BEEP!
-      { id: 'b5', type: 'wait', duration: 0.5 },
-      { id: 'b6', type: 'set_pin', pin: '8', state: 'LOW' },   // Buzzer Silent
-      { id: 'b7', type: 'wait', duration: 1.0 }
+      { id: 'b1', type: 'set_pin', pin: '9', state: 'HIGH' },  // Laser ON (Arm Tripwire)
+      { id: 'b2', type: 'wait', duration: 1.0 }
     ]);
 
     setIsBeamBlocked(false);
-    showToast('Laser Security Tripwire System loaded (Laser + LDR + Buzzer + LED).', 'Preset Loaded', 'success');
+    showToast('Laser Security Tripwire System loaded! Click Run Simulation, then Wave Hand to test.', 'Preset Loaded', 'success');
   };
 
   // ==================== UNIVERSAL GRAPH CIRCUIT SOLVER ====================
@@ -555,7 +550,11 @@ export default function Simulation() {
     if (hasOvercurrent) {
       message = '💥 OVERCURRENT HAZARD: An LED is directly connected without a 220Ω resistor (~125mA will blow it)!';
     } else if (opticalAligned) {
-      message = '🎯 Laser & LDR Grid Aligned! Optical tripwire security active.';
+      if (isBeamBlocked) {
+        message = '🚨 TRIPWIRE BREACH! Obstacle in laser beam! Red Light ON & Buzzer Alarm BEEPING!';
+      } else {
+        message = '🎯 Laser pointing directly to LDR (Row 6) • Perimeter Secure • Click "Wave Hand (Block)" to test obstacle!';
+      }
     } else if (lasers.length > 0 && ldrs.length > 0) {
       message = '⚠️ Laser and LDR on different rows. Move them to the same row to align optical beam!';
     } else {
@@ -570,17 +569,12 @@ export default function Simulation() {
       hasOvercurrent,
       message
     };
-  }, [wires, components]);
+  }, [wires, components, isBeamBlocked]);
 
   // ==================== VISUAL BLOCK CODING STATE ====================
   const [blocks, setBlocks] = useState([
-    { id: 'b1', type: 'set_pin', pin: '9', state: 'HIGH' },   // Laser ON
-    { id: 'b2', type: 'set_pin', pin: '11', state: 'HIGH' },  // LED ON
-    { id: 'b3', type: 'wait', duration: 1.0 },
-    { id: 'b4', type: 'set_pin', pin: '8', state: 'HIGH' },   // Buzzer ON
-    { id: 'b5', type: 'wait', duration: 0.5 },
-    { id: 'b6', type: 'set_pin', pin: '8', state: 'LOW' },    // Buzzer OFF
-    { id: 'b7', type: 'wait', duration: 1.0 }
+    { id: 'b1', type: 'set_pin', pin: '9', state: 'HIGH' },   // Laser ON (Arm Tripwire)
+    { id: 'b2', type: 'wait', duration: 1.0 }
   ]);
   const [repeatLoop, setRepeatLoop] = useState(true);
   const [activeBlockIndex, setActiveBlockIndex] = useState(-1);
@@ -617,17 +611,35 @@ export default function Simulation() {
     const stat = circuitAnalysis.componentsStatus[comp.id];
     if (!stat || !stat.isComplete) return false;
 
+    // 1. LED (Red Light)
     if (comp.type === 'led') {
+      // In laser security tripwire mode: if beam is aligned & blocked, RED LIGHT TURNS ON!
+      if (circuitAnalysis.opticalAligned && isBeamBlocked && comp.color === 'red') {
+        return true;
+      }
+      // If beam is not blocked and optical security is active, Red Light stays OFF (Perimeter secure)
+      if (circuitAnalysis.opticalAligned && !isBeamBlocked && comp.color === 'red') {
+        return false;
+      }
       return Boolean(pinStates[stat.sourcePin]) && !comp.isBlown && !stat.isOvercurrent;
     }
+
+    // 2. KY-008 Laser Diode
     if (comp.type === 'laser') {
       return Boolean(pinStates[stat.sourcePin]);
     }
+
+    // 3. Piezo Buzzer
     if (comp.type === 'buzzer') {
-      // Direct pin HIGH or tripwire alarm (beam blocked or dark room alarm)
-      const directHigh = Boolean(pinStates[stat.sourcePin]);
-      const tripwireAlarm = isBeamBlocked && circuitAnalysis.opticalAligned;
-      return directHigh || tripwireAlarm;
+      // If tripwire beam is blocked: BUZZER BEEPS!
+      if (circuitAnalysis.opticalAligned && isBeamBlocked) {
+        return true;
+      }
+      // If tripwire beam is NOT blocked: Buzzer stays silent
+      if (circuitAnalysis.opticalAligned && !isBeamBlocked) {
+        return false;
+      }
+      return Boolean(pinStates[stat.sourcePin]);
     }
     return false;
   };
@@ -1046,18 +1058,26 @@ ${loopCode}}`;
               {circuitAnalysis.opticalAligned && (
                 <button
                   onClick={() => {
-                    setIsBeamBlocked(!isBeamBlocked);
-                    showToast(!isBeamBlocked ? 'Hand placed in front of Laser: BEAM BROKEN!' : 'Hand removed: Beam restored.', 'Laser Tripwire', 'info');
+                    getAudioContext();
+                    const nextBlocked = !isBeamBlocked;
+                    setIsBeamBlocked(nextBlocked);
+                    if (nextBlocked) {
+                      showToast('🚨 OBSTACLE DETECTED! Laser beam broken ➔ Red Light ON & Buzzer Alarm BEEPING!', 'Tripwire Breach!', 'error');
+                      setSerialLogs(prev => [...prev.slice(-30), `[🚨 ALARM TRIGGERED] Obstacle detected! Beam broken ➔ Red Light ON, Piezo Buzzer BEEPING (2400Hz)!`]);
+                    } else {
+                      showToast('Perimeter restored: Obstacle removed. Red Light OFF & Buzzer silent.', 'Perimeter Secure', 'success');
+                      setSerialLogs(prev => [...prev.slice(-30), `[🟢 PERIMETER RESTORED] Obstacle removed ➔ Laser beam intact on LDR (100Ω). Alarm Armed.`]);
+                    }
                   }}
-                  className={`px-2.5 py-1 rounded-xl border text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-md ${
                     isBeamBlocked 
-                      ? 'bg-rose-600 text-white border-rose-400 shadow-md shadow-rose-500/30 animate-pulse' 
-                      : 'bg-slate-800 hover:bg-slate-700 text-cyan-300 border-slate-700'
+                      ? 'bg-rose-600 hover:bg-rose-500 text-white border-rose-400 shadow-rose-600/40 animate-pulse' 
+                      : 'bg-indigo-600/30 hover:bg-indigo-600/50 text-cyan-300 border-indigo-500/40'
                   }`}
-                  title="Simulate object/hand blocking the laser beam to test security alarm"
+                  title="Simulate obstacle (e.g. hand or intruder) blocking the laser beam"
                 >
-                  <Hand size={13} />
-                  <span>{isBeamBlocked ? 'Beam Broken!' : 'Wave Hand (Block)'}</span>
+                  <Hand size={14} className={isBeamBlocked ? 'animate-bounce' : ''} />
+                  <span>{isBeamBlocked ? '🚨 Remove Obstacle' : '🖐️ Place Obstacle (Cut Beam)'}</span>
                 </button>
               )}
 
@@ -1542,11 +1562,22 @@ ${loopCode}}`;
                       <circle cx={startX} cy={startY} r="10" fill="#EF4444" opacity="0.85" className="animate-pulse" />
                       <circle cx={startX} cy={startY} r="3.5" fill="#FFFFFF" />
 
-                      {/* Interactive Hand Obstacle (if blocked) */}
+                      {/* Interactive 3D Physical Obstacle Barrier (when beam is blocked) */}
                       {isBeamBlocked && (
-                        <g transform={`translate(${blockX}, ${endY - 22})`} className="pointer-events-auto cursor-pointer" onClick={() => setIsBeamBlocked(false)}>
-                          <rect x="-18" y="-12" width="36" height="24" rx="6" fill="#DC2626" stroke="#FECACA" strokeWidth="1" />
-                          <text x="0" y="4" textAnchor="middle" fontSize="13" fill="white">✋</text>
+                        <g transform={`translate(${blockX}, ${endY - 26})`} className="pointer-events-auto cursor-pointer" onClick={() => setIsBeamBlocked(false)}>
+                          <title>Obstacle Barrier in Laser Path. Click to remove.</title>
+                          {/* Drop shadow */}
+                          <rect x="-24" y="-18" width="48" height="52" rx="8" fill="rgba(0,0,0,0.7)" transform="translate(0, 6)" />
+                          {/* Barrier Body */}
+                          <rect x="-24" y="-18" width="48" height="52" rx="8" fill="#1E293B" stroke="#F59E0B" strokeWidth="2" />
+                          {/* Hazard caution bar */}
+                          <rect x="-20" y="-14" width="40" height="8" rx="2" fill="#F59E0B" />
+                          {/* Laser hit spark on barrier left face */}
+                          <circle cx="-24" cy="26" r="6" fill="#EF4444" className="animate-ping" />
+                          <circle cx="-24" cy="26" r="2.5" fill="#FFFFFF" />
+                          {/* Hand icon */}
+                          <text x="0" y="10" textAnchor="middle" fontSize="18">✋</text>
+                          <text x="0" y="26" textAnchor="middle" fontSize="8" fill="#EF4444" fontWeight="black" fontFamily="monospace">BLOCKED</text>
                         </g>
                       )}
                     </g>
