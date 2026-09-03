@@ -498,23 +498,23 @@ export default function StudentPortal() {
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full md:w-auto shrink-0">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 w-full md:w-auto justify-start md:justify-end">
             {/* 0. Virtual Arduino Simulation Workbench Button */}
             <Link
               to="/simulation"
-              className="w-full sm:w-auto bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 hover:from-blue-500 hover:to-indigo-400 text-white text-xs font-black px-4 sm:px-4 py-2.5 sm:py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25 transition-all cursor-pointer shrink-0"
+              className="bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 hover:from-blue-500 hover:to-indigo-400 text-white text-xs font-black px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl flex items-center justify-center gap-1.5 shadow-lg shadow-blue-500/25 transition-all cursor-pointer shrink-0"
               title="Launch Virtual Arduino Simulation Workbench & Practice Circuit Wiring"
             >
-              <Cpu size={15} /> ⚡ Virtual Arduino Lab
+              <Cpu size={14} /> ⚡ Virtual Arduino Lab
             </Link>
 
             {/* 1. Progress Report Button: Always accessible for students to view active coursework */}
             <button 
               onClick={handlePrintProgressReport}
-              className="w-full sm:w-auto bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold px-4 sm:px-4 py-2.5 sm:py-3 rounded-xl flex items-center justify-center gap-2 border border-slate-700 transition-all cursor-pointer shrink-0"
+              className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl flex items-center justify-center gap-1.5 border border-slate-700 transition-all cursor-pointer shrink-0"
               title="Download Active Laboratory Progress & Assessment Report (No QR Certificate)"
             >
-              <FileText size={15} /> Progress Report
+              <FileText size={14} /> Progress Report
             </button>
 
             {/* 2. Official Certificate with QR: Unlocked only when course completed & authorized by Trainer */}
@@ -522,59 +522,68 @@ export default function StudentPortal() {
               <>
                 <button 
                   onClick={handlePrintOfficialCertificate}
-                  className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 active:scale-98 text-white text-xs font-bold px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 transition-all cursor-pointer shrink-0"
+                  className="bg-emerald-600 hover:bg-emerald-500 active:scale-98 text-white text-xs font-bold px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-500/20 transition-all cursor-pointer shrink-0"
                   title="Download Official Accredited Graduate Certificate with QR"
                 >
-                  <Award size={15} /> Official Certificate (with QR)
+                  <Award size={14} /> Official Certificate
                 </button>
                 <Link
                   to={`/verify?id=${encodeURIComponent(student.student_id)}`}
-                  className="w-full sm:w-auto bg-slate-800 hover:bg-slate-700 text-emerald-400 text-xs font-bold px-3.5 sm:px-4 py-2.5 sm:py-3 rounded-xl flex items-center justify-center gap-1.5 border border-emerald-500/30 transition-all shrink-0"
+                  className="bg-slate-800 hover:bg-slate-700 text-emerald-400 text-xs font-bold px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl flex items-center justify-center gap-1.5 border border-emerald-500/30 transition-all shrink-0"
                   title="Public Certificate Verification Registry"
                 >
-                  <ShieldCheck size={15} /> Verify (QR)
+                  <ShieldCheck size={14} /> Verify QR
                 </Link>
               </>
             ) : (
               <div 
-                className="w-full sm:w-auto bg-slate-800/80 text-slate-400 text-[11px] font-bold px-3.5 sm:px-4 py-2.5 sm:py-3 rounded-xl flex items-center justify-center gap-1.5 border border-slate-700/80 cursor-not-allowed"
+                className="bg-slate-800/80 text-slate-400 text-[11px] font-bold px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl flex items-center justify-center gap-1.5 border border-slate-700/80 cursor-not-allowed shrink-0"
                 title="Official Certificate with QR is locked. It will be issued one-time upon Level 5 course completion & faculty graduation approval."
               >
-                <span className="text-amber-400">🔒</span> Certificate Locked (In-Progress)
+                <span className="text-amber-400">🔒</span> Certificate Locked
               </div>
             )}
           </div>
         </div>
 
         {/* 2. 3 Metric Summary Cards (Mobile 3-column Grid) */}
-        <div className="grid grid-cols-3 gap-2 sm:gap-6">
-          <div className="bg-white p-2.5 sm:p-6 rounded-xl sm:rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center sm:items-center gap-1.5 sm:gap-4 text-center sm:text-left">
-            <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-              <Award className="w-4 h-4 sm:w-6 sm:h-6" />
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-6">
+          <div className="bg-white p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3 sm:gap-4 text-left">
+            <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+              <Award className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
-            <div className="min-w-0">
-              <p className="text-[9px] sm:text-xs text-slate-400 font-bold uppercase tracking-wider truncate">Mastery</p>
-              <p className="text-xs sm:text-xl font-bold text-slate-800 truncate">{student.tech_level}</p>
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] sm:text-xs text-slate-400 font-bold uppercase tracking-wider">Mastery</p>
+              <div className="flex flex-wrap items-baseline gap-1 sm:gap-1.5 mt-0.5">
+                <span className="text-sm sm:text-lg font-black text-slate-800">
+                  {student.tech_level?.split('(')[0]?.trim() || student.tech_level || 'Level 1'}
+                </span>
+                {student.tech_level?.includes('(') && (
+                  <span className="text-[10px] sm:text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+                    {student.tech_level.match(/\((.*?)\)/)?.[1] || 'Graduate'}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
-          <div className="bg-white p-2.5 sm:p-6 rounded-xl sm:rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center sm:items-center gap-1.5 sm:gap-4 text-center sm:text-left">
-            <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-              <Activity className="w-4 h-4 sm:w-6 sm:h-6" />
+          <div className="bg-white p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3 sm:gap-4 text-left">
+            <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+              <Activity className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
-            <div className="min-w-0">
-              <p className="text-[9px] sm:text-xs text-slate-400 font-bold uppercase tracking-wider truncate">Attendance</p>
-              <p className="text-xs sm:text-xl font-bold text-emerald-600">{attendanceRate}%</p>
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] sm:text-xs text-slate-400 font-bold uppercase tracking-wider">Attendance</p>
+              <p className="text-sm sm:text-lg font-black text-emerald-600 mt-0.5">{attendanceRate}%</p>
             </div>
           </div>
 
-          <div className="bg-white p-2.5 sm:p-6 rounded-xl sm:rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center sm:items-center gap-1.5 sm:gap-4 text-center sm:text-left">
-            <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-blue-50 text-pixiu-blue flex items-center justify-center shrink-0">
-              <Box className="w-4 h-4 sm:w-6 sm:h-6" />
+          <div className="bg-white p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3 sm:gap-4 text-left">
+            <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-blue-50 text-pixiu-blue flex items-center justify-center shrink-0">
+              <Box className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
-            <div className="min-w-0">
-              <p className="text-[9px] sm:text-xs text-slate-400 font-bold uppercase tracking-wider truncate">Lab Kit</p>
-              <p className="text-[11px] sm:text-sm font-bold font-mono text-slate-800 truncate">{student.assigned_kit_id || 'KIT-ZPS-01'}</p>
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] sm:text-xs text-slate-400 font-bold uppercase tracking-wider">Lab Kit</p>
+              <p className="text-xs sm:text-base font-bold font-mono text-slate-800 mt-0.5 truncate">{student.assigned_kit_id || 'KIT-ZPS-01'}</p>
             </div>
           </div>
         </div>
