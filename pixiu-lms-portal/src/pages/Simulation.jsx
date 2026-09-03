@@ -4,7 +4,7 @@ import {
   Cpu, Play, Square, RotateCcw, ShieldAlert, Lock, ArrowLeft, 
   CheckCircle2, Eye, Zap, Plus, Trash2, Code, Puzzle, 
   X, Clock, Layers, Wrench, Volume2, VolumeX, Hand,
-  Crosshair, BellRing, Sun, Moon, Copy, Check
+  Crosshair, BellRing, Sun, Moon, Copy, Check, ChevronUp, ChevronDown, CopyPlus
 } from 'lucide-react';
 
 export default function Simulation() {
@@ -638,16 +638,95 @@ void loop() {
     } else if (type === 'wait') {
       setBlocks(prev => [...prev, { id: 'b_' + Date.now(), type: 'wait', duration: 1.0 }]);
     } else if (type === 'tripwire_logic') {
-      setBlocks(prev => [...prev, { id: 'b_tripwire_' + Date.now(), type: 'tripwire_logic', laserPin: '9', ldrPin: 'A0', ledPin: '11', buzzerPin: '8' }]);
+      setBlocks(prev => [...prev, { 
+        id: 'b_tripwire_' + Date.now(), 
+        type: 'tripwire_logic', 
+        laserPin: '9', 
+        ldrPin: 'A0', 
+        thenPin1: '11', 
+        thenState1: 'HIGH',
+        thenPin2: '8',
+        thenState2: 'HIGH',
+        elsePin1: '11',
+        elseState1: 'LOW',
+        elsePin2: '8',
+        elseState2: 'LOW'
+      }]);
     }
   };
 
   const deleteBlock = (id) => {
-    if (blocks.length <= 1) {
-      showToast('Keep at least 1 block in the program.', 'Cannot Delete', 'info');
-      return;
-    }
     setBlocks(prev => prev.filter(b => b.id !== id));
+  };
+
+  const moveBlock = (idx, dir) => {
+    const targetIdx = idx + dir;
+    if (targetIdx < 0 || targetIdx >= blocks.length) return;
+    setBlocks(prev => {
+      const copy = [...prev];
+      const temp = copy[idx];
+      copy[idx] = copy[targetIdx];
+      copy[targetIdx] = temp;
+      return copy;
+    });
+  };
+
+  const duplicateBlock = (id) => {
+    const idx = blocks.findIndex(b => b.id === id);
+    if (idx === -1) return;
+    const target = blocks[idx];
+    const clone = { ...target, id: 'b_' + Date.now() };
+    setBlocks(prev => {
+      const copy = [...prev];
+      copy.splice(idx + 1, 0, clone);
+      return copy;
+    });
+    showToast('Block duplicated!', 'Block Cloned', 'info');
+  };
+
+  const clearAllBlocks = () => {
+    setBlocks([]);
+    showToast('Program cleared. Add your own blocks to write your code!', 'Program Cleared', 'info');
+  };
+
+  const loadProgramTemplate = (tmpl) => {
+    if (tmpl === 'tripwire') {
+      setBlocks([
+        { id: 'b1', type: 'set_pin', pin: '9', state: 'HIGH' },
+        { 
+          id: 'b_tripwire', 
+          type: 'tripwire_logic', 
+          laserPin: '9', 
+          ldrPin: 'A0', 
+          thenPin1: '11', thenState1: 'HIGH', 
+          thenPin2: '8', thenState2: 'HIGH', 
+          elsePin1: '11', elseState1: 'LOW', 
+          elsePin2: '8', elseState2: 'LOW' 
+        }
+      ]);
+      showToast('Loaded Laser Security Tripwire program.', 'Template Loaded', 'success');
+    } else if (tmpl === 'blink') {
+      setBlocks([
+        { id: 'b1', type: 'set_pin', pin: '11', state: 'HIGH' },
+        { id: 'b2', type: 'wait', duration: 1.0 },
+        { id: 'b3', type: 'set_pin', pin: '11', state: 'LOW' },
+        { id: 'b4', type: 'wait', duration: 1.0 }
+      ]);
+      showToast('Loaded LED Blinker program (1 sec interval).', 'Template Loaded', 'success');
+    } else if (tmpl === 'siren') {
+      setBlocks([
+        { id: 'b1', type: 'set_pin', pin: '8', state: 'HIGH' },
+        { id: 'b2', type: 'set_pin', pin: '11', state: 'HIGH' },
+        { id: 'b3', type: 'wait', duration: 0.3 },
+        { id: 'b4', type: 'set_pin', pin: '8', state: 'LOW' },
+        { id: 'b5', type: 'set_pin', pin: '11', state: 'LOW' },
+        { id: 'b6', type: 'wait', duration: 0.3 }
+      ]);
+      showToast('Loaded Buzzer + LED Siren program.', 'Template Loaded', 'success');
+    } else if (tmpl === 'blank') {
+      setBlocks([]);
+      showToast('Blank canvas loaded. Click + Pin Block or + Wait Block to write your own code!', 'Blank Canvas', 'info');
+    }
   };
 
   const updateBlock = (id, field, val) => {
@@ -659,42 +738,27 @@ void loop() {
   const [_runTimeSec, setRunTimeSec] = useState(0);
   const [serialLogs, setSerialLogs] = useState([]);
 
-  // Check which components are active
+  // Check which components are active based on user's pinStates
   const isComponentEmitting = (comp) => {
     if (!isRunning) return false;
     const stat = circuitAnalysis.componentsStatus[comp.id];
     if (!stat || !stat.isComplete) return false;
 
-    // 1. LED (Red Light)
+    // 1. LED (Red or Green Bulb)
     if (comp.type === 'led') {
-      // In laser security tripwire mode: if beam is blocked, RED LIGHT TURNS ON!
-      if (isBeamBlocked && comp.color === 'red') {
-        return true;
-      }
-      // If beam is not blocked, Red Light stays OFF (Perimeter secure)
-      if (!isBeamBlocked && comp.color === 'red') {
-        return false;
-      }
       return Boolean(pinStates[stat.sourcePin]) && !comp.isBlown && !stat.isOvercurrent;
     }
 
     // 2. KY-008 Laser Diode
     if (comp.type === 'laser') {
-      return Boolean(pinStates[stat.sourcePin]) || true; // Laser emits while simulation is active
+      return Boolean(pinStates[stat.sourcePin]);
     }
 
     // 3. Piezo Buzzer
     if (comp.type === 'buzzer') {
-      // If tripwire beam is blocked: BUZZER BEEPS!
-      if (isBeamBlocked) {
-        return true;
-      }
-      // If tripwire beam is NOT blocked: Buzzer stays silent
-      if (!isBeamBlocked) {
-        return false;
-      }
       return Boolean(pinStates[stat.sourcePin]);
     }
+
     return false;
   };
 
@@ -783,13 +847,33 @@ void loop() {
           timeoutId = setTimeout(executeNextBlock, ms);
         }
         else if (block.type === 'tripwire_logic') {
+          const thenPin1 = block.thenPin1 || '11';
+          const thenState1 = block.thenState1 || 'HIGH';
+          const thenPin2 = block.thenPin2 || '8';
+          const thenState2 = block.thenState2 || 'HIGH';
+
+          const elsePin1 = block.elsePin1 || '11';
+          const elseState1 = block.elseState1 || 'LOW';
+          const elsePin2 = block.elsePin2 || '8';
+          const elseState2 = block.elseState2 || 'LOW';
+
           if (isBeamBlocked) {
-            setSerialLogs(prev => [...prev.slice(-30), `[🚨 TRIPWIRE ALARM] Obstacle detected! Red Light ON, Piezo Buzzer BEEPING at 2400Hz!`]);
+            setPinStates(prev => ({
+              ...prev,
+              [thenPin1]: thenState1 === 'HIGH',
+              [thenPin2]: thenState2 === 'HIGH'
+            }));
+            setSerialLogs(prev => [...prev.slice(-30), `[🚨 IF Active] Obstacle detected! Pin ${thenPin1}=${thenState1}, Pin ${thenPin2}=${thenState2}`]);
           } else {
-            setSerialLogs(prev => [...prev.slice(-30), `[🟢 PERIMETER SECURE] Laser beam intact on LDR (100Ω). Red Light OFF, Buzzer Silent.`]);
+            setPinStates(prev => ({
+              ...prev,
+              [elsePin1]: elseState1 === 'HIGH',
+              [elsePin2]: elseState2 === 'HIGH'
+            }));
+            setSerialLogs(prev => [...prev.slice(-30), `[🟢 ELSE Active] Beam intact on LDR. Pin ${elsePin1}=${elseState1}, Pin ${elsePin2}=${elseState2}`]);
           }
           currentStep++;
-          timeoutId = setTimeout(executeNextBlock, 500);
+          timeoutId = setTimeout(executeNextBlock, 300);
         }
       };
 
@@ -805,6 +889,27 @@ void loop() {
       if (timerId) clearInterval(timerId);
     };
   }, [isRunning, blocks, repeatLoop, circuitAnalysis, isBeamBlocked]);
+
+  // Live reactive trigger when obstacle is placed or removed during simulation
+  useEffect(() => {
+    if (!isRunning) return;
+    const tripwireBlock = blocks.find(b => b.type === 'tripwire_logic');
+    if (tripwireBlock) {
+      if (isBeamBlocked) {
+        setPinStates(prev => ({
+          ...prev,
+          [tripwireBlock.thenPin1 || '11']: (tripwireBlock.thenState1 || 'HIGH') === 'HIGH',
+          [tripwireBlock.thenPin2 || '8']: (tripwireBlock.thenState2 || 'HIGH') === 'HIGH'
+        }));
+      } else {
+        setPinStates(prev => ({
+          ...prev,
+          [tripwireBlock.elsePin1 || '11']: (tripwireBlock.elseState1 || 'LOW') === 'HIGH',
+          [tripwireBlock.elsePin2 || '8']: (tripwireBlock.elseState2 || 'LOW') === 'HIGH'
+        }));
+      }
+    }
+  }, [isBeamBlocked, isRunning, blocks]);
 
   const handleToggleRun = () => {
     getAudioContext();
@@ -1088,31 +1193,6 @@ ${loopCode}}`;
             title="Reset simulation"
           >
             <RotateCcw size={13} />
-          </button>
-
-          {/* Top Bar Obstacle Trigger Button */}
-          <button
-            onClick={() => {
-              getAudioContext();
-              const nextBlocked = !isBeamBlocked;
-              setIsBeamBlocked(nextBlocked);
-              if (nextBlocked) {
-                showToast('🚨 OBSTACLE DETECTED! Laser beam cut ➔ Red Light ON & Buzzer Alarm BEEPING!', 'Tripwire Breach!', 'error');
-                setSerialLogs(prev => [...prev.slice(-30), `[🚨 ALARM TRIGGERED] Obstacle placed! Beam broken ➔ Red Light ON, Piezo Buzzer BEEPING (2400Hz)!`]);
-              } else {
-                showToast('Perimeter restored: Obstacle removed. Red Light OFF & Buzzer silent.', 'Perimeter Secure', 'success');
-                setSerialLogs(prev => [...prev.slice(-30), `[🟢 PERIMETER RESTORED] Obstacle removed ➔ Laser beam intact on LDR (100Ω). Alarm Armed.`]);
-              }
-            }}
-            className={`px-2.5 sm:px-3.5 py-1.5 rounded-xl border text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer shadow-md active:scale-95 ${
-              isBeamBlocked 
-                ? 'bg-rose-600 hover:bg-rose-500 text-white border-rose-400 shadow-rose-600/40 animate-pulse' 
-                : 'bg-indigo-600 hover:bg-indigo-500 text-white border-indigo-400 shadow-indigo-600/30'
-            }`}
-            title="Click to place/remove an obstacle in front of the laser beam"
-          >
-            <Hand size={14} className={isBeamBlocked ? 'animate-bounce' : ''} />
-            <span>{isBeamBlocked ? '🚨 Remove Obstacle' : '🖐️ Place Obstacle'}</span>
           </button>
 
           {/* Desktop Run Button */}
@@ -2200,16 +2280,56 @@ ${loopCode}}`;
           </div>
 
           {!showCppCode ? (
-            <div className="flex-1 p-4 flex flex-col space-y-3.5 overflow-y-auto">
+            <div className="flex-1 p-3.5 sm:p-4 flex flex-col space-y-3 overflow-y-auto">
               
-              <div className="bg-[#EAB308]/20 border-2 border-[#EAB308] rounded-2xl p-3 shadow-md">
-                <div className="flex items-center gap-2 font-bold text-xs text-yellow-300">
-                  <div className="w-2.5 h-2.5 rounded-full bg-yellow-400 animate-pulse"></div>
-                  <span>🟢 WHEN SIMULATION STARTS</span>
+              {/* Template Selector & Clear Button */}
+              <div className="flex items-center justify-between gap-2 pb-1 border-b border-slate-800">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] font-bold text-slate-400">Template:</span>
+                  <select
+                    onChange={(e) => loadProgramTemplate(e.target.value)}
+                    defaultValue="tripwire"
+                    className="bg-slate-900 border border-slate-700 text-cyan-300 text-[11px] rounded-lg px-2 py-1 font-bold cursor-pointer"
+                  >
+                    <option value="tripwire">🎯 Laser Security Tripwire</option>
+                    <option value="blink">💡 LED Blinker (1s)</option>
+                    <option value="siren">🚨 Siren Pulse (Buzzer+LED)</option>
+                    <option value="blank">✨ Blank Canvas (Write your own!)</option>
+                  </select>
+                </div>
+
+                <button
+                  onClick={clearAllBlocks}
+                  className="px-2 py-1 bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-300 rounded-lg text-[11px] font-bold border border-slate-700 hover:border-rose-700 flex items-center gap-1 transition-all cursor-pointer"
+                  title="Clear all blocks to write your code from scratch"
+                >
+                  <Trash2 size={12} />
+                  <span>Clear All</span>
+                </button>
+              </div>
+
+              <div className="bg-[#EAB308]/20 border-2 border-[#EAB308] rounded-2xl p-2.5 sm:p-3 shadow-md">
+                <div className="flex items-center justify-between font-bold text-xs text-yellow-300">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-yellow-400 animate-pulse"></div>
+                    <span>🟢 WHEN SIMULATION STARTS</span>
+                  </div>
+                  <span className="text-[10px] text-yellow-400/80 font-mono">{blocks.length} Blocks</span>
                 </div>
               </div>
 
-              <div className="space-y-2.5 pl-3 border-l-2 border-yellow-500/40">
+              {/* Empty state if user clears everything */}
+              {blocks.length === 0 && (
+                <div className="py-8 text-center border-2 border-dashed border-slate-800 rounded-2xl p-5 bg-slate-950/40 space-y-2">
+                  <Code className="mx-auto text-slate-600" size={32} />
+                  <p className="text-xs font-bold text-white">Write Your Own Program!</p>
+                  <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
+                    Click <strong>+ Pin Block</strong> or <strong>+ Wait Block</strong> below to add your own custom steps from scratch.
+                  </p>
+                </div>
+              )}
+
+              <div className="space-y-2 pl-2 sm:pl-3 border-l-2 border-yellow-500/40">
                 {blocks.map((block, idx) => {
                   const isActive = activeBlockIndex === idx;
 
@@ -2252,12 +2372,41 @@ ${loopCode}}`;
                           </select>
                         </div>
 
-                        <button 
-                          onClick={() => deleteBlock(block.id)}
-                          className="p-1 text-blue-200 hover:text-white rounded hover:bg-blue-800 transition-colors cursor-pointer"
-                        >
-                          <Trash2 size={13} />
-                        </button>
+                        {/* Block Action Controls */}
+                        <div className="flex items-center gap-1 shrink-0">
+                          {idx > 0 && (
+                            <button
+                              onClick={() => moveBlock(idx, -1)}
+                              className="p-1 text-blue-200 hover:text-white rounded hover:bg-blue-800 transition-colors cursor-pointer"
+                              title="Move Block Up"
+                            >
+                              <ChevronUp size={13} />
+                            </button>
+                          )}
+                          {idx < blocks.length - 1 && (
+                            <button
+                              onClick={() => moveBlock(idx, 1)}
+                              className="p-1 text-blue-200 hover:text-white rounded hover:bg-blue-800 transition-colors cursor-pointer"
+                              title="Move Block Down"
+                            >
+                              <ChevronDown size={13} />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => duplicateBlock(block.id)}
+                            className="p-1 text-blue-200 hover:text-white rounded hover:bg-blue-800 transition-colors cursor-pointer"
+                            title="Duplicate Block"
+                          >
+                            <CopyPlus size={13} />
+                          </button>
+                          <button 
+                            onClick={() => deleteBlock(block.id)}
+                            className="p-1 text-blue-200 hover:text-rose-300 rounded hover:bg-rose-900/50 transition-colors cursor-pointer"
+                            title="Delete Block"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
                       </div>
                     );
                   }
@@ -2280,7 +2429,7 @@ ${loopCode}}`;
                             type="number"
                             min="0.1"
                             max="10"
-                            step="0.5"
+                            step="0.2"
                             value={block.duration}
                             onChange={(e) => updateBlock(block.id, 'duration', parseFloat(e.target.value) || 1)}
                             className="w-14 sm:w-16 bg-amber-900 border border-amber-400 rounded-lg px-2 py-1 text-white text-center font-bold text-xs"
@@ -2289,12 +2438,41 @@ ${loopCode}}`;
                           <span>Seconds</span>
                         </div>
 
-                        <button 
-                          onClick={() => deleteBlock(block.id)}
-                          className="p-1 text-amber-200 hover:text-white rounded hover:bg-amber-800 transition-colors cursor-pointer"
-                        >
-                          <Trash2 size={13} />
-                        </button>
+                        {/* Block Action Controls */}
+                        <div className="flex items-center gap-1 shrink-0">
+                          {idx > 0 && (
+                            <button
+                              onClick={() => moveBlock(idx, -1)}
+                              className="p-1 text-amber-200 hover:text-white rounded hover:bg-amber-800 transition-colors cursor-pointer"
+                              title="Move Block Up"
+                            >
+                              <ChevronUp size={13} />
+                            </button>
+                          )}
+                          {idx < blocks.length - 1 && (
+                            <button
+                              onClick={() => moveBlock(idx, 1)}
+                              className="p-1 text-amber-200 hover:text-white rounded hover:bg-amber-800 transition-colors cursor-pointer"
+                              title="Move Block Down"
+                            >
+                              <ChevronDown size={13} />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => duplicateBlock(block.id)}
+                            className="p-1 text-amber-200 hover:text-white rounded hover:bg-amber-800 transition-colors cursor-pointer"
+                            title="Duplicate Block"
+                          >
+                            <CopyPlus size={13} />
+                          </button>
+                          <button 
+                            onClick={() => deleteBlock(block.id)}
+                            className="p-1 text-amber-200 hover:text-rose-300 rounded hover:bg-rose-900/50 transition-colors cursor-pointer"
+                            title="Delete Block"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
                       </div>
                     );
                   }
@@ -2303,7 +2481,7 @@ ${loopCode}}`;
                     return (
                       <div 
                         key={block.id}
-                        className={`rounded-2xl p-3.5 text-xs font-bold border-2 transition-all shadow-xl space-y-2.5 ${
+                        className={`rounded-2xl p-3 sm:p-3.5 text-xs font-bold border-2 transition-all shadow-xl space-y-2.5 ${
                           isBeamBlocked 
                             ? 'bg-gradient-to-br from-rose-950/95 to-slate-950 border-rose-500 shadow-[0_0_25px_rgba(239,68,68,0.4)] animate-pulse' 
                             : 'bg-gradient-to-br from-indigo-950/90 to-purple-950/90 border-indigo-500/70'
@@ -2312,43 +2490,133 @@ ${loopCode}}`;
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2 font-black text-xs text-yellow-300">
                             <Zap size={15} className={isBeamBlocked ? 'text-rose-400 animate-bounce' : 'text-yellow-400'} />
-                            <span>⚡ IF Obstacle Cuts Laser Beam (LDR &lt; 400):</span>
+                            <span>⚡ IF Obstacle Breaks Laser Beam (LDR &lt; 400):</span>
                           </div>
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold ${
-                            isBeamBlocked ? 'bg-rose-500 text-white animate-pulse' : 'bg-indigo-500/20 text-indigo-300'
-                          }`}>
-                            {isBeamBlocked ? '🚨 BREACH ACTIVE' : '🛡️ MONITORING'}
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold ${
+                              isBeamBlocked ? 'bg-rose-500 text-white animate-pulse' : 'bg-indigo-500/20 text-indigo-300'
+                            }`}>
+                              {isBeamBlocked ? '🚨 BREACH ACTIVE' : '🛡️ MONITORING'}
+                            </span>
+                            <button
+                              onClick={() => deleteBlock(block.id)}
+                              className="p-1 text-slate-400 hover:text-rose-400 rounded hover:bg-rose-950 transition-colors cursor-pointer"
+                              title="Delete Condition Block"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
                         </div>
 
+                        {/* THEN Branch */}
                         <div className={`pl-3.5 border-l-2 space-y-1.5 py-1 text-xs transition-colors ${
                           isBeamBlocked ? 'border-rose-400 bg-rose-950/40 rounded-r-xl pr-2' : 'border-rose-500/50'
                         }`}>
-                          <div className="flex items-center justify-between text-rose-200 font-bold">
-                            <span>💡 Turn ON Red Light (Pin 11)</span>
-                            <span className="px-2 py-0.5 bg-rose-600 text-white rounded text-[10px] font-mono shadow-sm">HIGH (ON)</span>
+                          <div className="flex items-center justify-between text-rose-200 font-bold flex-wrap gap-1">
+                            <div className="flex items-center gap-1.5">
+                              <span>💡 Set Pin</span>
+                              <select
+                                value={block.thenPin1 || '11'}
+                                onChange={(e) => updateBlock(block.id, 'thenPin1', e.target.value)}
+                                className="bg-rose-950 border border-rose-700 text-white rounded px-1.5 py-0.5 text-xs font-bold"
+                              >
+                                <option value="11">Pin 11 (LED)</option>
+                                <option value="13">Pin 13</option>
+                                <option value="12">Pin 12</option>
+                                <option value="8">Pin 8 (Buzzer)</option>
+                              </select>
+                              <span>to</span>
+                              <select
+                                value={block.thenState1 || 'HIGH'}
+                                onChange={(e) => updateBlock(block.id, 'thenState1', e.target.value)}
+                                className="bg-rose-950 border border-rose-700 text-white rounded px-1.5 py-0.5 text-xs font-bold"
+                              >
+                                <option value="HIGH">HIGH (ON)</option>
+                                <option value="LOW">LOW (OFF)</option>
+                              </select>
+                            </div>
                           </div>
-                          <div className="flex items-center justify-between text-yellow-200 font-bold">
-                            <span>🔊 Sound Piezo Buzzer (Pin 8)</span>
-                            <span className="px-2 py-0.5 bg-amber-500 text-slate-950 rounded text-[10px] font-mono shadow-sm font-black">2400Hz BEEP</span>
+
+                          <div className="flex items-center justify-between text-yellow-200 font-bold flex-wrap gap-1">
+                            <div className="flex items-center gap-1.5">
+                              <span>🔊 Set Pin</span>
+                              <select
+                                value={block.thenPin2 || '8'}
+                                onChange={(e) => updateBlock(block.id, 'thenPin2', e.target.value)}
+                                className="bg-amber-950 border border-amber-700 text-white rounded px-1.5 py-0.5 text-xs font-bold"
+                              >
+                                <option value="8">Pin 8 (Buzzer)</option>
+                                <option value="11">Pin 11 (LED)</option>
+                                <option value="13">Pin 13</option>
+                              </select>
+                              <span>to</span>
+                              <select
+                                value={block.thenState2 || 'HIGH'}
+                                onChange={(e) => updateBlock(block.id, 'thenState2', e.target.value)}
+                                className="bg-amber-950 border border-amber-700 text-white rounded px-1.5 py-0.5 text-xs font-bold"
+                              >
+                                <option value="HIGH">HIGH (BEEP)</option>
+                                <option value="LOW">LOW (SILENT)</option>
+                              </select>
+                            </div>
                           </div>
                         </div>
 
+                        {/* ELSE Branch */}
                         <div className="font-black text-xs text-emerald-400 pt-1 flex items-center justify-between">
                           <span>🛡️ ELSE (Laser Beam Intact on LDR):</span>
                           <span className="text-[10px] text-slate-400 font-mono">Analog: 980</span>
                         </div>
 
-                        <div className={`pl-3.5 border-l-2 space-y-1 py-1 text-xs transition-colors ${
+                        <div className={`pl-3.5 border-l-2 space-y-1.5 py-1 text-xs transition-colors ${
                           !isBeamBlocked ? 'border-emerald-400 bg-emerald-950/20 rounded-r-xl pr-2' : 'border-emerald-500/40'
                         }`}>
-                          <div className="text-slate-300 font-medium flex items-center justify-between">
-                            <span>🌑 Turn OFF Red Light (Pin 11)</span>
-                            <span className="text-[10px] text-slate-400 font-mono">LOW (OFF)</span>
+                          <div className="text-slate-300 font-medium flex items-center justify-between flex-wrap gap-1">
+                            <div className="flex items-center gap-1.5">
+                              <span>🌑 Set Pin</span>
+                              <select
+                                value={block.elsePin1 || '11'}
+                                onChange={(e) => updateBlock(block.id, 'elsePin1', e.target.value)}
+                                className="bg-slate-900 border border-slate-700 text-slate-200 rounded px-1.5 py-0.5 text-xs"
+                              >
+                                <option value="11">Pin 11 (LED)</option>
+                                <option value="13">Pin 13</option>
+                                <option value="8">Pin 8 (Buzzer)</option>
+                              </select>
+                              <span>to</span>
+                              <select
+                                value={block.elseState1 || 'LOW'}
+                                onChange={(e) => updateBlock(block.id, 'elseState1', e.target.value)}
+                                className="bg-slate-900 border border-slate-700 text-slate-200 rounded px-1.5 py-0.5 text-xs"
+                              >
+                                <option value="LOW">LOW (OFF)</option>
+                                <option value="HIGH">HIGH (ON)</option>
+                              </select>
+                            </div>
                           </div>
-                          <div className="text-slate-300 font-medium flex items-center justify-between">
-                            <span>🔇 Silence Piezo Buzzer (Pin 8)</span>
-                            <span className="text-[10px] text-slate-400 font-mono">LOW (SILENT)</span>
+
+                          <div className="text-slate-300 font-medium flex items-center justify-between flex-wrap gap-1">
+                            <div className="flex items-center gap-1.5">
+                              <span>🔇 Set Pin</span>
+                              <select
+                                value={block.elsePin2 || '8'}
+                                onChange={(e) => updateBlock(block.id, 'elsePin2', e.target.value)}
+                                className="bg-slate-900 border border-slate-700 text-slate-200 rounded px-1.5 py-0.5 text-xs"
+                              >
+                                <option value="8">Pin 8 (Buzzer)</option>
+                                <option value="11">Pin 11 (LED)</option>
+                                <option value="13">Pin 13</option>
+                              </select>
+                              <span>to</span>
+                              <select
+                                value={block.elseState2 || 'LOW'}
+                                onChange={(e) => updateBlock(block.id, 'elseState2', e.target.value)}
+                                className="bg-slate-900 border border-slate-700 text-slate-200 rounded px-1.5 py-0.5 text-xs"
+                              >
+                                <option value="LOW">LOW (SILENT)</option>
+                                <option value="HIGH">HIGH (BEEP)</option>
+                              </select>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -2377,21 +2645,21 @@ ${loopCode}}`;
               <div className="pt-1 flex items-center gap-2 flex-wrap">
                 <button
                   onClick={() => addBlock('set_pin')}
-                  className="flex-1 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/40 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  className="flex-1 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/40 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
                 >
                   <Plus size={13} /> + Pin Block
                 </button>
                 <button
                   onClick={() => addBlock('wait')}
-                  className="flex-1 py-2 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/40 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  className="flex-1 py-2 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/40 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
                 >
                   <Plus size={13} /> + Wait Block
                 </button>
                 <button
                   onClick={() => addBlock('tripwire_logic')}
-                  className="w-full py-2 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/40 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                  className="w-full py-2 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/40 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-95"
                 >
-                  <Zap size={13} className="text-yellow-400" /> + Tripwire IF/ELSE Logic Block
+                  <Zap size={13} className="text-yellow-400" /> + IF/ELSE Condition Block
                 </button>
               </div>
 
