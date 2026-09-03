@@ -15,6 +15,7 @@ import Login from './pages/Login';
 import StudentPortal from './pages/StudentPortal';
 import SchoolPortal from './pages/SchoolPortal';
 import Verify from './pages/Verify';
+import Simulation from './pages/Simulation';
 import { DataProvider, useData } from './context/DataContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider, useToast } from './context/ToastContext';
@@ -388,6 +389,9 @@ export default function App() {
               {/* Public Login & Standalone Credential Verification Routes (Unlinked) */}
               <Route path="/login" element={<Login />} />
               <Route path="/verify" element={<Verify />} />
+
+              {/* Virtual Arduino Simulation Workbench (Guarded via Portal Session) */}
+              <Route path="/simulation" element={<Simulation />} />
 
               {/* Student Protected Portal (Student Role Only) */}
               <Route path="/student-portal" element={<StudentRouteGuard />} />

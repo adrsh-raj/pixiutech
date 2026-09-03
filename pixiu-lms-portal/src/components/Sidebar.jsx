@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, FolderKanban, Settings, LogOut, Box, GraduationCap, MessageSquare, BookOpen, Building, CreditCard, PlaySquare, Megaphone, X, Wifi } from 'lucide-react';
+import { LayoutDashboard, Users, FolderKanban, Settings, LogOut, Box, GraduationCap, MessageSquare, BookOpen, Building, CreditCard, PlaySquare, Megaphone, X, Wifi, Cpu } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function Sidebar({ mobileOpen = false, setMobileOpen = () => {} }) {
@@ -13,6 +13,7 @@ export default function Sidebar({ mobileOpen = false, setMobileOpen = () => {} }
       title: 'TRAINER ACADEMICS',
       links: [
         { name: 'Live Sessions & Roster', path: '/trainers', icon: GraduationCap },
+        { name: 'Virtual Arduino Lab', path: '/simulation', icon: Cpu },
         { name: 'Content Hub', path: '/content', icon: PlaySquare },
         { name: 'Curriculum Plans', path: '/curriculum', icon: BookOpen },
         { name: 'Hardware Kits', path: '/inventory', icon: Box },
@@ -37,6 +38,7 @@ export default function Sidebar({ mobileOpen = false, setMobileOpen = () => {} }
       title: 'ACADEMICS & LMS',
       links: [
         { name: 'Student Directory', path: '/students', icon: Users },
+        { name: 'Virtual Arduino Lab', path: '/simulation', icon: Cpu },
         { name: 'Content Hub', path: '/content', icon: PlaySquare },
         { name: 'Curriculum Plans', path: '/curriculum', icon: BookOpen },
         { name: 'Trainers Roster', path: '/trainers', icon: GraduationCap },
