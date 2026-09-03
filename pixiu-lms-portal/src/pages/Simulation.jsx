@@ -157,13 +157,7 @@ export default function Simulation() {
     // 1. 220Ω Resistor
     { id: 'res_1', type: 'resistor', name: '220Ω Resistor', lead1: { row: 10, col: 'c' }, lead2: { row: 15, col: 'c' } },
     // 2. 5mm Red LED Bulb
-    { id: 'led_1', type: 'led', name: '5mm Red LED', color: 'red', lead1: { row: 15, col: 'd' }, lead2: { row: 16, col: 'd' }, isBlown: false },
-    // 3. KY-008 Laser Diode Emitter (2 Legs: Anode & Cathode)
-    { id: 'laser_1', type: 'laser', name: 'KY-008 Laser', lead1: { row: 6, col: 'b' }, lead2: { row: 7, col: 'b' } },
-    // 4. CdS Photodetector LDR (2 Legs: Lead 1 & Lead 2)
-    { id: 'ldr_1', type: 'ldr', name: 'CdS LDR Sensor', lead1: { row: 6, col: 'i' }, lead2: { row: 7, col: 'i' } },
-    // 5. Piezo Buzzer Transducer (2 Legs: Positive & Negative)
-    { id: 'buzzer_1', type: 'buzzer', name: 'Piezo Buzzer', lead1: { row: 22, col: 'c' }, lead2: { row: 24, col: 'c' } }
+    { id: 'led_1', type: 'led', name: '5mm Red LED', color: 'red', lead1: { row: 15, col: 'd' }, lead2: { row: 16, col: 'd' }, isBlown: false }
   ]);
 
   // Tripwire Obstacle State (Virtual Hand Blocking Beam)
@@ -179,13 +173,7 @@ export default function Simulation() {
   const [wires, setWires] = useState([
     // LED circuit (Pin 11 -> Resistor Row 10, LED Cathode Row 16 -> GND)
     { id: 'w1', fromId: 'ARD_11', toId: 'BB_10_a', fromLabel: 'Pin 11', toLabel: 'Row 10 (a)', color: '#3B82F6' },
-    { id: 'w2', fromId: 'BB_16_e', toId: 'ARD_GND', fromLabel: 'Row 16 (e)', toLabel: 'GND', color: '#0F172A' },
-    // Laser circuit (Pin 9 -> Laser Row 6, GND -> Row 7)
-    { id: 'w3', fromId: 'ARD_9', toId: 'BB_6_a', fromLabel: 'Pin 9', toLabel: 'Row 6 (a)', color: '#EF4444' },
-    { id: 'w4', fromId: 'BB_7_a', toId: 'ARD_GND', fromLabel: 'Row 7 (a)', toLabel: 'GND', color: '#0F172A' },
-    // Buzzer circuit (Pin 8 -> Buzzer Row 22, GND -> Row 24)
-    { id: 'w5', fromId: 'ARD_8', toId: 'BB_22_b', fromLabel: 'Pin 8', toLabel: 'Row 22 (b)', color: '#F59E0B' },
-    { id: 'w6', fromId: 'BB_24_b', toId: 'ARD_GND', fromLabel: 'Row 24 (b)', toLabel: 'GND', color: '#0F172A' }
+    { id: 'w2', fromId: 'BB_16_e', toId: 'ARD_GND', fromLabel: 'Row 16 (e)', toLabel: 'GND', color: '#0F172A' }
   ]);
 
   const [selectedWireColor, setSelectedWireColor] = useState('#3B82F6');
@@ -730,7 +718,7 @@ void loop() {
     }
   };
 
-  const [currentProjectId, setCurrentProjectId] = useState('class7_laser');
+  const [currentProjectId, setCurrentProjectId] = useState('class6_bulb');
 
   const loadProject = (projId) => {
     getAudioContext();
@@ -754,13 +742,15 @@ void loop() {
 
   // ==================== VISUAL BLOCK CODING STATE ====================
   const [blocks, setBlocks] = useState([
-    { id: 'b1', type: 'set_pin', pin: '9', state: 'HIGH' },   // Laser ON (Arm Tripwire)
-    { id: 'b_tripwire', type: 'tripwire_logic', laserPin: '9', ldrPin: 'A0', ledPin: '11', buzzerPin: '8' }
+    { id: 'b1', type: 'set_pin', pin: '11', state: 'HIGH' },
+    { id: 'b2', type: 'wait', duration: 1.0 },
+    { id: 'b3', type: 'set_pin', pin: '11', state: 'LOW' },
+    { id: 'b4', type: 'wait', duration: 1.0 }
   ]);
   const [repeatLoop, setRepeatLoop] = useState(true);
   const [activeBlockIndex, setActiveBlockIndex] = useState(-1);
   const [showCppCode, setShowCppCode] = useState(false);
-  const [editableCppCode, setEditableCppCode] = useState(DEFAULT_TRIPWIRE_SKETCH);
+  const [editableCppCode, setEditableCppCode] = useState(DEFAULT_CLASS6_SKETCH);
   const [isCopied, setIsCopied] = useState(false);
   const [isFlashing, setIsFlashing] = useState(false);
 
@@ -823,28 +813,9 @@ void loop() {
 
   const loadProgramTemplate = (tmpl) => {
     if (tmpl === 'tripwire') {
-      setBlocks([
-        { id: 'b1', type: 'set_pin', pin: '9', state: 'HIGH' },
-        { 
-          id: 'b_tripwire', 
-          type: 'tripwire_logic', 
-          laserPin: '9', 
-          ldrPin: 'A0', 
-          thenPin1: '11', thenState1: 'HIGH', 
-          thenPin2: '8', thenState2: 'HIGH', 
-          elsePin1: '11', elseState1: 'LOW', 
-          elsePin2: '8', elseState2: 'LOW' 
-        }
-      ]);
-      showToast('Loaded Laser Security Tripwire program.', 'Template Loaded', 'success');
+      loadProject('class7_laser');
     } else if (tmpl === 'blink') {
-      setBlocks([
-        { id: 'b1', type: 'set_pin', pin: '11', state: 'HIGH' },
-        { id: 'b2', type: 'wait', duration: 1.0 },
-        { id: 'b3', type: 'set_pin', pin: '11', state: 'LOW' },
-        { id: 'b4', type: 'wait', duration: 1.0 }
-      ]);
-      showToast('Loaded LED Blinker program (1 sec interval).', 'Template Loaded', 'success');
+      loadProject('class6_bulb');
     } else if (tmpl === 'siren') {
       setBlocks([
         { id: 'b1', type: 'set_pin', pin: '8', state: 'HIGH' },
@@ -1532,54 +1503,69 @@ ${loopCode}}`;
                   <Plus size={12} /> 220Ω Resistor
                 </button>
 
-                {/* + Add KY-008 Laser */}
-                <button
-                  onClick={() => handleAddNewComponent('laser')}
-                  className="px-2 py-1 bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/40 rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-all"
-                >
-                  <Plus size={12} /> Laser Diode
-                </button>
+                {/* Extra LED for Class 6 */}
+                {currentProjectId === 'class6_bulb' && (
+                  <button
+                    onClick={() => handleAddNewComponent('led', 'blue')}
+                    className="px-2 py-1 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/40 rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-all"
+                  >
+                    <Plus size={12} /> Blue LED
+                  </button>
+                )}
 
-                {/* + Add CdS LDR */}
-                <button
-                  onClick={() => handleAddNewComponent('ldr')}
-                  className="px-2 py-1 bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border border-cyan-500/40 rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-all"
-                >
-                  <Plus size={12} /> Photoresistor (LDR)
-                </button>
+                {/* Advanced Components (Laser, LDR, Buzzer, Obstacle) only for Class 7 / Advanced Projects */}
+                {(currentProjectId === 'class7_laser' || components.some(c => c.type === 'laser' || c.type === 'buzzer' || c.type === 'ldr')) && (
+                  <>
+                    {/* + Add KY-008 Laser */}
+                    <button
+                      onClick={() => handleAddNewComponent('laser')}
+                      className="px-2 py-1 bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/40 rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-all"
+                    >
+                      <Plus size={12} /> Laser Diode
+                    </button>
 
-                {/* + Add Piezo Buzzer */}
-                <button
-                  onClick={() => handleAddNewComponent('buzzer')}
-                  className="px-2 py-1 bg-yellow-600/20 hover:bg-yellow-600/30 text-yellow-300 border border-yellow-500/40 rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-all"
-                >
-                  <Plus size={12} /> Piezo Buzzer
-                </button>
+                    {/* + Add CdS LDR */}
+                    <button
+                      onClick={() => handleAddNewComponent('ldr')}
+                      className="px-2 py-1 bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border border-cyan-500/40 rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-all"
+                    >
+                      <Plus size={12} /> Photoresistor (LDR)
+                    </button>
 
-                {/* Obstacle Barrier Placement Toggle */}
-                <button
-                  onClick={() => {
-                    getAudioContext();
-                    const nextBlocked = !isBeamBlocked;
-                    setIsBeamBlocked(nextBlocked);
-                    if (nextBlocked) {
-                      showToast('🚨 OBSTACLE DETECTED! Laser beam cut ➔ Red Light ON & Buzzer Alarm BEEPING!', 'Tripwire Breach!', 'error');
-                      setSerialLogs(prev => [...prev.slice(-30), `[🚨 ALARM TRIGGERED] Obstacle placed! Beam broken ➔ Red Light ON, Piezo Buzzer BEEPING (2400Hz)!`]);
-                    } else {
-                      showToast('Perimeter restored: Obstacle removed. Red Light OFF & Buzzer silent.', 'Perimeter Secure', 'success');
-                      setSerialLogs(prev => [...prev.slice(-30), `[🟢 PERIMETER RESTORED] Obstacle removed ➔ Laser beam intact on LDR (100Ω). Alarm Armed.`]);
-                    }
-                  }}
-                  className={`px-2.5 py-1 rounded-lg border text-[11px] font-black uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-all ${
-                    isBeamBlocked
-                      ? 'bg-rose-600 text-white border-rose-400 shadow-md animate-pulse'
-                      : 'bg-indigo-600/40 hover:bg-indigo-600/60 text-indigo-200 border-indigo-500/50'
-                  }`}
-                  title="Simulate obstacle placed right in front of the laser beam"
-                >
-                  <Hand size={12} className={isBeamBlocked ? 'animate-bounce' : ''} />
-                  <span>{isBeamBlocked ? '🚨 Remove Obstacle' : '🖐️ Place Obstacle (Cut Beam)'}</span>
-                </button>
+                    {/* + Add Piezo Buzzer */}
+                    <button
+                      onClick={() => handleAddNewComponent('buzzer')}
+                      className="px-2 py-1 bg-yellow-600/20 hover:bg-yellow-600/30 text-yellow-300 border border-yellow-500/40 rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-all"
+                    >
+                      <Plus size={12} /> Piezo Buzzer
+                    </button>
+
+                    {/* Obstacle Barrier Placement Toggle */}
+                    <button
+                      onClick={() => {
+                        getAudioContext();
+                        const nextBlocked = !isBeamBlocked;
+                        setIsBeamBlocked(nextBlocked);
+                        if (nextBlocked) {
+                          showToast('🚨 OBSTACLE DETECTED! Laser beam cut ➔ Red Light ON & Buzzer Alarm BEEPING!', 'Tripwire Breach!', 'error');
+                          setSerialLogs(prev => [...prev.slice(-30), `[🚨 ALARM TRIGGERED] Obstacle placed! Beam broken ➔ Red Light ON, Piezo Buzzer BEEPING (2400Hz)!`]);
+                        } else {
+                          showToast('Perimeter restored: Obstacle removed. Red Light OFF & Buzzer silent.', 'Perimeter Secure', 'success');
+                          setSerialLogs(prev => [...prev.slice(-30), `[🟢 PERIMETER RESTORED] Obstacle removed ➔ Laser beam intact on LDR (100Ω). Alarm Armed.`]);
+                        }
+                      }}
+                      className={`px-2.5 py-1 rounded-lg border text-[11px] font-black uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-all ${
+                        isBeamBlocked
+                          ? 'bg-rose-600 text-white border-rose-400 shadow-md animate-pulse'
+                          : 'bg-indigo-600/40 hover:bg-indigo-600/60 text-indigo-200 border-indigo-500/50'
+                      }`}
+                      title="Simulate obstacle placed right in front of the laser beam"
+                    >
+                      <Hand size={12} className={isBeamBlocked ? 'animate-bounce' : ''} />
+                      <span>{isBeamBlocked ? '🚨 Remove Obstacle' : '🖐️ Place Obstacle (Cut Beam)'}</span>
+                    </button>
+                  </>
+                )}
               </div>
             </div>
 
@@ -2479,11 +2465,12 @@ ${loopCode}}`;
 
                 <button
                   onClick={() => {
-                    setEditableCppCode(DEFAULT_TRIPWIRE_SKETCH);
-                    showToast('Reset code to Laser Tripwire Security System template.', 'Template Restored', 'info');
+                    const code = LAB_PROJECTS[currentProjectId]?.cppCode || DEFAULT_CLASS6_SKETCH;
+                    setEditableCppCode(code);
+                    showToast(`Reset code to ${LAB_PROJECTS[currentProjectId]?.title || 'default'} sketch.`, 'Template Restored', 'info');
                   }}
                   className="p-1 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 rounded-lg border border-slate-700 transition-all cursor-pointer"
-                  title="Reset to default Laser Tripwire sketch"
+                  title="Reset to default project sketch"
                 >
                   <RotateCcw size={12} />
                 </button>
@@ -2867,12 +2854,14 @@ ${loopCode}}`;
                 >
                   <Plus size={13} /> + Wait Block
                 </button>
-                <button
-                  onClick={() => addBlock('tripwire_logic')}
-                  className="w-full py-2 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/40 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-95"
-                >
-                  <Zap size={13} className="text-yellow-400" /> + IF/ELSE Condition Block
-                </button>
+                {(currentProjectId === 'class7_laser' || components.some(c => c.type === 'laser')) && (
+                  <button
+                    onClick={() => addBlock('tripwire_logic')}
+                    className="w-full py-2 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/40 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-95"
+                  >
+                    <Zap size={13} className="text-yellow-400" /> + IF/ELSE Condition Block
+                  </button>
+                )}
               </div>
 
               {/* Serial Output */}
