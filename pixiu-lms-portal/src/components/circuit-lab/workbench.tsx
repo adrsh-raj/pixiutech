@@ -21,6 +21,7 @@ import { SerialMonitor, type SerialLine } from "./serial-monitor"
 import { StatusBar } from "./status-bar"
 import { TemplateBrowser } from "./template-browser"
 import { AiCameraPanel, type AiVisionState } from "./ai-camera-panel"
+import { ContextMenu, type ContextMenuTarget } from "./context-menu"
 import type { ProjectTemplate } from "@/lib/templates"
 
 const DEFAULT_XML = `<xml xmlns="https://developers.google.com/blockly/xml">
@@ -191,6 +192,17 @@ export function Workbench() {
   const [isTemplatesOpen, setIsTemplatesOpen] = useState(false)
   const [isAiCameraOpen, setIsAiCameraOpen] = useState(() => typeof window !== "undefined" && window.innerWidth >= 768)
   const [mobilePaletteOpen, setMobilePaletteOpen] = useState(false)
+  const [contextMenu, setContextMenu] = useState<{
+    x: number
+    y: number
+    target: ContextMenuTarget
+  } | null>(null)
+
+  const handleCanvasContextMenu = useCallback((e: React.MouseEvent, target: ContextMenuTarget) => {
+    e.preventDefault()
+    setContextMenu({ x: e.clientX, y: e.clientY, target })
+  }, [])
+
   const [aiState, setAiState] = useState<AiVisionState>({
     enabled: true,
     detectedClass: "none",
@@ -377,15 +389,49 @@ export function Workbench() {
     setWiring(null)
   }, [wiring, activeWireColor, updateState])
 
-  // Keyboard shortcut listener for Undo / Redo / Delete / Backspace
+  // Keyboard shortcut listener and DevTools protection
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // 1. Block F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+Shift+C, Ctrl+U, Ctrl+S
+      if (
+        e.key === "F12" ||
+        (e.ctrlKey && e.shiftKey && ["I", "i", "J", "j", "C", "c"].includes(e.key)) ||
+        (e.ctrlKey && ["U", "u", "S", "s"].includes(e.key))
+      ) {
+        e.preventDefault()
+        e.stopPropagation()
+        return
+      }
+
       const activeEl = document.activeElement
       const isInput =
         activeEl?.tagName === "INPUT" ||
         activeEl?.tagName === "TEXTAREA" ||
         (activeEl as HTMLElement)?.isContentEditable
       if (isInput) return
+
+      // Space toggles simulation
+      if (e.code === "Space") {
+        e.preventDefault()
+        toggleRun()
+        return
+      }
+
+      // 'R' rotates selected component
+      if ((e.key === "r" || e.key === "R") && !e.ctrlKey && !e.metaKey) {
+        if (selectedId) {
+          rotatePart(selectedId)
+          e.preventDefault()
+        }
+      }
+
+      // 'D' duplicates selected component
+      if ((e.key === "d" || e.key === "D") && !e.ctrlKey && !e.metaKey) {
+        if (selectedId) {
+          duplicatePart(selectedId)
+          e.preventDefault()
+        }
+      }
 
       // DELETE / BACKSPACE removes selected component or selected wire!
       if (e.key === "Delete" || e.key === "Backspace") {
@@ -410,9 +456,19 @@ export function Workbench() {
         e.preventDefault()
       }
     }
+
+    const handleGlobalContextMenu = (e: MouseEvent) => {
+      e.preventDefault()
+      setContextMenu({ x: e.clientX, y: e.clientY, target: { type: "canvas" } })
+    }
+
     window.addEventListener("keydown", handleKeyDown)
-    return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [handleUndo, handleRedo, selectedWireId, selectedId, deleteWire, deletePart])
+    window.addEventListener("contextmenu", handleGlobalContextMenu)
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown)
+      window.removeEventListener("contextmenu", handleGlobalContextMenu)
+    }
+  }, [handleUndo, handleRedo, selectedWireId, selectedId, deleteWire, deletePart, rotatePart, duplicatePart, toggleRun])
 
   const interact = useCallback((id: string, mode: "down" | "up") => {
     setPressed((prev) => {
@@ -673,6 +729,7 @@ export function Workbench() {
                   setSelectedWireId(id)
                   if (id) setSelectedId(null)
                 }}
+                onCanvasContextMenu={handleCanvasContextMenu}
               />
               {running && (
                 <div className="pointer-events-none absolute left-1/2 top-4 -translate-x-1/2 rounded-full border border-emerald-500/40 bg-emerald-950/80 backdrop-blur-sm px-4 py-1.5 font-mono text-xs text-emerald-400 shadow-lg flex items-center gap-2">
@@ -762,16 +819,40 @@ export function Workbench() {
         </div>
       )}
 
-      {/* Global Bottom Status Bar */}
-      <StatusBar
-        partCount={state.parts.length}
-        wireCount={state.wires.length}
-        zoom={1}
-        running={running}
-        runTime={runTime}
-        totalCurrentMa={totalCurrentMa}
-        lastSaved={lastSaved}
-      />
+      {/* Custom Context Menu */}
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          target={contextMenu.target}
+          partName={selected ? CATALOG[selected.type]?.name : undefined}
+          running={running}
+          activeWireColor={selectedWire ? selectedWire.color : activeWireColor}
+          onClose={() => setContextMenu(null)}
+          onRotate={() => selectedId && rotatePart(selectedId)}
+          onDuplicate={() => selectedId && duplicatePart(selectedId)}
+          onDelete={() => {
+            if (contextMenu.target.type === "part" && selectedId) {
+              deletePart(selectedId)
+              setSelectedId(null)
+            } else if (contextMenu.target.type === "wire" && selectedWireId) {
+              deleteWire(selectedWireId)
+              setSelectedWireId(null)
+            }
+          }}
+          onFitToScreen={() => {
+            window.dispatchEvent(new CustomEvent("circuit-fit-screen"))
+          }}
+          onOpenPalette={() => setMobilePaletteOpen(true)}
+          onOpenTemplates={() => setIsTemplatesOpen(true)}
+          onToggleSerial={() => setIsSerialOpen((prev) => !prev)}
+          onToggleAiCamera={() => setIsAiCameraOpen((prev) => !prev)}
+          onSwitchToCode={() => setView("code")}
+          onToggleRun={toggleRun}
+          onClearCanvas={clearAll}
+          onChangeWireColor={handleSelectWireColor}
+        />
+      )}
     </div>
   )
 }

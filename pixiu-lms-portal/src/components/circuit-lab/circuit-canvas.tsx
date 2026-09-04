@@ -7,6 +7,7 @@ import { CATALOG, PIN_KIND_COLOR } from "@/lib/components-catalog"
 import { getPinRefPosition, wirePath } from "@/lib/geometry"
 import { PartArt, type PartRuntime } from "./part-art"
 import { Maximize2, Plus, Minus } from "lucide-react"
+import type { ContextMenuTarget } from "./context-menu"
 
 interface View {
   scale: number
@@ -28,11 +29,10 @@ interface Props {
   onCancelWire: () => void
   onDeleteWire: (id: string) => void
   onDropPart: (type: PartType, x: number, y: number) => void
-  onDeleteWire: (id: string) => void
-  onDropPart: (type: PartType, x: number, y: number) => void
   onInteract: (id: string, active: boolean) => void
   selectedWireId?: string | null
   onSelectWire?: (id: string | null) => void
+  onCanvasContextMenu?: (e: React.MouseEvent, target: ContextMenuTarget) => void
 }
 
 export function CircuitCanvas(props: Props) {
@@ -53,6 +53,7 @@ export function CircuitCanvas(props: Props) {
     onInteract,
     selectedWireId,
     onSelectWire,
+    onCanvasContextMenu,
   } = props
 
   const svgRef = useRef<SVGSVGElement | null>(null)
@@ -128,6 +129,12 @@ export function CircuitCanvas(props: Props) {
     }
   }, [parts.length, fitToScreen])
 
+  useEffect(() => {
+    const handleFit = () => fitToScreen()
+    window.addEventListener("circuit-fit-screen", handleFit)
+    return () => window.removeEventListener("circuit-fit-screen", handleFit)
+  }, [fitToScreen])
+
   const onSvgPointerDown = (e: React.PointerEvent) => {
     // background: pan + deselect
     if (wiring) {
@@ -195,6 +202,10 @@ export function CircuitCanvas(props: Props) {
   return (
     <div
       className="relative h-full w-full overflow-hidden bg-background"
+      onContextMenu={(e) => {
+        e.preventDefault()
+        onCanvasContextMenu?.(e, { type: "canvas" })
+      }}
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => {
         e.preventDefault()
@@ -224,8 +235,28 @@ export function CircuitCanvas(props: Props) {
           </pattern>
         </defs>
 
-        <rect x={0} y={0} width="100%" height="100%" fill="url(#grid)" />
-        <rect x={0} y={0} width="100%" height="100%" fill="url(#grid-lg)" />
+        <rect
+          x={0}
+          y={0}
+          width="100%"
+          height="100%"
+          fill="url(#grid)"
+          onContextMenu={(e) => {
+            e.preventDefault()
+            onCanvasContextMenu?.(e, { type: "canvas" })
+          }}
+        />
+        <rect
+          x={0}
+          y={0}
+          width="100%"
+          height="100%"
+          fill="url(#grid-lg)"
+          onContextMenu={(e) => {
+            e.preventDefault()
+            onCanvasContextMenu?.(e, { type: "canvas" })
+          }}
+        />
 
         <g transform={`translate(${view.tx} ${view.ty}) scale(${view.scale})`}>
           {/* 1. Component Bodies (CHASSIS & ARTWORK) */}
@@ -234,7 +265,16 @@ export function CircuitCanvas(props: Props) {
             const selected = part.id === selectedId
             const interactive = running && (part.type === "pushbutton" || part.type === "potentiometer")
             return (
-              <g key={part.id} transform={`translate(${part.x} ${part.y})`}>
+              <g
+                key={part.id}
+                transform={`translate(${part.x} ${part.y})`}
+                onContextMenu={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  onSelect(part.id)
+                  onCanvasContextMenu?.(e, { type: "part", id: part.id })
+                }}
+              >
                 <g transform={`rotate(${part.rotation} ${def.width / 2} ${def.height / 2})`}>
                   {selected && (
                     <rect
@@ -331,6 +371,15 @@ export function CircuitCanvas(props: Props) {
                       onSelect(null)
                       onSelectWire?.(wire.id)
                     }
+                  }}
+                  onContextMenu={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    if (!running) {
+                      onSelect(null)
+                      onSelectWire?.(wire.id)
+                    }
+                    onCanvasContextMenu?.(e, { type: "wire", id: wire.id })
                   }}
                 >
                   <title>Click to select wire (Delete key to remove)</title>
