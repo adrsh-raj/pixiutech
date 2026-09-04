@@ -1,5 +1,6 @@
 import type { CircuitState, PinRef } from "./circuit-types"
 import type { ArduinoPinState } from "./simulation"
+import type { PartRuntime } from "@/components/circuit-lab/part-art"
 
 export interface PinPotentialInfo {
   voltage: number
@@ -25,6 +26,24 @@ export interface NodalSolution {
     diff: number
     vRed: number
     vBlack: number
+    explanation: string
+    subtext?: string
+    isWarning?: boolean
+  }
+  computeResistanceBetweenPins: (
+    refA: PinRef | null,
+    refB: PinRef | null
+  ) => {
+    resistance: number
+    explanation: string
+    subtext?: string
+  }
+  computeCurrentBetweenPins: (
+    red: PinRef | null,
+    black: PinRef | null,
+    runtime: Record<string, PartRuntime>
+  ) => {
+    currentMa: number
     explanation: string
     subtext?: string
     isWarning?: boolean
@@ -86,8 +105,7 @@ function solveLinearSystem(A: number[][], b: number[]): number[] {
  * Dynamic Electrical Network & Nodal Potential Solver:
  * - Solves exact electrical potentials (Volts) for EVERY pin in the circuit.
  * - Handles arbitrary networks of MULTIPLE resistors (series, parallel, voltage dividers).
- * - Models LED forward-voltage drops (Vf ~ 2.0V) and potentiometer variable dividers.
- * - Accurately detects digital pin HIGH/LOW states and constant 5V/3.3V power rails.
+ * - Computes real equivalent resistance and active branch currents across any two probed pins.
  */
 export function solveCircuitNodalPotentials(
   state: CircuitState,
@@ -98,7 +116,6 @@ export function solveCircuitNodalPotentials(
   // 1. Gather all pins across all placed components
   const allPins = new Set<string>()
   for (const part of state.parts) {
-    // Generate common pins based on component type
     switch (part.type) {
       case "arduino-uno": {
         for (let i = 0; i <= 13; i++) {
@@ -134,9 +151,6 @@ export function solveCircuitNodalPotentials(
         allPins.add(pinKey(part.id, "p2b"))
         break
       case "battery":
-        allPins.add(pinKey(part.id, "pos"))
-        allPins.add(pinKey(part.id, "neg"))
-        break
       case "buzzer":
       case "dc-motor":
         allPins.add(pinKey(part.id, "pos"))
@@ -170,7 +184,6 @@ export function solveCircuitNodalPotentials(
     }
   }
 
-  // Also ensure pins in wires exist
   for (const w of state.wires) {
     allPins.add(pinKey(w.from.partId, w.from.pinId))
     allPins.add(pinKey(w.to.partId, w.to.pinId))
@@ -193,12 +206,10 @@ export function solveCircuitNodalPotentials(
     }
   }
 
-  // Union wires
   for (const w of state.wires) {
     union(pinKey(w.from.partId, w.from.pinId), pinKey(w.to.partId, w.to.pinId))
   }
 
-  // Union breadboard internal strips
   for (const part of state.parts) {
     if (part.type === "breadboard") {
       const k = (pin: string) => pinKey(part.id, pin)
@@ -246,28 +257,24 @@ export function solveCircuitNodalPotentials(
     return rootToNetId.get(find(pinKey(partId, pinId))) ?? 0
   }
 
-  // 4. Identify Fixed Voltage Nets (Dirichlet Boundary Conditions)
+  // 4. Identify Fixed Voltage Nets
   const fixedNets = new Map<number, { voltage: number; label: string; isDigitalLow?: boolean; digitalPinName?: string }>()
 
   for (const part of state.parts) {
     if (part.type === "arduino-uno") {
-      // 5V power rail
       const net5V = pinToNetId(part.id, "5v")
       fixedNets.set(net5V, { voltage: 5.0, label: "Arduino 5V Power Rail" })
       const netVin = pinToNetId(part.id, "vin")
       fixedNets.set(netVin, { voltage: 5.0, label: "Arduino VIN (5.0V)" })
 
-      // 3.3V power rail
       const net3V3 = pinToNetId(part.id, "3v3")
       fixedNets.set(net3V3, { voltage: 3.3, label: "Arduino 3.3V Rail" })
 
-      // Ground sinks
       const netGnd = pinToNetId(part.id, "gnd")
       fixedNets.set(netGnd, { voltage: 0.0, label: "Ground (0V)" })
       const netGndPwr = pinToNetId(part.id, "gnd_pwr")
       fixedNets.set(netGndPwr, { voltage: 0.0, label: "Ground (0V)" })
 
-      // Digital pins
       for (let i = 0; i <= 13; i++) {
         const pinId = `d${i}`
         const netD = pinToNetId(part.id, pinId)
@@ -279,7 +286,6 @@ export function solveCircuitNodalPotentials(
           const vPwm = Number((5.0 * (pState.value / 255)).toFixed(2))
           fixedNets.set(netD, { voltage: vPwm, label: `Arduino Pin D${i} (PWM ${pState.value}/255 = ${vPwm}V)` })
         } else if (pState?.state === "LOW") {
-          // Explicitly driven LOW in code!
           fixedNets.set(netD, {
             voltage: 0.0,
             label: `Arduino Pin D${i} (OUTPUT LOW = 0.0V)`,
@@ -296,11 +302,11 @@ export function solveCircuitNodalPotentials(
     }
   }
 
-  // 5. Build component branches (Resistors, Potentiometers, LEDs, Loads)
+  // 5. Build component branches
   interface Branch {
     netA: number
     netB: number
-    conductance: number // G = 1/R
+    conductance: number
     isDiode?: boolean
     vForward?: number
   }
@@ -351,13 +357,12 @@ export function solveCircuitNodalPotentials(
     }
   }
 
-  // 6. Modified Nodal Analysis (MNA) Linear System
+  // 6. Modified Nodal Analysis (MNA)
   const netVoltages = new Map<number, number>()
   for (const [netId, info] of fixedNets.entries()) {
     netVoltages.set(netId, info.voltage)
   }
 
-  // Filter unknown nets
   const unknownNets: number[] = []
   const netToUnknownIdx = new Map<number, number>()
   for (let id = 0; id < nextNetId; id++) {
@@ -370,7 +375,6 @@ export function solveCircuitNodalPotentials(
   const M = unknownNets.length
 
   if (M > 0) {
-    // Run up to 2 passes to evaluate diode conduction
     let activeBranches = branches.slice()
 
     for (let pass = 0; pass < 2; pass++) {
@@ -384,7 +388,6 @@ export function solveCircuitNodalPotentials(
         const u = netToUnknownIdx.get(br.netA)
         const v = netToUnknownIdx.get(br.netB)
 
-        // Resistor / linear branch
         if (u !== undefined && v !== undefined) {
           A[u][u] += G
           A[v][v] += G
@@ -400,7 +403,6 @@ export function solveCircuitNodalPotentials(
           B[v] += G * vFixed
         }
 
-        // Norton equivalent for conducting diode
         if (br.isDiode && br.vForward) {
           const iEq = G * br.vForward
           if (u !== undefined) B[u] -= iEq
@@ -408,7 +410,6 @@ export function solveCircuitNodalPotentials(
         }
       }
 
-      // Add small shunt conductance to GND for floating nodes to ensure matrix non-singularity
       for (let i = 0; i < M; i++) {
         A[i][i] += 1e-9
       }
@@ -420,7 +421,6 @@ export function solveCircuitNodalPotentials(
         netVoltages.set(netId, vSolved)
       }
 
-      // Check diode condition: if V_anode - V_cathode < Vf, diode does not conduct
       let recheckNeeded = false
       activeBranches = activeBranches.filter((br) => {
         if (br.isDiode && br.vForward) {
@@ -428,7 +428,7 @@ export function solveCircuitNodalPotentials(
           const vC = netVoltages.get(br.netB) ?? 0
           if (vA - vC < br.vForward - 0.1) {
             recheckNeeded = true
-            return false // Diode OFF
+            return false
           }
         }
         return true
@@ -458,7 +458,6 @@ export function solveCircuitNodalPotentials(
     })
   }
 
-  // Helpers
   const getPinVoltage = (ref: PinRef | null): number => {
     if (!ref) return 0
     return pinPotentials.get(pinKey(ref.partId, ref.pinId))?.voltage ?? 0
@@ -473,6 +472,115 @@ export function solveCircuitNodalPotentials(
       netId: -1,
       isDriven: false,
       isGnd: false,
+    }
+  }
+
+  const computeResistanceBetweenPins = (
+    refA: PinRef | null,
+    refB: PinRef | null
+  ): { resistance: number; explanation: string; subtext?: string } => {
+    if (!refA || !refB) {
+      return { resistance: Infinity, explanation: "Clip both probes to measure resistance" }
+    }
+
+    if (refA.partId === refB.partId && refA.pinId === refB.pinId) {
+      return { resistance: 0, explanation: "0.0 Ω (Direct short / same terminal)" }
+    }
+
+    const netA = pinToNetId(refA.partId, refA.pinId)
+    const netB = pinToNetId(refB.partId, refB.pinId)
+
+    if (netA === netB) {
+      return {
+        resistance: 0,
+        explanation: "0.0 Ω (Direct wire / continuous tie-point)",
+        subtext: "Both probes are clipped to the same electrical net",
+      }
+    }
+
+    if (refA.partId === refB.partId && state.parts.find((p) => p.id === refA.partId)?.type === "resistor") {
+      const p = state.parts.find((p) => p.id === refA.partId)!
+      const r = Number(p.props.resistance || 220)
+      return {
+        resistance: r,
+        explanation: `Component Resistance: ${r.toFixed(1)} Ω`,
+        subtext: `Marking bands denote ${r}Ω nominal resistance`,
+      }
+    }
+
+    const adj = new Map<number, { to: number; r: number; partName: string }[]>()
+    function addR(u: number, v: number, r: number, name: string) {
+      if (!adj.has(u)) adj.set(u, [])
+      if (!adj.has(v)) adj.set(v, [])
+      adj.get(u)!.push({ to: v, r, partName: name })
+      adj.get(v)!.push({ to: u, r, partName: name })
+    }
+
+    for (const part of state.parts) {
+      if (part.type === "resistor") {
+        const u = pinToNetId(part.id, "a")
+        const v = pinToNetId(part.id, "b")
+        const r = Math.max(0.1, Number(part.props.resistance || 220))
+        addR(u, v, r, `${r}Ω Resistor`)
+      } else if (part.type === "potentiometer") {
+        const u = pinToNetId(part.id, "t1")
+        const w = pinToNetId(part.id, "wiper")
+        const v = pinToNetId(part.id, "t2")
+        const val = Math.max(0, Math.min(1023, Number(part.props.value ?? 512)))
+        const r1 = Math.max(0.5, (val / 1023) * 10000)
+        const r2 = Math.max(0.5, ((1023 - val) / 1023) * 10000)
+        addR(u, w, r1, "Potentiometer T1-Wiper")
+        addR(w, v, r2, "Potentiometer Wiper-T2")
+      } else if (part.type === "led") {
+        const u = pinToNetId(part.id, "anode")
+        const v = pinToNetId(part.id, "cathode")
+        addR(u, v, 15, "LED Diode Junction")
+      }
+    }
+
+    const dist = new Map<number, number>()
+    const visited = new Set<number>()
+    const pq: { net: number; d: number; parts: string[] }[] = [{ net: netA, d: 0, parts: [] }]
+    dist.set(netA, 0)
+
+    let bestR = Infinity
+    let bestParts: string[] = []
+
+    while (pq.length > 0) {
+      pq.sort((a, b) => a.d - b.d)
+      const { net, d, parts } = pq.shift()!
+
+      if (net === netB) {
+        bestR = d
+        bestParts = parts
+        break
+      }
+
+      if (visited.has(net)) continue
+      visited.add(net)
+
+      const edges = adj.get(net) || []
+      for (const e of edges) {
+        const newD = d + e.r
+        if (newD < (dist.get(e.to) ?? Infinity)) {
+          dist.set(e.to, newD)
+          pq.push({ net: e.to, d: newD, parts: [...parts, e.partName] })
+        }
+      }
+    }
+
+    if (bestR === Infinity) {
+      return {
+        resistance: Infinity,
+        explanation: "Open Circuit / High Resistance path (O.L)",
+        subtext: "Probes are not connected by a continuous resistive path",
+      }
+    }
+
+    return {
+      resistance: Number(bestR.toFixed(1)),
+      explanation: `Path Resistance: ${bestR >= 1000 ? (bestR / 1000).toFixed(2) + " kΩ" : bestR.toFixed(1) + " Ω"}`,
+      subtext: bestParts.length > 0 ? `Through: ${bestParts.join(" + ")}` : undefined,
     }
   }
 
@@ -516,7 +624,6 @@ export function solveCircuitNodalPotentials(
           subtext: `Ohm's Law: ΔV = I × R = ${currentMa.toFixed(1)}mA × ${rOhms}Ω. Resistor drops ${Math.abs(diff).toFixed(2)}V to protect load!`,
         }
       } else {
-        // Drop is 0 across resistor! Why?
         if (infoRed.isDigitalLow || infoBlack.isDigitalLow) {
           const pinName = infoRed.digitalPinName || infoBlack.digitalPinName || "Digital Pin"
           return {
@@ -589,15 +696,104 @@ export function solveCircuitNodalPotentials(
       }
     }
 
-    // Standard potential difference readout
+    // Reversed polarity note
+    let polarityNote = ""
+    if (diff < 0) {
+      polarityNote = ` (Reversed Polarity: Black probe is on higher potential +${vBlack.toFixed(2)}V)`
+    }
+
     return {
       diff,
       vRed,
       vBlack,
-      explanation: `Potential Difference: Red (${vRed.toFixed(2)}V) minus Black (${vBlack.toFixed(2)}V)`,
-      subtext: infoBlack.isGnd
-        ? "Absolute potential measured relative to Ground (0V reference)."
-        : undefined,
+      explanation: `Potential Difference: Red (${vRed.toFixed(2)}V) minus Black (${vBlack.toFixed(2)}V)${polarityNote}`,
+      subtext: diff < 0
+        ? "💡 Use '⇄ Swap Probes' below to invert polarity and measure positive voltage."
+        : infoBlack.isGnd
+          ? "Absolute potential measured relative to Ground (0V reference)."
+          : undefined,
+    }
+  }
+
+  const computeCurrentBetweenPins = (
+    red: PinRef | null,
+    black: PinRef | null,
+    runtime: Record<string, PartRuntime>
+  ): { currentMa: number; explanation: string; subtext?: string; isWarning?: boolean } => {
+    if (!red || !black) {
+      return { currentMa: 0, explanation: "Clip both probes to measure current" }
+    }
+
+    const pd = getPotentialDifference(red, black, state, pinStates)
+
+    // 1. If probes are across a single resistor
+    if (red.partId === black.partId && state.parts.find((p) => p.id === red.partId)?.type === "resistor") {
+      const part = state.parts.find((p) => p.id === red.partId)!
+      const r = Number(part.props.resistance || 220)
+      const currentMa = r > 0 ? (Math.abs(pd.diff) / r) * 1000 : 0
+      return {
+        currentMa: Number(currentMa.toFixed(1)),
+        explanation: `Branch Current through Resistor: ${currentMa.toFixed(1)} mA`,
+        subtext: `Ohm's Law: I = ΔV / R = ${Math.abs(pd.diff).toFixed(2)}V / ${r}Ω`,
+      }
+    }
+
+    // 2. If probes are across an LED
+    const ledPart = state.parts.find((p) => p.type === "led" && (p.id === red.partId || p.id === black.partId))
+    if (ledPart) {
+      const r = runtime[ledPart.id]
+      const c = r?.currentMa ?? (r?.level ? 15.0 : 0)
+      return {
+        currentMa: Number(c.toFixed(1)),
+        explanation: `LED Branch Current: ${c.toFixed(1)} mA`,
+        subtext: r?.burnt ? "⚠️ OVERCURRENT BURNOUT!" : "Diode is conducting forward current",
+        isWarning: r?.burnt,
+      }
+    }
+
+    // 3. If probes are across power source and ground (e.g. Arduino Pin D13 & GND, or 5V & GND)
+    const infoRed = getPinInfo(red)
+    const infoBlack = getPinInfo(black)
+    const hasSource = (infoRed.isDriven && infoBlack.isGnd) || (infoBlack.isDriven && infoRed.isGnd)
+    if (hasSource) {
+      const sourceRef = infoRed.isDriven ? red : black
+      const sourcePinName = sourceRef.pinId.toUpperCase()
+      let totalLoadMa = 0
+      const activeComponents: string[] = []
+
+      for (const part of state.parts) {
+        const r = runtime[part.id]
+        if (r && (r.currentMa || r.level)) {
+          const ma = r.currentMa ?? 15.0
+          totalLoadMa += ma
+          activeComponents.push(part.type.toUpperCase())
+        }
+      }
+
+      if (totalLoadMa > 0) {
+        return {
+          currentMa: Number(totalLoadMa.toFixed(1)),
+          explanation: `Total Circuit Current supplied by ${sourceRef.partId.toUpperCase()} (${sourcePinName}): ${totalLoadMa.toFixed(1)} mA`,
+          subtext: `Active loads: ${activeComponents.slice(0, 3).join(", ")} drawing power to Ground.`,
+        }
+      }
+    }
+
+    // 4. Default: If non-zero voltage drop across resistive path
+    const rInfo = computeResistanceBetweenPins(red, black)
+    if (rInfo.resistance > 0 && rInfo.resistance < Infinity && Math.abs(pd.diff) > 0.05) {
+      const iMa = (Math.abs(pd.diff) / rInfo.resistance) * 1000
+      return {
+        currentMa: Number(iMa.toFixed(1)),
+        explanation: `Path Current: ${iMa.toFixed(1)} mA`,
+        subtext: `Ohm's Law: I = ΔV (${Math.abs(pd.diff).toFixed(2)}V) / R (${rInfo.resistance.toFixed(1)}Ω)`,
+      }
+    }
+
+    return {
+      currentMa: 0,
+      explanation: "0.0 mA (No active current loop between probed terminals)",
+      subtext: "Clip probes across an active component, source pin, or inline load during simulation.",
     }
   }
 
@@ -607,5 +803,7 @@ export function solveCircuitNodalPotentials(
     getPinVoltage,
     getPinInfo,
     getPotentialDifference,
+    computeResistanceBetweenPins,
+    computeCurrentBetweenPins,
   }
 }

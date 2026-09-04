@@ -1,7 +1,5 @@
-"use client"
-
 import { useState, useEffect, useMemo } from "react"
-import { Gauge, X, Volume2, HelpCircle, Sparkles, CheckCircle2, RotateCcw, AlertTriangle, Zap } from "lucide-react"
+import { Gauge, X, Volume2, HelpCircle, Sparkles, CheckCircle2, RotateCcw, AlertTriangle, Zap, ArrowUpDown } from "lucide-react"
 import type { CircuitState, PinRef } from "@/lib/circuit-types"
 import type { PartRuntime } from "./part-art"
 import type { ArduinoPinState } from "@/lib/simulation"
@@ -110,88 +108,51 @@ export function Multimeter({
       }
 
       case "resistance": {
-        if (resistorVal !== null) {
+        const res = nodalSolution.computeResistanceBetweenPins(probeRed, probeBlack)
+        if (res.resistance === Infinity) {
           return {
-            value: `${resistorVal.toFixed(1)}`,
-            unit: "Ω",
+            value: "O.L",
+            unit: "kΩ",
             isContinuityBeep: false,
-            explanation: `Component Resistance across Resistor terminals`,
-            subtext: `Marking bands indicate nominal value: ${resistorVal}Ω`,
+            explanation: res.explanation,
+            subtext: res.subtext,
           }
         }
-        // If probing same tie-point or direct wire
-        if (
-          (probeRed.partId === probeBlack.partId && probeRed.pinId === probeBlack.pinId) ||
-          (infoRed.netId === infoBlack.netId && infoRed.netId !== -1)
-        ) {
-          return {
-            value: "0.0",
-            unit: "Ω",
-            isContinuityBeep: false,
-            explanation: "Zero resistance (Direct copper wire / continuous net)",
-          }
-        }
+        const isKilo = res.resistance >= 1000
+        const dispVal = isKilo ? (res.resistance / 1000).toFixed(2) : res.resistance.toFixed(1)
         return {
-          value: "O.L",
-          unit: "kΩ",
+          value: dispVal,
+          unit: isKilo ? "kΩ" : "Ω",
           isContinuityBeep: false,
-          explanation: "Open Circuit / High Resistance path",
-          subtext: "Probes are not connected by a continuous resistive element",
+          explanation: res.explanation,
+          subtext: res.subtext,
         }
       }
 
       case "continuity": {
-        const isDirect =
-          (probeRed.partId === probeBlack.partId && probeRed.pinId === probeBlack.pinId) ||
-          (infoRed.netId === infoBlack.netId && infoRed.netId !== -1)
-        const isLowR = resistorVal !== null && resistorVal < 30
-
-        const isContinuous = isDirect || isLowR
+        const res = nodalSolution.computeResistanceBetweenPins(probeRed, probeBlack)
+        const isContinuous = res.resistance < 30
 
         return {
-          value: isContinuous ? "0.0" : "O.L",
+          value: isContinuous ? res.resistance.toFixed(1) : "O.L",
           unit: "Ω",
           isContinuityBeep: isContinuous,
           explanation: isContinuous
-            ? "🔊 Closed continuous path (Resistance < 30Ω)"
-            : "No continuous connection between probes",
+            ? `🔊 Closed continuous path (${res.resistance.toFixed(1)}Ω < 30Ω)`
+            : "No continuous low-resistance connection between probes (O.L)",
           subtext: isContinuous ? "Beep tone actively sounding via Web Audio API" : undefined,
         }
       }
 
       case "current": {
-        const pd = nodalSolution.getPotentialDifference(probeRed, probeBlack, state, pinStates)
-        if (sameResistor && resistorVal && resistorVal > 0) {
-          const currentMa = (Math.abs(pd.diff) / resistorVal) * 1000
-          return {
-            value: `${currentMa.toFixed(1)}`,
-            unit: "mA",
-            isContinuityBeep: false,
-            explanation: `Current flowing through ${resistorVal}Ω Resistor`,
-            subtext: `Ohm's Law: I = ΔV / R = ${Math.abs(pd.diff).toFixed(2)}V / ${resistorVal}Ω = ${currentMa.toFixed(1)} mA`,
-          }
-        }
-
-        // If measuring active LED
-        const led = state.parts.find((p) => p.id === probeRed.partId || p.id === probeBlack.partId)
-        const ledRuntime = led ? runtime[led.id] : null
-        if (ledRuntime && ledRuntime.currentMa !== undefined) {
-          return {
-            value: `${ledRuntime.currentMa.toFixed(1)}`,
-            unit: "mA",
-            isContinuityBeep: false,
-            explanation: `Loop Current through LED branch: ${ledRuntime.currentMa} mA`,
-            subtext: ledRuntime.burnt ? "⚠️ BURNOUT OVERCURRENT!" : "Normal safe operating range",
-            isWarning: ledRuntime.burnt,
-          }
-        }
-
+        const cur = nodalSolution.computeCurrentBetweenPins(probeRed, probeBlack, runtime)
         return {
-          value: "0.0",
+          value: cur.currentMa.toFixed(1),
           unit: "mA",
           isContinuityBeep: false,
-          explanation: "In-line current measurement requires closed active loop",
-          subtext: "Clip probes in series or across component terminals during simulation",
+          explanation: cur.explanation,
+          subtext: cur.subtext,
+          isWarning: cur.isWarning,
         }
       }
     }
@@ -376,6 +337,23 @@ export function Multimeter({
               </button>
             )}
           </div>
+        </div>
+
+        {/* Swap Probes (+ / -) */}
+        <div className="flex justify-center my-0.5">
+          <button
+            onClick={() => {
+              const temp = probeRed
+              onSetProbeRed(probeBlack)
+              onSetProbeBlack(temp)
+            }}
+            disabled={!probeRed && !probeBlack}
+            className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 disabled:opacity-40 disabled:pointer-events-none text-[10px] font-mono font-bold transition cursor-pointer border border-slate-700/60 shadow-xs"
+            title="Swap Red (+) and Black (-) probes"
+          >
+            <ArrowUpDown size={12} />
+            <span>⇄ Swap Probes (+ / -)</span>
+          </button>
         </div>
 
         {/* Black Negative / Ground Probe */}
