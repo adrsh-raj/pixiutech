@@ -737,8 +737,6 @@ export function Workbench() {
         onSave={handleSave}
         isSerialOpen={isSerialOpen}
         onToggleSerial={() => setIsSerialOpen((prev) => !prev)}
-        isDmmOpen={isDmmOpen}
-        onToggleDmm={() => setIsDmmOpen((prev) => !prev)}
         isAiCameraOpen={isAiCameraOpen}
         onToggleAiCamera={() => setIsAiCameraOpen((prev) => !prev)}
         isInspectorOpen={isInspectorOpen}
@@ -746,8 +744,6 @@ export function Workbench() {
         isMuted={isMuted}
         onToggleMute={toggleMute}
         onOpenTemplates={() => setIsTemplatesOpen(true)}
-        activeWireColor={selectedWire ? selectedWire.color : activeWireColor}
-        onSelectWireColor={handleSelectWireColor}
         selectedWireId={selectedWireId}
         onDeleteSelectedWire={deleteSelectedWire}
         isPaused={isPaused}
@@ -796,6 +792,10 @@ export function Workbench() {
           }}
           isOpen={mobilePaletteOpen}
           onClose={() => setMobilePaletteOpen(false)}
+          isDmmOpen={isDmmOpen}
+          onToggleDmm={() => setIsDmmOpen((prev) => !prev)}
+          activeWireColor={selectedWire ? selectedWire.color : activeWireColor}
+          onSelectWireColor={handleSelectWireColor}
         />
         <main className="relative min-w-0 flex-1 flex flex-col overflow-hidden pb-16 md:pb-0">
           <div className="flex-1 relative">

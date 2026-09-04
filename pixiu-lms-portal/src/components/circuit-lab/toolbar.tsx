@@ -1,18 +1,7 @@
 import { Link } from "react-router-dom"
-import { CircuitBoard, Play, Square, Trash2, ArrowLeft, Undo2, Redo2, Save, Terminal, Volume2, VolumeX, Sparkles, Camera, Gauge, Sliders, Pause, StepForward, FastForward } from "lucide-react"
+import { CircuitBoard, Play, Square, Trash2, ArrowLeft, Undo2, Redo2, Save, Terminal, Volume2, VolumeX, Sparkles, Camera, Sliders, Pause, StepForward, FastForward } from "lucide-react"
 
 export type WorkbenchView = "circuit" | "code" | "3d"
-
-const WIRE_COLOR_OPTIONS = [
-  { name: "Green", color: "#22c55e" },
-  { name: "Red (5V)", color: "#ef4444" },
-  { name: "Black (GND)", color: "#1e293b" },
-  { name: "Yellow", color: "#eab308" },
-  { name: "Blue", color: "#3b82f6" },
-  { name: "Orange", color: "#f97316" },
-  { name: "White", color: "#f8fafc" },
-  { name: "Purple", color: "#a855f7" },
-]
 
 interface Props {
   view: WorkbenchView
@@ -27,8 +16,6 @@ interface Props {
   onSave?: () => void
   isSerialOpen?: boolean
   onToggleSerial?: () => void
-  isDmmOpen?: boolean
-  onToggleDmm?: () => void
   isAiCameraOpen?: boolean
   onToggleAiCamera?: () => void
   isInspectorOpen?: boolean
@@ -36,8 +23,6 @@ interface Props {
   isMuted?: boolean
   onToggleMute?: () => void
   onOpenTemplates?: () => void
-  activeWireColor?: string
-  onSelectWireColor?: (color: string) => void
   selectedWireId?: string | null
   onDeleteSelectedWire?: () => void
   // Stepping Debugger Props
@@ -69,8 +54,6 @@ export function Toolbar({
   onSave,
   isSerialOpen = false,
   onToggleSerial,
-  isDmmOpen = false,
-  onToggleDmm,
   isAiCameraOpen = false,
   onToggleAiCamera,
   isInspectorOpen = true,
@@ -78,8 +61,6 @@ export function Toolbar({
   isMuted = false,
   onToggleMute,
   onOpenTemplates,
-  activeWireColor = "#22c55e",
-  onSelectWireColor,
   selectedWireId,
   onDeleteSelectedWire,
   isPaused = false,
@@ -231,26 +212,6 @@ export function Toolbar({
           </button>
         )}
 
-        {/* Wire Color Palette (Desktop: shown on 2xl or compact) */}
-        {view === "circuit" && onSelectWireColor && (
-          <div className="hidden 2xl:flex items-center gap-1 bg-background px-2 py-1 rounded-lg border border-border">
-            <span className="text-[10px] font-mono text-muted-foreground mr-0.5">Wire:</span>
-            {WIRE_COLOR_OPTIONS.map((c) => (
-              <button
-                key={c.color}
-                onClick={() => onSelectWireColor(c.color)}
-                title={c.name}
-                className={`h-3.5 w-3.5 rounded-full transition-all cursor-pointer ${
-                  activeWireColor === c.color
-                    ? "ring-2 ring-primary ring-offset-1 ring-offset-background scale-110"
-                    : "hover:scale-110 opacity-70 hover:opacity-100"
-                }`}
-                style={{ backgroundColor: c.color }}
-              />
-            ))}
-          </div>
-        )}
-
         {/* Delete Selected Wire button */}
         {selectedWireId && onDeleteSelectedWire && (
           <button
@@ -276,22 +237,6 @@ export function Toolbar({
           >
             <Camera className="h-3.5 w-3.5 text-purple-400" />
             <span className="hidden xl:inline">AI Camera</span>
-          </button>
-        )}
-
-        {/* Digital Multimeter Toggle */}
-        {onToggleDmm && (
-          <button
-            onClick={onToggleDmm}
-            title="Toggle Digital Multimeter (DMM)"
-            className={`flex items-center gap-1 rounded-lg border px-2 sm:px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer ${
-              isDmmOpen
-                ? "border-amber-500 bg-amber-500/25 text-amber-300 shadow-sm shadow-amber-500/30"
-                : "border-border text-muted-foreground hover:bg-amber-950/20 hover:text-amber-300 hover:border-amber-500/40"
-            }`}
-          >
-            <Gauge className="h-3.5 w-3.5 text-amber-400" />
-            <span className="hidden xl:inline">Multimeter</span>
           </button>
         )}
 
