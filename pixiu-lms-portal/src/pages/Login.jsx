@@ -32,12 +32,24 @@ export default function Login() {
     setError('');
   };
 
+  const handleUsernameChange = (val) => {
+    setUsername(val);
+    const upper = val.trim().toUpperCase();
+    if (upper.startsWith('XYZ') || upper.startsWith('ABC') || upper.startsWith('ZPS') || upper.startsWith('STU')) {
+      setSelectedRoleTab('student');
+    } else if (upper.startsWith('SCH') || upper.includes('SCHOOL')) {
+      setSelectedRoleTab('school');
+    } else if (upper === 'ADMIN' || upper.startsWith('TRN') || upper.includes('TRAINER')) {
+      setSelectedRoleTab('trainer');
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
-    const res = await login(username, password, selectedRoleTab);
+    const res = await login(username, password);
     setLoading(false);
 
     if (res.success) {
@@ -139,7 +151,7 @@ export default function Login() {
               <input
                 type="text"
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                onChange={(e) => handleUsernameChange(e.target.value)}
                 placeholder={
                   selectedRoleTab === 'student' 
                     ? 'Enter Student Roll ID' 

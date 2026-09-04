@@ -219,17 +219,6 @@ export function AuthProvider({ children }) {
       
       if (res.ok && res.headers.get('content-type')?.includes('application/json')) {
         const data = await res.json();
-        // Allow Admin to log in via Trainer / Faculty tab
-        const roleAllowed = !expectedRole || 
-          data.user.role === expectedRole || 
-          (expectedRole === 'trainer' && data.user.role === 'admin');
-
-        if (!roleAllowed) {
-          return {
-            success: false,
-            error: `Access Denied: You are attempting to log in as ${expectedRole.toUpperCase()}, but this account is registered as ${data.user.role.toUpperCase()}. Please switch to the ${data.user.role.toUpperCase()} tab.`
-          };
-        }
         setToken(data.token);
         setUser(data.user);
         localStorage.setItem('pixiu_auth_token', data.token);
@@ -256,18 +245,6 @@ export function AuthProvider({ children }) {
     );
 
     if (match) {
-      // Allow Admin to log in via Trainer / Faculty tab
-      const isRoleAllowed = !expectedRole || 
-        match.role === expectedRole || 
-        (expectedRole === 'trainer' && match.role === 'admin');
-
-      if (!isRoleAllowed) {
-        return {
-          success: false,
-          error: `Access Denied: You are trying to log in under the ${expectedRole.toUpperCase()} tab, but account "${match.username}" belongs to ${match.role.toUpperCase()}. Please switch to the ${match.role.toUpperCase()} tab.`
-        };
-      }
-
       const clientUser = {
         id: match.id,
         username: match.username,
