@@ -24,39 +24,34 @@ import { AiCameraPanel, type AiVisionState } from "./ai-camera-panel"
 import type { ProjectTemplate } from "@/lib/templates"
 
 const DEFAULT_XML = `<xml xmlns="https://developers.google.com/blockly/xml">
-  <block type="arduino_setup" deletable="false" movable="false" x="40" y="40">
+  <block type="arduino_program" x="40" y="40">
     <statement name="SETUP">
       <block type="serial_begin">
         <field name="BAUD">9600</field>
         <next>
-          <block type="servo_attach">
+          <block type="servo_write">
             <field name="PIN">6</field>
+            <value name="ANGLE">
+              <shadow type="math_number">
+                <field name="NUM">0</field>
+              </shadow>
+            </value>
             <next>
-              <block type="servo_write">
-                <field name="PIN">6</field>
-                <value name="ANGLE">
-                  <block type="math_number">
-                    <field name="NUM">0</field>
-                  </block>
-                </value>
+              <block type="io_pinmode">
+                <field name="PIN">12</field>
+                <field name="MODE">OUTPUT</field>
                 <next>
-                  <block type="io_pinmode">
-                    <field name="PIN">13</field>
-                    <field name="MODE">OUTPUT</field>
+                  <block type="io_digitalwrite">
+                    <field name="PIN">12</field>
+                    <field name="STATE">LOW</field>
                     <next>
-                      <block type="io_digitalwrite">
+                      <block type="io_pinmode">
                         <field name="PIN">13</field>
-                        <field name="STATE">HIGH</field>
+                        <field name="MODE">OUTPUT</field>
                         <next>
-                          <block type="io_pinmode">
-                            <field name="PIN">12</field>
-                            <field name="MODE">OUTPUT</field>
-                            <next>
-                              <block type="io_digitalwrite">
-                                <field name="PIN">12</field>
-                                <field name="STATE">LOW</field>
-                              </block>
-                            </next>
+                          <block type="io_digitalwrite">
+                            <field name="PIN">13</field>
+                            <field name="STATE">HIGH</field>
                           </block>
                         </next>
                       </block>
@@ -71,41 +66,41 @@ const DEFAULT_XML = `<xml xmlns="https://developers.google.com/blockly/xml">
     </statement>
     <statement name="LOOP">
       <block type="controls_if">
+        <mutation else="1"></mutation>
         <value name="IF0">
           <block type="ai_is_detected">
             <field name="CLASS">car</field>
           </block>
         </value>
         <statement name="DO0">
-          <block type="serial_print">
-            <field name="NEWLINE">TRUE</field>
-            <value name="CONTENT">
-              <block type="text">
-                <field name="TEXT">[AI Vision] Vehicle detected! Opening barrier gate...</field>
+          <block type="serial_println">
+            <value name="TEXT">
+              <block type="text_string">
+                <field name="TEXT">🚗 [AI Vision] Car Detected! Raising Boom Barrier...</field>
               </block>
             </value>
             <next>
               <block type="servo_write">
                 <field name="PIN">6</field>
                 <value name="ANGLE">
-                  <block type="math_number">
+                  <shadow type="math_number">
                     <field name="NUM">90</field>
-                  </block>
+                  </shadow>
                 </value>
                 <next>
                   <block type="io_digitalwrite">
-                    <field name="PIN">13</field>
-                    <field name="STATE">LOW</field>
+                    <field name="PIN">12</field>
+                    <field name="STATE">HIGH</field>
                     <next>
                       <block type="io_digitalwrite">
-                        <field name="PIN">12</field>
-                        <field name="STATE">HIGH</field>
+                        <field name="PIN">13</field>
+                        <field name="STATE">LOW</field>
                         <next>
                           <block type="time_delay">
-                            <value name="DELAY_MS">
-                              <block type="math_number">
-                                <field name="NUM">3000</field>
-                              </block>
+                            <value name="MS">
+                              <shadow type="math_number">
+                                <field name="NUM">800</field>
+                              </shadow>
                             </value>
                           </block>
                         </next>
@@ -117,28 +112,28 @@ const DEFAULT_XML = `<xml xmlns="https://developers.google.com/blockly/xml">
             </next>
           </block>
         </statement>
-        <next>
+        <statement name="ELSE">
           <block type="servo_write">
             <field name="PIN">6</field>
             <value name="ANGLE">
-              <block type="math_number">
+              <shadow type="math_number">
                 <field name="NUM">0</field>
-              </block>
+              </shadow>
             </value>
             <next>
               <block type="io_digitalwrite">
-                <field name="PIN">13</field>
-                <field name="STATE">HIGH</field>
+                <field name="PIN">12</field>
+                <field name="STATE">LOW</field>
                 <next>
                   <block type="io_digitalwrite">
-                    <field name="PIN">12</field>
-                    <field name="STATE">LOW</field>
+                    <field name="PIN">13</field>
+                    <field name="STATE">HIGH</field>
                     <next>
                       <block type="time_delay">
-                        <value name="DELAY_MS">
-                          <block type="math_number">
-                            <field name="NUM">200</field>
-                          </block>
+                        <value name="MS">
+                          <shadow type="math_number">
+                            <field name="NUM">300</field>
+                          </shadow>
                         </value>
                       </block>
                     </next>
@@ -147,7 +142,7 @@ const DEFAULT_XML = `<xml xmlns="https://developers.google.com/blockly/xml">
               </block>
             </next>
           </block>
-        </next>
+        </statement>
       </block>
     </statement>
   </block>

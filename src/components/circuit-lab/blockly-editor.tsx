@@ -182,11 +182,19 @@ export function BlocklyEditor({ circuit, xml, onXmlChange }: Props) {
       </block>
     </xml>`
 
+    const lastLoadedXml = { current: initialXml }
+
     try {
       const dom = Blockly.utils.xml.textToDom(initialXml)
       Blockly.Xml.domToWorkspace(dom, workspace)
-    } catch {
-      // ignore
+      setTimeout(() => {
+        Blockly.svgResize(workspace)
+        if (typeof (workspace as any).scrollCenter === "function") {
+          (workspace as any).scrollCenter()
+        }
+      }, 100)
+    } catch (err) {
+      console.error("Failed to load initial XML:", err)
     }
 
     const updateCode = () => {
@@ -196,6 +204,7 @@ export function BlocklyEditor({ circuit, xml, onXmlChange }: Props) {
         if (onXmlChange) {
           const dom = Blockly.Xml.workspaceToDom(workspace)
           const text = Blockly.utils.xml.domToText(dom)
+          lastLoadedXml.current = text
           onXmlChange(text)
         }
       } catch (err) {
@@ -217,6 +226,32 @@ export function BlocklyEditor({ circuit, xml, onXmlChange }: Props) {
     }
   }, [])
 
+  // Sync workspace when external xml prop changes (e.g., when picking a template)
+  useEffect(() => {
+    if (!workspaceRef.current || !xml) return
+    try {
+      const currentDom = Blockly.Xml.workspaceToDom(workspaceRef.current)
+      const currentXml = Blockly.utils.xml.domToText(currentDom)
+      if (currentXml !== xml) {
+        workspaceRef.current.clear()
+        const dom = Blockly.utils.xml.textToDom(xml)
+        Blockly.Xml.domToWorkspace(dom, workspaceRef.current)
+        const code = arduino.workspaceToCode(workspaceRef.current)
+        setCppCode(code)
+        setTimeout(() => {
+          if (workspaceRef.current) {
+            Blockly.svgResize(workspaceRef.current)
+            if (typeof (workspaceRef.current as any).scrollCenter === "function") {
+              (workspaceRef.current as any).scrollCenter()
+            }
+          }
+        }, 100)
+      }
+    } catch (err) {
+      console.error("Failed to sync XML to workspace:", err)
+    }
+  }, [xml])
+
   useEffect(() => {
     setPinContext(circuit)
   }, [circuit])
@@ -236,7 +271,12 @@ export function BlocklyEditor({ circuit, xml, onXmlChange }: Props) {
             onClick={() => {
               setMobileTab("blocks")
               setTimeout(() => {
-                if (workspaceRef.current) Blockly.svgResize(workspaceRef.current)
+                if (workspaceRef.current) {
+                  Blockly.svgResize(workspaceRef.current)
+                  if (typeof (workspaceRef.current as any).scrollCenter === "function") {
+                    (workspaceRef.current as any).scrollCenter()
+                  }
+                }
               }, 60)
             }}
             className={`flex items-center gap-1.5 px-3 py-1 rounded-md font-semibold transition cursor-pointer ${
