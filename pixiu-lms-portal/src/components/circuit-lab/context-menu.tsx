@@ -13,7 +13,6 @@ import {
   FolderOpen,
   Play,
   Square,
-  ShieldCheck,
   Palette,
   X,
 } from "lucide-react"
@@ -316,15 +315,6 @@ export function ContextMenu({
             <span>Clear Canvas</span>
           </button>
         )}
-      </div>
-
-      {/* Security Environment Banner */}
-      <div className="mt-1.5 px-2.5 py-1.5 bg-slate-900/90 rounded-xl border border-slate-800/80 flex items-center gap-2">
-        <ShieldCheck size={14} className="text-emerald-400 shrink-0" />
-        <div className="min-w-0">
-          <p className="text-[10px] font-bold text-slate-300 leading-none truncate">Pixiu Protected Environment</p>
-          <p className="text-[9px] text-slate-500 mt-0.5 leading-none truncate">Inspection & DevTools locked</p>
-        </div>
       </div>
     </div>
   )
