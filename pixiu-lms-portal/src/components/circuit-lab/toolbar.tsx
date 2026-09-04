@@ -184,12 +184,12 @@ export function Toolbar({
         {onToggleAiCamera && (
           <button
             onClick={onToggleAiCamera}
-            className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-semibold transition ${
+            title="Toggle AI Vision Camera (Pixiu AI Vision Engine)"
+            className={`relative flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition ${
               isAiCameraOpen
                 ? "border-purple-500 bg-purple-500/20 text-purple-300 shadow-sm shadow-purple-500/30"
                 : "border-border text-muted-foreground hover:bg-purple-950/20 hover:text-purple-300 hover:border-purple-500/40"
             }`}
-            title="Toggle AI Vision Camera (PictoBlox AI Engine)"
           >
             <Camera className="h-3.5 w-3.5 text-purple-400" />
             <span className="hidden sm:inline">AI Camera</span>

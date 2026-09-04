@@ -251,7 +251,7 @@ export function AiCameraPanel({ isOpen, onClose, aiState, onAiStateChange, isSim
             <h3 className="text-xs font-bold text-white flex items-center gap-1.5">
               <span>AI Vision Camera</span>
               <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-purple-500/25 text-purple-300 border border-purple-500/40">
-                PICTOBLOX AI
+                PIXIU VISION AI
               </span>
             </h3>
           </div>

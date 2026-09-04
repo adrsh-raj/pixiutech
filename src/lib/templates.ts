@@ -13,10 +13,10 @@ export interface ProjectTemplate {
 export const TEMPLATES: ProjectTemplate[] = [
   {
     id: "ai-smart-barrier",
-    title: "1. 🚗 AI Vision Smart Boom Barrier Gate (PictoBlox Style)",
+    title: "1. 🚗 AI Vision Smart Boom Barrier Gate (Pixiu AI)",
     description: "AI Computer Vision meets Smart Parking! Camera detects approaching vehicle -> swings the striped boom barrier open (90°), turns Green Pass LED on, and streams AI telemetry to Serial Monitor.",
     difficulty: "Intermediate",
-    tags: ["AI Vision", "PictoBlox", "Servo", "Boom Barrier", "Camera"],
+    tags: ["AI Vision", "Pixiu AI", "Servo", "Boom Barrier", "Camera"],
     circuit: {
       parts: [
         { id: "uno", type: "arduino-uno", x: 40, y: 110, rotation: 0, props: {} },
