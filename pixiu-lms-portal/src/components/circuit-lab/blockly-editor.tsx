@@ -116,6 +116,7 @@ export function BlocklyEditor({ circuit, xml, onXmlChange }: Props) {
   const workspaceRef = useRef<Blockly.WorkspaceSvg | null>(null)
   const [cppCode, setCppCode] = useState("")
   const [copied, setCopied] = useState(false)
+  const [mobileTab, setMobileTab] = useState<"blocks" | "cpp">("blocks")
 
   useEffect(() => {
     defineArduinoBlocks()
@@ -227,14 +228,60 @@ export function BlocklyEditor({ circuit, xml, onXmlChange }: Props) {
   }
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col lg:flex-row bg-slate-900 text-white">
+    <div className="flex h-full min-h-0 w-full flex-col lg:flex-row bg-slate-900 text-white overflow-hidden">
+      {/* Mobile-Only Tab Switcher: Blocks vs C++ Code */}
+      <div className="lg:hidden flex items-center justify-between border-b border-slate-800 bg-slate-950 px-3 py-2 shrink-0">
+        <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 p-0.5 rounded-lg text-xs">
+          <button
+            onClick={() => {
+              setMobileTab("blocks")
+              setTimeout(() => {
+                if (workspaceRef.current) Blockly.svgResize(workspaceRef.current)
+              }, 60)
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-md font-semibold transition cursor-pointer ${
+              mobileTab === "blocks" ? "bg-[#00878F] text-white shadow-xs" : "text-slate-400 hover:text-white"
+            }`}
+          >
+            <span>🧩 Blocks</span>
+          </button>
+          <button
+            onClick={() => setMobileTab("cpp")}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-md font-semibold transition cursor-pointer ${
+              mobileTab === "cpp" ? "bg-[#00878F] text-white shadow-xs" : "text-slate-400 hover:text-white"
+            }`}
+          >
+            <Code2 size={13} />
+            <span>C++ Code</span>
+          </button>
+        </div>
+
+        {mobileTab === "cpp" && (
+          <button
+            onClick={handleCopy}
+            className="flex items-center gap-1 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold transition active:scale-95 cursor-pointer"
+          >
+            {copied ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
+            <span>{copied ? "Copied" : "Copy"}</span>
+          </button>
+        )}
+      </div>
+
       {/* Visual Blockly Area */}
-      <div className="relative h-[55%] lg:h-full lg:w-[60%] border-b lg:border-b-0 lg:border-r border-slate-800">
+      <div
+        className={`relative flex-1 lg:h-full lg:w-[60%] border-b lg:border-b-0 lg:border-r border-slate-800 ${
+          mobileTab === "blocks" ? "flex" : "hidden lg:flex"
+        }`}
+      >
         <div ref={blocklyDiv} className="absolute inset-0 w-full h-full" />
       </div>
 
       {/* Generated Arduino C++ Sketch Panel */}
-      <div className="flex flex-1 flex-col h-[45%] lg:h-full bg-slate-950">
+      <div
+        className={`flex-1 flex-col lg:h-full bg-slate-950 ${
+          mobileTab === "cpp" ? "flex" : "hidden lg:flex"
+        }`}
+      >
         <div className="flex items-center justify-between border-b border-slate-800 px-4 py-2.5 bg-slate-900/80">
           <div className="flex items-center gap-2 text-xs font-mono font-bold text-slate-300">
             <Code2 size={16} className="text-[#00878F]" />

@@ -626,7 +626,7 @@ export function Workbench() {
             isOpen={mobilePaletteOpen}
             onClose={() => setMobilePaletteOpen(false)}
           />
-          <main className="relative min-w-0 flex-1 flex flex-col overflow-hidden">
+          <main className="relative min-w-0 flex-1 flex flex-col overflow-hidden pb-16 md:pb-0">
             <div className="flex-1 relative">
               {/* Mobile Quick-Add Components Trigger */}
               <button
@@ -685,7 +685,7 @@ export function Workbench() {
             />
 
             {/* Mobile Bottom Dock Bar */}
-            <div className="md:hidden fixed bottom-3 inset-x-3 z-30 flex items-center justify-around rounded-2xl border border-border/80 bg-card/95 backdrop-blur-md shadow-2xl py-1.5 px-2 text-xs font-semibold">
+            <div className="md:hidden fixed bottom-3 inset-x-3 z-30 flex items-center justify-around rounded-2xl border border-slate-700/80 bg-slate-950/95 backdrop-blur-lg shadow-2xl py-2 px-2 text-xs font-semibold text-white">
               <button
                 onClick={() => setMobilePaletteOpen(true)}
                 className="flex flex-col items-center gap-0.5 p-1 text-foreground hover:text-primary transition active:scale-95"

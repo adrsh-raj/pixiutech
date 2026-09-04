@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, KeyboardEvent } from 'react';
-import { Terminal, Trash2, Clock, ChevronDown, ChevronUp, SendHorizontal } from 'lucide-react';
+import { Terminal, Trash2, Clock, ChevronDown, ChevronUp, SendHorizontal, X } from 'lucide-react';
 
 export interface SerialLine {
   text: string;
@@ -54,9 +54,11 @@ export const SerialMonitor: React.FC<Props> = ({
 
   return (
     <div
-      className={`fixed bottom-[24px] left-0 right-0 bg-slate-900 border-t border-slate-800 transition-all duration-300 ease-in-out z-40 flex flex-col ${
-        isOpen ? 'h-[240px]' : 'h-[36px]'
-      }`}
+      className={`
+        ${!isOpen ? 'hidden md:flex' : 'fixed inset-x-0 bottom-0 md:bottom-[24px] z-50 md:z-40'}
+        left-0 right-0 bg-slate-900 border-t border-slate-800 transition-all duration-300 ease-in-out flex flex-col shadow-2xl md:shadow-none
+        ${isOpen ? 'h-[280px] md:h-[240px] rounded-t-2xl md:rounded-none' : 'h-0 md:h-[36px]'}
+      `}
     >
       {/* Header */}
       <div
@@ -79,7 +81,7 @@ export const SerialMonitor: React.FC<Props> = ({
                   e.stopPropagation();
                   setShowTimestamps(!showTimestamps);
                 }}
-                className={`p-1.5 rounded-md transition-colors ${
+                className={`p-1.5 rounded-md transition-colors cursor-pointer ${
                   showTimestamps ? 'bg-slate-700 text-slate-200' : 'hover:bg-slate-700/50 text-slate-400'
                 }`}
                 title="Toggle timestamps"
@@ -91,16 +93,23 @@ export const SerialMonitor: React.FC<Props> = ({
                   e.stopPropagation();
                   onClear();
                 }}
-                className="p-1.5 rounded-md hover:bg-slate-700/50 text-slate-400 hover:text-red-400 transition-colors mr-2"
+                className="p-1.5 rounded-md hover:bg-slate-700/50 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
                 title="Clear output"
               >
                 <Trash2 size={14} />
               </button>
-              <div className="w-px h-4 bg-slate-700 mx-1"></div>
             </>
           )}
-          <button className="p-1.5 text-slate-400 hover:text-slate-200 transition-colors">
-            {isOpen ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle();
+            }}
+            className="p-1.5 rounded-md hover:bg-slate-700/50 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+            title={isOpen ? "Close Serial Monitor" : "Open Serial Monitor"}
+          >
+            {isOpen ? <X size={15} /> : <ChevronUp size={15} />}
           </button>
         </div>
       </div>

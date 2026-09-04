@@ -6,6 +6,7 @@ import type { PartType, PinRef, PlacedPart, Wire } from "@/lib/circuit-types"
 import { CATALOG, PIN_KIND_COLOR } from "@/lib/components-catalog"
 import { getPinRefPosition, wirePath } from "@/lib/geometry"
 import { PartArt, type PartRuntime } from "./part-art"
+import { Maximize2, Plus, Minus } from "lucide-react"
 
 interface View {
   scale: number
@@ -90,6 +91,42 @@ export function CircuitCanvas(props: Props) {
       }
     })
   }, [])
+
+  const fitToScreen = useCallback(() => {
+    if (!parts.length || !svgRef.current) return
+    const rect = svgRef.current.getBoundingClientRect()
+    if (!rect.width || !rect.height) return
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+    for (const p of parts) {
+      const def = CATALOG[p.type]
+      const w = def?.width || 100
+      const h = def?.height || 100
+      minX = Math.min(minX, p.x)
+      minY = Math.min(minY, p.y)
+      maxX = Math.max(maxX, p.x + w)
+      maxY = Math.max(maxY, p.y + h)
+    }
+    const padding = 28
+    const boundsW = Math.max(100, maxX - minX + padding * 2)
+    const boundsH = Math.max(100, maxY - minY + padding * 2)
+    const scale = Math.min(rect.width / boundsW, rect.height / boundsH)
+    const finalScale = Math.max(0.3, Math.min(scale, 1.0))
+    const tx = (rect.width - (maxX - minX) * finalScale) / 2 - minX * finalScale
+    const ty = (rect.height - (maxY - minY) * finalScale) / 2 - minY * finalScale
+    setView({ scale: finalScale, tx, ty })
+  }, [parts])
+
+  const initialFitDone = useRef(false)
+  useEffect(() => {
+    if (!initialFitDone.current && parts.length > 0) {
+      const timer = setTimeout(() => {
+        fitToScreen()
+        initialFitDone.current = true
+      }, 60)
+      return () => clearTimeout(timer)
+    }
+  }, [parts.length, fitToScreen])
 
   const onSvgPointerDown = (e: React.PointerEvent) => {
     // background: pan + deselect
@@ -378,24 +415,31 @@ export function CircuitCanvas(props: Props) {
         </div>
       )}
 
-      {/* zoom controls */}
-      <div className="absolute bottom-4 right-4 flex flex-col overflow-hidden rounded-md border border-border bg-card/90 backdrop-blur">
+      {/* Zoom & Fit Controls */}
+      <div className="absolute right-3 top-3 md:top-auto md:bottom-6 z-20 flex flex-col overflow-hidden rounded-xl border border-border bg-card/90 backdrop-blur-md shadow-lg">
         <button
-          className="px-3 py-1.5 text-lg leading-none text-foreground hover:bg-secondary"
-          onClick={() => setView((v) => ({ ...v, scale: Math.min(2.5, v.scale * 1.15) }))}
+          className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary transition active:scale-90 flex items-center justify-center cursor-pointer"
+          onClick={() => setView((v) => ({ ...v, scale: Math.min(2.5, v.scale * 1.2) }))}
+          title="Zoom In"
           aria-label="Zoom in"
         >
-          +
+          <Plus size={15} />
         </button>
-        <div className="border-t border-border px-3 py-1 text-center font-mono text-[10px] text-muted-foreground">
-          {Math.round(view.scale * 100)}%
-        </div>
         <button
-          className="border-t border-border px-3 py-1.5 text-lg leading-none text-foreground hover:bg-secondary"
-          onClick={() => setView((v) => ({ ...v, scale: Math.max(0.3, v.scale / 1.15) }))}
+          className="border-t border-border p-2 text-muted-foreground hover:text-foreground hover:bg-secondary transition active:scale-90 flex items-center justify-center cursor-pointer"
+          onClick={fitToScreen}
+          title="Fit to Screen"
+          aria-label="Fit to Screen"
+        >
+          <Maximize2 size={13} />
+        </button>
+        <button
+          className="border-t border-border p-2 text-muted-foreground hover:text-foreground hover:bg-secondary transition active:scale-90 flex items-center justify-center cursor-pointer"
+          onClick={() => setView((v) => ({ ...v, scale: Math.max(0.25, v.scale / 1.2) }))}
+          title="Zoom Out"
           aria-label="Zoom out"
         >
-          −
+          <Minus size={15} />
         </button>
       </div>
 
