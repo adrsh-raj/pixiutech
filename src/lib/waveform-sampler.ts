@@ -1,4 +1,4 @@
-﻿import type { CircuitState, PinRef } from "./circuit-types"
+import type { CircuitState, PinRef } from "./circuit-types"
 import type { ArduinoPinState } from "./simulation"
 import type { PartRuntime } from "@/components/circuit-lab/part-art"
 import { solveCircuitNodalPotentials } from "./circuit-solver"
@@ -31,15 +31,16 @@ export function samplePinVoltage(
   // 1. Direct Arduino Pin check for high-fidelity PWM / Digital simulation
   const part = state.parts.find((p) => p.id === ref.partId)
   if (part?.type === "arduino-uno") {
-    const pin = ref.pinId.toLowerCase()
+    const rawPin = ref.pinId.toLowerCase()
+    const pinDigits = rawPin.replace(/^d/, "")
 
     // Power rails
-    if (pin === "5v" || pin === "vin") return 5.0
-    if (pin === "3v3") return 3.3
-    if (pin === "gnd" || pin === "gnd1" || pin === "gnd2") return 0.0
+    if (rawPin === "5v" || rawPin === "vin" || rawPin === "pos_top" || rawPin === "pos_bot") return 5.0
+    if (rawPin === "3v3") return 3.3
+    if (rawPin.includes("gnd")) return 0.0
 
-    // Digital pins with potential PWM
-    const pinData = pinStates[pin]
+    // Digital pins with potential PWM (check both "d13" and "13")
+    const pinData = pinStates[rawPin] || pinStates[pinDigits]
     if (pinData) {
       if (typeof pinData.value === "number" && pinData.value > 0 && pinData.value < 255) {
         // Authentic Arduino PWM (490Hz default, period ~2.04ms)

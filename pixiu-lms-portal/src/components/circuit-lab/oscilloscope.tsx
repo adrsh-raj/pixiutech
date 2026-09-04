@@ -160,18 +160,33 @@ export function Oscilloscope({
   const vMaxScale = 5.5 // 0V to 5.5V full scale
 
   const generatePath = (channel: "v1" | "v2") => {
-    if (history.length < 2) return ""
+    if (history.length === 0) return ""
     const latestT = history[history.length - 1].t
     const startT = latestT - activeWindowMs
 
     const visiblePoints = history.filter((p) => p.t >= startT)
-    if (visiblePoints.length < 2) return ""
+    if (visiblePoints.length === 0) {
+      const currentV = history[history.length - 1][channel]
+      const y = screenHeight - (Math.max(0, Math.min(vMaxScale, currentV)) / vMaxScale) * screenHeight
+      return `M 0 ${y.toFixed(1)} L ${screenWidth} ${y.toFixed(1)}`
+    }
 
-    return visiblePoints.reduce((acc, pt, idx) => {
+    if (visiblePoints.length === 1) {
+      const y = screenHeight - (Math.max(0, Math.min(vMaxScale, visiblePoints[0][channel])) / vMaxScale) * screenHeight
+      return `M 0 ${y.toFixed(1)} L ${screenWidth} ${y.toFixed(1)}`
+    }
+
+    const segments = visiblePoints.map((pt, idx) => {
       const x = ((pt.t - startT) / activeWindowMs) * screenWidth
       const y = screenHeight - (Math.max(0, Math.min(vMaxScale, pt[channel])) / vMaxScale) * screenHeight
-      return `${acc} ${idx === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`
-    }, "")
+      return `${idx === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`
+    })
+
+    const firstX = ((visiblePoints[0].t - startT) / activeWindowMs) * screenWidth
+    const firstY = screenHeight - (Math.max(0, Math.min(vMaxScale, visiblePoints[0][channel])) / vMaxScale) * screenHeight
+    const prefix = firstX > 0.5 ? `M 0 ${firstY.toFixed(1)} L ` : ""
+
+    return prefix + segments.join(" ")
   }
 
   const pathCH1 = generatePath("v1")
@@ -296,28 +311,52 @@ export function Oscilloscope({
 
                 {/* CH2 Signal Path (Cyan) */}
                 {probeCH2 && pathCH2 && (
-                  <path
-                    d={pathCH2}
-                    fill="none"
-                    stroke="#06b6d4"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    filter="url(#glowCyan)"
-                  />
+                  <g>
+                    {/* Neon Glow Halo */}
+                    <path
+                      d={pathCH2}
+                      fill="none"
+                      stroke="#06b6d4"
+                      strokeWidth="5"
+                      strokeOpacity="0.35"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    {/* Bright Core Beam */}
+                    <path
+                      d={pathCH2}
+                      fill="none"
+                      stroke="#22d3ee"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </g>
                 )}
 
                 {/* CH1 Signal Path (Electric Yellow) */}
                 {probeCH1 && pathCH1 && (
-                  <path
-                    d={pathCH1}
-                    fill="none"
-                    stroke="#facc15"
-                    strokeWidth="2.2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    filter="url(#glowYellow)"
-                  />
+                  <g>
+                    {/* Neon Glow Halo */}
+                    <path
+                      d={pathCH1}
+                      fill="none"
+                      stroke="#facc15"
+                      strokeWidth="5"
+                      strokeOpacity="0.35"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    {/* Bright Core Beam */}
+                    <path
+                      d={pathCH1}
+                      fill="none"
+                      stroke="#fef08a"
+                      strokeWidth="2.2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </g>
                 )}
               </svg>
 
