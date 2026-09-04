@@ -26,7 +26,7 @@ export function AiCameraPanel({ isOpen, onClose, aiState, onAiStateChange, isSim
   const [cameraError, setCameraError] = useState<string | null>(null)
   const [modelLoading, setModelLoading] = useState(false)
   const [modelLoaded, setModelLoaded] = useState(false)
-  const [minimized, setMinimized] = useState(false)
+  const [minimized, setMinimized] = useState(() => typeof window !== "undefined" && window.innerWidth < 768)
 
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -236,8 +236,8 @@ export function AiCameraPanel({ isOpen, onClose, aiState, onAiStateChange, isSim
 
   return (
     <div
-      className={`fixed bottom-12 right-3 sm:right-6 z-40 flex flex-col rounded-2xl border border-purple-500/40 bg-slate-950/95 shadow-2xl backdrop-blur-md text-white overflow-hidden transition-all duration-300 max-w-[calc(100vw-24px)] ${
-        minimized ? "w-60" : "w-80 sm:w-96"
+      className={`fixed bottom-3 sm:bottom-12 right-2 sm:right-6 z-40 flex flex-col rounded-2xl border border-purple-500/40 bg-slate-950/95 shadow-2xl backdrop-blur-md text-white overflow-hidden transition-all duration-300 max-h-[85vh] ${
+        minimized ? "!w-auto max-w-[calc(100vw-16px)]" : "w-[calc(100vw-16px)] sm:w-96"
       }`}
       style={{ boxShadow: "0 10px 35px -5px rgba(168, 85, 247, 0.35)" }}
     >

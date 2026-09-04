@@ -68,87 +68,79 @@ export function Toolbar({
   onDeleteSelectedWire,
 }: Props) {
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-card px-2 sm:px-4 gap-1.5 sm:gap-2 overflow-x-auto min-w-0">
-      <div className="flex items-center gap-2 sm:gap-3">
+    <header className="flex h-12 md:h-14 shrink-0 items-center justify-between border-b border-border bg-card px-2.5 sm:px-4 gap-1.5 sm:gap-2">
+      {/* LEFT: Back + CyberLab Logo */}
+      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
         <Link
           to="/"
-          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-border bg-background hover:bg-secondary text-xs font-bold text-muted-foreground hover:text-foreground transition-all"
+          className="flex items-center gap-1 p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg border border-border bg-background hover:bg-secondary text-xs font-bold text-muted-foreground hover:text-foreground transition-all"
+          title="Back to Portal"
         >
           <ArrowLeft size={14} />
-          <span className="hidden sm:inline">Portal</span>
+          <span className="hidden md:inline">Portal</span>
         </Link>
-        <div className="flex items-center gap-2">
-          <div className="grid h-8 w-8 place-items-center rounded-lg bg-[#00878F] text-white shadow-sm">
-            <CircuitBoard className="h-5 w-5" />
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="grid h-7 w-7 sm:h-8 sm:w-8 place-items-center rounded-lg bg-[#00878F] text-white shadow-sm shrink-0">
+            <CircuitBoard className="h-4 w-4 sm:h-5 sm:w-5" />
           </div>
           <div className="leading-tight">
-            <div className="font-mono text-xs sm:text-sm font-bold tracking-tight text-foreground flex items-center gap-1.5">
-              <span>Pixiu CyberLab</span>
+            <div className="font-mono text-xs sm:text-sm font-bold tracking-tight text-foreground">
+              <span>CyberLab</span>
             </div>
-            <div className="text-[9px] uppercase tracking-widest text-muted-foreground font-mono">
+            <div className="hidden lg:block text-[9px] uppercase tracking-widest text-muted-foreground font-mono">
               Virtual Arduino & Circuit Studio
             </div>
           </div>
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
-        {/* Undo / Redo */}
-        <div className="hidden md:flex items-center gap-1 bg-background p-1 rounded-lg border border-border">
-          <button
-            onClick={onUndo}
-            disabled={!canUndo}
-            title="Undo (Ctrl+Z)"
-            className="p-1.5 rounded hover:bg-secondary disabled:opacity-30 disabled:hover:bg-transparent text-muted-foreground hover:text-foreground transition"
-          >
-            <Undo2 size={15} />
-          </button>
-          <button
-            onClick={onRedo}
-            disabled={!canRedo}
-            title="Redo (Ctrl+Shift+Z)"
-            className="p-1.5 rounded hover:bg-secondary disabled:opacity-30 disabled:hover:bg-transparent text-muted-foreground hover:text-foreground transition"
-          >
-            <Redo2 size={15} />
-          </button>
-        </div>
+      {/* CENTER: Circuit / Code Mode Toggle */}
+      <div className="flex items-center gap-1 rounded-lg border border-border bg-background p-0.5 sm:p-1 shrink-0">
+        <button
+          onClick={() => onViewChange("circuit")}
+          className={`rounded-md px-2.5 sm:px-3.5 py-1 text-xs sm:text-sm font-semibold transition ${
+            view === "circuit"
+              ? "bg-primary text-primary-foreground shadow-xs"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Circuit
+        </button>
+        <button
+          onClick={() => onViewChange("code")}
+          className={`rounded-md px-2.5 sm:px-3.5 py-1 text-xs sm:text-sm font-semibold transition ${
+            view === "code"
+              ? "bg-primary text-primary-foreground shadow-xs"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Code
+        </button>
+        <button
+          disabled
+          className="hidden sm:inline-flex rounded-md px-2 py-1 text-[11px] font-medium text-muted-foreground/50 cursor-not-allowed"
+        >
+          3D <span className="ml-1 text-[8px] uppercase tracking-wider opacity-60">soon</span>
+        </button>
+      </div>
 
-        {/* View mode switcher */}
-        <nav className="flex items-center gap-1 rounded-lg border border-border bg-background p-1">
-          {VIEWS.map((v) => (
-            <button
-              key={v.id}
-              onClick={() => !v.soon && onViewChange(v.id)}
-              disabled={v.soon}
-              className={`relative rounded-md px-3.5 py-1.5 text-xs sm:text-sm font-medium transition ${
-                view === v.id
-                  ? "bg-primary text-primary-foreground"
-                  : v.soon
-                    ? "cursor-not-allowed text-muted-foreground/50"
-                    : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {v.label}
-              {v.soon && <span className="ml-1 text-[9px] uppercase tracking-wider opacity-70">soon</span>}
-            </button>
-          ))}
-        </nav>
-
-        {/* Starter Templates button */}
+      {/* RIGHT: Actions */}
+      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        {/* Templates (Desktop) */}
         {onOpenTemplates && (
           <button
             onClick={onOpenTemplates}
-            className="flex items-center gap-1.5 rounded-lg border border-indigo-500/30 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 px-3 py-1.5 text-xs font-semibold transition shrink-0"
+            className="hidden md:flex items-center gap-1.5 rounded-lg border border-indigo-500/30 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 px-2.5 py-1.5 text-xs font-semibold transition"
             title="Browse Curriculum Project Templates"
           >
             <Sparkles size={14} />
-            <span className="hidden sm:inline">Templates</span>
+            <span>Templates</span>
           </button>
         )}
 
-        {/* Wire Color Palette */}
+        {/* Wire Color Palette (Desktop) */}
         {view === "circuit" && onSelectWireColor && (
-          <div className="hidden lg:flex items-center gap-1 bg-background px-2 py-1 rounded-lg border border-border">
+          <div className="hidden xl:flex items-center gap-1 bg-background px-2 py-1 rounded-lg border border-border">
             <span className="text-[10px] font-mono text-muted-foreground mr-0.5">Wire:</span>
             {WIRE_COLOR_OPTIONS.map((c) => (
               <button
@@ -170,24 +162,22 @@ export function Toolbar({
         {selectedWireId && onDeleteSelectedWire && (
           <button
             onClick={onDeleteSelectedWire}
-            className="flex items-center gap-1 rounded-lg border border-red-500/40 bg-red-500/15 text-red-400 hover:bg-red-500/25 px-2.5 py-1.5 text-xs font-semibold transition animate-in fade-in"
-            title="Delete Selected Wire (or press Delete / Backspace)"
+            className="flex items-center gap-1 rounded-lg border border-red-500/40 bg-red-500/15 text-red-400 px-2 sm:px-2.5 py-1.5 text-xs font-semibold transition"
+            title="Delete Selected Wire"
           >
             <Trash2 size={13} />
-            <span>Delete Wire</span>
+            <span className="hidden sm:inline">Delete</span>
           </button>
         )}
-      </div>
 
-      <div className="flex items-center gap-2">
         {/* AI Vision Camera Toggle */}
         {onToggleAiCamera && (
           <button
             onClick={onToggleAiCamera}
             title="Toggle AI Vision Camera (Pixiu AI Vision Engine)"
-            className={`relative flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition ${
+            className={`flex items-center gap-1 rounded-lg border px-2 sm:px-2.5 py-1.5 text-xs font-semibold transition ${
               isAiCameraOpen
-                ? "border-purple-500 bg-purple-500/20 text-purple-300 shadow-sm shadow-purple-500/30"
+                ? "border-purple-500 bg-purple-500/25 text-purple-300 shadow-sm shadow-purple-500/30"
                 : "border-border text-muted-foreground hover:bg-purple-950/20 hover:text-purple-300 hover:border-purple-500/40"
             }`}
           >
@@ -196,61 +186,51 @@ export function Toolbar({
           </button>
         )}
 
-        {/* Serial Monitor Toggle */}
-        <button
-          onClick={onToggleSerial}
-          className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-mono transition ${
-            isSerialOpen
-              ? "border-primary bg-primary/10 text-primary"
-              : "border-border text-muted-foreground hover:bg-secondary hover:text-foreground"
-          }`}
-          title="Toggle Serial Monitor"
-        >
-          <Terminal className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">Serial</span>
-        </button>
+        {/* Serial Monitor Toggle (Desktop) */}
+        {onToggleSerial && (
+          <button
+            onClick={onToggleSerial}
+            className={`hidden md:flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-mono transition ${
+              isSerialOpen
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-border text-muted-foreground hover:bg-secondary hover:text-foreground"
+            }`}
+            title="Toggle Serial Monitor"
+          >
+            <Terminal className="h-3.5 w-3.5" />
+            <span>Serial</span>
+          </button>
+        )}
 
-        {/* Mute Audio */}
+        {/* Mute Audio (Desktop) */}
         <button
           onClick={onToggleMute}
-          className="p-1.5 rounded-md border border-border text-muted-foreground hover:bg-secondary hover:text-foreground transition"
+          className="hidden md:flex p-1.5 rounded-md border border-border text-muted-foreground hover:bg-secondary hover:text-foreground transition cursor-pointer"
           title={isMuted ? "Unmute Sound" : "Mute Sound"}
         >
           {isMuted ? <VolumeX className="h-4 w-4 text-red-400" /> : <Volume2 className="h-4 w-4" />}
         </button>
 
-        {/* Save */}
-        {onSave && (
-          <button
-            onClick={onSave}
-            className="hidden sm:flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs text-muted-foreground transition hover:bg-secondary hover:text-foreground"
-            title="Save Circuit to Browser"
-          >
-            <Save className="h-3.5 w-3.5" />
-            <span>Save</span>
-          </button>
-        )}
-
-        {/* Clear */}
+        {/* Clear (Desktop) */}
         <button
           onClick={onClear}
-          className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs sm:text-sm text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+          className="hidden md:flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs text-muted-foreground transition hover:bg-secondary hover:text-foreground cursor-pointer"
         >
           <Trash2 className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">Clear</span>
+          <span>Clear</span>
         </button>
 
-        {/* Simulate / Stop */}
+        {/* ALWAYS-VISIBLE RUN / STOP SIMULATION BUTTON */}
         <button
           onClick={onToggleRun}
-          className={`flex items-center gap-1.5 rounded-md px-3.5 py-1.5 text-xs sm:text-sm font-semibold transition ${
+          className={`flex items-center gap-1.5 rounded-lg px-3 sm:px-3.5 py-1.5 text-xs sm:text-sm font-bold transition shadow-sm cursor-pointer ${
             running
-              ? "bg-destructive text-white hover:opacity-90"
-              : "bg-emerald-600 text-white hover:bg-emerald-500 shadow-md shadow-emerald-600/20"
+              ? "bg-destructive text-white hover:opacity-90 animate-pulse"
+              : "bg-emerald-600 text-white hover:bg-emerald-500 shadow-emerald-600/25"
           }`}
         >
-          {running ? <Square className="h-4 w-4" /> : <Play className="h-4 w-4 fill-current" />}
-          {running ? "Stop" : "Simulate"}
+          {running ? <Square className="h-3.5 w-3.5 fill-current" /> : <Play className="h-3.5 w-3.5 fill-current" />}
+          <span>{running ? "Stop" : "Run"}</span>
         </button>
       </div>
     </header>

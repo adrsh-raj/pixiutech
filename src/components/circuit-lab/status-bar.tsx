@@ -61,7 +61,7 @@ export const StatusBar: React.FC<Props> = ({
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 h-[24px] bg-slate-900/95 backdrop-blur border-t border-slate-700/50 flex items-center justify-between px-3 text-[11px] font-mono text-slate-400 z-50 select-none">
+    <div className="hidden md:flex fixed bottom-0 left-0 right-0 h-[24px] bg-slate-900/95 backdrop-blur border-t border-slate-700/50 items-center justify-between px-3 text-[11px] font-mono text-slate-400 z-50 select-none">
       {/* Left section */}
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-1.5" title="Component count">

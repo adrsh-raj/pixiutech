@@ -1,6 +1,7 @@
 import type { PlacedPart } from "@/lib/circuit-types"
 import { CATALOG } from "@/lib/components-catalog"
 import type { PartRuntime } from "./part-art"
+import { X } from "lucide-react"
 
 interface Props {
   part: PlacedPart | null
@@ -11,6 +12,7 @@ interface Props {
   onRotate: (id: string) => void
   onDelete: (id: string) => void
   onDuplicate: (id: string) => void
+  onClose?: () => void
 }
 
 const LED_COLORS = ["red", "green", "blue", "yellow", "white"]
@@ -25,11 +27,25 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
-export function Inspector({ part, runtime, partCount, wireCount, onChangeProp, onRotate, onDelete, onDuplicate }: Props) {
+export function Inspector({ part, runtime, partCount, wireCount, onChangeProp, onRotate, onDelete, onDuplicate, onClose }: Props) {
   return (
-    <aside className="flex h-full w-72 shrink-0 flex-col border-l border-border bg-sidebar">
-      <div className="border-b border-border px-4 py-3">
+    <aside
+      className={`
+        ${!part ? "hidden md:flex" : "fixed inset-x-0 bottom-0 z-40 max-h-[60vh] md:max-h-full rounded-t-2xl md:rounded-none shadow-2xl md:shadow-none border-t md:border-t-0 flex"}
+        md:static md:flex h-auto md:h-full w-full md:w-72 shrink-0 flex-col md:border-l border-border bg-sidebar transition-all duration-200
+      `}
+    >
+      <div className="border-b border-border px-4 py-2.5 sm:py-3 flex items-center justify-between">
         <h2 className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Inspector</h2>
+        {part && onClose && (
+          <button
+            onClick={onClose}
+            className="md:hidden p-1 text-muted-foreground hover:text-foreground rounded hover:bg-secondary cursor-pointer"
+            title="Close Inspector"
+          >
+            <X size={16} />
+          </button>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">

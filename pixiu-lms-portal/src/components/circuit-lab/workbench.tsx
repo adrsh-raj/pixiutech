@@ -11,6 +11,7 @@ import { audioEngine } from "@/lib/audio-engine"
 import { createHistory, pushState, undo as historyUndo, redo as historyRedo, canUndo, canRedo, type HistoryState } from "@/lib/history"
 import { saveCircuit, loadCircuit } from "@/lib/storage"
 import * as Blockly from "blockly"
+import { Boxes, Camera, Sparkles, Terminal, Trash2 } from "lucide-react"
 import { CircuitCanvas } from "./circuit-canvas"
 import { Inspector } from "./inspector"
 import { Palette } from "./palette"
@@ -23,33 +24,130 @@ import { AiCameraPanel, type AiVisionState } from "./ai-camera-panel"
 import type { ProjectTemplate } from "@/lib/templates"
 
 const DEFAULT_XML = `<xml xmlns="https://developers.google.com/blockly/xml">
-  <block type="arduino_program" x="40" y="40">
+  <block type="arduino_setup" deletable="false" movable="false" x="40" y="40">
     <statement name="SETUP">
-      <block type="serial_begin"><field name="BAUD">9600</field><next>
-      <block type="servo_write"><field name="PIN">6</field><value name="ANGLE"><shadow type="math_number"><field name="NUM">0</field></shadow></value></block>
-      </next></block>
+      <block type="serial_begin">
+        <field name="BAUD">9600</field>
+        <next>
+          <block type="servo_attach">
+            <field name="PIN">6</field>
+            <next>
+              <block type="servo_write">
+                <field name="PIN">6</field>
+                <value name="ANGLE">
+                  <block type="math_number">
+                    <field name="NUM">0</field>
+                  </block>
+                </value>
+                <next>
+                  <block type="io_pinmode">
+                    <field name="PIN">13</field>
+                    <field name="MODE">OUTPUT</field>
+                    <next>
+                      <block type="io_digitalwrite">
+                        <field name="PIN">13</field>
+                        <field name="STATE">HIGH</field>
+                        <next>
+                          <block type="io_pinmode">
+                            <field name="PIN">12</field>
+                            <field name="MODE">OUTPUT</field>
+                            <next>
+                              <block type="io_digitalwrite">
+                                <field name="PIN">12</field>
+                                <field name="STATE">LOW</field>
+                              </block>
+                            </next>
+                          </block>
+                        </next>
+                      </block>
+                    </next>
+                  </block>
+                </next>
+              </block>
+            </next>
+          </block>
+        </next>
+      </block>
     </statement>
     <statement name="LOOP">
       <block type="controls_if">
-        <mutation else="1"></mutation>
         <value name="IF0">
-          <block type="ai_is_detected"><field name="CLASS">car</field></block>
+          <block type="ai_is_detected">
+            <field name="CLASS">car</field>
+          </block>
         </value>
         <statement name="DO0">
-          <block type="serial_println"><value name="TEXT"><block type="text_string"><field name="TEXT">🚗 [AI Vision] Car Detected! Raising Boom Barrier...</field></block></value><next>
-          <block type="servo_write"><field name="PIN">6</field><value name="ANGLE"><shadow type="math_number"><field name="NUM">90</field></shadow></value><next>
-          <block type="io_digitalwrite"><field name="PIN">12</field><field name="STATE">HIGH</field><next>
-          <block type="io_digitalwrite"><field name="PIN">13</field><field name="STATE">LOW</field><next>
-          <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">600</field></shadow></value></block>
-          </next></block></next></block></next></block></next></block>
+          <block type="serial_print">
+            <field name="NEWLINE">TRUE</field>
+            <value name="CONTENT">
+              <block type="text">
+                <field name="TEXT">[AI Vision] Vehicle detected! Opening barrier gate...</field>
+              </block>
+            </value>
+            <next>
+              <block type="servo_write">
+                <field name="PIN">6</field>
+                <value name="ANGLE">
+                  <block type="math_number">
+                    <field name="NUM">90</field>
+                  </block>
+                </value>
+                <next>
+                  <block type="io_digitalwrite">
+                    <field name="PIN">13</field>
+                    <field name="STATE">LOW</field>
+                    <next>
+                      <block type="io_digitalwrite">
+                        <field name="PIN">12</field>
+                        <field name="STATE">HIGH</field>
+                        <next>
+                          <block type="time_delay">
+                            <value name="DELAY_MS">
+                              <block type="math_number">
+                                <field name="NUM">3000</field>
+                              </block>
+                            </value>
+                          </block>
+                        </next>
+                      </block>
+                    </next>
+                  </block>
+                </next>
+              </block>
+            </next>
+          </block>
         </statement>
-        <statement name="ELSE">
-          <block type="servo_write"><field name="PIN">6</field><value name="ANGLE"><shadow type="math_number"><field name="NUM">0</field></shadow></value><next>
-          <block type="io_digitalwrite"><field name="PIN">12</field><field name="STATE">LOW</field><next>
-          <block type="io_digitalwrite"><field name="PIN">13</field><field name="STATE">HIGH</field><next>
-          <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">300</field></shadow></value></block>
-          </next></block></next></block></next></block>
-        </statement>
+        <next>
+          <block type="servo_write">
+            <field name="PIN">6</field>
+            <value name="ANGLE">
+              <block type="math_number">
+                <field name="NUM">0</field>
+              </block>
+            </value>
+            <next>
+              <block type="io_digitalwrite">
+                <field name="PIN">13</field>
+                <field name="STATE">HIGH</field>
+                <next>
+                  <block type="io_digitalwrite">
+                    <field name="PIN">12</field>
+                    <field name="STATE">LOW</field>
+                    <next>
+                      <block type="time_delay">
+                        <value name="DELAY_MS">
+                          <block type="math_number">
+                            <field name="NUM">200</field>
+                          </block>
+                        </value>
+                      </block>
+                    </next>
+                  </block>
+                </next>
+              </block>
+            </next>
+          </block>
+        </next>
       </block>
     </statement>
   </block>
@@ -96,7 +194,7 @@ export function Workbench() {
   const [runTime, setRunTime] = useState(0)
   const [lastSaved, setLastSaved] = useState<string | null>(null)
   const [isTemplatesOpen, setIsTemplatesOpen] = useState(false)
-  const [isAiCameraOpen, setIsAiCameraOpen] = useState(true)
+  const [isAiCameraOpen, setIsAiCameraOpen] = useState(() => typeof window !== "undefined" && window.innerWidth >= 768)
   const [mobilePaletteOpen, setMobilePaletteOpen] = useState(false)
   const [aiState, setAiState] = useState<AiVisionState>({
     enabled: true,
@@ -585,6 +683,58 @@ export function Workbench() {
                 ])
               }}
             />
+
+            {/* Mobile Bottom Dock Bar */}
+            <div className="md:hidden fixed bottom-3 inset-x-3 z-30 flex items-center justify-around rounded-2xl border border-border/80 bg-card/95 backdrop-blur-md shadow-2xl py-1.5 px-2 text-xs font-semibold">
+              <button
+                onClick={() => setMobilePaletteOpen(true)}
+                className="flex flex-col items-center gap-0.5 p-1 text-foreground hover:text-primary transition active:scale-95"
+                title="Add Components"
+              >
+                <Boxes size={18} className="text-primary" />
+                <span className="text-[10px]">Parts</span>
+              </button>
+
+              <button
+                onClick={() => setIsAiCameraOpen((prev) => !prev)}
+                className={`flex flex-col items-center gap-0.5 p-1 transition active:scale-95 ${
+                  isAiCameraOpen ? "text-purple-400 font-bold" : "text-muted-foreground hover:text-foreground"
+                }`}
+                title="Toggle AI Camera"
+              >
+                <Camera size={18} className={isAiCameraOpen ? "text-purple-400" : ""} />
+                <span className="text-[10px]">AI Cam</span>
+              </button>
+
+              <button
+                onClick={() => setIsTemplatesOpen(true)}
+                className="flex flex-col items-center gap-0.5 p-1 text-indigo-400 transition active:scale-95"
+                title="Templates & Projects"
+              >
+                <Sparkles size={18} />
+                <span className="text-[10px]">Projects</span>
+              </button>
+
+              <button
+                onClick={() => setIsSerialOpen((prev) => !prev)}
+                className={`flex flex-col items-center gap-0.5 p-1 transition active:scale-95 ${
+                  isSerialOpen ? "text-primary font-bold" : "text-muted-foreground hover:text-foreground"
+                }`}
+                title="Serial Monitor"
+              >
+                <Terminal size={18} />
+                <span className="text-[10px]">Serial</span>
+              </button>
+
+              <button
+                onClick={clearAll}
+                className="flex flex-col items-center gap-0.5 p-1 text-muted-foreground hover:text-destructive transition active:scale-95"
+                title="Clear Canvas"
+              >
+                <Trash2 size={18} />
+                <span className="text-[10px]">Clear</span>
+              </button>
+            </div>
           </main>
           <Inspector
             part={selected}
@@ -595,6 +745,7 @@ export function Workbench() {
             onRotate={rotatePart}
             onDelete={deletePart}
             onDuplicate={duplicatePart}
+            onClose={() => setSelectedId(null)}
           />
         </div>
       )}
