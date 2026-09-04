@@ -389,87 +389,6 @@ export function Workbench() {
     setWiring(null)
   }, [wiring, activeWireColor, updateState])
 
-  // Keyboard shortcut listener and DevTools protection
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // 1. Block F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+Shift+C, Ctrl+U, Ctrl+S
-      if (
-        e.key === "F12" ||
-        (e.ctrlKey && e.shiftKey && ["I", "i", "J", "j", "C", "c"].includes(e.key)) ||
-        (e.ctrlKey && ["U", "u", "S", "s"].includes(e.key))
-      ) {
-        e.preventDefault()
-        e.stopPropagation()
-        return
-      }
-
-      const activeEl = document.activeElement
-      const isInput =
-        activeEl?.tagName === "INPUT" ||
-        activeEl?.tagName === "TEXTAREA" ||
-        (activeEl as HTMLElement)?.isContentEditable
-      if (isInput) return
-
-      // Space toggles simulation
-      if (e.code === "Space") {
-        e.preventDefault()
-        toggleRun()
-        return
-      }
-
-      // 'R' rotates selected component
-      if ((e.key === "r" || e.key === "R") && !e.ctrlKey && !e.metaKey) {
-        if (selectedId) {
-          rotatePart(selectedId)
-          e.preventDefault()
-        }
-      }
-
-      // 'D' duplicates selected component
-      if ((e.key === "d" || e.key === "D") && !e.ctrlKey && !e.metaKey) {
-        if (selectedId) {
-          duplicatePart(selectedId)
-          e.preventDefault()
-        }
-      }
-
-      // DELETE / BACKSPACE removes selected component or selected wire!
-      if (e.key === "Delete" || e.key === "Backspace") {
-        if (selectedWireId) {
-          deleteWire(selectedWireId)
-          setSelectedWireId(null)
-          e.preventDefault()
-        } else if (selectedId) {
-          deletePart(selectedId)
-          setSelectedId(null)
-          e.preventDefault()
-        }
-      } else if ((e.ctrlKey || e.metaKey) && e.key === "z") {
-        if (e.shiftKey) {
-          handleRedo()
-        } else {
-          handleUndo()
-        }
-        e.preventDefault()
-      } else if ((e.ctrlKey || e.metaKey) && e.key === "y") {
-        handleRedo()
-        e.preventDefault()
-      }
-    }
-
-    const handleGlobalContextMenu = (e: MouseEvent) => {
-      e.preventDefault()
-      setContextMenu({ x: e.clientX, y: e.clientY, target: { type: "canvas" } })
-    }
-
-    window.addEventListener("keydown", handleKeyDown)
-    window.addEventListener("contextmenu", handleGlobalContextMenu)
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown)
-      window.removeEventListener("contextmenu", handleGlobalContextMenu)
-    }
-  }, [handleUndo, handleRedo, selectedWireId, selectedId, deleteWire, deletePart, rotatePart, duplicatePart, toggleRun])
-
   const interact = useCallback((id: string, mode: "down" | "up") => {
     setPressed((prev) => {
       const next = new Set(prev)
@@ -605,6 +524,87 @@ export function Workbench() {
       return next
     })
   }, [startProgram, stopProgram])
+
+  // Keyboard shortcut listener and DevTools protection (placed after toggleRun and edit callbacks)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // 1. Block F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+Shift+C, Ctrl+U, Ctrl+S
+      if (
+        e.key === "F12" ||
+        (e.ctrlKey && e.shiftKey && ["I", "i", "J", "j", "C", "c"].includes(e.key)) ||
+        (e.ctrlKey && ["U", "u", "S", "s"].includes(e.key))
+      ) {
+        e.preventDefault()
+        e.stopPropagation()
+        return
+      }
+
+      const activeEl = document.activeElement
+      const isInput =
+        activeEl?.tagName === "INPUT" ||
+        activeEl?.tagName === "TEXTAREA" ||
+        (activeEl as HTMLElement)?.isContentEditable
+      if (isInput) return
+
+      // Space toggles simulation
+      if (e.code === "Space") {
+        e.preventDefault()
+        toggleRun()
+        return
+      }
+
+      // 'R' rotates selected component
+      if ((e.key === "r" || e.key === "R") && !e.ctrlKey && !e.metaKey) {
+        if (selectedId) {
+          rotatePart(selectedId)
+          e.preventDefault()
+        }
+      }
+
+      // 'D' duplicates selected component
+      if ((e.key === "d" || e.key === "D") && !e.ctrlKey && !e.metaKey) {
+        if (selectedId) {
+          duplicatePart(selectedId)
+          e.preventDefault()
+        }
+      }
+
+      // DELETE / BACKSPACE removes selected component or selected wire!
+      if (e.key === "Delete" || e.key === "Backspace") {
+        if (selectedWireId) {
+          deleteWire(selectedWireId)
+          setSelectedWireId(null)
+          e.preventDefault()
+        } else if (selectedId) {
+          deletePart(selectedId)
+          setSelectedId(null)
+          e.preventDefault()
+        }
+      } else if ((e.ctrlKey || e.metaKey) && e.key === "z") {
+        if (e.shiftKey) {
+          handleRedo()
+        } else {
+          handleUndo()
+        }
+        e.preventDefault()
+      } else if ((e.ctrlKey || e.metaKey) && e.key === "y") {
+        handleRedo()
+        e.preventDefault()
+      }
+    }
+
+    const handleGlobalContextMenu = (e: MouseEvent) => {
+      e.preventDefault()
+      setContextMenu({ x: e.clientX, y: e.clientY, target: { type: "canvas" } })
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+    window.addEventListener("contextmenu", handleGlobalContextMenu)
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown)
+      window.removeEventListener("contextmenu", handleGlobalContextMenu)
+    }
+  }, [handleUndo, handleRedo, selectedWireId, selectedId, deleteWire, deletePart, rotatePart, duplicatePart, toggleRun])
 
   const handleSave = useCallback(() => {
     saveCircuit("default", state, blocklyXml)
