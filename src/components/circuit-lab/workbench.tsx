@@ -11,7 +11,7 @@ import { audioEngine } from "@/lib/audio-engine"
 import { createHistory, pushState, undo as historyUndo, redo as historyRedo, canUndo, canRedo, type HistoryState } from "@/lib/history"
 import { saveCircuit, loadCircuit } from "@/lib/storage"
 import * as Blockly from "blockly"
-import { Boxes, Camera, Sparkles, Terminal, Trash2, Gauge } from "lucide-react"
+import { Boxes, Camera, Sparkles, Terminal, Trash2, Gauge, Sliders } from "lucide-react"
 import { computeWireCurrents } from "@/lib/current-flow"
 import { Multimeter } from "./multimeter"
 import { CircuitCanvas } from "./circuit-canvas"
@@ -193,6 +193,7 @@ export function Workbench() {
   const [lastSaved, setLastSaved] = useState<string | null>(null)
   const [isTemplatesOpen, setIsTemplatesOpen] = useState(false)
   const [isAiCameraOpen, setIsAiCameraOpen] = useState(() => typeof window !== "undefined" && window.innerWidth >= 768)
+  const [isInspectorOpen, setIsInspectorOpen] = useState(true)
   const [mobilePaletteOpen, setMobilePaletteOpen] = useState(false)
   const [contextMenu, setContextMenu] = useState<{
     x: number
@@ -678,6 +679,8 @@ export function Workbench() {
         onToggleDmm={() => setIsDmmOpen((prev) => !prev)}
         isAiCameraOpen={isAiCameraOpen}
         onToggleAiCamera={() => setIsAiCameraOpen((prev) => !prev)}
+        isInspectorOpen={isInspectorOpen}
+        onToggleInspector={() => setIsInspectorOpen((prev) => !prev)}
         isMuted={isMuted}
         onToggleMute={toggleMute}
         onOpenTemplates={() => setIsTemplatesOpen(true)}
@@ -729,6 +732,18 @@ export function Workbench() {
                 <span>Components</span>
               </button>
 
+              {/* Re-open Inspector Button when closed */}
+              {!isInspectorOpen && (
+                <button
+                  onClick={() => setIsInspectorOpen(true)}
+                  className="absolute top-3 right-3 z-20 flex items-center gap-1.5 rounded-xl bg-card/90 backdrop-blur-sm border border-border px-3 py-1.5 text-xs font-bold shadow-md text-foreground hover:bg-secondary cursor-pointer transition animate-in fade-in"
+                  title="Open Inspector Panel"
+                >
+                  <Sliders size={14} className="text-primary" />
+                  <span className="hidden sm:inline">Inspector</span>
+                </button>
+              )}
+
               <CircuitCanvas
                 parts={state.parts}
                 wires={state.wires}
@@ -744,7 +759,10 @@ export function Workbench() {
                 onProbeClip={handleProbeClip}
                 onSelect={(id) => {
                   setSelectedId(id)
-                  if (id) setSelectedWireId(null)
+                  if (id) {
+                    setSelectedWireId(null)
+                    setIsInspectorOpen(true)
+                  }
                 }}
                 onMovePart={movePart}
                 onPinDown={handlePinDown}
@@ -844,17 +862,22 @@ export function Workbench() {
               </button>
             </div>
           </main>
-          <Inspector
-            part={selected}
-            runtime={selected ? runtime[selected.id] : undefined}
-            partCount={state.parts.length}
-            wireCount={state.wires.length}
-            onChangeProp={changeProp}
-            onRotate={rotatePart}
-            onDelete={deletePart}
-            onDuplicate={duplicatePart}
-            onClose={() => setSelectedId(null)}
-          />
+          {isInspectorOpen && (
+            <Inspector
+              part={selected}
+              runtime={selected ? runtime[selected.id] : undefined}
+              partCount={state.parts.length}
+              wireCount={state.wires.length}
+              onChangeProp={changeProp}
+              onRotate={rotatePart}
+              onDelete={deletePart}
+              onDuplicate={duplicatePart}
+              onClose={() => {
+                setIsInspectorOpen(false)
+                setSelectedId(null)
+              }}
+            />
+          )}
         </div>
       )}
 

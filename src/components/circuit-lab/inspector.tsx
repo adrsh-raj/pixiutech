@@ -36,12 +36,20 @@ export function Inspector({ part, runtime, partCount, wireCount, onChangeProp, o
       `}
     >
       <div className="border-b border-border px-4 py-2.5 sm:py-3 flex items-center justify-between">
-        <h2 className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Inspector</h2>
-        {part && onClose && (
+        <div className="flex items-center gap-2 min-w-0">
+          <h2 className="font-mono text-xs uppercase tracking-widest text-muted-foreground truncate">Inspector</h2>
+          {part && (
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-primary/10 text-primary font-bold truncate">
+              {CATALOG[part.type]?.name || part.type}
+            </span>
+          )}
+        </div>
+        {onClose && (
           <button
             onClick={onClose}
-            className="md:hidden p-1 text-muted-foreground hover:text-foreground rounded hover:bg-secondary cursor-pointer"
-            title="Close Inspector"
+            className="p-1 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition cursor-pointer shrink-0 ml-2"
+            title="Close Inspector (Cut panel)"
+            aria-label="Close Inspector"
           >
             <X size={16} />
           </button>

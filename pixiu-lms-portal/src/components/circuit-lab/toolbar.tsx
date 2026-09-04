@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom"
-import { CircuitBoard, Play, Square, Trash2, ArrowLeft, Undo2, Redo2, Save, Terminal, Volume2, VolumeX, Sparkles, Camera, Gauge } from "lucide-react"
+import { CircuitBoard, Play, Square, Trash2, ArrowLeft, Undo2, Redo2, Save, Terminal, Volume2, VolumeX, Sparkles, Camera, Gauge, Sliders } from "lucide-react"
 
 export type WorkbenchView = "circuit" | "code" | "3d"
 
@@ -31,6 +31,8 @@ interface Props {
   onToggleDmm?: () => void
   isAiCameraOpen?: boolean
   onToggleAiCamera?: () => void
+  isInspectorOpen?: boolean
+  onToggleInspector?: () => void
   isMuted?: boolean
   onToggleMute?: () => void
   onOpenTemplates?: () => void
@@ -63,6 +65,8 @@ export function Toolbar({
   onToggleDmm,
   isAiCameraOpen = false,
   onToggleAiCamera,
+  isInspectorOpen = true,
+  onToggleInspector,
   isMuted = false,
   onToggleMute,
   onOpenTemplates,
@@ -203,6 +207,22 @@ export function Toolbar({
           >
             <Gauge className="h-3.5 w-3.5 text-amber-400" />
             <span className="hidden sm:inline">Multimeter</span>
+          </button>
+        )}
+
+        {/* Inspector Panel Toggle (Desktop) */}
+        {onToggleInspector && (
+          <button
+            onClick={onToggleInspector}
+            title="Toggle Inspector Panel (Properties & Stats)"
+            className={`hidden md:flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer ${
+              isInspectorOpen
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-border text-muted-foreground hover:bg-secondary hover:text-foreground"
+            }`}
+          >
+            <Sliders className="h-3.5 w-3.5" />
+            <span>Inspector</span>
           </button>
         )}
 
