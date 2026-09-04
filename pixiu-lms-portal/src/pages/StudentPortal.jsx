@@ -168,18 +168,16 @@ export default function StudentPortal() {
       (student.school_id === 'XYZ' || (student.student_id || '').startsWith('XYZ') ? 'Akash Sharma' : 'Vikas Pandey');
 
     const studentSpecificReviews = (studentReviews || []).filter(r => {
-      const matchId = (r.student_id || '').trim().replace(/\s+/g, ' ') === cleanId || 
-                      r.student_id === student.student_id ||
-                      (student.student_id === 'XYZ6A 01' && r.student_id === 'ABC6A 01');
-      const isDummy = ['REV-001', 'REV-002', 'REV-003', 'REV-004'].includes(r.id) ||
-        r.verified_date === 'Curriculum Baseline' ||
-        r.review?.includes('Demonstrated exceptional understanding') ||
-        r.review?.includes('Successfully calibrated analog') ||
-        r.review?.includes('Accurate transistor switching') ||
-        r.review?.includes('Superb conditional logic') ||
-        r.review?.includes('Firmware pin modes') ||
-        r.review?.includes('Integrated 2WD robotic chassis') ||
-        r.review?.includes('Final autonomous exhibition');
+      if (!r) return false;
+      const cleanR = (r.student_id || '').toUpperCase().replace(/\s+/g, '');
+      const cleanS = (student.student_id || '').toUpperCase().replace(/\s+/g, '');
+      const cleanC = (cleanId || '').toUpperCase().replace(/\s+/g, '');
+
+      const isManish = cleanS === 'XYZ6A01' || cleanC === 'XYZ6A01' || (student.name && student.name.trim().toLowerCase() === 'manish rawat');
+      const reviewBelongsToManish = isManish && (cleanR === 'XYZ6A01' || cleanR === 'ABC6A01' || (r.student_name && r.student_name.trim().toLowerCase() === 'manish rawat'));
+
+      const matchId = cleanR === cleanC || cleanR === cleanS || reviewBelongsToManish;
+      const isDummy = r.verified_date === 'Curriculum Baseline';
       return matchId && !isDummy;
     });
     
@@ -212,7 +210,7 @@ export default function StudentPortal() {
         verifiedDate: 'Awaiting Evaluation'
       };
     });
-  }, [studentReviews, student.student_id, student.school_id, cleanId, schools, DEFAULT_UNITS]);
+  }, [studentReviews, student.student_id, student.school_id, student.name, cleanId, schools, DEFAULT_UNITS]);
 
   const reviewedLevelsList = useMemo(() => {
     return levelReviewData.filter(l => l.hasReview && l.score !== null);

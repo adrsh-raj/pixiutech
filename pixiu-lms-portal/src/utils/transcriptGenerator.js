@@ -78,9 +78,12 @@ export const generateStudentTranscriptPDF = ({
 
   // Match reviews
   const studentSpecificReviews = (studentReviews || []).filter(r => {
+    if (!r) return false;
     const rId = (r.student_id || '').trim().toLowerCase().replace(/\s+/g, '');
     const sId = (student.student_id || '').trim().toLowerCase().replace(/\s+/g, '');
-    return rId === sId || (sId === 'xyz6a01' && rId === 'abc6a01');
+    const isManish = sId === 'xyz6a01' || (student.name && student.name.toLowerCase() === 'manish rawat');
+    const reviewBelongsToManish = isManish && (rId === 'xyz6a01' || rId === 'abc6a01' || (r.student_name && r.student_name.toLowerCase() === 'manish rawat'));
+    return rId === sId || reviewBelongsToManish;
   });
 
   const levelReviewData = defaultUnits.map(unit => {

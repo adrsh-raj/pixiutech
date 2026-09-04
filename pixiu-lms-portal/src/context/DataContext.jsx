@@ -200,10 +200,10 @@ export function DataProvider({ children }) {
     try {
       const raw = safeGetItem('pixiu_student_reviews', null);
       if (!raw || !Array.isArray(raw)) return SEED_STUDENT_REVIEWS;
-      const userCreated = raw.filter(r => !r.id?.startsWith('REV-XYZ-') && !r.id?.startsWith('REV-ZPS-')).map(r => {
-        // Fix for accidental ABC6A 01 review saved when intending XYZ6A 01 Manish Rawat
-        if (r.student_id === 'ABC6A 01' && (r.student_name === 'Manish Rawat' || !r.student_name)) {
-          return { ...r, student_id: 'XYZ6A 01', class_grade: '6' };
+      const userCreated = raw.filter(r => r.verified_date !== 'Curriculum Baseline').map(r => {
+        // Remap any accidental ABC6A 01 or Manish Rawat review directly to XYZ6A 01
+        if (r.student_id === 'ABC6A 01' || r.student_name === 'Manish Rawat') {
+          return { ...r, student_id: 'XYZ6A 01', class_grade: '6', student_name: 'Manish Rawat' };
         }
         return r;
       });
@@ -1034,10 +1034,19 @@ export function DataProvider({ children }) {
 
   // 16. End-of-Unit Student Reviews by Trainers
   const saveStudentReview = (reviewData) => {
+    let normalizedStudentId = (reviewData.student_id || '').trim().replace(/\s+/g, ' ');
+    let normalizedStudentName = reviewData.student_name;
+    if (normalizedStudentId === 'ABC6A 01' || normalizedStudentName === 'Manish Rawat') {
+      normalizedStudentId = 'XYZ6A 01';
+      normalizedStudentName = 'Manish Rawat';
+    }
+
     const reviewId = reviewData.id || `REV-${Date.now().toString().slice(-4)}`;
     const fullReview = {
       ...reviewData,
       id: reviewId,
+      student_id: normalizedStudentId,
+      student_name: normalizedStudentName,
       verified_date: reviewData.verified_date || new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
       updated_at: new Date().toISOString()
     };

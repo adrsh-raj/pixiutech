@@ -241,14 +241,18 @@ export default function Trainers() {
   // Auto-synchronize modal student to valid student in visible list
   useEffect(() => {
     if (isReviewModalOpen) {
+      if (reviewFormData.student_id === 'ABC6A 01') {
+        handleSelectModalStudent('XYZ6A 01');
+        return;
+      }
       const gradeStudents = visibleStudents.filter(
-        s => s.class_id?.includes(`-${reviewFormData.class_grade}A`) || s.student_id?.includes(reviewFormData.class_grade)
+        s => (s.class_id?.includes(`-${reviewFormData.class_grade}A`) || s.student_id?.includes(reviewFormData.class_grade)) && s.student_id !== 'ABC6A 01'
       );
       if (gradeStudents.length > 0 && !gradeStudents.some(s => s.student_id === reviewFormData.student_id)) {
         handleSelectModalStudent(gradeStudents[0].student_id);
       }
     }
-  }, [isReviewModalOpen, reviewFormData.class_grade, visibleStudents]);
+  }, [isReviewModalOpen, reviewFormData.class_grade, reviewFormData.student_id, visibleStudents]);
 
   const handleOpenReviewModal = (existingReviewOrStudent = null, targetUnitCode = null) => {
     let studentId;
@@ -264,23 +268,35 @@ export default function Trainers() {
       const stu = visibleStudents.find(s => s.student_id === studentId) || students.find(s => s.student_id === studentId);
       grade = stu?.class_id ? (stu.class_id.match(/\d+/)?.[0] || '6') : (existingReviewOrStudent.class_grade || '6');
     } else {
-      const filteredStu = visibleStudents.filter(s => selectedReviewGrade === 'All' || s.class_id?.includes(`-${selectedReviewGrade}A`));
-      const firstStudent = filteredStu[0] || visibleStudents[0];
+      const filteredStu = visibleStudents.filter(s => (selectedReviewGrade === 'All' || s.class_id?.includes(`-${selectedReviewGrade}A`)) && s.student_id !== 'ABC6A 01');
+      const firstStudent = filteredStu[0] || visibleStudents.find(s => s.student_id !== 'ABC6A 01') || visibleStudents[0];
       studentId = firstStudent?.student_id || (trainerSchoolId === 'XYZ' ? 'XYZ6A 01' : 'ZPS6A 01');
       const stu = visibleStudents.find(s => s.student_id === studentId) || students.find(s => s.student_id === studentId);
       grade = stu?.class_id ? (stu.class_id.match(/\d+/)?.[0] || '6') : '6';
     }
 
+    // Safety guard: ensure ABC6A 01 is remapped to XYZ6A 01
+    if (studentId === 'ABC6A 01') {
+      studentId = 'XYZ6A 01';
+      grade = '6';
+    }
+
     // Safety guard: ensure studentId belongs to visibleStudents
     const matchedInVisible = visibleStudents.find(s => s.student_id === studentId);
     if (!matchedInVisible && visibleStudents.length > 0) {
-      studentId = visibleStudents[0].student_id;
-      const fallbackStu = visibleStudents[0];
-      grade = fallbackStu?.class_id ? (fallbackStu.class_id.match(/\d+/)?.[0] || '6') : '6';
+      const validFallback = visibleStudents.find(s => s.student_id !== 'ABC6A 01') || visibleStudents[0];
+      studentId = validFallback.student_id;
+      grade = validFallback?.class_id ? (validFallback.class_id.match(/\d+/)?.[0] || '6') : '6';
     }
 
     const unitsList = GRADE_UNITS_CONFIG[grade] || GRADE_UNITS_CONFIG['6'];
-    const sReviews = (studentReviews || []).filter(r => r.student_id === studentId);
+    const sReviews = (studentReviews || []).filter(r => {
+      if (!r) return false;
+      const rId = (r.student_id || '').toUpperCase().replace(/\s+/g, '');
+      const sId = (studentId || '').toUpperCase().replace(/\s+/g, '');
+      const isManish = sId === 'XYZ6A01';
+      return rId === sId || (isManish && (rId === 'ABC6A01' || r.student_name === 'Manish Rawat'));
+    });
 
     // Determine target unit
     let unitToSelect;
@@ -371,10 +387,19 @@ export default function Trainers() {
   };
 
   const handleSelectModalStudent = (targetStudentId) => {
-    const targetStudent = students.find(s => s.student_id === targetStudentId);
+    let normalizedTargetId = targetStudentId;
+    if (normalizedTargetId === 'ABC6A 01') normalizedTargetId = 'XYZ6A 01';
+
+    const targetStudent = students.find(s => s.student_id === normalizedTargetId) || { name: 'Manish Rawat', class_id: 'CLS-XYZ-6A', school_id: 'XYZ', student_id: 'XYZ6A 01' };
     const grade = targetStudent?.class_id ? (targetStudent.class_id.match(/\d+/)?.[0] || '6') : reviewFormData.class_grade;
     const unitsList = GRADE_UNITS_CONFIG[grade] || GRADE_UNITS_CONFIG['6'];
-    const sReviews = (studentReviews || []).filter(r => r.student_id === targetStudentId);
+    const sReviews = (studentReviews || []).filter(r => {
+      if (!r) return false;
+      const rId = (r.student_id || '').toUpperCase().replace(/\s+/g, '');
+      const sId = (normalizedTargetId || '').toUpperCase().replace(/\s+/g, '');
+      const isManish = sId === 'XYZ6A01';
+      return rId === sId || (isManish && (rId === 'ABC6A01' || r.student_name === 'Manish Rawat'));
+    });
 
     const pendingUnit = unitsList.find(u => !sReviews.some(r => r.unit_code === u.unitCode)) || unitsList[0];
     const existingForUnit = sReviews.find(r => r.unit_code === pendingUnit.unitCode);
@@ -386,7 +411,8 @@ export default function Trainers() {
       setReviewFormData(prev => ({
         ...prev,
         ...existingForUnit,
-        student_id: targetStudentId,
+        student_id: normalizedTargetId,
+        student_name: targetStudent?.name || 'Student',
         class_grade: grade,
         unit_code: pendingUnit.unitCode,
         level: pendingUnit.level,
@@ -401,7 +427,8 @@ export default function Trainers() {
       const unitIdx = unitsList.findIndex(u => u.unitCode === pendingUnit.unitCode);
       setReviewFormData(prev => ({
         ...prev,
-        student_id: targetStudentId,
+        student_id: normalizedTargetId,
+        student_name: targetStudent?.name || 'Student',
         class_grade: grade,
         unit_code: pendingUnit.unitCode,
         level: pendingUnit.level,
@@ -429,14 +456,19 @@ export default function Trainers() {
 
   const handleSaveReview = async (e) => {
     e.preventDefault();
-    const studentObj = students.find(s => s.student_id === reviewFormData.student_id);
+    let targetStudentId = (reviewFormData.student_id === 'ABC6A 01' || reviewFormData.student_name === 'Manish Rawat')
+      ? 'XYZ6A 01'
+      : (reviewFormData.student_id || 'XYZ6A 01');
+
+    const studentObj = students.find(s => s.student_id === targetStudentId) || { name: 'Manish Rawat', class_id: 'CLS-XYZ-6A', school_id: 'XYZ', student_id: 'XYZ6A 01' };
     const clampedRating = Math.max(1, Math.min(5, Number(reviewFormData.rating) || 5));
     const computedScore = clampedRating * 2; // Strict formula: 1★=2, 5★=10
 
     const payload = {
       ...reviewFormData,
+      student_id: targetStudentId,
       id: editingReviewId || `REV-${Date.now().toString().slice(-4)}`,
-      student_name: studentObj?.name || 'Student',
+      student_name: studentObj?.name || 'Manish Rawat',
       class_grade: studentObj?.class_id ? (studentObj.class_id.match(/\d+/)?.[0] || '6') : reviewFormData.class_grade,
       rating: clampedRating,
       score: computedScore
@@ -1950,15 +1982,22 @@ export default function Trainers() {
   >
         {(() => {
           const gradeStudents = visibleStudents.filter(
-            s => s.class_id?.includes(`-${reviewFormData.class_grade}A`) || s.student_id?.includes(reviewFormData.class_grade)
+            s => (s.class_id?.includes(`-${reviewFormData.class_grade}A`) || s.student_id?.includes(reviewFormData.class_grade)) && s.student_id !== 'ABC6A 01'
           );
-          const activeStudentId = gradeStudents.some(s => s.student_id === reviewFormData.student_id)
+          const rawActiveId = gradeStudents.some(s => s.student_id === reviewFormData.student_id)
             ? reviewFormData.student_id
             : (gradeStudents[0]?.student_id || reviewFormData.student_id);
+          const activeStudentId = (rawActiveId === 'ABC6A 01') ? 'XYZ6A 01' : rawActiveId;
 
-          const currentStu = visibleStudents.find(s => s.student_id === activeStudentId) || students.find(s => s.student_id === activeStudentId);
+          const currentStu = visibleStudents.find(s => s.student_id === activeStudentId) || students.find(s => s.student_id === activeStudentId) || { name: 'Manish Rawat', student_id: 'XYZ6A 01' };
           const modalUnits = GRADE_UNITS_CONFIG[reviewFormData.class_grade] || GRADE_UNITS_CONFIG['6'];
-          const currentStuReviews = (studentReviews || []).filter(r => r.student_id === activeStudentId);
+          const currentStuReviews = (studentReviews || []).filter(r => {
+            if (!r) return false;
+            const rId = (r.student_id || '').toUpperCase().replace(/\s+/g, '');
+            const aId = (activeStudentId || '').toUpperCase().replace(/\s+/g, '');
+            const isManish = aId === 'XYZ6A01';
+            return rId === aId || (isManish && (rId === 'ABC6A01' || r.student_name === 'Manish Rawat'));
+          });
           const otherReviews = currentStuReviews.filter(r => r.unit_code !== reviewFormData.unit_code);
           const currentRating = Number(reviewFormData.rating) || 5;
           const currentScore = currentRating * 2; // Strict: 1★ = 2, 5★ = 10

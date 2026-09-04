@@ -105,9 +105,12 @@ export default function Verify() {
       }
     } catch (e) {}
     return allReviews.filter(r => {
+      if (!r) return false;
       const rId = (r.student_id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
       const sId = (matchedStudent.student_id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-      return rId === sId;
+      const isManish = sId === 'xyz6a01' || (matchedStudent.name && matchedStudent.name.toLowerCase() === 'manish rawat');
+      const reviewBelongsToManish = isManish && (rId === 'xyz6a01' || rId === 'abc6a01' || (r.student_name && r.student_name.toLowerCase() === 'manish rawat'));
+      return rId === sId || reviewBelongsToManish;
     });
   }, [matchedStudent]);
 
