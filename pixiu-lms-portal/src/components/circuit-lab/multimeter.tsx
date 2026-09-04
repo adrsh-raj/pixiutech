@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react"
-import { Gauge, X, Volume2, HelpCircle, Sparkles, CheckCircle2, RotateCcw, AlertTriangle, Zap, ArrowUpDown } from "lucide-react"
+import { Gauge, X, Volume2, HelpCircle, Sparkles, CheckCircle2, RotateCcw, AlertTriangle, Zap } from "lucide-react"
 import type { CircuitState, PinRef } from "@/lib/circuit-types"
 import type { PartRuntime } from "./part-art"
 import type { ArduinoPinState } from "@/lib/simulation"
@@ -337,23 +337,6 @@ export function Multimeter({
               </button>
             )}
           </div>
-        </div>
-
-        {/* Swap Probes (+ / -) */}
-        <div className="flex justify-center my-0.5">
-          <button
-            onClick={() => {
-              const temp = probeRed
-              onSetProbeRed(probeBlack)
-              onSetProbeBlack(temp)
-            }}
-            disabled={!probeRed && !probeBlack}
-            className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 disabled:opacity-40 disabled:pointer-events-none text-[10px] font-mono font-bold transition cursor-pointer border border-slate-700/60 shadow-xs"
-            title="Swap Red (+) and Black (-) probes"
-          >
-            <ArrowUpDown size={12} />
-            <span>⇄ Swap Probes (+ / -)</span>
-          </button>
         </div>
 
         {/* Black Negative / Ground Probe */}

@@ -708,7 +708,7 @@ export function solveCircuitNodalPotentials(
       vBlack,
       explanation: `Potential Difference: Red (${vRed.toFixed(2)}V) minus Black (${vBlack.toFixed(2)}V)${polarityNote}`,
       subtext: diff < 0
-        ? "💡 Use '⇄ Swap Probes' below to invert polarity and measure positive voltage."
+        ? "Reversed polarity: Connect Red (+) to higher potential and Black (-) to Ground for positive reading."
         : infoBlack.isGnd
           ? "Absolute potential measured relative to Ground (0V reference)."
           : undefined,
