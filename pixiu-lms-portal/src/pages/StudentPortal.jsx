@@ -7,13 +7,9 @@ import { generateStudentTranscriptPDF } from '../utils/transcriptGenerator';
 import { 
   Award, BookOpen, Activity, FileText, Download, CheckCircle, 
   Clock, LogOut, User, Box, PlaySquare, Eye, Sparkles, Megaphone, 
-  Bell, Check, X, TrendingUp, Star, ShieldCheck, CheckCircle2, ChevronRight, Send, Trash2,
+  Bell, Check, X, Star, ShieldCheck, CheckCircle2, ChevronRight, Send, Trash2,
   Cpu, Maximize2, Zap, Layers, Info, List, LayoutGrid, PackageCheck, MessageCircle, ShoppingBag, PhoneCall
 } from 'lucide-react';
-import { 
-  AreaChart, Area, LineChart, Line, XAxis, YAxis, 
-  CartesianGrid, Tooltip, ResponsiveContainer 
-} from 'recharts';
 import { Link } from 'react-router-dom';
 import Modal from '../components/ui/Modal';
 
@@ -120,17 +116,7 @@ export default function StudentPortal() {
     c.target === 'Student' && (c.class_grade === studentGrade || !c.class_grade)
   );
 
-  // 1. Attendance Progression Trend Curve (Graph 1)
-  const attendanceTrendData = [
-    { session: 'S1 (Aug W1)', attendance: 100, label: 'Session 1: Circuit Foundations' },
-    { session: 'S2 (Aug W2)', attendance: 92, label: 'Session 2: Breadboard Logic' },
-    { session: 'S3 (Aug W3)', attendance: 96, label: 'Session 3: Sensor Signal Interfacing' },
-    { session: 'S4 (Aug W4)', attendance: 95, label: 'Session 4: Motor & Relay Drivers' },
-    { session: 'S5 (Sep W1)', attendance: Math.min(100, attendanceRate + 2), label: 'Session 5: Microcontroller Basics' },
-    { session: 'S6 (Current)', attendance: attendanceRate, label: 'Session 6: Live Hands-On Lab' },
-  ];
-
-  // 2. Dynamic End-of-Unit Reviews from Context (Sync with Trainer Live Reviews)
+  // Dynamic End-of-Unit Reviews from Context (Sync with Trainer Live Reviews)
   const GRADE_UNITS_MAP = {
     '6': [
       { level: 'Level 0', unitCode: 'Unit 1', title: 'Introduction to Robotics & Electronics' },
@@ -231,33 +217,6 @@ export default function StudentPortal() {
     const total = reviewedLevelsList.reduce((acc, curr) => acc + curr.score, 0);
     return (total / reviewedLevelsList.length).toFixed(1);
   }, [reviewedLevelsList]);
-
-  // Custom Chart Tooltips
-  const CustomAttendanceTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-slate-900 text-white p-2.5 sm:p-3 rounded-xl shadow-xl text-xs border border-slate-700">
-          <p className="font-bold text-pixiu-blue">{label}</p>
-          <p className="text-slate-300 mt-0.5 text-[11px]">{payload[0].payload.label}</p>
-          <p className="text-emerald-400 font-bold mt-1">Attendance: {payload[0].value}%</p>
-        </div>
-      );
-    }
-    return null;
-  };
-
-  const CustomReviewTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-slate-900 text-white p-2.5 sm:p-3 rounded-xl shadow-xl text-xs border border-slate-700">
-          <p className="font-bold text-emerald-400">{label}</p>
-          <p className="text-slate-300 mt-0.5 text-[11px]">{payload[0].payload.title}</p>
-          <p className="text-amber-400 font-bold mt-1">Review Score: {payload[0].value} / 10 ★</p>
-        </div>
-      );
-    }
-    return null;
-  };
 
   const totalCumulativeScore = useMemo(() => {
     return reviewedLevelsList.reduce((acc, curr) => acc + (Number(curr.score) || 0), 0);
@@ -552,8 +511,8 @@ export default function StudentPortal() {
           </div>
         </div>
 
-        {/* 2. 3 Metric Summary Cards (Mobile 3-column Grid) */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-6">
+        {/* 2. 4 Metric Summary Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
           <div className="bg-white p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3 sm:gap-4 text-left">
             <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
               <Award className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -574,6 +533,23 @@ export default function StudentPortal() {
           </div>
 
           <div className="bg-white p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3 sm:gap-4 text-left">
+            <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-blue-50 text-pixiu-blue flex items-center justify-center shrink-0">
+              <Star className="w-5 h-5 sm:w-6 sm:h-6" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] sm:text-xs text-slate-400 font-bold uppercase tracking-wider">Review Score</p>
+              <div className="flex flex-wrap items-baseline gap-1.5 mt-0.5">
+                <span className="text-sm sm:text-lg font-black text-slate-800">
+                  {totalCumulativeScore} / 60
+                </span>
+                <span className="text-[10px] sm:text-[11px] font-bold text-slate-500">
+                  ({Math.round((totalCumulativeScore / 60) * 100)}%)
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3 sm:gap-4 text-left">
             <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
               <Activity className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
@@ -584,7 +560,7 @@ export default function StudentPortal() {
           </div>
 
           <div className="bg-white p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3 sm:gap-4 text-left">
-            <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-blue-50 text-pixiu-blue flex items-center justify-center shrink-0">
+            <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center shrink-0">
               <Box className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
             <div className="min-w-0 flex-1">
@@ -627,125 +603,6 @@ export default function StudentPortal() {
             <MessageCircle size={15} />
             Buy at Below Market Price (+91 7985403186) →
           </a>
-        </div>
-
-        {/* ==================== 2 INTERACTIVE LINE GRAPHS ==================== */}
-        <div className="space-y-3 sm:space-y-4">
-          <div className="flex items-center gap-2">
-            <TrendingUp size={16} className="text-pixiu-blue shrink-0" />
-            <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase tracking-wider">
-              Student Performance & Attendance Analytics
-            </h3>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-            {/* Graph 1: Attendance Consistency Line Graph */}
-            <div className="bg-white p-3.5 sm:p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
-              <div>
-                <div className="flex flex-wrap justify-between items-start gap-2 mb-3 sm:mb-4">
-                  <div>
-                    <h4 className="font-bold text-slate-800 text-xs sm:text-sm">📈 Lab Attendance Consistency Curve</h4>
-                    <p className="text-[10px] sm:text-xs text-slate-500">Session-wise attendance rate throughout academic term</p>
-                  </div>
-                  <span className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold bg-blue-50 text-pixiu-blue border border-blue-200 shrink-0">
-                    {attendanceRate}% Avg Rate
-                  </span>
-                </div>
-
-                <div className="h-44 sm:h-56 w-full -ml-2 sm:ml-0">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={attendanceTrendData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="attGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#0066FF" stopOpacity={0.3}/>
-                          <stop offset="95%" stopColor="#0066FF" stopOpacity={0.0}/>
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                      <XAxis dataKey="session" stroke="#94a3b8" fontSize={10} tickLine={false} tickFormatter={v => v.split(' ')[0]} />
-                      <YAxis stroke="#94a3b8" fontSize={10} domain={[70, 100]} tickLine={false} tickFormatter={v => `${v}%`} />
-                      <Tooltip content={<CustomAttendanceTooltip />} />
-                      <Area 
-                        type="monotone" 
-                        dataKey="attendance" 
-                        stroke="#0066FF" 
-                        strokeWidth={2.5} 
-                        fillOpacity={1} 
-                        fill="url(#attGradient)" 
-                        dot={{ r: 3.5, fill: '#0066FF', strokeWidth: 2, stroke: '#fff' }}
-                        activeDot={{ r: 5.5, fill: '#0066FF' }}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap justify-between items-center pt-3 border-t border-slate-100 text-[10px] sm:text-xs text-slate-500 mt-2 gap-1">
-                <span>Status: <strong className="text-emerald-600">Gold Tier Regular</strong></span>
-                <span>Attended: <strong className="text-slate-800">6 of 6 Labs</strong></span>
-              </div>
-            </div>
-
-            {/* Graph 2: Level Progression & Review Score Line Graph */}
-            <div className="bg-white p-3.5 sm:p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
-              <div>
-                <div className="flex flex-wrap justify-between items-start gap-2 mb-3 sm:mb-4">
-                  <div>
-                    <h4 className="font-bold text-slate-800 text-xs sm:text-sm">🚀 Level Progression & Review Rating</h4>
-                    <p className="text-[10px] sm:text-xs text-slate-500">Instructor evaluation score out of 10 for each level</p>
-                  </div>
-                  <span className={`px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold border shrink-0 ${
-                    avgReviewScore ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-600 border-slate-200'
-                  }`}>
-                    {avgReviewScore ? `${avgReviewScore} / 10 Avg Review` : 'Awaiting Reviews'}
-                  </span>
-                </div>
-
-                {reviewedLevelsList.length > 0 ? (
-                  <div className="h-44 sm:h-56 w-full -ml-2 sm:ml-0">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={reviewedLevelsList} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
-                        <defs>
-                          <linearGradient id="scoreGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#10B981" stopOpacity={0.3}/>
-                            <stop offset="95%" stopColor="#10B981" stopOpacity={0.0}/>
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                        <XAxis dataKey="level" stroke="#94a3b8" fontSize={10} tickLine={false} tickFormatter={v => v.replace('Level ', 'L')} />
-                        <YAxis stroke="#94a3b8" fontSize={10} domain={[0, 10]} tickLine={false} tickFormatter={v => `${v}`} />
-                        <Tooltip content={<CustomReviewTooltip />} />
-                        <Area 
-                          type="monotone" 
-                          dataKey="score" 
-                          stroke="#10B981" 
-                          strokeWidth={2.5} 
-                          fillOpacity={1} 
-                          fill="url(#scoreGradient)" 
-                          dot={{ r: 3.5, fill: '#10B981', strokeWidth: 2, stroke: '#fff' }}
-                          activeDot={{ r: 5.5, fill: '#10B981' }}
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                ) : (
-                  <div className="h-44 sm:h-56 w-full flex flex-col items-center justify-center text-center p-4 bg-slate-50/70 rounded-xl border border-dashed border-slate-200">
-                    <Star size={26} className="text-amber-400/80 mb-2" />
-                    <p className="font-bold text-slate-700 text-xs sm:text-sm">End-of-Unit Reviews Pending</p>
-                    <p className="text-[11px] text-slate-500 max-w-xs mt-1">
-                      Your progression curve will appear here in real-time as your trainer logs your hands-on lab evaluations.
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex flex-wrap justify-between items-center pt-3 border-t border-slate-100 text-[10px] sm:text-xs text-slate-500 mt-2 gap-2">
-                <span>Cumulative Score: <strong className="text-slate-900 font-extrabold">{totalCumulativeScore} / 60 pts ({Math.round((totalCumulativeScore / 60) * 100)}%)</strong></span>
-                <span>Rating: <strong className={avgReviewScore ? 'text-amber-500' : 'text-slate-500'}>{avgReviewScore ? `★ ${avgReviewScore}/10 Verified` : 'Pending'}</strong></span>
-                <span>Stage: <strong className="text-slate-800">{reviewedLevelsList.length} of 6 Evaluated</strong></span>
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* ==================== END-OF-LEVEL INSTRUCTOR REVIEWS ==================== */}
