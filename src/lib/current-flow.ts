@@ -1,6 +1,7 @@
 import type { CircuitState, PinRef } from "./circuit-types"
 import type { PartRuntime } from "@/components/circuit-lab/part-art"
 import type { ArduinoPinState } from "./simulation"
+import { solveCircuitNodalPotentials } from "./circuit-solver"
 
 export interface WireCurrentState {
   currentMa: number
@@ -13,6 +14,7 @@ const pinKey = (ref: PinRef) => `${ref.partId}:${ref.pinId}`
 /**
  * Computes the electrical current magnitude and direction through every wire on the canvas.
  * Used to drive 60fps animated SVG dashoffset electron/charge flow lines.
+ * Fully supports LEDs, Buzzers, Motors, and standalone Multiple Resistor / Voltage Divider networks.
  */
 export function computeWireCurrents(
   state: CircuitState,
@@ -21,7 +23,10 @@ export function computeWireCurrents(
 ): Record<string, WireCurrentState> {
   const result: Record<string, WireCurrentState> = {}
 
-  // 1. Identify active power sources and ground sinks
+  // 1. Solve exact nodal potentials across circuit
+  const nodal = solveCircuitNodalPotentials(state, new Set(), pinStates, true)
+
+  // 2. Identify active power sources and ground sinks
   const powerPins = new Set<string>()
   const groundPins = new Set<string>()
 
@@ -38,7 +43,7 @@ export function computeWireCurrents(
 
       // Digital pins d0..d13
       for (let i = 0; i <= 13; i++) {
-        const pState = pinStates[String(i)]
+        const pState = pinStates[String(i)] || pinStates[`d${i}`]
         if (pState?.state === "HIGH" || (pState?.value ?? 0) > 0) {
           powerPins.add(k(`d${i}`))
           powerPins.add(k(String(i)))
@@ -53,7 +58,7 @@ export function computeWireCurrents(
     }
   }
 
-  // 2. Build internal part connection mappings (e.g. breadboard rows, resistors, buttons)
+  // 3. Build internal part connection mappings (e.g. breadboard rows, resistors, buttons)
   const partInternalLinks = new Map<string, string[]>()
   function linkInternal(a: string, b: string) {
     if (!partInternalLinks.has(a)) partInternalLinks.set(a, [])
@@ -65,7 +70,6 @@ export function computeWireCurrents(
   for (const part of state.parts) {
     const k = (pin: string) => `${part.id}:${pin}`
     if (part.type === "breadboard") {
-      // Columns a-e and f-j
       for (let c = 1; c <= 20; c++) {
         const topRows = ["a", "b", "c", "d", "e"]
         for (let i = 0; i < topRows.length - 1; i++) {
@@ -76,14 +80,12 @@ export function computeWireCurrents(
           linkInternal(k(`${botRows[i]}_${c}`), k(`${botRows[i + 1]}_${c}`))
         }
       }
-      // Power rails
       for (let c = 1; c < 20; c++) {
         linkInternal(k(`pos_t_${c}`), k(`pos_t_${c + 1}`))
         linkInternal(k(`neg_t_${c}`), k(`neg_t_${c + 1}`))
         linkInternal(k(`pos_b_${c}`), k(`pos_b_${c + 1}`))
         linkInternal(k(`neg_b_${c}`), k(`neg_b_${c + 1}`))
       }
-      // Legacy breadboard pins
       linkInternal(k("pos_top"), k("pos_t_1"))
       linkInternal(k("neg_top"), k("neg_t_1"))
       linkInternal(k("pos_bot"), k("pos_b_1"))
@@ -93,51 +95,27 @@ export function computeWireCurrents(
     } else if (part.type === "pushbutton") {
       linkInternal(k("p1a"), k("p1b"))
       linkInternal(k("p2a"), k("p2b"))
-      linkInternal(k("p1a"), k("p2a")) // for flow tracking
+      linkInternal(k("p1a"), k("p2a"))
     }
   }
 
-  // 3. For each active consumer in runtime that has current > 0 (or burnt):
-  // Trace the paths from power source -> load -> ground sink.
-  for (const part of state.parts) {
-    const r = runtime[part.id]
-    const currentMa = r?.currentMa ?? (r?.level && r.level > 0 ? 15.0 : 0)
-    if (currentMa <= 0 && !r?.burnt) continue
+  // 4. Trace current through each active consumer or conducting resistor
+  function markWireFlow(wireId: string, current: number, isForward: boolean, period: number) {
+    result[wireId] = {
+      currentMa: current,
+      isForward,
+      period,
+    }
+  }
 
-    const effectiveMa = Math.max(0.5, r?.burnt ? 45.0 : currentMa)
-    // Animation period: faster current = smaller period (0.3s to 2.5s)
+  function traceComponentFlow(loadInPin: string, loadOutPin: string, currentMa: number) {
+    const effectiveMa = Math.max(0.5, currentMa)
     const period = Math.max(0.25, Math.min(2.5, Number((20 / effectiveMa).toFixed(2))))
 
-    // Pin pairs for this active part
-    let loadInPin = ""
-    let loadOutPin = ""
-    if (part.type === "led") {
-      loadInPin = `${part.id}:anode`
-      loadOutPin = `${part.id}:cathode`
-    } else if (part.type === "buzzer" || part.type === "dcmotor") {
-      loadInPin = `${part.id}:pos`
-      loadOutPin = `${part.id}:neg`
-    } else if (part.type === "rgb-led") {
-      loadInPin = `${part.id}:red`
-      loadOutPin = `${part.id}:gnd`
-    }
-
-    if (!loadInPin || !loadOutPin) continue
-
-    // Find wire paths connecting to loadInPin (upstream towards Power)
-    // and loadOutPin (downstream towards Ground)
     const upstreamVisited = new Set<string>()
     const downstreamVisited = new Set<string>()
 
-    function markWireFlow(wireId: string, current: number, isForward: boolean) {
-      result[wireId] = {
-        currentMa: current,
-        isForward,
-        period,
-      }
-    }
-
-    // BFS Upstream: find wires connected to loadInPin towards powerPins
+    // BFS Upstream: towards power source
     const queueUp: { pin: string; pathWires: { id: string; forward: boolean }[] }[] = [
       { pin: loadInPin, pathWires: [] },
     ]
@@ -146,20 +124,17 @@ export function computeWireCurrents(
     while (queueUp.length > 0) {
       const { pin, pathWires } = queueUp.shift()!
       if (powerPins.has(pin)) {
-        // We reached power! All wires in this path carry forward current (from source to load)
         for (const w of pathWires) {
-          markWireFlow(w.id, effectiveMa, w.forward)
+          markWireFlow(w.id, effectiveMa, w.forward, period)
         }
         break
       }
 
-      // Check wire connections
       for (const wire of state.wires) {
         const u = pinKey(wire.from)
         const v = pinKey(wire.to)
         if (u === pin && !upstreamVisited.has(v)) {
           upstreamVisited.add(v)
-          // Wire went from u to v, but upstream is towards source, so forward flow is v -> u
           queueUp.push({ pin: v, pathWires: [...pathWires, { id: wire.id, forward: false }] })
         } else if (v === pin && !upstreamVisited.has(u)) {
           upstreamVisited.add(u)
@@ -167,7 +142,6 @@ export function computeWireCurrents(
         }
       }
 
-      // Check internal component bridges (e.g. breadboard, resistor)
       const internalLinks = partInternalLinks.get(pin) || []
       for (const nextPin of internalLinks) {
         if (!upstreamVisited.has(nextPin)) {
@@ -177,7 +151,7 @@ export function computeWireCurrents(
       }
     }
 
-    // BFS Downstream: find wires connected to loadOutPin towards groundPins
+    // BFS Downstream: towards ground sink
     const queueDown: { pin: string; pathWires: { id: string; forward: boolean }[] }[] = [
       { pin: loadOutPin, pathWires: [] },
     ]
@@ -186,9 +160,8 @@ export function computeWireCurrents(
     while (queueDown.length > 0) {
       const { pin, pathWires } = queueDown.shift()!
       if (groundPins.has(pin)) {
-        // We reached ground! All wires in this path carry forward current (from load to ground)
         for (const w of pathWires) {
-          markWireFlow(w.id, effectiveMa, w.forward)
+          markWireFlow(w.id, effectiveMa, w.forward, period)
         }
         break
       }
@@ -211,6 +184,47 @@ export function computeWireCurrents(
           downstreamVisited.add(nextPin)
           queueDown.push({ pin: nextPin, pathWires })
         }
+      }
+    }
+  }
+
+  // A. Check active consumers in runtime
+  for (const part of state.parts) {
+    const r = runtime[part.id]
+    const currentMa = r?.currentMa ?? (r?.level && r.level > 0 ? 15.0 : 0)
+    if (currentMa <= 0 && !r?.burnt) continue
+
+    let loadInPin = ""
+    let loadOutPin = ""
+    if (part.type === "led") {
+      loadInPin = `${part.id}:anode`
+      loadOutPin = `${part.id}:cathode`
+    } else if (part.type === "buzzer" || part.type === "dc-motor") {
+      loadInPin = `${part.id}:pos`
+      loadOutPin = `${part.id}:neg`
+    } else if (part.type === "rgb-led") {
+      loadInPin = `${part.id}:red`
+      loadOutPin = `${part.id}:gnd`
+    }
+
+    if (loadInPin && loadOutPin) {
+      traceComponentFlow(loadInPin, loadOutPin, r?.burnt ? 45.0 : currentMa)
+    }
+  }
+
+  // B. Check pure resistor networks (e.g. voltage dividers, multiple series/parallel resistors)
+  for (const part of state.parts) {
+    if (part.type === "resistor") {
+      const vA = nodal.getPinVoltage({ partId: part.id, pinId: "a" })
+      const vB = nodal.getPinVoltage({ partId: part.id, pinId: "b" })
+      const diff = Math.abs(vA - vB)
+      const rVal = Math.max(0.1, Number(part.props.resistance || 220))
+      const rCurrentMa = (diff / rVal) * 1000
+
+      if (rCurrentMa > 0.2) {
+        const inPin = vA >= vB ? `${part.id}:a` : `${part.id}:b`
+        const outPin = vA >= vB ? `${part.id}:b` : `${part.id}:a`
+        traceComponentFlow(inPin, outPin, rCurrentMa)
       }
     }
   }
