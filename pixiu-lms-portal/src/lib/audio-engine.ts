@@ -22,6 +22,16 @@ export class AudioEngine {
   }
 
   /**
+   * Unlocks and resumes the AudioContext on user interaction.
+   */
+  public unlockAudio(): void {
+    this.initContext()
+    if (this.ctx && this.ctx.state === 'suspended') {
+      this.ctx.resume().catch(() => {})
+    }
+  }
+
+  /**
    * Plays a square wave tone. Volume is PWM-mapped from 0-255 to a safe 0.0-0.3 gain.
    */
   playTone(frequency: number, volume: number = 255): void {
@@ -30,7 +40,7 @@ export class AudioEngine {
     
     // Resume context if suspended due to autoplay policies
     if (this.ctx.state === 'suspended') {
-      this.ctx.resume().catch(console.error)
+      this.ctx.resume().catch(() => {})
     }
 
     this.stopTone()
@@ -105,3 +115,14 @@ export class AudioEngine {
 }
 
 export const audioEngine = new AudioEngine()
+
+// Auto-unlock AudioContext on first user interaction anywhere on the screen
+if (typeof window !== 'undefined') {
+  const unlock = () => {
+    audioEngine.unlockAudio()
+    window.removeEventListener('pointerdown', unlock)
+    window.removeEventListener('keydown', unlock)
+  }
+  window.addEventListener('pointerdown', unlock, { once: true, passive: true })
+  window.addEventListener('keydown', unlock, { once: true, passive: true })
+}

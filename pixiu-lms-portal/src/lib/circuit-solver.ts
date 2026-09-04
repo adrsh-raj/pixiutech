@@ -508,6 +508,14 @@ export function solveCircuitNodalPotentials(
       }
     }
 
+    if (refA.partId === refB.partId && state.parts.find((p) => p.id === refA.partId)?.type === "led") {
+      return {
+        resistance: Infinity,
+        explanation: "Open Circuit / Diode Junction (O.L)",
+        subtext: "LEDs are semiconductor diodes (Vf ≈ 1.8V - 2.2V). Continuity/Ohmmeter test voltage (<0.4V) cannot overcome the p-n junction barrier.",
+      }
+    }
+
     const adj = new Map<number, { to: number; r: number; partName: string }[]>()
     function addR(u: number, v: number, r: number, name: string) {
       if (!adj.has(u)) adj.set(u, [])
@@ -531,11 +539,9 @@ export function solveCircuitNodalPotentials(
         const r2 = Math.max(0.5, ((1023 - val) / 1023) * 10000)
         addR(u, w, r1, "Potentiometer T1-Wiper")
         addR(w, v, r2, "Potentiometer Wiper-T2")
-      } else if (part.type === "led") {
-        const u = pinToNetId(part.id, "anode")
-        const v = pinToNetId(part.id, "cathode")
-        addR(u, v, 15, "LED Diode Junction")
       }
+      // Note: LEDs are semiconductor diodes with non-linear p-n barrier voltage (Vf ≈ 1.8V-2.2V).
+      // They do not act as low-resistance ohmic conductors for continuity or resistance measurement.
     }
 
     const dist = new Map<number, number>()
@@ -570,6 +576,27 @@ export function solveCircuitNodalPotentials(
     }
 
     if (bestR === Infinity) {
+      // Check if probes are directly on or connected across an LED
+      const ledPart = state.parts.find((p) => {
+        if (p.type !== "led") return false
+        const anodeNet = pinToNetId(p.id, "anode")
+        const cathodeNet = pinToNetId(p.id, "cathode")
+        return (
+          (netA === anodeNet && netB === cathodeNet) ||
+          (netA === cathodeNet && netB === anodeNet) ||
+          p.id === refA.partId ||
+          p.id === refB.partId
+        )
+      })
+
+      if (ledPart) {
+        return {
+          resistance: Infinity,
+          explanation: "Open Circuit / Diode Junction (O.L)",
+          subtext: "LEDs are semiconductor diodes (Vf ≈ 1.8V - 2.2V). Multimeter continuity/ohmmeter test voltage (<0.4V) cannot forward-bias the p-n barrier.",
+        }
+      }
+
       return {
         resistance: Infinity,
         explanation: "Open Circuit / High Resistance path (O.L)",

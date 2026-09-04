@@ -50,6 +50,18 @@ export function Multimeter({
   const [minimized, setMinimized] = useState(false)
   const [position, setPosition] = useState<{ x: number; y: number } | null>(null)
   const [isDragging, setIsDragging] = useState(false)
+  const [testedAudio, setTestedAudio] = useState(false)
+
+  const handleTestBeep = () => {
+    audioEngine.unlockAudio()
+    audioEngine.playTone(2400)
+    setTestedAudio(true)
+    setTimeout(() => {
+      audioEngine.stopTone()
+      setTestedAudio(false)
+    }, 250)
+  }
+
   const dragStartRef = useRef<{ mouseX: number; mouseY: number; startX: number; startY: number }>({
     mouseX: 0,
     mouseY: 0,
@@ -181,7 +193,7 @@ export function Multimeter({
 
       case "continuity": {
         const res = nodalSolution.computeResistanceBetweenPins(probeRed, probeBlack)
-        const isContinuous = res.resistance < 30
+        const isContinuous = Number.isFinite(res.resistance) && res.resistance < 30
 
         return {
           value: isContinuous ? res.resistance.toFixed(1) : "O.L",
@@ -189,8 +201,10 @@ export function Multimeter({
           isContinuityBeep: isContinuous,
           explanation: isContinuous
             ? `🔊 Closed continuous path (${res.resistance.toFixed(1)}Ω < 30Ω)`
-            : "No continuous low-resistance connection between probes (O.L)",
-          subtext: isContinuous ? "Beep tone actively sounding via Web Audio API" : undefined,
+            : (res.explanation || "No continuous low-resistance connection between probes (O.L)"),
+          subtext: isContinuous
+            ? "Beep tone actively sounding via Web Audio API (2.4 kHz)"
+            : res.subtext,
         }
       }
 
@@ -388,7 +402,10 @@ export function Multimeter({
       {/* Rotary Mode Selector Buttons */}
       <div className="mt-3 grid grid-cols-4 gap-1.5 p-1 rounded-xl bg-slate-900 border border-slate-800 text-xs font-semibold font-mono">
         <button
-          onClick={() => setMode("voltage")}
+          onClick={() => {
+            audioEngine.unlockAudio()
+            setMode("voltage")
+          }}
           className={`py-1.5 rounded-lg text-center transition cursor-pointer ${
             mode === "voltage"
               ? "bg-amber-500 text-slate-950 font-bold shadow-md shadow-amber-500/20"
@@ -398,7 +415,10 @@ export function Multimeter({
           DC V
         </button>
         <button
-          onClick={() => setMode("current")}
+          onClick={() => {
+            audioEngine.unlockAudio()
+            setMode("current")
+          }}
           className={`py-1.5 rounded-lg text-center transition cursor-pointer ${
             mode === "current"
               ? "bg-amber-500 text-slate-950 font-bold shadow-md shadow-amber-500/20"
@@ -408,7 +428,10 @@ export function Multimeter({
           mA
         </button>
         <button
-          onClick={() => setMode("resistance")}
+          onClick={() => {
+            audioEngine.unlockAudio()
+            setMode("resistance")
+          }}
           className={`py-1.5 rounded-lg text-center transition cursor-pointer ${
             mode === "resistance"
               ? "bg-amber-500 text-slate-950 font-bold shadow-md shadow-amber-500/20"
@@ -418,7 +441,10 @@ export function Multimeter({
           Ω (Ohm)
         </button>
         <button
-          onClick={() => setMode("continuity")}
+          onClick={() => {
+            audioEngine.unlockAudio()
+            setMode("continuity")
+          }}
           className={`py-1.5 rounded-lg text-center flex items-center justify-center gap-1 transition cursor-pointer ${
             mode === "continuity"
               ? "bg-amber-500 text-slate-950 font-bold shadow-md shadow-amber-500/20"
@@ -428,6 +454,30 @@ export function Multimeter({
           <Volume2 size={12} /> Cont
         </button>
       </div>
+
+      {/* Continuity Mode Status & Audio Test Bar */}
+      {mode === "continuity" && (
+        <div className="mt-2 flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-[10px] font-mono">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className={`h-2 w-2 rounded-full shrink-0 ${reading.isContinuityBeep ? "bg-emerald-400 animate-ping" : "bg-slate-500"}`} />
+            <span className="text-slate-300 truncate">
+              {reading.isContinuityBeep ? "Path Closed (< 30Ω)" : "Threshold: R < 30Ω (Silent on Diodes)"}
+            </span>
+          </div>
+          <button
+            onClick={handleTestBeep}
+            className={`px-2 py-0.5 rounded transition cursor-pointer shrink-0 font-bold flex items-center gap-1 ${
+              testedAudio
+                ? "bg-emerald-500 text-slate-950 shadow-sm"
+                : "bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30"
+            }`}
+            title="Click to test continuity audio buzzer tone via browser speakers"
+          >
+            <Volume2 size={11} />
+            <span>{testedAudio ? "Sound OK!" : "Test Beep"}</span>
+          </button>
+        </div>
+      )}
 
       {/* Probe Clips & Attachment Jacks */}
       <div className="mt-3 space-y-2 text-[11px]">
@@ -524,6 +574,7 @@ export function Multimeter({
         <div className="flex gap-1 flex-wrap">
           <button
             onClick={() => {
+              audioEngine.unlockAudio()
               const uno = state.parts.find((p) => p.type === "arduino-uno")
               if (uno) {
                 onSetProbeRed({ partId: uno.id, pinId: "5v" })
@@ -538,6 +589,7 @@ export function Multimeter({
           </button>
           <button
             onClick={() => {
+              audioEngine.unlockAudio()
               const uno = state.parts.find((p) => p.type === "arduino-uno")
               if (uno) {
                 onSetProbeRed({ partId: uno.id, pinId: "d13" })
@@ -555,6 +607,7 @@ export function Multimeter({
           {firstResistor && (
             <button
               onClick={() => {
+                audioEngine.unlockAudio()
                 onSetProbeRed({ partId: firstResistor.id, pinId: "a" })
                 onSetProbeBlack({ partId: firstResistor.id, pinId: "b" })
                 setMode("voltage")
@@ -570,6 +623,7 @@ export function Multimeter({
           {firstLed && (
             <button
               onClick={() => {
+                audioEngine.unlockAudio()
                 onSetProbeRed({ partId: firstLed.id, pinId: "anode" })
                 onSetProbeBlack({ partId: firstLed.id, pinId: "cathode" })
                 setMode("voltage")
