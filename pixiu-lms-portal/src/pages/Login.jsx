@@ -35,7 +35,7 @@ export default function Login() {
   const handleUsernameChange = (val) => {
     setUsername(val);
     const upper = val.trim().toUpperCase();
-    if (upper.startsWith('XYZ') || upper.startsWith('ABC') || upper.startsWith('ZPS') || upper.startsWith('STU')) {
+    if (upper.startsWith('XYZ') || upper.startsWith('ZPS') || upper.startsWith('STU')) {
       setSelectedRoleTab('student');
     } else if (upper.startsWith('SCH') || upper.includes('SCHOOL')) {
       setSelectedRoleTab('school');

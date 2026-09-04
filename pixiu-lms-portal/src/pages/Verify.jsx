@@ -70,9 +70,9 @@ export default function Verify() {
       }
     } catch (e) {}
     return allSchools.find(s => s.id === sId || s.code === sId) || {
-      name: sId === 'XYZ' ? 'XYZ Academy (Pilot Lab)' : sId === 'ABC' ? 'ABC Public School & Robotics Lab' : 'Zenith Public School',
+      name: sId === 'XYZ' ? 'XYZ Academy (Pilot Lab)' : 'Zenith Public School',
       code: sId || 'ZPS',
-      lead_trainer: sId === 'XYZ' || sId === 'ABC' ? 'Akash Sharma' : 'Vikas Pandey'
+      lead_trainer: sId === 'XYZ' ? 'Akash Sharma' : 'Vikas Pandey'
     };
   }, [matchedStudent]);
 
@@ -105,12 +105,10 @@ export default function Verify() {
       }
     } catch (e) {}
     return allReviews.filter(r => {
-      if (!r) return false;
+      if (!r || !r.student_id) return false;
       const rId = (r.student_id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
       const sId = (matchedStudent.student_id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-      const isManish = sId === 'xyz6a01' || (matchedStudent.name && matchedStudent.name.toLowerCase() === 'manish rawat');
-      const reviewBelongsToManish = isManish && (rId === 'xyz6a01' || rId === 'abc6a01' || (r.student_name && r.student_name.toLowerCase() === 'manish rawat'));
-      return rId === sId || reviewBelongsToManish;
+      return rId === sId;
     });
   }, [matchedStudent]);
 
@@ -219,7 +217,7 @@ export default function Verify() {
                 type="text"
                 value={inputStudentId}
                 onChange={(e) => setInputStudentId(e.target.value)}
-                placeholder="Enter Student Roll ID (e.g. ABC6A 01, XYZ6A 01, ZPS6A 01)"
+                placeholder="Enter Student Roll ID (e.g. XYZ6A 01, ZPS6A 01)"
                 className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-mono text-sm placeholder:text-slate-400 focus:outline-none focus:border-pixiu-blue focus:bg-white transition-all uppercase font-bold"
               />
             </div>
@@ -392,7 +390,7 @@ export default function Verify() {
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs">
                 <div className="space-y-0.5">
                   <div className="text-slate-600 font-medium">
-                    Assigned Trainer / Faculty: <b className="text-slate-900">{matchedSchool?.lead_trainer || (matchedStudent.school_id === 'XYZ' || matchedStudent.school_id === 'ABC' ? 'Akash Sharma' : 'Vikas Pandey')}</b>
+                    Assigned Trainer / Faculty: <b className="text-slate-900">{matchedSchool?.lead_trainer || (matchedStudent.school_id === 'XYZ' ? 'Akash Sharma' : 'Vikas Pandey')}</b>
                   </div>
                   <div className="text-[11px] text-slate-400 font-mono">
                     Security Registry: <b>{isGraduate ? 'CRYPTOGRAPHICALLY SIGNED GRADUATE RECORD' : 'ACTIVE LAB ATTENDANCE RECORD'}</b>

@@ -44,8 +44,9 @@ export function DataProvider({ children }) {
         localStorage.setItem('pixiu_schools', JSON.stringify(SEED_SCHOOLS));
         return SEED_SCHOOLS;
       }
+      const cleanSaved = saved.filter(s => s.id !== 'ABC' && s.code !== 'ABC');
       const seedIds = new Set(SEED_SCHOOLS.map(s => s.id));
-      const custom = saved.filter(s => !seedIds.has(s.id));
+      const custom = cleanSaved.filter(s => !seedIds.has(s.id));
       const merged = [...SEED_SCHOOLS, ...custom];
       localStorage.setItem('pixiu_schools', JSON.stringify(merged));
       return merged;
@@ -61,8 +62,9 @@ export function DataProvider({ children }) {
         localStorage.setItem('pixiu_classes', JSON.stringify(SEED_CLASSES));
         return SEED_CLASSES;
       }
+      const cleanSaved = saved.filter(c => c.school_id !== 'ABC' && c.id !== 'CLS-ABC-6A');
       const seedIds = new Set(SEED_CLASSES.map(c => c.id));
-      const custom = saved.filter(c => !seedIds.has(c.id));
+      const custom = cleanSaved.filter(c => !seedIds.has(c.id));
       const merged = [...SEED_CLASSES, ...custom];
       localStorage.setItem('pixiu_classes', JSON.stringify(merged));
       return merged;
@@ -78,8 +80,9 @@ export function DataProvider({ children }) {
         localStorage.setItem('pixiu_students', JSON.stringify(SEED_STUDENTS));
         return SEED_STUDENTS;
       }
+      const cleanSaved = saved.filter(s => s.school_id !== 'ABC' && s.id !== 'STU-ABC-601' && !s.student_id?.startsWith('ABC'));
       const seedIds = new Set(SEED_STUDENTS.map(s => s.id || s.student_id));
-      const custom = saved.filter(s => !seedIds.has(s.id) && !seedIds.has(s.student_id));
+      const custom = cleanSaved.filter(s => !seedIds.has(s.id) && !seedIds.has(s.student_id));
       const merged = [...SEED_STUDENTS, ...custom];
       localStorage.setItem('pixiu_students', JSON.stringify(merged));
       return merged;
@@ -111,8 +114,9 @@ export function DataProvider({ children }) {
         localStorage.setItem('pixiu_sessions', JSON.stringify(SEED_SESSIONS));
         return SEED_SESSIONS;
       }
+      const cleanSaved = saved.filter(s => s.school_id !== 'ABC' && !s.id?.startsWith('SES-ABC'));
       const seedIds = SEED_SESSIONS.map(s => s.id);
-      const custom = saved.filter(s => !seedIds.includes(s.id));
+      const custom = cleanSaved.filter(s => !seedIds.includes(s.id));
       const merged = [...custom, ...SEED_SESSIONS];
       localStorage.setItem('pixiu_sessions', JSON.stringify(merged));
       return merged;
@@ -128,8 +132,9 @@ export function DataProvider({ children }) {
         localStorage.setItem('pixiu_attendance', JSON.stringify(SEED_ATTENDANCE));
         return SEED_ATTENDANCE;
       }
+      const cleanSaved = saved.filter(a => !a.session_id?.startsWith('SES-ABC') && !a.student_id?.startsWith('ABC'));
       const seedSessionIds = SEED_SESSIONS.map(s => s.id);
-      const custom = saved.filter(a => !seedSessionIds.includes(a.session_id));
+      const custom = cleanSaved.filter(a => !seedSessionIds.includes(a.session_id));
       const merged = [...custom, ...SEED_ATTENDANCE];
       localStorage.setItem('pixiu_attendance', JSON.stringify(merged));
       return merged;
@@ -200,15 +205,14 @@ export function DataProvider({ children }) {
     try {
       const raw = safeGetItem('pixiu_student_reviews', null);
       if (!raw || !Array.isArray(raw)) return SEED_STUDENT_REVIEWS;
-      const userCreated = raw.filter(r => r.verified_date !== 'Curriculum Baseline').map(r => {
-        // Remap any accidental ABC6A 01 or Manish Rawat review directly to XYZ6A 01
-        if (r.student_id === 'ABC6A 01' || r.student_name === 'Manish Rawat') {
-          return { ...r, student_id: 'XYZ6A 01', class_grade: '6', student_name: 'Manish Rawat' };
-        }
-        return r;
-      });
-      localStorage.setItem('pixiu_student_reviews', JSON.stringify(userCreated));
-      return userCreated;
+      const cleanReviews = raw.filter(r => 
+        r && 
+        r.student_id !== 'ABC6A 01' && 
+        !r.student_id?.startsWith('ABC') && 
+        r.verified_date !== 'Curriculum Baseline'
+      );
+      localStorage.setItem('pixiu_student_reviews', JSON.stringify(cleanReviews));
+      return cleanReviews;
     } catch (e) {
       return SEED_STUDENT_REVIEWS;
     }
@@ -1034,33 +1038,40 @@ export function DataProvider({ children }) {
 
   // 16. End-of-Unit Student Reviews by Trainers
   const saveStudentReview = (reviewData) => {
-    let normalizedStudentId = (reviewData.student_id || '').trim().replace(/\s+/g, ' ');
-    let normalizedStudentName = reviewData.student_name;
-    if (normalizedStudentId === 'ABC6A 01' || normalizedStudentName === 'Manish Rawat') {
-      normalizedStudentId = 'XYZ6A 01';
-      normalizedStudentName = 'Manish Rawat';
-    }
-
+    const studentId = (reviewData.student_id || '').trim().replace(/\s+/g, ' ');
+    const studentName = reviewData.student_name || '';
+    const cleanStudentId = studentId.toUpperCase().replace(/\s+/g, '');
     const reviewId = reviewData.id || `REV-${Date.now().toString().slice(-4)}`;
+
     const fullReview = {
       ...reviewData,
       id: reviewId,
-      student_id: normalizedStudentId,
-      student_name: normalizedStudentName,
+      student_id: studentId,
+      student_name: studentName,
       verified_date: reviewData.verified_date || new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
       updated_at: new Date().toISOString()
     };
 
     setStudentReviews(prev => {
-      // If review for same student_id + unit_code exists, update it; otherwise add new
-      const exists = prev.some(r => r.student_id === fullReview.student_id && r.unit_code === fullReview.unit_code);
-      let updated;
-      if (exists) {
-        updated = prev.map(r => (r.student_id === fullReview.student_id && r.unit_code === fullReview.unit_code) ? fullReview : r);
-      } else {
-        updated = [fullReview, ...prev];
-      }
-      try { localStorage.setItem('pixiu_student_reviews', JSON.stringify(updated)); } catch (e) {}
+      // Filter out existing review for the same student and unit/level
+      const filtered = prev.filter(r => {
+        if (!r || !r.student_id) return false;
+        const rCleanId = r.student_id.toUpperCase().replace(/\s+/g, '');
+        if (rCleanId !== cleanStudentId) return true;
+
+        const isSameUnit = r.unit_code && fullReview.unit_code &&
+          r.unit_code.toLowerCase().replace(/\s+/g, '') === fullReview.unit_code.toLowerCase().replace(/\s+/g, '');
+        const isSameLevel = r.level && fullReview.level &&
+          r.level.toLowerCase().replace(/\s+/g, '') === fullReview.level.toLowerCase().replace(/\s+/g, '');
+
+        return !(isSameUnit || isSameLevel);
+      });
+
+      const updated = [fullReview, ...filtered];
+      try {
+        localStorage.setItem('pixiu_student_reviews', JSON.stringify(updated));
+        window.dispatchEvent(new CustomEvent('pixiu_student_reviews_updated', { detail: updated }));
+      } catch (e) {}
       return updated;
     });
 

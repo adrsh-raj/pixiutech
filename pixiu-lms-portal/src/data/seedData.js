@@ -2,8 +2,7 @@
 
 export const SEED_SCHOOLS = [
   { id: 'ZPS', name: 'Zenith Public School', code: 'ZPS', city: 'Hata', tier: 'Tier 2 Partner', status: 'Active', contract_type: 'Full STEM Lab Suite', principal_name: 'Dr. R.K. Mishra', principal_phone: '+91 94151 22334', lab_room: 'Block B - Innovation Lab 102', enrolled_classes: ['6A', '7A', '8A', '9A', '11A'], created_at: '2026-08-01', lead_trainer: 'Vikas Pandey', trainer_id: 'TR-01' },
-  { id: 'XYZ', name: 'XYZ Academy (Pilot Lab)', code: 'XYZ', city: 'Gorakhpur', tier: 'Tier 1 Partner', status: 'Active', contract_type: 'Robotics & STEM Lab Suite', principal_name: 'Prof. S.N. Verma', principal_phone: '+91 94151 88776', lab_room: 'Block C - Advanced Robotics Lab 204', enrolled_classes: ['6A', '7A', '8A', '9A', '11A'], created_at: '2026-08-15', lead_trainer: 'Akash Sharma', trainer_id: 'TR-02' },
-  { id: 'ABC', name: 'ABC Public School & Robotics Lab', code: 'ABC', city: 'Gorakhpur', tier: 'Tier 1 Partner', status: 'Active', contract_type: 'Advanced STEM & AI Lab Suite', principal_name: 'Dr. A.K. Singhania', principal_phone: '+91 94151 77665', lab_room: 'Innovation & Robotics Lab 101', enrolled_classes: ['6A'], created_at: '2026-08-01', lead_trainer: 'Akash Sharma', trainer_id: 'TR-02' }
+  { id: 'XYZ', name: 'XYZ Academy (Pilot Lab)', code: 'XYZ', city: 'Gorakhpur', tier: 'Tier 1 Partner', status: 'Active', contract_type: 'Robotics & STEM Lab Suite', principal_name: 'Prof. S.N. Verma', principal_phone: '+91 94151 88776', lab_room: 'Block C - Advanced Robotics Lab 204', enrolled_classes: ['6A', '7A', '8A', '9A', '11A'], created_at: '2026-08-15', lead_trainer: 'Akash Sharma', trainer_id: 'TR-02' }
 ];
 
 export const SEED_CLASSES = [
@@ -20,14 +19,9 @@ export const SEED_CLASSES = [
   { id: 'CLS-XYZ-8A', school_id: 'XYZ', grade: '8', section: 'A', stream: 'Autonomous Mobile Robotics', student_count: 4, lead_trainer_id: 'TR-02', day: 'Tuesday', time_slot: '09:00 AM - 10:30 AM' },
   { id: 'CLS-XYZ-9A', school_id: 'XYZ', grade: '9', section: 'A', stream: 'Opto-Electronics & Display Systems', student_count: 4, lead_trainer_id: 'TR-02', day: 'Tuesday', time_slot: '10:45 AM - 12:15 PM' },
   { id: 'CLS-XYZ-11A', school_id: 'XYZ', grade: '11', section: 'A', stream: 'Laser Optics & Capstone Robotics', student_count: 4, lead_trainer_id: 'TR-02', day: 'Tuesday', time_slot: '01:00 PM - 02:30 PM' },
-
-  // ABC School Class
-  { id: 'CLS-ABC-6A', school_id: 'ABC', grade: '6', section: 'A', stream: 'Robotics & Embedded Systems', student_count: 1, lead_trainer_id: 'TR-02', day: 'Wednesday', time_slot: '09:00 AM - 10:30 AM' },
 ];
 
 export const SEED_STUDENTS = [
-  // ==================== ABC PUBLIC SCHOOL ====================
-  { id: 'STU-ABC-601', student_id: 'ABC6A 01', name: 'Aaradhya Verma', school_id: 'ABC', class_id: 'CLS-ABC-6A', tech_level: 'Level 0', parent_name: 'Rajeev Verma', parent_phone: '+91 98390 77111', assigned_kit_id: 'KIT-ABC-01', status: 'Active' },
 
   // ==================== ZENITH PUBLIC SCHOOL (ZPS) ====================
   // Class 6A
@@ -159,16 +153,9 @@ export const SEED_SESSIONS = [
   { id: 'SES-XYZ-1101', school_id: 'XYZ', class_id: 'CLS-XYZ-11A', trainer_id: 'TR-02', date: '2026-08-26', time: '01:00 PM - 02:30 PM', unit_code: 'Unit 1', level: 'Level 0', session_no: 1, total_sessions: 2, topic: 'Unit 1 (Class 1/2): Laser Tripwire Array & Optical Collimation', is_locked: 1, notes: '650nm laser beam alignment and photodiode latching.' },
   { id: 'SES-XYZ-1102', school_id: 'XYZ', class_id: 'CLS-XYZ-11A', trainer_id: 'TR-02', date: '2026-08-29', time: '01:00 PM - 02:30 PM', unit_code: 'Unit 1', level: 'Level 0', session_no: 2, total_sessions: 2, topic: 'Unit 1 (Class 2/2): Autonomous Maze-Solving Logic & Wall Following', is_locked: 1, notes: 'Left-hand wall following algorithm execution.' },
 
-  // ==================== ABC PUBLIC SCHOOL SESSIONS (Trainer: Akash Sharma TR-02) ====================
-  { id: 'SES-ABC-601', school_id: 'ABC', class_id: 'CLS-ABC-6A', trainer_id: 'TR-02', date: '2026-08-25', time: '09:00 AM - 10:30 AM', unit_code: 'Unit 1', level: 'Level 0', session_no: 1, total_sessions: 2, topic: 'Unit 1 (Class 1/2): Robotics Core Fundamentals - Breadboard Loops & Power Rails', is_locked: 1, notes: 'ABC pilot hands-on breadboard loops and polarity verification.' },
-  { id: 'SES-ABC-602', school_id: 'ABC', class_id: 'CLS-ABC-6A', trainer_id: 'TR-02', date: '2026-08-28', time: '09:00 AM - 10:30 AM', unit_code: 'Unit 1', level: 'Level 0', session_no: 2, total_sessions: 2, topic: 'Unit 1 (Class 2/2): Microcontroller Basics & Traffic Signal Logic', is_locked: 1, notes: 'C++ loop sequences and digital output pin calibration.' }
 ];
 
 export const SEED_ATTENDANCE = [
-  // ==================== ABC PUBLIC SCHOOL ====================
-  // Class 6A (Session 1 & Session 2)
-  { session_id: 'SES-ABC-601', student_id: 'ABC6A 01', status: 'Present' },
-  { session_id: 'SES-ABC-602', student_id: 'ABC6A 01', status: 'Present' },
 
   // ==================== ZENITH PUBLIC SCHOOL (ZPS) ====================
   // Class 6A (Session 1 & Session 2)

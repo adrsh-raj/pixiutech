@@ -78,16 +78,20 @@ export const generateStudentTranscriptPDF = ({
 
   // Match reviews
   const studentSpecificReviews = (studentReviews || []).filter(r => {
-    if (!r) return false;
+    if (!r || !r.student_id) return false;
     const rId = (r.student_id || '').trim().toLowerCase().replace(/\s+/g, '');
     const sId = (student.student_id || '').trim().toLowerCase().replace(/\s+/g, '');
-    const isManish = sId === 'xyz6a01' || (student.name && student.name.toLowerCase() === 'manish rawat');
-    const reviewBelongsToManish = isManish && (rId === 'xyz6a01' || rId === 'abc6a01' || (r.student_name && r.student_name.toLowerCase() === 'manish rawat'));
-    return rId === sId || reviewBelongsToManish;
+    return rId === sId;
   });
 
   const levelReviewData = defaultUnits.map(unit => {
-    const match = studentSpecificReviews.find(r => r.unit_code === unit.unitCode || r.level === unit.level);
+    const match = studentSpecificReviews.find(r => {
+      const rUnit = (r.unit_code || '').toLowerCase().replace(/\s+/g, '');
+      const uUnit = (unit.unitCode || '').toLowerCase().replace(/\s+/g, '');
+      const rLevel = (r.level || '').toLowerCase().replace(/\s+/g, '');
+      const uLevel = (unit.level || '').toLowerCase().replace(/\s+/g, '');
+      return (rUnit && rUnit === uUnit) || (rLevel && rLevel === uLevel);
+    });
     if (match) {
       return {
         hasReview: true,

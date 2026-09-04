@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useToast } from '../context/ToastContext';
@@ -19,6 +19,38 @@ export default function StudentPortal() {
   const { students, schools, content, projects, deleteProject, getStudentAttendance, notifications, curriculum, studentReviews = [], classKits = {}, inventory = [] } = useData();
   const [selectedComponent, setSelectedComponent] = useState(null);
   const [isKitDiagramModalOpen, setIsKitDiagramModalOpen] = useState(false);
+
+  // Real-time synchronization for reviews with localStorage fallback
+  const [localReviews, setLocalReviews] = useState(() => {
+    try {
+      const raw = localStorage.getItem('pixiu_student_reviews');
+      return raw ? JSON.parse(raw) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      try {
+        const raw = localStorage.getItem('pixiu_student_reviews');
+        if (raw) setLocalReviews(JSON.parse(raw));
+      } catch (e) {}
+    };
+    window.addEventListener('storage', handleUpdate);
+    window.addEventListener('pixiu_student_reviews_updated', handleUpdate);
+    return () => {
+      window.removeEventListener('storage', handleUpdate);
+      window.removeEventListener('pixiu_student_reviews_updated', handleUpdate);
+    };
+  }, []);
+
+  const allReviews = useMemo(() => {
+    const map = new Map();
+    (studentReviews || []).forEach(r => { if (r && r.id) map.set(r.id, r); });
+    (localReviews || []).forEach(r => { if (r && r.id) map.set(r.id, r); });
+    return Array.from(map.values());
+  }, [studentReviews, localReviews]);
 
   // Faculty / Admin live preview support
   const isAdminOrTrainer = user?.role === 'admin' || user?.role === 'trainer';
@@ -164,25 +196,29 @@ export default function StudentPortal() {
 
   const levelReviewData = useMemo(() => {
     const studentSchool = (schools || []).find(s => s.id === student.school_id || s.code === student.school_id);
-    const defaultFacultyName = studentSchool?.lead_trainer || 
-      (student.school_id === 'XYZ' || (student.student_id || '').startsWith('XYZ') ? 'Akash Sharma' : 'Vikas Pandey');
+    const isXYZ = student.school_id === 'XYZ' || (student.student_id || '').startsWith('XYZ');
+    const defaultFacultyName = isXYZ ? 'Akash Sharma' : (studentSchool?.lead_trainer || 'Vikas Pandey');
 
-    const studentSpecificReviews = (studentReviews || []).filter(r => {
-      if (!r) return false;
-      const cleanR = (r.student_id || '').toUpperCase().replace(/\s+/g, '');
-      const cleanS = (student.student_id || '').toUpperCase().replace(/\s+/g, '');
-      const cleanC = (cleanId || '').toUpperCase().replace(/\s+/g, '');
+    const cleanS = (student.student_id || '').toUpperCase().replace(/\s+/g, '');
+    const cleanC = (cleanId || '').toUpperCase().replace(/\s+/g, '');
 
-      const isManish = cleanS === 'XYZ6A01' || cleanC === 'XYZ6A01' || (student.name && student.name.trim().toLowerCase() === 'manish rawat');
-      const reviewBelongsToManish = isManish && (cleanR === 'XYZ6A01' || cleanR === 'ABC6A01' || (r.student_name && r.student_name.trim().toLowerCase() === 'manish rawat'));
-
-      const matchId = cleanR === cleanC || cleanR === cleanS || reviewBelongsToManish;
+    const studentSpecificReviews = (allReviews || []).filter(r => {
+      if (!r || !r.student_id) return false;
+      const cleanR = r.student_id.toUpperCase().replace(/\s+/g, '');
+      const matchId = cleanR === cleanC || cleanR === cleanS;
       const isDummy = r.verified_date === 'Curriculum Baseline';
       return matchId && !isDummy;
     });
     
     return DEFAULT_UNITS.map(unit => {
-      const match = studentSpecificReviews.find(r => r.unit_code === unit.unitCode || r.level === unit.level);
+      const match = studentSpecificReviews.find(r => {
+        const rUnit = (r.unit_code || '').toLowerCase().replace(/\s+/g, '');
+        const uUnit = (unit.unitCode || '').toLowerCase().replace(/\s+/g, '');
+        const rLevel = (r.level || '').toLowerCase().replace(/\s+/g, '');
+        const uLevel = (unit.level || '').toLowerCase().replace(/\s+/g, '');
+        return (rUnit && rUnit === uUnit) || (rLevel && rLevel === uLevel);
+      });
+
       if (match) {
         return {
           hasReview: true,
@@ -210,7 +246,7 @@ export default function StudentPortal() {
         verifiedDate: 'Awaiting Evaluation'
       };
     });
-  }, [studentReviews, student.student_id, student.school_id, student.name, cleanId, schools, DEFAULT_UNITS]);
+  }, [allReviews, student.student_id, student.school_id, student.name, cleanId, schools, DEFAULT_UNITS]);
 
   const reviewedLevelsList = useMemo(() => {
     return levelReviewData.filter(l => l.hasReview && l.score !== null);
@@ -238,7 +274,7 @@ export default function StudentPortal() {
       student,
       school,
       attendanceRate,
-      studentReviews,
+      studentReviews: allReviews,
       projects: studentProjects,
       curriculum,
       isOfficialCertificate: false
@@ -255,7 +291,7 @@ export default function StudentPortal() {
       student,
       school,
       attendanceRate,
-      studentReviews,
+      studentReviews: allReviews,
       projects: studentProjects,
       curriculum,
       isOfficialCertificate: true
