@@ -117,60 +117,130 @@ export function Toolbar({
         </div>
       </div>
 
-      {/* CENTER: Circuit / Code Mode Toggle */}
-      <div className="flex items-center gap-1 rounded-lg border border-border bg-background p-0.5 sm:p-1 shrink-0">
-        <button
-          onClick={() => onViewChange("circuit")}
-          className={`rounded-md px-2.5 sm:px-3.5 py-1 text-xs sm:text-sm font-semibold transition ${
-            view === "circuit"
-              ? "bg-primary text-primary-foreground shadow-xs"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          Circuit
-        </button>
-        <button
-          onClick={() => onViewChange("code")}
-          className={`rounded-md px-2.5 sm:px-3.5 py-1 text-xs sm:text-sm font-semibold transition ${
-            view === "code"
-              ? "bg-primary text-primary-foreground shadow-xs"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          Code
-        </button>
-        <button
-          disabled
-          className="hidden sm:inline-flex rounded-md px-2 py-1 text-[11px] font-medium text-muted-foreground/50 cursor-not-allowed"
-        >
-          3D <span className="ml-1 text-[8px] uppercase tracking-wider opacity-60">soon</span>
-        </button>
+      {/* CENTER: View Switcher & Primary Execution/Stepping Controller */}
+      <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+        {/* Mode Toggle: Circuit / Code */}
+        <div className="flex items-center gap-1 rounded-lg border border-border bg-background p-0.5 sm:p-1 shrink-0 shadow-xs">
+          <button
+            onClick={() => onViewChange("circuit")}
+            className={`rounded-md px-2.5 sm:px-3 py-1 text-xs sm:text-sm font-semibold transition cursor-pointer ${
+              view === "circuit"
+                ? "bg-primary text-primary-foreground shadow-xs"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Circuit
+          </button>
+          <button
+            onClick={() => onViewChange("code")}
+            className={`rounded-md px-2.5 sm:px-3 py-1 text-xs sm:text-sm font-semibold transition cursor-pointer ${
+              view === "code"
+                ? "bg-primary text-primary-foreground shadow-xs"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Code
+          </button>
+          <button
+            disabled
+            className="hidden sm:inline-flex rounded-md px-1.5 py-1 text-[11px] font-medium text-muted-foreground/50 cursor-not-allowed"
+          >
+            3D <span className="ml-1 text-[8px] uppercase tracking-wider opacity-60">soon</span>
+          </button>
+        </div>
+
+        {/* PRIMARY EXECUTION & STEPPING CONTROLLER (Always Front & Center, Never Cut Off) */}
+        <div className="flex items-center gap-1 bg-background p-0.5 sm:p-1 rounded-lg border border-border shadow-xs shrink-0">
+          {/* Main Run / Stop Simulation Button */}
+          <button
+            onClick={onToggleRun}
+            className={`flex items-center gap-1.5 rounded-md px-2.5 sm:px-3.5 py-1 text-xs font-bold transition shadow-sm cursor-pointer active:scale-95 ${
+              running
+                ? "bg-destructive text-white hover:opacity-90 animate-pulse"
+                : "bg-emerald-600 text-white hover:bg-emerald-500 shadow-emerald-600/25"
+            }`}
+            title={running ? "Stop Simulation (Space)" : "Run Simulation Continuously (Space)"}
+          >
+            {running ? <Square className="h-3.5 w-3.5 fill-current" /> : <Play className="h-3.5 w-3.5 fill-current" />}
+            <span>{running ? "Stop" : "Run"}</span>
+          </button>
+
+          {/* Pause / Resume Button (when running) */}
+          {running && (
+            isPaused ? (
+              <button
+                onClick={onResume}
+                className="flex items-center gap-1 rounded-md px-2 sm:px-2.5 py-1 text-xs font-semibold bg-emerald-600/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-600/30 transition cursor-pointer"
+                title="Resume continuous execution (P)"
+              >
+                <Play className="h-3 w-3 fill-current" />
+                <span className="hidden sm:inline">Resume</span>
+              </button>
+            ) : (
+              <button
+                onClick={onPause}
+                className="flex items-center gap-1 rounded-md px-2 sm:px-2.5 py-1 text-xs font-semibold bg-amber-600/20 text-amber-300 border border-amber-500/40 hover:bg-amber-600/30 transition cursor-pointer"
+                title="Pause execution before next block (P)"
+              >
+                <Pause className="h-3 w-3 fill-current" />
+                <span className="hidden sm:inline">Pause</span>
+              </button>
+            )
+          )}
+
+          {/* Step Next Button (available when paused or when stopped) */}
+          {(!running || isPaused) && onStepNext && (
+            <button
+              onClick={onStepNext}
+              className="flex items-center gap-1 rounded-md px-2 sm:px-2.5 py-1 text-xs font-bold bg-amber-500 text-slate-950 hover:bg-amber-400 font-mono shadow-sm transition cursor-pointer active:scale-95"
+              title="Execute next single block and pause (Step Debugger - F10)"
+            >
+              <StepForward className="h-3 w-3" />
+              <span>Step</span>
+            </button>
+          )}
+
+          {/* Speed Toggle: 1x / 0.5x Trace / Step */}
+          {onDebugSpeedChange && (
+            <button
+              onClick={() => {
+                const nextSpeed = debugSpeed === "normal" ? "slow" : debugSpeed === "slow" ? "step" : "normal"
+                onDebugSpeedChange(nextSpeed)
+              }}
+              className="hidden md:flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-mono font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition cursor-pointer"
+              title="Execution Speed: 1x (Normal) -> 0.5x (Slow Trace) -> Step by Step"
+            >
+              <FastForward size={11} className={debugSpeed !== "normal" ? "text-amber-400" : ""} />
+              <span>{debugSpeed === "normal" ? "1x" : debugSpeed === "slow" ? "0.5x" : "Step"}</span>
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* RIGHT: Actions */}
-      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+      {/* RIGHT: Secondary Tools & Utilities */}
+      <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
         {/* Templates (Desktop) */}
         {onOpenTemplates && (
           <button
             onClick={onOpenTemplates}
-            className="hidden md:flex items-center gap-1.5 rounded-lg border border-indigo-500/30 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 px-2.5 py-1.5 text-xs font-semibold transition"
+            className="hidden lg:flex items-center gap-1 rounded-lg border border-indigo-500/30 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 px-2 sm:px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer"
             title="Browse Curriculum Project Templates"
           >
-            <Sparkles size={14} />
-            <span>Templates</span>
+            <Sparkles size={13} />
+            <span className="hidden xl:inline">Templates</span>
           </button>
         )}
 
-        {/* Wire Color Palette (Desktop) */}
+        {/* Wire Color Palette (Desktop: shown on 2xl or compact) */}
         {view === "circuit" && onSelectWireColor && (
-          <div className="hidden xl:flex items-center gap-1 bg-background px-2 py-1 rounded-lg border border-border">
+          <div className="hidden 2xl:flex items-center gap-1 bg-background px-2 py-1 rounded-lg border border-border">
             <span className="text-[10px] font-mono text-muted-foreground mr-0.5">Wire:</span>
             {WIRE_COLOR_OPTIONS.map((c) => (
               <button
                 key={c.color}
                 onClick={() => onSelectWireColor(c.color)}
                 title={c.name}
-                className={`h-4 w-4 rounded-full transition-all cursor-pointer ${
+                className={`h-3.5 w-3.5 rounded-full transition-all cursor-pointer ${
                   activeWireColor === c.color
                     ? "ring-2 ring-primary ring-offset-1 ring-offset-background scale-110"
                     : "hover:scale-110 opacity-70 hover:opacity-100"
@@ -185,7 +255,7 @@ export function Toolbar({
         {selectedWireId && onDeleteSelectedWire && (
           <button
             onClick={onDeleteSelectedWire}
-            className="flex items-center gap-1 rounded-lg border border-red-500/40 bg-red-500/15 text-red-400 px-2 sm:px-2.5 py-1.5 text-xs font-semibold transition"
+            className="flex items-center gap-1 rounded-lg border border-red-500/40 bg-red-500/15 text-red-400 px-2 sm:px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer"
             title="Delete Selected Wire"
           >
             <Trash2 size={13} />
@@ -197,15 +267,15 @@ export function Toolbar({
         {onToggleAiCamera && (
           <button
             onClick={onToggleAiCamera}
-            title="Toggle AI Vision Camera (Pixiu AI Vision Engine)"
-            className={`flex items-center gap-1 rounded-lg border px-2 sm:px-2.5 py-1.5 text-xs font-semibold transition ${
+            title="Toggle AI Vision Camera"
+            className={`flex items-center gap-1 rounded-lg border px-2 sm:px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer ${
               isAiCameraOpen
                 ? "border-purple-500 bg-purple-500/25 text-purple-300 shadow-sm shadow-purple-500/30"
                 : "border-border text-muted-foreground hover:bg-purple-950/20 hover:text-purple-300 hover:border-purple-500/40"
             }`}
           >
             <Camera className="h-3.5 w-3.5 text-purple-400" />
-            <span className="hidden sm:inline">AI Camera</span>
+            <span className="hidden xl:inline">AI Camera</span>
           </button>
         )}
 
@@ -214,14 +284,14 @@ export function Toolbar({
           <button
             onClick={onToggleDmm}
             title="Toggle Digital Multimeter (DMM)"
-            className={`flex items-center gap-1 rounded-lg border px-2 sm:px-2.5 py-1.5 text-xs font-semibold transition ${
+            className={`flex items-center gap-1 rounded-lg border px-2 sm:px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer ${
               isDmmOpen
                 ? "border-amber-500 bg-amber-500/25 text-amber-300 shadow-sm shadow-amber-500/30"
                 : "border-border text-muted-foreground hover:bg-amber-950/20 hover:text-amber-300 hover:border-amber-500/40"
             }`}
           >
             <Gauge className="h-3.5 w-3.5 text-amber-400" />
-            <span className="hidden sm:inline">Multimeter</span>
+            <span className="hidden xl:inline">Multimeter</span>
           </button>
         )}
 
@@ -230,22 +300,22 @@ export function Toolbar({
           <button
             onClick={onToggleInspector}
             title="Toggle Inspector Panel (Properties & Stats)"
-            className={`hidden md:flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer ${
+            className={`hidden md:flex items-center gap-1 rounded-lg border px-2 sm:px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer ${
               isInspectorOpen
                 ? "border-primary bg-primary/10 text-primary"
                 : "border-border text-muted-foreground hover:bg-secondary hover:text-foreground"
             }`}
           >
             <Sliders className="h-3.5 w-3.5" />
-            <span>Inspector</span>
+            <span className="hidden xl:inline">Inspector</span>
           </button>
         )}
 
-        {/* Serial Monitor Toggle (Desktop) */}
+        {/* Serial Monitor Toggle */}
         {onToggleSerial && (
           <button
             onClick={onToggleSerial}
-            className={`hidden md:flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-mono transition ${
+            className={`hidden sm:flex items-center gap-1 rounded-lg border px-2 sm:px-2.5 py-1.5 text-xs font-mono transition cursor-pointer ${
               isSerialOpen
                 ? "border-primary bg-primary/10 text-primary"
                 : "border-border text-muted-foreground hover:bg-secondary hover:text-foreground"
@@ -253,104 +323,28 @@ export function Toolbar({
             title="Toggle Serial Monitor"
           >
             <Terminal className="h-3.5 w-3.5" />
-            <span>Serial</span>
+            <span className="hidden xl:inline">Serial</span>
           </button>
         )}
 
-        {/* Mute Audio (Desktop) */}
+        {/* Mute Audio */}
         <button
           onClick={onToggleMute}
-          className="hidden md:flex p-1.5 rounded-md border border-border text-muted-foreground hover:bg-secondary hover:text-foreground transition cursor-pointer"
+          className="hidden md:flex p-1.5 rounded-lg border border-border text-muted-foreground hover:bg-secondary hover:text-foreground transition cursor-pointer"
           title={isMuted ? "Unmute Sound" : "Mute Sound"}
         >
           {isMuted ? <VolumeX className="h-4 w-4 text-red-400" /> : <Volume2 className="h-4 w-4" />}
         </button>
 
-        {/* Clear (Desktop) */}
+        {/* Clear Canvas */}
         <button
           onClick={onClear}
-          className="hidden md:flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs text-muted-foreground transition hover:bg-secondary hover:text-foreground cursor-pointer"
+          className="hidden md:flex items-center gap-1 rounded-lg border border-border px-2 sm:px-2.5 py-1.5 text-xs text-muted-foreground transition hover:bg-destructive/15 hover:text-destructive hover:border-destructive/40 cursor-pointer"
+          title="Clear Canvas"
         >
           <Trash2 className="h-3.5 w-3.5" />
-          <span>Clear</span>
+          <span className="hidden 2xl:inline">Clear</span>
         </button>
-
-        {/* Active Statement HUD when Paused / Stepping */}
-        {running && isPaused && activeStepLabel && (
-          <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-[11px] font-mono text-amber-300 animate-in fade-in">
-            <span className="h-2 w-2 rounded-full bg-amber-400 animate-ping shrink-0" />
-            <span className="truncate max-w-[200px] xl:max-w-[260px]" title={activeStepLabel}>
-              ⏸ {activeStepLabel}
-            </span>
-          </div>
-        )}
-
-        {/* STEPPING & EXECUTION CONTROLS */}
-        <div className="flex items-center gap-1 bg-background p-0.5 sm:p-1 rounded-lg border border-border">
-          {/* Main Run / Stop Simulation Button */}
-          <button
-            onClick={onToggleRun}
-            className={`flex items-center gap-1.5 rounded-md px-2.5 sm:px-3 py-1 text-xs font-bold transition shadow-sm cursor-pointer ${
-              running
-                ? "bg-destructive text-white hover:opacity-90 animate-pulse"
-                : "bg-emerald-600 text-white hover:bg-emerald-500 shadow-emerald-600/25"
-            }`}
-            title={running ? "Stop Simulation" : "Run Simulation Continuously"}
-          >
-            {running ? <Square className="h-3.5 w-3.5 fill-current" /> : <Play className="h-3.5 w-3.5 fill-current" />}
-            <span>{running ? "Stop" : "Run"}</span>
-          </button>
-
-          {/* Pause / Resume Button (when running) */}
-          {running && (
-            isPaused ? (
-              <button
-                onClick={onResume}
-                className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold bg-emerald-600/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-600/30 transition cursor-pointer"
-                title="Resume continuous execution"
-              >
-                <Play className="h-3 w-3 fill-current" />
-                <span className="hidden sm:inline">Resume</span>
-              </button>
-            ) : (
-              <button
-                onClick={onPause}
-                className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold bg-amber-600/20 text-amber-300 border border-amber-500/40 hover:bg-amber-600/30 transition cursor-pointer"
-                title="Pause execution before next block"
-              >
-                <Pause className="h-3 w-3 fill-current" />
-                <span className="hidden sm:inline">Pause</span>
-              </button>
-            )
-          )}
-
-          {/* Step Next Button (available when paused or when stopped) */}
-          {(!running || isPaused) && onStepNext && (
-            <button
-              onClick={onStepNext}
-              className="flex items-center gap-1 rounded-md px-2 sm:px-2.5 py-1 text-xs font-semibold bg-amber-500 text-slate-950 hover:bg-amber-400 font-mono shadow-sm transition cursor-pointer active:scale-95"
-              title="Execute next single block and pause (Step Debugger)"
-            >
-              <StepForward className="h-3 w-3" />
-              <span>Step</span>
-            </button>
-          )}
-
-          {/* Speed Toggle: 1x / 0.5x Trace / Step */}
-          {onDebugSpeedChange && (
-            <button
-              onClick={() => {
-                const nextSpeed = debugSpeed === "normal" ? "slow" : debugSpeed === "slow" ? "step" : "normal"
-                onDebugSpeedChange(nextSpeed)
-              }}
-              className="hidden xl:flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-mono font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition cursor-pointer"
-              title="Execution Speed: 1x (Normal) -> 0.5x (Slow Trace) -> Step by Step"
-            >
-              <FastForward size={11} className={debugSpeed !== "normal" ? "text-amber-400" : ""} />
-              <span>{debugSpeed === "normal" ? "1x" : debugSpeed === "slow" ? "0.5x Trace" : "Step"}</span>
-            </button>
-          )}
-        </div>
       </div>
     </header>
   )
