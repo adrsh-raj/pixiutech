@@ -14,6 +14,7 @@ import {
   Play,
   Square,
   Palette,
+  Gauge,
   X,
 } from "lucide-react"
 
@@ -36,6 +37,7 @@ interface Props {
   onFitToScreen?: () => void
   onOpenPalette?: () => void
   onOpenTemplates?: () => void
+  onToggleDmm?: () => void
   onToggleSerial?: () => void
   onToggleAiCamera?: () => void
   onSwitchToCode?: () => void
@@ -68,6 +70,7 @@ export function ContextMenu({
   onFitToScreen,
   onOpenPalette,
   onOpenTemplates,
+  onToggleDmm,
   onToggleSerial,
   onToggleAiCamera,
   onSwitchToCode,
@@ -296,6 +299,16 @@ export function ContextMenu({
           <Terminal size={13} className="text-amber-400" />
           <span>Serial Monitor</span>
         </button>
+
+        {onToggleDmm && (
+          <button
+            onClick={() => action(onToggleDmm)}
+            className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-slate-800/80 text-slate-200 transition cursor-pointer"
+          >
+            <Gauge size={13} className="text-amber-400" />
+            <span>Digital Multimeter (DMM)</span>
+          </button>
+        )}
 
         <button
           onClick={() => action(onOpenTemplates)}

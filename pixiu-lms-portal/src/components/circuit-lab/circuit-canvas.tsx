@@ -8,6 +8,7 @@ import { getPinRefPosition, wirePath } from "@/lib/geometry"
 import { PartArt, type PartRuntime } from "./part-art"
 import { Maximize2, Plus, Minus } from "lucide-react"
 import type { ContextMenuTarget } from "./context-menu"
+import type { WireCurrentState } from "@/lib/current-flow"
 
 interface View {
   scale: number
@@ -23,6 +24,11 @@ interface Props {
   wiring: PinRef | null
   runtime: Record<string, PartRuntime>
   running: boolean
+  wireCurrents?: Record<string, WireCurrentState>
+  probeRed?: PinRef | null
+  probeBlack?: PinRef | null
+  activeProbeToPlace?: "red" | "black" | null
+  onProbeClip?: (ref: PinRef) => void
   onSelect: (id: string | null) => void
   onMovePart: (id: string, x: number, y: number) => void
   onPinDown: (ref: PinRef) => void
@@ -44,6 +50,11 @@ export function CircuitCanvas(props: Props) {
     wiring,
     runtime,
     running,
+    wireCurrents,
+    probeRed,
+    probeBlack,
+    activeProbeToPlace,
+    onProbeClip,
     onSelect,
     onMovePart,
     onPinDown,
@@ -184,6 +195,10 @@ export function CircuitCanvas(props: Props) {
 
   const onPinPointerDown = (e: React.PointerEvent, ref: PinRef) => {
     e.stopPropagation()
+    if (activeProbeToPlace) {
+      onProbeClip?.(ref)
+      return
+    }
     if (running) return
     onPinDown(ref)
   }
@@ -355,6 +370,23 @@ export function CircuitCanvas(props: Props) {
                   strokeLinecap="round"
                   opacity={0.98}
                 />
+                {/* Animated Current Flow (Charge particles flowing along wire) */}
+                {running && wireCurrents?.[wire.id] && wireCurrents[wire.id].currentMa > 0 && (
+                  <path
+                    d={wirePath(a, b)}
+                    fill="none"
+                    stroke="#ffffff"
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                    strokeDasharray="4 8"
+                    style={{
+                      animation: `pixiuCurrentFlow ${wireCurrents[wire.id].period}s linear infinite ${
+                        wireCurrents[wire.id].isForward ? "normal" : "reverse"
+                      }`,
+                      filter: "drop-shadow(0 0 3px rgba(96, 165, 250, 0.95))",
+                    }}
+                  />
+                )}
                 {/* Wire terminal dots */}
                 <circle cx={a.x} cy={a.y} r={3} fill={wire.color} stroke="#ffffff" strokeWidth={1} />
                 <circle cx={b.x} cy={b.y} r={3} fill={wire.color} stroke="#ffffff" strokeWidth={1} />
@@ -445,8 +477,49 @@ export function CircuitCanvas(props: Props) {
               </g>
             )
           })}
+          {/* 5. Multimeter Probe Clips Overlay */}
+          {probeRed && (() => {
+            const pos = getPinRefPosition(probeRed, parts)
+            if (!pos) return null
+            return (
+              <g transform={`translate(${pos.x} ${pos.y})`} className="pointer-events-none">
+                <circle r={12} fill="#ef4444" opacity={0.35} className="animate-ping" />
+                <circle r={6.5} fill="#ef4444" stroke="#ffffff" strokeWidth={1.8} />
+                <path d="M-2 -8 L2 -8 L1 -4 L-1 -4 Z" fill="#ef4444" />
+                <g transform="translate(0, -12)">
+                  <rect x={-20} y={-10} width={40} height={12} rx={3} fill="#991b1b" stroke="#fca5a5" strokeWidth={0.8} />
+                  <text y={-1} textAnchor="middle" fontSize={7.5} fontWeight={700} fill="#ffffff" fontFamily="monospace">
+                    RED (+)
+                  </text>
+                </g>
+              </g>
+            )
+          })()}
+          {probeBlack && (() => {
+            const pos = getPinRefPosition(probeBlack, parts)
+            if (!pos) return null
+            return (
+              <g transform={`translate(${pos.x} ${pos.y})`} className="pointer-events-none">
+                <circle r={12} fill="#0f172a" opacity={0.35} className="animate-ping" />
+                <circle r={6.5} fill="#1e293b" stroke="#ffffff" strokeWidth={1.8} />
+                <path d="M-2 -8 L2 -8 L1 -4 L-1 -4 Z" fill="#1e293b" />
+                <g transform="translate(0, -12)">
+                  <rect x={-20} y={-10} width={40} height={12} rx={3} fill="#0f172a" stroke="#cbd5e1" strokeWidth={0.8} />
+                  <text y={-1} textAnchor="middle" fontSize={7.5} fontWeight={700} fill="#ffffff" fontFamily="monospace">
+                    BLK (-)
+                  </text>
+                </g>
+              </g>
+            )
+          })()}
         </g>
       </svg>
+      <style>{`
+        @keyframes pixiuCurrentFlow {
+          from { stroke-dashoffset: 24; }
+          to { stroke-dashoffset: 0; }
+        }
+      `}</style>
 
       {/* Overcurrent Burnout Alert */}
       {Object.values(runtime).some((r) => r?.burnt) && (

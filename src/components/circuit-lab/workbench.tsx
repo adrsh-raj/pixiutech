@@ -11,7 +11,9 @@ import { audioEngine } from "@/lib/audio-engine"
 import { createHistory, pushState, undo as historyUndo, redo as historyRedo, canUndo, canRedo, type HistoryState } from "@/lib/history"
 import { saveCircuit, loadCircuit } from "@/lib/storage"
 import * as Blockly from "blockly"
-import { Boxes, Camera, Sparkles, Terminal, Trash2 } from "lucide-react"
+import { Boxes, Camera, Sparkles, Terminal, Trash2, Gauge } from "lucide-react"
+import { computeWireCurrents } from "@/lib/current-flow"
+import { Multimeter } from "./multimeter"
 import { CircuitCanvas } from "./circuit-canvas"
 import { Inspector } from "./inspector"
 import { Palette } from "./palette"
@@ -198,6 +200,21 @@ export function Workbench() {
     target: ContextMenuTarget
   } | null>(null)
 
+  const [isDmmOpen, setIsDmmOpen] = useState(false)
+  const [probeRed, setProbeRed] = useState<PinRef | null>(null)
+  const [probeBlack, setProbeBlack] = useState<PinRef | null>(null)
+  const [activeProbeToPlace, setActiveProbeToPlace] = useState<"red" | "black" | null>(null)
+
+  const handleProbeClip = useCallback((ref: PinRef) => {
+    if (activeProbeToPlace === "red") {
+      setProbeRed(ref)
+      setActiveProbeToPlace(null)
+    } else if (activeProbeToPlace === "black") {
+      setProbeBlack(ref)
+      setActiveProbeToPlace(null)
+    }
+  }, [activeProbeToPlace])
+
   const handleCanvasContextMenu = useCallback((e: React.MouseEvent, target: ContextMenuTarget) => {
     e.preventDefault()
     setContextMenu({ x: e.clientX, y: e.clientY, target })
@@ -227,6 +244,11 @@ export function Workbench() {
   const runtime = useMemo(
     () => (running ? computeRuntime(state, pressed, pinStates) : {}),
     [running, state, pressed, pinStates],
+  )
+
+  const wireCurrents = useMemo(
+    () => (running ? computeWireCurrents(state, runtime, pinStates) : {}),
+    [running, state, runtime, pinStates],
   )
 
   // Calculate total mA consumption across components
@@ -652,6 +674,8 @@ export function Workbench() {
         onSave={handleSave}
         isSerialOpen={isSerialOpen}
         onToggleSerial={() => setIsSerialOpen((prev) => !prev)}
+        isDmmOpen={isDmmOpen}
+        onToggleDmm={() => setIsDmmOpen((prev) => !prev)}
         isAiCameraOpen={isAiCameraOpen}
         onToggleAiCamera={() => setIsAiCameraOpen((prev) => !prev)}
         isMuted={isMuted}
@@ -713,6 +737,11 @@ export function Workbench() {
                 wiring={wiring}
                 runtime={runtime}
                 running={running}
+                wireCurrents={wireCurrents}
+                probeRed={probeRed}
+                probeBlack={probeBlack}
+                activeProbeToPlace={activeProbeToPlace}
+                onProbeClip={handleProbeClip}
                 onSelect={(id) => {
                   setSelectedId(id)
                   if (id) setSelectedWireId(null)
@@ -772,6 +801,17 @@ export function Workbench() {
               >
                 <Camera size={18} className={isAiCameraOpen ? "text-purple-400" : ""} />
                 <span className="text-[10px]">AI Cam</span>
+              </button>
+
+              <button
+                onClick={() => setIsDmmOpen((prev) => !prev)}
+                className={`flex flex-col items-center gap-0.5 p-1 transition active:scale-95 ${
+                  isDmmOpen ? "text-amber-400 font-bold" : "text-muted-foreground hover:text-foreground"
+                }`}
+                title="Digital Multimeter"
+              >
+                <Gauge size={18} className={isDmmOpen ? "text-amber-400" : ""} />
+                <span className="text-[10px]">DMM</span>
               </button>
 
               <button
@@ -845,6 +885,8 @@ export function Workbench() {
           onOpenPalette={() => setMobilePaletteOpen(true)}
           onOpenTemplates={() => setIsTemplatesOpen(true)}
           onToggleSerial={() => setIsSerialOpen((prev) => !prev)}
+          isDmmOpen={isDmmOpen}
+          onToggleDmm={() => setIsDmmOpen((prev) => !prev)}
           onToggleAiCamera={() => setIsAiCameraOpen((prev) => !prev)}
           onSwitchToCode={() => setView("code")}
           onToggleRun={toggleRun}
@@ -852,6 +894,22 @@ export function Workbench() {
           onChangeWireColor={handleSelectWireColor}
         />
       )}
+
+      {/* Interactive Digital Multimeter (DMM) */}
+      <Multimeter
+        isOpen={isDmmOpen}
+        onClose={() => setIsDmmOpen(false)}
+        state={state}
+        runtime={runtime}
+        pinStates={pinStates}
+        running={running}
+        probeRed={probeRed}
+        probeBlack={probeBlack}
+        onSetProbeRed={setProbeRed}
+        onSetProbeBlack={setProbeBlack}
+        activeProbeToPlace={activeProbeToPlace}
+        onSetActiveProbeToPlace={setActiveProbeToPlace}
+      />
     </div>
   )
 }

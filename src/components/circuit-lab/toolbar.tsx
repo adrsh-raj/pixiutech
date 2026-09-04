@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom"
-import { CircuitBoard, Play, Square, Trash2, ArrowLeft, Undo2, Redo2, Save, Terminal, Volume2, VolumeX, Sparkles, Camera } from "lucide-react"
+import { CircuitBoard, Play, Square, Trash2, ArrowLeft, Undo2, Redo2, Save, Terminal, Volume2, VolumeX, Sparkles, Camera, Gauge } from "lucide-react"
 
 export type WorkbenchView = "circuit" | "code" | "3d"
 
@@ -27,6 +27,8 @@ interface Props {
   onSave?: () => void
   isSerialOpen?: boolean
   onToggleSerial?: () => void
+  isDmmOpen?: boolean
+  onToggleDmm?: () => void
   isAiCameraOpen?: boolean
   onToggleAiCamera?: () => void
   isMuted?: boolean
@@ -57,6 +59,8 @@ export function Toolbar({
   onSave,
   isSerialOpen = false,
   onToggleSerial,
+  isDmmOpen = false,
+  onToggleDmm,
   isAiCameraOpen = false,
   onToggleAiCamera,
   isMuted = false,
@@ -183,6 +187,22 @@ export function Toolbar({
           >
             <Camera className="h-3.5 w-3.5 text-purple-400" />
             <span className="hidden sm:inline">AI Camera</span>
+          </button>
+        )}
+
+        {/* Digital Multimeter Toggle */}
+        {onToggleDmm && (
+          <button
+            onClick={onToggleDmm}
+            title="Toggle Digital Multimeter (DMM)"
+            className={`flex items-center gap-1 rounded-lg border px-2 sm:px-2.5 py-1.5 text-xs font-semibold transition ${
+              isDmmOpen
+                ? "border-amber-500 bg-amber-500/25 text-amber-300 shadow-sm shadow-amber-500/30"
+                : "border-border text-muted-foreground hover:bg-amber-950/20 hover:text-amber-300 hover:border-amber-500/40"
+            }`}
+          >
+            <Gauge className="h-3.5 w-3.5 text-amber-400" />
+            <span className="hidden sm:inline">Multimeter</span>
           </button>
         )}
 
