@@ -1,4 +1,10 @@
-﻿import * as Blockly from "blockly"
+import * as Blockly from "blockly"
+
+export interface BlockStepInfo {
+  id: string
+  type: string
+  label: string
+}
 
 export interface ExecutionEnvironment {
   setDigitalPin: (pin: string, state: "HIGH" | "LOW") => void
@@ -16,6 +22,12 @@ export interface ExecutionEnvironment {
   setAiCamera?: (enabled: boolean) => void
   sleep: (ms: number) => Promise<void>
   isRunning: () => boolean
+  // Stepping & Debugging methods
+  isPaused?: () => boolean
+  getExecutionSpeed?: () => "normal" | "slow" | "step"
+  waitStep?: (info: BlockStepInfo) => Promise<void>
+  highlightBlock?: (blockId: string | null) => void
+  onBlockEnter?: (info: BlockStepInfo) => void
 }
 
 let lcdCursorCol = 0
@@ -108,7 +120,99 @@ function evaluateValueInput(block: Blockly.Block, inputName: string, env?: Execu
   return defaultValue
 }
 
+function getBlockDescription(block: Blockly.Block, env: ExecutionEnvironment): string {
+  switch (block.type) {
+    case "io_digitalwrite": {
+      const pin = block.getFieldValue("PIN") ?? "13"
+      const state = block.getFieldValue("STATE") ?? "HIGH"
+      return `digitalWrite(Pin ${pin}, ${state})`
+    }
+    case "time_delay": {
+      const ms = evaluateNumberInput(block, "MS", env, 1000)
+      return `delay(${ms} ms)`
+    }
+    case "io_analogwrite": {
+      const pin = block.getFieldValue("PIN") ?? "13"
+      const val = evaluateNumberInput(block, "VALUE", env, 255)
+      return `analogWrite(Pin ${pin}, ${val})`
+    }
+    case "servo_write": {
+      const pin = block.getFieldValue("PIN") ?? "9"
+      const angle = evaluateNumberInput(block, "ANGLE", env, 90)
+      return `servo.write(Pin ${pin}, ${angle}°)`
+    }
+    case "tone_play": {
+      const pin = block.getFieldValue("PIN") ?? "8"
+      const freq = evaluateNumberInput(block, "FREQ", env, 440)
+      return `tone(Pin ${pin}, ${freq} Hz)`
+    }
+    case "tone_stop": {
+      const pin = block.getFieldValue("PIN") ?? "8"
+      return `noTone(Pin ${pin})`
+    }
+    case "serial_begin": {
+      const baud = block.getFieldValue("BAUD") ?? "9600"
+      return `Serial.begin(${baud})`
+    }
+    case "serial_print": {
+      const text = evaluateValueInput(block, "TEXT", env, "")
+      return `Serial.print("${text}")`
+    }
+    case "serial_println": {
+      const text = evaluateValueInput(block, "TEXT", env, "")
+      return `Serial.println("${text}")`
+    }
+    case "lcd_print": {
+      const text = evaluateValueInput(block, "TEXT", env, "")
+      return `lcd.print("${text}")`
+    }
+    case "lcd_set_cursor": {
+      const col = block.getFieldValue("COL") ?? "0"
+      const row = block.getFieldValue("ROW") ?? "0"
+      return `lcd.setCursor(${col}, ${row})`
+    }
+    case "lcd_clear":
+      return "lcd.clear()"
+    case "ai_camera_enable": {
+      const state = block.getFieldValue("STATE") ?? "ON"
+      return `AI Camera ${state}`
+    }
+    case "controls_if":
+      return "if (condition)"
+    case "controls_repeat_ext": {
+      const times = evaluateNumberInput(block, "TIMES", env, 1)
+      return `repeat (${times}x)`
+    }
+    default:
+      return block.type
+  }
+}
+
+async function beforeExecuteBlock(block: Blockly.Block, env: ExecutionEnvironment, signal: AbortSignal) {
+  if (signal.aborted || !env.isRunning()) return
+
+  const label = getBlockDescription(block, env)
+  const info: BlockStepInfo = { id: block.id, type: block.type, label }
+
+  env.highlightBlock?.(block.id)
+  env.onBlockEnter?.(info)
+
+  const isPaused = env.isPaused ? env.isPaused() : false
+  const speed = env.getExecutionSpeed ? env.getExecutionSpeed() : "normal"
+
+  if (isPaused || speed === "step") {
+    if (env.waitStep) {
+      await env.waitStep(info)
+    }
+  } else if (speed === "slow") {
+    await env.sleep(500)
+  }
+}
+
 async function executeSingleBlock(block: Blockly.Block, env: ExecutionEnvironment, signal: AbortSignal) {
+  if (signal.aborted || !env.isRunning()) return
+
+  await beforeExecuteBlock(block, env, signal)
   if (signal.aborted || !env.isRunning()) return
 
   switch (block.type) {
@@ -120,8 +224,14 @@ async function executeSingleBlock(block: Blockly.Block, env: ExecutionEnvironmen
     }
 
     case "time_delay": {
-      const ms = Math.max(10, evaluateNumberInput(block, "MS", env, 1000))
-      await env.sleep(ms)
+      const speed = env.getExecutionSpeed ? env.getExecutionSpeed() : "normal"
+      const isPaused = env.isPaused ? env.isPaused() : false
+      if (speed === "step" || isPaused) {
+        await env.sleep(30)
+      } else {
+        const ms = Math.max(10, evaluateNumberInput(block, "MS", env, 1000))
+        await env.sleep(ms)
+      }
       break
     }
 
@@ -247,19 +357,23 @@ export async function runBlocklyProgram(workspace: Blockly.Workspace, env: Execu
   lcdCursorCol = 0
   lcdCursorRow = 0
 
-  // 1. Execute SETUP statement
-  const setupBlock = root.getInputTargetBlock("SETUP")
-  if (setupBlock) {
-    await executeStatement(setupBlock, env, signal)
-  }
-
-  // 2. Execute LOOP statement continuously
-  const loopBlock = root.getInputTargetBlock("LOOP")
-  while (!signal.aborted && env.isRunning()) {
-    if (loopBlock) {
-      await executeStatement(loopBlock, env, signal)
+  try {
+    // 1. Execute SETUP statement
+    const setupBlock = root.getInputTargetBlock("SETUP")
+    if (setupBlock) {
+      await executeStatement(setupBlock, env, signal)
     }
-    // Small safety delay to yield control and avoid freezing if loop has no wait block
-    await env.sleep(20)
+
+    // 2. Execute LOOP statement continuously
+    const loopBlock = root.getInputTargetBlock("LOOP")
+    while (!signal.aborted && env.isRunning()) {
+      if (loopBlock) {
+        await executeStatement(loopBlock, env, signal)
+      }
+      // Small safety delay to yield control and avoid freezing if loop has no wait block
+      await env.sleep(20)
+    }
+  } finally {
+    env.highlightBlock?.(null)
   }
 }

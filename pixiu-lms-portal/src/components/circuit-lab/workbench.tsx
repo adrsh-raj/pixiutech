@@ -6,7 +6,7 @@ import { CATALOG } from "@/lib/components-catalog"
 import { samePin } from "@/lib/geometry"
 import { computeRuntime, type ArduinoPinState } from "@/lib/simulation"
 import { defineArduinoBlocks } from "@/lib/arduino-blocks"
-import { runBlocklyProgram, type ExecutionEnvironment } from "@/lib/blockly-runner"
+import { runBlocklyProgram, type ExecutionEnvironment, type BlockStepInfo } from "@/lib/blockly-runner"
 import { audioEngine } from "@/lib/audio-engine"
 import { createHistory, pushState, undo as historyUndo, redo as historyRedo, canUndo, canRedo, type HistoryState } from "@/lib/history"
 import { saveCircuit, loadCircuit } from "@/lib/storage"
@@ -118,6 +118,36 @@ export function Workbench() {
   const [probeBlack, setProbeBlack] = useState<PinRef | null>(null)
   const [activeProbeToPlace, setActiveProbeToPlace] = useState<"red" | "black" | null>(null)
 
+  // Stepping debugger state & refs
+  const [isPaused, setIsPaused] = useState(false)
+  const [debugSpeed, setDebugSpeed] = useState<"normal" | "slow" | "step">("normal")
+  const [activeStepBlock, setActiveStepBlock] = useState<BlockStepInfo | null>(null)
+
+  const isPausedRef = useRef(false)
+  const debugSpeedRef = useRef<"normal" | "slow" | "step">("normal")
+  const stepResolverRef = useRef<(() => void) | null>(null)
+  const visualWorkspaceRef = useRef<Blockly.WorkspaceSvg | null>(null)
+
+  useEffect(() => {
+    isPausedRef.current = isPaused
+  }, [isPaused])
+
+  useEffect(() => {
+    debugSpeedRef.current = debugSpeed
+  }, [debugSpeed])
+
+  // Resize Blockly workspace whenever user switches to "code" view
+  useEffect(() => {
+    if (view === "code" && visualWorkspaceRef.current) {
+      const timer = setTimeout(() => {
+        if (visualWorkspaceRef.current) {
+          Blockly.svgResize(visualWorkspaceRef.current)
+        }
+      }, 50)
+      return () => clearTimeout(timer)
+    }
+  }, [view])
+
   const handleProbeClip = useCallback((ref: PinRef) => {
     if (activeProbeToPlace === "red") {
       setProbeRed(ref)
@@ -169,17 +199,20 @@ export function Workbench() {
     return Object.values(runtime).reduce((acc, r) => acc + (r?.currentMa ?? 0), 0)
   }, [runtime])
 
-  // Run timer effect
+  // Run timer effect (pauses when debugger is paused)
   useEffect(() => {
     if (!running) {
       setRunTime(0)
+      return
+    }
+    if (isPaused) {
       return
     }
     const timer = setInterval(() => {
       setRunTime((prev) => prev + 1)
     }, 1000)
     return () => clearInterval(timer)
-  }, [running])
+  }, [running, isPaused])
 
   // Audio effect: if any buzzer is powered in runtime and simulation is running, sound tone!
   useEffect(() => {
@@ -336,15 +369,33 @@ export function Workbench() {
     runningRef.current = false
     runnerAbortRef.current?.abort()
     runnerAbortRef.current = null
+    if (stepResolverRef.current) {
+      const resolve = stepResolverRef.current
+      stepResolverRef.current = null
+      resolve()
+    }
+    if (visualWorkspaceRef.current) {
+      try {
+        visualWorkspaceRef.current.highlightBlock(null)
+      } catch (e) {}
+    }
     audioEngine.stopTone()
     setPinStates({})
+    setIsPaused(false)
+    isPausedRef.current = false
+    setActiveStepBlock(null)
   }, [])
 
-  const startProgram = useCallback(() => {
+  const startProgram = useCallback((startPaused: boolean = false) => {
     stopProgram()
     runningRef.current = true
     const controller = new AbortController()
     runnerAbortRef.current = controller
+
+    if (startPaused) {
+      setIsPaused(true)
+      isPausedRef.current = true
+    }
 
     // Only run Arduino code and AI Vision if an Arduino board actually exists in the circuit
     const hasArduino = state.parts.some((p) => p.type === "arduino-uno")
@@ -431,15 +482,82 @@ export function Workbench() {
         setAiCamera: (enabled) => setIsAiCameraOpen(enabled),
         sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
         isRunning: () => runningRef.current,
+
+        // Live Stepping Debugger hooks
+        isPaused: () => isPausedRef.current,
+        getExecutionSpeed: () => debugSpeedRef.current,
+        waitStep: async (info: BlockStepInfo) => {
+          setActiveStepBlock(info)
+          return new Promise<void>((resolve) => {
+            stepResolverRef.current = resolve
+          })
+        },
+        highlightBlock: (blockId: string | null) => {
+          if (visualWorkspaceRef.current) {
+            try {
+              visualWorkspaceRef.current.highlightBlock(blockId)
+            } catch (e) {}
+          }
+        },
+        onBlockEnter: (info: BlockStepInfo) => {
+          setActiveStepBlock(info)
+        },
       }
 
       runBlocklyProgram(workspace, env, controller.signal).finally(() => {
         workspace.dispose()
+        if (visualWorkspaceRef.current) {
+          try {
+            visualWorkspaceRef.current.highlightBlock(null)
+          } catch (e) {}
+        }
+        setActiveStepBlock(null)
       })
     } catch (err) {
       console.error("Failed to run Blockly program:", err)
     }
   }, [blocklyXml, state.parts, stopProgram])
+
+  const handlePause = useCallback(() => {
+    setIsPaused(true)
+    isPausedRef.current = true
+  }, [])
+
+  const handleResume = useCallback(() => {
+    setIsPaused(false)
+    isPausedRef.current = false
+    if (stepResolverRef.current) {
+      const resolve = stepResolverRef.current
+      stepResolverRef.current = null
+      resolve()
+    }
+  }, [])
+
+  const handleStepNext = useCallback(() => {
+    if (!runningRef.current) {
+      setRunning(true)
+      setIsPaused(true)
+      isPausedRef.current = true
+      startProgram(true)
+      return
+    }
+    setIsPaused(true)
+    isPausedRef.current = true
+    if (stepResolverRef.current) {
+      const resolve = stepResolverRef.current
+      stepResolverRef.current = null
+      resolve()
+    }
+  }, [startProgram])
+
+  const handleDebugSpeedChange = useCallback((speed: "normal" | "slow" | "step") => {
+    setDebugSpeed(speed)
+    debugSpeedRef.current = speed
+    if (speed === "step") {
+      setIsPaused(true)
+      isPausedRef.current = true
+    }
+  }, [])
 
   const clearAll = useCallback(() => {
     stopProgram()
@@ -448,6 +566,9 @@ export function Workbench() {
     setSelectedWireId(null)
     setWiring(null)
     setRunning(false)
+    setIsPaused(false)
+    isPausedRef.current = false
+    setActiveStepBlock(null)
     setPressed(new Set())
     setSerialLines([])
     setBlocklyXml(DEFAULT_XML)
@@ -461,7 +582,7 @@ export function Workbench() {
         setWiring(null)
         setSelectedId(null)
         setSelectedWireId(null)
-        startProgram()
+        startProgram(false)
       } else {
         setPressed(new Set())
         stopProgram()
@@ -495,6 +616,24 @@ export function Workbench() {
       if (e.code === "Space") {
         e.preventDefault()
         toggleRun()
+        return
+      }
+
+      // F10 Step Next in debugger
+      if (e.key === "F10") {
+        e.preventDefault()
+        handleStepNext()
+        return
+      }
+
+      // 'P' toggles Pause/Resume when simulation is running
+      if ((e.key === "p" || e.key === "P") && !e.ctrlKey && !e.metaKey && running) {
+        e.preventDefault()
+        if (isPaused) {
+          handleResume()
+        } else {
+          handlePause()
+        }
         return
       }
 
@@ -549,7 +688,7 @@ export function Workbench() {
       window.removeEventListener("keydown", handleKeyDown)
       window.removeEventListener("contextmenu", handleGlobalContextMenu)
     }
-  }, [handleUndo, handleRedo, selectedWireId, selectedId, deleteWire, deletePart, rotatePart, duplicatePart, toggleRun])
+  }, [handleUndo, handleRedo, selectedWireId, selectedId, deleteWire, deletePart, rotatePart, duplicatePart, toggleRun, handleStepNext, handlePause, handleResume, isPaused, running])
 
   const handleSave = useCallback(() => {
     saveCircuit("default", state, blocklyXml)
@@ -611,6 +750,13 @@ export function Workbench() {
         onSelectWireColor={handleSelectWireColor}
         selectedWireId={selectedWireId}
         onDeleteSelectedWire={deleteSelectedWire}
+        isPaused={isPaused}
+        onPause={handlePause}
+        onResume={handleResume}
+        onStepNext={handleStepNext}
+        debugSpeed={debugSpeed}
+        onDebugSpeedChange={handleDebugSpeedChange}
+        activeStepLabel={activeStepBlock?.label ?? null}
       />
 
       <TemplateBrowser
@@ -629,180 +775,203 @@ export function Workbench() {
         onStartSim={toggleRun}
       />
 
-      {view === "code" ? (
-        <div className="flex-1 min-h-0 w-full overflow-hidden">
-          <BlocklyEditor circuit={state} xml={blocklyXml} onXmlChange={setBlocklyXml} />
-        </div>
-      ) : (
-        <div className="flex min-h-0 flex-1 relative">
-          <Palette
-            onQuickAdd={(t) => {
-              addPart(t)
-              setMobilePaletteOpen(false)
+      {/* Blockly Code View (Kept mounted to preserve workspace & block highlights) */}
+      <div className={view === "code" ? "flex-1 min-h-0 w-full overflow-hidden" : "hidden"}>
+        <BlocklyEditor
+          circuit={state}
+          xml={blocklyXml}
+          onXmlChange={setBlocklyXml}
+          onWorkspaceReady={(ws) => {
+            visualWorkspaceRef.current = ws
+          }}
+        />
+      </div>
+
+      {/* Circuit Studio View */}
+      <div className={view !== "code" ? "flex min-h-0 flex-1 relative" : "hidden"}>
+        <Palette
+          onQuickAdd={(t) => {
+            addPart(t)
+            setMobilePaletteOpen(false)
+          }}
+          isOpen={mobilePaletteOpen}
+          onClose={() => setMobilePaletteOpen(false)}
+        />
+        <main className="relative min-w-0 flex-1 flex flex-col overflow-hidden pb-16 md:pb-0">
+          <div className="flex-1 relative">
+            {/* Mobile Quick-Add Components Trigger */}
+            <button
+              onClick={() => setMobilePaletteOpen(true)}
+              className="md:hidden absolute top-3 left-3 z-20 flex items-center gap-1.5 rounded-xl bg-card/90 backdrop-blur-sm border border-border px-3 py-1.5 text-xs font-bold shadow-md text-foreground hover:bg-secondary cursor-pointer"
+              title="Open Components Palette"
+            >
+              <span className="text-primary text-sm font-black">+</span>
+              <span>Components</span>
+            </button>
+
+            {/* Re-open Inspector Button when closed */}
+            {!isInspectorOpen && (
+              <button
+                onClick={() => setIsInspectorOpen(true)}
+                className="absolute top-3 right-3 z-20 flex items-center gap-1.5 rounded-xl bg-card/90 backdrop-blur-sm border border-border px-3 py-1.5 text-xs font-bold shadow-md text-foreground hover:bg-secondary cursor-pointer transition animate-in fade-in"
+                title="Open Inspector Panel"
+              >
+                <Sliders size={14} className="text-primary" />
+                <span className="hidden sm:inline">Inspector</span>
+              </button>
+            )}
+
+            <CircuitCanvas
+              parts={state.parts}
+              wires={state.wires}
+              selectedId={selectedId}
+              tool="select"
+              wiring={wiring}
+              runtime={runtime}
+              running={running}
+              wireCurrents={wireCurrents}
+              probeRed={probeRed}
+              probeBlack={probeBlack}
+              activeProbeToPlace={activeProbeToPlace}
+              onProbeClip={handleProbeClip}
+              onSelect={(id) => {
+                setSelectedId(id)
+                if (id) {
+                  setSelectedWireId(null)
+                  setIsInspectorOpen(true)
+                }
+              }}
+              onMovePart={movePart}
+              onPinDown={handlePinDown}
+              onCancelWire={() => setWiring(null)}
+              onDeleteWire={deleteWire}
+              onDropPart={addPart}
+              onInteract={interact}
+              selectedWireId={selectedWireId}
+              onSelectWire={(id) => {
+                setSelectedWireId(id)
+                if (id) setSelectedId(null)
+              }}
+              onCanvasContextMenu={handleCanvasContextMenu}
+            />
+
+            {running && (
+              <div
+                className={`pointer-events-none absolute left-1/2 top-4 -translate-x-1/2 rounded-full border backdrop-blur-sm px-4 py-1.5 font-mono text-xs shadow-lg flex items-center gap-2 transition-all ${
+                  isPaused
+                    ? "border-amber-500/50 bg-amber-950/85 text-amber-300 ring-2 ring-amber-500/20"
+                    : "border-emerald-500/40 bg-emerald-950/80 text-emerald-400"
+                }`}
+              >
+                <span
+                  className={`h-2 w-2 rounded-full ${
+                    isPaused ? "bg-amber-400" : "bg-emerald-400 animate-ping"
+                  }`}
+                />
+                <span>{isPaused ? `Paused at Step (${runTime}s)` : `Simulation Active (${runTime}s)`}</span>
+                {isPaused && activeStepBlock && (
+                  <span className="max-w-[240px] truncate text-[11px] text-amber-200 bg-amber-900/70 px-2 py-0.5 rounded-md font-mono border border-amber-600/50 font-bold">
+                    {activeStepBlock.label}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Sliding Serial Monitor Panel */}
+          <SerialMonitor
+            lines={serialLines}
+            isOpen={isSerialOpen}
+            onToggle={() => setIsSerialOpen((prev) => !prev)}
+            onClear={() => setSerialLines([])}
+            onSend={(text) => {
+              setSerialLines((prev) => [
+                ...prev,
+                { text, timestamp: Date.now(), type: "input" },
+              ])
             }}
-            isOpen={mobilePaletteOpen}
-            onClose={() => setMobilePaletteOpen(false)}
           />
-          <main className="relative min-w-0 flex-1 flex flex-col overflow-hidden pb-16 md:pb-0">
-            <div className="flex-1 relative">
-              {/* Mobile Quick-Add Components Trigger */}
-              <button
-                onClick={() => setMobilePaletteOpen(true)}
-                className="md:hidden absolute top-3 left-3 z-20 flex items-center gap-1.5 rounded-xl bg-card/90 backdrop-blur-sm border border-border px-3 py-1.5 text-xs font-bold shadow-md text-foreground hover:bg-secondary cursor-pointer"
-                title="Open Components Palette"
-              >
-                <span className="text-primary text-sm font-black">+</span>
-                <span>Components</span>
-              </button>
 
-              {/* Re-open Inspector Button when closed */}
-              {!isInspectorOpen && (
-                <button
-                  onClick={() => setIsInspectorOpen(true)}
-                  className="absolute top-3 right-3 z-20 flex items-center gap-1.5 rounded-xl bg-card/90 backdrop-blur-sm border border-border px-3 py-1.5 text-xs font-bold shadow-md text-foreground hover:bg-secondary cursor-pointer transition animate-in fade-in"
-                  title="Open Inspector Panel"
-                >
-                  <Sliders size={14} className="text-primary" />
-                  <span className="hidden sm:inline">Inspector</span>
-                </button>
-              )}
+          {/* Mobile Bottom Dock Bar */}
+          <div className="md:hidden fixed bottom-3 inset-x-3 z-30 flex items-center justify-around rounded-2xl border border-slate-700/80 bg-slate-950/95 backdrop-blur-lg shadow-2xl py-2 px-2 text-xs font-semibold text-white">
+            <button
+              onClick={() => setMobilePaletteOpen(true)}
+              className="flex flex-col items-center gap-0.5 p-1 text-foreground hover:text-primary transition active:scale-95"
+              title="Add Components"
+            >
+              <Boxes size={18} className="text-primary" />
+              <span className="text-[10px]">Parts</span>
+            </button>
 
-              <CircuitCanvas
-                parts={state.parts}
-                wires={state.wires}
-                selectedId={selectedId}
-                tool="select"
-                wiring={wiring}
-                runtime={runtime}
-                running={running}
-                wireCurrents={wireCurrents}
-                probeRed={probeRed}
-                probeBlack={probeBlack}
-                activeProbeToPlace={activeProbeToPlace}
-                onProbeClip={handleProbeClip}
-                onSelect={(id) => {
-                  setSelectedId(id)
-                  if (id) {
-                    setSelectedWireId(null)
-                    setIsInspectorOpen(true)
-                  }
-                }}
-                onMovePart={movePart}
-                onPinDown={handlePinDown}
-                onCancelWire={() => setWiring(null)}
-                onDeleteWire={deleteWire}
-                onDropPart={addPart}
-                onInteract={interact}
-                selectedWireId={selectedWireId}
-                onSelectWire={(id) => {
-                  setSelectedWireId(id)
-                  if (id) setSelectedId(null)
-                }}
-                onCanvasContextMenu={handleCanvasContextMenu}
-              />
-              {running && (
-                <div className="pointer-events-none absolute left-1/2 top-4 -translate-x-1/2 rounded-full border border-emerald-500/40 bg-emerald-950/80 backdrop-blur-sm px-4 py-1.5 font-mono text-xs text-emerald-400 shadow-lg flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
-                  <span>Simulation Active ({runTime}s)</span>
-                </div>
-              )}
-            </div>
+            <button
+              onClick={() => setIsAiCameraOpen((prev) => !prev)}
+              className={`flex flex-col items-center gap-0.5 p-1 transition active:scale-95 ${
+                isAiCameraOpen ? "text-purple-400 font-bold" : "text-muted-foreground hover:text-foreground"
+              }`}
+              title="Toggle AI Camera"
+            >
+              <Camera size={18} className={isAiCameraOpen ? "text-purple-400" : ""} />
+              <span className="text-[10px]">AI Cam</span>
+            </button>
 
-            {/* Sliding Serial Monitor Panel */}
-            <SerialMonitor
-              lines={serialLines}
-              isOpen={isSerialOpen}
-              onToggle={() => setIsSerialOpen((prev) => !prev)}
-              onClear={() => setSerialLines([])}
-              onSend={(text) => {
-                setSerialLines((prev) => [
-                  ...prev,
-                  { text, timestamp: Date.now(), type: "input" },
-                ])
-              }}
-            />
+            <button
+              onClick={() => setIsDmmOpen((prev) => !prev)}
+              className={`flex flex-col items-center gap-0.5 p-1 transition active:scale-95 ${
+                isDmmOpen ? "text-amber-400 font-bold" : "text-muted-foreground hover:text-foreground"
+              }`}
+              title="Digital Multimeter"
+            >
+              <Gauge size={18} className={isDmmOpen ? "text-amber-400" : ""} />
+              <span className="text-[10px]">DMM</span>
+            </button>
 
-            {/* Mobile Bottom Dock Bar */}
-            <div className="md:hidden fixed bottom-3 inset-x-3 z-30 flex items-center justify-around rounded-2xl border border-slate-700/80 bg-slate-950/95 backdrop-blur-lg shadow-2xl py-2 px-2 text-xs font-semibold text-white">
-              <button
-                onClick={() => setMobilePaletteOpen(true)}
-                className="flex flex-col items-center gap-0.5 p-1 text-foreground hover:text-primary transition active:scale-95"
-                title="Add Components"
-              >
-                <Boxes size={18} className="text-primary" />
-                <span className="text-[10px]">Parts</span>
-              </button>
+            <button
+              onClick={() => setIsTemplatesOpen(true)}
+              className="flex flex-col items-center gap-0.5 p-1 text-indigo-400 transition active:scale-95"
+              title="Templates & Projects"
+            >
+              <Sparkles size={18} />
+              <span className="text-[10px]">Projects</span>
+            </button>
 
-              <button
-                onClick={() => setIsAiCameraOpen((prev) => !prev)}
-                className={`flex flex-col items-center gap-0.5 p-1 transition active:scale-95 ${
-                  isAiCameraOpen ? "text-purple-400 font-bold" : "text-muted-foreground hover:text-foreground"
-                }`}
-                title="Toggle AI Camera"
-              >
-                <Camera size={18} className={isAiCameraOpen ? "text-purple-400" : ""} />
-                <span className="text-[10px]">AI Cam</span>
-              </button>
+            <button
+              onClick={() => setIsSerialOpen((prev) => !prev)}
+              className={`flex flex-col items-center gap-0.5 p-1 transition active:scale-95 ${
+                isSerialOpen ? "text-primary font-bold" : "text-muted-foreground hover:text-foreground"
+              }`}
+              title="Serial Monitor"
+            >
+              <Terminal size={18} />
+              <span className="text-[10px]">Serial</span>
+            </button>
 
-              <button
-                onClick={() => setIsDmmOpen((prev) => !prev)}
-                className={`flex flex-col items-center gap-0.5 p-1 transition active:scale-95 ${
-                  isDmmOpen ? "text-amber-400 font-bold" : "text-muted-foreground hover:text-foreground"
-                }`}
-                title="Digital Multimeter"
-              >
-                <Gauge size={18} className={isDmmOpen ? "text-amber-400" : ""} />
-                <span className="text-[10px]">DMM</span>
-              </button>
-
-              <button
-                onClick={() => setIsTemplatesOpen(true)}
-                className="flex flex-col items-center gap-0.5 p-1 text-indigo-400 transition active:scale-95"
-                title="Templates & Projects"
-              >
-                <Sparkles size={18} />
-                <span className="text-[10px]">Projects</span>
-              </button>
-
-              <button
-                onClick={() => setIsSerialOpen((prev) => !prev)}
-                className={`flex flex-col items-center gap-0.5 p-1 transition active:scale-95 ${
-                  isSerialOpen ? "text-primary font-bold" : "text-muted-foreground hover:text-foreground"
-                }`}
-                title="Serial Monitor"
-              >
-                <Terminal size={18} />
-                <span className="text-[10px]">Serial</span>
-              </button>
-
-              <button
-                onClick={clearAll}
-                className="flex flex-col items-center gap-0.5 p-1 text-muted-foreground hover:text-destructive transition active:scale-95"
-                title="Clear Canvas"
-              >
-                <Trash2 size={18} />
-                <span className="text-[10px]">Clear</span>
-              </button>
-            </div>
-          </main>
-          {isInspectorOpen && (
-            <Inspector
-              part={selected}
-              runtime={selected ? runtime[selected.id] : undefined}
-              partCount={state.parts.length}
-              wireCount={state.wires.length}
-              onChangeProp={changeProp}
-              onRotate={rotatePart}
-              onDelete={deletePart}
-              onDuplicate={duplicatePart}
-              onClose={() => {
-                setIsInspectorOpen(false)
-                setSelectedId(null)
-              }}
-            />
-          )}
-        </div>
-      )}
+            <button
+              onClick={clearAll}
+              className="flex flex-col items-center gap-0.5 p-1 text-muted-foreground hover:text-destructive transition active:scale-95"
+              title="Clear Canvas"
+            >
+              <Trash2 size={18} />
+              <span className="text-[10px]">Clear</span>
+            </button>
+          </div>
+        </main>
+        {isInspectorOpen && (
+          <Inspector
+            part={selected}
+            runtime={selected ? runtime[selected.id] : undefined}
+            partCount={state.parts.length}
+            wireCount={state.wires.length}
+            onChangeProp={changeProp}
+            onRotate={rotatePart}
+            onDelete={deletePart}
+            onDuplicate={duplicatePart}
+            onClose={() => {
+              setIsInspectorOpen(false)
+              setSelectedId(null)
+            }}
+          />
+        )}
+      </div>
 
       {/* Custom Context Menu */}
       {contextMenu && (

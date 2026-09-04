@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom"
-import { CircuitBoard, Play, Square, Trash2, ArrowLeft, Undo2, Redo2, Save, Terminal, Volume2, VolumeX, Sparkles, Camera, Gauge, Sliders } from "lucide-react"
+import { CircuitBoard, Play, Square, Trash2, ArrowLeft, Undo2, Redo2, Save, Terminal, Volume2, VolumeX, Sparkles, Camera, Gauge, Sliders, Pause, StepForward, FastForward } from "lucide-react"
 
 export type WorkbenchView = "circuit" | "code" | "3d"
 
@@ -40,6 +40,14 @@ interface Props {
   onSelectWireColor?: (color: string) => void
   selectedWireId?: string | null
   onDeleteSelectedWire?: () => void
+  // Stepping Debugger Props
+  isPaused?: boolean
+  onPause?: () => void
+  onResume?: () => void
+  onStepNext?: () => void
+  debugSpeed?: "normal" | "slow" | "step"
+  onDebugSpeedChange?: (speed: "normal" | "slow" | "step") => void
+  activeStepLabel?: string | null
 }
 
 const VIEWS: { id: WorkbenchView; label: string; soon?: boolean }[] = [
@@ -74,6 +82,13 @@ export function Toolbar({
   onSelectWireColor,
   selectedWireId,
   onDeleteSelectedWire,
+  isPaused = false,
+  onPause,
+  onResume,
+  onStepNext,
+  debugSpeed = "normal",
+  onDebugSpeedChange,
+  activeStepLabel,
 }: Props) {
   return (
     <header className="flex h-12 md:h-14 shrink-0 items-center justify-between border-b border-border bg-card px-2.5 sm:px-4 gap-1.5 sm:gap-2">
@@ -260,18 +275,82 @@ export function Toolbar({
           <span>Clear</span>
         </button>
 
-        {/* ALWAYS-VISIBLE RUN / STOP SIMULATION BUTTON */}
-        <button
-          onClick={onToggleRun}
-          className={`flex items-center gap-1.5 rounded-lg px-3 sm:px-3.5 py-1.5 text-xs sm:text-sm font-bold transition shadow-sm cursor-pointer ${
-            running
-              ? "bg-destructive text-white hover:opacity-90 animate-pulse"
-              : "bg-emerald-600 text-white hover:bg-emerald-500 shadow-emerald-600/25"
-          }`}
-        >
-          {running ? <Square className="h-3.5 w-3.5 fill-current" /> : <Play className="h-3.5 w-3.5 fill-current" />}
-          <span>{running ? "Stop" : "Run"}</span>
-        </button>
+        {/* Active Statement HUD when Paused / Stepping */}
+        {running && isPaused && activeStepLabel && (
+          <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-[11px] font-mono text-amber-300 animate-in fade-in">
+            <span className="h-2 w-2 rounded-full bg-amber-400 animate-ping shrink-0" />
+            <span className="truncate max-w-[200px] xl:max-w-[260px]" title={activeStepLabel}>
+              ⏸ {activeStepLabel}
+            </span>
+          </div>
+        )}
+
+        {/* STEPPING & EXECUTION CONTROLS */}
+        <div className="flex items-center gap-1 bg-background p-0.5 sm:p-1 rounded-lg border border-border">
+          {/* Main Run / Stop Simulation Button */}
+          <button
+            onClick={onToggleRun}
+            className={`flex items-center gap-1.5 rounded-md px-2.5 sm:px-3 py-1 text-xs font-bold transition shadow-sm cursor-pointer ${
+              running
+                ? "bg-destructive text-white hover:opacity-90 animate-pulse"
+                : "bg-emerald-600 text-white hover:bg-emerald-500 shadow-emerald-600/25"
+            }`}
+            title={running ? "Stop Simulation" : "Run Simulation Continuously"}
+          >
+            {running ? <Square className="h-3.5 w-3.5 fill-current" /> : <Play className="h-3.5 w-3.5 fill-current" />}
+            <span>{running ? "Stop" : "Run"}</span>
+          </button>
+
+          {/* Pause / Resume Button (when running) */}
+          {running && (
+            isPaused ? (
+              <button
+                onClick={onResume}
+                className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold bg-emerald-600/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-600/30 transition cursor-pointer"
+                title="Resume continuous execution"
+              >
+                <Play className="h-3 w-3 fill-current" />
+                <span className="hidden sm:inline">Resume</span>
+              </button>
+            ) : (
+              <button
+                onClick={onPause}
+                className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold bg-amber-600/20 text-amber-300 border border-amber-500/40 hover:bg-amber-600/30 transition cursor-pointer"
+                title="Pause execution before next block"
+              >
+                <Pause className="h-3 w-3 fill-current" />
+                <span className="hidden sm:inline">Pause</span>
+              </button>
+            )
+          )}
+
+          {/* Step Next Button (available when paused or when stopped) */}
+          {(!running || isPaused) && onStepNext && (
+            <button
+              onClick={onStepNext}
+              className="flex items-center gap-1 rounded-md px-2 sm:px-2.5 py-1 text-xs font-semibold bg-amber-500 text-slate-950 hover:bg-amber-400 font-mono shadow-sm transition cursor-pointer active:scale-95"
+              title="Execute next single block and pause (Step Debugger)"
+            >
+              <StepForward className="h-3 w-3" />
+              <span>Step</span>
+            </button>
+          )}
+
+          {/* Speed Toggle: 1x / 0.5x Trace / Step */}
+          {onDebugSpeedChange && (
+            <button
+              onClick={() => {
+                const nextSpeed = debugSpeed === "normal" ? "slow" : debugSpeed === "slow" ? "step" : "normal"
+                onDebugSpeedChange(nextSpeed)
+              }}
+              className="hidden xl:flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-mono font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition cursor-pointer"
+              title="Execution Speed: 1x (Normal) -> 0.5x (Slow Trace) -> Step by Step"
+            >
+              <FastForward size={11} className={debugSpeed !== "normal" ? "text-amber-400" : ""} />
+              <span>{debugSpeed === "normal" ? "1x" : debugSpeed === "slow" ? "0.5x Trace" : "Step"}</span>
+            </button>
+          )}
+        </div>
       </div>
     </header>
   )

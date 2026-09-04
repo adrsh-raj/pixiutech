@@ -10,6 +10,7 @@ interface Props {
   circuit: CircuitState
   xml?: string
   onXmlChange?: (xml: string) => void
+  onWorkspaceReady?: (workspace: Blockly.WorkspaceSvg) => void
 }
 
 const TOOLBOX = {
@@ -111,7 +112,7 @@ const TOOLBOX = {
   ],
 }
 
-export function BlocklyEditor({ circuit, xml, onXmlChange }: Props) {
+export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: Props) {
   const blocklyDiv = useRef<HTMLDivElement>(null)
   const workspaceRef = useRef<Blockly.WorkspaceSvg | null>(null)
   const [cppCode, setCppCode] = useState("")
@@ -145,6 +146,7 @@ export function BlocklyEditor({ circuit, xml, onXmlChange }: Props) {
     })
 
     workspaceRef.current = workspace
+    onWorkspaceReady?.(workspace)
 
     // Load initial Arduino Program block
     const initialXml = xml || `<xml xmlns="https://developers.google.com/blockly/xml">
@@ -281,6 +283,14 @@ export function BlocklyEditor({ circuit, xml, onXmlChange }: Props) {
         .blocklySvg svg,
         .blocklySvg g {
           max-width: none !important;
+        }
+
+        /* Glowing amber highlight for actively executing / stepped block */
+        .blocklyHighlighted > .blocklyPath {
+          stroke: #f59e0b !important;
+          stroke-width: 4px !important;
+          filter: drop-shadow(0 0 12px rgba(245, 158, 11, 0.95)) !important;
+          transition: stroke 0.15s ease, filter 0.15s ease;
         }
       `}</style>
 
