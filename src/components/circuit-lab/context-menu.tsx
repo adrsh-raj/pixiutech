@@ -15,6 +15,7 @@ import {
   Square,
   Palette,
   Gauge,
+  Activity,
   X,
 } from "lucide-react"
 
@@ -38,6 +39,8 @@ interface Props {
   onOpenPalette?: () => void
   onOpenTemplates?: () => void
   onToggleDmm?: () => void
+  isScopeOpen?: boolean
+  onToggleScope?: () => void
   onToggleSerial?: () => void
   onToggleAiCamera?: () => void
   onSwitchToCode?: () => void
@@ -71,6 +74,8 @@ export function ContextMenu({
   onOpenPalette,
   onOpenTemplates,
   onToggleDmm,
+  isScopeOpen,
+  onToggleScope,
   onToggleSerial,
   onToggleAiCamera,
   onSwitchToCode,
@@ -307,6 +312,16 @@ export function ContextMenu({
           >
             <Gauge size={13} className="text-amber-400" />
             <span>Digital Multimeter (DMM)</span>
+          </button>
+        )}
+
+        {onToggleScope && (
+          <button
+            onClick={() => action(onToggleScope)}
+            className="flex w-full items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-slate-800/80 text-slate-200 transition cursor-pointer"
+          >
+            <Activity size={13} className="text-cyan-400" />
+            <span>Oscilloscope (Dual Ch)</span>
           </button>
         )}
 

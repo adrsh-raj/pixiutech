@@ -82,6 +82,28 @@ function MultimeterThumb() {
   )
 }
 
+function OscilloscopeThumb() {
+  return (
+    <svg viewBox="0 0 56 56" className="h-14 w-14 shrink-0">
+      {/* Scope Chassis */}
+      <rect x="6" y="6" width="44" height="44" rx="6" fill="#0b1120" stroke="#1e293b" strokeWidth="1.2" />
+      {/* CRT Screen */}
+      <rect x="10" y="10" width="36" height="26" rx="3" fill="#022c22" stroke="#065f46" strokeWidth="1" />
+      {/* Phosphor Grid */}
+      <line x1="10" y1="23" x2="46" y2="23" stroke="#047857" strokeWidth="0.5" strokeDasharray="1 2" />
+      <line x1="28" y1="10" x2="28" y2="36" stroke="#047857" strokeWidth="0.5" strokeDasharray="1 2" />
+      {/* CH1 Waveform (Yellow square/PWM) */}
+      <path d="M 12 30 L 18 30 L 18 16 L 24 16 L 24 30 L 30 30 L 30 16 L 36 16 L 36 30 L 44 30" fill="none" stroke="#facc15" strokeWidth="1.4" />
+      {/* CH2 Waveform (Cyan) */}
+      <path d="M 12 24 Q 18 17 24 24 T 36 24 T 44 24" fill="none" stroke="#06b6d4" strokeWidth="1.2" opacity="0.85" />
+      {/* Controls / BNC jacks */}
+      <circle cx="16" cy="43" r="3" fill="#1e293b" stroke="#facc15" strokeWidth="1.2" />
+      <circle cx="26" cy="43" r="3" fill="#1e293b" stroke="#06b6d4" strokeWidth="1.2" />
+      <rect x="34" y="41" width="12" height="4" rx="2" fill="#334155" />
+    </svg>
+  )
+}
+
 const CATEGORIES = [
   { id: "all", label: "All" },
   { id: "basic", label: "Basic" },
@@ -118,6 +140,8 @@ interface Props {
   onClose?: () => void
   isDmmOpen?: boolean
   onToggleDmm?: () => void
+  isScopeOpen?: boolean
+  onToggleScope?: () => void
   activeWireColor?: string
   onSelectWireColor?: (color: string) => void
 }
@@ -128,6 +152,8 @@ export function Palette({
   onClose,
   isDmmOpen = false,
   onToggleDmm,
+  isScopeOpen = false,
+  onToggleScope,
   activeWireColor = "#22c55e",
   onSelectWireColor,
 }: Props) {
@@ -162,6 +188,10 @@ export function Palette({
     !search ||
     "digital multimeter dmm voltage current resistance continuity tester probe meter".toLowerCase().includes(search.toLowerCase())
 
+  const matchesScopeSearch =
+    !search ||
+    "oscilloscope scope logic waveform grapher signal analyzer pwm frequency voltage crt".toLowerCase().includes(search.toLowerCase())
+
   const activeColorObj = WIRE_COLOR_OPTIONS.find((c) => c.color === activeWireColor)
 
   return (
@@ -183,7 +213,7 @@ export function Palette({
         <div className="border-b border-border p-3 space-y-2.5">
           <div className="flex items-center justify-between">
             <h2 className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
-              Components ({PALETTE_ORDER.length + 2})
+              Components ({PALETTE_ORDER.length + 3})
             </h2>
             {onClose && (
               <button
@@ -203,7 +233,7 @@ export function Palette({
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search parts, multimeter, wire..."
+              placeholder="Search parts, multimeter, scope, wire..."
               className="w-full bg-background border border-border rounded-lg pl-8 pr-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </div>
@@ -259,6 +289,42 @@ export function Palette({
                 </span>
                 <span className="block text-[10px] text-muted-foreground line-clamp-2 leading-tight mt-0.5">
                   Measure DC Voltage, Current, Resistance & Continuity with test probes.
+                </span>
+              </span>
+            </div>
+          )}
+
+          {/* 2. Mini Oscilloscope & Logic Waveform Grapher in Palette */}
+          {showTools && matchesScopeSearch && (
+            <div
+              onClick={onToggleScope}
+              className={`group flex w-full items-center gap-3 rounded-xl border p-2 text-left transition-all cursor-pointer ${
+                isScopeOpen
+                  ? "border-cyan-500/60 bg-cyan-500/10 shadow-xs"
+                  : "border-transparent hover:border-border hover:bg-secondary/70"
+              }`}
+              title={isScopeOpen ? "Oscilloscope is active on canvas (Click to close)" : "Open Mini Oscilloscope on canvas"}
+            >
+              <span className="grid h-14 w-14 place-items-center rounded-lg bg-background/80 ring-1 ring-border shadow-xs shrink-0">
+                <OscilloscopeThumb />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="flex items-center justify-between gap-1">
+                  <span className="block truncate font-bold text-xs text-foreground group-hover:text-primary transition">
+                    Oscilloscope (Dual Ch)
+                  </span>
+                  <span
+                    className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md uppercase font-mono ${
+                      isScopeOpen
+                        ? "bg-cyan-500/25 text-cyan-300 border border-cyan-500/50"
+                        : "bg-secondary text-muted-foreground"
+                    }`}
+                  >
+                    {isScopeOpen ? "Active" : "Open"}
+                  </span>
+                </span>
+                <span className="block text-[10px] text-muted-foreground line-clamp-2 leading-tight mt-0.5">
+                  Dual-channel real-time signal grapher for PWM, digital clock pulses & analog voltages.
                 </span>
               </span>
             </div>

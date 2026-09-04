@@ -29,6 +29,10 @@ interface Props {
   probeBlack?: PinRef | null
   activeProbeToPlace?: "red" | "black" | null
   onProbeClip?: (ref: PinRef) => void
+  scopeProbeCH1?: PinRef | null
+  scopeProbeCH2?: PinRef | null
+  activeScopeProbeToPlace?: "ch1" | "ch2" | null
+  onScopeProbeClip?: (ref: PinRef) => void
   onSelect: (id: string | null) => void
   onMovePart: (id: string, x: number, y: number) => void
   onPinDown: (ref: PinRef) => void
@@ -55,6 +59,10 @@ export function CircuitCanvas(props: Props) {
     probeBlack,
     activeProbeToPlace,
     onProbeClip,
+    scopeProbeCH1,
+    scopeProbeCH2,
+    activeScopeProbeToPlace,
+    onScopeProbeClip,
     onSelect,
     onMovePart,
     onPinDown,
@@ -195,6 +203,10 @@ export function CircuitCanvas(props: Props) {
 
   const onPinPointerDown = (e: React.PointerEvent, ref: PinRef) => {
     e.stopPropagation()
+    if (activeScopeProbeToPlace) {
+      onScopeProbeClip?.(ref)
+      return
+    }
     if (activeProbeToPlace) {
       onProbeClip?.(ref)
       return
@@ -507,6 +519,41 @@ export function CircuitCanvas(props: Props) {
                   <rect x={-20} y={-10} width={40} height={12} rx={3} fill="#0f172a" stroke="#cbd5e1" strokeWidth={0.8} />
                   <text y={-1} textAnchor="middle" fontSize={7.5} fontWeight={700} fill="#ffffff" fontFamily="monospace">
                     BLK (-)
+                  </text>
+                </g>
+              </g>
+            )
+          })()}
+          {/* 6. Oscilloscope Probe Clips Overlay (CH1 Yellow / CH2 Cyan) */}
+          {scopeProbeCH1 && (() => {
+            const pos = getPinRefPosition(scopeProbeCH1, parts)
+            if (!pos) return null
+            return (
+              <g transform={`translate(${pos.x} ${pos.y})`} className="pointer-events-none">
+                <circle r={12} fill="#facc15" opacity={0.35} className="animate-ping" />
+                <circle r={6.5} fill="#facc15" stroke="#ffffff" strokeWidth={1.8} />
+                <path d="M-2 -8 L2 -8 L1 -4 L-1 -4 Z" fill="#facc15" />
+                <g transform="translate(0, -12)">
+                  <rect x={-24} y={-10} width={48} height={12} rx={3} fill="#854d0e" stroke="#fef08a" strokeWidth={0.8} />
+                  <text y={-1} textAnchor="middle" fontSize={7.5} fontWeight={700} fill="#ffffff" fontFamily="monospace">
+                    CH1 (YEL)
+                  </text>
+                </g>
+              </g>
+            )
+          })()}
+          {scopeProbeCH2 && (() => {
+            const pos = getPinRefPosition(scopeProbeCH2, parts)
+            if (!pos) return null
+            return (
+              <g transform={`translate(${pos.x} ${pos.y})`} className="pointer-events-none">
+                <circle r={12} fill="#06b6d4" opacity={0.35} className="animate-ping" />
+                <circle r={6.5} fill="#06b6d4" stroke="#ffffff" strokeWidth={1.8} />
+                <path d="M-2 -8 L2 -8 L1 -4 L-1 -4 Z" fill="#06b6d4" />
+                <g transform="translate(0, -12)">
+                  <rect x={-24} y={-10} width={48} height={12} rx={3} fill="#0e7490" stroke="#a5f3fc" strokeWidth={0.8} />
+                  <text y={-1} textAnchor="middle" fontSize={7.5} fontWeight={700} fill="#ffffff" fontFamily="monospace">
+                    CH2 (CYAN)
                   </text>
                 </g>
               </g>

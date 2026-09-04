@@ -14,6 +14,7 @@ import * as Blockly from "blockly"
 import { Boxes, Camera, Sparkles, Terminal, Trash2, Gauge, Sliders } from "lucide-react"
 import { computeWireCurrents } from "@/lib/current-flow"
 import { Multimeter } from "./multimeter"
+import { Oscilloscope } from "./oscilloscope"
 import { CircuitCanvas } from "./circuit-canvas"
 import { Inspector } from "./inspector"
 import { Palette } from "./palette"
@@ -118,6 +119,11 @@ export function Workbench() {
   const [probeBlack, setProbeBlack] = useState<PinRef | null>(null)
   const [activeProbeToPlace, setActiveProbeToPlace] = useState<"red" | "black" | null>(null)
 
+  const [isScopeOpen, setIsScopeOpen] = useState(false)
+  const [scopeProbeCH1, setScopeProbeCH1] = useState<PinRef | null>(null)
+  const [scopeProbeCH2, setScopeProbeCH2] = useState<PinRef | null>(null)
+  const [activeScopeProbeToPlace, setActiveScopeProbeToPlace] = useState<"ch1" | "ch2" | null>(null)
+
   // Stepping debugger state & refs
   const [isPaused, setIsPaused] = useState(false)
   const [debugSpeed, setDebugSpeed] = useState<"normal" | "slow" | "step">("normal")
@@ -157,6 +163,16 @@ export function Workbench() {
       setActiveProbeToPlace(null)
     }
   }, [activeProbeToPlace])
+
+  const handleScopeProbeClip = useCallback((ref: PinRef) => {
+    if (activeScopeProbeToPlace === "ch1") {
+      setScopeProbeCH1(ref)
+      setActiveScopeProbeToPlace(null)
+    } else if (activeScopeProbeToPlace === "ch2") {
+      setScopeProbeCH2(ref)
+      setActiveScopeProbeToPlace(null)
+    }
+  }, [activeScopeProbeToPlace])
 
   const handleCanvasContextMenu = useCallback((e: React.MouseEvent, target: ContextMenuTarget) => {
     e.preventDefault()
@@ -573,6 +589,10 @@ export function Workbench() {
     setSerialLines([])
     setBlocklyXml(DEFAULT_XML)
     setIsAiCameraOpen(false)
+    setProbeRed(null)
+    setProbeBlack(null)
+    setScopeProbeCH1(null)
+    setScopeProbeCH2(null)
   }, [stopProgram, updateState])
 
   const toggleRun = useCallback(() => {
@@ -794,6 +814,8 @@ export function Workbench() {
           onClose={() => setMobilePaletteOpen(false)}
           isDmmOpen={isDmmOpen}
           onToggleDmm={() => setIsDmmOpen((prev) => !prev)}
+          isScopeOpen={isScopeOpen}
+          onToggleScope={() => setIsScopeOpen((prev) => !prev)}
           activeWireColor={selectedWire ? selectedWire.color : activeWireColor}
           onSelectWireColor={handleSelectWireColor}
         />
@@ -834,6 +856,10 @@ export function Workbench() {
               probeBlack={probeBlack}
               activeProbeToPlace={activeProbeToPlace}
               onProbeClip={handleProbeClip}
+              scopeProbeCH1={scopeProbeCH1}
+              scopeProbeCH2={scopeProbeCH2}
+              activeScopeProbeToPlace={activeScopeProbeToPlace}
+              onScopeProbeClip={handleScopeProbeClip}
               onSelect={(id) => {
                 setSelectedId(id)
                 if (id) {
@@ -1002,6 +1028,8 @@ export function Workbench() {
           onToggleSerial={() => setIsSerialOpen((prev) => !prev)}
           isDmmOpen={isDmmOpen}
           onToggleDmm={() => setIsDmmOpen((prev) => !prev)}
+          isScopeOpen={isScopeOpen}
+          onToggleScope={() => setIsScopeOpen((prev) => !prev)}
           onToggleAiCamera={() => setIsAiCameraOpen((prev) => !prev)}
           onSwitchToCode={() => setView("code")}
           onToggleRun={toggleRun}
@@ -1025,6 +1053,22 @@ export function Workbench() {
         activeProbeToPlace={activeProbeToPlace}
         onSetActiveProbeToPlace={setActiveProbeToPlace}
         isAiCameraOpen={isAiCameraOpen}
+      />
+
+      {/* Interactive Mini Oscilloscope & Logic Waveform Grapher */}
+      <Oscilloscope
+        isOpen={isScopeOpen}
+        onClose={() => setIsScopeOpen(false)}
+        state={state}
+        runtime={runtime}
+        pinStates={pinStates}
+        running={running}
+        probeCH1={scopeProbeCH1}
+        probeCH2={scopeProbeCH2}
+        onSetProbeCH1={setScopeProbeCH1}
+        onSetProbeCH2={setScopeProbeCH2}
+        activeProbeToPlace={activeScopeProbeToPlace}
+        onSetActiveProbeToPlace={setActiveScopeProbeToPlace}
       />
     </div>
   )
