@@ -184,17 +184,25 @@ export function DataProvider({ children }) {
   });
   const [comms, setComms] = useState(() => safeGetItem('pixiu_comms', []));
   const [projects, setProjects] = useState(() => {
-    const saved = safeGetItem('pixiu_projects', null);
-    if (!saved || !saved.length) return SEED_PROJECTS;
-    return saved;
+    try {
+      const saved = safeGetItem('pixiu_projects', null);
+      if (!saved || !Array.isArray(saved)) return SEED_PROJECTS;
+      const userCreated = saved.filter(p => !p.id?.startsWith('PRJ-XYZ-') && !p.id?.startsWith('PRJ-ZPS-'));
+      localStorage.setItem('pixiu_projects', JSON.stringify(userCreated));
+      return userCreated;
+    } catch (e) {
+      return SEED_PROJECTS;
+    }
   });
   const [alerts, setAlerts] = useState(() => safeGetItem('pixiu_alerts', SEED_ALERTS));
   const [notifications, setNotifications] = useState(() => safeGetItem('pixiu_notifications', SEED_NOTIFICATIONS));
   const [studentReviews, setStudentReviews] = useState(() => {
     try {
       const raw = safeGetItem('pixiu_student_reviews', null);
-      if (!raw || !raw.length) return SEED_STUDENT_REVIEWS;
-      return raw;
+      if (!raw || !Array.isArray(raw)) return SEED_STUDENT_REVIEWS;
+      const userCreated = raw.filter(r => !r.id?.startsWith('REV-XYZ-') && !r.id?.startsWith('REV-ZPS-'));
+      localStorage.setItem('pixiu_student_reviews', JSON.stringify(userCreated));
+      return userCreated;
     } catch (e) {
       return SEED_STUDENT_REVIEWS;
     }

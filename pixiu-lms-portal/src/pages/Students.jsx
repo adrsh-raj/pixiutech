@@ -26,13 +26,13 @@ export default function Students() {
   // Add Modal State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [formData, setFormData] = useState({
-    schoolCode: 'ZPS', class: '6', section: 'A', roll: '', name: '', parent: '', phone: '', level: 'Level 1', assigned_kit_id: 'KIT-6001'
+    schoolCode: 'ZPS', class: '6', section: 'A', roll: '', name: '', parent: '', phone: '', level: 'Level 0', assigned_kit_id: 'KIT-6001'
   });
 
   // Edit Modal State
   const [editingStudent, setEditingStudent] = useState(null);
   const [editFormData, setEditFormData] = useState({
-    name: '', parent_name: '', parent_whatsapp: '', tech_level: 'Level 1', status: 'Active', assigned_kit_id: ''
+    name: '', parent_name: '', parent_whatsapp: '', tech_level: 'Level 0', status: 'Active', assigned_kit_id: ''
   });
 
   useEffect(() => {
@@ -139,7 +139,7 @@ export default function Students() {
       name: student.name || '',
       parent_name: student.parent_name || '',
       parent_whatsapp: student.parent_whatsapp || '',
-      tech_level: student.tech_level || 'Level 1',
+      tech_level: student.tech_level || 'Level 0',
       status: student.status || 'Active',
       assigned_kit_id: student.assigned_kit_id || ''
     });

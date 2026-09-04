@@ -562,7 +562,7 @@ export default function StudentPortal() {
               <p className="text-[10px] sm:text-xs text-slate-400 font-bold uppercase tracking-wider">Mastery</p>
               <div className="flex flex-wrap items-baseline gap-1 sm:gap-1.5 mt-0.5">
                 <span className="text-sm sm:text-lg font-black text-slate-800">
-                  {student.tech_level?.split('(')[0]?.trim() || student.tech_level || 'Level 1'}
+                  {student.tech_level?.split('(')[0]?.trim() || student.tech_level || 'Level 0'}
                 </span>
                 {student.tech_level?.includes('(') && (
                   <span className="text-[10px] sm:text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">

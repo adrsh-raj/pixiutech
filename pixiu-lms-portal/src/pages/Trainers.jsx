@@ -3,7 +3,7 @@ import {
   GraduationCap, Plus, Phone, Building2, Star, CheckCircle, Clock, X, Trash2, 
   Play, User, Users, Camera, Check, FileText, Upload, Image as ImageIcon, IndianRupee, 
   Calendar, AlertTriangle, ShieldAlert, Lock, Unlock, Bell, Send, History, 
-  CheckSquare, XSquare, ChevronRight, BookOpen, Megaphone, Edit3, Award, MessageSquare, Box, Download, Cpu, Search
+  CheckSquare, XSquare, ChevronRight, BookOpen, Megaphone, Edit3, Award, Box, Download, Cpu, Search
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useData } from '../context/DataContext';
@@ -1291,7 +1291,7 @@ export default function Trainers() {
                             <Award size={13} className="text-slate-500" /> Syllabus Level:
                           </span>
                           <span className="font-semibold text-slate-700 text-[11px]">
-                            {student.tech_level || 'Level 1'}
+                            {student.tech_level || 'Level 0'}
                           </span>
                         </div>
 
@@ -1407,19 +1407,6 @@ export default function Trainers() {
                       >
                         <Download size={14} />
                       </button>
-
-                      {/* WhatsApp Button */}
-                      {student.parent_phone && (
-                        <a
-                          href={`https://wa.me/${student.parent_phone.replace(/[^0-9]/g, '')}?text=Hello%20${encodeURIComponent(student.parent_name || 'Parent')},%20this%20is%20Pixiu%20Tech%20Robotics%20Lab%20regarding%20${encodeURIComponent(student.name)}'s%20progress.`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-200 rounded-lg transition-all cursor-pointer"
-                          title="WhatsApp Parent"
-                        >
-                          <MessageSquare size={14} />
-                        </a>
-                      )}
                     </div>
                   </div>
                 </div>
