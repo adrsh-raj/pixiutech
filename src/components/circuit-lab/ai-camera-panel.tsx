@@ -26,7 +26,7 @@ export function AiCameraPanel({ isOpen, onClose, aiState, onAiStateChange, isSim
   const [cameraError, setCameraError] = useState<string | null>(null)
   const [modelLoading, setModelLoading] = useState(false)
   const [modelLoaded, setModelLoaded] = useState(false)
-  const [minimized, setMinimized] = useState(() => typeof window !== "undefined" && window.innerWidth < 768)
+  const [minimized, setMinimized] = useState(false)
 
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -34,6 +34,22 @@ export function AiCameraPanel({ isOpen, onClose, aiState, onAiStateChange, isSim
   const modelRef = useRef<cocoSsd.ObjectDetection | null>(null)
   const animFrameRef = useRef<number | null>(null)
   const manualOverrideRef = useRef<boolean>(false)
+
+  // Auto-activate webcam whenever the AI panel is opened
+  useEffect(() => {
+    if (isOpen) {
+      setCameraActive(true)
+      setMinimized(false)
+    }
+  }, [isOpen])
+
+  // Also ensure camera is active and expanded when simulation starts running
+  useEffect(() => {
+    if (isOpen && isSimRunning) {
+      setCameraActive(true)
+      setMinimized(false)
+    }
+  }, [isOpen, isSimRunning])
 
   // 1. Load COCO-SSD Neural Network Model
   useEffect(() => {
@@ -236,7 +252,7 @@ export function AiCameraPanel({ isOpen, onClose, aiState, onAiStateChange, isSim
 
   return (
     <div
-      className={`fixed bottom-3 sm:bottom-12 right-2 sm:right-6 z-40 flex flex-col rounded-2xl border border-purple-500/40 bg-slate-950/95 shadow-2xl backdrop-blur-md text-white overflow-hidden transition-all duration-300 max-h-[85vh] ${
+      className={`fixed bottom-16 sm:bottom-12 right-2 sm:right-6 z-40 flex flex-col rounded-2xl border border-purple-500/40 bg-slate-950/95 shadow-2xl backdrop-blur-md text-white overflow-hidden transition-all duration-300 max-h-[85vh] ${
         minimized ? "!w-auto max-w-[calc(100vw-16px)]" : "w-[calc(100vw-16px)] sm:w-96"
       }`}
       style={{ boxShadow: "0 10px 35px -5px rgba(168, 85, 247, 0.35)" }}
@@ -365,6 +381,75 @@ export function AiCameraPanel({ isOpen, onClose, aiState, onAiStateChange, isSim
                 {aiState.confidence}%
               </span>
             )}
+          </div>
+
+          {/* Quick AI Test Targets (1-Tap Simulation without needing physical items) */}
+          <div className="px-3 py-2 bg-slate-900/90 border-b border-slate-800">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                Quick Test Targets {manualOverrideRef.current && <span className="text-purple-400 normal-case">(Manual Active)</span>}
+              </span>
+              {manualOverrideRef.current && (
+                <button
+                  onClick={resetToRealCamera}
+                  className="text-[10px] text-purple-400 hover:text-purple-300 flex items-center gap-1 cursor-pointer font-semibold"
+                  title="Switch back to live webcam AI detection"
+                >
+                  <RefreshCw size={10} />
+                  <span>Use Live Cam</span>
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-4 gap-1.5">
+              <button
+                onClick={() => handleManualTarget("car", 94)}
+                className={`flex items-center justify-center gap-1 py-1 px-1 rounded-lg text-[11px] font-bold transition cursor-pointer border ${
+                  aiState.detectedClass === "car"
+                    ? "bg-emerald-600 text-white border-emerald-400 shadow-xs shadow-emerald-500/30"
+                    : "bg-slate-800/80 hover:bg-slate-800 text-slate-300 border-slate-700"
+                }`}
+                title="Simulate Car Detection (Opens Boom Barrier)"
+              >
+                <Car size={12} />
+                <span>Car</span>
+              </button>
+              <button
+                onClick={() => handleManualTarget("phone", 89)}
+                className={`flex items-center justify-center gap-1 py-1 px-1 rounded-lg text-[11px] font-bold transition cursor-pointer border ${
+                  aiState.detectedClass === "phone"
+                    ? "bg-purple-600 text-white border-purple-400 shadow-xs shadow-purple-500/30"
+                    : "bg-slate-800/80 hover:bg-slate-800 text-slate-300 border-slate-700"
+                }`}
+                title="Simulate Phone Detection"
+              >
+                <Smartphone size={12} />
+                <span>Phone</span>
+              </button>
+              <button
+                onClick={() => handleManualTarget("person", 92)}
+                className={`flex items-center justify-center gap-1 py-1 px-1 rounded-lg text-[11px] font-bold transition cursor-pointer border ${
+                  aiState.detectedClass === "person"
+                    ? "bg-blue-600 text-white border-blue-400 shadow-xs shadow-blue-500/30"
+                    : "bg-slate-800/80 hover:bg-slate-800 text-slate-300 border-slate-700"
+                }`}
+                title="Simulate Person Detection"
+              >
+                <User size={12} />
+                <span>Person</span>
+              </button>
+              <button
+                onClick={() => handleManualTarget("none", 0)}
+                className={`flex items-center justify-center gap-1 py-1 px-1 rounded-lg text-[11px] font-bold transition cursor-pointer border ${
+                  aiState.detectedClass === "none"
+                    ? "bg-slate-700 text-white border-slate-500"
+                    : "bg-slate-800/80 hover:bg-slate-800 text-slate-400 border-slate-700"
+                }`}
+                title="Clear Detection (Closes Barrier)"
+              >
+                <Ban size={12} />
+                <span>Clear</span>
+              </button>
+            </div>
           </div>
 
           {/* Circuit Simulation Status / Quick Run Trigger */}

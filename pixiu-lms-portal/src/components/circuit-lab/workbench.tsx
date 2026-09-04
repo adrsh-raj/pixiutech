@@ -437,6 +437,20 @@ export function Workbench() {
     const controller = new AbortController()
     runnerAbortRef.current = controller
 
+    // Auto-open AI Vision HUD if current program uses AI Vision blocks
+    const usesAi = Boolean(
+      blocklyXml.includes('type="ai_') ||
+      blocklyXml.includes("ai_is_detected") ||
+      blocklyXml.includes("ai_get_detected_class") ||
+      blocklyXml.includes("ai_confidence") ||
+      blocklyXml.includes("ai_camera_enable")
+    )
+    if (usesAi) {
+      setIsAiCameraOpen(true)
+    } else {
+      setIsAiCameraOpen(false)
+    }
+
     try {
       defineArduinoBlocks()
       const workspace = new Blockly.Workspace()
@@ -550,8 +564,11 @@ export function Workbench() {
       setSelectedWireId(null)
       setWiring(null)
       setSerialLines([])
-      if (tmpl.tags.includes("AI Vision") || tmpl.id.includes("ai")) {
+      const tmplUsesAi = tmpl.tags.includes("AI Vision") || tmpl.id.includes("ai") || tmpl.blocklyXml.includes('type="ai_')
+      if (tmplUsesAi) {
         setIsAiCameraOpen(true)
+      } else {
+        setIsAiCameraOpen(false)
       }
     },
     [stopProgram, updateState],
