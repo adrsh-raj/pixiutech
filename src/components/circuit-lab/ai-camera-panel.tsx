@@ -35,21 +35,19 @@ export function AiCameraPanel({ isOpen, onClose, aiState, onAiStateChange, isSim
   const animFrameRef = useRef<number | null>(null)
   const manualOverrideRef = useRef<boolean>(false)
 
-  // Auto-activate webcam whenever the AI panel is opened
+  // Activate webcam when AI panel is opened, stop tracks when closed
   useEffect(() => {
     if (isOpen) {
       setCameraActive(true)
       setMinimized(false)
+    } else {
+      setCameraActive(false)
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop())
+        streamRef.current = null
+      }
     }
   }, [isOpen])
-
-  // Also ensure camera is active and expanded when simulation starts running
-  useEffect(() => {
-    if (isOpen && isSimRunning) {
-      setCameraActive(true)
-      setMinimized(false)
-    }
-  }, [isOpen, isSimRunning])
 
   // 1. Load COCO-SSD Neural Network Model
   useEffect(() => {
@@ -249,6 +247,8 @@ export function AiCameraPanel({ isOpen, onClose, aiState, onAiStateChange, isSim
       confidence: 0,
     })
   }
+
+  if (!isOpen) return null
 
   return (
     <div

@@ -32,33 +32,35 @@ const DEFAULT_XML = `<xml xmlns="https://developers.google.com/blockly/xml">
       <block type="serial_begin">
         <field name="BAUD">9600</field>
         <next>
-          <block type="servo_write">
-            <field name="PIN">6</field>
-            <value name="ANGLE">
+          <block type="io_pinmode">
+            <field name="PIN">13</field>
+            <field name="MODE">OUTPUT</field>
+          </block>
+        </next>
+      </block>
+    </statement>
+    <statement name="LOOP">
+      <block type="io_digitalwrite">
+        <field name="PIN">13</field>
+        <field name="STATE">HIGH</field>
+        <next>
+          <block type="time_delay">
+            <value name="MS">
               <shadow type="math_number">
-                <field name="NUM">0</field>
+                <field name="NUM">1000</field>
               </shadow>
             </value>
             <next>
-              <block type="io_pinmode">
-                <field name="PIN">12</field>
-                <field name="MODE">OUTPUT</field>
+              <block type="io_digitalwrite">
+                <field name="PIN">13</field>
+                <field name="STATE">LOW</field>
                 <next>
-                  <block type="io_digitalwrite">
-                    <field name="PIN">12</field>
-                    <field name="STATE">LOW</field>
-                    <next>
-                      <block type="io_pinmode">
-                        <field name="PIN">13</field>
-                        <field name="MODE">OUTPUT</field>
-                        <next>
-                          <block type="io_digitalwrite">
-                            <field name="PIN">13</field>
-                            <field name="STATE">HIGH</field>
-                          </block>
-                        </next>
-                      </block>
-                    </next>
+                  <block type="time_delay">
+                    <value name="MS">
+                      <shadow type="math_number">
+                        <field name="NUM">1000</field>
+                      </shadow>
+                    </value>
                   </block>
                 </next>
               </block>
@@ -67,109 +69,19 @@ const DEFAULT_XML = `<xml xmlns="https://developers.google.com/blockly/xml">
         </next>
       </block>
     </statement>
-    <statement name="LOOP">
-      <block type="controls_if">
-        <mutation else="1"></mutation>
-        <value name="IF0">
-          <block type="ai_is_detected">
-            <field name="CLASS">car</field>
-          </block>
-        </value>
-        <statement name="DO0">
-          <block type="serial_println">
-            <value name="TEXT">
-              <block type="text_string">
-                <field name="TEXT">🚗 [AI Vision] Car Detected! Raising Boom Barrier...</field>
-              </block>
-            </value>
-            <next>
-              <block type="servo_write">
-                <field name="PIN">6</field>
-                <value name="ANGLE">
-                  <shadow type="math_number">
-                    <field name="NUM">90</field>
-                  </shadow>
-                </value>
-                <next>
-                  <block type="io_digitalwrite">
-                    <field name="PIN">12</field>
-                    <field name="STATE">HIGH</field>
-                    <next>
-                      <block type="io_digitalwrite">
-                        <field name="PIN">13</field>
-                        <field name="STATE">LOW</field>
-                        <next>
-                          <block type="time_delay">
-                            <value name="MS">
-                              <shadow type="math_number">
-                                <field name="NUM">800</field>
-                              </shadow>
-                            </value>
-                          </block>
-                        </next>
-                      </block>
-                    </next>
-                  </block>
-                </next>
-              </block>
-            </next>
-          </block>
-        </statement>
-        <statement name="ELSE">
-          <block type="servo_write">
-            <field name="PIN">6</field>
-            <value name="ANGLE">
-              <shadow type="math_number">
-                <field name="NUM">0</field>
-              </shadow>
-            </value>
-            <next>
-              <block type="io_digitalwrite">
-                <field name="PIN">12</field>
-                <field name="STATE">LOW</field>
-                <next>
-                  <block type="io_digitalwrite">
-                    <field name="PIN">13</field>
-                    <field name="STATE">HIGH</field>
-                    <next>
-                      <block type="time_delay">
-                        <value name="MS">
-                          <shadow type="math_number">
-                            <field name="NUM">300</field>
-                          </shadow>
-                        </value>
-                      </block>
-                    </next>
-                  </block>
-                </next>
-              </block>
-            </next>
-          </block>
-        </statement>
-      </block>
-    </statement>
   </block>
 </xml>`
 
 const INITIAL_STATE: CircuitState = {
   parts: [
     { id: "uno", type: "arduino-uno", x: 40, y: 110, rotation: 0, props: {} },
-    { id: "gate", type: "servo", x: 430, y: 70, rotation: 0, props: { arm: "barrier", angle: 0 } },
-    { id: "led_green", type: "led", x: 600, y: 60, rotation: 0, props: { color: "green" } },
-    { id: "r_green", type: "resistor", x: 600, y: 150, rotation: 0, props: { resistance: 220 } },
-    { id: "led_red", type: "led", x: 440, y: 220, rotation: 0, props: { color: "red" } },
-    { id: "r_red", type: "resistor", x: 540, y: 220, rotation: 0, props: { resistance: 220 } },
+    { id: "r_red", type: "resistor", x: 400, y: 170, rotation: 0, props: { resistance: 220 } },
+    { id: "led_red", type: "led", x: 520, y: 170, rotation: 0, props: { color: "red" } },
   ],
   wires: [
-    { id: "w_gvcc", from: { partId: "uno", pinId: "5v" }, to: { partId: "gate", pinId: "vcc" }, color: "#ef4444" },
-    { id: "w_ggnd", from: { partId: "gate", pinId: "gnd" }, to: { partId: "uno", pinId: "gnd" }, color: "#1e293b" },
-    { id: "w_gsig", from: { partId: "uno", pinId: "d6" }, to: { partId: "gate", pinId: "sig" }, color: "#f97316" },
-    { id: "w_r1", from: { partId: "uno", pinId: "d12" }, to: { partId: "r_green", pinId: "a" }, color: "#22c55e" },
-    { id: "w_r2", from: { partId: "r_green", pinId: "b" }, to: { partId: "led_green", pinId: "anode" }, color: "#22c55e" },
-    { id: "w_lgnd", from: { partId: "led_green", pinId: "cathode" }, to: { partId: "uno", pinId: "gnd" }, color: "#1e293b" },
-    { id: "w_r3", from: { partId: "uno", pinId: "d13" }, to: { partId: "r_red", pinId: "a" }, color: "#ef4444" },
-    { id: "w_r4", from: { partId: "r_red", pinId: "b" }, to: { partId: "led_red", pinId: "anode" }, color: "#ef4444" },
-    { id: "w_lrgnd", from: { partId: "led_red", pinId: "cathode" }, to: { partId: "uno", pinId: "gnd" }, color: "#1e293b" },
+    { id: "w_r1", from: { partId: "uno", pinId: "d13" }, to: { partId: "r_red", pinId: "a" }, color: "#ef4444" },
+    { id: "w_r2", from: { partId: "r_red", pinId: "b" }, to: { partId: "led_red", pinId: "anode" }, color: "#ef4444" },
+    { id: "w_lgnd", from: { partId: "led_red", pinId: "cathode" }, to: { partId: "uno", pinId: "gnd" }, color: "#1e293b" },
   ],
 }
 
@@ -192,7 +104,7 @@ export function Workbench() {
   const [runTime, setRunTime] = useState(0)
   const [lastSaved, setLastSaved] = useState<string | null>(null)
   const [isTemplatesOpen, setIsTemplatesOpen] = useState(false)
-  const [isAiCameraOpen, setIsAiCameraOpen] = useState(() => typeof window !== "undefined" && window.innerWidth >= 768)
+  const [isAiCameraOpen, setIsAiCameraOpen] = useState(false)
   const [isInspectorOpen, setIsInspectorOpen] = useState(true)
   const [mobilePaletteOpen, setMobilePaletteOpen] = useState(false)
   const [contextMenu, setContextMenu] = useState<{
@@ -434,9 +346,18 @@ export function Workbench() {
     const controller = new AbortController()
     runnerAbortRef.current = controller
 
-    // Auto-open AI Vision HUD if current program uses AI Vision blocks
+    // Only run Arduino code and AI Vision if an Arduino board actually exists in the circuit
+    const hasArduino = state.parts.some((p) => p.type === "arduino-uno")
+    if (!hasArduino) {
+      // Pure DC circuit (battery, resistor, LED, etc.) - no Arduino code, no AI camera
+      setIsAiCameraOpen(false)
+      return
+    }
+
+    // Auto-open AI Vision HUD ONLY if current program uses AI Vision blocks
     const usesAi = Boolean(
       blocklyXml.includes('type="ai_') ||
+      blocklyXml.includes("ai_detect_objects") ||
       blocklyXml.includes("ai_is_detected") ||
       blocklyXml.includes("ai_get_detected_class") ||
       blocklyXml.includes("ai_confidence") ||
@@ -529,6 +450,8 @@ export function Workbench() {
     setRunning(false)
     setPressed(new Set())
     setSerialLines([])
+    setBlocklyXml(DEFAULT_XML)
+    setIsAiCameraOpen(false)
   }, [stopProgram, updateState])
 
   const toggleRun = useCallback(() => {
