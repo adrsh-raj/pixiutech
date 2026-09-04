@@ -9,12 +9,6 @@ export const generateStudentTranscriptPDF = ({
 }) => {
   if (!student) return;
 
-  const isEligibleGraduate = student.status === 'Certified Graduate' || 
-                             student.tech_level?.includes('Level 5') || 
-                             student.certificate_issued === true;
-
-  const showQRCodeCertificate = isOfficialCertificate && isEligibleGraduate;
-
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
 
   // Extract grade accurately (e.g. CLS-ZPS-6A -> '6', CLS-XYZ-7A -> '7', XYZ6A 01 -> '6', ZPS11A 01 -> '11')
@@ -120,9 +114,13 @@ export const generateStudentTranscriptPDF = ({
   });
 
   const reviewedLevelsList = levelReviewData.filter(l => l.hasReview && l.score !== null);
-  const avgReviewScore = reviewedLevelsList.length > 0
-    ? (reviewedLevelsList.reduce((acc, curr) => acc + curr.score, 0) / reviewedLevelsList.length).toFixed(1)
-    : null;
+  const completedLevelsCount = reviewedLevelsList.length;
+  const cumulativeReviewScore = reviewedLevelsList.reduce((acc, curr) => acc + (Number(curr.score) || 0), 0);
+  const cumulativePercent = Math.round((cumulativeReviewScore / 60) * 100);
+
+  // QR Code is ONLY unlocked when all 6 levels are completed and authorized
+  const isEligibleGraduate = completedLevelsCount >= 6 && (student.status === 'Certified Graduate' || student.certificate_issued === true);
+  const showQRCodeCertificate = isOfficialCertificate && isEligibleGraduate;
 
   const studentProjects = (projects || []).filter(p => {
     const pid = (p.student_id || '').trim().toLowerCase().replace(/\s+/g, '');
@@ -146,6 +144,32 @@ export const generateStudentTranscriptPDF = ({
           @page { size: A4; margin: 12mm 16mm; }
           * { box-sizing: border-box; }
           body { font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif; color: #0f172a; margin: 0; padding: 0; background: #fff; line-height: 1.45; font-size: 12.5px; }
+          
+          .no-print-bar {
+            position: sticky; top: 0; left: 0; right: 0; background: #0f172a; color: #fff;
+            padding: 10px 20px; z-index: 9999; border-bottom: 1px solid #334155;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+          }
+          .bar-content {
+            max-width: 860px; margin: 0 auto; display: flex; justify-content: space-between;
+            align-items: center; font-family: system-ui, sans-serif; font-size: 12px;
+          }
+          .bar-info { display: flex; align-items: center; gap: 8px; font-weight: 600; color: #94a3b8; }
+          .bar-dot { width: 8px; height: 8px; border-radius: 50%; background: #10b981; display: inline-block; }
+          .bar-actions { display: flex; gap: 8px; }
+          .btn-print {
+            background: #2563eb; color: #fff; border: none; padding: 6px 14px; border-radius: 6px;
+            font-weight: 700; cursor: pointer; font-size: 12px; display: inline-flex; align-items: center; gap: 5px;
+          }
+          .btn-print:hover { background: #1d4ed8; }
+          .btn-close {
+            background: #334155; color: #cbd5e1; border: none; padding: 6px 12px; border-radius: 6px;
+            font-weight: 600; cursor: pointer; font-size: 12px;
+          }
+          .btn-close:hover { background: #475569; color: #fff; }
+          @media print {
+            .no-print-bar { display: none !important; }
+          }
           
           .certificate-container { border: 2.5px solid #0A1A33; padding: 22px; border-radius: 12px; position: relative; background: #ffffff; }
           .header-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; border-bottom: 2.5px solid #0066FF; padding-bottom: 14px; }
@@ -184,7 +208,23 @@ export const generateStudentTranscriptPDF = ({
         </style>
       </head>
       <body>
-        <div class="certificate-container">
+        <div class="no-print-bar">
+          <div class="bar-content">
+            <div class="bar-info">
+              <span class="bar-dot"></span>
+              <span>${showQRCodeCertificate ? 'Official Accredited Certificate & Transcript' : 'Student Laboratory Progress Report'}</span>
+            </div>
+            <div class="bar-actions">
+              <button onclick="window.print()" class="btn-print">
+                🖨️ Print / Save as PDF
+              </button>
+              <button onclick="window.close()" class="btn-close">
+                ✕ Close
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="certificate-container" style="margin: 16px auto; max-width: 860px;">
           <table class="header-table">
             <tr>
               <td style="vertical-align: middle;">
@@ -205,13 +245,13 @@ export const generateStudentTranscriptPDF = ({
             <p class="doc-sub">${showQRCodeCertificate ? 'Official Accredited Institutional Graduation Credential & Laboratory Competency Record' : 'Active Student Competency & Practical Laboratory Evaluation Record'}</p>
           </div>
 
-          <!-- Student Profile Grid -->
+          <!-- Student Information Profile Strip -->
           <table class="profile-grid">
             <tr>
-              <td class="label">Candidate Name:</td>
+              <td class="label">Student Name:</td>
               <td class="val">${student.name}</td>
-              <td class="label">Candidate ID:</td>
-              <td class="val" style="color: #0066FF; font-family: monospace;">${student.student_id}</td>
+              <td class="label">Canonical Student ID:</td>
+              <td class="val" style="font-family: monospace; color: #0066FF;">${student.student_id}</td>
             </tr>
             <tr>
               <td class="label">Partner Institution:</td>
@@ -239,12 +279,12 @@ export const generateStudentTranscriptPDF = ({
                 <div class="m-val" style="color: #0066FF;">${student.tech_level || 'Level 0'}</div>
               </td>
               <td class="metric-box">
-                <div class="m-label">Cumulative Score</div>
-                <div class="m-val" style="color: #d97706;">${avgReviewScore ? `${avgReviewScore} / 10` : '10 / 10'}</div>
+                <div class="m-label">Cumulative Score (Max 60)</div>
+                <div class="m-val" style="color: #d97706;">${cumulativeReviewScore} / 60 <span style="font-size: 11px; color: #64748b;">(${cumulativePercent}%)</span></div>
               </td>
               <td class="metric-box">
-                <div class="m-label">Practical Aptitude</div>
-                <div class="m-val" style="color: #4f46e5; font-size: 13px; margin-top: 3px;">${reviewedLevelsList.length > 0 ? '★★★★★ High Distinction' : '★★★★★ Grade A+'}</div>
+                <div class="m-label">Levels Progression</div>
+                <div class="m-val" style="color: #4f46e5; font-size: 14px; margin-top: 2px;">${completedLevelsCount} / 6 Units Evaluated</div>
               </td>
             </tr>
           </table>
@@ -391,9 +431,6 @@ export const generateStudentTranscriptPDF = ({
   `);
   
   printWindow.document.close();
-  setTimeout(() => {
-    printWindow.print();
-  }, 400);
 };
 
 // =========================================================================
@@ -671,13 +708,52 @@ export const generateClassCohortTranscriptPDF = ({
             font-size: 8.5px;
             color: #64748b;
           }
+          .no-print-bar {
+            position: sticky; top: 0; left: 0; right: 0; background: #0f172a; color: #fff;
+            padding: 10px 20px; z-index: 9999; border-bottom: 1px solid #334155;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15); margin: -20px -20px 20px -20px;
+          }
+          .bar-content {
+            max-width: 900px; margin: 0 auto; display: flex; justify-content: space-between;
+            align-items: center; font-family: system-ui, sans-serif; font-size: 12px;
+          }
+          .bar-info { display: flex; align-items: center; gap: 8px; font-weight: 600; color: #94a3b8; }
+          .bar-dot { width: 8px; height: 8px; border-radius: 50%; background: #10b981; display: inline-block; }
+          .bar-actions { display: flex; gap: 8px; }
+          .btn-print {
+            background: #2563eb; color: #fff; border: none; padding: 6px 14px; border-radius: 6px;
+            font-weight: 700; cursor: pointer; font-size: 12px; display: inline-flex; align-items: center; gap: 5px;
+          }
+          .btn-print:hover { background: #1d4ed8; }
+          .btn-close {
+            background: #334155; color: #cbd5e1; border: none; padding: 6px 12px; border-radius: 6px;
+            font-weight: 600; cursor: pointer; font-size: 12px;
+          }
+          .btn-close:hover { background: #475569; color: #fff; }
           @media print {
             body { background: #ffffff; padding: 0; }
             .report-sheet { border: none; box-shadow: none; padding: 0; }
+            .no-print-bar { display: none !important; }
           }
         </style>
       </head>
       <body>
+        <div class="no-print-bar">
+          <div class="bar-content">
+            <div class="bar-info">
+              <span class="bar-dot"></span>
+              <span>Class ${classGrade}${classSection} Master Progress Report • ${schoolName}</span>
+            </div>
+            <div class="bar-actions">
+              <button onclick="window.print()" class="btn-print">
+                🖨️ Print / Save as PDF
+              </button>
+              <button onclick="window.close()" class="btn-close">
+                ✕ Close
+              </button>
+            </div>
+          </div>
+        </div>
         <div class="report-sheet">
           <!-- Top Header -->
           <table class="header-table">
@@ -737,7 +813,7 @@ export const generateClassCohortTranscriptPDF = ({
                 <th>Curriculum Level</th>
                 <th>Assigned Kit</th>
                 <th>Lab Attendance</th>
-                <th>Unit Review Avg</th>
+                <th>Cumulative Score (Max 60)</th>
                 <th>Certified Builds</th>
               </tr>
             </thead>
@@ -746,9 +822,7 @@ export const generateClassCohortTranscriptPDF = ({
                 const att = getStudentAttendance(st.student_id);
                 const sReviews = cohortReviews.filter(r => r.student_id === st.student_id);
                 const sProjects = cohortProjects.filter(p => p.student_id === st.student_id);
-                const avgScore = sReviews.length > 0 
-                  ? (sReviews.reduce((sum, r) => sum + (Number(r.score) || 10), 0) / sReviews.length).toFixed(1)
-                  : '10.0';
+                const cumulativeScore = sReviews.reduce((sum, r) => sum + (Number(r.score) || 0), 0);
 
                 return `
                   <tr>
@@ -757,7 +831,7 @@ export const generateClassCohortTranscriptPDF = ({
                     <td><span class="badge-pill badge-level">${st.tech_level || 'Level 0'}</span></td>
                     <td style="font-family: monospace; color: #475569;">${st.assigned_kit_id || 'KIT-01'}</td>
                     <td><span class="badge-pill badge-present">${att}%</span></td>
-                    <td style="font-weight: 800; color: #d97706;">★ ${avgScore} / 10</td>
+                    <td style="font-weight: 800; color: #d97706;">🏆 ${cumulativeScore} / 60 <span style="font-size: 8.5px; color: #64748b;">(${sReviews.length}/6 Levels)</span></td>
                     <td style="font-weight: 700; color: #2563eb;">${sProjects.length} Certified</td>
                   </tr>
                 `;
@@ -887,8 +961,5 @@ export const generateClassCohortTranscriptPDF = ({
   `);
 
   printWindow.document.close();
-  setTimeout(() => {
-    printWindow.print();
-  }, 400);
 };
 

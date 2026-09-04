@@ -238,43 +238,188 @@ export default function Trainers() {
     toast.success('Directive acknowledged & marked as read!', 'Acknowledged');
   };
 
-  const handleOpenReviewModal = (existingReview = null) => {
-    if (existingReview && existingReview.id) {
-      setEditingReviewId(existingReview.id);
-      setReviewFormData(existingReview);
+  const handleOpenReviewModal = (existingReviewOrStudent = null, targetUnitCode = null) => {
+    let studentId;
+    let grade;
+    let existingReview = null;
+
+    if (existingReviewOrStudent && existingReviewOrStudent.id) {
+      existingReview = existingReviewOrStudent;
+      studentId = existingReview.student_id;
+      grade = existingReview.class_grade || '6';
+    } else if (existingReviewOrStudent && existingReviewOrStudent.student_id) {
+      studentId = existingReviewOrStudent.student_id;
+      const stu = students.find(s => s.student_id === studentId);
+      grade = stu?.class_id ? (stu.class_id.match(/\d+/)?.[0] || '6') : (existingReviewOrStudent.class_grade || '6');
+    } else {
+      const filteredStu = students.filter(s => selectedReviewGrade === 'All' || s.class_id?.includes(`-${selectedReviewGrade}A`));
+      const firstStudent = filteredStu[0] || visibleStudents[0] || students[0];
+      studentId = firstStudent?.student_id || (trainerSchoolId === 'XYZ' ? 'XYZ6A 01' : 'ZPS6A 01');
+      const stu = students.find(s => s.student_id === studentId);
+      grade = stu?.class_id ? (stu.class_id.match(/\d+/)?.[0] || '6') : '6';
+    }
+
+    const unitsList = GRADE_UNITS_CONFIG[grade] || GRADE_UNITS_CONFIG['6'];
+    const sReviews = (studentReviews || []).filter(r => r.student_id === studentId);
+
+    // Determine target unit
+    let unitToSelect;
+    if (existingReview) {
+      unitToSelect = unitsList.find(u => u.unitCode === existingReview.unit_code) || unitsList[0];
+    } else if (targetUnitCode) {
+      unitToSelect = unitsList.find(u => u.unitCode === targetUnitCode) || unitsList[0];
+    } else {
+      const pendingUnit = unitsList.find(u => !sReviews.some(r => r.unit_code === u.unitCode));
+      unitToSelect = pendingUnit || unitsList[0];
+    }
+
+    const unitReview = existingReview || sReviews.find(r => r.unit_code === unitToSelect.unitCode);
+
+    if (unitReview) {
+      setEditingReviewId(unitReview.id);
+      const rating = Number(unitReview.rating) || Math.round((Number(unitReview.score) || 10) / 2);
+      const clampedRating = Math.max(1, Math.min(5, rating));
+      setReviewFormData({
+        ...unitReview,
+        student_id: studentId,
+        class_grade: grade,
+        unit_code: unitToSelect.unitCode,
+        level: unitToSelect.level,
+        unit_title: unitToSelect.title,
+        rating: clampedRating,
+        score: clampedRating * 2, // Formula: 1★=2, 5★=10
+        status: unitReview.status || 'Mastered',
+        review: unitReview.review || REVIEW_PRESETS[0],
+        trainer_name: unitReview.trainer_name || user?.name || (isAkash ? 'Akash Sharma (Senior Robotics Faculty)' : 'Vikas Pandey (Lead Instructor)'),
+        issue_graduation_certificate: false
+      });
     } else {
       setEditingReviewId(null);
-      const targetStudentId = existingReview?.student_id;
-      const targetStudent = targetStudentId ? students.find(s => s.student_id === targetStudentId) : null;
-      const filteredStu = students.filter(s => selectedReviewGrade === 'All' || s.class_id.includes(`-${selectedReviewGrade}A`));
-      const firstStudent = targetStudent || filteredStu[0] || visibleStudents[0] || students[0];
-      const grade = firstStudent?.class_id ? (firstStudent.class_id.match(/\d+/)?.[0] || '6') : (existingReview?.class_grade || '6');
-      const unitsList = GRADE_UNITS_CONFIG[grade] || GRADE_UNITS_CONFIG['6'];
-      
+      const unitIdx = unitsList.findIndex(u => u.unitCode === unitToSelect.unitCode);
+      const defaultPreset = REVIEW_PRESETS[unitIdx >= 0 ? unitIdx % REVIEW_PRESETS.length : 0];
       setReviewFormData({
-        student_id: firstStudent?.student_id || (trainerSchoolId === 'XYZ' ? 'XYZ6A 01' : 'ZPS6A 01'),
+        student_id: studentId,
         class_grade: grade,
-        unit_code: unitsList[0].unitCode,
-        level: unitsList[0].level,
-        unit_title: unitsList[0].title,
-        score: 9.5,
+        unit_code: unitToSelect.unitCode,
+        level: unitToSelect.level,
+        unit_title: unitToSelect.title,
         rating: 5,
+        score: 10, // 5★ = 10 pts
         status: 'Mastered',
-        review: REVIEW_PRESETS[0],
-        trainer_name: user?.name || (isAkash ? 'Akash Sharma (Senior Robotics Faculty)' : 'Vikas Pandey (Lead Instructor)')
+        review: defaultPreset,
+        trainer_name: user?.name || (isAkash ? 'Akash Sharma (Senior Robotics Faculty)' : 'Vikas Pandey (Lead Instructor)'),
+        issue_graduation_certificate: false
       });
     }
     setIsReviewModalOpen(true);
   };
 
+  const handleSelectModalUnit = (targetUnit) => {
+    const sReviews = (studentReviews || []).filter(r => r.student_id === reviewFormData.student_id);
+    const existingForUnit = sReviews.find(r => r.unit_code === targetUnit.unitCode);
+
+    if (existingForUnit) {
+      setEditingReviewId(existingForUnit.id);
+      const rating = Number(existingForUnit.rating) || Math.round((Number(existingForUnit.score) || 10) / 2);
+      const clampedRating = Math.max(1, Math.min(5, rating));
+      setReviewFormData(prev => ({
+        ...prev,
+        ...existingForUnit,
+        unit_code: targetUnit.unitCode,
+        level: targetUnit.level,
+        unit_title: targetUnit.title,
+        rating: clampedRating,
+        score: clampedRating * 2,
+        status: existingForUnit.status || 'Mastered',
+        review: existingForUnit.review || REVIEW_PRESETS[0]
+      }));
+    } else {
+      setEditingReviewId(null);
+      const unitsList = GRADE_UNITS_CONFIG[reviewFormData.class_grade] || GRADE_UNITS_CONFIG['6'];
+      const unitIdx = unitsList.findIndex(u => u.unitCode === targetUnit.unitCode);
+      setReviewFormData(prev => ({
+        ...prev,
+        unit_code: targetUnit.unitCode,
+        level: targetUnit.level,
+        unit_title: targetUnit.title,
+        rating: 5,
+        score: 10,
+        status: 'Mastered',
+        review: REVIEW_PRESETS[unitIdx >= 0 ? unitIdx % REVIEW_PRESETS.length : 0]
+      }));
+    }
+  };
+
+  const handleSelectModalStudent = (targetStudentId) => {
+    const targetStudent = students.find(s => s.student_id === targetStudentId);
+    const grade = targetStudent?.class_id ? (targetStudent.class_id.match(/\d+/)?.[0] || '6') : reviewFormData.class_grade;
+    const unitsList = GRADE_UNITS_CONFIG[grade] || GRADE_UNITS_CONFIG['6'];
+    const sReviews = (studentReviews || []).filter(r => r.student_id === targetStudentId);
+
+    const pendingUnit = unitsList.find(u => !sReviews.some(r => r.unit_code === u.unitCode)) || unitsList[0];
+    const existingForUnit = sReviews.find(r => r.unit_code === pendingUnit.unitCode);
+
+    if (existingForUnit) {
+      setEditingReviewId(existingForUnit.id);
+      const rating = Number(existingForUnit.rating) || Math.round((Number(existingForUnit.score) || 10) / 2);
+      const clampedRating = Math.max(1, Math.min(5, rating));
+      setReviewFormData(prev => ({
+        ...prev,
+        ...existingForUnit,
+        student_id: targetStudentId,
+        class_grade: grade,
+        unit_code: pendingUnit.unitCode,
+        level: pendingUnit.level,
+        unit_title: pendingUnit.title,
+        rating: clampedRating,
+        score: clampedRating * 2,
+        status: existingForUnit.status || 'Mastered',
+        review: existingForUnit.review || REVIEW_PRESETS[0]
+      }));
+    } else {
+      setEditingReviewId(null);
+      const unitIdx = unitsList.findIndex(u => u.unitCode === pendingUnit.unitCode);
+      setReviewFormData(prev => ({
+        ...prev,
+        student_id: targetStudentId,
+        class_grade: grade,
+        unit_code: pendingUnit.unitCode,
+        level: pendingUnit.level,
+        unit_title: pendingUnit.title,
+        rating: 5,
+        score: 10,
+        status: 'Mastered',
+        review: REVIEW_PRESETS[unitIdx >= 0 ? unitIdx % REVIEW_PRESETS.length : 0],
+        issue_graduation_certificate: false
+      }));
+    }
+  };
+
+  const handleRatingChange = (newRating) => {
+    const clampedRating = Math.max(1, Math.min(5, newRating));
+    const newScore = clampedRating * 2; // Strict formula: 1★=2, 2★=4, 3★=6, 4★=8, 5★=10
+    const newStatus = clampedRating === 5 ? 'Mastered' : clampedRating >= 4 ? 'Mastered' : clampedRating >= 3 ? 'In Progress' : 'Needs Practice';
+    setReviewFormData(prev => ({
+      ...prev,
+      rating: clampedRating,
+      score: newScore,
+      status: newStatus
+    }));
+  };
+
   const handleSaveReview = async (e) => {
     e.preventDefault();
     const studentObj = students.find(s => s.student_id === reviewFormData.student_id);
+    const clampedRating = Math.max(1, Math.min(5, Number(reviewFormData.rating) || 5));
+    const computedScore = clampedRating * 2; // Strict formula: 1★=2, 5★=10
+
     const payload = {
       ...reviewFormData,
       id: editingReviewId || `REV-${Date.now().toString().slice(-4)}`,
       student_name: studentObj?.name || 'Student',
-      class_grade: studentObj?.class_id ? (studentObj.class_id.match(/\d+/)?.[0] || '6') : reviewFormData.class_grade
+      class_grade: studentObj?.class_id ? (studentObj.class_id.match(/\d+/)?.[0] || '6') : reviewFormData.class_grade,
+      rating: clampedRating,
+      score: computedScore
     };
     saveStudentReview(payload);
 
@@ -295,7 +440,7 @@ export default function Trainers() {
       });
       toast.success(`Official Accredited Certificate with QR unlocked for ${studentObj.name}! One-time credential issued.`, 'Graduate Certified');
     } else {
-      toast.success(`Unit review for ${payload.student_name} (${payload.unit_code}) saved successfully!`, 'Review Published');
+      toast.success(`Unit review for ${payload.student_name} (${payload.unit_code}) saved! Score: ${computedScore}/10 (${clampedRating}★).`, 'Review Published');
     }
     setIsReviewModalOpen(false);
   };
@@ -1074,7 +1219,13 @@ export default function Trainers() {
             {filteredEnrolledStudents.map(student => {
               const attRate = getStudentAttendance ? getStudentAttendance(student.student_id) : 100;
               const cleanGrade = student.class_id ? student.class_id.split('-').pop() : '6A';
-              const isCertified = student.status?.includes('Certified') || student.tech_level?.includes('Certified');
+              const gradeNum = cleanGrade.replace('A', '') || '6';
+              const unitsList = GRADE_UNITS_CONFIG[gradeNum] || GRADE_UNITS_CONFIG['6'];
+              const sReviews = (studentReviews || []).filter(r => r.student_id === student.student_id);
+              const sTotalScore = sReviews.reduce((sum, r) => sum + (Number(r.score) || 0), 0);
+              const sCompletedUnits = sReviews.length;
+              const isAll6Completed = sCompletedUnits >= 6;
+              const isQRCertified = isAll6Completed && (student.status === 'Certified Graduate' || student.certificate_issued === true);
 
               return (
                 <div 
@@ -1082,7 +1233,7 @@ export default function Trainers() {
                   className="bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md hover:border-blue-200 transition-all duration-200 flex flex-col justify-between overflow-hidden group"
                 >
                   {/* Top Bar Accent */}
-                  <div className={`h-1.5 w-full ${isCertified ? 'bg-gradient-to-r from-amber-400 to-amber-500' : 'bg-gradient-to-r from-pixiu-blue to-blue-400'}`} />
+                  <div className={`h-1.5 w-full ${isQRCertified ? 'bg-gradient-to-r from-emerald-400 to-teal-500' : isAll6Completed ? 'bg-gradient-to-r from-amber-400 to-amber-500' : 'bg-gradient-to-r from-pixiu-blue to-blue-400'}`} />
 
                   <div className="p-5 flex-1 flex flex-col justify-between">
                     <div>
@@ -1090,8 +1241,10 @@ export default function Trainers() {
                       <div className="flex items-start justify-between gap-3 mb-3">
                         <div className="flex items-center gap-3">
                           <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-sm text-white shadow-xs shrink-0 ${
-                            isCertified 
-                              ? 'bg-gradient-to-br from-amber-500 to-amber-600' 
+                            isQRCertified 
+                              ? 'bg-gradient-to-br from-emerald-500 to-teal-600' 
+                              : isAll6Completed
+                              ? 'bg-gradient-to-br from-amber-500 to-amber-600'
                               : 'bg-gradient-to-br from-pixiu-blue to-indigo-600'
                           }`}>
                             {student.name.split(' ').map(w => w[0]).join('').slice(0, 2)}
@@ -1112,11 +1265,13 @@ export default function Trainers() {
                         </div>
 
                         <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border shrink-0 ${
-                          isCertified 
-                            ? 'bg-amber-50 text-amber-700 border-amber-200' 
-                            : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          isQRCertified 
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                            : isAll6Completed
+                            ? 'bg-amber-50 text-amber-700 border-amber-200'
+                            : 'bg-blue-50 text-blue-700 border-blue-200'
                         }`}>
-                          {isCertified ? 'Certified' : 'Active'}
+                          {isQRCertified ? '✓ QR Certified' : isAll6Completed ? '6/6 Evaluated' : `${sCompletedUnits}/6 Evaluated`}
                         </span>
                       </div>
 
@@ -1157,6 +1312,60 @@ export default function Trainers() {
                         </div>
                       </div>
 
+                      {/* 6-Level Review Progression & Cumulative Score */}
+                      <div className="bg-slate-50/90 rounded-xl p-3 border border-slate-100 mb-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-600 text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5">
+                            <Star size={13} className="text-amber-500 fill-amber-500" />
+                            Cumulative Score:
+                          </span>
+                          <span className="font-mono font-extrabold text-xs text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200">
+                            🏆 {sTotalScore} / 60 pts
+                            <span className="text-slate-400 font-normal ml-1">({Math.round((sTotalScore / 60) * 100)}%)</span>
+                          </span>
+                        </div>
+
+                        {/* 6 Units Mini Indicators */}
+                        <div>
+                          <div className="flex justify-between items-center text-[10px] text-slate-500 mb-1.5">
+                            <span>Level Reviews ({sCompletedUnits}/6 Units):</span>
+                            {isAll6Completed ? (
+                              <span className="text-emerald-700 font-bold flex items-center gap-0.5">
+                                <CheckCircle size={11} /> 6/6 Done • QR Unlocked
+                              </span>
+                            ) : (
+                              <span className="text-amber-700 font-semibold flex items-center gap-0.5">
+                                <Lock size={11} /> QR Locked ({sCompletedUnits}/6)
+                              </span>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-6 gap-1">
+                            {unitsList.map((unit, uIdx) => {
+                              const rev = sReviews.find(r => r.unit_code === unit.unitCode);
+                              const isDone = !!rev;
+                              return (
+                                <button
+                                  key={unit.unitCode}
+                                  type="button"
+                                  onClick={() => handleOpenReviewModal({ student_id: student.student_id, class_grade: gradeNum }, unit.unitCode)}
+                                  className={`p-1 rounded text-center transition-all cursor-pointer border ${
+                                    isDone
+                                      ? 'bg-emerald-50 border-emerald-300 text-emerald-800 hover:bg-emerald-100 hover:border-emerald-400'
+                                      : 'bg-white border-slate-200 text-slate-400 hover:border-pixiu-blue hover:text-pixiu-blue'
+                                  }`}
+                                  title={`${unit.unitCode} (${unit.level}): ${unit.title} - ${isDone ? `Score: ${rev.score}/10 (${rev.rating}★)` : 'Click to evaluate'}`}
+                                >
+                                  <span className="block text-[9px] font-mono font-bold leading-none">U{uIdx + 1}</span>
+                                  <span className="block text-[9px] font-bold leading-none mt-0.5">
+                                    {isDone ? `${rev.score}` : '—'}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+
                       {/* Parent Contact Details */}
                       {student.parent_name && (
                         <div className="flex items-center justify-between text-[11px] text-slate-500 px-1 mb-3">
@@ -1182,7 +1391,7 @@ export default function Trainers() {
 
                       {/* Review Button */}
                       <button
-                        onClick={() => handleOpenReviewModal({ student_id: student.student_id, class_grade: cleanGrade.replace('A', '') })}
+                        onClick={() => handleOpenReviewModal({ student_id: student.student_id, class_grade: gradeNum })}
                         className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
                         title="Give End-of-Unit Review & Grading"
                       >
@@ -1719,173 +1928,361 @@ export default function Trainers() {
     onClose={() => setIsReviewModalOpen(false)}
     title={
       <div className="flex items-center gap-2">
-        <Star size={18} className="text-amber-400 fill-amber-400"/>
-        <span className="text-sm font-bold uppercase tracking-wider">
-          {editingReviewId ? 'Edit Student Unit Review' : 'Submit End-of-Unit Student Review'}
-        </span>
+        <Star size={18} className="text-amber-500 fill-amber-500"/>
+        <div>
+          <span className="text-sm font-bold text-slate-900 block leading-tight">
+            {editingReviewId ? 'Edit Level-Wise Evaluation' : 'Submit Level-Wise Student Evaluation'}
+          </span>
+          <span className="text-[11px] text-slate-500 font-normal">
+            6 Units Curriculum Assessment (Score = Rating × 2, Sum / 60)
+          </span>
+        </div>
       </div>
     }
-    size="md"
+    size="lg"
   >
-        <form onSubmit={handleSaveReview} className="p-6 space-y-4 text-xs">
-          {/* Class & Student Selection */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block font-bold text-slate-600 uppercase mb-1">Select Class Grade</label>
-              <select
-                value={reviewFormData.class_grade}
-                onChange={(e) => {
-                  const grade = e.target.value;
-                  const studentInGrade = visibleStudents.find(s => s.class_id.includes(`-${grade}A`));
-                  const unitsList = GRADE_UNITS_CONFIG[grade] || GRADE_UNITS_CONFIG['6'];
-                  const currentOrFirstUnit = unitsList.find(u => u.unitCode === reviewFormData.unit_code) || unitsList[0];
-                  setReviewFormData({
-                    ...reviewFormData,
-                    class_grade: grade,
-                    student_id: studentInGrade ? studentInGrade.student_id : reviewFormData.student_id,
-                    unit_code: currentOrFirstUnit.unitCode,
-                    level: currentOrFirstUnit.level,
-                    unit_title: currentOrFirstUnit.title
-                  });
-                }}
-                className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold bg-white text-slate-800"
-              >
-                <option value="6">Class 6A</option>
-                <option value="7">Class 7A</option>
-                <option value="8">Class 8A</option>
-                <option value="9">Class 9A</option>
-                <option value="11">Class 11A</option>
-              </select>
-            </div>
+        {(() => {
+          const currentStu = students.find(s => s.student_id === reviewFormData.student_id);
+          const modalUnits = GRADE_UNITS_CONFIG[reviewFormData.class_grade] || GRADE_UNITS_CONFIG['6'];
+          const currentStuReviews = (studentReviews || []).filter(r => r.student_id === reviewFormData.student_id);
+          const otherReviews = currentStuReviews.filter(r => r.unit_code !== reviewFormData.unit_code);
+          const currentRating = Number(reviewFormData.rating) || 5;
+          const currentScore = currentRating * 2; // Strict: 1★ = 2, 5★ = 10
+          const prospectiveTotalScore = otherReviews.reduce((sum, r) => sum + (Number(r.score) || 0), 0) + currentScore;
+          const prospectiveCompletedCount = otherReviews.length + 1;
+          const isAll6LevelsComplete = prospectiveCompletedCount >= 6;
 
-            <div>
-              <label className="block font-bold text-slate-600 uppercase mb-1">Select Student</label>
-              <select
-                value={reviewFormData.student_id}
-                onChange={(e) => setReviewFormData({ ...reviewFormData, student_id: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold bg-white text-slate-800"
-              >
-                {visibleStudents
-                  .filter(s => s.class_id.includes(`-${reviewFormData.class_grade}A`))
-                  .map(s => (
-                    <option key={s.student_id} value={s.student_id}>
-                      {s.student_id} - {s.name}
-                    </option>
-                  ))}
-              </select>
-            </div>
-          </div>
+          return (
+            <form onSubmit={handleSaveReview} className="p-6 space-y-5 text-xs">
+              {/* Class & Student Selection */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-600 uppercase mb-1">Select Class Grade</label>
+                  <select
+                    value={reviewFormData.class_grade}
+                    onChange={(e) => {
+                      const grade = e.target.value;
+                      const studentInGrade = visibleStudents.find(s => s.class_id?.includes(`-${grade}A`));
+                      if (studentInGrade) {
+                        handleSelectModalStudent(studentInGrade.student_id);
+                      } else {
+                        const unitsList = GRADE_UNITS_CONFIG[grade] || GRADE_UNITS_CONFIG['6'];
+                        setReviewFormData(prev => ({
+                          ...prev,
+                          class_grade: grade,
+                          unit_code: unitsList[0].unitCode,
+                          level: unitsList[0].level,
+                          unit_title: unitsList[0].title
+                        }));
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold bg-white text-slate-800"
+                  >
+                    <option value="6">Class 6A</option>
+                    <option value="7">Class 7A</option>
+                    <option value="8">Class 8A</option>
+                    <option value="9">Class 9A</option>
+                    <option value="11">Class 11A</option>
+                  </select>
+                </div>
 
-          {/* Score & Rating */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block font-bold text-slate-600 uppercase mb-1">Competency Score (Out of 10) *</label>
-              <input
-                type="number"
-                step="0.5"
-                min="1"
-                max="10"
-                value={reviewFormData.score}
-                onChange={(e) => setReviewFormData({ ...reviewFormData, score: parseFloat(e.target.value) || 0 })}
-                required
-                className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold text-slate-800"
-              />
-            </div>
-
-            <div>
-              <label className="block font-bold text-slate-600 uppercase mb-1">Status Classification</label>
-              <select
-                value={reviewFormData.status}
-                onChange={(e) => setReviewFormData({ ...reviewFormData, status: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold bg-white text-slate-800"
-              >
-                <option value="Mastered">Mastered (Distinction)</option>
-                <option value="In Progress">In Progress (Active)</option>
-                <option value="Needs Practice">Needs Practice</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Qualitative Remarks */}
-          <div>
-            <div className="flex justify-between items-center mb-1">
-              <label className="font-bold text-slate-600 uppercase">Qualitative Instructor Remarks *</label>
-              <span className="text-[10px] text-slate-400">Quick Remarks Preset</span>
-            </div>
-
-            {/* Quick Remarks Buttons */}
-            <div className="flex flex-wrap gap-1 mb-2">
-              {REVIEW_PRESETS.slice(0, 3).map((preset, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => setReviewFormData({ ...reviewFormData, review: preset })}
-                  className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded text-[10px] truncate max-w-xs cursor-pointer"
-                  title={preset}
-                >
-                  {preset.slice(0, 35)}...
-                </button>
-              ))}
-            </div>
-
-            <textarea
-              rows={3}
-              value={reviewFormData.review}
-              onChange={(e) => setReviewFormData({ ...reviewFormData, review: e.target.value })}
-              required
-              placeholder="Enter detailed trainer remarks on hands-on practical execution, circuit wiring, and conceptual comprehension..."
-              className="w-full px-3 py-2 border border-slate-300 rounded-xl text-slate-800 font-medium"
-            />
-          </div>
-
-          {/* Verified Trainer Name */}
-          <div>
-            <label className="block font-bold text-slate-600 uppercase mb-1">Evaluating Trainer Name</label>
-            <input
-              type="text"
-              value={reviewFormData.trainer_name}
-              onChange={(e) => setReviewFormData({ ...reviewFormData, trainer_name: e.target.value })}
-              required
-              className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold text-slate-800"
-            />
-          </div>
-
-          {/* Authorize Graduation Certificate Checkbox */}
-          <div className="p-3 bg-emerald-50/80 border border-emerald-200 rounded-xl">
-            <label className="flex items-start gap-2.5 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={reviewFormData.issue_graduation_certificate || false}
-                onChange={(e) => setReviewFormData({ ...reviewFormData, issue_graduation_certificate: e.target.checked })}
-                className="mt-0.5 w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300"
-              />
-              <div>
-                <span className="font-bold text-emerald-950 text-xs flex items-center gap-1.5">
-                  🎓 Authorize & Issue Official Graduate Certificate (with QR)
-                </span>
-                <p className="text-[10.5px] text-emerald-800 mt-0.5 leading-tight">
-                  Check this when student completes syllabus / final unit with distinction. This permanently authorizes their official 1-time accredited certificate with public verification QR.
-                </p>
+                <div>
+                  <label className="block font-bold text-slate-600 uppercase mb-1">Select Student</label>
+                  <select
+                    value={reviewFormData.student_id}
+                    onChange={(e) => handleSelectModalStudent(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold bg-white text-slate-800"
+                  >
+                    {visibleStudents
+                      .filter(s => s.class_id?.includes(`-${reviewFormData.class_grade}A`) || s.student_id?.includes(reviewFormData.class_grade))
+                      .map(s => (
+                        <option key={s.student_id} value={s.student_id}>
+                          {s.student_id} - {s.name}
+                        </option>
+                      ))}
+                  </select>
+                </div>
               </div>
-            </label>
-          </div>
 
-          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-            <button
-              type="button"
-              onClick={() => setIsReviewModalOpen(false)}
-              className="px-4 py-2 font-bold text-slate-500 hover:bg-slate-100 rounded-xl cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-5 py-2 font-bold text-white bg-pixiu-blue hover:bg-blue-600 rounded-xl shadow-md shadow-blue-500/20 cursor-pointer"
-            >
-              {editingReviewId ? 'Update Review' : 'Publish Student Review'}
-            </button>
-          </div>
-        </form>
+              {/* Cumulative Score & Progress Summary Banner */}
+              <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white p-4 rounded-xl shadow-xs space-y-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Candidate Evaluation Status</span>
+                    <h4 className="text-sm font-extrabold text-white">
+                      {currentStu?.name || 'Selected Student'} <span className="font-mono text-pixiu-cyan text-xs font-normal">({reviewFormData.student_id})</span>
+                    </h4>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Prospective Cumulative Score</span>
+                    <span className="text-sm font-black text-amber-400">
+                      🏆 {prospectiveTotalScore} / 60 pts <span className="text-xs text-slate-300 font-normal">({Math.round((prospectiveTotalScore / 60) * 100)}%)</span>
+                    </span>
+                  </div>
+                </div>
+
+                {/* Progress bar */}
+                <div>
+                  <div className="flex justify-between items-center text-[10.5px] text-slate-300 mb-1">
+                    <span>Curriculum Progression: <strong>{prospectiveCompletedCount} of 6 Units</strong> Evaluated</span>
+                    {isAll6LevelsComplete ? (
+                      <span className="text-emerald-400 font-bold flex items-center gap-1">
+                        <CheckCircle size={12} /> All 6 Units Complete • QR Unlocked
+                      </span>
+                    ) : (
+                      <span className="text-amber-400 font-medium flex items-center gap-1">
+                        <Lock size={12} /> {6 - prospectiveCompletedCount} Units Remaining for QR
+                      </span>
+                    )}
+                  </div>
+                  <div className="w-full h-2 bg-slate-700 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full rounded-full transition-all duration-300 ${isAll6LevelsComplete ? 'bg-emerald-500' : 'bg-pixiu-blue'}`}
+                      style={{ width: `${Math.min(100, (prospectiveCompletedCount / 6) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* 6-Level Unit Selector Pills */}
+              <div>
+                <label className="block font-bold text-slate-700 uppercase mb-2">
+                  Select Unit / Level to Review (Level 0 to Level 5):
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {modalUnits.map((u, idx) => {
+                    const existingRev = currentStuReviews.find(r => r.unit_code === u.unitCode);
+                    const isSelected = reviewFormData.unit_code === u.unitCode;
+                    const isDone = !!existingRev;
+
+                    return (
+                      <button
+                        key={u.unitCode}
+                        type="button"
+                        onClick={() => handleSelectModalUnit(u)}
+                        className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                          isSelected
+                            ? 'bg-blue-50/90 border-pixiu-blue ring-2 ring-blue-500/20 shadow-xs'
+                            : isDone
+                            ? 'bg-emerald-50/50 border-emerald-200 hover:bg-emerald-50'
+                            : 'bg-white border-slate-200 hover:border-slate-300'
+                        }`}
+                      >
+                        <div className="flex justify-between items-start gap-1">
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                            isSelected ? 'bg-pixiu-blue text-white' : isDone ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'
+                          }`}>
+                            {u.unitCode} ({u.level})
+                          </span>
+                          {isDone ? (
+                            <span className="text-[10px] font-bold text-emerald-700 flex items-center gap-0.5">
+                              <CheckCircle size={10} /> {existingRev.score} pts
+                            </span>
+                          ) : (
+                            <span className="text-[9.5px] font-medium text-slate-400">
+                              Pending
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] font-bold text-slate-800 mt-1 truncate" title={u.title}>
+                          {u.title}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Active Unit Banner */}
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Currently Evaluating</span>
+                  <p className="font-bold text-slate-800 text-xs mt-0.5">
+                    {reviewFormData.unit_code} ({reviewFormData.level}): {reviewFormData.unit_title}
+                  </p>
+                </div>
+                {editingReviewId && (
+                  <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded text-[10px] font-bold">
+                    Editing Existing Record
+                  </span>
+                )}
+              </div>
+
+              {/* Interactive 5-Star Rating Control (Score = Rating * 2) */}
+              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label className="font-bold text-slate-700 uppercase">
+                    Competency Rating & Score *
+                  </label>
+                  <span className="px-2 py-0.5 bg-blue-50 text-pixiu-blue border border-blue-200 rounded font-bold text-[10px]">
+                    ⚡ Formula: Score = Rating × 2 (Max 10)
+                  </span>
+                </div>
+
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+                  {/* Interactive 5 Stars */}
+                  <div className="flex items-center gap-2">
+                    {[1, 2, 3, 4, 5].map((starNum) => {
+                      const isFilled = starNum <= currentRating;
+                      return (
+                        <button
+                          key={starNum}
+                          type="button"
+                          onClick={() => handleRatingChange(starNum)}
+                          className="p-1 hover:scale-110 active:scale-95 transition-transform cursor-pointer focus:outline-none"
+                          title={`Give ${starNum} Star${starNum > 1 ? 's' : ''} = ${starNum * 2} Points`}
+                        >
+                          <Star
+                            size={28}
+                            className={`${
+                              isFilled
+                                ? 'text-amber-400 fill-amber-400 drop-shadow-xs'
+                                : 'text-slate-300 hover:text-amber-200'
+                            } transition-colors`}
+                          />
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Large Score Readout */}
+                  <div className="flex items-center gap-3">
+                    <div className="bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-xl text-center">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 block">Assigned Score</span>
+                      <span className="text-base font-extrabold text-amber-900">
+                        {currentScore} / 10 pts
+                      </span>
+                    </div>
+
+                    <div className="bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl text-center">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Rating</span>
+                      <span className="text-base font-extrabold text-slate-800">
+                        {currentRating} ★
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Star Legend */}
+                <div className="flex flex-wrap items-center gap-3 text-[10px] text-slate-400 pt-1 border-t border-slate-100">
+                  <span>1★ = 2 pts (Needs Practice)</span>
+                  <span>2★ = 4 pts</span>
+                  <span>3★ = 6 pts (In Progress)</span>
+                  <span>4★ = 8 pts</span>
+                  <span className="text-emerald-600 font-semibold">5★ = 10 pts (Mastered)</span>
+                </div>
+              </div>
+
+              {/* Status Classification */}
+              <div>
+                <label className="block font-bold text-slate-600 uppercase mb-1">Status Classification</label>
+                <select
+                  value={reviewFormData.status}
+                  onChange={(e) => setReviewFormData({ ...reviewFormData, status: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold bg-white text-slate-800"
+                >
+                  <option value="Mastered">Mastered (Distinction - 8 to 10 pts)</option>
+                  <option value="In Progress">In Progress (Satisfactory - 6 pts)</option>
+                  <option value="Needs Practice">Needs Practice (2 to 4 pts)</option>
+                </select>
+              </div>
+
+              {/* Qualitative Remarks */}
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="font-bold text-slate-600 uppercase">Qualitative Instructor Remarks *</label>
+                  <span className="text-[10px] text-slate-400">Quick Remarks Presets:</span>
+                </div>
+
+                {/* Quick Remarks Buttons */}
+                <div className="flex flex-wrap gap-1 mb-2">
+                  {REVIEW_PRESETS.map((preset, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setReviewFormData({ ...reviewFormData, review: preset })}
+                      className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded text-[10px] truncate max-w-xs cursor-pointer"
+                      title={preset}
+                    >
+                      {preset.slice(0, 32)}...
+                    </button>
+                  ))}
+                </div>
+
+                <textarea
+                  rows={3}
+                  value={reviewFormData.review}
+                  onChange={(e) => setReviewFormData({ ...reviewFormData, review: e.target.value })}
+                  required
+                  placeholder="Enter detailed trainer remarks on hands-on practical execution, circuit wiring, and conceptual comprehension..."
+                  className="w-full px-3 py-2 border border-slate-300 rounded-xl text-slate-800 font-medium"
+                />
+              </div>
+
+              {/* Verified Trainer Name */}
+              <div>
+                <label className="block font-bold text-slate-600 uppercase mb-1">Evaluating Trainer Name</label>
+                <input
+                  type="text"
+                  value={reviewFormData.trainer_name}
+                  onChange={(e) => setReviewFormData({ ...reviewFormData, trainer_name: e.target.value })}
+                  required
+                  className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold text-slate-800"
+                />
+              </div>
+
+              {/* ==================== STRICT GATED QR GRADUATION CERTIFICATE ==================== */}
+              {isAll6LevelsComplete ? (
+                <div className="p-3.5 bg-emerald-50 border border-emerald-300 rounded-xl">
+                  <label className="flex items-start gap-2.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={reviewFormData.issue_graduation_certificate || false}
+                      onChange={(e) => setReviewFormData({ ...reviewFormData, issue_graduation_certificate: e.target.checked })}
+                      className="mt-0.5 w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300"
+                    />
+                    <div>
+                      <span className="font-bold text-emerald-950 text-xs flex items-center gap-1.5">
+                        🎓 Authorize & Issue Official Graduate Certificate (with QR)
+                      </span>
+                      <p className="text-[10.5px] text-emerald-800 mt-0.5 leading-tight">
+                        All 6 Curriculum Units have been evaluated for this candidate. Checking this box permanently unlocks the official 1-time accredited certificate with public QR verification registry.
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              ) : (
+                <div className="p-3.5 bg-slate-100 border border-slate-200 rounded-xl flex items-start gap-2.5 text-slate-600">
+                  <Lock size={16} className="text-slate-400 mt-0.5 shrink-0" />
+                  <div>
+                    <span className="font-bold text-slate-700 text-xs block">
+                      🔒 Official Accredited Certificate with QR Locked
+                    </span>
+                    <p className="text-[10.5px] text-slate-500 mt-0.5 leading-tight">
+                      All 6 curriculum levels (Level 0 to Level 5) must be evaluated and completed before issuing official graduate credentials. (Currently {prospectiveCompletedCount} / 6 units evaluated).
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsReviewModalOpen(false)}
+                  className="px-4 py-2 font-bold text-slate-500 hover:bg-slate-100 rounded-xl cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 font-bold text-white bg-pixiu-blue hover:bg-blue-600 rounded-xl shadow-md shadow-blue-500/20 cursor-pointer"
+                >
+                  {editingReviewId ? 'Update Level Review' : 'Save & Publish Level Review'}
+                </button>
+              </div>
+            </form>
+          );
+        })()}
   </Modal>
 
   {/* ==================== SCHEDULE NEXT CLASS MODAL ==================== */}

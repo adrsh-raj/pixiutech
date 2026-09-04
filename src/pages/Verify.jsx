@@ -120,10 +120,15 @@ export default function Verify() {
     setTimeout(() => setIsSearching(false), 600);
   };
 
+  const cumulativeScore = useMemo(() => {
+    return studentReviews.reduce((sum, r) => sum + (Number(r.score) || 0), 0);
+  }, [studentReviews]);
+
   const isGraduate = matchedStudent && (
-    matchedStudent.status === 'Certified Graduate' || 
-    matchedStudent.tech_level?.includes('Level 5') || 
-    matchedStudent.certificate_issued === true
+    (matchedStudent.status === 'Certified Graduate' || 
+     matchedStudent.tech_level?.includes('Level 5') || 
+     matchedStudent.certificate_issued === true) &&
+    studentReviews.length >= 6
   );
 
   const handleDownloadTranscript = () => {
@@ -315,7 +320,7 @@ export default function Verify() {
             {/* In-Progress Student Notice Alert */}
             {!isGraduate && (
               <div className="mx-6 mt-6 p-4 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 leading-relaxed">
-                <strong>⚠️ Official Graduate Certificate Notice:</strong> Candidate <strong>{matchedStudent.name}</strong> is an active enrolled learner currently undergoing hands-on practical lab modules ({matchedStudent.tech_level || 'Level 0'}). The official accredited certificate with QR verification code is unlocked only upon <strong>Level 5 curriculum completion & faculty graduation approval</strong>.
+                <strong>⚠️ Official Graduate Certificate Notice:</strong> Candidate <strong>{matchedStudent.name}</strong> is an active enrolled learner currently undergoing hands-on practical lab modules ({matchedStudent.tech_level || 'Level 0'}). The official accredited certificate with QR verification code is unlocked only upon <strong>completing all 6 curriculum levels & faculty graduation approval</strong> (currently {studentReviews.length}/6 levels evaluated).
               </div>
             )}
 
@@ -340,10 +345,10 @@ export default function Verify() {
                 </div>
 
                 <div className="bg-emerald-50/60 p-4 rounded-xl border border-emerald-100">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">Practical Score</div>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">Cumulative Lab Score</div>
                   <div className="text-sm font-bold text-emerald-900 mt-1 flex items-center gap-1.5">
                     <Sparkles size={15} className="shrink-0 text-emerald-600" />
-                    <span>10 / 10 (Distinction)</span>
+                    <span>{studentReviews.length > 0 ? `${cumulativeScore} / 60 pts (${studentReviews.length}/6 Levels)` : 'Course In Progress'}</span>
                   </div>
                 </div>
 

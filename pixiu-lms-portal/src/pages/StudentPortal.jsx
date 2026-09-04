@@ -259,9 +259,15 @@ export default function StudentPortal() {
     return null;
   };
 
-  const isGraduateCertified = student.status === 'Certified Graduate' || 
-                              student.tech_level?.includes('Level 5') || 
-                              student.certificate_issued === true;
+  const totalCumulativeScore = useMemo(() => {
+    return reviewedLevelsList.reduce((acc, curr) => acc + (Number(curr.score) || 0), 0);
+  }, [reviewedLevelsList]);
+
+  const isGraduateCertified = reviewedLevelsList.length >= 6 && (
+    student.status === 'Certified Graduate' || 
+    student.tech_level?.includes('Level 5') || 
+    student.certificate_issued === true
+  );
 
   // Ultra-Professional PDF Transcript & Certificate Generator
   const handlePrintProgressReport = () => {
@@ -279,7 +285,7 @@ export default function StudentPortal() {
 
   const handlePrintOfficialCertificate = () => {
     if (!isGraduateCertified) {
-      toast.warning('Official QR Certificate is locked! It will be issued one-time upon Level 5 course completion and faculty authorization.', 'Certificate Locked');
+      toast.warning(`Official QR Certificate is locked! All 6 curriculum levels must be evaluated and completed before certificate issuance (currently ${reviewedLevelsList.length}/6 evaluated).`, 'Certificate Locked');
       return;
     }
     generateStudentTranscriptPDF({
@@ -538,9 +544,9 @@ export default function StudentPortal() {
             ) : (
               <div 
                 className="bg-slate-800/80 text-slate-400 text-[11px] font-bold px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl flex items-center justify-center gap-1.5 border border-slate-700/80 cursor-not-allowed shrink-0"
-                title="Official Certificate with QR is locked. It will be issued one-time upon Level 5 course completion & faculty graduation approval."
+                title={`Official Certificate with QR is locked. All 6 levels must be evaluated by faculty (currently ${reviewedLevelsList.length}/6 complete).`}
               >
-                <span className="text-amber-400">🔒</span> Certificate Locked
+                <span className="text-amber-400">🔒</span> Certificate Locked ({reviewedLevelsList.length}/6)
               </div>
             )}
           </div>
@@ -733,7 +739,8 @@ export default function StudentPortal() {
                 )}
               </div>
 
-              <div className="flex flex-wrap justify-between items-center pt-3 border-t border-slate-100 text-[10px] sm:text-xs text-slate-500 mt-2 gap-1">
+              <div className="flex flex-wrap justify-between items-center pt-3 border-t border-slate-100 text-[10px] sm:text-xs text-slate-500 mt-2 gap-2">
+                <span>Cumulative Score: <strong className="text-slate-900 font-extrabold">{totalCumulativeScore} / 60 pts ({Math.round((totalCumulativeScore / 60) * 100)}%)</strong></span>
                 <span>Rating: <strong className={avgReviewScore ? 'text-amber-500' : 'text-slate-500'}>{avgReviewScore ? `★ ${avgReviewScore}/10 Verified` : 'Pending'}</strong></span>
                 <span>Stage: <strong className="text-slate-800">{reviewedLevelsList.length} of 6 Evaluated</strong></span>
               </div>
@@ -749,7 +756,7 @@ export default function StudentPortal() {
               <p className="text-[11px] sm:text-xs text-slate-500">Verified competency feedback and technical milestone validation</p>
             </div>
             <span className="text-[10px] sm:text-xs font-bold bg-slate-100 text-slate-700 px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full border border-slate-200 shrink-0">
-              6 Unit Curricula
+              Score: {totalCumulativeScore}/60 pts • {reviewedLevelsList.length}/6 Evaluated
             </span>
           </div>
 
