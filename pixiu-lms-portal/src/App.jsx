@@ -438,7 +438,7 @@ export default function App() {
                 <Route path="schools" element={<AdminOnly><Schools /></AdminOnly>} />
                 <Route path="billing" element={<AdminOnly><Billing /></AdminOnly>} />
                 <Route path="settings" element={<AdminOnly><Settings /></AdminOnly>} />
-                <Route path="students" element={<AdminOnly><Students /></AdminOnly>} />
+                <Route path="students" element={<Students />} />
                 <Route path="comms" element={<AdminOnly><Comms /></AdminOnly>} />
 
                 {/* ACADEMICS & OPERATIONS (Shared Trainer & Admin) */}

@@ -3,14 +3,14 @@ import {
   GraduationCap, Plus, Phone, Building2, Star, CheckCircle, Clock, X, Trash2, 
   Play, User, Users, Camera, Check, FileText, Upload, Image as ImageIcon, IndianRupee, 
   Calendar, AlertTriangle, ShieldAlert, Lock, Unlock, Bell, Send, History, 
-  CheckSquare, XSquare, ChevronRight, BookOpen, Megaphone, Edit3, Award, MessageSquare, Box, Download, Cpu
+  CheckSquare, XSquare, ChevronRight, BookOpen, Megaphone, Edit3, Award, MessageSquare, Box, Download, Cpu, Search
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useData } from '../context/DataContext';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import Modal from '../components/ui/Modal';
-import { generateClassCohortTranscriptPDF } from '../utils/transcriptGenerator';
+import { generateClassCohortTranscriptPDF, generateStudentTranscriptPDF } from '../utils/transcriptGenerator';
 
 const REVIEW_PRESETS = [
   "Demonstrated exceptional understanding of breadboard power rails, series-parallel LEDs, and Ohm's Law current calculations.",
@@ -71,7 +71,7 @@ export default function Trainers() {
     deleteTrainer, uploadFile, projects = [], addProject, deleteProject, scheduleSession, 
     adminUpdateAttendance, notifications, curriculum,
     studentReviews = [], saveStudentReview, deleteStudentReview,
-    updateStudent, pushSchoolNotification
+    updateStudent, pushSchoolNotification, getStudentAttendance
   } = useData();
   
   const { role, user } = useAuth();
@@ -82,7 +82,9 @@ export default function Trainers() {
   const trainerSchoolId = isAkash ? 'XYZ' : 'ZPS';
 
   // ==================== ALL REACT STATE HOOKS (DECLARED FIRST) ====================
-  const [activeTab, setActiveTab] = useState('trainers');
+  const [activeTab, setActiveTab] = useState(isAdmin ? 'trainers' : 'students');
+  const [studentSearchTerm, setStudentSearchTerm] = useState('');
+  const [studentGradeFilter, setStudentGradeFilter] = useState('All');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState(null);
@@ -162,6 +164,56 @@ export default function Trainers() {
     return students.filter(s => s.school_id === trainerSchoolId || (trainerSchoolId === 'XYZ' ? s.student_id.startsWith('XYZ') : s.student_id.startsWith('ZPS')));
   }, [students, isAdmin, user, trainerSchoolId]);
 
+  const filteredEnrolledStudents = useMemo(() => {
+    return visibleStudents.filter(s => {
+      if (studentGradeFilter !== 'All') {
+        const gradeStr = studentGradeFilter.replace('Class ', '').replace('A', '');
+        const gradeMatch = s.class_id?.includes(`-${gradeStr}A`) || s.student_id?.includes(gradeStr);
+        if (!gradeMatch) return false;
+      }
+      if (studentSearchTerm.trim()) {
+        const q = studentSearchTerm.toLowerCase().trim();
+        const matchesName = s.name?.toLowerCase().includes(q);
+        const matchesId = s.student_id?.toLowerCase().includes(q);
+        const matchesKit = s.assigned_kit_id?.toLowerCase().includes(q);
+        const matchesClass = s.class_id?.toLowerCase().includes(q);
+        if (!matchesName && !matchesId && !matchesKit && !matchesClass) return false;
+      }
+      return true;
+    });
+  }, [visibleStudents, studentGradeFilter, studentSearchTerm]);
+
+  const handleDownloadTranscript = (student, e) => {
+    if (e && e.stopPropagation) e.stopPropagation();
+    const schoolName = schools.find(s => s.id === student.school_id)?.name || (student.school_id === 'XYZ' ? 'XYZ Academy' : 'Zenith Public School');
+    const studentProjects = projects.filter(p => p.student_id === student.student_id);
+    const attendancePercentage = getStudentAttendance ? getStudentAttendance(student.student_id) : 100;
+
+    generateStudentTranscriptPDF({
+      student,
+      school: schoolName,
+      attendanceRate: attendancePercentage,
+      studentReviews: studentReviews || [],
+      projects: studentProjects,
+      curriculum: curriculum || []
+    });
+    toast.success(`Generated official PDF transcript for ${student.name}!`, 'Transcript Exported');
+  };
+
+  const handleStartAttendanceForStudent = (student, e) => {
+    if (e && e.stopPropagation) e.stopPropagation();
+    const targetClassId = student.class_id;
+    const classSessions = sessions.filter(s => s.class_id === targetClassId);
+    const activeUnlocked = classSessions.find(s => s.is_locked === 0);
+    const targetSession = activeUnlocked || classSessions[0];
+    if (targetSession) {
+      setActiveSessionId(targetSession.id);
+      toast.info(`Opened attendance session for Class ${student.class_id?.split('-').pop() || ''}!`, 'Classroom Attendance');
+    } else {
+      handleOpenStartSessionModal(targetClassId);
+    }
+  };
+
   const visibleStudentReviews = useMemo(() => {
     return studentReviews.filter(r => {
       const matchesGrade = selectedReviewGrade === 'All' || r.class_grade === selectedReviewGrade;
@@ -195,12 +247,12 @@ export default function Trainers() {
       const targetStudentId = existingReview?.student_id;
       const targetStudent = targetStudentId ? students.find(s => s.student_id === targetStudentId) : null;
       const filteredStu = students.filter(s => selectedReviewGrade === 'All' || s.class_id.includes(`-${selectedReviewGrade}A`));
-      const firstStudent = targetStudent || filteredStu[0] || students[0];
-      const grade = firstStudent?.class_id ? firstStudent.class_id.replace('CLS-ZPS-', '').replace('A', '') : (existingReview?.class_grade || '6');
+      const firstStudent = targetStudent || filteredStu[0] || visibleStudents[0] || students[0];
+      const grade = firstStudent?.class_id ? (firstStudent.class_id.match(/\d+/)?.[0] || '6') : (existingReview?.class_grade || '6');
       const unitsList = GRADE_UNITS_CONFIG[grade] || GRADE_UNITS_CONFIG['6'];
       
       setReviewFormData({
-        student_id: firstStudent?.student_id || 'ZPS6A 01',
+        student_id: firstStudent?.student_id || (trainerSchoolId === 'XYZ' ? 'XYZ6A 01' : 'ZPS6A 01'),
         class_grade: grade,
         unit_code: unitsList[0].unitCode,
         level: unitsList[0].level,
@@ -209,7 +261,7 @@ export default function Trainers() {
         rating: 5,
         status: 'Mastered',
         review: REVIEW_PRESETS[0],
-        trainer_name: user?.name || 'Vikas Pandey (Lead Instructor)'
+        trainer_name: user?.name || (isAkash ? 'Akash Sharma (Senior Robotics Faculty)' : 'Vikas Pandey (Lead Instructor)')
       });
     }
     setIsReviewModalOpen(true);
@@ -222,7 +274,7 @@ export default function Trainers() {
       ...reviewFormData,
       id: editingReviewId || `REV-${Date.now().toString().slice(-4)}`,
       student_name: studentObj?.name || 'Student',
-      class_grade: studentObj?.class_id ? studentObj.class_id.replace('CLS-ZPS-', '').replace('A', '') : reviewFormData.class_grade
+      class_grade: studentObj?.class_id ? (studentObj.class_id.match(/\d+/)?.[0] || '6') : reviewFormData.class_grade
     };
     saveStudentReview(payload);
 
@@ -468,33 +520,38 @@ export default function Trainers() {
           {/* Class Switcher inside Live Runner */}
           <div className="mt-4 pt-3 border-t border-slate-700/60 flex items-center justify-center gap-1.5 overflow-x-auto">
             <span className="text-[10px] font-bold text-slate-400 uppercase mr-1">Switch Grade:</span>
-            {[
-              { grade: '6', id: 'CLS-ZPS-6A', label: '6A' },
-              { grade: '7', id: 'CLS-ZPS-7A', label: '7A' },
-              { grade: '8', id: 'CLS-ZPS-8A', label: '8A' },
-              { grade: '9', id: 'CLS-ZPS-9A', label: '9A' },
-              { grade: '11', id: 'CLS-ZPS-11A', label: '11A' },
-            ].map(cls => {
-              const clsSession = sessions.find(s => s.class_id === cls.id);
-              const isSelected = activeSession.class_id === cls.id;
-              return (
-                <button
-                  key={cls.id}
-                  onClick={() => {
-                    if (clsSession) {
-                      setActiveSessionId(clsSession.id);
-                    }
-                  }}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                    isSelected 
-                      ? 'bg-pixiu-blue text-white shadow-md shadow-blue-500/30 ring-2 ring-blue-400' 
-                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
-                  }`}
-                >
-                  Class {cls.label}
-                </button>
-              );
-            })}
+            {(() => {
+              const liveSchoolCode = sessionSchool?.code || sessionSchool?.id || activeSession?.school_id || trainerSchoolId || 'ZPS';
+              return [
+                { grade: '6', id: `CLS-${liveSchoolCode}-6A`, label: '6A' },
+                { grade: '7', id: `CLS-${liveSchoolCode}-7A`, label: '7A' },
+                { grade: '8', id: `CLS-${liveSchoolCode}-8A`, label: '8A' },
+                { grade: '9', id: `CLS-${liveSchoolCode}-9A`, label: '9A' },
+                { grade: '11', id: `CLS-${liveSchoolCode}-11A`, label: '11A' },
+              ].map(cls => {
+                const clsSession = sessions.find(s => s.class_id === cls.id);
+                const isSelected = activeSession.class_id === cls.id;
+                return (
+                  <button
+                    key={cls.id}
+                    onClick={() => {
+                      if (clsSession) {
+                        setActiveSessionId(clsSession.id);
+                      } else {
+                        handleOpenStartSessionModal(cls.id);
+                      }
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                      isSelected 
+                        ? 'bg-pixiu-blue text-white shadow-md shadow-blue-500/30 ring-2 ring-blue-400' 
+                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
+                    }`}
+                  >
+                    Class {cls.label}
+                  </button>
+                );
+              });
+            })()}
           </div>
         </div>
 
@@ -854,6 +911,14 @@ export default function Trainers() {
       {/* Tabs Navigation */}
       <div className="flex border-b border-slate-200 mb-6 gap-6 overflow-x-auto">
         <button
+          onClick={() => setActiveTab('students')}
+          className={`pb-3 text-sm font-bold flex items-center gap-2 cursor-pointer transition-all shrink-0 ${
+            activeTab === 'students' ? 'border-b-2 border-pixiu-blue text-pixiu-blue' : 'text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <Users size={17} /> Enrolled Students ({visibleStudents.length})
+        </button>
+        <button
           onClick={() => setActiveTab('trainers')}
           className={`pb-3 text-sm font-bold flex items-center gap-2 cursor-pointer transition-all shrink-0 ${
             activeTab === 'trainers' ? 'border-b-2 border-pixiu-blue text-pixiu-blue' : 'text-slate-500 hover:text-slate-800'
@@ -878,6 +943,299 @@ export default function Trainers() {
           <History size={17} /> Date-wise Attendance Logs ({sessions.length})
         </button>
       </div>
+
+      {activeTab === 'students' && (
+        <>
+          {/* Student Directory KPI Metric Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center gap-4">
+              <div className="w-11 h-11 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-pixiu-blue shrink-0">
+                <Users size={22} />
+              </div>
+              <div>
+                <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider">Total Enrolled</p>
+                <p className="text-2xl font-extrabold text-slate-900 tracking-tight">{visibleStudents.length} Learners</p>
+              </div>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center gap-4">
+              <div className="w-11 h-11 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
+                <CheckCircle size={22} />
+              </div>
+              <div>
+                <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider">Active In Lab</p>
+                <p className="text-2xl font-extrabold text-slate-900 tracking-tight">
+                  {visibleStudents.filter(s => s.status === 'Active' || !s.status).length} Active
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center gap-4">
+              <div className="w-11 h-11 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 shrink-0">
+                <Award size={22} />
+              </div>
+              <div>
+                <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider">Certified Graduates</p>
+                <p className="text-2xl font-extrabold text-slate-900 tracking-tight">
+                  {visibleStudents.filter(s => s.status?.includes('Certified') || s.tech_level?.includes('Certified')).length} Certified
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center gap-4">
+              <div className="w-11 h-11 rounded-xl bg-violet-50 border border-violet-100 flex items-center justify-center text-violet-600 shrink-0">
+                <Box size={22} />
+              </div>
+              <div>
+                <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider">Kits Assigned</p>
+                <p className="text-2xl font-extrabold text-slate-900 tracking-tight">
+                  {visibleStudents.filter(s => s.assigned_kit_id && s.assigned_kit_id !== 'Unassigned').length} Kits
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Search, Filter & Cohort Export Bar */}
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm mb-6 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mr-1">Grade Filter:</span>
+              {['All', '6', '7', '8', '9', '11'].map(grade => {
+                const count = grade === 'All' 
+                  ? visibleStudents.length 
+                  : visibleStudents.filter(s => s.class_id?.includes(`-${grade}A`) || s.student_id?.includes(grade)).length;
+                const isSelected = studentGradeFilter === grade;
+                return (
+                  <button
+                    key={grade}
+                    onClick={() => setStudentGradeFilter(grade)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      isSelected 
+                        ? 'bg-pixiu-blue text-white shadow-xs' 
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {grade === 'All' ? 'All Grades' : `Class ${grade}A`} ({count})
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="relative flex-1 sm:w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                <input
+                  type="text"
+                  placeholder="Search name, ID, kit..."
+                  value={studentSearchTerm}
+                  onChange={e => setStudentSearchTerm(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-pixiu-blue focus:bg-white transition-all"
+                />
+                {studentSearchTerm && (
+                  <button 
+                    onClick={() => setStudentSearchTerm('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+
+              {/* Download Cohort PDF for Selected Grade */}
+              <button
+                type="button"
+                onClick={() => {
+                  const targetGrade = studentGradeFilter === 'All' ? '6' : studentGradeFilter;
+                  const cohortStudents = visibleStudents.filter(s => s.class_id?.includes(`-${targetGrade}A`) || s.student_id?.includes(targetGrade));
+                  const schoolObj = schools.find(s => s.id === (cohortStudents[0]?.school_id || trainerSchoolId)) || { name: trainerSchoolId === 'XYZ' ? 'XYZ Academy' : 'Zenith Public School' };
+                  generateClassCohortTranscriptPDF({
+                    classGrade: targetGrade,
+                    classSection: 'A',
+                    school: schoolObj,
+                    students: cohortStudents.length > 0 ? cohortStudents : visibleStudents,
+                    studentReviews,
+                    projects,
+                    curriculum,
+                    getStudentAttendance: (id) => getStudentAttendance ? getStudentAttendance(id) : 100,
+                    userRole: 'trainer'
+                  });
+                  toast.success(`Generated Cohort Transcript PDF for Class ${targetGrade}A!`, 'Class Cohort Report');
+                }}
+                className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 shadow-xs"
+                title="Download consolidated PDF report for this class"
+              >
+                <Download size={14} />
+                <span className="hidden sm:inline">Cohort PDF</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Students Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 mb-8">
+            {filteredEnrolledStudents.map(student => {
+              const attRate = getStudentAttendance ? getStudentAttendance(student.student_id) : 100;
+              const cleanGrade = student.class_id ? student.class_id.split('-').pop() : '6A';
+              const isCertified = student.status?.includes('Certified') || student.tech_level?.includes('Certified');
+
+              return (
+                <div 
+                  key={student.student_id}
+                  className="bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md hover:border-blue-200 transition-all duration-200 flex flex-col justify-between overflow-hidden group"
+                >
+                  {/* Top Bar Accent */}
+                  <div className={`h-1.5 w-full ${isCertified ? 'bg-gradient-to-r from-amber-400 to-amber-500' : 'bg-gradient-to-r from-pixiu-blue to-blue-400'}`} />
+
+                  <div className="p-5 flex-1 flex flex-col justify-between">
+                    <div>
+                      {/* Header: Avatar, Name, ID & Status Badge */}
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-sm text-white shadow-xs shrink-0 ${
+                            isCertified 
+                              ? 'bg-gradient-to-br from-amber-500 to-amber-600' 
+                              : 'bg-gradient-to-br from-pixiu-blue to-indigo-600'
+                          }`}>
+                            {student.name.split(' ').map(w => w[0]).join('').slice(0, 2)}
+                          </div>
+                          <div>
+                            <h4 className="font-extrabold text-slate-900 text-sm group-hover:text-pixiu-blue transition-colors">
+                              {student.name}
+                            </h4>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className="font-mono text-[10px] font-bold text-pixiu-blue bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">
+                                {student.student_id}
+                              </span>
+                              <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                                Class {cleanGrade}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border shrink-0 ${
+                          isCertified 
+                            ? 'bg-amber-50 text-amber-700 border-amber-200' 
+                            : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        }`}>
+                          {isCertified ? 'Certified' : 'Active'}
+                        </span>
+                      </div>
+
+                      {/* Hardware Kit & Tech Level */}
+                      <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-2 mb-3 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-400 text-[11px] font-medium flex items-center gap-1.5">
+                            <Box size={13} className="text-slate-500" /> Kit Assigned:
+                          </span>
+                          <span className="font-mono font-bold text-slate-800 text-[11px] bg-white px-2 py-0.5 rounded border border-slate-200">
+                            {student.assigned_kit_id || 'KIT-001'}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-400 text-[11px] font-medium flex items-center gap-1.5">
+                            <Award size={13} className="text-slate-500" /> Syllabus Level:
+                          </span>
+                          <span className="font-semibold text-slate-700 text-[11px]">
+                            {student.tech_level || 'Level 1'}
+                          </span>
+                        </div>
+
+                        {/* Attendance Bar */}
+                        <div className="pt-1.5 border-t border-slate-200/60">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Attendance:</span>
+                            <span className={`font-mono text-[11px] font-bold ${attRate >= 80 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                              {attRate}%
+                            </span>
+                          </div>
+                          <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                            <div 
+                              className={`h-full rounded-full transition-all ${attRate >= 80 ? 'bg-emerald-500' : 'bg-amber-500'}`}
+                              style={{ width: `${Math.min(100, Math.max(0, attRate))}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Parent Contact Details */}
+                      {student.parent_name && (
+                        <div className="flex items-center justify-between text-[11px] text-slate-500 px-1 mb-3">
+                          <span className="truncate">Parent: <strong className="text-slate-700 font-semibold">{student.parent_name}</strong></span>
+                          {student.parent_phone && (
+                            <span className="font-mono text-slate-600 shrink-0">{student.parent_phone}</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="pt-3 border-t border-slate-100 flex items-center gap-1.5">
+                      {/* Take Class Attendance */}
+                      <button
+                        onClick={(e) => handleStartAttendanceForStudent(student, e)}
+                        className="flex-1 bg-pixiu-blue hover:bg-blue-600 text-white font-bold py-1.5 px-2.5 rounded-lg text-xs flex items-center justify-center gap-1 transition-all cursor-pointer shadow-xs"
+                        title={`Take attendance for Class ${cleanGrade}`}
+                      >
+                        <Play size={12} fill="white" />
+                        <span>Attendance</span>
+                      </button>
+
+                      {/* Review Button */}
+                      <button
+                        onClick={() => handleOpenReviewModal({ student_id: student.student_id, class_grade: cleanGrade.replace('A', '') })}
+                        className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
+                        title="Give End-of-Unit Review & Grading"
+                      >
+                        <Star size={14} className="text-amber-500 fill-amber-500" />
+                        <span className="hidden sm:inline">Review</span>
+                      </button>
+
+                      {/* PDF Transcript Button */}
+                      <button
+                        onClick={(e) => handleDownloadTranscript(student, e)}
+                        className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-all cursor-pointer"
+                        title="Download Student Progress Transcript PDF"
+                      >
+                        <Download size={14} />
+                      </button>
+
+                      {/* WhatsApp Button */}
+                      {student.parent_phone && (
+                        <a
+                          href={`https://wa.me/${student.parent_phone.replace(/[^0-9]/g, '')}?text=Hello%20${encodeURIComponent(student.parent_name || 'Parent')},%20this%20is%20Pixiu%20Tech%20Robotics%20Lab%20regarding%20${encodeURIComponent(student.name)}'s%20progress.`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-200 rounded-lg transition-all cursor-pointer"
+                          title="WhatsApp Parent"
+                        >
+                          <MessageSquare size={14} />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Empty State */}
+          {filteredEnrolledStudents.length === 0 && (
+            <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center max-w-md mx-auto mb-8 shadow-xs">
+              <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 mx-auto mb-3">
+                <Users size={24} />
+              </div>
+              <h4 className="font-bold text-slate-800 text-sm mb-1">No Enrolled Students Found</h4>
+              <p className="text-xs text-slate-500 mb-4">No students matched the active search or grade filter.</p>
+              <button
+                onClick={() => { setStudentSearchTerm(''); setStudentGradeFilter('All'); }}
+                className="text-xs font-bold text-pixiu-blue hover:underline cursor-pointer"
+              >
+                Reset Search & Filters
+              </button>
+            </div>
+          )}
+        </>
+      )}
 
       {activeTab === 'trainers' && (
         <>

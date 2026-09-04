@@ -13,6 +13,7 @@ export default function Sidebar({ mobileOpen = false, setMobileOpen = () => {} }
       title: 'TRAINER ACADEMICS',
       links: [
         { name: 'Live Sessions & Roster', path: '/trainers', icon: GraduationCap },
+        { name: 'Student Directory', path: '/students', icon: Users },
         { name: 'Virtual Arduino Lab', path: '/simulation', icon: Cpu },
         { name: 'Content Hub', path: '/content', icon: PlaySquare },
         { name: 'Curriculum Plans', path: '/curriculum', icon: BookOpen },

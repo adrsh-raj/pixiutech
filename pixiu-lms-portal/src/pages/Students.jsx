@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Search, Plus, MoreVertical, MessageCircle, Building2, X, FileText, ChevronRight, User, Award, Activity, Box, Trash2, Edit, Check, Phone, GraduationCap, Download } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
 import { generateStudentTranscriptPDF, generateClassCohortTranscriptPDF } from '../utils/transcriptGenerator';
 import Modal from '../components/ui/Modal';
 
@@ -11,9 +12,13 @@ const generateId = (schoolCode, cls, sec, roll) => {
 
 export default function Students() {
   const { schools, classes, students, projects, studentReviews, curriculum, addStudent, updateStudent, deleteStudent, getNextRollNumber, getStudentAttendance } = useData();
+  const { role, user } = useAuth();
   const toast = useToast();
   
-  const [selectedSchool, setSelectedSchool] = useState('All');
+  const isTrainer = role === 'trainer';
+  const trainerSchoolId = user?.school_id || (user?.username === 'akashsharma' || user?.related_id === 'TR-02' ? 'XYZ' : 'ZPS');
+
+  const [selectedSchool, setSelectedSchool] = useState(() => isTrainer ? trainerSchoolId : 'All');
   const [selectedClassFilter, setSelectedClassFilter] = useState('All');
   const [activeStudent, setActiveStudent] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
