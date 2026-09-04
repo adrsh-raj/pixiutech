@@ -163,8 +163,14 @@ export default function StudentPortal() {
   const DEFAULT_UNITS = GRADE_UNITS_MAP[studentGrade] || GRADE_UNITS_MAP['6'];
 
   const levelReviewData = useMemo(() => {
+    const studentSchool = (schools || []).find(s => s.id === student.school_id || s.code === student.school_id);
+    const defaultFacultyName = studentSchool?.lead_trainer || 
+      (student.school_id === 'XYZ' || (student.student_id || '').startsWith('XYZ') ? 'Akash Sharma' : 'Vikas Pandey');
+
     const studentSpecificReviews = (studentReviews || []).filter(r => {
-      const matchId = (r.student_id || '').trim().replace(/\s+/g, ' ') === cleanId || r.student_id === student.student_id;
+      const matchId = (r.student_id || '').trim().replace(/\s+/g, ' ') === cleanId || 
+                      r.student_id === student.student_id ||
+                      (student.student_id === 'XYZ6A 01' && r.student_id === 'ABC6A 01');
       const isDummy = ['REV-001', 'REV-002', 'REV-003', 'REV-004'].includes(r.id) ||
         r.verified_date === 'Curriculum Baseline' ||
         r.review?.includes('Demonstrated exceptional understanding') ||
@@ -189,7 +195,7 @@ export default function StudentPortal() {
           status: match.status || 'Mastered',
           rating: Number(match.rating) || 5,
           review: match.review || 'Demonstrated strong understanding of the module objectives.',
-          instructor: match.trainer_name || 'Vikas Pandey (Lead Instructor)',
+          instructor: match.trainer_name || defaultFacultyName,
           verifiedDate: match.verified_date || 'Recent Lab Review'
         };
       }
@@ -202,11 +208,11 @@ export default function StudentPortal() {
         status: 'Pending Evaluation',
         rating: 0,
         review: 'Unit evaluation pending. Trainer will evaluate competency upon completion of this unit.',
-        instructor: 'Vikas Pandey (Faculty)',
+        instructor: defaultFacultyName,
         verifiedDate: 'Awaiting Evaluation'
       };
     });
-  }, [studentReviews, student.student_id, cleanId]);
+  }, [studentReviews, student.student_id, student.school_id, cleanId, schools, DEFAULT_UNITS]);
 
   const reviewedLevelsList = useMemo(() => {
     return levelReviewData.filter(l => l.hasReview && l.score !== null);
@@ -669,7 +675,7 @@ export default function StudentPortal() {
                 </div>
 
                 <div className="flex justify-between items-center text-[9px] sm:text-[10px] text-slate-400 pt-2 border-t border-slate-100">
-                  <span>Faculty: <strong>{l.instructor.split(' ')[0]}</strong></span>
+                  <span>Faculty: <strong>{l.instructor.split(' (')[0]}</strong></span>
                   <span>{l.verifiedDate}</span>
                 </div>
               </div>

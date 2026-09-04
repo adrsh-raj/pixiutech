@@ -80,7 +80,7 @@ export const generateStudentTranscriptPDF = ({
   const studentSpecificReviews = (studentReviews || []).filter(r => {
     const rId = (r.student_id || '').trim().toLowerCase().replace(/\s+/g, '');
     const sId = (student.student_id || '').trim().toLowerCase().replace(/\s+/g, '');
-    return rId === sId;
+    return rId === sId || (sId === 'xyz6a01' && rId === 'abc6a01');
   });
 
   const levelReviewData = defaultUnits.map(unit => {
