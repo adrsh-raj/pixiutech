@@ -34,7 +34,30 @@ body{
   font-family:var(--f-body);font-size:17px;line-height:1.62;
   -webkit-font-smoothing:antialiased;
 }
-img,svg{max-width:100%;display:block}
+img,svg:not(.blocklySvg *):not(.blocklySvg){max-width:100%;display:block}
+
+/* Fix SVG presentation attributes like display="none" being overridden by CSS resets */
+svg[display="none"],
+g[display="none"],
+[display="none"] {
+  display: none !important;
+}
+
+/* Explicitly ensure hidden Blockly scrollbars and flyout components never render when closed */
+.blocklyFlyoutScrollbar[display="none"],
+.blocklyScrollbarVertical[display="none"],
+.blocklyScrollbarHorizontal[display="none"],
+.blocklyScrollbar[display="none"],
+.blocklyFlyout[display="none"] {
+  display: none !important;
+}
+
+.blocklySvg,
+.blocklySvg svg,
+.blocklySvg g {
+  max-width: none !important;
+}
+
 h1,h2,h3,h4{
   font-family:var(--f-display);
   font-stretch:112%;font-variation-settings:'wdth' 112;

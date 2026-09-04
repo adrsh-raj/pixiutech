@@ -264,6 +264,26 @@ export function BlocklyEditor({ circuit, xml, onXmlChange }: Props) {
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col lg:flex-row bg-slate-900 text-white overflow-hidden">
+      {/* Scoped CSS to eliminate Tailwind/Global CSS conflicts with Blockly SVG presentation attributes */}
+      <style>{`
+        .blocklySvg svg[display="none"],
+        .blocklySvg g[display="none"],
+        .blocklySvg [display="none"],
+        .blocklyFlyoutScrollbar[display="none"],
+        .blocklyScrollbarVertical[display="none"],
+        .blocklyScrollbarHorizontal[display="none"],
+        .blocklyScrollbar[display="none"],
+        .blocklyFlyout[display="none"],
+        .blocklyFlyoutBackground[display="none"] {
+          display: none !important;
+        }
+        .blocklySvg,
+        .blocklySvg svg,
+        .blocklySvg g {
+          max-width: none !important;
+        }
+      `}</style>
+
       {/* Mobile-Only Tab Switcher: Blocks vs C++ Code */}
       <div className="lg:hidden flex items-center justify-between border-b border-slate-800 bg-slate-950 px-3 py-2 shrink-0">
         <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 p-0.5 rounded-lg text-xs">

@@ -53,3 +53,28 @@ body {
   background-color: #1D6EFF;
   color: white;
 }
+
+/* ============================================================
+   BLOCKLY SVG & PRESENTATION FIXES
+   ============================================================ */
+/* Fix SVG presentation attributes like display="none" being overridden by Tailwind CSS resets */
+svg[display="none"],
+g[display="none"],
+[display="none"] {
+  display: none !important;
+}
+
+/* Explicitly ensure hidden Blockly scrollbars and flyout components never render when closed */
+.blocklyFlyoutScrollbar[display="none"],
+.blocklyScrollbarVertical[display="none"],
+.blocklyScrollbarHorizontal[display="none"],
+.blocklyScrollbar[display="none"],
+.blocklyFlyout[display="none"] {
+  display: none !important;
+}
+
+.blocklySvg,
+.blocklySvg svg,
+.blocklySvg g {
+  max-width: none !important;
+}
