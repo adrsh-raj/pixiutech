@@ -54,7 +54,7 @@ export function samplePinVoltage(
   }
 
   // 2. Pure nodal potential solver for rest of circuit
-  const nodal = solveCircuitNodalPotentials(state, pinStates, runtime)
+  const nodal = solveCircuitNodalPotentials(state, new Set(), pinStates, true)
   return Math.max(0, Math.min(5.0, nodal.getPinVoltage(ref)))
 }
 

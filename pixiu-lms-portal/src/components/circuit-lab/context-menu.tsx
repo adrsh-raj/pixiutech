@@ -19,6 +19,8 @@ import {
   X,
 } from "lucide-react"
 
+import type { PlacedPart } from "@/lib/circuit-types"
+
 export interface ContextMenuTarget {
   type: "part" | "wire" | "canvas"
   id?: string | null
@@ -29,6 +31,7 @@ interface Props {
   y: number
   target: ContextMenuTarget
   partName?: string
+  selectedPart?: PlacedPart | null
   running: boolean
   activeWireColor?: string
   onClose: () => void
@@ -47,6 +50,7 @@ interface Props {
   onToggleRun?: () => void
   onClearCanvas?: () => void
   onChangeWireColor?: (color: string) => void
+  onChangeProp?: (id: string, prop: string, value: unknown) => void
 }
 
 const WIRE_COLORS = [
@@ -64,6 +68,7 @@ export function ContextMenu({
   y,
   target,
   partName,
+  selectedPart,
   running,
   activeWireColor,
   onClose,
@@ -82,6 +87,7 @@ export function ContextMenu({
   onToggleRun,
   onClearCanvas,
   onChangeWireColor,
+  onChangeProp,
 }: Props) {
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -150,6 +156,38 @@ export function ContextMenu({
         <div className="px-2.5 py-1 text-[10px] font-mono text-cyan-300/90 bg-cyan-950/40 rounded-lg border border-cyan-500/20 mb-1 flex items-center justify-between">
           <span className="truncate">{partName || "Component Selected"}</span>
           <span className="text-[9px] uppercase tracking-wider text-slate-400">PART</span>
+        </div>
+      )}
+
+      {/* Direct Potentiometer Wiper Value Slider */}
+      {target.type === "part" && selectedPart?.type === "potentiometer" && (
+        <div
+          className="p-2 bg-slate-900/95 rounded-xl border border-cyan-500/40 mb-1.5 shadow-lg select-none"
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between text-[11px] font-mono mb-1.5">
+            <span className="text-cyan-300 font-bold flex items-center gap-1">
+              <span>🎛️</span>
+              <span>Wiper Output</span>
+            </span>
+            <span className="text-white font-extrabold bg-cyan-950 px-1.5 py-0.5 rounded border border-cyan-500/40 text-[10px]">
+              {((Number(selectedPart.props.value ?? 512) / 1023) * 5).toFixed(2)}V ({selectedPart.props.value ?? 512})
+            </span>
+          </div>
+          <input
+            type="range"
+            min={0}
+            max={1023}
+            value={Number(selectedPart.props.value ?? 512)}
+            onChange={(e) => onChangeProp?.(selectedPart.id, "value", Number(e.target.value))}
+            className="w-full accent-cyan-400 cursor-pointer h-2 bg-slate-800 rounded-lg"
+          />
+          <div className="flex justify-between text-[9px] text-slate-400 font-mono mt-1">
+            <span>0.0V (Min)</span>
+            <span>2.5V</span>
+            <span>5.0V (Max)</span>
+          </div>
         </div>
       )}
 

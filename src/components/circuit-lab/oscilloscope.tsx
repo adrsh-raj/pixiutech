@@ -5,6 +5,7 @@ import { Activity, X, Play, Pause, RotateCcw, Minimize2, Maximize2, GripHorizont
 import type { CircuitState, PinRef } from "@/lib/circuit-types"
 import type { ArduinoPinState } from "@/lib/simulation"
 import type { PartRuntime } from "./part-art"
+import { CATALOG } from "@/lib/components-catalog"
 import { samplePinVoltage, computeChannelMetrics, type WaveformPoint } from "@/lib/waveform-sampler"
 
 interface Props {
@@ -46,7 +47,7 @@ export function Oscilloscope({
 }: Props) {
   const [isHold, setIsHold] = useState(false)
   const [minimized, setMinimized] = useState(false)
-  const [timebaseIndex, setTimebaseIndex] = useState(1) // 100ms / 1s window default
+  const [timebaseIndex, setTimebaseIndex] = useState(2) // 250ms / 2.5s window default
   const [position, setPosition] = useState<{ x: number; y: number } | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [history, setHistory] = useState<WaveformPoint[]>([])
@@ -139,8 +140,9 @@ export function Oscilloscope({
   const formatPin = (ref: PinRef | null) => {
     if (!ref) return "Not Connected"
     const part = state.parts.find((p) => p.id === ref.partId)
-    const partName = part?.type === "arduino-uno" ? "Uno" : (part?.type ?? ref.partId)
-    return `${partName}: ${ref.pinId.toUpperCase()}`
+    const def = part ? CATALOG[part.type] : null
+    const pin = def?.pins.find((p) => p.id === ref.pinId)
+    return `${def?.name ?? ref.partId} · ${pin?.label ?? ref.pinId}`
   }
 
   // Quick Preset Handlers
@@ -176,17 +178,24 @@ export function Oscilloscope({
       return `M 0 ${y.toFixed(1)} L ${screenWidth} ${y.toFixed(1)}`
     }
 
-    const segments = visiblePoints.map((pt, idx) => {
+    const points = visiblePoints.map((pt) => {
       const x = ((pt.t - startT) / activeWindowMs) * screenWidth
       const y = screenHeight - (Math.max(0, Math.min(vMaxScale, pt[channel])) / vMaxScale) * screenHeight
-      return `${idx === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`
+      return { x, y }
     })
 
-    const firstX = ((visiblePoints[0].t - startT) / activeWindowMs) * screenWidth
-    const firstY = screenHeight - (Math.max(0, Math.min(vMaxScale, visiblePoints[0][channel])) / vMaxScale) * screenHeight
-    const prefix = firstX > 0.5 ? `M 0 ${firstY.toFixed(1)} L ` : ""
+    let path = ""
+    if (points[0].x > 0.5) {
+      path = `M 0 ${points[0].y.toFixed(1)} L ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)} `
+    } else {
+      path = `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)} `
+    }
 
-    return prefix + segments.join(" ")
+    for (let i = 1; i < points.length; i++) {
+      path += `L ${points[i].x.toFixed(1)} ${points[i].y.toFixed(1)} `
+    }
+
+    return path.trim()
   }
 
   const pathCH1 = generatePath("v1")

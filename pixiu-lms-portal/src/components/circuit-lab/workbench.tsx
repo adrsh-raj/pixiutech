@@ -48,7 +48,7 @@ const DEFAULT_XML = `<xml xmlns="https://developers.google.com/blockly/xml">
           <block type="time_delay">
             <value name="MS">
               <shadow type="math_number">
-                <field name="NUM">1000</field>
+                <field name="NUM">500</field>
               </shadow>
             </value>
             <next>
@@ -59,7 +59,7 @@ const DEFAULT_XML = `<xml xmlns="https://developers.google.com/blockly/xml">
                   <block type="time_delay">
                     <value name="MS">
                       <shadow type="math_number">
-                        <field name="NUM">1000</field>
+                        <field name="NUM">500</field>
                       </shadow>
                     </value>
                   </block>
@@ -76,13 +76,17 @@ const DEFAULT_XML = `<xml xmlns="https://developers.google.com/blockly/xml">
 const INITIAL_STATE: CircuitState = {
   parts: [
     { id: "uno", type: "arduino-uno", x: 40, y: 110, rotation: 0, props: {} },
-    { id: "r_red", type: "resistor", x: 400, y: 170, rotation: 0, props: { resistance: 220 } },
-    { id: "led_red", type: "led", x: 520, y: 170, rotation: 0, props: { color: "red" } },
+    { id: "r_red", type: "resistor", x: 400, y: 130, rotation: 0, props: { resistance: 220 } },
+    { id: "led_red", type: "led", x: 520, y: 130, rotation: 0, props: { color: "red" } },
+    { id: "pot", type: "potentiometer", x: 410, y: 240, rotation: 0, props: { value: 512 } },
   ],
   wires: [
     { id: "w_r1", from: { partId: "uno", pinId: "d13" }, to: { partId: "r_red", pinId: "a" }, color: "#ef4444" },
     { id: "w_r2", from: { partId: "r_red", pinId: "b" }, to: { partId: "led_red", pinId: "anode" }, color: "#ef4444" },
     { id: "w_lgnd", from: { partId: "led_red", pinId: "cathode" }, to: { partId: "uno", pinId: "gnd" }, color: "#1e293b" },
+    { id: "w_pot_gnd", from: { partId: "uno", pinId: "gnd_pwr" }, to: { partId: "pot", pinId: "t1" }, color: "#1e293b" },
+    { id: "w_pot_wiper", from: { partId: "pot", pinId: "wiper" }, to: { partId: "uno", pinId: "a0" }, color: "#06b6d4" },
+    { id: "w_pot_5v", from: { partId: "uno", pinId: "5v" }, to: { partId: "pot", pinId: "t2" }, color: "#ef4444" },
   ],
 }
 
@@ -119,9 +123,9 @@ export function Workbench() {
   const [probeBlack, setProbeBlack] = useState<PinRef | null>(null)
   const [activeProbeToPlace, setActiveProbeToPlace] = useState<"red" | "black" | null>(null)
 
-  const [isScopeOpen, setIsScopeOpen] = useState(false)
-  const [scopeProbeCH1, setScopeProbeCH1] = useState<PinRef | null>(null)
-  const [scopeProbeCH2, setScopeProbeCH2] = useState<PinRef | null>(null)
+  const [isScopeOpen, setIsScopeOpen] = useState(true)
+  const [scopeProbeCH1, setScopeProbeCH1] = useState<PinRef | null>({ partId: "uno", pinId: "d13" })
+  const [scopeProbeCH2, setScopeProbeCH2] = useState<PinRef | null>({ partId: "pot", pinId: "wiper" })
   const [activeScopeProbeToPlace, setActiveScopeProbeToPlace] = useState<"ch1" | "ch2" | null>(null)
 
   // Stepping debugger state & refs
@@ -485,11 +489,15 @@ export function Workbench() {
             lcd_line2: "" as any,
           }))
         },
-        getSensorValue: (type) => {
+        getSensorValue: (type, pin) => {
           const p = partsRef.current.find((pt) => pt.type === type)
           if (type === "ultrasonic") return Number(p?.props?.distance ?? 100)
           if (type === "ldr") return Number(p?.props?.light ?? 512)
           if (type === "tmp36") return Number(p?.props?.temperature ?? 25)
+          if (type === "analog") {
+            const pot = partsRef.current.find((pt) => pt.type === "potentiometer")
+            return Number(pot?.props?.value ?? 512)
+          }
           return 0
         },
         isAiDetected: (cls) => aiStateRef.current.detectedClass === cls,
@@ -879,6 +887,7 @@ export function Workbench() {
                 if (id) setSelectedId(null)
               }}
               onCanvasContextMenu={handleCanvasContextMenu}
+              onChangeProp={changeProp}
             />
 
             {running && (
@@ -1006,6 +1015,7 @@ export function Workbench() {
           y={contextMenu.y}
           target={contextMenu.target}
           partName={selected ? CATALOG[selected.type]?.name : undefined}
+          selectedPart={selected}
           running={running}
           activeWireColor={selectedWire ? selectedWire.color : activeWireColor}
           onClose={() => setContextMenu(null)}
@@ -1035,12 +1045,13 @@ export function Workbench() {
           onToggleRun={toggleRun}
           onClearCanvas={clearAll}
           onChangeWireColor={handleSelectWireColor}
+          onChangeProp={changeProp}
         />
       )}
 
       {/* Interactive Digital Multimeter (DMM) */}
       <Multimeter
-        isOpen={isDmmOpen}
+        isOpen={isDmmOpen && view === "circuit"}
         onClose={() => setIsDmmOpen(false)}
         state={state}
         runtime={runtime}
@@ -1057,7 +1068,7 @@ export function Workbench() {
 
       {/* Interactive Mini Oscilloscope & Logic Waveform Grapher */}
       <Oscilloscope
-        isOpen={isScopeOpen}
+        isOpen={isScopeOpen && view === "circuit"}
         onClose={() => setIsScopeOpen(false)}
         state={state}
         runtime={runtime}

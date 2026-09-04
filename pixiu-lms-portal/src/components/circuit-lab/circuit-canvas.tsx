@@ -43,6 +43,7 @@ interface Props {
   selectedWireId?: string | null
   onSelectWire?: (id: string | null) => void
   onCanvasContextMenu?: (e: React.MouseEvent, target: ContextMenuTarget) => void
+  onChangeProp?: (id: string, prop: string, value: unknown) => void
 }
 
 export function CircuitCanvas(props: Props) {
@@ -73,6 +74,7 @@ export function CircuitCanvas(props: Props) {
     selectedWireId,
     onSelectWire,
     onCanvasContextMenu,
+    onChangeProp,
   } = props
 
   const svgRef = useRef<SVGSVGElement | null>(null)
@@ -339,6 +341,50 @@ export function CircuitCanvas(props: Props) {
                       />
                     )}
                   </g>
+
+                  {/* Direct Floating Potentiometer Knob / Range Slider on Canvas */}
+                  {part.type === "potentiometer" && (
+                    <foreignObject
+                      x={-28}
+                      y={-50}
+                      width={120}
+                      height={46}
+                      className="overflow-visible pointer-events-auto"
+                    >
+                      <div
+                        className="bg-slate-950/95 border border-cyan-500/50 shadow-xl rounded-lg px-2 py-1 text-white flex flex-col gap-0.5 select-none backdrop-blur-sm"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
+                        onContextMenu={(e) => {
+                          e.stopPropagation()
+                          onSelect(part.id)
+                          onCanvasContextMenu?.(e, { type: "part", id: part.id })
+                        }}
+                      >
+                        <div className="flex items-center justify-between text-[9px] font-mono leading-tight">
+                          <span className="text-cyan-400 font-bold flex items-center gap-1">
+                            <span>🎛️</span>
+                            <span>Wiper</span>
+                          </span>
+                          <span className="text-cyan-200 font-extrabold font-mono bg-cyan-950/70 px-1 rounded border border-cyan-500/30 text-[9px]">
+                            {((Number(part.props.value ?? 512) / 1023) * 5).toFixed(2)}V ({part.props.value ?? 512})
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min={0}
+                          max={1023}
+                          value={Number(part.props.value ?? 512)}
+                          onChange={(e) => {
+                            e.stopPropagation()
+                            onChangeProp?.(part.id, "value", Number(e.target.value))
+                          }}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          className="w-full accent-cyan-400 cursor-pointer h-1.5 bg-slate-800 rounded"
+                        />
+                      </div>
+                    </foreignObject>
+                  )}
                 </g>
               </g>
             )
