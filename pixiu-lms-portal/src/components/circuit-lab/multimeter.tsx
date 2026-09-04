@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from "react"
-import { Gauge, X, Volume2, HelpCircle, Sparkles, CheckCircle2, RotateCcw, AlertTriangle, Zap } from "lucide-react"
+import { useState, useEffect, useMemo, useRef } from "react"
+import { Gauge, X, Volume2, HelpCircle, Sparkles, CheckCircle2, RotateCcw, AlertTriangle, Zap, Minimize2, Maximize2, GripHorizontal } from "lucide-react"
 import type { CircuitState, PinRef } from "@/lib/circuit-types"
 import type { PartRuntime } from "./part-art"
 import type { ArduinoPinState } from "@/lib/simulation"
@@ -28,6 +28,7 @@ interface Props {
   onSetProbeBlack: (ref: PinRef | null) => void
   activeProbeToPlace: "red" | "black" | null
   onSetActiveProbeToPlace: (color: "red" | "black" | null) => void
+  isAiCameraOpen?: boolean
 }
 
 export function Multimeter({
@@ -43,8 +44,57 @@ export function Multimeter({
   onSetProbeBlack,
   activeProbeToPlace,
   onSetActiveProbeToPlace,
+  isAiCameraOpen = false,
 }: Props) {
   const [mode, setMode] = useState<DmmMode>("voltage")
+  const [minimized, setMinimized] = useState(false)
+  const [position, setPosition] = useState<{ x: number; y: number } | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
+  const dragStartRef = useRef<{ mouseX: number; mouseY: number; startX: number; startY: number }>({
+    mouseX: 0,
+    mouseY: 0,
+    startX: 0,
+    startY: 0,
+  })
+  const panelRef = useRef<HTMLDivElement | null>(null)
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if ((e.target as HTMLElement).closest("button") || (e.target as HTMLElement).closest("input")) return
+    const panel = panelRef.current
+    if (!panel) return
+
+    const rect = panel.getBoundingClientRect()
+    dragStartRef.current = {
+      mouseX: e.clientX,
+      mouseY: e.clientY,
+      startX: rect.left,
+      startY: rect.top,
+    }
+    setIsDragging(true)
+    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+  }
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!isDragging) return
+    const dx = e.clientX - dragStartRef.current.mouseX
+    const dy = e.clientY - dragStartRef.current.mouseY
+    const panel = panelRef.current
+    const panelWidth = panel ? panel.offsetWidth : 380
+    const panelHeight = panel ? panel.offsetHeight : 200
+
+    const newX = Math.max(10, Math.min(window.innerWidth - panelWidth - 10, dragStartRef.current.startX + dx))
+    const newY = Math.max(10, Math.min(window.innerHeight - panelHeight - 10, dragStartRef.current.startY + dy))
+    setPosition({ x: newX, y: newY })
+  }
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    if (isDragging) {
+      setIsDragging(false)
+      try {
+        ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
+      } catch {}
+    }
+  }
 
   // Dynamically solve exact nodal potentials across entire circuit network
   const nodalSolution = useMemo(() => {
@@ -176,33 +226,118 @@ export function Multimeter({
 
   return (
     <div
-      className="fixed bottom-14 right-4 z-40 w-80 sm:w-96 rounded-2xl border border-slate-700/80 bg-slate-950/95 backdrop-blur-xl shadow-2xl p-4 text-white animate-in slide-in-from-bottom-5 duration-200 select-none font-sans"
-      style={{ boxShadow: "0 20px 50px rgba(0,0,0,0.6), 0 0 20px rgba(245, 158, 11, 0.15)" }}
+      ref={panelRef}
+      className={`fixed z-40 rounded-2xl border border-slate-700/80 bg-slate-950/95 backdrop-blur-xl shadow-2xl text-white select-none font-sans transition-shadow duration-200 ${
+        position === null
+          ? isAiCameraOpen
+            ? "bottom-14 right-2 sm:right-[424px] max-w-[calc(100vw-16px)]"
+            : "bottom-14 right-4 max-w-[calc(100vw-16px)]"
+          : ""
+      } ${minimized ? "w-auto min-w-[260px] p-2.5" : "w-80 sm:w-96 p-4 animate-in slide-in-from-bottom-5"}`}
+      style={
+        position !== null
+          ? {
+              left: `${position.x}px`,
+              top: `${position.y}px`,
+              bottom: "auto",
+              right: "auto",
+              boxShadow: "0 20px 50px rgba(0,0,0,0.6), 0 0 20px rgba(245, 158, 11, 0.15)",
+            }
+          : {
+              boxShadow: "0 20px 50px rgba(0,0,0,0.6), 0 0 20px rgba(245, 158, 11, 0.15)",
+            }
+      }
     >
-      {/* Header Bar */}
-      <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-        <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/30">
-            <Gauge size={16} />
-          </div>
-          <div>
-            <h3 className="text-xs font-bold text-slate-100 flex items-center gap-1.5">
-              <span>Digital Multimeter</span>
-              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono font-normal">
-                Physics MNA
+      {/* Minimized View */}
+      {minimized ? (
+        <div
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          className="flex items-center justify-between gap-3 px-1 py-0.5 cursor-grab active:cursor-grabbing touch-none"
+          title="Drag to reposition. Click expand to open full Multimeter."
+        >
+          <div className="flex items-center gap-2">
+            <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-[10px] font-mono uppercase font-bold text-amber-400">
+                {mode.toUpperCase()}:
               </span>
-            </h3>
-            <span className="text-[10px] text-slate-400 font-mono">Model DMM-2026</span>
+              <span className="text-xs font-extrabold text-emerald-400 font-mono tracking-tight">
+                {reading.value || "---"} {reading.unit}
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setMinimized(false)}
+              className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+              title="Expand Multimeter"
+            >
+              <Maximize2 size={13} />
+            </button>
+            <button
+              onClick={onClose}
+              className="p-1 rounded text-slate-400 hover:text-red-400 hover:bg-slate-800 transition cursor-pointer"
+              title="Close Multimeter"
+            >
+              <X size={14} />
+            </button>
           </div>
         </div>
-        <button
-          onClick={onClose}
-          className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white transition cursor-pointer"
-          title="Close Multimeter"
-        >
-          <X size={16} />
-        </button>
-      </div>
+      ) : (
+        <>
+          {/* Header Bar (Draggable) */}
+          <div
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            className="flex items-center justify-between pb-3 border-b border-slate-800 cursor-grab active:cursor-grabbing touch-none select-none"
+            title="Click & drag header to move Multimeter anywhere on screen"
+          >
+            <div className="flex items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/30 shrink-0">
+                <Gauge size={16} />
+              </div>
+              <div>
+                <h3 className="text-xs font-bold text-slate-100 flex items-center gap-1.5">
+                  <span>Digital Multimeter</span>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono font-normal">
+                    Physics MNA
+                  </span>
+                </h3>
+                <span className="text-[9px] text-slate-400 font-mono flex items-center gap-1">
+                  <GripHorizontal size={11} className="text-slate-500" />
+                  <span>Drag to move</span>
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              {position !== null && (
+                <button
+                  onClick={() => setPosition(null)}
+                  className="rounded-lg py-0.5 px-1.5 text-[9px] font-mono text-slate-400 hover:text-amber-300 hover:bg-slate-800 transition cursor-pointer"
+                  title="Reset to default position"
+                >
+                  Reset
+                </button>
+              )}
+              <button
+                onClick={() => setMinimized(true)}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white transition cursor-pointer"
+                title="Minimize Multimeter"
+              >
+                <Minimize2 size={14} />
+              </button>
+              <button
+                onClick={onClose}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white transition cursor-pointer"
+                title="Close Multimeter"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          </div>
 
       {/* Backlit Digital LCD Screen */}
       <div className="mt-3 rounded-xl border-2 border-slate-800 bg-[#0c1f17] p-3 shadow-inner relative overflow-hidden">
@@ -447,6 +582,8 @@ export function Multimeter({
           )}
         </div>
       </div>
+        </>
+      )}
     </div>
   )
 }

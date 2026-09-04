@@ -909,6 +909,7 @@ export function Workbench() {
         onSetProbeBlack={setProbeBlack}
         activeProbeToPlace={activeProbeToPlace}
         onSetActiveProbeToPlace={setActiveProbeToPlace}
+        isAiCameraOpen={isAiCameraOpen}
       />
     </div>
   )

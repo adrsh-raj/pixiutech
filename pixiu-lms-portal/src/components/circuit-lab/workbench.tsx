@@ -219,7 +219,6 @@ export function Workbench() {
     e.preventDefault()
     setContextMenu({ x: e.clientX, y: e.clientY, target })
   }, [])
-
   const [aiState, setAiState] = useState<AiVisionState>({
     enabled: true,
     detectedClass: "none",
@@ -910,6 +909,7 @@ export function Workbench() {
         onSetProbeBlack={setProbeBlack}
         activeProbeToPlace={activeProbeToPlace}
         onSetActiveProbeToPlace={setActiveProbeToPlace}
+        isAiCameraOpen={isAiCameraOpen}
       />
     </div>
   )
