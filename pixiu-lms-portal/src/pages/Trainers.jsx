@@ -238,6 +238,18 @@ export default function Trainers() {
     toast.success('Directive acknowledged & marked as read!', 'Acknowledged');
   };
 
+  // Auto-synchronize modal student to valid student in visible list
+  useEffect(() => {
+    if (isReviewModalOpen) {
+      const gradeStudents = visibleStudents.filter(
+        s => s.class_id?.includes(`-${reviewFormData.class_grade}A`) || s.student_id?.includes(reviewFormData.class_grade)
+      );
+      if (gradeStudents.length > 0 && !gradeStudents.some(s => s.student_id === reviewFormData.student_id)) {
+        handleSelectModalStudent(gradeStudents[0].student_id);
+      }
+    }
+  }, [isReviewModalOpen, reviewFormData.class_grade, visibleStudents]);
+
   const handleOpenReviewModal = (existingReviewOrStudent = null, targetUnitCode = null) => {
     let studentId;
     let grade;
@@ -249,14 +261,22 @@ export default function Trainers() {
       grade = existingReview.class_grade || '6';
     } else if (existingReviewOrStudent && existingReviewOrStudent.student_id) {
       studentId = existingReviewOrStudent.student_id;
-      const stu = students.find(s => s.student_id === studentId);
+      const stu = visibleStudents.find(s => s.student_id === studentId) || students.find(s => s.student_id === studentId);
       grade = stu?.class_id ? (stu.class_id.match(/\d+/)?.[0] || '6') : (existingReviewOrStudent.class_grade || '6');
     } else {
-      const filteredStu = students.filter(s => selectedReviewGrade === 'All' || s.class_id?.includes(`-${selectedReviewGrade}A`));
-      const firstStudent = filteredStu[0] || visibleStudents[0] || students[0];
+      const filteredStu = visibleStudents.filter(s => selectedReviewGrade === 'All' || s.class_id?.includes(`-${selectedReviewGrade}A`));
+      const firstStudent = filteredStu[0] || visibleStudents[0];
       studentId = firstStudent?.student_id || (trainerSchoolId === 'XYZ' ? 'XYZ6A 01' : 'ZPS6A 01');
-      const stu = students.find(s => s.student_id === studentId);
+      const stu = visibleStudents.find(s => s.student_id === studentId) || students.find(s => s.student_id === studentId);
       grade = stu?.class_id ? (stu.class_id.match(/\d+/)?.[0] || '6') : '6';
+    }
+
+    // Safety guard: ensure studentId belongs to visibleStudents
+    const matchedInVisible = visibleStudents.find(s => s.student_id === studentId);
+    if (!matchedInVisible && visibleStudents.length > 0) {
+      studentId = visibleStudents[0].student_id;
+      const fallbackStu = visibleStudents[0];
+      grade = fallbackStu?.class_id ? (fallbackStu.class_id.match(/\d+/)?.[0] || '6') : '6';
     }
 
     const unitsList = GRADE_UNITS_CONFIG[grade] || GRADE_UNITS_CONFIG['6'];
@@ -1929,9 +1949,16 @@ export default function Trainers() {
     size="lg"
   >
         {(() => {
-          const currentStu = students.find(s => s.student_id === reviewFormData.student_id);
+          const gradeStudents = visibleStudents.filter(
+            s => s.class_id?.includes(`-${reviewFormData.class_grade}A`) || s.student_id?.includes(reviewFormData.class_grade)
+          );
+          const activeStudentId = gradeStudents.some(s => s.student_id === reviewFormData.student_id)
+            ? reviewFormData.student_id
+            : (gradeStudents[0]?.student_id || reviewFormData.student_id);
+
+          const currentStu = visibleStudents.find(s => s.student_id === activeStudentId) || students.find(s => s.student_id === activeStudentId);
           const modalUnits = GRADE_UNITS_CONFIG[reviewFormData.class_grade] || GRADE_UNITS_CONFIG['6'];
-          const currentStuReviews = (studentReviews || []).filter(r => r.student_id === reviewFormData.student_id);
+          const currentStuReviews = (studentReviews || []).filter(r => r.student_id === activeStudentId);
           const otherReviews = currentStuReviews.filter(r => r.unit_code !== reviewFormData.unit_code);
           const currentRating = Number(reviewFormData.rating) || 5;
           const currentScore = currentRating * 2; // Strict: 1★ = 2, 5★ = 10
@@ -1976,17 +2003,15 @@ export default function Trainers() {
                 <div>
                   <label className="block font-bold text-slate-600 uppercase mb-1">Select Student</label>
                   <select
-                    value={reviewFormData.student_id}
+                    value={activeStudentId}
                     onChange={(e) => handleSelectModalStudent(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold bg-white text-slate-800"
                   >
-                    {visibleStudents
-                      .filter(s => s.class_id?.includes(`-${reviewFormData.class_grade}A`) || s.student_id?.includes(reviewFormData.class_grade))
-                      .map(s => (
-                        <option key={s.student_id} value={s.student_id}>
-                          {s.student_id} - {s.name}
-                        </option>
-                      ))}
+                    {gradeStudents.map(s => (
+                      <option key={s.student_id} value={s.student_id}>
+                        {s.student_id} - {s.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -1997,7 +2022,7 @@ export default function Trainers() {
                   <div>
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Candidate Evaluation Status</span>
                     <h4 className="text-sm font-extrabold text-white">
-                      {currentStu?.name || 'Selected Student'} <span className="font-mono text-pixiu-cyan text-xs font-normal">({reviewFormData.student_id})</span>
+                      {currentStu?.name || 'Selected Student'} <span className="font-mono text-pixiu-cyan text-xs font-normal">({activeStudentId})</span>
                     </h4>
                   </div>
                   <div className="text-right">

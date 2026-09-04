@@ -27,7 +27,7 @@ export const SEED_CLASSES = [
 
 export const SEED_STUDENTS = [
   // ==================== ABC PUBLIC SCHOOL ====================
-  { id: 'STU-ABC-601', student_id: 'ABC6A 01', name: 'Manish Rawat', school_id: 'ABC', class_id: 'CLS-ABC-6A', tech_level: 'Level 0', parent_name: 'Prakash Rawat', parent_phone: '+91 98390 66111', assigned_kit_id: 'KIT-ABC-01', status: 'Active' },
+  { id: 'STU-ABC-601', student_id: 'ABC6A 01', name: 'Aaradhya Verma', school_id: 'ABC', class_id: 'CLS-ABC-6A', tech_level: 'Level 0', parent_name: 'Rajeev Verma', parent_phone: '+91 98390 77111', assigned_kit_id: 'KIT-ABC-01', status: 'Active' },
 
   // ==================== ZENITH PUBLIC SCHOOL (ZPS) ====================
   // Class 6A

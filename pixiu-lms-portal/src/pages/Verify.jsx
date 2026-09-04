@@ -233,7 +233,7 @@ export default function Verify() {
           {/* Quick Demo Test Pill */}
           <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100 text-[11px] text-slate-500">
             <span className="font-bold text-slate-400">Sample Candidate ID:</span>
-            {['ABC6A 01'].map(id => (
+            {['XYZ6A 01', 'ZPS6A 01'].map(id => (
               <button
                 key={id}
                 type="button"

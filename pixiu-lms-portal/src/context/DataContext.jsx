@@ -200,7 +200,13 @@ export function DataProvider({ children }) {
     try {
       const raw = safeGetItem('pixiu_student_reviews', null);
       if (!raw || !Array.isArray(raw)) return SEED_STUDENT_REVIEWS;
-      const userCreated = raw.filter(r => !r.id?.startsWith('REV-XYZ-') && !r.id?.startsWith('REV-ZPS-'));
+      const userCreated = raw.filter(r => !r.id?.startsWith('REV-XYZ-') && !r.id?.startsWith('REV-ZPS-')).map(r => {
+        // Fix for accidental ABC6A 01 review saved when intending XYZ6A 01 Manish Rawat
+        if (r.student_id === 'ABC6A 01' && (r.student_name === 'Manish Rawat' || !r.student_name)) {
+          return { ...r, student_id: 'XYZ6A 01', class_grade: '6' };
+        }
+        return r;
+      });
       localStorage.setItem('pixiu_student_reviews', JSON.stringify(userCreated));
       return userCreated;
     } catch (e) {
