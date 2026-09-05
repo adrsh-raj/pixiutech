@@ -1026,6 +1026,149 @@ export const SEED_STUDENT_REVIEWS = [
     comment: 'Official MCQ Assessment verified. Candidate scored 4/10 (40%) on Level 1 assessment. Shows basic understanding of Arduino IDE and Blink sketches, but needs additional hands-on practice with syntax and GPIO configuration.',
     trainer_name: 'Akash Sharma (Senior Robotics Faculty)',
     verified_date: '28 Aug 2026'
+  },
+  // XYZ6A 01 - Manish Rawat (XYZ Academy - Level 2)
+  {
+    id: 'REV-XYZ6A01-U3',
+    student_id: 'XYZ6A 01',
+    student_name: 'Manish Rawat',
+    class_grade: '6',
+    unit_code: 'Unit 3',
+    level: 'Level 2',
+    unit_title: 'Basic Project: Traffic Light Signal Controller',
+    score: 6.0,
+    rating: 3,
+    status: 'In Progress',
+    review: 'Official MCQ Assessment verified. Candidate scored 6/10 (60%) on Level 2 assessment with 0 anti-cheat strikes. Demonstrated improving understanding of traffic signal logic and digital output sequencing.',
+    comment: 'Official MCQ Assessment verified. Candidate scored 6/10 (60%) on Level 2 assessment with 0 anti-cheat strikes. Demonstrated improving understanding of traffic signal logic and digital output sequencing.',
+    trainer_name: 'Akash Sharma (Senior Robotics Faculty)',
+    verified_date: '02 Sep 2026'
+  },
+
+  // XYZ6A 02 - Kavita Saxena (Level 0)
+  {
+    id: 'REV-XYZ6A02-U1',
+    student_id: 'XYZ6A 02',
+    student_name: 'Kavita Saxena',
+    class_grade: '6',
+    unit_code: 'Unit 1',
+    level: 'Level 0',
+    unit_title: 'Introduction to Robotics & Electronics',
+    score: 8.0,
+    rating: 4,
+    status: 'Competent',
+    review: 'Good understanding of breadboard wiring and LED circuits. Quick learner with strong hands-on enthusiasm.',
+    comment: 'Good understanding of breadboard wiring and LED circuits. Quick learner with strong hands-on enthusiasm.',
+    trainer_name: 'Akash Sharma (Senior Robotics Faculty)',
+    verified_date: '26 Aug 2026'
+  },
+
+  // XYZ6A 03 - Ayushmann Jha (Level 0)
+  {
+    id: 'REV-XYZ6A03-U1',
+    student_id: 'XYZ6A 03',
+    student_name: 'Ayushmann Jha',
+    class_grade: '6',
+    unit_code: 'Unit 1',
+    level: 'Level 0',
+    unit_title: 'Introduction to Robotics & Electronics',
+    score: 9.5,
+    rating: 5,
+    status: 'Mastered',
+    review: 'Exceptional performance in breadboard assembly and circuit debugging. Natural aptitude for electronics.',
+    comment: 'Exceptional performance in breadboard assembly and circuit debugging. Natural aptitude for electronics.',
+    trainer_name: 'Akash Sharma (Senior Robotics Faculty)',
+    verified_date: '27 Aug 2026'
+  },
+
+  // XYZ6A 04 - Ritika Sen (Level 0)
+  {
+    id: 'REV-XYZ6A04-U1',
+    student_id: 'XYZ6A 04',
+    student_name: 'Ritika Sen',
+    class_grade: '6',
+    unit_code: 'Unit 1',
+    level: 'Level 0',
+    unit_title: 'Introduction to Robotics & Electronics',
+    score: 6.0,
+    rating: 3,
+    status: 'In Progress',
+    review: 'Shows effort but needs more practice with breadboard connections. Improving steadily with each session.',
+    comment: 'Shows effort but needs more practice with breadboard connections. Improving steadily with each session.',
+    trainer_name: 'Akash Sharma (Senior Robotics Faculty)',
+    verified_date: '27 Aug 2026'
+  },
+
+  // XYZ7A 01 - Pranav Bhatt (Level 0)
+  {
+    id: 'REV-XYZ7A01-U1',
+    student_id: 'XYZ7A 01',
+    student_name: 'Pranav Bhatt',
+    class_grade: '7',
+    unit_code: 'Unit 1',
+    level: 'Level 0',
+    unit_title: 'Introduction to Analog & Digital Electronics',
+    score: 9.0,
+    rating: 5,
+    status: 'Mastered',
+    review: 'Strong grasp of analog concepts and voltage divider circuits. Outstanding lab performance.',
+    comment: 'Strong grasp of analog concepts and voltage divider circuits. Outstanding lab performance.',
+    trainer_name: 'Akash Sharma (Senior Robotics Faculty)',
+    verified_date: '26 Aug 2026'
+  },
+
+  // XYZ8A 01 - Varun Nair (Level 0)
+  {
+    id: 'REV-XYZ8A01-U1',
+    student_id: 'XYZ8A 01',
+    student_name: 'Varun Nair',
+    class_grade: '8',
+    unit_code: 'Unit 1',
+    level: 'Level 0',
+    unit_title: 'Introduction to Waves & Distance Measurement',
+    score: 8.5,
+    rating: 4,
+    status: 'Competent',
+    review: 'Good understanding of ultrasonic wave mechanics and sensor calibration. Clean wiring techniques.',
+    comment: 'Good understanding of ultrasonic wave mechanics and sensor calibration. Clean wiring techniques.',
+    trainer_name: 'Akash Sharma (Senior Robotics Faculty)',
+    verified_date: '27 Aug 2026'
+  },
+
+  // XYZ9A 01 - Gaurav Kulkarni (Level 0)
+  {
+    id: 'REV-XYZ9A01-U1',
+    student_id: 'XYZ9A 01',
+    student_name: 'Gaurav Kulkarni',
+    class_grade: '9',
+    unit_code: 'Unit 1',
+    level: 'Level 0',
+    unit_title: 'Introduction to Industrial Sensors & Displays',
+    score: 9.3,
+    rating: 5,
+    status: 'Mastered',
+    review: 'Excellent precision in sensor calibration and LCD display integration. Advanced analytical skills.',
+    comment: 'Excellent precision in sensor calibration and LCD display integration. Advanced analytical skills.',
+    trainer_name: 'Akash Sharma (Senior Robotics Faculty)',
+    verified_date: '27 Aug 2026'
+  },
+
+  // XYZ11A 01 - Harshit Chauhan (Level 0)
+  {
+    id: 'REV-XYZ11A01-U1',
+    student_id: 'XYZ11A 01',
+    student_name: 'Harshit Chauhan',
+    class_grade: '11',
+    unit_code: 'Unit 1',
+    level: 'Level 0',
+    unit_title: 'Introduction to Engineering Specs & Optics',
+    score: 9.7,
+    rating: 5,
+    status: 'Mastered',
+    review: 'Outstanding grasp of laser optics, collimation principles, and engineering specification documentation.',
+    comment: 'Outstanding grasp of laser optics, collimation principles, and engineering specification documentation.',
+    trainer_name: 'Akash Sharma (Senior Robotics Faculty)',
+    verified_date: '27 Aug 2026'
   }
 ];
 

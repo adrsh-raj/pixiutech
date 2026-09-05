@@ -345,7 +345,7 @@ export default function Trainers() {
     const targetClassId = student.class_id;
     const classSessions = sessions.filter(s => s.class_id === targetClassId);
     const activeUnlocked = classSessions.find(s => s.is_locked === 0);
-    const targetSession = activeUnlocked || classSessions[0];
+    const targetSession = activeUnlocked || classSessions[classSessions.length - 1] || classSessions[0];
     if (targetSession) {
       setActiveSessionId(targetSession.id);
       toast.info(`Opened attendance session for Class ${student.class_id?.split('-').pop() || ''}!`, 'Classroom Attendance');
@@ -773,7 +773,12 @@ export default function Trainers() {
   };
 
   const getAttendanceStatus = (studentId) => {
-    return attendance.find(a => a.session_id === activeSessionId && a.student_id === studentId)?.status;
+    if (!studentId) return null;
+    const cleanTarget = String(studentId).toUpperCase().replace(/\s+/g, '');
+    return attendance.find(a => 
+      a.session_id === activeSessionId && 
+      (a.student_id || '').toUpperCase().replace(/\s+/g, '') === cleanTarget
+    )?.status;
   };
 
   const finishSession = () => {
@@ -866,7 +871,8 @@ export default function Trainers() {
                 { grade: '9', id: `CLS-${liveSchoolCode}-9A`, label: '9A' },
                 { grade: '11', id: `CLS-${liveSchoolCode}-11A`, label: '11A' },
               ].map(cls => {
-                const clsSession = sessions.find(s => s.class_id === cls.id);
+                const classSessions = sessions.filter(s => s.class_id === cls.id);
+                const clsSession = classSessions.find(s => s.is_locked === 0) || classSessions[classSessions.length - 1] || classSessions[0];
                 const isSelected = activeSession.class_id === cls.id;
                 return (
                   <button
@@ -942,7 +948,8 @@ export default function Trainers() {
                     projects,
                     curriculum,
                     getStudentAttendance: (id) => {
-                      const records = (attendance || []).filter(a => a.student_id === id);
+                      const cleanId = (id || '').toUpperCase().replace(/\s+/g, '');
+                      const records = (attendance || []).filter(a => (a.student_id || '').toUpperCase().replace(/\s+/g, '') === cleanId);
                       if (!records.length) return 100;
                       const present = records.filter(r => r.status === 'Present').length;
                       return Math.round((present / records.length) * 100);
@@ -958,7 +965,6 @@ export default function Trainers() {
 
               <button
                 onClick={handleMarkAllPresent}
-                disabled={isLocked && !isAdmin}
                 className="text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-0.5 rounded-md cursor-pointer transition-colors"
               >
                 ✓ Mark All Present
@@ -1105,12 +1111,28 @@ export default function Trainers() {
               <Lock size={16} /> Submit & Lock Attendance
             </button>
           ) : (
-            <button 
-              onClick={() => setActiveSessionId(null)}
-              className="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 text-sm cursor-pointer"
-            >
-              Close Session View
-            </button>
+            <div className="flex flex-col gap-2">
+              <button 
+                onClick={async () => {
+                  for (const student of roster) {
+                    const currentStatus = getAttendanceStatus(student.student_id);
+                    if (currentStatus) {
+                      await markAttendance(activeSessionId, student.student_id, currentStatus);
+                    }
+                  }
+                  toast.success('Attendance record saved & synced across all portals!', 'Attendance Updated');
+                }}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2 text-sm cursor-pointer transition-colors"
+              >
+                <CheckCircle size={16} /> Save & Update Attendance Record
+              </button>
+              <button 
+                onClick={() => setActiveSessionId(null)}
+                className="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-2.5 rounded-xl flex items-center justify-center gap-2 text-sm cursor-pointer"
+              >
+                Close Session View
+              </button>
+            </div>
           )}
         </div>
 
@@ -1372,7 +1394,7 @@ export default function Trainers() {
                   const targetClassId = `CLS-${trainerSchoolId === 'XYZ' ? 'XYZ' : 'ZPS'}-${targetGrade}A`;
                   const classSessions = sessions.filter(s => s.class_id === targetClassId);
                   const activeUnlocked = classSessions.find(s => s.is_locked === 0);
-                  const targetSession = activeUnlocked || classSessions[0];
+                  const targetSession = activeUnlocked || classSessions[classSessions.length - 1] || classSessions[0];
                   if (targetSession) {
                     setActiveSessionId(targetSession.id);
                     toast.info(`Opened attendance session for Class ${targetGrade}A!`, 'Classroom Attendance');

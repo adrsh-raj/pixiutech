@@ -350,14 +350,32 @@ export function DataProvider({ children }) {
       } catch (err) {}
     };
 
+    const handleCustomQuizSubs = () => {
+      try {
+        const raw = localStorage.getItem('pixiu_quiz_submissions');
+        if (raw) setQuizSubmissions(JSON.parse(raw));
+      } catch (err) {}
+    };
+
+    const handleCustomReviews = () => {
+      try {
+        const raw = localStorage.getItem('pixiu_student_reviews');
+        if (raw) setStudentReviews(JSON.parse(raw));
+      } catch (err) {}
+    };
+
     window.addEventListener('storage', handleStorageChange);
     window.addEventListener('pixiu_attendance_updated', handleCustomAttendance);
     window.addEventListener('pixiu_sessions_updated', handleCustomSessions);
+    window.addEventListener('pixiu_quiz_submissions_updated', handleCustomQuizSubs);
+    window.addEventListener('pixiu_student_reviews_updated', handleCustomReviews);
 
     return () => {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('pixiu_attendance_updated', handleCustomAttendance);
       window.removeEventListener('pixiu_sessions_updated', handleCustomSessions);
+      window.removeEventListener('pixiu_quiz_submissions_updated', handleCustomQuizSubs);
+      window.removeEventListener('pixiu_student_reviews_updated', handleCustomReviews);
     };
   }, []);
 
