@@ -9,16 +9,7 @@ export default function Login() {
   const toast = useToast();
   const navigate = useNavigate();
 
-  // If already authenticated, redirect immediately away from login
-  useEffect(() => {
-    if (!authLoading && isAuthenticated && user) {
-      const dest = user.role === 'student' ? '/student-portal'
-                 : user.role === 'school' ? '/school-portal'
-                 : user.role === 'trainer' ? '/trainers'
-                 : '/';
-      navigate(dest, { replace: true });
-    }
-  }, [isAuthenticated, user, authLoading, navigate]);
+
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');

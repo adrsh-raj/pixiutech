@@ -1,3 +1,49 @@
+const openInIframeModal = (htmlString) => {
+  const existing = document.getElementById('pixiu-pdf-modal');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'pixiu-pdf-modal';
+  overlay.style.position = 'fixed';
+  overlay.style.top = '0';
+  overlay.style.left = '0';
+  overlay.style.width = '100vw';
+  overlay.style.height = '100vh';
+  overlay.style.backgroundColor = 'rgba(15, 23, 42, 0.85)';
+  overlay.style.zIndex = '999999';
+  overlay.style.display = 'flex';
+  overlay.style.alignItems = 'center';
+  overlay.style.justifyContent = 'center';
+  overlay.style.backdropFilter = 'blur(4px)';
+
+  const container = document.createElement('div');
+  container.style.width = '90%';
+  container.style.maxWidth = '1000px';
+  container.style.height = '95vh';
+  container.style.backgroundColor = '#fff';
+  container.style.borderRadius = '12px';
+  container.style.overflow = 'hidden';
+  container.style.boxShadow = '0 25px 50px -12px rgba(0, 0, 0, 0.5)';
+  container.style.display = 'flex';
+  container.style.flexDirection = 'column';
+
+  const iframe = document.createElement('iframe');
+  iframe.style.flex = '1';
+  iframe.style.width = '100%';
+  iframe.style.border = 'none';
+  
+  const finalHtml = htmlString.replace(/window\.close\(\)/g, 'parent.closePdfModal()');
+  iframe.srcdoc = finalHtml;
+
+  window.closePdfModal = () => {
+    overlay.remove();
+  };
+
+  container.appendChild(iframe);
+  overlay.appendChild(container);
+  document.body.appendChild(overlay);
+};
+
 export const generateStudentTranscriptPDF = ({
   student,
   school = 'Zenith Public School',
@@ -135,13 +181,7 @@ export const generateStudentTranscriptPDF = ({
     return pid === currentId || p.student_id === student.student_id;
   });
 
-  const printWindow = window.open('', '_blank');
-  if (!printWindow) {
-    alert('Please allow popups for this site to download the progress transcript.');
-    return;
-  }
-
-  printWindow.document.write(`
+  const htmlContent = `
     <!DOCTYPE html>
     <html>
       <head>
@@ -430,14 +470,14 @@ export const generateStudentTranscriptPDF = ({
           </table>
 
           <div class="footer-strip">
-            Pixiu Tech LLP • Official STEM, Robotics & AI Education Partner • Electronically generated on ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} • Registry: pixiutech.com/verify
+          Pixiu Tech LLP • Official STEM, Robotics & AI Education Partner • Electronically generated on ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} • Registry: pixiutech.com/verify
           </div>
         </div>
       </body>
     </html>
-  `);
-  
-  printWindow.document.close();
+    `;
+    
+  openInIframeModal(htmlContent);
 };
 
 // =========================================================================
@@ -518,9 +558,7 @@ export const generateClassCohortTranscriptPDF = ({
   const cohortProjects = projects.filter(p => studentIds.includes(p.student_id));
   const cohortReviews = studentReviews.filter(r => studentIds.includes(r.student_id));
 
-  const printWindow = window.open('', '_blank');
-
-  printWindow.document.write(`
+  const htmlContent = `
     <!DOCTYPE html>
     <html>
       <head>
@@ -965,8 +1003,7 @@ export const generateClassCohortTranscriptPDF = ({
         </div>
       </body>
     </html>
-  `);
-
-  printWindow.document.close();
+    `;
+  
+  openInIframeModal(htmlContent);
 };
-

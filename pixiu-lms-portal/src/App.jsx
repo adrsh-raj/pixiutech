@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Outlet, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Outlet, Navigate, useNavigate, Link } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
 import Students from './pages/Students';
@@ -16,6 +16,7 @@ import StudentPortal from './pages/StudentPortal';
 import SchoolPortal from './pages/SchoolPortal';
 import Verify from './pages/Verify';
 import Simulation from './pages/Simulation';
+import AuditLogs from './pages/AuditLogs';
 import { DataProvider, useData } from './context/DataContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider, useToast } from './context/ToastContext';
@@ -67,6 +68,16 @@ function ProtectedLayout() {
       return [];
     }
   });
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(`pixiu_read_notifs_${user?.username || 'admin'}`);
+      if (saved) setReadNotifIds(JSON.parse(saved));
+      else setReadNotifIds([]);
+    } catch (e) {
+      setReadNotifIds([]);
+    }
+  }, [user?.username]);
 
   const markAsRead = (id) => {
     const updated = Array.from(new Set([...readNotifIds, id]));
@@ -147,6 +158,16 @@ function ProtectedLayout() {
           </div>
           
           <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+            {/* Quick Login Logs Link */}
+            <Link
+              to="/logs"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer"
+              title="View Admin & Security Login Logs"
+            >
+              <ShieldCheck size={15} />
+              <span className="hidden sm:inline">Login Logs</span>
+            </Link>
+
             {/* Live Operational & Announcements Bell */}
             <div className="relative">
               <button 
@@ -386,21 +407,24 @@ function SchoolRouteGuard() {
 // Guest Route Guard (Redirects authenticated users away from Login to their appropriate dashboard)
 function GuestRouteGuard({ children }) {
   const { isAuthenticated, user, loading } = useAuth();
+  const navigate = useNavigate();
 
-  if (loading) {
+  useEffect(() => {
+    if (!loading && isAuthenticated && user) {
+      const dest = user.role === 'student' ? '/student-portal'
+                 : user.role === 'school' ? '/school-portal'
+                 : user.role === 'trainer' ? '/trainers'
+                 : '/';
+      navigate(dest, { replace: true });
+    }
+  }, [loading, isAuthenticated, user, navigate]);
+
+  if (loading || (isAuthenticated && user)) {
     return (
       <div className="min-h-screen bg-[#040810] flex items-center justify-center text-white">
         <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div>
       </div>
     );
-  }
-
-  if (isAuthenticated && user) {
-    const dest = user.role === 'student' ? '/student-portal'
-               : user.role === 'school' ? '/school-portal'
-               : user.role === 'trainer' ? '/trainers'
-               : '/';
-    return <Navigate to={dest} replace />;
   }
 
   return children;
@@ -469,6 +493,7 @@ export default function App() {
                 <Route path="schools" element={<AdminOnly><Schools /></AdminOnly>} />
                 <Route path="billing" element={<AdminOnly><Billing /></AdminOnly>} />
                 <Route path="settings" element={<AdminOnly><Settings /></AdminOnly>} />
+                <Route path="logs" element={<AuditLogs />} />
                 <Route path="students" element={<Students />} />
                 <Route path="comms" element={<AdminOnly><Comms /></AdminOnly>} />
 

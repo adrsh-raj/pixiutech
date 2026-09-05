@@ -205,6 +205,37 @@ export function AuthProvider({ children }) {
     };
   }, [user]);
 
+    const logAdminLogin = (loggedInUser) => {
+    if (loggedInUser && (loggedInUser.role === 'admin' || loggedInUser.role === 'superadmin')) {
+      try {
+        const logs = JSON.parse(localStorage.getItem('pixiu_admin_logs') || '[]');
+        logs.unshift({
+          id: 'LOG-' + Date.now(),
+          date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+          time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+          user_id: loggedInUser.username || 'admin',
+          name: loggedInUser.name || 'Administrator',
+          role: loggedInUser.role || 'admin',
+          status: 'Authenticated (SHA-256)',
+          ip: '127.0.0.1 (Localhost Session)'
+        });
+        localStorage.setItem('pixiu_admin_logs', JSON.stringify(logs.slice(0, 500)));
+      } catch (e) {}
+    }
+  };
+
+  // Auto-record active session if admin is already logged in
+  useEffect(() => {
+    if (user && (user.role === 'admin' || user.role === 'superadmin')) {
+      try {
+        const logs = JSON.parse(localStorage.getItem('pixiu_admin_logs') || '[]');
+        if (logs.length === 0) {
+          logAdminLogin(user);
+        }
+      } catch (e) {}
+    }
+  }, [user]);
+
   const login = async (username, password, expectedRole = null) => {
     const cleanUsername = username?.trim();
     const cleanPassword = password?.trim();
@@ -223,6 +254,7 @@ export function AuthProvider({ children }) {
         setUser(data.user);
         localStorage.setItem('pixiu_auth_token', data.token);
         localStorage.setItem('pixiu_auth_user', JSON.stringify(data.user));
+        logAdminLogin(data.user);
         return { success: true, user: data.user };
       } else {
         const data = await res.json().catch(() => ({}));
@@ -258,6 +290,7 @@ export function AuthProvider({ children }) {
       setUser(clientUser);
       localStorage.setItem('pixiu_auth_token', clientToken);
       localStorage.setItem('pixiu_auth_user', JSON.stringify(clientUser));
+      logAdminLogin(clientUser);
       return { success: true, user: clientUser };
     }
 
@@ -290,3 +323,4 @@ export function AuthProvider({ children }) {
 }
 
 export const useAuth = () => useContext(AuthContext);
+

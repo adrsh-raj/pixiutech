@@ -122,6 +122,16 @@ export default function StudentPortal() {
     }
   });
 
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(`pixiu_read_notifs_${cleanId}`);
+      if (saved) setReadNotifIds(JSON.parse(saved));
+      else setReadNotifIds([]);
+    } catch (e) {
+      setReadNotifIds([]);
+    }
+  }, [cleanId]);
+
   const [isNotifDrawerOpen, setIsNotifDrawerOpen] = useState(false);
 
   const markAsRead = (id) => {
@@ -206,7 +216,7 @@ export default function StudentPortal() {
       if (!r || !r.student_id) return false;
       const cleanR = r.student_id.toUpperCase().replace(/\s+/g, '');
       const matchId = cleanR === cleanC || cleanR === cleanS;
-      const isDummy = r.verified_date === 'Curriculum Baseline';
+      const isDummy = r.verified_date === 'Curriculum Baseline' && (!r.score || r.score === 0 || r.status === 'Pending Evaluation');
       return matchId && !isDummy;
     });
     

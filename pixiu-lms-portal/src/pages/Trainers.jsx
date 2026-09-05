@@ -453,7 +453,8 @@ export default function Trainers() {
       student_name: studentObj?.name || reviewFormData.student_name || 'Student',
       class_grade: studentObj?.class_id ? (studentObj.class_id.match(/\d+/)?.[0] || '6') : reviewFormData.class_grade,
       rating: clampedRating,
-      score: computedScore
+      score: computedScore,
+      verified_date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
     };
     saveStudentReview(payload);
 
@@ -775,13 +776,6 @@ export default function Trainers() {
             <p className="font-bold text-slate-800 text-sm">{activeSession.topic}</p>
           </div>
           <div className="flex items-center gap-2">
-            <Link
-              to="/simulation"
-              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
-              title="Launch Virtual Arduino Workbench for Classroom Smart-Board Projection"
-            >
-              <Cpu size={14} /> ⚡ Virtual Arduino Demo
-            </Link>
             <div className="bg-blue-50 text-pixiu-blue p-2 rounded-lg"><FileText size={18}/></div>
           </div>
         </div>

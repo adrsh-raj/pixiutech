@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { Users, Trophy, Activity, Building2, BookOpen, Plus, Bell, AlertCircle, Zap, ShieldCheck, Sparkles, X, Box, IndianRupee } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
 import { useData } from '../context/DataContext';
@@ -143,7 +144,13 @@ export default function Dashboard() {
           <p className="text-sm text-slate-500">Network-wide robotics ERP & LMS operations console.</p>
         </div>
         
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-2.5">
+          <Link 
+            to="/logs"
+            className="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-xl font-semibold flex items-center gap-2 hover:bg-slate-50 transition-all shadow-xs text-sm cursor-pointer hover:shadow-sm"
+          >
+            <ShieldCheck size={16} className="text-blue-600" /> Login & Audit Logs
+          </Link>
           <button 
             onClick={() => setIsClassModalOpen(true)}
             className="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-xl font-semibold flex items-center gap-2 hover:bg-slate-50 transition-all shadow-xs text-sm cursor-pointer hover:shadow-sm"
@@ -401,6 +408,56 @@ export default function Dashboard() {
           </div>
         </form>
       </Modal>
+
+      {/* Admin Login Audit Logs */}
+      <div className="mt-8 mb-4">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+            <ShieldCheck size={16} className="text-blue-500" />
+            Admin Login Audit Logs
+          </h2>
+          <Link 
+            to="/logs" 
+            className="text-xs font-bold text-pixiu-blue hover:text-blue-700 flex items-center gap-1 hover:underline"
+          >
+            Open Full Logs Console ➡️
+          </Link>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm max-h-64 overflow-y-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-slate-50 border-b border-slate-200 sticky top-0">
+              <tr>
+                <th className="p-3 text-slate-500 font-bold uppercase">Date & Time</th>
+                <th className="p-3 text-slate-500 font-bold uppercase">Admin User ID</th>
+                <th className="p-3 text-slate-500 font-bold uppercase">Role</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {(JSON.parse(localStorage.getItem('pixiu_admin_logs') || '[]')).length > 0 ? (
+                JSON.parse(localStorage.getItem('pixiu_admin_logs') || '[]').map(log => (
+                  <tr key={log.id} className="hover:bg-slate-50">
+                    <td className="p-3 text-slate-700">{log.date} - {log.time}</td>
+                    <td className="p-3 font-medium text-slate-900">{log.user_id} <span className="text-slate-400">({log.name})</span></td>
+                    <td className="p-3">
+                      <span className="px-2 py-1 rounded bg-blue-50 text-blue-700 font-bold uppercase tracking-wider">{log.role}</span>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="3" className="p-6 text-center text-slate-500">
+                    <div className="flex flex-col items-center justify-center gap-1">
+                      <ShieldCheck size={20} className="text-blue-400" />
+                      <p className="font-semibold text-xs text-slate-700">Audit Logging Active</p>
+                      <p className="text-[11px] text-slate-400">Click &quot;Open Full Logs Console&quot; above to view live audit records or export reports.</p>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       {/* New Class Modal */}
       <Modal isOpen={isClassModalOpen} onClose={() => setIsClassModalOpen(false)} title="Add New Classroom">

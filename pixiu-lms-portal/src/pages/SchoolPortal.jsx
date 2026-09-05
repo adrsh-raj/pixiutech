@@ -78,6 +78,14 @@ export default function SchoolPortal() {
     }
   });
 
+  useEffect(() => {
+    try {
+      setReadNotifIds(JSON.parse(localStorage.getItem(`pixiu_school_read_${defaultSchoolId}`) || '[]'));
+    } catch (e) {
+      setReadNotifIds([]);
+    }
+  }, [defaultSchoolId]);
+
   const activeSchool = useMemo(() => {
     return schools.find(s => s.id === selectedSchoolId) || schools[0] || {
       id: 'ZPS',

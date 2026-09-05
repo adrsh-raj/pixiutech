@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, FolderKanban, Settings, LogOut, Box, GraduationCap, MessageSquare, BookOpen, Building, CreditCard, PlaySquare, Megaphone, X, Wifi, Cpu } from 'lucide-react';
+import { LayoutDashboard, Users, FolderKanban, Settings, LogOut, Box, GraduationCap, MessageSquare, BookOpen, Building, CreditCard, PlaySquare, Megaphone, X, Wifi, Cpu, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function Sidebar({ mobileOpen = false, setMobileOpen = () => {} }) {
@@ -18,6 +18,7 @@ export default function Sidebar({ mobileOpen = false, setMobileOpen = () => {} }
         { name: 'Content Hub', path: '/content', icon: PlaySquare },
         { name: 'Curriculum Plans', path: '/curriculum', icon: BookOpen },
         { name: 'Hardware Kits', path: '/inventory', icon: Box },
+        { name: 'Login & Audit Logs', path: '/logs', icon: ShieldCheck },
       ]
     }
   ] : [
@@ -25,6 +26,7 @@ export default function Sidebar({ mobileOpen = false, setMobileOpen = () => {} }
       title: 'MAIN',
       links: [
         { name: 'Dashboard', path: '/', icon: LayoutDashboard },
+        { name: 'Login & Audit Logs', path: '/logs', icon: ShieldCheck },
       ]
     },
     {
@@ -50,6 +52,7 @@ export default function Sidebar({ mobileOpen = false, setMobileOpen = () => {} }
       links: [
         { name: 'Hardware & Kits', path: '/inventory', icon: Box },
         { name: 'Announcements & Comms', path: '/comms', icon: Megaphone },
+        { name: 'Login & Audit Logs', path: '/logs', icon: ShieldCheck },
         { name: 'Settings', path: '/settings', icon: Settings },
       ]
     }
