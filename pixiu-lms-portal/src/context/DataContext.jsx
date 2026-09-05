@@ -256,7 +256,7 @@ export function DataProvider({ children }) {
     try {
       const [
         schRes, clsRes, stuRes, trRes, sesRes, attRes, 
-        ldRes, cntRes, curRes, invRes, bilRes, comRes, prjRes, altRes, notifRes
+        ldRes, cntRes, curRes, invRes, bilRes, comRes, prjRes, altRes, notifRes, revRes
       ] = await Promise.all([
         safeFetch(`${API_BASE}/schools`),
         safeFetch(`${API_BASE}/classes`),
@@ -273,6 +273,7 @@ export function DataProvider({ children }) {
         safeFetch(`${API_BASE}/projects`),
         safeFetch(`${API_BASE}/alerts`),
         safeFetch(`${API_BASE}/notifications`),
+        safeFetch(`${API_BASE}/reviews`),
       ]);
 
       if (schRes && schRes.length > 0) setSchools(schRes);
@@ -290,6 +291,7 @@ export function DataProvider({ children }) {
       if (prjRes && prjRes.length > 0) setProjects(prjRes);
       if (altRes && altRes.length > 0) setAlerts(altRes);
       if (notifRes && notifRes.length > 0) setNotifications(notifRes);
+      if (revRes && revRes.length > 0) setStudentReviews(revRes);
     } catch (err) {
       console.warn("Backend API unavailable, using offline seed state.");
     }
@@ -661,6 +663,16 @@ export function DataProvider({ children }) {
   };
 
   const updateBillingInvoice = async (id, updatedFields) => {
+    try {
+      await fetch(`${API_URL}/billing/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedFields)
+      });
+    } catch (e) {
+      console.error(e);
+    }
+
     setBilling(prev => {
       const updated = prev.map(b => b.id === id ? { ...b, ...updatedFields } : b);
       try { localStorage.setItem('pixiu_billing', JSON.stringify(updated)); } catch (e) {}
@@ -670,6 +682,12 @@ export function DataProvider({ children }) {
   };
 
   const deleteBillingInvoice = async (id) => {
+    try {
+      await fetch(`${API_URL}/billing/${id}`, { method: 'DELETE' });
+    } catch (e) {
+      console.error(e);
+    }
+
     setBilling(prev => {
       const updated = prev.filter(b => b.id !== id);
       try { localStorage.setItem('pixiu_billing', JSON.stringify(updated)); } catch (e) {}
@@ -850,12 +868,15 @@ export function DataProvider({ children }) {
     }
   };
 
-  const unlockSession = (sessionId) => {
+  const unlockSession = async (sessionId) => {
     setSessions(prev => {
       const updated = prev.map(s => s.id === sessionId ? { ...s, is_locked: 0 } : s);
       try { localStorage.setItem('pixiu_sessions', JSON.stringify(updated)); } catch (e) {}
       return updated;
     });
+    try {
+      await fetch(`${API_URL}/sessions/${sessionId}/admin-unlock`, { method: 'PUT' });
+    } catch (e) {}
     return { success: true };
   };
 
@@ -880,6 +901,13 @@ export function DataProvider({ children }) {
       try { localStorage.setItem('pixiu_sessions', JSON.stringify(updated)); } catch (e) {}
       return updated;
     });
+    try {
+      await fetch(`${API_URL}/sessions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newSession)
+      });
+    } catch (e) {}
     return newSession;
   };
 
@@ -1041,7 +1069,7 @@ export function DataProvider({ children }) {
   };
 
   // 16. End-of-Unit Student Reviews by Trainers
-  const saveStudentReview = (reviewData) => {
+  const saveStudentReview = async (reviewData) => {
     const studentId = (reviewData.student_id || '').trim().replace(/\s+/g, ' ');
     const studentName = reviewData.student_name || '';
     const cleanStudentId = studentId.toUpperCase().replace(/\s+/g, '');
@@ -1079,15 +1107,32 @@ export function DataProvider({ children }) {
       return updated;
     });
 
+    try {
+      await fetch(`${API_URL}/reviews`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(fullReview)
+      });
+    } catch (e) {
+      console.error("Backend review save error:", e);
+    }
+
     return { success: true, data: fullReview };
   };
 
-  const deleteStudentReview = (id) => {
+  const deleteStudentReview = async (id) => {
     setStudentReviews(prev => {
       const updated = prev.filter(r => r.id !== id);
       try { localStorage.setItem('pixiu_student_reviews', JSON.stringify(updated)); } catch (e) {}
       return updated;
     });
+
+    try {
+      await fetch(`${API_URL}/reviews/${id}`, { method: 'DELETE' });
+    } catch (e) {
+      console.error("Backend review delete error:", e);
+    }
+
     return { success: true };
   };
 

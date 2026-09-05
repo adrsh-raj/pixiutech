@@ -254,6 +254,21 @@ function initializeDatabase() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
 
+    // 17. Student Reviews (Trainer Unit Reviews & Skill Assessments)
+    db.run(`CREATE TABLE IF NOT EXISTS student_reviews (
+      id TEXT PRIMARY KEY,
+      student_id TEXT NOT NULL,
+      student_name TEXT,
+      unit_code TEXT,
+      level TEXT,
+      rating REAL,
+      comment TEXT,
+      trainer_name TEXT,
+      verified_date TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+
 
     // Seed database if empty
     db.get("SELECT COUNT(*) as count FROM users", async (err, row) => {

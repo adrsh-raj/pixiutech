@@ -20,7 +20,7 @@ export default function AuditLogs() {
       let serverLogs = null;
       try {
         const res = await fetch(`${API_BASE}/logs`);
-        if (res.ok) {
+        if (res.ok && res.headers.get('content-type')?.includes('application/json')) {
           const json = await res.json();
           if (Array.isArray(json) && json.length > 0) {
             serverLogs = json;

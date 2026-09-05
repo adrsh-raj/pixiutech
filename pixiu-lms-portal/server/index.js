@@ -187,6 +187,23 @@ app.post('/api/schools', (req, res) => {
   });
 });
 
+app.put('/api/schools/:id', (req, res) => {
+  const { name, principal, contact, status, contract_start, renewal_date, expected_revenue } = req.body;
+  const sql = `UPDATE schools SET 
+                name = COALESCE(?, name),
+                principal = COALESCE(?, principal),
+                contact = COALESCE(?, contact),
+                status = COALESCE(?, status),
+                contract_start = COALESCE(?, contract_start),
+                renewal_date = COALESCE(?, renewal_date),
+                expected_revenue = COALESCE(?, expected_revenue)
+               WHERE id = ? OR code = ?`;
+  db.run(sql, [name, principal, contact, status, contract_start, renewal_date, expected_revenue, req.params.id, req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, id: req.params.id, name, status });
+  });
+});
+
 app.delete('/api/schools/:id', (req, res) => {
   db.run("DELETE FROM schools WHERE id = ?", [req.params.id], function(err) {
     if (err) return res.status(500).json({ error: err.message });
@@ -571,6 +588,33 @@ app.put('/api/billing/:id/status', (req, res) => {
   });
 });
 
+app.put('/api/billing/:id', (req, res) => {
+  const { tranche_title, amount, total_contract_value, date_issued, due_date, status, payment_method, place_of_supply, receipt_no, is_confirmed } = req.body;
+  const sql = `UPDATE billing SET 
+                tranche_title = COALESCE(?, tranche_title),
+                amount = COALESCE(?, amount),
+                total_contract_value = COALESCE(?, total_contract_value),
+                date_issued = COALESCE(?, date_issued),
+                due_date = COALESCE(?, due_date),
+                status = COALESCE(?, status),
+                payment_method = COALESCE(?, payment_method),
+                place_of_supply = COALESCE(?, place_of_supply),
+                receipt_no = COALESCE(?, receipt_no),
+                is_confirmed = COALESCE(?, is_confirmed)
+               WHERE id = ?`;
+  db.run(sql, [tranche_title, amount, total_contract_value, date_issued, due_date, status, payment_method, place_of_supply, receipt_no, is_confirmed, req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, id: req.params.id });
+  });
+});
+
+app.delete('/api/billing/:id', (req, res) => {
+  db.run("DELETE FROM billing WHERE id = ?", [req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, deleted: req.params.id });
+  });
+});
+
 // ==================== 10. TRAINERS API & AUTO-ACCOUNT ====================
 app.get('/api/trainers', (req, res) => {
   db.all("SELECT * FROM trainers ORDER BY name ASC", [], (err, rows) => {
@@ -892,6 +936,7 @@ app.delete('/api/notifications/:id', (req, res) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ success: true, deleted: req.params.id });
   });
+});
 // Audit Logs API (Persistent SQLite storage)
 app.get('/api/logs', (req, res) => {
   db.all('SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 500', [], (err, rows) => {
@@ -917,6 +962,48 @@ app.delete('/api/logs', (req, res) => {
   db.run('DELETE FROM audit_logs', [], function(err) {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ success: true, count: this.changes });
+  });
+});
+
+// ==================== 17. STUDENT REVIEWS API ====================
+app.get('/api/reviews', (req, res) => {
+  db.all("SELECT * FROM student_reviews ORDER BY updated_at DESC", [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows || []);
+  });
+});
+
+app.post('/api/reviews', (req, res) => {
+  const { id, student_id, student_name, unit_code, level, rating, comment, trainer_name, verified_date } = req.body;
+  const reviewId = id || `REV-${Date.now().toString().slice(-4)}`;
+  const now = new Date().toISOString();
+  const vDate = verified_date || new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+
+  const sql = `INSERT OR REPLACE INTO student_reviews (id, student_id, student_name, unit_code, level, rating, comment, trainer_name, verified_date, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+
+  db.run(sql, [reviewId, student_id, student_name || '', unit_code || '', level || '', rating || 5, comment || '', trainer_name || '', vDate, now], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ 
+      success: true, 
+      id: reviewId, 
+      student_id, 
+      student_name, 
+      unit_code, 
+      level, 
+      rating, 
+      comment, 
+      trainer_name, 
+      verified_date: vDate,
+      updated_at: now
+    });
+  });
+});
+
+app.delete('/api/reviews/:id', (req, res) => {
+  db.run("DELETE FROM student_reviews WHERE id = ?", [req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, deleted: req.params.id });
   });
 });
 
