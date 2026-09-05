@@ -205,32 +205,35 @@ export function AuthProvider({ children }) {
     };
   }, [user]);
 
-    const logAdminLogin = (loggedInUser) => {
-    if (loggedInUser && (loggedInUser.role === 'admin' || loggedInUser.role === 'superadmin')) {
+  const logUserLogin = (loggedInUser) => {
+    if (loggedInUser) {
       try {
         const logs = JSON.parse(localStorage.getItem('pixiu_admin_logs') || '[]');
         logs.unshift({
           id: 'LOG-' + Date.now(),
           date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
           time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-          user_id: loggedInUser.username || 'admin',
-          name: loggedInUser.name || 'Administrator',
-          role: loggedInUser.role || 'admin',
+          user_id: loggedInUser.username || loggedInUser.id || 'unknown',
+          name: loggedInUser.name || (loggedInUser.role === 'student' ? 'Student' : 'User'),
+          role: loggedInUser.role || 'student',
+          school_id: loggedInUser.school_id || 'N/A',
           status: 'Authenticated (SHA-256)',
-          ip: '127.0.0.1 (Localhost Session)'
+          ip: 'Client Local Session'
         });
         localStorage.setItem('pixiu_admin_logs', JSON.stringify(logs.slice(0, 500)));
       } catch (e) {}
     }
   };
 
-  // Auto-record active session if admin is already logged in
+  // Auto-record active session on initial load if not recorded yet
   useEffect(() => {
-    if (user && (user.role === 'admin' || user.role === 'superadmin')) {
+    if (user) {
       try {
         const logs = JSON.parse(localStorage.getItem('pixiu_admin_logs') || '[]');
-        if (logs.length === 0) {
-          logAdminLogin(user);
+        const latest = logs[0];
+        const isRecentSameUser = latest && latest.user_id === user.username;
+        if (!isRecentSameUser) {
+          logUserLogin(user);
         }
       } catch (e) {}
     }
@@ -254,7 +257,7 @@ export function AuthProvider({ children }) {
         setUser(data.user);
         localStorage.setItem('pixiu_auth_token', data.token);
         localStorage.setItem('pixiu_auth_user', JSON.stringify(data.user));
-        logAdminLogin(data.user);
+        logUserLogin(data.user);
         return { success: true, user: data.user };
       } else {
         const data = await res.json().catch(() => ({}));
@@ -290,7 +293,7 @@ export function AuthProvider({ children }) {
       setUser(clientUser);
       localStorage.setItem('pixiu_auth_token', clientToken);
       localStorage.setItem('pixiu_auth_user', JSON.stringify(clientUser));
-      logAdminLogin(clientUser);
+      logUserLogin(clientUser);
       return { success: true, user: clientUser };
     }
 

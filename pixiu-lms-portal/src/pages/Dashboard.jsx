@@ -409,12 +409,12 @@ export default function Dashboard() {
         </form>
       </Modal>
 
-      {/* Admin Login Audit Logs */}
+      {/* User & Student Login Audit Logs */}
       <div className="mt-8 mb-4">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
             <ShieldCheck size={16} className="text-blue-500" />
-            Admin Login Audit Logs
+            User & Student Login Audit Logs (Recent Activity)
           </h2>
           <Link 
             to="/logs" 
@@ -428,24 +428,39 @@ export default function Dashboard() {
             <thead className="bg-slate-50 border-b border-slate-200 sticky top-0">
               <tr>
                 <th className="p-3 text-slate-500 font-bold uppercase">Date & Time</th>
-                <th className="p-3 text-slate-500 font-bold uppercase">Admin User ID</th>
+                <th className="p-3 text-slate-500 font-bold uppercase">User & Identity</th>
                 <th className="p-3 text-slate-500 font-bold uppercase">Role</th>
+                <th className="p-3 text-slate-500 font-bold uppercase">School / Batch</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {(JSON.parse(localStorage.getItem('pixiu_admin_logs') || '[]')).length > 0 ? (
-                JSON.parse(localStorage.getItem('pixiu_admin_logs') || '[]').map(log => (
-                  <tr key={log.id} className="hover:bg-slate-50">
-                    <td className="p-3 text-slate-700">{log.date} - {log.time}</td>
-                    <td className="p-3 font-medium text-slate-900">{log.user_id} <span className="text-slate-400">({log.name})</span></td>
-                    <td className="p-3">
-                      <span className="px-2 py-1 rounded bg-blue-50 text-blue-700 font-bold uppercase tracking-wider">{log.role}</span>
-                    </td>
-                  </tr>
-                ))
+                JSON.parse(localStorage.getItem('pixiu_admin_logs') || '[]').map(log => {
+                  const badgeColor = 
+                    log.role === 'student' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                    log.role === 'trainer' ? 'bg-purple-50 text-purple-700 border-purple-200' :
+                    log.role === 'school' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                    'bg-blue-50 text-blue-700 border-blue-200';
+                  return (
+                    <tr key={log.id} className="hover:bg-slate-50">
+                      <td className="p-3 text-slate-700 whitespace-nowrap">{log.date} • {log.time}</td>
+                      <td className="p-3 font-medium text-slate-900">
+                        {log.name} <span className="text-slate-400 font-mono">(@{log.user_id})</span>
+                      </td>
+                      <td className="p-3">
+                        <span className={`px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-wider ${badgeColor}`}>
+                          {log.role}
+                        </span>
+                      </td>
+                      <td className="p-3 font-mono text-slate-500 text-[11px]">
+                        {log.school_id || 'Network'}
+                      </td>
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
-                  <td colSpan="3" className="p-6 text-center text-slate-500">
+                  <td colSpan="4" className="p-6 text-center text-slate-500">
                     <div className="flex flex-col items-center justify-center gap-1">
                       <ShieldCheck size={20} className="text-blue-400" />
                       <p className="font-semibold text-xs text-slate-700">Audit Logging Active</p>
