@@ -2275,7 +2275,7 @@ export default function Trainers() {
                     onChange={e => setScheduleData({ ...scheduleData, trainer_id: e.target.value })} 
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold bg-white"
                   >
-                    {trainers.map(t => <option key={t.id} value={t.id}>{t.name} ({t.id})</option>)}
+                    {(trainers || []).map(t => <option key={t.id} value={t.id}>{t.name} ({t.id})</option>)}
                   </select>
                 </div>
                 <div>
@@ -2285,7 +2285,7 @@ export default function Trainers() {
                     onChange={e => setScheduleData({ ...scheduleData, class_id: e.target.value })} 
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold bg-white"
                   >
-                    {classes.map(c => <option key={c.id} value={c.id}>Class {c.grade}{c.section} (Zenith)</option>)}
+                    {(classes || []).map(c => <option key={c.id} value={c.id}>Class {c.grade}{c.section} (Zenith)</option>)}
                   </select>
                 </div>
               </div>

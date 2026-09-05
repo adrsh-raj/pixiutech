@@ -46,6 +46,17 @@ export default function Dashboard() {
     section: 'A'
   });
 
+  const recentLogs = useMemo(() => {
+    try {
+      const raw = localStorage.getItem('pixiu_admin_logs');
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed.slice(0, 10) : [];
+    } catch (e) {
+      return [];
+    }
+  }, []);
+
   // Calculate live dynamic metrics from real database state
   const stats = useMemo(() => {
     const relevantStudents = selectedSchool === 'All' 
@@ -275,7 +286,7 @@ export default function Dashboard() {
             onChange={e => setSelectedSchool(e.target.value)}
           >
             <option value="All">All Partner Schools (Network-wide)</option>
-            {schools.map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
+            {(schools || []).map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
           </select>
         </div>
       </div>
@@ -435,8 +446,8 @@ export default function Dashboard() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {(JSON.parse(localStorage.getItem('pixiu_admin_logs') || '[]')).length > 0 ? (
-                JSON.parse(localStorage.getItem('pixiu_admin_logs') || '[]').map(log => {
+              {recentLogs.length > 0 ? (
+                recentLogs.map(log => {
                   const badgeColor = 
                     log.role === 'student' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
                     log.role === 'trainer' ? 'bg-purple-50 text-purple-700 border-purple-200' :
@@ -492,7 +503,7 @@ export default function Dashboard() {
               onChange={e => setClassFormData({ ...classFormData, school_id: e.target.value })} 
               className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-pixiu-blue bg-white"
             >
-              {schools.map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
+              {(schools || []).map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
             </select>
           </div>
 

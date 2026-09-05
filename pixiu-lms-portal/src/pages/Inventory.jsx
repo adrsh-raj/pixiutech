@@ -768,7 +768,7 @@ export default function Inventory() {
                     onChange={e => setFormData({ ...formData, school_id: e.target.value })} 
                     className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-pixiu-blue bg-white"
                   >
-                    {schools.map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
+                    {(schools || []).map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
                   </select>
                 </div>
                 <div>
@@ -779,7 +779,7 @@ export default function Inventory() {
                     className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-pixiu-blue bg-white"
                   >
                     <option value="">Select Student</option>
-                    {students.map(s => (
+                    {(students || []).map(s => (
                       <option key={s.id} value={s.student_id}>
                         {s.name} ({s.student_id})
                       </option>

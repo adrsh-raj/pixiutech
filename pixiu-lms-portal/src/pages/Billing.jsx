@@ -366,7 +366,7 @@ export default function Billing() {
             className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-700 focus:outline-none focus:border-pixiu-blue cursor-pointer"
           >
             <option value="All">All Partner Schools (Network-wide)</option>
-            {schools.map(s => (
+            {(schools || []).map(s => (
               <option key={s.id} value={s.id}>{s.name} ({s.code})</option>
             ))}
           </select>
@@ -765,7 +765,7 @@ export default function Billing() {
                   onChange={e => setFormData({ ...formData, school_id: e.target.value })} 
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white font-bold"
                 >
-                  {schools.map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
+                  {(schools || []).map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
                 </select>
               </div>
 

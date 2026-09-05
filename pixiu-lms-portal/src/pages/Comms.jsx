@@ -499,7 +499,7 @@ export default function Comms() {
               </div>
 
               <div className="p-6 space-y-4 overflow-y-auto max-h-[750px]">
-                {notifications.map(notif => {
+                {(notifications || []).map(notif => {
                   const targetClasses = notif.target_classes ? notif.target_classes.split(',') : [];
                   const isAll = targetClasses.length === 5 || notif.target_type === 'All_Students' || notif.target_type === 'Universal';
 
@@ -610,7 +610,7 @@ export default function Comms() {
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-bold focus:outline-none focus:border-pixiu-blue bg-white"
                 >
                   <option value="All">All Schools</option>
-                  {schools.map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
+                  {(schools || []).map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
                 </select>
               </div>
 
@@ -688,7 +688,7 @@ export default function Comms() {
                   </tr>
                 </thead>
                 <tbody>
-                  {comms.map(log => (
+                  {(comms || []).map(log => (
                     <tr key={log.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
                       <td className="p-4">
                         <div className="font-bold text-slate-800 text-sm flex items-center gap-1">

@@ -302,7 +302,7 @@ function ProtectedLayout() {
                           </div>
                         )}
 
-                        {notifications.map(notif => {
+                        {(notifications || []).map(notif => {
                           const isRead = readNotifIds.includes(notif.id);
                           return (
                             <div 

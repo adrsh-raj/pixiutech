@@ -365,7 +365,7 @@ export default function Students() {
               className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-700 focus:outline-none focus:border-pixiu-blue"
             >
               <option value="All">All Partner Schools</option>
-              {schools.map(s => (
+              {(schools || []).map(s => (
                 <option key={s.id} value={s.id}>{s.name} ({s.code})</option>
               ))}
             </select>
@@ -645,7 +645,7 @@ export default function Students() {
                   onChange={e => setFormData({ ...formData, schoolCode: e.target.value })} 
                   className="w-full px-2 py-1.5 border border-slate-300 rounded-lg bg-white font-bold"
                 >
-                  {schools.map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
+                  {(schools || []).map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
                 </select>
               </div>
               <div>

@@ -499,7 +499,7 @@ export default function Schools() {
                     onChange={e => setEditFormData({ ...editFormData, trainer_id: e.target.value })}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-pixiu-blue bg-white font-bold text-slate-800"
                   >
-                    {trainers.map(t => (
+                    {(trainers || []).map(t => (
                       <option key={t.id} value={t.id}>{t.name} ({t.role})</option>
                     ))}
                   </select>
@@ -730,7 +730,7 @@ export default function Schools() {
                     onChange={e => setFormData({ ...formData, trainer_id: e.target.value })}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-pixiu-blue bg-white font-bold"
                   >
-                    {trainers.map(t => (
+                    {(trainers || []).map(t => (
                       <option key={t.id} value={t.id}>{t.name} ({t.role})</option>
                     ))}
                   </select>
