@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, lazy, Suspense, Component } from 'react';
 import { BrowserRouter, Routes, Route, Outlet, Navigate, useNavigate, Link } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
@@ -17,8 +17,67 @@ import SchoolPortal from './pages/SchoolPortal';
 import Verify from './pages/Verify';
 import AuditLogs from './pages/AuditLogs';
 
-// Lazily load Virtual Simulation to keep initial portal login fast and lightweight
-const Simulation = lazy(() => import('./pages/Simulation'));
+// Robust lazy import with automatic single reload when new builds invalidate asset chunks
+const lazyWithRetry = (importFn) => {
+  return lazy(async () => {
+    const isRetried = sessionStorage.getItem('pixiu_chunk_retry');
+    try {
+      const module = await importFn();
+      sessionStorage.removeItem('pixiu_chunk_retry');
+      return module;
+    } catch (err) {
+      if (!isRetried) {
+        sessionStorage.setItem('pixiu_chunk_retry', 'true');
+        window.location.reload();
+        return new Promise(() => {}); // Pause execution while browser reloads
+      }
+      sessionStorage.removeItem('pixiu_chunk_retry');
+      throw err;
+    }
+  });
+};
+
+const Simulation = lazyWithRetry(() => import('./pages/Simulation'));
+
+class ChunkErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error) {
+    console.error("Simulation chunk load error:", error);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-[#070B14] flex flex-col items-center justify-center text-white gap-4 p-6">
+          <div className="bg-slate-900 border border-slate-800 p-8 rounded-2xl max-w-md text-center shadow-2xl">
+            <div className="w-12 h-12 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center mx-auto mb-4 border border-blue-500/20">
+              <Sparkles size={24} />
+            </div>
+            <h3 className="text-lg font-bold text-white mb-2">New Virtual Lab Update</h3>
+            <p className="text-xs text-slate-400 mb-6 leading-relaxed">
+              Virtual Lab ka latest update load karne ke liye please neeche diye button par click karein.
+            </p>
+            <button
+              onClick={() => {
+                sessionStorage.removeItem('pixiu_chunk_retry');
+                window.location.reload();
+              }}
+              className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-bold transition-all cursor-pointer shadow-lg shadow-blue-600/30 w-full"
+            >
+              Reload Virtual Lab
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 import { DataProvider, useData } from './context/DataContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider, useToast } from './context/ToastContext';
@@ -485,19 +544,21 @@ export default function App() {
               <Route 
                 path="/simulation" 
                 element={
-                  <Suspense
-                    fallback={
-                      <div className="min-h-screen bg-[#070B14] flex flex-col items-center justify-center text-white gap-4 p-6">
-                        <div className="w-12 h-12 border-3 border-blue-500/20 border-t-pixiu-blue rounded-full animate-spin"></div>
-                        <div className="text-center">
-                          <p className="text-base font-extrabold text-white tracking-wide">Initializing Virtual Arduino Circuit Lab...</p>
-                          <p className="text-xs text-slate-400 mt-1 font-mono">Loading Interactive Blockly Engine & Electronics Simulator</p>
+                  <ChunkErrorBoundary>
+                    <Suspense
+                      fallback={
+                        <div className="min-h-screen bg-[#070B14] flex flex-col items-center justify-center text-white gap-4 p-6">
+                          <div className="w-12 h-12 border-3 border-blue-500/20 border-t-pixiu-blue rounded-full animate-spin"></div>
+                          <div className="text-center">
+                            <p className="text-base font-extrabold text-white tracking-wide">Initializing Virtual Arduino Circuit Lab...</p>
+                            <p className="text-xs text-slate-400 mt-1 font-mono">Loading Interactive Blockly Engine & Electronics Simulator</p>
+                          </div>
                         </div>
-                      </div>
-                    }
-                  >
-                    <Simulation />
-                  </Suspense>
+                      }
+                    >
+                      <Simulation />
+                    </Suspense>
+                  </ChunkErrorBoundary>
                 } 
               />
 
