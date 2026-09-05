@@ -26,7 +26,9 @@ const safeGetItem = (key, fallback) => {
 
 const safeFetch = async (url) => {
   try {
-    const r = await fetch(url);
+    const token = typeof window !== 'undefined' ? localStorage.getItem('pixiu_auth_token') : null;
+    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+    const r = await fetch(url, { headers });
     if (!r.ok) return null;
     const contentType = r.headers.get('content-type') || '';
     if (!contentType.includes('application/json')) return null;
@@ -298,7 +300,29 @@ export function DataProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    refreshAll();
+    // Only pull protected data from backend if an authenticated user session is active
+    const hasSession = () => {
+      try {
+        const token = localStorage.getItem('pixiu_auth_token');
+        const user = localStorage.getItem('pixiu_auth_user');
+        return !!(token || user);
+      } catch (e) {
+        return false;
+      }
+    };
+
+    if (hasSession()) {
+      refreshAll();
+    }
+
+    const handleAuthChange = () => {
+      if (hasSession()) {
+        refreshAll();
+      }
+    };
+
+    window.addEventListener('pixiu_auth_state_changed', handleAuthChange);
+    return () => window.removeEventListener('pixiu_auth_state_changed', handleAuthChange);
   }, [refreshAll]);
 
   // ==================== ACTIONS ====================

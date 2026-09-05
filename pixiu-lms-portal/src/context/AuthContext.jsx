@@ -266,6 +266,7 @@ export function AuthProvider({ children }) {
         localStorage.setItem('pixiu_auth_token', data.token);
         localStorage.setItem('pixiu_auth_user', JSON.stringify(data.user));
         logUserActivity(data.user, 'Login');
+        window.dispatchEvent(new Event('pixiu_auth_state_changed'));
         return { success: true, user: data.user };
       } else {
         const data = await res.json().catch(() => ({}));
@@ -302,6 +303,7 @@ export function AuthProvider({ children }) {
       localStorage.setItem('pixiu_auth_token', clientToken);
       localStorage.setItem('pixiu_auth_user', JSON.stringify(clientUser));
       logUserActivity(clientUser, 'Login');
+      window.dispatchEvent(new Event('pixiu_auth_state_changed'));
       return { success: true, user: clientUser };
     }
 
@@ -317,6 +319,7 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('pixiu_auth_token');
     localStorage.removeItem('pixiu_auth_user');
     localStorage.removeItem('pixiu_last_active_timestamp');
+    window.dispatchEvent(new Event('pixiu_auth_state_changed'));
   };
 
   const value = {
