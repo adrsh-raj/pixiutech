@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Outlet, Navigate, useNavigate, Link } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
@@ -15,8 +15,10 @@ import Login from './pages/Login';
 import StudentPortal from './pages/StudentPortal';
 import SchoolPortal from './pages/SchoolPortal';
 import Verify from './pages/Verify';
-import Simulation from './pages/Simulation';
 import AuditLogs from './pages/AuditLogs';
+
+// Lazily load Virtual Simulation to keep initial portal login fast and lightweight
+const Simulation = lazy(() => import('./pages/Simulation'));
 import { DataProvider, useData } from './context/DataContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider, useToast } from './context/ToastContext';
@@ -470,8 +472,25 @@ export default function App() {
               } />
               <Route path="/verify" element={<Verify />} />
 
-              {/* Virtual Arduino Simulation Workbench (Guarded via Portal Session) */}
-              <Route path="/simulation" element={<Simulation />} />
+              {/* Virtual Arduino Simulation Workbench (Lazily Loaded on Demand) */}
+              <Route 
+                path="/simulation" 
+                element={
+                  <Suspense
+                    fallback={
+                      <div className="min-h-screen bg-[#070B14] flex flex-col items-center justify-center text-white gap-4 p-6">
+                        <div className="w-12 h-12 border-3 border-blue-500/20 border-t-pixiu-blue rounded-full animate-spin"></div>
+                        <div className="text-center">
+                          <p className="text-base font-extrabold text-white tracking-wide">Initializing Virtual Arduino Circuit Lab...</p>
+                          <p className="text-xs text-slate-400 mt-1 font-mono">Loading Interactive Blockly Engine & Electronics Simulator</p>
+                        </div>
+                      </div>
+                    }
+                  >
+                    <Simulation />
+                  </Suspense>
+                } 
+              />
 
               {/* Student Protected Portal (Student Role Only) */}
               <Route path="/student-portal" element={<StudentRouteGuard />} />

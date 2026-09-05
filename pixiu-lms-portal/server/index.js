@@ -892,6 +892,32 @@ app.delete('/api/notifications/:id', (req, res) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ success: true, deleted: req.params.id });
   });
+// Audit Logs API (Persistent SQLite storage)
+app.get('/api/logs', (req, res) => {
+  db.all('SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 500', [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows || []);
+  });
+});
+
+app.post('/api/logs', (req, res) => {
+  const { id, date, time, user_id, name, role, school_id, event_type, status, ip } = req.body;
+  db.run(
+    `INSERT OR REPLACE INTO audit_logs (id, date, time, user_id, name, role, school_id, event_type, status, ip)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [id, date, time, user_id, name, role, school_id, event_type || 'Login', status, ip],
+    function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ success: true, id });
+    }
+  );
+});
+
+app.delete('/api/logs', (req, res) => {
+  db.run('DELETE FROM audit_logs', [], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, count: this.changes });
+  });
 });
 
 // Start Server

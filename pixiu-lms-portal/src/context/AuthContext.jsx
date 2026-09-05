@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import { SEED_LOGIN_LOGS } from '../data/seedData';
 
 const AuthContext = createContext();
 
@@ -205,39 +206,46 @@ export function AuthProvider({ children }) {
     };
   }, [user]);
 
-  const logUserLogin = (loggedInUser) => {
-    if (loggedInUser) {
-      try {
-        const logs = JSON.parse(localStorage.getItem('pixiu_admin_logs') || '[]');
-        logs.unshift({
-          id: 'LOG-' + Date.now(),
-          date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-          time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-          user_id: loggedInUser.username || loggedInUser.id || 'unknown',
-          name: loggedInUser.name || (loggedInUser.role === 'student' ? 'Student' : 'User'),
-          role: loggedInUser.role || 'student',
-          school_id: loggedInUser.school_id || 'N/A',
-          status: 'Authenticated (SHA-256)',
-          ip: 'Client Local Session'
-        });
-        localStorage.setItem('pixiu_admin_logs', JSON.stringify(logs.slice(0, 500)));
-      } catch (e) {}
-    }
+  const logUserActivity = (targetUser, eventType = 'Login') => {
+    if (!targetUser) return;
+    try {
+      const existing = JSON.parse(localStorage.getItem('pixiu_admin_logs') || 'null');
+      const base = Array.isArray(existing) && existing.length > 0 ? existing : [...SEED_LOGIN_LOGS];
+      
+      const newEntry = {
+        id: 'LOG-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+        date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+        time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        user_id: targetUser.username || targetUser.id || 'unknown',
+        name: targetUser.name || (targetUser.role === 'student' ? 'Student' : 'User'),
+        role: targetUser.role || 'student',
+        school_id: targetUser.school_id || 'N/A',
+        event_type: eventType,
+        status: 'Authenticated (SHA-256)',
+        ip: 'Client Local Session'
+      };
+
+      base.unshift(newEntry);
+      localStorage.setItem('pixiu_admin_logs', JSON.stringify(base.slice(0, 500)));
+
+      // Sync to SQLite backend API if reachable
+      fetch(`${API_BASE}/logs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newEntry)
+      }).catch(() => {});
+    } catch (e) {}
   };
 
-  // Auto-record active session on initial load if not recorded yet
+  // Seed baseline logs on first mount if empty
   useEffect(() => {
-    if (user) {
-      try {
-        const logs = JSON.parse(localStorage.getItem('pixiu_admin_logs') || '[]');
-        const latest = logs[0];
-        const isRecentSameUser = latest && latest.user_id === user.username;
-        if (!isRecentSameUser) {
-          logUserLogin(user);
-        }
-      } catch (e) {}
-    }
-  }, [user]);
+    try {
+      const existing = JSON.parse(localStorage.getItem('pixiu_admin_logs') || 'null');
+      if (!Array.isArray(existing) || existing.length === 0) {
+        localStorage.setItem('pixiu_admin_logs', JSON.stringify(SEED_LOGIN_LOGS));
+      }
+    } catch (e) {}
+  }, []);
 
   const login = async (username, password, expectedRole = null) => {
     const cleanUsername = username?.trim();
@@ -257,7 +265,7 @@ export function AuthProvider({ children }) {
         setUser(data.user);
         localStorage.setItem('pixiu_auth_token', data.token);
         localStorage.setItem('pixiu_auth_user', JSON.stringify(data.user));
-        logUserLogin(data.user);
+        logUserActivity(data.user, 'Login');
         return { success: true, user: data.user };
       } else {
         const data = await res.json().catch(() => ({}));
@@ -293,7 +301,7 @@ export function AuthProvider({ children }) {
       setUser(clientUser);
       localStorage.setItem('pixiu_auth_token', clientToken);
       localStorage.setItem('pixiu_auth_user', JSON.stringify(clientUser));
-      logUserLogin(clientUser);
+      logUserActivity(clientUser, 'Login');
       return { success: true, user: clientUser };
     }
 
@@ -301,6 +309,9 @@ export function AuthProvider({ children }) {
   };
 
   const logout = () => {
+    if (user) {
+      logUserActivity(user, 'Logout');
+    }
     setUser(null);
     setToken(null);
     localStorage.removeItem('pixiu_auth_token');

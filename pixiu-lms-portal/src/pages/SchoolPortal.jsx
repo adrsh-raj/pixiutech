@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { 
   Building2, Users, Award, BookOpen, Receipt, FileText, 
   CheckCircle2, Clock, Phone, MessageSquare, Search, Filter, 

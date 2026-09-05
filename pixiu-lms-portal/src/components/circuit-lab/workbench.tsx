@@ -29,65 +29,12 @@ import type { ProjectTemplate } from "@/lib/templates"
 
 const DEFAULT_XML = `<xml xmlns="https://developers.google.com/blockly/xml">
   <block type="arduino_program" x="40" y="40">
-    <statement name="SETUP">
-      <block type="serial_begin">
-        <field name="BAUD">9600</field>
-        <next>
-          <block type="io_pinmode">
-            <field name="PIN">13</field>
-            <field name="MODE">OUTPUT</field>
-          </block>
-        </next>
-      </block>
-    </statement>
-    <statement name="LOOP">
-      <block type="io_digitalwrite">
-        <field name="PIN">13</field>
-        <field name="STATE">HIGH</field>
-        <next>
-          <block type="time_delay">
-            <value name="MS">
-              <shadow type="math_number">
-                <field name="NUM">500</field>
-              </shadow>
-            </value>
-            <next>
-              <block type="io_digitalwrite">
-                <field name="PIN">13</field>
-                <field name="STATE">LOW</field>
-                <next>
-                  <block type="time_delay">
-                    <value name="MS">
-                      <shadow type="math_number">
-                        <field name="NUM">500</field>
-                      </shadow>
-                    </value>
-                  </block>
-                </next>
-              </block>
-            </next>
-          </block>
-        </next>
-      </block>
-    </statement>
   </block>
 </xml>`
 
 const INITIAL_STATE: CircuitState = {
-  parts: [
-    { id: "uno", type: "arduino-uno", x: 40, y: 110, rotation: 0, props: {} },
-    { id: "r_red", type: "resistor", x: 400, y: 130, rotation: 0, props: { resistance: 220 } },
-    { id: "led_red", type: "led", x: 520, y: 130, rotation: 0, props: { color: "red" } },
-    { id: "pot", type: "potentiometer", x: 410, y: 240, rotation: 0, props: { value: 512 } },
-  ],
-  wires: [
-    { id: "w_r1", from: { partId: "uno", pinId: "d13" }, to: { partId: "r_red", pinId: "a" }, color: "#ef4444" },
-    { id: "w_r2", from: { partId: "r_red", pinId: "b" }, to: { partId: "led_red", pinId: "anode" }, color: "#ef4444" },
-    { id: "w_lgnd", from: { partId: "led_red", pinId: "cathode" }, to: { partId: "uno", pinId: "gnd" }, color: "#1e293b" },
-    { id: "w_pot_gnd", from: { partId: "uno", pinId: "gnd_pwr" }, to: { partId: "pot", pinId: "t1" }, color: "#1e293b" },
-    { id: "w_pot_wiper", from: { partId: "pot", pinId: "wiper" }, to: { partId: "uno", pinId: "a0" }, color: "#06b6d4" },
-    { id: "w_pot_5v", from: { partId: "uno", pinId: "5v" }, to: { partId: "pot", pinId: "t2" }, color: "#ef4444" },
-  ],
+  parts: [],
+  wires: [],
 }
 
 export function Workbench() {

@@ -838,4 +838,45 @@ export const SEED_STUDENT_REVIEWS = [];
 
 export const SEED_PROJECTS = [];
 
+// Baseline Login Activity Audit Logs
+export const SEED_LOGIN_LOGS = [
+  {
+    id: 'LOG-INIT-01',
+    date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+    time: '08:30:15 AM',
+    user_id: 'admin',
+    name: 'Adarsh Raj (Founder & Admin)',
+    role: 'admin',
+    school_id: 'ALL',
+    event_type: 'Login',
+    status: 'Authenticated (SHA-256)',
+    ip: 'Command Center Host'
+  },
+  {
+    id: 'LOG-INIT-02',
+    date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+    time: '08:45:22 AM',
+    user_id: 'vikaspandey',
+    name: 'Vikas Pandey',
+    role: 'trainer',
+    school_id: 'ZPS',
+    event_type: 'Login',
+    status: 'Authenticated (SHA-256)',
+    ip: 'Trainer Terminal'
+  },
+  {
+    id: 'LOG-INIT-03',
+    date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+    time: '09:00:05 AM',
+    user_id: 'XYZ6A 01',
+    name: 'Manish Rawat',
+    role: 'student',
+    school_id: 'XYZ',
+    event_type: 'Login',
+    status: 'Authenticated (SHA-256)',
+    ip: 'Student Lab Seat 01'
+  }
+];
+
+
 

@@ -239,6 +239,22 @@ function initializeDatabase() {
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
 
+    // 16. Audit Logs for Security & User Logins
+    db.run(`CREATE TABLE IF NOT EXISTS audit_logs (
+      id TEXT PRIMARY KEY,
+      date TEXT,
+      time TEXT,
+      user_id TEXT,
+      name TEXT,
+      role TEXT,
+      school_id TEXT,
+      event_type TEXT DEFAULT 'Login',
+      status TEXT,
+      ip TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+
     // Seed database if empty
     db.get("SELECT COUNT(*) as count FROM users", async (err, row) => {
       if (row && row.count === 0) {

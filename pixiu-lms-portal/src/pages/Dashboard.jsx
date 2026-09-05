@@ -428,6 +428,7 @@ export default function Dashboard() {
             <thead className="bg-slate-50 border-b border-slate-200 sticky top-0">
               <tr>
                 <th className="p-3 text-slate-500 font-bold uppercase">Date & Time</th>
+                <th className="p-3 text-slate-500 font-bold uppercase">Action</th>
                 <th className="p-3 text-slate-500 font-bold uppercase">User & Identity</th>
                 <th className="p-3 text-slate-500 font-bold uppercase">Role</th>
                 <th className="p-3 text-slate-500 font-bold uppercase">School / Batch</th>
@@ -444,6 +445,13 @@ export default function Dashboard() {
                   return (
                     <tr key={log.id} className="hover:bg-slate-50">
                       <td className="p-3 text-slate-700 whitespace-nowrap">{log.date} • {log.time}</td>
+                      <td className="p-3">
+                        <span className={`px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-wider ${
+                          log.event_type === 'Logout' ? 'bg-slate-100 text-slate-600 border-slate-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        }`}>
+                          {log.event_type || 'Login'}
+                        </span>
+                      </td>
                       <td className="p-3 font-medium text-slate-900">
                         {log.name} <span className="text-slate-400 font-mono">(@{log.user_id})</span>
                       </td>
