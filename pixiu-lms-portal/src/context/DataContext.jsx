@@ -918,10 +918,12 @@ export function DataProvider({ children }) {
     try {
       await fetch(`${API_URL}/attendance`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-admin-override': 'true' },
         body: JSON.stringify({ session_id: sessionId, student_id: studentId, status, date: liveDate, day: liveDay, time: liveTime, timestamp })
       });
-    } catch (e) {}
+    } catch (e) {
+      console.error('Error marking attendance on server:', e);
+    }
 
     return { success: true };
   };
@@ -938,10 +940,12 @@ export function DataProvider({ children }) {
     try {
       await fetch(`${API_URL}/attendance/admin-override`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-admin-override': 'true' },
         body: JSON.stringify({ session_id: sessionId, student_id: studentId, status })
       });
-    } catch (e) {}
+    } catch (e) {
+      console.error('Error overriding attendance on server:', e);
+    }
     return { success: true };
   };
 

@@ -741,13 +741,11 @@ export default function Trainers() {
   const roster = activeSession ? students.filter(s => s.class_id === activeSession.class_id) : [];
 
   const handleMarkAttendance = async (studentId, status) => {
-    if (activeSession && activeSession.is_locked === 1 && !isAdmin) {
-      toast.error("This session is locked. Only Admin can edit past attendance records!");
-      return;
-    }
     const res = await markAttendance(activeSessionId, studentId, status);
     if (res && res.error) {
       toast.error(res.error);
+    } else {
+      toast.success(`Marked ${status} for student`, 'Attendance Saved');
     }
   };
 
@@ -808,10 +806,6 @@ export default function Trainers() {
   };
 
   const handleMarkAllPresent = async () => {
-    if (activeSession && activeSession.is_locked === 1 && !isAdmin) {
-      toast.error("This session is locked. Only Admin can edit past attendance records!");
-      return;
-    }
     for (const student of roster) {
       await markAttendance(activeSessionId, student.student_id, 'Present');
     }
@@ -875,12 +869,12 @@ export default function Trainers() {
           </div>
         </div>
 
-        {/* Lock Warning & Action Banner */}
+        {/* Session Status & Action Banner */}
         {isLocked ? (
-          <div className="bg-amber-50 border-b border-amber-200 px-4 py-3 text-xs text-amber-900 font-medium flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-            <div className="flex items-center gap-1.5 font-bold text-[11px] sm:text-xs">
-              <Lock size={14} className="text-amber-600 shrink-0"/>
-              <span>Attendance Locked (Past Record)</span>
+          <div className="bg-emerald-50/80 border-b border-emerald-200/80 px-4 py-3 text-xs text-emerald-900 font-medium flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2 font-bold text-[11px] sm:text-xs text-emerald-800">
+              <CheckCircle size={15} className="text-emerald-600 shrink-0"/>
+              <span>Attendance Recorded • Click Present/Absent to Edit Record</span>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -888,18 +882,6 @@ export default function Trainers() {
                 className="px-3 py-1.5 bg-pixiu-blue hover:bg-blue-600 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
               >
                 <Plus size={14}/> Start Next Session
-              </button>
-              <button
-                onClick={() => {
-                  if (window.confirm("Unlock this session to edit past attendance?")) {
-                    unlockSession(activeSessionId);
-                    toast.success("Session unlocked! You can now edit attendance.", "Session Unlocked");
-                  }
-                }}
-                className="px-2.5 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors"
-                title="Unlock to edit past attendance"
-              >
-                <Unlock size={13}/> Unlock Edit
               </button>
             </div>
           </div>
@@ -991,24 +973,22 @@ export default function Trainers() {
                   </button>
                   <button 
                     onClick={() => handleMarkAttendance(student.student_id, 'Present')}
-                    disabled={isLocked && !isAdmin}
                     className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
                       status === 'Present' 
-                        ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20' 
-                        : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
-                    } ${isLocked && !isAdmin ? 'cursor-not-allowed opacity-80' : ''}`}
+                        ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20 ring-2 ring-emerald-400' 
+                        : 'bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-600'
+                    }`}
                     title="Mark Present"
                   >
                     <Check size={18}/>
                   </button>
                   <button 
                     onClick={() => handleMarkAttendance(student.student_id, 'Absent')}
-                    disabled={isLocked && !isAdmin}
                     className={`w-9 h-9 rounded-lg flex items-center justify-center font-bold text-xs transition-all cursor-pointer ${
                       status === 'Absent' 
-                        ? 'bg-rose-500 text-white shadow-md shadow-rose-500/20' 
-                        : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
-                    } ${isLocked && !isAdmin ? 'cursor-not-allowed opacity-80' : ''}`}
+                        ? 'bg-rose-500 text-white shadow-md shadow-rose-500/20 ring-2 ring-rose-400' 
+                        : 'bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-600'
+                    }`}
                     title="Mark Absent"
                   >
                     A
@@ -1361,6 +1341,29 @@ export default function Trainers() {
                 )}
               </div>
 
+              {/* Take Class Attendance for Selected Grade */}
+              <button
+                type="button"
+                onClick={() => {
+                  const targetGrade = studentGradeFilter === 'All' ? '6' : studentGradeFilter;
+                  const targetClassId = `CLS-${trainerSchoolId === 'XYZ' ? 'XYZ' : 'ZPS'}-${targetGrade}A`;
+                  const classSessions = sessions.filter(s => s.class_id === targetClassId);
+                  const activeUnlocked = classSessions.find(s => s.is_locked === 0);
+                  const targetSession = activeUnlocked || classSessions[0];
+                  if (targetSession) {
+                    setActiveSessionId(targetSession.id);
+                    toast.info(`Opened attendance session for Class ${targetGrade}A!`, 'Classroom Attendance');
+                  } else {
+                    handleOpenStartSessionModal(targetClassId);
+                  }
+                }}
+                className="bg-pixiu-blue hover:bg-blue-600 text-white text-xs font-bold px-3.5 py-2 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 shadow-xs"
+                title={`Take live attendance for Class ${studentGradeFilter === 'All' ? '6A' : studentGradeFilter + 'A'}`}
+              >
+                <Play size={13} fill="white" />
+                <span>Take Class Attendance</span>
+              </button>
+
               {/* Download Cohort PDF for Selected Grade */}
               <button
                 type="button"
@@ -1558,34 +1561,25 @@ export default function Trainers() {
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="pt-3 border-t border-slate-100 flex items-center gap-1.5">
-                      {/* Take Class Attendance */}
-                      <button
-                        onClick={(e) => handleStartAttendanceForStudent(student, e)}
-                        className="flex-1 bg-pixiu-blue hover:bg-blue-600 text-white font-bold py-1.5 px-2.5 rounded-lg text-xs flex items-center justify-center gap-1 transition-all cursor-pointer shadow-xs"
-                        title={`Take attendance for Class ${cleanGrade}`}
-                      >
-                        <Play size={12} fill="white" />
-                        <span>Attendance</span>
-                      </button>
-
-                      {/* Review Button */}
+                    <div className="pt-3 border-t border-slate-100 flex items-center gap-2">
+                      {/* Review & Grade Button */}
                       <button
                         onClick={() => handleOpenReviewModal({ student_id: student.student_id, student_name: student.name, class_grade: gradeNum })}
-                        className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
+                        className="flex-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300/80 font-bold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs"
                         title="Give End-of-Unit Review & Grading"
                       >
                         <Star size={14} className="text-amber-500 fill-amber-500" />
-                        <span className="hidden sm:inline">Review</span>
+                        <span>Review & Grade</span>
                       </button>
 
                       {/* PDF Transcript Button */}
                       <button
                         onClick={(e) => handleDownloadTranscript(student, e)}
-                        className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-all cursor-pointer"
+                        className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
                         title="Download Student Progress Transcript PDF"
                       >
                         <Download size={14} />
+                        <span className="hidden sm:inline">Transcript</span>
                       </button>
                     </div>
                   </div>

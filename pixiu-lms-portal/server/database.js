@@ -1,6 +1,7 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const bcrypt = require('bcryptjs');
+const { seedSessionsAndAttendance } = require('./seed_sessions_attendance');
 
 const dbPath = path.resolve(__dirname, 'pixiu_lms.db');
 const db = new sqlite3.Database(dbPath, (err) => {
@@ -613,6 +614,9 @@ function initializeDatabase() {
         subStmt.finalize();
       }
     });
+
+    // Ensure sessions and attendance records are permanently seeded
+    seedSessionsAndAttendance(db);
 
     // Seed database if empty
     db.get("SELECT COUNT(*) as count FROM users", async (err, row) => {

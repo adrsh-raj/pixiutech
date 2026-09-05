@@ -395,28 +395,29 @@ app.get('/api/attendance', (req, res) => {
 
 app.post('/api/attendance', (req, res) => {
   const { session_id, student_id, status } = req.body;
+  if (!session_id || !student_id || !status) {
+    return res.status(400).json({ error: 'session_id, student_id, and status are required' });
+  }
   
-  // Verify if session is already locked
-  db.get("SELECT is_locked FROM sessions WHERE id = ?", [session_id], (err, session) => {
-    if (session && session.is_locked === 1 && !req.headers['x-admin-override']) {
-      return res.status(403).json({ error: 'This attendance record is permanently locked. Only Admin can modify past attendance.' });
-    }
-    
-    const id = `ATT-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
-    const sql = `INSERT INTO attendance (id, session_id, student_id, status) VALUES (?, ?, ?, ?)
-                 ON CONFLICT(session_id, student_id) DO UPDATE SET status=excluded.status, timestamp=CURRENT_TIMESTAMP`;
-    db.run(sql, [id, session_id, student_id, status], function(err) {
-      if (err) return res.status(500).json({ error: err.message });
-      res.json({ success: true, session_id, student_id, status });
-    });
+  const id = `ATT-${session_id.replace(/\s+/g, '')}-${student_id.replace(/\s+/g, '')}`;
+  const sql = `INSERT INTO attendance (id, session_id, student_id, status) VALUES (?, ?, ?, ?)
+               ON CONFLICT(session_id, student_id) DO UPDATE SET status=excluded.status, timestamp=CURRENT_TIMESTAMP`;
+  db.run(sql, [id, session_id, student_id, status], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, id, session_id, student_id, status });
   });
 });
 
-// Admin Attendance Override
+// Attendance Override / Update
 app.put('/api/attendance/admin-override', (req, res) => {
   const { session_id, student_id, status } = req.body;
-  const sql = `UPDATE attendance SET status = ? WHERE session_id = ? AND student_id = ?`;
-  db.run(sql, [status, session_id, student_id], function(err) {
+  if (!session_id || !student_id || !status) {
+    return res.status(400).json({ error: 'session_id, student_id, and status are required' });
+  }
+  const id = `ATT-${session_id.replace(/\s+/g, '')}-${student_id.replace(/\s+/g, '')}`;
+  const sql = `INSERT INTO attendance (id, session_id, student_id, status) VALUES (?, ?, ?, ?)
+               ON CONFLICT(session_id, student_id) DO UPDATE SET status=excluded.status, timestamp=CURRENT_TIMESTAMP`;
+  db.run(sql, [id, session_id, student_id, status], function(err) {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ success: true, session_id, student_id, status });
   });
