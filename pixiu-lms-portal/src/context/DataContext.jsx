@@ -5,6 +5,7 @@ import {
   SEED_ALERTS, SEED_CURRICULUM, SEED_CONTENT, SEED_NOTIFICATIONS,
   SEED_STUDENT_REVIEWS, SEED_PROJECTS, CLASS_KITS
 } from '../data/seedData';
+import { SEED_QUIZZES } from '../data/seedQuizzes';
 
 const DataContext = createContext();
 
@@ -219,6 +220,24 @@ export function DataProvider({ children }) {
       return SEED_STUDENT_REVIEWS;
     }
   });
+
+  const [quizzes, setQuizzes] = useState(() => {
+    try {
+      const saved = safeGetItem('pixiu_quizzes', null);
+      if (!saved || !Array.isArray(saved) || saved.length === 0) {
+        localStorage.setItem('pixiu_quizzes', JSON.stringify(SEED_QUIZZES));
+        return SEED_QUIZZES;
+      }
+      return saved;
+    } catch (e) {
+      return SEED_QUIZZES;
+    }
+  });
+
+  const [quizSubmissions, setQuizSubmissions] = useState(() => {
+    return safeGetItem('pixiu_quiz_submissions', []);
+  });
+
   const [loading, setLoading] = useState(false);
 
   // Cross-tab / Cross-window Real-time Sync
@@ -248,6 +267,18 @@ export function DataProvider({ children }) {
           if (fresh && fresh.length > 0) setAttendance(fresh);
         } catch (err) {}
       }
+      if (e.key === 'pixiu_quizzes') {
+        try {
+          const fresh = JSON.parse(e.newValue || '[]');
+          if (fresh && fresh.length > 0) setQuizzes(fresh);
+        } catch (err) {}
+      }
+      if (e.key === 'pixiu_quiz_submissions') {
+        try {
+          const fresh = JSON.parse(e.newValue || '[]');
+          if (fresh) setQuizSubmissions(fresh);
+        } catch (err) {}
+      }
     };
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
@@ -258,7 +289,8 @@ export function DataProvider({ children }) {
     try {
       const [
         schRes, clsRes, stuRes, trRes, sesRes, attRes, 
-        ldRes, cntRes, curRes, invRes, bilRes, comRes, prjRes, altRes, notifRes, revRes
+        ldRes, cntRes, curRes, invRes, bilRes, comRes, prjRes, altRes, notifRes, revRes,
+        quizRes, subRes
       ] = await Promise.all([
         safeFetch(`${API_BASE}/schools`),
         safeFetch(`${API_BASE}/classes`),
@@ -276,6 +308,8 @@ export function DataProvider({ children }) {
         safeFetch(`${API_BASE}/alerts`),
         safeFetch(`${API_BASE}/notifications`),
         safeFetch(`${API_BASE}/reviews`),
+        safeFetch(`${API_BASE}/quizzes`),
+        safeFetch(`${API_BASE}/quiz-submissions`),
       ]);
 
       if (schRes && schRes.length > 0) setSchools(schRes);
@@ -294,6 +328,14 @@ export function DataProvider({ children }) {
       if (altRes && altRes.length > 0) setAlerts(altRes);
       if (notifRes && notifRes.length > 0) setNotifications(notifRes);
       if (revRes && revRes.length > 0) setStudentReviews(revRes);
+      if (quizRes && quizRes.length > 0) {
+        setQuizzes(quizRes);
+        try { localStorage.setItem('pixiu_quizzes', JSON.stringify(quizRes)); } catch (e) {}
+      }
+      if (subRes && Array.isArray(subRes)) {
+        setQuizSubmissions(subRes);
+        try { localStorage.setItem('pixiu_quiz_submissions', JSON.stringify(subRes)); } catch (e) {}
+      }
     } catch (err) {
       console.warn("Backend API unavailable, using offline seed state.");
     }
@@ -1233,6 +1275,178 @@ export function DataProvider({ children }) {
     return Math.round((present / studentRecords.length) * 100);
   };
 
+  // Quizzes & MCQ Management
+  const createQuiz = async (quizData) => {
+    const id = quizData.id || `QUIZ-${Date.now().toString().slice(-4)}`;
+    const fullQuiz = { ...quizData, id };
+    try {
+      await fetch(`${API_URL}/quizzes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(fullQuiz)
+      });
+    } catch (e) {
+      console.warn('Backend unavailable, saving quiz to local state');
+    }
+    setQuizzes(prev => {
+      const updated = [fullQuiz, ...prev.filter(q => q.id !== id)];
+      try { localStorage.setItem('pixiu_quizzes', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+    return { success: true, quiz: fullQuiz };
+  };
+
+  const updateQuiz = async (id, quizData) => {
+    try {
+      await fetch(`${API_URL}/quizzes/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(quizData)
+      });
+    } catch (e) {
+      console.warn('Backend unavailable for updateQuiz');
+    }
+    setQuizzes(prev => {
+      const updated = prev.map(q => q.id === id ? { ...q, ...quizData } : q);
+      try { localStorage.setItem('pixiu_quizzes', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+    return { success: true };
+  };
+
+  const deleteQuiz = async (id) => {
+    try {
+      await fetch(`${API_URL}/quizzes/${id}`, { method: 'DELETE' });
+    } catch (e) {
+      console.warn('Backend unavailable for deleteQuiz');
+    }
+    setQuizzes(prev => {
+      const updated = prev.filter(q => q.id !== id);
+      try { localStorage.setItem('pixiu_quizzes', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+    return { success: true };
+  };
+
+  const submitQuizAttempt = async (attemptData) => {
+    const { quiz_id, student_id, student_name, class_grade, level, answers, time_taken_seconds, violation_count, status } = attemptData;
+    
+    // Clear in-progress local active draft
+    try {
+      localStorage.removeItem(`pixiu_quiz_active_${quiz_id}_${student_id}`);
+    } catch (e) {}
+
+    try {
+      const res = await fetch(`${API_URL}/quiz-submissions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(attemptData)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.submission) {
+          setQuizSubmissions(prev => {
+            const updated = [data.submission, ...prev.filter(s => !(s.quiz_id === quiz_id && s.student_id === student_id))];
+            try { localStorage.setItem('pixiu_quiz_submissions', JSON.stringify(updated)); } catch (e) {}
+            return updated;
+          });
+          return data;
+        }
+      } else if (res.status === 403) {
+        const errData = await res.json().catch(() => ({}));
+        return { success: false, error: errData.error || 'Single attempt locked' };
+      }
+    } catch (e) {
+      console.warn('Backend unavailable for submitQuizAttempt, grading locally');
+    }
+
+    // Local fallback grading
+    const targetQuiz = quizzes.find(q => q.id === quiz_id);
+    const questions = targetQuiz?.questions || [];
+    let correctCount = 0;
+    let attemptedCount = 0;
+    let earnedScore = 0;
+    let totalMarks = 0;
+
+    questions.forEach(q => {
+      const points = q.points || 2;
+      totalMarks += points;
+      const studentChoice = answers?.[q.id];
+      if (studentChoice !== undefined && studentChoice !== null && studentChoice !== '') {
+        attemptedCount++;
+        if (String(studentChoice).trim().toUpperCase() === String(q.correct_option).trim().toUpperCase()) {
+          correctCount++;
+          earnedScore += points;
+        }
+      }
+    });
+
+    const percentage = totalMarks > 0 ? Math.round((earnedScore / totalMarks) * 100) : 0;
+    const subId = `SUB-${Date.now().toString().slice(-4)}-${Math.floor(Math.random() * 1000)}`;
+    const now = new Date().toISOString();
+
+    const localSubmission = {
+      id: subId,
+      quiz_id,
+      student_id,
+      student_name: student_name || 'Student',
+      class_grade: class_grade || '6',
+      level: level || 'Level 0',
+      score: earnedScore,
+      total_marks: totalMarks,
+      percentage,
+      correct_count: correctCount,
+      attempted_count: attemptedCount,
+      total_questions: questions.length,
+      answers: answers || {},
+      time_taken_seconds: time_taken_seconds || 0,
+      violation_count: violation_count || 0,
+      status: status || 'Completed',
+      reattempt_allowed: 0,
+      completed_at: now
+    };
+
+    setQuizSubmissions(prev => {
+      const updated = [localSubmission, ...prev.filter(s => !(s.quiz_id === quiz_id && s.student_id === student_id))];
+      try { localStorage.setItem('pixiu_quiz_submissions', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+
+    return {
+      success: true,
+      submission: localSubmission,
+      questions
+    };
+  };
+
+  const allowQuizReattempt = async (submissionId) => {
+    try {
+      await fetch(`${API_URL}/quiz-submissions/${submissionId}/reattempt`, { method: 'PUT' });
+    } catch (e) {
+      console.warn('Backend unavailable for allowQuizReattempt');
+    }
+    setQuizSubmissions(prev => {
+      const updated = prev.map(s => s.id === submissionId ? { ...s, reattempt_allowed: 1 } : s);
+      try { localStorage.setItem('pixiu_quiz_submissions', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+    return { success: true };
+  };
+
+  const deleteQuizSubmission = async (submissionId) => {
+    try {
+      await fetch(`${API_URL}/quiz-submissions/${submissionId}`, { method: 'DELETE' });
+    } catch (e) {
+      console.warn('Backend unavailable for deleteQuizSubmission');
+    }
+    setQuizSubmissions(prev => {
+      const updated = prev.filter(s => s.id !== submissionId);
+      try { localStorage.setItem('pixiu_quiz_submissions', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+    return { success: true };
+  };
+
   const value = {
     loading, refreshAll,
     schools, addSchool, updateSchool, deleteSchool,
@@ -1251,7 +1465,9 @@ export function DataProvider({ children }) {
     projects, addProject, deleteProject, uploadFile,
     alerts, resolveAlertAction,
     notifications, sendBroadcastNotification, updateNotification, deleteNotification, pushSchoolNotification,
-    studentReviews, saveStudentReview, deleteStudentReview
+    studentReviews, saveStudentReview, deleteStudentReview,
+    quizzes, createQuiz, updateQuiz, deleteQuiz,
+    quizSubmissions, submitQuizAttempt, allowQuizReattempt, deleteQuizSubmission
   };
 
   return (

@@ -1040,6 +1040,312 @@ app.delete('/api/reviews/:id', (req, res) => {
   });
 });
 
+// ==================== 19. QUIZZES & MCQS API ====================
+// Get all Quizzes (optionally filtered by class_grade and level) with Questions
+app.get('/api/quizzes', (req, res) => {
+  const { class_grade, level } = req.query;
+  let sql = "SELECT * FROM quizzes WHERE status = 'Active'";
+  const params = [];
+
+  if (class_grade) {
+    sql += " AND (class_grade = ? OR class_grade = 'ALL')";
+    params.push(class_grade);
+  }
+  if (level) {
+    sql += " AND level = ?";
+    params.push(level);
+  }
+  sql += " ORDER BY level ASC, created_at ASC";
+
+  db.all(sql, params, (err, quizzes) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!quizzes || quizzes.length === 0) return res.json([]);
+
+    db.all("SELECT * FROM quiz_questions ORDER BY question_order ASC", [], (qErr, allQuestions) => {
+      if (qErr) return res.status(500).json({ error: qErr.message });
+
+      const questionMap = {};
+      (allQuestions || []).forEach(q => {
+        if (!questionMap[q.quiz_id]) questionMap[q.quiz_id] = [];
+        questionMap[q.quiz_id].push(q);
+      });
+
+      const fullQuizzes = quizzes.map(qz => ({
+        ...qz,
+        questions: questionMap[qz.id] || []
+      }));
+
+      res.json(fullQuizzes);
+    });
+  });
+});
+
+// Get Single Quiz with Questions
+app.get('/api/quizzes/:id', (req, res) => {
+  db.get("SELECT * FROM quizzes WHERE id = ?", [req.params.id], (err, quiz) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!quiz) return res.status(404).json({ error: 'Quiz not found' });
+
+    db.all("SELECT * FROM quiz_questions WHERE quiz_id = ? ORDER BY question_order ASC", [quiz.id], (qErr, questions) => {
+      if (qErr) return res.status(500).json({ error: qErr.message });
+      res.json({ ...quiz, questions: questions || [] });
+    });
+  });
+});
+
+// Create Quiz with Nested Questions
+app.post('/api/quizzes', (req, res) => {
+  const { title, class_grade, level, unit_code, duration_minutes, total_marks, created_by, questions } = req.body;
+  const quizId = `QUIZ-${Date.now().toString().slice(-4)}`;
+  const now = new Date().toISOString();
+
+  const quizSql = `INSERT INTO quizzes (id, title, class_grade, level, unit_code, duration_minutes, total_marks, created_by, status, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Active', ?, ?)`;
+
+  db.run(quizSql, [
+    quizId,
+    title || 'Robotics & Electronics MCQ Quiz',
+    class_grade || '6',
+    level || 'Level 0',
+    unit_code || 'Unit 1',
+    parseInt(duration_minutes) || 10,
+    parseInt(total_marks) || 10,
+    created_by || 'Trainer',
+    now,
+    now
+  ], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+
+    if (Array.isArray(questions) && questions.length > 0) {
+      const qStmt = db.prepare(`INSERT INTO quiz_questions (id, quiz_id, question_order, question_text, option_a, option_b, option_c, option_d, correct_option, explanation, points)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      
+      questions.forEach((q, idx) => {
+        const qId = q.id || `Q-${quizId}-${idx + 1}`;
+        qStmt.run([
+          qId,
+          quizId,
+          idx + 1,
+          q.question_text || '',
+          q.option_a || '',
+          q.option_b || '',
+          q.option_c || '',
+          q.option_d || '',
+          (q.correct_option || 'A').toUpperCase(),
+          q.explanation || 'Consult the official unit documentation for detailed derivation.',
+          q.points || 2
+        ]);
+      });
+
+      qStmt.finalize(() => {
+        res.json({ success: true, id: quizId, message: 'Quiz created successfully' });
+      });
+    } else {
+      res.json({ success: true, id: quizId, message: 'Quiz created without questions' });
+    }
+  });
+});
+
+// Update Quiz
+app.put('/api/quizzes/:id', (req, res) => {
+  const { title, class_grade, level, unit_code, duration_minutes, total_marks, questions } = req.body;
+  const now = new Date().toISOString();
+
+  const updateSql = `UPDATE quizzes SET title = ?, class_grade = ?, level = ?, unit_code = ?, duration_minutes = ?, total_marks = ?, updated_at = ? WHERE id = ?`;
+
+  db.run(updateSql, [title, class_grade, level, unit_code, duration_minutes, total_marks, now, req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+
+    if (Array.isArray(questions)) {
+      // Re-write questions
+      db.run("DELETE FROM quiz_questions WHERE quiz_id = ?", [req.params.id], () => {
+        const qStmt = db.prepare(`INSERT INTO quiz_questions (id, quiz_id, question_order, question_text, option_a, option_b, option_c, option_d, correct_option, explanation, points)
+                                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+        questions.forEach((q, idx) => {
+          const qId = q.id || `Q-${req.params.id}-${idx + 1}`;
+          qStmt.run([
+            qId,
+            req.params.id,
+            idx + 1,
+            q.question_text || '',
+            q.option_a || '',
+            q.option_b || '',
+            q.option_c || '',
+            q.option_d || '',
+            (q.correct_option || 'A').toUpperCase(),
+            q.explanation || '',
+            q.points || 2
+          ]);
+        });
+        qStmt.finalize(() => {
+          res.json({ success: true, id: req.params.id, message: 'Quiz updated' });
+        });
+      });
+    } else {
+      res.json({ success: true, id: req.params.id });
+    }
+  });
+});
+
+// Delete Quiz
+app.delete('/api/quizzes/:id', (req, res) => {
+  db.run("DELETE FROM quiz_questions WHERE quiz_id = ?", [req.params.id], () => {
+    db.run("DELETE FROM quiz_submissions WHERE quiz_id = ?", [req.params.id], () => {
+      db.run("DELETE FROM quizzes WHERE id = ?", [req.params.id], function(err) {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ success: true, deleted: req.params.id });
+      });
+    });
+  });
+});
+
+// ==================== 20. QUIZ SUBMISSIONS & PROCTORING ====================
+// Get Quiz Submissions (filter by student_id, quiz_id, or class_grade)
+app.get('/api/quiz-submissions', (req, res) => {
+  const { student_id, quiz_id, class_grade } = req.query;
+  let sql = "SELECT * FROM quiz_submissions WHERE 1=1";
+  const params = [];
+
+  if (student_id) {
+    sql += " AND student_id = ?";
+    params.push(student_id);
+  }
+  if (quiz_id) {
+    sql += " AND quiz_id = ?";
+    params.push(quiz_id);
+  }
+  if (class_grade) {
+    sql += " AND class_grade = ?";
+    params.push(class_grade);
+  }
+  sql += " ORDER BY completed_at DESC";
+
+  db.all(sql, params, (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    const parsed = (rows || []).map(r => ({
+      ...r,
+      answers: r.answers_json ? JSON.parse(r.answers_json) : {}
+    }));
+    res.json(parsed);
+  });
+});
+
+// Submit Quiz Attempt (Grades answers, locks attempt, records proctoring audit)
+app.post('/api/quiz-submissions', (req, res) => {
+  const { quiz_id, student_id, student_name, class_grade, level, answers, time_taken_seconds, violation_count, status } = req.body;
+
+  if (!quiz_id || !student_id) {
+    return res.status(400).json({ error: 'Quiz ID and Student ID are required' });
+  }
+
+  // Check if student has already submitted this quiz
+  db.get("SELECT * FROM quiz_submissions WHERE quiz_id = ? AND student_id = ?", [quiz_id, student_id], (checkErr, existing) => {
+    if (checkErr) return res.status(500).json({ error: checkErr.message });
+    if (existing && existing.reattempt_allowed !== 1) {
+      return res.status(403).json({ 
+        error: 'Single Attempt Restriction: You have already completed this quiz. Re-attempts are locked unless authorized by your Trainer.',
+        existing_submission: existing
+      });
+    }
+
+    // Fetch questions to grade the exam securely on server
+    db.all("SELECT * FROM quiz_questions WHERE quiz_id = ? ORDER BY question_order ASC", [quiz_id], (qErr, questions) => {
+      if (qErr) return res.status(500).json({ error: qErr.message });
+      if (!questions || questions.length === 0) {
+        return res.status(400).json({ error: 'Quiz has no questions to grade' });
+      }
+
+      let correctCount = 0;
+      let attemptedCount = 0;
+      let earnedScore = 0;
+      let totalMarks = 0;
+
+      const studentAnswers = answers || {};
+
+      questions.forEach(q => {
+        const points = q.points || 2;
+        totalMarks += points;
+        const studentChoice = studentAnswers[q.id];
+        if (studentChoice !== undefined && studentChoice !== null && studentChoice !== '') {
+          attemptedCount++;
+          if (String(studentChoice).trim().toUpperCase() === String(q.correct_option).trim().toUpperCase()) {
+            correctCount++;
+            earnedScore += points;
+          }
+        }
+      });
+
+      const percentage = totalMarks > 0 ? Math.round((earnedScore / totalMarks) * 100) : 0;
+      const subId = existing ? existing.id : `SUB-${Date.now().toString().slice(-4)}-${Math.floor(Math.random() * 1000)}`;
+      const now = new Date().toISOString();
+
+      const insertSql = `INSERT OR REPLACE INTO quiz_submissions (
+        id, quiz_id, student_id, student_name, class_grade, level, score, total_marks, percentage,
+        correct_count, attempted_count, total_questions, answers_json, time_taken_seconds, violation_count, status, reattempt_allowed, completed_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`;
+
+      db.run(insertSql, [
+        subId,
+        quiz_id,
+        student_id,
+        student_name || 'Student',
+        class_grade || '6',
+        level || 'Level 0',
+        earnedScore,
+        totalMarks,
+        percentage,
+        correctCount,
+        attemptedCount,
+        questions.length,
+        JSON.stringify(studentAnswers),
+        time_taken_seconds || 0,
+        violation_count || 0,
+        status || 'Completed',
+        now
+      ], function(saveErr) {
+        if (saveErr) return res.status(500).json({ error: saveErr.message });
+
+        res.json({
+          success: true,
+          submission: {
+            id: subId,
+            quiz_id,
+            student_id,
+            student_name,
+            score: earnedScore,
+            total_marks: totalMarks,
+            percentage,
+            correct_count: correctCount,
+            attempted_count: attemptedCount,
+            total_questions: questions.length,
+            time_taken_seconds,
+            violation_count,
+            status: status || 'Completed',
+            completed_at: now
+          },
+          questions // Send back full questions with correct answers & explanations for post-exam review
+        });
+      });
+    });
+  });
+});
+
+// Allow Student Re-attempt (Trainer only)
+app.put('/api/quiz-submissions/:id/reattempt', (req, res) => {
+  db.run("UPDATE quiz_submissions SET reattempt_allowed = 1 WHERE id = ?", [req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, id: req.params.id, message: 'Re-attempt unlocked for student' });
+  });
+});
+
+// Delete Submission (Resets student attempt completely)
+app.delete('/api/quiz-submissions/:id', (req, res) => {
+  db.run("DELETE FROM quiz_submissions WHERE id = ?", [req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, deleted: req.params.id });
+  });
+});
+
 // Start Server
 app.listen(PORT, () => {
   console.log(`⚡ Pixiu Core API & Auth Engine running on http://localhost:${PORT}`);

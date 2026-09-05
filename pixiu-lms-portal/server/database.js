@@ -284,6 +284,129 @@ function initializeDatabase() {
       UNIQUE(notification_id, user_key)
     )`);
 
+    // 19. Online Lab Quizzes & MCQs Engine
+    db.run(`CREATE TABLE IF NOT EXISTS quizzes (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      class_grade TEXT NOT NULL, -- '6', '7', '8', '9', '11', 'ALL'
+      level TEXT NOT NULL,       -- 'Level 0', 'Level 1', 'Level 2', 'Level 3', 'Level 4', 'Level 5', 'Level 6'
+      unit_code TEXT,            -- 'Unit 1', 'Unit 2', etc.
+      duration_minutes INTEGER DEFAULT 10,
+      total_marks INTEGER DEFAULT 10,
+      created_by TEXT DEFAULT 'Pixiu Academic Faculty',
+      status TEXT DEFAULT 'Active',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+    // 20. Quiz Questions with 4 Choices & Pedagogical Reasoning
+    db.run(`CREATE TABLE IF NOT EXISTS quiz_questions (
+      id TEXT PRIMARY KEY,
+      quiz_id TEXT NOT NULL,
+      question_order INTEGER DEFAULT 1,
+      question_text TEXT NOT NULL,
+      option_a TEXT NOT NULL,
+      option_b TEXT NOT NULL,
+      option_c TEXT NOT NULL,
+      option_d TEXT NOT NULL,
+      correct_option TEXT NOT NULL, -- 'A', 'B', 'C', 'D'
+      explanation TEXT NOT NULL,     -- Detailed reasoning shown post-quiz
+      points INTEGER DEFAULT 2,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+    // 21. Student Quiz Submissions with Proctoring Audit & Single-Attempt Lock
+    db.run(`CREATE TABLE IF NOT EXISTS quiz_submissions (
+      id TEXT PRIMARY KEY,
+      quiz_id TEXT NOT NULL,
+      student_id TEXT NOT NULL,
+      student_name TEXT,
+      class_grade TEXT,
+      level TEXT,
+      score REAL DEFAULT 0,
+      total_marks REAL DEFAULT 10,
+      percentage REAL DEFAULT 0,
+      correct_count INTEGER DEFAULT 0,
+      attempted_count INTEGER DEFAULT 0,
+      total_questions INTEGER DEFAULT 0,
+      answers_json TEXT,             -- Serialized student answers map
+      time_taken_seconds INTEGER DEFAULT 0,
+      violation_count INTEGER DEFAULT 0,
+      status TEXT DEFAULT 'Completed', -- 'Completed', 'Terminated_Violation', 'Timed_Out'
+      reattempt_allowed INTEGER DEFAULT 0, -- 1 if trainer granted reattempt
+      completed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(quiz_id, student_id)
+    )`);
+
+    // Seed default level-wise quizzes and questions if empty
+    db.get("SELECT COUNT(*) as count FROM quizzes", (err, row) => {
+      if (!err && row && row.count === 0) {
+        console.log("📝 Seeding Official Curriculum Quizzes & Question Banks...");
+        const qzStmt = db.prepare("INSERT INTO quizzes (id, title, class_grade, level, unit_code, duration_minutes, total_marks, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        
+        // Level 0 Quiz
+        qzStmt.run('QUIZ-L0', 'Level 0 Assessment: Fundamentals of Electronics & Breadboards', '6', 'Level 0', 'Unit 1', 10, 10, 'Pixiu Academic Faculty');
+        // Level 1 Quiz
+        qzStmt.run('QUIZ-L1', 'Level 1 Assessment: Arduino IDE, GPIO & C++ Programming', '6', 'Level 1', 'Unit 2', 10, 10, 'Pixiu Academic Faculty');
+        // Level 2 Quiz
+        qzStmt.run('QUIZ-L2', 'Level 2 Assessment: Traffic Light Sequencer & Digital Logic', '6', 'Level 2', 'Unit 3', 10, 10, 'Pixiu Academic Faculty');
+        // Level 3 Quiz
+        qzStmt.run('QUIZ-L3', 'Level 3 Assessment: LDR Sensors, ADC & Automatic Lighting', '6', 'Level 3', 'Unit 4', 10, 10, 'Pixiu Academic Faculty');
+        // Level 4 Quiz
+        qzStmt.run('QUIZ-L4', 'Level 4 Assessment: Ultrasonic Sensing & Servo Barrier Toll', '6', 'Level 4', 'Unit 5', 10, 10, 'Pixiu Academic Faculty');
+        // Level 5 Quiz
+        qzStmt.run('QUIZ-L5', 'Level 5 Assessment: Robotics Capstone, Motors & Troubleshooting', '6', 'Level 5', 'Unit 6', 10, 10, 'Pixiu Academic Faculty');
+        qzStmt.finalize();
+
+        // Seed Questions
+        const qStmt = db.prepare("INSERT INTO quiz_questions (id, quiz_id, question_order, question_text, option_a, option_b, option_c, option_d, correct_option, explanation, points) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        
+        // Level 0 Questions
+        qStmt.run('Q-L0-1', 'QUIZ-L0', 1, 'What is the primary role of a current-limiting resistor connected in series with an LED?', 'To increase the supply voltage', 'To protect the LED from burning out due to excessive current', 'To invert direct current into AC power', 'To amplify brightness indefinitely', 'B', 'LEDs have very low internal resistance when forward-biased. A series resistor limits current to safe operating levels (typically 15-20mA), preventing thermal runaway and permanent burn-out.', 2);
+        qStmt.run('Q-L0-2', 'QUIZ-L0', 2, 'On a standard solderless breadboard, how are the power rail holes connected?', 'Diagonally across the center divider', 'Horizontally in groups of 5 holes', 'Vertically throughout the entire continuous strip (+ and -)', 'They are completely isolated from each other', 'C', 'Breadboard power rails (+ and -) run in continuous vertical columns along the outer edges to distribute VCC and GND across the entire board conveniently.', 2);
+        qStmt.run('Q-L0-3', 'QUIZ-L0', 3, 'Which fundamental electrical law states the relationship V = I × R?', 'Faradays Law of Induction', 'Ohms Law', 'Coulombs Electrostatic Law', 'Kirchhoffs Current Law', 'B', 'Ohms Law states that voltage (V) equals current (I) multiplied by resistance (R). It is the fundamental equation used to calculate resistor values in circuits.', 2);
+        qStmt.run('Q-L0-4', 'QUIZ-L0', 4, 'How can you identify the positive terminal (Anode) of a brand new 5mm LED?', 'The anode has a shorter leg and flat rim notch', 'The anode has the longer leg and circular collar', 'The anode is always coated in black silicone', 'Both legs are always completely identical', 'B', 'New LEDs have a longer lead for the Anode (positive) and a shorter lead with a flat notch on the plastic casing for the Cathode (negative/GND).', 2);
+        qStmt.run('Q-L0-5', 'QUIZ-L0', 5, 'If two 220Ω resistors are connected in a single SERIES line, what is the total equivalent resistance?', '110Ω', '440Ω', '0Ω', '220Ω', 'B', 'In a series circuit, individual resistances add up directly: R_total = R1 + R2 = 220Ω + 220Ω = 440Ω.', 2);
+
+        // Level 1 Questions
+        qStmt.run('Q-L1-1', 'QUIZ-L1', 1, 'In an Arduino sketch, what is the key characteristic of the setup() function?', 'It repeats continuously in an infinite cycle', 'It runs exactly once when the board powers up or is reset', 'It is used only for drawing graphics on screen', 'It cannot configure digital pin directions', 'B', 'setup() is called once when the sketch starts. It is used to initialize pin modes (pinMode), set baud rates (Serial.begin), and set initial variables.', 2);
+        qStmt.run('Q-L1-2', 'QUIZ-L1', 2, 'Which Arduino C++ function configures digital pin 13 to supply power to an LED?', 'digitalRead(13, INPUT)', 'pinMode(13, OUTPUT)', 'analogWrite(13, 255)', 'setPinMode(13, HIGH)', 'B', 'pinMode(pinNumber, OUTPUT) configures the specified digital pin to provide voltage output (+5V).', 2);
+        qStmt.run('Q-L1-3', 'QUIZ-L1', 3, 'What does the function delay(1000) do in an Arduino sketch?', 'Pauses the processor execution for 1 second (1000 milliseconds)', 'Pauses the processor for 1 microsecond', 'Cycles an LED 1000 times', 'Increases the processor clock speed to 1000 MHz', 'A', 'The parameter for delay() is specified in milliseconds. 1000 milliseconds equals exactly 1 second.', 2);
+        qStmt.run('Q-L1-4', 'QUIZ-L1', 4, 'What voltage is present on digital pin 8 after calling digitalWrite(8, HIGH) on Arduino Uno?', '0 Volts (GND)', '3.3 Volts', '5.0 Volts', '12.0 Volts', 'C', 'On 5V ATmega328P Arduino boards like the Uno and Nano, HIGH outputs +5V, while LOW outputs 0V (Ground).', 2);
+        qStmt.run('Q-L1-5', 'QUIZ-L1', 5, 'Which punctuation mark is mandatory at the end of every executable instruction in Arduino C++?', 'A colon (:)', 'A semicolon (;)', 'A period (.)', 'An exclamation point (!)', 'B', 'Every standalone C/C++ statement in Arduino must terminate with a semicolon (;), otherwise the compiler throws a syntax error.', 2);
+
+        // Level 2 Questions
+        qStmt.run('Q-L2-1', 'QUIZ-L2', 1, 'In an Indian standard 3-color traffic light sequencer, what is the correct state transition sequence?', 'Red -> Yellow -> Green -> Red', 'Red -> Green -> Yellow -> Red', 'Green -> Red -> Yellow -> Green', 'Yellow -> Red -> Green -> Yellow', 'B', 'Standard traffic sequencing stops vehicles on Red, transitions to Green to allow movement, alerts drivers to prepare to stop on Yellow/Amber, then cycles back to Red.', 2);
+        qStmt.run('Q-L2-2', 'QUIZ-L2', 2, 'Why is using long blocking delay() calls problematic in advanced robotics systems?', 'It reduces the flash memory of the microcontroller', 'It completely freezes the CPU, preventing sensors and emergency stops from responding', 'It drains the battery five times faster', 'It flips the polarity of the power supply', 'B', 'delay() halts the CPU clock from processing any subsequent sensor readings or interrupts until the delay time completes, causing the robot to be blind to obstacles.', 2);
+        qStmt.run('Q-L2-3', 'QUIZ-L2', 3, 'How many digital I/O pins are available on an Arduino Uno board?', '8 pins (0 to 7)', '14 pins (0 to 13)', '20 pins (0 to 19)', '6 pins (A0 to A5)', 'B', 'The Arduino Uno has 14 digital input/output pins numbered 0 to 13 (of which 6 can also provide PWM output).', 2);
+        qStmt.run('Q-L2-4', 'QUIZ-L2', 4, 'What role do pins 0 (RX) and 1 (TX) play on the Arduino board?', 'Analog audio inputs', 'Hardware Serial UART communication with PC over USB', 'Motor high-voltage drivers', 'Oscillator crystal connections', 'B', 'Pins 0 (Receive) and 1 (Transmit) are dedicated to the ATmega hardware UART serial interface, connecting to the USB bridge chip.', 2);
+        qStmt.run('Q-L2-5', 'QUIZ-L2', 5, 'What is the purpose of an active buzzer versus a passive buzzer in a pedestrian crosswalk circuit?', 'Active buzzers require no external frequency sketch; they sound immediately when given 5V', 'Passive buzzers are louder than active buzzers', 'Active buzzers only run on AC household current', 'There is no functional difference between them', 'A', 'An active buzzer contains an internal oscillating circuit, producing a tone automatically when powered by DC 5V. A passive buzzer requires PWM tone() frequencies.', 2);
+
+        // Level 3 Questions
+        qStmt.run('Q-L3-1', 'QUIZ-L3', 1, 'How does the resistance of a Light Dependent Resistor (LDR / Photoresistor) change in the dark?', 'Its resistance drops to nearly zero ohms', 'Its resistance increases dramatically (often up to mega-ohms)', 'Its resistance remains constant at 100 ohms', 'Its resistance turns negative', 'B', 'In the dark, fewer photons hit the semiconductor crystal, releasing fewer electron-hole pairs, causing LDR resistance to rise into hundreds of kilo-ohms or mega-ohms.', 2);
+        qStmt.run('Q-L3-2', 'QUIZ-L3', 2, 'What integer range of values is returned by the Arduino analogRead() function?', '0 to 255 (8-bit)', '0 to 1023 (10-bit)', '0 to 65535 (16-bit)', '0 to 100 (percentage)', 'B', 'The Arduino Uno ADC (Analog-to-Digital Converter) has 10-bit resolution, translating 0V to 5V into integer values from 0 to 1023 (2^10 = 1024 steps).', 2);
+        qStmt.run('Q-L3-3', 'QUIZ-L3', 3, 'Why must an LDR be paired with a fixed resistor in a voltage divider circuit?', 'To protect the LDR from excessive sunlight', 'Microcontrollers can only measure voltage, not raw resistance directly', 'To step down 220V AC current', 'To prevent radio interference', 'B', 'The Arduino analog pins measure voltage (0 to 5V). A voltage divider circuit converts the LDR variable resistance into a proportional variable voltage that analogRead() can digitize.', 2);
+        qStmt.run('Q-L3-4', 'QUIZ-L3', 4, 'If analogRead(A0) outputs 300 in darkness and 850 in daylight, what is an optimal threshold to switch on a night lamp?', '100', '550', '950', '0', 'B', 'A midpoint threshold around 550 ((300 + 850) / 2) creates a reliable switching boundary between daytime and night.', 2);
+        qStmt.run('Q-L3-5', 'QUIZ-L3', 5, 'Which Arduino function outputs an 8-bit simulated analog voltage using Pulse Width Modulation (PWM)?', 'analogRead(pin)', 'analogWrite(pin, value)', 'pwmSet(pin, hz)', 'digitalWrite(pin, ANALOG)', 'B', 'analogWrite(pin, 0-255) generates a PWM square wave on compatible pins (~3, ~5, ~6, ~9, ~10, ~11) to control LED brightness or motor speeds.', 2);
+
+        // Level 4 Questions
+        qStmt.run('Q-L4-1', 'QUIZ-L4', 1, 'On an HC-SR04 Ultrasonic distance sensor, what is the function of the Trig pin?', 'It sends out a 10-microsecond ultrasonic pulse trigger', 'It receives the reflected sonic echo', 'It powers the internal crystal oscillator', 'It connects to GND', 'A', 'Sending a 10µs HIGH pulse to the Trig pin causes the sensor transmitter to emit an 8-cycle sonic burst at 40 kHz.', 2);
+        qStmt.run('Q-L4-2', 'QUIZ-L4', 2, 'Why is the round-trip time returned by pulseIn(echoPin, HIGH) divided by 2 when calculating distance?', 'Because sound travels at half speed through air', 'Because the sound wave travels forward to the object and bounces back, doubling the distance', 'Because the Arduino clock runs at half speed', 'Because the echo pin has 50% duty cycle', 'B', 'The sound wave travels to the obstacle and returns to the receiver. Dividing by 2 isolates the one-way distance to the target.', 2);
+        qStmt.run('Q-L4-3', 'QUIZ-L4', 3, 'What type of motor is commonly used to actuate a smart toll booth barrier arm with precise angle control (0° to 90°)?', 'DC Motor without feedback', 'Stepper Motor with H-bridge', 'SG90 Micro Servo Motor', 'Solenoid valve', 'C', 'Micro servo motors (like SG90) contain an internal potentiometer and feedback control circuit, allowing programmers to set exact barrier angles using servo.write(angle).', 2);
+        qStmt.run('Q-L4-4', 'QUIZ-L4', 4, 'What library must be included in an Arduino sketch to control a standard servo motor?', '<EEPROM.h>', '<Servo.h>', '<Wire.h>', '<SoftwareSerial.h>', 'B', 'The official <Servo.h> library generates the 50 Hz PWM pulse train required to position servo motors smoothly between 0° and 180°.', 2);
+        qStmt.run('Q-L4-5', 'QUIZ-L4', 5, 'What is the speed of sound in dry air at room temperature (~20°C)?', '300,000 km/s', '343 meters per second (approx. 0.0343 cm/µs)', '1500 meters per second', '100 meters per second', 'B', 'Sound travels at approximately 343 m/s (or ~29.1 microseconds per centimeter), which is the constant used in ultrasonic obstacle math.', 2);
+
+        // Level 5 Questions
+        qStmt.run('Q-L5-1', 'QUIZ-L5', 1, 'In an autonomous line-follower robot, how does an IR sensor differentiate between a black track and white floor?', 'Black lines absorb infrared light, while white surfaces reflect infrared light back to the photodiode', 'Black lines generate higher voltage than white surfaces', 'White surfaces block magnetic fields', 'IR sensors cannot detect black surfaces', 'A', 'Dark/black pigments absorb infrared radiation, resulting in negligible reflection to the phototransistor, while white surfaces reflect infrared strongly.', 2);
+        qStmt.run('Q-L5-2', 'QUIZ-L5', 2, 'Why cannot high-power DC gear motors be powered directly from an Arduino digital pin?', 'Arduino digital pins can only supply up to 20-40mA, whereas motors draw hundreds of milliamperes, risking microcontroller burnout', 'Arduino digital pins only output AC voltage', 'Motors require negative voltage to turn', 'Digital pins do not support GND', 'A', 'Microcontroller pins are low-current logic signals. Connecting a motor directly will exceed the ATmega pin current rating (40mA max) and destroy the chip. An H-bridge motor driver (like L298N or L293D) is required.', 2);
+        qStmt.run('Q-L5-3', 'QUIZ-L5', 3, 'What circuit topology allows an H-bridge driver to reverse the rotational direction of a DC motor?', 'Four switching transistors arranged like the letter H that reverse the polarity across the motor terminals', 'A single diode connected in parallel', 'A potentiometer that changes resistance', 'A high-pass filter', 'A', 'An H-bridge uses 4 switches (transistors/MOSFETs). Activating diagonal pairs flips current direction through the motor coils, reversing direction of rotation.', 2);
+        qStmt.run('Q-L5-4', 'QUIZ-L5', 4, 'If your robot turns uncontrollably in circles when both motors are commanded forward, what is the most likely wiring cause?', 'The Arduino code has a syntax error', 'One motor polarity is inverted (+ and - reversed on the driver terminal)', 'The battery is at 100% capacity', 'The breadboard has too many jumper wires', 'B', 'DC motors spin in reverse when their supply polarity is swapped. If one motor runs forward and the other runs backward, the robot spins in place.', 2);
+        qStmt.run('Q-L5-5', 'QUIZ-L5', 5, 'What component protects microcontroller circuits from inductive voltage spikes generated when motor coils are turned off?', 'Flyback (Freewheeling) Diodes', 'Electrolytic capacitors only', 'Ceramic resistors', 'Light emitting diodes', 'A', 'Inductive motor windings produce reverse high-voltage spikes (back-EMF) when current is cut. Flyback diodes safely redirect this energy back to the power rail.', 2);
+
+        qStmt.finalize();
+      }
+    });
+
     // Ensure notifications table has seed data if empty
     db.get("SELECT COUNT(*) as count FROM notifications", (err, row) => {
       if (!err && row && row.count === 0) {

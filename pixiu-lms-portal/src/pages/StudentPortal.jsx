@@ -13,13 +13,25 @@ import {
 import { Link } from 'react-router-dom';
 import Modal from '../components/ui/Modal';
 import { filterNotificationsForUser, fetchUserReadNotifIds, saveUserReadNotifIds, getCanonicalUserKey } from '../utils/notifications';
+import QuizPreExamModal from '../components/quiz/QuizPreExamModal';
+import QuizExamEngine from '../components/quiz/QuizExamEngine';
+import QuizResultSheetModal from '../components/quiz/QuizResultSheetModal';
 
 export default function StudentPortal() {
   const { user, logout } = useAuth();
   const toast = useToast();
-  const { students, schools, content, projects, deleteProject, getStudentAttendance, notifications, curriculum, studentReviews = [], classKits = {}, inventory = [] } = useData();
+  const { 
+    students, schools, content, projects, deleteProject, getStudentAttendance, 
+    notifications, curriculum, studentReviews = [], classKits = {}, inventory = [],
+    quizzes = [], quizSubmissions = [], submitQuizAttempt
+  } = useData();
   const [selectedComponent, setSelectedComponent] = useState(null);
   const [isKitDiagramModalOpen, setIsKitDiagramModalOpen] = useState(false);
+
+  // Quiz interactive modals state
+  const [selectedQuizForPreExam, setSelectedQuizForPreExam] = useState(null);
+  const [activeExamQuiz, setActiveExamQuiz] = useState(null);
+  const [selectedResultSheet, setSelectedResultSheet] = useState(null);
 
   // Real-time synchronization for reviews with localStorage fallback
   const [localReviews, setLocalReviews] = useState(() => {
@@ -302,6 +314,44 @@ export default function StudentPortal() {
       isOfficialCertificate: true
     });
     toast.success(`Official Accredited Graduate Certificate with QR generated for ${student.name}!`, 'Official Certificate Issued');
+  };
+
+  // Quizzes matching student's curriculum
+  const studentAvailableQuizzes = useMemo(() => {
+    if (!quizzes || quizzes.length === 0) return [];
+    return [...quizzes].sort((a, b) => {
+      const levelA = parseInt(a.level?.replace(/\D/g, '') || '0', 10);
+      const levelB = parseInt(b.level?.replace(/\D/g, '') || '0', 10);
+      return levelA - levelB;
+    });
+  }, [quizzes]);
+
+  const studentQuizSubmissions = useMemo(() => {
+    return (quizSubmissions || []).filter(s => 
+      s.student_id === student.student_id || 
+      s.student_id === cleanId ||
+      (s.student_name && student.name && s.student_name.toLowerCase() === student.name.toLowerCase())
+    );
+  }, [quizSubmissions, student.student_id, student.name, cleanId]);
+
+  const handleExamSubmit = async (attemptData) => {
+    try {
+      const res = await submitQuizAttempt(attemptData);
+      setActiveExamQuiz(null);
+      if (res.success && res.submission) {
+        toast.success(`Exam submitted successfully! Score: ${res.submission.score}/${res.submission.total_marks} (${res.submission.percentage}%)`, 'Assessment Completed');
+        const targetQuiz = quizzes.find(q => q.id === attemptData.quiz_id) || activeExamQuiz;
+        setSelectedResultSheet({
+          quiz: targetQuiz,
+          submission: res.submission
+        });
+      } else {
+        toast.error(res.error || 'Failed to submit exam attempt', 'Submission Alert');
+      }
+    } catch (err) {
+      toast.error('Unexpected error while submitting exam', 'Error');
+      setActiveExamQuiz(null);
+    }
   };
 
   return (
@@ -650,6 +700,141 @@ export default function StudentPortal() {
           </a>
         </div>
 
+        {/* ==================== 🎯 LAB QUIZZES & LEVEL MCQs ==================== */}
+        <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 p-4 sm:p-8 shadow-sm space-y-4 sm:space-y-6">
+          <div className="flex flex-wrap justify-between items-center gap-2">
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm sm:text-lg font-bold text-slate-800">
+                  🎯 Lab Quizzes & Level MCQs
+                </h3>
+                <span className="bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
+                  Proctored Engine
+                </span>
+              </div>
+              <p className="text-[11px] sm:text-xs text-slate-500">
+                Official curriculum MCQ assessments with strict 2-strike anti-cheat and instant pedagogical feedback
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] sm:text-xs font-bold bg-slate-100 text-slate-700 px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full border border-slate-200 shrink-0">
+                {studentQuizSubmissions.length} of {studentAvailableQuizzes.length} Completed
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+            {studentAvailableQuizzes.map(quiz => {
+              const submission = quizSubmissions.find(s => s.quiz_id === quiz.id && (s.student_id === student.student_id || s.student_id === cleanId));
+              const isSubmitted = !!submission;
+              const reattemptAllowed = submission?.reattempt_allowed === 1;
+
+              return (
+                <div 
+                  key={quiz.id}
+                  className={`p-4 sm:p-5 rounded-xl sm:rounded-2xl border transition-all flex flex-col justify-between space-y-3 ${
+                    isSubmitted && !reattemptAllowed
+                      ? 'border-emerald-200/90 bg-emerald-50/20'
+                      : reattemptAllowed
+                      ? 'border-amber-300 bg-amber-50/30'
+                      : 'border-slate-200 bg-white hover:border-blue-300 hover:shadow-sm'
+                  }`}
+                >
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-start gap-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="px-2 py-0.5 rounded-md text-[9px] sm:text-[10px] font-bold bg-slate-900 text-white uppercase">
+                          {quiz.level}
+                        </span>
+                        <span className="text-[10px] font-mono text-slate-400">
+                          {quiz.unit_code}
+                        </span>
+                      </div>
+
+                      {isSubmitted && !reattemptAllowed ? (
+                        <span className="px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                          Completed ({submission.percentage}%)
+                        </span>
+                      ) : reattemptAllowed ? (
+                        <span className="px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 animate-pulse">
+                          Re-attempt Unlocked
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                          Ready to Take
+                        </span>
+                      )}
+                    </div>
+
+                    <h4 className="font-bold text-slate-800 text-xs sm:text-sm line-clamp-2">
+                      {quiz.title}
+                    </h4>
+
+                    <div className="flex items-center gap-3 text-[11px] text-slate-500 pt-1">
+                      <span className="flex items-center gap-1">
+                        <Clock size={12} className="text-slate-400" />
+                        {quiz.duration_minutes || 10} Mins
+                      </span>
+                      <span>•</span>
+                      <span>{quiz.questions?.length || 5} Questions</span>
+                      <span>•</span>
+                      <span>{quiz.total_marks || 10} Marks</span>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                    {isSubmitted && !reattemptAllowed ? (
+                      <>
+                        <div className="text-[11px] font-bold text-slate-700">
+                          Score: <span className="text-emerald-600 font-extrabold">{submission.score} / {submission.total_marks}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedResultSheet({ quiz, submission })}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                        >
+                          <FileText size={13} />
+                          <span>View Result Sheet</span>
+                        </button>
+                      </>
+                    ) : reattemptAllowed ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedResultSheet({ quiz, submission })}
+                          className="text-[11px] font-bold text-slate-500 hover:text-slate-800 underline"
+                        >
+                          Past: {submission.score}/{submission.total_marks}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedQuizForPreExam(quiz)}
+                          className="inline-flex items-center gap-1 px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                        >
+                          <Zap size={13} />
+                          <span>Retake Quiz</span>
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-[10px] text-slate-400 font-medium">1 Attempt Allowed</span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedQuizForPreExam(quiz)}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-xs shadow-blue-500/20 transition-all cursor-pointer"
+                        >
+                          <span>Start Exam</span>
+                          <ChevronRight size={14} />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
         {/* ==================== END-OF-LEVEL INSTRUCTOR REVIEWS ==================== */}
         <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 p-4 sm:p-8 shadow-sm space-y-4 sm:space-y-6">
           <div className="flex flex-wrap justify-between items-center gap-2">
@@ -887,6 +1072,42 @@ export default function StudentPortal() {
           />
         </div>
       </Modal>
+
+      {/* ==================== QUIZ PRE-EXAM MODAL ==================== */}
+      {selectedQuizForPreExam && (
+        <QuizPreExamModal
+          isOpen={!!selectedQuizForPreExam}
+          quiz={selectedQuizForPreExam}
+          student={student}
+          onClose={() => setSelectedQuizForPreExam(null)}
+          onStartExam={() => {
+            const q = selectedQuizForPreExam;
+            setSelectedQuizForPreExam(null);
+            setActiveExamQuiz(q);
+          }}
+        />
+      )}
+
+      {/* ==================== FULLSCREEN PROCTORED EXAM ENGINE ==================== */}
+      {activeExamQuiz && (
+        <QuizExamEngine
+          quiz={activeExamQuiz}
+          student={student}
+          onSubmit={handleExamSubmit}
+          onCancel={() => setActiveExamQuiz(null)}
+        />
+      )}
+
+      {/* ==================== DETAILED RESULT SHEET MODAL ==================== */}
+      {selectedResultSheet && (
+        <QuizResultSheetModal
+          isOpen={!!selectedResultSheet}
+          quiz={selectedResultSheet.quiz}
+          submission={selectedResultSheet.submission}
+          student={student}
+          onClose={() => setSelectedResultSheet(null)}
+        />
+      )}
     </div>
   );
 }

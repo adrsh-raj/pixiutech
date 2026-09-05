@@ -3,13 +3,15 @@ import {
   GraduationCap, Plus, Phone, Building2, Star, CheckCircle, Clock, X, Trash2, 
   Play, User, Users, Camera, Check, FileText, Upload, Image as ImageIcon, IndianRupee, 
   Calendar, AlertTriangle, ShieldAlert, Lock, Unlock, Bell, Send, History, 
-  CheckSquare, XSquare, ChevronRight, BookOpen, Megaphone, Edit3, Award, Box, Download, Cpu, Search
+  CheckSquare, XSquare, ChevronRight, BookOpen, Megaphone, Edit3, Award, Box, Download, Cpu, Search,
+  HelpCircle, RotateCcw, Eye, Zap
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useData } from '../context/DataContext';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import Modal from '../components/ui/Modal';
+import QuizResultSheetModal from '../components/quiz/QuizResultSheetModal';
 import { generateClassCohortTranscriptPDF, generateStudentTranscriptPDF } from '../utils/transcriptGenerator';
 
 const REVIEW_PRESETS = [
@@ -71,7 +73,9 @@ export default function Trainers() {
     deleteTrainer, uploadFile, projects = [], addProject, deleteProject, scheduleSession, 
     adminUpdateAttendance, notifications, curriculum,
     studentReviews = [], saveStudentReview, deleteStudentReview,
-    updateStudent, pushSchoolNotification, getStudentAttendance
+    updateStudent, pushSchoolNotification, getStudentAttendance,
+    quizzes = [], createQuiz, updateQuiz, deleteQuiz,
+    quizSubmissions = [], allowQuizReattempt, deleteQuizSubmission
   } = useData();
   
   const { role, user } = useAuth();
@@ -144,6 +148,142 @@ export default function Trainers() {
     review: REVIEW_PRESETS[0],
     trainer_name: user?.name || 'Vikas Pandey (Lead Instructor)'
   });
+
+  // Quizzes & MCQs State
+  const [isCreateQuizModalOpen, setIsCreateQuizModalOpen] = useState(false);
+  const [quizGradeFilter, setQuizGradeFilter] = useState('All');
+  const [quizSearchTerm, setQuizSearchTerm] = useState('');
+  const [selectedQuizForInspection, setSelectedQuizForInspection] = useState(null);
+  const [quizFormData, setQuizFormData] = useState({
+    title: '',
+    class_grade: '6',
+    level: 'Level 0',
+    unit_code: 'Unit 1',
+    duration_minutes: 10,
+    total_marks: 10,
+    questions: [
+      {
+        id: 'Q-1',
+        question_text: '',
+        option_a: '',
+        option_b: '',
+        option_c: '',
+        option_d: '',
+        correct_option: 'A',
+        explanation: '',
+        points: 2
+      }
+    ]
+  });
+
+  const handleAddQuestionToBuilder = () => {
+    setQuizFormData(prev => ({
+      ...prev,
+      questions: [
+        ...prev.questions,
+        {
+          id: `Q-${prev.questions.length + 1}`,
+          question_text: '',
+          option_a: '',
+          option_b: '',
+          option_c: '',
+          option_d: '',
+          correct_option: 'A',
+          explanation: '',
+          points: 2
+        }
+      ]
+    }));
+  };
+
+  const handleRemoveQuestionFromBuilder = (index) => {
+    setQuizFormData(prev => {
+      const q = [...prev.questions];
+      q.splice(index, 1);
+      return { ...prev, questions: q };
+    });
+  };
+
+  const handleQuestionFieldChange = (index, field, value) => {
+    setQuizFormData(prev => {
+      const q = [...prev.questions];
+      q[index] = { ...q[index], [field]: value };
+      return { ...prev, questions: q };
+    });
+  };
+
+  const handleSaveCustomQuiz = async (e) => {
+    e.preventDefault();
+    if (!quizFormData.title.trim()) {
+      toast.warning('Please enter a quiz title');
+      return;
+    }
+    if (quizFormData.questions.length === 0) {
+      toast.warning('Please add at least one question');
+      return;
+    }
+
+    const totalMarksCalculated = quizFormData.questions.reduce((sum, q) => sum + (Number(q.points) || 2), 0);
+    const newQuizPayload = {
+      ...quizFormData,
+      total_marks: totalMarksCalculated,
+      status: 'Active',
+      created_by: user?.name || 'Trainer Faculty'
+    };
+
+    await createQuiz(newQuizPayload);
+    toast.success(`Quiz "${quizFormData.title}" created with ${quizFormData.questions.length} questions!`, 'Quiz Published');
+    setIsCreateQuizModalOpen(false);
+    setQuizFormData({
+      title: '',
+      class_grade: '6',
+      level: 'Level 0',
+      unit_code: 'Unit 1',
+      duration_minutes: 10,
+      total_marks: 10,
+      questions: [
+        {
+          id: 'Q-1',
+          question_text: '',
+          option_a: '',
+          option_b: '',
+          option_c: '',
+          option_d: '',
+          correct_option: 'A',
+          explanation: '',
+          points: 2
+        }
+      ]
+    });
+  };
+
+  const handleSyncQuizToReview = async (submission) => {
+    const studentObj = students.find(s => s.student_id === submission.student_id);
+    const scoreOutOf10 = submission.total_marks > 0 
+      ? Math.round((submission.score / submission.total_marks) * 10 * 10) / 10 
+      : 8.0;
+
+    const rating = Math.min(5, Math.max(1, Math.round(scoreOutOf10 / 2)));
+    const status = scoreOutOf10 >= 8 ? 'Mastered' : scoreOutOf10 >= 5 ? 'In Progress' : 'Needs Practice';
+    const remarks = `Official MCQ Assessment verified. Candidate scored ${submission.score}/${submission.total_marks} (${submission.percentage}%) on ${submission.level} assessment with ${submission.violation_count || 0} anti-cheat strikes. Demonstrated strong conceptual foundation.`;
+
+    await saveStudentReview({
+      student_id: submission.student_id,
+      student_name: submission.student_name || studentObj?.name || 'Student',
+      class_grade: submission.class_grade || '6',
+      unit_code: submission.level === 'Level 0' ? 'Unit 1' : submission.level === 'Level 1' ? 'Unit 2' : submission.level === 'Level 2' ? 'Unit 3' : submission.level === 'Level 3' ? 'Unit 4' : submission.level === 'Level 4' ? 'Unit 5' : 'Unit 6',
+      level: submission.level,
+      unit_title: `${submission.level} Lab Competency Assessment`,
+      score: scoreOutOf10,
+      rating: rating,
+      status: status,
+      review: remarks,
+      trainer_name: user?.name || 'Vikas Pandey (Lead Instructor)',
+      verified_date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+    });
+
+    toast.success(`Score ${scoreOutOf10}/10 synchronized to student unit review!`, 'Synced to Review Engine');
+  };
 
   // ==================== COMPUTED / MEMOIZED DATA ====================
   // Strict isolation: Akash sees ONLY Akash; Vikas sees ONLY Vikas; Admin sees ALL
@@ -1100,6 +1240,14 @@ export default function Trainers() {
           <GraduationCap size={17} /> Instructor Roster & Payouts
         </button>
         <button
+          onClick={() => setActiveTab('quizzes')}
+          className={`pb-3 text-sm font-bold flex items-center gap-2 cursor-pointer transition-all shrink-0 ${
+            activeTab === 'quizzes' ? 'border-b-2 border-pixiu-blue text-pixiu-blue' : 'text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <Award size={17} className="text-blue-600" /> Lab Quizzes & MCQs ({quizzes.length})
+        </button>
+        <button
           onClick={() => setActiveTab('reviews')}
           className={`pb-3 text-sm font-bold flex items-center gap-2 cursor-pointer transition-all shrink-0 ${
             activeTab === 'reviews' ? 'border-b-2 border-pixiu-blue text-pixiu-blue' : 'text-slate-500 hover:text-slate-800'
@@ -1752,6 +1900,362 @@ export default function Trainers() {
                 </p>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ==================== LAB QUIZZES & MCQs ENGINE TAB ==================== */}
+      {activeTab === 'quizzes' && (
+        <div className="space-y-6">
+          {/* Header Banner */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+              <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                <Award size={18} className="text-blue-600" />
+                Laboratory Quizzes, MCQs & Proctored Attempt Registry
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Author custom class quizzes, monitor student attempt audits & anti-cheat strikes, and inspect detailed student answer sheets.
+              </p>
+            </div>
+
+            <button
+              onClick={() => setIsCreateQuizModalOpen(true)}
+              className="bg-pixiu-blue hover:bg-blue-600 text-white text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-sm transition-all cursor-pointer shrink-0"
+            >
+              <Plus size={15} /> Create Custom Quiz / Question Bank
+            </button>
+          </div>
+
+          {/* KPI Metrics Row */}
+          {(() => {
+            const totalAttempts = quizSubmissions.length;
+            const avgAccuracy = totalAttempts > 0 
+              ? Math.round(quizSubmissions.reduce((acc, s) => acc + (s.percentage || 0), 0) / totalAttempts) 
+              : 0;
+            const flaggedAttempts = quizSubmissions.filter(s => (s.violation_count || 0) > 0).length;
+
+            return (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
+                    <Award size={20} />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Curriculum Quizzes</p>
+                    <p className="text-xl font-black text-slate-900">{quizzes.length} Active Banks</p>
+                  </div>
+                </div>
+
+                <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100">
+                    <Users size={20} />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Student Attempts</p>
+                    <p className="text-xl font-black text-slate-900">{totalAttempts} Submissions</p>
+                  </div>
+                </div>
+
+                <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center shrink-0 border border-violet-100">
+                    <CheckCircle size={20} />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Average Accuracy</p>
+                    <p className="text-xl font-black text-slate-900">{avgAccuracy}% Overall</p>
+                  </div>
+                </div>
+
+                <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 border border-rose-100">
+                    <ShieldAlert size={20} />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Anti-Cheat Flags</p>
+                    <p className="text-xl font-black text-rose-600">{flaggedAttempts} Strikes Logged</p>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Submissions Filter & Search Strip */}
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+            <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mr-1 shrink-0">Filter Grade:</span>
+              {['All', '6', '7', '8', '9', '11'].map(grade => (
+                <button
+                  key={grade}
+                  onClick={() => setQuizGradeFilter(grade)}
+                  className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    quizGradeFilter === grade 
+                      ? 'bg-slate-900 text-white shadow-xs' 
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  {grade === 'All' ? 'All Classes' : `Class ${grade}A`}
+                </button>
+              ))}
+            </div>
+
+            <div className="relative w-full md:w-72">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search candidate or quiz title..."
+                value={quizSearchTerm}
+                onChange={(e) => setQuizSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-pixiu-blue focus:bg-white"
+              />
+            </div>
+          </div>
+
+          {/* Submissions Registry Table */}
+          {(() => {
+            const filteredSubmissions = quizSubmissions
+              .filter(sub => {
+                if (quizGradeFilter === 'All') return true;
+                return sub.class_grade === quizGradeFilter || sub.student_id?.includes(quizGradeFilter);
+              })
+              .filter(sub => {
+                if (!quizSearchTerm.trim()) return true;
+                const term = quizSearchTerm.toLowerCase();
+                return (
+                  (sub.student_name && sub.student_name.toLowerCase().includes(term)) ||
+                  (sub.student_id && sub.student_id.toLowerCase().includes(term)) ||
+                  (sub.quiz_id && sub.quiz_id.toLowerCase().includes(term)) ||
+                  (sub.level && sub.level.toLowerCase().includes(term))
+                );
+              });
+
+            if (filteredSubmissions.length === 0) {
+              return (
+                <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center text-slate-400 shadow-xs">
+                  <Award size={36} className="mx-auto text-slate-300 mb-2" />
+                  <p className="font-bold text-slate-700 text-sm">No Student Quiz Submissions Found</p>
+                  <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+                    Students can attempt curriculum quizzes in their Student Portal. Once completed, graded attempts and anti-cheat records will appear here automatically.
+                  </p>
+                </div>
+              );
+            }
+
+            return (
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+                <div className="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+                  <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                    <span>Student Assessment Records & Proctoring Log</span>
+                    <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full font-bold">
+                      {filteredSubmissions.length} Submissions
+                    </span>
+                  </h3>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+                        <th className="p-3.5 pl-5">Candidate Student</th>
+                        <th className="p-3.5">Assessment Level</th>
+                        <th className="p-3.5 text-center">Score & Accuracy</th>
+                        <th className="p-3.5 text-center">Breakdown</th>
+                        <th className="p-3.5 text-center">Time Spent</th>
+                        <th className="p-3.5 text-center">Proctoring Audit</th>
+                        <th className="p-3.5">Attempt Status</th>
+                        <th className="p-3.5 pr-5 text-right">Trainer Directives</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                      {filteredSubmissions.map(sub => {
+                        const targetQuiz = quizzes.find(q => q.id === sub.quiz_id) || {
+                          id: sub.quiz_id,
+                          title: `${sub.level} Assessment`,
+                          level: sub.level,
+                          questions: []
+                        };
+                        const isReattemptUnlocked = sub.reattempt_allowed === 1;
+                        const strikes = sub.violation_count || 0;
+
+                        return (
+                          <tr key={sub.id} className="hover:bg-slate-50/60 transition-colors">
+                            {/* Student */}
+                            <td className="p-3.5 pl-5">
+                              <p className="font-bold text-slate-900 text-xs">{sub.student_name}</p>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <span className="font-mono text-[10px] text-blue-600 font-semibold">{sub.student_id}</span>
+                                <span className="text-[10px] text-slate-400">• Class {sub.class_grade}A</span>
+                              </div>
+                            </td>
+
+                            {/* Quiz Level */}
+                            <td className="p-3.5">
+                              <span className="px-2 py-0.5 rounded-md font-bold text-[10px] bg-slate-900 text-white uppercase inline-block mb-1">
+                                {sub.level}
+                              </span>
+                              <p className="text-[11px] text-slate-600 font-semibold truncate max-w-[180px]" title={targetQuiz.title}>
+                                {targetQuiz.title}
+                              </p>
+                            </td>
+
+                            {/* Score */}
+                            <td className="p-3.5 text-center">
+                              <span className={`px-2.5 py-1 rounded-lg font-black text-xs inline-block ${
+                                (sub.percentage || 0) >= 80 
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                  : (sub.percentage || 0) >= 50
+                                  ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                                  : 'bg-rose-50 text-rose-700 border border-rose-200'
+                              }`}>
+                                {sub.score} / {sub.total_marks} ({sub.percentage}%)
+                              </span>
+                            </td>
+
+                            {/* Breakdown */}
+                            <td className="p-3.5 text-center font-mono text-[11px]">
+                              <span className="text-emerald-600 font-bold">{sub.correct_count}</span>
+                              <span className="text-slate-400"> / </span>
+                              <span className="text-slate-700 font-semibold">{sub.attempted_count || sub.total_questions}</span>
+                            </td>
+
+                            {/* Time Spent */}
+                            <td className="p-3.5 text-center text-[11px] text-slate-500 font-mono">
+                              {sub.time_taken_seconds 
+                                ? `${Math.floor(sub.time_taken_seconds / 60)}m ${sub.time_taken_seconds % 60}s`
+                                : 'Fast'}
+                            </td>
+
+                            {/* Proctoring / Anti-Cheat Audit */}
+                            <td className="p-3.5 text-center">
+                              {strikes === 0 ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                                  ✓ Clean (0 Strikes)
+                                </span>
+                              ) : strikes === 1 ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-300 px-2 py-0.5 rounded-full">
+                                  ⚠️ 1 Strike Warning
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-300 px-2 py-0.5 rounded-full animate-pulse">
+                                  🚨 {strikes} Strikes (Lockout)
+                                </span>
+                              )}
+                            </td>
+
+                            {/* Attempt Status */}
+                            <td className="p-3.5">
+                              {isReattemptUnlocked ? (
+                                <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-300 px-2 py-0.5 rounded-md">
+                                  Re-attempt Allowed
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-bold text-slate-600 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md">
+                                  Locked (1 Attempt)
+                                </span>
+                              )}
+                            </td>
+
+                            {/* Actions */}
+                            <td className="p-3.5 pr-5 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                {/* Inspect Answers */}
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedQuizForInspection({ quiz: targetQuiz, submission: sub })}
+                                  className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors cursor-pointer"
+                                  title="Inspect Full Student Answer Sheet & Explanations"
+                                >
+                                  <Eye size={15} />
+                                </button>
+
+                                {/* Allow Re-attempt */}
+                                {!isReattemptUnlocked && (
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      await allowQuizReattempt(sub.id);
+                                      toast.success(`Re-attempt unlocked for ${sub.student_name}! Student can now retake this quiz.`, 'Re-attempt Granted');
+                                    }}
+                                    className="p-1.5 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors cursor-pointer"
+                                    title="Unlock 1 Re-attempt for Student"
+                                  >
+                                    <RotateCcw size={15} />
+                                  </button>
+                                )}
+
+                                {/* Sync to Unit Review */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleSyncQuizToReview(sub)}
+                                  className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors cursor-pointer"
+                                  title="Sync Quiz Score Directly into Official End-of-Unit Student Review"
+                                >
+                                  <Star size={15} />
+                                </button>
+
+                                {/* Reset / Delete Submission */}
+                                {isAdmin && (
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      if (window.confirm(`Reset and delete quiz submission for ${sub.student_name}?`)) {
+                                        await deleteQuizSubmission(sub.id);
+                                        toast.info(`Attempt record deleted for ${sub.student_name}.`, 'Attempt Reset');
+                                      }
+                                    }}
+                                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                                    title="Delete Submission Record"
+                                  >
+                                    <Trash2 size={15} />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Curriculum Quizzes Roster */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-slate-800">
+                  📚 Published Curriculum Question Banks ({quizzes.length})
+                </h3>
+                <p className="text-[11px] text-slate-500">
+                  Standardized Level 0 to Level 5 assessment modules deployed across student portals
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {quizzes.map(q => (
+                <div key={q.id} className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-white hover:border-blue-300 transition-all space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-slate-900 text-white uppercase">
+                      {q.level} • {q.unit_code}
+                    </span>
+                    <span className="text-[10px] font-mono text-slate-500 font-bold">
+                      Class {q.class_grade || 'ALL'}
+                    </span>
+                  </div>
+                  <h4 className="font-bold text-slate-800 text-xs line-clamp-2">
+                    {q.title}
+                  </h4>
+                  <div className="flex items-center justify-between pt-1 border-t border-slate-200 text-[10px] text-slate-500 font-medium">
+                    <span>{q.questions?.length || 5} Questions</span>
+                    <span>{q.duration_minutes || 10} Mins</span>
+                    <span className="font-bold text-blue-600">{q.total_marks || 10} Marks</span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -2688,6 +3192,237 @@ export default function Trainers() {
           </div>
         )}
       </Modal>
+
+      {/* ==================== CREATE QUIZ MODAL ==================== */}
+      <Modal
+        isOpen={isCreateQuizModalOpen}
+        onClose={() => setIsCreateQuizModalOpen(false)}
+        title={
+          <div>
+            <span className="text-base font-bold text-slate-800 flex items-center gap-2">
+              <Award size={18} className="text-blue-600" /> Create Laboratory Quiz & Question Bank
+            </span>
+            <p className="text-xs text-slate-500 font-normal mt-0.5">Author custom assessment questions with 4 choices and technical reasoning</p>
+          </div>
+        }
+        size="xl"
+      >
+        <form onSubmit={handleSaveCustomQuiz} className="p-6 space-y-5 text-xs">
+          {/* Top details */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block font-bold text-slate-600 uppercase mb-1">Quiz Title *</label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. Level 2 Assessment: Traffic Lights & Digital Logic"
+                value={quizFormData.title}
+                onChange={(e) => setQuizFormData({ ...quizFormData, title: e.target.value })}
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl font-medium focus:outline-none focus:border-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block font-bold text-slate-600 uppercase mb-1">Target Class Grade</label>
+              <select
+                value={quizFormData.class_grade}
+                onChange={(e) => setQuizFormData({ ...quizFormData, class_grade: e.target.value })}
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold bg-white text-slate-800"
+              >
+                <option value="6">Class 6A</option>
+                <option value="7">Class 7A</option>
+                <option value="8">Class 8A</option>
+                <option value="9">Class 9A</option>
+                <option value="11">Class 11A</option>
+                <option value="ALL">All Grades (General)</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block font-bold text-slate-600 uppercase mb-1">Curriculum Level</label>
+              <select
+                value={quizFormData.level}
+                onChange={(e) => setQuizFormData({ ...quizFormData, level: e.target.value })}
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold bg-white text-slate-800"
+              >
+                <option value="Level 0">Level 0 (Intro)</option>
+                <option value="Level 1">Level 1 (IDE / Core)</option>
+                <option value="Level 2">Level 2 (Basic Project)</option>
+                <option value="Level 3">Level 3 (Sensors / Analog)</option>
+                <option value="Level 4">Level 4 (Advanced Logic)</option>
+                <option value="Level 5">Level 5 (Robotics Capstone)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block font-bold text-slate-600 uppercase mb-1">Unit Code</label>
+              <input
+                type="text"
+                value={quizFormData.unit_code}
+                onChange={(e) => setQuizFormData({ ...quizFormData, unit_code: e.target.value })}
+                placeholder="Unit 1"
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold focus:outline-none focus:border-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block font-bold text-slate-600 uppercase mb-1">Duration (Minutes)</label>
+              <input
+                type="number"
+                min="1"
+                max="60"
+                value={quizFormData.duration_minutes}
+                onChange={(e) => setQuizFormData({ ...quizFormData, duration_minutes: Number(e.target.value) || 10 })}
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold text-center focus:outline-none focus:border-blue-500"
+              />
+            </div>
+          </div>
+
+          {/* Question Builder List */}
+          <div className="space-y-4 pt-2 border-t border-slate-200">
+            <div className="flex items-center justify-between">
+              <h4 className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
+                <span>MCQ Questions ({quizFormData.questions.length})</span>
+              </h4>
+              <button
+                type="button"
+                onClick={handleAddQuestionToBuilder}
+                className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 font-bold rounded-lg transition-colors flex items-center gap-1 cursor-pointer text-xs"
+              >
+                <Plus size={14} /> Add Question
+              </button>
+            </div>
+
+            <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-1">
+              {quizFormData.questions.map((q, qIndex) => (
+                <div key={q.id || qIndex} className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-blue-900 bg-blue-100 px-2 py-0.5 rounded text-xs">
+                      Question #{qIndex + 1}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] text-slate-400 font-bold uppercase">Points:</span>
+                        <input
+                          type="number"
+                          min="1"
+                          max="10"
+                          value={q.points || 2}
+                          onChange={(e) => handleQuestionFieldChange(qIndex, 'points', Number(e.target.value) || 2)}
+                          className="w-12 px-2 py-0.5 border border-slate-300 rounded text-center font-bold bg-white text-xs"
+                        />
+                      </div>
+                      {quizFormData.questions.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveQuestionFromBuilder(qIndex)}
+                          className="text-slate-400 hover:text-rose-600 p-1 transition-colors"
+                          title="Remove Question"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <input
+                      type="text"
+                      required
+                      placeholder={`Enter question #${qIndex + 1} prompt here...`}
+                      value={q.question_text}
+                      onChange={(e) => handleQuestionFieldChange(qIndex, 'question_text', e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-xl text-slate-900 font-semibold bg-white focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  {/* 4 Choices */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {['option_a', 'option_b', 'option_c', 'option_d'].map((fieldKey, optIdx) => {
+                      const letter = ['A', 'B', 'C', 'D'][optIdx];
+                      return (
+                        <div key={fieldKey} className="flex items-center gap-1.5">
+                          <span className="w-6 h-6 rounded-md bg-slate-200 text-slate-700 font-bold flex items-center justify-center shrink-0 text-xs">
+                            {letter}
+                          </span>
+                          <input
+                            type="text"
+                            required
+                            placeholder={`Choice ${letter}...`}
+                            value={q[fieldKey] || ''}
+                            onChange={(e) => handleQuestionFieldChange(qIndex, fieldKey, e.target.value)}
+                            className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-xs focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Correct Option and Explanation */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                    <div>
+                      <label className="block font-bold text-emerald-800 uppercase text-[10px] mb-1">
+                        Correct Option *
+                      </label>
+                      <select
+                        value={q.correct_option || 'A'}
+                        onChange={(e) => handleQuestionFieldChange(qIndex, 'correct_option', e.target.value)}
+                        className="w-full px-3 py-1.5 border border-emerald-400 bg-emerald-50 text-emerald-900 rounded-lg font-bold text-xs"
+                      >
+                        <option value="A">Option A</option>
+                        <option value="B">Option B</option>
+                        <option value="C">Option C</option>
+                        <option value="D">Option D</option>
+                      </select>
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="block font-bold text-slate-600 uppercase text-[10px] mb-1">
+                        Pedagogical Concept & Reasoning (Shown on Result Sheet)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Current-limiting resistor absorbs excess voltage per Ohm's law..."
+                        value={q.explanation || ''}
+                        onChange={(e) => handleQuestionFieldChange(qIndex, 'explanation', e.target.value)}
+                        className="w-full px-3 py-1.5 border border-slate-300 rounded-lg bg-white text-xs focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+            <button
+              type="button"
+              onClick={() => setIsCreateQuizModalOpen(false)}
+              className="px-4 py-2 font-bold text-slate-500 hover:bg-slate-100 rounded-xl cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-5 py-2 font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-md shadow-blue-500/20 cursor-pointer"
+            >
+              Save & Publish Quiz Bank
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* ==================== INSPECT STUDENT ANSWER SHEET MODAL ==================== */}
+      {selectedQuizForInspection && (
+        <QuizResultSheetModal
+          isOpen={!!selectedQuizForInspection}
+          quiz={selectedQuizForInspection.quiz}
+          submission={selectedQuizForInspection.submission}
+          onClose={() => setSelectedQuizForInspection(null)}
+        />
+      )}
     </div>
   );
 }
