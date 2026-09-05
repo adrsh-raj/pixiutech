@@ -112,10 +112,12 @@ export default function StudentPortal() {
     return false;
   });
 
-  // Read / Unread State per student
+  // Read / Unread State per student (Normalized key without whitespace issues)
+  const studentNotifKey = (cleanId || 'student').replace(/\s+/g, '_').toUpperCase();
+
   const [readNotifIds, setReadNotifIds] = useState(() => {
     try {
-      const saved = localStorage.getItem(`pixiu_read_notifs_${cleanId}`);
+      const saved = localStorage.getItem(`pixiu_read_notifs_${studentNotifKey}`);
       return saved ? JSON.parse(saved) : [];
     } catch (e) {
       return [];
@@ -124,13 +126,13 @@ export default function StudentPortal() {
 
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(`pixiu_read_notifs_${cleanId}`);
+      const saved = localStorage.getItem(`pixiu_read_notifs_${studentNotifKey}`);
       if (saved) setReadNotifIds(JSON.parse(saved));
       else setReadNotifIds([]);
     } catch (e) {
       setReadNotifIds([]);
     }
-  }, [cleanId]);
+  }, [studentNotifKey]);
 
   const [isNotifDrawerOpen, setIsNotifDrawerOpen] = useState(false);
 
@@ -138,7 +140,7 @@ export default function StudentPortal() {
     const updated = Array.from(new Set([...readNotifIds, id]));
     setReadNotifIds(updated);
     try {
-      localStorage.setItem(`pixiu_read_notifs_${cleanId}`, JSON.stringify(updated));
+      localStorage.setItem(`pixiu_read_notifs_${studentNotifKey}`, JSON.stringify(updated));
     } catch (e) {}
   };
 
@@ -147,7 +149,7 @@ export default function StudentPortal() {
     const updated = Array.from(new Set([...readNotifIds, ...allIds]));
     setReadNotifIds(updated);
     try {
-      localStorage.setItem(`pixiu_read_notifs_${cleanId}`, JSON.stringify(updated));
+      localStorage.setItem(`pixiu_read_notifs_${studentNotifKey}`, JSON.stringify(updated));
     } catch (e) {}
   };
 
@@ -727,87 +729,7 @@ export default function StudentPortal() {
           </div>
         </div>
 
-        {/* Class Announcements & Revision Notice Feed */}
-        {classNotifs.length > 0 && (
-          <div className="space-y-3">
-            <div className="flex justify-between items-center gap-2">
-              <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-                <Megaphone size={16} className="text-pixiu-blue shrink-0" />
-                <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase tracking-wider truncate">
-                  Class {studentGrade} Notices ({unreadCount} New)
-                </h3>
-              </div>
-              {unreadCount > 0 && (
-                <button 
-                  onClick={markAllAsRead}
-                  className="text-[11px] sm:text-xs font-bold text-pixiu-blue hover:underline cursor-pointer flex items-center gap-1 shrink-0"
-                >
-                  <Check size={12} /> Mark All Read
-                </button>
-              )}
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-              {classNotifs.map(notif => {
-                const isRead = readNotifIds.includes(notif.id);
-                return (
-                  <div 
-                    key={notif.id}
-                    className={`p-4 sm:p-5 rounded-xl sm:rounded-2xl border bg-white shadow-xs space-y-2.5 sm:space-y-3 transition-all ${
-                      isRead ? 'opacity-80 border-slate-200' :
-                      notif.severity === 'urgent' 
-                        ? 'border-rose-200 ring-2 ring-rose-100' 
-                        : notif.severity === 'important' 
-                        ? 'border-purple-200 ring-2 ring-purple-100' 
-                        : 'border-blue-200 ring-2 ring-blue-50'
-                    }`}
-                  >
-                    <div className="flex justify-between items-start gap-2">
-                      <div className="flex items-center gap-1.5">
-                        <span className={`px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider ${
-                          notif.severity === 'urgent' 
-                            ? 'bg-rose-50 text-rose-700 border border-rose-200' 
-                            : notif.severity === 'important' 
-                            ? 'bg-purple-50 text-purple-700 border border-purple-200' 
-                            : 'bg-blue-50 text-pixiu-blue border border-blue-200'
-                        }`}>
-                          {notif.severity ? notif.severity.toUpperCase() : 'NOTICE'}
-                        </span>
-                        {!isRead && (
-                          <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>
-                        )}
-                      </div>
-
-                      <span className="text-[10px] text-slate-400 font-mono flex items-center gap-1">
-                        <Clock size={10} /> {notif.scheduled_date} • {notif.scheduled_time}
-                      </span>
-                    </div>
-
-                    <h4 className="font-bold text-slate-800 text-xs sm:text-sm">{notif.title}</h4>
-                    <p className="text-[11px] sm:text-xs text-slate-600 leading-relaxed bg-slate-50 p-2.5 sm:p-3 rounded-xl border border-slate-100 whitespace-pre-line">
-                      {notif.message}
-                    </p>
-
-                    <div className="flex justify-end pt-1">
-                      {isRead ? (
-                        <span className="text-[11px] text-emerald-600 font-bold flex items-center gap-1">
-                          <CheckCircle size={13}/> Read & Acknowledged
-                        </span>
-                      ) : (
-                        <button
-                          onClick={() => markAsRead(notif.id)}
-                          className="px-3 py-1.5 bg-pixiu-blue hover:bg-blue-600 text-white rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
-                        >
-                          <Check size={12} /> Mark as Read
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
 
         {/* Class Study Material & Workbooks (Watermarked Edition) */}
         <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 p-4 sm:p-8 shadow-sm space-y-4 sm:space-y-6">

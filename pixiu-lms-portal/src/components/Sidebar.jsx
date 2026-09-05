@@ -18,7 +18,6 @@ export default function Sidebar({ mobileOpen = false, setMobileOpen = () => {} }
         { name: 'Content Hub', path: '/content', icon: PlaySquare },
         { name: 'Curriculum Plans', path: '/curriculum', icon: BookOpen },
         { name: 'Hardware Kits', path: '/inventory', icon: Box },
-        { name: 'Login & Audit Logs', path: '/logs', icon: ShieldCheck },
       ]
     }
   ] : [

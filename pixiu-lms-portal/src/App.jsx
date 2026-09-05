@@ -55,6 +55,7 @@ const Settings = () => (
 // Protected Layout for Admin & Trainers
 function ProtectedLayout() {
   const { isAuthenticated, user, logout, loading } = useAuth();
+  const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
   const { alerts, resolveAlertAction, notifications } = useData();
   const toast = useToast();
   const [isAlertsOpen, setIsAlertsOpen] = useState(false);
@@ -62,9 +63,12 @@ function ProtectedLayout() {
   const [activeBellTab, setActiveBellTab] = useState('announcements'); // 'announcements' | 'system'
   const [actionLoading, setActionLoading] = useState(null);
 
+  const getUserKey = (u) => (u?.username || u?.id || 'admin').toLowerCase().trim();
+
   const [readNotifIds, setReadNotifIds] = useState(() => {
     try {
-      const saved = localStorage.getItem(`pixiu_read_notifs_${user?.username || 'admin'}`);
+      const key = (user?.username || user?.id || 'admin').toLowerCase().trim();
+      const saved = localStorage.getItem(`pixiu_read_notifs_${key}`);
       return saved ? JSON.parse(saved) : [];
     } catch (e) {
       return [];
@@ -72,29 +76,32 @@ function ProtectedLayout() {
   });
 
   useEffect(() => {
+    const key = (user?.username || user?.id || 'admin').toLowerCase().trim();
     try {
-      const saved = localStorage.getItem(`pixiu_read_notifs_${user?.username || 'admin'}`);
+      const saved = localStorage.getItem(`pixiu_read_notifs_${key}`);
       if (saved) setReadNotifIds(JSON.parse(saved));
       else setReadNotifIds([]);
     } catch (e) {
       setReadNotifIds([]);
     }
-  }, [user?.username]);
+  }, [user]);
 
   const markAsRead = (id) => {
+    const key = getUserKey(user);
     const updated = Array.from(new Set([...readNotifIds, id]));
     setReadNotifIds(updated);
     try {
-      localStorage.setItem(`pixiu_read_notifs_${user?.username || 'admin'}`, JSON.stringify(updated));
+      localStorage.setItem(`pixiu_read_notifs_${key}`, JSON.stringify(updated));
     } catch (e) {}
   };
 
   const markAllAsRead = () => {
+    const key = getUserKey(user);
     const allIds = (notifications || []).map(n => n.id);
     const updated = Array.from(new Set([...readNotifIds, ...allIds]));
     setReadNotifIds(updated);
     try {
-      localStorage.setItem(`pixiu_read_notifs_${user?.username || 'admin'}`, JSON.stringify(updated));
+      localStorage.setItem(`pixiu_read_notifs_${key}`, JSON.stringify(updated));
     } catch (e) {}
   };
 
@@ -160,15 +167,17 @@ function ProtectedLayout() {
           </div>
           
           <div className="flex items-center gap-2 sm:gap-4 shrink-0">
-            {/* Quick Login Logs Link */}
-            <Link
-              to="/logs"
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer"
-              title="View Admin & Security Login Logs"
-            >
-              <ShieldCheck size={15} />
-              <span className="hidden sm:inline">Login Logs</span>
-            </Link>
+            {/* Quick Login Logs Link (Admin Only) */}
+            {isAdmin && (
+              <Link
+                to="/logs"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer"
+                title="View Admin & Security Login Logs"
+              >
+                <ShieldCheck size={15} />
+                <span className="hidden sm:inline">Login Logs</span>
+              </Link>
+            )}
 
             {/* Live Operational & Announcements Bell */}
             <div className="relative">
@@ -512,7 +521,7 @@ export default function App() {
                 <Route path="schools" element={<AdminOnly><Schools /></AdminOnly>} />
                 <Route path="billing" element={<AdminOnly><Billing /></AdminOnly>} />
                 <Route path="settings" element={<AdminOnly><Settings /></AdminOnly>} />
-                <Route path="logs" element={<AuditLogs />} />
+                <Route path="logs" element={<AdminOnly><AuditLogs /></AdminOnly>} />
                 <Route path="students" element={<Students />} />
                 <Route path="comms" element={<AdminOnly><Comms /></AdminOnly>} />
 
