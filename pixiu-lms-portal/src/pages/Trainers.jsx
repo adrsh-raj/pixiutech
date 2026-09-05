@@ -101,9 +101,9 @@ export default function Trainers() {
 
   // Start Next Session Modal State
   const [isNewSessionModalOpen, setIsNewSessionModalOpen] = useState(false);
-  const [newSessionModalData, setNewSessionModalData] = useState({
-    school_id: 'ZPS',
-    class_id: 'CLS-ZPS-6A',
+  const [newSessionModalData, setNewSessionModalData] = useState(() => ({
+    school_id: trainerSchoolId,
+    class_id: trainerSchoolId === 'XYZ' ? 'CLS-XYZ-6A' : 'CLS-ZPS-6A',
     class_grade: '6',
     unit_code: 'Unit 2',
     class_number: 'Class 1',
@@ -111,7 +111,7 @@ export default function Trainers() {
     notes: 'Hands-on robotics laboratory session.',
     date: new Date().toISOString().split('T')[0],
     time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
-  });
+  }));
 
   // Security Modal for Deleting Trainer ("Type Name to Confirm")
   const [trainerToDelete, setTrainerToDelete] = useState(null);
@@ -363,6 +363,25 @@ export default function Trainers() {
       return trainerSchoolId === 'XYZ' ? rId.includes('XYZ') : rId.includes('ZPS');
     });
   }, [studentReviews, selectedReviewGrade, isAdmin, user, trainerSchoolId]);
+
+  const visibleQuizSubmissions = useMemo(() => {
+    if (isAdmin || user?.school_id === 'ALL') return quizSubmissions;
+    return quizSubmissions.filter(sub => {
+      const sId = (sub.student_id || '').toUpperCase();
+      return trainerSchoolId === 'XYZ' ? sId.startsWith('XYZ') : sId.startsWith('ZPS');
+    });
+  }, [quizSubmissions, isAdmin, user, trainerSchoolId]);
+
+  const visibleSessions = useMemo(() => {
+    if (isAdmin || user?.school_id === 'ALL') return sessions;
+    return sessions.filter(s => {
+      const schId = (s.school_id || '').toUpperCase();
+      const clsId = (s.class_id || '').toUpperCase();
+      return trainerSchoolId === 'XYZ' 
+        ? (schId === 'XYZ' || clsId.includes('XYZ') || s.trainer_id === 'TR-02')
+        : (schId === 'ZPS' || clsId.includes('ZPS') || s.trainer_id === 'TR-01');
+    });
+  }, [sessions, isAdmin, user, trainerSchoolId]);
 
   const trainerNotifs = (notifications || []).filter(n => {
     if (n.status === 'Archived') return false;
@@ -699,10 +718,12 @@ export default function Trainers() {
 
   const handleLaunchNewSession = async (e) => {
     e.preventDefault();
+    const targetSchoolId = newSessionModalData.school_id || trainerSchoolId;
+    const targetTrainerId = user?.related_id || user?.id || (targetSchoolId === 'XYZ' ? 'TR-02' : 'TR-01');
     const createdSession = await startNewSession({
-      school_id: 'ZPS',
+      school_id: targetSchoolId,
       class_id: newSessionModalData.class_id,
-      trainer_id: user?.id || 'TR-01',
+      trainer_id: targetTrainerId,
       unit_code: newSessionModalData.unit_code,
       class_number: newSessionModalData.class_number,
       date: newSessionModalData.date,
@@ -715,14 +736,16 @@ export default function Trainers() {
     toast.success(`Live session started for ${newSessionModalData.topic}! You can now mark attendance.`, 'Session Active');
   };
 
-  const handleOpenStartSessionModal = (targetClassId = 'CLS-ZPS-6A') => {
-    const grade = targetClassId.replace('CLS-ZPS-', '').replace('A', '');
+  const handleOpenStartSessionModal = (targetClassId) => {
+    const defaultClass = trainerSchoolId === 'XYZ' ? 'CLS-XYZ-6A' : 'CLS-ZPS-6A';
+    const clsId = targetClassId || defaultClass;
+    const grade = clsId.replace(/CLS-(ZPS|XYZ)-/g, '').replace('A', '') || '6';
     const gradeUnits = GRADE_UNITS_CONFIG[grade] || GRADE_UNITS_CONFIG['6'];
     const nextUnit = gradeUnits[1] || gradeUnits[0];
 
     setNewSessionModalData({
-      school_id: 'ZPS',
-      class_id: targetClassId,
+      school_id: trainerSchoolId,
+      class_id: clsId,
       class_grade: grade,
       unit_code: nextUnit.unitCode,
       class_number: 'Class 1',
@@ -1225,7 +1248,7 @@ export default function Trainers() {
             activeTab === 'quizzes' ? 'border-b-2 border-pixiu-blue text-pixiu-blue' : 'text-slate-500 hover:text-slate-800'
           }`}
         >
-          <Award size={17} className="text-blue-600" /> Lab Quizzes & MCQs ({quizzes.length})
+          <Award size={17} className="text-blue-600" /> Lab Quizzes & MCQs ({visibleQuizSubmissions.length})
         </button>
         <button
           onClick={() => setActiveTab('reviews')}
@@ -1233,7 +1256,7 @@ export default function Trainers() {
             activeTab === 'reviews' ? 'border-b-2 border-pixiu-blue text-pixiu-blue' : 'text-slate-500 hover:text-slate-800'
           }`}
         >
-          <Star size={17} className="text-amber-500 fill-amber-500" /> End-of-Unit Student Reviews ({studentReviews.length})
+          <Star size={17} className="text-amber-500 fill-amber-500" /> End-of-Unit Student Reviews ({visibleStudentReviews.length})
         </button>
         <button
           onClick={() => setActiveTab('history')}
@@ -1241,7 +1264,7 @@ export default function Trainers() {
             activeTab === 'history' ? 'border-b-2 border-pixiu-blue text-pixiu-blue' : 'text-slate-500 hover:text-slate-800'
           }`}
         >
-          <History size={17} /> Date-wise Attendance Logs ({sessions.length})
+          <History size={17} /> Date-wise Attendance Logs ({visibleSessions.length})
         </button>
       </div>
 
@@ -1801,12 +1824,12 @@ export default function Trainers() {
               <div className="flex items-center gap-1 overflow-x-auto">
                 <span className="text-xs font-bold text-slate-400 uppercase mr-1 shrink-0">Filter Grade:</span>
                 {[
-                  { grade: 'All', label: `All (${sessions.length})` },
-                  { grade: '6A', label: `6A (${sessions.filter(s => s.class_id === 'CLS-ZPS-6A').length})` },
-                  { grade: '7A', label: `7A (${sessions.filter(s => s.class_id === 'CLS-ZPS-7A').length})` },
-                  { grade: '8A', label: `8A (${sessions.filter(s => s.class_id === 'CLS-ZPS-8A').length})` },
-                  { grade: '9A', label: `9A (${sessions.filter(s => s.class_id === 'CLS-ZPS-9A').length})` },
-                  { grade: '11A', label: `11A (${sessions.filter(s => s.class_id === 'CLS-ZPS-11A').length})` }
+                  { grade: 'All', label: `All (${visibleSessions.length})` },
+                  { grade: '6A', label: `6A (${visibleSessions.filter(s => s.class_id?.includes('6A')).length})` },
+                  { grade: '7A', label: `7A (${visibleSessions.filter(s => s.class_id?.includes('7A')).length})` },
+                  { grade: '8A', label: `8A (${visibleSessions.filter(s => s.class_id?.includes('8A')).length})` },
+                  { grade: '9A', label: `9A (${visibleSessions.filter(s => s.class_id?.includes('9A')).length})` },
+                  { grade: '11A', label: `11A (${visibleSessions.filter(s => s.class_id?.includes('11A')).length})` }
                 ].map(item => (
                   <button
                     key={item.grade}
@@ -1823,7 +1846,7 @@ export default function Trainers() {
               </div>
 
               <button
-                onClick={() => handleOpenStartSessionModal('CLS-ZPS-6A')}
+                onClick={() => handleOpenStartSessionModal(trainerSchoolId === 'XYZ' ? 'CLS-XYZ-6A' : 'CLS-ZPS-6A')}
                 className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs"
               >
                 <Plus size={13}/> Start Next Session
@@ -1832,11 +1855,11 @@ export default function Trainers() {
           </div>
 
           <div className="divide-y divide-slate-100">
-            {sessions
+            {visibleSessions
               .filter(ses => ses.is_locked === 1 || attendance.some(a => a.session_id === ses.id))
               .filter(ses => {
                 if (historyClassFilter === 'All') return true;
-                return ses.class_id.includes(historyClassFilter);
+                return ses.class_id?.includes(historyClassFilter);
               })
               .map(ses => {
                 const sessionAtt = attendance.filter(a => a.session_id === ses.id);
@@ -1852,7 +1875,7 @@ export default function Trainers() {
                           <Calendar size={12} /> {ses.date} • {ses.time}
                         </span>
                         <span className="font-bold text-slate-900 text-xs px-2 py-0.5 bg-slate-100 rounded-md border border-slate-200">
-                          {ses.class_id.replace('CLS-ZPS-', 'Class ')}
+                          {ses.class_id.replace('CLS-ZPS-', 'Class ').replace('CLS-XYZ-', 'Class ')}
                         </span>
                         {isUnlocked ? (
                           <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-full flex items-center gap-1 animate-pulse">
@@ -1885,7 +1908,7 @@ export default function Trainers() {
                 );
               })}
 
-            {sessions.filter(ses => ses.is_locked === 1 || attendance.some(a => a.session_id === ses.id)).length === 0 && (
+            {visibleSessions.filter(ses => ses.is_locked === 1 || attendance.some(a => a.session_id === ses.id)).length === 0 && (
               <div className="p-12 text-center text-slate-400">
                 <Calendar size={36} className="mx-auto text-slate-300 mb-2" />
                 <p className="font-bold text-slate-700 text-sm">No Live Attendance Logged Yet</p>
@@ -1923,11 +1946,11 @@ export default function Trainers() {
 
           {/* KPI Metrics Row */}
           {(() => {
-            const totalAttempts = quizSubmissions.length;
+            const totalAttempts = visibleQuizSubmissions.length;
             const avgAccuracy = totalAttempts > 0 
-              ? Math.round(quizSubmissions.reduce((acc, s) => acc + (s.percentage || 0), 0) / totalAttempts) 
+              ? Math.round(visibleQuizSubmissions.reduce((acc, s) => acc + (s.percentage || 0), 0) / totalAttempts) 
               : 0;
-            const flaggedAttempts = quizSubmissions.filter(s => (s.violation_count || 0) > 0).length;
+            const flaggedAttempts = visibleQuizSubmissions.filter(s => (s.violation_count || 0) > 0).length;
 
             return (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -2007,7 +2030,7 @@ export default function Trainers() {
 
           {/* Submissions Registry Table */}
           {(() => {
-            const filteredSubmissions = quizSubmissions
+            const filteredSubmissions = visibleQuizSubmissions
               .filter(sub => {
                 if (quizGradeFilter === 'All') return true;
                 return sub.class_grade === quizGradeFilter || sub.student_id?.includes(quizGradeFilter);

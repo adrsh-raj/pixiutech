@@ -993,11 +993,11 @@ export const SEED_STUDENT_REVIEWS = [
     verified_date: '25 Aug 2026'
   },
 
-  // XYZ6A 01 - Aayush Maurya (XYZ Academy - Level 0 Mastered)
+  // XYZ6A 01 - Manish Rawat (XYZ Academy - Level 0 Mastered)
   {
     id: 'REV-XYZ6A01-U1',
     student_id: 'XYZ6A 01',
-    student_name: 'Aayush Maurya',
+    student_name: 'Manish Rawat',
     class_grade: '6',
     unit_code: 'Unit 1',
     level: 'Level 0',

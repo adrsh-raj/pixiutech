@@ -216,7 +216,12 @@ export function DataProvider({ children }) {
         r.student_id !== 'ABC6A 01' && 
         !r.student_id?.startsWith('ABC') && 
         r.verified_date !== 'Curriculum Baseline'
-      );
+      ).map(r => {
+        if (r.student_id === 'XYZ6A 01' && (r.student_name === 'Aayush Maurya' || !r.student_name)) {
+          return { ...r, student_name: 'Manish Rawat' };
+        }
+        return r;
+      });
       if (cleanReviews.length === 0) {
         localStorage.setItem('pixiu_student_reviews', JSON.stringify(SEED_STUDENT_REVIEWS));
         return SEED_STUDENT_REVIEWS;
@@ -255,7 +260,12 @@ export function DataProvider({ children }) {
           map.set(`${s.quiz_id}_${s.student_id}`, s);
         }
       });
-      const merged = Array.from(map.values());
+      const merged = Array.from(map.values()).map(s => {
+        if (s.student_id === 'XYZ6A 01' && (s.student_name === 'Aayush Maurya' || !s.student_name)) {
+          return { ...s, student_name: 'Manish Rawat' };
+        }
+        return s;
+      });
       localStorage.setItem('pixiu_quiz_submissions', JSON.stringify(merged));
       return merged;
     } catch (e) {

@@ -696,12 +696,12 @@ export const SEED_QUIZ_SUBMISSIONS = [
     completed_at: '2026-08-25T11:00:00.000Z'
   },
 
-  // XYZ6A 01 - Aayush Maurya
+  // XYZ6A 01 - Manish Rawat
   {
     id: 'SUB-XYZ6A01-L0',
     quiz_id: 'QUIZ-L0',
     student_id: 'XYZ6A 01',
-    student_name: 'Aayush Maurya',
+    student_name: 'Manish Rawat',
     class_grade: '6',
     level: 'Level 0',
     score: 10,

@@ -519,9 +519,9 @@ function initializeDatabase() {
           'Vikas Pandey (Lead Instructor)', '25 Aug 2026'
         );
 
-        // XYZ6A 01 - Aayush Maurya (XYZ Academy - Level 0 Mastered)
+        // XYZ6A 01 - Manish Rawat (XYZ Academy - Level 0 Mastered)
         revStmt.run(
-          'REV-XYZ6A01-U1', 'XYZ6A 01', 'Aayush Maurya', '6', 'Unit 1', 'Level 0',
+          'REV-XYZ6A01-U1', 'XYZ6A 01', 'Manish Rawat', '6', 'Unit 1', 'Level 0',
           'Introduction to Robotics & Electronics',
           9.2, 5, 'Mastered',
           'Great enthusiastic participation in robotics lab fundamentals and breadboard wiring.',
@@ -603,9 +603,9 @@ function initializeDatabase() {
           200, 0, 'Completed', '2026-08-25 11:00:00'
         );
 
-        // XYZ6A 01 - Aayush Maurya
+        // XYZ6A 01 - Manish Rawat
         subStmt.run(
-          'SUB-XYZ6A01-L0', 'QUIZ-L0', 'XYZ6A 01', 'Aayush Maurya', '6', 'Level 0',
+          'SUB-XYZ6A01-L0', 'QUIZ-L0', 'XYZ6A 01', 'Manish Rawat', '6', 'Level 0',
           10, 10, 100, 5, 5, 5,
           JSON.stringify({ 'Q-L0-1': 'B', 'Q-L0-2': 'C', 'Q-L0-3': 'B', 'Q-L0-4': 'B', 'Q-L0-5': 'B' }),
           330, 0, 'Completed', '2026-08-26 10:15:00'
@@ -646,9 +646,11 @@ function initializeDatabase() {
         uStmt.run('USR-ADMIN', 'adarshraj', adminHash, 'admin', 'ADM-01', 'Adarsh Raj (Founder & Admin)', 'ALL', new Date().toISOString());
         uStmt.run('USR-ADMIN-ALT', 'admin', adminHash, 'admin', 'ADM-01', 'Adarsh Raj (Founder & Admin)', 'ALL', new Date().toISOString());
 
-        // 2. Primary Trainer Vikas Pandey
+        // 2. Primary Trainers
         uStmt.run('USR-TR01', 'vikaspandey', trainerHash, 'trainer', 'TR-01', 'Vikas Pandey', 'ZPS', new Date().toISOString());
         uStmt.run('USR-TR01-ALT', 'TR-01', trainerHash, 'trainer', 'TR-01', 'Vikas Pandey', 'ZPS', new Date().toISOString());
+        uStmt.run('USR-TR02', 'akashsharma', trainerHash, 'trainer', 'TR-02', 'Akash Sharma', 'XYZ', new Date().toISOString());
+        uStmt.run('USR-TR02-ALT', 'TR-02', trainerHash, 'trainer', 'TR-02', 'Akash Sharma', 'XYZ', new Date().toISOString());
         
         // 3. Seed student logins for ALL 25 students
         ['ZPS6A 01', 'ZPS6A 02', 'ZPS6A 03', 'ZPS6A 04', 'ZPS6A 05'].forEach(sId => {
@@ -669,18 +671,24 @@ function initializeDatabase() {
 
         uStmt.finalize();
 
-        // Schools (ONLY Zenith Public School)
+        // Schools (Zenith Public School & XYZ Academy)
         const sStmt = db.prepare("INSERT INTO schools VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
         sStmt.run('ZPS', 'Zenith Public School', 'ZPS', 'Dr. R.K. Sharma', '9876543210', 'Active', '2026-04-01', '2027-03-31', 180000);
+        sStmt.run('XYZ', 'XYZ Academy', 'XYZ', 'Dr. S.K. Verma', '9876543222', 'Active', '2026-04-01', '2027-03-31', 150000);
         sStmt.finalize();
 
-        // Classes (Zenith Public School: Class 6, 7, 8, 9, 11 - Section A)
+        // Classes (Zenith Public School & XYZ Academy)
         const cStmt = db.prepare("INSERT INTO classes VALUES (?, ?, ?, ?)");
         cStmt.run('CLS-ZPS-6A', 'ZPS', '6', 'A');
         cStmt.run('CLS-ZPS-7A', 'ZPS', '7', 'A');
         cStmt.run('CLS-ZPS-8A', 'ZPS', '8', 'A');
         cStmt.run('CLS-ZPS-9A', 'ZPS', '9', 'A');
         cStmt.run('CLS-ZPS-11A', 'ZPS', '11', 'A');
+        cStmt.run('CLS-XYZ-6A', 'XYZ', '6', 'A');
+        cStmt.run('CLS-XYZ-7A', 'XYZ', '7', 'A');
+        cStmt.run('CLS-XYZ-8A', 'XYZ', '8', 'A');
+        cStmt.run('CLS-XYZ-9A', 'XYZ', '9', 'A');
+        cStmt.run('CLS-XYZ-11A', 'XYZ', '11', 'A');
         cStmt.finalize();
 
         // Students (5 editable sample students per class: 6A, 7A, 8A, 9A, 11A)
@@ -723,9 +731,10 @@ function initializeDatabase() {
         
         stuStmt.finalize();
 
-        // Trainers (Primary: Vikas Pandey with ₹600/day salary, 2 sessions/week = ₹1,200/week)
+        // Trainers (Primary: Vikas Pandey ZPS, Akash Sharma XYZ)
         const trStmt = db.prepare("INSERT INTO trainers VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         trStmt.run('TR-01', 'Vikas Pandey', '9811122233', 'Senior Robotics & AI Instructor', 'ZPS', 600, 2, 5.0, 'Active', 'vikas.pandey@pixiutech.com', new Date().toISOString());
+        trStmt.run('TR-02', 'Akash Sharma', '9450077882', 'Senior STEM & Robotics Trainer', 'XYZ', 600, 2, 4.9, 'Active', 'akash.sharma@pixiutech.com', new Date().toISOString());
         trStmt.finalize();
 
         // Planned Sessions (Clean slate ready for live real-time attendance)
