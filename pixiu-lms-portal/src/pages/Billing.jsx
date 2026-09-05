@@ -317,7 +317,7 @@ export default function Billing() {
               <p style="margin: 4px 0 0 0; color: #475569; line-height: 1.6;">
                 Account Name: <strong>PIXIU TECH LLP</strong><br/>
                 Account No: <strong>5599971440</strong> (Central Bank of India)<br/>
-                IFSC Code: <strong>CBIN0282573</strong> | Branch: Gorakhpur Main
+                IFSC Code: <strong>CBIN0282573</strong> | Branch: Hata, Kushinagar
               </p>
             </div>
             <div style="text-align: right;">

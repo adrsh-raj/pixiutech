@@ -352,7 +352,7 @@ export default function SchoolPortal() {
             <div style="font-weight: 800; color: #166534; text-transform: uppercase; margin-bottom: 6px;">Bank Wire Transfer Details:</div>
             <div><strong>Beneficiary:</strong> PIXIU TECH LLP</div>
             <div><strong>Account Number:</strong> 5599971440</div>
-            <div><strong>Bank & Branch:</strong> Central Bank of India | Gorakhpur Main Branch</div>
+            <div><strong>Bank & Branch:</strong> Central Bank of India | Hata Branch, Kushinagar</div>
             <div><strong>IFSC Code:</strong> CBIN0282573</div>
           </div>
 
@@ -787,7 +787,7 @@ export default function SchoolPortal() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-slate-700 pt-1">
                   <div><strong>Beneficiary / Company:</strong> PIXIU TECH LLP</div>
                   <div><strong>Account Number:</strong> 5599971440</div>
-                  <div><strong>Bank & Branch:</strong> Central Bank of India (Gorakhpur Main)</div>
+                  <div><strong>Bank & Branch:</strong> Central Bank of India (Hata Branch, Kushinagar)</div>
                   <div><strong>IFSC Code:</strong> CBIN0282573</div>
                 </div>
               </div>
