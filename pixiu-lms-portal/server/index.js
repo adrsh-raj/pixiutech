@@ -1346,6 +1346,132 @@ app.delete('/api/quiz-submissions/:id', (req, res) => {
   });
 });
 
+// ==================== 22. STUDENT REVIEWS API ====================
+
+// GET all reviews (or filtered by student_id or class_grade)
+app.get('/api/reviews', (req, res) => {
+  const { student_id, class_grade } = req.query;
+  let sql = "SELECT * FROM student_reviews";
+  const params = [];
+
+  if (student_id) {
+    sql += " WHERE UPPER(REPLACE(student_id, ' ', '')) = UPPER(REPLACE(?, ' ', ''))";
+    params.push(student_id);
+  } else if (class_grade) {
+    sql += " WHERE class_grade = ?";
+    params.push(class_grade);
+  }
+
+  sql += " ORDER BY created_at DESC";
+
+  db.all(sql, params, (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    const normalized = (rows || []).map(r => ({
+      ...r,
+      score: Number(r.score) || 0,
+      rating: Number(r.rating) || (r.score ? Math.round(Number(r.score) / 2) : 5),
+      review: r.review || r.comment || '',
+      comment: r.comment || r.review || '',
+      status: r.status || 'Mastered'
+    }));
+    res.json(normalized);
+  });
+});
+
+// GET reviews for specific student
+app.get('/api/reviews/student/:studentId', (req, res) => {
+  const studentId = req.params.studentId;
+  const sql = "SELECT * FROM student_reviews WHERE UPPER(REPLACE(student_id, ' ', '')) = UPPER(REPLACE(?, ' ', '')) ORDER BY created_at DESC";
+  db.all(sql, [studentId], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    const normalized = (rows || []).map(r => ({
+      ...r,
+      score: Number(r.score) || 0,
+      rating: Number(r.rating) || (r.score ? Math.round(Number(r.score) / 2) : 5),
+      review: r.review || r.comment || '',
+      comment: r.comment || r.review || '',
+      status: r.status || 'Mastered'
+    }));
+    res.json(normalized);
+  });
+});
+
+// POST create or update review
+app.post('/api/reviews', (req, res) => {
+  const r = req.body;
+  if (!r.student_id || !r.unit_code) {
+    return res.status(400).json({ error: 'student_id and unit_code are required' });
+  }
+
+  const cleanStudentId = (r.student_id || '').trim();
+  const reviewId = r.id || `REV-${cleanStudentId.replace(/\s+/g, '')}-${(r.unit_code || '').replace(/\s+/g, '')}`;
+  const score = Number(r.score) || (r.rating ? Number(r.rating) * 2 : 10);
+  const rating = Number(r.rating) || Math.max(1, Math.min(5, Math.round(score / 2)));
+  const reviewText = r.review || r.comment || 'Satisfactory lab evaluation.';
+  const now = new Date().toISOString();
+  const verifiedDate = r.verified_date || new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+
+  const sql = `INSERT OR REPLACE INTO student_reviews (
+    id, student_id, student_name, class_grade, unit_code, level, unit_title,
+    score, rating, status, review, comment, trainer_name, verified_date, created_at, updated_at
+  ) VALUES (
+    ?, ?, ?, ?, ?, ?, ?,
+    ?, ?, ?, ?, ?, ?, ?,
+    COALESCE((SELECT created_at FROM student_reviews WHERE id = ?), ?),
+    ?
+  )`;
+
+  db.run(sql, [
+    reviewId,
+    cleanStudentId,
+    r.student_name || 'Student',
+    r.class_grade || '6',
+    r.unit_code,
+    r.level || 'Level 0',
+    r.unit_title || '',
+    score,
+    rating,
+    r.status || 'Mastered',
+    reviewText,
+    reviewText,
+    r.trainer_name || 'Vikas Pandey (Lead Instructor)',
+    verifiedDate,
+    reviewId,
+    now,
+    now
+  ], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({
+      success: true,
+      data: {
+        id: reviewId,
+        student_id: cleanStudentId,
+        student_name: r.student_name,
+        class_grade: r.class_grade,
+        unit_code: r.unit_code,
+        level: r.level,
+        unit_title: r.unit_title,
+        score,
+        rating,
+        status: r.status || 'Mastered',
+        review: reviewText,
+        comment: reviewText,
+        trainer_name: r.trainer_name,
+        verified_date: verifiedDate,
+        updated_at: now
+      }
+    });
+  });
+});
+
+// DELETE review
+app.delete('/api/reviews/:id', (req, res) => {
+  db.run("DELETE FROM student_reviews WHERE id = ?", [req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, deleted: req.params.id });
+  });
+});
+
 // Start Server
 app.listen(PORT, () => {
   console.log(`⚡ Pixiu Core API & Auth Engine running on http://localhost:${PORT}`);

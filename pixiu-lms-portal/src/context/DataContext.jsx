@@ -207,13 +207,20 @@ export function DataProvider({ children }) {
   const [studentReviews, setStudentReviews] = useState(() => {
     try {
       const raw = safeGetItem('pixiu_student_reviews', null);
-      if (!raw || !Array.isArray(raw)) return SEED_STUDENT_REVIEWS;
+      if (!raw || !Array.isArray(raw) || raw.length === 0) {
+        localStorage.setItem('pixiu_student_reviews', JSON.stringify(SEED_STUDENT_REVIEWS));
+        return SEED_STUDENT_REVIEWS;
+      }
       const cleanReviews = raw.filter(r => 
         r && 
         r.student_id !== 'ABC6A 01' && 
         !r.student_id?.startsWith('ABC') && 
         r.verified_date !== 'Curriculum Baseline'
       );
+      if (cleanReviews.length === 0) {
+        localStorage.setItem('pixiu_student_reviews', JSON.stringify(SEED_STUDENT_REVIEWS));
+        return SEED_STUDENT_REVIEWS;
+      }
       localStorage.setItem('pixiu_student_reviews', JSON.stringify(cleanReviews));
       return cleanReviews;
     } catch (e) {
@@ -327,7 +334,10 @@ export function DataProvider({ children }) {
       if (prjRes && prjRes.length > 0) setProjects(prjRes);
       if (altRes && altRes.length > 0) setAlerts(altRes);
       if (notifRes && notifRes.length > 0) setNotifications(notifRes);
-      if (revRes && revRes.length > 0) setStudentReviews(revRes);
+      if (revRes && revRes.length > 0) {
+        setStudentReviews(revRes);
+        try { localStorage.setItem('pixiu_student_reviews', JSON.stringify(revRes)); } catch (e) {}
+      }
       if (quizRes && quizRes.length > 0) {
         setQuizzes(quizRes);
         try { localStorage.setItem('pixiu_quizzes', JSON.stringify(quizRes)); } catch (e) {}

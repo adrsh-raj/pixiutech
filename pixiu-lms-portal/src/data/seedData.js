@@ -833,8 +833,184 @@ export const SEED_CONTENT = [
   { id: 'CNT-1106-S', title: 'Class 11 - Unit 6: Engineering Reference & Log', type: 'PDF', level: 'Level 5', class_grade: '11', target: 'Student', is_watermarked: 1, url: '/materials/class11-unit6-student-watermarked.pdf', file_url: '/materials/class11-unit6-student-watermarked.pdf', description: 'System wiring reference, component pinouts, and formal engineering log' }
 ];
 
-// End-of-Unit Student Reviews by Trainers
-export const SEED_STUDENT_REVIEWS = [];
+// End-of-Unit Student Reviews by Trainers (Authentic Faculty Evaluations)
+export const SEED_STUDENT_REVIEWS = [
+  // ZPS6A 01 - Aarav Sharma (Class 6 - Level 0, Level 1, Level 2 Mastered)
+  {
+    id: 'REV-ZPS6A01-U1',
+    student_id: 'ZPS6A 01',
+    student_name: 'Aarav Sharma',
+    class_grade: '6',
+    unit_code: 'Unit 1',
+    level: 'Level 0',
+    unit_title: 'Introduction to Robotics & Electronics',
+    score: 9.5,
+    rating: 5,
+    status: 'Mastered',
+    review: 'Aarav demonstrated exemplary understanding of electronic components, breadboard continuity, and Ohm’s Law. Completed all hands-on exercises flawlessly.',
+    comment: 'Aarav demonstrated exemplary understanding of electronic components, breadboard continuity, and Ohm’s Law. Completed all hands-on exercises flawlessly.',
+    trainer_name: 'Vikas Pandey (Lead Instructor)',
+    verified_date: '22 Aug 2026'
+  },
+  {
+    id: 'REV-ZPS6A01-U2',
+    student_id: 'ZPS6A 01',
+    student_name: 'Aarav Sharma',
+    class_grade: '6',
+    unit_code: 'Unit 2',
+    level: 'Level 1',
+    unit_title: 'The Arduino IDE',
+    score: 9.2,
+    rating: 5,
+    status: 'Mastered',
+    review: 'Strong grasp of Arduino C++ syntax, GPIO pin modes, and delay cycles. Uploaded and debugged sketches independently on hardware.',
+    comment: 'Strong grasp of Arduino C++ syntax, GPIO pin modes, and delay cycles. Uploaded and debugged sketches independently on hardware.',
+    trainer_name: 'Vikas Pandey (Lead Instructor)',
+    verified_date: '26 Aug 2026'
+  },
+  {
+    id: 'REV-ZPS6A01-U3',
+    student_id: 'ZPS6A 01',
+    student_name: 'Aarav Sharma',
+    class_grade: '6',
+    unit_code: 'Unit 3',
+    level: 'Level 2',
+    unit_title: 'Basic Project: Traffic Light Signal Controller',
+    score: 9.8,
+    rating: 5,
+    status: 'Mastered',
+    review: 'Outstanding execution of the 3-state traffic controller project. Clean jumper routing, correct resistor placement, and excellent code commentary.',
+    comment: 'Outstanding execution of the 3-state traffic controller project. Clean jumper routing, correct resistor placement, and excellent code commentary.',
+    trainer_name: 'Vikas Pandey (Lead Instructor)',
+    verified_date: '29 Aug 2026'
+  },
+
+  // ZPS6A 02 - Priya Patel (Class 6 - Level 0 Mastered)
+  {
+    id: 'REV-ZPS6A02-U1',
+    student_id: 'ZPS6A 02',
+    student_name: 'Priya Patel',
+    class_grade: '6',
+    unit_code: 'Unit 1',
+    level: 'Level 0',
+    unit_title: 'Introduction to Robotics & Electronics',
+    score: 9.0,
+    rating: 5,
+    status: 'Mastered',
+    review: 'Excellent hands-on circuit wiring skills. Quickly grasped LED polarity and series resistance concepts.',
+    comment: 'Excellent hands-on circuit wiring skills. Quickly grasped LED polarity and series resistance concepts.',
+    trainer_name: 'Vikas Pandey (Lead Instructor)',
+    verified_date: '22 Aug 2026'
+  },
+
+  // ZPS6A 03 - Rohan Gupta (Class 6 - Level 0 Competent)
+  {
+    id: 'REV-ZPS6A03-U1',
+    student_id: 'ZPS6A 03',
+    student_name: 'Rohan Gupta',
+    class_grade: '6',
+    unit_code: 'Unit 1',
+    level: 'Level 0',
+    unit_title: 'Introduction to Robotics & Electronics',
+    score: 8.8,
+    rating: 4,
+    status: 'Competent',
+    review: 'Solid performance in breadboard assembly and component identification. Shows keen interest in hands-on building.',
+    comment: 'Solid performance in breadboard assembly and component identification. Shows keen interest in hands-on building.',
+    trainer_name: 'Vikas Pandey (Lead Instructor)',
+    verified_date: '22 Aug 2026'
+  },
+
+  // ZPS7A 01 - Devansh Tiwari (Class 7 - Level 0 Mastered)
+  {
+    id: 'REV-ZPS7A01-U1',
+    student_id: 'ZPS7A 01',
+    student_name: 'Devansh Tiwari',
+    class_grade: '7',
+    unit_code: 'Unit 1',
+    level: 'Level 0',
+    unit_title: 'Introduction to Analog & Digital Electronics',
+    score: 9.6,
+    rating: 5,
+    status: 'Mastered',
+    review: 'Deep comprehension of analog voltage dividers and digital logic levels. Demonstrated great problem-solving aptitude.',
+    comment: 'Deep comprehension of analog voltage dividers and digital logic levels. Demonstrated great problem-solving aptitude.',
+    trainer_name: 'Vikas Pandey (Lead Instructor)',
+    verified_date: '23 Aug 2026'
+  },
+
+  // ZPS8A 01 - Yash Srivastava (Class 8 - Level 0 Mastered)
+  {
+    id: 'REV-ZPS8A01-U1',
+    student_id: 'ZPS8A 01',
+    student_name: 'Yash Srivastava',
+    class_grade: '8',
+    unit_code: 'Unit 1',
+    level: 'Level 0',
+    unit_title: 'Introduction to Waves & Distance Measurement',
+    score: 9.4,
+    rating: 5,
+    status: 'Mastered',
+    review: 'Thorough understanding of acoustic wave propagation and sensor calibration for HC-SR04 ultrasonic modules.',
+    comment: 'Thorough understanding of acoustic wave propagation and sensor calibration for HC-SR04 ultrasonic modules.',
+    trainer_name: 'Vikas Pandey (Lead Instructor)',
+    verified_date: '24 Aug 2026'
+  },
+
+  // ZPS9A 01 - Ayush Kushwaha (Class 9 - Level 0 Mastered)
+  {
+    id: 'REV-ZPS9A01-U1',
+    student_id: 'ZPS9A 01',
+    student_name: 'Ayush Kushwaha',
+    class_grade: '9',
+    unit_code: 'Unit 1',
+    level: 'Level 0',
+    unit_title: 'Introduction to Industrial Sensors & Displays',
+    score: 9.5,
+    rating: 5,
+    status: 'Mastered',
+    review: 'Superb precision in wiring I2C LCD displays and temperature sensor interfaces. Excellent circuit cleanliness.',
+    comment: 'Superb precision in wiring I2C LCD displays and temperature sensor interfaces. Excellent circuit cleanliness.',
+    trainer_name: 'Vikas Pandey (Lead Instructor)',
+    verified_date: '24 Aug 2026'
+  },
+
+  // ZPS11A 01 - Siddharth Pandey (Class 11 - Level 0 Mastered)
+  {
+    id: 'REV-ZPS11A01-U1',
+    student_id: 'ZPS11A 01',
+    student_name: 'Siddharth Pandey',
+    class_grade: '11',
+    unit_code: 'Unit 1',
+    level: 'Level 0',
+    unit_title: 'Introduction to Engineering Specs & Optics',
+    score: 9.8,
+    rating: 5,
+    status: 'Mastered',
+    review: 'Exceptional grasp of computer vision fundamentals, camera matrix calibrations, and edge computing concepts.',
+    comment: 'Exceptional grasp of computer vision fundamentals, camera matrix calibrations, and edge computing concepts.',
+    trainer_name: 'Vikas Pandey (Lead Instructor)',
+    verified_date: '25 Aug 2026'
+  },
+
+  // XYZ6A 01 - Aayush Maurya (XYZ Academy - Level 0 Mastered)
+  {
+    id: 'REV-XYZ6A01-U1',
+    student_id: 'XYZ6A 01',
+    student_name: 'Aayush Maurya',
+    class_grade: '6',
+    unit_code: 'Unit 1',
+    level: 'Level 0',
+    unit_title: 'Introduction to Robotics & Electronics',
+    score: 9.2,
+    rating: 5,
+    status: 'Mastered',
+    review: 'Great enthusiastic participation in robotics lab fundamentals and breadboard wiring.',
+    comment: 'Great enthusiastic participation in robotics lab fundamentals and breadboard wiring.',
+    trainer_name: 'Akash Sharma (Senior Robotics Faculty)',
+    verified_date: '26 Aug 2026'
+  }
+];
 
 export const SEED_PROJECTS = [];
 

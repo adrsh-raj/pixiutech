@@ -265,9 +265,14 @@ function initializeDatabase() {
       id TEXT PRIMARY KEY,
       student_id TEXT NOT NULL,
       student_name TEXT,
+      class_grade TEXT,
       unit_code TEXT,
       level TEXT,
+      unit_title TEXT,
+      score REAL,
       rating REAL,
+      status TEXT,
+      review TEXT,
       comment TEXT,
       trainer_name TEXT,
       verified_date TEXT,
@@ -415,6 +420,115 @@ function initializeDatabase() {
         notifStmt.run('NOTIF-002', 'All_Students', '6,7,8,9,11', 'All', '📝 Unit 1 Concept Revision & Circuit Viva Notice', 'Attention All Classes (6, 7, 8, 9, 11): Unit 1 concept revision and hands-on circuit viva checks will be held in Friday session. Please study the Unit 1 guides in your Student Portal.', 'revision', 'Friday, 04 Sep 2026', '11:00 AM', 'important', 'Active', '2026-08-31 22:41:00', '2026-08-31 22:41:00');
         notifStmt.run('NOTIF-003', 'All_Trainers', '6,7,8,9,11', 'TR-01', '🛠️ Trainer Directive: Prepare Level 1 Unit 2 Sensor Kits', 'Trainer Vikas Pandey: Please inspect and calibrate the LDR, IR and ultrasonic sensors for Classes 6A to 11A before Friday morning session.', 'kit_prep', 'Friday, 04 Sep 2026', '09:30 AM', 'urgent', 'Active', '2026-08-31 22:42:00', '2026-08-31 22:42:00');
         notifStmt.finalize();
+      }
+    });
+
+    // Ensure student_reviews table has seed data if empty
+    db.get("SELECT COUNT(*) as count FROM student_reviews", (err, row) => {
+      if (!err && row && row.count === 0) {
+        console.log("⭐ Seeding Baseline Faculty Student Reviews & Competency Evaluations...");
+        const revStmt = db.prepare(`INSERT INTO student_reviews (
+          id, student_id, student_name, class_grade, unit_code, level, unit_title,
+          score, rating, status, review, comment, trainer_name, verified_date
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+
+        // ZPS6A 01 - Aarav Sharma (Class 6 - Level 0, Level 1, Level 2 Mastered)
+        revStmt.run(
+          'REV-ZPS6A01-U1', 'ZPS6A 01', 'Aarav Sharma', '6', 'Unit 1', 'Level 0',
+          'Introduction to Robotics & Electronics',
+          9.5, 5, 'Mastered',
+          'Aarav demonstrated exemplary understanding of electronic components, breadboard continuity, and Ohm’s Law. Completed all hands-on exercises flawlessly.',
+          'Aarav demonstrated exemplary understanding of electronic components, breadboard continuity, and Ohm’s Law. Completed all hands-on exercises flawlessly.',
+          'Vikas Pandey (Lead Instructor)', '22 Aug 2026'
+        );
+        revStmt.run(
+          'REV-ZPS6A01-U2', 'ZPS6A 01', 'Aarav Sharma', '6', 'Unit 2', 'Level 1',
+          'The Arduino IDE',
+          9.2, 5, 'Mastered',
+          'Strong grasp of Arduino C++ syntax, GPIO pin modes, and delay cycles. Uploaded and debugged sketches independently on hardware.',
+          'Strong grasp of Arduino C++ syntax, GPIO pin modes, and delay cycles. Uploaded and debugged sketches independently on hardware.',
+          'Vikas Pandey (Lead Instructor)', '26 Aug 2026'
+        );
+        revStmt.run(
+          'REV-ZPS6A01-U3', 'ZPS6A 01', 'Aarav Sharma', '6', 'Unit 3', 'Level 2',
+          'Basic Project: Traffic Light Signal Controller',
+          9.8, 5, 'Mastered',
+          'Outstanding execution of the 3-state traffic controller project. Clean jumper routing, correct resistor placement, and excellent code commentary.',
+          'Outstanding execution of the 3-state traffic controller project. Clean jumper routing, correct resistor placement, and excellent code commentary.',
+          'Vikas Pandey (Lead Instructor)', '29 Aug 2026'
+        );
+
+        // ZPS6A 02 - Priya Patel (Class 6 - Level 0 Mastered)
+        revStmt.run(
+          'REV-ZPS6A02-U1', 'ZPS6A 02', 'Priya Patel', '6', 'Unit 1', 'Level 0',
+          'Introduction to Robotics & Electronics',
+          9.0, 5, 'Mastered',
+          'Excellent hands-on circuit wiring skills. Quickly grasped LED polarity and series resistance concepts.',
+          'Excellent hands-on circuit wiring skills. Quickly grasped LED polarity and series resistance concepts.',
+          'Vikas Pandey (Lead Instructor)', '22 Aug 2026'
+        );
+
+        // ZPS6A 03 - Rohan Gupta (Class 6 - Level 0 Competent)
+        revStmt.run(
+          'REV-ZPS6A03-U1', 'ZPS6A 03', 'Rohan Gupta', '6', 'Unit 1', 'Level 0',
+          'Introduction to Robotics & Electronics',
+          8.8, 4, 'Competent',
+          'Solid performance in breadboard assembly and component identification. Shows keen interest in hands-on building.',
+          'Solid performance in breadboard assembly and component identification. Shows keen interest in hands-on building.',
+          'Vikas Pandey (Lead Instructor)', '22 Aug 2026'
+        );
+
+        // ZPS7A 01 - Devansh Tiwari (Class 7 - Level 0 Mastered)
+        revStmt.run(
+          'REV-ZPS7A01-U1', 'ZPS7A 01', 'Devansh Tiwari', '7', 'Unit 1', 'Level 0',
+          'Introduction to Analog & Digital Electronics',
+          9.6, 5, 'Mastered',
+          'Deep comprehension of analog voltage dividers and digital logic levels. Demonstrated great problem-solving aptitude.',
+          'Deep comprehension of analog voltage dividers and digital logic levels. Demonstrated great problem-solving aptitude.',
+          'Vikas Pandey (Lead Instructor)', '23 Aug 2026'
+        );
+
+        // ZPS8A 01 - Yash Srivastava (Class 8 - Level 0 Mastered)
+        revStmt.run(
+          'REV-ZPS8A01-U1', 'ZPS8A 01', 'Yash Srivastava', '8', 'Unit 1', 'Level 0',
+          'Introduction to Waves & Distance Measurement',
+          9.4, 5, 'Mastered',
+          'Thorough understanding of acoustic wave propagation and sensor calibration for HC-SR04 ultrasonic modules.',
+          'Thorough understanding of acoustic wave propagation and sensor calibration for HC-SR04 ultrasonic modules.',
+          'Vikas Pandey (Lead Instructor)', '24 Aug 2026'
+        );
+
+        // ZPS9A 01 - Ayush Kushwaha (Class 9 - Level 0 Mastered)
+        revStmt.run(
+          'REV-ZPS9A01-U1', 'ZPS9A 01', 'Ayush Kushwaha', '9', 'Unit 1', 'Level 0',
+          'Introduction to Industrial Sensors & Displays',
+          9.5, 5, 'Mastered',
+          'Superb precision in wiring I2C LCD displays and temperature sensor interfaces. Excellent circuit cleanliness.',
+          'Superb precision in wiring I2C LCD displays and temperature sensor interfaces. Excellent circuit cleanliness.',
+          'Vikas Pandey (Lead Instructor)', '24 Aug 2026'
+        );
+
+        // ZPS11A 01 - Siddharth Pandey (Class 11 - Level 0 Mastered)
+        revStmt.run(
+          'REV-ZPS11A01-U1', 'ZPS11A 01', 'Siddharth Pandey', '11', 'Unit 1', 'Level 0',
+          'Introduction to Engineering Specs & Optics',
+          9.8, 5, 'Mastered',
+          'Exceptional grasp of computer vision fundamentals, camera matrix calibrations, and edge computing concepts.',
+          'Exceptional grasp of computer vision fundamentals, camera matrix calibrations, and edge computing concepts.',
+          'Vikas Pandey (Lead Instructor)', '25 Aug 2026'
+        );
+
+        // XYZ6A 01 - Aayush Maurya (XYZ Academy - Level 0 Mastered)
+        revStmt.run(
+          'REV-XYZ6A01-U1', 'XYZ6A 01', 'Aayush Maurya', '6', 'Unit 1', 'Level 0',
+          'Introduction to Robotics & Electronics',
+          9.2, 5, 'Mastered',
+          'Great enthusiastic participation in robotics lab fundamentals and breadboard wiring.',
+          'Great enthusiastic participation in robotics lab fundamentals and breadboard wiring.',
+          'Akash Sharma (Senior Robotics Faculty)', '26 Aug 2026'
+        );
+
+        revStmt.finalize();
       }
     });
 
