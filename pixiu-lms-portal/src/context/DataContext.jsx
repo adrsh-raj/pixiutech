@@ -5,7 +5,7 @@ import {
   SEED_ALERTS, SEED_CURRICULUM, SEED_CONTENT, SEED_NOTIFICATIONS,
   SEED_STUDENT_REVIEWS, SEED_PROJECTS, CLASS_KITS
 } from '../data/seedData';
-import { SEED_QUIZZES } from '../data/seedQuizzes';
+import { SEED_QUIZZES, SEED_QUIZ_SUBMISSIONS } from '../data/seedQuizzes';
 
 const DataContext = createContext();
 
@@ -242,7 +242,25 @@ export function DataProvider({ children }) {
   });
 
   const [quizSubmissions, setQuizSubmissions] = useState(() => {
-    return safeGetItem('pixiu_quiz_submissions', []);
+    try {
+      const saved = safeGetItem('pixiu_quiz_submissions', null);
+      if (!saved || !Array.isArray(saved) || saved.length === 0) {
+        localStorage.setItem('pixiu_quiz_submissions', JSON.stringify(SEED_QUIZ_SUBMISSIONS));
+        return SEED_QUIZ_SUBMISSIONS;
+      }
+      const map = new Map();
+      SEED_QUIZ_SUBMISSIONS.forEach(s => map.set(`${s.quiz_id}_${s.student_id}`, s));
+      saved.forEach(s => {
+        if (s && s.quiz_id && s.student_id) {
+          map.set(`${s.quiz_id}_${s.student_id}`, s);
+        }
+      });
+      const merged = Array.from(map.values());
+      localStorage.setItem('pixiu_quiz_submissions', JSON.stringify(merged));
+      return merged;
+    } catch (e) {
+      return SEED_QUIZ_SUBMISSIONS;
+    }
   });
 
   const [loading, setLoading] = useState(false);
@@ -343,8 +361,15 @@ export function DataProvider({ children }) {
         try { localStorage.setItem('pixiu_quizzes', JSON.stringify(quizRes)); } catch (e) {}
       }
       if (subRes && Array.isArray(subRes)) {
-        setQuizSubmissions(subRes);
-        try { localStorage.setItem('pixiu_quiz_submissions', JSON.stringify(subRes)); } catch (e) {}
+        setQuizSubmissions(prev => {
+          const map = new Map();
+          SEED_QUIZ_SUBMISSIONS.forEach(s => map.set(`${s.quiz_id}_${s.student_id}`, s));
+          prev.forEach(s => map.set(`${s.quiz_id}_${s.student_id}`, s));
+          subRes.forEach(s => map.set(`${s.quiz_id}_${s.student_id}`, s));
+          const merged = Array.from(map.values());
+          try { localStorage.setItem('pixiu_quiz_submissions', JSON.stringify(merged)); } catch (e) {}
+          return merged;
+        });
       }
     } catch (err) {
       console.warn("Backend API unavailable, using offline seed state.");
@@ -352,25 +377,11 @@ export function DataProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    // Only pull protected data from backend if an authenticated user session is active
-    const hasSession = () => {
-      try {
-        const token = localStorage.getItem('pixiu_auth_token');
-        const user = localStorage.getItem('pixiu_auth_user');
-        return !!(token || user);
-      } catch (e) {
-        return false;
-      }
-    };
-
-    if (hasSession()) {
-      refreshAll();
-    }
+    // Always refresh public & persistent state on mount
+    refreshAll();
 
     const handleAuthChange = () => {
-      if (hasSession()) {
-        refreshAll();
-      }
+      refreshAll();
     };
 
     window.addEventListener('pixiu_auth_state_changed', handleAuthChange);

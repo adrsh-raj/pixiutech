@@ -473,3 +473,254 @@ export const SEED_QUIZZES = [
     ]
   }
 ];
+
+// Baseline Persistent Student Quiz Submissions (Permanent Completed Attempts)
+export const SEED_QUIZ_SUBMISSIONS = [
+  // ZPS6A 01 - Aarav Sharma (Completed Quizzes for Level 0, Level 1, Level 2)
+  {
+    id: 'SUB-ZPS6A01-L0',
+    quiz_id: 'QUIZ-L0',
+    student_id: 'ZPS6A 01',
+    student_name: 'Aarav Sharma',
+    class_grade: '6',
+    level: 'Level 0',
+    score: 10,
+    total_marks: 10,
+    percentage: 100,
+    correct_count: 5,
+    attempted_count: 5,
+    total_questions: 5,
+    answers: {
+      'Q-L0-1': 'B',
+      'Q-L0-2': 'C',
+      'Q-L0-3': 'B',
+      'Q-L0-4': 'B',
+      'Q-L0-5': 'B'
+    },
+    time_taken_seconds: 245,
+    violation_count: 0,
+    status: 'Completed',
+    reattempt_allowed: 0,
+    completed_at: '2026-08-22T11:15:00.000Z'
+  },
+  {
+    id: 'SUB-ZPS6A01-L1',
+    quiz_id: 'QUIZ-L1',
+    student_id: 'ZPS6A 01',
+    student_name: 'Aarav Sharma',
+    class_grade: '6',
+    level: 'Level 1',
+    score: 10,
+    total_marks: 10,
+    percentage: 100,
+    correct_count: 5,
+    attempted_count: 5,
+    total_questions: 5,
+    answers: {
+      'Q-L1-1': 'B',
+      'Q-L1-2': 'B',
+      'Q-L1-3': 'A',
+      'Q-L1-4': 'C',
+      'Q-L1-5': 'B'
+    },
+    time_taken_seconds: 310,
+    violation_count: 0,
+    status: 'Completed',
+    reattempt_allowed: 0,
+    completed_at: '2026-08-26T11:20:00.000Z'
+  },
+  {
+    id: 'SUB-ZPS6A01-L2',
+    quiz_id: 'QUIZ-L2',
+    student_id: 'ZPS6A 01',
+    student_name: 'Aarav Sharma',
+    class_grade: '6',
+    level: 'Level 2',
+    score: 10,
+    total_marks: 10,
+    percentage: 100,
+    correct_count: 5,
+    attempted_count: 5,
+    total_questions: 5,
+    answers: {
+      'Q-L2-1': 'B',
+      'Q-L2-2': 'B',
+      'Q-L2-3': 'B',
+      'Q-L2-4': 'B',
+      'Q-L2-5': 'A'
+    },
+    time_taken_seconds: 280,
+    violation_count: 0,
+    status: 'Completed',
+    reattempt_allowed: 0,
+    completed_at: '2026-08-29T11:35:00.000Z'
+  },
+
+  // ZPS6A 02 - Priya Patel
+  {
+    id: 'SUB-ZPS6A02-L0',
+    quiz_id: 'QUIZ-L0',
+    student_id: 'ZPS6A 02',
+    student_name: 'Priya Patel',
+    class_grade: '6',
+    level: 'Level 0',
+    score: 10,
+    total_marks: 10,
+    percentage: 100,
+    correct_count: 5,
+    attempted_count: 5,
+    total_questions: 5,
+    answers: {
+      'Q-L0-1': 'B',
+      'Q-L0-2': 'C',
+      'Q-L0-3': 'B',
+      'Q-L0-4': 'B',
+      'Q-L0-5': 'B'
+    },
+    time_taken_seconds: 290,
+    violation_count: 0,
+    status: 'Completed',
+    reattempt_allowed: 0,
+    completed_at: '2026-08-22T11:45:00.000Z'
+  },
+
+  // ZPS7A 01 - Devansh Tiwari
+  {
+    id: 'SUB-ZPS7A01-L0',
+    quiz_id: 'QUIZ-L0',
+    student_id: 'ZPS7A 01',
+    student_name: 'Devansh Tiwari',
+    class_grade: '7',
+    level: 'Level 0',
+    score: 10,
+    total_marks: 10,
+    percentage: 100,
+    correct_count: 5,
+    attempted_count: 5,
+    total_questions: 5,
+    answers: {
+      'Q-L0-1': 'B',
+      'Q-L0-2': 'C',
+      'Q-L0-3': 'B',
+      'Q-L0-4': 'B',
+      'Q-L0-5': 'B'
+    },
+    time_taken_seconds: 210,
+    violation_count: 0,
+    status: 'Completed',
+    reattempt_allowed: 0,
+    completed_at: '2026-08-23T10:30:00.000Z'
+  },
+
+  // ZPS8A 01 - Yash Srivastava
+  {
+    id: 'SUB-ZPS8A01-L0',
+    quiz_id: 'QUIZ-L0',
+    student_id: 'ZPS8A 01',
+    student_name: 'Yash Srivastava',
+    class_grade: '8',
+    level: 'Level 0',
+    score: 10,
+    total_marks: 10,
+    percentage: 100,
+    correct_count: 5,
+    attempted_count: 5,
+    total_questions: 5,
+    answers: {
+      'Q-L0-1': 'B',
+      'Q-L0-2': 'C',
+      'Q-L0-3': 'B',
+      'Q-L0-4': 'B',
+      'Q-L0-5': 'B'
+    },
+    time_taken_seconds: 260,
+    violation_count: 0,
+    status: 'Completed',
+    reattempt_allowed: 0,
+    completed_at: '2026-08-24T10:45:00.000Z'
+  },
+
+  // ZPS9A 01 - Ayush Kushwaha
+  {
+    id: 'SUB-ZPS9A01-L0',
+    quiz_id: 'QUIZ-L0',
+    student_id: 'ZPS9A 01',
+    student_name: 'Ayush Kushwaha',
+    class_grade: '9',
+    level: 'Level 0',
+    score: 10,
+    total_marks: 10,
+    percentage: 100,
+    correct_count: 5,
+    attempted_count: 5,
+    total_questions: 5,
+    answers: {
+      'Q-L0-1': 'B',
+      'Q-L0-2': 'C',
+      'Q-L0-3': 'B',
+      'Q-L0-4': 'B',
+      'Q-L0-5': 'B'
+    },
+    time_taken_seconds: 240,
+    violation_count: 0,
+    status: 'Completed',
+    reattempt_allowed: 0,
+    completed_at: '2026-08-24T11:15:00.000Z'
+  },
+
+  // ZPS11A 01 - Siddharth Pandey
+  {
+    id: 'SUB-ZPS11A01-L0',
+    quiz_id: 'QUIZ-L0',
+    student_id: 'ZPS11A 01',
+    student_name: 'Siddharth Pandey',
+    class_grade: '11',
+    level: 'Level 0',
+    score: 10,
+    total_marks: 10,
+    percentage: 100,
+    correct_count: 5,
+    attempted_count: 5,
+    total_questions: 5,
+    answers: {
+      'Q-L0-1': 'B',
+      'Q-L0-2': 'C',
+      'Q-L0-3': 'B',
+      'Q-L0-4': 'B',
+      'Q-L0-5': 'B'
+    },
+    time_taken_seconds: 200,
+    violation_count: 0,
+    status: 'Completed',
+    reattempt_allowed: 0,
+    completed_at: '2026-08-25T11:00:00.000Z'
+  },
+
+  // XYZ6A 01 - Aayush Maurya
+  {
+    id: 'SUB-XYZ6A01-L0',
+    quiz_id: 'QUIZ-L0',
+    student_id: 'XYZ6A 01',
+    student_name: 'Aayush Maurya',
+    class_grade: '6',
+    level: 'Level 0',
+    score: 10,
+    total_marks: 10,
+    percentage: 100,
+    correct_count: 5,
+    attempted_count: 5,
+    total_questions: 5,
+    answers: {
+      'Q-L0-1': 'B',
+      'Q-L0-2': 'C',
+      'Q-L0-3': 'B',
+      'Q-L0-4': 'B',
+      'Q-L0-5': 'B'
+    },
+    time_taken_seconds: 330,
+    violation_count: 0,
+    status: 'Completed',
+    reattempt_allowed: 0,
+    completed_at: '2026-08-26T10:15:00.000Z'
+  }
+];

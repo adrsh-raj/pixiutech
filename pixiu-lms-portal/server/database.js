@@ -532,6 +532,88 @@ function initializeDatabase() {
       }
     });
 
+    // Ensure quiz_submissions table has baseline submissions if empty
+    db.get("SELECT COUNT(*) as count FROM quiz_submissions", (err, row) => {
+      if (!err && row && row.count === 0) {
+        console.log("📝 Seeding Baseline Student Quiz Submissions & Proctored Records...");
+        const subStmt = db.prepare(`INSERT INTO quiz_submissions (
+          id, quiz_id, student_id, student_name, class_grade, level,
+          score, total_marks, percentage, correct_count, attempted_count, total_questions,
+          answers_json, time_taken_seconds, violation_count, status, reattempt_allowed, completed_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`);
+
+        // ZPS6A 01 - Aarav Sharma (Completed Quizzes for Level 0, Level 1, Level 2)
+        subStmt.run(
+          'SUB-ZPS6A01-L0', 'QUIZ-L0', 'ZPS6A 01', 'Aarav Sharma', '6', 'Level 0',
+          10, 10, 100, 5, 5, 5,
+          JSON.stringify({ 'Q-L0-1': 'B', 'Q-L0-2': 'C', 'Q-L0-3': 'B', 'Q-L0-4': 'B', 'Q-L0-5': 'B' }),
+          245, 0, 'Completed', '2026-08-22 11:15:00'
+        );
+        subStmt.run(
+          'SUB-ZPS6A01-L1', 'QUIZ-L1', 'ZPS6A 01', 'Aarav Sharma', '6', 'Level 1',
+          10, 10, 100, 5, 5, 5,
+          JSON.stringify({ 'Q-L1-1': 'B', 'Q-L1-2': 'B', 'Q-L1-3': 'A', 'Q-L1-4': 'C', 'Q-L1-5': 'B' }),
+          310, 0, 'Completed', '2026-08-26 11:20:00'
+        );
+        subStmt.run(
+          'SUB-ZPS6A01-L2', 'QUIZ-L2', 'ZPS6A 01', 'Aarav Sharma', '6', 'Level 2',
+          10, 10, 100, 5, 5, 5,
+          JSON.stringify({ 'Q-L2-1': 'B', 'Q-L2-2': 'B', 'Q-L2-3': 'B', 'Q-L2-4': 'B', 'Q-L2-5': 'A' }),
+          280, 0, 'Completed', '2026-08-29 11:35:00'
+        );
+
+        // ZPS6A 02 - Priya Patel
+        subStmt.run(
+          'SUB-ZPS6A02-L0', 'QUIZ-L0', 'ZPS6A 02', 'Priya Patel', '6', 'Level 0',
+          10, 10, 100, 5, 5, 5,
+          JSON.stringify({ 'Q-L0-1': 'B', 'Q-L0-2': 'C', 'Q-L0-3': 'B', 'Q-L0-4': 'B', 'Q-L0-5': 'B' }),
+          290, 0, 'Completed', '2026-08-22 11:45:00'
+        );
+
+        // ZPS7A 01 - Devansh Tiwari
+        subStmt.run(
+          'SUB-ZPS7A01-L0', 'QUIZ-L0', 'ZPS7A 01', 'Devansh Tiwari', '7', 'Level 0',
+          10, 10, 100, 5, 5, 5,
+          JSON.stringify({ 'Q-L0-1': 'B', 'Q-L0-2': 'C', 'Q-L0-3': 'B', 'Q-L0-4': 'B', 'Q-L0-5': 'B' }),
+          210, 0, 'Completed', '2026-08-23 10:30:00'
+        );
+
+        // ZPS8A 01 - Yash Srivastava
+        subStmt.run(
+          'SUB-ZPS8A01-L0', 'QUIZ-L0', 'ZPS8A 01', 'Yash Srivastava', '8', 'Level 0',
+          10, 10, 100, 5, 5, 5,
+          JSON.stringify({ 'Q-L0-1': 'B', 'Q-L0-2': 'C', 'Q-L0-3': 'B', 'Q-L0-4': 'B', 'Q-L0-5': 'B' }),
+          260, 0, 'Completed', '2026-08-24 10:45:00'
+        );
+
+        // ZPS9A 01 - Ayush Kushwaha
+        subStmt.run(
+          'SUB-ZPS9A01-L0', 'QUIZ-L0', 'ZPS9A 01', 'Ayush Kushwaha', '9', 'Level 0',
+          10, 10, 100, 5, 5, 5,
+          JSON.stringify({ 'Q-L0-1': 'B', 'Q-L0-2': 'C', 'Q-L0-3': 'B', 'Q-L0-4': 'B', 'Q-L0-5': 'B' }),
+          240, 0, 'Completed', '2026-08-24 11:15:00'
+        );
+
+        // ZPS11A 01 - Siddharth Pandey
+        subStmt.run(
+          'SUB-ZPS11A01-L0', 'QUIZ-L0', 'ZPS11A 01', 'Siddharth Pandey', '11', 'Level 0',
+          10, 10, 100, 5, 5, 5,
+          JSON.stringify({ 'Q-L0-1': 'B', 'Q-L0-2': 'C', 'Q-L0-3': 'B', 'Q-L0-4': 'B', 'Q-L0-5': 'B' }),
+          200, 0, 'Completed', '2026-08-25 11:00:00'
+        );
+
+        // XYZ6A 01 - Aayush Maurya
+        subStmt.run(
+          'SUB-XYZ6A01-L0', 'QUIZ-L0', 'XYZ6A 01', 'Aayush Maurya', '6', 'Level 0',
+          10, 10, 100, 5, 5, 5,
+          JSON.stringify({ 'Q-L0-1': 'B', 'Q-L0-2': 'C', 'Q-L0-3': 'B', 'Q-L0-4': 'B', 'Q-L0-5': 'B' }),
+          330, 0, 'Completed', '2026-08-26 10:15:00'
+        );
+
+        subStmt.finalize();
+      }
+    });
+
     // Seed database if empty
     db.get("SELECT COUNT(*) as count FROM users", async (err, row) => {
       if (row && row.count === 0) {
