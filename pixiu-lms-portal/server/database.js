@@ -225,9 +225,11 @@ function initializeDatabase() {
     // 15. Admin Broadcast Notifications & Class Announcements (Multi-Class 6, 7, 8, 9, 11 & Trainers)
     db.run(`CREATE TABLE IF NOT EXISTS notifications (
       id TEXT PRIMARY KEY,
-      target_type TEXT NOT NULL, -- 'All_Students', 'Specific_Class', 'All_Trainers', 'Universal'
+      target_type TEXT NOT NULL, -- 'All_Students', 'Specific_Class', 'All_Trainers', 'Universal', 'School'
       target_classes TEXT,        -- e.g. "6,7,8,9,11" or "6"
       target_trainer_id TEXT,     -- e.g. "TR-01" or "All"
+      target_school_id TEXT,      -- e.g. "ZPS", "XYZ", "ADMIN"
+      type TEXT DEFAULT 'announcement', -- 'announcement', 'payment_claim', 'payment_matched'
       title TEXT NOT NULL,
       message TEXT NOT NULL,
       template_type TEXT,        -- 'next_class', 'revision', 'kit_prep', 'general'
@@ -237,7 +239,11 @@ function initializeDatabase() {
       status TEXT DEFAULT 'Active', -- 'Active', 'Archived'
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
+    )`, () => {
+      // Safe non-breaking migrations for existing SQLite files
+      db.run("ALTER TABLE notifications ADD COLUMN target_school_id TEXT", () => {});
+      db.run("ALTER TABLE notifications ADD COLUMN type TEXT DEFAULT 'announcement'", () => {});
+    });
 
     // 16. Audit Logs for Security & User Logins
     db.run(`CREATE TABLE IF NOT EXISTS audit_logs (
@@ -269,6 +275,25 @@ function initializeDatabase() {
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
 
+    // 18. Notification Reads (Per-User Read Tracking to persist read state across devices & history clear)
+    db.run(`CREATE TABLE IF NOT EXISTS notification_reads (
+      id TEXT PRIMARY KEY,
+      notification_id TEXT NOT NULL,
+      user_key TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(notification_id, user_key)
+    )`);
+
+    // Ensure notifications table has seed data if empty
+    db.get("SELECT COUNT(*) as count FROM notifications", (err, row) => {
+      if (!err && row && row.count === 0) {
+        const notifStmt = db.prepare("INSERT INTO notifications VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        notifStmt.run('NOTIF-001', 'Universal', '6,7,8,9,11', 'All', '🚀 Term 1 Robotics Lab Sessions Live', 'Welcome to Pixiu Tech Innovation Lab! Friday and Saturday hands-on lab sessions are active for Classes 6A to 11A.', 'next_class', 'Friday, 04 Sep 2026', '10:00 AM', 'info', 'Active', '2026-08-31 22:40:00', '2026-08-31 22:40:00');
+        notifStmt.run('NOTIF-002', 'All_Students', '6,7,8,9,11', 'All', '📝 Unit 1 Concept Revision & Circuit Viva Notice', 'Attention All Classes (6, 7, 8, 9, 11): Unit 1 concept revision and hands-on circuit viva checks will be held in Friday session. Please study the Unit 1 guides in your Student Portal.', 'revision', 'Friday, 04 Sep 2026', '11:00 AM', 'important', 'Active', '2026-08-31 22:41:00', '2026-08-31 22:41:00');
+        notifStmt.run('NOTIF-003', 'All_Trainers', '6,7,8,9,11', 'TR-01', '🛠️ Trainer Directive: Prepare Level 1 Unit 2 Sensor Kits', 'Trainer Vikas Pandey: Please inspect and calibrate the LDR, IR and ultrasonic sensors for Classes 6A to 11A before Friday morning session.', 'kit_prep', 'Friday, 04 Sep 2026', '09:30 AM', 'urgent', 'Active', '2026-08-31 22:42:00', '2026-08-31 22:42:00');
+        notifStmt.finalize();
+      }
+    });
 
     // Seed database if empty
     db.get("SELECT COUNT(*) as count FROM users", async (err, row) => {

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import Modal from '../components/ui/Modal';
+import { filterNotificationsForUser, fetchUserReadNotifIds, saveUserReadNotifIds, getCanonicalUserKey } from '../utils/notifications';
 
 export default function StudentPortal() {
   const { user, logout } = useAuth();
@@ -102,22 +103,19 @@ export default function StudentPortal() {
   const whatsappKitUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(
     `Hello Pixiu Tech Team! 🚀\nI am ${student.name} from Class ${studentGrade}A (Student ID: ${student.student_id}) at ${school}.\nI want to buy/order my personal STEM Robotics Hardware Kit (${studentKit.name || `Class ${studentGrade} Kit`}) at the special subsidized student discount rate (below market price).\nPlease share the discounted kit price and delivery details.`
   )}`;
-  const classNotifs = (notifications || []).filter(n => {
-    if (n.status === 'Archived') return false;
-    if (n.target_type === 'Universal' || n.target_type === 'All_Students') return true;
-    if (n.target_type === 'Specific_Class' || n.target_classes) {
-      const classes = (n.target_classes || '').split(',').map(c => c.trim());
-      return classes.includes(studentGrade.trim()) || classes.length === 5;
-    }
-    return false;
-  });
+  const studentUser = useMemo(() => {
+    return user || { role: 'student', username: cleanId, related_id: cleanId };
+  }, [user, cleanId]);
 
-  // Read / Unread State per student (Normalized key without whitespace issues)
-  const studentNotifKey = (cleanId || 'student').replace(/\s+/g, '_').toUpperCase();
+  const classNotifs = useMemo(() => {
+    return filterNotificationsForUser(notifications, studentUser);
+  }, [notifications, studentUser]);
 
   const [readNotifIds, setReadNotifIds] = useState(() => {
     try {
-      const saved = localStorage.getItem(`pixiu_read_notifs_${studentNotifKey}`);
+      const key = getCanonicalUserKey(studentUser);
+      if (!key) return [];
+      const saved = localStorage.getItem(`pixiu_read_notifs_${key}`);
       return saved ? JSON.parse(saved) : [];
     } catch (e) {
       return [];
@@ -125,32 +123,27 @@ export default function StudentPortal() {
   });
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(`pixiu_read_notifs_${studentNotifKey}`);
-      if (saved) setReadNotifIds(JSON.parse(saved));
-      else setReadNotifIds([]);
-    } catch (e) {
-      setReadNotifIds([]);
-    }
-  }, [studentNotifKey]);
+    if (!studentUser) return;
+    let isMounted = true;
+    fetchUserReadNotifIds(studentUser).then(ids => {
+      if (isMounted && Array.isArray(ids)) {
+        setReadNotifIds(ids);
+      }
+    });
+    return () => { isMounted = false; };
+  }, [studentUser]);
 
   const [isNotifDrawerOpen, setIsNotifDrawerOpen] = useState(false);
 
-  const markAsRead = (id) => {
-    const updated = Array.from(new Set([...readNotifIds, id]));
+  const markAsRead = async (id) => {
+    const updated = await saveUserReadNotifIds(id, studentUser);
     setReadNotifIds(updated);
-    try {
-      localStorage.setItem(`pixiu_read_notifs_${studentNotifKey}`, JSON.stringify(updated));
-    } catch (e) {}
   };
 
-  const markAllAsRead = () => {
+  const markAllAsRead = async () => {
     const allIds = classNotifs.map(n => n.id);
-    const updated = Array.from(new Set([...readNotifIds, ...allIds]));
+    const updated = await saveUserReadNotifIds(allIds, studentUser);
     setReadNotifIds(updated);
-    try {
-      localStorage.setItem(`pixiu_read_notifs_${studentNotifKey}`, JSON.stringify(updated));
-    } catch (e) {}
   };
 
   const unreadCount = classNotifs.filter(n => !readNotifIds.includes(n.id)).length;

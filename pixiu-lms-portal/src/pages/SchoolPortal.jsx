@@ -15,6 +15,7 @@ import KpiCard from '../components/ui/KpiCard';
 import Badge from '../components/ui/Badge';
 import Modal from '../components/ui/Modal';
 import { useToast } from '../context/ToastContext';
+import { filterNotificationsForUser, fetchUserReadNotifIds, saveUserReadNotifIds, getCanonicalUserKey } from '../utils/notifications';
 
 export default function SchoolPortal() {
   const { user, logout } = useAuth();
@@ -68,24 +69,6 @@ export default function SchoolPortal() {
     urgency: 'High'
   });
 
-  // Notification Flyout & Read State
-  const [isNotifOpen, setIsNotifOpen] = useState(false);
-  const [readNotifIds, setReadNotifIds] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem(`pixiu_school_read_${defaultSchoolId}`) || '[]');
-    } catch (e) {
-      return [];
-    }
-  });
-
-  useEffect(() => {
-    try {
-      setReadNotifIds(JSON.parse(localStorage.getItem(`pixiu_school_read_${defaultSchoolId}`) || '[]'));
-    } catch (e) {
-      setReadNotifIds([]);
-    }
-  }, [defaultSchoolId]);
-
   const activeSchool = useMemo(() => {
     return schools.find(s => s.id === selectedSchoolId) || schools[0] || {
       id: 'ZPS',
@@ -98,17 +81,51 @@ export default function SchoolPortal() {
     };
   }, [schools, selectedSchoolId]);
 
-  // Relevant School Announcements from Central Admin
+  const schoolUser = useMemo(() => {
+    return user || { role: 'school', school_id: activeSchool.id, related_id: activeSchool.id };
+  }, [user, activeSchool]);
+
+  // Relevant School Announcements filtered by role & audience
   const schoolNotifications = useMemo(() => {
-    if (!notifications || !Array.isArray(notifications)) return [];
-    return notifications.filter(n => {
-      const aud = n.target_audience || n.target_school_id || n.target_type;
-      if (!aud || aud === 'ALL' || aud === 'Universal' || aud === 'All_Students' || aud === 'All_Trainers') return true;
-      if (aud === activeSchool.id || aud === activeSchool.code) return true;
-      if (n.target_type === 'School' && (n.target_school_id === activeSchool.id || n.target_school_id === activeSchool.code)) return true;
-      return false;
+    return filterNotificationsForUser(notifications, schoolUser);
+  }, [notifications, schoolUser]);
+
+  // Notification Flyout & Read State with backend sync
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [readNotifIds, setReadNotifIds] = useState(() => {
+    try {
+      const key = getCanonicalUserKey(schoolUser);
+      if (!key) return [];
+      const saved = localStorage.getItem(`pixiu_read_notifs_${key}`);
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    if (!schoolUser) return;
+    let isMounted = true;
+    fetchUserReadNotifIds(schoolUser).then(ids => {
+      if (isMounted && Array.isArray(ids)) {
+        setReadNotifIds(ids);
+      }
     });
-  }, [notifications, activeSchool]);
+    return () => { isMounted = false; };
+  }, [schoolUser]);
+
+  const markAsRead = async (id) => {
+    const updated = await saveUserReadNotifIds(id, schoolUser);
+    setReadNotifIds(updated);
+  };
+
+  const markAllAsRead = async () => {
+    const ids = schoolNotifications.map(n => n.id);
+    const updated = await saveUserReadNotifIds(ids, schoolUser);
+    setReadNotifIds(updated);
+  };
+
+  const unreadNotifCount = schoolNotifications.filter(n => !readNotifIds.includes(n.id)).length;
 
   // Filter students for this school
   const schoolStudents = useMemo(() => {
@@ -222,7 +239,7 @@ export default function SchoolPortal() {
 
     // Push high-priority notification to Admin
     await pushSchoolNotification({
-      target_school_id: 'ALL',
+      target_school_id: 'ADMIN',
       title: `💰 Payment Proof Submitted: ${activeSchool.name}`,
       message: `${activeSchool.name} submitted payment proof for ${submittingPaymentInvoice.tranche_title || 'Robotics Tranche'} (₹${Number(submittingPaymentInvoice.amount).toLocaleString('en-IN')}) with UTR: ${paymentFormData.transaction_id}. Please match and reconcile.`,
       type: 'payment_claim',
@@ -400,6 +417,107 @@ export default function SchoolPortal() {
             >
               <Cpu size={14} /> ⚡ Virtual Lab Simulator
             </Link>
+
+            {/* School Announcements Bell */}
+            <div className="relative">
+              <button 
+                onClick={() => setIsNotifOpen(!isNotifOpen)}
+                className="relative p-2 text-slate-300 hover:text-white hover:bg-slate-800 rounded-xl transition-colors cursor-pointer border border-slate-700"
+                title="Institutional Notices & Official Updates"
+              >
+                <Bell size={17} />
+                {unreadNotifCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center border-2 border-slate-900 shadow-sm animate-pulse">
+                    {unreadNotifCount}
+                  </span>
+                )}
+              </button>
+
+              {/* Notification Flyout */}
+              {isNotifOpen && (
+                <div className="fixed sm:absolute inset-x-3 top-16 sm:inset-auto sm:right-0 sm:top-auto sm:mt-3 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden z-50 text-slate-800 max-h-[80vh] flex flex-col animate-in fade-in zoom-in-95">
+                  <div className="p-3.5 bg-slate-900 text-white flex justify-between items-center border-b border-slate-800 shrink-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Megaphone size={15} className="text-pixiu-blue shrink-0"/>
+                      <h3 className="font-bold text-xs uppercase tracking-wider truncate">
+                        Institutional Notices ({unreadNotifCount} Unread)
+                      </h3>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {unreadNotifCount > 0 && (
+                        <button
+                          onClick={markAllAsRead}
+                          className="text-[10px] font-bold text-blue-400 hover:text-blue-300 cursor-pointer underline"
+                        >
+                          Mark all read
+                        </button>
+                      )}
+                      <button 
+                        onClick={() => setIsNotifOpen(false)} 
+                        className="p-1 text-slate-400 hover:text-white cursor-pointer"
+                      >
+                        <X size={16}/>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="overflow-y-auto p-3 space-y-2.5 flex-1">
+                    {schoolNotifications.map(notif => {
+                      const isRead = readNotifIds.includes(notif.id);
+                      return (
+                        <div 
+                          key={notif.id}
+                          className={`p-3 rounded-xl border text-xs space-y-2 transition-all ${
+                            isRead 
+                              ? 'bg-slate-50 border-slate-200 opacity-75' 
+                              : 'bg-blue-50/60 border-blue-200 shadow-xs'
+                          }`}
+                        >
+                          <div className="flex justify-between items-start gap-1">
+                            <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${
+                              notif.severity === 'urgent' ? 'bg-rose-100 text-rose-800' :
+                              notif.severity === 'important' ? 'bg-purple-100 text-purple-800' :
+                              'bg-blue-100 text-blue-800'
+                            }`}>
+                              {notif.severity ? notif.severity.toUpperCase() : 'NOTICE'}
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              {notif.scheduled_date || notif.created_at || 'Notice'}
+                            </span>
+                          </div>
+
+                          <h4 className="font-bold text-slate-900 text-xs">{notif.title}</h4>
+                          <p className="text-[11px] text-slate-600 leading-relaxed bg-white p-2.5 rounded-lg border border-slate-100 whitespace-pre-line">
+                            {notif.message}
+                          </p>
+
+                          <div className="flex justify-end pt-1">
+                            {isRead ? (
+                              <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
+                                <ShieldCheck size={12}/> Read
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => markAsRead(notif.id)}
+                                className="px-2.5 py-1 bg-pixiu-blue hover:bg-blue-600 text-white rounded-md text-[10px] font-bold transition-all cursor-pointer shadow-xs"
+                              >
+                                ✓ Mark as Read
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {schoolNotifications.length === 0 && (
+                      <div className="p-8 text-center text-slate-400 text-xs font-medium">
+                        No announcements for this school.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
 
             <div className="hidden sm:block text-right">
               <p className="text-xs font-bold text-white truncate max-w-[200px]">{activeSchool.name}</p>

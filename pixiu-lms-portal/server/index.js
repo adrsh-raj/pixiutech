@@ -865,18 +865,20 @@ app.get('/api/notifications', (req, res) => {
 });
 
 app.post('/api/notifications', (req, res) => {
-  const { target_type, target_classes, target_trainer_id, title, message, template_type, scheduled_date, scheduled_time, severity } = req.body;
+  const { target_type, target_classes, target_trainer_id, target_school_id, type, title, message, template_type, scheduled_date, scheduled_time, severity } = req.body;
   const id = `NOTIF-${Date.now().toString().slice(-4)}`;
   const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
 
-  const sql = `INSERT INTO notifications (id, target_type, target_classes, target_trainer_id, title, message, template_type, scheduled_date, scheduled_time, severity, status, created_at, updated_at) 
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Active', ?, ?)`;
+  const sql = `INSERT INTO notifications (id, target_type, target_classes, target_trainer_id, target_school_id, type, title, message, template_type, scheduled_date, scheduled_time, severity, status, created_at, updated_at) 
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Active', ?, ?)`;
 
   db.run(sql, [
     id, 
     target_type || 'All_Students', 
     target_classes || '6,7,8,9,11', 
     target_trainer_id || 'All', 
+    target_school_id || null,
+    type || 'announcement',
     title, 
     message, 
     template_type || 'custom', 
@@ -893,6 +895,8 @@ app.post('/api/notifications', (req, res) => {
       target_type: target_type || 'All_Students', 
       target_classes: target_classes || '6,7,8,9,11', 
       target_trainer_id: target_trainer_id || 'All', 
+      target_school_id: target_school_id || null,
+      type: type || 'announcement',
       title, 
       message, 
       template_type: template_type || 'custom', 
@@ -937,6 +941,35 @@ app.delete('/api/notifications/:id', (req, res) => {
     res.json({ success: true, deleted: req.params.id });
   });
 });
+
+// ==================== NOTIFICATION READ STATUS API (Per-User Cross-Device Tracking) ====================
+app.get('/api/notifications/reads/:userKey', (req, res) => {
+  const userKey = (req.params.userKey || '').toLowerCase().replace(/\s+/g, '');
+  if (!userKey) return res.json([]);
+  db.all("SELECT notification_id FROM notification_reads WHERE user_key = ?", [userKey], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json((rows || []).map(r => r.notification_id));
+  });
+});
+
+app.post('/api/notifications/reads', (req, res) => {
+  const { userKey, notificationId, notificationIds } = req.body;
+  const cleanUserKey = (userKey || '').toLowerCase().replace(/\s+/g, '');
+  if (!cleanUserKey) return res.status(400).json({ error: 'User key required' });
+
+  const idsToMark = Array.isArray(notificationIds) ? notificationIds : (notificationId ? [notificationId] : []);
+  if (idsToMark.length === 0) return res.json({ success: true, count: 0 });
+
+  const stmt = db.prepare("INSERT OR IGNORE INTO notification_reads (id, notification_id, user_key) VALUES (?, ?, ?)");
+  idsToMark.forEach(notifId => {
+    stmt.run([`${cleanUserKey}_${notifId}`, notifId, cleanUserKey]);
+  });
+  stmt.finalize((err) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, count: idsToMark.length });
+  });
+});
+
 // Audit Logs API (Persistent SQLite storage)
 app.get('/api/logs', (req, res) => {
   db.all('SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 500', [], (err, rows) => {

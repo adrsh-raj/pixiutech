@@ -726,17 +726,36 @@ export function DataProvider({ children }) {
       title,
       message,
       type,
+      target_type: 'School',
+      target_school_id,
       target_audience: target_school_id,
       priority,
+      severity: priority === 'high' ? 'urgent' : 'info',
       created_at: new Date().toISOString().split('T')[0],
       sender_name: 'Pixiu Central Administration'
     };
 
     setNotifications(prev => {
-      const updated = [newNotif, ...prev];
+      const updated = [newNotif, ...prev.filter(n => n.id !== newNotif.id)];
       try { localStorage.setItem('pixiu_notifications', JSON.stringify(updated)); } catch (e) {}
       return updated;
     });
+
+    try {
+      fetch(`${API_BASE}/notifications`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          target_type: 'School',
+          target_school_id,
+          title,
+          message,
+          type,
+          severity: priority === 'high' ? 'urgent' : 'info'
+        })
+      }).catch(() => {});
+    } catch (e) {}
+
     return { success: true, notification: newNotif };
   };
 

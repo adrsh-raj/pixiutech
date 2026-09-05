@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense, Component } from 'react';
+import { useState, useEffect, useMemo, lazy, Suspense, Component } from 'react';
 import { BrowserRouter, Routes, Route, Outlet, Navigate, useNavigate, Link } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
@@ -16,6 +16,7 @@ import StudentPortal from './pages/StudentPortal';
 import SchoolPortal from './pages/SchoolPortal';
 import Verify from './pages/Verify';
 import AuditLogs from './pages/AuditLogs';
+import { filterNotificationsForUser, fetchUserReadNotifIds, saveUserReadNotifIds, getCanonicalUserKey } from './utils/notifications';
 
 // Robust lazy import with automatic single reload when new builds invalidate asset chunks
 const lazyWithRetry = (importFn) => {
@@ -122,11 +123,14 @@ function ProtectedLayout() {
   const [activeBellTab, setActiveBellTab] = useState('announcements'); // 'announcements' | 'system'
   const [actionLoading, setActionLoading] = useState(null);
 
-  const getUserKey = (u) => (u?.username || u?.id || 'admin').toLowerCase().trim();
+  const visibleNotifications = useMemo(() => {
+    return filterNotificationsForUser(notifications, user);
+  }, [notifications, user]);
 
   const [readNotifIds, setReadNotifIds] = useState(() => {
     try {
-      const key = (user?.username || user?.id || 'admin').toLowerCase().trim();
+      const key = getCanonicalUserKey(user);
+      if (!key) return [];
       const saved = localStorage.getItem(`pixiu_read_notifs_${key}`);
       return saved ? JSON.parse(saved) : [];
     } catch (e) {
@@ -135,33 +139,25 @@ function ProtectedLayout() {
   });
 
   useEffect(() => {
-    const key = (user?.username || user?.id || 'admin').toLowerCase().trim();
-    try {
-      const saved = localStorage.getItem(`pixiu_read_notifs_${key}`);
-      if (saved) setReadNotifIds(JSON.parse(saved));
-      else setReadNotifIds([]);
-    } catch (e) {
-      setReadNotifIds([]);
-    }
+    if (!user) return;
+    let isMounted = true;
+    fetchUserReadNotifIds(user).then(ids => {
+      if (isMounted && Array.isArray(ids)) {
+        setReadNotifIds(ids);
+      }
+    });
+    return () => { isMounted = false; };
   }, [user]);
 
-  const markAsRead = (id) => {
-    const key = getUserKey(user);
-    const updated = Array.from(new Set([...readNotifIds, id]));
+  const markAsRead = async (id) => {
+    const updated = await saveUserReadNotifIds(id, user);
     setReadNotifIds(updated);
-    try {
-      localStorage.setItem(`pixiu_read_notifs_${key}`, JSON.stringify(updated));
-    } catch (e) {}
   };
 
-  const markAllAsRead = () => {
-    const key = getUserKey(user);
-    const allIds = (notifications || []).map(n => n.id);
-    const updated = Array.from(new Set([...readNotifIds, ...allIds]));
+  const markAllAsRead = async () => {
+    const visibleIds = visibleNotifications.map(n => n.id);
+    const updated = await saveUserReadNotifIds(visibleIds, user);
     setReadNotifIds(updated);
-    try {
-      localStorage.setItem(`pixiu_read_notifs_${key}`, JSON.stringify(updated));
-    } catch (e) {}
   };
 
   if (loading) {
@@ -203,7 +199,7 @@ function ProtectedLayout() {
     return true;
   });
 
-  const unreadAnnouncementsCount = (notifications || []).filter(n => !readNotifIds.includes(n.id) && n.status !== 'Archived').length;
+  const unreadAnnouncementsCount = visibleNotifications.filter(n => !readNotifIds.includes(n.id)).length;
   const totalUnreadCount = unreadAnnouncementsCount + (visibleAlerts ? visibleAlerts.length : 0);
 
   return (
@@ -302,7 +298,7 @@ function ProtectedLayout() {
                           </div>
                         )}
 
-                        {(notifications || []).map(notif => {
+                        {(visibleNotifications || []).map(notif => {
                           const isRead = readNotifIds.includes(notif.id);
                           return (
                             <div 
@@ -349,7 +345,7 @@ function ProtectedLayout() {
                           );
                         })}
 
-                        {notifications.length === 0 && (
+                        {visibleNotifications.length === 0 && (
                           <div className="p-8 text-center text-slate-400 text-xs font-medium">
                             No announcements published yet.
                           </div>
