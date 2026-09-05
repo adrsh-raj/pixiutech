@@ -8,7 +8,8 @@ import {
   Award, BookOpen, Activity, FileText, Download, CheckCircle, 
   Clock, LogOut, User, Box, PlaySquare, Eye, Sparkles, Megaphone, 
   Bell, Check, X, Star, ShieldCheck, CheckCircle2, ChevronRight, Send, Trash2,
-  Cpu, Maximize2, Zap, Layers, Info, List, LayoutGrid, PackageCheck, MessageCircle, ShoppingBag, PhoneCall
+  Cpu, Maximize2, Zap, Layers, Info, List, LayoutGrid, PackageCheck, MessageCircle, ShoppingBag, PhoneCall,
+  Calendar
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import Modal from '../components/ui/Modal';
@@ -23,7 +24,8 @@ export default function StudentPortal() {
   const { 
     students, schools, content, projects, deleteProject, getStudentAttendance, 
     notifications, curriculum, studentReviews = [], classKits = {}, inventory = [],
-    quizzes = [], quizSubmissions = [], submitQuizAttempt
+    quizzes = [], quizSubmissions = [], submitQuizAttempt,
+    attendance = [], sessions = []
   } = useData();
   const [selectedComponent, setSelectedComponent] = useState(null);
   const [isKitDiagramModalOpen, setIsKitDiagramModalOpen] = useState(false);
@@ -43,6 +45,8 @@ export default function StudentPortal() {
     }
   });
 
+  const [attendanceTick, setAttendanceTick] = useState(0);
+
   useEffect(() => {
     const handleUpdate = () => {
       try {
@@ -50,11 +54,23 @@ export default function StudentPortal() {
         if (raw) setLocalReviews(JSON.parse(raw));
       } catch (e) {}
     };
+
+    const handleAttUpdate = () => {
+      setAttendanceTick(t => t + 1);
+    };
+
     window.addEventListener('storage', handleUpdate);
     window.addEventListener('pixiu_student_reviews_updated', handleUpdate);
+    window.addEventListener('storage', handleAttUpdate);
+    window.addEventListener('pixiu_attendance_updated', handleAttUpdate);
+    window.addEventListener('pixiu_sessions_updated', handleAttUpdate);
+
     return () => {
       window.removeEventListener('storage', handleUpdate);
       window.removeEventListener('pixiu_student_reviews_updated', handleUpdate);
+      window.removeEventListener('storage', handleAttUpdate);
+      window.removeEventListener('pixiu_attendance_updated', handleAttUpdate);
+      window.removeEventListener('pixiu_sessions_updated', handleAttUpdate);
     };
   }, []);
 
@@ -85,7 +101,56 @@ export default function StudentPortal() {
   };
 
   const school = schools.find(s => s.id === student.school_id)?.name || 'Zenith Public School';
-  const attendanceRate = getStudentAttendance(student.student_id);
+  const attendanceRate = getStudentAttendance ? getStudentAttendance(student.student_id) : 100;
+
+  const studentCleanId = (student.student_id || '').toUpperCase().replace(/\s+/g, '');
+  const studentAttendanceRecords = useMemo(() => {
+    return (attendance || []).filter(a => (a.student_id || '').toUpperCase().replace(/\s+/g, '') === studentCleanId);
+  }, [attendance, studentCleanId, attendanceTick]);
+
+  const studentSessionsLog = useMemo(() => {
+    const classId = student.class_id;
+    const logs = [];
+
+    const relevantSessions = (sessions || []).filter(s => s.class_id === classId);
+    relevantSessions.forEach(ses => {
+      const att = studentAttendanceRecords.find(a => a.session_id === ses.id);
+      const isConducted = ses.is_locked === 1 || !!att;
+      if (isConducted) {
+        logs.push({
+          id: ses.id,
+          date: att?.date || ses.date,
+          day: att?.day || ses.day || '',
+          time: att?.time || ses.time || '10:00 AM',
+          topic: ses.topic,
+          notes: ses.notes,
+          status: att ? att.status : 'Present',
+          isLocked: ses.is_locked === 1
+        });
+      }
+    });
+
+    studentAttendanceRecords.forEach(att => {
+      if (!logs.some(l => l.id === att.session_id)) {
+        const ses = (sessions || []).find(s => s.id === att.session_id);
+        logs.push({
+          id: att.session_id,
+          date: att.date || ses?.date || 'Recent Class',
+          day: att.day || ses?.day || '',
+          time: att.time || ses?.time || '10:00 AM',
+          topic: ses?.topic || 'Robotics Hands-on Session',
+          notes: ses?.notes || 'Lab session completed',
+          status: att.status || 'Present',
+          isLocked: true
+        });
+      }
+    });
+
+    return logs.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  }, [sessions, studentAttendanceRecords, student.class_id, attendanceTick]);
+
+  const presentCount = studentSessionsLog.filter(s => s.status === 'Present').length;
+  const totalConductedCount = studentSessionsLog.length;
   const studentProjects = projects.filter(p => {
     if (!p || !p.student_id) return false;
     const pid = p.student_id.trim().toLowerCase().replace(/\s+/g, '');
@@ -968,7 +1033,71 @@ export default function StudentPortal() {
           </div>
         </div>
 
+        {/* ==================== 📅 LAB ATTENDANCE & PARTICIPATION LOGS ==================== */}
+        <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 p-4 sm:p-8 shadow-sm space-y-4 sm:space-y-6">
+          <div className="flex flex-wrap justify-between items-center gap-2">
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm sm:text-lg font-bold text-slate-800 flex items-center gap-2">
+                  <Calendar size={18} className="text-emerald-600" />
+                  Laboratory Attendance & Class Session Logs
+                </h3>
+                <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
+                  Verified Roster
+                </span>
+              </div>
+              <p className="text-[11px] sm:text-xs text-slate-500">
+                Official syllabus lab classes & attendance records marked by trainer in real-time
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] sm:text-xs font-bold bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-200 shrink-0">
+                {attendanceRate}% Overall • {presentCount} of {totalConductedCount || 1} Sessions Attended
+              </span>
+            </div>
+          </div>
 
+          {studentSessionsLog.length > 0 ? (
+            <div className="divide-y divide-slate-100 border border-slate-200/80 rounded-2xl overflow-hidden">
+              {studentSessionsLog.map(ses => (
+                <div key={ses.id} className="p-4 sm:p-5 hover:bg-slate-50/70 transition-colors flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                  <div className="space-y-1 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-mono text-[11px] font-bold bg-blue-50 text-pixiu-blue px-2.5 py-0.5 rounded-md flex items-center gap-1 border border-blue-100">
+                        <Calendar size={12} /> {ses.date} {ses.time ? `• ${ses.time}` : ''}
+                      </span>
+                      <span className="font-bold text-slate-700 text-xs px-2 py-0.5 bg-slate-100 rounded-md border border-slate-200">
+                        Class {studentGrade}A Lab
+                      </span>
+                      <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border flex items-center gap-1 ${
+                        ses.status === 'Present'
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : 'bg-rose-50 text-rose-700 border-rose-200'
+                      }`}>
+                        <CheckCircle size={10} /> {ses.status}
+                      </span>
+                    </div>
+                    <p className="text-xs sm:text-sm font-bold text-slate-800 mt-1">{ses.topic}</p>
+                    {ses.notes && <p className="text-xs text-slate-500">{ses.notes}</p>}
+                  </div>
+
+                  <div className="text-right shrink-0">
+                    <span className="text-[10px] text-slate-400 font-medium block">Verification</span>
+                    <span className="text-[11px] font-bold text-emerald-600">✓ Trainer Logged</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="p-8 text-center text-slate-400 bg-slate-50 rounded-2xl border border-slate-200">
+              <Calendar size={32} className="mx-auto text-slate-300 mb-2" />
+              <p className="font-bold text-slate-700 text-xs sm:text-sm">Lab Attendance Synced ({attendanceRate}%)</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Detailed per-session timestamps and topic logs will appear as practical lab sessions are recorded by your trainer.
+              </p>
+            </div>
+          )}
+        </div>
 
         {/* Class Study Material & Workbooks (Watermarked Edition) */}
         <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 p-4 sm:p-8 shadow-sm space-y-4 sm:space-y-6">

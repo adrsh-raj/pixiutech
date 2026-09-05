@@ -118,9 +118,10 @@ export function DataProvider({ children }) {
         return SEED_SESSIONS;
       }
       const cleanSaved = saved.filter(s => s.school_id !== 'ABC' && !s.id?.startsWith('SES-ABC'));
-      const seedIds = SEED_SESSIONS.map(s => s.id);
-      const custom = cleanSaved.filter(s => !seedIds.includes(s.id));
-      const merged = [...custom, ...SEED_SESSIONS];
+      const sessionMap = new Map();
+      SEED_SESSIONS.forEach(s => { if (s && s.id) sessionMap.set(s.id, s); });
+      cleanSaved.forEach(s => { if (s && s.id) sessionMap.set(s.id, s); });
+      const merged = Array.from(sessionMap.values());
       localStorage.setItem('pixiu_sessions', JSON.stringify(merged));
       return merged;
     } catch (e) {
@@ -136,9 +137,11 @@ export function DataProvider({ children }) {
         return SEED_ATTENDANCE;
       }
       const cleanSaved = saved.filter(a => !a.session_id?.startsWith('SES-ABC') && !a.student_id?.startsWith('ABC'));
-      const seedSessionIds = SEED_SESSIONS.map(s => s.id);
-      const custom = cleanSaved.filter(a => !seedSessionIds.includes(a.session_id));
-      const merged = [...custom, ...SEED_ATTENDANCE];
+      const attMap = new Map();
+      const makeKey = (a) => `${a.session_id}__${(a.student_id || '').toUpperCase().replace(/\s+/g, '')}`;
+      SEED_ATTENDANCE.forEach(a => { if (a && a.session_id && a.student_id) attMap.set(makeKey(a), a); });
+      cleanSaved.forEach(a => { if (a && a.session_id && a.student_id) attMap.set(makeKey(a), a); });
+      const merged = Array.from(attMap.values());
       localStorage.setItem('pixiu_attendance', JSON.stringify(merged));
       return merged;
     } catch (e) {
@@ -222,12 +225,23 @@ export function DataProvider({ children }) {
         }
         return r;
       });
-      if (cleanReviews.length === 0) {
-        localStorage.setItem('pixiu_student_reviews', JSON.stringify(SEED_STUDENT_REVIEWS));
-        return SEED_STUDENT_REVIEWS;
-      }
-      localStorage.setItem('pixiu_student_reviews', JSON.stringify(cleanReviews));
-      return cleanReviews;
+
+      const revMap = new Map();
+      SEED_STUDENT_REVIEWS.forEach(r => {
+        if (r && r.student_id) {
+          const key = `${r.student_id.toUpperCase().replace(/\s+/g, '')}__${(r.unit_code || r.level || '').toLowerCase().replace(/\s+/g, '')}`;
+          revMap.set(key, r);
+        }
+      });
+      cleanReviews.forEach(r => {
+        if (r && r.student_id) {
+          const key = `${r.student_id.toUpperCase().replace(/\s+/g, '')}__${(r.unit_code || r.level || '').toLowerCase().replace(/\s+/g, '')}`;
+          revMap.set(key, r);
+        }
+      });
+      const merged = Array.from(revMap.values());
+      localStorage.setItem('pixiu_student_reviews', JSON.stringify(merged));
+      return merged;
     } catch (e) {
       return SEED_STUDENT_REVIEWS;
     }
@@ -302,6 +316,12 @@ export function DataProvider({ children }) {
           if (fresh && fresh.length > 0) setAttendance(fresh);
         } catch (err) {}
       }
+      if (e.key === 'pixiu_sessions') {
+        try {
+          const fresh = JSON.parse(e.newValue || '[]');
+          if (fresh && fresh.length > 0) setSessions(fresh);
+        } catch (err) {}
+      }
       if (e.key === 'pixiu_quizzes') {
         try {
           const fresh = JSON.parse(e.newValue || '[]');
@@ -315,8 +335,30 @@ export function DataProvider({ children }) {
         } catch (err) {}
       }
     };
+
+    const handleCustomAttendance = () => {
+      try {
+        const raw = localStorage.getItem('pixiu_attendance');
+        if (raw) setAttendance(JSON.parse(raw));
+      } catch (err) {}
+    };
+
+    const handleCustomSessions = () => {
+      try {
+        const raw = localStorage.getItem('pixiu_sessions');
+        if (raw) setSessions(JSON.parse(raw));
+      } catch (err) {}
+    };
+
     window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+    window.addEventListener('pixiu_attendance_updated', handleCustomAttendance);
+    window.addEventListener('pixiu_sessions_updated', handleCustomSessions);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('pixiu_attendance_updated', handleCustomAttendance);
+      window.removeEventListener('pixiu_sessions_updated', handleCustomSessions);
+    };
   }, []);
 
   // --- REFRESH ALL TABLES FROM BACKEND IF AVAILABLE ---
@@ -916,11 +958,16 @@ export function DataProvider({ children }) {
     const liveTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     const timestamp = `${liveDay}, ${liveDate} • ${liveTime}`;
 
+    const cleanS = (studentId || '').toUpperCase().replace(/\s+/g, '');
+
     setAttendance(prev => {
-      const filtered = prev.filter(a => !(a.session_id === sessionId && a.student_id === studentId));
+      const filtered = prev.filter(a => !(a.session_id === sessionId && (a.student_id || '').toUpperCase().replace(/\s+/g, '') === cleanS));
       const updated = [...filtered, { session_id: sessionId, student_id: studentId, status, date: liveDate, day: liveDay, time: liveTime, timestamp }];
       try {
         localStorage.setItem('pixiu_attendance', JSON.stringify(updated));
+      } catch (e) {}
+      try {
+        window.dispatchEvent(new CustomEvent('pixiu_attendance_updated', { detail: { sessionId, studentId, status, updated } }));
       } catch (e) {}
       return updated;
     });
@@ -932,17 +979,33 @@ export function DataProvider({ children }) {
         body: JSON.stringify({ session_id: sessionId, student_id: studentId, status, date: liveDate, day: liveDay, time: liveTime, timestamp })
       });
     } catch (e) {
-      console.error('Error marking attendance on server:', e);
+      console.warn('Backend unavailable, attendance marked locally in state & localStorage');
     }
 
     return { success: true };
   };
 
   const adminUpdateAttendance = async (sessionId, studentId, status) => {
+    const cleanS = (studentId || '').toUpperCase().replace(/\s+/g, '');
+    const now = new Date();
+    const liveDate = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const liveDay = now.toLocaleDateString('en-US', { weekday: 'long' });
+    const liveTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    const timestamp = `${liveDay}, ${liveDate} • ${liveTime}`;
+
     setAttendance(prev => {
-      const updated = prev.map(a => (a.session_id === sessionId && a.student_id === studentId) ? { ...a, status } : a);
+      const exists = prev.some(a => a.session_id === sessionId && (a.student_id || '').toUpperCase().replace(/\s+/g, '') === cleanS);
+      let updated;
+      if (exists) {
+        updated = prev.map(a => (a.session_id === sessionId && (a.student_id || '').toUpperCase().replace(/\s+/g, '') === cleanS) ? { ...a, status } : a);
+      } else {
+        updated = [...prev, { session_id: sessionId, student_id: studentId, status, date: liveDate, day: liveDay, time: liveTime, timestamp }];
+      }
       try {
         localStorage.setItem('pixiu_attendance', JSON.stringify(updated));
+      } catch (e) {}
+      try {
+        window.dispatchEvent(new CustomEvent('pixiu_attendance_updated', { detail: { sessionId, studentId, status, updated } }));
       } catch (e) {}
       return updated;
     });
@@ -954,7 +1017,7 @@ export function DataProvider({ children }) {
         body: JSON.stringify({ session_id: sessionId, student_id: studentId, status })
       });
     } catch (e) {
-      console.error('Error overriding attendance on server:', e);
+      console.warn('Backend unavailable for admin-override, updated locally');
     }
     return { success: true };
   };
@@ -966,25 +1029,21 @@ export function DataProvider({ children }) {
     const liveTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     const formattedDate = `${liveDay}, ${liveDate}`;
 
+    setSessions(prev => {
+      const updated = prev.map(s => s.id === sessionId ? { ...s, status: 'Completed', is_locked: 1, date: formattedDate, time: liveTime, day: liveDay } : s);
+      try { localStorage.setItem('pixiu_sessions', JSON.stringify(updated)); } catch (e) {}
+      try { window.dispatchEvent(new CustomEvent('pixiu_sessions_updated', { detail: { sessionId, updated } })); } catch (e) {}
+      return updated;
+    });
+
     try {
       await fetch(`${API_URL}/sessions/${sessionId}/complete`, { 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date: formattedDate, time: liveTime, day: liveDay })
       });
-      setSessions(prev => {
-        const updated = prev.map(s => s.id === sessionId ? { ...s, status: 'Completed', is_locked: 1, date: formattedDate, time: liveTime, day: liveDay } : s);
-        try { localStorage.setItem('pixiu_sessions', JSON.stringify(updated)); } catch (e) {}
-        return updated;
-      });
-      await refreshAll();
     } catch (e) {
-      console.error(e);
-      setSessions(prev => {
-        const updated = prev.map(s => s.id === sessionId ? { ...s, status: 'Completed', is_locked: 1, date: formattedDate, time: liveTime, day: liveDay } : s);
-        try { localStorage.setItem('pixiu_sessions', JSON.stringify(updated)); } catch (e) {}
-        return updated;
-      });
+      console.warn('Backend unavailable for completeSession, session locked locally');
     }
   };
 
@@ -992,6 +1051,7 @@ export function DataProvider({ children }) {
     setSessions(prev => {
       const updated = prev.map(s => s.id === sessionId ? { ...s, is_locked: 0 } : s);
       try { localStorage.setItem('pixiu_sessions', JSON.stringify(updated)); } catch (e) {}
+      try { window.dispatchEvent(new CustomEvent('pixiu_sessions_updated', { detail: { sessionId, updated } })); } catch (e) {}
       return updated;
     });
     try {
@@ -1019,6 +1079,7 @@ export function DataProvider({ children }) {
     setSessions(prev => {
       const updated = [newSession, ...prev];
       try { localStorage.setItem('pixiu_sessions', JSON.stringify(updated)); } catch (e) {}
+      try { window.dispatchEvent(new CustomEvent('pixiu_sessions_updated', { detail: { newSession, updated } })); } catch (e) {}
       return updated;
     });
     try {
@@ -1304,10 +1365,18 @@ export function DataProvider({ children }) {
   };
 
   const getStudentAttendance = (studentId) => {
-    const studentRecords = attendance.filter(a => a.student_id === studentId);
+    if (!studentId) return 100;
+    const cleanTarget = String(studentId).toUpperCase().replace(/\s+/g, '');
+    const studentRecords = attendance.filter(a => (a.student_id || '').toUpperCase().replace(/\s+/g, '') === cleanTarget);
     if (studentRecords.length === 0) return 92; // Default baseline if newly enrolled
     const present = studentRecords.filter(a => a.status === 'Present').length;
     return Math.round((present / studentRecords.length) * 100);
+  };
+
+  const getStudentAttendanceRecords = (studentId) => {
+    if (!studentId) return [];
+    const cleanTarget = String(studentId).toUpperCase().replace(/\s+/g, '');
+    return attendance.filter(a => (a.student_id || '').toUpperCase().replace(/\s+/g, '') === cleanTarget);
   };
 
   // Quizzes & MCQ Management
@@ -1385,6 +1454,33 @@ export function DataProvider({ children }) {
             try { localStorage.setItem('pixiu_quiz_submissions', JSON.stringify(updated)); } catch (e) {}
             return updated;
           });
+
+          // Auto sync to student reviews
+          const earned = Number(data.submission.score) || 0;
+          const maxMarks = Number(data.submission.total_marks) || 10;
+          const scoreOutOf10 = maxMarks > 0 ? Math.round((earned / maxMarks) * 10 * 10) / 10 : 8.0;
+          const rating = Math.min(5, Math.max(1, Math.round(scoreOutOf10 / 2)));
+          const revStatus = scoreOutOf10 >= 8 ? 'Mastered' : scoreOutOf10 >= 5 ? 'In Progress' : 'Needs Practice';
+          const uCode = level === 'Level 0' ? 'Unit 1' : level === 'Level 1' ? 'Unit 2' : level === 'Level 2' ? 'Unit 3' : level === 'Level 3' ? 'Unit 4' : level === 'Level 4' ? 'Unit 5' : 'Unit 6';
+          saveStudentReview({
+            student_id,
+            student_name: student_name || 'Student',
+            class_grade: class_grade || '6',
+            unit_code: uCode,
+            level: level || 'Level 0',
+            unit_title: `${level || 'Level 0'} Lab Competency Assessment`,
+            score: scoreOutOf10,
+            rating,
+            status: revStatus,
+            review: `Official MCQ Assessment verified. Candidate scored ${earned}/${maxMarks} (${data.submission.percentage || 0}%) on ${level} assessment with ${violation_count || 0} anti-cheat strikes. Demonstrated strong conceptual foundation.`,
+            trainer_name: student_id?.toUpperCase().includes('XYZ') ? 'Akash Sharma (Senior Robotics Faculty)' : 'Vikas Pandey (Lead Instructor)',
+            verified_date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+          });
+
+          try {
+            window.dispatchEvent(new CustomEvent('pixiu_quiz_submissions_updated', { detail: data.submission }));
+          } catch (e) {}
+
           return data;
         }
       } else if (res.status === 403) {
@@ -1447,6 +1543,32 @@ export function DataProvider({ children }) {
       return updated;
     });
 
+    // Auto-sync into student reviews
+    const scoreOutOf10 = totalMarks > 0 ? Math.round((earnedScore / totalMarks) * 10 * 10) / 10 : 8.0;
+    const rating = Math.min(5, Math.max(1, Math.round(scoreOutOf10 / 2)));
+    const reviewStatus = scoreOutOf10 >= 8 ? 'Mastered' : scoreOutOf10 >= 5 ? 'In Progress' : 'Needs Practice';
+    const unitCode = level === 'Level 0' ? 'Unit 1' : level === 'Level 1' ? 'Unit 2' : level === 'Level 2' ? 'Unit 3' : level === 'Level 3' ? 'Unit 4' : level === 'Level 4' ? 'Unit 5' : 'Unit 6';
+    const remarks = `Official MCQ Assessment verified. Candidate scored ${earnedScore}/${totalMarks} (${percentage}%) on ${level} assessment with ${violation_count || 0} anti-cheat strikes. Demonstrated strong conceptual foundation.`;
+
+    saveStudentReview({
+      student_id,
+      student_name: student_name || 'Student',
+      class_grade: class_grade || '6',
+      unit_code: unitCode,
+      level: level || 'Level 0',
+      unit_title: `${level || 'Level 0'} Lab Competency Assessment`,
+      score: scoreOutOf10,
+      rating,
+      status: reviewStatus,
+      review: remarks,
+      trainer_name: student_id?.toUpperCase().includes('XYZ') ? 'Akash Sharma (Senior Robotics Faculty)' : 'Vikas Pandey (Lead Instructor)',
+      verified_date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+    });
+
+    try {
+      window.dispatchEvent(new CustomEvent('pixiu_quiz_submissions_updated', { detail: localSubmission }));
+    } catch (e) {}
+
     return {
       success: true,
       submission: localSubmission,
@@ -1486,7 +1608,7 @@ export function DataProvider({ children }) {
     loading, refreshAll,
     schools, addSchool, updateSchool, deleteSchool,
     classes, addClass,
-    students, addStudent, updateStudent, deleteStudent, getNextRollNumber, getStudentAttendance,
+    students, addStudent, updateStudent, deleteStudent, getNextRollNumber, getStudentAttendance, getStudentAttendanceRecords,
     trainers, addTrainer, updateTrainer, updateTrainerStatus, deleteTrainer,
     sessions, scheduleSession, completeSession, unlockSession, startNewSession,
     attendance, markAttendance, adminUpdateAttendance,

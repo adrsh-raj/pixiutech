@@ -1009,6 +1009,23 @@ export const SEED_STUDENT_REVIEWS = [
     comment: 'Great enthusiastic participation in robotics lab fundamentals and breadboard wiring.',
     trainer_name: 'Akash Sharma (Senior Robotics Faculty)',
     verified_date: '26 Aug 2026'
+  },
+  // XYZ6A 01 - Manish Rawat (XYZ Academy - Level 1 In Progress)
+  {
+    id: 'REV-XYZ6A01-U2',
+    student_id: 'XYZ6A 01',
+    student_name: 'Manish Rawat',
+    class_grade: '6',
+    unit_code: 'Unit 2',
+    level: 'Level 1',
+    unit_title: 'The Arduino IDE & Programming Fundamentals',
+    score: 4.0,
+    rating: 2,
+    status: 'In Progress',
+    review: 'Official MCQ Assessment verified. Candidate scored 4/10 (40%) on Level 1 assessment. Shows basic understanding of Arduino IDE and Blink sketches, but needs additional hands-on practice with syntax and GPIO configuration.',
+    comment: 'Official MCQ Assessment verified. Candidate scored 4/10 (40%) on Level 1 assessment. Shows basic understanding of Arduino IDE and Blink sketches, but needs additional hands-on practice with syntax and GPIO configuration.',
+    trainer_name: 'Akash Sharma (Senior Robotics Faculty)',
+    verified_date: '28 Aug 2026'
   }
 ];
 

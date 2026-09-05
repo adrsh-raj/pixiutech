@@ -103,6 +103,22 @@ export default function SchoolPortal() {
     }
   });
 
+  const [attendanceTick, setAttendanceTick] = useState(0);
+
+  useEffect(() => {
+    const handleAttUpdate = () => {
+      setAttendanceTick(t => t + 1);
+    };
+    window.addEventListener('storage', handleAttUpdate);
+    window.addEventListener('pixiu_attendance_updated', handleAttUpdate);
+    window.addEventListener('pixiu_sessions_updated', handleAttUpdate);
+    return () => {
+      window.removeEventListener('storage', handleAttUpdate);
+      window.removeEventListener('pixiu_attendance_updated', handleAttUpdate);
+      window.removeEventListener('pixiu_sessions_updated', handleAttUpdate);
+    };
+  }, []);
+
   useEffect(() => {
     if (!schoolUser) return;
     let isMounted = true;
@@ -166,13 +182,17 @@ export default function SchoolPortal() {
 
   // School Attendance Rate
   const schoolAttendanceRate = useMemo(() => {
-    const schoolSessions = sessions.filter(s => s.school_id === activeSchool.id);
+    const schoolSessions = sessions.filter(s => 
+      s.school_id === activeSchool.id || 
+      s.school_id === activeSchool.code ||
+      (activeSchool.id === 'XYZ' ? s.class_id?.includes('XYZ') : s.class_id?.includes('ZPS'))
+    );
     const sessionIds = schoolSessions.map(s => s.id);
     const schoolAttendanceRecords = attendance.filter(a => sessionIds.includes(a.session_id));
     if (schoolAttendanceRecords.length === 0) return 96;
     const presentCount = schoolAttendanceRecords.filter(a => a.status === 'Present').length;
     return Math.round((presentCount / schoolAttendanceRecords.length) * 100);
-  }, [sessions, attendance, activeSchool]);
+  }, [sessions, attendance, activeSchool, attendanceTick]);
 
   // Hardware Kits for this school
   const schoolKits = useMemo(() => {
@@ -181,8 +201,10 @@ export default function SchoolPortal() {
 
   // Helper for student attendance
   const getStudentAttendance = (studentId) => {
-    const records = attendance.filter(a => a.student_id === studentId);
-    if (!records.length) return 100;
+    if (!studentId) return 100;
+    const cleanTarget = String(studentId).toUpperCase().replace(/\s+/g, '');
+    const records = attendance.filter(a => (a.student_id || '').toUpperCase().replace(/\s+/g, '') === cleanTarget);
+    if (!records.length) return 96;
     const present = records.filter(r => r.status === 'Present').length;
     return Math.round((present / records.length) * 100);
   };

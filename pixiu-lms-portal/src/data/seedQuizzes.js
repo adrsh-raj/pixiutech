@@ -722,5 +722,31 @@ export const SEED_QUIZ_SUBMISSIONS = [
     status: 'Completed',
     reattempt_allowed: 0,
     completed_at: '2026-08-26T10:15:00.000Z'
+  },
+  {
+    id: 'SUB-XYZ6A01-L1',
+    quiz_id: 'QUIZ-L1',
+    student_id: 'XYZ6A 01',
+    student_name: 'Manish Rawat',
+    class_grade: '6',
+    level: 'Level 1',
+    score: 4,
+    total_marks: 10,
+    percentage: 40,
+    correct_count: 2,
+    attempted_count: 5,
+    total_questions: 5,
+    answers: {
+      'Q-L1-1': 'B',
+      'Q-L1-2': 'A',
+      'Q-L1-3': 'A',
+      'Q-L1-4': 'A',
+      'Q-L1-5': 'C'
+    },
+    time_taken_seconds: 280,
+    violation_count: 0,
+    status: 'Completed',
+    reattempt_allowed: 0,
+    completed_at: '2026-08-28T10:30:00.000Z'
   }
 ];
