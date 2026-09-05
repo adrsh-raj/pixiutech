@@ -101,6 +101,10 @@ function ProtectedLayout() {
   if (user?.role === 'student') {
     return <Navigate to="/student-portal" replace />;
   }
+  // If school logs into admin routes, redirect to school space
+  if (user?.role === 'school') {
+    return <Navigate to="/school-portal" replace />;
+  }
 
   const handleExecuteAction = async (alertItem) => {
     setActionLoading(alertItem.id);
@@ -379,6 +383,29 @@ function SchoolRouteGuard() {
   return <SchoolPortal />;
 }
 
+// Guest Route Guard (Redirects authenticated users away from Login to their appropriate dashboard)
+function GuestRouteGuard({ children }) {
+  const { isAuthenticated, user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#040810] flex items-center justify-center text-white">
+        <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (isAuthenticated && user) {
+    const dest = user.role === 'student' ? '/student-portal'
+               : user.role === 'school' ? '/school-portal'
+               : user.role === 'trainer' ? '/trainers'
+               : '/';
+    return <Navigate to={dest} replace />;
+  }
+
+  return children;
+}
+
 export default function App() {
   useEffect(() => {
     const handleContextMenu = (e) => {
@@ -411,8 +438,12 @@ export default function App() {
         <DataProvider>
           <BrowserRouter>
             <Routes>
-              {/* Public Login & Standalone Credential Verification Routes (Unlinked) */}
-              <Route path="/login" element={<Login />} />
+              {/* Public Login with Guest Guard: Prevents authenticated users from seeing Login form on Back */}
+              <Route path="/login" element={
+                <GuestRouteGuard>
+                  <Login />
+                </GuestRouteGuard>
+              } />
               <Route path="/verify" element={<Verify />} />
 
               {/* Virtual Arduino Simulation Workbench (Guarded via Portal Session) */}

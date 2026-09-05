@@ -1,13 +1,24 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ShieldCheck, Lock, User, KeyRound, ArrowRight, GraduationCap, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useNavigate } from 'react-router-dom';
 
 export default function Login() {
-  const { login } = useAuth();
+  const { login, isAuthenticated, user, loading: authLoading } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
+
+  // If already authenticated, redirect immediately away from login
+  useEffect(() => {
+    if (!authLoading && isAuthenticated && user) {
+      const dest = user.role === 'student' ? '/student-portal'
+                 : user.role === 'school' ? '/school-portal'
+                 : user.role === 'trainer' ? '/trainers'
+                 : '/';
+      navigate(dest, { replace: true });
+    }
+  }, [isAuthenticated, user, authLoading, navigate]);
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -54,20 +65,24 @@ export default function Login() {
 
     if (res.success) {
       toast.success(`Welcome back, ${res.user.name || res.user.username}!`, 'Authenticated');
-      if (res.user.role === 'student') {
-        navigate('/student-portal');
-      } else if (res.user.role === 'school') {
-        navigate('/school-portal');
-      } else if (res.user.role === 'trainer') {
-        navigate('/trainers');
-      } else {
-        navigate('/');
-      }
+      const dest = res.user.role === 'student' ? '/student-portal'
+                 : res.user.role === 'school' ? '/school-portal'
+                 : res.user.role === 'trainer' ? '/trainers'
+                 : '/';
+      navigate(dest, { replace: true });
     } else {
       setError(res.error || 'Invalid credentials');
       toast.error(res.error || 'Invalid credentials.', 'Login Failed');
     }
   };
+
+  if (authLoading || (isAuthenticated && user)) {
+    return (
+      <div className="min-h-screen bg-[#040810] flex items-center justify-center text-white">
+        <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#040810] flex items-center justify-center p-4 selection:bg-pixiu-blue selection:text-white relative overflow-hidden">
