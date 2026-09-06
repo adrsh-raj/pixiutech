@@ -16,7 +16,7 @@ async function initializeDatabaseWithRetry() {
       delete require.cache[modulePath];
       const db = require('./database');
       await db.ready;
-      return;
+      return db;
     } catch (err) {
       lastError = err;
       if (attempt > delays.length) break;
@@ -31,7 +31,9 @@ async function initializeDatabaseWithRetry() {
 
 (async () => {
   try {
-    await initializeDatabaseWithRetry();
+    const db = await initializeDatabaseWithRetry();
+    const { bootstrapAdmin } = require('./bootstrap-admin');
+    await bootstrapAdmin();
     require('./index.js');
   } catch (err) {
     console.error('Pixiu LMS API failed to initialize:', err);
