@@ -7,6 +7,7 @@ const path = require('path');
 const fs = require('fs');
 const db = require('./database');
 const { authorizationMiddleware } = require('./middleware/authorization');
+const { buildCorsOptions } = require('./middleware/cors');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -15,19 +16,8 @@ if (!JWT_SECRET || JWT_SECRET.trim().length < 32) {
   throw new Error('JWT_SECRET must be configured with at least 32 characters.');
 }
 
-const configuredOrigins = (process.env.CORS_ORIGINS || '').split(',').map(v => v.trim()).filter(Boolean);
-if (!configuredOrigins.length) throw new Error('CORS_ORIGINS must be configured for the Pixiu LMS API.');
-const allowedOrigins = new Set(configuredOrigins);
-
-app.use(cors({
-  origin: function(origin, callback) {
-    if (!origin || allowedOrigins.has(origin)) {
-      return callback(null, true);
-    }
-    return callback(new Error('CORS origin denied'));
-  },
-  credentials: true
-}));
+const corsOptions = buildCorsOptions();
+app.use(cors(corsOptions));
 
 app.use(express.json({ limit: '2mb' }));
 
