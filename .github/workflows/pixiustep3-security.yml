@@ -1,0 +1,262 @@
+name: PIXIU Step 3 Security Hardening
+
+on:
+  push:
+    paths:
+      - '.github/step3-trigger'
+
+permissions:
+  contents: write
+
+jobs:
+  harden:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply security hardening
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p pixiu-lms-portal/server/middleware
+
+          cat > pixiu-lms-portal/server/middleware/authorization.js <<'EOF'
+          const READ_ONLY_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+          const ADMIN_ONLY_PREFIXES = ['/leads', '/billing', '/audit-logs'];
+          const TRAINER_OR_ADMIN_PREFIXES = ['/students', '/classes', '/sessions', '/attendance', '/content', '/curriculum', '/inventory', '/projects', '/reviews', '/quizzes', '/quiz-submissions', '/notifications', '/comms'];
+
+          function sameId(a, b) {
+            return a != null && b != null && String(a).trim() === String(b).trim();
+          }
+
+          function startsWithAny(path, prefixes) {
+            return prefixes.some(prefix => path === prefix || path.startsWith(`${prefix}/`));
+          }
+
+          function deny(res, message = 'Forbidden') {
+            return res.status(403).json({ error: message });
+          }
+
+          function attachScopedJson(req, res, scope) {
+            const originalJson = res.json.bind(res);
+            res.json = (payload) => {
+              if (scope.role === 'admin' || !Array.isArray(payload)) {
+                return originalJson(payload);
+              }
+
+              const scoped = payload.filter((row) => {
+                if (!row || typeof row !== 'object') return true;
+
+                if (scope.role === 'student') {
+                  if (row.student_id != null) return sameId(row.student_id, scope.studentId);
+                  if (row.user_key != null) return sameId(row.user_key, scope.userId) || sameId(row.user_key, scope.studentId);
+                  if (row.school_id != null) return sameId(row.school_id, scope.schoolId);
+                  return true;
+                }
+
+                if (row.school_id != null) return sameId(row.school_id, scope.schoolId);
+                if (row.target_school_id != null) return sameId(row.target_school_id, scope.schoolId);
+                if (row.student_id != null) return scope.studentIds.has(String(row.student_id));
+                return true;
+              });
+
+              return originalJson(scoped);
+            };
+          }
+
+          function getRequestSchoolId(req) {
+            return req.body?.school_id || req.query?.school_id || null;
+          }
+
+          function authorizationMiddleware(db) {
+            return async function authorization(req, res, next) {
+              const user = req.user;
+              const role = user?.role;
+              const path = req.path;
+
+              if (!user || !role) return deny(res, 'Authenticated user role is required');
+              if (role === 'admin') return next();
+              if (!['trainer', 'school', 'student'].includes(role)) return deny(res, 'Unsupported role');
+
+              if (startsWithAny(path, ADMIN_ONLY_PREFIXES)) {
+                return deny(res, 'This resource is restricted to administrators');
+              }
+
+              if (role === 'student') {
+                const allowedReadPrefixes = ['/students', '/classes', '/sessions', '/attendance', '/content', '/curriculum', '/projects', '/reviews', '/notifications', '/quizzes', '/quiz-submissions'];
+                const isAllowedRead = READ_ONLY_METHODS.has(req.method) && startsWithAny(path, allowedReadPrefixes);
+                const isAllowedQuizSubmit = req.method === 'POST' && (path === '/quiz-submissions' || path.startsWith('/quiz-submissions/'));
+                if (!isAllowedRead && !isAllowedQuizSubmit) {
+                  return deny(res, 'Students are not permitted to modify this resource');
+                }
+
+                const studentId = user.related_id || user.username;
+                const schoolId = user.school_id || null;
+                const scope = { role, userId: user.id, studentId, schoolId, studentIds: new Set([String(studentId)]) };
+
+                if (path.startsWith('/students/')) {
+                  const requestedId = decodeURIComponent(path.split('/')[2] || '');
+                  if (!sameId(requestedId, studentId)) return deny(res, 'Students can access only their own profile');
+                }
+
+                if (req.body?.student_id && !sameId(req.body.student_id, studentId)) {
+                  return deny(res, 'Students can submit data only for their own account');
+                }
+
+                if (req.body?.school_id && schoolId && !sameId(req.body.school_id, schoolId)) {
+                  return deny(res, 'Invalid school scope');
+                }
+
+                attachScopedJson(req, res, scope);
+                return next();
+              }
+
+              if (!user.school_id) {
+                return deny(res, 'School scope is required for this account');
+              }
+
+              const schoolId = String(user.school_id);
+              const studentIds = new Set();
+              await new Promise((resolve) => {
+                db.all('SELECT student_id FROM students WHERE school_id = ?', [schoolId], (err, rows = []) => {
+                  if (!err) rows.forEach(row => studentIds.add(String(row.student_id)));
+                  resolve();
+                });
+              });
+
+              if (role === 'school' && startsWithAny(path, ['/trainers', '/leads', '/billing', '/comms'])) {
+                return deny(res, 'This resource is restricted for school accounts');
+              }
+
+              if (role === 'trainer' && startsWithAny(path, ['/trainers'])) {
+                return deny(res, 'Trainer account management is restricted to administrators');
+              }
+
+              const requestedSchoolId = getRequestSchoolId(req);
+              if (requestedSchoolId && !sameId(requestedSchoolId, schoolId)) {
+                return deny(res, 'Cross-school access is not permitted');
+              }
+
+              if (req.body?.student_id && !studentIds.has(String(req.body.student_id))) {
+                return deny(res, 'Student is outside your school scope');
+              }
+
+              if (path.startsWith('/students/')) {
+                const requestedId = decodeURIComponent(path.split('/')[2] || '');
+                if (!studentIds.has(String(requestedId))) return deny(res, 'Student is outside your school scope');
+              }
+
+              if (path.startsWith('/schools/')) {
+                const requestedId = decodeURIComponent(path.split('/')[2] || '');
+                if (!sameId(requestedId, schoolId)) return deny(res, 'School is outside your account scope');
+              }
+
+              if (role === 'school' && !READ_ONLY_METHODS.has(req.method)) {
+                const schoolWritePrefixes = ['/attendance', '/notifications', '/reviews', '/quiz-submissions'];
+                if (!startsWithAny(path, schoolWritePrefixes)) {
+                  return deny(res, 'School accounts have read-only access to this resource');
+                }
+              }
+
+              if (role === 'trainer' && startsWithAny(path, ['/content', '/curriculum', '/inventory', '/projects', '/reviews', '/quiz-submissions', '/sessions', '/attendance', '/students', '/classes'])) {
+                // Trainer actions are allowed only within their own school. Body/record checks above enforce the scope.
+              }
+
+              attachScopedJson(req, res, { role, userId: user.id, schoolId, studentIds });
+              return next();
+            };
+          }
+
+          module.exports = { authorizationMiddleware };
+          EOF
+
+          python - <<'PY'
+          from pathlib import Path
+
+          index = Path('pixiu-lms-portal/server/index.js')
+          text = index.read_text()
+
+          marker = "const db = require('./database');\n"
+          replacement = marker + "const { authorizationMiddleware } = require('./middleware/authorization');\n"
+          if "require('./middleware/authorization')" not in text:
+              if marker not in text:
+                  raise SystemExit('index.js import marker not found')
+              text = text.replace(marker, replacement, 1)
+
+          old_cors = """// Production CORS: only the official Pixiu browser origins are allowed.\nconst allowedOrigins = new Set([\n  'https://portal.pixiutech.com',\n  'https://pixiutech.com',\n  'https://www.pixiutech.com'\n]);\n"""
+          new_cors = """// Production CORS is configured through the deployment environment.\nconst configuredOrigins = (process.env.CORS_ORIGINS || '').split(',').map(value => value.trim()).filter(Boolean);\nif (configuredOrigins.length === 0) {\n  throw new Error('CORS_ORIGINS must be configured for the Pixiu LMS API.');\n}\nconst allowedOrigins = new Set(configuredOrigins);\n"""
+          if old_cors in text:
+              text = text.replace(old_cors, new_cors, 1)
+
+          text = text.replace("{ expiresIn: '7d' }", "{ expiresIn: '12h' }", 1)
+
+          login_old = """  const cleanUsername = username.trim();\n  const clientIp = req.ip || req.connection.remoteAddress || 'unknown';\n"""
+          login_new = """  const cleanUsername = username.trim();\n  const requestedRole = typeof req.body?.role === 'string' ? req.body.role.trim().toLowerCase() : '';\n  const clientIp = req.ip || req.connection.remoteAddress || 'unknown';\n"""
+          if login_old in text and 'requestedRole' not in text:
+              text = text.replace(login_old, login_new, 1)
+
+          match_block = """    const isMatch = await bcrypt.compare(password, user.password_hash);\n    if (!isMatch) {\n      return res.status(401).json({ error: 'Invalid ID / Username or Password' });\n    }\n\n    // Sign JWT Token\n"""
+          match_replacement = """    const isMatch = await bcrypt.compare(password, user.password_hash);\n    if (!isMatch) {\n      return res.status(401).json({ error: 'Invalid ID / Username or Password' });\n    }\n\n    if (requestedRole && user.role !== requestedRole) {\n      return res.status(403).json({ error: 'This account is not permitted to use the selected login type.' });\n    }\n\n    // Sign JWT Token\n"""
+          if match_block in text:
+              text = text.replace(match_block, match_replacement, 1)
+
+          old_auth = "app.use('/api', requireAuth);"
+          new_auth = "app.use('/api', requireAuth);\napp.use('/api', authorizationMiddleware(db));"
+          if new_auth not in text:
+              if old_auth not in text:
+                  raise SystemExit('global auth marker not found')
+              text = text.replace(old_auth, new_auth, 1)
+
+          old_student = """    // Auto-create student login user in `users` table with hashed password\n    const studentPassword = password || 'student123';\n    const passwordHash = await bcrypt.hash(studentPassword, 10);\n    const userId = `USR-${student_id.replace(/\\s+/g, '')}`;\n"""
+          new_student = """    // Auto-create a student login user only when an explicit password is provided.\n    // Never fall back to a shared/default password.\n    if (!password || String(password).length < 10) {\n      return res.status(400).json({ error: 'A student account password of at least 10 characters is required.' });\n    }\n    const studentPassword = String(password);\n    const passwordHash = await bcrypt.hash(studentPassword, 12);\n    const userId = `USR-${student_id.replace(/\\s+/g, '')}`;\n"""
+          if old_student in text:
+              text = text.replace(old_student, new_student, 1)
+
+          index.write_text(text)
+
+          start = Path('pixiu-lms-portal/server/start.js')
+          s = start.read_text()
+          if 'CORS_ORIGINS' not in s:
+              s = s.replace("if (process.env.NODE_ENV !== 'production') {", "if (!process.env.CORS_ORIGINS || !process.env.CORS_ORIGINS.trim()) {\n  throw new Error('CORS_ORIGINS must be configured before the Pixiu LMS API can start.');\n}\n\nif (process.env.NODE_ENV !== 'production') {", 1)
+              start.write_text(s)
+
+          data = Path('pixiu-lms-portal/src/context/DataContext.jsx')
+          d = data.read_text()
+          d = d.replace("const readCache = (key, fallback) => {", "const cacheScope = (() => {\n  try {\n    const raw = localStorage.getItem('pixiu_auth_user');\n    if (!raw) return 'guest';\n    const user = JSON.parse(raw);\n    return String(user?.id || user?.username || 'guest').replace(/[^a-zA-Z0-9_-]/g, '_');\n  } catch {\n    return 'guest';\n  }\n})();\n\nconst scopedKey = (key) => `${key}:${cacheScope}`;\n\nconst readCache = (key, fallback) => {").replace("localStorage.getItem(key);", "localStorage.getItem(scopedKey(key));", 1).replace("localStorage.setItem(key, JSON.stringify(value));", "localStorage.setItem(scopedKey(key), JSON.stringify(value));", 1)
+          data.write_text(d)
+
+          auth = Path('pixiu-lms-portal/src/context/AuthContext.jsx')
+          a = auth.read_text()
+          logout_old = """      localStorage.removeItem(TOKEN_KEY);\n      localStorage.removeItem(USER_KEY);\n      window.dispatchEvent(new Event('pixiu_auth_state_changed'));\n"""
+          logout_new = """      localStorage.removeItem(TOKEN_KEY);\n      localStorage.removeItem(USER_KEY);\n      Object.keys(localStorage).filter(key => key.startsWith('pixiu_') && key.includes(':')).forEach(key => localStorage.removeItem(key));\n      window.dispatchEvent(new Event('pixiu_auth_state_changed'));\n"""
+          if logout_old in a:
+              a = a.replace(logout_old, logout_new, 1)
+              auth.write_text(a)
+
+          students = Path('pixiu-lms-portal/src/pages/Students.jsx')
+          st = students.read_text()
+          st = st.replace("  const trainerSchoolId = user?.school_id || (user?.username === 'akashsharma' || user?.related_id === 'TR-02' ? 'XYZ' : 'ZPS');", "  const trainerSchoolId = user?.school_id || '';", 1)
+          students.write_text(st)
+          PY
+
+          # Remove the old default-password literal and legacy SHA/local-browser auth patterns if they somehow reappear.
+          if grep -RniE "student123|SHA-256|sha256|hub_authenticated" pixiu-lms-portal/src pixiu-lms-portal/server src 2>/dev/null; then
+            echo 'Legacy authentication pattern detected.'
+            exit 1
+          fi
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add pixiu-lms-portal/server/middleware/authorization.js pixiu-lms-portal/server/index.js pixiu-lms-portal/server/start.js pixiu-lms-portal/src/context/DataContext.jsx pixiu-lms-portal/src/context/AuthContext.jsx pixiu-lms-portal/src/pages/Students.jsx
+          git commit -m 'security: harden LMS authorization and session cache' || exit 0
+          git push origin HEAD:main
+
+      - name: Verify production files
+        run: |
+          node --check pixiu-lms-portal/server/index.js
+          node --check pixiu-lms-portal/server/start.js
+          node --check pixiu-lms-portal/server/middleware/authorization.js
