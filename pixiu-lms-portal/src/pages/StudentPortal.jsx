@@ -811,33 +811,7 @@ export default function StudentPortal() {
                 return subClean === studentClean || nameMatch;
               });
 
-              // Self-healing double-lock: Check if student already evaluated & mastered this unit/level in verified reviews
-              const matchingReview = levelReviewData.find(l => 
-                (l.hasReview && l.score !== null && l.score > 0) && (
-                  (l.level && quiz.level && l.level.toLowerCase().replace(/\s+/g, '') === quiz.level.toLowerCase().replace(/\s+/g, '')) ||
-                  (l.unitCode && quiz.unit_code && l.unitCode.toLowerCase().replace(/\s+/g, '') === quiz.unit_code.toLowerCase().replace(/\s+/g, ''))
-                )
-              );
-
-              const submission = directSub || (matchingReview ? {
-                id: `SUB-AUTO-${quiz.id}-${student.student_id.replace(/\s+/g, '')}`,
-                quiz_id: quiz.id,
-                student_id: student.student_id,
-                student_name: student.name,
-                class_grade: studentGrade,
-                level: quiz.level,
-                score: quiz.total_marks || 10,
-                total_marks: quiz.total_marks || 10,
-                percentage: 100,
-                correct_count: quiz.questions?.length || 5,
-                attempted_count: quiz.questions?.length || 5,
-                total_questions: quiz.questions?.length || 5,
-                time_taken_seconds: 240,
-                violation_count: 0,
-                status: 'Completed',
-                reattempt_allowed: 0,
-                completed_at: matchingReview.verifiedDate
-              } : null);
+              const submission = directSub || null;
 
               const isSubmitted = !!submission;
               const reattemptAllowed = submission?.reattempt_allowed === 1;
