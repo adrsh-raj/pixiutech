@@ -14,13 +14,12 @@ import Curriculum from './pages/Curriculum';
 import Login from './pages/Login';
 import StudentPortal from './pages/StudentPortal';
 import SchoolPortal from './pages/SchoolPortal';
-import Verify from './pages/Verify';
 import AuditLogs from './pages/AuditLogs';
 import { DataProvider, useData } from './context/DataContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider, useToast } from './context/ToastContext';
 import { LogOut, Bell, ShieldCheck } from 'lucide-react';
-import { filterNotificationsForUser, fetchUserReadNotifIds, saveUserReadNotifIds, getCanonicalUserKey } from './utils/notifications';
+import { filterNotificationsForUser, fetchUserReadNotifIds, saveUserReadNotifIds } from './utils/notifications';
 
 const Simulation = lazy(() => import('./pages/Simulation'));
 
@@ -192,7 +191,6 @@ export default function App() {
           <BrowserRouter>
             <Routes>
               <Route path="/login" element={<GuestRouteGuard><Login /></GuestRouteGuard>} />
-              <Route path="/verify" element={<Verify />} />
               <Route path="/simulation" element={<ChunkErrorBoundary><Suspense fallback={<div className="min-h-screen bg-[#070B14] flex items-center justify-center text-white"><div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" /></div>}><Simulation /></Suspense></ChunkErrorBoundary>} />
               <Route path="/student-portal" element={<StudentRouteGuard />} />
               <Route path="/school-portal" element={<SchoolRouteGuard />} />
