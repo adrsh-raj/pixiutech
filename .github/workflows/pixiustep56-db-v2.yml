@@ -1,0 +1,93 @@
+name: PIXIU Step 5-6 Database Migration v2
+
+on:
+  push:
+    paths:
+      - '.github/step56-v2-trigger'
+
+permissions:
+  contents: write
+
+jobs:
+  migrate-and-verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: pixiu_test
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d pixiu_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply Step 5-6 patch
+        run: python scripts/step56_patch.py
+
+      - name: Install API dependencies and refresh lockfile
+        working-directory: pixiu-lms-portal/server
+        run: npm install
+
+      - name: Validate PostgreSQL schema and adapter
+        working-directory: pixiu-lms-portal/server
+        env:
+          NODE_ENV: production
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/pixiu_test
+          JWT_SECRET: test-secret-that-is-at-least-32-characters-long
+          CORS_ORIGINS: https://portal.pixiutech.com,https://pixiutech.com,https://www.pixiutech.com
+          DB_POOL_MAX: 5
+          DB_STATEMENT_TIMEOUT_MS: 10000
+        run: |
+          node --check database.js
+          node --check index.js
+          node --check start.js
+          node - <<'JS'
+          const db = require('./database');
+          (async () => {
+            await db.ready;
+            const tables = await db.all("SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename NOT LIKE 'pg_%'");
+            const required = ['users','schools','classes','students','trainers','sessions','attendance','billing','quizzes','quiz_questions','quiz_submissions','audit_logs'];
+            const names = new Set(tables.map(row => row.tablename));
+            const missing = required.filter(name => !names.has(name));
+            if (missing.length) throw new Error(`Missing PostgreSQL tables: ${missing.join(', ')}`);
+            const students = await db.get('SELECT COUNT(*)::int AS count FROM students');
+            const users = await db.get('SELECT COUNT(*)::int AS count FROM users');
+            if ((students?.count || 0) < 1 || (users?.count || 0) < 1) throw new Error('SQLite → PostgreSQL migration did not preserve core data.');
+            console.log(`PostgreSQL verification passed: ${students.count} students, ${users.count} users, ${names.size} tables.`);
+          })().catch(err => { console.error(err); process.exit(1); });
+          JS
+
+      - name: Validate production runtime patterns
+        run: |
+          set -euo pipefail
+          ! grep -RniE "new Database\(|http://localhost:|http://127\.0\.0\.1:|INSERT OR REPLACE|PRAGMA " pixiu-lms-portal/server --include='*.js'
+          grep -n "const compression = require('compression');" pixiu-lms-portal/server/index.js
+          grep -n "app.use(compression());" pixiu-lms-portal/server/index.js
+          grep -n "DATABASE_URL" pixiu-lms-portal/server/start.js
+          grep -n "fromDatabase:" pixiu-lms-portal/render.yaml
+
+      - name: Build frontend applications
+        run: |
+          npm install
+          npm run build
+          cd pixiu-lms-portal
+          npm install
+          npm run build
+
+      - name: Remove one-shot migration tooling
+        run: |
+          rm -f .github/workflows/pixiustep56-db.yml .github/workflows/pixiustep56-db-v2.yml .github/step56-trigger .github/step56-v2-trigger scripts/step56_patch.py
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'feat: migrate LMS persistence to PostgreSQL' || true
+          git push origin HEAD:main
