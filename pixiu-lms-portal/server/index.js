@@ -31,7 +31,6 @@ const uploadsDir = uploadsBase;
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
-app.use('/uploads', express.static(uploadsDir));
 
 // Secure Multer Storage Configuration for Robot Build Photos
 const storage = multer.diskStorage({
@@ -90,7 +89,7 @@ app.post('/api/upload', (req, res) => {
     if (!req.file) {
       return res.status(400).json({ error: 'No file provided' });
     }
-    const fileUrl = `/uploads/${req.file.filename}`;
+    const fileUrl = `/api/uploads/${req.file.filename}`;
     res.json({
       success: true,
       url: fileUrl,
@@ -205,6 +204,30 @@ function requireAuth(req, res, next) {
 }
 
 app.use('/api', requireAuth);
+
+// Uploaded evidence is private. The auth middleware runs before this route.
+app.get('/api/uploads/:filename', (req, res) => {
+  const filename = decodeURIComponent(req.params?.filename || '');
+  if (!/^evidence-[A-Za-z0-9._-]+\.(jpg|jpeg|png|webp|gif)$/i.test(filename)) {
+    return res.status(400).json({ error: 'Invalid upload filename.' });
+  }
+
+  const filePath = path.join(uploadsDir, filename);
+  const resolvedRoot = path.resolve(uploadsDir);
+  const resolvedFile = path.resolve(filePath);
+  if (!resolvedFile.startsWith(`${resolvedRoot}${path.sep}`)) {
+    return res.status(400).json({ error: 'Invalid upload path.' });
+  }
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: 'Upload not found.' });
+  }
+
+  res.setHeader('Cache-Control', 'private, max-age=300');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.type(path.extname(filePath));
+  return res.sendFile(filePath);
+});
+
 app.use('/api', authorizationMiddleware(db));
 
 // ==================== 1. SCHOOLS API ====================
