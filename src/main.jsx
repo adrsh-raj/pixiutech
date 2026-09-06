@@ -5,6 +5,7 @@ import App from './App.jsx'
 import './styles/variables.css'
 import './styles/global.css'
 
+// Production build marker: canonical root stylesheet imports only.
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>
