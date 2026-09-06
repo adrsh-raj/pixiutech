@@ -18,7 +18,7 @@ async function bootstrapAdmin() {
     throw new Error('ADMIN_BOOTSTRAP_PASSWORD must be at least 12 characters.');
   }
 
-  const username = (process.env.ADMIN_BOOTSTRAP_USERNAME || 'admin').trim();
+  const username = (process.env.ADMIN_BOOTSTRAP_USERNAME || 'adarshraj').trim();
   if (!/^[A-Za-z0-9._-]{3,64}$/.test(username)) {
     throw new Error('ADMIN_BOOTSTRAP_USERNAME must be 3-64 characters using letters, numbers, dot, underscore or hyphen.');
   }
