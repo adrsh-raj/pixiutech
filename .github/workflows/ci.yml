@@ -16,6 +16,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Verify LMS backend syntax
         run: node --check pixiu-lms-portal/server/index.js
+      - name: Verify production CORS policy
+        run: node pixiu-lms-portal/server/tests/cors-policy.test.js
       - name: Verify public website build
         run: npm ci && npm run build
       - name: Verify LMS frontend build
