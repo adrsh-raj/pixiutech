@@ -3,6 +3,7 @@ import { PlaySquare, FileText, Upload, Search, Filter, Trash2, X, ExternalLink, 
 import { useData } from '../context/DataContext';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
+import { openProtectedMaterial } from '../utils/protectedMaterial';
 
 export default function ContentHub() {
   const { content, uploadContent, deleteContent } = useData();
@@ -20,7 +21,7 @@ export default function ContentHub() {
     level: 'Level 1',
     class_grade: '6',
     target: 'Teacher',
-    url: '/materials/class6-unit1-teacher.pdf',
+    url: '',
     is_watermarked: 0,
     description: ''
   });
@@ -59,12 +60,16 @@ export default function ContentHub() {
     });
   };
 
-  const handleOpenMaterial = (url) => {
+  const handleOpenMaterial = async (url) => {
     if (!url) {
       toast.warning("File URL not configured.");
       return;
     }
-    window.open(url, '_blank');
+    try {
+      await openProtectedMaterial(url);
+    } catch (error) {
+      toast.error(error.message || 'Unable to open material.');
+    }
   };
 
   const teacherPacksCount = content.filter(c => c.target === 'Teacher' || c.target === 'Trainer').length;
@@ -91,7 +96,6 @@ export default function ContentHub() {
         )}
       </div>
 
-      {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="p-6 rounded-xl text-white shadow-sm flex justify-between items-center bg-gradient-to-br from-slate-900 to-slate-800">
           <div>
@@ -118,7 +122,6 @@ export default function ContentHub() {
         </div>
       </div>
 
-      {/* Class & Search Filter Bar */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-4 mb-6 items-center justify-between">
         <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-1 md:pb-0">
           <span className="text-xs font-bold uppercase text-slate-400 mr-2 shrink-0">Filter Grade:</span>
@@ -149,7 +152,6 @@ export default function ContentHub() {
         </div>
       </div>
 
-      {/* Material Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredContent.map(item => {
           return (
@@ -212,7 +214,6 @@ export default function ContentHub() {
         )}
       </div>
 
-      {/* Upload Material Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95">
@@ -268,7 +269,7 @@ export default function ContentHub() {
                 <label className="block font-bold text-slate-500 uppercase mb-1">PDF File Resource URL *</label>
                 <input 
                   type="text" 
-                  placeholder="/materials/class6-unit1-student-watermarked.pdf" 
+                  placeholder="/materials/class6-unit1-teacher.pdf" 
                   value={formData.url} 
                   onChange={e => setFormData({ ...formData, url: e.target.value })} 
                   required
