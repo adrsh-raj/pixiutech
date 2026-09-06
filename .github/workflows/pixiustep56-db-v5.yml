@@ -46,7 +46,7 @@ jobs:
           node --check start.js
           node - <<'JS'
           const db=require('./database');
-          (async()=>{await db.ready; const tables=await db.all("SELECT tablename FROM pg_tables WHERE schemaname='public'"); const s=await db.get('SELECT COUNT(*)::int AS c FROM students'); const u=await db.get('SELECT COUNT(*)::int AS c FROM users'); const schools=await db.get('SELECT COUNT(*)::int AS c FROM schools'); if(!s.c||!u.c||!schools.c) throw new Error('Core migration data missing'); console.log(`PASS tables=${tables.length} students=${s.c} users=${u.c} schools=${schools.c}`)})().catch(e=>{console.error(e);process.exit(1)})
+          (async()=>{await db.ready; const tables=(await db.all("SELECT tablename FROM pg_tables WHERE schemaname='public'" )).rows; const getCount=async n => (await db.get(`SELECT COUNT(*)::int AS c FROM \"${n}\"`)).rows[0].c; const s=await getCount('students'); const u=await getCount('users'); const schools=await getCount('schools'); if(!s||!u||!schools) throw new Error(`Core migration data missing: students=${s}, users=${u}, schools=${schools}`); console.log(`PASS tables=${tables.length} students=${s} users=${u} schools=${schools}`)})().catch(e=>{console.error(e);process.exit(1)})
           JS
       - name: Verify performance and production safety
         run: |
@@ -66,7 +66,7 @@ jobs:
           npm run build
       - name: Commit production migration and clean one-shot tooling
         run: |
-          rm -f .github/workflows/pixiustep56-db.yml .github/workflows/pixiustep56-db-v2.yml .github/workflows/pixiustep56-db-v3.yml .github/workflows/pixiustep56-db-v4.yml .github/workflows/pixiustep56-db-v5.yml .github/step56-trigger .github/step56-v2-trigger .github/step56-v3-trigger .github/step56-v4-trigger .github/step56-v5-trigger scripts/step56_patch.py
+          rm -f .github/workflows/pixiustep56-db.yml .github/workflows/pixiustep56-db-v2.yml .github/workflows/pixiustep56-db-v3.yml .github/workflows/pixiustep56-db-v4.yml .github/workflows/pixiustep56-db-v5.yml .github/workflows/pixiustep56-inspect.yml .github/workflows/pixiustep56-diag.yml .github/step56-trigger .github/step56-v2-trigger .github/step56-v3-trigger .github/step56-v4-trigger .github/step56-v5-trigger .github/step56-inspect-trigger .github/step56-diag-trigger scripts/step56_patch.py
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
