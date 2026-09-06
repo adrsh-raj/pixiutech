@@ -13,8 +13,9 @@ services:
     region: singapore
     plan: free
     rootDir: pixiu-lms-portal/server
-    buildCommand: npm install
+    buildCommand: npm ci
     startCommand: node start.js
+    healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
         value: production
