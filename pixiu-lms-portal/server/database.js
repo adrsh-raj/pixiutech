@@ -1,18 +1,61 @@
-const sqlite3 = require('sqlite3').verbose();
+const Database = require('better-sqlite3');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 const { seedSessionsAndAttendance } = require('./seed_sessions_attendance');
 
 const dbDir = process.env.RENDER ? '/opt/render/project/src/data' : __dirname;
 const dbPath = path.resolve(dbDir, 'pixiu_lms.db');
-const db = new sqlite3.Database(dbPath, (err) => {
-  if (err) {
-    console.error('Error opening database:', err.message);
-  } else {
-    console.log('Connected to SQLite database: pixiu_lms.db');
-    initializeDatabase();
+
+// better-sqlite3 compatibility wrapper (same API as node-sqlite3 callbacks)
+const rawDb = new Database(dbPath);
+rawDb.pragma('journal_mode = WAL');
+console.log('Connected to SQLite database: pixiu_lms.db');
+
+const db = {
+  run(sql, params, callback) {
+    if (typeof params === 'function') { callback = params; params = []; }
+    if (!params) params = [];
+    try {
+      const result = rawDb.prepare(sql).run(...(Array.isArray(params) ? params : [params]));
+      if (callback) callback.call({ lastID: result.lastInsertRowid, changes: result.changes }, null);
+    } catch (err) {
+      if (callback) callback.call({}, err);
+      else console.error('DB run error:', err.message);
+    }
+  },
+  all(sql, params, callback) {
+    if (typeof params === 'function') { callback = params; params = []; }
+    if (!params) params = [];
+    try {
+      const rows = rawDb.prepare(sql).all(...(Array.isArray(params) ? params : [params]));
+      if (callback) callback(null, rows);
+    } catch (err) {
+      if (callback) callback(err, []);
+      else console.error('DB all error:', err.message);
+    }
+  },
+  get(sql, params, callback) {
+    if (typeof params === 'function') { callback = params; params = []; }
+    if (!params) params = [];
+    try {
+      const row = rawDb.prepare(sql).get(...(Array.isArray(params) ? params : [params]));
+      if (callback) callback(null, row);
+    } catch (err) {
+      if (callback) callback(err, null);
+      else console.error('DB get error:', err.message);
+    }
+  },
+  serialize(fn) { if (fn) fn(); },
+  prepare(sql) {
+    const stmt = rawDb.prepare(sql);
+    return {
+      run(...args) { return stmt.run(...args); },
+      finalize() { /* no-op for better-sqlite3 */ }
+    };
   }
-});
+};
+
+initializeDatabase();
 
 function initializeDatabase() {
   db.serialize(() => {
