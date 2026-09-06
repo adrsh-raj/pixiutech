@@ -35,6 +35,7 @@ async function initializeDatabaseWithRetry() {
     const { bootstrapAdmin } = require('./bootstrap-admin');
     await bootstrapAdmin();
     require('./trainer-password-reset-route');
+    require('./school-password-reset-route');
     require('./index.js');
   } catch (err) {
     console.error('Pixiu LMS API failed to initialize:', err);
