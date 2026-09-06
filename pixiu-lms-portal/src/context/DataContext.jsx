@@ -3,98 +3,75 @@ import { API_BASE } from '../config/api';
 
 const DataContext = createContext(null);
 
-const CACHE_KEYS = {
-  schools: 'pixiu_schools',
-  classes: 'pixiu_classes',
-  students: 'pixiu_students',
-  trainers: 'pixiu_trainers',
-  sessions: 'pixiu_sessions',
-  attendance: 'pixiu_attendance',
-  leads: 'pixiu_leads',
-  content: 'pixiu_content',
-  curriculum: 'pixiu_curriculum',
-  inventory: 'pixiu_inventory',
-  classKits: 'pixiu_class_kits',
-  billing: 'pixiu_billing',
-  comms: 'pixiu_comms',
-  projects: 'pixiu_projects',
-  alerts: 'pixiu_alerts',
-  notifications: 'pixiu_notifications',
-  studentReviews: 'pixiu_student_reviews',
-  quizzes: 'pixiu_quizzes',
-  quizSubmissions: 'pixiu_quiz_submissions'
-};
-
-const cacheScope = (() => {
-  try {
-    const raw = localStorage.getItem('pixiu_auth_user');
-    const user = raw ? JSON.parse(raw) : null;
-    return String(user?.id || user?.username || 'guest').replace(/[^a-zA-Z0-9_-]/g, '_');
-  } catch { return 'guest'; }
-})();
-const scopedKey = key => `${key}:${cacheScope}`;
-
-const readCache = (key, fallback) => {
-  try {
-    const raw = localStorage.getItem(scopedKey(key));
-    if (!raw) return fallback;
-    const parsed = JSON.parse(raw);
-    return parsed ?? fallback;
-  } catch {
-    return fallback;
-  }
-};
-
-const writeCache = (key, value) => {
-  try {
-    localStorage.setItem(scopedKey(key), JSON.stringify(value));
-  } catch {
-    // Cache is optional; the server remains authoritative.
-  }
-};
-
 const getToken = () => localStorage.getItem('pixiu_auth_token');
 
 async function apiRequest(path, options = {}) {
   const token = getToken();
   const headers = new Headers(options.headers || {});
-  if (options.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+  if (options.body && !(options.body instanceof FormData) && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
   if (token) headers.set('Authorization', `Bearer ${token}`);
 
-  const response = await fetch(`${API_BASE}${path}`, { ...options, headers });
-  const contentType = response.headers.get('content-type') || '';
-  const payload = contentType.includes('application/json')
-    ? await response.json().catch(() => ({}))
-    : {};
+  const method = String(options.method || 'GET').toUpperCase();
+  const retryable = method === 'GET' || method === 'HEAD';
+  const delays = retryable ? [0, 1500, 3500] : [0];
+  let lastError;
 
-  if (!response.ok) {
-    throw new Error(payload.error || `Request failed (${response.status})`);
+  for (let attempt = 0; attempt < delays.length; attempt += 1) {
+    if (delays[attempt]) await new Promise(resolve => setTimeout(resolve, delays[attempt]));
+
+    try {
+      const response = await fetch(`${API_BASE}${path}`, {
+        ...options,
+        headers,
+        cache: retryable ? 'no-store' : options.cache
+      });
+      const contentType = response.headers.get('content-type') || '';
+      const payload = contentType.includes('application/json')
+        ? await response.json().catch(() => ({}))
+        : {};
+
+      if (response.ok) return payload;
+
+      const error = new Error(payload.error || `Request failed (${response.status})`);
+      if (!retryable || ![502, 503, 504].includes(response.status) || attempt === delays.length - 1) {
+        throw error;
+      }
+      lastError = error;
+    } catch (error) {
+      lastError = error;
+      if (!retryable || attempt === delays.length - 1) throw error;
+    }
   }
-  return payload;
+
+  throw lastError || new Error('Request failed.');
 }
 
 const collection = (payload) => Array.isArray(payload) ? payload : (payload?.data || []);
 
 export function DataProvider({ children }) {
-  const [schools, setSchools] = useState(() => readCache(CACHE_KEYS.schools, []));
-  const [classes, setClasses] = useState(() => readCache(CACHE_KEYS.classes, []));
-  const [students, setStudents] = useState(() => readCache(CACHE_KEYS.students, []));
-  const [trainers, setTrainers] = useState(() => readCache(CACHE_KEYS.trainers, []));
-  const [sessions, setSessions] = useState(() => readCache(CACHE_KEYS.sessions, []));
-  const [attendance, setAttendance] = useState(() => readCache(CACHE_KEYS.attendance, []));
-  const [leads, setLeads] = useState(() => readCache(CACHE_KEYS.leads, []));
-  const [content, setContent] = useState(() => readCache(CACHE_KEYS.content, []));
-  const [curriculum, setCurriculum] = useState(() => readCache(CACHE_KEYS.curriculum, []));
-  const [inventory, setInventory] = useState(() => readCache(CACHE_KEYS.inventory, []));
-  const [classKits, setClassKits] = useState(() => readCache(CACHE_KEYS.classKits, {}));
-  const [billing, setBilling] = useState(() => readCache(CACHE_KEYS.billing, []));
-  const [comms, setComms] = useState(() => readCache(CACHE_KEYS.comms, []));
-  const [projects, setProjects] = useState(() => readCache(CACHE_KEYS.projects, []));
-  const [alerts, setAlerts] = useState(() => readCache(CACHE_KEYS.alerts, []));
-  const [notifications, setNotifications] = useState(() => readCache(CACHE_KEYS.notifications, []));
-  const [studentReviews, setStudentReviews] = useState(() => readCache(CACHE_KEYS.studentReviews, []));
-  const [quizzes, setQuizzes] = useState(() => readCache(CACHE_KEYS.quizzes, []));
-  const [quizSubmissions, setQuizSubmissions] = useState(() => readCache(CACHE_KEYS.quizSubmissions, []));
+  // PostgreSQL/API is the only source of truth. LocalStorage is intentionally
+  // limited to the authentication token; application records are not cached.
+  const [schools, setSchools] = useState([]);
+  const [classes, setClasses] = useState([]);
+  const [students, setStudents] = useState([]);
+  const [trainers, setTrainers] = useState([]);
+  const [sessions, setSessions] = useState([]);
+  const [attendance, setAttendance] = useState([]);
+  const [leads, setLeads] = useState([]);
+  const [content, setContent] = useState([]);
+  const [curriculum, setCurriculum] = useState([]);
+  const [inventory, setInventory] = useState([]);
+  const [classKits, setClassKits] = useState({});
+  const [billing, setBilling] = useState([]);
+  const [comms, setComms] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [alerts, setAlerts] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [studentReviews, setStudentReviews] = useState([]);
+  const [quizzes, setQuizzes] = useState([]);
+  const [quizSubmissions, setQuizSubmissions] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const refreshAll = useCallback(async () => {
@@ -102,40 +79,41 @@ export function DataProvider({ children }) {
 
     setLoading(true);
     const endpoints = [
-      ['schools', '/schools', setSchools],
-      ['classes', '/classes', setClasses],
-      ['students', '/students', setStudents],
-      ['trainers', '/trainers', setTrainers],
-      ['sessions', '/sessions', setSessions],
-      ['attendance', '/attendance', setAttendance],
-      ['leads', '/leads', setLeads],
-      ['content', '/content', setContent],
-      ['curriculum', '/curriculum', setCurriculum],
-      ['inventory', '/inventory', setInventory],
-      ['billing', '/billing', setBilling],
-      ['comms', '/comms', setComms],
-      ['projects', '/projects', setProjects],
-      ['alerts', '/alerts', setAlerts],
-      ['notifications', '/notifications', setNotifications],
-      ['studentReviews', '/reviews', setStudentReviews],
-      ['quizzes', '/quizzes', setQuizzes],
-      ['quizSubmissions', '/quiz-submissions', setQuizSubmissions]
+      ['/schools', setSchools],
+      ['/classes', setClasses],
+      ['/students', setStudents],
+      ['/trainers', setTrainers],
+      ['/sessions', setSessions],
+      ['/attendance', setAttendance],
+      ['/leads', setLeads],
+      ['/content', setContent],
+      ['/curriculum', setCurriculum],
+      ['/inventory', setInventory],
+      ['/billing', setBilling],
+      ['/comms', setComms],
+      ['/projects', setProjects],
+      ['/alerts', setAlerts],
+      ['/notifications', setNotifications],
+      ['/reviews', setStudentReviews],
+      ['/quizzes', setQuizzes],
+      ['/quiz-submissions', setQuizSubmissions]
     ];
 
-    const results = await Promise.allSettled(endpoints.map(([, path]) => apiRequest(path)));
-    results.forEach((result, index) => {
-      if (result.status !== 'fulfilled') return;
-      const [cacheKey, , setter] = endpoints[index];
-      const rows = collection(result.value);
-      setter(rows);
-      writeCache(CACHE_KEYS[cacheKey], rows);
-    });
+    try {
+      const results = await Promise.allSettled(endpoints.map(([path]) => apiRequest(path)));
+      results.forEach((result, index) => {
+        if (result.status !== 'fulfilled') return;
+        const [, setter] = endpoints[index];
+        setter(collection(result.value));
+      });
 
-    setLoading(false);
-    return {
-      success: results.some(result => result.status === 'fulfilled'),
-      failed: results.filter(result => result.status === 'rejected').length
-    };
+      return {
+        success: results.some(result => result.status === 'fulfilled'),
+        failed: results.filter(result => result.status === 'rejected').length
+      };
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -145,10 +123,7 @@ export function DataProvider({ children }) {
     return () => window.removeEventListener('pixiu_auth_state_changed', onAuthChange);
   }, [refreshAll]);
 
-  const commitCollectionChange = (setter, cacheKey, value) => {
-    setter(value);
-    writeCache(cacheKey, value);
-  };
+  const commitCollectionChange = (setter, value) => setter(value);
 
   const addSchool = async (schoolData) => {
     try {
@@ -382,7 +357,7 @@ export function DataProvider({ children }) {
     const form = new FormData();
     form.append('file', file);
     try {
-      const data = await apiRequest('/upload', { method: 'POST', body: form, headers: {} });
+      const data = await apiRequest('/upload', { method: 'POST', body: form });
       return { success: true, url: data.url, filename: data.filename };
     } catch (e) { return { success: false, error: e.message }; }
   };
@@ -502,9 +477,7 @@ export function DataProvider({ children }) {
     } catch (e) { return { success: false, error: e.message }; }
   };
 
-  const startNewSession = async (sessionData) => {
-    return scheduleSession(sessionData);
-  };
+  const startNewSession = async (sessionData) => scheduleSession(sessionData);
 
   const markAttendance = async (sessionId, studentId, status) => {
     try {
@@ -558,7 +531,7 @@ export function DataProvider({ children }) {
         components: (current.components || []).map(component => component.id === componentId ? { ...component, ...updatedFields } : component)
       }
     };
-    commitCollectionChange(setClassKits, CACHE_KEYS.classKits, next);
+    commitCollectionChange(setClassKits, next);
     return { success: true };
   };
 
@@ -567,7 +540,7 @@ export function DataProvider({ children }) {
     if (!current) return { success: false, error: 'Class kit is not loaded from the server yet.' };
     const nextComponents = [...(current.components || []), { ...newComponent, id: newComponent.id || `C${grade}-${Date.now()}` }];
     const next = { ...classKits, [grade]: { ...current, total_components: nextComponents.length, components: nextComponents } };
-    commitCollectionChange(setClassKits, CACHE_KEYS.classKits, next);
+    commitCollectionChange(setClassKits, next);
     return { success: true };
   };
 
