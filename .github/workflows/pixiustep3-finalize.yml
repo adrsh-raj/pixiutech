@@ -1,0 +1,66 @@
+name: PIXIU Step 3 Finalize
+
+on:
+  push:
+    paths:
+      - '.github/step3-finalize-trigger'
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Execute repaired Step 3 patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          workflow = Path('.github/workflows/pixiustep3-repair.yml').read_text()
+          start_marker = '      - name: Apply final security patch\n        shell: bash\n        run: |\n'
+          start = workflow.index(start_marker) + len(start_marker)
+          end = workflow.index('\n\n      -', start)
+          block = workflow[start:end]
+          lines = []
+          for line in block.splitlines():
+              lines.append(line[10:] if line.startswith('          ') else line)
+          script = '\n'.join(lines)
+
+          # Remove the old broad localhost assertion; replace the offending files explicitly below.
+          old_check = """# Hard fail on legacy browser authentication and local runtime URLs.\nif grep -RniE \"student123|hub_authenticated|http://localhost|http://127\\.0\\.0\\.1|https://localhost\" src pixiu-lms-portal/src pixiu-lms-portal/server 2>/dev/null; then\n  echo 'Legacy browser auth/default credential/localhost runtime marker detected.'\n  exit 1\nfi\n\n"""
+          script = script.replace(old_check, '')
+
+          # Centralize the last two helper modules on the already-required VITE_API_URL authority.
+          marker = "          # User-specific cache namespace prevents one account from reusing another account's cached records."
+          patch = """          # Remove remaining local API fallbacks from helper modules.\n          python - <<'PY2'\n          from pathlib import Path\n          for fp in [Path('pixiu-lms-portal/src/utils/notifications.js'), Path('pixiu-lms-portal/src/pages/AuditLogs.jsx')]:\n              if fp.exists():\n                  txt = fp.read_text()\n                  txt = txt.replace(\"http://localhost:5000/api\", \"\${API_BASE}\")\n                  fp.write_text(txt)\n          PY2\n\n"""
+          # Put this immediately before the final node checks / git add.
+          script = script.replace("          node --check pixiu-lms-portal/server/index.js", patch + "          node --check pixiu-lms-portal/server/index.js", 1)
+          Path('/tmp/pixiustep3.sh').write_text(script)
+          PY
+          bash /tmp/pixiustep3.sh
+
+          # The two helper replacements above must use the real imported API_BASE, not a literal placeholder.
+          python - <<'PY'
+          from pathlib import Path
+          fp = Path('pixiu-lms-portal/src/utils/notifications.js')
+          if fp.exists():
+              txt = fp.read_text()
+              if 'const { API_BASE }' not in txt and "from '../config/api'" not in txt:
+                  txt = "import { API_BASE } from '../config/api';\n" + txt
+              txt = txt.replace("${API_BASE}", "${API_BASE}")
+              fp.write_text(txt)
+          fp = Path('pixiu-lms-portal/src/pages/AuditLogs.jsx')
+          if fp.exists() and '${API_BASE}' in fp.read_text() and "from '../config/api'" not in fp.read_text():
+              txt = fp.read_text()
+              txt = "import { API_BASE } from '../config/api';\n" + txt
+              fp.write_text(txt)
+          PY
+
+          grep -RniE "student123|hub_authenticated|http://localhost|http://127\.0\.0\.1|https://localhost|SHA-256" src pixiu-lms-portal/src pixiu-lms-portal/server 2>/dev/null && exit 1 || true
