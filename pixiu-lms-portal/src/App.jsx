@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard';
 import Students from './pages/Students';
 import Inventory from './pages/Inventory';
 import Trainers from './pages/Trainers';
+import TrainerCredentials from './pages/TrainerCredentials';
 import Comms from './pages/Comms';
 import Leads from './pages/Leads';
 import Schools from './pages/Schools';
@@ -72,6 +73,10 @@ const Settings = () => (
         <p className="font-bold text-slate-700">Database & Auth Status</p>
         <p className="text-emerald-600 font-bold text-xs mt-1">Server API + BCrypt/JWT Authentication</p>
       </div>
+      <Link to="/trainer-credentials" className="block p-4 bg-blue-50 rounded-xl border border-blue-100 hover:border-blue-300 transition-colors">
+        <p className="font-bold text-blue-900">Trainer Login Credentials</p>
+        <p className="text-xs text-blue-700 mt-1">Reset trainer portal passwords securely from the admin console.</p>
+      </Link>
     </div>
   </div>
 );
@@ -204,6 +209,7 @@ export default function App() {
                 <Route path="students" element={<Students />} />
                 <Route path="comms" element={<AdminOnly><Comms /></AdminOnly>} />
                 <Route path="trainers" element={<Trainers />} />
+                <Route path="trainer-credentials" element={<AdminOnly><TrainerCredentials /></AdminOnly>} />
                 <Route path="content" element={<ContentHub />} />
                 <Route path="curriculum" element={<Curriculum />} />
                 <Route path="inventory" element={<Inventory />} />
