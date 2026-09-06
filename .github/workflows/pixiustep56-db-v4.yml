@@ -1,0 +1,62 @@
+name: PIXIU Step 5-6 DB v4
+on:
+  push:
+    paths:
+      - '.github/step56-v4-trigger'
+permissions:
+  contents: write
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: pixiu_test
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d pixiu_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Patch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('scripts/step56_patch.py')
+          s = p.read_text()
+          s = s.replace(r'db\\.run\\(`(CREATE TABLE', r'db\.run\(`(CREATE TABLE')
+          p.write_text(s)
+          PY
+          python scripts/step56_patch.py
+      - name: Install and test
+        working-directory: pixiu-lms-portal/server
+        env:
+          NODE_ENV: production
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/pixiu_test
+          JWT_SECRET: test-secret-that-is-at-least-32-characters-long
+          CORS_ORIGINS: https://portal.pixiutech.com,https://pixiutech.com,https://www.pixiutech.com
+        run: |
+          npm install
+          node --check database.js
+          node --check index.js
+          node --check start.js
+          node - <<'JS'
+          const db=require('./database');
+          (async()=>{await db.ready; const t=await db.all("select tablename from pg_tables where schemaname='public'"); const s=await db.get('select count(*)::int c from students'); const u=await db.get('select count(*)::int c from users'); if(!s.c||!u.c) throw new Error('migration data missing'); console.log('PASS',t.length,'tables',s.c,'students',u.c,'users')})().catch(e=>{console.error(e);process.exit(1)})
+          JS
+      - name: Commit verified changes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          rm -f .github/workflows/pixiustep56-db.yml .github/workflows/pixiustep56-db-v2.yml .github/workflows/pixiustep56-db-v3.yml .github/workflows/pixiustep56-db-v4.yml .github/step56-trigger .github/step56-v2-trigger .github/step56-v3-trigger .github/step56-v4-trigger scripts/step56_patch.py
+          git add -A
+          git commit -m 'feat: migrate LMS persistence to PostgreSQL'
+          git push origin HEAD:main
