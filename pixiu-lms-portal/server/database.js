@@ -41,6 +41,41 @@ function convertPlaceholders(sql) {
   return output;
 }
 
+function convertSqliteCompat(sql) {
+  let converted = sql;
+
+  // SQLite-compatible ordering alias used by a few legacy endpoints.
+  converted = converted.replace(/\bORDER\s+BY\s+rowid\s+DESC\b/gi, 'ORDER BY id DESC');
+
+  // SQLite INSERT OR IGNORE -> PostgreSQL ON CONFLICT DO NOTHING.
+  converted = converted.replace(/INSERT\s+OR\s+IGNORE\s+INTO\s+/gi, 'INSERT INTO ');
+  if (/^\s*INSERT\s+INTO\s+/i.test(converted) && !/\bON\s+CONFLICT\b/i.test(converted)) {
+    // Only append for the statements that originated from OR IGNORE.
+    // The sentinel is added below by the dedicated replacement.
+  }
+
+  // SQLite INSERT OR REPLACE -> PostgreSQL upsert. This intentionally uses an
+  // unconstrained ON CONFLICT clause so any primary/unique key conflict is updated.
+  const replaceMatch = sql.match(/^\s*INSERT\s+OR\s+REPLACE\s+INTO\s+([\w\"]+)\s*\(([^)]+)\)\s*(VALUES\s*\([\s\S]*\))\s*;?\s*$/i);
+  if (replaceMatch) {
+    const table = replaceMatch[1];
+    const columns = replaceMatch[2].split(',').map(col => col.trim());
+    const valuesPart = replaceMatch[3];
+    const updates = columns
+      .filter(col => !/^id$/i.test(col.replace(/[`\"]+/g, '')))
+      .map(col => `${col} = EXCLUDED.${col}`)
+      .join(', ');
+    return `INSERT INTO ${table} (${replaceMatch[2]}) ${valuesPart} ON CONFLICT DO UPDATE SET ${updates || 'id = EXCLUDED.id'}`;
+  }
+
+  const ignoreMatch = sql.match(/^\s*INSERT\s+OR\s+IGNORE\s+INTO\s+([\w\"]+)\s*\(([^)]+)\)\s*(VALUES\s*\([\s\S]*\))\s*;?\s*$/i);
+  if (ignoreMatch) {
+    return `INSERT INTO ${ignoreMatch[1]} (${ignoreMatch[2]}) ${ignoreMatch[3]} ON CONFLICT DO NOTHING`;
+  }
+
+  return converted;
+}
+
 const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
 
 async function migrateLegacySqlite() {
@@ -109,28 +144,41 @@ const db = {
   run(sql, params, callback) {
     if (typeof params === 'function') { callback = params; params = []; }
     const values = Array.isArray(params) ? params : (params == null ? [] : [params]);
-    const promise = ready.then(() => pool.query(convertPlaceholders(sql), values));
+    const promise = ready.then(() => pool.query(convertPlaceholders(convertSqliteCompat(sql)), values));
     if (callback) promise.then(result => callback.call({ lastID: result.rows?.[0]?.id ?? null, changes: result.rowCount }, null)).catch(err => callback.call({}, err));
     return promise;
   },
   all(sql, params, callback) {
     if (typeof params === 'function') { callback = params; params = []; }
     const values = Array.isArray(params) ? params : (params == null ? [] : [params]);
-    const promise = ready.then(() => pool.query(convertPlaceholders(sql), values));
+    const promise = ready.then(() => pool.query(convertPlaceholders(convertSqliteCompat(sql)), values));
     if (callback) promise.then(result => callback(null, result.rows)).catch(err => callback(err, []));
     return promise;
   },
   get(sql, params, callback) {
     if (typeof params === 'function') { callback = params; params = []; }
     const values = Array.isArray(params) ? params : (params == null ? [] : [params]);
-    const promise = ready.then(() => pool.query(convertPlaceholders(sql), values));
+    const promise = ready.then(() => pool.query(convertPlaceholders(convertSqliteCompat(sql)), values));
     if (callback) promise.then(result => callback(null, result.rows[0])).catch(err => callback(err, null));
     return promise;
   },
   serialize(fn) { return typeof fn === 'function' ? fn() : undefined; },
   prepare(sql) {
-    const converted = convertPlaceholders(sql);
-    return { run(...args) { return ready.then(() => pool.query(converted, args)); }, finalize() {} };
+    const converted = convertPlaceholders(convertSqliteCompat(sql));
+    const pending = [];
+    return {
+      run(...args) {
+        const values = args.length === 1 && Array.isArray(args[0]) ? args[0] : args;
+        const promise = ready.then(() => pool.query(converted, values));
+        pending.push(promise);
+        return promise;
+      },
+      finalize(callback) {
+        return Promise.all(pending)
+          .then(results => { if (typeof callback === 'function') callback(null, results); return results; })
+          .catch(error => { if (typeof callback === 'function') callback(error); throw error; });
+      }
+    };
   }
 };
 
