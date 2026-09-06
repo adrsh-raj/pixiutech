@@ -64,6 +64,7 @@ export default function StudentPortal() {
     window.addEventListener('storage', handleAttUpdate);
     window.addEventListener('pixiu_attendance_updated', handleAttUpdate);
     window.addEventListener('pixiu_sessions_updated', handleAttUpdate);
+    window.addEventListener('pixiu_quiz_submissions_updated', handleAttUpdate);
 
     return () => {
       window.removeEventListener('storage', handleUpdate);
@@ -71,6 +72,7 @@ export default function StudentPortal() {
       window.removeEventListener('storage', handleAttUpdate);
       window.removeEventListener('pixiu_attendance_updated', handleAttUpdate);
       window.removeEventListener('pixiu_sessions_updated', handleAttUpdate);
+      window.removeEventListener('pixiu_quiz_submissions_updated', handleAttUpdate);
     };
   }, []);
 
@@ -396,37 +398,13 @@ export default function StudentPortal() {
 
   const studentQuizSubmissions = useMemo(() => {
     const sCleanId = (student.student_id || cleanId || '').toUpperCase().replace(/\s+/g, '');
-    const directSubs = (quizSubmissions || []).filter(s => {
+    return (quizSubmissions || []).filter(s => {
       if (!s || !s.student_id) return false;
       const subClean = s.student_id.toUpperCase().replace(/\s+/g, '');
       const nameMatch = s.student_name && student.name && s.student_name.toLowerCase().trim() === student.name.toLowerCase().trim();
       return subClean === sCleanId || nameMatch;
     });
-
-    const completedQuizIds = new Set(directSubs.map(s => s.quiz_id));
-    studentAvailableQuizzes.forEach(q => {
-      if (!completedQuizIds.has(q.id)) {
-        const matchingReview = levelReviewData.find(l => 
-          (l.hasReview && l.score !== null && l.score > 0) && (
-            (l.level && q.level && l.level.toLowerCase().replace(/\s+/g, '') === q.level.toLowerCase().replace(/\s+/g, '')) ||
-            (l.unitCode && q.unit_code && l.unitCode.toLowerCase().replace(/\s+/g, '') === q.unit_code.toLowerCase().replace(/\s+/g, ''))
-          )
-        );
-        if (matchingReview) {
-          completedQuizIds.add(q.id);
-          directSubs.push({
-            id: `SUB-AUTO-${q.id}-${student.student_id.replace(/\s+/g, '')}`,
-            quiz_id: q.id,
-            student_id: student.student_id,
-            score: 10,
-            total_marks: 10
-          });
-        }
-      }
-    });
-
-    return directSubs;
-  }, [quizSubmissions, student.student_id, student.name, cleanId, studentAvailableQuizzes, levelReviewData]);
+  }, [quizSubmissions, student.student_id, student.name, cleanId]);
 
   const handleExamSubmit = async (attemptData) => {
     try {

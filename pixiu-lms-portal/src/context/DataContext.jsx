@@ -263,27 +263,14 @@ export function DataProvider({ children }) {
   const [quizSubmissions, setQuizSubmissions] = useState(() => {
     try {
       const saved = safeGetItem('pixiu_quiz_submissions', null);
-      if (!saved || !Array.isArray(saved) || saved.length === 0) {
-        localStorage.setItem('pixiu_quiz_submissions', JSON.stringify(SEED_QUIZ_SUBMISSIONS));
-        return SEED_QUIZ_SUBMISSIONS;
+      if (Array.isArray(saved)) {
+        // Filter out legacy hardcoded seed submissions (starts with SUB-ZPS6A01, SUB-XYZ6A01, etc.)
+        const realOnly = saved.filter(s => s && s.id && !s.id.startsWith('SUB-ZPS6A') && !s.id.startsWith('SUB-AUTO-'));
+        return realOnly;
       }
-      const map = new Map();
-      SEED_QUIZ_SUBMISSIONS.forEach(s => map.set(`${s.quiz_id}_${s.student_id}`, s));
-      saved.forEach(s => {
-        if (s && s.quiz_id && s.student_id) {
-          map.set(`${s.quiz_id}_${s.student_id}`, s);
-        }
-      });
-      const merged = Array.from(map.values()).map(s => {
-        if (s.student_id === 'XYZ6A 01' && (s.student_name === 'Aayush Maurya' || !s.student_name)) {
-          return { ...s, student_name: 'Manish Rawat' };
-        }
-        return s;
-      });
-      localStorage.setItem('pixiu_quiz_submissions', JSON.stringify(merged));
-      return merged;
+      return [];
     } catch (e) {
-      return SEED_QUIZ_SUBMISSIONS;
+      return [];
     }
   });
 
@@ -439,15 +426,9 @@ export function DataProvider({ children }) {
         try { localStorage.setItem('pixiu_quizzes', JSON.stringify(quizRes)); } catch (e) {}
       }
       if (subRes && Array.isArray(subRes)) {
-        setQuizSubmissions(prev => {
-          const map = new Map();
-          SEED_QUIZ_SUBMISSIONS.forEach(s => map.set(`${s.quiz_id}_${s.student_id}`, s));
-          prev.forEach(s => map.set(`${s.quiz_id}_${s.student_id}`, s));
-          subRes.forEach(s => map.set(`${s.quiz_id}_${s.student_id}`, s));
-          const merged = Array.from(map.values());
-          try { localStorage.setItem('pixiu_quiz_submissions', JSON.stringify(merged)); } catch (e) {}
-          return merged;
-        });
+        setQuizSubmissions(subRes);
+        try { localStorage.setItem('pixiu_quiz_submissions', JSON.stringify(subRes)); } catch (e) {}
+        try { window.dispatchEvent(new CustomEvent('pixiu_quiz_submissions_updated', { detail: subRes })); } catch (e) {}
       }
     } catch (err) {
       console.warn("Backend API unavailable, using offline seed state.");
