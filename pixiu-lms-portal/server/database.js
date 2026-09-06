@@ -44,22 +44,21 @@ function convertPlaceholders(sql) {
 const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
 
 async function migrateLegacySqlite() {
+  const sqlitePath = process.env.SQLITE_MIGRATION_PATH?.trim();
+  if (!sqlitePath) {
+    console.log('No legacy SQLite migration path configured; using PostgreSQL as the authoritative database.');
+    return;
+  }
+
+  if (!fs.existsSync(sqlitePath)) {
+    throw new Error(`SQLITE_MIGRATION_PATH does not exist: ${sqlitePath}`);
+  }
+
   const client = await pool.connect();
   let sqlite = null;
   try {
     const marker = await client.query("SELECT 1 FROM _pixiu_migrations WHERE id = 'sqlite-to-postgres-v1'");
     if (marker.rowCount) return;
-
-    const candidates = [
-      process.env.SQLITE_MIGRATION_PATH,
-      '/opt/render/project/src/data/pixiu_lms.db',
-      path.join(__dirname, 'pixiu_lms.db')
-    ].filter(Boolean);
-    const sqlitePath = candidates.find(file => fs.existsSync(file));
-    if (!sqlitePath) {
-      console.warn('No legacy SQLite database found; using existing PostgreSQL data.');
-      return;
-    }
 
     const Database = require('better-sqlite3');
     sqlite = new Database(sqlitePath, { readonly: true, fileMustExist: true });
