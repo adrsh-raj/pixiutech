@@ -1017,47 +1017,6 @@ app.delete('/api/logs', (req, res) => {
   });
 });
 
-// ==================== 17. STUDENT REVIEWS API ====================
-app.get('/api/reviews', (req, res) => {
-  db.all("SELECT * FROM student_reviews ORDER BY updated_at DESC", [], (err, rows) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json(rows || []);
-  });
-});
-
-app.post('/api/reviews', (req, res) => {
-  const { id, student_id, student_name, unit_code, level, rating, comment, trainer_name, verified_date } = req.body;
-  const reviewId = id || `REV-${Date.now().toString().slice(-4)}`;
-  const now = new Date().toISOString();
-  const vDate = verified_date || new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-
-  const sql = `INSERT OR REPLACE INTO student_reviews (id, student_id, student_name, unit_code, level, rating, comment, trainer_name, verified_date, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-
-  db.run(sql, [reviewId, student_id, student_name || '', unit_code || '', level || '', rating || 5, comment || '', trainer_name || '', vDate, now], function(err) {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json({ 
-      success: true, 
-      id: reviewId, 
-      student_id, 
-      student_name, 
-      unit_code, 
-      level, 
-      rating, 
-      comment, 
-      trainer_name, 
-      verified_date: vDate,
-      updated_at: now
-    });
-  });
-});
-
-app.delete('/api/reviews/:id', (req, res) => {
-  db.run("DELETE FROM student_reviews WHERE id = ?", [req.params.id], function(err) {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json({ success: true, deleted: req.params.id });
-  });
-});
 
 // ==================== 19. QUIZZES & MCQS API ====================
 // Get all Quizzes (optionally filtered by class_grade and level) with Questions
@@ -1381,104 +1340,191 @@ app.get('/api/reviews', (req, res) => {
     params.push(class_grade);
   }
 
-  sql += " ORDER BY created_at DESC";
+  sql += " ORDER BY updated_at DESC, created_at DESC";
 
   db.all(sql, params, (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
-    const normalized = (rows || []).map(r => ({
-      ...r,
-      score: Number(r.score) || 0,
-      rating: Number(r.rating) || (r.score ? Math.round(Number(r.score) / 2) : 5),
-      review: r.review || r.comment || '',
-      comment: r.comment || r.review || '',
-      status: r.status || 'Mastered'
-    }));
-    res.json(normalized);
+
+    const revMap = new Map();
+    (rows || []).forEach(r => {
+      if (!r || !r.student_id) return;
+      const cleanSId = r.student_id.trim().replace(/\s+/g, ' ');
+      const sKey = cleanSId.toUpperCase().replace(/\s+/g, '');
+      const uCode = (r.unit_code || '').trim() || (r.level === 'Level 0' ? 'Unit 1' : r.level === 'Level 1' ? 'Unit 2' : r.level === 'Level 2' ? 'Unit 3' : r.level === 'Level 3' ? 'Unit 4' : r.level === 'Level 4' ? 'Unit 5' : 'Unit 6');
+      const uKey = uCode.toUpperCase().replace(/\s+/g, '');
+      const dedupKey = `${sKey}__${uKey}`;
+
+      const rawScore = Number(r.score);
+      const hasScore = !isNaN(rawScore) && rawScore >= 0;
+      const score = hasScore ? rawScore : (Number(r.rating) ? Number(r.rating) * 2 : 10);
+      const rating = Number(r.rating) || Math.max(1, Math.min(5, Math.round(score / 2)));
+      const reviewText = (r.review || r.comment || '').trim();
+
+      // Filter out corrupt rows with no review text and no score
+      if (!reviewText && !hasScore) return;
+
+      const norm = {
+        ...r,
+        id: r.id || `REV-${sKey}-${uKey}`,
+        student_id: cleanSId,
+        student_name: r.student_name || 'Student',
+        class_grade: r.class_grade || (cleanSId.match(/\d+/)?.[0] || '6'),
+        unit_code: uCode,
+        level: r.level || (uCode === 'Unit 1' ? 'Level 0' : uCode === 'Unit 2' ? 'Level 1' : uCode === 'Unit 3' ? 'Level 2' : uCode === 'Unit 4' ? 'Level 3' : uCode === 'Unit 5' ? 'Level 4' : 'Level 5'),
+        unit_title: r.unit_title || '',
+        score,
+        rating,
+        status: r.status || (score >= 8 ? 'Mastered' : score >= 5 ? 'In Progress' : 'Needs Practice'),
+        review: reviewText || 'Satisfactory lab evaluation.',
+        comment: reviewText || 'Satisfactory lab evaluation.',
+        trainer_name: r.trainer_name || (cleanSId.includes('XYZ') ? 'Akash Sharma (Senior Robotics Faculty)' : 'Vikas Pandey (Lead Instructor)'),
+        verified_date: r.verified_date || 'Verified'
+      };
+
+      if (!revMap.has(dedupKey)) {
+        revMap.set(dedupKey, norm);
+      }
+    });
+
+    res.json(Array.from(revMap.values()));
   });
 });
 
 // GET reviews for specific student
 app.get('/api/reviews/student/:studentId', (req, res) => {
   const studentId = req.params.studentId;
-  const sql = "SELECT * FROM student_reviews WHERE UPPER(REPLACE(student_id, ' ', '')) = UPPER(REPLACE(?, ' ', '')) ORDER BY created_at DESC";
+  const sql = "SELECT * FROM student_reviews WHERE UPPER(REPLACE(student_id, ' ', '')) = UPPER(REPLACE(?, ' ', '')) ORDER BY updated_at DESC, created_at DESC";
   db.all(sql, [studentId], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
-    const normalized = (rows || []).map(r => ({
-      ...r,
-      score: Number(r.score) || 0,
-      rating: Number(r.rating) || (r.score ? Math.round(Number(r.score) / 2) : 5),
-      review: r.review || r.comment || '',
-      comment: r.comment || r.review || '',
-      status: r.status || 'Mastered'
-    }));
-    res.json(normalized);
+
+    const revMap = new Map();
+    (rows || []).forEach(r => {
+      if (!r || !r.student_id) return;
+      const cleanSId = r.student_id.trim().replace(/\s+/g, ' ');
+      const sKey = cleanSId.toUpperCase().replace(/\s+/g, '');
+      const uCode = (r.unit_code || '').trim() || (r.level === 'Level 0' ? 'Unit 1' : r.level === 'Level 1' ? 'Unit 2' : r.level === 'Level 2' ? 'Unit 3' : r.level === 'Level 3' ? 'Unit 4' : r.level === 'Level 4' ? 'Unit 5' : 'Unit 6');
+      const uKey = uCode.toUpperCase().replace(/\s+/g, '');
+      const dedupKey = `${sKey}__${uKey}`;
+
+      const rawScore = Number(r.score);
+      const hasScore = !isNaN(rawScore) && rawScore >= 0;
+      const score = hasScore ? rawScore : (Number(r.rating) ? Number(r.rating) * 2 : 10);
+      const rating = Number(r.rating) || Math.max(1, Math.min(5, Math.round(score / 2)));
+      const reviewText = (r.review || r.comment || '').trim();
+
+      if (!reviewText && !hasScore) return;
+
+      const norm = {
+        ...r,
+        id: r.id || `REV-${sKey}-${uKey}`,
+        student_id: cleanSId,
+        student_name: r.student_name || 'Student',
+        class_grade: r.class_grade || (cleanSId.match(/\d+/)?.[0] || '6'),
+        unit_code: uCode,
+        level: r.level || (uCode === 'Unit 1' ? 'Level 0' : uCode === 'Unit 2' ? 'Level 1' : uCode === 'Unit 3' ? 'Level 2' : uCode === 'Unit 4' ? 'Level 3' : uCode === 'Unit 5' ? 'Level 4' : 'Level 5'),
+        unit_title: r.unit_title || '',
+        score,
+        rating,
+        status: r.status || (score >= 8 ? 'Mastered' : score >= 5 ? 'In Progress' : 'Needs Practice'),
+        review: reviewText || 'Satisfactory lab evaluation.',
+        comment: reviewText || 'Satisfactory lab evaluation.',
+        trainer_name: r.trainer_name || (cleanSId.includes('XYZ') ? 'Akash Sharma (Senior Robotics Faculty)' : 'Vikas Pandey (Lead Instructor)'),
+        verified_date: r.verified_date || 'Verified'
+      };
+
+      if (!revMap.has(dedupKey)) {
+        revMap.set(dedupKey, norm);
+      }
+    });
+
+    res.json(Array.from(revMap.values()));
   });
 });
 
 // POST create or update review
 app.post('/api/reviews', (req, res) => {
   const r = req.body;
-  if (!r.student_id || !r.unit_code) {
-    return res.status(400).json({ error: 'student_id and unit_code are required' });
+  if (!r.student_id || (!r.unit_code && !r.level)) {
+    return res.status(400).json({ error: 'student_id and unit_code (or level) are required' });
   }
 
-  const cleanStudentId = (r.student_id || '').trim();
-  const reviewId = r.id || `REV-${cleanStudentId.replace(/\s+/g, '')}-${(r.unit_code || '').replace(/\s+/g, '')}`;
-  const score = Number(r.score) || (r.rating ? Number(r.rating) * 2 : 10);
+  const cleanStudentId = (r.student_id || '').trim().replace(/\s+/g, ' ');
+  const sKey = cleanStudentId.toUpperCase().replace(/\s+/g, '');
+  const uCode = (r.unit_code || '').trim() || (r.level === 'Level 0' ? 'Unit 1' : r.level === 'Level 1' ? 'Unit 2' : r.level === 'Level 2' ? 'Unit 3' : r.level === 'Level 3' ? 'Unit 4' : r.level === 'Level 4' ? 'Unit 5' : 'Unit 6');
+  const uKey = uCode.toUpperCase().replace(/\s+/g, '');
+  const reviewId = `REV-${sKey}-${uKey}`;
+
+  const rawScore = Number(r.score);
+  const score = (!isNaN(rawScore) && rawScore >= 0) ? rawScore : (Number(r.rating) ? Number(r.rating) * 2 : 10);
   const rating = Number(r.rating) || Math.max(1, Math.min(5, Math.round(score / 2)));
-  const reviewText = r.review || r.comment || 'Satisfactory lab evaluation.';
+  const reviewText = (r.review || r.comment || '').trim() || 'Satisfactory lab evaluation.';
+  const grade = r.class_grade || (cleanStudentId.match(/\d+/)?.[0] || '6');
+  const level = r.level || (uCode === 'Unit 1' ? 'Level 0' : uCode === 'Unit 2' ? 'Level 1' : uCode === 'Unit 3' ? 'Level 2' : uCode === 'Unit 4' ? 'Level 3' : uCode === 'Unit 5' ? 'Level 4' : 'Level 5');
+  const status = r.status || (score >= 8 ? 'Mastered' : score >= 5 ? 'In Progress' : 'Needs Practice');
   const now = new Date().toISOString();
   const verifiedDate = r.verified_date || new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  const trainerName = r.trainer_name || (cleanStudentId.includes('XYZ') ? 'Akash Sharma (Senior Robotics Faculty)' : 'Vikas Pandey (Lead Instructor)');
 
-  const sql = `INSERT OR REPLACE INTO student_reviews (
-    id, student_id, student_name, class_grade, unit_code, level, unit_title,
-    score, rating, status, review, comment, trainer_name, verified_date, created_at, updated_at
-  ) VALUES (
-    ?, ?, ?, ?, ?, ?, ?,
-    ?, ?, ?, ?, ?, ?, ?,
-    COALESCE((SELECT created_at FROM student_reviews WHERE id = ?), ?),
-    ?
-  )`;
+  // Delete prior row for this student and unit/level to prevent duplicate cards
+  const delSql = `DELETE FROM student_reviews 
+    WHERE UPPER(REPLACE(student_id, ' ', '')) = UPPER(REPLACE(?, ' ', '')) 
+    AND (
+      UPPER(REPLACE(unit_code, ' ', '')) = UPPER(REPLACE(?, ' ', '')) 
+      OR UPPER(REPLACE(level, ' ', '')) = UPPER(REPLACE(?, ' ', ''))
+      OR id = ?
+    )`;
 
-  db.run(sql, [
-    reviewId,
-    cleanStudentId,
-    r.student_name || 'Student',
-    r.class_grade || '6',
-    r.unit_code,
-    r.level || 'Level 0',
-    r.unit_title || '',
-    score,
-    rating,
-    r.status || 'Mastered',
-    reviewText,
-    reviewText,
-    r.trainer_name || 'Vikas Pandey (Lead Instructor)',
-    verifiedDate,
-    reviewId,
-    now,
-    now
-  ], function(err) {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json({
-      success: true,
-      data: {
-        id: reviewId,
-        student_id: cleanStudentId,
-        student_name: r.student_name,
-        class_grade: r.class_grade,
-        unit_code: r.unit_code,
-        level: r.level,
-        unit_title: r.unit_title,
-        score,
-        rating,
-        status: r.status || 'Mastered',
-        review: reviewText,
-        comment: reviewText,
-        trainer_name: r.trainer_name,
-        verified_date: verifiedDate,
-        updated_at: now
-      }
+  db.run(delSql, [cleanStudentId, uCode, level, reviewId], function(delErr) {
+    if (delErr) console.warn("Warning deleting prior review:", delErr.message);
+
+    const insertSql = `INSERT INTO student_reviews (
+      id, student_id, student_name, class_grade, unit_code, level, unit_title,
+      score, rating, status, review, comment, trainer_name, verified_date, created_at, updated_at
+    ) VALUES (
+      ?, ?, ?, ?, ?, ?, ?,
+      ?, ?, ?, ?, ?, ?, ?,
+      ?, ?
+    )`;
+
+    db.run(insertSql, [
+      reviewId,
+      cleanStudentId,
+      r.student_name || 'Student',
+      grade,
+      uCode,
+      level,
+      r.unit_title || `${level} Lab Competency Assessment`,
+      score,
+      rating,
+      status,
+      reviewText,
+      reviewText,
+      trainerName,
+      verifiedDate,
+      now,
+      now
+    ], function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({
+        success: true,
+        data: {
+          id: reviewId,
+          student_id: cleanStudentId,
+          student_name: r.student_name || 'Student',
+          class_grade: grade,
+          unit_code: uCode,
+          level,
+          unit_title: r.unit_title || `${level} Lab Competency Assessment`,
+          score,
+          rating,
+          status,
+          review: reviewText,
+          comment: reviewText,
+          trainer_name: trainerName,
+          verified_date: verifiedDate,
+          updated_at: now
+        }
+      });
     });
   });
 });

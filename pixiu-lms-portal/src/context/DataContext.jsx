@@ -210,37 +210,59 @@ export function DataProvider({ children }) {
   const [studentReviews, setStudentReviews] = useState(() => {
     try {
       const raw = safeGetItem('pixiu_student_reviews', null);
-      if (!raw || !Array.isArray(raw) || raw.length === 0) {
-        localStorage.setItem('pixiu_student_reviews', JSON.stringify(SEED_STUDENT_REVIEWS));
-        return SEED_STUDENT_REVIEWS;
-      }
-      const cleanReviews = raw.filter(r => 
-        r && 
-        r.student_id !== 'ABC6A 01' && 
-        !r.student_id?.startsWith('ABC') && 
-        r.verified_date !== 'Curriculum Baseline'
-      ).map(r => {
-        if (r.student_id === 'XYZ6A 01' && (r.student_name === 'Aayush Maurya' || !r.student_name)) {
-          return { ...r, student_name: 'Manish Rawat' };
-        }
-        return r;
+      const revMap = new Map();
+
+      // Seed baseline reviews first
+      SEED_STUDENT_REVIEWS.forEach(r => {
+        if (!r || !r.student_id) return;
+        const sKey = r.student_id.toUpperCase().replace(/\s+/g, '');
+        const uCode = (r.unit_code || '').trim() || (r.level === 'Level 0' ? 'Unit 1' : r.level === 'Level 1' ? 'Unit 2' : r.level === 'Level 2' ? 'Unit 3' : r.level === 'Level 3' ? 'Unit 4' : r.level === 'Level 4' ? 'Unit 5' : 'Unit 6');
+        const uKey = uCode.toUpperCase().replace(/\s+/g, '');
+        const key = `${sKey}__${uKey}`;
+        revMap.set(key, { ...r, unit_code: uCode, id: r.id || `REV-${sKey}-${uKey}` });
       });
 
-      const revMap = new Map();
-      SEED_STUDENT_REVIEWS.forEach(r => {
-        if (r && r.student_id) {
-          const key = `${r.student_id.toUpperCase().replace(/\s+/g, '')}__${(r.unit_code || r.level || '').toLowerCase().replace(/\s+/g, '')}`;
-          revMap.set(key, r);
-        }
-      });
-      cleanReviews.forEach(r => {
-        if (r && r.student_id) {
-          const key = `${r.student_id.toUpperCase().replace(/\s+/g, '')}__${(r.unit_code || r.level || '').toLowerCase().replace(/\s+/g, '')}`;
-          revMap.set(key, r);
-        }
-      });
+      // Overlay saved user/trainer reviews if valid and not corrupt
+      if (raw && Array.isArray(raw) && raw.length > 0) {
+        raw.forEach(r => {
+          if (!r || !r.student_id) return;
+          if (r.student_id === 'ABC6A 01' || r.student_id?.startsWith('ABC') || r.verified_date === 'Curriculum Baseline') return;
+          
+          const rawScore = Number(r.score);
+          const hasScore = !isNaN(rawScore) && rawScore >= 0;
+          const reviewText = (r.review || r.comment || '').trim();
+
+          // Discard corrupt reviews with empty text and no score
+          if (!reviewText && !hasScore) return;
+
+          const sClean = r.student_id.trim().replace(/\s+/g, ' ');
+          const sKey = sClean.toUpperCase().replace(/\s+/g, '');
+          const uCode = (r.unit_code || '').trim() || (r.level === 'Level 0' ? 'Unit 1' : r.level === 'Level 1' ? 'Unit 2' : r.level === 'Level 2' ? 'Unit 3' : r.level === 'Level 3' ? 'Unit 4' : r.level === 'Level 4' ? 'Unit 5' : 'Unit 6');
+          const uKey = uCode.toUpperCase().replace(/\s+/g, '');
+          const key = `${sKey}__${uKey}`;
+          const grade = r.class_grade || (sKey.match(/\d+/)?.[0] || '6');
+
+          const sName = (sClean === 'XYZ6A 01' && (r.student_name === 'Aayush Maurya' || !r.student_name)) 
+            ? 'Manish Rawat' 
+            : (r.student_name || 'Student');
+
+          revMap.set(key, {
+            ...r,
+            id: r.id || `REV-${sKey}-${uKey}`,
+            student_id: sClean,
+            student_name: sName,
+            class_grade: grade,
+            unit_code: uCode,
+            score: hasScore ? rawScore : (Number(r.rating) ? Number(r.rating) * 2 : 10),
+            rating: Number(r.rating) || (hasScore ? Math.max(1, Math.min(5, Math.round(rawScore / 2))) : 5),
+            review: reviewText || 'Satisfactory lab evaluation.',
+            comment: reviewText || 'Satisfactory lab evaluation.'
+          });
+        });
+      }
+
       const merged = Array.from(revMap.values());
-      localStorage.setItem('pixiu_student_reviews', JSON.stringify(merged));
+      try { localStorage.setItem('pixiu_student_reviews', JSON.stringify(merged)); } catch (e) {}
       return merged;
     } catch (e) {
       return SEED_STUDENT_REVIEWS;
@@ -1259,32 +1281,54 @@ export function DataProvider({ children }) {
   // 16. End-of-Unit Student Reviews by Trainers
   const saveStudentReview = async (reviewData) => {
     const studentId = (reviewData.student_id || '').trim().replace(/\s+/g, ' ');
-    const studentName = reviewData.student_name || '';
     const cleanStudentId = studentId.toUpperCase().replace(/\s+/g, '');
-    const reviewId = reviewData.id || `REV-${Date.now().toString().slice(-4)}`;
+    const uCode = (reviewData.unit_code || '').trim() || (reviewData.level === 'Level 0' ? 'Unit 1' : reviewData.level === 'Level 1' ? 'Unit 2' : reviewData.level === 'Level 2' ? 'Unit 3' : reviewData.level === 'Level 3' ? 'Unit 4' : reviewData.level === 'Level 4' ? 'Unit 5' : 'Unit 6');
+    const uKey = uCode.toUpperCase().replace(/\s+/g, '');
+    const reviewId = `REV-${cleanStudentId}-${uKey}`;
+    const grade = reviewData.class_grade || (cleanStudentId.match(/\d+/)?.[0] || '6');
+    const level = reviewData.level || (uCode === 'Unit 1' ? 'Level 0' : uCode === 'Unit 2' ? 'Level 1' : uCode === 'Unit 3' ? 'Level 2' : uCode === 'Unit 4' ? 'Level 3' : uCode === 'Unit 5' ? 'Level 4' : 'Level 5');
+    const rawScore = Number(reviewData.score);
+    const score = (!isNaN(rawScore) && rawScore >= 0) ? rawScore : (Number(reviewData.rating) ? Number(reviewData.rating) * 2 : 10);
+    const rating = Number(reviewData.rating) || Math.max(1, Math.min(5, Math.round(score / 2)));
+    const reviewText = (reviewData.review || reviewData.comment || '').trim() || 'Demonstrated commendable lab performance and technical aptitude.';
+    const trainerName = reviewData.trainer_name || (cleanStudentId.includes('XYZ') ? 'Akash Sharma (Senior Robotics Faculty)' : 'Vikas Pandey (Lead Instructor)');
+    const vDate = reviewData.verified_date || new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 
     const fullReview = {
       ...reviewData,
       id: reviewId,
       student_id: studentId,
-      student_name: studentName,
-      verified_date: reviewData.verified_date || new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+      student_name: reviewData.student_name || 'Student',
+      class_grade: grade,
+      unit_code: uCode,
+      level,
+      unit_title: reviewData.unit_title || `${level} Lab Competency Assessment`,
+      score,
+      rating,
+      status: reviewData.status || (score >= 8 ? 'Mastered' : score >= 5 ? 'In Progress' : 'Needs Practice'),
+      review: reviewText,
+      comment: reviewText,
+      trainer_name: trainerName,
+      verified_date: vDate,
       updated_at: new Date().toISOString()
     };
 
     setStudentReviews(prev => {
-      // Filter out existing review for the same student and unit/level
+      // Filter out ANY existing review for the same student and unit/level
       const filtered = prev.filter(r => {
         if (!r || !r.student_id) return false;
         const rCleanId = r.student_id.toUpperCase().replace(/\s+/g, '');
         if (rCleanId !== cleanStudentId) return true;
 
-        const isSameUnit = r.unit_code && fullReview.unit_code &&
-          r.unit_code.toLowerCase().replace(/\s+/g, '') === fullReview.unit_code.toLowerCase().replace(/\s+/g, '');
-        const isSameLevel = r.level && fullReview.level &&
-          r.level.toLowerCase().replace(/\s+/g, '') === fullReview.level.toLowerCase().replace(/\s+/g, '');
+        const rUnit = (r.unit_code || '').toUpperCase().replace(/\s+/g, '');
+        const targetUnit = uCode.toUpperCase().replace(/\s+/g, '');
+        const rLevel = (r.level || '').toUpperCase().replace(/\s+/g, '');
+        const targetLevel = level.toUpperCase().replace(/\s+/g, '');
 
-        return !(isSameUnit || isSameLevel);
+        if (rUnit && targetUnit && rUnit === targetUnit) return false;
+        if (rLevel && targetLevel && rLevel === targetLevel) return false;
+        if (r.id === reviewId) return false;
+        return true;
       });
 
       const updated = [fullReview, ...filtered];
@@ -1462,28 +1506,6 @@ export function DataProvider({ children }) {
             return updated;
           });
 
-          // Auto sync to student reviews
-          const earned = Number(data.submission.score) || 0;
-          const maxMarks = Number(data.submission.total_marks) || 10;
-          const scoreOutOf10 = maxMarks > 0 ? Math.round((earned / maxMarks) * 10 * 10) / 10 : 8.0;
-          const rating = Math.min(5, Math.max(1, Math.round(scoreOutOf10 / 2)));
-          const revStatus = scoreOutOf10 >= 8 ? 'Mastered' : scoreOutOf10 >= 5 ? 'In Progress' : 'Needs Practice';
-          const uCode = level === 'Level 0' ? 'Unit 1' : level === 'Level 1' ? 'Unit 2' : level === 'Level 2' ? 'Unit 3' : level === 'Level 3' ? 'Unit 4' : level === 'Level 4' ? 'Unit 5' : 'Unit 6';
-          saveStudentReview({
-            student_id,
-            student_name: student_name || 'Student',
-            class_grade: class_grade || '6',
-            unit_code: uCode,
-            level: level || 'Level 0',
-            unit_title: `${level || 'Level 0'} Lab Competency Assessment`,
-            score: scoreOutOf10,
-            rating,
-            status: revStatus,
-            review: `Official MCQ Assessment verified. Candidate scored ${earned}/${maxMarks} (${data.submission.percentage || 0}%) on ${level} assessment with ${violation_count || 0} anti-cheat strikes. Demonstrated strong conceptual foundation.`,
-            trainer_name: student_id?.toUpperCase().includes('XYZ') ? 'Akash Sharma (Senior Robotics Faculty)' : 'Vikas Pandey (Lead Instructor)',
-            verified_date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-          });
-
           try {
             window.dispatchEvent(new CustomEvent('pixiu_quiz_submissions_updated', { detail: data.submission }));
           } catch (e) {}
@@ -1548,28 +1570,6 @@ export function DataProvider({ children }) {
       const updated = [localSubmission, ...prev.filter(s => !(s.quiz_id === quiz_id && s.student_id === student_id))];
       try { localStorage.setItem('pixiu_quiz_submissions', JSON.stringify(updated)); } catch (e) {}
       return updated;
-    });
-
-    // Auto-sync into student reviews
-    const scoreOutOf10 = totalMarks > 0 ? Math.round((earnedScore / totalMarks) * 10 * 10) / 10 : 8.0;
-    const rating = Math.min(5, Math.max(1, Math.round(scoreOutOf10 / 2)));
-    const reviewStatus = scoreOutOf10 >= 8 ? 'Mastered' : scoreOutOf10 >= 5 ? 'In Progress' : 'Needs Practice';
-    const unitCode = level === 'Level 0' ? 'Unit 1' : level === 'Level 1' ? 'Unit 2' : level === 'Level 2' ? 'Unit 3' : level === 'Level 3' ? 'Unit 4' : level === 'Level 4' ? 'Unit 5' : 'Unit 6';
-    const remarks = `Official MCQ Assessment verified. Candidate scored ${earnedScore}/${totalMarks} (${percentage}%) on ${level} assessment with ${violation_count || 0} anti-cheat strikes. Demonstrated strong conceptual foundation.`;
-
-    saveStudentReview({
-      student_id,
-      student_name: student_name || 'Student',
-      class_grade: class_grade || '6',
-      unit_code: unitCode,
-      level: level || 'Level 0',
-      unit_title: `${level || 'Level 0'} Lab Competency Assessment`,
-      score: scoreOutOf10,
-      rating,
-      status: reviewStatus,
-      review: remarks,
-      trainer_name: student_id?.toUpperCase().includes('XYZ') ? 'Akash Sharma (Senior Robotics Faculty)' : 'Vikas Pandey (Lead Instructor)',
-      verified_date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
     });
 
     try {

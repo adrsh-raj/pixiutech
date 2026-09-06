@@ -993,26 +993,25 @@ export const SEED_STUDENT_REVIEWS = [
     verified_date: '25 Aug 2026'
   },
 
-  // XYZ6A 01 - Manish Rawat (XYZ Academy - Level 0 Mastered)
+  // XYZ6A 01 - Manish Rawat (XYZ Academy - Level 0, Level 1, Level 2)
   {
-    id: 'REV-XYZ6A01-U1',
+    id: 'REV-XYZ6A01-UNIT1',
     student_id: 'XYZ6A 01',
     student_name: 'Manish Rawat',
     class_grade: '6',
     unit_code: 'Unit 1',
     level: 'Level 0',
     unit_title: 'Introduction to Robotics & Electronics',
-    score: 9.2,
-    rating: 5,
+    score: 8.0,
+    rating: 4,
     status: 'Mastered',
-    review: 'Great enthusiastic participation in robotics lab fundamentals and breadboard wiring.',
-    comment: 'Great enthusiastic participation in robotics lab fundamentals and breadboard wiring.',
+    review: "Demonstrated exceptional understanding of breadboard power rails, series-parallel LEDs, and Ohm's Law current calculations.",
+    comment: "Demonstrated exceptional understanding of breadboard power rails, series-parallel LEDs, and Ohm's Law current calculations.",
     trainer_name: 'Akash Sharma (Senior Robotics Faculty)',
     verified_date: '26 Aug 2026'
   },
-  // XYZ6A 01 - Manish Rawat (XYZ Academy - Level 1 In Progress)
   {
-    id: 'REV-XYZ6A01-U2',
+    id: 'REV-XYZ6A01-UNIT2',
     student_id: 'XYZ6A 01',
     student_name: 'Manish Rawat',
     class_grade: '6',
@@ -1027,9 +1026,8 @@ export const SEED_STUDENT_REVIEWS = [
     trainer_name: 'Akash Sharma (Senior Robotics Faculty)',
     verified_date: '28 Aug 2026'
   },
-  // XYZ6A 01 - Manish Rawat (XYZ Academy - Level 2)
   {
-    id: 'REV-XYZ6A01-U3',
+    id: 'REV-XYZ6A01-UNIT3',
     student_id: 'XYZ6A 01',
     student_name: 'Manish Rawat',
     class_grade: '6',
@@ -1038,9 +1036,9 @@ export const SEED_STUDENT_REVIEWS = [
     unit_title: 'Basic Project: Traffic Light Signal Controller',
     score: 6.0,
     rating: 3,
-    status: 'In Progress',
-    review: 'Official MCQ Assessment verified. Candidate scored 6/10 (60%) on Level 2 assessment with 0 anti-cheat strikes. Demonstrated improving understanding of traffic signal logic and digital output sequencing.',
-    comment: 'Official MCQ Assessment verified. Candidate scored 6/10 (60%) on Level 2 assessment with 0 anti-cheat strikes. Demonstrated improving understanding of traffic signal logic and digital output sequencing.',
+    status: 'Mastered',
+    review: "Demonstrated exceptional understanding of breadboard power rails, series-parallel LEDs, and Ohm's Law current calculations.",
+    comment: "Demonstrated exceptional understanding of breadboard power rails, series-parallel LEDs, and Ohm's Law current calculations.",
     trainer_name: 'Akash Sharma (Senior Robotics Faculty)',
     verified_date: '02 Sep 2026'
   },

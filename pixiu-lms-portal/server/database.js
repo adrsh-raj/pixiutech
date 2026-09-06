@@ -567,14 +567,30 @@ function initializeDatabase() {
           'Vikas Pandey (Lead Instructor)', '25 Aug 2026'
         );
 
-        // XYZ6A 01 - Manish Rawat (XYZ Academy - Level 0 Mastered)
+        // XYZ6A 01 - Manish Rawat (XYZ Academy - Level 0, Level 1, Level 2)
         revStmt.run(
-          'REV-XYZ6A01-U1', 'XYZ6A 01', 'Manish Rawat', '6', 'Unit 1', 'Level 0',
+          'REV-XYZ6A01-UNIT1', 'XYZ6A 01', 'Manish Rawat', '6', 'Unit 1', 'Level 0',
           'Introduction to Robotics & Electronics',
-          9.2, 5, 'Mastered',
-          'Great enthusiastic participation in robotics lab fundamentals and breadboard wiring.',
-          'Great enthusiastic participation in robotics lab fundamentals and breadboard wiring.',
+          8.0, 4, 'Mastered',
+          'Demonstrated exceptional understanding of breadboard power rails, series-parallel LEDs, and Ohm\'s Law current calculations.',
+          'Demonstrated exceptional understanding of breadboard power rails, series-parallel LEDs, and Ohm\'s Law current calculations.',
           'Akash Sharma (Senior Robotics Faculty)', '26 Aug 2026'
+        );
+        revStmt.run(
+          'REV-XYZ6A01-UNIT2', 'XYZ6A 01', 'Manish Rawat', '6', 'Unit 2', 'Level 1',
+          'The Arduino IDE & Programming Fundamentals',
+          4.0, 2, 'In Progress',
+          'Official MCQ Assessment verified. Candidate scored 4/10 (40%) on Level 1 assessment. Shows basic understanding of Arduino IDE and Blink sketches, but needs additional hands-on practice with syntax and GPIO configuration.',
+          'Official MCQ Assessment verified. Candidate scored 4/10 (40%) on Level 1 assessment. Shows basic understanding of Arduino IDE and Blink sketches, but needs additional hands-on practice with syntax and GPIO configuration.',
+          'Akash Sharma (Senior Robotics Faculty)', '28 Aug 2026'
+        );
+        revStmt.run(
+          'REV-XYZ6A01-UNIT3', 'XYZ6A 01', 'Manish Rawat', '6', 'Unit 3', 'Level 2',
+          'Basic Project: Traffic Light Signal Controller',
+          6.0, 3, 'Mastered',
+          'Demonstrated exceptional understanding of breadboard power rails, series-parallel LEDs, and Ohm\'s Law current calculations.',
+          'Demonstrated exceptional understanding of breadboard power rails, series-parallel LEDs, and Ohm\'s Law current calculations.',
+          'Akash Sharma (Senior Robotics Faculty)', '02 Sep 2026'
         );
 
         revStmt.finalize();

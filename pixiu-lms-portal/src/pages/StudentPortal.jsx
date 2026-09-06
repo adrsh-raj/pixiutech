@@ -78,8 +78,20 @@ export default function StudentPortal() {
 
   const allReviews = useMemo(() => {
     const map = new Map();
-    (studentReviews || []).forEach(r => { if (r && r.id) map.set(r.id, r); });
-    (localReviews || []).forEach(r => { if (r && r.id) map.set(r.id, r); });
+    [...(studentReviews || []), ...(localReviews || [])].forEach(r => {
+      if (!r || !r.student_id) return;
+      const sKey = (r.student_id || '').toUpperCase().replace(/\s+/g, '');
+      const uCode = (r.unit_code || '').trim() || (r.level === 'Level 0' ? 'Unit 1' : r.level === 'Level 1' ? 'Unit 2' : r.level === 'Level 2' ? 'Unit 3' : r.level === 'Level 3' ? 'Unit 4' : r.level === 'Level 4' ? 'Unit 5' : 'Unit 6');
+      const uKey = uCode.toUpperCase().replace(/\s+/g, '');
+      const key = `${sKey}__${uKey}`;
+
+      const rawScore = Number(r.score);
+      const hasScore = !isNaN(rawScore) && rawScore >= 0;
+      const hasText = (r.review || r.comment || '').trim().length > 0;
+      if (!hasText && !hasScore) return;
+
+      map.set(key, { ...r, unit_code: uCode });
+    });
     return Array.from(map.values());
   }, [studentReviews, localReviews]);
 

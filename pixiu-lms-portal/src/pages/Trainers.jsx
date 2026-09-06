@@ -355,13 +355,39 @@ export default function Trainers() {
   };
 
   const visibleStudentReviews = useMemo(() => {
-    return studentReviews.filter(r => {
-      const matchesGrade = selectedReviewGrade === 'All' || r.class_grade === selectedReviewGrade;
+    const revMap = new Map();
+
+    const filtered = (studentReviews || []).filter(r => {
+      if (!r || !r.student_id) return false;
+
+      // Filter out corrupt cards with no review text and no valid score
+      const hasReviewText = (r.review || r.comment || '').trim().length > 0;
+      const rawScore = Number(r.score);
+      const hasScore = !isNaN(rawScore) && rawScore >= 0;
+      if (!hasReviewText && !hasScore) return false;
+
+      const sClean = (r.student_id || '').trim().replace(/\s+/g, ' ');
+      const grade = r.class_grade || (sClean.match(/\d+/)?.[0] || '6');
+      const matchesGrade = selectedReviewGrade === 'All' || grade === selectedReviewGrade;
       if (!matchesGrade) return false;
       if (isAdmin || user?.school_id === 'ALL') return true;
-      const rId = (r.student_id || '').toUpperCase();
+      const rId = sClean.toUpperCase();
       return trainerSchoolId === 'XYZ' ? rId.includes('XYZ') : rId.includes('ZPS');
     });
+
+    filtered.forEach(r => {
+      const sClean = (r.student_id || '').trim().replace(/\s+/g, ' ');
+      const sKey = sClean.toUpperCase().replace(/\s+/g, '');
+      const uCode = (r.unit_code || '').trim() || (r.level === 'Level 0' ? 'Unit 1' : r.level === 'Level 1' ? 'Unit 2' : r.level === 'Level 2' ? 'Unit 3' : r.level === 'Level 3' ? 'Unit 4' : r.level === 'Level 4' ? 'Unit 5' : 'Unit 6');
+      const uKey = uCode.toUpperCase().replace(/\s+/g, '');
+      const key = `${sKey}__${uKey}`;
+
+      if (!revMap.has(key)) {
+        revMap.set(key, { ...r, student_id: sClean, unit_code: uCode });
+      }
+    });
+
+    return Array.from(revMap.values());
   }, [studentReviews, selectedReviewGrade, isAdmin, user, trainerSchoolId]);
 
   const visibleQuizSubmissions = useMemo(() => {
@@ -600,22 +626,29 @@ export default function Trainers() {
 
   const handleSaveReview = async (e) => {
     e.preventDefault();
-    const targetStudentId = reviewFormData.student_id;
+    const targetStudentId = (reviewFormData.student_id || '').trim().replace(/\s+/g, ' ');
     const studentObj = visibleStudents.find(s => s.student_id === targetStudentId) || students.find(s => s.student_id === targetStudentId);
     const clampedRating = Math.max(1, Math.min(5, Number(reviewFormData.rating) || 5));
     const computedScore = clampedRating * 2; // Strict formula: 1★=2, 5★=10
 
+    const sKey = targetStudentId.toUpperCase().replace(/\s+/g, '');
+    const uCode = (reviewFormData.unit_code || '').trim() || (reviewFormData.level === 'Level 0' ? 'Unit 1' : reviewFormData.level === 'Level 1' ? 'Unit 2' : reviewFormData.level === 'Level 2' ? 'Unit 3' : reviewFormData.level === 'Level 3' ? 'Unit 4' : reviewFormData.level === 'Level 4' ? 'Unit 5' : 'Unit 6');
+    const uKey = uCode.toUpperCase().replace(/\s+/g, '');
+    const canonicalId = editingReviewId || `REV-${sKey}-${uKey}`;
+    const grade = studentObj?.class_id ? (studentObj.class_id.match(/\d+/)?.[0] || '6') : (reviewFormData.class_grade || sKey.match(/\d+/)?.[0] || '6');
+
     const payload = {
       ...reviewFormData,
       student_id: targetStudentId,
-      id: editingReviewId || `REV-${Date.now().toString().slice(-4)}`,
+      id: canonicalId,
       student_name: studentObj?.name || reviewFormData.student_name || 'Student',
-      class_grade: studentObj?.class_id ? (studentObj.class_id.match(/\d+/)?.[0] || '6') : reviewFormData.class_grade,
+      class_grade: grade,
+      unit_code: uCode,
       rating: clampedRating,
       score: computedScore,
       verified_date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
     };
-    saveStudentReview(payload);
+    await saveStudentReview(payload);
 
     // If Trainer chose to authorize & issue graduation certificate
     if (reviewFormData.issue_graduation_certificate && studentObj) {
@@ -2354,12 +2387,12 @@ export default function Trainers() {
                         {rev.student_id}
                       </span>
                       <h4 className="text-sm font-bold text-slate-800 mt-1">{rev.student_name}</h4>
-                      <p className="text-[11px] text-slate-400">Class {rev.class_grade}A Cohort</p>
+                      <p className="text-[11px] text-slate-400">Class {rev.class_grade || (rev.student_id?.match(/\d+/)?.[0] || '6')}A Cohort</p>
                     </div>
 
                     <div className="text-right">
                       <span className="inline-block px-2.5 py-1 rounded-lg text-xs font-black bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        {rev.score} / 10
+                        {rev.score ?? 10} / 10
                       </span>
                       <div className="flex items-center gap-0.5 justify-end mt-1">
                         {[...Array(Number(rev.rating) || 5)].map((_, i) => (
@@ -2377,12 +2410,12 @@ export default function Trainers() {
                         rev.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
                         'bg-amber-100 text-amber-800'
                       }`}>
-                        {rev.status}
+                        {rev.status || 'Mastered'}
                       </span>
                     </div>
-                    <p className="text-[11px] font-medium text-slate-600 mb-2">{rev.unit_title}</p>
+                    <p className="text-[11px] font-medium text-slate-600 mb-2">{rev.unit_title || `${rev.level} Lab Competency Assessment`}</p>
                     <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100 whitespace-pre-line italic">
-                      "{rev.review}"
+                      "{rev.review || rev.comment || 'Satisfactory lab evaluation.'}"
                     </p>
                   </div>
                 </div>
