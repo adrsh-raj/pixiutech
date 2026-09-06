@@ -1,4 +1,4 @@
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
       username TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
@@ -9,7 +9,7 @@ CREATE TABLE users (
       created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
-CREATE TABLE schools (
+CREATE TABLE IF NOT EXISTS schools (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       code TEXT NOT NULL UNIQUE,
@@ -21,7 +21,7 @@ CREATE TABLE schools (
       expected_revenue INTEGER DEFAULT 0
     );
 
-CREATE TABLE classes (
+CREATE TABLE IF NOT EXISTS classes (
       id TEXT PRIMARY KEY,
       school_id TEXT NOT NULL,
       grade TEXT NOT NULL,
@@ -29,7 +29,7 @@ CREATE TABLE classes (
       FOREIGN KEY (school_id) REFERENCES schools(id)
     );
 
-CREATE TABLE students (
+CREATE TABLE IF NOT EXISTS students (
       student_id TEXT PRIMARY KEY,
       school_id TEXT NOT NULL,
       class_id TEXT NOT NULL,
@@ -44,7 +44,7 @@ CREATE TABLE students (
       FOREIGN KEY (class_id) REFERENCES classes(id)
     );
 
-CREATE TABLE trainers (
+CREATE TABLE IF NOT EXISTS trainers (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       phone TEXT NOT NULL,
@@ -58,7 +58,7 @@ CREATE TABLE trainers (
       created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
-CREATE TABLE sessions (
+CREATE TABLE IF NOT EXISTS sessions (
       id TEXT PRIMARY KEY,
       school_id TEXT NOT NULL,
       class_id TEXT NOT NULL,
@@ -73,7 +73,7 @@ CREATE TABLE sessions (
       FOREIGN KEY (class_id) REFERENCES classes(id)
     );
 
-CREATE TABLE attendance (
+CREATE TABLE IF NOT EXISTS attendance (
       id TEXT PRIMARY KEY,
       session_id TEXT NOT NULL,
       student_id TEXT NOT NULL,
@@ -84,7 +84,7 @@ CREATE TABLE attendance (
       UNIQUE(session_id, student_id)
     );
 
-CREATE TABLE leads (
+CREATE TABLE IF NOT EXISTS leads (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       contact_person TEXT,
@@ -96,7 +96,7 @@ CREATE TABLE leads (
       last_contact TEXT
     );
 
-CREATE TABLE content (
+CREATE TABLE IF NOT EXISTS content (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
       type TEXT DEFAULT 'PDF',
@@ -108,7 +108,7 @@ CREATE TABLE content (
       description TEXT
     );
 
-CREATE TABLE curriculum (
+CREATE TABLE IF NOT EXISTS curriculum (
       id TEXT PRIMARY KEY,
       week TEXT NOT NULL,
       level TEXT NOT NULL,
@@ -117,7 +117,7 @@ CREATE TABLE curriculum (
       status TEXT DEFAULT 'Upcoming'
     );
 
-CREATE TABLE inventory (
+CREATE TABLE IF NOT EXISTS inventory (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       level TEXT DEFAULT 'Level 1',
@@ -128,7 +128,7 @@ CREATE TABLE inventory (
       issue_notes TEXT
     );
 
-CREATE TABLE billing (
+CREATE TABLE IF NOT EXISTS billing (
       id TEXT PRIMARY KEY,
       school_id TEXT NOT NULL,
       school_name TEXT NOT NULL,
@@ -146,7 +146,7 @@ CREATE TABLE billing (
       is_confirmed INTEGER DEFAULT 0
     );
 
-CREATE TABLE comms_logs (
+CREATE TABLE IF NOT EXISTS comms_logs (
       id TEXT PRIMARY KEY,
       student_id TEXT,
       recipient TEXT NOT NULL,
@@ -156,7 +156,7 @@ CREATE TABLE comms_logs (
       status TEXT DEFAULT 'Delivered'
     );
 
-CREATE TABLE projects (
+CREATE TABLE IF NOT EXISTS projects (
       id TEXT PRIMARY KEY,
       student_id TEXT NOT NULL,
       title TEXT NOT NULL,
@@ -168,12 +168,12 @@ CREATE TABLE projects (
       FOREIGN KEY (student_id) REFERENCES students(student_id)
     );
 
-CREATE TABLE alerts (
+CREATE TABLE IF NOT EXISTS alerts (
       id TEXT PRIMARY KEY,
-      type TEXT NOT NULL, -- 'hardware', 'renewal', 'attendance', 'billing'
+      type TEXT NOT NULL,
       title TEXT NOT NULL,
       message TEXT NOT NULL,
-      severity TEXT DEFAULT 'warning', -- 'critical', 'warning', 'info'
+      severity TEXT DEFAULT 'warning',
       related_id TEXT,
       action_label TEXT,
       action_type TEXT,
@@ -181,23 +181,25 @@ CREATE TABLE alerts (
       created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
-CREATE TABLE notifications (
+CREATE TABLE IF NOT EXISTS notifications (
       id TEXT PRIMARY KEY,
-      target_type TEXT NOT NULL, -- 'All_Students', 'Specific_Class', 'All_Trainers', 'Universal'
-      target_classes TEXT,        -- e.g. "6,7,8,9,11" or "6"
-      target_trainer_id TEXT,     -- e.g. "TR-01" or "All"
+      target_type TEXT NOT NULL,
+      target_classes TEXT,
+      target_trainer_id TEXT,
       title TEXT NOT NULL,
       message TEXT NOT NULL,
-      template_type TEXT,        -- 'next_class', 'revision', 'kit_prep', 'general'
+      template_type TEXT,
       scheduled_date TEXT,
       scheduled_time TEXT,
-      severity TEXT DEFAULT 'info', -- 'info', 'important', 'urgent'
-      status TEXT DEFAULT 'Active', -- 'Active', 'Archived'
+      severity TEXT DEFAULT 'info',
+      status TEXT DEFAULT 'Active',
       created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-    , target_school_id TEXT, type TEXT DEFAULT 'announcement');
+      updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+      target_school_id TEXT,
+      type TEXT DEFAULT 'announcement'
+    );
 
-CREATE TABLE audit_logs (
+CREATE TABLE IF NOT EXISTS audit_logs (
       id TEXT PRIMARY KEY,
       date TEXT,
       time TEXT,
@@ -211,7 +213,7 @@ CREATE TABLE audit_logs (
       created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
-CREATE TABLE student_reviews (
+CREATE TABLE IF NOT EXISTS student_reviews (
       id TEXT PRIMARY KEY,
       student_id TEXT NOT NULL,
       student_name TEXT,
@@ -230,7 +232,7 @@ CREATE TABLE student_reviews (
       updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
-CREATE TABLE notification_reads (
+CREATE TABLE IF NOT EXISTS notification_reads (
       id TEXT PRIMARY KEY,
       notification_id TEXT NOT NULL,
       user_key TEXT NOT NULL,
@@ -238,12 +240,12 @@ CREATE TABLE notification_reads (
       UNIQUE(notification_id, user_key)
     );
 
-CREATE TABLE quizzes (
+CREATE TABLE IF NOT EXISTS quizzes (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
-      class_grade TEXT NOT NULL, -- '6', '7', '8', '9', '11', 'ALL'
-      level TEXT NOT NULL,       -- 'Level 0', 'Level 1', 'Level 2', 'Level 3', 'Level 4', 'Level 5', 'Level 6'
-      unit_code TEXT,            -- 'Unit 1', 'Unit 2', etc.
+      class_grade TEXT NOT NULL,
+      level TEXT NOT NULL,
+      unit_code TEXT,
       duration_minutes INTEGER DEFAULT 10,
       total_marks INTEGER DEFAULT 10,
       created_by TEXT DEFAULT 'Pixiu Academic Faculty',
@@ -252,7 +254,7 @@ CREATE TABLE quizzes (
       updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
-CREATE TABLE quiz_questions (
+CREATE TABLE IF NOT EXISTS quiz_questions (
       id TEXT PRIMARY KEY,
       quiz_id TEXT NOT NULL,
       question_order INTEGER DEFAULT 1,
@@ -261,13 +263,13 @@ CREATE TABLE quiz_questions (
       option_b TEXT NOT NULL,
       option_c TEXT NOT NULL,
       option_d TEXT NOT NULL,
-      correct_option TEXT NOT NULL, -- 'A', 'B', 'C', 'D'
-      explanation TEXT NOT NULL,     -- Detailed reasoning shown post-quiz
+      correct_option TEXT NOT NULL,
+      explanation TEXT NOT NULL,
       points INTEGER DEFAULT 2,
       created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
-CREATE TABLE quiz_submissions (
+CREATE TABLE IF NOT EXISTS quiz_submissions (
       id TEXT PRIMARY KEY,
       quiz_id TEXT NOT NULL,
       student_id TEXT NOT NULL,
@@ -280,11 +282,11 @@ CREATE TABLE quiz_submissions (
       correct_count INTEGER DEFAULT 0,
       attempted_count INTEGER DEFAULT 0,
       total_questions INTEGER DEFAULT 0,
-      answers_json TEXT,             -- Serialized student answers map
+      answers_json TEXT,
       time_taken_seconds INTEGER DEFAULT 0,
       violation_count INTEGER DEFAULT 0,
-      status TEXT DEFAULT 'Completed', -- 'Completed', 'Terminated_Violation', 'Timed_Out'
-      reattempt_allowed INTEGER DEFAULT 0, -- 1 if trainer granted reattempt
+      status TEXT DEFAULT 'Completed',
+      reattempt_allowed INTEGER DEFAULT 0,
       completed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
       UNIQUE(quiz_id, student_id)
     );
@@ -295,47 +297,25 @@ CREATE TABLE IF NOT EXISTS _pixiu_migrations (
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_school_role ON users (school_id, role);
-
 CREATE INDEX IF NOT EXISTS idx_classes_school ON classes (school_id);
-
 CREATE INDEX IF NOT EXISTS idx_students_school_class ON students (school_id, class_id);
-
 CREATE INDEX IF NOT EXISTS idx_sessions_school_date ON sessions (school_id, date);
-
 CREATE INDEX IF NOT EXISTS idx_sessions_class_date ON sessions (class_id, date);
-
 CREATE INDEX IF NOT EXISTS idx_attendance_student ON attendance (student_id);
-
 CREATE INDEX IF NOT EXISTS idx_attendance_session ON attendance (session_id);
-
 CREATE INDEX IF NOT EXISTS idx_leads_stage ON leads (stage);
-
 CREATE INDEX IF NOT EXISTS idx_content_grade_level ON content (class_grade, level);
-
 CREATE INDEX IF NOT EXISTS idx_inventory_school_status ON inventory (school_id, status);
-
 CREATE INDEX IF NOT EXISTS idx_inventory_student ON inventory (assigned_student_id);
-
 CREATE INDEX IF NOT EXISTS idx_billing_school_status ON billing (school_id, status);
-
 CREATE INDEX IF NOT EXISTS idx_comms_student_sent ON comms_logs (student_id, sent_at);
-
 CREATE INDEX IF NOT EXISTS idx_projects_student ON projects (student_id);
-
 CREATE INDEX IF NOT EXISTS idx_alerts_read_created ON alerts (is_read, created_at);
-
 CREATE INDEX IF NOT EXISTS idx_notifications_school_status ON notifications (target_school_id, status);
-
 CREATE INDEX IF NOT EXISTS idx_notifications_schedule ON notifications (scheduled_date, scheduled_time);
-
 CREATE INDEX IF NOT EXISTS idx_audit_user_created ON audit_logs (user_id, created_at);
-
 CREATE INDEX IF NOT EXISTS idx_audit_school_created ON audit_logs (school_id, created_at);
-
 CREATE INDEX IF NOT EXISTS idx_reviews_student_created ON student_reviews (student_id, created_at);
-
 CREATE INDEX IF NOT EXISTS idx_notification_reads_user ON notification_reads (user_key, created_at);
-
 CREATE INDEX IF NOT EXISTS idx_quiz_questions_quiz_order ON quiz_questions (quiz_id, question_order);
-
 CREATE INDEX IF NOT EXISTS idx_quiz_submissions_student ON quiz_submissions (student_id, completed_at);
