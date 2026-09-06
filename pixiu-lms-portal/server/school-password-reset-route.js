@@ -29,25 +29,30 @@ function patchSchoolPasswordResetRoute() {
         if (!schoolId) return res.status(400).json({ error: 'School ID is required.' });
         if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters.' });
 
-        const school = await db.get('SELECT id, name, code, status FROM schools WHERE id = ? OR code = ? LIMIT 1', [schoolId, schoolId]);
+        const school = await db.get(
+          'SELECT id, name, code, status FROM schools WHERE id = ? OR code = ? LIMIT 1',
+          [schoolId, schoolId]
+        );
         if (!school) return res.status(404).json({ error: 'School not found.' });
 
-        const username = school.code || school.id;
+        const username = String(school.code || school.id).trim();
         const passwordHash = await bcrypt.hash(password, 12);
         const existingUser = await db.get(
-          "SELECT id FROM users WHERE related_id = ? OR (username = ? AND role = 'school') LIMIT 1",
+          "SELECT id, role, username FROM users WHERE (related_id = ? AND role = 'school') OR (username = ? AND role = 'school') LIMIT 1",
           [school.id, username]
         );
 
         if (existingUser?.id) {
-          const result = await db.run(
+          await db.run(
             "UPDATE users SET username = ?, password_hash = ?, role = 'school', related_id = ?, name = ?, school_id = ? WHERE id = ?",
             [username, passwordHash, school.id, school.name, school.id, existingUser.id]
           );
-          if (!result || Number(result.changes ?? 0) < 1) {
-            return res.status(500).json({ error: 'Password update did not modify the school account.' });
-          }
         } else {
+          const conflictingUser = await db.get('SELECT id, role FROM users WHERE username = ? LIMIT 1', [username]);
+          if (conflictingUser?.id) {
+            return res.status(409).json({ error: `School username ${username} is already assigned to another account.` });
+          }
+
           const userId = `USR-SCHOOL-${school.id}`;
           await db.run(
             "INSERT INTO users (id, username, password_hash, role, related_id, name, school_id) VALUES (?, ?, ?, 'school', ?, ?, ?)",
