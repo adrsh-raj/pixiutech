@@ -3,7 +3,11 @@ const path = require('path');
 const bcrypt = require('bcryptjs');
 const { seedSessionsAndAttendance } = require('./seed_sessions_attendance');
 
-const dbDir = process.env.RENDER ? '/opt/render/project/src/data' : __dirname;
+const fs = require('fs');
+let dbDir = __dirname;
+if (process.env.RENDER && fs.existsSync('/opt/render/project/src/data')) {
+  dbDir = '/opt/render/project/src/data';
+}
 const dbPath = path.resolve(dbDir, 'pixiu_lms.db');
 
 // better-sqlite3 compatibility wrapper (same API as node-sqlite3 callbacks)

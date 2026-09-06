@@ -39,7 +39,9 @@ app.use(cors({
 app.use(express.json({ limit: '2mb' }));
 
 // Serve uploaded media files statically
-const uploadsBase = process.env.RENDER ? '/opt/render/project/src/data/uploads' : path.join(__dirname, 'uploads');
+const uploadsBase = (process.env.RENDER && fs.existsSync('/opt/render/project/src/data')) 
+  ? '/opt/render/project/src/data/uploads' 
+  : path.join(__dirname, 'uploads');
 const uploadsDir = uploadsBase;
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
