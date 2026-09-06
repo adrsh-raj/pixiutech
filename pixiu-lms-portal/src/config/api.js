@@ -1,16 +1,13 @@
 // Single runtime API authority for the Pixiu LMS frontend.
-// Production/preview deployments may override VITE_API_URL. When the variable
-// is unavailable during a static build, use the deterministic same-origin
-// /api base rather than crashing the bundle at module load time.
-const rawApiBase = import.meta.env.VITE_API_URL?.trim() || '/api';
+// The portal is deployed separately from the API, so production must not
+// silently fall back to the portal's own /api origin. VITE_API_URL can still
+// override this for another environment/preview.
+const DEFAULT_API_BASE = 'https://pixiu-lms-api.onrender.com/api';
+const rawApiBase = import.meta.env.VITE_API_URL?.trim() || DEFAULT_API_BASE;
 
 function normalizeApiBase(value) {
   const candidate = String(value || '').trim();
-  if (!candidate) return '/api';
-
-  if (candidate.startsWith('/')) {
-    return candidate.replace(/\/$/, '') || '/api';
-  }
+  if (!candidate) return DEFAULT_API_BASE;
 
   try {
     const url = new URL(candidate);
