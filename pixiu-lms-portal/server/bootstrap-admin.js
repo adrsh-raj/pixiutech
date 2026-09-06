@@ -24,7 +24,10 @@ async function bootstrapAdmin() {
     throw new Error('ADMIN_BOOTSTRAP_USERNAME must be 3-64 characters using letters, numbers, dot, underscore or hyphen.');
   }
 
-  const existing = await db.get('SELECT id, role, name FROM users WHERE username = ?', [username]);
+  // db.get() without a callback resolves to the PostgreSQL QueryResult, so
+  // explicitly read the first row here.
+  const existingResult = await db.get('SELECT id, role, name FROM users WHERE username = ?', [username]);
+  const existing = existingResult?.rows?.[0] || null;
   const force = String(process.env.ADMIN_BOOTSTRAP_FORCE || '').toLowerCase() === 'true';
   const passwordHash = await bcrypt.hash(password, 12);
   const userId = existing?.id || `USR-${crypto.createHash('sha256').update(username).digest('hex').slice(0, 16)}`;
@@ -32,11 +35,26 @@ async function bootstrapAdmin() {
   if (existing) {
     const existingRole = String(existing.role || '').trim().toLowerCase();
     if (!['admin', 'superadmin'].includes(existingRole) || force) {
-      await db.run(
+      const result = await db.run(
         'UPDATE users SET password_hash = ?, role = ?, name = ?, related_id = NULL, school_id = NULL WHERE id = ?',
         [passwordHash, 'admin', 'PIXIU Tech Administrator', userId]
       );
+      if (result?.rowCount !== 1) {
+        throw new Error(`Admin bootstrap could not update existing account "${username}".`);
+      }
       console.warn(`Admin bootstrap repaired account "${username}"${force ? ' and reset its password' : ''}.`);
+      return;
+    }
+
+    if (force) {
+      const result = await db.run(
+        'UPDATE users SET password_hash = ?, role = ?, name = ?, related_id = NULL, school_id = NULL WHERE id = ?',
+        [passwordHash, 'admin', 'PIXIU Tech Administrator', userId]
+      );
+      if (result?.rowCount !== 1) {
+        throw new Error(`Admin bootstrap could not reset account "${username}".`);
+      }
+      console.warn(`Admin bootstrap repaired account "${username}" and reset its password.`);
       return;
     }
 
@@ -44,10 +62,13 @@ async function bootstrapAdmin() {
     return;
   }
 
-  await db.run(
+  const result = await db.run(
     'INSERT INTO users (id, username, password_hash, role, related_id, name, school_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
     [userId, username, passwordHash, 'admin', null, 'PIXIU Tech Administrator', null]
   );
+  if (result?.rowCount !== 1) {
+    throw new Error(`Admin bootstrap could not create account "${username}".`);
+  }
   console.log(`Admin bootstrap account "${username}" created.`);
 }
 
