@@ -18,7 +18,6 @@ import Verify from './pages/Verify';
 import AuditLogs from './pages/AuditLogs';
 import { filterNotificationsForUser, fetchUserReadNotifIds, saveUserReadNotifIds, getCanonicalUserKey } from './utils/notifications';
 
-// Robust lazy import with automatic single reload when new builds invalidate asset chunks
 const lazyWithRetry = (importFn) => {
   return lazy(async () => {
     const isRetried = sessionStorage.getItem('pixiu_chunk_retry');
@@ -30,7 +29,7 @@ const lazyWithRetry = (importFn) => {
       if (!isRetried) {
         sessionStorage.setItem('pixiu_chunk_retry', 'true');
         window.location.reload();
-        return new Promise(() => {}); // Pause execution while browser reloads
+        return new Promise(() => {});
       }
       sessionStorage.removeItem('pixiu_chunk_retry');
       throw err;
@@ -49,29 +48,17 @@ class ChunkErrorBoundary extends Component {
     return { hasError: true };
   }
   componentDidCatch(error) {
-    console.error("Simulation chunk load error:", error);
+    console.error('Simulation chunk load error:', error);
   }
   render() {
     if (this.state.hasError) {
       return (
         <div className="min-h-screen bg-[#070B14] flex flex-col items-center justify-center text-white gap-4 p-6">
           <div className="bg-slate-900 border border-slate-800 p-8 rounded-2xl max-w-md text-center shadow-2xl">
-            <div className="w-12 h-12 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center mx-auto mb-4 border border-blue-500/20">
-              <Sparkles size={24} />
-            </div>
+            <div className="w-12 h-12 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center mx-auto mb-4 border border-blue-500/20">✨</div>
             <h3 className="text-lg font-bold text-white mb-2">New Virtual Lab Update</h3>
-            <p className="text-xs text-slate-400 mb-6 leading-relaxed">
-              Virtual Lab ka latest update load karne ke liye please neeche diye button par click karein.
-            </p>
-            <button
-              onClick={() => {
-                sessionStorage.removeItem('pixiu_chunk_retry');
-                window.location.reload();
-              }}
-              className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-bold transition-all cursor-pointer shadow-lg shadow-blue-600/30 w-full"
-            >
-              Reload Virtual Lab
-            </button>
+            <p className="text-xs text-slate-400 mb-6 leading-relaxed">Virtual Lab ka latest update load karne ke liye please neeche diye button par click karein.</p>
+            <button onClick={() => { sessionStorage.removeItem('pixiu_chunk_retry'); window.location.reload(); }} className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-bold transition-all cursor-pointer shadow-lg shadow-blue-600/30 w-full">Reload Virtual Lab</button>
           </div>
         </div>
       );
@@ -88,31 +75,14 @@ const Settings = () => (
   <div className="max-w-xl bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
     <h2 className="text-xl font-bold text-slate-800 mb-2">System Configuration & Master ID Rules</h2>
     <p className="text-sm text-slate-500 mb-6">Manage global ID prefix formats, academic years, and communication keys.</p>
-    
     <div className="space-y-4 text-sm">
-      <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
-        <label className="block font-bold text-slate-700 mb-1">Student ID Auto-Generation Format</label>
-        <p className="font-mono text-pixiu-blue text-xs font-bold">[SchoolCode][Grade][Section] [RollNo]</p>
-        <p className="text-xs text-slate-500 mt-1">Example: Zenith Public School, Class 6 Section A ➡️ <span className="font-mono font-bold">ZPS6A 01</span></p>
-      </div>
-
-      <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
-        <label className="block font-bold text-slate-700 mb-1">Active Academic Year</label>
-        <p className="font-medium text-slate-800">2026 - 2027 (Term 1 Active)</p>
-      </div>
-
-      <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
-        <label className="block font-bold text-slate-700 mb-1">Database & Auth Status</label>
-        <p className="text-emerald-600 font-bold flex items-center gap-1.5 text-xs">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          SQLite + BCrypt Hash Auth Active
-        </p>
-      </div>
+      <div className="p-4 bg-slate-50 rounded-xl border border-slate-100"><label className="block font-bold text-slate-700 mb-1">Student ID Auto-Generation Format</label><p className="font-mono text-pixiu-blue text-xs font-bold">[SchoolCode][Grade][Section] [RollNo]</p><p className="text-xs text-slate-500 mt-1">Example: Zenith Public School, Class 6 Section A ➡️ <span className="font-mono font-bold">ZPS6A 01</span></p></div>
+      <div className="p-4 bg-slate-50 rounded-xl border border-slate-100"><label className="block font-bold text-slate-700 mb-1">Active Academic Year</label><p className="font-medium text-slate-800">2026 - 2027 (Term 1 Active)</p></div>
+      <div className="p-4 bg-slate-50 rounded-xl border border-slate-100"><label className="block font-bold text-slate-700 mb-1">Database & Auth Status</label><p className="text-emerald-600 font-bold flex items-center gap-1.5 text-xs"><span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>SQLite + BCrypt Hash Auth Active</p></div>
     </div>
   </div>
 );
 
-// Protected Layout for Admin & Trainers
 function ProtectedLayout() {
   const { isAuthenticated, user, logout, loading } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
@@ -120,481 +90,116 @@ function ProtectedLayout() {
   const toast = useToast();
   const [isAlertsOpen, setIsAlertsOpen] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [activeBellTab, setActiveBellTab] = useState('announcements'); // 'announcements' | 'system'
+  const [activeBellTab, setActiveBellTab] = useState('announcements');
   const [actionLoading, setActionLoading] = useState(null);
-
-  const visibleNotifications = useMemo(() => {
-    return filterNotificationsForUser(notifications, user);
-  }, [notifications, user]);
-
+  const visibleNotifications = useMemo(() => filterNotificationsForUser(notifications, user), [notifications, user]);
   const [readNotifIds, setReadNotifIds] = useState(() => {
     try {
       const key = getCanonicalUserKey(user);
       if (!key) return [];
       const saved = localStorage.getItem(`pixiu_read_notifs_${key}`);
       return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      return [];
-    }
+    } catch { return []; }
   });
-
   useEffect(() => {
     if (!user) return;
     let isMounted = true;
-    fetchUserReadNotifIds(user).then(ids => {
-      if (isMounted && Array.isArray(ids)) {
-        setReadNotifIds(ids);
-      }
-    });
+    fetchUserReadNotifIds(user).then(ids => { if (isMounted && Array.isArray(ids)) setReadNotifIds(ids); });
     return () => { isMounted = false; };
   }, [user]);
-
-  const markAsRead = async (id) => {
-    const updated = await saveUserReadNotifIds(id, user);
-    setReadNotifIds(updated);
-  };
-
-  const markAllAsRead = async () => {
-    const visibleIds = visibleNotifications.map(n => n.id);
-    const updated = await saveUserReadNotifIds(visibleIds, user);
-    setReadNotifIds(updated);
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white">
-        <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
-
-  // If student logs into admin routes, redirect to student space
-  if (user?.role === 'student') {
-    return <Navigate to="/student-portal" replace />;
-  }
-  // If school logs into admin routes, redirect to school space
-  if (user?.role === 'school') {
-    return <Navigate to="/school-portal" replace />;
-  }
-
-  const handleExecuteAction = async (alertItem) => {
-    setActionLoading(alertItem.id);
-    const res = await resolveAlertAction(alertItem.id, alertItem.action_type, alertItem.related_id);
-    setActionLoading(null);
-    if (res.success) {
-      toast.success(res.message, 'Operational Action Executed');
-    } else {
-      toast.error(res.error || 'Failed to execute action');
-    }
-  };
-
-  const visibleAlerts = alerts.filter(a => {
-    if (user?.role !== 'admin' && (a.type === 'billing_due' || a.action_type === 'view_billing' || a.type === 'billing')) {
-      return false;
-    }
-    return true;
-  });
-
+  const markAsRead = async (id) => { const updated = await saveUserReadNotifIds(id, user); setReadNotifIds(updated); };
+  const markAllAsRead = async () => { const updated = await saveUserReadNotifIds(visibleNotifications.map(n => n.id), user); setReadNotifIds(updated); };
+  if (loading) return <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white"><div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div></div>;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (user?.role === 'student') return <Navigate to="/student-portal" replace />;
+  if (user?.role === 'school') return <Navigate to="/school-portal" replace />;
+  const handleExecuteAction = async (alertItem) => { setActionLoading(alertItem.id); const res = await resolveAlertAction(alertItem.id, alertItem.action_type, alertItem.related_id); setActionLoading(null); res.success ? toast.success(res.message, 'Operational Action Executed') : toast.error(res.error || 'Failed to execute action'); };
+  const visibleAlerts = alerts.filter(a => !(user?.role !== 'admin' && (a.type === 'billing_due' || a.action_type === 'view_billing' || a.type === 'billing')));
   const unreadAnnouncementsCount = visibleNotifications.filter(n => !readNotifIds.includes(n.id)).length;
-  const totalUnreadCount = unreadAnnouncementsCount + (visibleAlerts ? visibleAlerts.length : 0);
-
+  const totalUnreadCount = unreadAnnouncementsCount + visibleAlerts.length;
   return (
     <div className="flex h-screen bg-slate-50 font-sans antialiased selection:bg-blue-500 selection:text-white overflow-hidden">
       <Sidebar mobileOpen={mobileSidebarOpen} setMobileOpen={setMobileSidebarOpen} />
       <div className="flex-1 overflow-auto relative flex flex-col min-w-0">
         <header className="bg-white/80 backdrop-blur-md border-b border-slate-200/60 px-3.5 sm:px-8 py-2.5 sm:py-3.5 flex justify-between items-center sticky top-0 z-20">
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <button
-              onClick={() => setMobileSidebarOpen(true)}
-              className="md:hidden p-1.5 text-slate-600 hover:text-slate-900 rounded-lg hover:bg-slate-100 cursor-pointer"
-              title="Open Navigation Menu"
-            >
-              <Menu size={20} />
-            </button>
-            <div className="min-w-0">
-              <h2 className="text-sm sm:text-base font-bold text-slate-800 tracking-tight truncate">Pixiu Tech Console</h2>
-              <p className="text-[9px] sm:text-[10px] text-slate-400 font-medium uppercase tracking-wider truncate">Robotics & AI Operating System</p>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-2 sm:gap-4 shrink-0">
-            {/* Quick Login Logs Link (Admin Only) */}
-            {isAdmin && (
-              <Link
-                to="/logs"
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer"
-                title="View Admin & Security Login Logs"
-              >
-                <ShieldCheck size={15} />
-                <span className="hidden sm:inline">Login Logs</span>
-              </Link>
-            )}
-
-            {/* Live Operational & Announcements Bell */}
-            <div className="relative">
-              <button 
-                onClick={() => setIsAlertsOpen(!isAlertsOpen)}
-                className="relative p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer border border-slate-200"
-                title="Announcements & System Alerts"
-              >
-                <Bell size={17} />
-                {totalUnreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center border-2 border-white shadow-sm animate-pulse">
-                    {totalUnreadCount}
-                  </span>
-                )}
-              </button>
-
-              {/* Alerts Dropdown Drawer (Mobile Viewport Safe) */}
-              {isAlertsOpen && (
-                <div className="fixed sm:absolute inset-x-3 top-14 sm:inset-auto sm:right-0 sm:top-auto sm:mt-3 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden z-30 animate-in fade-in zoom-in-95 max-h-[80vh] flex flex-col">
-                  <div className="p-3.5 bg-slate-900 text-white flex justify-between items-center shrink-0">
-                    <div>
-                      <h3 className="font-bold text-xs uppercase tracking-wider">Notifications & Alerts</h3>
-                      <p className="text-[10px] text-slate-400">{unreadAnnouncementsCount} unread notices</p>
-                    </div>
-                    <button onClick={() => setIsAlertsOpen(false)} className="text-slate-400 hover:text-white cursor-pointer"><X size={16}/></button>
-                  </div>
-
-                  {/* Bell Tabs Switcher */}
-                  <div className="grid grid-cols-2 p-1.5 bg-slate-100 border-b border-slate-200 text-xs font-bold shrink-0">
-                    <button
-                      onClick={() => setActiveBellTab('announcements')}
-                      className={`py-1.5 rounded-lg transition-all cursor-pointer ${
-                        activeBellTab === 'announcements' 
-                          ? 'bg-white text-pixiu-blue shadow-xs' 
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      📢 Broadcasts ({unreadAnnouncementsCount})
-                    </button>
-                    <button
-                      onClick={() => setActiveBellTab('system')}
-                      className={`py-1.5 rounded-lg transition-all cursor-pointer ${
-                        activeBellTab === 'system' 
-                          ? 'bg-white text-amber-600 shadow-xs' 
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      ⚡ System ({visibleAlerts.length})
-                    </button>
-                  </div>
-
-                  <div className="max-h-96 overflow-y-auto p-3 space-y-2.5">
-                    {activeBellTab === 'announcements' && (
-                      <div className="space-y-2.5">
-                        {unreadAnnouncementsCount > 0 && (
-                          <div className="flex justify-end px-1">
-                            <button
-                              onClick={markAllAsRead}
-                              className="text-[10px] font-bold text-pixiu-blue hover:underline cursor-pointer"
-                            >
-                              ✓ Mark all as read
-                            </button>
-                          </div>
-                        )}
-
-                        {(visibleNotifications || []).map(notif => {
-                          const isRead = readNotifIds.includes(notif.id);
-                          return (
-                            <div 
-                              key={notif.id}
-                              className={`p-3 rounded-xl border text-xs space-y-2 transition-all ${
-                                isRead 
-                                  ? 'bg-slate-50 border-slate-200 opacity-75' 
-                                  : 'bg-blue-50/60 border-blue-200 shadow-xs'
-                              }`}
-                            >
-                              <div className="flex justify-between items-start gap-1">
-                                <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${
-                                  notif.severity === 'urgent' ? 'bg-rose-100 text-rose-800' :
-                                  notif.severity === 'important' ? 'bg-purple-100 text-purple-800' :
-                                  'bg-blue-100 text-blue-800'
-                                }`}>
-                                  {notif.severity ? notif.severity.toUpperCase() : 'NOTICE'}
-                                </span>
-                                <span className="text-[10px] text-slate-400 font-mono">
-                                  {notif.scheduled_date} • {notif.scheduled_time}
-                                </span>
-                              </div>
-
-                              <h4 className="font-bold text-slate-900 text-xs">{notif.title}</h4>
-                              <p className="text-[11px] text-slate-600 leading-relaxed bg-white p-2.5 rounded-lg border border-slate-100 whitespace-pre-line">
-                                {notif.message}
-                              </p>
-
-                              <div className="flex justify-end pt-1">
-                                {isRead ? (
-                                  <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
-                                    <ShieldCheck size={12}/> Read
-                                  </span>
-                                ) : (
-                                  <button
-                                    onClick={() => markAsRead(notif.id)}
-                                    className="px-2.5 py-1 bg-pixiu-blue hover:bg-blue-600 text-white rounded-md text-[10px] font-bold transition-all cursor-pointer shadow-xs"
-                                  >
-                                    ✓ Mark as Read
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-
-                        {visibleNotifications.length === 0 && (
-                          <div className="p-8 text-center text-slate-400 text-xs font-medium">
-                            No announcements published yet.
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {activeBellTab === 'system' && (
-                      <div className="space-y-2.5">
-                        {visibleAlerts.map(alertItem => (
-                          <div key={alertItem.id} className={`p-3.5 rounded-xl border text-xs ${
-                            alertItem.severity === 'critical' ? 'bg-red-50/70 border-red-200 text-red-950' :
-                            alertItem.severity === 'warning' ? 'bg-amber-50/70 border-amber-200 text-amber-950' :
-                            'bg-blue-50/70 border-blue-200 text-blue-950'
-                          }`}>
-                            <div className="flex items-start gap-2 mb-1.5">
-                              {alertItem.severity === 'critical' ? <AlertCircle size={15} className="text-red-500 shrink-0 mt-0.5"/> :
-                               alertItem.severity === 'warning' ? <AlertTriangle size={15} className="text-amber-500 shrink-0 mt-0.5"/> :
-                               <ShieldCheck size={15} className="text-blue-500 shrink-0 mt-0.5"/>}
-                              <div>
-                                <p className="font-bold">{alertItem.title}</p>
-                                <p className="text-[11px] opacity-80 mt-0.5 leading-relaxed">{alertItem.message}</p>
-                              </div>
-                            </div>
-
-                            {alertItem.action_label && (
-                              <button
-                                onClick={() => handleExecuteAction(alertItem)}
-                                disabled={actionLoading === alertItem.id}
-                                className={`w-full mt-2 py-1.5 px-3 rounded-lg font-bold text-[11px] flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs ${
-                                  alertItem.severity === 'critical' ? 'bg-red-600 hover:bg-red-700 text-white' :
-                                  alertItem.severity === 'warning' ? 'bg-amber-600 hover:bg-amber-700 text-white' :
-                                  'bg-pixiu-blue hover:bg-blue-600 text-white'
-                                }`}
-                              >
-                                {actionLoading === alertItem.id ? (
-                                  'Executing...'
-                                ) : (
-                                  <><Sparkles size={12}/> {alertItem.action_label}</>
-                                )}
-                              </button>
-                            )}
-                          </div>
-                        ))}
-
-                        {visibleAlerts.length === 0 && (
-                          <div className="p-8 text-center text-slate-400 text-xs font-medium">
-                            All systems operational. No critical bottlenecks or alerts!
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Live Authenticated
-            </span>
-            <button 
-              onClick={logout} 
-              className="text-slate-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
-              title="Logout"
-            >
-              <LogOut size={16}/>
-            </button>
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0"><button onClick={() => setMobileSidebarOpen(true)} className="md:hidden p-1.5 text-slate-600 hover:text-slate-900 rounded-lg hover:bg-slate-100 cursor-pointer" title="Open Navigation Menu"><Menu size={20} /></button><div className="min-w-0"><h2 className="text-sm sm:text-base font-bold text-slate-800 tracking-tight truncate">Pixiu Tech Console</h2><p className="text-[9px] sm:text-[10px] text-slate-400 font-medium uppercase tracking-wider truncate">Robotics & AI Operating System</p></div></div>
+          <div className="flex items-center gap-2 sm:gap-4 shrink-0">{isAdmin && <Link to="/logs" className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer" title="View Admin & Security Login Logs"><ShieldCheck size={15} /><span className="hidden sm:inline">Login Logs</span></Link>}
+            <div className="relative"><button onClick={() => setIsAlertsOpen(!isAlertsOpen)} className="relative p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer border border-slate-200" title="Announcements & System Alerts"><Bell size={17} />{totalUnreadCount > 0 && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center border-2 border-white shadow-sm animate-pulse">{totalUnreadCount}</span>}</button>{isAlertsOpen && <div className="fixed sm:absolute inset-x-3 top-14 sm:inset-auto sm:right-0 sm:top-auto sm:mt-3 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden z-30 animate-in fade-in zoom-in-95 max-h-[80vh] flex flex-col"><div className="p-3.5 bg-slate-900 text-white flex justify-between items-center shrink-0"><div><h3 className="font-bold text-xs uppercase tracking-wider">Notifications & Alerts</h3><p className="text-[10px] text-slate-400">{unreadAnnouncementsCount} unread notices</p></div><button onClick={() => setIsAlertsOpen(false)} className="text-slate-400 hover:text-white cursor-pointer"><X size={16}/></button></div><div className="grid grid-cols-2 p-1.5 bg-slate-100 border-b border-slate-200 text-xs font-bold"><button onClick={() => setActiveBellTab('announcements')} className={`py-1.5 rounded-lg transition-all cursor-pointer ${activeBellTab === 'announcements' ? 'bg-white text-pixiu-blue shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}>📢 Broadcasts ({unreadAnnouncementsCount})</button><button onClick={() => setActiveBellTab('system')} className={`py-1.5 rounded-lg transition-all cursor-pointer ${activeBellTab === 'system' ? 'bg-white text-amber-600 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}>⚡ System ({visibleAlerts.length})</button></div><div className="max-h-96 overflow-y-auto p-3 space-y-2.5">{activeBellTab === 'announcements' && <div className="space-y-2.5">{unreadAnnouncementsCount > 0 && <div className="flex justify-end px-1"><button onClick={markAllAsRead} className="text-[10px] font-bold text-pixiu-blue hover:underline cursor-pointer">✓ Mark all as read</button></div>}{(visibleNotifications || []).map(notif => { const isRead = readNotifIds.includes(notif.id); return <div key={notif.id} className={`p-3 rounded-xl border text-xs space-y-2 transition-all ${isRead ? 'bg-slate-50 border-slate-200 opacity-75' : 'bg-blue-50/60 border-blue-200 shadow-xs'}`}><div className="flex justify-between items-start gap-1"><span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${notif.severity === 'urgent' ? 'bg-rose-100 text-rose-800' : notif.severity === 'important' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>{notif.severity ? notif.severity.toUpperCase() : 'NOTICE'}</span><span className="text-[10px] text-slate-400 font-mono">{notif.scheduled_date} • {notif.scheduled_time}</span></div><h4 className="font-bold text-slate-900 text-xs">{notif.title}</h4><p className="text-[11px] text-slate-600 leading-relaxed bg-white p-2.5 rounded-lg border border-slate-100 whitespace-pre-line">{notif.message}</p><div className="flex justify-end pt-1">{isRead ? <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1"><ShieldCheck size={12}/> Read</span> : <button onClick={() => markAsRead(notif.id)} className="px-2.5 py-1 bg-pixiu-blue hover:bg-blue-600 text-white rounded-md text-[10px] font-bold transition-all cursor-pointer shadow-xs">✓ Mark as Read</button>}</div></div>; })}{visibleNotifications.length === 0 && <div className="p-8 text-center text-slate-400 text-xs font-medium">No announcements published yet.</div>}</div>}{activeBellTab === 'system' && <div className="space-y-2.5">{visibleAlerts.map(alertItem => <div key={alertItem.id} className={`p-3.5 rounded-xl border text-xs ${alertItem.severity === 'critical' ? 'bg-red-50/70 border-red-200 text-red-950' : alertItem.severity === 'warning' ? 'bg-amber-50/70 border-amber-200 text-amber-950' : 'bg-blue-50/70 border-blue-200 text-blue-950'}`}><div className="flex items-start gap-2 mb-1.5">{alertItem.severity === 'critical' ? <AlertCircle size={15} className="text-red-500 shrink-0 mt-0.5"/> : alertItem.severity === 'warning' ? <AlertTriangle size={15} className="text-amber-500 shrink-0 mt-0.5"/> : <ShieldCheck size={15} className="text-blue-500 shrink-0 mt-0.5"/>}<div><p className="font-bold">{alertItem.title}</p><p className="text-[11px] opacity-80 mt-0.5 leading-relaxed">{alertItem.message}</p></div></div>{alertItem.action_label && <button onClick={() => handleExecuteAction(alertItem)} disabled={actionLoading === alertItem.id} className={`w-full mt-2 py-1.5 px-3 rounded-lg font-bold text-[11px] flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs ${alertItem.severity === 'critical' ? 'bg-red-600 hover:bg-red-700 text-white' : alertItem.severity === 'warning' ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'bg-pixiu-blue hover:bg-blue-600 text-white'}`}>{actionLoading === alertItem.id ? 'Executing...' : <><Sparkles size={12}/> {alertItem.action_label}</>}</button>}</div>)}{visibleAlerts.length === 0 && <div className="p-8 text-center text-slate-400 text-xs font-medium">All systems operational. No critical bottlenecks or alerts!</div>}</div>}</div></div>}</div>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Live Authenticated</span><button onClick={logout} className="text-slate-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors cursor-pointer" title="Logout"><LogOut size={16}/></button>
           </div>
         </header>
-        <main className="p-8 flex-1">
-          <Outlet />
-        </main>
+        <main className="p-8 flex-1"><Outlet /></main>
       </div>
     </div>
   );
 }
 
-// Admin Route Guard Component
 function AdminOnly({ children }) {
   const { user } = useAuth();
-  if (user?.role !== 'admin') {
-    return <Navigate to="/trainers" replace />;
-  }
+  if (user?.role !== 'admin') return <Navigate to="/trainers" replace />;
   return children;
 }
 
-// Student Route Guard
 function StudentRouteGuard() {
   const { isAuthenticated, user, loading } = useAuth();
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white">
-        <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
-
+  if (loading) return <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white"><div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div></div>;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (user?.role !== 'student') return <Navigate to="/" replace />;
   return <StudentPortal />;
 }
 
-// School Partner Portal Route Guard
 function SchoolRouteGuard() {
   const { isAuthenticated, user, loading } = useAuth();
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white">
-        <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
-
+  if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white"><div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div></div>;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!['school', 'admin'].includes(user?.role)) return <Navigate to="/" replace />;
   return <SchoolPortal />;
 }
 
-// Guest Route Guard (Redirects authenticated users away from Login to their appropriate dashboard)
 function GuestRouteGuard({ children }) {
   const { isAuthenticated, user, loading } = useAuth();
   const navigate = useNavigate();
-
   useEffect(() => {
     if (!loading && isAuthenticated && user) {
-      const dest = user.role === 'student' ? '/student-portal'
-                 : user.role === 'school' ? '/school-portal'
-                 : user.role === 'trainer' ? '/trainers'
-                 : '/';
+      const dest = user.role === 'student' ? '/student-portal' : user.role === 'school' ? '/school-portal' : user.role === 'trainer' ? '/trainers' : '/';
       navigate(dest, { replace: true });
     }
   }, [loading, isAuthenticated, user, navigate]);
-
-  if (loading || (isAuthenticated && user)) {
-    return (
-      <div className="min-h-screen bg-[#040810] flex items-center justify-center text-white">
-        <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div>
-      </div>
-    );
-  }
-
+  if (loading || (isAuthenticated && user)) return <div className="min-h-screen bg-[#040810] flex items-center justify-center text-white"><div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div></div>;
   return children;
 }
 
 export default function App() {
   useEffect(() => {
-    const handleContextMenu = (e) => {
-      e.preventDefault();
-    };
-
+    const handleContextMenu = (e) => e.preventDefault();
     const handleKeyDown = (e) => {
-      // Block F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+Shift+C, Ctrl+U, Ctrl+S
-      if (
-        e.key === 'F12' ||
-        ((e.ctrlKey || e.metaKey) && e.shiftKey && ['I', 'i', 'J', 'j', 'C', 'c'].includes(e.key)) ||
-        ((e.ctrlKey || e.metaKey) && ['U', 'u', 'S', 's'].includes(e.key))
-      ) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
+      if (e.key === 'F12' || ((e.ctrlKey || e.metaKey) && e.shiftKey && ['I', 'i', 'J', 'j', 'C', 'c'].includes(e.key)) || ((e.ctrlKey || e.metaKey) && ['U', 'u', 'S', 's'].includes(e.key))) { e.preventDefault(); e.stopPropagation(); }
     };
-
     window.addEventListener('contextmenu', handleContextMenu);
     window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('contextmenu', handleContextMenu);
-      window.removeEventListener('keydown', handleKeyDown);
-    };
+    return () => { window.removeEventListener('contextmenu', handleContextMenu); window.removeEventListener('keydown', handleKeyDown); };
   }, []);
 
-  return (
-    <ToastProvider>
-      <AuthProvider>
-        <DataProvider>
-          <BrowserRouter>
-            <Routes>
-              {/* Public Login with Guest Guard: Prevents authenticated users from seeing Login form on Back */}
-              <Route path="/login" element={
-                <GuestRouteGuard>
-                  <Login />
-                </GuestRouteGuard>
-              } />
-              <Route path="/verify" element={<Verify />} />
-
-              {/* Virtual Arduino Simulation Workbench (Lazily Loaded on Demand) */}
-              <Route 
-                path="/simulation" 
-                element={
-                  <ChunkErrorBoundary>
-                    <Suspense
-                      fallback={
-                        <div className="min-h-screen bg-[#070B14] flex flex-col items-center justify-center text-white gap-4 p-6">
-                          <div className="w-12 h-12 border-3 border-blue-500/20 border-t-pixiu-blue rounded-full animate-spin"></div>
-                          <div className="text-center">
-                            <p className="text-base font-extrabold text-white tracking-wide">Initializing Virtual Arduino Circuit Lab...</p>
-                            <p className="text-xs text-slate-400 mt-1 font-mono">Loading Interactive Blockly Engine & Electronics Simulator</p>
-                          </div>
-                        </div>
-                      }
-                    >
-                      <Simulation />
-                    </Suspense>
-                  </ChunkErrorBoundary>
-                } 
-              />
-
-              {/* Student Protected Portal (Student Role Only) */}
-              <Route path="/student-portal" element={<StudentRouteGuard />} />
-
-              {/* School Partner Portal (School Authorities & Admin) */}
-              <Route path="/school-portal" element={<SchoolRouteGuard />} />
-
-              {/* Protected Enterprise Routes (Admin & Trainers) */}
-              <Route path="/" element={<ProtectedLayout />}>
-                {/* Default Index Route: Admin sees Dashboard, Trainer redirected to Live Classrooms */}
-                <Route index element={
-                  <AdminOnly>
-                    <Dashboard />
-                  </AdminOnly>
-                } />
-                
-                {/* BUSINESS & CRM (Admin Only) */}
-                <Route path="leads" element={<AdminOnly><Leads /></AdminOnly>} />
-                <Route path="schools" element={<AdminOnly><Schools /></AdminOnly>} />
-                <Route path="billing" element={<AdminOnly><Billing /></AdminOnly>} />
-                <Route path="settings" element={<AdminOnly><Settings /></AdminOnly>} />
-                <Route path="logs" element={<AdminOnly><AuditLogs /></AdminOnly>} />
-                <Route path="students" element={<Students />} />
-                <Route path="comms" element={<AdminOnly><Comms /></AdminOnly>} />
-
-                {/* ACADEMICS & OPERATIONS (Shared Trainer & Admin) */}
-                <Route path="trainers" element={<Trainers />} />
-                <Route path="content" element={<ContentHub />} />
-                <Route path="curriculum" element={<Curriculum />} />
-                <Route path="inventory" element={<Inventory />} />
-              </Route>
-
-              {/* Catch-all fallback */}
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </BrowserRouter>
-        </DataProvider>
-      </AuthProvider>
-    </ToastProvider>
-  );
+  return <ToastProvider><AuthProvider><DataProvider><BrowserRouter><Routes>
+    <Route path="/login" element={<GuestRouteGuard><Login /></GuestRouteGuard>} />
+    <Route path="/verify" element={<Verify />} />
+    <Route path="/simulation" element={<ChunkErrorBoundary><Suspense fallback={<div className="min-h-screen bg-[#070B14] flex flex-col items-center justify-center text-white gap-4 p-6"><div className="w-12 h-12 border-3 border-blue-500/20 border-t-pixiu-blue rounded-full animate-spin"></div><div className="text-center"><p className="text-base font-extrabold text-white tracking-wide">Initializing Virtual Arduino Circuit Lab...</p><p className="text-xs text-slate-400 mt-1 font-mono">Loading Interactive Blockly Engine & Electronics Simulator</p></div></Suspense></ChunkErrorBoundary>} />
+    <Route path="/student-portal" element={<StudentRouteGuard />} />
+    <Route path="/school-portal" element={<SchoolRouteGuard />} />
+    <Route path="/" element={<ProtectedLayout />}>
+      <Route index element={<AdminOnly><Dashboard /></AdminOnly>} />
+      <Route path="leads" element={<AdminOnly><Leads /></AdminOnly>} />
+      <Route path="schools" element={<AdminOnly><Schools /></AdminOnly>} />
+      <Route path="billing" element={<AdminOnly><Billing /></AdminOnly>} />
+      <Route path="settings" element={<AdminOnly><Settings /></AdminOnly>} />
+      <Route path="logs" element={<AdminOnly><AuditLogs /></AdminOnly>} />
+      <Route path="students" element={<Students />} />
+      <Route path="comms" element={<AdminOnly><Comms /></AdminOnly>} />
+      <Route path="trainers" element={<Trainers />} />
+      <Route path="content" element={<ContentHub />} />
+      <Route path="curriculum" element={<Curriculum />} />
+      <Route path="inventory" element={<Inventory />} />
+    </Route>
+    <Route path="*" element={<Navigate to="/" replace />} />
+  </Routes></BrowserRouter></DataProvider></AuthProvider></ToastProvider>;
 }
