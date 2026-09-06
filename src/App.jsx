@@ -11,8 +11,7 @@ import Contact from './pages/Contact.jsx'
 import Verify from './pages/Verify.jsx'
 import Simulation from './pages/Simulation.jsx'
 import NotFound from './pages/NotFound.jsx'
-
-const LMS_LOGIN_URL = 'https://portal.pixiutech.com/login'
+import { LMS_LOGIN_URL } from './config/runtime.js'
 
 function ProductionLoginRedirect() {
   useEffect(() => {

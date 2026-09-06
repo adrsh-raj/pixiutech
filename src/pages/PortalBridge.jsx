@@ -1,7 +1,6 @@
 import { Link } from 'react-router-dom'
 import Reveal from '../components/Reveal.jsx'
-
-const PORTAL_LOGIN_URL = 'https://portal.pixiutech.com/login'
+import { LMS_LOGIN_URL } from '../config/runtime.js'
 
 export default function PortalBridge() {
   return (
@@ -22,7 +21,7 @@ export default function PortalBridge() {
             </p>
 
             <a
-              href={PORTAL_LOGIN_URL}
+              href={LMS_LOGIN_URL}
               className="btn btn--primary"
               style={{ width: '100%', fontSize: '1rem', padding: '14px 24px', fontWeight: '700', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px', borderRadius: '12px', textDecoration: 'none' }}
             >
