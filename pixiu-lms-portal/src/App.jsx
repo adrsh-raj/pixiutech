@@ -6,6 +6,7 @@ import Students from './pages/Students';
 import Inventory from './pages/Inventory';
 import Trainers from './pages/Trainers';
 import TrainerCredentials from './pages/TrainerCredentials';
+import SchoolCredentials from './pages/SchoolCredentials';
 import Comms from './pages/Comms';
 import Leads from './pages/Leads';
 import Schools from './pages/Schools';
@@ -45,9 +46,7 @@ class ChunkErrorBoundary extends Component {
           <div className="bg-slate-900 border border-slate-800 p-8 rounded-2xl max-w-md w-full text-center">
             <h3 className="text-lg font-bold mb-2">Virtual Lab Update</h3>
             <p className="text-sm text-slate-400 mb-5">The latest Virtual Lab build could not be loaded.</p>
-            <button onClick={() => window.location.reload()} className="w-full px-5 py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold">
-              Reload
-            </button>
+            <button onClick={() => window.location.reload()} className="w-full px-5 py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold">Reload</button>
           </div>
         </div>
       );
@@ -76,6 +75,10 @@ const Settings = () => (
       <Link to="/trainer-credentials" className="block p-4 bg-blue-50 rounded-xl border border-blue-100 hover:border-blue-300 transition-colors">
         <p className="font-bold text-blue-900">Trainer Login Credentials</p>
         <p className="text-xs text-blue-700 mt-1">Reset trainer portal passwords securely from the admin console.</p>
+      </Link>
+      <Link to="/school-credentials" className="block p-4 bg-emerald-50 rounded-xl border border-emerald-100 hover:border-emerald-300 transition-colors">
+        <p className="font-bold text-emerald-900">School Login Credentials</p>
+        <p className="text-xs text-emerald-700 mt-1">Set or reset school portal passwords whenever a school forgets them.</p>
       </Link>
     </div>
   </div>
@@ -159,7 +162,7 @@ function ProtectedLayout() {
 
 function AdminOnly({ children }) {
   const { user } = useAuth();
-  return user?.role === 'admin' ? children : <Navigate to="/trainers" replace />;
+  return user?.role === 'admin' || user?.role === 'superadmin' ? children : <Navigate to="/trainers" replace />;
 }
 
 function StudentRouteGuard() {
@@ -210,6 +213,7 @@ export default function App() {
                 <Route path="comms" element={<AdminOnly><Comms /></AdminOnly>} />
                 <Route path="trainers" element={<Trainers />} />
                 <Route path="trainer-credentials" element={<AdminOnly><TrainerCredentials /></AdminOnly>} />
+                <Route path="school-credentials" element={<AdminOnly><SchoolCredentials /></AdminOnly>} />
                 <Route path="content" element={<ContentHub />} />
                 <Route path="curriculum" element={<Curriculum />} />
                 <Route path="inventory" element={<Inventory />} />
