@@ -9,29 +9,24 @@ const db = require('./database');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const JWT_SECRET = process.env.JWT_SECRET || 'pixiu_super_secret_jwt_key_2026';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET || JWT_SECRET.trim().length < 32) {
+  throw new Error('JWT_SECRET must be configured with at least 32 characters.');
+}
 
-// CORS Configuration
-const allowedOrigins = [
-  'http://localhost:5173',
-  'http://localhost:5174',
-  'http://localhost:3000',
+// Production CORS: only the official Pixiu browser origins are allowed.
+const allowedOrigins = new Set([
   'https://portal.pixiutech.com',
   'https://pixiutech.com',
   'https://www.pixiutech.com'
-];
+]);
 
 app.use(cors({
   origin: function(origin, callback) {
-    if (!origin || allowedOrigins.indexOf(origin) !== -1 
-        || origin.startsWith('http://localhost:')
-        || origin.endsWith('.vercel.app')
-        || origin.endsWith('.onrender.com')
-        || origin.endsWith('.pixiutech.com')) {
-      callback(null, true);
-    } else {
-      callback(null, true); // Permissive for now
+    if (!origin || allowedOrigins.has(origin)) {
+      return callback(null, true);
     }
+    return callback(new Error('CORS origin denied'));
   },
   credentials: true
 }));
@@ -87,6 +82,15 @@ app.get('/', (req, res) => {
 
 // File Upload Endpoint with validation
 app.post('/api/upload', (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Unauthorized: No token provided' });
+  }
+  try {
+    req.user = jwt.verify(authHeader.slice(7).trim(), JWT_SECRET);
+  } catch (err) {
+    return res.status(401).json({ error: 'Session expired or invalid' });
+  }
   upload.single('file')(req, res, function (err) {
     if (err instanceof multer.MulterError) {
       return res.status(400).json({ error: `Upload error: ${err.message}` });
@@ -185,6 +189,28 @@ app.get('/api/auth/me', (req, res) => {
     return res.status(401).json({ error: 'Session expired or invalid' });
   }
 });
+
+// Global API authentication boundary. Login remains public; all following API routes require a valid JWT.
+function requireAuth(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Unauthorized: No token provided' });
+  }
+
+  const token = authHeader.slice(7).trim();
+  if (!token) {
+    return res.status(401).json({ error: 'Unauthorized: No token provided' });
+  }
+
+  try {
+    req.user = jwt.verify(token, JWT_SECRET);
+    return next();
+  } catch (err) {
+    return res.status(401).json({ error: 'Session expired or invalid' });
+  }
+}
+
+app.use('/api', requireAuth);
 
 // ==================== 1. SCHOOLS API ====================
 app.get('/api/schools', (req, res) => {
