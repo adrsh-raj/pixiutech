@@ -3,6 +3,7 @@ import { ShieldCheck, UserCheck, Clock, Calendar, Search, RefreshCw, Trash2, Dow
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { SEED_LOGIN_LOGS } from '../data/seedData';
+import { API_BASE } from '../config/api';
 
 export default function AuditLogs() {
   const { user } = useAuth();
@@ -13,10 +14,6 @@ export default function AuditLogs() {
 
   const loadLogs = async () => {
     try {
-      const API_BASE = typeof window !== 'undefined' && window.location.hostname === 'localhost'
-        ? 'http://localhost:5000/api'
-        : (import.meta.env.VITE_API_URL || '/api');
-      
       let serverLogs = null;
       try {
         const res = await fetch(`${API_BASE}/logs`);
@@ -52,9 +49,6 @@ export default function AuditLogs() {
 
   const handleClearLogs = async () => {
     if (window.confirm('Reset session logs to clean system baseline?')) {
-      const API_BASE = typeof window !== 'undefined' && window.location.hostname === 'localhost'
-        ? 'http://localhost:5000/api'
-        : (import.meta.env.VITE_API_URL || '/api');
       try {
         await fetch(`${API_BASE}/logs`, { method: 'DELETE' });
       } catch (e) {}
@@ -287,7 +281,7 @@ export default function AuditLogs() {
                     <td className="py-3.5 px-4">
                       <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                        {log.status || 'Verified (SHA-256)'}
+                        {log.status || 'Verified'}
                       </span>
                     </td>
                   </tr>

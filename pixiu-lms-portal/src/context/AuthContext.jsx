@@ -123,6 +123,7 @@ export function AuthProvider({ children }) {
       setToken(null);
       localStorage.removeItem(TOKEN_KEY);
       localStorage.removeItem(USER_KEY);
+      Object.keys(localStorage).filter(key => key.startsWith('pixiu_') && key.includes(':')).forEach(key => localStorage.removeItem(key));
       window.dispatchEvent(new Event('pixiu_auth_state_changed'));
     }
   };

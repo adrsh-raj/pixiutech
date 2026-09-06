@@ -25,9 +25,18 @@ const CACHE_KEYS = {
   quizSubmissions: 'pixiu_quiz_submissions'
 };
 
+const cacheScope = (() => {
+  try {
+    const raw = localStorage.getItem('pixiu_auth_user');
+    const user = raw ? JSON.parse(raw) : null;
+    return String(user?.id || user?.username || 'guest').replace(/[^a-zA-Z0-9_-]/g, '_');
+  } catch { return 'guest'; }
+})();
+const scopedKey = key => `${key}:${cacheScope}`;
+
 const readCache = (key, fallback) => {
   try {
-    const raw = localStorage.getItem(key);
+    const raw = localStorage.getItem(scopedKey(key));
     if (!raw) return fallback;
     const parsed = JSON.parse(raw);
     return parsed ?? fallback;
@@ -38,7 +47,7 @@ const readCache = (key, fallback) => {
 
 const writeCache = (key, value) => {
   try {
-    localStorage.setItem(key, JSON.stringify(value));
+    localStorage.setItem(scopedKey(key), JSON.stringify(value));
   } catch {
     // Cache is optional; the server remains authoritative.
   }

@@ -8,9 +8,7 @@
  * 4. Schools: Own Institutional Notices & Official Verified Fee Receipts. ZERO OTHER SCHOOLS.
  */
 
-const API_BASE = typeof window !== 'undefined' && window.location.hostname === 'localhost'
-  ? 'http://localhost:5000/api'
-  : (import.meta.env?.VITE_API_URL || '/api');
+import { API_BASE } from '../config/api';
 
 /**
  * Returns a stable, canonical user key regardless of login alias or spacing

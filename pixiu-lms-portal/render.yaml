@@ -16,3 +16,5 @@ services:
         value: 20.18.0
       - key: JWT_SECRET
         generateValue: true
+      - key: CORS_ORIGINS
+        value: https://portal.pixiutech.com,https://pixiutech.com,https://www.pixiutech.com

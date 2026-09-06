@@ -16,7 +16,7 @@ export default function Students() {
   const toast = useToast();
   
   const isTrainer = role === 'trainer';
-  const trainerSchoolId = user?.school_id || (user?.username === 'akashsharma' || user?.related_id === 'TR-02' ? 'XYZ' : 'ZPS');
+  const trainerSchoolId = user?.school_id || '';
 
   const [selectedSchool, setSelectedSchool] = useState(() => isTrainer ? trainerSchoolId : 'All');
   const [selectedClassFilter, setSelectedClassFilter] = useState('All');
@@ -115,7 +115,7 @@ export default function Students() {
     e.preventDefault();
     const newId = generateId(formData.schoolCode, formData.class, formData.section, formData.roll);
     
-    await addStudent({
+    const result = await addStudent({
       student_id: newId, 
       school_id: formData.schoolCode, 
       class_id: `CLS-${formData.schoolCode}-${formData.class}${formData.section}`,
@@ -127,7 +127,12 @@ export default function Students() {
       status: 'Active'
     });
     
-    toast.success(`Student ${formData.name} enrolled with ID "${newId}"!`, 'Student Registered');
+    if (!result?.success) {
+      toast.error(result?.error || 'Student registration failed.');
+      return;
+    }
+    const tempPassword = result?.data?.temporary_password;
+    toast.success(tempPassword ? `Student ${formData.name} enrolled. Temporary login password: ${tempPassword}` : `Student ${formData.name} enrolled with ID "${newId}"!`, 'Student Registered');
     setIsAddModalOpen(false);
     setFormData(prev => ({ ...prev, name: '', parent: '', phone: '' }));
   };

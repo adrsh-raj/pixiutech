@@ -1183,7 +1183,7 @@ export const SEED_LOGIN_LOGS = [
     role: 'admin',
     school_id: 'ALL',
     event_type: 'Login',
-    status: 'Authenticated (SHA-256)',
+    status: 'Authenticated',
     ip: 'Command Center Host'
   },
   {
@@ -1195,7 +1195,7 @@ export const SEED_LOGIN_LOGS = [
     role: 'trainer',
     school_id: 'ZPS',
     event_type: 'Login',
-    status: 'Authenticated (SHA-256)',
+    status: 'Authenticated',
     ip: 'Trainer Terminal'
   },
   {
@@ -1207,7 +1207,7 @@ export const SEED_LOGIN_LOGS = [
     role: 'student',
     school_id: 'XYZ',
     event_type: 'Login',
-    status: 'Authenticated (SHA-256)',
+    status: 'Authenticated',
     ip: 'Student Lab Seat 01'
   }
 ];

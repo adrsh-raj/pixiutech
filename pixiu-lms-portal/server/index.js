@@ -6,6 +6,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const db = require('./database');
+const { authorizationMiddleware } = require('./middleware/authorization');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -14,12 +15,9 @@ if (!JWT_SECRET || JWT_SECRET.trim().length < 32) {
   throw new Error('JWT_SECRET must be configured with at least 32 characters.');
 }
 
-// Production CORS: only the official Pixiu browser origins are allowed.
-const allowedOrigins = new Set([
-  'https://portal.pixiutech.com',
-  'https://pixiutech.com',
-  'https://www.pixiutech.com'
-]);
+const configuredOrigins = (process.env.CORS_ORIGINS || '').split(',').map(v => v.trim()).filter(Boolean);
+if (!configuredOrigins.length) throw new Error('CORS_ORIGINS must be configured for the Pixiu LMS API.');
+const allowedOrigins = new Set(configuredOrigins);
 
 app.use(cors({
   origin: function(origin, callback) {
@@ -124,6 +122,7 @@ app.post('/api/auth/login', (req, res) => {
   }
 
   const cleanUsername = username.trim();
+  const requestedRole = typeof req.body?.role === 'string' ? req.body.role.trim().toLowerCase() : '';
   const clientIp = req.ip || req.connection.remoteAddress || 'unknown';
   const trackerKey = `${clientIp}:${cleanUsername}`;
 
@@ -144,6 +143,9 @@ app.post('/api/auth/login', (req, res) => {
     if (!isMatch) {
       return res.status(401).json({ error: 'Invalid ID / Username or Password' });
     }
+    if (requestedRole && user.role !== requestedRole) {
+      return res.status(403).json({ error: 'This account is not permitted to use the selected login type.' });
+    }
 
     // Sign JWT Token
     const token = jwt.sign(
@@ -156,7 +158,7 @@ app.post('/api/auth/login', (req, res) => {
         school_id: user.school_id 
       }, 
       JWT_SECRET, 
-      { expiresIn: '7d' }
+      { expiresIn: '12h' }
     );
 
     res.json({
@@ -211,6 +213,7 @@ function requireAuth(req, res, next) {
 }
 
 app.use('/api', requireAuth);
+app.use('/api', authorizationMiddleware(db));
 
 // ==================== 1. SCHOOLS API ====================
 app.get('/api/schools', (req, res) => {
@@ -290,7 +293,7 @@ app.post('/api/students', async (req, res) => {
     if (err) return res.status(500).json({ error: err.message });
     
     // Auto-create student login user in `users` table with hashed password
-    const studentPassword = password || 'student123';
+    const studentPassword = password || require('crypto').randomBytes(18).toString('base64url');
     const passwordHash = await bcrypt.hash(studentPassword, 10);
     const userId = `USR-${student_id.replace(/\s+/g, '')}`;
     
@@ -299,7 +302,7 @@ app.post('/api/students', async (req, res) => {
       [userId, student_id, passwordHash, 'student', student_id, name, school_id]
     );
 
-    res.json({ success: true, student_id, school_id, class_id, name, parent_name, parent_whatsapp, tech_level });
+    res.json({ success: true, student_id, school_id, class_id, name, parent_name, parent_whatsapp, tech_level, temporary_password: password ? null : studentPassword });
   });
 });
 
