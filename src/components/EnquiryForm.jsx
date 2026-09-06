@@ -9,7 +9,7 @@ const FIELDS = [
   { id: 'strength', label: 'Student strength', ph: 'Approximate number of students who will use the lab', wide: true },
 ]
 
-const EMPTY = { school: '', person: '', phone: '', email: '', city: '', strength: '', message: '' }
+const EMPTY = { school: '', person: '', phone: '', email: '', city: '', strength: '', message: '', website: '' }
 
 export default function EnquiryForm({ intent }) {
   const [values, setValues] = useState({
@@ -46,28 +46,21 @@ export default function EnquiryForm({ intent }) {
     setStatus({ kind: '', text: 'Sending your enquiry...' })
 
     try {
-      const response = await fetch('https://formspree.io/f/xzepqjep', {
+      const response = await fetch('/api/enquiry', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          "School Name": values.school,
-          "Contact Person": values.person,
-          "Phone": values.phone,
-          "Email": values.email,
-          "City": values.city,
-          "Student Strength": values.strength,
-          "Message": values.message
-        }),
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(values),
       })
-      
-      if (response.ok) {
-        setStatus(null)
-        setSent(true)
-      } else {
-        setStatus({ kind: 'err', text: 'There was a problem sending your enquiry. Please try again.' })
+
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(data.error || 'There was a problem sending your enquiry.')
       }
+
+      setStatus(null)
+      setSent(true)
     } catch (error) {
-      setStatus({ kind: 'err', text: 'Network error. Please check your connection and try again.' })
+      setStatus({ kind: 'err', text: error.message || 'Network error. Please check your connection and try again.' })
     }
   }
 
@@ -85,6 +78,8 @@ export default function EnquiryForm({ intent }) {
               type="button"
               onClick={() => {
                 setValues(EMPTY)
+                setErrors([])
+                setStatus(null)
                 setSent(false)
               }}
             >
@@ -113,6 +108,10 @@ export default function EnquiryForm({ intent }) {
             />
           </div>
         ))}
+        <div className="field field--wide" aria-hidden="true" style={{ position: 'absolute', left: '-10000px', width: 1, height: 1, overflow: 'hidden' }}>
+          <label htmlFor="f-website">Website</label>
+          <input id="f-website" value={values.website} onChange={set('website')} tabIndex={-1} autoComplete="off" />
+        </div>
         <div className="field field--wide">
           <label htmlFor="f-message">Message</label>
           <textarea
