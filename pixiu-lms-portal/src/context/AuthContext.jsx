@@ -12,15 +12,10 @@ async function readJson(response) {
 }
 
 export function AuthProvider({ children }) {
+  // A cached token is only a session hint. The user identity is never trusted
+  // from localStorage until the backend validates the token with /auth/me.
   const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY));
-  const [user, setUser] = useState(() => {
-    try {
-      const cached = localStorage.getItem(USER_KEY);
-      return cached ? JSON.parse(cached) : null;
-    } catch {
-      return null;
-    }
-  });
+  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -30,6 +25,7 @@ export function AuthProvider({ children }) {
       const savedToken = localStorage.getItem(TOKEN_KEY);
       if (!savedToken) {
         if (active) {
+          setToken(null);
           setUser(null);
           setLoading(false);
         }
@@ -38,12 +34,13 @@ export function AuthProvider({ children }) {
 
       try {
         const response = await fetch(`${API_BASE}/auth/me`, {
-          headers: { Authorization: `Bearer ${savedToken}` }
+          headers: { Authorization: `Bearer ${savedToken}` },
+          cache: 'no-store'
         });
 
         if (!response.ok) throw new Error('Session expired');
         const data = await readJson(response);
-        if (!data.user) throw new Error('Invalid session response');
+        if (!data.user || !data.user.id || !data.user.role) throw new Error('Invalid session response');
 
         if (active) {
           setToken(savedToken);
@@ -113,7 +110,8 @@ export function AuthProvider({ children }) {
       if (currentToken) {
         await fetch(`${API_BASE}/auth/logout`, {
           method: 'POST',
-          headers: { Authorization: `Bearer ${currentToken}` }
+          headers: { Authorization: `Bearer ${currentToken}` },
+          cache: 'no-store'
         });
       }
     } catch {
@@ -123,7 +121,9 @@ export function AuthProvider({ children }) {
       setToken(null);
       localStorage.removeItem(TOKEN_KEY);
       localStorage.removeItem(USER_KEY);
-      Object.keys(localStorage).filter(key => key.startsWith('pixiu_') && key.includes(':')).forEach(key => localStorage.removeItem(key));
+      Object.keys(localStorage)
+        .filter(key => key.startsWith('pixiu_') && key.includes(':'))
+        .forEach(key => localStorage.removeItem(key));
       window.dispatchEvent(new Event('pixiu_auth_state_changed'));
     }
   };
