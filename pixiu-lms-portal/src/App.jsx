@@ -24,6 +24,8 @@ import { ToastProvider, useToast } from './context/ToastContext';
 import { LogOut, Bell, ShieldCheck } from 'lucide-react';
 import { filterNotificationsForUser, fetchUserReadNotifIds, saveUserReadNotifIds } from './utils/notifications';
 
+// Production console routes include the administrator-only data reset screen.
+
 const Simulation = lazy(() => import('./pages/Simulation'));
 
 class ChunkErrorBoundary extends Component {
