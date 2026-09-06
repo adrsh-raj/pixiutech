@@ -37,6 +37,7 @@ async function initializeDatabaseWithRetry() {
     require('./trainer-password-reset-route');
     require('./school-password-reset-route');
     require('./reset-data-route');
+    require('./school-trainer-assignment-route');
     require('./index.js');
   } catch (err) {
     console.error('Pixiu LMS API failed to initialize:', err);
