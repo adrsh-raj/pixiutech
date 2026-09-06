@@ -9,15 +9,36 @@ function generateStudentPassword(studentId) {
   const normalized = String(studentId || '').trim().replace(/\s+/g, ' ');
   const match = normalized.match(/^([A-Za-z]+)(\d+)([A-Za-z]+)?\s+(\d+)$/);
   if (!match) return '';
-
   const [, schoolCodeRaw, grade, sectionRaw = '', rollRaw] = match;
   const schoolCode = schoolCodeRaw.toUpperCase();
   const schoolCodeLower = schoolCodeRaw.toLowerCase();
   const section = sectionRaw.toUpperCase();
   const roll = String(parseInt(rollRaw, 10));
   if (!Number.isFinite(Number(roll)) || Number(roll) <= 0) return '';
-
   return `${schoolCode}${schoolCodeLower}${grade}${section}${roll}@hata`;
+}
+
+function splitAssignments(value) {
+  if (Array.isArray(value)) return value.map(item => String(item).trim()).filter(Boolean);
+  const raw = String(value || '').trim();
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed.map(item => String(item).trim()).filter(Boolean);
+  } catch {}
+  return raw.split(',').map(item => item.trim()).filter(Boolean);
+}
+
+function enrichSchools(schoolRows, trainerRows) {
+  return schoolRows.map(school => {
+    const schoolKeys = [school.id, school.code].filter(Boolean).map(value => String(value).trim());
+    const assignedTrainer = trainerRows.find(trainer => splitAssignments(trainer.assigned_schools).some(item => schoolKeys.includes(item)));
+    return {
+      ...school,
+      trainer_id: assignedTrainer?.id || school.trainer_id || '',
+      lead_trainer: assignedTrainer?.name || school.lead_trainer || 'Not Assigned'
+    };
+  });
 }
 
 async function apiRequest(path, options = {}) {
@@ -25,12 +46,10 @@ async function apiRequest(path, options = {}) {
   const headers = new Headers(options.headers || {});
   if (options.body && !(options.body instanceof FormData) && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
   if (token) headers.set('Authorization', `Bearer ${token}`);
-
   const method = String(options.method || 'GET').toUpperCase();
   const retryable = method === 'GET' || method === 'HEAD';
   const delays = retryable ? [0, 1500, 3500] : [0];
   let lastError;
-
   for (let attempt = 0; attempt < delays.length; attempt += 1) {
     if (delays[attempt]) await new Promise(resolve => setTimeout(resolve, delays[attempt]));
     try {
@@ -72,7 +91,13 @@ export function DataProvider({ children }) {
     ];
     try {
       const results = await Promise.allSettled(endpoints.map(([path]) => apiRequest(path)));
-      results.forEach((result, index) => { if (result.status === 'fulfilled') endpoints[index][1](collection(result.value)); });
+      const schoolResult = results[0];
+      const trainerResult = results[3];
+      const schoolRows = schoolResult?.status === 'fulfilled' ? collection(schoolResult.value) : [];
+      const trainerRows = trainerResult?.status === 'fulfilled' ? collection(trainerResult.value) : [];
+      if (schoolResult?.status === 'fulfilled') setSchools(enrichSchools(schoolRows, trainerRows));
+      results.forEach((result, index) => { if (result.status === 'fulfilled' && index !== 0 && index !== 3) endpoints[index][1](collection(result.value)); });
+      if (trainerResult?.status === 'fulfilled') setTrainers(trainerRows);
       return { success: results.some(result => result.status === 'fulfilled'), failed: results.filter(result => result.status === 'rejected').length };
     } finally { setLoading(false); }
   }, []);
@@ -93,15 +118,42 @@ export function DataProvider({ children }) {
     catch (e) { return { success: false, error: e.message }; }
   };
 
-  const addSchool = data => save('/schools', 'POST', data); const updateSchool = (id, data) => save(`/schools/${encodeURIComponent(id)}`, 'PUT', data); const deleteSchool = id => remove(`/schools/${encodeURIComponent(id)}`);
+  const syncSchoolTrainer = async (schoolId, trainerId) => {
+    try {
+      return await apiRequest(`/schools/${encodeURIComponent(schoolId)}/assign-trainer`, {
+        method: 'POST',
+        body: JSON.stringify({ trainer_id: trainerId || '' })
+      });
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  };
+
+  const addSchool = async data => {
+    const result = await save('/schools', 'POST', data);
+    if (!result.success) return result;
+    const assignment = await syncSchoolTrainer(data?.id || data?.code, data?.trainer_id);
+    if (!assignment.success) return { success: false, error: `School created, but trainer assignment failed: ${assignment.error}` };
+    await refreshAll();
+    return result;
+  };
+
+  const updateSchool = async (id, data) => {
+    const result = await save(`/schools/${encodeURIComponent(id)}`, 'PUT', data);
+    if (!result.success) return result;
+    const assignment = await syncSchoolTrainer(id, data?.trainer_id);
+    if (!assignment.success) return { success: false, error: `School updated, but trainer assignment failed: ${assignment.error}` };
+    await refreshAll();
+    return result;
+  };
+
+  const deleteSchool = id => remove(`/schools/${encodeURIComponent(id)}`);
   const addClass = data => save('/classes', 'POST', data);
   const addStudent = async data => {
     const generatedPassword = generateStudentPassword(data?.student_id);
     if (!generatedPassword) return { success: false, error: 'Student ID must follow the format SCHOOLGRADSECTION roll, e.g. XYZ8A 03.' };
     const result = await save('/students', 'POST', { ...data, password: generatedPassword });
-    if (result.success) {
-      return { ...result, data: { ...(result.data || {}), temporary_password: generatedPassword } };
-    }
+    if (result.success) return { ...result, data: { ...(result.data || {}), temporary_password: generatedPassword } };
     return result;
   };
   const updateStudent = (id, data) => save(`/students/${encodeURIComponent(id)}`, 'PUT', data); const deleteStudent = id => remove(`/students/${encodeURIComponent(id)}`);
