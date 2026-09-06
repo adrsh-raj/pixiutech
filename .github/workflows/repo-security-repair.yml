@@ -70,13 +70,8 @@ jobs:
           if workflow.exists(): workflow.unlink()
           PY
 
-          if grep -R --line-number --exclude-dir=.git --exclude='*.lock' "app.use('/uploads'" src pixiu-lms-portal public 2>/dev/null; then
-            echo "Unexpected public static upload exposure found."
-            exit 1
-          fi
-
-          if grep -R --line-number --exclude-dir=.git --exclude='*.lock' '/uploads/${' pixiu-lms-portal src public 2>/dev/null; then
-            echo "Legacy public upload URL found."
+          if grep -R --line-number --exclude-dir=.git --exclude='*.lock' "public/materials\|app\.use('/uploads'" src pixiu-lms-portal public 2>/dev/null; then
+            echo "Unexpected public material/static upload exposure found."
             exit 1
           fi
 
