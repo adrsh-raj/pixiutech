@@ -6,40 +6,23 @@ import ScrollToTop from './components/ScrollToTop.jsx'
 import Home from './pages/Home.jsx'
 import Solutions from './pages/Solutions.jsx'
 import Careers from './pages/Careers.jsx'
-import Login from './pages/Login.jsx'
-import Hub from './pages/Hub.jsx'
 import PortalBridge from './pages/PortalBridge.jsx'
 import Contact from './pages/Contact.jsx'
 import Verify from './pages/Verify.jsx'
 import Simulation from './pages/Simulation.jsx'
 import NotFound from './pages/NotFound.jsx'
 
-export default function App() {
+const LMS_LOGIN_URL = 'https://portal.pixiutech.com/login'
+
+function ProductionLoginRedirect() {
   useEffect(() => {
-    const handleContextMenu = (e) => {
-      e.preventDefault()
-    }
-
-    const handleKeyDown = (e) => {
-      // Block F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+Shift+C, Ctrl+U, Ctrl+S
-      if (
-        e.key === 'F12' ||
-        ((e.ctrlKey || e.metaKey) && e.shiftKey && ['I', 'i', 'J', 'j', 'C', 'c'].includes(e.key)) ||
-        ((e.ctrlKey || e.metaKey) && ['U', 'u', 'S', 's'].includes(e.key))
-      ) {
-        e.preventDefault()
-        e.stopPropagation()
-      }
-    }
-
-    window.addEventListener('contextmenu', handleContextMenu)
-    window.addEventListener('keydown', handleKeyDown)
-    return () => {
-      window.removeEventListener('contextmenu', handleContextMenu)
-      window.removeEventListener('keydown', handleKeyDown)
-    }
+    window.location.replace(LMS_LOGIN_URL)
   }, [])
 
+  return null
+}
+
+export default function App() {
   return (
     <>
       <ScrollToTop />
@@ -51,11 +34,10 @@ export default function App() {
           <Route path="/careers" element={<Careers />} />
           <Route path="/portal" element={<PortalBridge />} />
           <Route path="/hub" element={<PortalBridge />} />
-          <Route path="/login" element={<PortalBridge />} />
+          <Route path="/login" element={<ProductionLoginRedirect />} />
           <Route path="/verify" element={<Verify />} />
           <Route path="/simulation" element={<Simulation />} />
           <Route path="/contact" element={<Contact />} />
-          {/* Redirects for deleted pages */}
           <Route path="/curriculum" element={<Navigate to="/solutions" replace />} />
           <Route path="/partnership" element={<Navigate to="/" replace />} />
           <Route path="/about" element={<Navigate to="/" replace />} />
