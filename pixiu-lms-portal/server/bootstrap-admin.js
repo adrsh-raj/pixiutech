@@ -7,8 +7,9 @@ const db = require('./database');
  * It never uses a hardcoded password. Set ADMIN_BOOTSTRAP_PASSWORD in the
  * server environment to create/update the designated admin account.
  *
- * Set ADMIN_BOOTSTRAP_FORCE=true only when intentionally recovering access to
- * an existing admin account. Remove/disable FORCE afterwards.
+ * Existing malformed rows are repaired so a username collision cannot prevent
+ * the API from starting. Set ADMIN_BOOTSTRAP_FORCE=true only when intentionally
+ * recovering access to an existing admin account; remove/disable it afterwards.
  */
 async function bootstrapAdmin() {
   const password = process.env.ADMIN_BOOTSTRAP_PASSWORD?.trim();
@@ -23,33 +24,31 @@ async function bootstrapAdmin() {
     throw new Error('ADMIN_BOOTSTRAP_USERNAME must be 3-64 characters using letters, numbers, dot, underscore or hyphen.');
   }
 
-  const existing = await db.get('SELECT id, role FROM users WHERE username = ?', [username]);
+  const existing = await db.get('SELECT id, role, name FROM users WHERE username = ?', [username]);
   const force = String(process.env.ADMIN_BOOTSTRAP_FORCE || '').toLowerCase() === 'true';
-
-  if (existing && !force) {
-    if (!['admin', 'superadmin'].includes(existing.role)) {
-      throw new Error(`Bootstrap username "${username}" already belongs to role "${existing.role}".`);
-    }
-    console.log(`Admin bootstrap skipped; account "${username}" already exists.`);
-    return;
-  }
-
   const passwordHash = await bcrypt.hash(password, 12);
   const userId = existing?.id || `USR-${crypto.createHash('sha256').update(username).digest('hex').slice(0, 16)}`;
 
   if (existing) {
-    await db.run(
-      'UPDATE users SET password_hash = ?, role = ?, name = ? WHERE id = ?',
-      [passwordHash, 'admin', 'PIXIU Tech Administrator', userId]
-    );
-    console.warn(`Admin bootstrap password reset for "${username}" because ADMIN_BOOTSTRAP_FORCE=true.`);
-  } else {
-    await db.run(
-      'INSERT INTO users (id, username, password_hash, role, related_id, name, school_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [userId, username, passwordHash, 'admin', null, 'PIXIU Tech Administrator', null]
-    );
-    console.log(`Admin bootstrap account "${username}" created.`);
+    const existingRole = String(existing.role || '').trim().toLowerCase();
+    if (!['admin', 'superadmin'].includes(existingRole) || force) {
+      await db.run(
+        'UPDATE users SET password_hash = ?, role = ?, name = ?, related_id = NULL, school_id = NULL WHERE id = ?',
+        [passwordHash, 'admin', 'PIXIU Tech Administrator', userId]
+      );
+      console.warn(`Admin bootstrap repaired account "${username}"${force ? ' and reset its password' : ''}.`);
+      return;
+    }
+
+    console.log(`Admin bootstrap skipped; account "${username}" already exists.`);
+    return;
   }
+
+  await db.run(
+    'INSERT INTO users (id, username, password_hash, role, related_id, name, school_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [userId, username, passwordHash, 'admin', null, 'PIXIU Tech Administrator', null]
+  );
+  console.log(`Admin bootstrap account "${username}" created.`);
 }
 
 module.exports = { bootstrapAdmin };
