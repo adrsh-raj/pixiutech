@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node start.js",
+    "reset-data": "node reset-data.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
