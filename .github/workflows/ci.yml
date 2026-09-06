@@ -1,0 +1,23 @@
+name: PIXIU Production Verification
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify LMS backend syntax
+        run: node --check pixiu-lms-portal/server/index.js
+      - name: Verify public website build
+        run: npm ci && npm run build
+      - name: Verify LMS frontend build
+        working-directory: pixiu-lms-portal
+        run: npm ci && npm run build
