@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const compression = require('compression');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
@@ -19,6 +20,7 @@ if (!JWT_SECRET || JWT_SECRET.trim().length < 32) {
 const corsOptions = buildCorsOptions();
 app.use(cors(corsOptions));
 
+app.use(compression());
 app.use(express.json({ limit: '2mb' }));
 
 // Serve uploaded media files statically

@@ -1,3 +1,11 @@
+databases:
+  - name: pixiu-lms-db
+    plan: free
+    region: singapore
+    databaseName: pixiu_lms
+    postgresMajorVersion: "17"
+    connectionPool: none
+
 services:
   - type: web
     name: pixiu-lms-api
@@ -18,3 +26,11 @@ services:
         generateValue: true
       - key: CORS_ORIGINS
         value: https://portal.pixiutech.com,https://pixiutech.com,https://www.pixiutech.com
+      - key: DATABASE_URL
+        fromDatabase:
+          name: pixiu-lms-db
+          property: connectionString
+      - key: DB_POOL_MAX
+        value: 10
+      - key: DB_STATEMENT_TIMEOUT_MS
+        value: 10000
