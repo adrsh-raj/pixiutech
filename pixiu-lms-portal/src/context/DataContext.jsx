@@ -5,6 +5,21 @@ import { CLASS_KITS } from '../data/classKits';
 const DataContext = createContext(null);
 const getToken = () => localStorage.getItem('pixiu_auth_token');
 
+function generateStudentPassword(studentId) {
+  const normalized = String(studentId || '').trim().replace(/\s+/g, ' ');
+  const match = normalized.match(/^([A-Za-z]+)(\d+)([A-Za-z]+)?\s+(\d+)$/);
+  if (!match) return '';
+
+  const [, schoolCodeRaw, grade, sectionRaw = '', rollRaw] = match;
+  const schoolCode = schoolCodeRaw.toUpperCase();
+  const schoolCodeLower = schoolCodeRaw.toLowerCase();
+  const section = sectionRaw.toUpperCase();
+  const roll = String(parseInt(rollRaw, 10));
+  if (!Number.isFinite(Number(roll)) || Number(roll) <= 0) return '';
+
+  return `${schoolCode}${schoolCodeLower}${grade}${section}${roll}@hata`;
+}
+
 async function apiRequest(path, options = {}) {
   const token = getToken();
   const headers = new Headers(options.headers || {});
@@ -79,7 +94,17 @@ export function DataProvider({ children }) {
   };
 
   const addSchool = data => save('/schools', 'POST', data); const updateSchool = (id, data) => save(`/schools/${encodeURIComponent(id)}`, 'PUT', data); const deleteSchool = id => remove(`/schools/${encodeURIComponent(id)}`);
-  const addClass = data => save('/classes', 'POST', data); const addStudent = data => save('/students', 'POST', data); const updateStudent = (id, data) => save(`/students/${encodeURIComponent(id)}`, 'PUT', data); const deleteStudent = id => remove(`/students/${encodeURIComponent(id)}`);
+  const addClass = data => save('/classes', 'POST', data);
+  const addStudent = async data => {
+    const generatedPassword = generateStudentPassword(data?.student_id);
+    if (!generatedPassword) return { success: false, error: 'Student ID must follow the format SCHOOLGRADSECTION roll, e.g. XYZ8A 03.' };
+    const result = await save('/students', 'POST', { ...data, password: generatedPassword });
+    if (result.success) {
+      return { ...result, data: { ...(result.data || {}), temporary_password: generatedPassword } };
+    }
+    return result;
+  };
+  const updateStudent = (id, data) => save(`/students/${encodeURIComponent(id)}`, 'PUT', data); const deleteStudent = id => remove(`/students/${encodeURIComponent(id)}`);
   const getNextRollNumber = (schoolCode, grade, section) => { const cohort = students.filter(s => s.school_id === schoolCode && s.class_id === `CLS-${schoolCode}-${grade}${section || ''}`); if (!cohort.length) return '01'; const maxRoll = Math.max(...cohort.map(s => parseInt(String(s.student_id || '').split(' ').pop(), 10) || 0)); return String(maxRoll + 1).padStart(2, '0'); };
   const getStudentAttendance = studentId => { if (!studentId) return 0; const clean = String(studentId).toUpperCase().replace(/\s+/g, ''); const rows = attendance.filter(a => String(a.student_id || '').toUpperCase().replace(/\s+/g, '') === clean); return rows.length ? Math.round((rows.filter(a => a.status === 'Present').length / rows.length) * 100) : 0; };
   const getStudentAttendanceRecords = studentId => !studentId ? [] : attendance.filter(a => String(a.student_id || '').toUpperCase().replace(/\s+/g, '') === String(studentId).toUpperCase().replace(/\s+/g, ''));
