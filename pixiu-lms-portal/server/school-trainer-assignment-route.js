@@ -40,22 +40,31 @@ function patchSchoolTrainerAssignmentRoute() {
         if (!school) return res.status(404).json({ error: 'School not found.' });
 
         const schoolKey = String(school.code || school.id).trim();
-
-        // Remove this school from every trainer first, so one school has at most one assigned trainer.
         const trainers = await db.all('SELECT id, assigned_schools FROM trainers', []);
+
+        // Remove this school from all trainers first so one school has one owner.
         for (const trainer of trainers) {
-          const assignments = splitAssignments(trainer.assigned_schools).filter(item => item !== school.id && item !== schoolKey);
+          const assignments = splitAssignments(trainer.assigned_schools)
+            .filter(item => item !== school.id && item !== schoolKey);
           await db.run('UPDATE trainers SET assigned_schools = ? WHERE id = ?', [assignments.join(','), trainer.id]);
         }
 
-        if (trainerId) {
-          const trainer = await db.get('SELECT id, name FROM trainers WHERE id = ? LIMIT 1', [trainerId]);
-          if (!trainer) return res.status(404).json({ error: 'Selected trainer not found.' });
-          await db.run('UPDATE trainers SET assigned_schools = ? WHERE id = ?', [schoolKey, trainer.id]);
-          return res.json({ success: true, school_id: school.id, trainer_id: trainer.id, trainer_name: trainer.name });
+        if (!trainerId) {
+          return res.json({ success: true, school_id: school.id, trainer_id: null, trainer_name: null });
         }
 
-        return res.json({ success: true, school_id: school.id, trainer_id: null, trainer_name: null });
+        const trainer = trainers.find(item => item.id === trainerId);
+        if (!trainer) return res.status(404).json({ error: 'Selected trainer not found.' });
+
+        const assignments = [...new Set([...splitAssignments(trainer.assigned_schools), schoolKey])];
+        await db.run('UPDATE trainers SET assigned_schools = ? WHERE id = ?', [assignments.join(','), trainer.id]);
+
+        return res.json({
+          success: true,
+          school_id: school.id,
+          trainer_id: trainer.id,
+          trainer_name: (await db.get('SELECT name FROM trainers WHERE id = ? LIMIT 1', [trainer.id]))?.name || null
+        });
       } catch (error) {
         console.error('School trainer assignment failed:', error);
         return res.status(500).json({ error: `Unable to assign trainer: ${error?.message || 'Unknown server error.'}` });
