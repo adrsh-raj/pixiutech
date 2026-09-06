@@ -1,0 +1,4 @@
+/* Shared website design tokens that must exist before component styles use them. */
+:root {
+  --line-light: rgba(10, 26, 51, 0.12);
+}
