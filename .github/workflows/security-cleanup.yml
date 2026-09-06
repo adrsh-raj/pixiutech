@@ -1,0 +1,250 @@
+name: Security and architecture cleanup
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/security-cleanup.yml'
+      - '.github/cleanup-security-and-architecture.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Refactor security boundaries and consolidate circuit lab
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          root = Path('.')
+          root_src = root / 'src'
+          lms_src = root / 'pixiu-lms-portal' / 'src'
+          server = root / 'pixiu-lms-portal' / 'server'
+
+          # Canonical simulation lives in the LMS app; the public site only bridges to it.
+          (root_src / 'pages' / 'Simulation.jsx').write_text(
+              "import { LMS_BASE_URL } from '../config/runtime.js';\n\n"
+              "export default function Simulation() {\n"
+              "  window.location.replace(`${LMS_BASE_URL}/simulation`);\n"
+              "  return null;\n}\n",
+              encoding='utf-8'
+          )
+
+          # Teacher master PDFs leave public/ and become API-protected server assets.
+          private_materials = server / 'private' / 'materials'
+          private_materials.mkdir(parents=True, exist_ok=True)
+          for public_materials in [lms_src.parent / 'public' / 'materials', root / 'public' / 'materials']:
+              if not public_materials.exists():
+                  continue
+              for pdf in public_materials.glob('*-teacher.pdf'):
+                  target = private_materials / pdf.name
+                  if target.exists():
+                      pdf.unlink()
+                  else:
+                      pdf.rename(target)
+
+          # PostgreSQL is authoritative; a committed SQLite snapshot is not allowed in source.
+          (server / 'pixiu_lms.db').unlink(missing_ok=True)
+
+          # Remove legacy seed datasets that contain personal/partner contact details.
+          for candidate in [root_src / 'data' / 'seedData.js', lms_src / 'data' / 'seedData.js']:
+              candidate.unlink(missing_ok=True)
+          (server / 'seed_sessions_attendance.js').unlink(missing_ok=True)
+
+          # Remove obsolete root-site artifacts made redundant by the consolidated architecture.
+          (root / 'public' / '_redirects').unlink(missing_ok=True)
+          hub_css = root_src / 'styles' / 'hub.css'
+          if hub_css.exists():
+              refs = []
+              for p in root_src.rglob('*'):
+                  if p.is_file() and p.suffix in {'.js', '.jsx', '.ts', '.tsx', '.css'} and p != hub_css:
+                      try:
+                          if 'hub.css' in p.read_text(encoding='utf-8'):
+                              refs.append(p)
+                      except Exception:
+                          pass
+              if not refs:
+                  hub_css.unlink()
+
+          # Old root public materials are removed when no non-teacher material remains.
+          root_materials = root / 'public' / 'materials'
+          if root_materials.exists() and not any(p.is_file() for p in root_materials.rglob('*')):
+              for p in sorted(root_materials.rglob('*'), reverse=True):
+                  if p.is_dir(): p.rmdir()
+              root_materials.rmdir()
+
+          # Legacy SQLite migration is now explicitly opt-in through SQLITE_MIGRATION_PATH.
+          db_file = server / 'database.js'
+          text = db_file.read_text(encoding='utf-8')
+          old = "      process.env.SQLITE_MIGRATION_PATH,\n      '/opt/render/project/src/data/pixiu_lms.db',\n      path.join(__dirname, 'pixiu_lms.db')"
+          text = text.replace(old, "      process.env.SQLITE_MIGRATION_PATH")
+          db_file.write_text(text, encoding='utf-8')
+
+          # Authenticated teacher-material endpoint. Generic /uploads static hosting remains separate.
+          api_file = server / 'index.js'
+          text = api_file.read_text(encoding='utf-8')
+          marker = "app.use('/api', authorizationMiddleware(db));\n\n// ==================== 1. SCHOOLS API ===================="
+          route = r'''app.use('/api', authorizationMiddleware(db));
+
+// Private teacher-master materials. Never expose this directory through static hosting.
+const privateMaterialsDir = path.join(__dirname, 'private', 'materials');
+if (fs.existsSync(privateMaterialsDir)) {
+  app.get('/api/materials/:filename', (req, res) => {
+    if (!['admin', 'trainer'].includes(req.user?.role)) {
+      return res.status(403).json({ error: 'Teacher master materials are restricted.' });
+    }
+
+    const filename = decodeURIComponent(req.params.filename || '');
+    if (!/^[A-Za-z0-9._-]+$/.test(filename) || !filename.toLowerCase().endsWith('.pdf')) {
+      return res.status(400).json({ error: 'Invalid material filename.' });
+    }
+
+    const filePath = path.join(privateMaterialsDir, filename);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Material not found.' });
+    }
+
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.type('application/pdf');
+    return res.sendFile(filePath);
+  });
+}
+
+// ==================== 1. SCHOOLS API ===================='''
+          if marker not in text:
+              raise SystemExit('Expected API authorization marker not found')
+          api_file.write_text(text.replace(marker, route, 1), encoding='utf-8')
+
+          # Authenticated browser helper for opening a private PDF with the JWT header.
+          helper = lms_src / 'utils' / 'protectedMaterial.js'
+          helper.parent.mkdir(parents=True, exist_ok=True)
+          helper.write_text(r'''import { API_BASE } from '../config/api';
+
+export async function openProtectedMaterial(url) {
+  const value = String(url || '').trim();
+  if (!value) throw new Error('File URL not configured.');
+
+  const parsed = new URL(value, window.location.origin);
+  if (!parsed.pathname.startsWith('/materials/')) throw new Error('Invalid protected material URL.');
+
+  const filename = decodeURIComponent(parsed.pathname.slice('/materials/'.length));
+  if (!/^[A-Za-z0-9._-]+\.pdf$/i.test(filename)) throw new Error('Invalid material file.');
+
+  const token = localStorage.getItem('pixiu_auth_token');
+  if (!token) throw new Error('Authentication required.');
+
+  const popup = window.open('', '_blank');
+  if (!popup) throw new Error('Please allow pop-ups to view the PDF.');
+
+  try {
+    const response = await fetch(`${API_BASE}/materials/${encodeURIComponent(filename)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload.error || `Unable to open material (${response.status})`);
+    }
+    const blobUrl = URL.createObjectURL(await response.blob());
+    popup.location.href = blobUrl;
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+  } catch (error) {
+    popup.close();
+    throw error;
+  }
+}
+''', encoding='utf-8')
+
+          # Content Hub uses the protected material flow, not a public static URL.
+          content = lms_src / 'pages' / 'ContentHub.jsx'
+          text = content.read_text(encoding='utf-8')
+          if "from '../utils/protectedMaterial'" not in text:
+              text = text.replace(
+                  "import { useAuth } from '../context/AuthContext';",
+                  "import { useAuth } from '../context/AuthContext';\nimport { openProtectedMaterial } from '../utils/protectedMaterial';"
+              )
+          text = text.replace("url: '/materials/class6-unit1-teacher.pdf',", "url: '',")
+          text = text.replace('  const handleOpenMaterial = (url) => {', '  const handleOpenMaterial = async (url) => {')
+          text = text.replace(
+              '    window.open(url, \'_blank\');',
+              "    try {\n      await openProtectedMaterial(url);\n    } catch (error) {\n      toast.error(error.message || 'Unable to open material.');\n    }",
+              1
+          )
+          text = text.replace('placeholder="/materials/class6-unit1-student-watermarked.pdf"', 'placeholder="/materials/class6-unit1-teacher.pdf"')
+          content.write_text(text, encoding='utf-8')
+
+          # The LMS src/lib implementation is canonical. Remove duplicate root circuit-lab/lib copies if unused.
+          component_lib = lms_src / 'components' / 'circuit-lab' / 'lib'
+          references = []
+          if component_lib.exists():
+              for p in lms_src.rglob('*'):
+                  if p.is_file() and not str(p).startswith(str(component_lib)):
+                      try:
+                          body = p.read_text(encoding='utf-8')
+                      except Exception:
+                          continue
+                      if 'components/circuit-lab/lib/' in body:
+                          references.append(p)
+          if component_lib.exists() and not references:
+              for p in sorted(component_lib.rglob('*'), reverse=True):
+                  if p.is_file(): p.unlink()
+                  elif p.is_dir(): p.rmdir()
+              component_lib.rmdir()
+
+          # Root website no longer owns a circuit-lab implementation or lab-only libraries.
+          for directory in [root_src / 'components' / 'circuit-lab', root_src / 'lib']:
+              if directory.exists():
+                  for p in sorted(directory.rglob('*'), reverse=True):
+                      if p.is_file(): p.unlink()
+                      elif p.is_dir(): p.rmdir()
+                  directory.rmdir()
+
+          for directory in [root_src / 'components', root_src / 'data', root_src / 'utils']:
+              if directory.exists() and not any(directory.iterdir()):
+                  directory.rmdir()
+          PY
+
+      - name: Verify source hygiene and builds
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! test -e pixiu-lms-portal/server/pixiu_lms.db
+          ! test -e pixiu-lms-portal/src/data/seedData.js
+          ! test -e src/data/seedData.js
+          ! test -e src/components/circuit-lab
+          ! test -e src/lib
+          test -d pixiu-lms-portal/server/private/materials
+          ! find pixiu-lms-portal/public/materials public/materials -type f -name '*-teacher.pdf' -print -quit 2>/dev/null | grep -q .
+          ! rg -n --hidden --glob '!node_modules/**' --glob '!.git/**' '(parent_phone|principal_phone|parent_name|principal_name)' src pixiu-lms-portal/src pixiu-lms-portal/server || true
+          npm ci
+          npm run build
+          cd pixiu-lms-portal
+          npm ci
+          npm run build
+          cd server
+          npm ci
+          node --check index.js
+          node --check database.js
+          node --check middleware/authorization.js
+
+      - name: Commit cleanup and remove temporary workflows
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          rm -f .github/cleanup-security-and-architecture.yml
+          git add -A
+          git status --short
+          git commit -m 'security: remove personal data and protect teacher materials' || true
+          git push
