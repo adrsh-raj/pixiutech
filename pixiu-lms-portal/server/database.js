@@ -3,7 +3,8 @@ const path = require('path');
 const bcrypt = require('bcryptjs');
 const { seedSessionsAndAttendance } = require('./seed_sessions_attendance');
 
-const dbPath = path.resolve(__dirname, 'pixiu_lms.db');
+const dbDir = process.env.RENDER ? '/opt/render/project/src/data' : __dirname;
+const dbPath = path.resolve(dbDir, 'pixiu_lms.db');
 const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
     console.error('Error opening database:', err.message);

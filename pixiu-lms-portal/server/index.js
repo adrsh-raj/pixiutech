@@ -15,16 +15,22 @@ const JWT_SECRET = process.env.JWT_SECRET || 'pixiu_super_secret_jwt_key_2026';
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:5174',
+  'http://localhost:3000',
   'https://portal.pixiutech.com',
-  'https://pixiutech.com'
+  'https://pixiutech.com',
+  'https://www.pixiutech.com'
 ];
 
 app.use(cors({
   origin: function(origin, callback) {
-    if (!origin || allowedOrigins.indexOf(origin) !== -1 || origin.startsWith('http://localhost:')) {
+    if (!origin || allowedOrigins.indexOf(origin) !== -1 
+        || origin.startsWith('http://localhost:')
+        || origin.endsWith('.vercel.app')
+        || origin.endsWith('.onrender.com')
+        || origin.endsWith('.pixiutech.com')) {
       callback(null, true);
     } else {
-      callback(null, true); // Permissive in dev, constrained in prod
+      callback(null, true); // Permissive for now
     }
   },
   credentials: true
@@ -33,7 +39,8 @@ app.use(cors({
 app.use(express.json({ limit: '2mb' }));
 
 // Serve uploaded media files statically
-const uploadsDir = path.join(__dirname, 'uploads');
+const uploadsBase = process.env.RENDER ? '/opt/render/project/src/data/uploads' : path.join(__dirname, 'uploads');
+const uploadsDir = uploadsBase;
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
@@ -65,6 +72,15 @@ const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
   limits: { fileSize: 5 * 1024 * 1024 } // 5MB maximum
+});
+
+// Health Check Endpoint (for Render / deployment monitoring)
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', service: 'Pixiu LMS API', timestamp: new Date().toISOString() });
+});
+
+app.get('/', (req, res) => {
+  res.json({ message: 'Pixiu LMS Backend API is running', docs: '/api/health' });
 });
 
 // File Upload Endpoint with validation
@@ -1474,6 +1490,6 @@ app.delete('/api/reviews/:id', (req, res) => {
 });
 
 // Start Server
-app.listen(PORT, () => {
-  console.log(`⚡ Pixiu Core API & Auth Engine running on http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`⚡ Pixiu Core API & Auth Engine running on port ${PORT}`);
 });

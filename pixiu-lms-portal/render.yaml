@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: pixiu-lms-api
+    runtime: node
+    region: singapore
+    plan: free
+    rootDir: pixiu-lms-portal/server
+    buildCommand: npm install
+    startCommand: node index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: JWT_SECRET
+        generateValue: true
+    disk:
+      name: pixiu-data
+      mountPath: /opt/render/project/src/data
+      sizeGB: 1
