@@ -1,0 +1,119 @@
+name: Repo Security Repair
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Repair security and cleanup
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          import shutil
+
+          root = Path('.')
+
+          # Remove tracked sensitive/demo data and obsolete duplicate assets.
+          remove_paths = [
+              'src/data/seedData.js',
+              'pixiu-lms-portal/src/data/seedData.js',
+              'pixiu-lms-portal/server/seed_sessions_attendance.js',
+              'pixiu-lms-portal/server/pixiu_lms.db',
+              'public/_redirects',
+              'src/styles/hub.css',
+          ]
+          for raw in remove_paths:
+              p = root / raw
+              if p.exists():
+                  if p.is_dir(): shutil.rmtree(p)
+                  else: p.unlink()
+
+          # The canonical circuit lab lives only in the LMS portal.
+          for raw in ['src/components/circuit-lab', 'src/lib/circuitLab', 'src/lib/circuit-lab']:
+              p = root / raw
+              if p.exists():
+                  shutil.rmtree(p)
+
+          # Public teacher materials must never remain under a web-served directory.
+          public_materials = root / 'public/materials'
+          private_materials = root / 'pixiu-lms-portal/server/private/materials'
+          if public_materials.exists():
+              private_materials.mkdir(parents=True, exist_ok=True)
+              for src in public_materials.iterdir():
+                  dest = private_materials / src.name
+                  if not dest.exists():
+                      shutil.move(str(src), str(dest))
+              if public_materials.exists():
+                  shutil.rmtree(public_materials)
+
+          index = root / 'pixiu-lms-portal/server/index.js'
+          text = index.read_text(encoding='utf-8')
+          text = text.replace("app.use('/uploads', express.static(uploadsDir));\n", '')
+          text = text.replace("const fileUrl = `/uploads/${req.file.filename}`;", "const fileUrl = `/api/uploads/${req.file.filename}`;")
+
+          protected_upload_route = r'''
+          // Uploaded evidence is private. Require a valid JWT before serving any file.
+          app.get('/api/uploads/:filename', (req, res) => {
+            const filename = decodeURIComponent(req.params?.filename || '');
+            if (!/^evidence-[A-Za-z0-9._-]+\.(jpg|jpeg|png|webp|gif)$/i.test(filename)) {
+              return res.status(400).json({ error: 'Invalid upload filename.' });
+            }
+
+            const filePath = path.join(uploadsDir, filename);
+            const resolvedRoot = path.resolve(uploadsDir);
+            const resolvedFile = path.resolve(filePath);
+            if (!resolvedFile.startsWith(`${resolvedRoot}${path.sep}`)) {
+              return res.status(400).json({ error: 'Invalid upload path.' });
+            }
+            if (!fs.existsSync(filePath)) {
+              return res.status(404).json({ error: 'Upload not found.' });
+            }
+
+            res.setHeader('Cache-Control', 'private, max-age=300');
+            res.setHeader('X-Content-Type-Options', 'nosniff');
+            res.type(path.extname(filePath));
+            return res.sendFile(filePath);
+          });
+          '''.strip()
+
+          marker = "app.use('/api', requireAuth);\napp.use('/api', authorizationMiddleware(db));"
+          replacement = "app.use('/api', requireAuth);\n\n" + protected_upload_route + "\n\napp.use('/api', authorizationMiddleware(db));"
+          if marker not in text:
+              raise SystemExit('Expected auth middleware marker not found; aborting.')
+          text = text.replace(marker, replacement, 1)
+          index.write_text(text, encoding='utf-8')
+
+          # Prevent the cleanup automation from remaining in production history.
+          workflow = root / '.github/workflows/repo-security-repair.yml'
+          if workflow.exists():
+              workflow.unlink()
+          PY
+
+          # No public material references or browser-direct upload paths may remain.
+          if grep -R --line-number --exclude-dir=.git --exclude='*.lock' "public/materials\|/uploads/" src pixiu-lms-portal public 2>/dev/null; then
+            echo "Unexpected public material/upload reference found."
+            exit 1
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes required."
+            exit 0
+          fi
+          git commit -m "security: close private-data and upload exposure"
+          git push origin main
