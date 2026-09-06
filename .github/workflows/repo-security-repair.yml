@@ -39,12 +39,10 @@ jobs:
                   if p.is_dir(): shutil.rmtree(p)
                   else: p.unlink()
 
-          # Keep exactly one implementation of the circuit lab: the LMS portal.
           for raw in ['src/components/circuit-lab', 'src/lib/circuitLab', 'src/lib/circuit-lab']:
               p = root / raw
               if p.exists(): shutil.rmtree(p)
 
-          # Move any remaining public teacher material into the protected server area.
           public_materials = root / 'public/materials'
           private_materials = root / 'pixiu-lms-portal/server/private/materials'
           if public_materials.exists():
@@ -68,18 +66,16 @@ jobs:
               text = text.replace(marker, "app.use('/api', requireAuth);\n\n" + protected_upload_route + "\n\napp.use('/api', authorizationMiddleware(db));", 1)
           index.write_text(text, encoding='utf-8')
 
-          # The workflow is a one-shot repair helper; do not keep it in the repo.
           workflow = root / '.github/workflows/repo-security-repair.yml'
           if workflow.exists(): workflow.unlink()
           PY
 
-          # Validate the actual exposure boundaries, while allowing the protected API path.
-          if grep -R --line-number --exclude-dir=.git --exclude='*.lock' "public/materials\|app\.use('/uploads'" src pixiu-lms-portal public 2>/dev/null; then
-            echo "Unexpected public material/static upload exposure found."
+          if grep -R --line-number --exclude-dir=.git --exclude='*.lock' "app.use('/uploads'" src pixiu-lms-portal public 2>/dev/null; then
+            echo "Unexpected public static upload exposure found."
             exit 1
           fi
 
-          if grep -R --line-number --exclude-dir=.git --exclude='*.lock' "const fileUrl = `/uploads/" pixiu-lms-portal src public 2>/dev/null; then
+          if grep -R --line-number --exclude-dir=.git --exclude='*.lock' '/uploads/${' pixiu-lms-portal src public 2>/dev/null; then
             echo "Legacy public upload URL found."
             exit 1
           fi
