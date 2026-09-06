@@ -35,18 +35,22 @@ function patchSchoolPasswordResetRoute() {
         );
         if (!school) return res.status(404).json({ error: 'School not found.' });
 
-        const username = String(school.code || school.id).trim();
+        const schoolPk = String(school.id || schoolId).trim();
+        const username = String(school.code || schoolPk).trim();
+        const schoolName = String(school.name || school.code || schoolPk).trim();
+        if (!schoolName) return res.status(500).json({ error: 'School account name could not be determined.' });
+
         const passwordHash = await bcrypt.hash(password, 12);
 
         const existingUser = await db.get(
           "SELECT id FROM users WHERE (related_id = ? AND role = 'school') OR (username = ? AND role = 'school') LIMIT 1",
-          [school.id, username]
+          [schoolPk, username]
         );
 
         if (existingUser?.id) {
           const result = await db.run(
             "UPDATE users SET username = ?, password_hash = ?, role = 'school', related_id = ?, name = ?, school_id = ? WHERE id = ?",
-            [username, passwordHash, school.id, school.name, school.id, existingUser.id]
+            [username, passwordHash, schoolPk, schoolName, schoolPk, existingUser.id]
           );
           if (Number(result?.rowCount ?? result?.changes ?? 0) < 1) {
             return res.status(500).json({ error: 'School account could not be updated.' });
@@ -60,19 +64,19 @@ function patchSchoolPasswordResetRoute() {
             return res.status(409).json({ error: `School username ${username} is already assigned to another account.` });
           }
 
-          const userId = `USR-SCHOOL-${school.id}`;
+          const userId = `USR-SCHOOL-${schoolPk}`;
           await db.run(
             "INSERT INTO users (id, username, password_hash, role, related_id, name, school_id) VALUES (?, ?, ?, 'school', ?, ?, ?)",
-            [userId, username, passwordHash, school.id, school.name, school.id]
+            [userId, username, passwordHash, schoolPk, schoolName, schoolPk]
           );
         }
 
         return res.json({
           success: true,
-          school_id: school.id,
-          school_name: school.name,
+          school_id: schoolPk,
+          school_name: schoolName,
           username,
-          message: `School password saved successfully for ${school.name}.`
+          message: `School password saved successfully for ${schoolName}.`
         });
       } catch (error) {
         console.error('School password reset failed:', error);
