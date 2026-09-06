@@ -7,6 +7,7 @@ import Inventory from './pages/Inventory';
 import Trainers from './pages/Trainers';
 import TrainerCredentials from './pages/TrainerCredentials';
 import SchoolCredentials from './pages/SchoolCredentials';
+import DataReset from './pages/DataReset';
 import Comms from './pages/Comms';
 import Leads from './pages/Leads';
 import Schools from './pages/Schools';
@@ -79,6 +80,10 @@ const Settings = () => (
       <Link to="/school-credentials" className="block p-4 bg-emerald-50 rounded-xl border border-emerald-100 hover:border-emerald-300 transition-colors">
         <p className="font-bold text-emerald-900">School Login Credentials</p>
         <p className="text-xs text-emerald-700 mt-1">Set or reset school portal passwords whenever a school forgets them.</p>
+      </Link>
+      <Link to="/data-reset" className="block p-4 bg-red-50 rounded-xl border border-red-100 hover:border-red-300 transition-colors">
+        <p className="font-bold text-red-900">Danger Zone — Reset Application Data</p>
+        <p className="text-xs text-red-700 mt-1">Clear operational records and preserve administrator access.</p>
       </Link>
     </div>
   </div>
@@ -214,6 +219,7 @@ export default function App() {
                 <Route path="trainers" element={<Trainers />} />
                 <Route path="trainer-credentials" element={<AdminOnly><TrainerCredentials /></AdminOnly>} />
                 <Route path="school-credentials" element={<AdminOnly><SchoolCredentials /></AdminOnly>} />
+                <Route path="data-reset" element={<AdminOnly><DataReset /></AdminOnly>} />
                 <Route path="content" element={<ContentHub />} />
                 <Route path="curriculum" element={<Curriculum />} />
                 <Route path="inventory" element={<Inventory />} />
