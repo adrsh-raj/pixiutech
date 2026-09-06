@@ -1,0 +1,76 @@
+name: Pixiu Step 1 One Shot
+
+on:
+  push:
+    paths:
+      - '.github/pixiu-step1-trigger'
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch backend safely
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path('pixiu-lms-portal/server/index.js')
+          text = p.read_text(encoding='utf-8')
+
+          old = "const JWT_SECRET = process.env.JWT_SECRET || 'pixiu_super_secret_jwt_key_2026';"
+          new = "const JWT_SECRET = process.env.JWT_SECRET;\nif (!JWT_SECRET || JWT_SECRET.trim().length < 32) {\n  throw new Error('JWT_SECRET must be configured with at least 32 characters.');\n}"
+          if old not in text:
+              raise SystemExit('JWT fallback not found; refusing to patch.')
+          text = text.replace(old, new, 1)
+
+          cors = re.compile(r"// CORS Configuration\n.*?app\.use\(cors\(\{.*?\}\)\);", re.S)
+          new_cors = """// Production CORS: only the official Pixiu browser origins are allowed.\nconst allowedOrigins = new Set([\n  'https://portal.pixiutech.com',\n  'https://pixiutech.com',\n  'https://www.pixiutech.com'\n]);\n\napp.use(cors({\n  origin: function(origin, callback) {\n    if (!origin || allowedOrigins.has(origin)) {\n      return callback(null, true);\n    }\n    return callback(new Error('CORS origin denied'));\n  },\n  credentials: true\n}));"""
+          text, count = cors.subn(new_cors, text, count=1)
+          if count != 1:
+              raise SystemExit('CORS block not found; refusing to patch.')
+
+          upload = "app.post('/api/upload', (req, res) => {"
+          guarded_upload = """app.post('/api/upload', (req, res) => {\n  const authHeader = req.headers.authorization;\n  if (!authHeader || !authHeader.startsWith('Bearer ')) {\n    return res.status(401).json({ error: 'Unauthorized: No token provided' });\n  }\n  try {\n    req.user = jwt.verify(authHeader.slice(7).trim(), JWT_SECRET);\n  } catch (err) {\n    return res.status(401).json({ error: 'Session expired or invalid' });\n  }"""
+          if text.count(upload) != 1:
+              raise SystemExit('Upload endpoint not found exactly once; refusing to patch.')
+          text = text.replace(upload, guarded_upload, 1)
+
+          marker = "// ==================== 1. SCHOOLS API ===================="
+          auth = """// Global API authentication boundary. Login remains public; all following API routes require a valid JWT.\nfunction requireAuth(req, res, next) {\n  const authHeader = req.headers.authorization;\n  if (!authHeader || !authHeader.startsWith('Bearer ')) {\n    return res.status(401).json({ error: 'Unauthorized: No token provided' });\n  }\n\n  const token = authHeader.slice(7).trim();\n  if (!token) {\n    return res.status(401).json({ error: 'Unauthorized: No token provided' });\n  }\n\n  try {\n    req.user = jwt.verify(token, JWT_SECRET);\n    return next();\n  } catch (err) {\n    return res.status(401).json({ error: 'Session expired or invalid' });\n  }\n}\n\napp.use('/api', requireAuth);\n\n// ==================== 1. SCHOOLS API ===================="""
+          if text.count(marker) != 1:
+              raise SystemExit('API marker not found exactly once; refusing to patch.')
+          text = text.replace(marker, auth, 1)
+
+          p.write_text(text, encoding='utf-8')
+          print('Backend patch complete.')
+          PY
+
+      - name: Verify security source
+        run: |
+          ! grep -F "pixiu_super_secret_jwt_key_2026" pixiu-lms-portal/server/index.js
+          ! grep -F "http://localhost" pixiu-lms-portal/server/index.js
+          ! grep -F "vercel.app" pixiu-lms-portal/server/index.js
+          ! grep -F "onrender.com" pixiu-lms-portal/server/index.js
+          grep -F "const JWT_SECRET = process.env.JWT_SECRET;" pixiu-lms-portal/server/index.js
+          grep -F "app.use('/api', requireAuth);" pixiu-lms-portal/server/index.js
+
+      - name: Verify backend syntax
+        run: node --check pixiu-lms-portal/server/index.js
+
+      - name: Verify frontend production build
+        working-directory: pixiu-lms-portal
+        run: npm ci && npm run build
+
+      - name: Commit only after all checks pass
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pixiu-lms-portal/server/index.js
+          git commit -m "security: finalize production LMS API boundary"
+          git push
