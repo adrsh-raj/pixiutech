@@ -11,7 +11,7 @@ const DataContext = createContext();
 
 const API_BASE = typeof window !== 'undefined' && window.location.hostname === 'localhost'
   ? 'http://localhost:5000/api'
-  : (import.meta.env.VITE_API_URL || '/api');
+  : (import.meta.env.VITE_API_URL || 'https://pixiu-lms-api.onrender.com/api');
 
 const API_URL = API_BASE;
 
@@ -411,8 +411,16 @@ export function DataProvider({ children }) {
       if (clsRes && clsRes.length > 0) setClasses(clsRes);
       if (stuRes && stuRes.length > 0) setStudents(stuRes);
       if (trRes && trRes.length > 0) setTrainers(trRes);
-      if (sesRes && sesRes.length > 0) setSessions(sesRes);
-      if (attRes && attRes.length > 0) setAttendance(attRes);
+      if (sesRes && sesRes.length > 0) {
+        setSessions(sesRes);
+        try { localStorage.setItem('pixiu_sessions', JSON.stringify(sesRes)); } catch (e) {}
+        try { window.dispatchEvent(new CustomEvent('pixiu_sessions_updated', { detail: sesRes })); } catch (e) {}
+      }
+      if (attRes && attRes.length > 0) {
+        setAttendance(attRes);
+        try { localStorage.setItem('pixiu_attendance', JSON.stringify(attRes)); } catch (e) {}
+        try { window.dispatchEvent(new CustomEvent('pixiu_attendance_updated', { detail: attRes })); } catch (e) {}
+      }
       if (ldRes) setLeads(ldRes);
       if (cntRes && cntRes.length > 0) setContent(cntRes);
       if (curRes && curRes.length > 0) setCurriculum(curRes);

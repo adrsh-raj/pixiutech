@@ -83,7 +83,10 @@ export default function StudentPortal() {
 
   // Faculty / Admin live preview support
   const isAdminOrTrainer = user?.role === 'admin' || user?.role === 'trainer';
-  const [previewStudentId, setPreviewStudentId] = useState('ZPS6A 01');
+  const isXYZTrainer = user?.school_id === 'XYZ' || user?.username === 'akashsharma';
+  const [previewStudentId, setPreviewStudentId] = useState(() => {
+    return isXYZTrainer ? 'XYZ6A 01' : 'ZPS6A 01';
+  });
 
   // Resolve active student
   const activeStudentId = isAdminOrTrainer ? previewStudentId : (user?.username || user?.related_id || 'ZPS6A 01');
@@ -593,15 +596,21 @@ export default function StudentPortal() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-              {[
+              {(isXYZTrainer ? [
+                { grade: '6', id: 'XYZ6A 01', label: 'Class 6 (Manish)' },
+                { grade: '7', id: 'XYZ7A 01', label: 'Class 7 (Pranav)' },
+                { grade: '8', id: 'XYZ8A 01', label: 'Class 8 (Varun)' },
+                { grade: '9', id: 'XYZ9A 01', label: 'Class 9 (Gaurav)' },
+                { grade: '11', id: 'XYZ11A 01', label: 'Class 11 (Harshit)' }
+              ] : [
                 { grade: '6', id: 'ZPS6A 01', label: 'Class 6 (Aarav)' },
                 { grade: '7', id: 'ZPS7A 01', label: 'Class 7 (Devansh)' },
                 { grade: '8', id: 'ZPS8A 01', label: 'Class 8 (Siddharth)' },
                 { grade: '9', id: 'ZPS9A 01', label: 'Class 9 (Arjun)' },
                 { grade: '11', id: 'ZPS11A 01', label: 'Class 11 (Aryan)' }
-              ].map(c => (
+              ]).map(c => (
                 <button
-                  key={c.grade}
+                  key={c.id}
                   onClick={() => setPreviewStudentId(c.id)}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     previewStudentId === c.id 
