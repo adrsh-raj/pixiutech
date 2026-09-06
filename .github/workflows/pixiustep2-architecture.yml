@@ -1,0 +1,186 @@
+name: Pixiu Step 2 Architecture Cleanup
+
+on:
+  push:
+    paths:
+      - '.github/pixiu-step2-trigger'
+
+permissions:
+  contents: write
+
+jobs:
+  architecture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Refactor and consolidate architecture
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          
+          root = Path('.')
+
+          # 1) Create a single runtime configuration authority for the public website.
+          runtime = Path('src/config/runtime.js')
+          runtime.parent.mkdir(parents=True, exist_ok=True)
+          runtime.write_text("""const configuredLmsUrl = import.meta.env.VITE_LMS_URL?.trim();
+
+function getProductionLmsUrl() {
+  if (configuredLmsUrl) return configuredLmsUrl.replace(/\\/$/, '');
+
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname.replace(/^www\\./, '');
+    if (hostname === 'pixiutech.com') {
+      return `${window.location.protocol}//portal.${hostname}`;
+    }
+  }
+
+  throw new Error('VITE_LMS_URL is required outside the PIXIU Tech production website.');
+}
+
+export const LMS_BASE_URL = getProductionLmsUrl();
+export const LMS_LOGIN_URL = new URL('/login', `${LMS_BASE_URL}/`).toString();
+""", encoding='utf-8')
+
+          # 2) Public website login/portal links use the runtime authority.
+          app = Path('src/App.jsx')
+          text = app.read_text(encoding='utf-8')
+          text = text.replace("import NotFound from './pages/NotFound.jsx'\n\nconst LMS_LOGIN_URL = 'https://portal.pixiutech.com/login'", "import NotFound from './pages/NotFound.jsx'\nimport { LMS_LOGIN_URL } from './config/runtime.js'")
+          if "LMS_LOGIN_URL = 'https://portal.pixiutech.com/login'" in text:
+              raise SystemExit('Root App hard-coded LMS URL was not replaced.')
+          app.write_text(text, encoding='utf-8')
+
+          bridge = Path('src/pages/PortalBridge.jsx')
+          text = bridge.read_text(encoding='utf-8')
+          text = text.replace("import Reveal from '../components/Reveal.jsx'\n\nconst PORTAL_LOGIN_URL = 'https://portal.pixiutech.com/login'", "import Reveal from '../components/Reveal.jsx'\nimport { LMS_LOGIN_URL } from '../config/runtime.js'")
+          text = text.replace('href={PORTAL_LOGIN_URL}', 'href={LMS_LOGIN_URL}')
+          if "PORTAL_LOGIN_URL = 'https://portal.pixiutech.com/login'" in text:
+              raise SystemExit('PortalBridge hard-coded LMS URL was not replaced.')
+          bridge.write_text(text, encoding='utf-8')
+
+          # 3) LMS API URL is environment-only. No baked Render/localhost URL in browser code.
+          api = Path('pixiu-lms-portal/src/config/api.js')
+          api.write_text("""// Single runtime API authority for the Pixiu LMS frontend.
+// Configure VITE_API_URL in the LMS deployment environment.
+const configuredApiBase = import.meta.env.VITE_API_URL?.trim();
+
+if (!configuredApiBase) {
+  throw new Error('VITE_API_URL is required for the Pixiu LMS frontend.');
+}
+
+export const API_BASE = configuredApiBase.replace(/\\/$/, '');
+export const API_URL = API_BASE;
+""", encoding='utf-8')
+
+          # 4) Remove obsolete duplicate public-site auth/resource implementations.
+          for obsolete in [
+              'src/pages/Login.jsx',
+              'src/pages/Hub.jsx',
+              'src/pages/StudentPortal.jsx',
+              'netlify.toml',
+          ]:
+              p = Path(obsolete)
+              if p.exists():
+                  p.unlink()
+
+          # 5) Remove the standalone unreferenced Next.js circuit-lab application.
+          legacy_lab = Path('virtual-circuit-lab')
+          if legacy_lab.exists():
+              import shutil
+              shutil.rmtree(legacy_lab)
+
+          # 6) Add environment templates so deployments are configured, not code-configured.
+          Path('.env.example').write_text(
+              '# Public website runtime configuration\nVITE_LMS_URL=https://portal.pixiutech.com\n',
+              encoding='utf-8'
+          )
+          Path('pixiu-lms-portal/.env.example').write_text(
+              '# LMS frontend runtime configuration\nVITE_API_URL=https://<your-lms-api-host>/api\n',
+              encoding='utf-8'
+          )
+
+          # 7) Document the final production ownership map.
+          Path('ARCHITECTURE.md').write_text("""# PIXIU Tech Production Architecture
+
+## Production ownership
+
+- Root application: public PIXIU Tech website on Vercel.
+- `pixiu-lms-portal/`: canonical LMS web application on Vercel.
+- `pixiu-lms-portal/server/`: canonical LMS API on Render.
+- SQLite/database state belongs to the LMS backend; browser localStorage is cache/session state only.
+
+## Routing ownership
+
+- `https://pixiutech.com/login` redirects to the canonical LMS login.
+- `https://portal.pixiutech.com/login` is the actual LMS authentication screen.
+- Public website routes stay in the root Vite app.
+- LMS routes stay inside `pixiu-lms-portal`.
+
+## Configuration ownership
+
+- Public website portal URL: `VITE_LMS_URL` (with a production-host-derived fallback only on the PIXIU production domain).
+- LMS API URL: `VITE_API_URL`; there is no browser-side localhost/Render hard-coded fallback.
+- JWT signing secret: server environment variable `JWT_SECRET` only.
+
+## Removed duplicate runtime authorities
+
+- Root legacy login implementation removed.
+- Root legacy resource hub removed.
+- Root legacy student portal removed.
+- Standalone `virtual-circuit-lab/` application removed; the LMS/root-owned circuit-lab implementation is the remaining source.
+- Netlify deployment configuration removed; Vercel is the public website deployment authority.
+
+## Data rule
+
+The API/database is authoritative. Frontend localStorage may cache session and fetched data for UX, but it must never become an authentication or persistence authority.
+""", encoding='utf-8')
+
+          # 8) Repository-wide architecture checks before committing.
+          forbidden = [
+              "pixiu_super_secret_jwt_key_2026",
+              "http://localhost",
+              "localhost:5000",
+              "hostname === 'localhost'",
+              "https://pixiu-lms-api.onrender.com/api",
+              "https://portal.pixiutech.com/login'",
+          ]
+          scan_roots = [Path('src'), Path('pixiu-lms-portal/src'), Path('pixiu-lms-portal/server')]
+          for base in scan_roots:
+              for file in base.rglob('*'):
+                  if not file.is_file() or file.suffix not in {'.js', '.jsx', '.ts', '.tsx', '.json'}:
+                      continue
+                  content = file.read_text(encoding='utf-8', errors='ignore')
+                  for token in forbidden:
+                      if token in content:
+                          raise SystemExit(f'Forbidden architecture literal remains in {file}: {token}')
+
+          assert not Path('virtual-circuit-lab').exists()
+          assert not Path('src/pages/Login.jsx').exists()
+          assert not Path('src/pages/Hub.jsx').exists()
+          assert not Path('src/pages/StudentPortal.jsx').exists()
+          print('Step 2 source consolidation complete.')
+          PY
+
+      - name: Verify builds and backend syntax
+        shell: bash
+        run: |
+          node --check pixiu-lms-portal/server/index.js
+          npm ci
+          npm run build
+          cd pixiu-lms-portal
+          npm ci
+          npm run build
+
+      - name: Commit final Step 2 architecture
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "refactor: consolidate PIXIU production architecture"
+          git rm -f .github/pixiu-step2-trigger .github/workflows/pixiustep2-architecture.yml || true
+          git commit -m "chore: remove one-time architecture cleanup workflow" || true
+          git push
