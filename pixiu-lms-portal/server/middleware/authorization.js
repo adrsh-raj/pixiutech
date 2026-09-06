@@ -1,6 +1,9 @@
+const fs = require('fs');
+const path = require('path');
+
 const READ_ONLY = new Set(['GET', 'HEAD', 'OPTIONS']);
 const ADMIN_ONLY = ['/leads', '/billing', '/audit-logs', '/trainers'];
-const matches = (path, list) => list.some(prefix => path === prefix || path.startsWith(`${prefix}/`));
+const matches = (pathValue, list) => list.some(prefix => pathValue === prefix || pathValue.startsWith(`${prefix}/`));
 const same = (a, b) => a != null && b != null && String(a).trim() === String(b).trim();
 const deny = (res, message) => res.status(403).json({ error: message || 'Forbidden' });
 
@@ -24,12 +27,43 @@ function scopeResponse(res, scope) {
   };
 }
 
+async function servePrivateTeacherMaterial(req, res) {
+  const filename = decodeURIComponent(req.params?.filename || '');
+  if (!/^[A-Za-z0-9._-]+\.pdf$/i.test(filename)) {
+    return res.status(400).json({ error: 'Invalid material filename.' });
+  }
+
+  const privateMaterialsDir = path.join(__dirname, '..', 'private', 'materials');
+  const filePath = path.join(privateMaterialsDir, filename);
+  const resolvedRoot = path.resolve(privateMaterialsDir);
+  const resolvedFile = path.resolve(filePath);
+  if (!resolvedFile.startsWith(`${resolvedRoot}${path.sep}`)) {
+    return res.status(400).json({ error: 'Invalid material path.' });
+  }
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: 'Material not found.' });
+  }
+
+  res.setHeader('Cache-Control', 'private, max-age=300');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.type('application/pdf');
+  return res.sendFile(filePath);
+}
+
 function authorizationMiddleware(db) {
   return async (req, res, next) => {
     const user = req.user;
     const role = user?.role;
     const route = req.path;
     if (!user || !role) return deny(res, 'Authenticated role is required');
+
+    // Teacher master PDFs are private server assets and only available to admins/trainers.
+    if (route.startsWith('/materials/')) {
+      if (req.method !== 'GET' && req.method !== 'HEAD') return deny(res, 'Material access is read-only');
+      if (!['admin', 'trainer'].includes(role)) return deny(res, 'Teacher master materials are restricted.');
+      return servePrivateTeacherMaterial(req, res);
+    }
+
     if (role === 'admin') return next();
     if (!['trainer', 'school', 'student'].includes(role)) return deny(res, 'Unsupported role');
     if (matches(route, ADMIN_ONLY)) return deny(res, 'Administrator access required');
