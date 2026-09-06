@@ -8,7 +8,6 @@ import Solutions from './pages/Solutions.jsx'
 import Careers from './pages/Careers.jsx'
 import PortalBridge from './pages/PortalBridge.jsx'
 import Contact from './pages/Contact.jsx'
-import Verify from './pages/Verify.jsx'
 import Simulation from './pages/Simulation.jsx'
 import NotFound from './pages/NotFound.jsx'
 import { LMS_LOGIN_URL } from './config/runtime.js'
@@ -34,7 +33,6 @@ export default function App() {
           <Route path="/portal" element={<PortalBridge />} />
           <Route path="/hub" element={<PortalBridge />} />
           <Route path="/login" element={<ProductionLoginRedirect />} />
-          <Route path="/verify" element={<Verify />} />
           <Route path="/simulation" element={<Simulation />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/curriculum" element={<Navigate to="/solutions" replace />} />
