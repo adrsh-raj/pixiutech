@@ -13,8 +13,8 @@ from accounts.models import User, UserRole
 from academics.models import School, SchoolClass, Student, Trainer, TrainerSchoolAssignment
 from audit.models import AuditAction, AuditLog
 from billing.models import Invoice, InvoiceLineItem, Payment, Receipt
-from crm.models import Lead, LeadActivity, LeadContact
-from inventory.models import InventoryItem, Kit, KitCustody, KitItem, StockBalance, StockMovement
+from crm.models import Lead
+from inventory.models import InventoryItem, Kit, KitCustody, StockBalance, StockMovement
 from learning.models import AttendanceRecord, ContentClassAssignment, CurriculumUnit, LearningContent, Project, ProjectEvidence, Quiz, QuizAttempt, QuizClassAssignment, Session, StudentAssessment
 from notifications.models import Notification, NotificationPreference
 
@@ -77,7 +77,7 @@ class ControlledResetAPI(APIView):
             _audit(request, AuditAction.DELETE, "controlled_reset", f"Controlled data reset completed: {scope}", {"scope": scope, "deleted": deleted})
         return JsonResponse({"success": True, "scope": scope, "deleted": deleted, "preserved": ["accounts", "academics", "audit_logs"]})
     def _models(self, scope):
-        groups = {"learning_runtime": [AttendanceRecord, ProjectEvidence, Project, QuizAttempt, StudentAssessment, Session], "business": [Receipt, Payment, InvoiceLineItem, Invoice, LeadActivity, LeadContact, Lead], "inventory": [KitCustody, KitItem, Kit, StockMovement, StockBalance, InventoryItem], "notifications": [NotificationPreference, Notification]}
+        groups = {"learning_runtime": [AttendanceRecord, ProjectEvidence, Project, QuizAttempt, StudentAssessment, Session], "business": [Receipt, Payment, InvoiceLineItem, Invoice], "inventory": [KitCustody, KitItem, Kit, StockMovement, StockBalance, InventoryItem], "notifications": [NotificationPreference, Notification]}
         return groups[scope] if scope != "all_operational" else sum(groups.values(), [])
     def _counts(self, scope):
         return {model.__name__: model.objects.count() for model in self._models(scope)}
@@ -90,19 +90,7 @@ class IntegrityAudit:
         return {"code": code, "severity": severity, "count": int(count), "message": message, "samples": samples or []}
     @staticmethod
     def run_checks():
-        checks = [
-            ("assignment_dates", IntegrityAudit.assignment_dates),
-            ("session_trainer_school", IntegrityAudit.session_trainer_school),
-            ("attendance_class_scope", IntegrityAudit.attendance_class_scope),
-            ("student_rolls", IntegrityAudit.student_rolls),
-            ("invoice_math", IntegrityAudit.invoice_math),
-            ("payments_over_invoice", IntegrityAudit.payments_over_invoice),
-            ("invoice_lines", IntegrityAudit.invoice_lines),
-            ("content_assignment_grade", IntegrityAudit.content_assignment_grade),
-            ("quiz_attempt_scope", IntegrityAudit.quiz_attempt_scope),
-            ("kit_custody_scope", IntegrityAudit.kit_custody_scope),
-            ("account_profiles", IntegrityAudit.account_profiles),
-        ]
+        checks = [("assignment_dates", IntegrityAudit.assignment_dates), ("session_trainer_school", IntegrityAudit.session_trainer_school), ("attendance_class_scope", IntegrityAudit.attendance_class_scope), ("student_rolls", IntegrityAudit.student_rolls), ("invoice_math", IntegrityAudit.invoice_math), ("payments_over_invoice", IntegrityAudit.payments_over_invoice), ("invoice_lines", IntegrityAudit.invoice_lines), ("content_assignment_grade", IntegrityAudit.content_assignment_grade), ("quiz_attempt_scope", IntegrityAudit.quiz_attempt_scope), ("kit_custody_scope", IntegrityAudit.kit_custody_scope), ("account_profiles", IntegrityAudit.account_profiles)]
         findings = [fn(code) for code, fn in checks]
         errors = sum(item["count"] for item in findings if item["severity"] == "error")
         warnings = sum(item["count"] for item in findings if item["severity"] == "warning")
@@ -113,13 +101,13 @@ class IntegrityAudit:
         return IntegrityAudit._item(code, "error", q.count(), "Trainer assignment ends before it starts.", list(q.values("id", "trainer__trainer_id", "school__school_code")[:5]))
     @staticmethod
     def session_trainer_school(code):
-        bad = []
+        count = 0; samples = []
         for row in Session.objects.select_related("school_class__school", "trainer").iterator():
             valid = TrainerSchoolAssignment.objects.filter(trainer=row.trainer, school=row.school_class.school, status="active", assigned_from__lte=row.date).filter(Q(assigned_to__isnull=True) | Q(assigned_to__gte=row.date)).exists()
             if not valid:
-                bad.append({"id": str(row.id), "trainer": row.trainer.trainer_id, "school": row.school_class.school.school_code, "date": row.date.isoformat()})
-                if len(bad) >= 5: break
-        return IntegrityAudit._item(code, "error", len(bad), "Session trainer was not assigned to the session school on that date.", bad)
+                count += 1
+                if len(samples) < 5: samples.append({"id": str(row.id), "trainer": row.trainer.trainer_id, "school": row.school_class.school.school_code, "date": row.date.isoformat()})
+        return IntegrityAudit._item(code, "error", count, "Session trainer was not assigned to the session school on that date.", samples)
     @staticmethod
     def attendance_class_scope(code):
         q = AttendanceRecord.objects.exclude(session__school_class_id=F("student__school_class_id"))
@@ -134,44 +122,44 @@ class IntegrityAudit:
         return IntegrityAudit._item(code, "error", q.count(), "Invoice total does not equal subtotal plus tax.", list(q.values("invoice_number", "subtotal", "tax_amount", "total_amount")[:5]))
     @staticmethod
     def payments_over_invoice(code):
-        bad = []
+        count = 0; samples = []
         for inv in Invoice.objects.all().iterator():
             paid = inv.payments.filter(status="success").aggregate(v=Sum("amount"))["v"] or Decimal("0")
             if paid > inv.total_amount:
-                bad.append({"invoice": inv.invoice_number, "total": _money(inv.total_amount), "successful_payments": _money(paid)})
-                if len(bad) >= 5: break
-        return IntegrityAudit._item(code, "error", len(bad), "Successful payments exceed the invoice total.", bad)
+                count += 1
+                if len(samples) < 5: samples.append({"invoice": inv.invoice_number, "total": _money(inv.total_amount), "successful_payments": _money(paid)})
+        return IntegrityAudit._item(code, "error", count, "Successful payments exceed the invoice total.", samples)
     @staticmethod
     def invoice_lines(code):
         q = InvoiceLineItem.objects.exclude(line_total=F("quantity") * F("unit_price"))
         return IntegrityAudit._item(code, "warning", q.count(), "Invoice line total differs from quantity × unit price.", list(q.values("id", "invoice__invoice_number", "quantity", "unit_price", "line_total")[:5]))
     @staticmethod
     def content_assignment_grade(code):
-        bad = []
+        count = 0; samples = []
         for row in ContentClassAssignment.objects.select_related("content", "school_class").iterator():
             if row.content.grade and row.content.grade.upper() != row.school_class.grade.upper():
-                bad.append({"content": str(row.content.id), "class": str(row.school_class.id)})
-                if len(bad) >= 5: break
-        return IntegrityAudit._item(code, "warning", len(bad), "Content is assigned to a class with a different grade.", bad)
+                count += 1
+                if len(samples) < 5: samples.append({"content": str(row.content.id), "class": str(row.school_class.id)})
+        return IntegrityAudit._item(code, "warning", count, "Content is assigned to a class with a different grade.", samples)
     @staticmethod
     def quiz_attempt_scope(code):
-        bad = []
+        count = 0; samples = []
         for row in QuizAttempt.objects.select_related("quiz", "student__school_class").iterator():
             if not QuizClassAssignment.objects.filter(quiz=row.quiz, school_class=row.student.school_class).exists():
-                bad.append({"attempt": str(row.id), "quiz": str(row.quiz.id), "student": row.student.student_id})
-                if len(bad) >= 5: break
-        return IntegrityAudit._item(code, "warning", len(bad), "Quiz attempt belongs to a class not assigned that quiz.", bad)
+                count += 1
+                if len(samples) < 5: samples.append({"attempt": str(row.id), "quiz": str(row.quiz.id), "student": row.student.student_id})
+        return IntegrityAudit._item(code, "warning", count, "Quiz attempt belongs to a class not assigned that quiz.", samples)
     @staticmethod
     def kit_custody_scope(code):
         q = KitCustody.objects.filter(school__isnull=False, trainer__isnull=False) | KitCustody.objects.filter(school__isnull=False, student__isnull=False) | KitCustody.objects.filter(trainer__isnull=False, student__isnull=False)
         return IntegrityAudit._item(code, "error", q.count(), "Kit custody has multiple recipient types.")
     @staticmethod
     def account_profiles(code):
-        bad = []
+        count = 0; samples = []
         for user in User.objects.filter(role__in=[UserRole.SCHOOL, UserRole.TRAINER, UserRole.STUDENT]).iterator():
             try:
                 _ = user.school_profile if user.role == UserRole.SCHOOL else user.trainer_profile if user.role == UserRole.TRAINER else user.student_profile
             except Exception:
-                bad.append({"username": user.username, "role": user.role})
-                if len(bad) >= 5: break
-        return IntegrityAudit._item(code, "warning", len(bad), "Non-admin account has no authoritative academic profile.", bad)
+                count += 1
+                if len(samples) < 5: samples.append({"username": user.username, "role": user.role})
+        return IntegrityAudit._item(code, "warning", count, "Non-admin account has no authoritative academic profile.", samples)
