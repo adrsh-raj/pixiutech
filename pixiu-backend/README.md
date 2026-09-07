@@ -106,6 +106,41 @@ python manage.py test
 python manage.py runserver
 ```
 
+## Fresh database bootstrap
+
+A new Render PostgreSQL database is bootstrapped in two distinct steps: schema creation with migrations, followed by creation of the first admin account.
+
+First configure these environment variables on the Django service:
+
+```text
+DATABASE_URL=<new Render PostgreSQL connection string>
+DJANGO_EXPECTED_DATABASE_NAME=<exact new database name>
+PIXIU_BOOTSTRAP_ADMIN_USERNAME=<initial admin username>
+PIXIU_BOOTSTRAP_ADMIN_PASSWORD=<strong initial admin password>
+PIXIU_BOOTSTRAP_ADMIN_NAME=PIXIU Administrator
+PIXIU_BOOTSTRAP_ADMIN_EMAIL=<optional admin email>
+```
+
+Then run:
+
+```bash
+python manage.py check_database --strict
+python manage.py migrate
+python manage.py bootstrap_pixiu
+```
+
+The bootstrap command is intentionally production-safe:
+
+- It refuses to continue unless `DJANGO_EXPECTED_DATABASE_NAME` is configured and matches the connected PostgreSQL database.
+- It creates the requested admin account when missing.
+- If the same admin username already exists, it reconciles that account to the required admin/staff/superuser state and updates the password supplied to the command.
+- It does not create demo schools, trainers, classes, students, invoices, or fake learning records.
+- It is safe to run again on the same intended database, but treat the supplied bootstrap password as a real credential and store it only in the deployment secret store.
+
+For Render, use the command as a one-time post-database setup action. Do not permanently add it to every deploy hook unless you intentionally want the bootstrap admin password reset on every deployment.
+
+After bootstrap, create real schools, trainers, classes and students through the Pixiu admin/API workflow. Student credentials are then generated from the authoritative academic identity rules.
+
 ## Environment rules
 
 `DATABASE_URL` must point to the new PIXIU Django PostgreSQL database during this rebuild.
