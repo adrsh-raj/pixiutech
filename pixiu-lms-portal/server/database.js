@@ -63,12 +63,26 @@ function convertSqliteCompat(sql) {
 const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
 
 async function runSchemaMigrations() {
-  // These are deliberately idempotent so an existing production database can be upgraded safely.
+  // Idempotent production upgrades for existing PostgreSQL databases.
   await pool.query(`ALTER TABLE billing ADD COLUMN IF NOT EXISTS school_claimed_payment BOOLEAN DEFAULT FALSE`);
   await pool.query(`ALTER TABLE billing ADD COLUMN IF NOT EXISTS transaction_id TEXT`);
   await pool.query(`ALTER TABLE billing ADD COLUMN IF NOT EXISTS proof_url TEXT`);
   await pool.query(`ALTER TABLE billing ADD COLUMN IF NOT EXISTS payment_notes TEXT`);
   await pool.query(`ALTER TABLE billing ADD COLUMN IF NOT EXISTS claimed_at TIMESTAMPTZ`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS trainer_materials (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    type TEXT DEFAULT 'PDF',
+    class_grade TEXT,
+    level TEXT,
+    target_trainer_id TEXT NOT NULL,
+    file_name TEXT NOT NULL,
+    file_url TEXT NOT NULL,
+    uploaded_by TEXT,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+  )`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_trainer_materials_target ON trainer_materials(target_trainer_id)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_students_school_id ON students(school_id)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_classes_school_id ON classes(school_id)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_sessions_school_id ON sessions(school_id)`);
