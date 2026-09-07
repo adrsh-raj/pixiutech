@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { API_BASE } from '../config/api';
+import { apiFetch } from './AuthContext';
 import { CLASS_KITS } from '../data/classKits';
 
 const DataContext = createContext(null);
@@ -31,7 +32,7 @@ function splitAssignments(value) {
 
 function enrichSchools(schoolRows, trainerRows) {
   return schoolRows.map(school => {
-    const schoolKeys = [school.id, school.code].filter(Boolean).map(value => String(value).trim());
+    const schoolKeys = [school.id, school.code, school.school_id].filter(Boolean).map(value => String(value).trim());
     const assignedTrainer = trainerRows.find(trainer => splitAssignments(trainer.assigned_schools).some(item => schoolKeys.includes(item)));
     return {
       ...school,
@@ -42,10 +43,8 @@ function enrichSchools(schoolRows, trainerRows) {
 }
 
 async function apiRequest(path, options = {}) {
-  const token = getToken();
   const headers = new Headers(options.headers || {});
   if (options.body && !(options.body instanceof FormData) && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
-  if (token) headers.set('Authorization', `Bearer ${token}`);
   const method = String(options.method || 'GET').toUpperCase();
   const retryable = method === 'GET' || method === 'HEAD';
   const delays = retryable ? [0, 1500, 3500] : [0];
@@ -53,11 +52,11 @@ async function apiRequest(path, options = {}) {
   for (let attempt = 0; attempt < delays.length; attempt += 1) {
     if (delays[attempt]) await new Promise(resolve => setTimeout(resolve, delays[attempt]));
     try {
-      const response = await fetch(`${API_BASE}${path}`, { ...options, headers, cache: retryable ? 'no-store' : options.cache });
+      const response = await apiFetch(path, { ...options, headers, cache: retryable ? 'no-store' : options.cache });
       const contentType = response.headers.get('content-type') || '';
       const payload = contentType.includes('application/json') ? await response.json().catch(() => ({})) : {};
       if (response.ok) return payload;
-      const error = new Error(payload.error || `Request failed (${response.status})`);
+      const error = new Error(payload.error || payload.detail || `Request failed (${response.status})`);
       if (!retryable || ![502, 503, 504].includes(response.status) || attempt === delays.length - 1) throw error;
       lastError = error;
     } catch (error) {
@@ -86,7 +85,7 @@ export function DataProvider({ children }) {
     const endpoints = [
       ['/schools', setSchools], ['/classes', setClasses], ['/students', setStudents], ['/trainers', setTrainers], ['/sessions', setSessions],
       ['/attendance', setAttendance], ['/leads', setLeads], ['/content', setContent], ['/curriculum', setCurriculum], ['/inventory', setInventory],
-      ['/billing', setBilling], ['/comms', setComms], ['/projects', setProjects], ['/alerts', setAlerts], ['/notifications', setNotifications],
+      ['/billing', setBilling], ['/comms', setComms], ['/projects', setProjects], ['/notifications', setNotifications],
       ['/reviews', setStudentReviews], ['/quizzes', setQuizzes], ['/quiz-submissions', setQuizSubmissions]
     ];
     try {
@@ -119,41 +118,31 @@ export function DataProvider({ children }) {
   };
 
   const syncSchoolTrainer = async (schoolId, trainerId) => {
-    try {
-      return await apiRequest(`/schools/${encodeURIComponent(schoolId)}/assign-trainer`, {
-        method: 'POST',
-        body: JSON.stringify({ trainer_id: trainerId || '' })
-      });
-    } catch (e) {
-      return { success: false, error: e.message };
-    }
+    try { return await apiRequest(`/schools/${encodeURIComponent(schoolId)}/assign-trainer`, { method: 'POST', body: JSON.stringify({ trainer_id: trainerId || '' }) }); }
+    catch (e) { return { success: false, error: e.message }; }
   };
-
   const addSchool = async data => {
     const result = await save('/schools', 'POST', data);
     if (!result.success) return result;
-    const assignment = await syncSchoolTrainer(data?.id || data?.code, data?.trainer_id);
+    const persistedSchoolId = result.data?.id || result.data?.school_id || data?.id || data?.code;
+    const assignment = await syncSchoolTrainer(persistedSchoolId, data?.trainer_id);
     if (!assignment.success) return { success: false, error: `School created, but trainer assignment failed: ${assignment.error}` };
-    await refreshAll();
-    return result;
+    await refreshAll(); return result;
   };
-
   const updateSchool = async (id, data) => {
     const result = await save(`/schools/${encodeURIComponent(id)}`, 'PUT', data);
     if (!result.success) return result;
     const assignment = await syncSchoolTrainer(id, data?.trainer_id);
     if (!assignment.success) return { success: false, error: `School updated, but trainer assignment failed: ${assignment.error}` };
-    await refreshAll();
-    return result;
+    await refreshAll(); return result;
   };
-
   const deleteSchool = id => remove(`/schools/${encodeURIComponent(id)}`);
   const addClass = data => save('/classes', 'POST', data);
   const addStudent = async data => {
     const generatedPassword = generateStudentPassword(data?.student_id);
     if (!generatedPassword) return { success: false, error: 'Student ID must follow the format SCHOOLGRADSECTION roll, e.g. XYZ8A 03.' };
     const result = await save('/students', 'POST', { ...data, password: generatedPassword });
-    if (result.success) return { ...result, data: { ...(result.data || {}), temporary_password: generatedPassword } };
+    if (result.success) return { ...result, data: { ...(result.data || {}), temporary_password: result.data?.initial_password || generatedPassword } };
     return result;
   };
   const updateStudent = (id, data) => save(`/students/${encodeURIComponent(id)}`, 'PUT', data); const deleteStudent = id => remove(`/students/${encodeURIComponent(id)}`);
@@ -167,7 +156,7 @@ export function DataProvider({ children }) {
   const createInvoice = data => save('/billing', 'POST', data); const updateInvoiceStatus = (id, status) => save(`/billing/${encodeURIComponent(id)}/status`, 'PUT', { status }); const confirmPaymentReceipt = (id, isConfirmed, paymentMethod, receiptNo) => save(`/billing/${encodeURIComponent(id)}/confirm-payment`, 'PUT', { is_confirmed: isConfirmed, payment_method: paymentMethod, receipt_no: receiptNo }); const updateBillingInvoice = (id, data) => save(`/billing/${encodeURIComponent(id)}`, 'PUT', data); const deleteBillingInvoice = id => remove(`/billing/${encodeURIComponent(id)}`);
   const sendCommsMessage = data => save('/comms', 'POST', data);
   const uploadFile = async file => { if (!file) return { success: false, error: 'No file selected' }; const form = new FormData(); form.append('file', file); try { const data = await apiRequest('/upload', { method: 'POST', body: form }); return { success: true, url: data.url, filename: data.filename }; } catch (e) { return { success: false, error: e.message }; } };
-  const addProject = data => save('/projects', 'POST', data); const deleteProject = id => remove(`/projects/${encodeURIComponent(id)}`); const resolveAlertAction = (id, actionType, relatedId) => save(`/alerts/${encodeURIComponent(id)}/resolve`, 'POST', { action_type: actionType, related_id: relatedId });
+  const addProject = data => save('/projects', 'POST', data); const deleteProject = id => remove(`/projects/${encodeURIComponent(id)}`);
   const sendBroadcastNotification = data => save('/notifications', 'POST', data); const updateNotification = (id, data) => save(`/notifications/${encodeURIComponent(id)}`, 'PUT', data); const deleteNotification = id => remove(`/notifications/${encodeURIComponent(id)}`);
   const pushSchoolNotification = async ({ target_school_id = 'ALL', title, message, type = 'announcement', priority = 'normal' }) => sendBroadcastNotification({ target_type: 'School', target_school_id, title, message, type, severity: priority === 'high' ? 'urgent' : 'info' });
   const addTrainer = data => save('/trainers', 'POST', data); const updateTrainer = (id, data) => save(`/trainers/${encodeURIComponent(id)}`, 'PUT', data); const updateTrainerStatus = (id, status) => save(`/trainers/${encodeURIComponent(id)}/status`, 'PUT', { status }); const deleteTrainer = id => remove(`/trainers/${encodeURIComponent(id)}`);
@@ -178,7 +167,7 @@ export function DataProvider({ children }) {
   const addComponentToClassKit = (grade, newComponent) => { const current = classKits?.[grade]; if (!current) return { success: false, error: 'Class kit blueprint not available.' }; setClassKits(prev => ({ ...prev, [grade]: { ...prev[grade], total_components: (prev[grade].components || []).length + 1, components: [...(prev[grade].components || []), { ...newComponent, id: newComponent.id || `C${grade}-${Date.now()}` }] } })); return { success: true }; };
   const createQuiz = async data => { const result = await save('/quizzes', 'POST', data); return result.success ? { success: true, quiz: result.data?.quiz || result.data } : result; }; const updateQuiz = (id, data) => save(`/quizzes/${encodeURIComponent(id)}`, 'PUT', data); const deleteQuiz = id => remove(`/quizzes/${encodeURIComponent(id)}`); const submitQuizAttempt = data => save('/quiz-submissions', 'POST', data); const allowQuizReattempt = id => save(`/quiz-submissions/${encodeURIComponent(id)}/reattempt`, 'PUT', {}); const deleteQuizSubmission = id => remove(`/quiz-submissions/${encodeURIComponent(id)}`);
 
-  const value = useMemo(() => ({ loading, refreshAll, schools, addSchool, updateSchool, deleteSchool, classes, addClass, students, addStudent, updateStudent, deleteStudent, getNextRollNumber, getStudentAttendance, getStudentAttendanceRecords, trainers, addTrainer, updateTrainer, updateTrainerStatus, deleteTrainer, sessions, scheduleSession, completeSession, unlockSession, startNewSession, attendance, markAttendance, adminUpdateAttendance, leads, addLead, updateLeadStage, deleteLead, convertLeadToSchool, content, uploadContent, deleteContent, curriculum, addCurriculumPlan, updateCurriculumStatus, inventory, addInventoryKit, updateKitStatus, deleteKit, classKits, updateClassKitComponent, addComponentToClassKit, billing, createInvoice, updateInvoiceStatus, confirmPaymentReceipt, updateBillingInvoice, deleteBillingInvoice, comms, sendCommsMessage, projects, addProject, deleteProject, uploadFile, alerts, resolveAlertAction, notifications, sendBroadcastNotification, updateNotification, deleteNotification, pushSchoolNotification, studentReviews, saveStudentReview, deleteStudentReview, quizzes, createQuiz, updateQuiz, deleteQuiz, quizSubmissions, submitQuizAttempt, allowQuizReattempt, deleteQuizSubmission }), [loading, refreshAll, schools, classes, students, trainers, sessions, attendance, leads, content, curriculum, inventory, classKits, billing, comms, projects, alerts, notifications, studentReviews, quizzes, quizSubmissions]);
+  const value = useMemo(() => ({ loading, refreshAll, schools, addSchool, updateSchool, deleteSchool, classes, addClass, students, addStudent, updateStudent, deleteStudent, getNextRollNumber, getStudentAttendance, getStudentAttendanceRecords, trainers, addTrainer, updateTrainer, updateTrainerStatus, deleteTrainer, sessions, scheduleSession, completeSession, unlockSession, startNewSession, attendance, markAttendance, adminUpdateAttendance, leads, addLead, updateLeadStage, deleteLead, convertLeadToSchool, content, uploadContent, deleteContent, curriculum, addCurriculumPlan, updateCurriculumStatus, inventory, addInventoryKit, updateKitStatus, deleteKit, classKits, updateClassKitComponent, addComponentToClassKit, billing, createInvoice, updateInvoiceStatus, confirmPaymentReceipt, updateBillingInvoice, deleteBillingInvoice, comms, sendCommsMessage, projects, addProject, deleteProject, uploadFile, notifications, sendBroadcastNotification, updateNotification, deleteNotification, pushSchoolNotification, studentReviews, saveStudentReview, deleteStudentReview, quizzes, createQuiz, updateQuiz, deleteQuiz, quizSubmissions, submitQuizAttempt, allowQuizReattempt, deleteQuizSubmission }), [loading, refreshAll, schools, classes, students, trainers, sessions, attendance, leads, content, curriculum, inventory, classKits, billing, comms, projects, notifications, studentReviews, quizzes, quizSubmissions]);
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
 }
 export const useData = () => { const context = useContext(DataContext); if (!context) throw new Error('useData must be used inside DataProvider'); return context; };
