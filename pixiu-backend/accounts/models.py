@@ -1,4 +1,5 @@
 from django.contrib.auth.models import AbstractUser, UserManager
+from django.core.exceptions import ValidationError
 from django.db import models
 
 
@@ -51,8 +52,17 @@ class User(AbstractUser):
     display_name = models.CharField(max_length=200, blank=True)
 
     objects = AccountUserManager()
+    REQUIRED_FIELDS = []
 
-    REQUIRED_FIELDS = ["role"]
+    def clean(self):
+        super().clean()
+        self.username = self.username.strip()
+        if not self.role:
+            raise ValidationError({"role": "A PIXIU user role is required."})
+        if self.role != UserRole.ADMIN and (self.is_staff or self.is_superuser):
+            raise ValidationError("Only admin-role users may be staff or superusers.")
+        if self.role == UserRole.ADMIN and self.is_superuser:
+            self.is_staff = True
 
     def save(self, *args, **kwargs):
         self.username = self.username.strip()
@@ -60,6 +70,11 @@ class User(AbstractUser):
             self.display_name = " ".join(
                 part for part in [self.first_name.strip(), self.last_name.strip()] if part
             )
+        if self.role != UserRole.ADMIN:
+            self.is_staff = False
+            self.is_superuser = False
+        elif self.is_superuser:
+            self.is_staff = True
         super().save(*args, **kwargs)
 
     def __str__(self):
