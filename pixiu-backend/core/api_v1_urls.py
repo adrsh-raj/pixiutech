@@ -3,32 +3,16 @@ from rest_framework.routers import DefaultRouter
 
 from accounts.views import LoginView, LogoutView, MeView, RefreshView
 from .api_v1_compat import (
-    ContractAssessmentViewSet,
-    ContractAttendanceViewSet,
-    ContractClassViewSet,
-    ContractContentViewSet,
-    ContractCurriculumViewSet,
-    ContractInventoryViewSet,
-    ContractLeadViewSet,
-    ContractProjectViewSet,
-    ContractQuizAttemptViewSet,
-    ContractQuizViewSet,
-    ContractReviewViewSet,
-    ContractSessionViewSet,
-    ContractStudentViewSet,
-    ContractTrainerViewSet,
-    health,
-    upload,
+    ContractAssessmentViewSet, ContractAttendanceViewSet, ContractClassViewSet, ContractContentViewSet,
+    ContractCurriculumViewSet, ContractInventoryViewSet, ContractLeadViewSet, ContractProjectViewSet,
+    ContractQuizAttemptViewSet, ContractQuizViewSet, ContractReviewViewSet, ContractSessionViewSet,
+    ContractSchoolViewSet, ContractStudentViewSet, ContractTrainerViewSet, health, upload,
 )
-from .phase7_compat_extras import (
-    ContractBillingFullViewSet,
-    ContractCommunicationLogViewSet,
-    ContractNotificationFullViewSet,
-)
-from .phase7_contract_overrides import ContractSchoolCompatViewSet, ContractSessionCompatViewSet
+from .phase7_compat_extras import ContractBillingFullViewSet, ContractCommunicationLogViewSet, ContractNotificationFullViewSet
+from .phase7_contract_overrides import ContractSessionCompatViewSet
 
 router = DefaultRouter(trailing_slash=False)
-router.register("schools", ContractSchoolCompatViewSet, basename="v1-school")
+router.register("schools", ContractSchoolViewSet, basename="v1-school")
 router.register("trainers", ContractTrainerViewSet, basename="v1-trainer")
 router.register("classes", ContractClassViewSet, basename="v1-class")
 router.register("students", ContractStudentViewSet, basename="v1-student")
