@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -6,7 +7,16 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 
-from .serializers import LoginSerializer, UserMeSerializer
+from .credentials import create_or_reset_managed_account, set_managed_password
+from .models import User, UserRole
+from .permissions import IsAdminRole, IsActiveAccount
+from .serializers import (
+    ChangeOwnPasswordSerializer,
+    LoginSerializer,
+    ManagedAccountSerializer,
+    ResetManagedPasswordSerializer,
+    UserMeSerializer,
+)
 
 
 class LoginView(APIView):
@@ -30,20 +40,19 @@ class LoginView(APIView):
                 "access": serializer.validated_data["access"],
                 "refresh": serializer.validated_data["refresh"],
                 "user": UserMeSerializer(user).data,
-            },
-            status=status.HTTP_200_OK,
+            }
         )
 
 
 class MeView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsActiveAccount]
 
     def get(self, request):
         return Response({"success": True, "user": UserMeSerializer(request.user).data})
 
 
 class LogoutView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsActiveAccount]
 
     def post(self, request):
         refresh_token = request.data.get("refresh")
@@ -59,3 +68,64 @@ class LogoutView(APIView):
 class RefreshView(TokenRefreshView):
     permission_classes = [AllowAny]
     authentication_classes = []
+
+
+class ChangeOwnPasswordView(APIView):
+    permission_classes = [IsAuthenticated, IsActiveAccount]
+
+    def post(self, request):
+        serializer = ChangeOwnPasswordSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        user = request.user
+        user.set_password(serializer.validated_data["new_password"])
+        user.must_change_password = False
+        user.save(update_fields=["password", "must_change_password"])
+        return Response({"success": True, "detail": "Password changed successfully."})
+
+
+class ManagedAccountView(APIView):
+    """Admin-only create/reset entry point for school and trainer accounts."""
+
+    permission_classes = [IsAuthenticated, IsActiveAccount, IsAdminRole]
+
+    @transaction.atomic
+    def post(self, request):
+        serializer = ManagedAccountSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user, created = create_or_reset_managed_account(
+            username=serializer.validated_data["username"],
+            password=serializer.validated_data["password"],
+            role=serializer.validated_data["role"],
+            display_name=serializer.validated_data.get("display_name", ""),
+            email=serializer.validated_data.get("email", ""),
+        )
+        return Response(
+            {
+                "success": True,
+                "created": created,
+                "user": UserMeSerializer(user).data,
+                "detail": "Account created." if created else "Account password and profile updated.",
+            },
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+
+class ManagedPasswordResetView(APIView):
+    permission_classes = [IsAuthenticated, IsActiveAccount, IsAdminRole]
+
+    @transaction.atomic
+    def post(self, request, username):
+        user = User.objects.filter(username=username.strip()).first()
+        if user is None:
+            return Response({"detail": "Account not found."}, status=status.HTTP_404_NOT_FOUND)
+        if user.role not in {UserRole.SCHOOL, UserRole.TRAINER}:
+            return Response({"detail": "Only school and trainer accounts can be reset here."}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = ResetManagedPasswordSerializer(
+            data=request.data,
+            context={"target_user": user},
+        )
+        serializer.is_valid(raise_exception=True)
+        set_managed_password(user, serializer.validated_data["new_password"], must_change=True)
+        return Response({"success": True, "detail": "Password reset successfully."})
