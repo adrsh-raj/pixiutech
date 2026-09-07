@@ -18,33 +18,76 @@ Business domains and authentication are added incrementally in the numbered rebu
 
 No school, trainer, class, student, database name, password, or relationship is hard-coded in application logic.
 
-## Step 5 — Authentication foundation
+## Phase 2 — Authentication, authorization and credentials
 
-The Django backend now uses a custom `accounts.User` model. The user account stores identity/access concerns only:
+### Step 6 — Authentication
 
-- username
-- password hash managed by Django
-- role: `admin`, `school`, `trainer`, `student`
-- status: `active`, `suspended`, `inactive`
-- password-change flag
-- display name
+The backend uses a custom `accounts.User` model with JWT Bearer authentication. Access tokens are short-lived, refresh tokens rotate, and refresh tokens are blacklisted after use. Logout blacklists the submitted refresh token.
 
-School, trainer, and student business profiles are intentionally not stored as loose string fields on the user row. They will be connected with explicit one-to-one/foreign-key relationships in later domain steps.
-
-JWT authentication endpoints:
+Endpoints:
 
 ```text
 POST /api/accounts/login/
 POST /api/accounts/refresh/
 POST /api/accounts/logout/
 GET  /api/accounts/me/
+POST /api/accounts/password/change/
 ```
 
-The access token is short-lived and refresh tokens rotate with blacklist support. Login is throttled by an environment-configurable rate limit.
+Login is scoped/throttled. Suspended/inactive accounts cannot authenticate into protected API endpoints.
+
+### Step 7 — Role and action permissions
+
+Four roles are defined: `admin`, `school`, `trainer`, and `student`.
+
+Business actions are represented explicitly as:
+
+```text
+VIEW CREATE EDIT DELETE PUBLISH ASSIGN GRADE RATE EXPORT
+```
+
+`accounts.permissions` provides the reusable action-policy foundation. Later domain modules must combine this with relational queryset/object scope checks. For example, a trainer may have `VIEW` permission for students but only students reachable through an actual trainer-school/class assignment.
+
+### Step 8 — Credential management
+
+Passwords are always passed through Django's password hashing API. Plaintext passwords are never stored and API responses do not return password values.
+
+Admin-only account management endpoints:
+
+```text
+POST /api/accounts/credentials/manage/
+POST /api/accounts/credentials/manage/<username>/reset/
+```
+
+Self-service password change:
+
+```text
+POST /api/accounts/password/change/
+```
+
+School passwords require at least 8 characters; trainer passwords require at least 12 characters. Admin-set/reset managed credentials set `must_change_password=True` and revoke existing refresh-token sessions.
+
+Student credential generation is implemented as a backend utility and will be called from the Student domain when the authoritative School → Class → Student relationships exist.
+
+Student ID format:
+
+`[SCHOOL_CODE][GRADE][SECTION] [ROLL_NO_2_DIGITS]`
+
+Example: `XYZ8A 03`
+
+Student password format:
+
+`[UPPERCASE_SCHOOL_CODE][COMPACT_STUDENT_USERNAME_WITH_LOWERCASE_SCHOOL_PREFIX][@hata]`
+
+Example: `XYZ8A 03` → `XYZxyz8A3@hata`
+
+The React frontend must never construct or invent these identities.
+
+See `PHASE_2_SECURITY.md` for the complete security contract.
 
 ### Admin bootstrap
 
-No default admin username or password exists in code.
+No default admin password exists in code.
 
 Set credentials only through the deployment environment:
 
@@ -80,6 +123,7 @@ copy .env.example .env   # Windows
 python manage.py check
 python manage.py check_database --strict
 python manage.py migrate
+python manage.py test accounts
 python manage.py runserver
 ```
 
