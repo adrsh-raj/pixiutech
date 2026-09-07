@@ -2,11 +2,7 @@ from django.db import transaction
 from rest_framework import serializers
 
 from .models import School, SchoolClass, Student, Trainer, TrainerSchoolAssignment
-from .services import (
-    accessible_class_queryset,
-    accessible_student_queryset,
-    provision_student,
-)
+from .services import accessible_class_queryset, provision_student
 
 
 class SchoolSerializer(serializers.ModelSerializer):
@@ -23,6 +19,8 @@ class SchoolSerializer(serializers.ModelSerializer):
 
     def validate_school_code(self, value):
         value = value.strip().upper()
+        if self.instance is not None and value != self.instance.school_code:
+            raise serializers.ValidationError("School code is immutable because it is the account username and part of student IDs.")
         if School.objects.filter(school_code=value).exclude(pk=getattr(self.instance, "pk", None)).exists():
             raise serializers.ValidationError("School code already exists.")
         return value
@@ -42,6 +40,8 @@ class TrainerSerializer(serializers.ModelSerializer):
 
     def validate_trainer_id(self, value):
         value = value.strip().upper()
+        if self.instance is not None and value != self.instance.trainer_id:
+            raise serializers.ValidationError("Trainer ID is immutable because it is the account username.")
         if Trainer.objects.filter(trainer_id=value).exclude(pk=getattr(self.instance, "pk", None)).exists():
             raise serializers.ValidationError("Trainer ID already exists.")
         return value
@@ -55,6 +55,13 @@ class TrainerSchoolAssignmentSerializer(serializers.ModelSerializer):
         model = TrainerSchoolAssignment
         fields = ["id", "trainer", "trainer_id", "school", "school_code", "assigned_from", "assigned_to", "status", "created_at"]
         read_only_fields = ["id", "trainer_id", "school_code", "created_at"]
+
+    def validate(self, attrs):
+        assigned_from = attrs.get("assigned_from", getattr(self.instance, "assigned_from", None))
+        assigned_to = attrs.get("assigned_to", getattr(self.instance, "assigned_to", None))
+        if assigned_to and assigned_from and assigned_to < assigned_from:
+            raise serializers.ValidationError("Assignment end date cannot be before its start date.")
+        return attrs
 
 
 class SchoolClassSerializer(serializers.ModelSerializer):
@@ -74,6 +81,10 @@ class SchoolClassSerializer(serializers.ModelSerializer):
 
         if request.user.role == "school" and (not school or school.account_id != request.user.id):
             raise serializers.ValidationError("A school can only manage its own classes.")
+
+        if self.instance is not None and self.instance.students.exists():
+            if school != self.instance.school or grade != self.instance.grade or section != self.instance.section:
+                raise serializers.ValidationError("A class with students cannot change school, grade, or section because those fields define student IDs.")
 
         if school and SchoolClass.objects.filter(school=school, grade=grade, section=section).exclude(pk=getattr(self.instance, "pk", None)).exists():
             raise serializers.ValidationError("This class already exists for the school.")
