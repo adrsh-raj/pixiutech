@@ -2,7 +2,7 @@ from datetime import date
 
 from django.db import IntegrityError, transaction
 from django.test import TestCase
-from rest_framework.test import APIClient, APIRequestFactory, force_authenticate
+from rest_framework.test import APIClient, APIRequestFactory
 
 from accounts.credentials import build_student_password, build_student_username
 from accounts.models import User, UserRole
@@ -127,4 +127,4 @@ class Phase3ScopeAndValidationTests(TestCase):
             context={"request": request},
         )
         self.assertFalse(serializer.is_valid())
-        self.assertIn("student IDs", str(serializer.errors).lower())
+        self.assertIn("student ids", str(serializer.errors).lower())
