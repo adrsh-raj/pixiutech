@@ -5,15 +5,18 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY")
-if not SECRET_KEY: raise RuntimeError("DJANGO_SECRET_KEY must be configured.")
+if not SECRET_KEY:
+    raise RuntimeError("DJANGO_SECRET_KEY must be configured.")
 DEBUG = os.environ.get("DJANGO_DEBUG", "False").lower() == "true"
 ALLOWED_HOSTS = [h.strip() for h in os.environ.get("DJANGO_ALLOWED_HOSTS", "").split(",") if h.strip()]
-if not ALLOWED_HOSTS and DEBUG: ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
+if not ALLOWED_HOSTS and DEBUG:
+    ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
 
 INSTALLED_APPS = [
     "django.contrib.admin", "django.contrib.auth", "django.contrib.contenttypes", "django.contrib.sessions",
     "django.contrib.messages", "django.contrib.staticfiles", "corsheaders", "rest_framework",
     "rest_framework_simplejwt.token_blacklist", "core", "accounts", "academics", "learning",
+    "billing", "inventory", "notifications", "crm", "audit",
 ]
 MIDDLEWARE = ["django.middleware.security.SecurityMiddleware", "corsheaders.middleware.CorsMiddleware", "django.contrib.sessions.middleware.SessionMiddleware", "django.middleware.common.CommonMiddleware", "django.middleware.csrf.CsrfViewMiddleware", "django.contrib.auth.middleware.AuthenticationMiddleware", "django.contrib.messages.middleware.MessageMiddleware", "django.middleware.clickjacking.XFrameOptionsMiddleware"]
 ROOT_URLCONF = "config.urls"
@@ -23,16 +26,20 @@ ASGI_APPLICATION = "config.asgi.application"
 AUTH_USER_MODEL = "accounts.User"
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
-if not DATABASE_URL: raise RuntimeError("DATABASE_URL must be configured.")
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL must be configured.")
 parsed = urlparse(DATABASE_URL)
-if parsed.scheme not in {"postgres", "postgresql"}: raise RuntimeError("DATABASE_URL must use a PostgreSQL URL.")
-if not parsed.hostname or not parsed.path.lstrip("/"): raise RuntimeError("DATABASE_URL must include a PostgreSQL host and database name.")
+if parsed.scheme not in {"postgres", "postgresql"}:
+    raise RuntimeError("DATABASE_URL must use a PostgreSQL URL.")
+if not parsed.hostname or not parsed.path.lstrip("/"):
+    raise RuntimeError("DATABASE_URL must include a PostgreSQL host and database name.")
 query_options = parse_qs(parsed.query)
 sslmode = (query_options.get("sslmode") or [os.environ.get("DJANGO_DB_SSLMODE", "")])[0]
 DATABASE_OPTIONS = {"sslmode": sslmode} if sslmode else {}
 DATABASES = {"default":{"ENGINE":"django.db.backends.postgresql","NAME":unquote(parsed.path.lstrip("/")),"USER":unquote(parsed.username or ""),"PASSWORD":unquote(parsed.password or ""),"HOST":parsed.hostname,"PORT":parsed.port or "5432","OPTIONS":DATABASE_OPTIONS,"CONN_MAX_AGE":int(os.environ.get("DJANGO_DB_CONN_MAX_AGE","60")),"CONN_HEALTH_CHECKS":True}}
 EXPECTED_DATABASE_NAME = os.environ.get("DJANGO_EXPECTED_DATABASE_NAME", "").strip()
-if EXPECTED_DATABASE_NAME and DATABASES["default"]["NAME"] != EXPECTED_DATABASE_NAME: raise RuntimeError("DATABASE_URL points to a database different from DJANGO_EXPECTED_DATABASE_NAME. Refusing to start to protect the Django rebuild from accidental legacy DB usage.")
+if EXPECTED_DATABASE_NAME and DATABASES["default"]["NAME"] != EXPECTED_DATABASE_NAME:
+    raise RuntimeError("DATABASE_URL points to a database different from DJANGO_EXPECTED_DATABASE_NAME. Refusing to start to protect the Django rebuild from accidental legacy DB usage.")
 
 REST_FRAMEWORK = {"DEFAULT_AUTHENTICATION_CLASSES":["rest_framework_simplejwt.authentication.JWTAuthentication"],"DEFAULT_PERMISSION_CLASSES":["rest_framework.permissions.IsAuthenticated"],"DEFAULT_RENDERER_CLASSES":["rest_framework.renderers.JSONRenderer"],"DEFAULT_THROTTLE_CLASSES":["rest_framework.throttling.ScopedRateThrottle"],"DEFAULT_THROTTLE_RATES":{"login":os.environ.get("DJANGO_LOGIN_RATE","10/min")}}
 SIMPLE_JWT = {"ACCESS_TOKEN_LIFETIME":timedelta(minutes=int(os.environ.get("JWT_ACCESS_MINUTES","30"))),"REFRESH_TOKEN_LIFETIME":timedelta(days=int(os.environ.get("JWT_REFRESH_DAYS","7"))),"ROTATE_REFRESH_TOKENS":True,"BLACKLIST_AFTER_ROTATION":True,"UPDATE_LAST_LOGIN":False,"AUTH_HEADER_TYPES":("Bearer",)}
