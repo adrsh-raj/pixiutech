@@ -34,15 +34,24 @@ def add_invoice_line(*, invoice: Invoice, description: str, quantity, unit_price
     locked_invoice = Invoice.objects.select_for_update().get(pk=invoice.pk)
     if locked_invoice.status not in {BillingStatus.DRAFT, BillingStatus.ISSUED}:
         raise ValidationError("Only draft or issued invoices can be edited.")
-    line = InvoiceLineItem.objects.create(
-        invoice=locked_invoice,
-        description=description.strip(),
-        quantity=quantity,
-        unit_price=unit_price,
-        line_total=(Decimal(quantity) * Decimal(unit_price)).quantize(TWOPLACES),
-    )
+    line = InvoiceLineItem.objects.create(invoice=locked_invoice, description=description.strip(), quantity=quantity, unit_price=unit_price, line_total=(Decimal(quantity) * Decimal(unit_price)).quantize(TWOPLACES))
     recalculate_invoice(locked_invoice)
     return line
+
+
+@transaction.atomic
+def update_invoice_line(*, line: InvoiceLineItem, description: str, quantity, unit_price) -> InvoiceLineItem:
+    locked_line = InvoiceLineItem.objects.select_for_update().select_related("invoice").get(pk=line.pk)
+    invoice = Invoice.objects.select_for_update().get(pk=locked_line.invoice_id)
+    if invoice.status not in {BillingStatus.DRAFT, BillingStatus.ISSUED}:
+        raise ValidationError("Only draft or issued invoices can be edited.")
+    locked_line.description = description.strip()
+    locked_line.quantity = quantity
+    locked_line.unit_price = unit_price
+    locked_line.line_total = (Decimal(quantity) * Decimal(unit_price)).quantize(TWOPLACES)
+    locked_line.save(update_fields=["description", "quantity", "unit_price", "line_total"])
+    recalculate_invoice(invoice)
+    return locked_line
 
 
 @transaction.atomic
@@ -55,21 +64,7 @@ def record_payment(*, invoice: Invoice, amount, method: str, payment_date, recor
     outstanding = (locked_invoice.total_amount - locked_invoice.amount_paid).quantize(TWOPLACES)
     if amount > outstanding:
         raise ValidationError({"amount": "Payment exceeds the outstanding invoice balance."})
-    payment = Payment.objects.create(
-        invoice=locked_invoice,
-        amount=amount,
-        method=method,
-        status=PaymentStatus.SUCCESS,
-        payment_date=payment_date,
-        transaction_reference=transaction_reference.strip(),
-        notes=notes.strip(),
-        recorded_by=recorded_by,
-    )
+    payment = Payment.objects.create(invoice=locked_invoice, amount=amount, method=method, status=PaymentStatus.SUCCESS, payment_date=payment_date, transaction_reference=transaction_reference.strip(), notes=notes.strip(), recorded_by=recorded_by)
     recalculate_invoice(locked_invoice)
-    receipt = Receipt.objects.create(
-        receipt_number=f"RCT-{timezone.now():%Y}-{uuid4().hex[:10].upper()}",
-        payment=payment,
-        issued_at=timezone.now(),
-        issued_by=recorded_by,
-    )
+    receipt = Receipt.objects.create(receipt_number=f"RCT-{timezone.now():%Y}-{uuid4().hex[:10].upper()}", payment=payment, issued_at=timezone.now(), issued_by=recorded_by)
     return payment, receipt
