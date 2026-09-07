@@ -7,7 +7,11 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 
-from .credentials import create_or_reset_managed_account, set_managed_password
+from .credentials import (
+    create_or_reset_managed_account,
+    revoke_all_refresh_tokens,
+    set_managed_password,
+)
 from .models import User, UserRole
 from .permissions import IsAdminRole, IsActiveAccount
 from .serializers import (
@@ -80,6 +84,7 @@ class ChangeOwnPasswordView(APIView):
         user.set_password(serializer.validated_data["new_password"])
         user.must_change_password = False
         user.save(update_fields=["password", "must_change_password"])
+        revoke_all_refresh_tokens(user)
         return Response({"success": True, "detail": "Password changed successfully."})
 
 
@@ -93,13 +98,17 @@ class ManagedAccountView(APIView):
         serializer = ManagedAccountSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        user, created = create_or_reset_managed_account(
-            username=serializer.validated_data["username"],
-            password=serializer.validated_data["password"],
-            role=serializer.validated_data["role"],
-            display_name=serializer.validated_data.get("display_name", ""),
-            email=serializer.validated_data.get("email", ""),
-        )
+        try:
+            user, created = create_or_reset_managed_account(
+                username=serializer.validated_data["username"],
+                password=serializer.validated_data["password"],
+                role=serializer.validated_data["role"],
+                display_name=serializer.validated_data.get("display_name", ""),
+                email=serializer.validated_data.get("email", ""),
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
         return Response(
             {
                 "success": True,
