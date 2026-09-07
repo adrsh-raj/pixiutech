@@ -38,8 +38,7 @@ class ContractBillingFullViewSet(ContractBillingViewSet):
             for line in self._legacy_lines(request):
                 add_invoice_line(invoice=invoice, description=str(_first(line, "description", "tranche_title", "title", default="STEM Robotics & Lab Operations"))[:250], quantity=_first(line, "quantity", "qty", default=1), unit_price=_first(line, "unit_price", "amount", "price", default=0))
             recalculate_invoice(invoice); invoice.refresh_from_db()
-            if requested_status != "draft":
-                invoice.status = requested_status; invoice.save(update_fields=["status", "updated_at"])
+            if requested_status != "draft": invoice.status = requested_status; invoice.save(update_fields=["status", "updated_at"])
             response.data = self.map_out(invoice)
         return response
 
@@ -64,10 +63,26 @@ class ContractBillingFullViewSet(ContractBillingViewSet):
     def status_change(self, request, pk=None):
         invoice = self.get_object(); self.role_only(UserRole.ADMIN, UserRole.SCHOOL); invoice.status = normalize_invoice_status(request.data.get("status", invoice.status)); invoice.save(update_fields=["status", "updated_at"]); return Response(self.map_out(invoice))
 
-class ContractNotificationFullViewSet(ContractNotificationViewSet):
+class ContractNotificationFullViewSet(viewsets.ModelViewSet):
+    """Admin broadcast CRUD; non-admins read only their own notifications."""
+    queryset = Notification.objects.all().order_by("-created_at")
+    permission_classes = [IsAuthenticated]
+    http_method_names = ["get", "post", "put", "patch", "delete", "head", "options"]
+
     def get_queryset(self):
-        if getattr(self.request.user, "role", None) == UserRole.ADMIN: return Notification.objects.all().order_by("-created_at")
-        return super().get_queryset()
+        if getattr(self.request.user, "role", None) == UserRole.ADMIN: return self.queryset
+        return self.queryset.filter(recipient=self.request.user)
+
+    def map_out(self, obj):
+        metadata = obj.metadata or {}
+        return {"id": str(obj.pk), "title": obj.title, "message": obj.message, "type": obj.notification_type, "severity": metadata.get("severity", "info"), "read": bool(obj.read_at), "created_at": obj.created_at, "target_type": metadata.get("target_type", "User"), "target_school_id": metadata.get("target_school_id", ""), "target_classes": metadata.get("target_classes", ""), "scheduled_date": metadata.get("scheduled_date", ""), "scheduled_time": metadata.get("scheduled_time", ""), "template_type": metadata.get("template_type", ""), "target_user_id": obj.recipient_id}
+
+    def list(self, request, *args, **kwargs):
+        return Response([self.map_out(obj) for obj in self.get_queryset()])
+
+    def retrieve(self, request, *args, **kwargs):
+        return Response(self.map_out(self.get_object()))
+
     def update(self, request, *args, **kwargs):
         notification = self.get_object()
         if request.user.role != UserRole.ADMIN: raise PermissionDenied("Only administrators can edit broadcast notifications.")
@@ -77,27 +92,30 @@ class ContractNotificationFullViewSet(ContractNotificationViewSet):
             if key in request.data: metadata[key] = request.data.get(key)
         notification.metadata = metadata; kind = str(_first(request.data, "notification_type", "type", default=notification.notification_type)).lower(); notification.notification_type = kind if kind in {x.value for x in NotificationType} else NotificationType.INFO
         notification.save(update_fields=["title", "message", "metadata", "notification_type"]); return Response(self.map_out(notification))
+
     def destroy(self, request, *args, **kwargs):
         if request.user.role != UserRole.ADMIN: raise PermissionDenied("Only administrators can delete broadcast notifications.")
         self.get_object().delete(); return Response(status=status.HTTP_204_NO_CONTENT)
-    def map_out(self, obj):
-        metadata = obj.metadata or {}; return {"id": str(obj.pk), "title": obj.title, "message": obj.message, "type": obj.notification_type, "severity": metadata.get("severity", "info"), "read": bool(obj.read_at), "created_at": obj.created_at, "target_type": metadata.get("target_type", "User"), "target_school_id": metadata.get("target_school_id", ""), "target_classes": metadata.get("target_classes", ""), "scheduled_date": metadata.get("scheduled_date", ""), "scheduled_time": metadata.get("scheduled_time", ""), "template_type": metadata.get("template_type", ""), "target_user_id": obj.recipient_id}
+
     def create(self, request, *args, **kwargs):
         if request.user.role != UserRole.ADMIN: raise PermissionDenied("Only administrators can send targeted notifications.")
-        target_type = str(request.data.get("target_type", "Universal")).strip().lower(); school = _school(request.data.get("target_school_id")); grades = {str(x).strip().upper() for x in str(request.data.get("target_classes", "")).split(",") if str(x).strip()}; students = Student.objects.filter(status="active", account__is_active=True); trainers = Trainer.objects.filter(status="active", account__is_active=True)
+        target_type = str(request.data.get("target_type", "Universal")).strip().lower(); school_value = request.data.get("target_school_id"); school = None if str(school_value or "").strip().upper() in {"", "ALL", "UNIVERSAL"} else _school(school_value)
+        grades = {str(x).strip().upper() for x in str(request.data.get("target_classes", "")).split(",") if str(x).strip()}; students = Student.objects.filter(status="active", account__is_active=True); trainers = Trainer.objects.filter(status="active", account__is_active=True)
         if school: students = students.filter(school_class__school=school); trainers = trainers.filter(school_assignments__school=school, school_assignments__status="active").distinct()
         if grades and target_type in {"all_students", "specific_class"}: students = students.filter(school_class__grade__in=grades)
         if target_type in {"all_students", "specific_class"}: recipients = [s.account for s in students.select_related("account") if s.account_id]
         elif target_type == "all_trainers": recipients = [t.account for t in trainers.select_related("account") if t.account_id]
         elif target_type in {"universal", "all"}: recipients = list(active_users())
         elif target_type == "school":
-            if school is None: raise ValidationError({"target_school_id": "A valid target school is required."})
-            recipients = [*list(s.account for s in students.select_related("account") if s.account_id), *list(t.account for t in trainers.select_related("account") if t.account_id)];
-            if school.account_id: recipients.append(school.account)
+            if school is None and str(school_value or "").strip().upper() not in {"ALL", "UNIVERSAL"}: raise ValidationError({"target_school_id": "A valid target school is required."})
+            recipients = [*list(s.account for s in students.select_related("account") if s.account_id), *list(t.account for t in trainers.select_related("account") if t.account_id)]
+            if school and school.account_id: recipients.append(school.account)
+            elif school is None and str(school_value or "").strip().upper() == "ALL": recipients = list(active_users())
         else: raise ValidationError({"target_type": "Unsupported notification target."})
         kind = str(_first(request.data, "notification_type", "type", default="info")).lower(); kind = kind if kind in {x.value for x in NotificationType} else NotificationType.INFO; base_key = str(_first(request.data, "event_key", default=f"broadcast-{timezone_timestamp()}")); metadata = {key: request.data.get(key) for key in ("target_type", "target_school_id", "target_classes", "scheduled_date", "scheduled_time", "severity", "template_type") if key in request.data}; created = []
         for recipient in {r for r in recipients if r and r.is_active}: created.append(Notification.objects.create(recipient=recipient, notification_type=kind, title=str(request.data.get("title", "Notification"))[:200], message=str(request.data.get("message", "")), event_key=f"{base_key}:{recipient.pk}", metadata=metadata))
         return Response([self.map_out(obj) for obj in created], status=status.HTTP_201_CREATED)
+
 
 def timezone_timestamp():
     from django.utils import timezone
