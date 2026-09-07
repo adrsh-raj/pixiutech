@@ -2,6 +2,7 @@ import uuid
 
 from django.conf import settings
 from django.db import models
+from django.db.models import Q
 
 from academics.models import School
 
@@ -34,13 +35,18 @@ class Lead(models.Model):
     source = models.CharField(max_length=20, choices=LeadSource.choices, default=LeadSource.OTHER)
     status = models.CharField(max_length=20, choices=LeadStatus.choices, default=LeadStatus.NEW)
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="crm_leads")
-    converted_school = models.OneToOneField(School, on_delete=models.PROTECT, null=True, blank=True, related_name="converted_lead")
+    converted_school = models.ForeignKey(School, on_delete=models.PROTECT, null=True, blank=True, related_name="converted_leads")
     expected_students = models.PositiveIntegerField(default=0)
     estimated_value = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     next_follow_up = models.DateTimeField(null=True, blank=True)
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        self.organization_name = self.organization_name.strip()
+        self.contact_name = self.contact_name.strip()
+        super().save(*args, **kwargs)
 
 
 class LeadActivity(models.Model):
@@ -69,5 +75,5 @@ class LeadContact(models.Model):
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=["lead", "email"], condition=~models.Q(email=""), name="uniq_lead_contact_email"),
+            models.UniqueConstraint(fields=["lead", "email"], condition=~Q(email=""), name="uniq_lead_contact_email"),
         ]
