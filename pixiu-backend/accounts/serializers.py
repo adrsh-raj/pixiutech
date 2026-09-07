@@ -15,23 +15,17 @@ class LoginSerializer(serializers.Serializer):
         request = self.context.get("request")
         username = normalize_login_username(attrs["username"])
         user = authenticate(request=request, username=username, password=attrs["password"])
-
         if user is None:
             raise serializers.ValidationError({"detail": "Invalid username or password."})
         if not user.is_active or user.status != UserStatus.ACTIVE:
             raise serializers.ValidationError({"detail": "This account is not active."})
-
         requested_role = attrs.get("role")
         if requested_role and user.role != requested_role:
-            raise serializers.ValidationError(
-                {"detail": "This account is not permitted to use the selected login type."}
-            )
-
+            raise serializers.ValidationError({"detail": "This account is not permitted to use the selected login type."})
         refresh = RefreshToken.for_user(user)
         refresh["role"] = user.role
         refresh["username"] = user.username
         refresh["display_name"] = user.display_name or user.get_full_name() or user.username
-
         attrs["user"] = user
         attrs["access"] = str(refresh.access_token)
         attrs["refresh"] = str(refresh)
@@ -40,25 +34,44 @@ class LoginSerializer(serializers.Serializer):
 
 class UserMeSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
+    name = serializers.SerializerMethodField()
+    related_id = serializers.SerializerMethodField()
+    school_id = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = (
-            "id",
-            "username",
-            "first_name",
-            "last_name",
-            "full_name",
-            "display_name",
-            "email",
-            "role",
-            "status",
-            "must_change_password",
+            "id", "username", "first_name", "last_name", "full_name", "name", "display_name", "email",
+            "role", "status", "must_change_password", "related_id", "school_id",
         )
         read_only_fields = fields
 
     def get_full_name(self, obj):
         return obj.get_full_name().strip() or obj.display_name or obj.username
+
+    def get_name(self, obj):
+        return self.get_full_name(obj)
+
+    def get_related_id(self, obj):
+        if obj.role == UserRole.SCHOOL:
+            return getattr(getattr(obj, "school_profile", None), "school_code", "")
+        if obj.role == UserRole.TRAINER:
+            return getattr(getattr(obj, "trainer_profile", None), "trainer_id", "")
+        if obj.role == UserRole.STUDENT:
+            return getattr(getattr(obj, "student_profile", None), "student_id", "")
+        return None
+
+    def get_school_id(self, obj):
+        profile = getattr(obj, "student_profile", None)
+        if profile is not None:
+            return profile.school_class.school.school_code
+        profile = getattr(obj, "trainer_profile", None)
+        if profile is not None:
+            assignment = profile.school_assignments.filter(status="active").select_related("school").first()
+            return assignment.school.school_code if assignment else None
+        if obj.role == UserRole.SCHOOL:
+            return getattr(getattr(obj, "school_profile", None), "school_code", None)
+        return None
 
 
 class ChangeOwnPasswordSerializer(serializers.Serializer):
