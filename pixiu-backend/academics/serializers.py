@@ -4,9 +4,7 @@ from rest_framework import serializers
 from .models import School, SchoolClass, Student, Trainer, TrainerSchoolAssignment
 from .services import (
     accessible_class_queryset,
-    accessible_school_queryset,
     accessible_student_queryset,
-    accessible_trainer_queryset,
     provision_student,
 )
 
@@ -58,12 +56,6 @@ class TrainerSchoolAssignmentSerializer(serializers.ModelSerializer):
         fields = ["id", "trainer", "trainer_id", "school", "school_code", "assigned_from", "assigned_to", "status", "created_at"]
         read_only_fields = ["id", "trainer_id", "school_code", "created_at"]
 
-    def validate(self, attrs):
-        request = self.context["request"]
-        if request.user.role == "school" and attrs.get("school") and attrs["school"].account_id != request.user.id:
-            raise serializers.ValidationError("A school can only manage its own assignments.")
-        return attrs
-
 
 class SchoolClassSerializer(serializers.ModelSerializer):
     school_code = serializers.CharField(source="school.school_code", read_only=True)
@@ -74,12 +66,17 @@ class SchoolClassSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "school_code", "created_at", "updated_at"]
 
     def validate(self, attrs):
-        school = attrs.get("school", getattr(self.instance, "school", None))
+        request = self.context["request"]
+        current_school = getattr(self.instance, "school", None)
+        school = attrs.get("school", current_school)
         grade = str(attrs.get("grade", getattr(self.instance, "grade", ""))).strip().upper()
         section = str(attrs.get("section", getattr(self.instance, "section", ""))).strip().upper()
-        if school and School.objects.filter(pk=school.pk).exists():
-            if SchoolClass.objects.filter(school=school, grade=grade, section=section).exclude(pk=getattr(self.instance, "pk", None)).exists():
-                raise serializers.ValidationError("This class already exists for the school.")
+
+        if request.user.role == "school" and (not school or school.account_id != request.user.id):
+            raise serializers.ValidationError("A school can only manage its own classes.")
+
+        if school and SchoolClass.objects.filter(school=school, grade=grade, section=section).exclude(pk=getattr(self.instance, "pk", None)).exists():
+            raise serializers.ValidationError("This class already exists for the school.")
         attrs["grade"] = grade
         attrs["section"] = section
         return attrs
@@ -141,12 +138,3 @@ class StudentUpdateSerializer(serializers.ModelSerializer):
             result.account.email = result.email
             result.account.save(update_fields=["display_name", "email"])
         return result
-
-
-class StudentCredentialResponseSerializer(StudentReadSerializer):
-    initial_password = serializers.CharField(read_only=True)
-
-
-class NestedScopeSerializer(serializers.Serializer):
-    """Internal serializer base marker; concrete serializers stay explicit."""
-    pass
