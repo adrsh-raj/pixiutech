@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Lead, LeadActivity, LeadContact
+from .models import CommunicationLog, Lead, LeadActivity, LeadContact
 
 
 class LeadContactSerializer(serializers.ModelSerializer):
@@ -25,3 +25,12 @@ class LeadSerializer(serializers.ModelSerializer):
         model = Lead
         fields = ["id", "organization_name", "contact_name", "email", "phone", "source", "status", "owner", "converted_school", "expected_students", "estimated_value", "next_follow_up", "notes", "created_at", "updated_at", "activities", "contacts"]
         read_only_fields = ["id", "owner", "created_at", "updated_at", "activities", "contacts"]
+
+
+class CommunicationLogSerializer(serializers.ModelSerializer):
+    student_id = serializers.CharField(source="student.student_id", read_only=True)
+
+    class Meta:
+        model = CommunicationLog
+        fields = ["id", "student", "student_id", "recipient", "channel", "template", "message", "status", "sent_at", "actor"]
+        read_only_fields = ["id", "student_id", "sent_at", "actor"]
