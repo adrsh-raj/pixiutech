@@ -9,7 +9,6 @@ if not SECRET_KEY:
     raise RuntimeError("DJANGO_SECRET_KEY must be configured.")
 
 DEBUG = os.environ.get("DJANGO_DEBUG", "False").lower() == "true"
-
 ALLOWED_HOSTS = [h.strip() for h in os.environ.get("DJANGO_ALLOWED_HOSTS", "").split(",") if h.strip()]
 if not ALLOWED_HOSTS and DEBUG:
     ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
@@ -21,6 +20,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "corsheaders",
     "rest_framework",
     "core",
     "accounts",
@@ -28,6 +28,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -66,10 +67,7 @@ if not parsed.hostname or not parsed.path.lstrip("/"):
 
 query_options = parse_qs(parsed.query)
 sslmode = (query_options.get("sslmode") or [os.environ.get("DJANGO_DB_SSLMODE", "")])[0]
-
-DATABASE_OPTIONS = {}
-if sslmode:
-    DATABASE_OPTIONS["sslmode"] = sslmode
+DATABASE_OPTIONS = {"sslmode": sslmode} if sslmode else {}
 
 DATABASES = {
     "default": {
@@ -85,7 +83,7 @@ DATABASES = {
     }
 }
 
-# Fresh-database safety rail. Pin the exact database name in each environment.
+# Fresh-database safety rail. Pin the exact database name in every environment.
 EXPECTED_DATABASE_NAME = os.environ.get("DJANGO_EXPECTED_DATABASE_NAME", "").strip()
 if EXPECTED_DATABASE_NAME and DATABASES["default"]["NAME"] != EXPECTED_DATABASE_NAME:
     raise RuntimeError(
@@ -130,7 +128,6 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
-
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 SECURE_CONTENT_TYPE_NOSNIFF = True
