@@ -24,6 +24,7 @@ class LoginSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 {"detail": "This account is not active."}, code="inactive_account"
             )
+
         requested_role = attrs.get("role")
         if requested_role and user.role != requested_role:
             raise serializers.ValidationError(
@@ -35,9 +36,6 @@ class LoginSerializer(serializers.Serializer):
         refresh["role"] = user.role
         refresh["username"] = user.username
         refresh["display_name"] = user.display_name or user.get_full_name() or user.username
-
-        user.last_login = __import__("django.utils.timezone", fromlist=["now"]).now()
-        user.save(update_fields=["last_login"])
 
         attrs["user"] = user
         attrs["access"] = str(refresh.access_token)
