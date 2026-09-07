@@ -22,6 +22,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "corsheaders",
     "rest_framework",
+    "rest_framework_simplejwt.token_blacklist",
     "core",
     "accounts",
 ]
@@ -83,7 +84,6 @@ DATABASES = {
     }
 }
 
-# Fresh-database safety rail. Pin the exact database name in every environment.
 EXPECTED_DATABASE_NAME = os.environ.get("DJANGO_EXPECTED_DATABASE_NAME", "").strip()
 if EXPECTED_DATABASE_NAME and DATABASES["default"]["NAME"] != EXPECTED_DATABASE_NAME:
     raise RuntimeError(
@@ -91,9 +91,11 @@ if EXPECTED_DATABASE_NAME and DATABASES["default"]["NAME"] != EXPECTED_DATABASE_
         "Refusing to start to protect the Django rebuild from accidental legacy DB usage."
     )
 
+AUTH_USER_MODEL = "accounts.User"
+
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework.authentication.SessionAuthentication",
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
@@ -101,6 +103,14 @@ REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": [
         "rest_framework.renderers.JSONRenderer",
     ],
+}
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": __import__("datetime").timedelta(minutes=int(os.environ.get("JWT_ACCESS_MINUTES", "30"))),
+    "REFRESH_TOKEN_LIFETIME": __import__("datetime").timedelta(days=int(os.environ.get("JWT_REFRESH_DAYS", "7"))),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+    "UPDATE_LAST_LOGIN": True,
 }
 
 CORS_ALLOWED_ORIGINS = [
