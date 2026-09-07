@@ -80,9 +80,13 @@ class Phase3ScopeAndValidationTests(TestCase):
         self.class_a = SchoolClass.objects.create(school=self.school_a, grade="8", section="A")
         self.class_b = SchoolClass.objects.create(school=self.school_b, grade="8", section="A")
 
+    def _request_with_user(self, method="post", path="/"):
+        request = getattr(APIRequestFactory(), method)(path)
+        request.user = self.school_a_user
+        return request
+
     def test_school_cannot_create_class_in_another_school(self):
-        request = APIRequestFactory().post("/api/academics/classes/")
-        force_authenticate(request, user=self.school_a_user)
+        request = self._request_with_user(path="/api/academics/classes/")
         serializer = SchoolClassSerializer(
             data={"school": str(self.school_b.id), "grade": "9", "section": "B"},
             context={"request": request},
@@ -91,8 +95,7 @@ class Phase3ScopeAndValidationTests(TestCase):
         self.assertIn("own classes", str(serializer.errors).lower())
 
     def test_school_cannot_create_student_in_another_school(self):
-        request = APIRequestFactory().post("/api/academics/students/")
-        force_authenticate(request, user=self.school_a_user)
+        request = self._request_with_user(path="/api/academics/students/")
         serializer = StudentCreateSerializer(
             data={"school_class": str(self.class_b.id), "roll_number": 1, "name": "Blocked"},
             context={"request": request},
@@ -116,8 +119,7 @@ class Phase3ScopeAndValidationTests(TestCase):
 
     def test_class_with_students_cannot_change_identity_fields(self):
         Student.objects.create(student_id="AAA8A 01", school_class=self.class_a, roll_number=1, name="Locked")
-        request = APIRequestFactory().patch(f"/api/academics/classes/{self.class_a.id}/")
-        force_authenticate(request, user=self.school_a_user)
+        request = self._request_with_user(method="patch", path=f"/api/academics/classes/{self.class_a.id}/")
         serializer = SchoolClassSerializer(
             self.class_a,
             data={"school": str(self.school_a.id), "grade": "9", "section": "B"},
