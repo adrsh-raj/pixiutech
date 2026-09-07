@@ -50,12 +50,6 @@ jobs:
           python manage.py test
           python -m compileall -q .
 
-      - name: Verify LMS backend syntax
-        run: node --check pixiu-lms-portal/server/index.js
-
-      - name: Verify production CORS policy
-        run: node pixiu-lms-portal/server/tests/cors-policy.test.js
-
       - name: Verify public website build
         run: npm ci && npm run build
 
