@@ -5,6 +5,8 @@ import Dashboard from './pages/Dashboard';
 import Students from './pages/Students';
 import Inventory from './pages/Inventory';
 import Trainers from './pages/Trainers';
+import TrainerWorkspace from './pages/TrainerWorkspace';
+import TrainerMaterials from './pages/TrainerMaterials';
 import TrainerCredentials from './pages/TrainerCredentials';
 import SchoolCredentials from './pages/SchoolCredentials';
 import DataReset from './pages/DataReset';
@@ -61,7 +63,6 @@ function ProtectedLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [readNotifIds, setReadNotifIds] = useState([]);
   const visibleNotifications = useMemo(() => filterNotificationsForUser(notifications, user), [notifications, user]);
-  const visibleAlerts = useMemo(() => alerts.filter(a => { if (user?.role !== 'admin' && (a.type === 'billing_due' || a.action_type === 'view_billing' || a.type === 'billing')) return false; return true; }), [alerts, user]);
   useEffect(() => { if (!user) return; fetchUserReadNotifIds(user).then(ids => setReadNotifIds(Array.isArray(ids) ? ids : [])); }, [user]);
   const unreadCount = visibleNotifications.filter(n => !readNotifIds.includes(n.id)).length;
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
@@ -87,6 +88,7 @@ function ProtectedLayout() {
 }
 
 function AdminOnly({ children }) { const { user } = useAuth(); return user?.role === 'admin' || user?.role === 'superadmin' ? children : <Navigate to="/trainers" replace />; }
+function TrainerConsoleRoute() { const { user } = useAuth(); return user?.role === 'trainer' ? <TrainerWorkspace /> : <Trainers />; }
 function StudentRouteGuard() { const { isAuthenticated, user, loading } = useAuth(); if (loading) return <div className="min-h-screen bg-slate-900 flex items-center justify-center"><div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" /></div>; if (!isAuthenticated) return <Navigate to="/login" replace />; if (user?.role !== 'student') return <Navigate to="/" replace />; return <StudentPortal />; }
 function SchoolRouteGuard() { const { isAuthenticated, user, loading } = useAuth(); if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" /></div>; if (!isAuthenticated) return <Navigate to="/login" replace />; if (!['school', 'admin'].includes(user?.role)) return <Navigate to="/" replace />; return <SchoolPortal />; }
 function GuestRouteGuard({ children }) { const { isAuthenticated, user, loading } = useAuth(); if (loading) return <div className="min-h-screen bg-[#040810] flex items-center justify-center"><div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" /></div>; if (isAuthenticated && user) { const destination = user.role === 'student' ? '/student-portal' : user.role === 'school' ? '/school-portal' : user.role === 'trainer' ? '/trainers' : '/'; return <Navigate to={destination} replace />; } return children; }
@@ -97,7 +99,7 @@ export default function App() {
     <Route path="/simulation" element={<ChunkErrorBoundary><Suspense fallback={<div className="min-h-screen bg-[#070B14] flex items-center justify-center text-white"><div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" /></div>}><Simulation /></Suspense></ChunkErrorBoundary>} />
     <Route path="/student-portal" element={<StudentRouteGuard />} /><Route path="/school-portal" element={<SchoolRouteGuard />} />
     <Route path="/" element={<ProtectedLayout />}>
-      <Route index element={<AdminOnly><Dashboard /></AdminOnly>} /><Route path="leads" element={<AdminOnly><Leads /></AdminOnly>} /><Route path="schools" element={<AdminOnly><Schools /></AdminOnly>} /><Route path="billing" element={<AdminOnly><Billing /></AdminOnly>} /><Route path="payments" element={<AdminOnly><Payments /></AdminOnly>} /><Route path="notifications" element={<AdminOnly><Notifications /></AdminOnly>} /><Route path="settings" element={<AdminOnly><Settings /></AdminOnly>} /><Route path="logs" element={<AdminOnly><AuditLogs /></AdminOnly>} /><Route path="students" element={<Students />} /><Route path="comms" element={<AdminOnly><Comms /></AdminOnly>} /><Route path="trainers" element={<Trainers />} /><Route path="trainer-credentials" element={<AdminOnly><TrainerCredentials /></AdminOnly>} /><Route path="school-credentials" element={<AdminOnly><SchoolCredentials /></AdminOnly>} /><Route path="data-reset" element={<AdminOnly><DataReset /></AdminOnly>} /><Route path="content" element={<ContentHub />} /><Route path="curriculum" element={<Curriculum />} /><Route path="inventory" element={<Inventory />} />
+      <Route index element={<AdminOnly><Dashboard /></AdminOnly>} /><Route path="leads" element={<AdminOnly><Leads /></AdminOnly>} /><Route path="schools" element={<AdminOnly><Schools /></AdminOnly>} /><Route path="billing" element={<AdminOnly><Billing /></AdminOnly>} /><Route path="payments" element={<AdminOnly><Payments /></AdminOnly>} /><Route path="notifications" element={<AdminOnly><Notifications /></AdminOnly>} /><Route path="settings" element={<AdminOnly><Settings /></AdminOnly>} /><Route path="logs" element={<AdminOnly><AuditLogs /></AdminOnly>} /><Route path="students" element={<Students />} /><Route path="comms" element={<AdminOnly><Comms /></AdminOnly>} /><Route path="trainers" element={<TrainerConsoleRoute />} /><Route path="trainer-materials" element={<TrainerMaterials />} /><Route path="trainer-credentials" element={<AdminOnly><TrainerCredentials /></AdminOnly>} /><Route path="school-credentials" element={<AdminOnly><SchoolCredentials /></AdminOnly>} /><Route path="data-reset" element={<AdminOnly><DataReset /></AdminOnly>} /><Route path="content" element={<ContentHub />} /><Route path="curriculum" element={<Curriculum />} /><Route path="inventory" element={<Inventory />} />
     </Route><Route path="*" element={<Navigate to="/" replace />} />
   </Routes></BrowserRouter></DataProvider></AuthProvider></ToastProvider>;
 }
