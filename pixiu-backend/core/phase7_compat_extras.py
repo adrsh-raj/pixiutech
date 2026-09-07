@@ -15,7 +15,6 @@ from notifications.models import Notification, NotificationType
 
 from .api_v1_compat import ContractBillingViewSet, ContractNotificationViewSet, _first, _school, _student
 
-
 LEGACY_INVOICE_STATUS = {
     "pending": "issued", "pending_verification": "issued", "paid": "paid", "partially_paid": "partially_paid",
     "overdue": "overdue", "draft": "draft", "issued": "issued", "void": "void",
@@ -42,9 +41,17 @@ class ContractBillingFullViewSet(ContractBillingViewSet):
             response = super().create(request, *args, **kwargs)
             invoice = Invoice.objects.filter(pk=response.data.get("id")).first() if isinstance(response.data, dict) else None
             if invoice is None: raise ValidationError("Invoice was created but could not be reloaded.")
+            requested_status = normalize_invoice_status(request.data.get("status", "draft"))
+            invoice.status = requested_status
+            invoice.save(update_fields=["status", "updated_at"])
             for line in self._legacy_lines(request):
                 add_invoice_line(invoice=invoice, description=str(_first(line, "description", "tranche_title", "title", default="STEM Robotics & Lab Operations"))[:250], quantity=_first(line, "quantity", "qty", default=1), unit_price=_first(line, "unit_price", "amount", "price", default=0))
-            recalculate_invoice(invoice); invoice.refresh_from_db(); response.data = self.map_out(invoice)
+            recalculate_invoice(invoice)
+            invoice.refresh_from_db()
+            if requested_status in {"paid", "partially_paid", "issued", "overdue", "void"} and invoice.status != requested_status:
+                invoice.status = requested_status
+                invoice.save(update_fields=["status", "updated_at"])
+            response.data = self.map_out(invoice)
         return response
 
     def update(self, request, *args, **kwargs):
