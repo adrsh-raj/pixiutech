@@ -42,8 +42,10 @@ class StockBalance(models.Model):
 
     class Meta:
         constraints = [
-            models.CheckConstraint(condition=Q(school__isnull=True) | Q(trainer__isnull=True), name="stock_one_or_zero_custodian"),
-            models.UniqueConstraint(fields=["item", "school", "trainer"], name="uniq_stock_location"),
+            models.CheckConstraint(condition=~(Q(school__isnull=False) & Q(trainer__isnull=False)), name="stock_not_school_trainer"),
+            models.UniqueConstraint(fields=["item", "school"], condition=Q(school__isnull=False), name="uniq_stock_school"),
+            models.UniqueConstraint(fields=["item", "trainer"], condition=Q(trainer__isnull=False), name="uniq_stock_trainer"),
+            models.UniqueConstraint(fields=["item"], condition=Q(school__isnull=True, trainer__isnull=True), name="uniq_stock_central"),
         ]
 
 
@@ -103,5 +105,8 @@ class KitCustody(models.Model):
     class Meta:
         constraints = [
             models.CheckConstraint(condition=Q(school__isnull=False) | Q(trainer__isnull=False) | Q(student__isnull=False), name="kit_custody_has_recipient"),
+            models.CheckConstraint(condition=~(Q(school__isnull=False) & Q(trainer__isnull=False)), name="kit_custody_not_school_trainer"),
+            models.CheckConstraint(condition=~(Q(school__isnull=False) & Q(student__isnull=False)), name="kit_custody_not_school_student"),
+            models.CheckConstraint(condition=~(Q(trainer__isnull=False) & Q(student__isnull=False)), name="kit_custody_not_trainer_student"),
             models.UniqueConstraint(fields=["kit"], condition=Q(returned_at__isnull=True), name="uniq_active_kit_custody"),
         ]
