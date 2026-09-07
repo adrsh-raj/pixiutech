@@ -71,6 +71,7 @@ function ProtectedLayout() {
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (user?.role === 'student') return <Navigate to="/student-portal" replace />;
   if (user?.role === 'school') return <Navigate to="/school-portal" replace />;
+  if (user?.role === 'trainer') return <PortalShell role="trainer" title="Trainer Workspace" subtitle="Run sessions, manage students and stay ready for your next class."><Outlet /></PortalShell>;
   const markRead = async id => { const updated = await saveUserReadNotifIds(id, user); setReadNotifIds(updated); };
   return <div className="flex h-screen bg-slate-50 font-sans overflow-hidden">
     <Sidebar mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
@@ -89,7 +90,7 @@ function ProtectedLayout() {
 }
 
 function AdminOnly({ children }) { const { user } = useAuth(); return user?.role === 'admin' || user?.role === 'superadmin' ? children : <Navigate to="/trainers" replace />; }
-function TrainerConsoleRoute() { const { user } = useAuth(); return user?.role === 'trainer' ? <PortalShell role="trainer" title="Trainer Workspace" subtitle="Run sessions, manage students and stay ready for your next class."><TrainerWorkspace /></PortalShell> : <Trainers />; }
+function TrainerConsoleRoute() { const { user } = useAuth(); return user?.role === 'trainer' ? <TrainerWorkspace /> : <Trainers />; }
 function StudentRouteGuard() { const { isAuthenticated, user, loading } = useAuth(); if (loading) return <div className="min-h-screen bg-slate-900 flex items-center justify-center"><div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" /></div>; if (!isAuthenticated) return <Navigate to="/login" replace />; if (user?.role !== 'student') return <Navigate to="/" replace />; return <StudentPortal />; }
 function SchoolRouteGuard() { const { isAuthenticated, user, loading } = useAuth(); if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" /></div>; if (!isAuthenticated) return <Navigate to="/login" replace />; if (!['school', 'admin'].includes(user?.role)) return <Navigate to="/" replace />; return <SchoolPortal />; }
 function GuestRouteGuard({ children }) { const { isAuthenticated, user, loading } = useAuth(); if (loading) return <div className="min-h-screen bg-[#040810] flex items-center justify-center text-white"><div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" /></div>; if (isAuthenticated && user) { const destination = user.role === 'student' ? '/student-portal' : user.role === 'school' ? '/school-portal' : user.role === 'trainer' ? '/trainers' : '/'; return <Navigate to={destination} replace />; } return children; }
