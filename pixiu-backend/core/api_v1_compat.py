@@ -7,7 +7,7 @@ from rest_framework import status
 from rest_framework.decorators import action, api_view, parser_classes, permission_classes
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.parsers import FormParser, MultiPartParser
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from accounts.models import UserRole
@@ -256,7 +256,7 @@ class ContractNotificationViewSet(LegacyShapeMixin, NotificationViewSet):
         return super().create(request, *args, **kwargs)
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 def health(request): return Response({"status": "ok", "service": "Pixiu Django API", "version": "v1"})
 
 @api_view(["POST"])
