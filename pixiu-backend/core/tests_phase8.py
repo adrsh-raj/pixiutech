@@ -33,6 +33,12 @@ class Phase8PermissionTests(APITestCase):
         refresh = RefreshToken.for_user(user)
         self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
 
+    def test_health_endpoint_is_public_for_render(self):
+        response = self.client.get("/api/v1/health/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["status"], "ok")
+        self.assertEqual(response.data["version"], "v1")
+
     def test_unauthenticated_cannot_read_v1_resource(self):
         response = self.client.get("/api/v1/schools")
         self.assertIn(response.status_code, {401, 403})
