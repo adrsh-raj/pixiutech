@@ -6,7 +6,15 @@ const ADMIN_MUTATION_ROOTS = ['/leads', '/billing', '/logs', '/audit-logs', '/se
 const matches = (pathValue, list) => list.some(prefix => pathValue === prefix || pathValue.startsWith(`${prefix}/`));
 const same = (a, b) => a != null && b != null && String(a).trim().toUpperCase() === String(b).trim().toUpperCase();
 const deny = (res, message) => res.status(403).json({ error: message || 'Forbidden' });
-const parseIds = value => String(value || '').split(/[\s,;|]+/).map(v => v.trim()).filter(Boolean);
+const parseIds = value => {
+  const raw = String(value || '').trim();
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed.map(v => String(v).trim()).filter(Boolean);
+  } catch {}
+  return raw.split(/[\s,;|]+/).map(v => v.trim()).filter(Boolean);
+};
 
 function filterQuizPayload(payload) {
   const redactQuestions = questions => Array.isArray(questions)
@@ -146,10 +154,20 @@ function authorizationMiddleware(db) {
     if (isSchoolPaymentClaim) {
       const invoiceSchool = await resourceSchoolId(db, route, 'billing');
       if (!invoiceSchool || !schoolIds.some(id => same(id, invoiceSchool))) return deny(res, 'Invoice is outside your school scope');
+      const allowedFields = new Set(['status', 'school_claimed_payment', 'transaction_id', 'receipt_no', 'payment_method', 'paid_date', 'proof_url', 'payment_notes', 'claimed_at']);
+      const bodyKeys = Object.keys(req.body || {});
+      if (bodyKeys.some(key => !allowedFields.has(key))) return deny(res, 'School payment claim contains restricted fields');
+      if (req.body?.status && !['Pending', 'Pending Verification'].includes(String(req.body.status))) return deny(res, 'Invalid school payment claim status');
+      if (req.body?.school_claimed_payment !== true && req.body?.school_claimed_payment !== false) return deny(res, 'Payment claim flag is required');
     }
 
     if (role === 'school' && route === '/notifications' && req.method === 'POST') {
       if (!same(req.body?.target_school_id, 'ADMIN') || req.body?.type !== 'payment_claim') return deny(res, 'Schools may only submit payment claims');
+    }
+    if (role === 'school' && matches(route, ['/notifications']) && !READ_ONLY.has(req.method) && !(route === '/notifications' && req.method === 'POST')) return deny(res, 'School notification mutations are restricted');
+    if (role === 'trainer' && matches(route, ['/notifications']) && !READ_ONLY.has(req.method)) {
+      if (!(route === '/notifications' && req.method === 'POST')) return deny(res, 'Trainer notification management is restricted');
+      if (req.body?.target_school_id && !same(req.body.target_school_id, 'ALL') && !schoolIds.some(id => same(id, req.body.target_school_id))) return deny(res, 'Notification target is outside trainer scope');
     }
 
     const requestSchool = req.body?.school_id || req.query?.school_id;
