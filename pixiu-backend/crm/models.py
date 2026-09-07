@@ -77,3 +77,18 @@ class LeadContact(models.Model):
         constraints = [
             models.UniqueConstraint(fields=["lead", "email"], condition=~Q(email=""), name="uniq_lead_contact_email"),
         ]
+
+
+class CommunicationLog(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="communication_logs")
+    student = models.ForeignKey("academics.Student", on_delete=models.PROTECT, null=True, blank=True, related_name="communication_logs")
+    recipient = models.CharField(max_length=200)
+    channel = models.CharField(max_length=30, default="whatsapp")
+    template = models.CharField(max_length=120, blank=True)
+    message = models.TextField()
+    status = models.CharField(max_length=40, default="Delivered")
+    sent_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-sent_at"]
