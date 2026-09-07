@@ -47,22 +47,18 @@ class Phase3ViewSet(viewsets.ModelViewSet):
         super().initial(request, *args, **kwargs)
 
     def get_queryset(self):
-        return self.queryset
+        # Lists are scope-filtered; detail routes resolve the full set and then
+        # use ScopePermission so authenticated users get 403, not an accidental 404.
+        return self.scoped_queryset() if self.action == "list" else self.queryset
 
     def scoped_queryset(self):
-        return self.get_queryset()
+        return self.queryset
 
     def get_object(self):
-        # Detail routes intentionally resolve against the full model queryset so
-        # authenticated users receive a 403 for a real but out-of-scope record.
-        if self.action in {"retrieve", "update", "partial_update", "destroy"}:
-            queryset = self.queryset
-        else:
-            queryset = self.scoped_queryset()
+        queryset = self.queryset if self.action in {"retrieve", "update", "partial_update", "destroy"} else self.scoped_queryset()
         queryset = self.filter_queryset(queryset)
         lookup_url_kwarg = self.lookup_url_kwarg or self.lookup_field
-        filter_kwargs = {self.lookup_field: self.kwargs[lookup_url_kwarg]}
-        obj = queryset.get(**filter_kwargs)
+        obj = queryset.get(**{self.lookup_field: self.kwargs[lookup_url_kwarg]})
         self.check_object_permissions(self.request, obj)
         return obj
 
@@ -99,9 +95,10 @@ class SchoolViewSet(Phase3ViewSet):
         if request.user.role != UserRole.ADMIN:
             raise PermissionDenied("Only administrators can deactivate a school.")
         school.status = "inactive"
-        school.account.status = "inactive"
-        school.account.is_active = False
-        school.account.save(update_fields=["status", "is_active"])
+        if school.account_id:
+            school.account.status = "inactive"
+            school.account.is_active = False
+            school.account.save(update_fields=["status", "is_active"])
         school.save(update_fields=["status", "updated_at"])
         return Response(self.get_serializer(school).data)
 
@@ -146,7 +143,6 @@ class TrainerSchoolAssignmentViewSet(Phase3ViewSet):
     def perform_destroy(self, instance):
         self.assert_role(UserRole.ADMIN)
         instance.status = "inactive"
-        instance.assigned_to = instance.assigned_to
         instance.save(update_fields=["status"])
 
 
