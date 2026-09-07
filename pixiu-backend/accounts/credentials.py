@@ -52,10 +52,21 @@ def build_student_username(school_code: str, grade: str, section: str, roll_numb
 
 
 def build_student_password(school_code: str, student_username: str) -> str:
-    """Build the deterministic student password from the final backend student ID."""
+    """Build the agreed deterministic student password format.
+
+    Example: XYZ8A 03 -> XYZxyz8A3@hata.
+    The leading school-code portion inside the compact username is lowercase,
+    while grade/section casing is preserved and the two-digit roll suffix drops
+    its presentation padding. The suffix is fixed by the PIXIU credential rule.
+    """
     school = str(school_code or "").strip().upper()
     username = normalize_login_username(student_username)
-    compact = re.sub(r"\s+", "", username).lower()
+    compact = re.sub(r"\s+", "", username)
+    if not compact.upper().startswith(school):
+        raise ValueError("Student username must begin with the school code.")
+
+    compact = school.lower() + compact[len(school):]
+    compact = re.sub(r"(\d{2})$", lambda match: str(int(match.group(1))), compact)
     return f"{school}{compact}{STUDENT_PASSWORD_SUFFIX}"
 
 
