@@ -1,0 +1,35 @@
+name: PIXIU Deployment Smoke Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      frontend_url:
+        description: "Deployed frontend URL"
+        required: false
+        type: string
+      api_url:
+        description: "Deployed Django API URL including /api/v1"
+        required: false
+        type: string
+  deployment_status:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.deployment_status.state == 'success' && github.event.deployment_status.target_url != '')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run deployment smoke checks
+        env:
+          E2E_BASE_URL: ${{ github.event_name == 'workflow_dispatch' && inputs.frontend_url || github.event.deployment_status.target_url }}
+          E2E_API_URL: ${{ github.event_name == 'workflow_dispatch' && inputs.api_url || secrets.E2E_API_URL }}
+          E2E_USERNAME: ${{ secrets.E2E_USERNAME }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+          E2E_ROLE: ${{ secrets.E2E_ROLE || 'admin' }}
+        run: node scripts/e2e-smoke.mjs
