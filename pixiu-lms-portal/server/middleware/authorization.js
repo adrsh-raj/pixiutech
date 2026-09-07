@@ -2,10 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 const READ_ONLY = new Set(['GET', 'HEAD', 'OPTIONS']);
-const ADMIN_ONLY = [
-  '/leads', '/billing', '/audit-logs', '/logs', '/trainers',
-  '/schools', '/comms', '/settings', '/data-reset'
-];
+const ADMIN_MUTATION_ROOTS = ['/leads', '/billing', '/logs', '/audit-logs', '/settings', '/data-reset'];
 const matches = (pathValue, list) => list.some(prefix => pathValue === prefix || pathValue.startsWith(`${prefix}/`));
 const same = (a, b) => a != null && b != null && String(a).trim().toUpperCase() === String(b).trim().toUpperCase();
 const deny = (res, message) => res.status(403).json({ error: message || 'Forbidden' });
@@ -15,25 +12,16 @@ function filterQuizPayload(payload) {
   const redactQuestions = questions => Array.isArray(questions)
     ? questions.map(({ correct_option, explanation, ...question }) => question)
     : questions;
-  if (Array.isArray(payload)) {
-    return payload.map(quiz => quiz && typeof quiz === 'object' ? { ...quiz, questions: redactQuestions(quiz.questions) } : quiz);
-  }
-  if (payload && typeof payload === 'object' && Array.isArray(payload.questions)) {
-    return { ...payload, questions: redactQuestions(payload.questions) };
-  }
+  if (Array.isArray(payload)) return payload.map(quiz => quiz && typeof quiz === 'object' ? { ...quiz, questions: redactQuestions(quiz.questions) } : quiz);
+  if (payload && typeof payload === 'object' && Array.isArray(payload.questions)) return { ...payload, questions: redactQuestions(payload.questions) };
   return payload;
 }
 
 function scopeResponse(res, scope, route) {
   const original = res.json.bind(res);
   res.json = payload => {
-    if (scope.role === 'admin') return original(payload);
-    let scoped = payload;
-
-    if (matches(route, ['/quizzes'])) {
-      scoped = filterQuizPayload(scoped);
-    }
-
+    if (scope.role === 'admin' || scope.role === 'superadmin') return original(payload);
+    let scoped = matches(route, ['/quizzes']) ? filterQuizPayload(payload) : payload;
     if (Array.isArray(scoped)) {
       scoped = scoped.filter(row => {
         if (!row || typeof row !== 'object') return true;
@@ -43,13 +31,11 @@ function scopeResponse(res, scope, route) {
           return matches(route, ['/content', '/curriculum', '/quizzes']);
         }
         if (row.school_id != null) return scope.schoolIds.some(id => same(row.school_id, id));
-        if (row.target_school_id != null) {
-          return row.target_school_id == null || same(row.target_school_id, 'ALL') || scope.schoolIds.some(id => same(row.target_school_id, id));
-        }
+        if (row.target_school_id != null) return same(row.target_school_id, 'ALL') || scope.schoolIds.some(id => same(row.target_school_id, id));
         if (row.student_id != null) return scope.studentIds.has(String(row.student_id));
         if (matches(route, ['/schools'])) return scope.schoolIds.some(id => same(row.id, id) || same(row.code, id));
-        if (matches(route, ['/trainers'])) return scope.trainerId ? same(row.id, scope.trainerId) : false;
-        if (matches(route, ['/alerts'])) return scope.schoolIds.length === 0;
+        if (matches(route, ['/trainers'])) return scope.role === 'school' ? scope.trainerIds.some(id => same(row.id, id)) : Boolean(scope.trainerId) && same(row.id, scope.trainerId);
+        if (matches(route, ['/alerts'])) return false;
         return true;
       });
     }
@@ -60,22 +46,29 @@ function scopeResponse(res, scope, route) {
 function loadSchoolIds(db, role, user) {
   if (role === 'school') return Promise.resolve(parseIds(user.school_id));
   const trainerId = user.related_id || user.id || user.username;
-  return new Promise(resolve => db.get('SELECT assigned_schools FROM trainers WHERE id = ?', [trainerId], (err, row) => {
-    resolve(err ? [] : parseIds(row?.assigned_schools || user.school_id));
+  return new Promise(resolve => db.get('SELECT assigned_schools FROM trainers WHERE id = ?', [trainerId], (err, row) => resolve(err ? [] : parseIds(row?.assigned_schools || user.school_id))));
+}
+
+function loadTrainerIds(db, schoolIds) {
+  if (!schoolIds.length) return Promise.resolve([]);
+  return new Promise(resolve => db.all('SELECT id, assigned_schools FROM trainers', [], (err, rows = []) => {
+    if (err) return resolve([]);
+    resolve(rows.filter(row => parseIds(row.assigned_schools).some(id => schoolIds.some(schoolId => same(id, schoolId)))).map(row => String(row.id)));
   }));
 }
 
-async function resourceSchoolId(db, route, paramName) {
+async function resourceSchoolId(db, route, objectName) {
   const id = decodeURIComponent(route.split('/')[2] || '');
   if (!id) return null;
   const tableMap = {
     inventory: 'SELECT school_id FROM inventory WHERE id = ?',
-    projects: 'SELECT school_id FROM projects p JOIN students s ON s.student_id = p.student_id WHERE p.id = ?',
+    projects: 'SELECT s.school_id FROM projects p JOIN students s ON s.student_id = p.student_id WHERE p.id = ?',
     'quiz-submissions': 'SELECT s.school_id FROM quiz_submissions q JOIN students s ON s.student_id = q.student_id WHERE q.id = ?',
     reviews: 'SELECT s.school_id FROM student_reviews r JOIN students s ON s.student_id = r.student_id WHERE r.id = ?',
     notifications: 'SELECT target_school_id FROM notifications WHERE id = ?',
+    billing: 'SELECT school_id FROM billing WHERE id = ?'
   };
-  const sql = tableMap[paramName];
+  const sql = tableMap[objectName];
   if (!sql) return null;
   return new Promise(resolve => db.get(sql, [id], (err, row) => resolve(err ? null : (row?.school_id ?? row?.target_school_id ?? null))));
 }
@@ -111,7 +104,6 @@ function authorizationMiddleware(db) {
     if (role === 'admin' || role === 'superadmin') return next();
     if (!['trainer', 'school', 'student'].includes(role)) return deny(res, 'Unsupported role');
 
-    // Students can only read learning data and submit their own quiz attempts.
     if (role === 'student') {
       const readable = ['/students', '/classes', '/sessions', '/attendance', '/content', '/curriculum', '/projects', '/reviews', '/notifications', '/quizzes', '/quiz-submissions'];
       const canRead = READ_ONLY.has(req.method) && matches(route, readable);
@@ -133,21 +125,25 @@ function authorizationMiddleware(db) {
       return next();
     }
 
-    // School/trainer accounts are tenant-scoped. Trainer school assignments are stored as a list.
     const schoolIds = await loadSchoolIds(db, role, user);
     if (!schoolIds.length) return deny(res, 'School scope is required for this account');
-    const schoolIdSet = new Set(schoolIds.map(id => String(id).toUpperCase()));
     const studentIds = new Set();
     await new Promise(resolve => db.all('SELECT student_id FROM students WHERE school_id = ANY(?)', [schoolIds], (err, rows = []) => {
       if (!err) rows.forEach(row => studentIds.add(String(row.student_id)));
       resolve();
     }));
+    const trainerIds = await loadTrainerIds(db, schoolIds);
 
-    // Resource capability rules. Management resources stay admin-only; trainers operate academic/kit workflows.
-    if (matches(route, ['/schools', '/leads', '/billing', '/logs', '/audit-logs', '/settings', '/data-reset'])) return deny(res, 'Administrator access required');
-    if (role === 'school' && matches(route, ['/trainers', '/comms'])) return deny(res, 'Restricted for school accounts');
+    if (matches(route, ADMIN_MUTATION_ROOTS) && !(role === 'school' && route.startsWith('/billing/') && req.method === 'GET')) return deny(res, 'Administrator access required');
+    if (role === 'school' && matches(route, ['/comms'])) return deny(res, 'Restricted for school accounts');
+    if (role === 'school' && route === '/notifications' && req.method !== 'GET' && req.method !== 'POST') return deny(res, 'Restricted notification operation');
     if (role === 'trainer' && route === '/trainers' && !READ_ONLY.has(req.method)) return deny(res, 'Trainer management is restricted to administrators');
-    if (role === 'trainer' && matches(route, ['/notifications']) && !READ_ONLY.has(req.method) && req.body?.target_school_id && !schoolIds.some(id => same(id, req.body.target_school_id)) && !same(req.body.target_school_id, 'ALL')) return deny(res, 'Notification target is outside trainer scope');
+    if (role === 'trainer' && matches(route, ['/billing'])) return deny(res, 'Billing is restricted to administrators');
+
+    if (role === 'school' && route.startsWith('/billing/') && req.method !== 'GET' && req.method !== 'PUT') return deny(res, 'School payment claims are restricted to invoice updates');
+    if (role === 'school' && route === '/notifications' && req.method === 'POST') {
+      if (!same(req.body?.target_school_id, 'ADMIN') || req.body?.type !== 'payment_claim') return deny(res, 'Schools may only submit payment claims');
+    }
 
     const requestSchool = req.body?.school_id || req.query?.school_id;
     if (requestSchool && !schoolIds.some(id => same(requestSchool, id))) return deny(res, 'Cross-school access is not permitted');
@@ -161,8 +157,7 @@ function authorizationMiddleware(db) {
       if (!schoolIds.some(s => same(id, s))) return deny(res, 'School is outside your account scope');
     }
 
-    // Protect object routes that do not carry school_id in the request body.
-    const objectNames = ['inventory', 'projects', 'quiz-submissions', 'reviews', 'notifications'];
+    const objectNames = ['inventory', 'projects', 'quiz-submissions', 'reviews', 'notifications', 'billing'];
     for (const objectName of objectNames) {
       if (route.startsWith(`/${objectName}/`) && req.params?.id) {
         const objectSchool = await resourceSchoolId(db, route, objectName);
@@ -170,17 +165,15 @@ function authorizationMiddleware(db) {
       }
     }
 
-    // Attendance must belong to a session in one of the caller's schools.
     if (route.startsWith('/attendance') && req.body?.session_id) {
-      const sessionAllowed = await new Promise(resolve => db.get('SELECT school_id, class_id FROM sessions WHERE id = ?', [req.body.session_id], (err, row) => resolve(!err && row && schoolIds.some(id => same(id, row.school_id)))));
+      const sessionAllowed = await new Promise(resolve => db.get('SELECT school_id FROM sessions WHERE id = ?', [req.body.session_id], (err, row) => resolve(!err && row && schoolIds.some(id => same(id, row.school_id)))));
       if (!sessionAllowed) return deny(res, 'Attendance session is outside your school scope');
     }
 
-    // School accounts are read-only except explicitly supported operational submissions.
-    if (role === 'school' && !READ_ONLY.has(req.method) && !matches(route, ['/attendance', '/notifications/reads', '/reviews'])) return deny(res, 'School account is read-only for this resource');
+    if (role === 'school' && !READ_ONLY.has(req.method) && !matches(route, ['/attendance', '/notifications/reads', '/reviews', '/notifications', '/billing/'])) return deny(res, 'School account is read-only for this resource');
 
     const trainerId = user.related_id || user.id || user.username;
-    scopeResponse(res, { role, schoolId: schoolIds[0], schoolIds, studentIds, trainerId }, route);
+    scopeResponse(res, { role, schoolIds, studentIds, trainerId, trainerIds }, route);
     return next();
   };
 }
