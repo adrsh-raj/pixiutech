@@ -21,14 +21,29 @@ async function assertOk(url, label, options = {}) {
   return response;
 }
 
+async function checkFrontendOrApiTarget(url) {
+  const response = await assertOk(url, "Deployment target");
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    const payload = await response.json();
+    if (payload.status !== "ok") {
+      throw new Error(`Deployment target returned unexpected JSON: ${JSON.stringify(payload)}`);
+    }
+    console.log(`Django deployment smoke test passed: ${url}`);
+    return "api";
+  }
+
+  const html = await response.text();
+  if (!/<html[\s>]/i.test(html) || !/(<script|root)/i.test(html)) {
+    throw new Error("Deployment target is neither a recognizable Vite HTML app nor the Django health JSON endpoint.");
+  }
+  console.log(`Frontend deployment smoke test passed: ${url}`);
+  return "frontend";
+}
+
 try {
   if (baseUrl) {
-    const response = await assertOk(baseUrl, "Frontend");
-    const html = await response.text();
-    if (!/<html[\s>]/i.test(html) || !/(<script|root)/i.test(html)) {
-      throw new Error("Frontend response does not look like a Vite/HTML application.");
-    }
-    console.log(`Frontend smoke test passed: ${baseUrl}`);
+    await checkFrontendOrApiTarget(baseUrl);
   }
 
   if (apiUrl) {
