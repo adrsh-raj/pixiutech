@@ -9,9 +9,9 @@ from academics.models import School, SchoolClass, Student, Trainer, TrainerSchoo
 from academics.services import provision_student
 
 from .models import (
-    AttendanceRecord, ContentClassAssignment, CurriculumClassAssignment, CurriculumUnit,
-    LearningContent, Project, ProjectEvidence, Quiz, QuizClassAssignment, QuizQuestion,
-    Session, StudentAssessment,
+    AttendanceRecord, CurriculumClassAssignment, CurriculumUnit, LearningContent,
+    Project, ProjectEvidence, Quiz, QuizClassAssignment, QuizQuestion, Session,
+    StudentAssessment,
 )
 from .serializers import (
     AttendanceRecordSerializer, ContentClassAssignmentSerializer, CurriculumClassAssignmentSerializer,
@@ -37,6 +37,7 @@ class Phase4DomainTests(TestCase):
     def request(self, method, path, user, data=None):
         req = getattr(self.factory, method)(path, data=data or {}, format="json")
         force_authenticate(req, user=user)
+        req.user = user
         return req
 
     def test_session_and_attendance_are_class_bound(self):
@@ -67,7 +68,7 @@ class Phase4DomainTests(TestCase):
         serializer = AttendanceRecordSerializer(record, data={"status": "absent"}, partial=True, context={"request": request})
         self.assertTrue(serializer.is_valid(), serializer.errors)
         from rest_framework.exceptions import ValidationError
-        with self.assertRaises((ValidationError, PermissionError)):
+        with self.assertRaises(ValidationError):
             serializer.save()
         record.refresh_from_db()
         self.assertEqual(record.status, "present")
