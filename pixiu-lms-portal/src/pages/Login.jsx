@@ -69,6 +69,7 @@ export default function Login() {
       toast.success(`Welcome back, ${res.user.name || res.user.username}!`, 'Authenticated');
       const dest = res.user.role === 'student' ? '/student-portal'
                  : res.user.role === 'school' ? '/school-portal'
+                 : (res.user.role === 'admin' || res.user.role === 'superadmin') ? '/'
                  : '/trainers';
       navigate(dest, { replace: true });
     } else {
