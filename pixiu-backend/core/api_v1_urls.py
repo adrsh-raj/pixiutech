@@ -5,13 +5,11 @@ from accounts.views import LoginView, LogoutView, MeView, RefreshView
 from .api_v1_compat import (
     ContractAssessmentViewSet,
     ContractAttendanceViewSet,
-    ContractBillingViewSet,
     ContractClassViewSet,
     ContractContentViewSet,
     ContractCurriculumViewSet,
     ContractInventoryViewSet,
     ContractLeadViewSet,
-    ContractNotificationViewSet,
     ContractProjectViewSet,
     ContractQuizAttemptViewSet,
     ContractQuizViewSet,
@@ -22,10 +20,13 @@ from .api_v1_compat import (
     health,
     upload,
 )
+from .phase7_compat_extras import (
+    ContractBillingFullViewSet,
+    ContractCommunicationLogViewSet,
+    ContractNotificationFullViewSet,
+)
 from .phase7_contract_overrides import ContractSchoolCompatViewSet, ContractSessionCompatViewSet
 
-# No trailing slash keeps the old portal request contract intact while the
-# public API is now owned by Django. Auth endpoints retain explicit slashes.
 router = DefaultRouter(trailing_slash=False)
 router.register("schools", ContractSchoolCompatViewSet, basename="v1-school")
 router.register("trainers", ContractTrainerViewSet, basename="v1-trainer")
@@ -40,10 +41,11 @@ router.register("quiz-submissions", ContractQuizAttemptViewSet, basename="v1-qui
 router.register("reviews", ContractReviewViewSet, basename="v1-review")
 router.register("assessments", ContractAssessmentViewSet, basename="v1-assessment")
 router.register("projects", ContractProjectViewSet, basename="v1-project")
-router.register("billing", ContractBillingViewSet, basename="v1-billing")
+router.register("billing", ContractBillingFullViewSet, basename="v1-billing")
 router.register("inventory", ContractInventoryViewSet, basename="v1-inventory")
 router.register("leads", ContractLeadViewSet, basename="v1-lead")
-router.register("notifications", ContractNotificationViewSet, basename="v1-notification")
+router.register("notifications", ContractNotificationFullViewSet, basename="v1-notification")
+router.register("comms", ContractCommunicationLogViewSet, basename="v1-comms")
 
 urlpatterns = [
     path("health/", health, name="v1-health"),
