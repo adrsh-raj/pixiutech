@@ -59,13 +59,13 @@ class AttendanceRecordSerializer(serializers.ModelSerializer):
         return create_attendance(user=self.context["request"].user, **validated_data)
 
     def update(self, instance, validated_data):
-        data = {
-            "session": instance.session,
-            "student": instance.student,
-            "status": validated_data.get("status", instance.status),
-            "note": validated_data.get("note", instance.note),
-        }
-        return create_attendance(user=self.context["request"].user, **data)
+        return create_attendance(
+            user=self.context["request"].user,
+            session=instance.session,
+            student=instance.student,
+            status=validated_data.get("status", instance.status),
+            note=validated_data.get("note", instance.note),
+        )
 
 
 class CurriculumUnitSerializer(serializers.ModelSerializer):
@@ -80,6 +80,8 @@ class CurriculumUnitSerializer(serializers.ModelSerializer):
         for field in ("grade", "level", "unit_code", "title", "objectives"):
             if field in attrs and not str(attrs[field]).strip():
                 raise serializers.ValidationError({field: "This field cannot be blank."})
+        if "grade" in attrs and not str(attrs["grade"]).strip().isdigit():
+            raise serializers.ValidationError({"grade": "Grade must be numeric."})
         return attrs
 
 
@@ -92,13 +94,16 @@ class CurriculumClassAssignmentSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "class_name", "assigned_by", "assigned_at"]
 
     def validate(self, attrs):
-        school_class = attrs["school_class"]
-        unit = attrs["curriculum_unit"]
-        if not accessible_class_queryset(self.context["request"].user).filter(pk=school_class.pk).exists():
+        user = self.context["request"].user
+        school_class = attrs.get("school_class", getattr(self.instance, "school_class", None))
+        unit = attrs.get("curriculum_unit", getattr(self.instance, "curriculum_unit", None))
+        if not school_class or not unit:
+            raise serializers.ValidationError("Both curriculum unit and class are required.")
+        if not accessible_class_queryset(user).filter(pk=school_class.pk).exists():
             raise serializers.ValidationError("You cannot assign curriculum to this class.")
         if str(unit.grade).upper() != str(school_class.grade).upper():
             raise serializers.ValidationError("Curriculum grade must match the class grade.")
-        if self.instance and attrs.get("curriculum_unit", self.instance.curriculum_unit) != self.instance.curriculum_unit:
+        if self.instance and unit != self.instance.curriculum_unit:
             raise serializers.ValidationError("Curriculum unit cannot be changed after assignment.")
         return attrs
 
@@ -125,8 +130,8 @@ class LearningContentSerializer(serializers.ModelSerializer):
         url = attrs.get("url", getattr(self.instance, "url", ""))
         file_value = attrs.get("file", getattr(self.instance, "file", None))
         content_type = attrs.get("content_type", getattr(self.instance, "content_type", ""))
-        status = attrs.get("status", getattr(self.instance, "status", "draft"))
-        if status == "published" and not url and not file_value:
+        content_status = attrs.get("status", getattr(self.instance, "status", "draft"))
+        if content_status == "published" and not url and not file_value:
             raise serializers.ValidationError("Published content must have a URL or file.")
         if content_type == "link" and not url:
             raise serializers.ValidationError({"url": "Link content requires a URL."})
@@ -143,15 +148,17 @@ class ContentClassAssignmentSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         user = self.context["request"].user
-        school_class = attrs["school_class"]
-        content = attrs["content"]
+        school_class = attrs.get("school_class", getattr(self.instance, "school_class", None))
+        content = attrs.get("content", getattr(self.instance, "content", None))
+        if not school_class or not content:
+            raise serializers.ValidationError("Both content and class are required.")
         if not accessible_class_queryset(user).filter(pk=school_class.pk).exists():
             raise serializers.ValidationError("You cannot assign content to this class.")
         if content.grade and str(content.grade).upper() != str(school_class.grade).upper():
             raise serializers.ValidationError("Content grade must match the class grade.")
         if content.status == "archived":
             raise serializers.ValidationError("Archived content cannot be assigned.")
-        if self.instance and attrs.get("content", self.instance.content) != self.instance.content:
+        if self.instance and content != self.instance.content:
             raise serializers.ValidationError("Content cannot be changed after assignment.")
         return attrs
 
@@ -171,7 +178,7 @@ class QuizQuestionWriteSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"quiz": "Quiz is required."})
         if quiz.status == "closed":
             raise serializers.ValidationError("Closed quizzes cannot be edited.")
-        if self.instance and attrs.get("quiz", self.instance.quiz) != self.instance.quiz:
+        if self.instance and quiz != self.instance.quiz:
             raise serializers.ValidationError("Question quiz cannot be changed after creation.")
         if int(attrs.get("points", getattr(self.instance, "points", 1))) <= 0:
             raise serializers.ValidationError({"points": "Points must be positive."})
@@ -217,15 +224,17 @@ class QuizClassAssignmentSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         user = self.context["request"].user
-        school_class = attrs["school_class"]
-        quiz = attrs["quiz"]
+        school_class = attrs.get("school_class", getattr(self.instance, "school_class", None))
+        quiz = attrs.get("quiz", getattr(self.instance, "quiz", None))
+        if not school_class or not quiz:
+            raise serializers.ValidationError("Both quiz and class are required.")
         if not accessible_class_queryset(user).filter(pk=school_class.pk).exists():
             raise serializers.ValidationError("You cannot assign this quiz to the selected class.")
         if str(quiz.grade).upper() != str(school_class.grade).upper():
             raise serializers.ValidationError("Quiz grade must match the class grade.")
         if quiz.status == "closed":
             raise serializers.ValidationError("Closed quizzes cannot be assigned.")
-        if self.instance and attrs.get("quiz", self.instance.quiz) != self.instance.quiz:
+        if self.instance and quiz != self.instance.quiz:
             raise serializers.ValidationError("Quiz cannot be changed after assignment.")
         return attrs
 
@@ -286,8 +295,8 @@ class StudentAssessmentSerializer(serializers.ModelSerializer):
         if user.role == UserRole.TRAINER:
             if trainer and trainer.account_id != user.id:
                 raise serializers.ValidationError("A trainer can only submit their own assessments.")
-            trainer = trainer or user.trainer_profile
-            attrs["trainer"] = trainer
+            attrs["trainer"] = trainer or user.trainer_profile
+            trainer = attrs["trainer"]
         if trainer and student and user.role != UserRole.ADMIN:
             if not trainer.school_assignments.filter(school_id=student.school_class.school_id, status="active").exists():
                 raise serializers.ValidationError("Trainer is not assigned to the student's school.")
@@ -300,15 +309,23 @@ class ProjectSerializer(serializers.ModelSerializer):
     class Meta:
         model = Project
         fields = ["id", "student", "student_id", "title", "description", "status", "score", "trainer_feedback", "submitted_at", "completed_at", "created_at", "updated_at"]
-        read_only_fields = ["id", "student_id", "status", "score", "trainer_feedback", "submitted_at", "completed_at", "created_at", "updated_at"]
+        read_only_fields = ["id", "student_id", "submitted_at", "completed_at", "created_at", "updated_at"]
 
-    def validate_student(self, student):
+    def validate(self, attrs):
         user = self.context["request"].user
-        if not accessible_student_queryset(user).filter(pk=student.pk).exists():
-            raise serializers.ValidationError("You cannot manage a project for this student.")
-        if user.role == UserRole.STUDENT and student.account_id != user.id:
-            raise serializers.ValidationError("Students can only manage their own project.")
-        return student
+        instance = self.instance
+        student = attrs.get("student", getattr(instance, "student", None))
+        if student and not accessible_student_queryset(user).filter(pk=student.pk).exists():
+            raise serializers.ValidationError({"student": "You cannot manage a project for this student."})
+        if user.role == UserRole.STUDENT:
+            if student and student.account_id != user.id:
+                raise serializers.ValidationError({"student": "Students can only manage their own project."})
+            protected = {field for field in ("status", "score", "trainer_feedback") if field in attrs}
+            if protected:
+                raise serializers.ValidationError({field: "Students cannot change evaluation fields." for field in protected})
+        elif user.role == UserRole.SCHOOL and any(field in attrs for field in ("status", "score", "trainer_feedback")):
+            raise serializers.ValidationError("Schools cannot change project evaluation fields.")
+        return attrs
 
 
 class ProjectEvidenceSerializer(serializers.ModelSerializer):
