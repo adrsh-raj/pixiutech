@@ -1,3 +1,4 @@
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -15,15 +16,14 @@ class LoginView(APIView):
 
     def post(self, request):
         serializer = LoginSerializer(data=request.data, context={"request": request})
-        try:
-            serializer.is_valid(raise_exception=True)
-        except Exception as exc:
-            code = getattr(exc, "detail", {}).get("detail", "") if hasattr(exc, "detail") and isinstance(exc.detail, dict) else ""
-            if "selected login type" in str(code):
-                return Response({"detail": code}, status=status.HTTP_403_FORBIDDEN)
+        if not serializer.is_valid():
+            if "selected login type" in str(serializer.errors):
+                return Response(serializer.errors, status=status.HTTP_403_FORBIDDEN)
             return Response(serializer.errors, status=status.HTTP_401_UNAUTHORIZED)
 
         user = serializer.validated_data["user"]
+        user.last_login = timezone.now()
+        user.save(update_fields=["last_login"])
         return Response(
             {
                 "success": True,
