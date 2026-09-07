@@ -55,21 +55,14 @@ The audit checks trainer assignment dates, trainer/school session scope, attenda
 
 The audit is diagnostic-first rather than a destructive repair job. Durable integrity remains enforced by PostgreSQL primary-key, unique, foreign-key and check constraints.
 
-## API authentication bridge
+## Authentication migration
 
-Phase 6 uses `ExpressJWTAuthentication` so the current portal can reuse its existing Bearer JWT instead of introducing a second login. Django validates the token with `EXPRESS_JWT_SECRET` (or `JWT_SECRET`) and only accepts `role=admin` for these endpoints.
+Phase 7 removes the temporary `ExpressJWTAuthentication` bridge. Phase 6 admin APIs now use the canonical Django REST Framework authentication configured by the Django project, and therefore accept the same Django SimpleJWT access token as the rest of the portal API.
 
 ## Frontend connection
 
-The admin portal now exposes `/phase6` and consumes all four Phase 6 endpoints using `VITE_DJANGO_API_URL`.
-
-Deployment requirements:
-
-- Frontend: `VITE_DJANGO_API_URL=https://<django-host>/api`
-- Django API: `EXPRESS_JWT_SECRET` must equal the Express LMS `JWT_SECRET` that signs the current portal token.
-
-Real secrets must never be committed to git.
+The admin portal exposes `/phase6` and consumes all four Phase 6 endpoints using `VITE_DJANGO_API_URL`. During Phase 7 the stored portal access token is now a Django access token, with its Django refresh token persisted for long sessions.
 
 ## Architecture rule
 
-Phase 6 does not introduce another database. The Django backend is the canonical rebuild backend and remains protected by the existing database-name preflight. The legacy Express/SQLite database is not silently reused by the Django APIs.
+Phase 6 does not introduce another database. The Django backend is the canonical rebuild backend and remains protected by the existing database-name preflight. The legacy Express/SQLite compatibility stack is not silently reused by the Django APIs.
