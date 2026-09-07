@@ -119,11 +119,11 @@ class AuthenticationAndCredentialTests(APITestCase):
     def test_student_credentials_are_deterministic(self):
         username = build_student_username("xyz", "8", "a", 3)
         self.assertEqual(username, "XYZ8A 03")
-        self.assertEqual(build_student_password("xyz", username), "XYZxyz8a03@hata")
+        self.assertEqual(build_student_password("xyz", username), "XYZxyz8A3@hata")
 
     def test_password_change_revokes_old_refresh_token(self):
         refresh = RefreshToken.for_user(self.student)
-        self.client.post(
+        change_response = self.client.post(
             reverse("password-change"),
             {
                 "current_password": "StudentStrong!123",
@@ -132,6 +132,8 @@ class AuthenticationAndCredentialTests(APITestCase):
             format="json",
             HTTP_AUTHORIZATION=f"Bearer {str(refresh.access_token)}",
         )
+        self.assertEqual(change_response.status_code, status.HTTP_200_OK)
+
         response = self.client.post(
             reverse("token-refresh"),
             {"refresh": str(refresh)},
