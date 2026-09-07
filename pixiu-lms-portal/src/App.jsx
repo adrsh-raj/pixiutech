@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, lazy, Suspense, Component } from 'react';
 import { BrowserRouter, Routes, Route, Outlet, Navigate, Link } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
+import PortalShell from './components/PortalShell';
 import Dashboard from './pages/Dashboard';
 import Phase6 from './pages/Phase6';
 import Students from './pages/Students';
@@ -25,7 +26,7 @@ import SchoolPortal from './pages/SchoolPortal';
 import AuditLogs from './pages/AuditLogs';
 import { DataProvider, useData } from './context/DataContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { ToastProvider, useToast } from './context/ToastContext';
+import { ToastProvider } from './context/ToastContext';
 import { LogOut, Bell, ShieldCheck, Menu } from 'lucide-react';
 import { filterNotificationsForUser, fetchUserReadNotifIds, saveUserReadNotifIds } from './utils/notifications';
 
@@ -88,10 +89,10 @@ function ProtectedLayout() {
 }
 
 function AdminOnly({ children }) { const { user } = useAuth(); return user?.role === 'admin' || user?.role === 'superadmin' ? children : <Navigate to="/trainers" replace />; }
-function TrainerConsoleRoute() { const { user } = useAuth(); return user?.role === 'trainer' ? <TrainerWorkspace /> : <Trainers />; }
+function TrainerConsoleRoute() { const { user } = useAuth(); return user?.role === 'trainer' ? <PortalShell role="trainer" title="Trainer Workspace" subtitle="Run sessions, manage students and stay ready for your next class."><TrainerWorkspace /></PortalShell> : <Trainers />; }
 function StudentRouteGuard() { const { isAuthenticated, user, loading } = useAuth(); if (loading) return <div className="min-h-screen bg-slate-900 flex items-center justify-center"><div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" /></div>; if (!isAuthenticated) return <Navigate to="/login" replace />; if (user?.role !== 'student') return <Navigate to="/" replace />; return <StudentPortal />; }
 function SchoolRouteGuard() { const { isAuthenticated, user, loading } = useAuth(); if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" /></div>; if (!isAuthenticated) return <Navigate to="/login" replace />; if (!['school', 'admin'].includes(user?.role)) return <Navigate to="/" replace />; return <SchoolPortal />; }
-function GuestRouteGuard({ children }) { const { isAuthenticated, user, loading } = useAuth(); if (loading) return <div className="min-h-screen bg-[#040810] flex items-center justify-center"><div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" /></div>; if (isAuthenticated && user) { const destination = user.role === 'student' ? '/student-portal' : user.role === 'school' ? '/school-portal' : user.role === 'trainer' ? '/trainers' : '/'; return <Navigate to={destination} replace />; } return children; }
+function GuestRouteGuard({ children }) { const { isAuthenticated, user, loading } = useAuth(); if (loading) return <div className="min-h-screen bg-[#040810] flex items-center justify-center text-white"><div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" /></div>; if (isAuthenticated && user) { const destination = user.role === 'student' ? '/student-portal' : user.role === 'school' ? '/school-portal' : user.role === 'trainer' ? '/trainers' : '/'; return <Navigate to={destination} replace />; } return children; }
 
 export default function App() {
   return <ToastProvider><AuthProvider><DataProvider><BrowserRouter><Routes>
