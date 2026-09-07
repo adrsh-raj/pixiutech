@@ -23,6 +23,7 @@ class Notification(models.Model):
     title = models.CharField(max_length=200)
     message = models.TextField()
     event_key = models.CharField(max_length=160)
+    metadata = models.JSONField(default=dict, blank=True)
     read_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
