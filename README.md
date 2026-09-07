@@ -1,13 +1,13 @@
 # Pixiu Tech
 
-Pixiu Tech is a React/Vite education platform with two frontend applications and one LMS backend.
+Pixiu Tech is a React/Vite education platform with two frontend applications and one canonical Django LMS backend.
 
 ## Production architecture
 
 - **Public website:** repository root, deployed on Vercel.
 - **LMS portal:** `pixiu-lms-portal/`, deployed on Vercel as a separate Vite project with that directory as its Root Directory.
-- **LMS API:** `pixiu-lms-portal/server/`, deployed on Render.
-- **Database:** PostgreSQL owned by the LMS API.
+- **LMS API:** `pixiu-backend/`, Django REST Framework, deployed on Render.
+- **Database:** PostgreSQL owned by the Django LMS API.
 - **Source of truth:** GitHub `main`.
 
 Both frontend applications use `npm run build` → `dist/`, with SPA fallback configured by their respective `vercel.json` files.
@@ -30,16 +30,18 @@ ENQUIRY_DELIVERY_ENDPOINT=https://formspree.io/f/<form-id>
 Set:
 
 ```env
-VITE_API_URL=https://<your-lms-api-host>/api
+VITE_API_URL=https://<your-django-api-host>/api/v1
 ```
 
-The LMS uses `pixiu-lms-portal/src/config/api.js` as its single API URL authority. The value may be an absolute HTTP(S) URL or a same-origin `/api` path. One trailing slash is normalized away.
+The LMS uses `pixiu-lms-portal/src/config/api.js` as its single API URL authority. The legacy `VITE_DJANGO_API_URL=https://<your-django-api-host>/api` variable is accepted only for the Phase 6 admin operations page and is normalized to `/api/v1`.
 
 The frontend has no localhost fallback and no browser-side database fallback. PostgreSQL/API is authoritative for application records. GET requests tolerate Render cold-start responses with bounded retry/backoff; writes are never retried automatically to avoid duplicates.
 
 ### LMS API
 
-The server requires deployment environment variables for its database, JWT signing secret, and CORS policy. No production credentials belong in Git.
+The Django backend requires deployment environment variables for its PostgreSQL database, JWT signing secret, allowed hosts, and frontend CORS/CSRF origins. No production credentials belong in Git.
+
+Required production configuration is documented in `PHASE_8_DEPLOYMENT.md` and `pixiu-backend/.env.example`.
 
 ## Routing ownership
 
@@ -57,13 +59,13 @@ The website does not attempt to block browser context menus, keyboard shortcuts,
 
 ## Protected materials and uploads
 
-Teacher master PDFs live outside web-public directories under `pixiu-lms-portal/server/private/materials/` and are served through authenticated API routes.
-
-Uploaded student/project evidence is stored privately and served through authenticated API routes. There is no public `/uploads` static mount.
+Protected teaching materials should not be placed inside frontend `public/` directories. Student/project evidence is intended to be private application data and should be stored through the authenticated Django API rather than as a public static asset.
 
 Do not place private teaching packs, answer keys, student/parent personal data, database snapshots, or runtime secrets under `public/` or frontend source directories.
 
 ## Development
+
+Public website:
 
 ```bash
 npm install
@@ -71,7 +73,7 @@ npm run dev
 npm run build
 ```
 
-For the LMS frontend:
+LMS frontend:
 
 ```bash
 cd pixiu-lms-portal
@@ -80,8 +82,19 @@ npm run dev
 npm run build
 ```
 
-The LMS backend lives at `pixiu-lms-portal/server/` and is a separate Node service.
+Django API:
 
-## Repository rules
+```bash
+cd pixiu-backend
+python -m pip install -r requirements.txt
+python manage.py migrate
+python manage.py runserver
+```
 
-Keep one canonical implementation for each production feature. Do not reintroduce legacy login/resource-hub apps, duplicate circuit-lab code, Netlify deployment files, browser-side database mocks, seed-data authentication, or browser credential fallbacks.
+For production, use the Render configuration in `render.yaml` rather than Django's development server.
+
+## Verification
+
+The GitHub Actions workflow runs Django deployment checks, migration-drift checks, the Django test suite against PostgreSQL 16, Python compilation, static collection, and both Vite production builds.
+
+Deployment smoke checks are available in `scripts/e2e-smoke.mjs`. See `PHASE_8_DEPLOYMENT.md` for the Render/Vercel setup and end-to-end verification flow.
