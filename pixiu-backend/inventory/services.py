@@ -1,6 +1,6 @@
 from django.db import transaction
 from django.utils import timezone
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from audit.services import record_audit
 from .models import InventoryItem, StockBalance, StockMovement, Kit, KitCustody
@@ -11,6 +11,8 @@ def move_stock(*, item: InventoryItem, quantity_delta: int, performed_by, reason
     quantity_delta = int(quantity_delta)
     if quantity_delta == 0:
         raise ValidationError("Quantity delta cannot be zero.")
+    if school is not None and trainer is not None:
+        raise ValidationError("Stock belongs to either a school, a trainer, or the central store.")
     balance, _ = StockBalance.objects.select_for_update().get_or_create(item=item, school=school, trainer=trainer, defaults={"quantity": 0})
     new_quantity = balance.quantity + quantity_delta
     if new_quantity < 0:
@@ -24,11 +26,18 @@ def move_stock(*, item: InventoryItem, quantity_delta: int, performed_by, reason
 
 @transaction.atomic
 def issue_kit(*, kit: Kit, issued_by, school=None, trainer=None, student=None, notes=""):
-    locked_kit = Kit.objects.select_for_update().get(pk=kit.pk)
-    if not any([school, trainer, student]):
-        raise ValidationError("A school, trainer or student recipient is required.")
-    if sum(bool(x) for x in [school, trainer, student]) != 1:
-        raise ValidationError("A kit can have exactly one active custodian.")
+    locked_kit = Kit.objects.select_for_update().select_related("school_class__school").get(pk=kit.pk)
+    recipients = [school, trainer, student]
+    if sum(bool(x) for x in recipients) != 1:
+        raise ValidationError("A kit must have exactly one active recipient.")
+    if locked_kit.school_class_id:
+        kit_school_id = locked_kit.school_class.school_id
+        if school is not None and school.id != kit_school_id:
+            raise PermissionDenied("Kit school does not match the recipient school.")
+        if student is not None and student.school_class.school_id != kit_school_id:
+            raise PermissionDenied("Student does not belong to the kit school.")
+        if trainer is not None and not trainer.school_assignments.filter(school_id=kit_school_id, status="active").exists():
+            raise PermissionDenied("Trainer is not assigned to the kit school.")
     if KitCustody.objects.filter(kit=locked_kit, returned_at__isnull=True).exists():
         raise ValidationError("Kit is already issued.")
     custody = KitCustody.objects.create(kit=locked_kit, school=school, trainer=trainer, student=student, issued_at=timezone.now(), issued_by=issued_by, notes=notes.strip())
