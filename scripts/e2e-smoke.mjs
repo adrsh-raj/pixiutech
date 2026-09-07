@@ -25,7 +25,7 @@ try {
   if (baseUrl) {
     const response = await assertOk(baseUrl, "Frontend");
     const html = await response.text();
-    if (!/<html[\\s>]/i.test(html) || !/(<script|root)/i.test(html)) {
+    if (!/<html[\s>]/i.test(html) || !/(<script|root)/i.test(html)) {
       throw new Error("Frontend response does not look like a Vite/HTML application.");
     }
     console.log(`Frontend smoke test passed: ${baseUrl}`);
