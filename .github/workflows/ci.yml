@@ -12,14 +12,53 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: pixiu
+          POSTGRES_PASSWORD: pixiu
+          POSTGRES_DB: pixiu_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pixiu -d pixiu_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify Django backend
+        working-directory: pixiu-backend
+        env:
+          DJANGO_SECRET_KEY: ci-only-not-for-production
+          DJANGO_DEBUG: "True"
+          DJANGO_ALLOWED_HOSTS: "127.0.0.1,localhost"
+          DATABASE_URL: postgresql://pixiu:pixiu@127.0.0.1:5432/pixiu_test
+          DJANGO_EXPECTED_DATABASE_NAME: pixiu_test
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python manage.py check
+          python manage.py migrate --noinput
+          python manage.py test
+          python -m compileall -q .
+
       - name: Verify LMS backend syntax
         run: node --check pixiu-lms-portal/server/index.js
+
       - name: Verify production CORS policy
         run: node pixiu-lms-portal/server/tests/cors-policy.test.js
+
       - name: Verify public website build
         run: npm ci && npm run build
+
       - name: Verify LMS frontend build
         working-directory: pixiu-lms-portal
         run: npm ci && npm run build
