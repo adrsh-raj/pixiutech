@@ -43,40 +43,41 @@ function convertPlaceholders(sql) {
 
 function convertSqliteCompat(sql) {
   let converted = sql;
-
-  // SQLite-compatible ordering alias used by a few legacy endpoints.
   converted = converted.replace(/\bORDER\s+BY\s+rowid\s+DESC\b/gi, 'ORDER BY id DESC');
-
-  // SQLite INSERT OR IGNORE -> PostgreSQL ON CONFLICT DO NOTHING.
   converted = converted.replace(/INSERT\s+OR\s+IGNORE\s+INTO\s+/gi, 'INSERT INTO ');
-  if (/^\s*INSERT\s+INTO\s+/i.test(converted) && !/\bON\s+CONFLICT\b/i.test(converted)) {
-    // Only append for the statements that originated from OR IGNORE.
-    // The sentinel is added below by the dedicated replacement.
-  }
 
-  // SQLite INSERT OR REPLACE -> PostgreSQL upsert. This intentionally uses an
-  // unconstrained ON CONFLICT clause so any primary/unique key conflict is updated.
   const replaceMatch = sql.match(/^\s*INSERT\s+OR\s+REPLACE\s+INTO\s+([\w\"]+)\s*\(([^)]+)\)\s*(VALUES\s*\([\s\S]*\))\s*;?\s*$/i);
   if (replaceMatch) {
     const table = replaceMatch[1];
     const columns = replaceMatch[2].split(',').map(col => col.trim());
     const valuesPart = replaceMatch[3];
-    const updates = columns
-      .filter(col => !/^id$/i.test(col.replace(/[`\"]+/g, '')))
-      .map(col => `${col} = EXCLUDED.${col}`)
-      .join(', ');
+    const updates = columns.filter(col => !/^id$/i.test(col.replace(/[`\"]+/g, ''))).map(col => `${col} = EXCLUDED.${col}`).join(', ');
     return `INSERT INTO ${table} (${replaceMatch[2]}) ${valuesPart} ON CONFLICT DO UPDATE SET ${updates || 'id = EXCLUDED.id'}`;
   }
 
   const ignoreMatch = sql.match(/^\s*INSERT\s+OR\s+IGNORE\s+INTO\s+([\w\"]+)\s*\(([^)]+)\)\s*(VALUES\s*\([\s\S]*\))\s*;?\s*$/i);
-  if (ignoreMatch) {
-    return `INSERT INTO ${ignoreMatch[1]} (${ignoreMatch[2]}) ${ignoreMatch[3]} ON CONFLICT DO NOTHING`;
-  }
-
+  if (ignoreMatch) return `INSERT INTO ${ignoreMatch[1]} (${ignoreMatch[2]}) ${ignoreMatch[3]} ON CONFLICT DO NOTHING`;
   return converted;
 }
 
 const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
+
+async function runSchemaMigrations() {
+  // These are deliberately idempotent so an existing production database can be upgraded safely.
+  await pool.query(`ALTER TABLE billing ADD COLUMN IF NOT EXISTS school_claimed_payment BOOLEAN DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE billing ADD COLUMN IF NOT EXISTS transaction_id TEXT`);
+  await pool.query(`ALTER TABLE billing ADD COLUMN IF NOT EXISTS proof_url TEXT`);
+  await pool.query(`ALTER TABLE billing ADD COLUMN IF NOT EXISTS payment_notes TEXT`);
+  await pool.query(`ALTER TABLE billing ADD COLUMN IF NOT EXISTS claimed_at TIMESTAMPTZ`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_students_school_id ON students(school_id)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_classes_school_id ON classes(school_id)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_sessions_school_id ON sessions(school_id)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_inventory_school_id ON inventory(school_id)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_billing_school_id ON billing(school_id)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_attendance_session_student ON attendance(session_id, student_id)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_reviews_student_id ON student_reviews(student_id)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_quiz_submissions_student_id ON quiz_submissions(student_id)`);
+}
 
 async function migrateLegacySqlite() {
   const sqlitePath = process.env.SQLITE_MIGRATION_PATH?.trim();
@@ -85,9 +86,7 @@ async function migrateLegacySqlite() {
     return;
   }
 
-  if (!fs.existsSync(sqlitePath)) {
-    throw new Error(`SQLITE_MIGRATION_PATH does not exist: ${sqlitePath}`);
-  }
+  if (!fs.existsSync(sqlitePath)) throw new Error(`SQLITE_MIGRATION_PATH does not exist: ${sqlitePath}`);
 
   const client = await pool.connect();
   let sqlite = null;
@@ -132,6 +131,8 @@ async function migrateLegacySqlite() {
 async function initializeDatabase() {
   await pool.query('SELECT 1');
   await pool.query(schema);
+  await pool.query(`CREATE TABLE IF NOT EXISTS _pixiu_migrations (id TEXT PRIMARY KEY, applied_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP)`);
+  await runSchemaMigrations();
   await migrateLegacySqlite();
   await pool.query('SELECT 1');
   console.log(`Connected to PostgreSQL database (pool max ${poolMax}).`);
