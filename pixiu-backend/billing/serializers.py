@@ -20,6 +20,18 @@ class InvoiceSerializer(serializers.ModelSerializer):
         fields = ["id", "invoice_number", "school", "school_class", "trainer", "status", "issue_date", "due_date", "notes", "subtotal", "tax_amount", "total_amount", "amount_paid", "lines", "created_by", "created_at", "updated_at"]
         read_only_fields = ["id", "invoice_number", "status", "subtotal", "total_amount", "amount_paid", "created_by", "created_at", "updated_at"]
 
+    def validate(self, attrs):
+        school = attrs.get("school", getattr(self.instance, "school", None))
+        school_class = attrs.get("school_class", getattr(self.instance, "school_class", None))
+        trainer = attrs.get("trainer", getattr(self.instance, "trainer", None))
+        if school_class and school and school_class.school_id != school.id:
+            raise serializers.ValidationError("Invoice class must belong to the selected school.")
+        if trainer and school and not trainer.school_assignments.filter(school_id=school.id, status="active").exists():
+            raise serializers.ValidationError("Invoice trainer is not actively assigned to the selected school.")
+        if attrs.get("tax_amount", getattr(self.instance, "tax_amount", 0)) < 0:
+            raise serializers.ValidationError({"tax_amount": "Tax cannot be negative."})
+        return attrs
+
 
 class InvoiceLineItemWriteSerializer(serializers.ModelSerializer):
     class Meta:
