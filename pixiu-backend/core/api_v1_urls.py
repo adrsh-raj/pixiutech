@@ -16,22 +16,22 @@ from .api_v1_compat import (
     ContractQuizAttemptViewSet,
     ContractQuizViewSet,
     ContractReviewViewSet,
-    ContractSchoolViewSet,
     ContractSessionViewSet,
     ContractStudentViewSet,
     ContractTrainerViewSet,
     health,
     upload,
 )
+from .phase7_contract_overrides import ContractSchoolCompatViewSet, ContractSessionCompatViewSet
 
 # No trailing slash keeps the old portal request contract intact while the
-# public API is now owned by Django. Explicit auth URLs below retain slashes.
+# public API is now owned by Django. Auth endpoints retain explicit slashes.
 router = DefaultRouter(trailing_slash=False)
-router.register("schools", ContractSchoolViewSet, basename="v1-school")
+router.register("schools", ContractSchoolCompatViewSet, basename="v1-school")
 router.register("trainers", ContractTrainerViewSet, basename="v1-trainer")
 router.register("classes", ContractClassViewSet, basename="v1-class")
 router.register("students", ContractStudentViewSet, basename="v1-student")
-router.register("sessions", ContractSessionViewSet, basename="v1-session")
+router.register("sessions", ContractSessionCompatViewSet, basename="v1-session")
 router.register("attendance", ContractAttendanceViewSet, basename="v1-attendance")
 router.register("curriculum", ContractCurriculumViewSet, basename="v1-curriculum")
 router.register("content", ContractContentViewSet, basename="v1-content")
