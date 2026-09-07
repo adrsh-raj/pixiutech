@@ -24,7 +24,9 @@ from .api_v1_compat import (
     upload,
 )
 
-router = DefaultRouter()
+# No trailing slash keeps the old portal request contract intact while the
+# public API is now owned by Django. Explicit auth URLs below retain slashes.
+router = DefaultRouter(trailing_slash=False)
 router.register("schools", ContractSchoolViewSet, basename="v1-school")
 router.register("trainers", ContractTrainerViewSet, basename="v1-trainer")
 router.register("classes", ContractClassViewSet, basename="v1-class")
