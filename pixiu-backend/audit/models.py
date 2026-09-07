@@ -31,8 +31,8 @@ class AuditLog(models.Model):
     class Meta:
         ordering = ["-created_at"]
         indexes = [
-            models.Index(fields=["entity_type", "entity_id"]),
-            models.Index(fields=["actor", "created_at"]),
+            models.Index(fields=["entity_type", "entity_id"], name="audit_entity_idx"),
+            models.Index(fields=["actor", "created_at"], name="audit_actor_time_idx"),
         ]
 
     def save(self, *args, **kwargs):
