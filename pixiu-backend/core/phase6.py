@@ -13,32 +13,39 @@ from accounts.models import User, UserRole
 from academics.models import School, SchoolClass, Student, Trainer, TrainerSchoolAssignment
 from audit.models import AuditAction, AuditLog
 from billing.models import Invoice, InvoiceLineItem, Payment, Receipt
-from crm.models import Lead
-from inventory.models import InventoryItem, Kit, KitCustody, StockBalance, StockMovement
+from crm.models import Lead, LeadActivity, LeadContact
+from inventory.models import InventoryItem, Kit, KitCustody, KitItem, StockBalance, StockMovement
 from learning.models import AttendanceRecord, ContentClassAssignment, CurriculumUnit, LearningContent, Project, ProjectEvidence, Quiz, QuizAttempt, QuizClassAssignment, Session, StudentAssessment
 from notifications.models import Notification, NotificationPreference
+from .phase6_auth import ExpressJWTAuthentication
 
 class AdminOnly(BasePermission):
     message = "Administrator access required."
     def has_permission(self, request, view):
-        return bool(request.user and request.user.is_authenticated and request.user.role == UserRole.ADMIN)
+        return bool(request.user and request.user.is_authenticated and getattr(request.user, "role", None) == UserRole.ADMIN)
 
 def _money(value):
     return float(value or Decimal("0"))
 
 def _audit(request, action, entity_type, summary, changes=None):
-    AuditLog.objects.create(actor=request.user, action=action, entity_type=entity_type, summary=summary, changes=changes or {}, ip_address=request.META.get("REMOTE_ADDR"), user_agent=request.META.get("HTTP_USER_AGENT", "")[:2000])
+    actor = None
+    username = getattr(request.user, "username", "")
+    if username:
+        actor = User.objects.filter(username=username).first()
+    AuditLog.objects.create(actor=actor, action=action, entity_type=entity_type, summary=summary, changes=changes or {}, ip_address=request.META.get("REMOTE_ADDR"), user_agent=request.META.get("HTTP_USER_AGENT", "")[:2000])
 
-class DashboardSummaryAPI(APIView):
+class Phase6BaseAPIView(APIView):
+    authentication_classes = [ExpressJWTAuthentication]
     permission_classes = [AdminOnly]
+
+class DashboardSummaryAPI(Phase6BaseAPIView):
     def get(self, request):
         attendance_total = AttendanceRecord.objects.count()
         present = AttendanceRecord.objects.filter(status="present").count()
         successful = Payment.objects.filter(status="success")
         return JsonResponse({"generated_at": timezone.now().isoformat(), "academics": {"schools": School.objects.count(), "active_schools": School.objects.filter(status="active").count(), "trainers": Trainer.objects.count(), "active_trainers": Trainer.objects.filter(status="active").count(), "classes": SchoolClass.objects.count(), "students": Student.objects.count(), "active_students": Student.objects.filter(status="active").count(), "active_trainer_school_assignments": TrainerSchoolAssignment.objects.filter(status="active").count()}, "learning": {"sessions": Session.objects.count(), "completed_sessions": Session.objects.filter(status="completed").count(), "attendance_records": attendance_total, "attendance_rate": round(present / attendance_total * 100, 2) if attendance_total else None, "curriculum_units": CurriculumUnit.objects.count(), "content": LearningContent.objects.count(), "quizzes": Quiz.objects.count(), "quiz_attempts": QuizAttempt.objects.count(), "projects": Project.objects.count(), "assessments": StudentAssessment.objects.count()}, "finance": {"invoices": Invoice.objects.count(), "invoiced": _money(Invoice.objects.aggregate(v=Sum("total_amount"))["v"]), "collected": _money(successful.aggregate(v=Sum("amount"))["v"]), "pending_payments": _money(Payment.objects.filter(status="pending").aggregate(v=Sum("amount"))["v"]), "overdue_invoices": Invoice.objects.filter(status="overdue").count()}, "inventory": {"items": InventoryItem.objects.count(), "kits": Kit.objects.count(), "stock_balances": StockBalance.objects.count(), "stock_movements": StockMovement.objects.count(), "active_custody": KitCustody.objects.filter(returned_at__isnull=True).count()}, "crm": {"leads": Lead.objects.count(), "open_leads": Lead.objects.exclude(status__in=["won", "lost"]).count(), "won_leads": Lead.objects.filter(status="won").count()}, "notifications": Notification.objects.count()})
 
-class ReportsOverviewAPI(APIView):
-    permission_classes = [AdminOnly]
+class ReportsOverviewAPI(Phase6BaseAPIView):
     def get(self, request):
         start = timezone.localdate().replace(day=1)
         months = []
@@ -52,13 +59,11 @@ class ReportsOverviewAPI(APIView):
         payments = {(r["month"].year, r["month"].month): _money(r["value"]) for r in payment_rows if r["month"]}
         return JsonResponse({"generated_at": timezone.now().isoformat(), "monthly_finance": [{"label": f"{month_abbr[m]} {str(y)[2:]}", "invoiced": invoices.get((y, m), 0), "collected": payments.get((y, m), 0)} for y, m in months], "students_by_grade": list(Student.objects.values(grade=F("school_class__grade")).annotate(total=Count("id")).order_by("grade")), "lead_funnel": list(Lead.objects.values("status").annotate(total=Count("id")).order_by("status")), "top_schools": list(School.objects.annotate(student_count=Count("classes__students", distinct=True)).values("school_code", "name", "student_count").order_by("-student_count", "school_code")[:10]), "trainer_load": list(Trainer.objects.annotate(session_count=Count("sessions", distinct=True)).values("trainer_id", "name", "session_count").order_by("-session_count", "trainer_id")[:20])})
 
-class IntegrityAuditAPI(APIView):
-    permission_classes = [AdminOnly]
+class IntegrityAuditAPI(Phase6BaseAPIView):
     def get(self, request):
         return JsonResponse(IntegrityAudit.run_checks())
 
-class ControlledResetAPI(APIView):
-    permission_classes = [AdminOnly]
+class ControlledResetAPI(Phase6BaseAPIView):
     RESET_PHRASE = "RESET PIXIU DATA"
     SCOPES = {"learning_runtime", "business", "inventory", "notifications", "all_operational"}
     def post(self, request):
@@ -77,7 +82,7 @@ class ControlledResetAPI(APIView):
             _audit(request, AuditAction.DELETE, "controlled_reset", f"Controlled data reset completed: {scope}", {"scope": scope, "deleted": deleted})
         return JsonResponse({"success": True, "scope": scope, "deleted": deleted, "preserved": ["accounts", "academics", "audit_logs"]})
     def _models(self, scope):
-        groups = {"learning_runtime": [AttendanceRecord, ProjectEvidence, Project, QuizAttempt, StudentAssessment, Session], "business": [Receipt, Payment, InvoiceLineItem, Invoice], "inventory": [KitCustody, KitItem, Kit, StockMovement, StockBalance, InventoryItem], "notifications": [NotificationPreference, Notification]}
+        groups = {"learning_runtime": [AttendanceRecord, ProjectEvidence, Project, QuizAttempt, StudentAssessment, Session], "business": [Receipt, Payment, InvoiceLineItem, Invoice, LeadActivity, LeadContact, Lead], "inventory": [KitCustody, KitItem, Kit, StockMovement, StockBalance, InventoryItem], "notifications": [NotificationPreference, Notification]}
         return groups[scope] if scope != "all_operational" else sum(groups.values(), [])
     def _counts(self, scope):
         return {model.__name__: model.objects.count() for model in self._models(scope)}
