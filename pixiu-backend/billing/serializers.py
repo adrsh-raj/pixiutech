@@ -25,7 +25,13 @@ class InvoiceLineItemWriteSerializer(serializers.ModelSerializer):
     class Meta:
         model = InvoiceLineItem
         fields = ["id", "invoice", "description", "quantity", "unit_price"]
-        read_only_fields = ["id", "invoice"]
+        read_only_fields = ["id"]
+
+
+class PaymentRecordSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Payment
+        fields = ["invoice", "amount", "method", "payment_date", "transaction_reference", "notes"]
 
 
 class PaymentSerializer(serializers.ModelSerializer):
