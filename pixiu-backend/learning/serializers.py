@@ -79,7 +79,7 @@ class CurriculumUnitSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         for field in ("grade", "level", "unit_code", "title", "objectives"):
             if field in attrs and not str(attrs[field]).strip():
-                raise serializers.ValidationError({field: "This field cannot be blank.")
+                raise serializers.ValidationError({field: "This field cannot be blank."})
         return attrs
 
 
@@ -287,11 +287,10 @@ class StudentAssessmentSerializer(serializers.ModelSerializer):
             if trainer and trainer.account_id != user.id:
                 raise serializers.ValidationError("A trainer can only submit their own assessments.")
             trainer = trainer or user.trainer_profile
+            attrs["trainer"] = trainer
         if trainer and student and user.role != UserRole.ADMIN:
             if not trainer.school_assignments.filter(school_id=student.school_class.school_id, status="active").exists():
                 raise serializers.ValidationError("Trainer is not assigned to the student's school.")
-        if user.role == UserRole.TRAINER and attrs.get("trainer") is None:
-            attrs["trainer"] = user.trainer_profile
         return attrs
 
 
