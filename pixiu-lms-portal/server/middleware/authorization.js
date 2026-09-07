@@ -1,5 +1,7 @@
 const fs = require('fs');
 const path = require('path');
+const multer = require('multer');
+const crypto = require('crypto');
 
 const READ_ONLY = new Set(['GET', 'HEAD', 'OPTIONS']);
 const ADMIN_MUTATION_ROOTS = ['/leads', '/billing', '/logs', '/audit-logs', '/settings', '/data-reset'];
@@ -37,6 +39,9 @@ function scopeResponse(res, scope, route) {
           if (row.student_id != null) return same(row.student_id, scope.studentId);
           if (row.school_id != null) return same(row.school_id, scope.schoolId);
           return matches(route, ['/content', '/curriculum', '/quizzes']);
+        }
+        if (matches(route, ['/trainer-materials'])) {
+          return same(row.target_trainer_id, 'ALL') || same(row.target_trainer_id, scope.trainerId);
         }
         if (row.school_id != null) return scope.schoolIds.some(id => same(row.school_id, id));
         if (row.target_school_id != null) return same(row.target_school_id, 'ALL') || scope.schoolIds.some(id => same(row.target_school_id, id));
@@ -81,19 +86,115 @@ async function resourceSchoolId(db, route, objectName) {
   return new Promise(resolve => db.get(sql, [id], (err, row) => resolve(err ? null : (row?.school_id ?? row?.target_school_id ?? null))));
 }
 
-async function servePrivateTeacherMaterial(req, res) {
-  const filename = decodeURIComponent(req.params?.filename || '');
-  if (!/^[A-Za-z0-9._-]+\.pdf$/i.test(filename)) return res.status(400).json({ error: 'Invalid material filename.' });
-  const privateMaterialsDir = path.join(__dirname, '..', 'private', 'materials');
-  const filePath = path.join(privateMaterialsDir, filename);
-  const resolvedRoot = path.resolve(privateMaterialsDir);
-  const resolvedFile = path.resolve(filePath);
-  if (!resolvedFile.startsWith(`${resolvedRoot}${path.sep}`)) return res.status(400).json({ error: 'Invalid material path.' });
-  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Material not found.' });
-  res.setHeader('Cache-Control', 'private, max-age=300');
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.type('application/pdf');
-  return res.sendFile(filePath);
+const materialDir = (process.env.RENDER && fs.existsSync('/opt/render/project/src/data'))
+  ? '/opt/render/project/src/data/uploads'
+  : path.join(__dirname, '..', 'uploads');
+if (!fs.existsSync(materialDir)) fs.mkdirSync(materialDir, { recursive: true });
+
+const materialStorage = multer.diskStorage({
+  destination: (_, __, cb) => cb(null, materialDir),
+  filename: (_, file, cb) => {
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    const token = crypto.randomBytes(12).toString('hex');
+    cb(null, `trainer-material-${Date.now()}-${token}${ext}`);
+  }
+});
+const materialUpload = multer({
+  storage: materialStorage,
+  fileFilter: (_, file, cb) => cb(null, file.mimetype === 'application/pdf' && path.extname(file.originalname || '').toLowerCase() === '.pdf'),
+  limits: { fileSize: 20 * 1024 * 1024 }
+});
+
+function materialFilePath(fileName) {
+  if (!/^[A-Za-z0-9._-]+\.pdf$/i.test(String(fileName || ''))) return null;
+  const candidate = path.resolve(path.join(materialDir, fileName));
+  const root = path.resolve(materialDir);
+  return candidate.startsWith(`${root}${path.sep}`) ? candidate : null;
+}
+
+function handleTrainerMaterials(db, req, res) {
+  const route = req.path;
+  const role = req.user?.role;
+  const trainerId = req.user?.related_id || req.user?.id || req.user?.username;
+
+  if (route === '/trainer-materials' && req.method === 'GET') {
+    const sql = role === 'admin' || role === 'superadmin'
+      ? 'SELECT * FROM trainer_materials ORDER BY created_at DESC'
+      : 'SELECT * FROM trainer_materials WHERE target_trainer_id = ? OR target_trainer_id = \'ALL\' ORDER BY created_at DESC';
+    const params = role === 'admin' || role === 'superadmin' ? [] : [trainerId];
+    return db.all(sql, params, (err, rows = []) => {
+      if (err) return res.status(500).json({ error: err.message });
+      return res.json(rows);
+    });
+  }
+
+  if (route.startsWith('/trainer-materials/') && route.endsWith('/file') && req.method === 'GET') {
+    const id = decodeURIComponent(route.split('/')[2] || '');
+    return db.get('SELECT * FROM trainer_materials WHERE id = ?', [id], (err, row) => {
+      if (err) return res.status(500).json({ error: err.message });
+      if (!row) return res.status(404).json({ error: 'Material not found.' });
+      if (role !== 'admin' && role !== 'superadmin' && !same(row.target_trainer_id, 'ALL') && !same(row.target_trainer_id, trainerId)) return deny(res, 'Material is not assigned to this trainer');
+      const filePath = materialFilePath(row.file_name);
+      if (!filePath || !fs.existsSync(filePath)) return res.status(404).json({ error: 'Material file is unavailable.' });
+      res.setHeader('Cache-Control', 'private, max-age=300');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('Content-Disposition', `inline; filename="${String(row.title || 'Trainer Material').replace(/[^A-Za-z0-9._ -]/g, '')}.pdf"`);
+      res.type('application/pdf');
+      return res.sendFile(filePath);
+    });
+  }
+
+  if (route === '/trainer-materials' && req.method === 'POST') {
+    if (role !== 'admin' && role !== 'superadmin') return deny(res, 'Administrator access required to send trainer materials');
+    return materialUpload.single('file')(req, res, async err => {
+      if (err) return res.status(400).json({ error: err.message || 'PDF upload failed.' });
+      const { title, description, class_grade, level } = req.body || {};
+      let targetTrainerId = String(req.body?.target_trainer_id || '').trim();
+      if (!title?.trim()) {
+        if (req.file) fs.rmSync(req.file.path, { force: true });
+        return res.status(400).json({ error: 'Material title is required.' });
+      }
+      if (!req.file) return res.status(400).json({ error: 'A PDF file is required.' });
+      if (!targetTrainerId) targetTrainerId = 'ALL';
+      if (!same(targetTrainerId, 'ALL')) {
+        const trainer = await db.get('SELECT id FROM trainers WHERE id = ?', [targetTrainerId]);
+        if (!trainer) {
+          fs.rmSync(req.file.path, { force: true });
+          return res.status(400).json({ error: 'Selected trainer does not exist.' });
+        }
+      }
+      const id = `TM-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+      const fileUrl = `/api/trainer-materials/${encodeURIComponent(id)}/file`;
+      db.run(
+        'INSERT INTO trainer_materials (id, title, description, type, class_grade, level, target_trainer_id, file_name, file_url, uploaded_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [id, title.trim(), description || '', 'PDF', class_grade || '', level || '', targetTrainerId, path.basename(req.file.path), fileUrl, req.user?.name || req.user?.username || 'Admin'],
+        function (insertErr) {
+          if (insertErr) {
+            fs.rmSync(req.file.path, { force: true });
+            return res.status(500).json({ error: insertErr.message });
+          }
+          return res.status(201).json({ success: true, id, target_trainer_id: targetTrainerId, file_url: fileUrl });
+        }
+      );
+    });
+  }
+
+  if (route.startsWith('/trainer-materials/') && req.method === 'DELETE') {
+    if (role !== 'admin' && role !== 'superadmin') return deny(res, 'Administrator access required');
+    const id = decodeURIComponent(route.split('/')[2] || '');
+    return db.get('SELECT file_name FROM trainer_materials WHERE id = ?', [id], (err, row) => {
+      if (err) return res.status(500).json({ error: err.message });
+      if (!row) return res.status(404).json({ error: 'Material not found.' });
+      db.run('DELETE FROM trainer_materials WHERE id = ?', [id], function (deleteErr) {
+        if (deleteErr) return res.status(500).json({ error: deleteErr.message });
+        const filePath = materialFilePath(row.file_name);
+        if (filePath) fs.rmSync(filePath, { force: true });
+        return res.json({ success: true, deleted: id });
+      });
+    });
+  }
+
+  return false;
 }
 
 function authorizationMiddleware(db) {
@@ -103,10 +204,9 @@ function authorizationMiddleware(db) {
     const route = req.path;
     if (!user || !role) return deny(res, 'Authenticated role is required');
 
-    if (route.startsWith('/materials/')) {
-      if (!READ_ONLY.has(req.method)) return deny(res, 'Material access is read-only');
-      if (!['admin', 'trainer'].includes(role)) return deny(res, 'Teacher master materials are restricted.');
-      return servePrivateTeacherMaterial(req, res);
+    if (route.startsWith('/trainer-materials')) {
+      const handled = handleTrainerMaterials(db, req, res);
+      if (handled !== false) return;
     }
 
     if (role === 'admin' || role === 'superadmin') return next();
