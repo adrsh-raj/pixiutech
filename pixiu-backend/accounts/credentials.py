@@ -2,6 +2,7 @@ import re
 
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
+from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 
 from .models import User, UserRole, UserStatus
 
@@ -51,10 +52,17 @@ def build_student_username(school_code: str, grade: str, section: str, roll_numb
 
 
 def build_student_password(school_code: str, student_username: str) -> str:
-    school = str(school_code or "").strip()
+    """Build the deterministic student password from the final backend student ID."""
+    school = str(school_code or "").strip().upper()
     username = normalize_login_username(student_username)
     compact = re.sub(r"\s+", "", username).lower()
-    return f"{school.upper()}{compact}{STUDENT_PASSWORD_SUFFIX}"
+    return f"{school}{compact}{STUDENT_PASSWORD_SUFFIX}"
+
+
+def revoke_all_refresh_tokens(user: User) -> None:
+    """Invalidate every outstanding refresh token belonging to an account."""
+    for token_record in OutstandingToken.objects.filter(user=user):
+        BlacklistedToken.objects.get_or_create(token=token_record)
 
 
 def set_managed_password(user: User, password: str, *, must_change: bool = True) -> User:
@@ -63,7 +71,8 @@ def set_managed_password(user: User, password: str, *, must_change: bool = True)
     user.must_change_password = must_change
     user.status = UserStatus.ACTIVE
     user.is_active = True
-    user.save(update_fields=["password", "must_change_password", "status", "is_active", "updated_at"] if hasattr(user, "updated_at") else ["password", "must_change_password", "status", "is_active"])
+    user.save(update_fields=["password", "must_change_password", "status", "is_active"])
+    revoke_all_refresh_tokens(user)
     return user
 
 
@@ -99,4 +108,5 @@ def create_or_reset_managed_account(
     user.is_staff = False
     user.is_superuser = False
     user.save()
+    revoke_all_refresh_tokens(user)
     return user, created
