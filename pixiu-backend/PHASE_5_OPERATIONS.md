@@ -33,3 +33,5 @@ The legacy database was used only to understand the previous concepts: billing, 
 ## Frontend contract for later portal work
 
 When the portal is wired to these APIs, all four role portals (student, trainer, school, admin) should use a simple responsive shell with a collapsible sidebar, clear role-specific navigation, readable cards/tables, mobile-friendly actions and no hardcoded demo/fallback records. API data must come from Django only.
+
+Phase 5 implementation is backend-first; portal wiring is a later phase and must preserve this UX contract.
