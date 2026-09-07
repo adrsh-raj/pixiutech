@@ -1,5 +1,4 @@
 from django.db import migrations, models
-import django.contrib.auth.models
 import django.utils.timezone
 
 
@@ -35,10 +34,9 @@ class Migration(migrations.Migration):
             options={
                 "verbose_name": "user",
                 "verbose_name_plural": "users",
-                "abstract": False,
             },
             managers=[
-                ("objects", django.contrib.auth.models.UserManager()),
+                ("objects", "accounts.models.AccountUserManager"),
             ],
         ),
     ]
