@@ -40,9 +40,7 @@ function scopeResponse(res, scope, route) {
           if (row.school_id != null) return same(row.school_id, scope.schoolId);
           return matches(route, ['/content', '/curriculum', '/quizzes']);
         }
-        if (matches(route, ['/trainer-materials'])) {
-          return same(row.target_trainer_id, 'ALL') || same(row.target_trainer_id, scope.trainerId);
-        }
+        if (matches(route, ['/trainer-materials'])) return same(row.target_trainer_id, 'ALL') || same(row.target_trainer_id, scope.trainerId);
         if (row.school_id != null) return scope.schoolIds.some(id => same(row.school_id, id));
         if (row.target_school_id != null) return same(row.target_school_id, 'ALL') || scope.schoolIds.some(id => same(row.target_school_id, id));
         if (row.student_id != null) return scope.studentIds.has(String(row.student_id));
@@ -116,12 +114,14 @@ function handleTrainerMaterials(db, req, res) {
   const route = req.path;
   const role = req.user?.role;
   const trainerId = req.user?.related_id || req.user?.id || req.user?.username;
+  const isAdmin = role === 'admin' || role === 'superadmin';
+  if (!['trainer', 'admin', 'superadmin'].includes(role)) return deny(res, 'Trainer materials are restricted to trainers and administrators');
 
   if (route === '/trainer-materials' && req.method === 'GET') {
-    const sql = role === 'admin' || role === 'superadmin'
+    const sql = isAdmin
       ? 'SELECT * FROM trainer_materials ORDER BY created_at DESC'
       : 'SELECT * FROM trainer_materials WHERE target_trainer_id = ? OR target_trainer_id = \'ALL\' ORDER BY created_at DESC';
-    const params = role === 'admin' || role === 'superadmin' ? [] : [trainerId];
+    const params = isAdmin ? [] : [trainerId];
     return db.all(sql, params, (err, rows = []) => {
       if (err) return res.status(500).json({ error: err.message });
       return res.json(rows);
@@ -133,7 +133,7 @@ function handleTrainerMaterials(db, req, res) {
     return db.get('SELECT * FROM trainer_materials WHERE id = ?', [id], (err, row) => {
       if (err) return res.status(500).json({ error: err.message });
       if (!row) return res.status(404).json({ error: 'Material not found.' });
-      if (role !== 'admin' && role !== 'superadmin' && !same(row.target_trainer_id, 'ALL') && !same(row.target_trainer_id, trainerId)) return deny(res, 'Material is not assigned to this trainer');
+      if (!isAdmin && !same(row.target_trainer_id, 'ALL') && !same(row.target_trainer_id, trainerId)) return deny(res, 'Material is not assigned to this trainer');
       const filePath = materialFilePath(row.file_name);
       if (!filePath || !fs.existsSync(filePath)) return res.status(404).json({ error: 'Material file is unavailable.' });
       res.setHeader('Cache-Control', 'private, max-age=300');
@@ -145,7 +145,7 @@ function handleTrainerMaterials(db, req, res) {
   }
 
   if (route === '/trainer-materials' && req.method === 'POST') {
-    if (role !== 'admin' && role !== 'superadmin') return deny(res, 'Administrator access required to send trainer materials');
+    if (!isAdmin) return deny(res, 'Administrator access required to send trainer materials');
     return materialUpload.single('file')(req, res, async err => {
       if (err) return res.status(400).json({ error: err.message || 'PDF upload failed.' });
       const { title, description, class_grade, level } = req.body || {};
@@ -180,7 +180,7 @@ function handleTrainerMaterials(db, req, res) {
   }
 
   if (route.startsWith('/trainer-materials/') && req.method === 'DELETE') {
-    if (role !== 'admin' && role !== 'superadmin') return deny(res, 'Administrator access required');
+    if (!isAdmin) return deny(res, 'Administrator access required');
     const id = decodeURIComponent(route.split('/')[2] || '');
     return db.get('SELECT file_name FROM trainer_materials WHERE id = ?', [id], (err, row) => {
       if (err) return res.status(500).json({ error: err.message });
