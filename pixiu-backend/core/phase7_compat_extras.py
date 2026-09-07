@@ -1,19 +1,34 @@
 from django.db import transaction
 from rest_framework import status, viewsets
-from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from accounts.models import UserRole
-from academics.models import School, Student, Trainer
-from billing.models import Invoice, InvoiceLineItem
+from academics.models import Student, Trainer
+from billing.models import Invoice
 from billing.services import add_invoice_line, recalculate_invoice, update_invoice_line
 from crm.models import CommunicationLog
 from crm.serializers import CommunicationLogSerializer
 from notifications.models import Notification, NotificationType
 
 from .api_v1_compat import ContractBillingViewSet, ContractNotificationViewSet, _first, _school, _student
+
+
+LEGACY_INVOICE_STATUS = {
+    "pending": "issued",
+    "pending_verification": "issued",
+    "paid": "paid",
+    "partially_paid": "partially_paid",
+    "overdue": "overdue",
+    "draft": "draft",
+    "issued": "issued",
+    "void": "void",
+}
+
+
+def normalize_invoice_status(value):
+    return LEGACY_INVOICE_STATUS.get(str(value or "").strip().lower().replace(" ", "_"), "issued")
 
 
 class ContractBillingFullViewSet(ContractBillingViewSet):
@@ -64,7 +79,7 @@ class ContractBillingFullViewSet(ContractBillingViewSet):
                 changed.append("issue_date")
             status_value = request.data.get("status")
             if status_value is not None:
-                invoice.status = str(status_value).lower().replace(" ", "_")
+                invoice.status = normalize_invoice_status(status_value)
                 changed.append("status")
             if changed:
                 invoice.save(update_fields=[*changed, "updated_at"])
@@ -96,7 +111,7 @@ class ContractNotificationFullViewSet(ContractNotificationViewSet):
         notification.title = str(_first(request.data, "title", default=notification.title))[:200]
         notification.message = str(_first(request.data, "message", default=notification.message))
         metadata = dict(notification.metadata or {})
-        for key in ("target_type", "target_classes", "scheduled_date", "scheduled_time", "severity", "template_type"):
+        for key in ("target_type", "target_school_id", "target_classes", "scheduled_date", "scheduled_time", "severity", "template_type"):
             if key in request.data:
                 metadata[key] = request.data.get(key)
         notification.metadata = metadata
@@ -116,19 +131,11 @@ class ContractNotificationFullViewSet(ContractNotificationViewSet):
     def map_out(self, obj):
         metadata = obj.metadata or {}
         return {
-            "id": str(obj.pk),
-            "title": obj.title,
-            "message": obj.message,
-            "type": obj.notification_type,
-            "severity": metadata.get("severity", "info"),
-            "read": bool(obj.read_at),
-            "created_at": obj.created_at,
-            "target_type": metadata.get("target_type", "User"),
-            "target_school_id": metadata.get("target_school_id", ""),
-            "target_classes": metadata.get("target_classes", ""),
-            "scheduled_date": metadata.get("scheduled_date", ""),
-            "scheduled_time": metadata.get("scheduled_time", ""),
-            "template_type": metadata.get("template_type", ""),
+            "id": str(obj.pk), "title": obj.title, "message": obj.message, "type": obj.notification_type,
+            "severity": metadata.get("severity", "info"), "read": bool(obj.read_at), "created_at": obj.created_at,
+            "target_type": metadata.get("target_type", "User"), "target_school_id": metadata.get("target_school_id", ""),
+            "target_classes": metadata.get("target_classes", ""), "scheduled_date": metadata.get("scheduled_date", ""),
+            "scheduled_time": metadata.get("scheduled_time", ""), "template_type": metadata.get("template_type", ""),
             "target_user_id": obj.recipient_id,
         }
 
@@ -138,7 +145,6 @@ class ContractNotificationFullViewSet(ContractNotificationViewSet):
         target_type = str(request.data.get("target_type", "Universal")).strip().lower()
         school = _school(request.data.get("target_school_id"))
         grades = {str(x).strip().upper() for x in str(request.data.get("target_classes", "")).split(",") if str(x).strip()}
-
         students = Student.objects.filter(status="active", account__is_active=True)
         trainers = Trainer.objects.filter(status="active", account__is_active=True)
         if school:
@@ -146,47 +152,39 @@ class ContractNotificationFullViewSet(ContractNotificationViewSet):
             trainers = trainers.filter(school_assignments__school=school, school_assignments__status="active").distinct()
         if grades and target_type in {"all_students", "specific_class"}:
             students = students.filter(school_class__grade__in=grades)
-
         if target_type in {"all_students", "specific_class"}:
             recipients = [s.account for s in students.select_related("account") if s.account_id]
         elif target_type == "all_trainers":
             recipients = [t.account for t in trainers.select_related("account") if t.account_id]
         elif target_type in {"universal", "all"}:
-            recipients = list(UserRoleAwareActiveUsers())
+            recipients = list(active_users())
         elif target_type == "school":
             if school is None:
                 raise ValidationError({"target_school_id": "A valid target school is required."})
-            recipients = list({*(s.account for s in students.select_related("account") if s.account_id), *(t.account for t in trainers.select_related("account") if t.account_id)})
+            recipients = [*list(s.account for s in students.select_related("account") if s.account_id), *list(t.account for t in trainers.select_related("account") if t.account_id)]
             if school.account_id:
                 recipients.append(school.account)
         else:
             raise ValidationError({"target_type": "Unsupported notification target."})
-
         kind = str(_first(request.data, "notification_type", "type", default="info")).lower()
         if kind not in {x.value for x in NotificationType}:
             kind = NotificationType.INFO
-        base_key = str(_first(request.data, "event_key", default=f"broadcast-{timezone_now_timestamp()}"))
-        metadata = {
-            key: request.data.get(key)
-            for key in ("target_type", "target_school_id", "target_classes", "scheduled_date", "scheduled_time", "severity", "template_type")
-            if key in request.data
-        }
+        base_key = str(_first(request.data, "event_key", default=f"broadcast-{timezone_timestamp()}"))
+        metadata = {key: request.data.get(key) for key in ("target_type", "target_school_id", "target_classes", "scheduled_date", "scheduled_time", "severity", "template_type") if key in request.data}
         created = []
         for recipient in {r for r in recipients if r and r.is_active}:
             created.append(Notification.objects.create(recipient=recipient, notification_type=kind, title=str(request.data.get("title", "Notification"))[:200], message=str(request.data.get("message", "")), event_key=f"{base_key}:{recipient.pk}", metadata=metadata))
         return Response([self.map_out(obj) for obj in created], status=status.HTTP_201_CREATED)
 
 
-# Small helpers kept local to avoid making the contract adapter depend on unrelated services.
-def timezone_now_timestamp():
+def timezone_timestamp():
     from django.utils import timezone
     return timezone.now().timestamp()
 
 
-def UserRoleAwareActiveUsers():
+def active_users():
     from django.contrib.auth import get_user_model
-    User = get_user_model()
-    return User.objects.filter(is_active=True, role__in={UserRole.ADMIN, UserRole.SCHOOL, UserRole.TRAINER, UserRole.STUDENT})
+    return get_user_model().objects.filter(is_active=True)
 
 
 class ContractCommunicationLogViewSet(viewsets.ModelViewSet):
@@ -206,7 +204,8 @@ class ContractCommunicationLogViewSet(viewsets.ModelViewSet):
         return qs.none()
 
     def create(self, request, *args, **kwargs):
-        self._require_sender_role()
+        if self.request.user.role not in {UserRole.ADMIN, UserRole.SCHOOL}:
+            raise PermissionDenied("Only administrators and school accounts can log parent communications.")
         student = _student(request.data.get("student_id") or request.data.get("student"))
         if student is None:
             raise ValidationError({"student_id": "Student does not exist."})
@@ -214,9 +213,4 @@ class ContractCommunicationLogViewSet(viewsets.ModelViewSet):
             raise PermissionDenied("You cannot log a message for another school.")
         serializer = self.get_serializer(data={"student": str(student.pk), "recipient": _first(request.data, "recipient", default="Parent"), "channel": _first(request.data, "channel", default="whatsapp"), "template": _first(request.data, "template", default=""), "message": _first(request.data, "message", default=""), "status": _first(request.data, "status", default="Queued")})
         serializer.is_valid(raise_exception=True)
-        log = serializer.save(actor=request.user)
-        return Response(self.get_serializer(log).data, status=status.HTTP_201_CREATED)
-
-    def _require_sender_role(self):
-        if self.request.user.role not in {UserRole.ADMIN, UserRole.SCHOOL}:
-            raise PermissionDenied("Only administrators and school accounts can log parent communications.")
+        return Response(self.get_serializer(serializer.save(actor=request.user)).data, status=status.HTTP_201_CREATED)
