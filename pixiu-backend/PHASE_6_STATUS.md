@@ -53,7 +53,7 @@ python manage.py data_integrity_audit --strict
 
 The audit checks trainer assignment dates, trainer/school session scope, attendance/class consistency, duplicate student rolls, invoice arithmetic, payment totals, invoice line arithmetic, content/grade assignment mismatches, quiz attempt scope, kit custody recipient rules, and account/profile consistency. Findings return severity, count, message and sample records.
 
-The implementation is designed as a diagnostic layer rather than a destructive repair job. Existing PostgreSQL constraints continue to prevent new invalid relationships. This follows PostgreSQL's constraint model: primary/unique/foreign-key/check constraints should enforce durable integrity, while the audit detects legacy or manually-created inconsistencies that may already exist. citehttps://www.postgresql.org/docs/current/ddl-constraints.html
+The implementation is diagnostic-first rather than a destructive repair job. Durable integrity remains enforced by PostgreSQL primary-key, unique, foreign-key and check constraints, while the audit identifies inconsistent states that may already exist.
 
 ## Architecture rule
 
