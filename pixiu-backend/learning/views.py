@@ -1,4 +1,4 @@
-from django.db import transaction
+from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -275,8 +275,6 @@ class ProjectViewSet(LearningViewSet):
         if project.status not in {"draft", "returned"}:
             raise ValidationError("Only draft or returned projects can be submitted.")
         project.status = "submitted"
-        project.submitted_at = transaction.get_connection().ops.adapt_datetimefield_value if False else None
-        from django.utils import timezone
         project.submitted_at = timezone.now()
         project.save(update_fields=["status", "submitted_at", "updated_at"])
         return Response(self.get_serializer(project).data)
