@@ -10,17 +10,15 @@ from academics.services import provision_student
 
 from .models import (
     AttendanceRecord, ContentClassAssignment, CurriculumClassAssignment, CurriculumUnit,
-    LearningContent, Project, Quiz, QuizClassAssignment, QuizQuestion, Session,
-    StudentAssessment,
+    LearningContent, Project, ProjectEvidence, Quiz, QuizClassAssignment, QuizQuestion,
+    Session, StudentAssessment,
 )
 from .serializers import (
     AttendanceRecordSerializer, ContentClassAssignmentSerializer, CurriculumClassAssignmentSerializer,
     LearningContentSerializer, ProjectSerializer, QuizClassAssignmentSerializer,
 )
 from .services import grade_attempt
-from .views import (
-    AttendanceViewSet, ContentAssignmentViewSet, ProjectViewSet, QuizViewSet, SessionViewSet,
-)
+from .views import AttendanceViewSet, CurriculumAssignmentViewSet, ProjectViewSet, QuizViewSet, SessionViewSet
 
 
 class Phase4DomainTests(TestCase):
@@ -68,7 +66,8 @@ class Phase4DomainTests(TestCase):
         request = self.request("patch", f"/api/learning/attendance/{record.id}/", self.trainer_user, {"status": "absent"})
         serializer = AttendanceRecordSerializer(record, data={"status": "absent"}, partial=True, context={"request": request})
         self.assertTrue(serializer.is_valid(), serializer.errors)
-        with self.assertRaises(Exception):
+        from rest_framework.exceptions import ValidationError
+        with self.assertRaises((ValidationError, PermissionError)):
             serializer.save()
         record.refresh_from_db()
         self.assertEqual(record.status, "present")
@@ -90,21 +89,21 @@ class Phase4DomainTests(TestCase):
         req = self.request("post", "/api/learning/curriculum-assignments/", self.admin, assignment_data)
         serializer = CurriculumClassAssignmentSerializer(data=assignment_data, context={"request": req})
         self.assertTrue(serializer.is_valid(), serializer.errors)
-        assignment = serializer.save(assigned_by=self.admin) if False else serializer.save()
+        assignment = serializer.save()
         self.assertEqual(assignment.school_class_id, self.cls.id)
 
         content = LearningContent.objects.create(title="Arduino PDF", grade="8", level="Level 1", unit_code="UNIT 2", created_by=self.admin, status="published", url="https://example.com/arduino.pdf")
-        bad_req = self.request("post", "/api/learning/content-assignments/", self.admin)
-        bad = ContentClassAssignmentSerializer(data={"content": str(content.id), "school_class": str(self.cls.id)}, context={"request": bad_req})
-        self.assertTrue(bad.is_valid(), bad.errors)
-        content_assignment = bad.save()
-        self.assertEqual(content_assignment.content_id, content.id)
+        content_req = self.request("post", "/api/learning/content-assignments/", self.admin)
+        content_serializer = ContentClassAssignmentSerializer(data={"content": str(content.id), "school_class": str(self.cls.id)}, context={"request": content_req})
+        self.assertTrue(content_serializer.is_valid(), content_serializer.errors)
+        self.assertEqual(content_serializer.save().content_id, content.id)
 
         quiz = Quiz.objects.create(title="Arduino MCQ", grade="8", level="Level 1", status="active", created_by=self.admin)
         quiz_req = self.request("post", "/api/learning/quiz-assignments/", self.admin)
         quiz_serializer = QuizClassAssignmentSerializer(data={"quiz": str(quiz.id), "school_class": str(self.cls.id)}, context={"request": quiz_req})
         self.assertTrue(quiz_serializer.is_valid(), quiz_serializer.errors)
         self.assertEqual(quiz_serializer.save().school_class_id, self.cls.id)
+        self.assertIsNotNone(assignment)
 
     def test_published_content_requires_source(self):
         req = self.request("post", "/api/learning/content/", self.admin)
@@ -146,14 +145,14 @@ class Phase4DomainTests(TestCase):
             grade_attempt(quiz=quiz, student=self.student, answers={str(q.id): "A", "not-a-question": "B"})
 
     def test_student_cannot_change_project_score_or_status(self):
-        project = __import__("learning.models", fromlist=["Project"]).Project.objects.create(student=self.student, title="Smart Dustbin")
+        project = Project.objects.create(student=self.student, title="Smart Dustbin")
         request = self.request("patch", f"/api/learning/projects/{project.id}/", self.student.account, {"score": 100, "status": "completed"})
         serializer = ProjectSerializer(project, data={"score": 100, "status": "completed"}, partial=True, context={"request": request})
         self.assertFalse(serializer.is_valid())
         self.assertIn("Students cannot change evaluation fields.", str(serializer.errors))
 
     def test_student_can_submit_only_own_project(self):
-        project = __import__("learning.models", fromlist=["Project"]).Project.objects.create(student=self.student, title="Smart Dustbin")
+        project = Project.objects.create(student=self.student, title="Smart Dustbin")
         request = self.request("post", f"/api/learning/projects/{project.id}/submit/", self.student.account)
         response = ProjectViewSet.as_view({"post": "submit"})(request, pk=str(project.id))
         self.assertEqual(response.status_code, 200)
@@ -171,7 +170,7 @@ class Phase4DomainTests(TestCase):
         unit = CurriculumUnit.objects.create(grade="8", level="Level 1", unit_code="UNIT 9", title="Robotics", objectives="Build", created_by=self.admin)
         assignment = CurriculumClassAssignment.objects.create(curriculum_unit=unit, school_class=self.cls, assigned_by=self.admin)
         request = self.request("get", f"/api/learning/curriculum-assignments/{assignment.id}/", other_trainer_user)
-        response = ContentAssignmentViewSet.as_view({"get": "retrieve"})(request, pk=str(assignment.id))
+        response = CurriculumAssignmentViewSet.as_view({"get": "retrieve"})(request, pk=str(assignment.id))
         self.assertEqual(response.status_code, 403)
         self.assertEqual(other_class.school_id, other_school.id)
 
@@ -188,8 +187,8 @@ class Phase4DomainTests(TestCase):
         self.assertEqual(session.status, "completed")
 
     def test_relational_records_preserve_source_of_truth(self):
-        project = __import__("learning.models", fromlist=["Project"]).Project.objects.create(student=self.student, title="Smart Dustbin")
-        evidence = __import__("learning.models", fromlist=["ProjectEvidence"]).ProjectEvidence.objects.create(project=project, title="Prototype", note="Working", uploaded_by=self.trainer_user)
+        project = Project.objects.create(student=self.student, title="Smart Dustbin")
+        evidence = ProjectEvidence.objects.create(project=project, title="Prototype", note="Working", uploaded_by=self.trainer_user)
         assessment = StudentAssessment.objects.create(student=self.student, trainer=self.trainer, assessment_date=date(2026, 9, 7), score=85, rating=4.5, feedback="Good")
         self.assertEqual(evidence.project.student_id, self.student.id)
         self.assertEqual(assessment.student.school_class_id, self.cls.id)
