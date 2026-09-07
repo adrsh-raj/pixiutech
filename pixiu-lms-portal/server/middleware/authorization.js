@@ -128,19 +128,26 @@ function authorizationMiddleware(db) {
     const schoolIds = await loadSchoolIds(db, role, user);
     if (!schoolIds.length) return deny(res, 'School scope is required for this account');
     const studentIds = new Set();
-    await new Promise(resolve => db.all('SELECT student_id FROM students WHERE school_id = ANY(?)', [schoolIds], (err, rows = []) => {
+    await new Promise(resolve => db.all('SELECT student_id FROM students WHERE school_id = ANY(?::text[])', [schoolIds], (err, rows = []) => {
       if (!err) rows.forEach(row => studentIds.add(String(row.student_id)));
       resolve();
     }));
     const trainerIds = await loadTrainerIds(db, schoolIds);
 
-    if (matches(route, ADMIN_MUTATION_ROOTS) && !(role === 'school' && route.startsWith('/billing/') && req.method === 'GET')) return deny(res, 'Administrator access required');
+    const isScopedSchoolRead = role === 'school' && READ_ONLY.has(req.method) && matches(route, ['/schools', '/billing', '/trainers']);
+    const isTrainerSchoolRead = role === 'trainer' && READ_ONLY.has(req.method) && matches(route, ['/schools', '/trainers']);
+    const isSchoolPaymentClaim = role === 'school' && route.startsWith('/billing/') && req.method === 'PUT';
+    if (matches(route, ADMIN_MUTATION_ROOTS) && !(isScopedSchoolRead || isTrainerSchoolRead || isSchoolPaymentClaim)) return deny(res, 'Administrator access required');
+
     if (role === 'school' && matches(route, ['/comms'])) return deny(res, 'Restricted for school accounts');
-    if (role === 'school' && route === '/notifications' && req.method !== 'GET' && req.method !== 'POST') return deny(res, 'Restricted notification operation');
     if (role === 'trainer' && route === '/trainers' && !READ_ONLY.has(req.method)) return deny(res, 'Trainer management is restricted to administrators');
     if (role === 'trainer' && matches(route, ['/billing'])) return deny(res, 'Billing is restricted to administrators');
 
-    if (role === 'school' && route.startsWith('/billing/') && req.method !== 'GET' && req.method !== 'PUT') return deny(res, 'School payment claims are restricted to invoice updates');
+    if (isSchoolPaymentClaim) {
+      const invoiceSchool = await resourceSchoolId(db, route, 'billing');
+      if (!invoiceSchool || !schoolIds.some(id => same(id, invoiceSchool))) return deny(res, 'Invoice is outside your school scope');
+    }
+
     if (role === 'school' && route === '/notifications' && req.method === 'POST') {
       if (!same(req.body?.target_school_id, 'ADMIN') || req.body?.type !== 'payment_claim') return deny(res, 'Schools may only submit payment claims');
     }
