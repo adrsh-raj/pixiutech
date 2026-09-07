@@ -1,12 +1,10 @@
-from datetime import date, time
-
 from django.db import connection
-from django.test import SimpleTestCase
+from django.test import TestCase
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from accounts.models import User, UserRole
-from academics.models import School, SchoolClass, Trainer, TrainerSchoolAssignment
+from academics.models import School, Trainer
 
 
 class Phase8PermissionTests(APITestCase):
@@ -28,12 +26,6 @@ class Phase8PermissionTests(APITestCase):
             username="phase8-trainer",
             password="StrongTrainerPass!123",
             role=UserRole.TRAINER,
-            status="active",
-        )
-        cls.student_user = User.objects.create_user(
-            username="phase8-student",
-            password="StrongStudentPass!123",
-            role=UserRole.STUDENT,
             status="active",
         )
 
@@ -118,7 +110,7 @@ class Phase8AuthenticationTests(APITestCase):
         self.assertEqual(logout.status_code, 205)
 
 
-class Phase8MigrationTests(SimpleTestCase):
+class Phase8MigrationTests(TestCase):
     def test_required_phase7_tables_exist(self):
         required_tables = {
             "accounts_user",
