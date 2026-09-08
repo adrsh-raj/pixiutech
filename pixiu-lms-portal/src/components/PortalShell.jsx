@@ -1,11 +1,13 @@
-import { Menu, Sparkles } from 'lucide-react';
+import { Menu, Sparkles, RefreshCw } from 'lucide-react';
 import PortalSidebar from './PortalSidebar';
 import { PORTAL_ROLE_LABELS } from '../config/portalNavigation';
 import { useAuth } from '../context/AuthContext';
+import { useData } from '../context/DataContext';
 import { useState } from 'react';
 
 export default function PortalShell({ role, title, subtitle, children }) {
   const { user } = useAuth();
+  const { refreshAll, loading } = useData();
   const [mobileOpen, setMobileOpen] = useState(false);
   const roleMeta = PORTAL_ROLE_LABELS[role] || PORTAL_ROLE_LABELS.student;
 
@@ -23,6 +25,9 @@ export default function PortalShell({ role, title, subtitle, children }) {
             </div>
           </div>
           <div className="flex items-center gap-2.5">
+            <button type="button" onClick={() => refreshAll()} disabled={loading} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-[10px] sm:text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50" title="Refresh live data" aria-label="Refresh live data">
+              <RefreshCw size={14} className={loading ? 'animate-spin' : ''}/><span className="hidden sm:inline">{loading ? 'Refreshing' : 'Refresh'}</span>
+            </button>
             <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-[10px] font-bold text-slate-600">
               <span className="w-2 h-2 rounded-full bg-emerald-400" /> Live
             </div>
