@@ -7,6 +7,22 @@ const collection = payload => Array.isArray(payload) ? payload : Array.isArray(p
 const text = value => String(value ?? '').trim();
 const lower = value => text(value).toLowerCase();
 
+function formatApiError(payload, status) {
+  if (typeof payload === 'string' && payload.trim()) return payload.trim();
+  if (!payload || typeof payload !== 'object') return `Request failed (${status}).`;
+  const headline = payload.detail || payload.error || payload.message;
+  const fieldErrors = Object.entries(payload)
+    .filter(([key, value]) => !['detail', 'error', 'message'].includes(key) && value != null)
+    .flatMap(([key, value]) => {
+      const values = Array.isArray(value) ? value : [value];
+      return values.map(item => `${key}: ${typeof item === 'object' ? JSON.stringify(item) : String(item)}`);
+    });
+  if (headline && fieldErrors.length) return `${headline} ${fieldErrors.join(' ')}`;
+  if (headline) return String(headline);
+  if (fieldErrors.length) return fieldErrors.join(' ');
+  return `Request failed (${status}).`;
+}
+
 async function apiRequest(path, options = {}) {
   const headers = new Headers(options.headers || {});
   if (options.body && !(options.body instanceof FormData) && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
@@ -21,7 +37,7 @@ async function apiRequest(path, options = {}) {
       const contentType = response.headers.get('content-type') || '';
       const payload = contentType.includes('application/json') ? await response.json().catch(() => ({})) : {};
       if (response.ok) return payload;
-      const error = new Error(payload.detail || payload.error || `Request failed (${response.status})`);
+      const error = new Error(formatApiError(payload, response.status));
       if (!retryable || ![502, 503, 504].includes(response.status) || attempt === delays.length - 1) throw error;
       lastError = error;
     } catch (error) {
