@@ -6,7 +6,7 @@ from .models import AuditAction, AuditLog
 
 class AuditSafetyTests(SimpleTestCase):
     def test_required_server_audit_actions_exist(self):
-        required = {'LOGIN', 'CREATE', 'UPDATE', 'DELETE', 'VOID', 'PASSWORD_RESET', 'ASSIGNMENT_CHANGE', 'ATTENDANCE_OVERRIDE', 'PAYMENT'}
+        required = {'login', 'create', 'update', 'delete', 'void', 'password_reset', 'assignment_change', 'attendance_override', 'payment'}
         available = {value for value, _label in AuditAction.choices}
         self.assertTrue(required.issubset(available))
 
