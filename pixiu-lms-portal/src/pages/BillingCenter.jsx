@@ -7,23 +7,122 @@ import EmptyState from '../components/ui/EmptyState';
 import ErrorState from '../components/ui/ErrorState';
 import RefreshButton from '../components/ui/RefreshButton';
 
-const dateToday=()=>new Date().toISOString().slice(0,10);
-async function req(path,method='GET',body){const r=await apiFetch(path,{method,...(body!==undefined?{headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{})});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.detail||d.error||'Request failed.');return d;}
-const money=v=>`₹${Number(v||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
-export default function BillingCenter(){
- const {user}=useAuth(); const {schools=[],refreshAll,loading}=useData(); const [contracts,setContracts]=useState([]);const [invoices,setInvoices]=useState([]);const [summary,setSummary]=useState(null);const [school,setSchool]=useState('');const [error,setError]=useState('');const [busy,setBusy]=useState(false);const [contractForm,setContractForm]=useState({contract_number:'',start_date:dateToday(),end_date:'',total_value:'',notes:''});const [invoiceForm,setInvoiceForm]=useState({contract:'',issue_date:dateToday(),due_date:'',notes:''});const [line,setLine]=useState({description:'',quantity:'1',unit_price:''});
- const effectiveSchool=useMemo(()=>schools.find(s=>String(s.id)===String(school)||String(s.school_code||s.code)===String(school)) || (user?.role==='school'?schools[0]:null),[schools,school,user]);
- async function load(){setError('');try{const scope=effectiveSchool?`?school=${encodeURIComponent(effectiveSchool.id||effectiveSchool.school_code)}`:'';const [c,i,s]=await Promise.all([req(`/contracts${scope}`),req(`/invoices${scope}`),req(`/billing-summary${scope}`)]);setContracts(Array.isArray(c)?c:c?.data||[]);setInvoices(Array.isArray(i)?i:i?.data||[]);setSummary(s)}catch(e){setError(e.message)}}
- useEffect(()=>{load()},[effectiveSchool]);
- const createContract=async e=>{e.preventDefault();setBusy(true);setError('');try{if(!effectiveSchool)throw new Error('Select a school first.');await req('/contracts','POST',{...contractForm,school:effectiveSchool.id,total_value:Number(contractForm.total_value||0)});setContractForm({contract_number:'',start_date:dateToday(),end_date:'',total_value:'',notes:''});await load()}catch(e){setError(e.message)}finally{setBusy(false)}};
- const createInvoice=async e=>{e.preventDefault();setBusy(true);setError('');try{if(!effectiveSchool)throw new Error('Select a school first.');const inv=await req('/invoices','POST',{school:effectiveSchool.id,contract:invoiceForm.contract||null,issue_date:invoiceForm.issue_date,due_date:invoiceForm.due_date,notes:invoiceForm.notes});const invoiceId=inv.id||inv?.data?.id;if(line.description.trim()&&invoiceId){await req('/billing-lines','POST',{invoice:invoiceId,description:line.description.trim(),quantity:Number(line.quantity||1),unit_price:Number(line.unit_price||0)})}setLine({description:'',quantity:'1',unit_price:''});await load()}catch(e){setError(e.message)}finally{setBusy(false)}};
- const issue=async id=>{setBusy(true);setError('');try{await req(`/invoices/${id}/issue`,'POST',{});await load()}catch(e){setError(e.message)}finally{setBusy(false)}};
- const voidInvoice=async id=>{setBusy(true);setError('');try{await req(`/invoices/${id}`,'DELETE');await load()}catch(e){setError(e.message)}finally{setBusy(false)}};
- return <div className="space-y-5 pb-10"><PageHeader eyebrow={user?.role==='admin'?'Admin Finance':'School Finance'} title="Billing & Contracts" description="Contracts, invoices, payments and outstanding balance are derived from database records. Voiding retains the financial history." actions={<RefreshButton onRefresh={()=>{refreshAll();load()}} loading={loading||busy}/>}/>{error&&<ErrorState title="Billing action failed" description={error}/>}<section className="grid grid-cols-2 lg:grid-cols-5 gap-3">{[['Contract value',summary?.contract_value],['Invoiced',summary?.invoiced],['Collected',summary?.collected],['Pending',summary?.pending],['Active invoices',summary?.invoice_count]].map(([k,v])=><div key={k} className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-[9px] uppercase tracking-[.12em] font-black text-slate-400">{k}</p><p className="text-xl font-black text-slate-900 mt-2">{k==='Active invoices'?v||0:money(v)}</p></div>)}</section>
- {user?.role==='admin'&&<div><label className="text-[10px] uppercase tracking-wide font-black text-slate-400">School scope</label><select value={school} onChange={e=>setSchool(e.target.value)} className="field mt-1"><option value="">All schools</option>{schools.map(s=><option key={s.id} value={s.id}>{s.name} ({s.school_code||s.code})</option>)}</select></div>}
- {(user?.role==='admin'||user?.role==='school')&&<section className="grid grid-cols-1 xl:grid-cols-2 gap-5"><form onSubmit={createContract} className="bg-white rounded-2xl border border-slate-200 p-5 space-y-3"><div className="flex items-center gap-2"><Wallet size={17}/><h2 className="font-black">New contract</h2></div><input className="field" placeholder="Contract number" value={contractForm.contract_number} onChange={e=>setContractForm({...contractForm,contract_number:e.target.value})} required/><div className="grid grid-cols-2 gap-2"><input type="date" className="field" value={contractForm.start_date} onChange={e=>setContractForm({...contractForm,start_date:e.target.value})} required/><input type="date" className="field" value={contractForm.end_date} onChange={e=>setContractForm({...contractForm,end_date:e.target.value})} required/></div><input type="number" min="0" step="0.01" className="field" placeholder="Contract value" value={contractForm.total_value} onChange={e=>setContractForm({...contractForm,total_value:e.target.value})} required/><textarea className="field min-h-20" placeholder="Notes" value={contractForm.notes} onChange={e=>setContractForm({...contractForm,notes:e.target.value})}/><button disabled={busy||!effectiveSchool} className="w-full py-2.5 rounded-xl bg-slate-900 text-white text-xs font-black disabled:opacity-50"><FilePlus2 size={14} className="inline mr-2"/>Create contract</button></form>
- <form onSubmit={createInvoice} className="bg-white rounded-2xl border border-slate-200 p-5 space-y-3"><div className="flex items-center gap-2"><ReceiptText size={17}/><h2 className="font-black">New invoice</h2></div><select className="field" value={invoiceForm.contract} onChange={e=>setInvoiceForm({...invoiceForm,contract:e.target.value})}><option value="">No contract link</option>{contracts.filter(c=>c.status!=='terminated').map(c=><option key={c.id} value={c.id}>{c.contract_number} · {money(c.total_value)}</option>)}</select><div className="grid grid-cols-2 gap-2"><input type="date" className="field" value={invoiceForm.issue_date} onChange={e=>setInvoiceForm({...invoiceForm,issue_date:e.target.value})} required/><input type="date" className="field" value={invoiceForm.due_date} onChange={e=>setInvoiceForm({...invoiceForm,due_date:e.target.value})} required/></div><input className="field" placeholder="First line description" value={line.description} onChange={e=>setLine({...line,description:e.target.value})}/><div className="grid grid-cols-2 gap-2"><input type="number" min="1" step="0.01" className="field" placeholder="Qty" value={line.quantity} onChange={e=>setLine({...line,quantity:e.target.value})}/><input type="number" min="0" step="0.01" className="field" placeholder="Unit price" value={line.unit_price} onChange={e=>setLine({...line,unit_price:e.target.value})}/></div><textarea className="field min-h-20" placeholder="Invoice notes" value={invoiceForm.notes} onChange={e=>setInvoiceForm({...invoiceForm,notes:e.target.value})}/><button disabled={busy||!effectiveSchool} className="w-full py-2.5 rounded-xl bg-blue-600 text-white text-xs font-black disabled:opacity-50">Create draft invoice</button></form></section>}
- <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden"><div className="p-5 border-b border-slate-100"><h2 className="font-black">Contracts</h2></div><div className="divide-y divide-slate-100">{contracts.map(c=><div key={c.id} className="p-4 flex flex-col sm:flex-row sm:items-center gap-3"><div className="flex-1"><p className="font-black text-slate-800">{c.contract_number}</p><p className="text-xs text-slate-400">{c.school_name||c.school_code} · {c.start_date} → {c.end_date}</p></div><p className="font-black">{money(c.total_value)}</p><span className="px-2 py-1 rounded-lg bg-slate-100 text-[10px] font-black uppercase">{c.status}</span></div>)}{!contracts.length&&<EmptyState title="No contracts" description="No database contracts match this scope."/>}</div></section>
- <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden"><div className="p-5 border-b border-slate-100"><h2 className="font-black">Invoices</h2></div><div className="divide-y divide-slate-100">{invoices.map(i=><div key={i.id} className="p-4 flex flex-col lg:flex-row lg:items-center gap-3"><div className="flex-1"><p className="font-black text-slate-800">{i.invoice_number}</p><p className="text-xs text-slate-400">{i.school_code||i.school} · Due {i.due_date}</p></div><div className="text-sm font-black">{money(i.total_amount)}</div><span className="px-2 py-1 rounded-lg bg-slate-100 text-[10px] font-black uppercase">{i.status}</span><div className="flex gap-1.5">{i.status==='draft'&&<button disabled={busy} onClick={()=>issue(i.id)} className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-[10px] font-black">Issue</button>}{!['void','paid'].includes(i.status)&&<button disabled={busy} onClick={()=>voidInvoice(i.id)} className="px-3 py-1.5 rounded-lg bg-rose-50 text-rose-700 text-[10px] font-black"><XCircle size={12} className="inline mr-1"/>Void</button>}</div></div>)}{!invoices.length&&<EmptyState title="No invoices" description="No database invoices match this scope."/>}</div></section>
- <style>{`.field{width:100%;border:1px solid #e2e8f0;border-radius:12px;padding:10px 12px;font-size:12px;font-weight:600;color:#334155;background:white;outline:none}.field:focus{border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.12)}`}</style></div>
+const dateToday = () => new Date().toISOString().slice(0, 10);
+const money = value => `₹${Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const rows = payload => Array.isArray(payload) ? payload : Array.isArray(payload?.results) ? payload.results : Array.isArray(payload?.data) ? payload.data : [];
+
+async function request(path, method = 'GET', body) {
+  const response = await apiFetch(path, {
+    method,
+    ...(body !== undefined ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.detail || data.error || `Request failed (${response.status})`);
+  return data;
+}
+
+export default function BillingCenter() {
+  const { user } = useAuth();
+  const { schools = [], refreshAll, loading } = useData();
+  const [selectedSchool, setSelectedSchool] = useState('');
+  const [contracts, setContracts] = useState([]);
+  const [invoices, setInvoices] = useState([]);
+  const [summary, setSummary] = useState(null);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [contractForm, setContractForm] = useState({ contract_number: '', start_date: dateToday(), end_date: '', total_value: '', notes: '' });
+  const [invoiceForm, setInvoiceForm] = useState({ contract: '', issue_date: dateToday(), due_date: '', notes: '' });
+  const [lineForm, setLineForm] = useState({ description: '', quantity: '1', unit_price: '' });
+
+  const school = useMemo(() => {
+    if (user?.role === 'school') return schools[0] || null;
+    return schools.find(item => String(item.id) === String(selectedSchool)) || null;
+  }, [schools, selectedSchool, user]);
+
+  const scope = school ? `?school=${encodeURIComponent(school.id)}` : '';
+
+  const load = async () => {
+    setError('');
+    try {
+      const [contractPayload, invoicePayload, summaryPayload] = await Promise.all([
+        request(`/contracts${scope}`),
+        request(`/invoices${scope}`),
+        request(`/billing-summary${scope}`),
+      ]);
+      setContracts(rows(contractPayload));
+      setInvoices(rows(invoicePayload));
+      setSummary(summaryPayload || null);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  useEffect(() => { load(); }, [scope]);
+
+  const createContract = async event => {
+    event.preventDefault();
+    if (!school) return setError('Select a school before creating a contract.');
+    setBusy(true); setError('');
+    try {
+      await request('/contracts', 'POST', { ...contractForm, school: school.id, total_value: Number(contractForm.total_value) });
+      setContractForm({ contract_number: '', start_date: dateToday(), end_date: '', total_value: '', notes: '' });
+      await load();
+      await refreshAll();
+    } catch (err) { setError(err.message); } finally { setBusy(false); }
+  };
+
+  const createInvoice = async event => {
+    event.preventDefault();
+    if (!school) return setError('Select a school before creating an invoice.');
+    setBusy(true); setError('');
+    try {
+      const payload = await request('/invoices', 'POST', {
+        school: school.id,
+        contract: invoiceForm.contract || null,
+        issue_date: invoiceForm.issue_date,
+        due_date: invoiceForm.due_date,
+        notes: invoiceForm.notes,
+      });
+      const invoice = payload?.data || payload;
+      if (lineForm.description.trim() && invoice?.id) {
+        await request('/billing-lines', 'POST', {
+          invoice: invoice.id,
+          description: lineForm.description.trim(),
+          quantity: Number(lineForm.quantity),
+          unit_price: Number(lineForm.unit_price),
+        });
+      }
+      setLineForm({ description: '', quantity: '1', unit_price: '' });
+      await load();
+      await refreshAll();
+    } catch (err) { setError(err.message); } finally { setBusy(false); }
+  };
+
+  const invoiceAction = async (id, action) => {
+    setBusy(true); setError('');
+    try { await request(`/invoices/${encodeURIComponent(id)}/${action}`, 'POST', {}); await load(); await refreshAll(); }
+    catch (err) { setError(err.message); } finally { setBusy(false); }
+  };
+
+  return <div className="space-y-5 pb-10">
+    <PageHeader eyebrow={user?.role === 'admin' ? 'Admin Finance' : 'School Finance'} title="Billing & Contracts" description="Live contracts, invoices, payments and balances from the Django financial ledger." actions={<RefreshButton onRefresh={() => { refreshAll(); load(); }} loading={loading || busy} />} />
+    {error && <ErrorState title="Billing action failed" description={error} />}
+    {user?.role === 'admin' && <div><label className="block text-[10px] uppercase tracking-wide font-black text-slate-400 mb-1">School scope</label><select value={selectedSchool} onChange={event => { setSelectedSchool(event.target.value); }} className="field"><option value="">All schools</option>{schools.map(item => <option key={item.id} value={item.id}>{item.name} ({item.school_code})</option>)}</select></div>}
+
+    <section className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      {[
+        ['Contract value', summary?.contract_value], ['Invoiced', summary?.invoiced], ['Collected', summary?.collected], ['Outstanding', summary?.pending], ['Invoices', summary?.invoice_count],
+      ].map(([label, value]) => <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-[9px] uppercase tracking-[.12em] font-black text-slate-400">{label}</p><p className="text-xl font-black text-slate-900 mt-2">{label === 'Invoices' ? Number(value || 0) : money(value)}</p></div>)}
+    </section>
+
+    {(user?.role === 'admin' || user?.role === 'school') && school && <section className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+      <form onSubmit={createContract} className="bg-white rounded-2xl border border-slate-200 p-5 space-y-3"><div className="flex items-center gap-2"><Wallet size={17}/><h2 className="font-black">New Contract</h2></div><input className="field" placeholder="Contract number" value={contractForm.contract_number} onChange={e => setContractForm(v => ({ ...v, contract_number: e.target.value }))} required/><div className="grid grid-cols-2 gap-2"><input type="date" className="field" value={contractForm.start_date} onChange={e => setContractForm(v => ({ ...v, start_date: e.target.value }))} required/><input type="date" className="field" value={contractForm.end_date} onChange={e => setContractForm(v => ({ ...v, end_date: e.target.value }))} required/></div><input type="number" min="0" step="0.01" className="field" placeholder="Contract value" value={contractForm.total_value} onChange={e => setContractForm(v => ({ ...v, total_value: e.target.value }))} required/><textarea className="field min-h-20" placeholder="Notes" value={contractForm.notes} onChange={e => setContractForm(v => ({ ...v, notes: e.target.value }))}/><button disabled={busy} className="w-full py-2.5 rounded-xl bg-slate-900 text-white text-xs font-black disabled:opacity-50"><FilePlus2 size={14} className="inline mr-2"/>Create Contract</button></form>
+      <form onSubmit={createInvoice} className="bg-white rounded-2xl border border-slate-200 p-5 space-y-3"><div className="flex items-center gap-2"><ReceiptText size={17}/><h2 className="font-black">New Draft Invoice</h2></div><select className="field" value={invoiceForm.contract} onChange={e => setInvoiceForm(v => ({ ...v, contract: e.target.value }))}><option value="">No contract link</option>{contracts.map(item => <option key={item.id} value={item.id}>{item.contract_number}</option>)}</select><div className="grid grid-cols-2 gap-2"><input type="date" className="field" value={invoiceForm.issue_date} onChange={e => setInvoiceForm(v => ({ ...v, issue_date: e.target.value }))} required/><input type="date" className="field" value={invoiceForm.due_date} onChange={e => setInvoiceForm(v => ({ ...v, due_date: e.target.value }))} required/></div><input className="field" placeholder="Line description" value={lineForm.description} onChange={e => setLineForm(v => ({ ...v, description: e.target.value }))}/><div className="grid grid-cols-2 gap-2"><input type="number" min="1" step="1" className="field" placeholder="Quantity" value={lineForm.quantity} onChange={e => setLineForm(v => ({ ...v, quantity: e.target.value }))}/><input type="number" min="0" step="0.01" className="field" placeholder="Unit price" value={lineForm.unit_price} onChange={e => setLineForm(v => ({ ...v, unit_price: e.target.value }))}/></div><textarea className="field min-h-20" placeholder="Invoice notes" value={invoiceForm.notes} onChange={e => setInvoiceForm(v => ({ ...v, notes: e.target.value }))}/><button disabled={busy} className="w-full py-2.5 rounded-xl bg-blue-600 text-white text-xs font-black disabled:opacity-50">Create Draft</button></form>
+    </section>}
+
+    <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden"><div className="p-5 border-b border-slate-100"><h2 className="font-black">Contracts</h2></div><div className="divide-y divide-slate-100">{contracts.map(item => <div key={item.id} className="p-4 flex flex-col sm:flex-row sm:items-center gap-3"><div className="flex-1"><p className="font-black text-slate-800">{item.contract_number}</p><p className="text-xs text-slate-400">{item.school_name || item.school_code || '—'} · {item.start_date} → {item.end_date}</p></div><p className="font-black">{money(item.total_value)}</p><span className="px-2 py-1 rounded-lg bg-slate-100 text-[10px] font-black uppercase">{item.status}</span></div>)}{!contracts.length && <EmptyState title="No contracts" description="No database contracts match this scope."/>}</div></section>
+
+    <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden"><div className="p-5 border-b border-slate-100"><h2 className="font-black">Invoices</h2></div><div className="divide-y divide-slate-100">{invoices.map(item => <div key={item.id} className="p-4 flex flex-col lg:flex-row lg:items-center gap-3"><div className="flex-1"><p className="font-black text-slate-800">{item.invoice_number}</p><p className="text-xs text-slate-400">{item.school_code || '—'} · Due {item.due_date}</p></div><p className="font-black">{money(item.total_amount)}</p><span className="px-2 py-1 rounded-lg bg-slate-100 text-[10px] font-black uppercase">{item.status}</span><div className="flex gap-2">{item.status === 'draft' && <button disabled={busy} onClick={() => invoiceAction(item.id, 'issue')} className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-[10px] font-black">Issue</button>}{!['void', 'paid'].includes(item.status) && <button disabled={busy} onClick={() => invoiceAction(item.id, 'void')} className="px-3 py-1.5 rounded-lg bg-rose-50 text-rose-700 text-[10px] font-black"><XCircle size={12} className="inline mr-1"/>Void</button>}</div></div>)}{!invoices.length && <EmptyState title="No invoices" description="No database invoices match this scope."/>}</div></section>
+    <style>{`.field{width:100%;border:1px solid #e2e8f0;border-radius:12px;padding:10px 12px;font-size:12px;font-weight:600;color:#334155;background:white;outline:none}.field:focus{border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.12)}`}</style>
+  </div>;
 }
