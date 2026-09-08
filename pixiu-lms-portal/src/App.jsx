@@ -97,10 +97,10 @@ function GuestRouteGuard({ children }) { const { isAuthenticated, user, loading 
 export default function App() {
   return <ToastProvider><AuthProvider><DataProvider><BrowserRouter><Routes>
     <Route path="/login" element={<GuestRouteGuard><Login /></GuestRouteGuard>} />
-    <Route path="/simulation" element={<ChunkErrorBoundary><Suspense fallback={<div className="min-h-screen bg-[#070B14] flex items-center justify-center text-white"><div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" /></div>}><Simulation /></Suspense></ChunkErrorBoundary>} />
+    <Route path="/simulation" element={<ChunkErrorBoundary><Suspense fallback={<div className="min-h-screen bg-[#070B14] flex items-center justify-center text-white"><div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-xl font-bold">Loading...</div></div>}><Simulation /></Suspense></ChunkErrorBoundary>} />
     <Route path="/student-portal" element={<StudentRouteGuard />} /><Route path="/school-portal" element={<SchoolRouteGuard />} />
     <Route path="/" element={<ProtectedLayout />}>
       <Route index element={<AdminOnly><Dashboard /></AdminOnly>} /><Route path="leads" element={<AdminOnly><Leads /></AdminOnly>} /><Route path="schools" element={<AdminOnly><Schools /></AdminOnly>} /><Route path="billing" element={<AdminOnly><Billing /></AdminOnly>} /><Route path="payments" element={<AdminOnly><Payments /></AdminOnly>} /><Route path="notifications" element={<AdminOnly><Notifications /></AdminOnly>} /><Route path="settings" element={<AdminOnly><Settings /></AdminOnly>} /><Route path="logs" element={<AdminOnly><AuditLogs /></AdminOnly>} /><Route path="students" element={<Students />} /><Route path="comms" element={<AdminOnly><Comms /></AdminOnly>} /><Route path="trainers" element={<TrainerConsoleRoute />} /><Route path="trainer-materials" element={<TrainerMaterials />} /><Route path="trainer-credentials" element={<AdminOnly><TrainerCredentials /></AdminOnly>} /><Route path="school-credentials" element={<AdminOnly><SchoolCredentials /></AdminOnly>} /><Route path="data-reset" element={<AdminOnly><DataReset /></AdminOnly>} /><Route path="content" element={<ContentHub />} /><Route path="curriculum" element={<Curriculum />} /><Route path="inventory" element={<Inventory />} />
-    </Route><Route path="*" element={<Navigate to="/" replace />} />
+    </Route><Route path="*" element={<Navigate to="/" replace"} />
   </Routes></BrowserRouter></DataProvider></AuthProvider></ToastProvider>;
 }
