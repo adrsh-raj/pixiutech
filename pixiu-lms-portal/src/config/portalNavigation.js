@@ -1,4 +1,4 @@
-import { BookOpen, Box, CalendarDays, ClipboardCheck, Cpu, FileFileText, FolderKanban, GraduationCap, LayoutDashboard, PlaySquare, Star, Trophy, Users, Video } from 'lucide-react';
+import { BookOpen, Box, CalendarDays, ClipboardCheck, Cpu, FileText, FolderKanban, GraduationCap, LayoutDashboard, PlaySquare, Star, Trophy, Users, Video } from 'lucide-react';
 
 // Learner/faculty navigation is presentation-only. Runtime records, permissions,
 // scores and assignments come from Django/PostgreSQL APIs.
@@ -36,7 +36,7 @@ export const PORTAL_NAVIGATION = {
         { name: 'Workspace', href: '/trainers', icon: LayoutDashboard },
         { name: 'My Students', href: '/students', icon: Users },
         { name: 'Sessions', href: '/trainers', icon: CalendarDays },
-        { name: 'Materials', href: '/trainer-materials', icon: FileFileText },
+        { name: 'Materials', href: '/trainer-materials', icon: FileText },
       ],
     },
     {
