@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, FolderKanban, Settings, LogOut, Box, GraduationCap, BookOpen, Building, CreditCard, PlaySquare, Megaphone, X, Cpu, ShieldCheck, ReceiptText, Bell, FileText, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, Users, FolderKanban, Settings, LogOut, Box, GraduationCap, BookOpen, Building, CreditCard, PlaySquare, Megaphone, X, Cpu, ShieldCheck, ReceiptText, Bell, FileText } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function Sidebar({ mobileOpen = false, setMobileOpen = () => {} }) {
@@ -17,7 +17,7 @@ export default function Sidebar({ mobileOpen = false, setMobileOpen = () => {} }
     { name: 'Curriculum Plans', path: '/curriculum', icon: BookOpen },
     { name: 'Hardware Kits', path: '/inventory', icon: Box },
   ] }] : [
-    { title: 'MAIN', links: [{ name: 'Dashboard', path: '/', icon: LayoutDashboard }, { name: 'Phase 6 Django Ops', path: '/phase6', icon: BarChart3 }, { name: 'Audit Logs', path: '/logs', icon: ShieldCheck }] },
+    { title: 'MAIN', links: [{ name: 'Dashboard', path: '/', icon: LayoutDashboard }, { name: 'Audit Logs', path: '/logs', icon: ShieldCheck }] },
     { title: 'BUSINESS & CRM', links: [
       { name: 'Sales Pipeline', path: '/leads', icon: FolderKanban },
       { name: 'Partner Schools', path: '/schools', icon: Building },
