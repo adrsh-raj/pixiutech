@@ -1,7 +1,7 @@
 from django.db import transaction
 from django.db.models import Q
 
-from accounts.credentials import build_student_password, build_student_username
+from accounts.credentials import build_student_password, build_student_username, create_or_reset_managed_account
 from accounts.models import User, UserRole, UserStatus
 
 from .models import School, SchoolClass, Student, Trainer, TrainerSchoolAssignment
@@ -12,6 +12,14 @@ def _clean_or_error(value: str, field: str) -> str:
     if not value:
         raise ValueError(f"{field} is required.")
     return value
+
+
+def next_trainer_id() -> str:
+    """Generate the next stable trainer account ID without requiring frontend input."""
+    number = 1
+    while Trainer.objects.filter(trainer_id=f"TR-{number:03d}").exists():
+        number += 1
+    return f"TR-{number:03d}"
 
 
 def create_school_account(*, school: School) -> User:
@@ -32,19 +40,18 @@ def create_school_account(*, school: School) -> User:
     return user
 
 
-def create_trainer_account(*, trainer: Trainer) -> User:
-    username = trainer.trainer_id
-    existing = User.objects.filter(username=username).first()
-    if existing and (existing.role != UserRole.TRAINER or existing.trainer_profile_id != trainer.id):
-        raise ValueError("Trainer ID is already used by another account.")
-    user = existing or User(username=username, role=UserRole.TRAINER)
-    user.role = UserRole.TRAINER
-    user.display_name = trainer.name
-    user.email = trainer.email
-    user.status = UserStatus.INACTIVE
-    user.is_active = False
-    user.set_unusable_password()
-    user.save()
+def create_trainer_account(*, trainer: Trainer, password: str) -> User:
+    user, _ = create_or_reset_managed_account(
+        username=trainer.trainer_id,
+        password=password,
+        role=UserRole.TRAINER,
+        display_name=trainer.name,
+        email=trainer.email,
+    )
+    if trainer.status != "active":
+        user.status = UserStatus.INACTIVE
+        user.is_active = False
+        user.save(update_fields=["status", "is_active"])
     trainer.account = user
     trainer.save(update_fields=["account", "updated_at"])
     return user
