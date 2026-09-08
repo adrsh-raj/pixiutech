@@ -1,83 +1,119 @@
-import { useMemo, useState } from 'react';
-import { ArrowRight, BookOpen, CalendarDays, Check, Clock3, Cpu, GraduationCap, Megaphone, Play, School, Star, Trophy, Users } from 'lucide-react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useEffect, useMemo, useState } from 'react';
+import { Activity, CalendarDays, CheckCircle2, ChevronRight, Clock3, Cpu, Lock, Play, Save, Users } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { apiFetch, useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
-import { useToast } from '../context/ToastContext';
+import PageHeader from '../components/ui/PageHeader';
 import EmptyState from '../components/ui/EmptyState';
+import ErrorState from '../components/ui/ErrorState';
+import RefreshButton from '../components/ui/RefreshButton';
+import { useToast } from '../context/ToastContext';
 
-const text = value => String(value ?? '').trim();
-const lower = value => text(value).toLowerCase();
-const normalize = value => text(value).toUpperCase();
-const todayKey = () => new Date().toISOString().slice(0, 10);
+const today = () => new Date().toISOString().slice(0, 10);
+const norm = value => String(value ?? '').trim().toLowerCase();
 
-function parseIds(value) {
-  if (Array.isArray(value)) return value.map(v => text(v)).filter(Boolean);
-  const raw = text(value);
-  if (!raw) return [];
-  try { const parsed = JSON.parse(raw); if (Array.isArray(parsed)) return parsed.map(v => text(v)).filter(Boolean); } catch {}
-  return raw.split(/[\s,;|]+/).map(v => v.trim()).filter(Boolean);
+async function request(path, method='GET', body) {
+  const options = { method, cache: method === 'GET' ? 'no-store' : undefined };
+  if (body !== undefined) { options.body = JSON.stringify(body); options.headers = { 'Content-Type': 'application/json' }; }
+  const response = await apiFetch(path, options);
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.detail || payload.error || 'Request failed.');
+  return payload;
 }
-
-function sameId(a, b) { return normalize(a) === normalize(b) && normalize(a) !== ''; }
-function schoolKeys(school) { return [school?.id, school?.school_code, school?.code, school?.school_id].filter(Boolean).map(normalize); }
-function dateKey(value) { if (!value) return ''; const d = new Date(value); return Number.isNaN(d.getTime()) ? text(value).slice(0, 10) : d.toISOString().slice(0, 10); }
 
 export default function TrainerWorkspace() {
   const { user } = useAuth();
-  const { trainers = [], schools = [], classes = [], students = [], sessions = [], attendance = [], studentReviews = [], notifications = [], markAttendance, completeSession } = useData();
+  const { trainers=[], sessions=[], students=[], refreshAll, loading } = useData();
   const toast = useToast();
-  const [params, setParams] = useSearchParams();
-  const [activeSessionId, setActiveSessionId] = useState(null);
+  const [activeId, setActiveId] = useState('');
+  const [attendance, setAttendance] = useState({});
+  const [activities, setActivities] = useState([]);
+  const [activityTitle, setActivityTitle] = useState('');
+  const [activityType, setActivityType] = useState('lesson');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
 
-  const trainerId = user?.related_id || user?.username || user?.id;
-  const trainer = useMemo(() => trainers.find(t => [t.id, t.trainer_id, t.account_username].some(value => sameId(value, trainerId))), [trainers, trainerId]);
-  const assignedSchoolIds = useMemo(() => parseIds(trainer?.assigned_schools || user?.school_id), [trainer, user]);
-  const assignedSchools = useMemo(() => schools.filter(school => assignedSchoolIds.some(id => schoolKeys(school).includes(normalize(id)))), [schools, assignedSchoolIds]);
-  const visibleStudents = useMemo(() => students.filter(student => assignedSchoolIds.length === 0 || assignedSchoolIds.some(id => sameId(id, student.school_id) || sameId(id, student.school_code))), [students, assignedSchoolIds]);
-  const visibleClasses = useMemo(() => {
-    const studentClassIds = new Set(visibleStudents.map(s => String(s.class_id || '')).filter(Boolean));
-    return classes.filter(item => assignedSchoolIds.length === 0 || assignedSchoolIds.some(id => sameId(id, item.school_id) || sameId(id, item.school_code)) || studentClassIds.has(String(item.id)));
-  }, [classes, assignedSchoolIds, visibleStudents]);
-  const visibleSessions = useMemo(() => sessions.filter(session => {
-    const sessionTrainer = session.trainer_id || session.trainer || session.trainer_code;
-    const sessionSchool = session.school_id || session.school_code;
-    return sameId(sessionTrainer, trainerId) || assignedSchoolIds.some(id => sameId(id, sessionSchool));
-  }), [sessions, trainerId, assignedSchoolIds]);
-  const today = todayKey();
-  const todaySessions = visibleSessions.filter(s => dateKey(s.date || s.start_time || s.created_at) === today && !['cancelled', 'completed'].includes(lower(s.status)));
-  const todayAttendance = attendance.filter(a => dateKey(a.date || a.timestamp || a.created_at) === today);
-  const todayAttendanceRate = todayAttendance.length ? Math.round((todayAttendance.filter(a => ['present', 'late'].includes(lower(a.status))).length / todayAttendance.length) * 100) : null;
-  const pendingReviews = studentReviews.filter(review => ['pending', 'draft', 'submitted'].includes(lower(review.status))).length;
-  const upcomingSessions = useMemo(() => [...visibleSessions].filter(s => !['cancelled', 'completed'].includes(lower(s.status))).sort((a,b) => dateKey(a.date).localeCompare(dateKey(b.date)) || text(a.time).localeCompare(text(b.time))).slice(0, 6), [visibleSessions]);
-  const activeSession = visibleSessions.find(s => String(s.id) === String(activeSessionId)) || null;
-  const sessionRoster = activeSession ? visibleStudents.filter(s => sameId(s.class_id, activeSession.class_id)) : [];
-  const activeTab = params.get('tab') || 'overview';
+  const trainer = useMemo(() => {
+    const key = String(user?.related_id || user?.username || user?.id || '').toUpperCase();
+    return trainers.find(t => [t.id, t.trainer_id, t.account_username].some(v => String(v || '').toUpperCase() === key));
+  }, [trainers, user]);
+  const trainerSessions = useMemo(() => {
+    const keys = new Set([trainer?.id, trainer?.trainer_id, user?.related_id, user?.username, user?.id].filter(Boolean).map(v => String(v).toUpperCase()));
+    return sessions.filter(s => keys.has(String(s.trainer_id || s.trainer || '').toUpperCase()) && norm(s.status) !== 'cancelled');
+  }, [sessions, trainer, user]);
+  const todaySessions = trainerSessions.filter(s => String(s.date || '').slice(0,10) === today() && norm(s.status) !== 'completed');
+  const activeSession = trainerSessions.find(s => String(s.id) === String(activeId)) || null;
+  const roster = useMemo(() => activeSession ? students.filter(st => String(st.class_id || '') === String(activeSession.class_id || activeSession.school_class || '')) : [], [activeSession, students]);
 
-  const setTab = tab => setParams({ tab });
-  const getStatus = studentId => attendance.find(a => sameId(a.session_id, activeSessionId) && sameId(a.student_id, studentId))?.status;
-  const mark = async (studentId, status) => { const result = await markAttendance(activeSessionId, studentId, status); if (result?.success === false) toast.error(result.error || 'Attendance could not be saved.'); };
+  const loadSession = async session => {
+    setActiveId(session.id); setError('');
+    try {
+      const [attendanceRows, activityRows] = await Promise.all([request(`/attendance?session=${encodeURIComponent(session.id)}`), request('/session-activities')]);
+      const map = {};
+      (Array.isArray(attendanceRows) ? attendanceRows : attendanceRows?.data || []).forEach(row => { map[String(row.student)] = norm(row.status); map[String(row.student_id)] = norm(row.status); });
+      setAttendance(map);
+      const allActivities = Array.isArray(activityRows) ? activityRows : activityRows?.data || [];
+      setActivities(allActivities.filter(a => String(a.session) === String(session.id)));
+    } catch (e) { setError(e.message); }
+  };
 
-  if (activeSession) return <div className="max-w-3xl mx-auto space-y-4 pb-10"><section className="rounded-3xl bg-slate-950 text-white p-5 sm:p-7 shadow-xl"><button type="button" onClick={() => setActiveSessionId(null)} className="text-xs text-slate-300 hover:text-white mb-3">← Back to workspace</button><p className="text-[10px] uppercase tracking-[0.18em] text-blue-300 font-black">Live classroom</p><h1 className="text-2xl font-black mt-1">{activeSession.topic || 'Scheduled class'}</h1><p className="text-sm text-slate-300 mt-2">{activeSession.date || 'No date'} {activeSession.time ? `· ${activeSession.time}` : ''} · {sessionRoster.length} students</p></section><section className="bg-white rounded-2xl border border-slate-200 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"><div><p className="font-black text-slate-800">Attendance</p><p className="text-xs text-slate-500 mt-1">Mark the current class roster. Changes are saved to the API.</p></div><button type="button" onClick={async () => { for (const student of sessionRoster) await mark(student.student_id, 'Present'); toast.success('All students marked present.'); }} className="inline-flex justify-center items-center gap-2 px-3 py-2.5 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-black"><Check size={14}/> Mark all present</button></section><section className="space-y-2">{sessionRoster.map(student => { const status = getStatus(student.student_id); return <div key={student.student_id} className="bg-white border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-3"><div className="min-w-0"><p className="font-bold text-sm text-slate-800 truncate">{student.name}</p><p className="font-mono text-[10px] text-slate-400">{student.student_id}</p></div><div className="flex gap-2 shrink-0"><button type="button" onClick={() => mark(student.student_id, 'Present')} className={`px-3 py-1.5 rounded-lg text-xs font-bold ${status === 'Present' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-700'}`}>Present</button><button type="button" onClick={() => mark(student.student_id, 'Absent')} className={`px-3 py-1.5 rounded-lg text-xs font-bold ${status === 'Absent' ? 'bg-rose-600 text-white' : 'bg-rose-50 text-rose-700'}`}>Absent</button></div></div>; })}{!sessionRoster.length && <EmptyState title="No students found for this class" description="This session is not linked to a current student roster."/>}</section><button type="button" onClick={async () => { const result = await completeSession(activeSession.id); if (result?.success !== false) { toast.success('Session completed and attendance locked.'); setActiveSessionId(null); } else toast.error(result.error || 'Could not complete session.'); }} className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-sm">Complete & lock session</button></div>;
+  useEffect(() => { if (activeSession) loadSession(activeSession); }, [activeId]);
 
-  const tabView = activeTab !== 'overview';
-  const statCards = [
-    { label: "Today's Classes", value: todaySessions.length, icon: CalendarDays, tone: 'blue' },
-    { label: 'My Students', value: visibleStudents.length, icon: Users, tone: 'violet' },
-    { label: 'Attendance Today', value: todayAttendanceRate == null ? '—' : `${todayAttendanceRate}%`, icon: Check, tone: 'emerald' },
-    { label: 'Pending Reviews', value: pendingReviews, icon: Star, tone: 'amber' },
-  ];
+  const start = async () => {
+    if (!activeSession) return;
+    setBusy(true); setError('');
+    try { await request(`/sessions/${activeSession.id}/start`, 'POST', {}); await refreshAll(); await loadSession({ ...activeSession, status: 'in_progress' }); toast.success('Session started.'); }
+    catch (e) { setError(e.message); }
+    finally { setBusy(false); }
+  };
+
+  const saveAttendance = async () => {
+    if (!activeSession) return;
+    if (!roster.length) throw new Error('No active students are linked to this class.');
+    const entries = roster.map(st => ({ student: st.id, status: attendance[String(st.id)] || attendance[String(st.student_id)] || 'absent' }));
+    await request('/attendance/bulk', 'POST', { session: activeSession.id, entries });
+    await refreshAll();
+  };
+
+  const addActivity = async e => {
+    e.preventDefault();
+    if (!activeSession || !activityTitle.trim()) return;
+    setBusy(true); setError('');
+    try { await request('/session-activities', 'POST', { session: activeSession.id, title: activityTitle.trim(), activity_type: activityType }); setActivityTitle(''); const rows=await request('/session-activities'); const all=Array.isArray(rows)?rows:rows?.data||[]; setActivities(all.filter(a=>String(a.session)===String(activeSession.id))); }
+    catch(e){ setError(e.message); } finally { setBusy(false); }
+  };
+
+  const finish = async () => {
+    if (!activeSession) return;
+    setBusy(true); setError('');
+    try { await saveAttendance(); await request(`/sessions/${activeSession.id}/complete`, 'POST', {}); await refreshAll(); toast.success('Attendance saved and session locked.'); setActiveId(''); }
+    catch(e){ setError(e.message); } finally { setBusy(false); }
+  };
+
+  if (activeSession) {
+    const sessionStatus = norm(activeSession.status);
+    return <div className="space-y-5 pb-10">
+      <PageHeader eyebrow="Live classroom" title={activeSession.topic || 'Class session'} description={`${activeSession.class_name || activeSession.class_id} · ${activeSession.date} · ${activeSession.start_time || 'Time not set'}`} actions={<RefreshButton onRefresh={() => loadSession(activeSession)} loading={busy || loading}/>} />
+      {error && <ErrorState title="Classroom action failed" description={error} />}
+      <section className="bg-slate-950 text-white rounded-3xl p-5 sm:p-7"><div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4"><div><p className="text-[10px] uppercase tracking-[0.18em] text-blue-300 font-black">Session status</p><p className="text-2xl font-black mt-1 capitalize">{sessionStatus.replace('_',' ')}</p><p className="text-xs text-slate-400 mt-2">Trainer: {trainer?.name || user?.name || 'Trainer'} · {roster.length} active students</p></div><Link to="/simulation" className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 border border-white/10 text-xs font-black"><Cpu size={14}/> Virtual Arduino Lab</Link></div></section>
+      {sessionStatus === 'planned' && <section className="bg-white rounded-2xl border border-slate-200 p-5 flex items-center justify-between gap-3"><div><h2 className="font-black text-slate-900">Ready to start?</h2><p className="text-xs text-slate-500 mt-1">Starting the session moves it to In progress and opens attendance/activity controls.</p></div><button disabled={busy} onClick={start} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 text-white text-xs font-black disabled:opacity-50"><Play size={14}/> Start session</button></section>}
+      {sessionStatus === 'in_progress' && <>
+        <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden"><div className="p-4 border-b border-slate-100"><div className="flex items-center gap-2"><Users size={16} className="text-blue-600"/><h2 className="font-black text-slate-900">Attendance</h2></div><p className="text-xs text-slate-400 mt-1">Every active student must have one status before saving.</p></div><div className="divide-y divide-slate-100">{roster.map(st=>{const current=attendance[String(st.id)]||attendance[String(st.student_id)]||''; return <div key={st.id} className="p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"><div><p className="text-sm font-bold text-slate-800">{st.name}</p><p className="text-[10px] font-mono text-slate-400">{st.student_id} · Roll {st.roll_number}</p></div><div className="flex flex-wrap gap-1.5">{['present','late','absent','excused'].map(option=><button key={option} disabled={busy} onClick={()=>setAttendance(prev=>({...prev,[String(st.id)]:option}))} className={`px-3 py-1.5 rounded-lg text-[11px] font-black capitalize ${current===option?'bg-slate-900 text-white':'bg-slate-100 text-slate-600'} disabled:opacity-50`}>{option}</button>)}</div></div>)}{!roster.length && <EmptyState title="Roster is empty" description="This session class has no active student records."/>}</div><div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end"><button disabled={busy || !roster.length} onClick={async()=>{setBusy(true);try{await saveAttendance();toast.success('Attendance saved.')}catch(e){setError(e.message)}finally{setBusy(false)}}} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 text-white text-xs font-black disabled:opacity-50"><Save size={14}/> Save attendance</button></div></section>
+        <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden"><div className="p-4 border-b border-slate-100 flex items-center gap-2"><Activity size={16} className="text-violet-600"/><div><h2 className="font-black text-slate-900">Activities</h2><p className="text-xs text-slate-400 mt-1">Record what happened in the classroom; activities become part of the session history.</p></div></div><form onSubmit={addActivity} className="p-4 flex flex-col sm:flex-row gap-2 border-b border-slate-100"><input value={activityTitle} onChange={e=>setActivityTitle(e.target.value)} placeholder="Activity, lesson or lab task" className="field flex-1"/><select value={activityType} onChange={e=>setActivityType(e.target.value)} className="field sm:w-44"><option value="lesson">Lesson</option><option value="lab">Lab</option><option value="project">Project</option><option value="quiz">Quiz</option><option value="review">Review</option></select><button disabled={busy} className="px-4 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-black disabled:opacity-50">Add activity</button></form><div className="divide-y divide-slate-100">{activities.map(a=><div key={a.id} className="p-4 flex items-center justify-between gap-3"><div><p className="text-sm font-bold text-slate-800">{a.title}</p><p className="text-[10px] uppercase font-black tracking-wide text-slate-400 mt-1">{a.activity_type}</p></div>{a.completed_at?<span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600"><CheckCircle2 size={14}/> Completed</span>:<span className="inline-flex items-center gap-1 text-xs font-bold text-slate-400"><Clock3 size={14}/> Recorded</span>}</div>)}{!activities.length&&<EmptyState title="No activities recorded yet" description="Add the lesson, lab or project activity completed in this session."/>}</div></section>
+        <button disabled={busy || !roster.length} onClick={finish} className="w-full py-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-black disabled:opacity-50"><Lock size={15} className="inline mr-2"/>Complete & lock session</button>
+      </>}
+      {sessionStatus === 'completed' && <section className="bg-white rounded-2xl border border-emerald-200 p-6 text-center"><CheckCircle2 size={28} className="mx-auto text-emerald-600"/><h2 className="font-black text-slate-900 mt-3">Session locked</h2><p className="text-sm text-slate-500 mt-1">This session is complete. Attendance and activities are retained as historical records.</p></section>}
+      <button type="button" onClick={()=>setActiveId('')} className="text-xs font-bold text-slate-500 hover:text-slate-900">← Back to today’s sessions</button>
+      <style>{`.field{width:100%;border:1px solid #e2e8f0;border-radius:12px;padding:10px 12px;font-size:12px;font-weight:600;color:#334155;background:white;outline:none}`}</style>
+    </div>;
+  }
 
   return <div className="space-y-5 pb-10">
-    {!tabView && <>
-      <section className="rounded-3xl bg-gradient-to-br from-slate-950 via-blue-950 to-blue-700 text-white p-5 sm:p-7 shadow-xl"><div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5"><div><p className="text-[10px] uppercase tracking-[0.18em] font-black text-blue-200">Trainer command center</p><h1 className="text-2xl sm:text-3xl font-black mt-1">Good morning, {trainer?.name || user?.name || 'Trainer'}</h1><p className="text-sm text-blue-100/80 mt-2">Your workspace is scoped to current trainer assignments and live LMS records.</p></div><div className="flex flex-wrap gap-2"><Link to="/trainer-ranking" className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-white text-blue-900 text-xs font-black"><Trophy size={14}/> Class ranking</Link><Link to="/simulation" className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-white/10 border border-white/15 text-white text-xs font-black"><Cpu size={14}/> Virtual Lab</Link></div></div></section>
-      <section className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">{statCards.map(({label,value,icon:Icon}) => <div key={label} className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-sm"><div className="w-9 h-9 rounded-xl bg-slate-50 text-slate-700 flex items-center justify-center"><Icon size={18}/></div><p className="text-[9px] uppercase tracking-wider text-slate-400 font-black mt-3">{label}</p><p className="text-2xl sm:text-3xl font-black text-slate-900 mt-1">{value}</p></div>)}</section>
-      <section className="grid grid-cols-1 lg:grid-cols-[1.35fr_1fr] gap-5"><div className="bg-white border border-slate-200/80 rounded-2xl shadow-sm overflow-hidden"><div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between"><div><h2 className="font-black text-slate-900">Today's sessions</h2><p className="text-xs text-slate-400 mt-0.5">Start a live classroom directly from here.</p></div><CalendarDays size={17} className="text-slate-300"/></div><div className="divide-y divide-slate-100">{todaySessions.map(session => <button type="button" key={session.id} onClick={() => setActiveSessionId(session.id)} className="w-full p-4 text-left hover:bg-slate-50 flex items-center gap-3"><div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0"><Play size={15}/></div><div className="min-w-0 flex-1"><p className="text-sm font-bold text-slate-800 truncate">{session.topic || 'Scheduled class'}</p><p className="text-[10px] text-slate-400 mt-1">{session.time || 'Time not set'} · {session.class_id || 'Class not set'}</p></div><ArrowRight size={15} className="text-slate-300"/></button>)}{!todaySessions.length && <EmptyState title="No classes scheduled today" description="When sessions are assigned to you, they will appear here."/>}</div></div><div className="space-y-5"><div className="bg-white border border-slate-200/80 rounded-2xl shadow-sm p-5"><p className="text-[10px] uppercase tracking-wider text-blue-600 font-black">Assigned schools</p><div className="mt-3 space-y-2">{assignedSchools.map(school => <div key={school.id} className="p-3 rounded-xl bg-slate-50 border border-slate-100"><p className="text-sm font-bold text-slate-800">{school.name}</p><p className="text-[10px] font-mono text-slate-400 mt-1">{school.school_code || school.code || school.id}</p></div>)}{!assignedSchools.length && <p className="text-xs text-slate-400">No active school assignments found.</p>}</div></div><div className="bg-blue-50 border border-blue-100 rounded-2xl p-5"><h3 className="font-black text-blue-950 flex items-center gap-2"><BookOpen size={17}/> Ready for the next class?</h3><p className="text-xs text-blue-900/70 mt-1.5">Open teaching materials or launch the interactive Arduino lab.</p><div className="flex flex-wrap gap-2 mt-4"><Link to="/trainer-materials" className="px-3 py-2 rounded-xl bg-white border border-blue-200 text-blue-700 text-xs font-black">Teaching materials</Link><Link to="/simulation" className="px-3 py-2 rounded-xl bg-blue-600 text-white text-xs font-black">Virtual Arduino Lab</Link></div></div></div></section>
-    </>}
-    {activeTab === 'classes' && <section className="space-y-4"><h2 className="text-2xl font-black text-slate-900">My Classes</h2><div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">{visibleClasses.map(item => <div key={item.id} className="bg-white border border-slate-200 rounded-2xl p-5"><div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center"><School size={18}/></div><p className="font-black mt-3">{item.display_name || `${item.grade || ''}${item.section || ''}`}</p><p className="text-xs text-slate-400 mt-1">{visibleStudents.filter(s => sameId(s.class_id, item.id)).length} students</p><Link to="/trainer-ranking" className="inline-flex items-center gap-1.5 mt-3 text-xs font-black text-blue-600">View performance <ArrowRight size={13}/></Link></div>)}{!visibleClasses.length && <div className="col-span-full"><EmptyState title="No assigned classes yet" description="Classes will appear after your trainer-school assignments are configured."/></div>}</div></section>}
-    {activeTab === 'notifications' && <section><EmptyState icon={<Megaphone size={20}/>} title="Notifications" description="Trainer-specific notifications will appear here as communication records are published."/></section>}
-    {activeTab === 'announcements' && <section><EmptyState icon={<Megaphone size={20}/>} title="Announcements" description="School and Pixiu announcements will appear here when available."/></section>}
-    {activeTab === 'attendance' && <section><div className="bg-white border border-slate-200 rounded-2xl p-5"><h2 className="text-xl font-black">Attendance</h2><p className="text-sm text-slate-500 mt-1">Today: {todayAttendanceRate == null ? 'No attendance data available yet.' : `${todayAttendanceRate}% present/late`}</p></div></section>}
-    {activeTab !== 'overview' && activeTab !== 'classes' && activeTab !== 'notifications' && activeTab !== 'announcements' && activeTab !== 'attendance' && <section><EmptyState title={`${activeTab.replace(/^./, c => c.toUpperCase())} workspace`} description="Use the dedicated module from the sidebar. This trainer workspace remains focused on daily teaching operations."/></section>}
+    <PageHeader eyebrow="Trainer" title="Teaching Workspace" description="Today’s schedule, live classroom controls, attendance and session activity history." actions={<RefreshButton onRefresh={refreshAll} loading={loading}/>} />
+    {error && <ErrorState title="Workspace error" description={error}/>} 
+    <section className="grid grid-cols-2 xl:grid-cols-4 gap-3"><div className="stat"><CalendarDays size={17}/><span>Today’s classes</span><strong>{todaySessions.length}</strong></div><div className="stat"><Users size={17}/><span>My students</span><strong>{students.length}</strong></div><div className="stat"><Play size={17}/><span>In progress</span><strong>{trainerSessions.filter(s=>norm(s.status)==='in_progress').length}</strong></div><div className="stat"><CheckCircle2 size={17}/><span>Completed sessions</span><strong>{trainerSessions.filter(s=>norm(s.status)==='completed').length}</strong></div></section>
+    <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden"><div className="p-5 border-b border-slate-100"><h2 className="font-black text-slate-900">Today’s sessions</h2><p className="text-xs text-slate-400 mt-1">Open a scheduled class to start the classroom workflow.</p></div><div className="divide-y divide-slate-100">{todaySessions.map(s=><button key={s.id} type="button" onClick={()=>loadSession(s)} className="w-full p-4 flex items-center gap-3 text-left hover:bg-slate-50"><div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center"><Play size={16}/></div><div className="min-w-0 flex-1"><p className="text-sm font-black text-slate-800 truncate">{s.topic || 'Class session'}</p><p className="text-[11px] text-slate-400 mt-1">{s.class_name || s.class_id} · {s.start_time || 'Time not set'} · {norm(s.status).replace('_',' ')}</p></div><ChevronRight size={16} className="text-slate-300"/></button>)}{!todaySessions.length&&<EmptyState title="No classes scheduled today" description="Your assigned sessions will appear here when a school schedules them."/>}</div></section>
+    <section className="bg-blue-50 border border-blue-100 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"><div><h3 className="font-black text-blue-950">Classroom tools</h3><p className="text-xs text-blue-900/70 mt-1">Open the Virtual Arduino Lab or teaching materials without leaving the trainer workspace.</p></div><div className="flex flex-wrap gap-2"><Link to="/simulation" className="px-3 py-2 rounded-xl bg-blue-600 text-white text-xs font-black inline-flex items-center gap-1.5"><Cpu size={14}/> Virtual Lab</Link><Link to="/trainer-materials" className="px-3 py-2 rounded-xl bg-white border border-blue-200 text-blue-700 text-xs font-black">Teaching materials</Link></div></section>
+    <style>{`.stat{background:white;border:1px solid #e2e8f0;border-radius:16px;padding:14px}.stat svg{color:#64748b}.stat span{display:block;font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:#94a3b8;font-weight:800;margin-top:9px}.stat strong{display:block;font-size:25px;line-height:1.1;color:#0f172a;margin-top:4px}`}</style>
   </div>;
 }
