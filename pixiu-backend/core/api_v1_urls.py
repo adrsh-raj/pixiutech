@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 
 from accounts.legacy_credential_routes import SchoolProfilePasswordResetView, TrainerProfilePasswordResetView
 from accounts.views import LoginView, LogoutView, MeView, RefreshView
+from audit.views import AuditLogViewSet
 from .api_v1_compat import (
     ContractAssessmentViewSet, ContractAttendanceViewSet, ContractClassViewSet, ContractContentViewSet,
     ContractCurriculumViewSet, ContractInventoryViewSet, ContractLeadViewSet, ContractProjectViewSet,
@@ -28,10 +29,11 @@ router.register("reviews", ContractReviewViewSet, basename="v1-review")
 router.register("assessments", ContractAssessmentViewSet, basename="v1-assessment")
 router.register("projects", ContractProjectViewSet, basename="v1-project")
 router.register("billing", ContractBillingFullViewSet, basename="v1-billing")
-router.register("inventory", ContractInventoryViewSet, basename="v1-inventory")
+router.register("inventory", ContractInventoryKitViewSet if False else ContractInventoryViewSet, basename="v1-inventory")
 router.register("leads", ContractLeadViewSet, basename="v1-lead")
 router.register("notifications", ContractNotificationFullViewSet, basename="v1-notification")
 router.register("comms", ContractCommunicationLogViewSet, basename="v1-comms")
+router.register("logs", AuditLogViewSet, basename="v1-audit-log")
 
 urlpatterns = [
     path("health/", health, name="v1-health"),
