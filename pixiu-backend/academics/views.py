@@ -1,6 +1,8 @@
+import json
+
 from django.db import transaction
+from django.utils import timezone
 from rest_framework import status, viewsets
-from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -27,6 +29,7 @@ from .services import (
     accessible_trainer_queryset,
     create_school_account,
     create_trainer_account,
+    next_trainer_id,
 )
 
 
@@ -47,8 +50,6 @@ class Phase3ViewSet(viewsets.ModelViewSet):
         super().initial(request, *args, **kwargs)
 
     def get_queryset(self):
-        # Lists are scope-filtered; detail routes resolve the full set and then
-        # use ScopePermission so authenticated users get 403, not an accidental 404.
         return self.scoped_queryset() if self.action == "list" else self.queryset
 
     def scoped_queryset(self):
@@ -112,9 +113,44 @@ class TrainerViewSet(Phase3ViewSet):
 
     def perform_create(self, serializer):
         self.assert_role(UserRole.ADMIN)
+        try:
+            original = json.loads((self.request.body or b"{}").decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            original = {}
+
+        password = str(original.get("password") or "").strip()
+        if not password:
+            raise ValidationError({"password": "Trainer password is required."})
+
+        requested_trainer_id = str(original.get("trainer_id") or "").strip().upper()
+        trainer_id = requested_trainer_id or next_trainer_id()
+        assigned_schools = original.get("assigned_schools") or []
+        if isinstance(assigned_schools, str):
+            assigned_schools = [item.strip() for item in assigned_schools.split(",") if item.strip()]
+        elif not isinstance(assigned_schools, list):
+            assigned_schools = []
+
         with transaction.atomic():
-            trainer = serializer.save()
-            create_trainer_account(trainer=trainer)
+            trainer = serializer.save(trainer_id=trainer_id)
+            create_trainer_account(trainer=trainer, password=password)
+
+            for school_value in assigned_schools:
+                raw = str(school_value or "").strip()
+                if not raw:
+                    continue
+                try:
+                    school = School.objects.filter(pk=raw).first()
+                except (ValueError, TypeError):
+                    school = None
+                school = school or School.objects.filter(school_code=raw.upper()).first()
+                if school is None:
+                    raise ValidationError({"assigned_schools": f"School '{raw}' was not found."})
+                TrainerSchoolAssignment.objects.update_or_create(
+                    trainer=trainer,
+                    school=school,
+                    assigned_from=timezone.localdate(),
+                    defaults={"status": "active", "assigned_to": None},
+                )
 
     def perform_update(self, serializer):
         self.assert_role(UserRole.ADMIN, UserRole.TRAINER)
