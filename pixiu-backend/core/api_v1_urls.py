@@ -6,7 +6,7 @@ from accounts.views import LoginView, LogoutView, MeView, RefreshView
 from audit.views import AuditLogViewSet
 from billing.contract_views import ContractViewSet, billing_summary
 from billing.views import InvoiceLineItemViewSet, InvoiceViewSet, PaymentViewSet, ReceiptViewSet
-from inventory.views import KitComponentViewSet, KitMaintenanceViewSet
+from inventory.views import KitComponentViewSet, KitMaintenanceViewSet, KitViewSet
 from learning.views import SessionActivityViewSet
 from .analytics import SchoolPerformanceView, StudentProgressView, TrainerPerformanceView
 from .class_ranking import ClassRankingView
@@ -41,9 +41,10 @@ router.register("contracts", ContractViewSet, basename="v1-contract")
 router.register("billing-lines", InvoiceLineItemViewSet, basename="v1-billing-line")
 router.register("payments", PaymentViewSet, basename="v1-payment")
 router.register("receipts", ReceiptViewSet, basename="v1-receipt")
-router.register("inventory", ContractInventoryViewSet, basename="v1-inventory")
+router.register("kits", KitViewSet, basename="v1-kit")
 router.register("kit-components", KitComponentViewSet, basename="v1-kit-component")
 router.register("kit-maintenance", KitMaintenanceViewSet, basename="v1-kit-maintenance")
+router.register("inventory", ContractInventoryViewSet, basename="v1-inventory")
 router.register("leads", ContractLeadViewSet, basename="v1-lead")
 router.register("notifications", ContractNotificationFullViewSet, basename="v1-notification")
 router.register("comms", ContractCommunicationLogViewSet, basename="v1-comms")
