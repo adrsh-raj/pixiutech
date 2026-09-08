@@ -5,7 +5,7 @@ import PortalShell from './components/PortalShell';
 import Dashboard from './pages/Dashboard';
 import Students from './pages/Students';
 import Inventory from './pages/Inventory';
-import Trainers from './pages/Trainers';
+import TrainerOperations from './pages/TrainerOperations';
 import TrainerWorkspace from './pages/TrainerWorkspace';
 import TrainerMaterials from './pages/TrainerMaterials';
 import TrainerCredentials from './pages/TrainerCredentials';
@@ -44,14 +44,13 @@ class ChunkErrorBoundary extends Component {
 const Settings = () => (
   <div className="max-w-xl bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
     <h2 className="text-xl font-bold text-slate-800 mb-2">System Configuration & Master ID Rules</h2>
-    <p className="text-sm text-slate-500 mb-6">Manage global ID prefix formats, academic years, and communication keys.</p>
+    <p className="text-sm text-slate-500 mb-6">Rules and operational controls for the live Django/PostgreSQL system.</p>
     <div className="space-y-4 text-sm">
       <div className="p-4 bg-slate-50 rounded-xl border border-slate-100"><p className="font-bold text-slate-700">Student ID Auto-Generation Format</p><p className="font-mono text-pixiu-blue text-xs font-bold mt-1">[SchoolCode][Grade][Section] [RollNo]</p></div>
-      <div className="p-4 bg-slate-50 rounded-xl border border-slate-100"><p className="font-bold text-slate-700">Active Academic Year</p><p className="font-medium text-slate-800 mt-1">2026 - 2027 (Term 1 Active)</p></div>
-      <div className="p-4 bg-slate-50 rounded-xl border border-slate-100"><p className="font-bold text-slate-700">Database & Auth Status</p><p className="text-emerald-600 font-bold text-xs mt-1">Django API + PostgreSQL/JWT Authentication</p></div>
+      <div className="p-4 bg-slate-50 rounded-xl border border-slate-100"><p className="font-bold text-slate-700">Database & Auth Status</p><p className="text-emerald-600 font-bold text-xs mt-1">Django REST API + PostgreSQL + JWT</p></div>
       <Link to="/trainer-credentials" className="block p-4 bg-blue-50 rounded-xl border border-blue-100 hover:border-blue-300 transition-colors"><p className="font-bold text-blue-900">Trainer Login Credentials</p><p className="text-xs text-blue-700 mt-1">Reset trainer portal passwords securely from the admin console.</p></Link>
       <Link to="/school-credentials" className="block p-4 bg-emerald-50 rounded-xl border border-emerald-100 hover:border-emerald-300 transition-colors"><p className="font-bold text-emerald-900">School Login Credentials</p><p className="text-xs text-emerald-700 mt-1">Set or reset school portal passwords whenever a school forgets them.</p></Link>
-      <Link to="/data-reset" className="block p-4 bg-red-50 rounded-xl border border-red-100 hover:border-red-300 transition-colors"><p className="font-bold text-red-900">Danger Zone — Reset Application Data</p><p className="text-xs text-red-700 mt-1">Clear operational records and preserve administrator access.</p></Link>
+      <Link to="/data-reset" className="block p-4 bg-red-50 rounded-xl border border-red-100 hover:border-red-300 transition-colors"><p className="font-bold text-red-900">Danger Zone — Operational Data Reset</p><p className="text-xs text-red-700 mt-1">Use only the controlled reset workflow; administrator access is preserved.</p></Link>
     </div>
   </div>
 );
@@ -76,7 +75,7 @@ function ProtectedLayout() {
 }
 
 function AdminOnly({ children }) { const { user } = useAuth(); return user?.role === 'admin' || user?.role === 'superadmin' ? children : <Navigate to="/trainers" replace />; }
-function TrainerConsoleRoute() { const { user } = useAuth(); return user?.role === 'trainer' ? <TrainerWorkspace /> : <Trainers />; }
+function TrainerConsoleRoute() { const { user } = useAuth(); return user?.role === 'trainer' ? <TrainerWorkspace /> : <TrainerOperations />; }
 function StudentRouteGuard() { const { isAuthenticated, user, loading } = useAuth(); if (loading) return <div className="min-h-screen bg-slate-900 flex items-center justify-center"><div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" /></div>; if (!isAuthenticated) return <Navigate to="/login" replace />; if (user?.role !== 'student') return <Navigate to="/" replace />; return <StudentPortal />; }
 function SchoolRouteGuard() { const { isAuthenticated, user, loading } = useAuth(); if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" /></div>; if (!isAuthenticated) return <Navigate to="/login" replace />; if (!['school', 'admin'].includes(user?.role)) return <Navigate to="/" replace />; return <SchoolPortal />; }
 function GuestRouteGuard({ children }) { const { isAuthenticated, user, loading } = useAuth(); if (loading) return <div className="min-h-screen bg-[#040810] flex items-center justify-center text-white"><div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" /></div>; if (isAuthenticated && user) { const destination = user.role === 'student' ? '/student-portal' : user.role === 'school' ? '/school-portal' : user.role === 'trainer' ? '/trainers' : '/'; return <Navigate to={destination} replace />; } return children; }
