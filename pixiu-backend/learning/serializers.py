@@ -99,23 +99,15 @@ class AttendanceRecordSerializer(serializers.ModelSerializer):
         return create_attendance(user=self.context["request"].user, **validated_data)
 
     def update(self, instance, validated_data):
-        return create_attendance(
-            user=self.context["request"].user,
-            session=instance.session,
-            student=instance.student,
-            status=validated_data.get("status", instance.status),
-            note=validated_data.get("note", instance.note),
-        )
+        return create_attendance(user=self.context["request"].user, session=instance.session, student=instance.student, status=validated_data.get("status", instance.status), note=validated_data.get("note", instance.note))
 
 
 class CurriculumUnitSerializer(serializers.ModelSerializer):
     class_count = serializers.IntegerField(source="class_assignments.count", read_only=True)
-
     class Meta:
         model = CurriculumUnit
         fields = ["id", "grade", "level", "unit_code", "title", "week", "topic", "objectives", "status", "created_by", "class_count", "created_at", "updated_at"]
         read_only_fields = ["id", "created_by", "class_count", "created_at", "updated_at"]
-
     def validate(self, attrs):
         for field in ("grade", "level", "unit_code", "title", "objectives"):
             if field in attrs and not str(attrs[field]).strip():
@@ -127,12 +119,10 @@ class CurriculumUnitSerializer(serializers.ModelSerializer):
 
 class CurriculumClassAssignmentSerializer(serializers.ModelSerializer):
     class_name = serializers.CharField(source="school_class.display_name", read_only=True)
-
     class Meta:
         model = CurriculumClassAssignment
         fields = ["id", "curriculum_unit", "school_class", "class_name", "assigned_by", "assigned_at"]
         read_only_fields = ["id", "class_name", "assigned_by", "assigned_at"]
-
     def validate(self, attrs):
         user = self.context["request"].user
         school_class = attrs.get("school_class", getattr(self.instance, "school_class", None))
@@ -146,7 +136,6 @@ class CurriculumClassAssignmentSerializer(serializers.ModelSerializer):
         if self.instance and unit != self.instance.curriculum_unit:
             raise serializers.ValidationError("Curriculum unit cannot be changed after assignment.")
         return attrs
-
     def create(self, validated_data):
         return CurriculumClassAssignment.objects.create(assigned_by=self.context["request"].user, **validated_data)
 
@@ -156,7 +145,6 @@ class LearningContentSerializer(serializers.ModelSerializer):
         model = LearningContent
         fields = ["id", "title", "description", "content_type", "grade", "level", "unit_code", "url", "file", "target_role", "status", "is_watermarked", "created_by", "created_at", "updated_at"]
         read_only_fields = ["id", "created_by", "created_at", "updated_at"]
-
     def validate(self, attrs):
         title = attrs.get("title", getattr(self.instance, "title", ""))
         if not str(title).strip():
@@ -180,12 +168,10 @@ class LearningContentSerializer(serializers.ModelSerializer):
 
 class ContentClassAssignmentSerializer(serializers.ModelSerializer):
     class_name = serializers.CharField(source="school_class.display_name", read_only=True)
-
     class Meta:
         model = ContentClassAssignment
         fields = ["id", "content", "school_class", "class_name", "assigned_by", "assigned_at"]
         read_only_fields = ["id", "class_name", "assigned_by", "assigned_at"]
-
     def validate(self, attrs):
         user = self.context["request"].user
         school_class = attrs.get("school_class", getattr(self.instance, "school_class", None))
@@ -201,7 +187,6 @@ class ContentClassAssignmentSerializer(serializers.ModelSerializer):
         if self.instance and content != self.instance.content:
             raise serializers.ValidationError("Content cannot be changed after assignment.")
         return attrs
-
     def create(self, validated_data):
         return ContentClassAssignment.objects.create(assigned_by=self.context["request"].user, **validated_data)
 
@@ -211,7 +196,6 @@ class QuizQuestionWriteSerializer(serializers.ModelSerializer):
         model = QuizQuestion
         fields = ["id", "quiz", "question_order", "question_text", "option_a", "option_b", "option_c", "option_d", "correct_option", "explanation", "points"]
         read_only_fields = ["id"]
-
     def validate(self, attrs):
         quiz = attrs.get("quiz", getattr(self.instance, "quiz", None))
         if quiz is None:
@@ -233,12 +217,10 @@ class QuizQuestionStudentSerializer(serializers.ModelSerializer):
 
 class QuizSerializer(serializers.ModelSerializer):
     questions = serializers.SerializerMethodField()
-
     class Meta:
         model = Quiz
         fields = ["id", "title", "grade", "level", "unit_code", "duration_minutes", "max_attempts", "status", "created_by", "questions", "created_at", "updated_at"]
         read_only_fields = ["id", "created_by", "questions", "created_at", "updated_at"]
-
     def validate(self, attrs):
         grade = attrs.get("grade", getattr(self.instance, "grade", ""))
         if not str(grade).strip().isdigit():
@@ -247,7 +229,6 @@ class QuizSerializer(serializers.ModelSerializer):
         if not str(title).strip():
             raise serializers.ValidationError({"title": "Title is required."})
         return attrs
-
     def get_questions(self, obj):
         user = self.context["request"].user
         serializer = QuizQuestionStudentSerializer if user.role == UserRole.STUDENT else QuizQuestionWriteSerializer
@@ -256,12 +237,10 @@ class QuizSerializer(serializers.ModelSerializer):
 
 class QuizClassAssignmentSerializer(serializers.ModelSerializer):
     class_name = serializers.CharField(source="school_class.display_name", read_only=True)
-
     class Meta:
         model = QuizClassAssignment
         fields = ["id", "quiz", "school_class", "class_name", "assigned_by", "assigned_at"]
         read_only_fields = ["id", "class_name", "assigned_by", "assigned_at"]
-
     def validate(self, attrs):
         user = self.context["request"].user
         school_class = attrs.get("school_class", getattr(self.instance, "school_class", None))
@@ -277,7 +256,6 @@ class QuizClassAssignmentSerializer(serializers.ModelSerializer):
         if self.instance and quiz != self.instance.quiz:
             raise serializers.ValidationError("Quiz cannot be changed after assignment.")
         return attrs
-
     def create(self, validated_data):
         return QuizClassAssignment.objects.create(assigned_by=self.context["request"].user, **validated_data)
 
@@ -285,7 +263,6 @@ class QuizClassAssignmentSerializer(serializers.ModelSerializer):
 class QuizAttemptReadSerializer(serializers.ModelSerializer):
     quiz_title = serializers.CharField(source="quiz.title", read_only=True)
     student_id = serializers.CharField(source="student.student_id", read_only=True)
-
     class Meta:
         model = QuizAttempt
         fields = ["id", "quiz", "quiz_title", "student", "student_id", "attempt_number", "score", "total_marks", "percentage", "correct_count", "attempted_count", "total_questions", "time_taken_seconds", "violation_count", "status", "completed_at"]
@@ -298,7 +275,6 @@ class QuizAttemptCreateSerializer(serializers.Serializer):
     answers = serializers.JSONField()
     time_taken_seconds = serializers.IntegerField(min_value=0, default=0)
     violation_count = serializers.IntegerField(min_value=0, default=0)
-
     def validate(self, attrs):
         request = self.context["request"]
         student = attrs.get("student") or getattr(request.user, "student_profile", None)
@@ -312,7 +288,6 @@ class QuizAttemptCreateSerializer(serializers.Serializer):
             raise serializers.ValidationError({"student": "Students can only submit their own attempts."})
         attrs["student"] = student
         return attrs
-
     def create(self, validated_data):
         return grade_attempt(**validated_data)
 
@@ -320,12 +295,10 @@ class QuizAttemptCreateSerializer(serializers.Serializer):
 class StudentAssessmentSerializer(serializers.ModelSerializer):
     student_id = serializers.CharField(source="student.student_id", read_only=True)
     trainer_id = serializers.CharField(source="trainer.trainer_id", read_only=True)
-
     class Meta:
         model = StudentAssessment
         fields = ["id", "student", "student_id", "trainer", "trainer_id", "unit_code", "level", "title", "score", "rating", "status", "feedback", "assessment_date", "created_at", "updated_at"]
         read_only_fields = ["id", "student_id", "trainer_id", "created_at", "updated_at"]
-
     def validate(self, attrs):
         user = self.context["request"].user
         student = attrs.get("student", getattr(self.instance, "student", None))
@@ -345,16 +318,16 @@ class StudentAssessmentSerializer(serializers.ModelSerializer):
 
 class ProjectSerializer(serializers.ModelSerializer):
     student_id = serializers.CharField(source="student.student_id", read_only=True)
-
     class Meta:
         model = Project
         fields = ["id", "student", "student_id", "title", "description", "status", "score", "trainer_feedback", "submitted_at", "completed_at", "created_at", "updated_at"]
         read_only_fields = ["id", "student_id", "submitted_at", "completed_at", "created_at", "updated_at"]
-
     def validate(self, attrs):
         user = self.context["request"].user
         student = attrs.get("student", getattr(self.instance, "student", None))
         if user.role == UserRole.STUDENT:
+            if {"score", "status", "trainer_feedback"}.intersection(attrs):
+                raise serializers.ValidationError("Students cannot change evaluation fields.")
             if self.instance and student and student.account_id != user.id:
                 raise serializers.ValidationError("Students can only edit their own projects.")
             attrs["student"] = user.student_profile
