@@ -7,34 +7,41 @@ from academics.services import accessible_class_queryset, accessible_student_que
 from .models import (
     AttendanceRecord, ContentClassAssignment, CurriculumClassAssignment, CurriculumUnit,
     LearningContent, Project, ProjectEvidence, Quiz, QuizAttempt, QuizClassAssignment,
-    QuizQuestion, Session, StudentAssessment,
+    QuizQuestion, Session, SessionActivity, StudentAssessment,
 )
 from .services import accessible_quizzes, create_attendance, grade_attempt
 
 
 class SessionSerializer(serializers.ModelSerializer):
+    school_id = serializers.CharField(source="school_class.school.school_code", read_only=True)
     school_code = serializers.CharField(source="school_class.school.school_code", read_only=True)
     class_name = serializers.CharField(source="school_class.display_name", read_only=True)
     trainer_id = serializers.CharField(source="trainer.trainer_id", read_only=True)
+    trainer_name = serializers.CharField(source="trainer.name", read_only=True)
+    activities = serializers.SerializerMethodField()
 
     class Meta:
         model = Session
-        fields = ["id", "school_class", "school_code", "class_name", "trainer", "trainer_id", "date", "start_time", "end_time", "topic", "notes", "status", "is_locked", "created_by", "created_at", "updated_at"]
-        read_only_fields = ["id", "school_code", "class_name", "trainer_id", "status", "is_locked", "created_by", "created_at", "updated_at"]
+        fields = ["id", "school_class", "school_id", "school_code", "class_name", "trainer", "trainer_id", "trainer_name", "date", "start_time", "end_time", "topic", "notes", "status", "is_locked", "created_by", "created_at", "updated_at", "activities"]
+        read_only_fields = ["id", "school_id", "school_code", "class_name", "trainer_id", "trainer_name", "status", "is_locked", "created_by", "created_at", "updated_at", "activities"]
 
     def validate(self, attrs):
         request = self.context["request"]
         instance = self.instance
         school_class = attrs.get("school_class", getattr(instance, "school_class", None))
         trainer = attrs.get("trainer", getattr(instance, "trainer", None))
-        if school_class and not accessible_class_queryset(request.user).filter(pk=school_class.pk).exists():
+        if not school_class:
+            raise serializers.ValidationError({"school_class": "Class is required."})
+        if not trainer:
+            raise serializers.ValidationError({"trainer": "Trainer is required."})
+        if not accessible_class_queryset(request.user).filter(pk=school_class.pk).exists():
             raise serializers.ValidationError("You cannot manage a session for this class.")
-        if trainer and not Trainer.objects.filter(pk=trainer.pk).exists():
-            raise serializers.ValidationError("Trainer does not exist.")
-        if trainer and school_class and request.user.role != UserRole.ADMIN:
+        if not trainer.status == "active":
+            raise serializers.ValidationError({"trainer": "Only active trainers can be scheduled."})
+        if request.user.role != UserRole.ADMIN:
             if not trainer.school_assignments.filter(school_id=school_class.school_id, status="active").exists():
                 raise serializers.ValidationError("Trainer is not assigned to this school.")
-        if request.user.role == UserRole.TRAINER and trainer and trainer.account_id != request.user.id:
+        if request.user.role == UserRole.TRAINER and trainer.account_id != request.user.id:
             raise serializers.ValidationError("A trainer can only schedule their own sessions.")
         if instance and instance.is_locked and request.user.role != UserRole.ADMIN:
             raise serializers.ValidationError("Locked sessions cannot be edited.")
@@ -45,15 +52,48 @@ class SessionSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         return Session.objects.create(created_by=self.context["request"].user, **validated_data)
 
+    def get_activities(self, obj):
+        return SessionActivitySerializer(obj.activities.all(), many=True, context=self.context).data
+
+
+class SessionActivitySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SessionActivity
+        fields = ["id", "session", "title", "activity_type", "notes", "completed_at", "created_by", "created_at", "updated_at"]
+        read_only_fields = ["id", "created_by", "created_at", "updated_at"]
+
+    def validate(self, attrs):
+        title = attrs.get("title", "")
+        if not str(title).strip():
+            raise serializers.ValidationError({"title": "Activity title is required."})
+        session = attrs.get("session")
+        if self.instance is not None:
+            session = self.instance.session
+        if not session:
+            raise serializers.ValidationError({"session": "Session is required."})
+        return attrs
+
 
 class AttendanceRecordSerializer(serializers.ModelSerializer):
     student_id = serializers.CharField(source="student.student_id", read_only=True)
+    student_name = serializers.CharField(source="student.name", read_only=True)
+    roll_number = serializers.IntegerField(source="student.roll_number", read_only=True)
+    class_id = serializers.SerializerMethodField()
+    class_name = serializers.CharField(source="session.school_class.display_name", read_only=True)
+    school_code = serializers.CharField(source="session.school_class.school.school_code", read_only=True)
+    trainer_id = serializers.CharField(source="session.trainer.trainer_id", read_only=True)
     session_topic = serializers.CharField(source="session.topic", read_only=True)
+    date = serializers.DateField(source="session.date", read_only=True)
+    time = serializers.TimeField(source="session.start_time", read_only=True)
+    marked_by_username = serializers.CharField(source="marked_by.username", read_only=True)
 
     class Meta:
         model = AttendanceRecord
-        fields = ["id", "session", "student", "student_id", "session_topic", "status", "marked_by", "marked_at", "note"]
-        read_only_fields = ["id", "student_id", "session_topic", "marked_by", "marked_at"]
+        fields = ["id", "session", "student", "student_id", "student_name", "roll_number", "class_id", "class_name", "school_code", "trainer_id", "session_topic", "date", "time", "status", "marked_by", "marked_by_username", "marked_at", "note"]
+        read_only_fields = ["id", "student_id", "student_name", "roll_number", "class_id", "class_name", "school_code", "trainer_id", "session_topic", "date", "time", "marked_by", "marked_by_username", "marked_at"]
+
+    def get_class_id(self, obj):
+        return str(obj.session.school_class_id)
 
     def create(self, validated_data):
         return create_attendance(user=self.context["request"].user, **validated_data)
@@ -313,18 +353,15 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         user = self.context["request"].user
-        instance = self.instance
-        student = attrs.get("student", getattr(instance, "student", None))
-        if student and not accessible_student_queryset(user).filter(pk=student.pk).exists():
-            raise serializers.ValidationError({"student": "You cannot manage a project for this student."})
+        student = attrs.get("student", getattr(self.instance, "student", None))
         if user.role == UserRole.STUDENT:
-            if student and student.account_id != user.id:
-                raise serializers.ValidationError({"student": "Students can only manage their own project."})
-            protected = {field for field in ("status", "score", "trainer_feedback") if field in attrs}
-            if protected:
-                raise serializers.ValidationError({field: "Students cannot change evaluation fields." for field in protected})
-        elif user.role == UserRole.SCHOOL and any(field in attrs for field in ("status", "score", "trainer_feedback")):
-            raise serializers.ValidationError("Schools cannot change project evaluation fields.")
+            if self.instance and student and student.account_id != user.id:
+                raise serializers.ValidationError("Students can only edit their own projects.")
+            attrs["student"] = user.student_profile
+            if self.instance and self.instance.status not in {"draft", "returned"}:
+                raise serializers.ValidationError("Only draft or returned projects can be edited.")
+        elif student and not accessible_student_queryset(user).filter(pk=student.pk).exists():
+            raise serializers.ValidationError("You cannot manage this student's project.")
         return attrs
 
 
@@ -332,23 +369,4 @@ class ProjectEvidenceSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectEvidence
         fields = ["id", "project", "title", "note", "file", "external_url", "uploaded_by", "created_at"]
-        read_only_fields = ["id", "uploaded_by", "created_at", "project"]
-
-    def validate(self, attrs):
-        project = attrs.get("project", getattr(self.instance, "project", None))
-        if not project:
-            raise serializers.ValidationError({"project": "Project is required."})
-        user = self.context["request"].user
-        if not accessible_student_queryset(user).filter(pk=project.student_id).exists():
-            raise serializers.ValidationError("You cannot add evidence to this project.")
-        if user.role == UserRole.STUDENT and project.student.account_id != user.id:
-            raise serializers.ValidationError("Students can only add evidence to their own project.")
-        file_value = attrs.get("file", getattr(self.instance, "file", None))
-        external_url = attrs.get("external_url", getattr(self.instance, "external_url", ""))
-        note = attrs.get("note", getattr(self.instance, "note", ""))
-        if not file_value and not external_url and not str(note).strip():
-            raise serializers.ValidationError("Evidence must contain a file, external URL, or note.")
-        return attrs
-
-    def create(self, validated_data):
-        return ProjectEvidence.objects.create(uploaded_by=self.context["request"].user, **validated_data)
+        read_only_fields = ["id", "uploaded_by", "created_at"]
