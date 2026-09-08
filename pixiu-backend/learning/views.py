@@ -12,19 +12,20 @@ from academics.services import accessible_class_queryset
 from .models import (
     AttendanceRecord, ContentClassAssignment, CurriculumClassAssignment, CurriculumUnit,
     LearningContent, Project, ProjectEvidence, Quiz, QuizAttempt, QuizClassAssignment,
-    QuizQuestion, Session, StudentAssessment,
+    QuizQuestion, Session, SessionActivity, StudentAssessment,
 )
 from .permissions import LearningScopePermission
 from .serializers import (
     AttendanceRecordSerializer, ContentClassAssignmentSerializer, CurriculumClassAssignmentSerializer,
     CurriculumUnitSerializer, LearningContentSerializer, ProjectEvidenceSerializer, ProjectSerializer,
     QuizAttemptCreateSerializer, QuizAttemptReadSerializer, QuizClassAssignmentSerializer,
-    QuizQuestionStudentSerializer, QuizQuestionWriteSerializer, QuizSerializer, SessionSerializer,
-    StudentAssessmentSerializer,
+    QuizQuestionStudentSerializer, QuizQuestionWriteSerializer, QuizSerializer, SessionActivitySerializer,
+    SessionSerializer, StudentAssessmentSerializer,
 )
 from .services import (
     accessible_assessments, accessible_attempts, accessible_attendance, accessible_content,
     accessible_curriculum, accessible_evidence, accessible_projects, accessible_quizzes, accessible_sessions,
+    complete_session, create_session_activity, start_session, save_attendance_batch,
 )
 
 
@@ -49,7 +50,7 @@ class LearningViewSet(viewsets.ModelViewSet):
 
 
 class SessionViewSet(LearningViewSet):
-    queryset = Session.objects.select_related("school_class__school", "trainer", "created_by")
+    queryset = Session.objects.select_related("school_class__school", "trainer", "created_by").prefetch_related("activities")
     serializer_class = SessionSerializer
 
     def scoped_queryset(self): return accessible_sessions(self.request.user)
@@ -69,19 +70,21 @@ class SessionViewSet(LearningViewSet):
         instance.status = "cancelled"
         instance.save(update_fields=["status", "updated_at"])
 
-    @action(detail=True, methods=["post"], url_path="complete")
+    @action(detail=True, methods=["post"])
+    def start(self, request, pk=None):
+        self.required_action = "EDIT"
+        session = self.get_object()
+        self.role_only(UserRole.ADMIN, UserRole.SCHOOL, UserRole.TRAINER)
+        return Response(self.get_serializer(start_session(user=request.user, session=session)).data)
+
+    @action(detail=True, methods=["post"])
     def complete(self, request, pk=None):
         self.required_action = "EDIT"
         session = self.get_object()
         self.role_only(UserRole.ADMIN, UserRole.SCHOOL, UserRole.TRAINER)
-        if session.status != "planned":
-            raise ValidationError("Only planned sessions can be completed.")
-        session.status = "completed"
-        session.is_locked = True
-        session.save(update_fields=["status", "is_locked", "updated_at"])
-        return Response(self.get_serializer(session).data)
+        return Response(self.get_serializer(complete_session(user=request.user, session=session)).data)
 
-    @action(detail=True, methods=["post"], url_path="unlock")
+    @action(detail=True, methods=["post"])
     def unlock(self, request, pk=None):
         self.required_action = "EDIT"
         session = self.get_object()
@@ -93,11 +96,66 @@ class SessionViewSet(LearningViewSet):
         return Response(self.get_serializer(session).data)
 
 
+class SessionActivityViewSet(LearningViewSet):
+    queryset = SessionActivity.objects.select_related("session", "created_by")
+    serializer_class = SessionActivitySerializer
+
+    def scoped_queryset(self): return SessionActivity.objects.filter(session_id__in=accessible_sessions(self.request.user).values("id"))
+
+    def perform_create(self, serializer):
+        self.role_only(UserRole.ADMIN, UserRole.SCHOOL, UserRole.TRAINER)
+        session = serializer.validated_data["session"]
+        activity = create_session_activity(
+            user=self.request.user,
+            session=session,
+            title=serializer.validated_data["title"],
+            activity_type=serializer.validated_data.get("activity_type", "lesson"),
+            notes=serializer.validated_data.get("notes", ""),
+        )
+        serializer.instance = activity
+
+    def perform_update(self, serializer):
+        self.role_only(UserRole.ADMIN, UserRole.SCHOOL, UserRole.TRAINER)
+        instance = serializer.instance
+        if instance.session.is_locked or instance.session.status in {"completed", "cancelled"}:
+            raise ValidationError("Locked or completed sessions cannot be changed.")
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        self.role_only(UserRole.ADMIN, UserRole.SCHOOL, UserRole.TRAINER)
+        if instance.session.is_locked or instance.session.status in {"completed", "cancelled"}:
+            raise ValidationError("Locked or completed sessions cannot be changed.")
+        instance.delete()
+
+    @action(detail=True, methods=["post"])
+    def complete(self, request, pk=None):
+        self.required_action = "EDIT"
+        activity = self.get_object()
+        self.role_only(UserRole.ADMIN, UserRole.SCHOOL, UserRole.TRAINER)
+        if activity.session.is_locked or activity.session.status in {"completed", "cancelled"}:
+            raise ValidationError("Locked or completed sessions cannot be changed.")
+        activity.completed_at = timezone.now()
+        activity.save(update_fields=["completed_at", "updated_at"])
+        return Response(self.get_serializer(activity).data)
+
+
 class AttendanceViewSet(LearningViewSet):
-    queryset = AttendanceRecord.objects.select_related("session", "student", "marked_by")
+    queryset = AttendanceRecord.objects.select_related(
+        "session__school_class__school", "session__trainer", "student", "marked_by"
+    )
     serializer_class = AttendanceRecordSerializer
 
-    def scoped_queryset(self): return accessible_attendance(self.request.user)
+    def scoped_queryset(self):
+        qs = accessible_attendance(self.request.user)
+        params = self.request.query_params
+        if params.get("session"): qs = qs.filter(session_id=params["session"])
+        if params.get("student"): qs = qs.filter(student_id=params["student"])
+        if params.get("school"): qs = qs.filter(session__school_class__school__school_code=params["school"].upper())
+        if params.get("class_id"): qs = qs.filter(session__school_class_id=params["class_id"])
+        if params.get("trainer"): qs = qs.filter(session__trainer__trainer_id=params["trainer"].upper())
+        if params.get("date_from"): qs = qs.filter(session__date__gte=params["date_from"])
+        if params.get("date_to"): qs = qs.filter(session__date__lte=params["date_to"])
+        return qs
 
     def perform_create(self, serializer):
         self.role_only(UserRole.ADMIN, UserRole.SCHOOL, UserRole.TRAINER)
@@ -109,7 +167,36 @@ class AttendanceViewSet(LearningViewSet):
 
     def perform_destroy(self, instance):
         self.role_only(UserRole.ADMIN)
+        if instance.session.is_locked or instance.session.status == "completed":
+            raise ValidationError("Attendance history for locked sessions cannot be deleted.")
         instance.delete()
+
+    @action(detail=False, methods=["post"], url_path="bulk")
+    def bulk(self, request):
+        self.required_action = "EDIT"
+        self.role_only(UserRole.ADMIN, UserRole.SCHOOL, UserRole.TRAINER)
+        session_id = request.data.get("session") or request.data.get("session_id")
+        if not session_id:
+            raise ValidationError({"session": "Session is required."})
+        session = Session.objects.filter(pk=session_id).first()
+        if not session:
+            raise ValidationError({"session": "Session does not exist."})
+        records = save_attendance_batch(user=request.user, session=session, entries=request.data.get("entries", []))
+        return Response(self.get_serializer(records, many=True).data)
+
+    @action(detail=False, methods=["put"], url_path="admin-override")
+    def admin_override(self, request):
+        self.required_action = "EDIT"
+        self.role_only(UserRole.ADMIN)
+        session_id = request.data.get("session") or request.data.get("session_id")
+        student_id = request.data.get("student") or request.data.get("student_id")
+        session = Session.objects.filter(pk=session_id).first()
+        student = __import__("academics.models", fromlist=["Student"]).Student.objects.filter(student_id=str(student_id).strip().upper()).first()
+        if not session or not student:
+            raise ValidationError("Session and student are required.")
+        from .services import create_attendance
+        obj = create_attendance(user=request.user, session=session, student=student, status=str(request.data.get("status", "absent")).lower(), note=str(request.data.get("note", "")))
+        return Response(self.get_serializer(obj).data)
 
 
 class CurriculumUnitViewSet(LearningViewSet):
@@ -132,7 +219,7 @@ class CurriculumAssignmentViewSet(LearningViewSet):
         if user.role == UserRole.ADMIN: return qs
         return qs.filter(school_class__id__in=accessible_class_queryset(user).values("id"))
 
-    def perform_create(self, serializer): self.role_only(UserRole.ADMIN, UserRole.SCHOOL, UserRole.TRAINER); serializer.save()
+    def perform_create(self, serializer): self.role_only(UserRole.ADMIN, UserRole.SCHOOL, UserRole.TRAINER); serializer.save(assigned_by=self.request.user)
     def perform_update(self, serializer): self.role_only(UserRole.ADMIN, UserRole.SCHOOL, UserRole.TRAINER); serializer.save()
     def perform_destroy(self, instance): self.role_only(UserRole.ADMIN); instance.delete()
 
@@ -157,7 +244,7 @@ class ContentAssignmentViewSet(LearningViewSet):
         if user.role == UserRole.ADMIN: return qs
         return qs.filter(school_class__id__in=accessible_class_queryset(user).values("id"))
 
-    def perform_create(self, serializer): self.role_only(UserRole.ADMIN, UserRole.SCHOOL, UserRole.TRAINER); serializer.save()
+    def perform_create(self, serializer): self.role_only(UserRole.ADMIN, UserRole.SCHOOL, UserRole.TRAINER); serializer.save(assigned_by=self.request.user)
     def perform_update(self, serializer): self.role_only(UserRole.ADMIN, UserRole.SCHOOL, UserRole.TRAINER); serializer.save()
     def perform_destroy(self, instance): self.role_only(UserRole.ADMIN); instance.delete()
 
@@ -171,7 +258,7 @@ class QuizViewSet(LearningViewSet):
     def perform_update(self, serializer): self.role_only(UserRole.ADMIN, UserRole.TRAINER); serializer.save()
     def perform_destroy(self, instance): self.role_only(UserRole.ADMIN); instance.status = "closed"; instance.save(update_fields=["status", "updated_at"])
 
-    @action(detail=True, methods=["post"], url_path="submit")
+    @action(detail=True, methods=["post"])
     def submit(self, request, pk=None):
         self.required_action = "CREATE"
         quiz = self.get_object()
@@ -184,12 +271,8 @@ class QuizViewSet(LearningViewSet):
 class QuizQuestionViewSet(LearningViewSet):
     queryset = QuizQuestion.objects.select_related("quiz")
 
-    def scoped_queryset(self):
-        return self.queryset.filter(quiz__in=accessible_quizzes(self.request.user))
-
-    def get_serializer_class(self):
-        return QuizQuestionStudentSerializer if self.request.user.role == UserRole.STUDENT else QuizQuestionWriteSerializer
-
+    def scoped_queryset(self): return self.queryset.filter(quiz__in=accessible_quizzes(self.request.user))
+    def get_serializer_class(self): return QuizQuestionStudentSerializer if self.request.user.role == UserRole.STUDENT else QuizQuestionWriteSerializer
     def perform_create(self, serializer): self.role_only(UserRole.ADMIN, UserRole.TRAINER); serializer.save()
     def perform_update(self, serializer): self.role_only(UserRole.ADMIN, UserRole.TRAINER); serializer.save()
     def perform_destroy(self, instance): self.role_only(UserRole.ADMIN, UserRole.TRAINER); instance.delete()
@@ -204,8 +287,7 @@ class QuizAssignmentViewSet(LearningViewSet):
         user = self.request.user
         if user.role == UserRole.ADMIN: return qs
         return qs.filter(school_class__id__in=accessible_class_queryset(user).values("id"))
-
-    def perform_create(self, serializer): self.role_only(UserRole.ADMIN, UserRole.SCHOOL, UserRole.TRAINER); serializer.save()
+    def perform_create(self, serializer): self.role_only(UserRole.ADMIN, UserRole.SCHOOL, UserRole.TRAINER); serializer.save(assigned_by=self.request.user)
     def perform_update(self, serializer): self.role_only(UserRole.ADMIN, UserRole.SCHOOL, UserRole.TRAINER); serializer.save()
     def perform_destroy(self, instance): self.role_only(UserRole.ADMIN); instance.delete()
 
@@ -213,34 +295,23 @@ class QuizAssignmentViewSet(LearningViewSet):
 class QuizAttemptViewSet(LearningViewSet):
     queryset = QuizAttempt.objects.select_related("quiz", "student")
     serializer_class = QuizAttemptReadSerializer
-
     def scoped_queryset(self): return accessible_attempts(self.request.user)
-
     def create(self, request, *args, **kwargs):
         self.required_action = "CREATE"
         serializer = QuizAttemptCreateSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
-        attempt = serializer.save()
-        return Response(QuizAttemptReadSerializer(attempt, context={"request": request}).data, status=status.HTTP_201_CREATED)
-
-    def perform_destroy(self, instance):
-        self.role_only(UserRole.ADMIN)
-        instance.status = "invalidated"
-        instance.save(update_fields=["status"])
+        return Response(QuizAttemptReadSerializer(serializer.save(), context={"request": request}).data, status=status.HTTP_201_CREATED)
+    def perform_destroy(self, instance): self.role_only(UserRole.ADMIN); instance.status = "invalidated"; instance.save(update_fields=["status"])
 
 
 class AssessmentViewSet(LearningViewSet):
     queryset = StudentAssessment.objects.select_related("student", "trainer")
     serializer_class = StudentAssessmentSerializer
-
     def scoped_queryset(self): return accessible_assessments(self.request.user)
-
     def perform_create(self, serializer):
         self.role_only(UserRole.ADMIN, UserRole.TRAINER)
-        if self.request.user.role == UserRole.TRAINER:
-            serializer.validated_data["trainer"] = self.request.user.trainer_profile
+        if self.request.user.role == UserRole.TRAINER: serializer.validated_data["trainer"] = self.request.user.trainer_profile
         serializer.save()
-
     def perform_update(self, serializer): self.role_only(UserRole.ADMIN, UserRole.TRAINER); serializer.save()
     def perform_destroy(self, instance): self.role_only(UserRole.ADMIN); instance.status = "draft"; instance.save(update_fields=["status", "updated_at"])
 
@@ -248,44 +319,27 @@ class AssessmentViewSet(LearningViewSet):
 class ProjectViewSet(LearningViewSet):
     queryset = Project.objects.select_related("student__school_class__school").prefetch_related("evidence")
     serializer_class = ProjectSerializer
-
     def scoped_queryset(self): return accessible_projects(self.request.user)
-
     def perform_create(self, serializer):
         self.role_only(UserRole.ADMIN, UserRole.SCHOOL, UserRole.TRAINER, UserRole.STUDENT)
-        if self.request.user.role == UserRole.STUDENT:
-            serializer.validated_data["student"] = self.request.user.student_profile
+        if self.request.user.role == UserRole.STUDENT: serializer.validated_data["student"] = self.request.user.student_profile
         serializer.save()
-
-    def perform_update(self, serializer):
-        self.role_only(UserRole.ADMIN, UserRole.SCHOOL, UserRole.TRAINER, UserRole.STUDENT)
-        serializer.save()
-
-    def perform_destroy(self, instance):
-        self.role_only(UserRole.ADMIN, UserRole.STUDENT)
-        instance.delete()
-
-    @action(detail=True, methods=["post"], url_path="submit")
+    def perform_update(self, serializer): self.role_only(UserRole.ADMIN, UserRole.SCHOOL, UserRole.TRAINER, UserRole.STUDENT); serializer.save()
+    def perform_destroy(self, instance): self.role_only(UserRole.ADMIN, UserRole.STUDENT); instance.delete()
+    @action(detail=True, methods=["post"])
     def submit(self, request, pk=None):
         self.required_action = "EDIT"
-        project = self.get_object()
-        self.role_only(UserRole.STUDENT)
-        if project.student.account_id != request.user.id:
-            raise PermissionDenied("Students can only submit their own project.")
-        if project.status not in {"draft", "returned"}:
-            raise ValidationError("Only draft or returned projects can be submitted.")
-        project.status = "submitted"
-        project.submitted_at = timezone.now()
-        project.save(update_fields=["status", "submitted_at", "updated_at"])
+        project = self.get_object(); self.role_only(UserRole.STUDENT)
+        if project.student.account_id != request.user.id: raise PermissionDenied("Students can only submit their own project.")
+        if project.status not in {"draft", "returned"}: raise ValidationError("Only draft or returned projects can be submitted.")
+        project.status = "submitted"; project.submitted_at = timezone.now(); project.save(update_fields=["status", "submitted_at", "updated_at"])
         return Response(self.get_serializer(project).data)
 
 
 class ProjectEvidenceViewSet(LearningViewSet):
     queryset = ProjectEvidence.objects.select_related("project__student", "uploaded_by")
     serializer_class = ProjectEvidenceSerializer
-
     def scoped_queryset(self): return accessible_evidence(self.request.user)
-
-    def perform_create(self, serializer): self.role_only(UserRole.ADMIN, UserRole.STUDENT); serializer.save()
+    def perform_create(self, serializer): self.role_only(UserRole.ADMIN, UserRole.STUDENT); serializer.save(uploaded_by=self.request.user)
     def perform_update(self, serializer): self.role_only(UserRole.ADMIN, UserRole.STUDENT); serializer.save()
     def perform_destroy(self, instance): self.role_only(UserRole.ADMIN, UserRole.STUDENT); instance.delete()
