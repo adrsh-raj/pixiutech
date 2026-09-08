@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { apiFetch } from './AuthContext';
 
 const DataContext = createContext(null);
@@ -44,6 +44,7 @@ export function DataProvider({ children }) {
   const [curriculum, setCurriculum] = useState([]), [inventory, setInventory] = useState([]), [billing, setBilling] = useState([]), [comms, setComms] = useState([]);
   const [projects, setProjects] = useState([]), [notifications, setNotifications] = useState([]), [studentReviews, setStudentReviews] = useState([]), [quizzes, setQuizzes] = useState([]), [quizSubmissions, setQuizSubmissions] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [endpointErrors, setEndpointErrors] = useState({});
 
   const refreshAll = useCallback(async () => {
     if (!getToken()) return { success: false, error: 'Authentication required' };
@@ -58,11 +59,24 @@ export function DataProvider({ children }) {
       ['/quiz-submissions', rows => setQuizSubmissions(rows)],
     ];
     const results = await Promise.allSettled(endpoints.map(([path]) => apiRequest(path)));
-    results.forEach((result, index) => { if (result.status === 'fulfilled') endpoints[index][1](collection(result.value)); });
+    const nextErrors = {};
+    results.forEach((result, index) => {
+      const [path, setter] = endpoints[index];
+      if (result.status === 'fulfilled') setter(collection(result.value));
+      else nextErrors[path] = result.reason?.message || `Unable to load ${path.slice(1) || 'data'}.`;
+    });
+    setEndpointErrors(nextErrors);
     setLoading(false);
-    return { success: results.some(result => result.status === 'fulfilled'), failed: results.filter(result => result.status === 'rejected').length };
+    return { success: results.some(result => result.status === 'fulfilled'), failed: results.filter(result => result.status === 'rejected').length, errors: nextErrors };
   }, []);
-  useEffect(() => { refreshAll(); const onAuthChange = () => refreshAll(); window.addEventListener('pixiu_auth_state_changed', onAuthChange); return () => window.removeEventListener('pixiu_auth_state_changed', onAuthChange); }, [refreshAll]);
+
+  useEffect(() => {
+    refreshAll();
+    const onAuthChange = () => refreshAll();
+    window.addEventListener('pixiu_auth_state_changed', onAuthChange);
+    return () => window.removeEventListener('pixiu_auth_state_changed', onAuthChange);
+  }, [refreshAll]);
+
   const save = async (path, method, body) => { try { const data = await requestJSON(path, method, body); await refreshAll(); return { success: true, data }; } catch (error) { return { success: false, error: error.message }; } };
   const remove = async path => { try { const data = await apiRequest(path, { method: 'DELETE' }); await refreshAll(); return { success: true, data }; } catch (error) { return { success: false, error: error.message }; } };
 
@@ -93,18 +107,41 @@ export function DataProvider({ children }) {
   const updateBillingInvoice = (id, data) => save(`/invoices/${encodeURIComponent(id)}`, 'PATCH', data);
   const deleteBillingInvoice = () => ({ success: false, error: 'Invoices are retained financial records; use the Void lifecycle instead of delete.' });
   const sendCommsMessage = data => save('/comms', 'POST', data), addProject = data => save('/projects', 'POST', data), deleteProject = id => remove(`/projects/${encodeURIComponent(id)}`);
-  const sendBroadcastNotification = data => save('/notifications', 'POST', data), updateNotification = (id, data) => save(`/notifications/${encodeURIComponent(id)}`, 'PUT', data), deleteNotification = id => remove(`/notifications/${encodeURIComponent(id)}`);
-  const pushSchoolNotification = ({ target_school_id, title, message, priority = 'normal' }) => sendBroadcastNotification({ target_type: target_school_id ? 'school' : 'universal', target_school_id: target_school_id || '', title, message, severity: priority === 'high' ? 'urgent' : 'info' });
+  const sendBroadcastNotification = data => save('/notifications', 'POST', data);
+  const updateNotification = () => ({ success: false, error: 'Notifications are immutable server records; create a new notification instead of editing.' });
+  const deleteNotification = () => ({ success: false, error: 'Notifications are immutable server records and cannot be deleted from the portal.' });
+  const pushSchoolNotification = ({ target_school_id, title, message, priority = 'normal' }) => sendBroadcastNotification({ target_type: target_school_id ? 'specific_school' : 'universal', target_school_id: target_school_id || '', title, message, severity: priority === 'high' ? 'urgent' : 'info' });
   const saveStudentReview = data => save('/assessments', 'POST', data), deleteStudentReview = id => remove(`/assessments/${encodeURIComponent(id)}`), createQuiz = data => save('/quizzes', 'POST', data), updateQuiz = (id, data) => save(`/quizzes/${encodeURIComponent(id)}`, 'PUT', data), deleteQuiz = id => remove(`/quizzes/${encodeURIComponent(id)}`), submitQuizAttempt = data => save('/quiz-submissions', 'POST', data);
   const allowQuizReattempt = () => ({ success: false, error: 'Quiz reattempt is controlled by the quiz lifecycle and is not exposed as a generic override.' });
   const deleteQuizSubmission = () => ({ success: false, error: 'Quiz attempts are retained for assessment history.' });
   const uploadFile = async file => { if (!file) return { success: false, error: 'No file selected.' }; const form = new FormData(); form.append('file', file); try { const data = await apiRequest('/upload', { method: 'POST', body: form }); return { success: true, url: data.url, filename: data.filename }; } catch (error) { return { success: false, error: error.message }; } };
-  const classKits = useMemo(() => ({}), []);
+  const classKits = {};
   const updateClassKitComponent = () => ({ success: false, error: 'Class kit blueprints are no longer stored in frontend state. Use the database-backed Kit Components workflow.' });
   const addComponentToClassKit = () => ({ success: false, error: 'Class kit components are persisted through the database-backed Kit Components workflow.' });
   const resolveAlertAction = useCallback(async () => ({ success: false, error: 'No operational alert action is connected.' }), []);
 
-  const value = useMemo(() => ({ loading, refreshAll, schools, addSchool, updateSchool, deleteSchool, classes, addClass, students, addStudent, updateStudent, deleteStudent, getNextRollNumber, getStudentAttendance, getStudentAttendanceRecords, trainers, addTrainer, updateTrainer, updateTrainerStatus, deleteTrainer, sessions, scheduleSession, completeSession, unlockSession, startNewSession, attendance, markAttendance, adminUpdateAttendance, leads, addLead, updateLeadStage, deleteLead, convertLeadToSchool, content, uploadContent, deleteContent, curriculum, addCurriculumPlan, updateCurriculumStatus, inventory, addInventoryKit, updateKitStatus, deleteKit, classKits, updateClassKitComponent, addComponentToClassKit, billing, createInvoice, updateInvoiceStatus, confirmPaymentReceipt, updateBillingInvoice, deleteBillingInvoice, comms, sendCommsMessage, projects, addProject, deleteProject, uploadFile, resolveAlertAction, notifications, sendBroadcastNotification, updateNotification, deleteNotification, pushSchoolNotification, studentReviews, saveStudentReview, deleteStudentReview, quizzes, createQuiz, updateQuiz, deleteQuiz, quizSubmissions, submitQuizAttempt, allowQuizReattempt, deleteQuizSubmission }), [loading, refreshAll, schools, classes, students, trainers, sessions, attendance, leads, content, curriculum, inventory, billing, comms, projects, notifications, studentReviews, quizzes, quizSubmissions, classKits, resolveAlertAction]);
+  const value = {
+    loading, endpointErrors, refreshAll,
+    schools, addSchool, updateSchool, deleteSchool,
+    classes, addClass,
+    students, addStudent, updateStudent, deleteStudent, getNextRollNumber, getStudentAttendance, getStudentAttendanceRecords,
+    trainers, addTrainer, updateTrainer, updateTrainerStatus, deleteTrainer,
+    sessions, scheduleSession, completeSession, unlockSession, startNewSession,
+    attendance, markAttendance, adminUpdateAttendance,
+    leads, addLead, updateLeadStage, deleteLead, convertLeadToSchool,
+    content, uploadContent, deleteContent, curriculum, addCurriculumPlan, updateCurriculumStatus,
+    inventory, addInventoryKit, updateKitStatus, deleteKit, classKits, updateClassKitComponent, addComponentToClassKit,
+    billing, createInvoice, updateInvoiceStatus, confirmPaymentReceipt, updateBillingInvoice, deleteBillingInvoice,
+    comms, sendCommsMessage, projects, addProject, deleteProject, uploadFile, resolveAlertAction,
+    notifications, sendBroadcastNotification, updateNotification, deleteNotification, pushSchoolNotification,
+    studentReviews, saveStudentReview, deleteStudentReview,
+    quizzes, createQuiz, updateQuiz, deleteQuiz, quizSubmissions, submitQuizAttempt, allowQuizReattempt, deleteQuizSubmission,
+  };
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
 }
-export const useData = () => { const context = useContext(DataContext); if (!context) throw new Error('useData must be used inside DataProvider'); return context; };
+
+export function useData() {
+  const context = useContext(DataContext);
+  if (!context) throw new Error('useData must be used inside a DataProvider.');
+  return context;
+}
