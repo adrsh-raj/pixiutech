@@ -9,18 +9,19 @@ from accounts.models import UserRole
 from academics.models import Student, Trainer
 from billing.models import Invoice
 from billing.services import add_invoice_line, recalculate_invoice, update_invoice_line
+from billing.views import InvoiceViewSet
 from crm.models import CommunicationLog
 from crm.serializers import CommunicationLogSerializer
 from notifications.models import Notification, NotificationType
 
-from .api_v1_compat import ContractBillingViewSet, ContractNotificationViewSet, _first, _school, _student
+from .api_v1_compat import _first, _school, _student
 
 LEGACY_INVOICE_STATUS = {"pending": "issued", "pending_verification": "issued", "paid": "paid", "partially_paid": "partially_paid", "overdue": "overdue", "draft": "draft", "issued": "issued", "void": "void"}
 
 def normalize_invoice_status(value):
     return LEGACY_INVOICE_STATUS.get(str(value or "").strip().lower().replace(" ", "_"), "issued")
 
-class ContractBillingFullViewSet(ContractBillingViewSet):
+class ContractBillingFullViewSet(InvoiceViewSet):
     def get_queryset(self):
         # DELETE intentionally voids invoices for financial/audit integrity.
         # Keep voided records in PostgreSQL, but remove them from the active ledger/API list.
@@ -46,6 +47,13 @@ class ContractBillingFullViewSet(ContractBillingViewSet):
             if requested_status != "draft": invoice.status = requested_status; invoice.save(update_fields=["status", "updated_at"])
             response.data = self.map_out(invoice)
         return response
+
+    def map_out(self, obj):
+        from billing.serializers import InvoiceSerializer, PaymentSerializer, ReceiptSerializer
+        data = InvoiceSerializer(obj, context={"request": self.request}).data
+        paid = float(obj.amount_paid)
+        total = float(obj.total_amount)
+        return {**data, "school_id": obj.school.school_code, "amount": total, "paid_amount": paid, "pending_amount": max(0, total - paid), "status": obj.status}
 
     def update(self, request, *args, **kwargs):
         invoice = self.get_object(); self.role_only(UserRole.ADMIN, UserRole.SCHOOL)
