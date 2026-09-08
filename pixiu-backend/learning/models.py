@@ -15,6 +15,7 @@ class Lifecycle(models.TextChoices):
 
 class SessionStatus(models.TextChoices):
     PLANNED = "planned", "Planned"
+    IN_PROGRESS = "in_progress", "In progress"
     COMPLETED = "completed", "Completed"
     CANCELLED = "cancelled", "Cancelled"
 
@@ -84,6 +85,24 @@ class Session(models.Model):
         ordering = ["-date", "-start_time"]
         constraints = [
             models.CheckConstraint(condition=Q(end_time__isnull=True) | Q(end_time__gt=models.F("start_time")), name="session_end_after_start"),
+        ]
+
+
+class SessionActivity(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name="activities")
+    title = models.CharField(max_length=250)
+    activity_type = models.CharField(max_length=50, default="lesson")
+    notes = models.TextField(blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_session_activities")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["created_at"]
+        constraints = [
+            models.CheckConstraint(condition=~Q(title=""), name="session_activity_title_required"),
         ]
 
 
