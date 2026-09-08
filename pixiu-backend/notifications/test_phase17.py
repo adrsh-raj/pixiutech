@@ -29,11 +29,11 @@ class NotificationAudienceAPITests(APITestCase):
         refresh = RefreshToken.for_user(user)
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh.access_token}')
 
-    def test_specific_school_reaches_school_trainer_and_students(self):
+    def test_specific_school_reaches_school_trainer_and_all_students_in_school(self):
         self.authenticate(self.admin)
         response = self.client.post('/api/v1/notifications', {'target_type': 'specific_school', 'target_school_id': str(self.school.id), 'title': 'School Notice', 'message': 'Important update'}, format='json')
         self.assertEqual(response.status_code, 201)
-        self.assertEqual({row['recipient_id'] for row in response.data}, {str(self.school_user.id), str(self.trainer_user.id), str(self.student_user.id)})
+        self.assertEqual({row['recipient_id'] for row in response.data}, {str(self.school_user.id), str(self.trainer_user.id), str(self.student_user.id), str(self.other_student_user.id)})
 
     def test_all_schools_targets_active_school_accounts(self):
         self.authenticate(self.admin)
