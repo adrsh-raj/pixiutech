@@ -1,6 +1,38 @@
-import { BookOpen, Box, CalendarDays, ClipboardCheck, Cpu, FileText, FolderKanban, GraduationCap, LayoutDashboard, Megaphone, PlaySquare, Receipt, School, Star, Trophy, Users, Video, WalletCards, Award, BarChart3 } from 'lucide-react';
+import { BookOpen, Box, CalendarDays, ChartNoAxesCombined, ClipboardCheck, Cpu, CreditCard, FileText, FolderKanban, GraduationCap, LayoutDashboard, Megaphone, PlaySquare, ReceiptText, School, Settings, ShieldCheck, Trophy, Users, Video, WalletCards, KeyRound } from 'lucide-react';
 
 export const PORTAL_NAVIGATION = {
+  admin: [
+    { title: 'COMMAND CENTER', links: [
+      { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+    ] },
+    { title: 'BUSINESS', links: [
+      { name: 'Sales Pipeline', href: '/leads', icon: FolderKanban },
+      { name: 'Partner Schools', href: '/schools', icon: School },
+      { name: 'Billing & Invoices', href: '/billing', icon: CreditCard },
+      { name: 'Payments & Receipts', href: '/payments', icon: ReceiptText },
+    ] },
+    { title: 'ACADEMICS', links: [
+      { name: 'Student Directory', href: '/students', icon: Users },
+      { name: 'Trainer Faculty', href: '/trainers', icon: GraduationCap },
+      { name: 'Classes & Sessions', href: '/sessions', icon: CalendarDays },
+      { name: 'Curriculum', href: '/curriculum', icon: BookOpen },
+      { name: 'Content Hub', href: '/content', icon: PlaySquare },
+      { name: 'Quizzes', href: '/quizzes', icon: ClipboardCheck },
+      { name: 'Projects', href: '/projects', icon: FolderKanban },
+      { name: 'Attendance', href: '/attendance', icon: CalendarDays },
+    ] },
+    { title: 'ANALYTICS & OPERATIONS', links: [
+      { name: 'Hardware & Kits', href: '/inventory', icon: Box },
+      { name: 'Notifications', href: '/notifications', icon: ReceiptText },
+      { name: 'Audit Logs', href: '/logs', icon: ShieldCheck },
+      { name: 'Announcements & Comms', href: '/comms', icon: Megaphone },
+    ] },
+    { title: 'SYSTEM', links: [
+      { name: 'Trainer Credentials', href: '/trainer-credentials', icon: KeyRound },
+      { name: 'School Credentials', href: '/school-credentials', icon: KeyRound },
+      { name: 'Settings', href: '/settings', icon: Settings },
+    ] },
+  ],
   student: [
     { title: 'MY LEARNING', links: [
       { name: 'Overview', key: 'overview', icon: LayoutDashboard },
@@ -11,8 +43,8 @@ export const PORTAL_NAVIGATION = {
     ] },
     { title: 'MY PERFORMANCE', links: [
       { name: 'Attendance', href: '/student-portal?tab=attendance', icon: CalendarDays },
-      { name: 'My Progress', href: '/student-progress', icon: BarChart3 },
-      { name: 'My Certificates', key: 'certificates', icon: Award },
+      { name: 'My Progress', href: '/student-progress', icon: ChartNoAxesCombined },
+      { name: 'My Certificates', key: 'certificates', icon: Trophy },
     ] },
     { title: 'MY CLASS', links: [
       { name: 'Class Ranking', href: '/student-ranking', icon: Trophy },
@@ -40,7 +72,7 @@ export const PORTAL_NAVIGATION = {
       { name: 'Learning Materials', href: '/content', icon: PlaySquare },
     ] },
     { title: 'PERFORMANCE', links: [
-      { name: 'School Performance', href: '/school-performance', icon: BarChart3 },
+      { name: 'School Performance', href: '/school-performance', icon: ChartNoAxesCombined },
       { name: 'Class Performance', href: '/school-ranking', icon: Trophy },
       { name: 'Student Rankings', href: '/school-ranking', icon: Trophy },
       { name: 'Progress', key: 'progress', icon: WalletCards },
@@ -50,7 +82,7 @@ export const PORTAL_NAVIGATION = {
     ] },
     { title: 'COMMUNICATION', links: [
       { name: 'Announcements', key: 'announcements', icon: Megaphone },
-      { name: 'Notifications', key: 'notifications', icon: Receipt },
+      { name: 'Notifications', key: 'notifications', icon: ReceiptText },
     ] },
     { title: 'LAB', links: [
       { name: 'Virtual Arduino Lab', href: '/simulation', icon: Cpu },
@@ -74,12 +106,12 @@ export const PORTAL_NAVIGATION = {
       { name: 'Attendance', href: '/attendance', icon: CalendarDays },
       { name: 'Class Performance', href: '/trainer-ranking', icon: Trophy },
       { name: 'Class Ranking', href: '/trainer-ranking', icon: Trophy },
-      { name: 'Student Reviews', href: '/trainers', icon: Star },
-      { name: 'Trainer Performance', href: '/trainer-performance', icon: BarChart3 },
+      { name: 'Student Reviews', href: '/trainers', icon: Trophy },
+      { name: 'Trainer Performance', href: '/trainer-performance', icon: ChartNoAxesCombined },
     ] },
     { title: 'COMMUNICATION', links: [
       { name: 'Announcements', href: '/comms', icon: Megaphone },
-      { name: 'Notifications', href: '/notifications', icon: Receipt },
+      { name: 'Notifications', href: '/notifications', icon: ReceiptText },
     ] },
     { title: 'LAB TOOLS', links: [
       { name: 'Virtual Arduino Lab', href: '/simulation', icon: Cpu },
@@ -89,6 +121,7 @@ export const PORTAL_NAVIGATION = {
 };
 
 export const PORTAL_ROLE_LABELS = {
+  admin: { name: 'Admin', subtitle: 'Command Center', icon: ShieldCheck },
   student: { name: 'Student', subtitle: 'Learning Portal', icon: GraduationCap },
   school: { name: 'School', subtitle: 'School Operations', icon: School },
   trainer: { name: 'Trainer', subtitle: 'Teaching Workspace', icon: Video },
