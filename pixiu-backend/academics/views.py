@@ -40,7 +40,15 @@ class SchoolViewSet(Phase3ViewSet):
             record_audit(actor=self.request.user, action="create", entity_type="school", entity_id=school.id, summary=f"School {school.school_code} created", request=self.request)
     def perform_update(self, serializer):
         self.assert_role(UserRole.ADMIN, UserRole.SCHOOL); school = serializer.save(); record_audit(actor=self.request.user, action="update", entity_type="school", entity_id=school.id, summary=f"School {school.school_code} updated", request=self.request)
-    def perform_destroy(self, instance): self.assert_role(UserRole.ADMIN); raise ValidationError("Schools are deactivated instead of hard-deleted.")
+    def perform_destroy(self, instance):
+        self.assert_role(UserRole.ADMIN)
+        instance.status = "inactive"
+        if instance.account_id:
+            instance.account.status = "inactive"
+            instance.account.is_active = False
+            instance.account.save(update_fields=["status", "is_active"])
+        instance.save(update_fields=["status", "updated_at"])
+        record_audit(actor=self.request.user, action="update", entity_type="school", entity_id=instance.id, summary=f"School {instance.school_code} deactivated", request=self.request)
     @action(detail=True, methods=["post"], url_path="deactivate")
     def deactivate(self, request, pk=None):
         self.required_action = "EDIT"; school = self.get_object();
@@ -57,7 +65,7 @@ class TrainerViewSet(Phase3ViewSet):
     def scoped_queryset(self): return accessible_trainer_queryset(self.request.user)
     def perform_create(self, serializer):
         self.assert_role(UserRole.ADMIN)
-        try: original = json.loads((self.request.body or b"{}").decode("utf-8"))
+        try: original = json.loads((self.request.body or b"").decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError): original = {}
         password = str(original.get("password") or "").strip()
         if not password: raise ValidationError({"password": "Trainer password is required."})

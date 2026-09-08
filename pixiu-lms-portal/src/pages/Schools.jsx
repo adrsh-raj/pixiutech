@@ -1,785 +1,165 @@
-import { useState } from 'react';
-import { 
-  Building2, Search, Plus, Phone, Calendar, IndianRupee, Trash2, X, 
-  Users, BookOpen, CheckCircle, Edit, Megaphone, Bell, Sparkles, 
-  Receipt, ShieldCheck, Check, Send, AlertCircle
-} from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Building2, Search, Plus, Phone, Users, BookOpen, CheckCircle, Edit, Megaphone, Receipt, X, Check, Send, UserCog } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { useToast } from '../context/ToastContext';
-import { Link } from 'react-router-dom';
+
+const emptyForm = {
+  school_code: '', name: '', principal_name: '', phone: '', email: '', address: '',
+  lab_name: '', lab_location: '', lab_capacity: '', lab_notes: '', status: 'active'
+};
 
 export default function Schools() {
-  const { 
-    schools, 
-    classes, 
-    students, 
-    trainers, 
-    billing, 
-    addSchool, 
-    updateSchool, 
-    deleteSchool, 
-    pushSchoolNotification,
-    updateInvoiceStatus 
-  } = useData();
+  const { schools, classes, students, trainers, billing, addSchool, updateSchool, deleteSchool, pushSchoolNotification } = useData();
   const toast = useToast();
-
+  const [assignments, setAssignments] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
-  
-  // Modals
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [isAddOpen, setIsAddOpen] = useState(false);
   const [editingSchool, setEditingSchool] = useState(null);
-  const [notificationSchool, setNotificationSchool] = useState(null); // When open, holds the target school or 'ALL'
+  const [notificationSchool, setNotificationSchool] = useState(null);
+  const [form, setForm] = useState(emptyForm);
+  const [notification, setNotification] = useState({ title: '', message: '', priority: 'normal' });
 
-  // Add Form State
-  const [formData, setFormData] = useState({
-    name: '',
-    code: '',
-    principal_name: '',
-    principal_phone: '',
-    lab_room: 'Block B - STEM Lab 101',
-    trainer_id: 'TR-01',
-    status: 'Active',
-    contract_type: 'Full STEM Lab Suite',
-    contract_start: new Date().toISOString().split('T')[0],
-    renewal_date: '2027-03-31',
-    expected_revenue: 100000
-  });
-
-  // Edit Form State
-  const [editFormData, setEditFormData] = useState({
-    name: '',
-    code: '',
-    principal_name: '',
-    principal_phone: '',
-    lab_room: '',
-    trainer_id: 'TR-01',
-    status: 'Active',
-    contract_type: 'Full STEM Lab Suite',
-    contract_start: '',
-    renewal_date: '',
-    expected_revenue: 100000
-  });
-
-  // Notification Push State
-  const [notifData, setNotifData] = useState({
-    title: '',
-    message: '',
-    type: 'announcement',
-    priority: 'normal',
-    target_school_id: 'ALL'
-  });
-
-  const filteredSchools = schools.filter(s => {
-    const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) || (s.code && s.code.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesStatus = statusFilter === 'All' || s.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
-
-  // Handle Add School
-  const handleAddSubmit = async (e) => {
-    e.preventDefault();
-    const code = formData.code.toUpperCase().trim();
-    const trainer = trainers.find(t => t.id === formData.trainer_id);
-    
-    await addSchool({
-      id: code,
-      name: formData.name,
-      code: code,
-      principal_name: formData.principal_name,
-      principal_phone: formData.principal_phone,
-      lab_room: formData.lab_room,
-      trainer_id: formData.trainer_id,
-      lead_trainer: trainer ? trainer.name : 'Vikas Pandey',
-      status: formData.status,
-      contract_type: formData.contract_type,
-      contract_start: formData.contract_start,
-      renewal_date: formData.renewal_date,
-      expected_revenue: Number(formData.expected_revenue) || 100000,
-      created_at: new Date().toISOString().split('T')[0]
-    });
-
-    toast.success(`${formData.name} successfully onboarded!`, 'Partner School Added');
-    setIsAddModalOpen(false);
-    setFormData({
-      name: '',
-      code: '',
-      principal_name: '',
-      principal_phone: '',
-      lab_room: 'Block B - STEM Lab 101',
-      trainer_id: 'TR-01',
-      status: 'Active',
-      contract_type: 'Full STEM Lab Suite',
-      contract_start: new Date().toISOString().split('T')[0],
-      renewal_date: '2027-03-31',
-      expected_revenue: 100000
-    });
-  };
-
-  // Open Edit Modal
-  const handleOpenEdit = (e, school) => {
-    e.stopPropagation();
-    setEditingSchool(school);
-    setEditFormData({
-      name: school.name || '',
-      code: school.code || school.id || '',
-      principal_name: school.principal_name || school.principal || '',
-      principal_phone: school.principal_phone || school.contact || '',
-      lab_room: school.lab_room || 'Block B - Innovation Lab 102',
-      trainer_id: school.trainer_id || 'TR-01',
-      status: school.status || 'Active',
-      contract_type: school.contract_type || 'Full STEM Lab Suite',
-      contract_start: school.contract_start || '2026-08-01',
-      renewal_date: school.renewal_date || '2027-03-31',
-      expected_revenue: school.expected_revenue || 100000
-    });
-  };
-
-  // Handle Edit Submit
-  const handleEditSubmit = async (e) => {
-    e.preventDefault();
-    if (!editingSchool) return;
-
-    const trainer = trainers.find(t => t.id === editFormData.trainer_id);
-
-    await updateSchool(editingSchool.id, {
-      name: editFormData.name,
-      principal_name: editFormData.principal_name,
-      principal_phone: editFormData.principal_phone,
-      lab_room: editFormData.lab_room,
-      trainer_id: editFormData.trainer_id,
-      lead_trainer: trainer ? trainer.name : editingSchool.lead_trainer,
-      status: editFormData.status,
-      contract_type: editFormData.contract_type,
-      contract_start: editFormData.contract_start,
-      renewal_date: editFormData.renewal_date,
-      expected_revenue: Number(editFormData.expected_revenue) || 0
-    });
-
-    toast.success(`School "${editFormData.name}" information updated successfully!`, 'School Updated');
-    setEditingSchool(null);
-  };
-
-  // Open Notification Push Modal
-  const handleOpenNotification = (school = null) => {
-    setNotificationSchool(school);
-    setNotifData({
-      title: '',
-      message: '',
-      type: 'announcement',
-      priority: 'normal',
-      target_school_id: school ? school.id : 'ALL'
-    });
-  };
-
-  // Handle Notification Send
-  const handleSendNotification = async (e) => {
-    e.preventDefault();
-    await pushSchoolNotification(notifData);
-    toast.success(`Announcement pushed to ${notifData.target_school_id === 'ALL' ? 'All Partner Schools' : notifData.target_school_id}!`, 'Notification Dispatched');
-    setNotificationSchool(null);
-  };
-
-  const getStudentCountForSchool = (schoolId) => {
-    return students.filter(s => s.school_id === schoolId || s.school_id === schoolId.replace('CLS-', '')).length;
-  };
-
-  const getClassCountForSchool = (schoolId) => {
-    return classes.filter(c => c.school_id === schoolId).length;
-  };
-
-  const getBillingStatsForSchool = (schoolId) => {
-    const schoolInvoices = billing.filter(b => b.school_id === schoolId);
-    const totalAmount = schoolInvoices.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
-    const paidInvoices = schoolInvoices.filter(b => b.status === 'Paid').length;
-    return {
-      totalAmount,
-      totalCount: schoolInvoices.length,
-      paidCount: paidInvoices,
-      hasPending: schoolInvoices.some(b => b.status !== 'Paid')
+  useEffect(() => {
+    let cancelled = false;
+    const loadAssignments = async () => {
+      try {
+        const token = localStorage.getItem('pixiu_auth_token');
+        const response = await fetch(`${window.location.origin}/api/trainer-school-assignments`, {
+          headers: { Authorization: `Bearer ${token || ''}` }, cache: 'no-store'
+        });
+        const payload = await response.json().catch(() => []);
+        if (!response.ok) throw new Error(payload.detail || payload.error || 'Unable to load trainer assignments.');
+        if (!cancelled) setAssignments(Array.isArray(payload) ? payload : payload.results || payload.data || []);
+      } catch (error) {
+        if (!cancelled) toast.error(error.message, 'Trainer assignments unavailable');
+      }
     };
+    loadAssignments();
+    return () => { cancelled = true; };
+  }, [toast]);
+
+  const statusOptions = useMemo(() => {
+    const values = [...new Set(schools.map(s => String(s.status || '').trim().toLowerCase()).filter(Boolean))];
+    return values.sort();
+  }, [schools]);
+
+  const filteredSchools = useMemo(() => schools.filter(school => {
+    const search = searchTerm.trim().toLowerCase();
+    const matchesSearch = !search || String(school.name || '').toLowerCase().includes(search) || String(school.school_code || school.code || '').toLowerCase().includes(search);
+    const matchesStatus = statusFilter === 'all' || String(school.status || '').toLowerCase() === statusFilter;
+    return matchesSearch && matchesStatus;
+  }), [schools, searchTerm, statusFilter]);
+
+  const getSchoolStudents = schoolId => students.filter(student => String(student.school_id || '').toLowerCase() === String(schoolId || '').toLowerCase());
+  const getSchoolClasses = schoolId => classes.filter(item => String(item.school_id || '').toLowerCase() === String(schoolId || '').toLowerCase());
+  const getSchoolInvoices = schoolId => billing.filter(item => String(item.school_id || '').toLowerCase() === String(schoolId || '').toLowerCase());
+  const getSchoolTrainers = schoolId => {
+    const ids = assignments.filter(a => String(a.school || a.school_id || '').toLowerCase() === String(schoolId || '').toLowerCase() && String(a.status || '').toLowerCase() === 'active').map(a => String(a.trainer || a.trainer_id || ''));
+    return trainers.filter(trainer => ids.includes(String(trainer.id)) || ids.includes(String(trainer.trainer_id)));
   };
+
+  const openEdit = school => {
+    setEditingSchool(school);
+    setForm({
+      school_code: school.school_code || school.code || '',
+      name: school.name || '',
+      principal_name: school.principal_name || '',
+      phone: school.phone || '', email: school.email || '', address: school.address || '',
+      lab_name: school.lab_name || '', lab_location: school.lab_location || '',
+      lab_capacity: school.lab_capacity ?? '', lab_notes: school.lab_notes || '',
+      status: String(school.status || 'active').toLowerCase()
+    });
+  };
+
+  const submitSchool = async event => {
+    event.preventDefault();
+    const payload = { ...form, lab_capacity: form.lab_capacity === '' ? null : Number(form.lab_capacity) };
+    const result = editingSchool ? await updateSchool(editingSchool.id, payload) : await addSchool(payload);
+    if (!result?.success) {
+      toast.error(result?.error || 'Unable to save school.', 'School save failed');
+      return;
+    }
+    toast.success(editingSchool ? 'School updated successfully.' : 'School added successfully.', editingSchool ? 'School Updated' : 'School Added');
+    setEditingSchool(null); setIsAddOpen(false); setForm(emptyForm);
+  };
+
+  const deactivateSchool = async school => {
+    if (!window.confirm(`Deactivate ${school.name}? The school record will be retained for audit history.`)) return;
+    const result = await deleteSchool(school.id);
+    if (!result?.success) {
+      toast.error(result?.error || 'Unable to deactivate school.', 'School deactivation failed');
+      return;
+    }
+    toast.success(`${school.name} has been deactivated.`, 'School Deactivated');
+  };
+
+  const sendNotification = async event => {
+    event.preventDefault();
+    const target = notificationSchool ? notificationSchool.school_code || notificationSchool.code || notificationSchool.id : '';
+    const result = await pushSchoolNotification({ target_school_id: target, title: notification.title, message: notification.message, priority: notification.priority });
+    if (!result?.success) {
+      toast.error(result?.error || 'Unable to dispatch announcement.', 'Announcement failed');
+      return;
+    }
+    toast.success('Announcement dispatched successfully.', 'Notification Sent');
+    setNotificationSchool(null); setNotification({ title: '', message: '', priority: 'normal' });
+  };
+
+  const startAdd = () => { setForm(emptyForm); setEditingSchool(null); setIsAddOpen(true); };
 
   return (
-    <div className="pb-10">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+    <div className="pb-10 space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Partner Schools (Client Directory)</h1>
-          <p className="text-slate-500">Full administrative control over school contracts, assigned trainers, live billing, and announcements.</p>
+          <div className="flex items-center gap-2 text-xs text-slate-400 font-bold uppercase tracking-wider"><Building2 size={14} /> Partner Schools</div>
+          <h1 className="text-2xl font-bold text-slate-900 mt-1">School Directory</h1>
+          <p className="text-sm text-slate-500 mt-1">Canonical school records, relationships, and operational status.</p>
         </div>
-        <div className="flex items-center gap-2.5">
-          <button 
-            onClick={() => handleOpenNotification(null)}
-            className="bg-slate-900 text-white px-4 py-2.5 rounded-lg font-medium flex items-center gap-2 hover:bg-slate-800 transition-colors shadow-sm cursor-pointer text-xs sm:text-sm"
-          >
-            <Megaphone size={16} /> Broadcast Announcement
-          </button>
-          <button 
-            onClick={() => setIsAddModalOpen(true)}
-            className="bg-pixiu-blue text-white px-5 py-2.5 rounded-lg font-medium flex items-center gap-2 hover:bg-blue-600 transition-colors shadow-sm cursor-pointer text-xs sm:text-sm"
-          >
-            <Plus size={18} /> Onboard School
-          </button>
-        </div>
+        <button type="button" onClick={startAdd} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-pixiu-blue text-white text-sm font-bold hover:bg-blue-600"><Plus size={17} /> Onboard School</button>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600">
-            <Building2 size={24} />
-          </div>
-          <div>
-            <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-0.5">Total Partners</p>
-            <p className="text-2xl font-bold text-slate-800">{schools.length}</p>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600">
-            <CheckCircle size={24} />
-          </div>
-          <div>
-            <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-0.5">Active Contracts</p>
-            <p className="text-2xl font-bold text-slate-800">{schools.filter(s => s.status === 'Active').length}</p>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-600">
-            <Users size={24} />
-          </div>
-          <div>
-            <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-0.5">Total Enrolled Students</p>
-            <p className="text-2xl font-bold text-slate-800">{students.length}</p>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600">
-            <Receipt size={24} />
-          </div>
-          <div>
-            <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-0.5">Total Invoiced Value</p>
-            <p className="text-2xl font-bold text-slate-800">
-              ₹{(billing.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0)).toLocaleString('en-IN')}
-            </p>
-          </div>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
+        <Metric icon={<Building2 size={22} />} label="Total Schools" value={schools.length} />
+        <Metric icon={<CheckCircle size={22} />} label="Active Schools" value={schools.filter(s => String(s.status || '').toLowerCase() === 'active').length} />
+        <Metric icon={<Users size={22} />} label="Enrolled Students" value={students.length} />
+        <Metric icon={<Receipt size={22} />} label="Invoiced Value" value={`₹${billing.reduce((sum, item) => sum + (Number(item.amount) || 0), 0).toLocaleString('en-IN')}`} />
       </div>
 
-      {/* Main Table Container */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        {/* Search and Filters */}
-        <div className="p-4 border-b border-slate-200 flex flex-wrap gap-4 items-center justify-between bg-slate-50">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-            <input 
-              type="text" 
-              placeholder="Search by school name or code..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-pixiu-blue bg-white" 
-            />
-          </div>
-          <div className="flex items-center gap-2 text-sm text-slate-600 font-medium">
-            <span>Status:</span>
-            <select 
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="bg-white border border-slate-300 rounded-lg px-3 py-1.5 focus:outline-none focus:border-pixiu-blue cursor-pointer text-xs font-bold"
-            >
-              <option value="All">All Statuses</option>
-              <option value="Active">Active</option>
-              <option value="Trial">Trial</option>
-              <option value="Paused">Paused</option>
-            </select>
-          </div>
-        </div>
-        
-        {/* Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="bg-slate-50/80 text-slate-500 uppercase tracking-wider font-bold border-b border-slate-200">
-                <th className="p-4">School Details</th>
-                <th className="p-4">Principal & Lab</th>
-                <th className="p-4">Assigned Faculty</th>
-                <th className="p-4">Enrolled / Classes</th>
-                <th className="p-4">Billing & Payments</th>
-                <th className="p-4 text-right">Admin Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredSchools.map(school => {
-                const billingStats = getBillingStatsForSchool(school.id);
-                const trainer = trainers.find(t => t.id === school.trainer_id || t.assigned_schools === school.id);
-                return (
-                  <tr key={school.id} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="p-4">
-                      <div className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                        {school.name}
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          school.status === 'Active' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                        }`}>
-                          {school.status}
-                        </span>
-                      </div>
-                      <div className="font-mono text-xs text-pixiu-blue font-bold mt-1">ID / Code: {school.code || school.id}</div>
-                      <div className="text-[11px] text-slate-400 mt-0.5">{school.city || 'Gorakhpur'} • {school.tier || 'Partner'}</div>
-                    </td>
-
-                    <td className="p-4">
-                      <div className="text-sm font-semibold text-slate-800">{school.principal_name || school.principal || 'Dr. Principal'}</div>
-                      <div className="text-xs text-slate-500 flex items-center gap-1 mt-0.5 font-mono">
-                        <Phone size={12} className="text-pixiu-blue"/> {school.principal_phone || school.contact || 'No phone'}
-                      </div>
-                      <div className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
-                        <Building2 size={11} /> {school.lab_room || 'Innovation Lab'}
-                      </div>
-                    </td>
-
-                    <td className="p-4">
-                      <div className="font-bold text-slate-800 text-xs">{trainer ? trainer.name : school.lead_trainer || 'Vikas Pandey'}</div>
-                      <div className="text-[11px] text-indigo-600 font-semibold mt-0.5">{trainer ? trainer.role : 'Lead STEM Trainer'}</div>
-                    </td>
-
-                    <td className="p-4">
-                      <div className="flex flex-col gap-1.5">
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 border border-slate-200 rounded text-xs font-bold text-slate-700">
-                          <Users size={12}/> {getStudentCountForSchool(school.id)} Students Enrolled
-                        </span>
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 border border-slate-200 rounded text-xs font-bold text-slate-700">
-                          <BookOpen size={12}/> {getClassCountForSchool(school.id)} Academic Classes
-                        </span>
-                      </div>
-                    </td>
-
-                    <td className="p-4">
-                      <div className="font-bold text-slate-800 text-sm">
-                        ₹{(billingStats.totalAmount || school.expected_revenue || 0).toLocaleString('en-IN')}
-                      </div>
-                      <div className="text-[11px] mt-0.5">
-                        <span className={`font-bold ${billingStats.hasPending ? 'text-amber-600' : 'text-emerald-600'}`}>
-                          {billingStats.paidCount} Paid / {billingStats.totalCount} Invoices
-                        </span>
-                      </div>
-                      <Link 
-                        to="/billing" 
-                        className="text-[11px] text-pixiu-blue font-bold hover:underline inline-flex items-center gap-0.5 mt-1"
-                      >
-                        Manage Invoices →
-                      </Link>
-                    </td>
-
-                    <td className="p-4 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        {/* Send Notification Button */}
-                        <button
-                          onClick={() => handleOpenNotification(school)}
-                          className="p-1.5 text-slate-500 hover:text-pixiu-blue hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                          title="Push Announcement to this School"
-                        >
-                          <Megaphone size={16} />
-                        </button>
-
-                        {/* Edit School Button */}
-                        <button
-                          onClick={(e) => handleOpenEdit(e, school)}
-                          className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
-                          title="Edit School Information"
-                        >
-                          <Edit size={16} />
-                        </button>
-
-                        {/* Delete School Button */}
-                        <button 
-                          onClick={async () => {
-                            if (confirm(`Are you sure you want to remove ${school.name} from the portal?`)) {
-                              await deleteSchool(school.id);
-                              toast.info(`School "${school.name}" removed from registry`, 'School Deleted');
-                            }
-                          }}
-                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                          title="Delete School"
-                        >
-                          <Trash2 size={16}/>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="p-4 border-b border-slate-200 bg-slate-50 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+          <div className="relative flex-1 max-w-md"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={17} /><input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Search school name or code..." className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-pixiu-blue" /></div>
+          <div className="flex items-center gap-2 text-sm"><span className="text-slate-500 font-semibold">Status</span><select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm"><option value="all">All statuses</option>{statusOptions.map(status => <option key={status} value={status}>{status}</option>)}</select></div>
         </div>
 
-        {filteredSchools.length === 0 && (
-          <div className="p-8 text-center text-slate-500">
-            No partner schools found matching your search.
-          </div>
-        )}
+        {filteredSchools.length === 0 ? <div className="p-10 text-center text-slate-500">No schools found.</div> : <div className="overflow-x-auto"><table className="w-full text-left"><thead><tr className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500 border-b border-slate-200"><th className="p-4">School</th><th className="p-4">Principal & Lab</th><th className="p-4">Assigned Faculty</th><th className="p-4">Students / Classes</th><th className="p-4">Billing</th><th className="p-4 text-right">Actions</th></tr></thead><tbody className="divide-y divide-slate-100">
+          {filteredSchools.map(school => {
+            const schoolStudents = getSchoolStudents(school.id);
+            const schoolClasses = getSchoolClasses(school.id);
+            const schoolInvoices = getSchoolInvoices(school.id);
+            const schoolTrainers = getSchoolTrainers(school.id);
+            const amount = schoolInvoices.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+            return <tr key={school.id} className="hover:bg-slate-50/60">
+              <td className="p-4"><div className="font-bold text-slate-900">{school.name || 'Unnamed school'}</div><div className="text-xs font-mono text-pixiu-blue mt-1">{school.school_code || school.code || 'No code'}</div><span className="inline-flex mt-2 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-slate-100 text-slate-600">{school.status || 'unknown'}</span></td>
+              <td className="p-4"><div className="text-sm font-semibold text-slate-800">{school.principal_name || 'Not provided'}</div><div className="text-xs text-slate-500 mt-1 flex items-center gap-1">{school.phone ? <><Phone size={12} />{school.phone}</> : 'No phone'}</div><div className="text-xs text-slate-400 mt-1">{school.lab_name || 'No lab name'}{school.lab_location ? ` • ${school.lab_location}` : ''}</div></td>
+              <td className="p-4"><div className="space-y-1">{schoolTrainers.length ? schoolTrainers.map(t => <div key={t.id || t.trainer_id} className="text-sm font-semibold text-slate-800">{t.name}</div>) : <span className="text-sm text-slate-400">No active assignment</span>}</div></td>
+              <td className="p-4"><div className="text-sm font-semibold text-slate-700 flex items-center gap-1"><Users size={14} /> {schoolStudents.length}</div><div className="text-sm font-semibold text-slate-700 flex items-center gap-1 mt-1"><BookOpen size={14} /> {schoolClasses.length}</div></td>
+              <td className="p-4"><div className="text-sm font-bold text-slate-800">₹{amount.toLocaleString('en-IN')}</div><div className="text-xs text-slate-500 mt-1">{schoolInvoices.length} invoice{schoolInvoices.length === 1 ? '' : 's'}</div></td>
+              <td className="p-4"><div className="flex justify-end gap-1"><button type="button" onClick={() => setNotificationSchool(school)} className="p-2 text-slate-500 hover:text-pixiu-blue rounded-lg" title="Send announcement"><Megaphone size={16} /></button><button type="button" onClick={() => openEdit(school)} className="p-2 text-slate-500 hover:text-emerald-600 rounded-lg" title="Edit school"><Edit size={16} /></button><button type="button" onClick={() => deactivateSchool(school)} className="p-2 text-slate-500 hover:text-red-600 rounded-lg" title="Deactivate school"><span className="text-xs font-bold">Deactivate</span></button></div></td>
+            </tr>;
+          })}</tbody></table></div>}
       </div>
 
-      {/* MODAL 1: EDIT SCHOOL INFORMATION */}
-      {editingSchool && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
-            <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-              <div>
-                <h2 className="text-base font-bold text-slate-800">Edit School Information</h2>
-                <p className="text-xs text-slate-500">Update institutional details, principal contact, lab room, and assigned faculty</p>
-              </div>
-              <button onClick={() => setEditingSchool(null)} className="text-slate-400 hover:text-slate-700 cursor-pointer">
-                <X size={18}/>
-              </button>
-            </div>
+      {(isAddOpen || editingSchool) && <Modal title={editingSchool ? 'Edit School' : 'Onboard School'} onClose={() => { setIsAddOpen(false); setEditingSchool(null); }}><form onSubmit={submitSchool} className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><Field label="School code *"><input required value={form.school_code} disabled={Boolean(editingSchool)} onChange={e => setForm({ ...form, school_code: e.target.value.toUpperCase() })} className="input" /></Field><Field label="School name *"><input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="input" /></Field><Field label="Principal name"><input value={form.principal_name} onChange={e => setForm({ ...form, principal_name: e.target.value })} className="input" /></Field><Field label="Phone"><input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} className="input" /></Field><Field label="Email"><input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className="input" /></Field><Field label="Address"><input value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} className="input" /></Field><Field label="Lab name"><input value={form.lab_name} onChange={e => setForm({ ...form, lab_name: e.target.value })} className="input" /></Field><Field label="Lab location"><input value={form.lab_location} onChange={e => setForm({ ...form, lab_location: e.target.value })} className="input" /></Field><Field label="Lab capacity"><input type="number" min="0" value={form.lab_capacity} onChange={e => setForm({ ...form, lab_capacity: e.target.value })} className="input" /></Field><Field label="Status"><select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} className="input"><option value="active">Active</option><option value="inactive">Inactive</option></select></Field></div>
+        <Field label="Lab notes"><textarea rows="3" value={form.lab_notes} onChange={e => setForm({ ...form, lab_notes: e.target.value })} className="input" /></Field><div className="flex justify-end gap-2 pt-3 border-t border-slate-100"><button type="button" onClick={() => { setIsAddOpen(false); setEditingSchool(null); }} className="btn-secondary">Cancel</button><button type="submit" className="btn-primary"><Check size={15} /> Save</button></div>
+      </form></Modal>}
 
-            <form onSubmit={handleEditSubmit} className="p-6 space-y-4 text-xs">
-              <div className="grid grid-cols-3 gap-3">
-                <div className="col-span-2">
-                  <label className="block font-bold text-slate-500 uppercase mb-1">School Full Name *</label>
-                  <input 
-                    type="text" 
-                    value={editFormData.name} 
-                    onChange={e => setEditFormData({ ...editFormData, name: e.target.value })} 
-                    required 
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-pixiu-blue font-bold text-slate-800"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-500 uppercase mb-1">School Code (ID)</label>
-                  <input 
-                    type="text" 
-                    value={editFormData.code} 
-                    disabled
-                    className="w-full px-3 py-2 border border-slate-200 bg-slate-100 font-mono font-bold text-slate-500 rounded-lg cursor-not-allowed"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-500 uppercase mb-1">Principal / Authority Name *</label>
-                  <input 
-                    type="text" 
-                    value={editFormData.principal_name} 
-                    onChange={e => setEditFormData({ ...editFormData, principal_name: e.target.value })} 
-                    required
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-pixiu-blue font-semibold"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-500 uppercase mb-1">Principal Direct Phone *</label>
-                  <input 
-                    type="text" 
-                    value={editFormData.principal_phone} 
-                    onChange={e => setEditFormData({ ...editFormData, principal_phone: e.target.value })} 
-                    required
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-pixiu-blue font-mono font-bold"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-500 uppercase mb-1">Designated Lab Room</label>
-                  <input 
-                    type="text" 
-                    value={editFormData.lab_room} 
-                    onChange={e => setEditFormData({ ...editFormData, lab_room: e.target.value })} 
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-pixiu-blue"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-500 uppercase mb-1">Assigned Lead Trainer</label>
-                  <select
-                    value={editFormData.trainer_id}
-                    onChange={e => setEditFormData({ ...editFormData, trainer_id: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-pixiu-blue bg-white font-bold text-slate-800"
-                  >
-                    {(trainers || []).map(t => (
-                      <option key={t.id} value={t.id}>{t.name} ({t.role})</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-500 uppercase mb-1">Contract Status</label>
-                  <select 
-                    value={editFormData.status} 
-                    onChange={e => setEditFormData({ ...editFormData, status: e.target.value })} 
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-pixiu-blue bg-white font-bold"
-                  >
-                    <option value="Active">Active Partner</option>
-                    <option value="Trial">Pilot Trial Lab</option>
-                    <option value="Paused">Temporarily Paused</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-500 uppercase mb-1">Expected Annual Revenue (₹)</label>
-                  <input 
-                    type="number" 
-                    value={editFormData.expected_revenue} 
-                    onChange={e => setEditFormData({ ...editFormData, expected_revenue: e.target.value })} 
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-pixiu-blue font-bold font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
-                <button 
-                  type="button" 
-                  onClick={() => setEditingSchool(null)} 
-                  className="px-4 py-2 font-medium text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="submit" 
-                  className="px-5 py-2 font-bold text-white bg-pixiu-blue hover:bg-blue-600 rounded-lg shadow-md shadow-blue-500/20 cursor-pointer flex items-center gap-1.5"
-                >
-                  <Check size={14}/> Save Changes
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 2: PUSH BROADCAST NOTIFICATION */}
-      {notificationSchool !== undefined && notificationSchool !== false && notificationSchool !== null && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
-            <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-900 text-white">
-              <div className="flex items-center gap-2">
-                <Megaphone size={18} className="text-pixiu-blue" />
-                <div>
-                  <h2 className="text-base font-bold">Push School Announcement</h2>
-                  <p className="text-xs text-slate-300">
-                    Target: <b>{notificationSchool?.name || 'All Partner Schools (Network-wide)'}</b>
-                  </p>
-                </div>
-              </div>
-              <button onClick={() => setNotificationSchool(null)} className="text-slate-400 hover:text-white cursor-pointer">
-                <X size={18}/>
-              </button>
-            </div>
-
-            <form onSubmit={handleSendNotification} className="p-6 space-y-4 text-xs">
-              <div>
-                <label className="block font-bold text-slate-600 uppercase mb-1">Announcement Title *</label>
-                <input 
-                  type="text" 
-                  placeholder="e.g. Term 1 Robotics Exhibition Schedule or Hardware Update"
-                  value={notifData.title}
-                  onChange={e => setNotifData({ ...notifData, title: e.target.value })}
-                  required
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-bold text-slate-800 focus:outline-none focus:border-pixiu-blue"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-600 uppercase mb-1">Message Content *</label>
-                <textarea 
-                  rows={4}
-                  placeholder="Type the message details for the school administration..."
-                  value={notifData.message}
-                  onChange={e => setNotifData({ ...notifData, message: e.target.value })}
-                  required
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:outline-none focus:border-pixiu-blue"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-600 uppercase mb-1">Category Type</label>
-                  <select
-                    value={notifData.type}
-                    onChange={e => setNotifData({ ...notifData, type: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-pixiu-blue bg-white font-semibold"
-                  >
-                    <option value="announcement">General Announcement</option>
-                    <option value="billing_due">Fee & Invoice Notice</option>
-                    <option value="curriculum">Curriculum & Term Update</option>
-                    <option value="event">Robotics Competition / Exhibition</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-600 uppercase mb-1">Priority</label>
-                  <select
-                    value={notifData.priority}
-                    onChange={e => setNotifData({ ...notifData, priority: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-pixiu-blue bg-white font-semibold"
-                  >
-                    <option value="normal">Normal Announcement</option>
-                    <option value="high">High Priority / Urgent</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
-                <button 
-                  type="button" 
-                  onClick={() => setNotificationSchool(null)} 
-                  className="px-4 py-2 font-medium text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="submit" 
-                  className="px-5 py-2 font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-md cursor-pointer flex items-center gap-1.5"
-                >
-                  <Send size={14}/> Dispatch Broadcast
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 3: ONBOARD NEW SCHOOL */}
-      {isAddModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
-            <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-              <div>
-                <h2 className="text-base font-bold text-slate-800">Onboard Partner School</h2>
-                <p className="text-xs text-slate-500">Add a new school client into the Pixiu ecosystem</p>
-              </div>
-              <button onClick={() => setIsAddModalOpen(false)} className="text-slate-400 hover:text-slate-700 cursor-pointer">
-                <X size={18}/>
-              </button>
-            </div>
-            
-            <form onSubmit={handleAddSubmit} className="p-6 space-y-4 text-xs">
-              <div className="grid grid-cols-3 gap-3">
-                <div className="col-span-2">
-                  <label className="block font-bold text-slate-500 uppercase mb-1">School Full Name *</label>
-                  <input 
-                    type="text" 
-                    placeholder="e.g. St. Xavier International" 
-                    value={formData.name} 
-                    onChange={e => {
-                      const name = e.target.value;
-                      const code = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 4);
-                      setFormData({ ...formData, name, code: formData.code || code });
-                    }} 
-                    required 
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-pixiu-blue font-bold"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-pixiu-blue uppercase mb-1">Code *</label>
-                  <input 
-                    type="text" 
-                    placeholder="e.g. SXI" 
-                    value={formData.code} 
-                    onChange={e => setFormData({ ...formData, code: e.target.value.toUpperCase() })} 
-                    required 
-                    maxLength={5}
-                    className="w-full px-3 py-2 border border-blue-300 bg-blue-50/50 font-mono font-bold text-pixiu-blue rounded-lg focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-500 uppercase mb-1">Principal Name *</label>
-                  <input 
-                    type="text" 
-                    placeholder="e.g. Dr. A.K. Singh" 
-                    value={formData.principal_name} 
-                    onChange={e => setFormData({ ...formData, principal_name: e.target.value })} 
-                    required 
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-pixiu-blue"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-500 uppercase mb-1">Principal Phone *</label>
-                  <input 
-                    type="text" 
-                    placeholder="e.g. +91 94151 99887" 
-                    value={formData.principal_phone} 
-                    onChange={e => setFormData({ ...formData, principal_phone: e.target.value })} 
-                    required 
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-pixiu-blue font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-500 uppercase mb-1">Designated Lab Room</label>
-                  <input 
-                    type="text" 
-                    placeholder="e.g. Block C - Lab 201" 
-                    value={formData.lab_room} 
-                    onChange={e => setFormData({ ...formData, lab_room: e.target.value })} 
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-pixiu-blue"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-500 uppercase mb-1">Assign Lead Trainer</label>
-                  <select
-                    value={formData.trainer_id}
-                    onChange={e => setFormData({ ...formData, trainer_id: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-pixiu-blue bg-white font-bold"
-                  >
-                    {(trainers || []).map(t => (
-                      <option key={t.id} value={t.id}>{t.name} ({t.role})</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-500 uppercase mb-1">Expected Revenue (₹)</label>
-                  <input 
-                    type="number" 
-                    value={formData.expected_revenue} 
-                    onChange={e => setFormData({ ...formData, expected_revenue: e.target.value })} 
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-pixiu-blue font-mono font-bold"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-500 uppercase mb-1">Status</label>
-                  <select 
-                    value={formData.status} 
-                    onChange={e => setFormData({ ...formData, status: e.target.value })} 
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-pixiu-blue bg-white font-bold"
-                  >
-                    <option value="Active">Active</option>
-                    <option value="Trial">Pilot Trial</option>
-                    <option value="Paused">Paused</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
-                <button 
-                  type="button" 
-                  onClick={() => setIsAddModalOpen(false)} 
-                  className="px-4 py-2 font-medium text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="submit" 
-                  className="px-5 py-2 font-bold text-white bg-pixiu-blue hover:bg-blue-600 rounded-lg shadow-md shadow-blue-500/20 cursor-pointer flex items-center gap-1.5"
-                >
-                  <Plus size={16}/> Complete Onboarding
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {notificationSchool && <Modal title="Send School Announcement" onClose={() => setNotificationSchool(null)}><form onSubmit={sendNotification} className="space-y-4"><p className="text-sm text-slate-500">Target: <span className="font-bold text-slate-800">{notificationSchool.name}</span></p><Field label="Title *"><input required value={notification.title} onChange={e => setNotification({ ...notification, title: e.target.value })} className="input" /></Field><Field label="Message *"><textarea required rows="5" value={notification.message} onChange={e => setNotification({ ...notification, message: e.target.value })} className="input" /></Field><Field label="Priority"><select value={notification.priority} onChange={e => setNotification({ ...notification, priority: e.target.value })} className="input"><option value="normal">Normal</option><option value="high">High</option></select></Field><div className="flex justify-end gap-2 pt-3 border-t border-slate-100"><button type="button" onClick={() => setNotificationSchool(null)} className="btn-secondary">Cancel</button><button type="submit" className="btn-primary"><Send size={15} /> Dispatch</button></div></form></Modal>}
     </div>
   );
 }
+
+function Metric({ icon, label, value }) { return <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex items-center gap-4"><div className="w-11 h-11 rounded-xl bg-blue-50 text-pixiu-blue flex items-center justify-center">{icon}</div><div><div className="text-xs uppercase tracking-wider font-bold text-slate-400">{label}</div><div className="text-2xl font-bold text-slate-900 mt-1">{value}</div></div></div>; }
+function Field({ label, children }) { return <label className="block text-sm font-semibold text-slate-600">{label}<div className="mt-1">{children}</div></label>; }
+function Modal({ title, onClose, children }) { return <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm p-4 flex items-center justify-center"><div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"><div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between"><h2 className="font-bold text-slate-900">{title}</h2><button type="button" onClick={onClose} className="p-2 text-slate-400 hover:text-slate-700"><X size={17} /></button></div><div className="p-6">{children}</div></div></div>; }
