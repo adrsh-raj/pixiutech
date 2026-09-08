@@ -18,7 +18,8 @@ export default function PortalSidebar({ role, mobileOpen = false, setMobileOpen 
 
   const isActive = link => {
     if (link.key) return location.pathname === basePath && currentTab === link.key;
-    return location.pathname === link.href || (link.href !== '/' && location.pathname.startsWith(`${link.href}/`));
+    if (location.pathname !== link.href) return link.href !== '/' && location.pathname.startsWith(`${link.href}/`);
+    return !(link.href === basePath && searchParams.get('tab') && searchParams.get('tab') !== 'overview');
   };
 
   const handleLink = link => {
