@@ -1,44 +1,72 @@
-import { Menu, Sparkles, RefreshCw } from 'lucide-react';
+import { Menu, Sparkles, Wifi, WifiOff } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import PortalSidebar from './PortalSidebar';
 import { PORTAL_ROLE_LABELS } from '../config/portalNavigation';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
-import { useState } from 'react';
+import RefreshButton from './ui/RefreshButton';
+import Breadcrumbs from './ui/Breadcrumbs';
 
 export default function PortalShell({ role, title, subtitle, children }) {
   const { user } = useAuth();
   const { refreshAll, loading } = useData();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [online, setOnline] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine));
   const roleMeta = PORTAL_ROLE_LABELS[role] || PORTAL_ROLE_LABELS.student;
+
+  useEffect(() => {
+    const handleOnline = () => setOnline(true);
+    const handleOffline = () => setOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  const crumbs = useMemo(() => [
+    { label: roleMeta.name, current: false },
+    { label: title || roleMeta.name, current: true },
+  ], [roleMeta.name, title]);
+
+  const handleRefresh = async () => {
+    const result = await refreshAll();
+    if (result?.success === false) throw new Error(result.error || 'Refresh failed');
+    return result;
+  };
 
   return (
     <div className="min-h-dvh bg-[#f5f7fb] text-slate-900 flex font-sans">
+      <a href="#portal-main" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[100] focus:rounded-xl focus:bg-slate-900 focus:px-4 focus:py-2 focus:text-xs focus:font-bold focus:text-white">Skip to content</a>
       <PortalSidebar role={role} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
       <div className="min-w-0 flex-1 flex flex-col">
-        <header className="sticky top-0 z-30 h-[68px] bg-white/90 backdrop-blur-xl border-b border-slate-200/80 flex items-center justify-between px-4 sm:px-7 lg:px-9">
+        <header className="sticky top-0 z-30 min-h-[68px] bg-white/90 backdrop-blur-xl border-b border-slate-200/80 flex items-center justify-between gap-3 px-3 sm:px-6 lg:px-9 py-2.5">
           <div className="flex items-center gap-3 min-w-0">
-            <button type="button" onClick={() => setMobileOpen(true)} className="md:hidden w-9 h-9 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 flex items-center justify-center" aria-label="Open navigation"><Menu size={17} /></button>
+            <button type="button" onClick={() => setMobileOpen(true)} className="md:hidden w-9 h-9 shrink-0 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 flex items-center justify-center" aria-label="Open navigation"><Menu size={17} /></button>
             <div className="min-w-0">
               <p className="hidden sm:flex items-center gap-1.5 text-[9px] font-extrabold tracking-[0.16em] uppercase text-blue-600"><Sparkles size={11} /> {roleMeta.name} workspace</p>
               <h1 className="text-sm sm:text-base font-black text-slate-900 truncate">{title || roleMeta.name}</h1>
-              {subtitle && <p className="text-[10px] sm:text-[11px] text-slate-500 truncate mt-0.5">{subtitle}</p>}
+              {subtitle && <p className="hidden md:block text-[10px] sm:text-[11px] text-slate-500 truncate mt-0.5">{subtitle}</p>}
             </div>
           </div>
-          <div className="flex items-center gap-2.5">
-            <button type="button" onClick={() => refreshAll()} disabled={loading} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-[10px] sm:text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50" title="Refresh live data" aria-label="Refresh live data">
-              <RefreshCw size={14} className={loading ? 'animate-spin' : ''}/><span className="hidden sm:inline">{loading ? 'Refreshing' : 'Refresh'}</span>
-            </button>
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-[10px] font-bold text-slate-600">
-              <span className="w-2 h-2 rounded-full bg-emerald-400" /> Live
+          <div className="flex items-center gap-2 shrink-0">
+            <RefreshButton onRefresh={handleRefresh} loading={loading} />
+            <div className={`hidden xs:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-[10px] font-bold ${online ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-amber-50 border-amber-200 text-amber-700'}`} title={online ? 'Network connection available' : 'Network connection unavailable'}>
+              {online ? <Wifi size={12} /> : <WifiOff size={12} />}
+              <span className="hidden lg:inline">{online ? 'Online' : 'Offline'}</span>
             </div>
-            <div className="hidden sm:flex items-center gap-2 pl-2 border-l border-slate-200">
-              <div className="w-8 h-8 rounded-xl bg-slate-900 text-white flex items-center justify-center text-[10px] font-black">{(user?.name || roleMeta.name).split(' ').map(x => x[0]).join('').slice(0, 2).toUpperCase()}</div>
-              <div className="max-w-36"><p className="text-xs font-bold truncate">{user?.name || roleMeta.name}</p><p className="text-[9px] uppercase tracking-wider text-slate-400">{role}</p></div>
+            <div className="hidden md:flex items-center gap-2 pl-2 border-l border-slate-200 max-w-44">
+              <div className="w-8 h-8 shrink-0 rounded-xl bg-slate-900 text-white flex items-center justify-center text-[10px] font-black">{(user?.name || roleMeta.name).split(' ').map(x => x[0]).join('').slice(0, 2).toUpperCase()}</div>
+              <div className="min-w-0"><p className="text-xs font-bold truncate">{user?.name || roleMeta.name}</p><p className="text-[9px] uppercase tracking-wider text-slate-400 truncate">{role}</p></div>
             </div>
           </div>
         </header>
-        <main className="flex-1 px-4 py-5 sm:px-7 sm:py-7 lg:px-9">
-          <div className="max-w-[1400px] mx-auto">{children}</div>
+        <main id="portal-main" className="flex-1 px-3 py-4 sm:px-6 sm:py-6 lg:px-9 lg:py-7">
+          <div className="max-w-[1400px] mx-auto min-w-0">
+            <div className="mb-4 sm:mb-5"><Breadcrumbs items={crumbs} /></div>
+            {children}
+          </div>
         </main>
       </div>
     </div>
