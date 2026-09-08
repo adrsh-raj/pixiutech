@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CalendarDays, Check, Clock3, Save, Users } from 'lucide-react';
-import { Link } from 'react-router-dom';
 import { apiFetch, useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import PageHeader from '../components/ui/PageHeader';
@@ -8,7 +7,7 @@ import EmptyState from '../components/ui/EmptyState';
 import ErrorState from '../components/ui/ErrorState';
 import RefreshButton from '../components/ui/RefreshButton';
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`; };
 const norm = value => String(value ?? '').trim().toLowerCase();
 const list = payload => Array.isArray(payload) ? payload : Array.isArray(payload?.results) ? payload.results : Array.isArray(payload?.data) ? payload.data : [];
 
