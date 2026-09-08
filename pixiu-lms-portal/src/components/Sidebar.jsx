@@ -1,7 +1,55 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, FolderKanban, Settings, LogOut, Box, GraduationCap, BookOpen, Building, CreditCard, PlaySquare, Megaphone, X, Cpu, ShieldCheck, ReceiptText, Bell, FileText, RefreshCw } from 'lucide-react';
+import {
+  LayoutDashboard, Users, FolderKanban, Settings, LogOut, Box, GraduationCap,
+  BookOpen, Building, CreditCard, PlaySquare, Megaphone, X, Cpu, ShieldCheck,
+  ReceiptText, Bell, FileText, RefreshCw, CalendarRange, ClipboardCheck, Wallet,
+  KeyRound
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
+
+const adminGroups = [
+  { title: 'COMMAND CENTER', links: [
+    { name: 'Dashboard', path: '/', icon: LayoutDashboard },
+  ]},
+  { title: 'BUSINESS', links: [
+    { name: 'Sales Pipeline', path: '/leads', icon: FolderKanban },
+    { name: 'Partner Schools', path: '/schools', icon: Building },
+    { name: 'Billing & Invoices', path: '/billing', icon: CreditCard },
+    { name: 'Payments & Receipts', path: '/payments', icon: ReceiptText },
+  ]},
+  { title: 'ACADEMICS', links: [
+    { name: 'Student Directory', path: '/students', icon: Users },
+    { name: 'Trainer Faculty', path: '/trainers', icon: GraduationCap },
+    { name: 'Classes & Sessions', path: '/sessions', icon: CalendarRange },
+    { name: 'Curriculum', path: '/curriculum', icon: BookOpen },
+    { name: 'Content Hub', path: '/content', icon: PlaySquare },
+    { name: 'Quizzes', path: '/quizzes', icon: ClipboardCheck },
+    { name: 'Projects', path: '/projects', icon: FileText },
+    { name: 'Attendance', path: '/attendance', icon: ClipboardCheck },
+  ]},
+  { title: 'OPERATIONS', links: [
+    { name: 'Hardware & Kits', path: '/inventory', icon: Box },
+    { name: 'Notifications', path: '/notifications', icon: Bell },
+    { name: 'Audit Logs', path: '/logs', icon: ShieldCheck },
+    { name: 'Announcements & Comms', path: '/comms', icon: Megaphone },
+  ]},
+  { title: 'SYSTEM', links: [
+    { name: 'Trainer Credentials', path: '/settings?section=trainer-credentials', icon: KeyRound },
+    { name: 'School Credentials', path: '/settings?section=school-credentials', icon: KeyRound },
+    { name: 'Settings', path: '/settings', icon: Settings },
+  ]},
+];
+
+const trainerGroups = [{ title: 'TRAINER ACADEMICS', links: [
+  { name: 'Trainer Workspace', path: '/trainers', icon: GraduationCap },
+  { name: 'Trainer Materials', path: '/trainer-materials', icon: FileText },
+  { name: 'Student Directory', path: '/students', icon: Users },
+  { name: 'Virtual Arduino Lab', path: '/simulation', icon: Cpu },
+  { name: 'Content Hub', path: '/content', icon: PlaySquare },
+  { name: 'Curriculum Plans', path: '/curriculum', icon: BookOpen },
+  { name: 'Hardware Kits', path: '/inventory', icon: Box },
+]}];
 
 export default function Sidebar({ mobileOpen = false, setMobileOpen = () => {} }) {
   const location = useLocation();
@@ -9,54 +57,51 @@ export default function Sidebar({ mobileOpen = false, setMobileOpen = () => {} }
   const { refreshAll, loading } = useData();
   const isTrainer = role === 'trainer';
   const isAdmin = role === 'admin' || role === 'superadmin';
+  const groups = isTrainer ? trainerGroups : adminGroups;
+  const initials = user?.name
+    ? user.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+    : 'PX';
 
-  const groups = isTrainer ? [{ title: 'TRAINER ACADEMICS', links: [
-    { name: 'Trainer Workspace', path: '/trainers', icon: GraduationCap },
-    { name: 'Trainer Materials', path: '/trainer-materials', icon: FileText },
-    { name: 'Student Directory', path: '/students', icon: Users },
-    { name: 'Virtual Arduino Lab', path: '/simulation', icon: Cpu },
-    { name: 'Content Hub', path: '/content', icon: PlaySquare },
-    { name: 'Curriculum Plans', path: '/curriculum', icon: BookOpen },
-    { name: 'Hardware Kits', path: '/inventory', icon: Box },
-  ] }] : [
-    { title: 'MAIN', links: [{ name: 'Dashboard', path: '/', icon: LayoutDashboard }, { name: 'Audit Logs', path: '/logs', icon: ShieldCheck }] },
-    { title: 'BUSINESS & CRM', links: [
-      { name: 'Sales Pipeline', path: '/leads', icon: FolderKanban },
-      { name: 'Partner Schools', path: '/schools', icon: Building },
-      { name: 'Billing & Invoices', path: '/billing', icon: CreditCard },
-      { name: 'Payments & Receipts', path: '/payments', icon: ReceiptText },
-    ] },
-    { title: 'ACADEMICS & LMS', links: [
-      { name: 'Student Directory', path: '/students', icon: Users },
-      { name: 'Virtual Arduino Lab', path: '/simulation', icon: Cpu },
-      { name: 'Content Hub', path: '/content', icon: PlaySquare },
-      { name: 'Curriculum Plans', path: '/curriculum', icon: BookOpen },
-      { name: 'Trainers Roster', path: '/trainers', icon: GraduationCap },
-      { name: 'Trainer Materials', path: '/trainer-materials', icon: FileText },
-    ] },
-    { title: 'OPERATIONS', links: [
-      { name: 'Hardware & Kits', path: '/inventory', icon: Box },
-      { name: 'Notifications', path: '/notifications', icon: Bell },
-      { name: 'Announcements & Comms', path: '/comms', icon: Megaphone },
-      { name: 'Settings', path: '/settings', icon: Settings },
-    ] }
-  ];
-
-  const visibleGroups = isAdmin ? groups : groups.filter(group => group.title !== 'MAIN' || isAdmin);
-  const initials = user?.name ? user.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() : 'AD';
+  const isActive = path => {
+    const [pathname] = path.split('?');
+    return location.pathname === pathname || (pathname !== '/' && location.pathname.startsWith(`${pathname}/`));
+  };
 
   return <>
-    {mobileOpen && <div onClick={() => setMobileOpen(false)} className="fixed inset-0 bg-slate-950/80 backdrop-blur-xs z-40 md:hidden" />}
-    <aside className={`fixed md:static inset-y-0 left-0 w-[260px] bg-[#070B14] text-white flex flex-col z-50 md:z-10 h-screen shrink-0 border-r border-slate-800/60 transition-transform duration-200 ease-in-out ${mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
-      <div className="px-5 py-4 border-b border-slate-800/60 flex items-center justify-between"><div className="flex items-center gap-3"><div className="bg-white px-2 py-1 rounded-xl shadow-md flex items-center justify-center shrink-0"><img src="/img/logo.png" alt="Pixiu Tech Logo" className="h-7 w-auto object-contain" /></div><div><h1 className="text-sm font-extrabold tracking-wider text-white leading-none">PIXIU TECH</h1><span className="text-[9px] text-slate-500 font-semibold tracking-widest uppercase">Robotics OS v2.4</span></div></div><button onClick={() => setMobileOpen(false)} className="md:hidden p-1.5 text-slate-500 hover:text-white rounded-lg" aria-label="Close navigation menu"><X size={18}/></button></div>
-      <div className="px-4 pt-4 pb-2"><div className="bg-slate-900/80 border border-slate-800/60 rounded-xl p-3 flex items-center gap-3"><div className="w-9 h-9 rounded-lg bg-gradient-to-br from-pixiu-blue to-blue-400 flex items-center justify-center font-bold text-xs text-white shadow-md shadow-blue-500/20 shrink-0">{initials}</div><div className="overflow-hidden"><p className="text-xs font-bold truncate text-white">{user?.name || 'Super Admin'}</p><p className="text-[10px] text-blue-400 font-semibold uppercase tracking-wider">{user?.role || 'Admin'} Console</p></div></div></div>
-      <nav className="flex-1 px-3 mt-2 space-y-5 overflow-y-auto pb-6">{visibleGroups.map(group => <div key={group.title}><p className="text-[9px] font-bold text-slate-600 uppercase tracking-[0.15em] mb-1.5 px-3">{group.title}</p><div className="space-y-0.5">{group.links.map(link => { const Icon = link.icon; const isActive = location.pathname === link.path || (link.path !== '/' && location.pathname.startsWith(`${link.path}/`)); return <Link key={link.path} to={link.path} onClick={() => setMobileOpen(false)} className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-all text-[13px] ${isActive ? 'bg-pixiu-blue/15 text-blue-400 font-semibold border-l-2 border-blue-400 pl-2.5' : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200 font-medium'}`}><Icon size={16} strokeWidth={isActive ? 2.5 : 1.8}/><span>{link.name}</span></Link>; })}</div></div>)}</nav>
-      <div className="px-4 py-3 border-t border-slate-800/60 space-y-2">
-        <div className="flex items-center gap-2 px-3 py-1.5 text-[10px]"><span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"/><span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"/></span><span className="text-slate-500 font-medium">Lab Hubs Connected</span></div>
-        <button type="button" onClick={() => refreshAll()} disabled={loading} className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-slate-500 hover:bg-slate-800/60 hover:text-slate-200 transition-colors text-xs font-semibold disabled:opacity-50" title="Refresh live data">
+    {mobileOpen && <div onClick={() => setMobileOpen(false)} className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-40 md:hidden" />}
+    <aside className={`fixed md:static inset-y-0 left-0 w-[268px] bg-[#070B14] text-white flex flex-col z-50 md:z-10 h-screen shrink-0 border-r border-slate-800/60 transition-transform duration-200 ease-in-out ${mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+      <div className="px-5 py-4 border-b border-slate-800/60 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="bg-white px-2 py-1 rounded-xl shadow-md flex items-center justify-center shrink-0"><img src="/img/logo.png" alt="Pixiu Tech Logo" className="h-7 w-auto object-contain" /></div>
+          <div className="min-w-0"><h1 className="text-sm font-extrabold tracking-wider text-white leading-none">PIXIU TECH</h1><span className="text-[9px] text-slate-500 font-semibold tracking-widest uppercase">Robotics OS</span></div>
+        </div>
+        <button onClick={() => setMobileOpen(false)} className="md:hidden p-1.5 text-slate-500 hover:text-white rounded-lg" aria-label="Close navigation menu"><X size={18}/></button>
+      </div>
+
+      <div className="px-4 pt-4 pb-2 shrink-0">
+        <div className="bg-slate-900/80 border border-slate-800/60 rounded-xl p-3 flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-pixiu-blue to-blue-400 flex items-center justify-center font-bold text-xs text-white shadow-md shadow-blue-500/20 shrink-0">{initials}</div>
+          <div className="overflow-hidden min-w-0"><p className="text-xs font-bold truncate text-white">{user?.name || 'PIXIU Administrator'}</p><p className="text-[10px] text-blue-400 font-semibold uppercase tracking-wider">{user?.role || 'Admin'} Console</p></div>
+        </div>
+      </div>
+
+      <nav className="flex-1 px-3 mt-2 space-y-5 overflow-y-auto pb-6 overscroll-contain">
+        {groups.map(group => <div key={group.title}>
+          <p className="text-[9px] font-bold text-slate-600 uppercase tracking-[0.15em] mb-1.5 px-3">{group.title}</p>
+          <div className="space-y-0.5">
+            {group.links.map(link => { const Icon = link.icon; const active = isActive(link.path); return <Link key={link.path} to={link.path} onClick={() => setMobileOpen(false)} className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-[13px] ${active ? 'bg-pixiu-blue/15 text-blue-400 font-semibold border-l-2 border-blue-400 pl-2.5' : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200 font-medium'}`}>
+              <Icon size={16} strokeWidth={active ? 2.5 : 1.8}/><span className="truncate">{link.name}</span>
+            </Link>; })}
+          </div>
+        </div>)}
+      </nav>
+
+      <div className="px-4 py-3 border-t border-slate-800/60 space-y-2 shrink-0">
+        <div className="flex items-center gap-2 px-3 py-1.5 text-[10px]"><span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"/><span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"/></span><span className="text-slate-500 font-medium">Live API Connected</span></div>
+        <button type="button" onClick={() => refreshAll()} disabled={loading} className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-slate-500 hover:bg-slate-800/60 hover:text-slate-200 transition-colors text-xs font-semibold disabled:opacity-50" title="Refresh live data">
           <RefreshCw size={15} className={loading ? 'animate-spin' : ''}/><span>{loading ? 'Refreshing…' : 'Refresh Data'}</span>
         </button>
-        <button onClick={logout} className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-slate-500 hover:bg-red-500/10 hover:text-red-400 transition-colors text-xs font-semibold"><LogOut size={15}/><span>Sign Out</span></button>
+        <button onClick={logout} className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-slate-500 hover:bg-red-500/10 hover:text-red-400 transition-colors text-xs font-semibold"><LogOut size={15}/><span>Sign Out</span></button>
       </div>
     </aside>
   </>;
