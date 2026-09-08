@@ -79,3 +79,34 @@ class User(AbstractUser):
 
     def __str__(self):
         return f"{self.username} ({self.role})"
+
+
+class LoginAuditLog(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    user = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="login_audit_logs",
+    )
+    user_id_snapshot = models.CharField(max_length=150)
+    name_snapshot = models.CharField(max_length=200, blank=True)
+    role = models.CharField(max_length=20, blank=True)
+    school_id = models.CharField(max_length=50, blank=True)
+    event_type = models.CharField(max_length=50, default="Login")
+    status = models.CharField(max_length=50, default="Verified")
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["created_at"]),
+            models.Index(fields=["role", "created_at"]),
+            models.Index(fields=["user_id_snapshot", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.user_id_snapshot} - {self.event_type} - {self.created_at.isoformat()}"
