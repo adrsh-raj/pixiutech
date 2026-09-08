@@ -191,6 +191,35 @@ def create_session_activity(*, user, session: Session, title: str, activity_type
 
 
 @transaction.atomic
+def create_attendance(*, user, session: Session, student: Student, status: str, note=""):
+    locked_session = Session.objects.select_for_update().select_related("school_class__school", "trainer").get(pk=session.pk)
+    if not accessible_sessions(user).filter(pk=locked_session.pk).exists():
+        raise PermissionDenied("You do not have access to this session.")
+    if locked_session.is_locked or locked_session.status in {"completed", "cancelled"}:
+        raise ValidationError("Attendance is locked for this session.")
+    if locked_session.status not in {"in_progress", "planned"}:
+        raise ValidationError("Attendance cannot be recorded for this session.")
+    if not accessible_student_queryset(user).filter(pk=student.pk).exists():
+        raise PermissionDenied("You do not have access to this student.")
+    if student.school_class_id != locked_session.school_class_id:
+        raise ValidationError("Student does not belong to the session class.")
+    if user.role == UserRole.TRAINER:
+        if locked_session.trainer.account_id != user.id:
+            raise PermissionDenied("A trainer can only manage attendance for their own sessions.")
+        if not locked_session.trainer.school_assignments.filter(school_id=locked_session.school_class.school_id, status="active").exists():
+            raise PermissionDenied("Trainer is not currently assigned to this school.")
+    normalized = str(status or "").strip().lower()
+    if normalized not in {choice.value for choice in AttendanceStatus}:
+        raise ValidationError({"status": "Status must be present, absent, late, or excused."})
+    record, _ = AttendanceRecord.objects.update_or_create(
+        session=locked_session,
+        student=student,
+        defaults={"status": normalized, "marked_by": user, "note": str(note or "")[:500]},
+    )
+    return record
+
+
+@transaction.atomic
 def save_attendance_batch(*, user, session: Session, entries):
     locked_session = Session.objects.select_for_update().select_related("school_class__school", "trainer").get(pk=session.pk)
     if not accessible_sessions(user).filter(pk=locked_session.pk).exists():
