@@ -69,13 +69,14 @@ async function apiRequest(path, options = {}) {
 
 const collection = payload => Array.isArray(payload) ? payload : (payload?.data || []);
 const cloneClassKits = () => JSON.parse(JSON.stringify(CLASS_KITS));
+const EMPTY_ALERTS = Object.freeze([]);
 
 export function DataProvider({ children }) {
   const [schools, setSchools] = useState([]); const [classes, setClasses] = useState([]); const [students, setStudents] = useState([]);
   const [trainers, setTrainers] = useState([]); const [sessions, setSessions] = useState([]); const [attendance, setAttendance] = useState([]);
   const [leads, setLeads] = useState([]); const [content, setContent] = useState([]); const [curriculum, setCurriculum] = useState([]);
   const [inventory, setInventory] = useState([]); const [classKits, setClassKits] = useState(() => cloneClassKits()); const [billing, setBilling] = useState([]);
-  const [comms, setComms] = useState([]); const [projects, setProjects] = useState([]); const [alerts] = useState([]);
+  const [comms, setComms] = useState([]); const [projects, setProjects] = useState([]); const [alerts] = useState(EMPTY_ALERTS);
   const [notifications, setNotifications] = useState([]); const [studentReviews, setStudentReviews] = useState([]); const [quizzes, setQuizzes] = useState([]);
   const [quizSubmissions, setQuizSubmissions] = useState([]); const [loading, setLoading] = useState(false);
 
@@ -173,7 +174,7 @@ export function DataProvider({ children }) {
     error: 'Operational trigger actions are not connected to the Django API yet.'
   }), []);
 
-  const value = useMemo(() => ({ loading, refreshAll, schools, addSchool, updateSchool, deleteSchool, classes, addClass, students, addStudent, updateStudent, deleteStudent, getNextRollNumber, getStudentAttendance, getStudentAttendanceRecords, trainers, addTrainer, updateTrainer, updateTrainerStatus, deleteTrainer, sessions, scheduleSession, completeSession, unlockSession, startNewSession, attendance, markAttendance, adminUpdateAttendance, leads, addLead, updateLeadStage, deleteLead, convertLeadToSchool, content, uploadContent, deleteContent, curriculum, addCurriculumPlan, updateCurriculumStatus, inventory, addInventoryKit, updateKitStatus, deleteKit, classKits, updateClassKitComponent, addComponentToClassKit, billing, createInvoice, updateInvoiceStatus, confirmPaymentReceipt, updateBillingInvoice, deleteBillingInvoice, comms, sendCommsMessage, projects, addProject, deleteProject, uploadFile, alerts, resolveAlertAction, notifications, sendBroadcastNotification, updateNotification, deleteNotification, pushSchoolNotification, studentReviews, saveStudentReview, deleteStudentReview, quizzes, createQuiz, updateQuiz, deleteQuiz, quizSubmissions, submitQuizAttempt, allowQuizReattempt, deleteQuizSubmission }), [loading, refreshAll, schools, classes, students, trainers, sessions, attendance, leads, content, curriculum, inventory, classKits, billing, comms, projects, alerts, notifications, studentReviews, quizzes, quizSubmissions, resolveAlertAction]);
+  const value = useMemo(() => ({ loading, refreshAll, schools, addSchool, updateSchool, deleteSchool, classes, addClass, students, addStudent, updateStudent, deleteStudent, getNextRollNumber, getStudentAttendance, getStudentAttendanceRecords, trainers, addTrainer, updateTrainer, updateTrainerStatus, deleteTrainer, sessions, scheduleSession, completeSession, unlockSession, startNewSession, attendance, markAttendance, adminUpdateAttendance, leads, addLead, updateLeadStage, deleteLead, convertLeadToSchool, content, uploadContent, deleteContent, curriculum, addCurriculumPlan, updateCurriculumStatus, inventory, addInventoryKit, updateKitStatus, deleteKit, classKits, updateClassKitComponent, addComponentToClassKit, billing, createInvoice, updateInvoiceStatus, confirmPaymentReceipt, updateBillingInvoice, deleteBillingInvoice, comms, sendCommsMessage, projects, addProject, deleteProject, uploadFile, alerts: Array.isArray(alerts) ? alerts : EMPTY_ALERTS, resolveAlertAction, notifications, sendBroadcastNotification, updateNotification, deleteNotification, pushSchoolNotification, studentReviews, saveStudentReview, deleteStudentReview, quizzes, createQuiz, updateQuiz, deleteQuiz, quizSubmissions, submitQuizAttempt, allowQuizReattempt, deleteQuizSubmission }), [loading, refreshAll, schools, classes, students, trainers, sessions, attendance, leads, content, curriculum, inventory, classKits, billing, comms, projects, alerts, notifications, studentReviews, quizzes, quizSubmissions, resolveAlertAction]);
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
 }
 export const useData = () => { const context = useContext(DataContext); if (!context) throw new Error('useData must be used inside DataProvider'); return context; };
