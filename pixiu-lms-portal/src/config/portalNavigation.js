@@ -11,7 +11,7 @@ export const PORTAL_NAVIGATION = {
       { name: 'Projects', key: 'projects', icon: FolderKanban },
     ] },
     { title: 'MY PERFORMANCE', links: [
-      { name: 'Attendance', key: 'attendance', icon: CalendarDays },
+      { name: 'Attendance', href: '/student-portal?tab=attendance', icon: CalendarDays },
       { name: 'My Progress', href: '/student-progress', icon: BarChart3 },
       { name: 'My Certificates', key: 'certificates', icon: Award },
     ] },
@@ -35,8 +35,8 @@ export const PORTAL_NAVIGATION = {
       { name: 'Trainers', key: 'trainers', icon: GraduationCap },
     ] },
     { title: 'ACADEMICS', links: [
-      { name: 'Attendance', key: 'attendance', icon: CalendarDays },
-      { name: 'Sessions', key: 'sessions', icon: CalendarDays },
+      { name: 'Attendance', href: '/attendance', icon: CalendarDays },
+      { name: 'Sessions', href: '/sessions', icon: CalendarDays },
       { name: 'Curriculum', key: 'curriculum', icon: BookOpen },
       { name: 'Learning Materials', href: '/content', icon: PlaySquare },
     ] },
@@ -52,7 +52,7 @@ export const PORTAL_NAVIGATION = {
     ] },
     { title: 'LAB', links: [
       { name: 'Virtual Arduino Lab', href: '/simulation', icon: Cpu },
-      { name: 'Hardware & Kits', key: 'hardware', icon: Box },
+      { name: 'Hardware & Kits', href: '/inventory', icon: Box },
     ] },
   ],
   trainer: [
@@ -69,7 +69,7 @@ export const PORTAL_NAVIGATION = {
       { name: 'Projects', href: '/content', icon: FolderKanban },
     ] },
     { title: 'STUDENT PERFORMANCE', links: [
-      { name: 'Attendance', href: '/trainers', icon: CalendarDays },
+      { name: 'Attendance', href: '/attendance', icon: CalendarDays },
       { name: 'Class Performance', href: '/trainer-ranking', icon: Trophy },
       { name: 'Class Ranking', href: '/trainer-ranking', icon: Trophy },
       { name: 'Student Reviews', href: '/trainers', icon: Star },
