@@ -1,7 +1,7 @@
-import { BookOpen, Box, CalendarDays, ClipboardCheck, Cpu, FileText, FolderKanban, GraduationCap, LayoutDashboard, PlaySquare, Star, Users, Video } from 'lucide-react';
+import { BookOpen, Box, CalendarDays, ClipboardCheck, Cpu, FileFileText, FolderKanban, GraduationCap, LayoutDashboard, PlaySquare, Star, Trophy, Users, Video } from 'lucide-react';
 
-// Keep learner/faculty navigation here so adding a new menu item does not
-// require changing the sidebar component itself.
+// Learner/faculty navigation is presentation-only. Runtime records, permissions,
+// scores and assignments come from Django/PostgreSQL APIs.
 export const PORTAL_NAVIGATION = {
   student: [
     {
@@ -18,6 +18,7 @@ export const PORTAL_NAVIGATION = {
       links: [
         { name: 'Attendance', key: 'attendance', icon: CalendarDays },
         { name: 'Trainer Reviews', key: 'reviews', icon: Star },
+        { name: 'Class Ranking', href: '/student-ranking', icon: Trophy },
       ],
     },
     {
@@ -35,7 +36,14 @@ export const PORTAL_NAVIGATION = {
         { name: 'Workspace', href: '/trainers', icon: LayoutDashboard },
         { name: 'My Students', href: '/students', icon: Users },
         { name: 'Sessions', href: '/trainers', icon: CalendarDays },
-        { name: 'Materials', href: '/trainer-materials', icon: FileText },
+        { name: 'Materials', href: '/trainer-materials', icon: FileFileText },
+      ],
+    },
+    {
+      title: 'PERFORMANCE',
+      links: [
+        { name: 'Class Performance', href: '/trainer-ranking', icon: Trophy },
+        { name: 'Student Reviews', href: '/trainers', icon: Star },
       ],
     },
     {
