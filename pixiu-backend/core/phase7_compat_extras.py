@@ -21,6 +21,11 @@ def normalize_invoice_status(value):
     return LEGACY_INVOICE_STATUS.get(str(value or "").strip().lower().replace(" ", "_"), "issued")
 
 class ContractBillingFullViewSet(ContractBillingViewSet):
+    def get_queryset(self):
+        # DELETE intentionally voids invoices for financial/audit integrity.
+        # Keep voided records in PostgreSQL, but remove them from the active ledger/API list.
+        return super().get_queryset().exclude(status="void")
+
     def _legacy_lines(self, request):
         lines = request.data.get("lines") or request.data.get("items")
         if isinstance(lines, dict): lines = [lines]
@@ -36,7 +41,7 @@ class ContractBillingFullViewSet(ContractBillingViewSet):
             if invoice is None: raise ValidationError("Invoice was created but could not be reloaded.")
             requested_status = normalize_invoice_status(request.data.get("status", "draft"))
             for line in self._legacy_lines(request):
-                add_invoice_line(invoice=invoice, description=str(_first(line, "description", "tranche_title", "title", default="STEM Robotics & Lab Operations"))[:250], quantity=_first(line, "quantity", "qty", default=1), unit_price=_first(line, "unit_price", "amount", "price", default=0))
+                add_invoice_line(invoice=invoice, description=str(_first(line, "description", "tranche_title", "title", default="STEM Lab Operations"))[:250], quantity=_first(line, "quantity", "qty", default=1), unit_price=_first(line, "unit_price", "amount", "price", default=0))
             recalculate_invoice(invoice); invoice.refresh_from_db()
             if requested_status != "draft": invoice.status = requested_status; invoice.save(update_fields=["status", "updated_at"])
             response.data = self.map_out(invoice)
@@ -53,7 +58,7 @@ class ContractBillingFullViewSet(ContractBillingViewSet):
             if changed: invoice.save(update_fields=[*changed, "updated_at"])
             title = _first(request.data, "tranche_title", "title"); amount = _first(request.data, "amount", "total_amount"); line = invoice.lines.first()
             if title is not None or amount is not None:
-                if line is None: add_invoice_line(invoice=invoice, description=str(title or "STEM Robotics & Lab Operations")[:250], quantity=1, unit_price=amount or 0)
+                if line is None: add_invoice_line(invoice=invoice, description=str(title or "STEM Lab Operations")[:250], quantity=1, unit_price=amount or 0)
                 else: update_invoice_line(line=line, description=str(title if title is not None else line.description)[:250], quantity=line.quantity, unit_price=amount if amount is not None else line.unit_price)
                 recalculate_invoice(invoice)
             invoice.refresh_from_db()
