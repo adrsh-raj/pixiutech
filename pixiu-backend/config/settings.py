@@ -21,15 +21,9 @@ INSTALLED_APPS = [
     "billing", "inventory", "notifications", "crm", "audit",
 ]
 MIDDLEWARE = [
-    "django.middleware.security.SecurityMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",
-    "corsheaders.middleware.CorsMiddleware",
-    "django.contrib.sessions.middleware.SessionMiddleware",
-    "django.middleware.common.CommonMiddleware",
-    "django.middleware.csrf.CsrfViewMiddleware",
-    "django.contrib.auth.middleware.AuthenticationMiddleware",
-    "django.contrib.messages.middleware.MessageMiddleware",
-    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "django.middleware.security.SecurityMiddleware", "whitenoise.middleware.WhiteNoiseMiddleware", "corsheaders.middleware.CorsMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware", "django.middleware.common.CommonMiddleware", "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware", "django.contrib.messages.middleware.MessageMiddleware", "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 ROOT_URLCONF = "config.urls"
 TEMPLATES = [{"BACKEND":"django.template.backends.django.DjangoTemplates","DIRS":[],"APP_DIRS":True,"OPTIONS":{"context_processors":["django.template.context_processors.request","django.contrib.auth.context_processors.auth","django.contrib.messages.context_processors.messages"]}}]
@@ -61,6 +55,29 @@ AUTH_PASSWORD_VALIDATORS = [{"NAME":"django.contrib.auth.password_validation.Use
 LANGUAGE_CODE="en-us"; TIME_ZONE="Asia/Kolkata"; USE_I18N=True; USE_TZ=True
 STATIC_URL="static/"; STATIC_ROOT=BASE_DIR / "staticfiles"; MEDIA_URL="media/"; MEDIA_ROOT=BASE_DIR / "media"; DEFAULT_AUTO_FIELD="django.db.models.BigAutoField"
 STORAGES = {"default": {"BACKEND": "django.core.files.storage.FileSystemStorage"}, "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"}}
+
+# Render's local filesystem is ephemeral. Set AWS_STORAGE_BUCKET_NAME (S3, R2 or another
+# S3-compatible provider) in production to make kit/component and learning uploads persistent.
+AWS_BUCKET = os.environ.get("AWS_STORAGE_BUCKET_NAME", "").strip()
+if AWS_BUCKET:
+    INSTALLED_APPS.append("storages")
+    STORAGES["default"] = {
+        "BACKEND": "storages.backends.s3.S3Storage",
+        "OPTIONS": {
+            "bucket_name": AWS_BUCKET,
+            "region_name": os.environ.get("AWS_S3_REGION_NAME") or None,
+            "endpoint_url": os.environ.get("AWS_S3_ENDPOINT_URL") or None,
+            "access_key_id": os.environ.get("AWS_ACCESS_KEY_ID") or None,
+            "secret_access_key": os.environ.get("AWS_SECRET_ACCESS_KEY") or None,
+            "location": os.environ.get("AWS_LOCATION", "pixiu-media").strip("/"),
+            "file_overwrite": False,
+            "querystring_auth": os.environ.get("AWS_QUERYSTRING_AUTH", "True").lower() == "true",
+            "querystring_expire": int(os.environ.get("AWS_QUERYSTRING_EXPIRE", "3600")),
+        },
+    }
+    MEDIA_URL = os.environ.get("AWS_CUSTOM_DOMAIN", "").strip()
+    if MEDIA_URL and not MEDIA_URL.endswith("/"): MEDIA_URL += "/"
+
 SECURE_CONTENT_TYPE_NOSNIFF=True; X_FRAME_OPTIONS="DENY"; SECURE_REFERRER_POLICY="strict-origin-when-cross-origin"
 if not DEBUG:
     SECURE_SSL_REDIRECT=os.environ.get("DJANGO_SECURE_SSL_REDIRECT","True").lower()=="true"; SESSION_COOKIE_SECURE=True; CSRF_COOKIE_SECURE=True; SECURE_HSTS_SECONDS=int(os.environ.get("DJANGO_HSTS_SECONDS","31536000")); SECURE_HSTS_INCLUDE_SUBDOMAINS=True; SECURE_HSTS_PRELOAD=True
