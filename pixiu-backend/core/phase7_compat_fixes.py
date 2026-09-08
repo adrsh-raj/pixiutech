@@ -1,22 +1,23 @@
 """Compatibility fixes for the legacy /api/v1 contract used by the portal.
 
-The rebuilt Django serializers are the source of truth.  This module only
-restores the legacy field names/shape expected by the existing portal while
-keeping the rebuilt services and permission checks underneath.
+The rebuilt Django serializers are the source of truth. This module restores
+legacy field names and endpoint behavior without duplicating database state.
 """
 
+from django.db import transaction
+from django.utils import timezone
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from accounts.models import UserRole
+from academics.models import TrainerSchoolAssignment
 from learning.models import Session
 from learning.services import admin_override_attendance
-from learning.serializers import AttendanceRecordSerializer, SessionSerializer
+from learning.serializers import AttendanceRecordSerializer
 from .api_v1_compat import (
     ContractAttendanceViewSet,
     ContractClassViewSet,
     ContractSchoolViewSet,
-    ContractSessionViewSet,
     ContractStudentViewSet,
     ContractTrainerViewSet,
     _class,
@@ -25,6 +26,7 @@ from .api_v1_compat import (
     _student,
     _trainer,
 )
+from .phase7_contract_overrides import ContractSessionCompatViewSet
 
 
 def _legacy_school(obj):
@@ -145,6 +147,8 @@ class LegacySchoolCompatViewSet(ContractSchoolViewSet):
         payload["name"] = _first(data, "name", "school_name", default="")
         payload["principal_name"] = _first(data, "principal_name", "principal", default="")
         payload["phone"] = _first(data, "phone", "contact", default="")
+        payload["email"] = _first(data, "email", default="")
+        payload["address"] = _first(data, "address", default="")
         value = str(_first(data, "status", default="active")).strip().lower()
         payload["status"] = "active" if value in {"active", "true", "1"} else "inactive"
         return payload
@@ -152,18 +156,55 @@ class LegacySchoolCompatViewSet(ContractSchoolViewSet):
     def map_out(self, obj):
         return _legacy_school(obj)
 
+    @action(detail=True, methods=["post"], url_path="assign-trainer")
+    def assign_trainer(self, request, pk=None):
+        self.required_action = "EDIT"
+        self.role_only(UserRole.ADMIN)
+        school = self.get_object()
+        trainer = _trainer(_first(request.data, "trainer_id", "trainer"))
+        with transaction.atomic():
+            TrainerSchoolAssignment.objects.filter(school=school, status="active").update(
+                status="inactive", assigned_to=timezone.localdate()
+            )
+            if trainer:
+                TrainerSchoolAssignment.objects.update_or_create(
+                    trainer=trainer,
+                    school=school,
+                    assigned_from=timezone.localdate(),
+                    defaults={"status": "active", "assigned_to": None},
+                )
+        return Response(_legacy_school(school))
+
 
 class LegacyTrainerCompatViewSet(ContractTrainerViewSet):
     def map_in(self, data):
         payload = dict(data)
         payload["trainer_id"] = _first(data, "trainer_id", "legacy_id", "id", default=None)
         payload["name"] = _first(data, "name", "trainer_name", default="")
+        payload["email"] = _first(data, "email", default="")
+        payload["phone"] = _first(data, "phone", default="")
+        payload["qualification"] = _first(data, "qualification", default="")
+        payload["specialization"] = _first(data, "specialization", default="")
+        payload["daily_rate"] = _first(data, "daily_rate")
+        payload["weekly_days"] = _first(data, "weekly_days")
+        payload["monthly_compensation"] = _first(data, "monthly_compensation")
+        payload["rating"] = _first(data, "rating")
         value = str(_first(data, "status", default="active")).strip().lower()
         payload["status"] = "active" if value in {"active", "true", "1"} else "inactive"
         return payload
 
     def map_out(self, obj):
         return _legacy_trainer(obj)
+
+    @action(detail=True, methods=["put"], url_path="status")
+    def status_change(self, request, pk=None):
+        self.required_action = "EDIT"
+        self.role_only(UserRole.ADMIN)
+        trainer = self.get_object()
+        value = str(_first(request.data, "status", default=trainer.status)).strip().lower()
+        trainer.status = "active" if value in {"active", "true", "1"} else "inactive"
+        trainer.save(update_fields=["status", "updated_at"])
+        return Response(_legacy_trainer(trainer))
 
 
 class LegacyClassCompatViewSet(ContractClassViewSet):
@@ -199,7 +240,7 @@ class LegacyStudentCompatViewSet(ContractStudentViewSet):
         return _legacy_student(obj)
 
 
-class LegacySessionCompatViewSet(ContractSessionViewSet):
+class LegacySessionCompatViewSet(ContractSessionCompatViewSet):
     def map_in(self, data):
         payload = dict(data)
         school = _school(_first(data, "school", "school_id", "school_code"))
