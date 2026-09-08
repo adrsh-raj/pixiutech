@@ -82,7 +82,8 @@ class Phase8AuthenticationTests(APITestCase):
         self.assertEqual(me.status_code, 200)
         self.assertEqual(me.data["user"]["username"], "phase8-auth")
 
-        logout = self.client.post("/api/v1/auth/logout/", {"refresh": refresh}, format="json")
+        active_refresh = refreshed.data.get("refresh", refresh)
+        logout = self.client.post("/api/v1/auth/logout/", {"refresh": active_refresh}, format="json")
         self.assertEqual(logout.status_code, 205)
 
 
