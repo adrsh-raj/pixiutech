@@ -4,6 +4,8 @@ from rest_framework.routers import DefaultRouter
 from accounts.legacy_credential_routes import SchoolProfilePasswordResetView, TrainerProfilePasswordResetView
 from accounts.views import LoginView, LogoutView, MeView, RefreshView
 from audit.views import AuditLogViewSet
+from inventory.views import KitComponentViewSet, KitMaintenanceViewSet
+from learning.views import SessionActivityViewSet
 from .analytics import SchoolPerformanceView, StudentProgressView, TrainerPerformanceView
 from .class_ranking import ClassRankingView
 from .api_v1_compat import (
@@ -22,6 +24,7 @@ router.register("trainers", ContractTrainerViewSet, basename="v1-trainer")
 router.register("classes", ContractClassViewSet, basename="v1-class")
 router.register("students", ContractStudentViewSet, basename="v1-student")
 router.register("sessions", ContractSessionCompatViewSet, basename="v1-session")
+router.register("session-activities", SessionActivityViewSet, basename="v1-session-activity")
 router.register("attendance", ContractAttendanceViewSet, basename="v1-attendance")
 router.register("curriculum", ContractCurriculumViewSet, basename="v1-curriculum")
 router.register("content", ContractContentViewSet, basename="v1-content")
@@ -32,6 +35,8 @@ router.register("assessments", ContractAssessmentViewSet, basename="v1-assessmen
 router.register("projects", ContractProjectViewSet, basename="v1-project")
 router.register("billing", ContractBillingFullViewSet, basename="v1-billing")
 router.register("inventory", ContractInventoryViewSet, basename="v1-inventory")
+router.register("kit-components", KitComponentViewSet, basename="v1-kit-component")
+router.register("kit-maintenance", KitMaintenanceViewSet, basename="v1-kit-maintenance")
 router.register("leads", ContractLeadViewSet, basename="v1-lead")
 router.register("notifications", ContractNotificationFullViewSet, basename="v1-notification")
 router.register("comms", ContractCommunicationLogViewSet, basename="v1-comms")
