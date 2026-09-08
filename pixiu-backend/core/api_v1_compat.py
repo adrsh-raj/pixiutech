@@ -15,7 +15,7 @@ from academics.models import School, SchoolClass, Student, Trainer, TrainerSchoo
 from academics.views import SchoolClassViewSet, SchoolViewSet, StudentViewSet, TrainerViewSet
 from billing.models import Invoice, PaymentMethod
 from billing.serializers import InvoiceSerializer, PaymentSerializer, ReceiptSerializer
-from billing.services import record_payment
+from billing.services import record_payment, recalculate_invoice
 from billing.views import InvoiceViewSet
 from crm.models import Lead, LeadStatus
 from crm.views import LeadViewSet
