@@ -12,7 +12,7 @@ export const PORTAL_NAVIGATION = {
     ] },
     { title: 'MY PERFORMANCE', links: [
       { name: 'Attendance', key: 'attendance', icon: CalendarDays },
-      { name: 'My Progress', key: 'progress', icon: BarChart3 },
+      { name: 'My Progress', href: '/student-progress', icon: BarChart3 },
       { name: 'My Certificates', key: 'certificates', icon: Award },
     ] },
     { title: 'MY CLASS', links: [
