@@ -1,3 +1,5 @@
+from datetime import date
+
 from django.db import connection
 from django.test import TestCase
 from rest_framework.test import APITestCase
@@ -10,24 +12,9 @@ from academics.models import School, Trainer
 class Phase8PermissionTests(APITestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.admin = User.objects.create_user(
-            username="phase8-admin",
-            password="StrongAdminPass!123",
-            role=UserRole.ADMIN,
-            status="active",
-        )
-        cls.school_user = User.objects.create_user(
-            username="phase8-school",
-            password="StrongSchoolPass!123",
-            role=UserRole.SCHOOL,
-            status="active",
-        )
-        cls.trainer_user = User.objects.create_user(
-            username="phase8-trainer",
-            password="StrongTrainerPass!123",
-            role=UserRole.TRAINER,
-            status="active",
-        )
+        cls.admin = User.objects.create_user(username="phase8-admin", password="StrongAdminPass!123", role=UserRole.ADMIN, status="active")
+        cls.school_user = User.objects.create_user(username="phase8-school", password="StrongSchoolPass!123", role=UserRole.SCHOOL, status="active")
+        cls.trainer_user = User.objects.create_user(username="phase8-trainer", password="StrongTrainerPass!123", role=UserRole.TRAINER, status="active")
 
     def authenticate(self, user):
         refresh = RefreshToken.for_user(user)
@@ -45,21 +32,13 @@ class Phase8PermissionTests(APITestCase):
 
     def test_admin_can_create_school(self):
         self.authenticate(self.admin)
-        response = self.client.post(
-            "/api/v1/schools",
-            {"school_id": "P8A", "name": "Phase Eight School"},
-            format="json",
-        )
+        response = self.client.post("/api/v1/schools", {"school_id": "P8A", "name": "Phase Eight School"}, format="json")
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data["school_id"], "P8A")
 
     def test_school_user_cannot_create_school(self):
         self.authenticate(self.school_user)
-        response = self.client.post(
-            "/api/v1/schools",
-            {"school_id": "P8B", "name": "Forbidden School"},
-            format="json",
-        )
+        response = self.client.post("/api/v1/schools", {"school_id": "P8B", "name": "Forbidden School"}, format="json")
         self.assertEqual(response.status_code, 403)
 
     def test_trainer_cannot_assign_trainer(self):
@@ -67,8 +46,8 @@ class Phase8PermissionTests(APITestCase):
         trainer = Trainer.objects.create(trainer_id="P8T", name="P8 Trainer", account=self.trainer_user)
         self.authenticate(self.trainer_user)
         response = self.client.post(
-            f"/api/v1/schools/{school.id}/assign-trainer",
-            {"trainer_id": trainer.trainer_id},
+            "/api/v1/trainer-school-assignments",
+            {"trainer": str(trainer.id), "school": str(school.id), "assigned_from": date.today().isoformat()},
             format="json",
         )
         self.assertEqual(response.status_code, 403)
@@ -84,19 +63,10 @@ class Phase8PermissionTests(APITestCase):
 class Phase8AuthenticationTests(APITestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.user = User.objects.create_user(
-            username="phase8-auth",
-            password="StrongAuthPass!123",
-            role=UserRole.ADMIN,
-            status="active",
-        )
+        cls.user = User.objects.create_user(username="phase8-auth", password="StrongAuthPass!123", role=UserRole.ADMIN, status="active")
 
     def test_login_refresh_me_logout_flow(self):
-        login = self.client.post(
-            "/api/v1/auth/login/",
-            {"username": "phase8-auth", "password": "StrongAuthPass!123", "role": "admin"},
-            format="json",
-        )
+        login = self.client.post("/api/v1/auth/login/", {"username": "phase8-auth", "password": "StrongAuthPass!123", "role": "admin"}, format="json")
         self.assertEqual(login.status_code, 200)
         self.assertTrue(login.data["access"])
         self.assertTrue(login.data["refresh"])
@@ -110,7 +80,7 @@ class Phase8AuthenticationTests(APITestCase):
         self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {refreshed.data['access']}")
         me = self.client.get("/api/v1/auth/me/")
         self.assertEqual(me.status_code, 200)
-        self.assertEqual(me.data["username"], "phase8-auth")
+        self.assertEqual(me.data["user"]["username"], "phase8-auth")
 
         logout = self.client.post("/api/v1/auth/logout/", {"refresh": refresh}, format="json")
         self.assertEqual(logout.status_code, 205)
@@ -119,15 +89,8 @@ class Phase8AuthenticationTests(APITestCase):
 class Phase8MigrationTests(TestCase):
     def test_required_phase7_tables_exist(self):
         required_tables = {
-            "accounts_user",
-            "academics_school",
-            "academics_schoolclass",
-            "academics_student",
-            "academics_trainer",
-            "learning_session",
-            "billing_invoice",
-            "notifications_notification",
-            "crm_communicationlog",
+            "accounts_user", "academics_school", "academics_schoolclass", "academics_student", "academics_trainer",
+            "learning_session", "billing_invoice", "notifications_notification", "crm_communicationlog",
         }
         with connection.cursor() as cursor:
             table_names = set(connection.introspection.table_names(cursor))
