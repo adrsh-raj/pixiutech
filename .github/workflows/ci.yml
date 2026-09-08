@@ -59,10 +59,12 @@ jobs:
       - name: Verify public website build
         run: npm ci && npm run build
 
-      - name: Verify LMS lint, hardcoded-demo scan, and build
+      - name: Verify LMS lint, hardcoded-demo scan, refresh safety, and build
         working-directory: pixiu-lms-portal
         run: |
           npm ci
           npm run lint
           ! grep -RInE 'Zenith Public School|Vikas Pandey|\bZPS\b|\bTR-01\b|\bTR-02\b' src --exclude-dir=node_modules
+          ! grep -RInE 'window\.location\.reload\s*\(' src --exclude-dir=node_modules
+          ! grep -RInE 'localStorage\.(getItem|setItem|removeItem).*\b(notification|attendance|ranking|revenue|student|trainer|school)\b' src --exclude-dir=node_modules --ignore-case
           npm run build
