@@ -1,9 +1,10 @@
-from django.test import TestCase
+from datetime import date
+
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from accounts.models import User, UserRole
-from academics.models import School, SchoolClass, Student, Trainer
+from academics.models import School, SchoolClass, Student, Trainer, TrainerSchoolAssignment
 from .models import Notification
 
 
@@ -18,6 +19,7 @@ class NotificationAudienceAPITests(APITestCase):
         self.school = School.objects.create(school_code='P17', name='Phase 17 School', account=self.school_user)
         self.trainer = Trainer.objects.create(trainer_id='PTR-01', name='Phase 17 Trainer', account=self.trainer_user)
         self.other_trainer = Trainer.objects.create(trainer_id='PTR-02', name='Phase 17 Trainer Two', account=self.other_trainer_user)
+        TrainerSchoolAssignment.objects.create(trainer=self.trainer, school=self.school, assigned_from=date(2026, 2, 1), status='active')
         self.school_class = SchoolClass.objects.create(school=self.school, grade='8', section='A')
         other_class = SchoolClass.objects.create(school=self.school, grade='9', section='A')
         Student.objects.create(account=self.student_user, school_class=self.school_class, student_id='P178A01', roll_number=1, name='Student One', status='active')
