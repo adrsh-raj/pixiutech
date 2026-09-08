@@ -7,6 +7,8 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 
+from audit.services import record_audit
+
 from .credentials import (
     create_or_reset_managed_account,
     revoke_all_refresh_tokens,
@@ -38,6 +40,14 @@ class LoginView(APIView):
         user = serializer.validated_data["user"]
         user.last_login = timezone.now()
         user.save(update_fields=["last_login"])
+        record_audit(
+            actor=user,
+            action="login",
+            entity_type="user",
+            entity_id=user.id,
+            summary=f"{user.role} account authenticated",
+            request=request,
+        )
         return Response(
             {
                 "success": True,
