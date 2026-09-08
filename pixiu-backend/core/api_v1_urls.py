@@ -5,6 +5,7 @@ from accounts.legacy_credential_routes import SchoolProfilePasswordResetView, Tr
 from accounts.views import LoginView, LogoutView, MeView, RefreshView
 from audit.views import AuditLogViewSet
 from billing.contract_views import ContractViewSet, billing_summary
+from billing.views import InvoiceLineItemViewSet, PaymentViewSet, ReceiptViewSet
 from inventory.views import KitComponentViewSet, KitMaintenanceViewSet
 from learning.views import SessionActivityViewSet
 from .analytics import SchoolPerformanceView, StudentProgressView, TrainerPerformanceView
@@ -36,6 +37,9 @@ router.register("assessments", ContractAssessmentViewSet, basename="v1-assessmen
 router.register("projects", ContractProjectViewSet, basename="v1-project")
 router.register("billing", ContractBillingFullViewSet, basename="v1-billing")
 router.register("contracts", ContractViewSet, basename="v1-contract")
+router.register("billing-lines", InvoiceLineItemViewSet, basename="v1-billing-line")
+router.register("payments", PaymentViewSet, basename="v1-payment")
+router.register("receipts", ReceiptViewSet, basename="v1-receipt")
 router.register("inventory", ContractInventoryViewSet, basename="v1-inventory")
 router.register("kit-components", KitComponentViewSet, basename="v1-kit-component")
 router.register("kit-maintenance", KitMaintenanceViewSet, basename="v1-kit-maintenance")
