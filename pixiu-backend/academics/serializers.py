@@ -37,6 +37,7 @@ class TrainerSerializer(serializers.ModelSerializer):
             "status", "created_at", "updated_at",
         ]
         read_only_fields = ["id", "account_username", "created_at", "updated_at"]
+        extra_kwargs = {"trainer_id": {"required": False, "allow_blank": True}}
 
     def validate_trainer_id(self, value):
         value = value.strip().upper()
