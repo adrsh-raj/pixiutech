@@ -11,23 +11,25 @@ from learning.views import SessionActivityViewSet
 from .analytics import SchoolPerformanceView, StudentProgressView, TrainerPerformanceView
 from .class_ranking import ClassRankingView
 from .api_v1_compat import (
-    ContractAssessmentViewSet, ContractAttendanceViewSet, ContractClassViewSet, ContractContentViewSet,
-    ContractCurriculumViewSet, ContractInventoryViewSet, ContractLeadViewSet, ContractProjectViewSet,
-    ContractQuizAttemptViewSet, ContractQuizViewSet, ContractReviewViewSet, ContractSessionViewSet,
-    ContractSchoolViewSet, ContractStudentViewSet, ContractTrainerViewSet, health, upload,
+    ContractAssessmentViewSet, ContractContentViewSet, ContractCurriculumViewSet, ContractInventoryViewSet,
+    ContractLeadViewSet, ContractProjectViewSet, ContractQuizAttemptViewSet, ContractQuizViewSet,
+    ContractReviewViewSet, health, upload,
 )
 from .phase7_compat_extras import ContractBillingFullViewSet, ContractCommunicationLogViewSet, ContractNotificationFullViewSet
-from .phase7_contract_overrides import ContractSessionCompatViewSet
+from .phase7_compat_fixes import (
+    LegacyAttendanceCompatViewSet, LegacyClassCompatViewSet, LegacySchoolCompatViewSet,
+    LegacySessionCompatViewSet, LegacyStudentCompatViewSet, LegacyTrainerCompatViewSet,
+)
 from .trainer_materials import TrainerMaterialDetailView, TrainerMaterialFileView, TrainerMaterialListCreateView
 
 router = DefaultRouter(trailing_slash=False)
-router.register("schools", ContractSchoolViewSet, basename="v1-school")
-router.register("trainers", ContractTrainerViewSet, basename="v1-trainer")
-router.register("classes", ContractClassViewSet, basename="v1-class")
-router.register("students", ContractStudentViewSet, basename="v1-student")
-router.register("sessions", ContractSessionCompatViewSet, basename="v1-session")
+router.register("schools", LegacySchoolCompatViewSet, basename="v1-school")
+router.register("trainers", LegacyTrainerCompatViewSet, basename="v1-trainer")
+router.register("classes", LegacyClassCompatViewSet, basename="v1-class")
+router.register("students", LegacyStudentCompatViewSet, basename="v1-student")
+router.register("sessions", LegacySessionCompatViewSet, basename="v1-session")
 router.register("session-activities", SessionActivityViewSet, basename="v1-session-activity")
-router.register("attendance", ContractAttendanceViewSet, basename="v1-attendance")
+router.register("attendance", LegacyAttendanceCompatViewSet, basename="v1-attendance")
 router.register("curriculum", ContractCurriculumViewSet, basename="v1-curriculum")
 router.register("content", ContractContentViewSet, basename="v1-content")
 router.register("quizzes", ContractQuizViewSet, basename="v1-quiz")
