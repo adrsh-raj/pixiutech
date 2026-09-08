@@ -12,7 +12,7 @@ from audit.services import record_audit
 
 from .models import BillingStatus, Invoice, InvoiceLineItem, Payment, Receipt, PaymentStatus
 from .serializers import InvoiceLineItemSerializer, InvoiceLineItemWriteSerializer, InvoiceSerializer, PaymentRecordSerializer, PaymentSerializer, ReceiptSerializer
-from .services import add_invoice_line, record_payment, recalculate_invoice
+from .services import add_invoice_line, record_payment, recalculate_invoice, update_invoice_line
 
 
 class BillingScopedMixin:
@@ -66,7 +66,7 @@ class InvoiceViewSet(BillingScopedMixin,viewsets.ModelViewSet):
         if invoice.status==BillingStatus.VOID: raise ValidationError("Invoice is already void.")
         invoice.status=BillingStatus.VOID
         invoice.save(update_fields=["status","updated_at"])
-        record_audit(actor=request.user,action="update",entity_type="Invoice",entity_id=invoice.id,summary=f"Voided invoice {invoice.invoice_number}",changes={"status":"void"},request=request)
+        record_audit(actor=request.user,action="void",entity_type="Invoice",entity_id=invoice.id,summary=f"Voided invoice {invoice.invoice_number}",changes={"status":"void"},request=request)
         return Response(self.get_serializer(invoice).data)
 
 
