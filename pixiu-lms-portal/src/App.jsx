@@ -24,6 +24,10 @@ import StudentPortal from './pages/StudentPortal';
 import SchoolPortal from './pages/SchoolPortal';
 import AuditLogs from './pages/AuditLogs';
 import ClassRankingPage from './pages/ClassRankingPage';
+import AttendanceCenter from './pages/AttendanceCenter';
+import SessionManager from './pages/SessionManager';
+import StudentProgressPage from './pages/StudentProgressPage';
+import PerformanceAnalyticsPage from './pages/PerformanceAnalyticsPage';
 import { DataProvider, useData } from './context/DataContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
@@ -76,6 +80,7 @@ function ProtectedLayout() {
 }
 
 function AdminOnly({ children }) { const { user } = useAuth(); return user?.role === 'admin' || user?.role === 'superadmin' ? children : <Navigate to="/trainers" replace />; }
+function RoleRoute({ roles, children }) { const { isAuthenticated, user, loading } = useAuth(); if (loading) return <div className="min-h-screen bg-slate-900 flex items-center justify-center"><div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" /></div>; if (!isAuthenticated) return <Navigate to="/login" replace />; if (!roles.includes(user?.role)) return <Navigate to="/" replace />; return children; }
 function TrainerConsoleRoute() { const { user } = useAuth(); return user?.role === 'trainer' ? <TrainerWorkspace /> : <TrainerOperations />; }
 function StudentRouteGuard() { const { isAuthenticated, user, loading } = useAuth(); if (loading) return <div className="min-h-screen bg-slate-900 flex items-center justify-center"><div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" /></div>; if (!isAuthenticated) return <Navigate to="/login" replace />; if (user?.role !== 'student') return <Navigate to="/" replace />; return <StudentPortal />; }
 function SchoolRouteGuard() { const { isAuthenticated, user, loading } = useAuth(); if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" /></div>; if (!isAuthenticated) return <Navigate to="/login" replace />; if (user?.role !== 'school') return <Navigate to="/" replace />; return <SchoolPortal />; }
@@ -86,6 +91,8 @@ function SchoolRankingRoute() { return <SchoolRoleRoute />; }
 function StudentRoleRoute() { const { isAuthenticated, user, loading } = useAuth(); if (loading) return <div className="min-h-screen bg-slate-900 flex items-center justify-center"><div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" /></div>; if (!isAuthenticated) return <Navigate to="/login" replace />; if (user?.role !== 'student') return <Navigate to="/" replace />; return <ClassRankingPage />; }
 function TrainerRoleRoute() { const { isAuthenticated, user, loading } = useAuth(); if (loading) return <div className="min-h-screen bg-slate-900 flex items-center justify-center"><div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" /></div>; if (!isAuthenticated) return <Navigate to="/login" replace />; if (user?.role !== 'trainer' && user?.role !== 'admin') return <Navigate to="/" replace />; return <ClassRankingPage />; }
 function SchoolRoleRoute() { const { isAuthenticated, user, loading } = useAuth(); if (loading) return <div className="min-h-screen bg-slate-900 flex items-center justify-center"><div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" /></div>; if (!isAuthenticated) return <Navigate to="/login" replace />; if (user?.role !== 'school') return <Navigate to="/" replace />; return <ClassRankingPage />; }
+function TrainerPerformanceRoute() { const { user } = useAuth(); return <PerformanceAnalyticsPage role={user?.role === 'admin' || user?.role === 'superadmin' ? 'admin' : 'trainer'} />; }
+function SchoolPerformanceRoute() { return <PerformanceAnalyticsPage role="school" />; }
 
 export default function App() {
   return <ToastProvider><AuthProvider><DataProvider><BrowserRouter><Routes>
@@ -96,8 +103,31 @@ export default function App() {
     <Route path="/student-ranking" element={<StudentRankingRoute />} />
     <Route path="/school-ranking" element={<SchoolRankingRoute />} />
     <Route path="/trainer-ranking" element={<TrainerRankingRoute />} />
+    <Route path="/attendance" element={<RoleRoute roles={['admin','superadmin','school','trainer']}><AttendanceCenter /></RoleRoute>} />
+    <Route path="/sessions" element={<RoleRoute roles={['admin','superadmin','school','trainer']}><SessionManager /></RoleRoute>} />
+    <Route path="/student-progress" element={<RoleRoute roles={['student']}><StudentProgressPage /></RoleRoute>} />
+    <Route path="/trainer-performance" element={<RoleRoute roles={['admin','superadmin','trainer']}><TrainerPerformanceRoute /></RoleRoute>} />
+    <Route path="/school-performance" element={<RoleRoute roles={['admin','superadmin','school']}><SchoolPerformanceRoute /></RoleRoute>} />
     <Route path="/" element={<ProtectedLayout />}>
-      <Route index element={<AdminOnly><AdminCommandCenter /></AdminOnly>} /><Route path="leads" element={<AdminOnly><Leads /></AdminOnly>} /><Route path="schools" element={<AdminOnly><Schools /></AdminOnly>} /><Route path="billing" element={<AdminOnly><Billing /></AdminOnly>} /><Route path="payments" element={<AdminOnly><Payments /></AdminOnly>} /><Route path="notifications" element={<AdminOnly><Notifications /></AdminOnly>} /><Route path="settings" element={<AdminOnly><Settings /></AdminOnly>} /><Route path="logs" element={<AdminOnly><AuditLogs /></AdminOnly>} /><Route path="students" element={<Students />} /><Route path="comms" element={<AdminOnly><Comms /></AdminOnly>} /><Route path="trainers" element={<TrainerConsoleRoute />} /><Route path="trainer-materials" element={<TrainerMaterials />} /><Route path="trainer-credentials" element={<AdminOnly><TrainerCredentials /></AdminOnly>} /><Route path="school-credentials" element={<AdminOnly><SchoolCredentials /></AdminOnly>} /><Route path="data-reset" element={<AdminOnly><DataReset /></AdminOnly>} /><Route path="content" element={<ContentHub />} /><Route path="curriculum" element={<Curriculum />} /><Route path="inventory" element={<Inventory />} />
-    </Route><Route path="*" element={<Navigate to="/" replace />} />
+      <Route index element={<AdminOnly><AdminCommandCenter /></AdminOnly>} />
+      <Route path="leads" element={<AdminOnly><Leads /></AdminOnly>} />
+      <Route path="schools" element={<AdminOnly><Schools /></AdminOnly>} />
+      <Route path="billing" element={<AdminOnly><Billing /></AdminOnly>} />
+      <Route path="payments" element={<AdminOnly><Payments /></AdminOnly>} />
+      <Route path="notifications" element={<AdminOnly><Notifications /></AdminOnly>} />
+      <Route path="settings" element={<AdminOnly><Settings /></AdminOnly>} />
+      <Route path="logs" element={<AdminOnly><AuditLogs /></AdminOnly>} />
+      <Route path="students" element={<Students />} />
+      <Route path="comms" element={<AdminOnly><Comms /></AdminOnly>} />
+      <Route path="trainers" element={<TrainerConsoleRoute />} />
+      <Route path="trainer-materials" element={<TrainerMaterials />} />
+      <Route path="trainer-credentials" element={<AdminOnly><TrainerCredentials /></AdminOnly>} />
+      <Route path="school-credentials" element={<AdminOnly><SchoolCredentials /></AdminOnly>} />
+      <Route path="data-reset" element={<AdminOnly><DataReset /></AdminOnly>} />
+      <Route path="content" element={<ContentHub />} />
+      <Route path="curriculum" element={<Curriculum />} />
+      <Route path="inventory" element={<Inventory />} />
+    </Route>
+    <Route path="*" element={<Navigate to="/" replace />} />
   </Routes></BrowserRouter></DataProvider></AuthProvider></ToastProvider>;
 }
