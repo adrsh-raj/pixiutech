@@ -1,6 +1,5 @@
 import { BookOpen, Box, CalendarDays, ClipboardCheck, Cpu, FileText, FolderKanban, GraduationCap, LayoutDashboard, Megaphone, PlaySquare, Receipt, School, Star, Trophy, Users, Video, WalletCards, Award, BarChart3 } from 'lucide-react';
 
-// Navigation is presentation-only. Runtime data, permissions and scope are enforced by Django APIs.
 export const PORTAL_NAVIGATION = {
   student: [
     { title: 'MY LEARNING', links: [
@@ -45,6 +44,9 @@ export const PORTAL_NAVIGATION = {
       { name: 'Class Performance', href: '/school-ranking', icon: Trophy },
       { name: 'Student Rankings', href: '/school-ranking', icon: Trophy },
       { name: 'Progress', key: 'progress', icon: WalletCards },
+    ] },
+    { title: 'FINANCE', links: [
+      { name: 'Billing & Contracts', href: '/billing', icon: WalletCards },
     ] },
     { title: 'COMMUNICATION', links: [
       { name: 'Announcements', key: 'announcements', icon: Megaphone },
