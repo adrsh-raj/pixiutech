@@ -1,763 +1,291 @@
-import { useState, useEffect, useMemo } from 'react';
-import { Search, Plus, MoreVertical, MessageCircle, Building2, X, FileText, ChevronRight, User, Award, Activity, Box, Trash2, Edit, Check, Phone, GraduationCap, Download } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Activity, Building2, Check, Download, Edit, FileText, MessageCircle, Plus, Search, Trash2, User } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import { generateStudentTranscriptPDF, generateClassCohortTranscriptPDF } from '../utils/transcriptGenerator';
 import Modal from '../components/ui/Modal';
 
-const generateId = (schoolCode, cls, sec, roll) => {
-  return `${schoolCode}${cls}${sec ? sec : ''} ${roll}`;
-};
+const normalizeStatus = value => String(value ?? '').toLowerCase();
+const schoolKey = school => String(school?.id || '');
+const classSchoolId = cls => String(cls?.school || cls?.school_id || '');
 
 export default function Students() {
-  const { schools, classes, students, projects, studentReviews, curriculum, addStudent, updateStudent, deleteStudent, getNextRollNumber, getStudentAttendance } = useData();
+  const {
+    schools = [], classes = [], students = [], projects = [], studentReviews = [], curriculum = [],
+    addStudent, updateStudent, deleteStudent, getNextRollNumber, getStudentAttendance,
+  } = useData();
   const { role, user } = useAuth();
   const toast = useToast();
-  
+
+  const isAdmin = role === 'admin' || role === 'superadmin';
   const isTrainer = role === 'trainer';
-  const trainerSchoolId = user?.school_id || '';
+  const trainerSchoolId = String(user?.school_id || '');
 
-  const [selectedSchool, setSelectedSchool] = useState(() => isTrainer ? trainerSchoolId : 'All');
-  const [selectedClassFilter, setSelectedClassFilter] = useState('All');
-  const [activeStudent, setActiveStudent] = useState(null);
+  const visibleSchools = useMemo(
+    () => isTrainer ? schools.filter(s => schoolKey(s) === trainerSchoolId) : schools,
+    [isTrainer, schools, trainerSchoolId],
+  );
+
+  const scopedStudents = useMemo(
+    () => isTrainer ? students.filter(s => String(s.school_code || s.school_id || '') === String(user?.school_code || trainerSchoolId)) : students,
+    [isTrainer, students, user, trainerSchoolId],
+  );
+
+  const scopedClasses = useMemo(
+    () => isTrainer ? classes.filter(c => classSchoolId(c) === trainerSchoolId || String(c.school_code || '') === String(user?.school_code || '')) : classes,
+    [classes, isTrainer, trainerSchoolId, user],
+  );
+
+  const [selectedSchool, setSelectedSchool] = useState(() => isTrainer ? trainerSchoolId : 'all');
+  const [selectedClass, setSelectedClass] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
-  
-  // Add Modal State
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [formData, setFormData] = useState({
-    schoolCode: 'ZPS', class: '6', section: 'A', roll: '', name: '', parent: '', phone: '', level: 'Level 0', assigned_kit_id: 'KIT-6001'
-  });
-
-  // Edit Modal State
+  const [activeStudent, setActiveStudent] = useState(null);
   const [editingStudent, setEditingStudent] = useState(null);
-  const [editFormData, setEditFormData] = useState({
-    name: '', parent_name: '', parent_whatsapp: '', tech_level: 'Level 0', status: 'Active', assigned_kit_id: ''
-  });
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [formData, setFormData] = useState({ school_class: '', roll_number: '', name: '', guardian_name: '', guardian_phone: '', guardian_email: '', email: '', phone: '', date_of_birth: '', gender: '', address: '', current_level: '', status: 'active' });
+  const [editFormData, setEditFormData] = useState({ name: '', guardian_name: '', guardian_phone: '', guardian_email: '', email: '', phone: '', date_of_birth: '', gender: '', address: '', current_level: '', status: 'active' });
+
+  const classesForSchool = useMemo(() => {
+    if (selectedSchool === 'all') return scopedClasses;
+    return scopedClasses.filter(c => classSchoolId(c) === selectedSchool || String(c.school_code || '') === selectedSchool);
+  }, [scopedClasses, selectedSchool]);
+
+  const filteredStudents = useMemo(() => scopedStudents.filter(student => {
+    const studentSchool = String(student.school_id || student.school_code || '');
+    const studentClass = String(student.school_class || student.class_id || '');
+    const matchesSchool = selectedSchool === 'all' || studentSchool === selectedSchool;
+    const matchesClass = selectedClass === 'all' || studentClass === selectedClass;
+    const haystack = [student.name, student.student_id, student.guardian_name, student.guardian_phone, student.class_name, student.school_name]
+      .filter(Boolean).join(' ').toLowerCase();
+    return matchesSchool && matchesClass && (!searchTerm || haystack.includes(searchTerm.toLowerCase()));
+  }), [scopedStudents, selectedSchool, selectedClass, searchTerm]);
 
   useEffect(() => {
-    if (isAddModalOpen) {
-      const nextRoll = getNextRollNumber(formData.schoolCode, formData.class, formData.section);
-      setFormData(prev => ({ ...prev, roll: nextRoll }));
-    }
-  }, [formData.schoolCode, formData.class, formData.section, isAddModalOpen]);
+    if (!isAddOpen) return;
+    const fallbackSchool = isTrainer ? visibleSchools[0] : visibleSchools[0];
+    const school = visibleSchools.find(s => schoolKey(s) === selectedSchool) || fallbackSchool;
+    const available = classesForSchool.filter(c => normalizeStatus(c.status) !== 'inactive');
+    const selected = available.find(c => String(c.id) === String(formData.school_class));
+    const nextClass = selected || available[0];
+    const schoolCode = school?.school_code || school?.code || school?.school_id || '';
+    const nextRoll = nextClass && schoolCode ? getNextRollNumber(schoolCode, nextClass.grade, nextClass.section) : '';
+    setFormData(prev => ({ ...prev, school_class: nextClass?.id || '', roll_number: nextRoll }));
+  }, [isAddOpen, isTrainer, visibleSchools, selectedSchool, classesForSchool, formData.school_class, getNextRollNumber]);
 
-  // Helper to extract clean grade + section string from student or class (e.g. '6A', '7A')
-  const getGradeSection = (item) => {
-    if (!item) return '';
-    if (item.grade && item.section) return `${item.grade}${item.section}`;
-    const classObj = classes.find(c => c.id === item.class_id);
-    if (classObj) return `${classObj.grade}${classObj.section}`;
-    const match = item.class_id?.match(/(\d+[A-Za-z]?)$/);
-    if (match) return match[1];
-    const stuIdMatch = item.student_id?.match(/[A-Za-z]+(\d+[A-Za-z]?)\s+\d+/);
-    if (stuIdMatch) return stuIdMatch[1];
-    return '';
+  const openAdd = () => {
+    const firstSchool = visibleSchools[0];
+    const firstClass = (firstSchool ? scopedClasses.filter(c => classSchoolId(c) === schoolKey(firstSchool)) : scopedClasses)[0];
+    setSelectedSchool(isTrainer ? trainerSchoolId : firstSchool ? schoolKey(firstSchool) : 'all');
+    setSelectedClass('all');
+    setFormData(prev => ({ ...prev, school_class: firstClass?.id || '', roll_number: '', name: '', guardian_name: '', guardian_phone: '', guardian_email: '', email: '', phone: '', date_of_birth: '', gender: '', address: '', current_level: '', status: 'active' }));
+    setIsAddOpen(true);
   };
 
-  // Available class filter tabs based on selected school (deduplicated across schools)
-  const availableClassTabs = useMemo(() => {
-    const relevantClasses = classes.filter(c => selectedSchool === 'All' || c.school_id === selectedSchool);
-    const seen = new Set();
-    const uniqueTabs = [];
-    
-    // From classes table
-    for (const c of relevantClasses) {
-      const key = `${c.grade}${c.section}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        uniqueTabs.push({
-          key,
-          label: `Class ${c.grade}${c.section}`,
-          grade: c.grade,
-          section: c.section
-        });
-      }
-    }
-
-    // From students table
-    const relevantStudents = students.filter(s => selectedSchool === 'All' || s.school_id === selectedSchool);
-    for (const s of relevantStudents) {
-      const gradeSec = getGradeSection(s);
-      if (gradeSec && !seen.has(gradeSec)) {
-        seen.add(gradeSec);
-        const gradeMatch = gradeSec.match(/\d+/);
-        const secMatch = gradeSec.match(/[A-Za-z]+/);
-        uniqueTabs.push({
-          key: gradeSec,
-          label: `Class ${gradeSec}`,
-          grade: gradeMatch ? gradeMatch[0] : '6',
-          section: secMatch ? secMatch[0] : 'A'
-        });
-      }
-    }
-
-    return uniqueTabs.sort((a, b) => (parseInt(a.grade, 10) || 0) - (parseInt(b.grade, 10) || 0));
-  }, [classes, students, selectedSchool]);
-
-  const filteredStudents = useMemo(() => {
-    return students.filter(s => {
-      const matchesSchool = selectedSchool === 'All' || s.school_id === selectedSchool;
-      const sGradeSec = getGradeSection(s);
-      const matchesClass = selectedClassFilter === 'All' || 
-                           sGradeSec === selectedClassFilter || 
-                           s.class_id === selectedClassFilter ||
-                           s.class_id?.endsWith(`-${selectedClassFilter}`) ||
-                           s.class_id?.includes(selectedClassFilter);
-      const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                            s.student_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            (s.parent_name && s.parent_name.toLowerCase().includes(searchTerm.toLowerCase()));
-      return matchesSchool && matchesClass && matchesSearch;
-    });
-  }, [students, classes, selectedSchool, selectedClassFilter, searchTerm]);
-
-  const handleAddSubmit = async (e) => {
-    e.preventDefault();
-    const newId = generateId(formData.schoolCode, formData.class, formData.section, formData.roll);
-    
-    const result = await addStudent({
-      student_id: newId, 
-      school_id: formData.schoolCode, 
-      class_id: `CLS-${formData.schoolCode}-${formData.class}${formData.section}`,
-      name: formData.name,
-      parent_name: formData.parent, 
-      parent_whatsapp: formData.phone, 
-      tech_level: formData.level,
-      assigned_kit_id: formData.assigned_kit_id,
-      status: 'Active'
-    });
-    
+  const handleAdd = async event => {
+    event.preventDefault();
+    setSaving(true);
+    const result = await addStudent(formData);
+    setSaving(false);
     if (!result?.success) {
       toast.error(result?.error || 'Student registration failed.');
       return;
     }
-    const tempPassword = result?.data?.temporary_password;
-    toast.success(tempPassword ? `Student ${formData.name} enrolled. Temporary login password: ${tempPassword}` : `Student ${formData.name} enrolled with ID "${newId}"!`, 'Student Registered');
-    setIsAddModalOpen(false);
-    setFormData(prev => ({ ...prev, name: '', parent: '', phone: '' }));
+    const student = result.data || {};
+    const credentialNote = student.initial_password ? ` Initial password: ${student.initial_password}` : '';
+    toast.success(`Student ${student.name || formData.name} enrolled.${credentialNote}`, 'Student Registered');
+    setIsAddOpen(false);
   };
 
-  const handleOpenEdit = (e, student) => {
-    e.stopPropagation();
+  const openEdit = (event, student) => {
+    event.stopPropagation();
     setEditingStudent(student);
     setEditFormData({
       name: student.name || '',
-      parent_name: student.parent_name || '',
-      parent_whatsapp: student.parent_whatsapp || '',
-      tech_level: student.tech_level || 'Level 0',
-      status: student.status || 'Active',
-      assigned_kit_id: student.assigned_kit_id || ''
+      guardian_name: student.guardian_name || '',
+      guardian_phone: student.guardian_phone || '',
+      guardian_email: student.guardian_email || '',
+      email: student.email || '',
+      phone: student.phone || '',
+      date_of_birth: student.date_of_birth || '',
+      gender: student.gender || '',
+      address: student.address || '',
+      current_level: student.current_level || '',
+      status: normalizeStatus(student.status || 'active'),
     });
   };
 
-  const handleEditSubmit = async (e) => {
-    e.preventDefault();
+  const handleEdit = async event => {
+    event.preventDefault();
     if (!editingStudent) return;
-
-    await updateStudent(editingStudent.student_id, editFormData);
-    toast.success(`Student "${editFormData.name}" (${editingStudent.student_id}) details updated!`, 'Profile Updated');
-    
-    if (activeStudent && activeStudent.student_id === editingStudent.student_id) {
-      setActiveStudent(prev => ({ ...prev, ...editFormData }));
+    setSaving(true);
+    const result = await updateStudent(editingStudent.id || editingStudent.student_id, editFormData);
+    setSaving(false);
+    if (!result?.success) {
+      toast.error(result?.error || 'Student update failed.');
+      return;
     }
-    
+    setActiveStudent(prev => prev && String(prev.id || prev.student_id) === String(editingStudent.id || editingStudent.student_id) ? { ...prev, ...editFormData } : prev);
     setEditingStudent(null);
+    toast.success('Student record updated.', 'Profile Updated');
   };
 
-  const openWhatsApp = (e, phone, name) => {
-    e.stopPropagation();
-    const cleanPhone = phone ? phone.replace(/\D/g, '') : '';
-    const text = encodeURIComponent(`Hello, this is an update from Pixiu Tech regarding ${name}'s robotics lab performance.`);
-    window.open(`https://wa.me/${cleanPhone}?text=${text}`, '_blank');
+  const removeStudent = async (event, student) => {
+    event.stopPropagation();
+    if (!window.confirm(`Deactivate ${student.name}?`)) return;
+    const result = await deleteStudent(student.id || student.student_id);
+    if (!result?.success) toast.error(result?.error || 'Student could not be deactivated.');
+    else toast.success(`${student.name} was deactivated.`, 'Student Updated');
   };
 
-  const handlePrintPDF = (e, student) => {
-    if (e && e.stopPropagation) e.stopPropagation();
-    const schoolName = schools.find(s => s.id === student.school_id)?.name || 'Zenith Public School';
-    const studentProjects = projects.filter(p => p.student_id === student.student_id);
-    const attendancePercentage = getStudentAttendance(student.student_id);
+  const openWhatsApp = (event, phone, name) => {
+    event.stopPropagation();
+    const clean = String(phone || '').replace(/\D/g, '');
+    if (!clean) return toast.error('No guardian phone number is stored for this student.');
+    const message = encodeURIComponent(`Hello, this is an update from Pixiu Tech regarding ${name}'s learning progress.`);
+    window.open(`https://wa.me/${clean}?text=${message}`, '_blank', 'noopener,noreferrer');
+  };
 
+  const studentProjects = student => projects.filter(p => String(p.student || p.student_id || '') === String(student.id || student.student_id));
+  const schoolForStudent = student => schools.find(s => String(s.id) === String(student.school_id)) || null;
+  const classForStudent = student => classes.find(c => String(c.id) === String(student.school_class || student.class_id)) || null;
+
+  const printStudent = (event, student) => {
+    if (event?.stopPropagation) event.stopPropagation();
     generateStudentTranscriptPDF({
       student,
-      school: schoolName,
-      attendanceRate: attendancePercentage,
+      school: student.school_name || schoolForStudent(student)?.name || '—',
+      attendanceRate: getStudentAttendance(student.id || student.student_id),
       studentReviews: studentReviews || [],
-      projects: studentProjects,
-      curriculum: curriculum || []
+      projects: studentProjects(student),
+      curriculum: curriculum || [],
     });
   };
 
-  // View: Single Student Profile Detailed Screen
+  const printClass = () => {
+    const chosenClass = classes.find(c => String(c.id) === String(selectedClass));
+    const chosenSchool = schools.find(s => String(s.id) === String(selectedSchool));
+    generateClassCohortTranscriptPDF({
+      classGrade: chosenClass?.grade || '',
+      classSection: chosenClass?.section || '',
+      school: chosenSchool || { name: '—' },
+      students: filteredStudents,
+      studentReviews,
+      projects,
+      curriculum,
+      getStudentAttendance,
+      userRole: role,
+    });
+  };
+
   if (activeStudent) {
-    const schoolName = schools.find(s => s.id === activeStudent.school_id)?.name || 'Zenith Public School';
-    const classObj = classes.find(c => c.id === activeStudent.class_id);
-    const attendancePercentage = getStudentAttendance(activeStudent.student_id);
-    const cleanActiveId = (activeStudent.student_id || '').trim().replace(/\s+/g, ' ');
-    const studentProjects = projects.filter(p => (p.student_id || '').trim().replace(/\s+/g, ' ') === cleanActiveId);
-
+    const school = schoolForStudent(activeStudent);
+    const cls = classForStudent(activeStudent);
+    const attendance = getStudentAttendance(activeStudent.id || activeStudent.student_id);
+    const projectsForStudent = studentProjects(activeStudent);
     return (
-      <div className="pb-10">
-        <button 
-          onClick={() => setActiveStudent(null)}
-          className="mb-6 text-sm text-slate-500 hover:text-slate-800 flex items-center gap-2 cursor-pointer font-bold"
-        >
-          ← Back to Students Directory
-        </button>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
-            <div className="text-center">
-              <div className="w-20 h-20 rounded-full bg-slate-900 text-white flex items-center justify-center text-2xl font-bold mx-auto mb-4 shadow-md">
-                {activeStudent.name.split(' ').map(w => w[0]).join('')}
-              </div>
-              <h2 className="text-xl font-bold text-slate-800">{activeStudent.name}</h2>
-              <p className="font-mono text-pixiu-blue font-bold text-xs mt-0.5">{activeStudent.student_id}</p>
-              <span className="inline-block mt-2 px-3 py-1 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-full">
-                {activeStudent.status} Student
-              </span>
+      <div className="space-y-6 pb-10">
+        <button type="button" onClick={() => setActiveStudent(null)} className="text-sm font-bold text-slate-500 hover:text-slate-800">← Back to Students</button>
+        <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="bg-white rounded-2xl border border-slate-200 p-6">
+            <div className="w-20 h-20 mx-auto rounded-full bg-slate-900 text-white flex items-center justify-center text-2xl font-black"><User size={28}/></div>
+            <div className="text-center mt-4"><h1 className="text-xl font-black text-slate-900">{activeStudent.name}</h1><p className="font-mono text-xs text-blue-600 mt-1">{activeStudent.student_id || '—'}</p><span className="inline-block mt-3 px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-bold capitalize">{activeStudent.status}</span></div>
+            <div className="border-t border-slate-100 mt-6 pt-5 space-y-4 text-xs">
+              <div><p className="text-slate-400 font-black uppercase">School & Class</p><p className="mt-1 font-bold text-slate-800">{activeStudent.school_name || school?.name || '—'} · {activeStudent.class_name || (cls ? `${cls.grade} ${cls.section}` : '—')}</p></div>
+              <div><p className="text-slate-400 font-black uppercase">Guardian</p><p className="mt-1 font-bold text-slate-800">{activeStudent.guardian_name || '—'}</p><p className="text-slate-500 mt-0.5">{activeStudent.guardian_phone || 'No phone stored'}</p></div>
+              <div><p className="text-slate-400 font-black uppercase">Current Level</p><p className="mt-1 font-bold text-slate-800">{activeStudent.current_level || '—'}</p></div>
             </div>
-
-            <div className="border-t border-slate-100 pt-4 space-y-3 text-xs">
-              <div>
-                <p className="text-slate-400 font-bold uppercase">School & Class</p>
-                <p className="font-bold text-slate-700 mt-0.5">{schoolName} • Class {classObj ? `${classObj.grade} ${classObj.section}` : '6A'}</p>
-              </div>
-              <div>
-                <p className="text-slate-400 font-bold uppercase">Parent Contact</p>
-                <p className="font-bold text-slate-700 mt-0.5">{activeStudent.parent_name || 'Ravi Sharma'} ({activeStudent.parent_whatsapp || '919876543210'})</p>
-              </div>
-              <div>
-                <p className="text-slate-400 font-bold uppercase">Assigned Hardware Kit</p>
-                <p className="font-bold font-mono text-slate-700 mt-0.5">{activeStudent.assigned_kit_id || 'KIT-6001'}</p>
-              </div>
-            </div>
-
-            <div className="border-t border-slate-100 pt-4 flex flex-col gap-2">
-              <button 
-                onClick={(e) => handleOpenEdit(e, activeStudent)}
-                className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-colors"
-              >
-                <Edit size={14} /> Edit Student Details
-              </button>
-              <button 
-                onClick={(e) => handlePrintPDF(e, activeStudent)}
-                className="w-full bg-pixiu-blue hover:bg-blue-600 text-white py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-colors shadow-sm"
-              >
-                <FileText size={14} /> Generate Progress Card PDF
-              </button>
+            <div className="border-t border-slate-100 mt-6 pt-5 space-y-2">
+              <button type="button" onClick={e => openEdit(e, activeStudent)} className="w-full py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-black inline-flex items-center justify-center gap-2"><Edit size={14}/> Edit Profile</button>
+              <button type="button" onClick={e => printStudent(e, activeStudent)} className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black inline-flex items-center justify-center gap-2"><FileText size={14}/> Progress Card PDF</button>
             </div>
           </div>
-
-          {/* Metrics & Projects Portfolio */}
           <div className="lg:col-span-2 space-y-6">
-            <div className="grid grid-cols-2 gap-6">
-              <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex gap-4">
-                <div className="w-12 h-12 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center"><Award size={24}/></div>
-                <div><p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Current Level</p><p className="text-xl font-bold text-slate-800">{activeStudent.tech_level}</p></div>
-              </div>
-              <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex gap-4">
-                <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center"><Activity size={24}/></div>
-                <div><p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Attendance</p><p className="text-xl font-bold text-slate-800">{attendancePercentage}%</p></div>
-              </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-white rounded-2xl border border-slate-200 p-5"><p className="text-[10px] uppercase font-black text-slate-400">Attendance</p><p className="text-3xl font-black text-slate-900 mt-2">{attendance}%</p></div>
+              <div className="bg-white rounded-2xl border border-slate-200 p-5"><p className="text-[10px] uppercase font-black text-slate-400">Projects</p><p className="text-3xl font-black text-slate-900 mt-2">{projectsForStudent.length}</p></div>
             </div>
-
-            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider">Robotics Project Portfolio & Certified Builds</h3>
-                <span className="text-xs font-bold bg-blue-50 text-pixiu-blue px-2.5 py-0.5 rounded-full border border-blue-100">
-                  {studentProjects.length} Certified Builds
-                </span>
-              </div>
-
+            <div className="bg-white rounded-2xl border border-slate-200 p-6">
+              <div className="flex items-center justify-between mb-4"><div><p className="text-[10px] uppercase font-black text-blue-600">Academic evidence</p><h2 className="text-lg font-black text-slate-900 mt-1">Projects & Builds</h2></div><Activity size={20} className="text-slate-300"/></div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {studentProjects.map(prj => (
-                  <div key={prj.id} className="border border-slate-200 rounded-xl p-4 bg-slate-50/50 hover:bg-white transition-all shadow-xs">
-                    {prj.image_url ? (
-                      <div className="w-full h-36 rounded-lg overflow-hidden mb-3 border border-slate-200 bg-slate-900">
-                        <img src={prj.image_url} alt={prj.title} className="w-full h-full object-cover" />
-                      </div>
-                    ) : (
-                      <div className="w-full h-28 bg-slate-100 rounded-lg mb-3 flex items-center justify-center text-slate-400 text-xs font-bold uppercase">
-                        🤖 Circuit & Hardware Build
-                      </div>
-                    )}
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h4 className="font-bold text-slate-800 text-sm">{prj.title}</h4>
-                        {prj.evidence_note && <p className="text-xs text-slate-500 mt-0.5">{prj.evidence_note}</p>}
-                      </div>
-                      <span className="text-xs font-bold px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-md shrink-0">
-                        {prj.score || 10}/10
-                      </span>
-                    </div>
-                    {prj.date_completed && (
-                      <p className="text-[10px] text-slate-400 mt-2 font-mono">Completed: {prj.date_completed}</p>
-                    )}
-                  </div>
-                ))}
-
-                {studentProjects.length === 0 && (
-                  <div className="col-span-2 p-8 text-center border border-dashed border-slate-200 rounded-xl text-slate-400 text-xs">
-                    No hardware projects uploaded yet for this student. Use the Trainer Session Runner to snap and upload robot builds!
-                  </div>
-                )}
+                {projectsForStudent.map(project => <div key={project.id} className="border border-slate-200 rounded-xl p-4"><h3 className="font-black text-slate-900 text-sm">{project.title}</h3><p className="text-xs text-slate-500 mt-1 capitalize">{normalizeStatus(project.status)}</p>{project.score != null && <p className="text-xs font-bold text-slate-700 mt-2">Score: {project.score}</p>}</div>)}
+                {!projectsForStudent.length && <div className="col-span-full border border-dashed border-slate-200 rounded-xl p-8 text-center text-xs text-slate-400">No project records are stored for this student yet.</div>}
               </div>
             </div>
           </div>
-        </div>
+        </section>
+        <EditStudentModal student={editingStudent} form={editFormData} setForm={setEditFormData} open={!!editingStudent} onClose={() => setEditingStudent(null)} onSubmit={handleEdit} saving={saving}/>
       </div>
     );
   }
 
   return (
-    <div className="pb-10">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">Student Directory & Academic Records</h1>
-          <p className="text-slate-500">Manage enrolled student rosters, edit details, and track hands-on kit allocations.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2.5">
-          <button
-            type="button"
-            onClick={() => {
-              const activeGrade = selectedClassFilter === 'All' ? '6' : selectedClassFilter.replace(/[^\d]/g, '') || '6';
-              const activeSection = selectedClassFilter === 'All' ? 'A' : selectedClassFilter.replace(/[^A-Za-z]/g, '') || 'A';
-              const targetSchoolObj = selectedSchool === 'All' 
-                ? { name: 'All Partner Schools Network', code: 'ALL', city: 'Hata & Gorakhpur' }
-                : schools.find(s => s.id === selectedSchool) || schools[0];
-
-              const cohortStudents = filteredStudents.length > 0 ? filteredStudents : students;
-
-              generateClassCohortTranscriptPDF({
-                classGrade: activeGrade,
-                classSection: activeSection,
-                school: targetSchoolObj,
-                students: cohortStudents,
-                studentReviews,
-                projects,
-                curriculum,
-                getStudentAttendance,
-                userRole: 'admin'
-              });
-            }}
-            className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 rounded-lg font-bold flex items-center gap-2 transition-colors shadow-sm cursor-pointer text-xs"
-            title="Download Whole Class Cohort Progress & Assessment Report PDF"
-          >
-            <Download size={15} /> Download Class Report PDF
-          </button>
-
-          <button 
-            onClick={() => setIsAddModalOpen(true)}
-            className="bg-pixiu-blue text-white px-5 py-2.5 rounded-lg font-bold flex items-center gap-2 hover:bg-blue-600 transition-colors shadow-sm cursor-pointer text-xs"
-          >
-            <Plus size={16} /> Enroll New Student
-          </button>
+    <div className="space-y-6 pb-10">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div><p className="text-[10px] uppercase tracking-[0.2em] font-black text-blue-600">Academics</p><h1 className="text-2xl font-black text-slate-900 mt-1">Student Directory</h1><p className="text-sm text-slate-500 mt-1">Live student records from the Django academic registry.</p></div>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" disabled={selectedClass === 'all' || !filteredStudents.length} onClick={printClass} className="px-4 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-black disabled:opacity-40 inline-flex items-center gap-2"><Download size={14}/> Class Report PDF</button>
+          <button type="button" onClick={openAdd} disabled={!visibleSchools.length || !scopedClasses.length} className="px-4 py-2.5 rounded-xl bg-blue-600 text-white text-xs font-black disabled:opacity-40 inline-flex items-center gap-2"><Plus size={15}/> Enroll Student</button>
         </div>
       </div>
 
-      {/* Filter and Search Bar */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-4 mb-6 items-center justify-between">
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          {/* School Selector */}
-          <div className="flex items-center gap-2">
-            <Building2 size={16} className="text-pixiu-blue" />
-            <select 
-              value={selectedSchool}
-              onChange={(e) => {
-                setSelectedSchool(e.target.value);
-                setSelectedClassFilter('All');
-              }}
-              className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-700 focus:outline-none focus:border-pixiu-blue"
-            >
-              <option value="All">All Partner Schools</option>
-              {(schools || []).map(s => (
-                <option key={s.id} value={s.id}>{s.name} ({s.code})</option>
-              ))}
-            </select>
+      <section className="bg-white border border-slate-200 rounded-2xl p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+        {isAdmin && <div><label className="block text-[10px] uppercase font-black text-slate-400 mb-1">School</label><select value={selectedSchool} onChange={e => { setSelectedSchool(e.target.value); setSelectedClass('all'); }} className="field"><option value="all">All schools</option>{visibleSchools.map(s => <option key={s.id} value={s.id}>{s.name} ({s.school_code})</option>)}</select></div>}
+        <div><label className="block text-[10px] uppercase font-black text-slate-400 mb-1">Class</label><select value={selectedClass} onChange={e => setSelectedClass(e.target.value)} className="field"><option value="all">All classes</option>{classesForSchool.map(c => <option key={c.id} value={c.id}>{c.display_name || `${c.grade} ${c.section}`}</option>)}</select></div>
+        <div className={isAdmin ? '' : 'md:col-span-2'}><label className="block text-[10px] uppercase font-black text-slate-400 mb-1">Search</label><div className="relative"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/><input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Student, ID, guardian or class" className="field pl-9"/></div></div>
+      </section>
+
+      <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+        <div className="overflow-x-auto"><table className="min-w-full text-sm"><thead className="bg-slate-50 border-b border-slate-200"><tr>{['Student','School / Class','Guardian','Level','Status','Actions'].map(h => <th key={h} className="px-4 py-3 text-left text-[10px] uppercase tracking-wider text-slate-400 font-black">{h}</th>)}</tr></thead>
+          <tbody className="divide-y divide-slate-100">
+            {filteredStudents.map(student => <tr key={student.id || student.student_id} onClick={() => setActiveStudent(student)} className="hover:bg-slate-50 cursor-pointer">
+              <td className="px-4 py-4"><div className="flex items-center gap-3"><div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center font-black text-slate-700">{String(student.name || '?').split(' ').map(w => w[0]).join('').slice(0,2)}</div><div><p className="font-black text-slate-900">{student.name}</p><p className="font-mono text-[10px] text-blue-600 mt-0.5">{student.student_id || '—'} · Roll {student.roll_number ?? '—'}</p></div></div></td>
+              <td className="px-4 py-4"><p className="font-bold text-slate-800">{student.school_name || '—'}</p><p className="text-xs text-slate-500 mt-0.5">{student.class_name || '—'}</p></td>
+              <td className="px-4 py-4"><p className="font-bold text-slate-800">{student.guardian_name || '—'}</p><div className="flex items-center gap-2 mt-1"><span className="text-xs text-slate-500">{student.guardian_phone || 'No phone'}</span>{student.guardian_phone && <button type="button" onClick={e => openWhatsApp(e, student.guardian_phone, student.name)} className="p-1 rounded-md text-emerald-600 hover:bg-emerald-50"><MessageCircle size={14}/></button>}</div></td>
+              <td className="px-4 py-4"><span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-[10px] font-black">{student.current_level || '—'}</span></td>
+              <td className="px-4 py-4"><span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-[10px] font-black capitalize">{student.status || '—'}</span></td>
+              <td className="px-4 py-4" onClick={e => e.stopPropagation()}><div className="flex items-center gap-1"><button type="button" onClick={e => openEdit(e, student)} className="p-2 rounded-lg text-slate-500 hover:bg-slate-100" title="Edit"><Edit size={15}/></button><button type="button" onClick={e => printStudent(e, student)} className="p-2 rounded-lg text-slate-500 hover:bg-slate-100" title="Progress card"><FileText size={15}/></button><button type="button" onClick={e => removeStudent(e, student)} className="p-2 rounded-lg text-red-500 hover:bg-red-50" title="Deactivate"><Trash2 size={15}/></button></div></td>
+            </tr>)}
+            {!filteredStudents.length && <tr><td colSpan={6} className="px-6 py-12 text-center text-xs text-slate-400">No student records match the current filters.</td></tr>}
+          </tbody>
+        </table></div>
+      </section>
+
+      <Modal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} title="Enroll Student" size="md">
+        <form onSubmit={handleAdd} className="space-y-4 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {isAdmin && <Field label="School"><select value={selectedSchool === 'all' ? '' : selectedSchool} onChange={e => { setSelectedSchool(e.target.value); setFormData(prev => ({ ...prev, school_class: '' })); }} className="field" required><option value="">Select school</option>{visibleSchools.map(s => <option key={s.id} value={s.id}>{s.name} ({s.school_code})</option>)}</select></Field>}
+            <Field label="Class"><select value={formData.school_class} onChange={e => setFormData(prev => ({ ...prev, school_class: e.target.value }))} className="field" required><option value="">Select class</option>{classesForSchool.map(c => <option key={c.id} value={c.id}>{c.display_name || `${c.grade} ${c.section}`}</option>)}</select></Field>
           </div>
-
-          {/* Class Filter Tabs */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
-            <button 
-              onClick={() => setSelectedClassFilter('All')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                selectedClassFilter === 'All' ? 'bg-slate-900 text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              All Grades
-            </button>
-            {availableClassTabs.map(tab => (
-              <button 
-                key={tab.key}
-                onClick={() => setSelectedClassFilter(tab.key)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
-                  selectedClassFilter === tab.key ? 'bg-pixiu-blue text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="relative w-full md:w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-          <input 
-            type="text" 
-            placeholder="Search by student or ID..." 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-4 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-pixiu-blue"
-          />
-        </div>
-      </div>
-
-      {/* Students Table */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                <th className="p-4 pl-6">Student & Canonical ID</th>
-                <th className="p-4">Class & School</th>
-                <th className="p-4">Parent WhatsApp</th>
-                <th className="p-4">Tech Level</th>
-                <th className="p-4">Hardware Kit</th>
-                <th className="p-4 text-right pr-6">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-xs">
-              {filteredStudents.map(student => {
-                const schoolObj = schools.find(s => s.id === student.school_id);
-                return (
-                  <tr 
-                    key={student.student_id} 
-                    onClick={() => setActiveStudent(student)}
-                    className="hover:bg-blue-50/40 transition-colors cursor-pointer group"
-                  >
-                    <td className="p-4 pl-6">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-slate-700 text-xs group-hover:bg-pixiu-blue group-hover:text-white transition-colors">
-                          {student.name.split(' ').map(w => w[0]).join('')}
-                        </div>
-                        <div>
-                          <p className="font-bold text-slate-900">{student.name}</p>
-                          <span className="font-mono text-[10px] text-pixiu-blue font-bold tracking-tight">{student.student_id}</span>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="p-4 font-medium text-slate-700">
-                      <div className="flex flex-col">
-                        <span className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
-                          <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-bold text-[10px] border border-blue-200">
-                            Class {getGradeSection(student) || '6A'}
-                          </span>
-                        </span>
-                        <span className="text-[11px] text-slate-500 font-medium mt-0.5">
-                          {schoolObj ? schoolObj.name : student.school_id}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-slate-600">{student.parent_whatsapp || '919876543210'}</span>
-                        <button 
-                          onClick={(e) => openWhatsApp(e, student.parent_whatsapp, student.name)}
-                          className="p-1 text-emerald-600 hover:bg-emerald-50 rounded-md transition-colors cursor-pointer"
-                          title="Send WhatsApp Update"
-                        >
-                          <MessageCircle size={15}/>
-                        </button>
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-pixiu-blue border border-blue-100">
-                        {student.tech_level}
-                      </span>
-                    </td>
-                    <td className="p-4 font-mono font-bold text-slate-600">
-                      {student.assigned_kit_id || 'KIT-6001'}
-                    </td>
-                    <td className="p-4 text-right pr-6">
-                      <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
-                        {/* Edit Button */}
-                        <button 
-                          onClick={(e) => handleOpenEdit(e, student)}
-                          className="p-1.5 text-slate-500 hover:text-pixiu-blue hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                          title="Edit Student Details"
-                        >
-                          <Edit size={15}/>
-                        </button>
-
-                        {/* PDF Report Button */}
-                        <button 
-                          onClick={(e) => handlePrintPDF(e, student)}
-                          className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-                          title="Print Student Report"
-                        >
-                          <FileText size={15}/>
-                        </button>
-
-                        {/* Delete Button */}
-                        <button 
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            if (confirm(`Remove student ${student.name} (${student.student_id})?`)) {
-                              await deleteStudent(student.student_id);
-                              toast.info(`Student ${student.name} removed from registry`, 'Student Deleted');
-                            }
-                          }}
-                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                          title="Delete Student"
-                        >
-                          <Trash2 size={15}/>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-
-              {filteredStudents.length === 0 && (
-                <tr>
-                  <td colSpan="6" className="p-12 text-center text-slate-400 text-xs">
-                    No students found matching current filters.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Edit Student Modal */}
-      <Modal 
-        isOpen={!!editingStudent} 
-        onClose={() => setEditingStudent(null)} 
-        title="Edit Student Details" 
-        size="sm"
-      >
-        {editingStudent && (
-          <div className="space-y-4">
-            <p className="text-xs font-mono text-pixiu-blue font-bold">{editingStudent.student_id}</p>
-            <form onSubmit={handleEditSubmit} className="space-y-4 text-xs">
-              <div>
-                <label className="block font-bold text-slate-500 uppercase mb-1">Student Full Name *</label>
-                <input 
-                  type="text" 
-                  value={editFormData.name} 
-                  onChange={e => setEditFormData({ ...editFormData, name: e.target.value })} 
-                  required
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-bold text-slate-800 focus:outline-none focus:border-pixiu-blue"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-500 uppercase mb-1">Parent Name</label>
-                  <input 
-                    type="text" 
-                    value={editFormData.parent_name} 
-                    onChange={e => setEditFormData({ ...editFormData, parent_name: e.target.value })} 
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:outline-none focus:border-pixiu-blue"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-500 uppercase mb-1">Parent WhatsApp Phone</label>
-                  <input 
-                    type="text" 
-                    value={editFormData.parent_whatsapp} 
-                    onChange={e => setEditFormData({ ...editFormData, parent_whatsapp: e.target.value })} 
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:outline-none focus:border-pixiu-blue font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-500 uppercase mb-1">Tech Level</label>
-                  <select 
-                    value={editFormData.tech_level} 
-                    onChange={e => setEditFormData({ ...editFormData, tech_level: e.target.value })} 
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white focus:outline-none focus:border-pixiu-blue font-bold"
-                  >
-                    <option value="Level 1">Level 1 (Class 6 - Sensor Basics)</option>
-                    <option value="Level 2">Level 2 (Class 7 - Microcontrollers)</option>
-                    <option value="Level 3">Level 3 (Class 8 - PID Autonomous)</option>
-                    <option value="Level 4">Level 4 (Class 9 - IoT & Cloud)</option>
-                    <option value="Level 5">Level 5 (Class 11 - Advanced AI & Vision)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-500 uppercase mb-1">Assigned Kit ID</label>
-                  <input 
-                    type="text" 
-                    value={editFormData.assigned_kit_id} 
-                    onChange={e => setEditFormData({ ...editFormData, assigned_kit_id: e.target.value })} 
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono font-bold focus:outline-none focus:border-pixiu-blue"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-500 uppercase mb-1">Enrollment Status</label>
-                <select 
-                  value={editFormData.status} 
-                  onChange={e => setEditFormData({ ...editFormData, status: e.target.value })} 
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white focus:outline-none focus:border-pixiu-blue"
-                >
-                  <option value="Active">Active</option>
-                  <option value="Graduated">Graduated</option>
-                  <option value="Inactive">Inactive</option>
-                </select>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
-                <button 
-                  type="button" 
-                  onClick={() => setEditingStudent(null)} 
-                  className="px-4 py-2 font-medium text-slate-600 hover:bg-slate-100 rounded-lg text-xs cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="submit" 
-                  className="px-5 py-2 font-bold text-white bg-pixiu-blue hover:bg-blue-600 rounded-lg text-xs shadow-md shadow-blue-500/20 cursor-pointer flex items-center gap-1.5"
-                >
-                  <Check size={14}/> Save Changes
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><Field label="Roll number"><input value={formData.roll_number} onChange={e => setFormData(prev => ({ ...prev, roll_number: e.target.value }))} type="number" min="1" className="field" required/></Field><Field label="Student name"><input value={formData.name} onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))} className="field" required/></Field></div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><Field label="Guardian name"><input value={formData.guardian_name} onChange={e => setFormData(prev => ({ ...prev, guardian_name: e.target.value }))} className="field"/></Field><Field label="Guardian phone"><input value={formData.guardian_phone} onChange={e => setFormData(prev => ({ ...prev, guardian_phone: e.target.value }))} className="field"/></Field></div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><Field label="Guardian email"><input value={formData.guardian_email} onChange={e => setFormData(prev => ({ ...prev, guardian_email: e.target.value }))} type="email" className="field"/></Field><Field label="Student email"><input value={formData.email} onChange={e => setFormData(prev => ({ ...prev, email: e.target.value }))} type="email" className="field"/></Field></div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><Field label="Student phone"><input value={formData.phone} onChange={e => setFormData(prev => ({ ...prev, phone: e.target.value }))} className="field"/></Field><Field label="Current level"><input value={formData.current_level} onChange={e => setFormData(prev => ({ ...prev, current_level: e.target.value }))} placeholder="Optional" className="field"/></Field></div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><Field label="Date of birth"><input value={formData.date_of_birth} onChange={e => setFormData(prev => ({ ...prev, date_of_birth: e.target.value }))} type="date" className="field"/></Field><Field label="Gender"><input value={formData.gender} onChange={e => setFormData(prev => ({ ...prev, gender: e.target.value }))} className="field"/></Field></div>
+          <Field label="Address"><textarea value={formData.address} onChange={e => setFormData(prev => ({ ...prev, address: e.target.value }))} rows="3" className="field"/></Field>
+          <div className="flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" onClick={() => setIsAddOpen(false)} className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 bg-slate-100">Cancel</button><button type="submit" disabled={saving} className="px-5 py-2 rounded-xl text-xs font-black text-white bg-blue-600 disabled:opacity-50 inline-flex items-center gap-2"><Plus size={14}/> {saving ? 'Saving…' : 'Enroll Student'}</button></div>
+        </form>
       </Modal>
 
-      {/* Enroll Student Modal */}
-      <Modal 
-        isOpen={isAddModalOpen} 
-        onClose={() => setIsAddModalOpen(false)} 
-        title="Enroll New Student" 
-        size="md"
-      >
-        <div className="space-y-4">
-          <p className="text-xs text-slate-500">Auto-assigns canonical roll number & login account</p>
-          <form onSubmit={handleAddSubmit} className="space-y-4 text-xs">
-            <div className="grid grid-cols-3 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
-              <div>
-                <label className="block font-bold text-slate-500 uppercase mb-1">School</label>
-                <select 
-                  value={formData.schoolCode} 
-                  onChange={e => setFormData({ ...formData, schoolCode: e.target.value })} 
-                  className="w-full px-2 py-1.5 border border-slate-300 rounded-lg bg-white font-bold"
-                >
-                  {(schools || []).map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block font-bold text-slate-500 uppercase mb-1">Grade</label>
-                <select 
-                  value={formData.class} 
-                  onChange={e => setFormData({ ...formData, class: e.target.value })} 
-                  className="w-full px-2 py-1.5 border border-slate-300 rounded-lg bg-white font-bold"
-                >
-                  <option value="6">Class 6</option>
-                  <option value="7">Class 7</option>
-                  <option value="8">Class 8</option>
-                  <option value="9">Class 9</option>
-                  <option value="11">Class 11</option>
-                </select>
-              </div>
-              <div>
-                <label className="block font-bold text-slate-500 uppercase mb-1">Section</label>
-                <select 
-                  value={formData.section} 
-                  onChange={e => setFormData({ ...formData, section: e.target.value })} 
-                  className="w-full px-2 py-1.5 border border-slate-300 rounded-lg bg-white font-bold"
-                >
-                  <option value="A">Section A</option>
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label className="block font-bold text-slate-500 uppercase mb-1">Student Full Name *</label>
-              <input 
-                type="text" 
-                placeholder="e.g. Aarav Sharma" 
-                value={formData.name} 
-                onChange={e => setFormData({ ...formData, name: e.target.value })} 
-                required
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-pixiu-blue"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block font-bold text-slate-500 uppercase mb-1">Parent Name</label>
-                <input 
-                  type="text" 
-                  placeholder="e.g. Ravi Sharma" 
-                  value={formData.parent} 
-                  onChange={e => setFormData({ ...formData, parent: e.target.value })} 
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-pixiu-blue"
-                />
-              </div>
-              <div>
-                <label className="block font-bold text-slate-500 uppercase mb-1">WhatsApp Number</label>
-                <input 
-                  type="text" 
-                  placeholder="e.g. 919876543210" 
-                  value={formData.phone} 
-                  onChange={e => setFormData({ ...formData, phone: e.target.value })} 
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-pixiu-blue"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block font-bold text-slate-500 uppercase mb-1">Tech Level</label>
-                <select 
-                  value={formData.level} 
-                  onChange={e => setFormData({ ...formData, level: e.target.value })} 
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white font-bold"
-                >
-                  <option value="Level 1">Level 1</option>
-                  <option value="Level 2">Level 2</option>
-                  <option value="Level 3">Level 3</option>
-                  <option value="Level 4">Level 4</option>
-                  <option value="Level 5">Level 5</option>
-                </select>
-              </div>
-              <div>
-                <label className="block font-bold text-slate-500 uppercase mb-1">Assigned Kit ID</label>
-                <input 
-                  type="text" 
-                  value={formData.assigned_kit_id} 
-                  onChange={e => setFormData({ ...formData, assigned_kit_id: e.target.value })} 
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono font-bold"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
-              <button 
-                type="button" 
-                onClick={() => setIsAddModalOpen(false)} 
-                className="px-4 py-2 font-medium text-slate-600 hover:bg-slate-100 rounded-lg text-xs cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button 
-                type="submit" 
-                className="px-5 py-2 font-bold text-white bg-pixiu-blue hover:bg-blue-600 rounded-lg text-xs shadow-md shadow-blue-500/20 cursor-pointer"
-              >
-                Enroll Student
-              </button>
-            </div>
-          </form>
-        </div>
-      </Modal>
+      <EditStudentModal student={editingStudent} form={editFormData} setForm={setEditFormData} open={!!editingStudent} onClose={() => setEditingStudent(null)} onSubmit={handleEdit} saving={saving}/>
+      <style>{`.field{width:100%;border:1px solid #e2e8f0;border-radius:12px;padding:10px 12px;font-size:12px;color:#334155;background:white;outline:none}.field:focus{border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.12)}`}</style>
     </div>
   );
+}
+
+function Field({ label, children }) { return <div><label className="block mb-1 text-[10px] uppercase font-black tracking-wide text-slate-400">{label}</label>{children}</div>; }
+
+function EditStudentModal({ student, form, setForm, open, onClose, onSubmit, saving }) {
+  return <Modal isOpen={open} onClose={onClose} title="Edit Student" size="md">
+    {student && <form onSubmit={onSubmit} className="space-y-4 text-xs">
+      <p className="font-mono text-[11px] text-blue-600">{student.student_id || student.id}</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><Field label="Student name"><input value={form.name} onChange={e => setForm(v => ({ ...v, name: e.target.value }))} className="field" required/></Field><Field label="Current level"><input value={form.current_level} onChange={e => setForm(v => ({ ...v, current_level: e.target.value }))} className="field"/></Field></div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><Field label="Guardian name"><input value={form.guardian_name} onChange={e => setForm(v => ({ ...v, guardian_name: e.target.value }))} className="field"/></Field><Field label="Guardian phone"><input value={form.guardian_phone} onChange={e => setForm(v => ({ ...v, guardian_phone: e.target.value }))} className="field"/></Field></div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><Field label="Guardian email"><input value={form.guardian_email} onChange={e => setForm(v => ({ ...v, guardian_email: e.target.value }))} type="email" className="field"/></Field><Field label="Student email"><input value={form.email} onChange={e => setForm(v => ({ ...v, email: e.target.value }))} type="email" className="field"/></Field></div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><Field label="Student phone"><input value={form.phone} onChange={e => setForm(v => ({ ...v, phone: e.target.value }))} className="field"/></Field><Field label="Status"><select value={normalizeStatus(form.status)} onChange={e => setForm(v => ({ ...v, status: e.target.value }))} className="field"><option value="active">Active</option><option value="inactive">Inactive</option><option value="graduated">Graduated</option></select></Field></div>
+      <Field label="Address"><textarea value={form.address} onChange={e => setForm(v => ({ ...v, address: e.target.value }))} rows="3" className="field"/></Field>
+      <div className="flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" onClick={onClose} className="px-4 py-2 rounded-xl bg-slate-100 text-xs font-bold text-slate-600">Cancel</button><button type="submit" disabled={saving} className="px-5 py-2 rounded-xl bg-blue-600 text-white text-xs font-black disabled:opacity-50 inline-flex items-center gap-2"><Check size={14}/> {saving ? 'Saving…' : 'Save Changes'}</button></div>
+    </form>}
+  </Modal>;
 }
