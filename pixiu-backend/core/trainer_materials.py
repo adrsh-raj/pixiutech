@@ -30,10 +30,6 @@ def _serialize(material, target="ALL"):
     }
 
 
-def _trainer_for_user(user):
-    return getattr(user, "trainer_profile", None)
-
-
 def _allowed_material_ids(user):
     return {
         str(row.metadata.get(MATERIAL_MARKER))
@@ -111,16 +107,17 @@ class TrainerMaterialListCreateView(APIView):
         )
         try:
             material.file.save(uploaded.name, uploaded, save=True)
-            recipients = [trainer.account] if trainer else list(
-                Trainer.objects.filter(status="active", account__is_active=True)
-                .select_related("account")
-                .values_list("account", flat=False)
-            )
-            # values_list above returns IDs; re-query accounts to keep Notification.recipient typed correctly.
-            if not trainer:
+            if trainer:
+                recipients = [trainer.account]
+            else:
                 from django.contrib.auth import get_user_model
                 User = get_user_model()
-                recipients = list(User.objects.filter(id__in=recipients, is_active=True, role=UserRole.TRAINER))
+                account_ids = Trainer.objects.filter(
+                    status="active", account__is_active=True
+                ).values_list("account_id", flat=True)
+                recipients = list(User.objects.filter(
+                    id__in=account_ids, is_active=True, role=UserRole.TRAINER
+                ))
             for recipient in recipients:
                 Notification.objects.create(
                     recipient=recipient,
