@@ -1,3 +1,4 @@
+from datetime import datetime, time, timedelta
 from decimal import Decimal
 
 from django.db import transaction
@@ -147,6 +148,15 @@ def ensure_student_access(user, student):
         raise PermissionDenied("You do not have access to this student.")
 
 
+def _safe_completion_time(start_time):
+    now = timezone.localtime().time().replace(microsecond=0)
+    if start_time is None or now > start_time:
+        return now
+    if start_time >= time(23, 59, 59):
+        raise ValidationError("This session cannot be completed because its start time leaves no later time on the same day.")
+    return (datetime.combine(datetime.min.date(), start_time) + timedelta(seconds=1)).time()
+
+
 @transaction.atomic
 def start_session(*, user, session: Session):
     locked = Session.objects.select_for_update().select_related("school_class", "trainer").get(pk=session.pk)
@@ -172,8 +182,8 @@ def complete_session(*, user, session: Session):
         raise ValidationError("Only in-progress sessions can be completed.")
     locked.status = "completed"
     locked.is_locked = True
-    if locked.end_time is None:
-        locked.end_time = timezone.localtime().time().replace(microsecond=0)
+    if locked.end_time is None or (locked.start_time and locked.end_time <= locked.start_time):
+        locked.end_time = _safe_completion_time(locked.start_time)
     locked.save(update_fields=["status", "is_locked", "end_time", "updated_at"])
     return locked
 
