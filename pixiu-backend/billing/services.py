@@ -68,6 +68,6 @@ def record_payment(*, invoice: Invoice, amount, method: str, payment_date, recor
     payment = Payment.objects.create(invoice=locked_invoice, amount=amount, method=method, status=PaymentStatus.SUCCESS, payment_date=payment_date, transaction_reference=transaction_reference.strip(), notes=notes.strip(), recorded_by=recorded_by)
     recalculate_invoice(locked_invoice)
     receipt = Receipt.objects.create(receipt_number=f"RCT-{timezone.now():%Y}-{uuid4().hex[:10].upper()}", payment=payment, issued_at=timezone.now(), issued_by=recorded_by)
-    record_audit(actor=recorded_by, action="create", entity_type="Payment", entity_id=payment.id, summary=f"Payment recorded for {locked_invoice.invoice_number}", changes={"amount": str(amount), "method": method, "invoice": locked_invoice.invoice_number})
+    record_audit(actor=recorded_by, action="payment", entity_type="Payment", entity_id=payment.id, summary=f"Payment recorded for {locked_invoice.invoice_number}", changes={"amount": str(amount), "method": method, "invoice": locked_invoice.invoice_number})
     record_audit(actor=recorded_by, action="create", entity_type="Receipt", entity_id=receipt.id, summary=f"Receipt issued for {locked_invoice.invoice_number}", changes={"receipt_number": receipt.receipt_number})
     return payment, receipt
