@@ -4,6 +4,7 @@ from rest_framework.routers import DefaultRouter
 from accounts.legacy_credential_routes import SchoolProfilePasswordResetView, TrainerProfilePasswordResetView
 from accounts.views import LoginView, LogoutView, MeView, RefreshView
 from audit.views import AuditLogViewSet
+from .analytics import SchoolPerformanceView, StudentProgressView, TrainerPerformanceView
 from .class_ranking import ClassRankingView
 from .api_v1_compat import (
     ContractAssessmentViewSet, ContractAttendanceViewSet, ContractClassViewSet, ContractContentViewSet,
@@ -49,4 +50,7 @@ urlpatterns = [
     path("trainer-materials/<uuid:pk>", TrainerMaterialDetailView.as_view(), name="v1-trainer-material-detail"),
     path("trainer-materials/<uuid:pk>/file", TrainerMaterialFileView.as_view(), name="v1-trainer-material-file"),
     path("class-ranking", ClassRankingView.as_view(), name="v1-class-ranking"),
+    path("student-progress", StudentProgressView.as_view(), name="v1-student-progress"),
+    path("trainer-performance", TrainerPerformanceView.as_view(), name="v1-trainer-performance"),
+    path("school-performance", SchoolPerformanceView.as_view(), name="v1-school-performance"),
 ] + router.urls
