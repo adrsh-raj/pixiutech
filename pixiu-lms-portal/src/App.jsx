@@ -106,7 +106,7 @@ export default function App() {
       <Route path="notifications" element={<RoleRoute roles={['admin', 'superadmin', 'school', 'trainer', 'student']}><Notifications /></RoleRoute>} />
       <Route path="settings" element={<AdminOnly><Settings /></AdminOnly>} />
       <Route path="logs" element={<AdminOnly><AuditLogs /></AdminOnly>} />
-      <Route path="students" element={<RoleRoute roles={['admin', 'superadmin', 'school', 'trainer']}><Students /></RoleRoute>} />
+      <Route path="students" element={<RoleRoute roles={['admin', 'superadmin', 'trainer']}><Students /></RoleRoute>} />
       <Route path="comms" element={<AdminOnly><Comms /></AdminOnly>} />
       <Route path="trainers" element={<TrainerConsoleRoute />} />
       <Route path="trainer-materials" element={<RoleRoute roles={['admin', 'superadmin', 'trainer']}><TrainerMaterials /></RoleRoute>} />
