@@ -1,6 +1,7 @@
 import { Menu, Sparkles, Wifi, WifiOff } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import PortalSidebar from './PortalSidebar';
+import NotificationCenter from './NotificationCenter';
 import { PORTAL_ROLE_LABELS } from '../config/portalNavigation';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
@@ -52,6 +53,7 @@ export default function PortalShell({ role, title, subtitle, children }) {
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <RefreshButton onRefresh={handleRefresh} loading={loading} />
+            <NotificationCenter />
             <div className={`hidden xs:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-[10px] font-bold ${online ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-amber-50 border-amber-200 text-amber-700'}`} title={online ? 'Network connection available' : 'Network connection unavailable'}>
               {online ? <Wifi size={12} /> : <WifiOff size={12} />}
               <span className="hidden lg:inline">{online ? 'Online' : 'Offline'}</span>
