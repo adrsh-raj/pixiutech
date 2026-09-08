@@ -4,6 +4,7 @@ from rest_framework.routers import DefaultRouter
 from accounts.legacy_credential_routes import SchoolProfilePasswordResetView, TrainerProfilePasswordResetView
 from accounts.views import LoginView, LogoutView, MeView, RefreshView
 from audit.views import AuditLogViewSet
+from billing.contract_views import ContractViewSet, billing_summary
 from inventory.views import KitComponentViewSet, KitMaintenanceViewSet
 from learning.views import SessionActivityViewSet
 from .analytics import SchoolPerformanceView, StudentProgressView, TrainerPerformanceView
@@ -34,6 +35,7 @@ router.register("reviews", ContractReviewViewSet, basename="v1-review")
 router.register("assessments", ContractAssessmentViewSet, basename="v1-assessment")
 router.register("projects", ContractProjectViewSet, basename="v1-project")
 router.register("billing", ContractBillingFullViewSet, basename="v1-billing")
+router.register("contracts", ContractViewSet, basename="v1-contract")
 router.register("inventory", ContractInventoryViewSet, basename="v1-inventory")
 router.register("kit-components", KitComponentViewSet, basename="v1-kit-component")
 router.register("kit-maintenance", KitMaintenanceViewSet, basename="v1-kit-maintenance")
@@ -54,6 +56,7 @@ urlpatterns = [
     path("trainer-materials", TrainerMaterialListCreateView.as_view(), name="v1-trainer-material-list-create"),
     path("trainer-materials/<uuid:pk>", TrainerMaterialDetailView.as_view(), name="v1-trainer-material-detail"),
     path("trainer-materials/<uuid:pk>/file", TrainerMaterialFileView.as_view(), name="v1-trainer-material-file"),
+    path("billing-summary", billing_summary, name="v1-billing-summary"),
     path("class-ranking", ClassRankingView.as_view(), name="v1-class-ranking"),
     path("student-progress", StudentProgressView.as_view(), name="v1-student-progress"),
     path("trainer-performance", TrainerPerformanceView.as_view(), name="v1-trainer-performance"),
