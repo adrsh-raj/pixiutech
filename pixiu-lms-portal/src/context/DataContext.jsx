@@ -1,53 +1,18 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { API_BASE } from '../config/api';
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { apiFetch } from './AuthContext';
-import { CLASS_KITS } from '../data/classKits';
 
 const DataContext = createContext(null);
 const getToken = () => localStorage.getItem('pixiu_auth_token');
-
-function generateStudentPassword(studentId) {
-  const normalized = String(studentId || '').trim().replace(/\s+/g, ' ');
-  const match = normalized.match(/^([A-Za-z]+)(\d+)([A-Za-z]+)?\s+(\d+)$/);
-  if (!match) return '';
-  const [, schoolCodeRaw, grade, sectionRaw = '', rollRaw] = match;
-  const schoolCode = schoolCodeRaw.toUpperCase();
-  const schoolCodeLower = schoolCodeRaw.toLowerCase();
-  const section = sectionRaw.toUpperCase();
-  const roll = String(parseInt(rollRaw, 10));
-  if (!Number.isFinite(Number(roll)) || Number(roll) <= 0) return '';
-  return `${schoolCode}${schoolCodeLower}${grade}${section}${roll}@hata`;
-}
-
-function splitAssignments(value) {
-  if (Array.isArray(value)) return value.map(item => String(item).trim()).filter(Boolean);
-  const raw = String(value || '').trim();
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) return parsed.map(item => String(item).trim()).filter(Boolean);
-  } catch {}
-  return raw.split(',').map(item => item.trim()).filter(Boolean);
-}
-
-function enrichSchools(schoolRows, trainerRows) {
-  return schoolRows.map(school => {
-    const schoolKeys = [school.id, school.code, school.school_id].filter(Boolean).map(value => String(value).trim());
-    const assignedTrainer = trainerRows.find(trainer => splitAssignments(trainer.assigned_schools).some(item => schoolKeys.includes(item)));
-    return {
-      ...school,
-      trainer_id: assignedTrainer?.id || school.trainer_id || '',
-      lead_trainer: assignedTrainer?.name || school.lead_trainer || 'Not Assigned'
-    };
-  });
-}
+const collection = payload => Array.isArray(payload) ? payload : Array.isArray(payload?.results) ? payload.results : Array.isArray(payload?.data) ? payload.data : [];
+const text = value => String(value ?? '').trim();
+const lower = value => text(value).toLowerCase();
 
 async function apiRequest(path, options = {}) {
   const headers = new Headers(options.headers || {});
   if (options.body && !(options.body instanceof FormData) && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
   const method = String(options.method || 'GET').toUpperCase();
   const retryable = method === 'GET' || method === 'HEAD';
-  const delays = retryable ? [0, 1500, 3500] : [0];
+  const delays = retryable ? [0, 1200, 3000] : [0];
   let lastError;
   for (let attempt = 0; attempt < delays.length; attempt += 1) {
     if (delays[attempt]) await new Promise(resolve => setTimeout(resolve, delays[attempt]));
@@ -56,7 +21,7 @@ async function apiRequest(path, options = {}) {
       const contentType = response.headers.get('content-type') || '';
       const payload = contentType.includes('application/json') ? await response.json().catch(() => ({})) : {};
       if (response.ok) return payload;
-      const error = new Error(payload.error || payload.detail || `Request failed (${response.status})`);
+      const error = new Error(payload.detail || payload.error || `Request failed (${response.status})`);
       if (!retryable || ![502, 503, 504].includes(response.status) || attempt === delays.length - 1) throw error;
       lastError = error;
     } catch (error) {
@@ -66,115 +31,117 @@ async function apiRequest(path, options = {}) {
   }
   throw lastError || new Error('Request failed.');
 }
-
-const collection = payload => Array.isArray(payload) ? payload : (payload?.data || []);
-const cloneClassKits = () => JSON.parse(JSON.stringify(CLASS_KITS));
-const EMPTY_ALERTS = Object.freeze([]);
+const requestJSON = (path, method, body) => apiRequest(path, { method, body: JSON.stringify(body) });
+function normalizeSchool(row) { const schoolCode = row.school_code || row.school_id || row.code || ''; return { ...row, school_code: schoolCode, school_id: row.school_id || schoolCode, code: row.code || schoolCode }; }
+function normalizeTrainer(row) { return { ...row, trainer_id: row.trainer_id || row.id || '' }; }
+function normalizeClass(row) { return { ...row, school_class: row.id, school_id: row.school_id || row.school_code || '' }; }
+function normalizeStudent(row) { return { ...row, school_id: row.school_id || row.school_code || '', class_id: row.class_id || row.school_class || '' }; }
+function normalizeAttendance(row) { return { ...row, status: lower(row.status), session_id: row.session_id || row.session || '', student_id: row.student_id || row.student || '' }; }
 
 export function DataProvider({ children }) {
-  const [schools, setSchools] = useState([]); const [classes, setClasses] = useState([]); const [students, setStudents] = useState([]);
-  const [trainers, setTrainers] = useState([]); const [sessions, setSessions] = useState([]); const [attendance, setAttendance] = useState([]);
-  const [leads, setLeads] = useState([]); const [content, setContent] = useState([]); const [curriculum, setCurriculum] = useState([]);
-  const [inventory, setInventory] = useState([]); const [classKits, setClassKits] = useState(() => cloneClassKits()); const [billing, setBilling] = useState([]);
-  const [comms, setComms] = useState([]); const [projects, setProjects] = useState([]); const [alerts] = useState(EMPTY_ALERTS);
-  const [notifications, setNotifications] = useState([]); const [studentReviews, setStudentReviews] = useState([]); const [quizzes, setQuizzes] = useState([]);
-  const [quizSubmissions, setQuizSubmissions] = useState([]); const [loading, setLoading] = useState(false);
+  const [schools, setSchools] = useState([]), [classes, setClasses] = useState([]), [students, setStudents] = useState([]), [trainers, setTrainers] = useState([]);
+  const [sessions, setSessions] = useState([]), [attendance, setAttendance] = useState([]), [leads, setLeads] = useState([]), [content, setContent] = useState([]);
+  const [curriculum, setCurriculum] = useState([]), [inventory, setInventory] = useState([]), [billing, setBilling] = useState([]), [comms, setComms] = useState([]);
+  const [projects, setProjects] = useState([]), [notifications, setNotifications] = useState([]), [studentReviews, setStudentReviews] = useState([]), [quizzes, setQuizzes] = useState([]), [quizSubmissions, setQuizSubmissions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [endpointErrors, setEndpointErrors] = useState({});
 
   const refreshAll = useCallback(async () => {
     if (!getToken()) return { success: false, error: 'Authentication required' };
     setLoading(true);
     const endpoints = [
-      ['/schools', setSchools], ['/classes', setClasses], ['/students', setStudents], ['/trainers', setTrainers], ['/sessions', setSessions],
-      ['/attendance', setAttendance], ['/leads', setLeads], ['/content', setContent], ['/curriculum', setCurriculum], ['/inventory', setInventory],
-      ['/billing', setBilling], ['/comms', setComms], ['/projects', setProjects], ['/notifications', setNotifications],
-      ['/reviews', setStudentReviews], ['/quizzes', setQuizzes], ['/quiz-submissions', setQuizSubmissions]
+      ['/schools', rows => setSchools(rows.map(normalizeSchool))], ['/classes', rows => setClasses(rows.map(normalizeClass))],
+      ['/students', rows => setStudents(rows.map(normalizeStudent))], ['/trainers', rows => setTrainers(rows.map(normalizeTrainer))],
+      ['/sessions', rows => setSessions(rows)], ['/attendance', rows => setAttendance(rows.map(normalizeAttendance))], ['/leads', rows => setLeads(rows)],
+      ['/content', rows => setContent(rows)], ['/curriculum', rows => setCurriculum(rows)], ['/inventory', rows => setInventory(rows)],
+      ['/billing', rows => setBilling(rows)], ['/comms', rows => setComms(rows)], ['/projects', rows => setProjects(rows)],
+      ['/notifications', rows => setNotifications(rows)], ['/reviews', rows => setStudentReviews(rows)], ['/quizzes', rows => setQuizzes(rows)],
+      ['/quiz-submissions', rows => setQuizSubmissions(rows)],
     ];
-    try {
-      const results = await Promise.allSettled(endpoints.map(([path]) => apiRequest(path)));
-      const schoolResult = results[0];
-      const trainerResult = results[3];
-      const schoolRows = schoolResult?.status === 'fulfilled' ? collection(schoolResult.value) : [];
-      const trainerRows = trainerResult?.status === 'fulfilled' ? collection(trainerResult.value) : [];
-      if (schoolResult?.status === 'fulfilled') setSchools(enrichSchools(schoolRows, trainerRows));
-      results.forEach((result, index) => { if (result.status === 'fulfilled' && index !== 0 && index !== 3) endpoints[index][1](collection(result.value)); });
-      if (trainerResult?.status === 'fulfilled') setTrainers(trainerRows);
-      return { success: results.some(result => result.status === 'fulfilled'), failed: results.filter(result => result.status === 'rejected').length };
-    } finally { setLoading(false); }
+    const results = await Promise.allSettled(endpoints.map(([path]) => apiRequest(path)));
+    const nextErrors = {};
+    results.forEach((result, index) => {
+      const [path, setter] = endpoints[index];
+      if (result.status === 'fulfilled') setter(collection(result.value));
+      else nextErrors[path] = result.reason?.message || `Unable to load ${path.slice(1) || 'data'}.`;
+    });
+    setEndpointErrors(nextErrors);
+    setLoading(false);
+    return { success: results.some(result => result.status === 'fulfilled'), failed: results.filter(result => result.status === 'rejected').length, errors: nextErrors };
   }, []);
 
   useEffect(() => {
     refreshAll();
-    const onAuthChange = () => { setClassKits(cloneClassKits()); refreshAll(); };
+    const onAuthChange = () => refreshAll();
     window.addEventListener('pixiu_auth_state_changed', onAuthChange);
     return () => window.removeEventListener('pixiu_auth_state_changed', onAuthChange);
   }, [refreshAll]);
 
-  const save = async (path, method, body) => {
-    try { const data = await apiRequest(path, { method, body: JSON.stringify(body) }); await refreshAll(); return { success: true, data }; }
-    catch (e) { return { success: false, error: e.message }; }
-  };
-  const remove = async path => {
-    try { await apiRequest(path, { method: 'DELETE' }); await refreshAll(); return { success: true }; }
-    catch (e) { return { success: false, error: e.message }; }
-  };
+  const save = async (path, method, body) => { try { const data = await requestJSON(path, method, body); await refreshAll(); return { success: true, data }; } catch (error) { return { success: false, error: error.message }; } };
+  const remove = async path => { try { const data = await apiRequest(path, { method: 'DELETE' }); await refreshAll(); return { success: true, data }; } catch (error) { return { success: false, error: error.message }; } };
 
-  const syncSchoolTrainer = async (schoolId, trainerId) => {
-    try { return await apiRequest(`/schools/${encodeURIComponent(schoolId)}/assign-trainer`, { method: 'POST', body: JSON.stringify({ trainer_id: trainerId || '' }) }); }
-    catch (e) { return { success: false, error: e.message }; }
-  };
-  const addSchool = async data => {
-    const result = await save('/schools', 'POST', data);
-    if (!result.success) return result;
-    const persistedSchoolId = result.data?.id || result.data?.school_id || data?.id || data?.code;
-    const assignment = await syncSchoolTrainer(persistedSchoolId, data?.trainer_id);
-    if (!assignment.success) return { success: false, error: `School created, but trainer assignment failed: ${assignment.error}` };
-    await refreshAll(); return result;
-  };
-  const updateSchool = async (id, data) => {
-    const result = await save(`/schools/${encodeURIComponent(id)}`, 'PUT', data);
-    if (!result.success) return result;
-    const assignment = await syncSchoolTrainer(id, data?.trainer_id);
-    if (!assignment.success) return { success: false, error: `School updated, but trainer assignment failed: ${assignment.error}` };
-    await refreshAll(); return result;
-  };
+  const addSchool = async data => { const schoolCode = text(data?.school_code || data?.school_id || data?.code).toUpperCase(); if (!schoolCode) return { success: false, error: 'School code is required.' }; return save('/schools', 'POST', { ...data, school_code: schoolCode }); };
+  const updateSchool = (id, data) => save(`/schools/${encodeURIComponent(id)}`, 'PUT', data);
   const deleteSchool = id => remove(`/schools/${encodeURIComponent(id)}`);
-  const addClass = data => save('/classes', 'POST', data);
-  const addStudent = async data => {
-    const generatedPassword = generateStudentPassword(data?.student_id);
-    if (!generatedPassword) return { success: false, error: 'Student ID must follow the format SCHOOLGRADSECTION roll, e.g. XYZ8A 03.' };
-    const result = await save('/students', 'POST', { ...data, password: generatedPassword });
-    if (result.success) return { ...result, data: { ...(result.data || {}), temporary_password: result.data?.initial_password || generatedPassword } };
-    return result;
+  const resolveClassId = (value, schoolCode = '') => { const raw = text(value); if (!raw) return ''; const exact = classes.find(item => String(item.id) === raw); if (exact) return exact.id; const byName = classes.find(item => (!schoolCode || text(item.school_id || item.school_code).toUpperCase() === schoolCode.toUpperCase()) && text(item.display_name).toUpperCase() === raw.toUpperCase()); return byName?.id || raw; };
+  const addClass = data => { const school = text(data?.school || data?.school_id || data?.school_code); return save('/classes', 'POST', { ...data, school: school || data?.school }); };
+  const addStudent = data => { const schoolCode = text(data?.school_code || data?.schoolCode || data?.school_id).toUpperCase(); const schoolClass = resolveClassId(data?.school_class || data?.class_id || data?.class, schoolCode); const rollNumber = Number(data?.roll_number ?? data?.roll); if (!schoolClass || !Number.isInteger(rollNumber) || rollNumber <= 0) return Promise.resolve({ success: false, error: 'A valid class and positive roll number are required.' }); return save('/students', 'POST', { school_class: schoolClass, roll_number: rollNumber, name: text(data?.name), date_of_birth: data?.date_of_birth || null, gender: data?.gender || '', email: data?.email || '', phone: data?.phone || '', guardian_name: data?.guardian_name || data?.parent || '', guardian_phone: data?.guardian_phone || '', guardian_email: data?.guardian_email || '', address: data?.address || '', current_level: data?.current_level || data?.level || '', status: lower(data?.status || 'active') }); };
+  const updateStudent = (id, data) => save(`/students/${encodeURIComponent(id)}`, 'PUT', data);
+  const deleteStudent = id => remove(`/students/${encodeURIComponent(id)}`);
+  const getNextRollNumber = (schoolCode, grade, section) => { const school = text(schoolCode).toUpperCase(); const cls = classes.find(item => text(item.school_id || item.school_code).toUpperCase() === school && text(item.grade).toUpperCase() === text(grade).toUpperCase() && text(item.section).toUpperCase() === text(section).toUpperCase()); const cohort = cls ? students.filter(student => String(student.class_id) === String(cls.id)) : []; const maxRoll = Math.max(0, ...cohort.map(student => Number(student.roll_number) || 0)); return String(maxRoll + 1).padStart(2, '0'); };
+  const getStudentAttendance = studentId => { const key = text(studentId).toUpperCase().replace(/\s+/g, ''); if (!key) return 0; const rows = attendance.filter(row => text(row.student_id).toUpperCase().replace(/\s+/g, '') === key); if (!rows.length) return 0; const present = rows.filter(row => ['present', 'late'].includes(lower(row.status))).length; return Math.round((present / rows.length) * 100); };
+  const getStudentAttendanceRecords = studentId => { const key = text(studentId).toUpperCase().replace(/\s+/g, ''); return key ? attendance.filter(row => text(row.student_id).toUpperCase().replace(/\s+/g, '') === key) : []; };
+
+  const addTrainer = data => save('/trainers', 'POST', data), updateTrainer = (id, data) => save(`/trainers/${encodeURIComponent(id)}`, 'PUT', data), updateTrainerStatus = (id, status) => save(`/trainers/${encodeURIComponent(id)}/status`, 'PUT', { status }), deleteTrainer = id => remove(`/trainers/${encodeURIComponent(id)}`);
+  const scheduleSession = data => { const schoolClass = resolveClassId(data?.school_class || data?.class_id || data?.class, data?.school_code || data?.school_id); const trainer = trainers.find(item => String(item.id) === String(data?.trainer || data?.trainer_id))?.id || data?.trainer; return save('/sessions', 'POST', { ...data, school_class: schoolClass, trainer }); };
+  const completeSession = (id, body = {}) => save(`/sessions/${encodeURIComponent(id)}/complete`, 'POST', body), unlockSession = id => save(`/sessions/${encodeURIComponent(id)}/unlock`, 'POST', {}), startNewSession = data => scheduleSession(data);
+  const markAttendance = (sessionId, studentId, status, note = '') => save('/attendance', 'POST', { session: sessionId, student: studentId, status: lower(status), note });
+  const adminUpdateAttendance = (sessionId, studentId, status, note = '') => save('/attendance/admin-override', 'PUT', { session: sessionId, student: studentId, status: lower(status), note });
+  const addLead = data => save('/leads', 'POST', data), updateLeadStage = (id, stage) => save(`/leads/${encodeURIComponent(id)}/stage`, 'PUT', { stage }), deleteLead = id => remove(`/leads/${encodeURIComponent(id)}`);
+  const convertLeadToSchool = () => ({ success: false, error: 'Lead conversion requires an explicit school code and school setup fields; no identifiers are generated automatically.' });
+  const uploadContent = data => save('/content', 'POST', data), deleteContent = id => remove(`/content/${encodeURIComponent(id)}`), addCurriculumPlan = data => save('/curriculum', 'POST', data), updateCurriculumStatus = (id, status) => save(`/curriculum/${encodeURIComponent(id)}/status`, 'PUT', { status });
+  const addInventoryKit = data => save('/kits', 'POST', data), updateKitStatus = (id, status) => save(`/kits/${encodeURIComponent(id)}`, 'PATCH', { status }), deleteKit = id => remove(`/kits/${encodeURIComponent(id)}`);
+  const createInvoice = data => save('/invoices', 'POST', data);
+  const updateInvoiceStatus = async (id, status) => { const action = lower(status) === 'issued' ? 'issue' : lower(status) === 'void' ? 'void' : null; if (!action) return { success: false, error: 'Invoice lifecycle supports only issued or void actions from this control.' }; return save(`/invoices/${encodeURIComponent(id)}/${action}`, 'POST', {}); };
+  const confirmPaymentReceipt = (id, amount, paymentMethod = 'other', paymentDate = new Date().toISOString(), transactionReference = '', notes = '') => { const numericAmount = Number(amount); if (!id || !Number.isFinite(numericAmount) || numericAmount <= 0) return Promise.resolve({ success: false, error: 'A positive payment amount is required.' }); return save('/payments/record', 'POST', { invoice: id, amount: numericAmount, method: lower(paymentMethod || 'other'), payment_date: paymentDate || new Date().toISOString(), transaction_reference: text(transactionReference), notes: text(notes) }); };
+  const updateBillingInvoice = (id, data) => save(`/invoices/${encodeURIComponent(id)}`, 'PATCH', data);
+  const deleteBillingInvoice = () => ({ success: false, error: 'Invoices are retained financial records; use the Void lifecycle instead of delete.' });
+  const sendCommsMessage = data => save('/comms', 'POST', data), addProject = data => save('/projects', 'POST', data), deleteProject = id => remove(`/projects/${encodeURIComponent(id)}`);
+  const sendBroadcastNotification = data => save('/notifications', 'POST', data);
+  const updateNotification = () => ({ success: false, error: 'Notifications are immutable server records; create a new notification instead of editing.' });
+  const deleteNotification = () => ({ success: false, error: 'Notifications are immutable server records and cannot be deleted from the portal.' });
+  const pushSchoolNotification = ({ target_school_id, title, message, priority = 'normal' }) => sendBroadcastNotification({ target_type: target_school_id ? 'specific_school' : 'universal', target_school_id: target_school_id || '', title, message, severity: priority === 'high' ? 'urgent' : 'info' });
+  const saveStudentReview = data => save('/assessments', 'POST', data), deleteStudentReview = id => remove(`/assessments/${encodeURIComponent(id)}`), createQuiz = data => save('/quizzes', 'POST', data), updateQuiz = (id, data) => save(`/quizzes/${encodeURIComponent(id)}`, 'PUT', data), deleteQuiz = id => remove(`/quizzes/${encodeURIComponent(id)}`), submitQuizAttempt = data => save('/quiz-submissions', 'POST', data);
+  const allowQuizReattempt = () => ({ success: false, error: 'Quiz reattempt is controlled by the quiz lifecycle and is not exposed as a generic override.' });
+  const deleteQuizSubmission = () => ({ success: false, error: 'Quiz attempts are retained for assessment history.' });
+  const uploadFile = async file => { if (!file) return { success: false, error: 'No file selected.' }; const form = new FormData(); form.append('file', file); try { const data = await apiRequest('/upload', { method: 'POST', body: form }); return { success: true, url: data.url, filename: data.filename }; } catch (error) { return { success: false, error: error.message }; } };
+  const classKits = {};
+  const updateClassKitComponent = () => ({ success: false, error: 'Class kit blueprints are no longer stored in frontend state. Use the database-backed Kit Components workflow.' });
+  const addComponentToClassKit = () => ({ success: false, error: 'Class kit components are persisted through the database-backed Kit Components workflow.' });
+  const resolveAlertAction = useCallback(async () => ({ success: false, error: 'No operational alert action is connected.' }), []);
+
+  const value = {
+    loading, endpointErrors, refreshAll,
+    schools, addSchool, updateSchool, deleteSchool,
+    classes, addClass,
+    students, addStudent, updateStudent, deleteStudent, getNextRollNumber, getStudentAttendance, getStudentAttendanceRecords,
+    trainers, addTrainer, updateTrainer, updateTrainerStatus, deleteTrainer,
+    sessions, scheduleSession, completeSession, unlockSession, startNewSession,
+    attendance, markAttendance, adminUpdateAttendance,
+    leads, addLead, updateLeadStage, deleteLead, convertLeadToSchool,
+    content, uploadContent, deleteContent, curriculum, addCurriculumPlan, updateCurriculumStatus,
+    inventory, addInventoryKit, updateKitStatus, deleteKit, classKits, updateClassKitComponent, addComponentToClassKit,
+    billing, createInvoice, updateInvoiceStatus, confirmPaymentReceipt, updateBillingInvoice, deleteBillingInvoice,
+    comms, sendCommsMessage, projects, addProject, deleteProject, uploadFile, resolveAlertAction,
+    notifications, sendBroadcastNotification, updateNotification, deleteNotification, pushSchoolNotification,
+    studentReviews, saveStudentReview, deleteStudentReview,
+    quizzes, createQuiz, updateQuiz, deleteQuiz, quizSubmissions, submitQuizAttempt, allowQuizReattempt, deleteQuizSubmission,
   };
-  const updateStudent = (id, data) => save(`/students/${encodeURIComponent(id)}`, 'PUT', data); const deleteStudent = id => remove(`/students/${encodeURIComponent(id)}`);
-  const getNextRollNumber = (schoolCode, grade, section) => { const cohort = students.filter(s => s.school_id === schoolCode && s.class_id === `CLS-${schoolCode}-${grade}${section || ''}`); if (!cohort.length) return '01'; const maxRoll = Math.max(...cohort.map(s => parseInt(String(s.student_id || '').split(' ').pop(), 10) || 0)); return String(maxRoll + 1).padStart(2, '0'); };
-  const getStudentAttendance = studentId => { if (!studentId) return 0; const clean = String(studentId).toUpperCase().replace(/\s+/g, ''); const rows = attendance.filter(a => String(a.student_id || '').toUpperCase().replace(/\s+/g, '') === clean); return rows.length ? Math.round((rows.filter(a => a.status === 'Present').length / rows.length) * 100) : 0; };
-  const getStudentAttendanceRecords = studentId => !studentId ? [] : attendance.filter(a => String(a.student_id || '').toUpperCase().replace(/\s+/g, '') === String(studentId).toUpperCase().replace(/\s+/g, ''));
-  const addLead = data => save('/leads', 'POST', data); const updateLeadStage = (id, stage) => save(`/leads/${encodeURIComponent(id)}/stage`, 'PUT', { stage }); const deleteLead = id => remove(`/leads/${encodeURIComponent(id)}`);
-  const convertLeadToSchool = async lead => { const code = lead.name?.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 4) || 'SCH'; const result = await addSchool({ id: code, name: lead.name, code, principal: lead.contact_person || 'Principal', contact: lead.phone || '', status: 'Active', contract_start: new Date().toISOString().split('T')[0], renewal_date: '2027-03-31', expected_revenue: lead.expected_value || 100000 }); if (!result.success) return result; return updateLeadStage(lead.id, 'Closed (Won)'); };
-  const uploadContent = data => save('/content', 'POST', data); const deleteContent = id => remove(`/content/${encodeURIComponent(id)}`); const addCurriculumPlan = data => save('/curriculum', 'POST', data); const updateCurriculumStatus = (id, status) => save(`/curriculum/${encodeURIComponent(id)}/status`, 'PUT', { status });
-  const addInventoryKit = data => save('/inventory', 'POST', data); const updateKitStatus = (id, status, issue_notes = '') => save(`/inventory/${encodeURIComponent(id)}/status`, 'PUT', { status, issue_notes }); const deleteKit = id => remove(`/inventory/${encodeURIComponent(id)}`);
-  const createInvoice = data => save('/billing', 'POST', data); const updateInvoiceStatus = (id, status) => save(`/billing/${encodeURIComponent(id)}/status`, 'PUT', { status }); const confirmPaymentReceipt = (id, isConfirmed, paymentMethod, receiptNo) => save(`/billing/${encodeURIComponent(id)}/confirm-payment`, 'PUT', { is_confirmed: isConfirmed, payment_method: paymentMethod, receipt_no: receiptNo }); const updateBillingInvoice = (id, data) => save(`/billing/${encodeURIComponent(id)}`, 'PUT', data); const deleteBillingInvoice = id => remove(`/billing/${encodeURIComponent(id)}`);
-  const sendCommsMessage = data => save('/comms', 'POST', data);
-  const uploadFile = async file => { if (!file) return { success: false, error: 'No file selected' }; const form = new FormData(); form.append('file', file); try { const data = await apiRequest('/upload', { method: 'POST', body: form }); return { success: true, url: data.url, filename: data.filename }; } catch (e) { return { success: false, error: e.message }; } };
-  const addProject = data => save('/projects', 'POST', data); const deleteProject = id => remove(`/projects/${encodeURIComponent(id)}`);
-  const sendBroadcastNotification = data => save('/notifications', 'POST', data); const updateNotification = (id, data) => save(`/notifications/${encodeURIComponent(id)}`, 'PUT', data); const deleteNotification = id => remove(`/notifications/${encodeURIComponent(id)}`);
-  const pushSchoolNotification = async ({ target_school_id = 'ALL', title, message, type = 'announcement', priority = 'normal' }) => sendBroadcastNotification({ target_type: 'School', target_school_id, title, message, type, severity: priority === 'high' ? 'urgent' : 'info' });
-  const addTrainer = data => save('/trainers', 'POST', data); const updateTrainer = (id, data) => save(`/trainers/${encodeURIComponent(id)}`, 'PUT', data); const updateTrainerStatus = (id, status) => save(`/trainers/${encodeURIComponent(id)}/status`, 'PUT', { status }); const deleteTrainer = id => remove(`/trainers/${encodeURIComponent(id)}`);
-  const scheduleSession = data => save('/sessions', 'POST', data); const completeSession = (id, meta = {}) => save(`/sessions/${encodeURIComponent(id)}/complete`, 'POST', meta); const unlockSession = id => save(`/sessions/${encodeURIComponent(id)}/unlock`, 'PUT', {}); const startNewSession = data => scheduleSession(data);
-  const markAttendance = (sessionId, studentId, status) => { const now = new Date(); return save('/attendance', 'POST', { session_id: sessionId, student_id: studentId, status, date: now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }), day: now.toLocaleDateString('en-US', { weekday: 'long' }), time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }), timestamp: now.toISOString() }); };
-  const adminUpdateAttendance = (sessionId, studentId, status) => save('/attendance/admin-override', 'PUT', { session_id: sessionId, student_id: studentId, status }); const saveStudentReview = data => save('/reviews', 'POST', data); const deleteStudentReview = id => remove(`/reviews/${encodeURIComponent(id)}`);
-  const updateClassKitComponent = (grade, componentId, updatedFields) => { const current = classKits?.[grade]; if (!current) return { success: false, error: 'Class kit blueprint not available.' }; setClassKits(prev => ({ ...prev, [grade]: { ...prev[grade], components: (prev[grade].components || []).map(c => c.id === componentId ? { ...c, ...updatedFields } : c) } })); return { success: true }; };
-  const addComponentToClassKit = (grade, newComponent) => { const current = classKits?.[grade]; if (!current) return { success: false, error: 'Class kit blueprint not available.' }; setClassKits(prev => ({ ...prev, [grade]: { ...prev[grade], total_components: (prev[grade].components || []).length + 1, components: [...(prev[grade].components || []), { ...newComponent, id: newComponent.id || `C${grade}-${Date.now()}` }] } })); return { success: true }; };
-  const createQuiz = async data => { const result = await save('/quizzes', 'POST', data); return result.success ? { success: true, quiz: result.data?.quiz || result.data } : result; }; const updateQuiz = (id, data) => save(`/quizzes/${encodeURIComponent(id)}`, 'PUT', data); const deleteQuiz = id => remove(`/quizzes/${encodeURIComponent(id)}`); const submitQuizAttempt = data => save('/quiz-submissions', 'POST', data); const allowQuizReattempt = id => save(`/quiz-submissions/${encodeURIComponent(id)}/reattempt`, 'PUT', {}); const deleteQuizSubmission = id => remove(`/quiz-submissions/${encodeURIComponent(id)}`);
-
-  // Dashboard currently has no persisted alert endpoint. Keep the collection defined and provide an explicit action result so a future alert cannot crash the portal on click.
-  const resolveAlertAction = useCallback(async () => ({
-    success: false,
-    error: 'Operational trigger actions are not connected to the Django API yet.'
-  }), []);
-
-  const value = useMemo(() => ({ loading, refreshAll, schools, addSchool, updateSchool, deleteSchool, classes, addClass, students, addStudent, updateStudent, deleteStudent, getNextRollNumber, getStudentAttendance, getStudentAttendanceRecords, trainers, addTrainer, updateTrainer, updateTrainerStatus, deleteTrainer, sessions, scheduleSession, completeSession, unlockSession, startNewSession, attendance, markAttendance, adminUpdateAttendance, leads, addLead, updateLeadStage, deleteLead, convertLeadToSchool, content, uploadContent, deleteContent, curriculum, addCurriculumPlan, updateCurriculumStatus, inventory, addInventoryKit, updateKitStatus, deleteKit, classKits, updateClassKitComponent, addComponentToClassKit, billing, createInvoice, updateInvoiceStatus, confirmPaymentReceipt, updateBillingInvoice, deleteBillingInvoice, comms, sendCommsMessage, projects, addProject, deleteProject, uploadFile, alerts: Array.isArray(alerts) ? alerts : EMPTY_ALERTS, resolveAlertAction, notifications, sendBroadcastNotification, updateNotification, deleteNotification, pushSchoolNotification, studentReviews, saveStudentReview, deleteStudentReview, quizzes, createQuiz, updateQuiz, deleteQuiz, quizSubmissions, submitQuizAttempt, allowQuizReattempt, deleteQuizSubmission }), [loading, refreshAll, schools, classes, students, trainers, sessions, attendance, leads, content, curriculum, inventory, classKits, billing, comms, projects, alerts, notifications, studentReviews, quizzes, quizSubmissions, resolveAlertAction]);
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
 }
-export const useData = () => { const context = useContext(DataContext); if (!context) throw new Error('useData must be used inside DataProvider'); return context; };
+
+export function useData() {
+  const context = useContext(DataContext);
+  if (!context) throw new Error('useData must be used inside a DataProvider.');
+  return context;
+}

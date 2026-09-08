@@ -26,7 +26,8 @@ def move_stock(*, item: InventoryItem, quantity_delta: int, performed_by, reason
 
 @transaction.atomic
 def issue_kit(*, kit: Kit, issued_by, school=None, trainer=None, student=None, notes=""):
-    locked_kit = Kit.objects.select_for_update().select_related("school_class__school").get(pk=kit.pk)
+    locked_kit = Kit.objects.select_for_update(of=("self",)).get(pk=kit.pk)
+    locked_kit = Kit.objects.select_related("school_class__school").get(pk=locked_kit.pk)
     recipients = [school, trainer, student]
     if sum(bool(x) for x in recipients) != 1:
         raise ValidationError("A kit must have exactly one active recipient.")
@@ -38,7 +39,7 @@ def issue_kit(*, kit: Kit, issued_by, school=None, trainer=None, student=None, n
             raise PermissionDenied("Student does not belong to the kit school.")
         if trainer is not None and not trainer.school_assignments.filter(school_id=kit_school_id, status="active").exists():
             raise PermissionDenied("Trainer is not assigned to the kit school.")
-    if KitCustody.objects.filter(kit=locked_kit, returned_at__isnull=True).exists():
+    if KitCustody.objects.filter(kit_id=locked_kit.pk, returned_at__isnull=True).exists():
         raise ValidationError("Kit is already issued.")
     custody = KitCustody.objects.create(kit=locked_kit, school=school, trainer=trainer, student=student, issued_at=timezone.now(), issued_by=issued_by, notes=notes.strip())
     record_audit(actor=issued_by, action="create", entity_type="KitCustody", entity_id=custody.id, summary=f"Issued kit {locked_kit.kit_code}")

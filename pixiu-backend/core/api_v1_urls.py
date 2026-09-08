@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 
 from accounts.legacy_credential_routes import SchoolProfilePasswordResetView, TrainerProfilePasswordResetView
 from accounts.views import LoginView, LogoutView, MeView, RefreshView
+from academics.views import TrainerSchoolAssignmentViewSet
 from audit.views import AuditLogViewSet
 from billing.contract_views import ContractViewSet, billing_summary
 from billing.views import InvoiceLineItemViewSet, InvoiceViewSet, PaymentViewSet, ReceiptViewSet
@@ -16,13 +17,15 @@ from .api_v1_compat import (
     ContractQuizAttemptViewSet, ContractQuizViewSet, ContractReviewViewSet, ContractSessionViewSet,
     ContractSchoolViewSet, ContractStudentViewSet, ContractTrainerViewSet, health, upload,
 )
-from .phase7_compat_extras import ContractBillingFullViewSet, ContractCommunicationLogViewSet, ContractNotificationFullViewSet
+from .phase7_compat_extras import ContractBillingFullViewSet, ContractCommunicationLogViewSet
 from .phase7_contract_overrides import ContractSessionCompatViewSet
 from .trainer_materials import TrainerMaterialDetailView, TrainerMaterialFileView, TrainerMaterialListCreateView
+from notifications.views import NotificationPortalViewSet
 
 router = DefaultRouter(trailing_slash=False)
 router.register("schools", ContractSchoolViewSet, basename="v1-school")
 router.register("trainers", ContractTrainerViewSet, basename="v1-trainer")
+router.register("trainer-school-assignments", TrainerSchoolAssignmentViewSet, basename="v1-trainer-school-assignment")
 router.register("classes", ContractClassViewSet, basename="v1-class")
 router.register("students", ContractStudentViewSet, basename="v1-student")
 router.register("sessions", ContractSessionCompatViewSet, basename="v1-session")
@@ -46,7 +49,7 @@ router.register("kit-components", KitComponentViewSet, basename="v1-kit-componen
 router.register("kit-maintenance", KitMaintenanceViewSet, basename="v1-kit-maintenance")
 router.register("inventory", ContractInventoryViewSet, basename="v1-inventory")
 router.register("leads", ContractLeadViewSet, basename="v1-lead")
-router.register("notifications", ContractNotificationFullViewSet, basename="v1-notification")
+router.register("notifications", NotificationPortalViewSet, basename="v1-notification")
 router.register("comms", ContractCommunicationLogViewSet, basename="v1-comms")
 router.register("logs", AuditLogViewSet, basename="v1-audit-log")
 

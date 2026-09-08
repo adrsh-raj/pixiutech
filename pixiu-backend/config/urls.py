@@ -1,6 +1,9 @@
 from django.contrib import admin
 from django.urls import include, path
 
+handler400 = "rest_framework.exceptions.bad_request"
+handler500 = "rest_framework.exceptions.server_error"
+
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/", include("core.urls")),
@@ -13,4 +16,5 @@ urlpatterns = [
     path("api/notifications/", include("notifications.urls")),
     path("api/crm/", include("crm.urls")),
     path("api/audit/", include("audit.urls")),
+    path("api/phase6/", include("core.phase6_urls")),
 ]

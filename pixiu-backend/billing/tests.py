@@ -25,9 +25,9 @@ class BillingTests(TestCase):
 
     def test_payment_creates_receipt_and_updates_balance(self):
         add_invoice_line(invoice=self.invoice, description="Program", quantity=1, unit_price=500)
-        payment, receipt = record_payment(invoice=self.invoice, amount=Decimal("500"), method="upi", payment_date=timezone.now(), recorded_by=self.admin)
+        payment, receipt = record_payment(invoice=self.invoice, amount=Decimal("510"), method="upi", payment_date=timezone.now(), recorded_by=self.admin)
         self.assertEqual(payment.status, "success")
         self.assertEqual(receipt.payment_id, payment.id)
         self.invoice.refresh_from_db()
-        self.assertEqual(self.invoice.amount_paid, Decimal("500.00"))
+        self.assertEqual(self.invoice.amount_paid, Decimal("510.00"))
         self.assertEqual(self.invoice.status, BillingStatus.PAID)
