@@ -8,15 +8,8 @@ from accounts.models import User, UserRole
 from academics.models import School, SchoolClass, Student, Trainer, TrainerSchoolAssignment
 from academics.services import provision_student
 
-from .models import (
-    AttendanceRecord, CurriculumClassAssignment, CurriculumUnit, LearningContent,
-    Project, ProjectEvidence, Quiz, QuizClassAssignment, QuizQuestion, Session,
-    StudentAssessment,
-)
-from .serializers import (
-    AttendanceRecordSerializer, ContentClassAssignmentSerializer, CurriculumClassAssignmentSerializer,
-    LearningContentSerializer, ProjectSerializer, QuizClassAssignmentSerializer,
-)
+from .models import AttendanceRecord, CurriculumClassAssignment, CurriculumUnit, LearningContent, Project, ProjectEvidence, Quiz, QuizClassAssignment, QuizQuestion, Session, StudentAssessment
+from .serializers import AttendanceRecordSerializer, ContentClassAssignmentSerializer, CurriculumClassAssignmentSerializer, LearningContentSerializer, ProjectSerializer, QuizClassAssignmentSerializer
 from .services import grade_attempt
 from .views import AttendanceViewSet, CurriculumAssignmentViewSet, ProjectViewSet, QuizViewSet, SessionViewSet
 
@@ -41,25 +34,16 @@ class Phase4DomainTests(TestCase):
         return req
 
     def test_session_and_attendance_are_class_bound(self):
-        session = Session.objects.create(
-            school_class=self.cls, trainer=self.trainer, date=date(2026, 9, 7),
-            start_time=time(10, 0), topic="Arduino", created_by=self.trainer_user,
-        )
+        session = Session.objects.create(school_class=self.cls, trainer=self.trainer, date=date(2026, 9, 7), start_time=time(10, 0), topic="Arduino", created_by=self.trainer_user)
         request = self.request("post", "/api/learning/attendance/", self.trainer_user)
-        serializer = AttendanceRecordSerializer(
-            data={"session": str(session.id), "student": str(self.student.id), "status": "present"},
-            context={"request": request},
-        )
+        serializer = AttendanceRecordSerializer(data={"session": str(session.id), "student": str(self.student.id), "status": "present"}, context={"request": request})
         self.assertTrue(serializer.is_valid(), serializer.errors)
         record = serializer.save()
         self.assertEqual(record.student_id, self.student.id)
         self.assertEqual(AttendanceRecord.objects.filter(session=session, student=self.student).count(), 1)
 
     def test_attendance_update_cannot_bypass_locked_session(self):
-        session = Session.objects.create(
-            school_class=self.cls, trainer=self.trainer, date=date(2026, 9, 7),
-            start_time=time(10, 0), topic="Arduino", created_by=self.trainer_user,
-        )
+        session = Session.objects.create(school_class=self.cls, trainer=self.trainer, date=date(2026, 9, 7), start_time=time(10, 0), topic="Arduino", created_by=self.trainer_user)
         record = AttendanceRecord.objects.create(session=session, student=self.student, status="present", marked_by=self.trainer_user)
         session.status = "completed"
         session.is_locked = True
@@ -68,19 +52,13 @@ class Phase4DomainTests(TestCase):
         serializer = AttendanceRecordSerializer(record, data={"status": "absent"}, partial=True, context={"request": request})
         self.assertTrue(serializer.is_valid(), serializer.errors)
         from rest_framework.exceptions import ValidationError
-        with self.assertRaises(ValidationError):
-            serializer.save()
+        with self.assertRaises(ValidationError): serializer.save()
         record.refresh_from_db()
         self.assertEqual(record.status, "present")
 
     def test_student_cannot_mark_attendance(self):
-        session = Session.objects.create(
-            school_class=self.cls, trainer=self.trainer, date=date(2026, 9, 7),
-            start_time=time(10, 0), topic="Arduino", created_by=self.trainer_user,
-        )
-        request = self.request("post", "/api/learning/attendance/", self.student.account, {
-            "session": str(session.id), "student": str(self.student.id), "status": "present",
-        })
+        session = Session.objects.create(school_class=self.cls, trainer=self.trainer, date=date(2026, 9, 7), start_time=time(10, 0), topic="Arduino", created_by=self.trainer_user)
+        request = self.request("post", "/api/learning/attendance/", self.student.account, {"session": str(session.id), "student": str(self.student.id), "status": "present"})
         response = AttendanceViewSet.as_view({"post": "create"})(request)
         self.assertEqual(response.status_code, 403)
 
@@ -92,26 +70,20 @@ class Phase4DomainTests(TestCase):
         self.assertTrue(serializer.is_valid(), serializer.errors)
         assignment = serializer.save()
         self.assertEqual(assignment.school_class_id, self.cls.id)
-
         content = LearningContent.objects.create(title="Arduino PDF", grade="8", level="Level 1", unit_code="UNIT 2", created_by=self.admin, status="published", url="https://example.com/arduino.pdf")
         content_req = self.request("post", "/api/learning/content-assignments/", self.admin)
         content_serializer = ContentClassAssignmentSerializer(data={"content": str(content.id), "school_class": str(self.cls.id)}, context={"request": content_req})
         self.assertTrue(content_serializer.is_valid(), content_serializer.errors)
         self.assertEqual(content_serializer.save().content_id, content.id)
-
         quiz = Quiz.objects.create(title="Arduino MCQ", grade="8", level="Level 1", status="active", created_by=self.admin)
         quiz_req = self.request("post", "/api/learning/quiz-assignments/", self.admin)
         quiz_serializer = QuizClassAssignmentSerializer(data={"quiz": str(quiz.id), "school_class": str(self.cls.id)}, context={"request": quiz_req})
         self.assertTrue(quiz_serializer.is_valid(), quiz_serializer.errors)
         self.assertEqual(quiz_serializer.save().school_class_id, self.cls.id)
-        self.assertIsNotNone(assignment)
 
     def test_published_content_requires_source(self):
         req = self.request("post", "/api/learning/content/", self.admin)
-        serializer = LearningContentSerializer(
-            data={"title": "Missing source", "grade": "8", "status": "published", "content_type": "pdf"},
-            context={"request": req},
-        )
+        serializer = LearningContentSerializer(data={"title": "Missing source", "grade": "8", "status": "published", "content_type": "pdf"}, context={"request": req})
         self.assertFalse(serializer.is_valid())
         self.assertIn("Published content must have a URL or file.", str(serializer.errors))
 
@@ -134,16 +106,14 @@ class Phase4DomainTests(TestCase):
         q = QuizQuestion.objects.create(quiz=quiz, question_order=1, question_text="Q", option_a="A", option_b="B", option_c="C", option_d="D", correct_option="A", points=1)
         grade_attempt(quiz=quiz, student=self.student, answers={str(q.id): "B"})
         from rest_framework.exceptions import ValidationError
-        with self.assertRaises(ValidationError):
-            grade_attempt(quiz=quiz, student=self.student, answers={str(q.id): "A"})
+        with self.assertRaises(ValidationError): grade_attempt(quiz=quiz, student=self.student, answers={str(q.id): "A"})
 
     def test_quiz_rejects_answers_for_other_questions(self):
         quiz = Quiz.objects.create(title="Answer Scope", grade="8", level="Level 1", status="active", created_by=self.admin)
         QuizClassAssignment.objects.create(quiz=quiz, school_class=self.cls, assigned_by=self.admin)
         q = QuizQuestion.objects.create(quiz=quiz, question_order=1, question_text="Q", option_a="A", option_b="B", option_c="C", option_d="D", correct_option="A")
         from rest_framework.exceptions import ValidationError
-        with self.assertRaises(ValidationError):
-            grade_attempt(quiz=quiz, student=self.student, answers={str(q.id): "A", "not-a-question": "B"})
+        with self.assertRaises(ValidationError): grade_attempt(quiz=quiz, student=self.student, answers={str(q.id): "A", "not-a-question": "B"})
 
     def test_student_cannot_change_project_score_or_status(self):
         project = Project.objects.create(student=self.student, title="Smart Dustbin")
@@ -176,10 +146,10 @@ class Phase4DomainTests(TestCase):
         self.assertEqual(other_class.school_id, other_school.id)
 
     def test_session_completion_locks_attendance(self):
-        session = Session.objects.create(
-            school_class=self.cls, trainer=self.trainer, date=date(2026, 9, 7),
-            start_time=time(10, 0), topic="Arduino", created_by=self.trainer_user,
-        )
+        session = Session.objects.create(school_class=self.cls, trainer=self.trainer, date=date(2026, 9, 7), start_time=time(10, 0), topic="Arduino", created_by=self.trainer_user)
+        start_request = self.request("post", f"/api/learning/sessions/{session.id}/start/", self.trainer_user)
+        start_response = SessionViewSet.as_view({"post": "start"})(start_request, pk=str(session.id))
+        self.assertEqual(start_response.status_code, 200, start_response.data)
         request = self.request("post", f"/api/learning/sessions/{session.id}/complete/", self.trainer_user)
         response = SessionViewSet.as_view({"post": "complete"})(request, pk=str(session.id))
         self.assertEqual(response.status_code, 200)
