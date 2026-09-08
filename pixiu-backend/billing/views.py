@@ -1,4 +1,5 @@
 from django.db import transaction
+from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -7,15 +8,16 @@ from rest_framework.response import Response
 
 from accounts.models import UserRole
 from accounts.permissions import HasActionPermission, IsActiveAccount
+from audit.services import record_audit
 
-from .models import BillingStatus, Invoice, InvoiceLineItem, Payment, Receipt
+from .models import BillingStatus, Invoice, InvoiceLineItem, Payment, Receipt, PaymentStatus
 from .serializers import InvoiceLineItemSerializer, InvoiceLineItemWriteSerializer, InvoiceSerializer, PaymentRecordSerializer, PaymentSerializer, ReceiptSerializer
-from .services import add_invoice_line, record_payment, recalculate_invoice, update_invoice_line
+from .services import add_invoice_line, record_payment, recalculate_invoice
 
 
 class BillingScopedMixin:
     def initial(self, request, *args, **kwargs):
-        mapping={"list":"VIEW","retrieve":"VIEW","create":"CREATE","update":"EDIT","partial_update":"EDIT","destroy":"DELETE","issue":"EDIT","record":"CREATE"}
+        mapping={"list":"VIEW","retrieve":"VIEW","create":"CREATE","update":"EDIT","partial_update":"EDIT","destroy":"DELETE","issue":"EDIT","void":"EDIT","record":"CREATE"}
         self.required_action=mapping.get(self.action,"VIEW")
         super().initial(request,*args,**kwargs)
     def role_only(self,*roles):
@@ -24,7 +26,7 @@ class BillingScopedMixin:
 
 class InvoiceViewSet(BillingScopedMixin,viewsets.ModelViewSet):
     permission_classes=[IsAuthenticated,IsActiveAccount,HasActionPermission]
-    queryset=Invoice.objects.select_related("school","school_class","trainer","created_by").prefetch_related("lines","payments__receipt")
+    queryset=Invoice.objects.select_related("school","school_class","trainer","contract","created_by").prefetch_related("lines","payments__receipt")
     serializer_class=InvoiceSerializer
     def get_queryset(self):
         u=self.request.user
@@ -32,15 +34,39 @@ class InvoiceViewSet(BillingScopedMixin,viewsets.ModelViewSet):
         if u.role==UserRole.SCHOOL:return self.queryset.filter(school__account_id=u.id)
         if u.role==UserRole.TRAINER:return self.queryset.filter(trainer__account_id=u.id)
         return self.queryset.none()
-    def perform_create(self,serializer): self.role_only(UserRole.ADMIN,UserRole.SCHOOL); serializer.save(invoice_number=f"INV-{__import__('uuid').uuid4().hex[:10].upper()}",created_by=self.request.user)
-    def perform_update(self,serializer): self.role_only(UserRole.ADMIN,UserRole.SCHOOL); serializer.save()
-    def perform_destroy(self,instance): self.role_only(UserRole.ADMIN); instance.status=BillingStatus.VOID; instance.save(update_fields=["status","updated_at"])
+    def perform_create(self,serializer):
+        self.role_only(UserRole.ADMIN,UserRole.SCHOOL)
+        obj=serializer.save(invoice_number=f"INV-{__import__('uuid').uuid4().hex[:10].upper()}",created_by=self.request.user)
+        record_audit(actor=self.request.user,action="create",entity_type="Invoice",entity_id=obj.id,summary=f"Created invoice {obj.invoice_number}",request=self.request)
+    def perform_update(self,serializer):
+        self.role_only(UserRole.ADMIN,UserRole.SCHOOL)
+        invoice=serializer.instance
+        if invoice.status not in {BillingStatus.DRAFT,BillingStatus.ISSUED}:
+            raise ValidationError("Only draft or issued invoices can be edited.")
+        obj=serializer.save()
+        record_audit(actor=self.request.user,action="update",entity_type="Invoice",entity_id=obj.id,summary=f"Updated invoice {obj.invoice_number}",request=self.request)
+    def perform_destroy(self,instance):
+        raise ValidationError("Invoices are not deleted. Use the Void action so the financial record remains retained.")
     @action(detail=True,methods=["post"])
     def issue(self,request,pk=None):
         self.role_only(UserRole.ADMIN,UserRole.SCHOOL)
         invoice=self.get_object()
         if invoice.status!=BillingStatus.DRAFT: raise ValidationError("Only draft invoices can be issued.")
-        recalculate_invoice(invoice); invoice.status=BillingStatus.ISSUED; invoice.save(update_fields=["status","updated_at"])
+        recalculate_invoice(invoice)
+        if invoice.total_amount <= 0: raise ValidationError("An invoice must have a positive total before it can be issued.")
+        invoice.status=BillingStatus.ISSUED
+        invoice.save(update_fields=["status","updated_at"])
+        record_audit(actor=request.user,action="update",entity_type="Invoice",entity_id=invoice.id,summary=f"Issued invoice {invoice.invoice_number}",changes={"status": "issued"},request=request)
+        return Response(self.get_serializer(invoice).data)
+    @action(detail=True,methods=["post"])
+    def void(self,request,pk=None):
+        self.role_only(UserRole.ADMIN,UserRole.SCHOOL)
+        invoice=self.get_object()
+        if invoice.status==BillingStatus.PAID: raise ValidationError("Paid invoices cannot be voided. Use a controlled finance adjustment.")
+        if invoice.status==BillingStatus.VOID: raise ValidationError("Invoice is already void.")
+        invoice.status=BillingStatus.VOID
+        invoice.save(update_fields=["status","updated_at"])
+        record_audit(actor=request.user,action="update",entity_type="Invoice",entity_id=invoice.id,summary=f"Voided invoice {invoice.invoice_number}",changes={"status":"void"},request=request)
         return Response(self.get_serializer(invoice).data)
 
 
@@ -81,12 +107,13 @@ class PaymentViewSet(BillingScopedMixin,viewsets.ReadOnlyModelViewSet):
         if u.role==UserRole.ADMIN:return self.queryset
         if u.role==UserRole.SCHOOL:return self.queryset.filter(invoice__school__account_id=u.id)
         return self.queryset.none()
-    @action(detail=False,methods=["post"],url_path="record")
+    @action(detail=False,methods=["post"] ,url_path="record")
     def record(self,request):
         self.role_only(UserRole.ADMIN,UserRole.SCHOOL)
         serializer=PaymentRecordSerializer(data=request.data); serializer.is_valid(raise_exception=True)
         invoice=serializer.validated_data["invoice"]
         if request.user.role==UserRole.SCHOOL and invoice.school.account_id!=request.user.id: raise PermissionDenied("You cannot record payment for this invoice.")
+        if invoice.status not in {BillingStatus.ISSUED,BillingStatus.PARTIALLY_PAID,BillingStatus.OVERDUE}: raise ValidationError("Only issued invoices can receive payments.")
         payment,receipt=record_payment(recorded_by=request.user,**serializer.validated_data)
         return Response({"payment":PaymentSerializer(payment).data,"receipt":ReceiptSerializer(receipt).data},status=status.HTTP_201_CREATED)
 
