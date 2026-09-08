@@ -8,16 +8,15 @@ from .api_v1_compat import (
     ContractAssessmentViewSet, ContractAttendanceViewSet, ContractClassViewSet, ContractContentViewSet,
     ContractCurriculumViewSet, ContractInventoryViewSet, ContractLeadViewSet, ContractProjectViewSet,
     ContractQuizAttemptViewSet, ContractQuizViewSet, ContractReviewViewSet, ContractSessionViewSet,
-    ContractSchoolViewSet, ContractStudentViewSet, health, upload,
+    ContractSchoolViewSet, ContractStudentViewSet, ContractTrainerViewSet, health, upload,
 )
 from .phase7_compat_extras import ContractBillingFullViewSet, ContractCommunicationLogViewSet, ContractNotificationFullViewSet
 from .phase7_contract_overrides import ContractSessionCompatViewSet
-from .trainer_compat import SafeContractTrainerViewSet
 from .trainer_materials import TrainerMaterialDetailView, TrainerMaterialFileView, TrainerMaterialListCreateView
 
 router = DefaultRouter(trailing_slash=False)
 router.register("schools", ContractSchoolViewSet, basename="v1-school")
-router.register("trainers", SafeContractTrainerViewSet, basename="v1-trainer")
+router.register("trainers", ContractTrainerViewSet, basename="v1-trainer")
 router.register("classes", ContractClassViewSet, basename="v1-class")
 router.register("students", ContractStudentViewSet, basename="v1-student")
 router.register("sessions", ContractSessionCompatViewSet, basename="v1-session")
