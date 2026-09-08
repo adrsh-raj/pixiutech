@@ -40,12 +40,14 @@ class ChunkErrorBoundary extends Component {
   static getDerivedStateFromError() { return { hasError: true }; }
   componentDidCatch(error) { console.error('Simulation chunk load error:', error); }
   render() {
-    if (this.state.hasError) return <div className="min-h-screen bg-[#070B14] flex items-center justify-center text-white p-6"><div className="bg-slate-900 border border-slate-800 p-8 rounded-2xl max-w-md w-full text-center"><h3 className="text-lg font-bold mb-2">Virtual Lab Update</h3><p className="text-sm text-slate-400 mb-5">The latest Virtual Lab build could not be loaded.</p><button type="button" onClick={() => window.location.reload()} className="w-full px-5 py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold">Reload</button></div></div>;
+    if (this.state.hasError) return <div className="min-h-screen bg-[#070B14] flex items-center justify-center text-white p-6"><div className="bg-slate-900 border border-slate-800 p-8 rounded-2xl max-w-md w-full text-center"><h3 className="text-lg font-bold mb-2">Virtual Lab Update</h3><p className="text-sm text-slate-400 mb-5">The latest Virtual Lab build could not be loaded.</p><button type="button" onClick={() => this.setState({ hasError: false })} className="w-full px-5 py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold">Try again</button></div></div>;
     return this.props.children;
   }
 }
 
 const LoadingScreen = ({ dark = true }) => <div className={`min-h-screen ${dark ? 'bg-slate-900' : 'bg-slate-50'} flex items-center justify-center`}><div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" /></div>;
+const roleLabel = { admin: 'Pixiu Tech Console', superadmin: 'Pixiu Tech Console', trainer: 'Trainer Workspace', school: 'School Operations', student: 'Student Portal' };
+const roleSubtitle = { admin: 'Robotics & AI Operating System', superadmin: 'Robotics & AI Operating System', trainer: 'Teaching workspace', school: 'School workspace', student: 'Learning workspace' };
 
 const Settings = () => <div className="max-w-xl bg-white p-8 rounded-2xl border border-slate-200 shadow-sm"><h2 className="text-xl font-bold text-slate-800 mb-2">System Configuration & Master ID Rules</h2><p className="text-sm text-slate-500 mb-6">Rules and operational controls for the live Django/PostgreSQL system.</p><div className="space-y-4 text-sm"><div className="p-4 bg-slate-50 rounded-xl border border-slate-100"><p className="font-bold text-slate-700">Student ID Auto-Generation Format</p><p className="font-mono text-pixiu-blue text-xs font-bold mt-1">Managed by Django from the school, class and roll records.</p></div><div className="p-4 bg-slate-50 rounded-xl border border-slate-100"><p className="font-bold text-slate-700">Database & Auth Status</p><p className="text-emerald-600 font-bold text-xs mt-1">Django REST API + PostgreSQL + JWT</p></div><Link to="/trainer-credentials" className="block p-4 bg-blue-50 rounded-xl border border-blue-100 hover:border-blue-300 transition-colors"><p className="font-bold text-blue-900">Trainer Login Credentials</p><p className="text-xs text-blue-700 mt-1">Reset trainer portal passwords securely from the admin console.</p></Link><Link to="/school-credentials" className="block p-4 bg-emerald-50 rounded-xl border border-emerald-100 hover:border-emerald-300 transition-colors"><p className="font-bold text-emerald-900">School Login Credentials</p><p className="text-xs text-emerald-700 mt-1">Set or reset school portal passwords whenever a school forgets them.</p></Link><Link to="/data-reset" className="block p-4 bg-red-50 rounded-xl border border-red-100 hover:border-red-300 transition-colors"><p className="font-bold text-red-900">Danger Zone — Operational Data Reset</p><p className="text-xs text-red-700 mt-1">Use only the controlled reset workflow; administrator access is preserved.</p></Link></div></div>;
 
@@ -53,10 +55,8 @@ function ProtectedLayout() {
   const { isAuthenticated, user, loading } = useAuth();
   if (loading) return <LoadingScreen />;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  if (user?.role === 'student') return <Navigate to="/student-portal" replace />;
-  if (user?.role === 'school') return <Navigate to="/school-portal" replace />;
-  if (user?.role === 'trainer') return <Navigate to="/trainers" replace />;
-  return <PortalShell role="admin" title="Pixiu Tech Console" subtitle="Robotics & AI Operating System"><Outlet /></PortalShell>;
+  const role = user?.role || 'admin';
+  return <PortalShell role={role === 'superadmin' ? 'admin' : role} title={roleLabel[role] || 'Pixiu Tech Console'} subtitle={roleSubtitle[role] || 'Pixiu Tech Operating System'}><Outlet /></PortalShell>;
 }
 
 function AdminOnly({ children }) {
@@ -103,18 +103,18 @@ export default function App() {
       <Route path="leads" element={<AdminOnly><Leads /></AdminOnly>} />
       <Route path="schools" element={<AdminOnly><Schools /></AdminOnly>} />
       <Route path="payments" element={<AdminOnly><Payments /></AdminOnly>} />
-      <Route path="notifications" element={<AdminOnly><Notifications /></AdminOnly>} />
+      <Route path="notifications" element={<RoleRoute roles={['admin', 'superadmin', 'school', 'trainer', 'student']}><Notifications /></RoleRoute>} />
       <Route path="settings" element={<AdminOnly><Settings /></AdminOnly>} />
       <Route path="logs" element={<AdminOnly><AuditLogs /></AdminOnly>} />
-      <Route path="students" element={<Students />} />
+      <Route path="students" element={<RoleRoute roles={['admin', 'superadmin', 'school', 'trainer']}><Students /></RoleRoute>} />
       <Route path="comms" element={<AdminOnly><Comms /></AdminOnly>} />
       <Route path="trainers" element={<TrainerConsoleRoute />} />
-      <Route path="trainer-materials" element={<TrainerMaterials />} />
+      <Route path="trainer-materials" element={<RoleRoute roles={['admin', 'superadmin', 'trainer']}><TrainerMaterials /></RoleRoute>} />
       <Route path="trainer-credentials" element={<AdminOnly><TrainerCredentials /></AdminOnly>} />
       <Route path="school-credentials" element={<AdminOnly><SchoolCredentials /></AdminOnly>} />
       <Route path="data-reset" element={<AdminOnly><DataReset /></AdminOnly>} />
-      <Route path="content" element={<ContentHub />} />
-      <Route path="curriculum" element={<Curriculum />} />
+      <Route path="content" element={<RoleRoute roles={['admin', 'superadmin', 'school', 'trainer', 'student']}><ContentHub /></RoleRoute>} />
+      <Route path="curriculum" element={<RoleRoute roles={['admin', 'superadmin', 'school', 'trainer', 'student']}><Curriculum /></RoleRoute>} />
       <Route path="quizzes" element={<AdminOnly><QuizHub /></AdminOnly>} />
       <Route path="projects" element={<AdminOnly><ProjectHub /></AdminOnly>} />
     </Route>
