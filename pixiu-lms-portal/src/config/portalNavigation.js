@@ -1,18 +1,26 @@
-import { BookOpen, Box, CalendarDays, ClipboardCheck, Cpu, FileText, FolderKanban, GraduationCap, LayoutDashboard, Megaphone, PlaySquare, Receipt, School, Star, Trophy, Users, Video, WalletCards } from 'lucide-react';
+import { BookOpen, Box, CalendarDays, ClipboardCheck, Cpu, FileText, FolderKanban, GraduationCap, LayoutDashboard, Megaphone, PlaySquare, Receipt, School, Star, Trophy, Users, Video, WalletCards, Award, BarChart3 } from 'lucide-react';
 
 // Navigation is presentation-only. Runtime data, permissions and scope are enforced by Django APIs.
 export const PORTAL_NAVIGATION = {
   student: [
     { title: 'MY LEARNING', links: [
       { name: 'Overview', key: 'overview', icon: LayoutDashboard },
-      { name: 'My Learning', key: 'learning', icon: BookOpen },
+      { name: 'My Classes', key: 'classes', icon: School },
+      { name: 'Lessons', key: 'learning', icon: BookOpen },
       { name: 'Quizzes', key: 'quizzes', icon: ClipboardCheck },
       { name: 'Projects', key: 'projects', icon: FolderKanban },
     ] },
-    { title: 'MY PROGRESS', links: [
+    { title: 'MY PERFORMANCE', links: [
       { name: 'Attendance', key: 'attendance', icon: CalendarDays },
-      { name: 'Trainer Reviews', key: 'reviews', icon: Star },
+      { name: 'My Progress', key: 'progress', icon: BarChart3 },
+      { name: 'My Certificates', key: 'certificates', icon: Award },
+    ] },
+    { title: 'MY CLASS', links: [
       { name: 'Class Ranking', href: '/student-ranking', icon: Trophy },
+      { name: 'Leaderboard', href: '/student-ranking', icon: Trophy },
+    ] },
+    { title: 'COMMUNICATION', links: [
+      { name: 'Announcements', key: 'announcements', icon: Megaphone },
     ] },
     { title: 'EXPLORE', links: [
       { name: 'Virtual Arduino Lab', href: '/simulation', icon: Cpu },
@@ -33,6 +41,7 @@ export const PORTAL_NAVIGATION = {
       { name: 'Learning Materials', href: '/content', icon: PlaySquare },
     ] },
     { title: 'PERFORMANCE', links: [
+      { name: 'School Performance', href: '/school-performance', icon: BarChart3 },
       { name: 'Class Performance', href: '/school-ranking', icon: Trophy },
       { name: 'Student Rankings', href: '/school-ranking', icon: Trophy },
       { name: 'Progress', key: 'progress', icon: WalletCards },
@@ -64,6 +73,7 @@ export const PORTAL_NAVIGATION = {
       { name: 'Class Performance', href: '/trainer-ranking', icon: Trophy },
       { name: 'Class Ranking', href: '/trainer-ranking', icon: Trophy },
       { name: 'Student Reviews', href: '/trainers', icon: Star },
+      { name: 'Trainer Performance', href: '/trainer-performance', icon: BarChart3 },
     ] },
     { title: 'COMMUNICATION', links: [
       { name: 'Announcements', href: '/comms', icon: Megaphone },
