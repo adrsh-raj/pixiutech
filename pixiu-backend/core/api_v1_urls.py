@@ -1,6 +1,7 @@
 from django.urls import path
 from rest_framework.routers import DefaultRouter
 
+from accounts.legacy_credential_routes import SchoolProfilePasswordResetView, TrainerProfilePasswordResetView
 from accounts.views import LoginView, LogoutView, MeView, RefreshView
 from .api_v1_compat import (
     ContractAssessmentViewSet, ContractAttendanceViewSet, ContractClassViewSet, ContractContentViewSet,
@@ -38,4 +39,6 @@ urlpatterns = [
     path("auth/refresh/", RefreshView.as_view(), name="v1-refresh"),
     path("auth/logout/", LogoutView.as_view(), name="v1-logout"),
     path("auth/me/", MeView.as_view(), name="v1-me"),
+    path("schools/<uuid:pk>/reset-password", SchoolProfilePasswordResetView.as_view(), name="v1-school-password-reset"),
+    path("trainers/<uuid:pk>/reset-password", TrainerProfilePasswordResetView.as_view(), name="v1-trainer-password-reset"),
 ] + router.urls
