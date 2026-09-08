@@ -167,8 +167,7 @@ export function DataProvider({ children }) {
   const addComponentToClassKit = (grade, newComponent) => { const current = classKits?.[grade]; if (!current) return { success: false, error: 'Class kit blueprint not available.' }; setClassKits(prev => ({ ...prev, [grade]: { ...prev[grade], total_components: (prev[grade].components || []).length + 1, components: [...(prev[grade].components || []), { ...newComponent, id: newComponent.id || `C${grade}-${Date.now()}` }] } })); return { success: true }; };
   const createQuiz = async data => { const result = await save('/quizzes', 'POST', data); return result.success ? { success: true, quiz: result.data?.quiz || result.data } : result; }; const updateQuiz = (id, data) => save(`/quizzes/${encodeURIComponent(id)}`, 'PUT', data); const deleteQuiz = id => remove(`/quizzes/${encodeURIComponent(id)}`); const submitQuizAttempt = data => save('/quiz-submissions', 'POST', data); const allowQuizReattempt = id => save(`/quiz-submissions/${encodeURIComponent(id)}/reattempt`, 'PUT', {}); const deleteQuizSubmission = id => remove(`/quiz-submissions/${encodeURIComponent(id)}`);
 
-  // Dashboard automation UI currently has no persisted alert endpoint in Django.
-  // Keep the collection always defined and return an explicit error for future actions.
+  // Dashboard currently has no persisted alert endpoint. Keep the collection defined and provide an explicit action result so a future alert cannot crash the portal on click.
   const resolveAlertAction = useCallback(async () => ({
     success: false,
     error: 'Operational trigger actions are not connected to the Django API yet.'
