@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.db import transaction
+from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from accounts.models import UserRole
@@ -8,9 +9,9 @@ from academics.models import Student
 from academics.services import accessible_class_queryset, accessible_student_queryset
 
 from .models import (
-    AttendanceRecord, ContentClassAssignment, CurriculumClassAssignment, CurriculumUnit,
+    AttendanceRecord, AttendanceStatus, ContentClassAssignment, CurriculumClassAssignment, CurriculumUnit,
     LearningContent, Project, ProjectEvidence, Quiz, QuizAttempt, QuizClassAssignment,
-    Session, StudentAssessment,
+    Session, SessionActivity, StudentAssessment,
 )
 
 
@@ -19,7 +20,7 @@ def assigned_class_ids(user):
 
 
 def accessible_sessions(user):
-    qs = Session.objects.select_related("school_class__school", "trainer", "created_by")
+    qs = Session.objects.select_related("school_class__school", "trainer", "created_by").prefetch_related("activities")
     if user.role == UserRole.ADMIN:
         return qs
     if user.role == UserRole.SCHOOL:
@@ -32,7 +33,9 @@ def accessible_sessions(user):
 
 
 def accessible_attendance(user):
-    qs = AttendanceRecord.objects.select_related("session", "student", "marked_by")
+    qs = AttendanceRecord.objects.select_related(
+        "session__school_class__school", "session__trainer", "student", "marked_by"
+    )
     if user.role == UserRole.ADMIN:
         return qs
     if user.role == UserRole.SCHOOL:
@@ -48,7 +51,9 @@ def accessible_curriculum(user):
     qs = CurriculumUnit.objects.select_related("created_by")
     if user.role == UserRole.ADMIN:
         return qs
-    if user.role in {UserRole.SCHOOL, UserRole.TRAINER, UserRole.STUDENT}:
+    if user.role == UserRole.STUDENT:
+        return qs.filter(status="published", class_assignments__school_class_id__in=assigned_class_ids(user)).distinct()
+    if user.role in {UserRole.SCHOOL, UserRole.TRAINER}:
         return qs.filter(class_assignments__school_class_id__in=assigned_class_ids(user)).distinct()
     return qs.none()
 
@@ -146,6 +151,117 @@ def ensure_student_access(user, student):
 
 
 @transaction.atomic
+def start_session(*, user, session: Session):
+    locked = Session.objects.select_for_update().select_related("school_class", "trainer").get(pk=session.pk)
+    if not accessible_sessions(user).filter(pk=locked.pk).exists():
+        raise PermissionDenied("You do not have access to this session.")
+    if locked.status != "planned":
+        raise ValidationError("Only planned sessions can be started.")
+    if locked.trainer.account_id != user.id and user.role not in {UserRole.ADMIN, UserRole.SCHOOL}:
+        raise PermissionDenied("A trainer can only start their own session.")
+    if user.role == UserRole.TRAINER and not locked.trainer.school_assignments.filter(school_id=locked.school_class.school_id, status="active").exists():
+        raise PermissionDenied("Trainer is not currently assigned to this school.")
+    locked.status = "in_progress"
+    locked.save(update_fields=["status", "updated_at"])
+    return locked
+
+
+@transaction.atomic
+def complete_session(*, user, session: Session):
+    locked = Session.objects.select_for_update().get(pk=session.pk)
+    if not accessible_sessions(user).filter(pk=locked.pk).exists():
+        raise PermissionDenied("You do not have access to this session.")
+    if locked.status != "in_progress":
+        raise ValidationError("Only in-progress sessions can be completed.")
+    locked.status = "completed"
+    locked.is_locked = True
+    if locked.end_time is None:
+        locked.end_time = timezone.localtime().time().replace(microsecond=0)
+    locked.save(update_fields=["status", "is_locked", "end_time", "updated_at"])
+    return locked
+
+
+@transaction.atomic
+def create_session_activity(*, user, session: Session, title: str, activity_type="lesson", notes=""):
+    if not accessible_sessions(user).filter(pk=session.pk).exists():
+        raise PermissionDenied("You do not have access to this session.")
+    if session.is_locked or session.status in {"completed", "cancelled"}:
+        raise ValidationError("Locked or completed sessions cannot be changed.")
+    title = (title or "").strip()
+    if not title:
+        raise ValidationError({"title": "Activity title is required."})
+    return SessionActivity.objects.create(
+        session=session,
+        title=title,
+        activity_type=(activity_type or "lesson").strip().lower(),
+        notes=(notes or "").strip(),
+        created_by=user,
+    )
+
+
+@transaction.atomic
+def save_attendance_batch(*, user, session: Session, entries):
+    """Atomically save the full active roster for a session."""
+    locked_session = Session.objects.select_for_update().select_related("school_class__school", "trainer").get(pk=session.pk)
+    if not accessible_sessions(user).filter(pk=locked_session.pk).exists():
+        raise PermissionDenied("You do not have access to this session.")
+    if locked_session.is_locked or locked_session.status in {"completed", "cancelled"}:
+        raise ValidationError("Attendance is locked for this session.")
+    if locked_session.status not in {"in_progress", "planned"}:
+        raise ValidationError("Attendance cannot be recorded for this session.")
+    if user.role == UserRole.TRAINER and locked_session.trainer.account_id != user.id:
+        raise PermissionDenied("A trainer can only manage attendance for their own sessions.")
+
+    roster_rows = list(Student.objects.filter(school_class_id=locked_session.school_class_id, status="active").order_by("roll_number"))
+    roster_by_pk = {str(s.pk): s for s in roster_rows}
+    roster_by_student_id = {str(s.student_id).upper(): s for s in roster_rows}
+    if not isinstance(entries, list) or not entries:
+        raise ValidationError({"entries": "Attendance entries are required."})
+
+    normalized = []
+    seen = set()
+    allowed = {choice.value for choice in AttendanceStatus}
+    for raw in entries:
+        if not isinstance(raw, dict):
+            raise ValidationError({"entries": "Each attendance entry must be an object."})
+        key = str(raw.get("student") or raw.get("student_id") or "").strip()
+        student = roster_by_pk.get(key) or roster_by_student_id.get(key.upper())
+        if not student:
+            raise ValidationError({"entries": "Every student must belong to the session class."})
+        student_key = str(student.pk)
+        if student_key in seen:
+            raise ValidationError({"entries": "A student cannot appear more than once."})
+        seen.add(student_key)
+        status = str(raw.get("status", "")).strip().lower()
+        if status not in allowed:
+            raise ValidationError({"status": "Status must be present, absent, late, or excused."})
+        normalized.append((student, status, str(raw.get("note", ""))[:500]))
+
+    if seen != set(roster_by_pk):
+        raise ValidationError({"entries": "Attendance must include every active student in the session roster."})
+
+    records = []
+    for student, status, note in normalized:
+        record, _ = AttendanceRecord.objects.update_or_create(
+            session=locked_session,
+            student=student,
+            defaults={"status": status, "marked_by": user, "note": note},
+        )
+        records.append(record)
+    return records
+
+
+@transaction.atomic
+def create_attendance(*, user, session: Session, student: Student, status: str, note: str = ""):
+    ensure_student_access(user, student)
+    return save_attendance_batch(
+        user=user,
+        session=session,
+        entries=[{"student_id": student.student_id, "status": status, "note": note}],
+    )[0]
+
+
+@transaction.atomic
 def grade_attempt(*, quiz, student: Student, answers: dict, time_taken_seconds=0, violation_count=0):
     """Grade atomically and serialize attempt-number allocation per quiz."""
     if not isinstance(answers, dict):
@@ -204,22 +320,3 @@ def grade_attempt(*, quiz, student: Student, answers: dict, time_taken_seconds=0
         time_taken_seconds=max(0, int(time_taken_seconds or 0)),
         violation_count=max(0, int(violation_count or 0)),
     )
-
-
-@transaction.atomic
-def create_attendance(*, user, session: Session, student: Student, status: str, note: str = ""):
-    ensure_student_access(user, student)
-    locked_session = Session.objects.select_for_update().get(pk=session.pk)
-    if not accessible_sessions(user).filter(pk=locked_session.pk).exists():
-        raise PermissionDenied("You do not have access to this session.")
-    if locked_session.is_locked and user.role != UserRole.ADMIN:
-        raise ValidationError("Attendance is locked for this session.")
-    if locked_session.status == "cancelled":
-        raise ValidationError("Attendance cannot be recorded for a cancelled session.")
-    if student.school_class_id != locked_session.school_class_id:
-        raise ValidationError("Student does not belong to the session class.")
-    return AttendanceRecord.objects.update_or_create(
-        session=locked_session,
-        student=student,
-        defaults={"status": status, "marked_by": user, "note": note},
-    )[0]
