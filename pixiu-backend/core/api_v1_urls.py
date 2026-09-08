@@ -11,6 +11,7 @@ from .api_v1_compat import (
 )
 from .phase7_compat_extras import ContractBillingFullViewSet, ContractCommunicationLogViewSet, ContractNotificationFullViewSet
 from .phase7_contract_overrides import ContractSessionCompatViewSet
+from .trainer_materials import TrainerMaterialDetailView, TrainerMaterialFileView, TrainerMaterialListCreateView
 
 router = DefaultRouter(trailing_slash=False)
 router.register("schools", ContractSchoolViewSet, basename="v1-school")
@@ -41,4 +42,7 @@ urlpatterns = [
     path("auth/me/", MeView.as_view(), name="v1-me"),
     path("schools/<uuid:pk>/reset-password", SchoolProfilePasswordResetView.as_view(), name="v1-school-password-reset"),
     path("trainers/<uuid:pk>/reset-password", TrainerProfilePasswordResetView.as_view(), name="v1-trainer-password-reset"),
+    path("trainer-materials", TrainerMaterialListCreateView.as_view(), name="v1-trainer-material-list-create"),
+    path("trainer-materials/<uuid:pk>", TrainerMaterialDetailView.as_view(), name="v1-trainer-material-detail"),
+    path("trainer-materials/<uuid:pk>/file", TrainerMaterialFileView.as_view(), name="v1-trainer-material-file"),
 ] + router.urls
