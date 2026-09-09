@@ -50,6 +50,10 @@ class ContractViewSet(viewsets.ModelViewSet):
         qs = self.queryset
         if self.request.user.role != UserRole.ADMIN:
             qs = qs.filter(school__in=accessible_school_queryset(self.request.user))
+        school = self.request.query_params.get("school")
+        if school:
+            value = str(school).strip()
+            qs = qs.filter(Q(school__school_code=value.upper()) | Q(school_id=value))
         return qs
 
     def perform_create(self, serializer):
