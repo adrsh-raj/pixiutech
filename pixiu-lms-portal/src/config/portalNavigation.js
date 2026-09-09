@@ -26,7 +26,7 @@ export const PORTAL_NAVIGATION = {
   trainer: [
     { title: 'MY WORK', links: [{ name: 'Workspace', key: 'overview', icon: LayoutDashboard }, { name: 'My Classes', href: '/trainer-classes', icon: School }, { name: 'My Students', href: '/students', icon: Users }, { name: "Today's Sessions", href: '/sessions', icon: CalendarDays }] },
     { title: 'ACADEMIC', links: [{ name: 'Curriculum', href: '/curriculum', icon: BookOpen }, { name: 'Teaching Materials', href: '/trainer-materials', icon: FileText }, { name: 'Quizzes', href: '/quizzes', icon: ClipboardCheck }, { name: 'Projects', href: '/projects', icon: FolderKanban }] },
-    { title: 'STUDENT PERFORMANCE', links: [{ name: 'Attendance', href: '/attendance', icon: CalendarDays }, { name: 'Class Performance', href: '/trainer-ranking', icon: Trophy }, { name: 'Class Ranking', href: '/trainer-ranking', icon: Trophy }, { name: 'Student Reviews', href: '/trainers', icon: Trophy }, { name: 'Trainer Performance', href: '/trainer-performance', icon: BarChart3 }] },
+    { title: 'STUDENT PERFORMANCE', links: [{ name: 'Attendance', href: '/attendance', icon: CalendarDays }, { name: 'Class Performance', href: '/trainer-ranking', icon: Trophy }, { name: 'Class Ranking', href: '/trainer-ranking', icon: Trophy }, { name: 'Student Reviews', href: '/trainer-reviews', icon: Trophy }, { name: 'Trainer Performance', href: '/trainer-performance', icon: BarChart3 }] },
     { title: 'COMMUNICATION', links: [{ name: 'Announcements', href: '/notifications', icon: Megaphone }, { name: 'Notifications', href: '/notifications', icon: ReceiptText }] },
     { title: 'LAB TOOLS', links: [{ name: 'Virtual Arduino Lab', href: '/simulation', icon: Cpu }, { name: 'Hardware & Kits', href: '/inventory', icon: Box }] },
   ],
