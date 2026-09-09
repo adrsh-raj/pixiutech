@@ -4,6 +4,7 @@ from rest_framework.routers import DefaultRouter
 from accounts.legacy_credential_routes import SchoolProfilePasswordResetView, TrainerProfilePasswordResetView
 from accounts.views import LoginView, LogoutView, MeView, RefreshView
 from academics.views import TrainerSchoolAssignmentViewSet
+from academics.school_activation import activate_school
 from audit.views import AuditLogViewSet
 from billing.contract_views import ContractViewSet, billing_summary
 from billing.views import InvoiceLineItemViewSet, InvoiceViewSet, PaymentViewSet, ReceiptViewSet
@@ -65,6 +66,7 @@ urlpatterns = [
     path("auth/logout/", LogoutView.as_view(), name="v1-logout"),
     path("auth/me/", MeView.as_view(), name="v1-me"),
     path("schools/<uuid:pk>/reset-password", SchoolProfilePasswordResetView.as_view(), name="v1-school-password-reset"),
+    path("schools/<uuid:pk>/activate", activate_school, name="v1-school-activate"),
     path("trainers/<uuid:pk>/reset-password", TrainerProfilePasswordResetView.as_view(), name="v1-trainer-password-reset"),
     path("trainer-materials", TrainerMaterialListCreateView.as_view(), name="v1-trainer-material-list-create"),
     path("trainer-materials/<uuid:pk>", TrainerMaterialDetailView.as_view(), name="v1-trainer-material-detail"),
