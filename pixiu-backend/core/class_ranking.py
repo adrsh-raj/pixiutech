@@ -8,6 +8,7 @@ from rest_framework.views import APIView
 from accounts.models import UserRole
 from accounts.permissions import IsActiveAccount
 from academics.models import SchoolClass, Student
+from academics.services import accessible_class_queryset
 from learning.models import AttendanceRecord, Project, QuizAttempt, StudentAssessment
 
 
@@ -28,29 +29,10 @@ def _student_components(students):
     if not student_ids:
         return result
 
-    quiz_rows = (
-        QuizAttempt.objects.filter(student_id__in=student_ids, status="completed")
-        .values("student_id")
-        .annotate(avg=Avg("percentage"))
-    )
-    project_rows = (
-        Project.objects.filter(student_id__in=student_ids, score__isnull=False)
-        .values("student_id")
-        .annotate(avg=Avg("score"))
-    )
-    review_rows = (
-        StudentAssessment.objects.filter(student_id__in=student_ids, status="published", score__isnull=False)
-        .values("student_id")
-        .annotate(avg=Avg("score"))
-    )
-    attendance_rows = (
-        AttendanceRecord.objects.filter(student_id__in=student_ids)
-        .values("student_id")
-        .annotate(
-            total=Count("id"),
-            present=Count("id", filter=Q(status__in=["present", "late"])),
-        )
-    )
+    quiz_rows = QuizAttempt.objects.filter(student_id__in=student_ids, status="completed").values("student_id").annotate(avg=Avg("percentage"))
+    project_rows = Project.objects.filter(student_id__in=student_ids, score__isnull=False).values("student_id").annotate(avg=Avg("score"))
+    review_rows = StudentAssessment.objects.filter(student_id__in=student_ids, status="published", score__isnull=False).values("student_id").annotate(avg=Avg("score"))
+    attendance_rows = AttendanceRecord.objects.filter(student_id__in=student_ids).values("student_id").annotate(total=Count("id"), present=Count("id", filter=Q(status__in=["present", "late"])))
 
     for row in quiz_rows:
         result[row["student_id"]]["quiz"] = _percent(row["avg"])
@@ -75,6 +57,9 @@ def _student_components(students):
 class ClassRankingView(APIView):
     permission_classes = [IsAuthenticated, IsActiveAccount]
 
+    def _empty_response(self):
+        return Response({"class": None, "ranking": [], "student": None, "total_students": 0, "summary": {"students": 0, "attendance": None, "quiz": None, "project": None, "trainer_assessment": None, "score": None}, "formula": WEIGHTS})
+
     def get(self, request):
         requested_class_id = request.query_params.get("class_id")
         user = request.user
@@ -85,41 +70,23 @@ class ClassRankingView(APIView):
                 return Response({"detail": "Student profile is not linked to this account."}, status=404)
             school_class = student.school_class
         else:
-            if not requested_class_id:
-                return Response({"detail": "class_id is required for non-student accounts."}, status=400)
-            school_class = SchoolClass.objects.select_related("school").filter(pk=requested_class_id).first()
-            if not school_class:
-                return Response({"detail": "Class not found."}, status=404)
-
-            if user.role == UserRole.TRAINER:
-                allowed = school_class.school.trainer_assignments.filter(
-                    trainer__account_id=user.id, status="active"
-                ).exists()
-                if not allowed:
+            accessible = accessible_class_queryset(user).filter(status="active").select_related("school")
+            if requested_class_id:
+                school_class = accessible.filter(pk=requested_class_id).first()
+                if not school_class:
                     return Response({"detail": "You do not have access to this class."}, status=403)
-            elif user.role == UserRole.SCHOOL:
-                if school_class.school.account_id != user.id:
-                    return Response({"detail": "You do not have access to this class."}, status=403)
-            elif user.role != UserRole.ADMIN:
-                return Response({"detail": "This ranking is not available for your account."}, status=403)
+            else:
+                school_class = accessible.order_by("school__school_code", "grade", "section", "id").first()
+                if not school_class:
+                    return self._empty_response()
 
-        students = list(
-            Student.objects.filter(school_class=school_class, status="active")
-            .only("id", "student_id", "name", "roll_number", "current_level")
-            .order_by("roll_number")
-        )
+        students = list(Student.objects.filter(school_class=school_class, status="active").only("id", "student_id", "name", "roll_number", "current_level").order_by("roll_number"))
         components = _student_components(students)
 
         rows = []
         for student in students:
             component = components.get(student.id, {"quiz": 0, "project": 0, "review": 0, "attendance": 0, "score": 0})
-            rows.append({
-                "student_id": student.student_id,
-                "name": student.name,
-                "roll_number": student.roll_number,
-                "learning_level": student.current_level or "",
-                **component,
-            })
+            rows.append({"student_id": student.student_id, "name": student.name, "roll_number": student.roll_number, "learning_level": student.current_level or "", **component})
 
         rows.sort(key=lambda row: (-row["score"], -row["attendance"], row["roll_number"], row["student_id"]))
         for index, row in enumerate(rows, start=1):
@@ -132,27 +99,6 @@ class ClassRankingView(APIView):
             values = [row[key] for row in rows if row[key] is not None]
             return _percent(sum(values) / len(values)) if values else None
 
-        summary = {
-            "students": len(rows),
-            "attendance": average("attendance"),
-            "quiz": average("quiz"),
-            "project": average("project"),
-            "trainer_assessment": average("review"),
-            "score": average("score"),
-        }
+        summary = {"students": len(rows), "attendance": average("attendance"), "quiz": average("quiz"), "project": average("project"), "trainer_assessment": average("review"), "score": average("score")}
 
-        return Response({
-            "class": {
-                "id": str(school_class.id),
-                "grade": school_class.grade,
-                "section": school_class.section,
-                "name": school_class.display_name,
-                "school_code": school_class.school.school_code,
-                "school_name": school_class.school.name,
-            },
-            "ranking": rows,
-            "student": current,
-            "total_students": len(rows),
-            "summary": summary,
-            "formula": WEIGHTS,
-        })
+        return Response({"class": {"id": str(school_class.id), "grade": school_class.grade, "section": school_class.section, "name": school_class.display_name, "school_code": school_class.school.school_code, "school_name": school_class.school.name}, "ranking": rows, "student": current, "total_students": len(rows), "summary": summary, "formula": WEIGHTS})

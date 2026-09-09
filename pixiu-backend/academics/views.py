@@ -8,7 +8,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from accounts.models import UserRole
+from accounts.models import UserRole, UserStatus
 from accounts.permissions import HasActionPermission, IsActiveAccount
 from audit.services import record_audit
 from .models import School, SchoolClass, Student, Trainer, TrainerSchoolAssignment
@@ -44,7 +44,7 @@ class SchoolViewSet(Phase3ViewSet):
         self.assert_role(UserRole.ADMIN)
         instance.status = "inactive"
         if instance.account_id:
-            instance.account.status = "inactive"
+            instance.account.status = UserStatus.INACTIVE
             instance.account.is_active = False
             instance.account.save(update_fields=["status", "is_active"])
         instance.save(update_fields=["status", "updated_at"])
@@ -55,7 +55,7 @@ class SchoolViewSet(Phase3ViewSet):
         if request.user.role != UserRole.ADMIN: raise PermissionDenied("Only administrators can deactivate a school.")
         school.status = "inactive"
         if school.account_id:
-            school.account.status = "inactive"; school.account.is_active = False; school.account.save(update_fields=["status", "is_active"])
+            school.account.status = UserStatus.INACTIVE; school.account.is_active = False; school.account.save(update_fields=["status", "is_active"])
         school.save(update_fields=["status", "updated_at"]); record_audit(actor=request.user, action="update", entity_type="school", entity_id=school.id, summary=f"School {school.school_code} deactivated", request=request)
         return Response(self.get_serializer(school).data)
 
@@ -85,7 +85,31 @@ class TrainerViewSet(Phase3ViewSet):
             record_audit(actor=self.request.user, action="create", entity_type="trainer", entity_id=trainer.id, summary=f"Trainer {trainer.trainer_id} created", request=self.request)
     def perform_update(self, serializer):
         self.assert_role(UserRole.ADMIN, UserRole.TRAINER); trainer = serializer.save(); record_audit(actor=self.request.user, action="update", entity_type="trainer", entity_id=trainer.id, summary=f"Trainer {trainer.trainer_id} updated", request=self.request)
-    def perform_destroy(self, instance): self.assert_role(UserRole.ADMIN); raise ValidationError("Trainers are deactivated instead of hard-deleted.")
+    def perform_destroy(self, instance):
+        self.assert_role(UserRole.ADMIN)
+        instance.status = "inactive"
+        if instance.account_id:
+            instance.account.status = UserStatus.INACTIVE
+            instance.account.is_active = False
+            instance.account.save(update_fields=["status", "is_active"])
+        instance.save(update_fields=["status", "updated_at"])
+        record_audit(actor=self.request.user, action="update", entity_type="trainer", entity_id=instance.id, summary=f"Trainer {instance.trainer_id} deactivated", request=self.request)
+    @action(detail=True, methods=["put"], url_path="status")
+    def status_action(self, request, pk=None):
+        self.required_action = "EDIT"
+        trainer = self.get_object()
+        self.assert_role(UserRole.ADMIN)
+        next_status = str(request.data.get("status") or "").strip().lower()
+        if next_status not in {"active", "inactive"}:
+            raise ValidationError({"status": "Status must be active or inactive."})
+        trainer.status = next_status
+        if trainer.account_id:
+            trainer.account.status = UserStatus.ACTIVE if next_status == "active" else UserStatus.INACTIVE
+            trainer.account.is_active = next_status == "active"
+            trainer.account.save(update_fields=["status", "is_active"])
+        trainer.save(update_fields=["status", "updated_at"])
+        record_audit(actor=request.user, action="update", entity_type="trainer", entity_id=trainer.id, summary=f"Trainer {trainer.trainer_id} status changed to {next_status}", changes={"status": next_status}, request=request)
+        return Response(self.get_serializer(trainer).data)
 
 
 class TrainerSchoolAssignmentViewSet(Phase3ViewSet):
@@ -129,5 +153,5 @@ class StudentViewSet(Phase3ViewSet):
     def deactivate(self, request, pk=None):
         self.required_action = "EDIT"; student = self.get_object(); self.assert_role(UserRole.ADMIN, UserRole.SCHOOL, UserRole.TRAINER); student.status = "inactive"
         if student.account_id:
-            student.account.status = "inactive"; student.account.is_active = False; student.account.save(update_fields=["status", "is_active"])
+            student.account.status = UserStatus.INACTIVE; student.account.is_active = False; student.account.save(update_fields=["status", "is_active"])
         student.save(update_fields=["status", "updated_at"]); record_audit(actor=request.user, action="update", entity_type="student", entity_id=student.id, summary=f"Student {student.student_id} deactivated", request=request); return Response(StudentReadSerializer(student, context={"request": request}).data)

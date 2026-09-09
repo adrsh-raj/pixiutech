@@ -6,6 +6,8 @@ import Students from './pages/Students';
 import KitInventoryCenter from './pages/KitInventoryCenter';
 import TrainerOperations from './pages/TrainerOperations';
 import TrainerWorkspace from './pages/TrainerWorkspace';
+import TrainerClasses from './pages/TrainerClasses';
+import TrainerAttendance from './pages/TrainerAttendance';
 import TrainerMaterials from './pages/TrainerMaterials';
 import TrainerCredentials from './pages/TrainerCredentials';
 import SchoolCredentials from './pages/SchoolCredentials';
@@ -73,6 +75,7 @@ function RoleRoute({ roles, children }) {
 }
 
 function TrainerConsoleRoute() { const { user } = useAuth(); return user?.role === 'trainer' ? <TrainerWorkspace /> : <TrainerOperations />; }
+function AttendanceRoute() { const { user } = useAuth(); return user?.role === 'trainer' ? <TrainerAttendance /> : <AttendanceCenter />; }
 function StudentRouteGuard() { const { isAuthenticated, user, loading } = useAuth(); if (loading) return <LoadingScreen />; if (!isAuthenticated) return <Navigate to="/login" replace />; if (user?.role !== 'student') return <Navigate to="/" replace />; return <StudentPortal />; }
 function SchoolRouteGuard() { const { isAuthenticated, user, loading } = useAuth(); if (loading) return <LoadingScreen />; if (!isAuthenticated) return <Navigate to="/login" replace />; if (user?.role !== 'school') return <Navigate to="/" replace />; return <SchoolPortal />; }
 function GuestRouteGuard({ children }) { const { isAuthenticated, user, loading } = useAuth(); if (loading) return <LoadingScreen />; if (isAuthenticated && user) { const destination = user.role === 'student' ? '/student-portal' : user.role === 'school' ? '/school-portal' : user.role === 'trainer' ? '/trainers' : '/'; return <Navigate to={destination} replace />; } return children; }
@@ -91,7 +94,7 @@ export default function App() {
     <Route path="/student-ranking" element={<StudentRoleRoute />} />
     <Route path="/school-ranking" element={<SchoolRoleRoute />} />
     <Route path="/trainer-ranking" element={<TrainerRoleRoute />} />
-    <Route path="/attendance" element={<RoleRoute roles={['admin', 'superadmin', 'school', 'trainer']}><AttendanceCenter /></RoleRoute>} />
+    <Route path="/attendance" element={<RoleRoute roles={['admin', 'superadmin', 'school', 'trainer']}><AttendanceRoute /></RoleRoute>} />
     <Route path="/sessions" element={<RoleRoute roles={['admin', 'superadmin', 'school', 'trainer']}><SessionManager /></RoleRoute>} />
     <Route path="/student-progress" element={<RoleRoute roles={['student']}><StudentProgressPage /></RoleRoute>} />
     <Route path="/trainer-performance" element={<RoleRoute roles={['admin', 'superadmin', 'trainer']}><TrainerPerformanceRoute /></RoleRoute>} />
@@ -109,14 +112,15 @@ export default function App() {
       <Route path="students" element={<RoleRoute roles={['admin', 'superadmin', 'trainer']}><Students /></RoleRoute>} />
       <Route path="comms" element={<AdminOnly><Comms /></AdminOnly>} />
       <Route path="trainers" element={<TrainerConsoleRoute />} />
+      <Route path="trainer-classes" element={<RoleRoute roles={['trainer']}><TrainerClasses /></RoleRoute>} />
       <Route path="trainer-materials" element={<RoleRoute roles={['admin', 'superadmin', 'trainer']}><TrainerMaterials /></RoleRoute>} />
       <Route path="trainer-credentials" element={<AdminOnly><TrainerCredentials /></AdminOnly>} />
       <Route path="school-credentials" element={<AdminOnly><SchoolCredentials /></AdminOnly>} />
       <Route path="data-reset" element={<AdminOnly><DataReset /></AdminOnly>} />
       <Route path="content" element={<RoleRoute roles={['admin', 'superadmin', 'school', 'trainer', 'student']}><ContentHub /></RoleRoute>} />
       <Route path="curriculum" element={<RoleRoute roles={['admin', 'superadmin', 'school', 'trainer', 'student']}><Curriculum /></RoleRoute>} />
-      <Route path="quizzes" element={<AdminOnly><QuizHub /></AdminOnly>} />
-      <Route path="projects" element={<AdminOnly><ProjectHub /></AdminOnly>} />
+      <Route path="quizzes" element={<RoleRoute roles={['admin', 'superadmin', 'trainer']}><QuizHub /></RoleRoute>} />
+      <Route path="projects" element={<RoleRoute roles={['admin', 'superadmin', 'trainer']}><ProjectHub /></RoleRoute>} />
     </Route>
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes></BrowserRouter></DataProvider></AuthProvider></ToastProvider>;
