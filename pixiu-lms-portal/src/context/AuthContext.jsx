@@ -5,6 +5,7 @@ const AuthContext = createContext(null);
 const TOKEN_KEY = 'pixiu_auth_token';
 const REFRESH_KEY = 'pixiu_auth_refresh_token';
 const USER_KEY = 'pixiu_auth_user';
+let refreshPromise = null;
 
 async function readJson(response) {
   const type = response.headers.get('content-type') || '';
@@ -40,19 +41,27 @@ async function fetchWithRetry(url, options = {}) {
 }
 
 async function refreshAccessToken() {
-  const refresh = localStorage.getItem(REFRESH_KEY);
-  if (!refresh) return null;
-  const response = await fetch(`${API_BASE}/auth/refresh/`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refresh }),
-    cache: 'no-store'
-  });
-  const data = await readJson(response);
-  if (!response.ok || !data.access) return null;
-  localStorage.setItem(TOKEN_KEY, data.access);
-  if (data.refresh) localStorage.setItem(REFRESH_KEY, data.refresh);
-  return data.access;
+  if (refreshPromise) return refreshPromise;
+  refreshPromise = (async () => {
+    const refresh = localStorage.getItem(REFRESH_KEY);
+    if (!refresh) return null;
+    try {
+      const response = await fetch(`${API_BASE}/auth/refresh/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh }),
+        cache: 'no-store'
+      });
+      const data = await readJson(response);
+      if (!response.ok || !data.access) return null;
+      localStorage.setItem(TOKEN_KEY, data.access);
+      if (data.refresh) localStorage.setItem(REFRESH_KEY, data.refresh);
+      return data.access;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+  return refreshPromise;
 }
 
 export async function apiFetch(path, options = {}) {
