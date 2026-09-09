@@ -24,16 +24,33 @@ class BillingScopedMixin:
         if self.request.user.role not in roles: raise PermissionDenied("Your role cannot perform this operation.")
 
 
+def _school_filter(qs, request, field="school"):
+    school = request.query_params.get("school")
+    if not school or field not in {"school", "invoice__school"}:
+        return qs
+    value = str(school).strip()
+    from django.db.models import Q
+    if field == "school":
+        return qs.filter(Q(school__school_code=value.upper()) | Q(school_id=value))
+    return qs.filter(Q(invoice__school__school_code=value.upper()) | Q(invoice__school_id=value))
+
+
 class InvoiceViewSet(BillingScopedMixin,viewsets.ModelViewSet):
     permission_classes=[IsAuthenticated,IsActiveAccount,HasActionPermission]
     queryset=Invoice.objects.select_related("school","school_class","trainer","contract","created_by").prefetch_related("lines","payments__receipt")
     serializer_class=InvoiceSerializer
     def get_queryset(self):
         u=self.request.user
-        if u.role==UserRole.ADMIN:return self.queryset
-        if u.role==UserRole.SCHOOL:return self.queryset.filter(school__account_id=u.id)
-        if u.role==UserRole.TRAINER:return self.queryset.filter(trainer__account_id=u.id)
-        return self.queryset.none()
+        qs=self.queryset
+        if u.role==UserRole.ADMIN:
+            pass
+        elif u.role==UserRole.SCHOOL:
+            qs=qs.filter(school__account_id=u.id)
+        elif u.role==UserRole.TRAINER:
+            qs=qs.filter(trainer__account_id=u.id)
+        else:
+            return qs.none()
+        return _school_filter(qs, self.request, "school")
     def perform_create(self,serializer):
         self.role_only(UserRole.ADMIN,UserRole.SCHOOL)
         obj=serializer.save(invoice_number=f"INV-{__import__('uuid').uuid4().hex[:10].upper()}",created_by=self.request.user)
@@ -67,7 +84,7 @@ class InvoiceViewSet(BillingScopedMixin,viewsets.ModelViewSet):
         invoice.status=BillingStatus.VOID
         invoice.save(update_fields=["status","updated_at"])
         record_audit(actor=request.user,action="void",entity_type="Invoice",entity_id=invoice.id,summary=f"Voided invoice {invoice.invoice_number}",changes={"status":"void"},request=request)
-        return Response(self.get_serializer(invoice).data)
+        return Response(self.get_serializer(invoice).data
 
 
 class InvoiceLineItemViewSet(BillingScopedMixin,viewsets.ModelViewSet):
@@ -76,9 +93,14 @@ class InvoiceLineItemViewSet(BillingScopedMixin,viewsets.ModelViewSet):
     serializer_class=InvoiceLineItemSerializer
     def get_queryset(self):
         u=self.request.user
-        if u.role==UserRole.ADMIN:return self.queryset
-        if u.role==UserRole.SCHOOL:return self.queryset.filter(invoice__school__account_id=u.id)
-        return self.queryset.none()
+        qs=self.queryset
+        if u.role==UserRole.ADMIN:
+            pass
+        elif u.role==UserRole.SCHOOL:
+            qs=qs.filter(invoice__school__account_id=u.id)
+        else:
+            return qs.none()
+        return _school_filter(qs, self.request, "invoice__school")
     def get_serializer_class(self): return InvoiceLineItemWriteSerializer if self.action in {"create","update","partial_update"} else InvoiceLineItemSerializer
     def perform_create(self,serializer):
         self.role_only(UserRole.ADMIN,UserRole.SCHOOL)
@@ -104,9 +126,14 @@ class PaymentViewSet(BillingScopedMixin,viewsets.ReadOnlyModelViewSet):
     serializer_class=PaymentSerializer
     def get_queryset(self):
         u=self.request.user
-        if u.role==UserRole.ADMIN:return self.queryset
-        if u.role==UserRole.SCHOOL:return self.queryset.filter(invoice__school__account_id=u.id)
-        return self.queryset.none()
+        qs=self.queryset
+        if u.role==UserRole.ADMIN:
+            pass
+        elif u.role==UserRole.SCHOOL:
+            qs=qs.filter(invoice__school__account_id=u.id)
+        else:
+            return qs.none()
+        return _school_filter(qs, self.request, "invoice__school")
     @action(detail=False,methods=["post"] ,url_path="record")
     def record(self,request):
         self.role_only(UserRole.ADMIN,UserRole.SCHOOL)
@@ -124,6 +151,11 @@ class ReceiptViewSet(BillingScopedMixin,viewsets.ReadOnlyModelViewSet):
     serializer_class=ReceiptSerializer
     def get_queryset(self):
         u=self.request.user
-        if u.role==UserRole.ADMIN:return self.queryset
-        if u.role==UserRole.SCHOOL:return self.queryset.filter(payment__invoice__school__account_id=u.id)
-        return self.queryset.none()
+        qs=self.queryset
+        if u.role==UserRole.ADMIN:
+            pass
+        elif u.role==UserRole.SCHOOL:
+            qs=qs.filter(payment__invoice__school__account_id=u.id)
+        else:
+            return qs.none()
+        return _school_filter(qs, self.request, "invoice__school")
