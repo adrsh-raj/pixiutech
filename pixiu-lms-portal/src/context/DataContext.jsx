@@ -1,8 +1,8 @@
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { apiFetch } from './AuthContext';
+import { useAuth } from './AuthContext';
 
 const DataContext = createContext(null);
-const getToken = () => localStorage.getItem('pixiu_auth_token');
 const collection = payload => Array.isArray(payload) ? payload : Array.isArray(payload?.results) ? payload.results : Array.isArray(payload?.data) ? payload.data : [];
 const text = value => String(value ?? '').trim();
 const lower = value => text(value).toLowerCase();
@@ -47,6 +47,23 @@ async function apiRequest(path, options = {}) {
   }
   throw lastError || new Error('Request failed.');
 }
+
+async function mapWithConcurrency(items, worker, limit = 4) {
+  const results = new Array(items.length);
+  let nextIndex = 0;
+  async function runner() {
+    while (true) {
+      const index = nextIndex;
+      nextIndex += 1;
+      if (index >= items.length) return;
+      try { results[index] = { status: 'fulfilled', value: await worker(items[index], index) }; }
+      catch (reason) { results[index] = { status: 'rejected', reason }; }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, runner));
+  return results;
+}
+
 const requestJSON = (path, method, body) => apiRequest(path, { method, body: JSON.stringify(body) });
 function normalizeSchool(row) { const schoolCode = row.school_code || row.school_id || row.code || ''; return { ...row, school_code: schoolCode, school_id: row.school_id || schoolCode, code: row.code || schoolCode }; }
 function normalizeTrainer(row) { return { ...row, trainer_id: row.trainer_id || row.id || '' }; }
@@ -55,46 +72,73 @@ function normalizeStudent(row) { return { ...row, school_id: row.school_id || ro
 function normalizeAttendance(row) { return { ...row, status: lower(row.status), session_id: row.session_id || row.session || '', student_id: row.student_id || row.student || '' }; }
 
 export function DataProvider({ children }) {
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const [schools, setSchools] = useState([]), [classes, setClasses] = useState([]), [students, setStudents] = useState([]), [trainers, setTrainers] = useState([]);
   const [sessions, setSessions] = useState([]), [attendance, setAttendance] = useState([]), [leads, setLeads] = useState([]), [content, setContent] = useState([]);
   const [curriculum, setCurriculum] = useState([]), [inventory, setInventory] = useState([]), [billing, setBilling] = useState([]), [comms, setComms] = useState([]);
   const [projects, setProjects] = useState([]), [notifications, setNotifications] = useState([]), [studentReviews, setStudentReviews] = useState([]), [quizzes, setQuizzes] = useState([]), [quizSubmissions, setQuizSubmissions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [endpointErrors, setEndpointErrors] = useState({});
+  const refreshPromiseRef = useRef(null);
+  const refreshTimerRef = useRef(null);
 
   const refreshAll = useCallback(async () => {
-    if (!getToken()) return { success: false, error: 'Authentication required' };
-    setLoading(true);
-    const endpoints = [
-      ['/schools', rows => setSchools(rows.map(normalizeSchool))], ['/classes', rows => setClasses(rows.map(normalizeClass))],
-      ['/students', rows => setStudents(rows.map(normalizeStudent))], ['/trainers', rows => setTrainers(rows.map(normalizeTrainer))],
-      ['/sessions', rows => setSessions(rows)], ['/attendance', rows => setAttendance(rows.map(normalizeAttendance))], ['/leads', rows => setLeads(rows)],
-      ['/content', rows => setContent(rows)], ['/curriculum', rows => setCurriculum(rows)], ['/inventory', rows => setInventory(rows)],
-      ['/billing', rows => setBilling(rows)], ['/comms', rows => setComms(rows)], ['/projects', rows => setProjects(rows)],
-      ['/notifications', rows => setNotifications(rows)], ['/reviews', rows => setStudentReviews(rows)], ['/quizzes', rows => setQuizzes(rows)],
-      ['/quiz-submissions', rows => setQuizSubmissions(rows)],
-    ];
-    const results = await Promise.allSettled(endpoints.map(([path]) => apiRequest(path)));
-    const nextErrors = {};
-    results.forEach((result, index) => {
-      const [path, setter] = endpoints[index];
-      if (result.status === 'fulfilled') setter(collection(result.value));
-      else nextErrors[path] = result.reason?.message || `Unable to load ${path.slice(1) || 'data'}.`;
-    });
-    setEndpointErrors(nextErrors);
-    setLoading(false);
-    return { success: results.some(result => result.status === 'fulfilled'), failed: results.filter(result => result.status === 'rejected').length, errors: nextErrors };
-  }, []);
+    if (authLoading || !isAuthenticated) return { success: false, error: 'Authentication required' };
+    if (refreshPromiseRef.current) return refreshPromiseRef.current;
 
-  useEffect(() => {
-    refreshAll();
-    const onAuthChange = () => refreshAll();
-    window.addEventListener('pixiu_auth_state_changed', onAuthChange);
-    return () => window.removeEventListener('pixiu_auth_state_changed', onAuthChange);
+    refreshPromiseRef.current = (async () => {
+      setLoading(true);
+      const endpoints = [
+        ['/schools', rows => setSchools(rows.map(normalizeSchool))], ['/classes', rows => setClasses(rows.map(normalizeClass))],
+        ['/students', rows => setStudents(rows.map(normalizeStudent))], ['/trainers', rows => setTrainers(rows.map(normalizeTrainer))],
+        ['/sessions', rows => setSessions(rows)], ['/attendance', rows => setAttendance(rows.map(normalizeAttendance))], ['/leads', rows => setLeads(rows)],
+        ['/content', rows => setContent(rows)], ['/curriculum', rows => setCurriculum(rows)], ['/inventory', rows => setInventory(rows)],
+        ['/billing', rows => setBilling(rows)], ['/comms', rows => setComms(rows)], ['/projects', rows => setProjects(rows)],
+        ['/notifications', rows => setNotifications(rows)], ['/reviews', rows => setStudentReviews(rows)], ['/quizzes', rows => setQuizzes(rows)],
+        ['/quiz-submissions', rows => setQuizSubmissions(rows)],
+      ];
+      try {
+        const results = await mapWithConcurrency(endpoints, ([path]) => apiRequest(path), 4);
+        const nextErrors = {};
+        results.forEach((result, index) => {
+          const [path, setter] = endpoints[index];
+          if (result.status === 'fulfilled') setter(collection(result.value));
+          else nextErrors[path] = result.reason?.message || `Unable to load ${path.slice(1) || 'data'}.`;
+        });
+        setEndpointErrors(nextErrors);
+        return { success: results.some(result => result.status === 'fulfilled'), failed: results.filter(result => result.status === 'rejected').length, errors: nextErrors };
+      } finally {
+        setLoading(false);
+        refreshPromiseRef.current = null;
+      }
+    })();
+    return refreshPromiseRef.current;
+  }, [authLoading, isAuthenticated]);
+
+  const scheduleRefresh = useCallback(() => {
+    if (refreshTimerRef.current) window.clearTimeout(refreshTimerRef.current);
+    refreshTimerRef.current = window.setTimeout(() => {
+      refreshTimerRef.current = null;
+      refreshAll();
+    }, 100);
   }, [refreshAll]);
 
-  const save = async (path, method, body) => { try { const data = await requestJSON(path, method, body); await refreshAll(); return { success: true, data }; } catch (error) { return { success: false, error: error.message }; } };
-  const remove = async path => { try { const data = await apiRequest(path, { method: 'DELETE' }); await refreshAll(); return { success: true, data }; } catch (error) { return { success: false, error: error.message }; } };
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) refreshAll();
+    if (!isAuthenticated) setLoading(false);
+    return () => {
+      if (refreshTimerRef.current) window.clearTimeout(refreshTimerRef.current);
+    };
+  }, [authLoading, isAuthenticated, refreshAll]);
+
+  const save = async (path, method, body) => {
+    try { const data = await requestJSON(path, method, body); scheduleRefresh(); return { success: true, data }; }
+    catch (error) { return { success: false, error: error.message }; }
+  };
+  const remove = async path => {
+    try { const data = await apiRequest(path, { method: 'DELETE' }); scheduleRefresh(); return { success: true, data }; }
+    catch (error) { return { success: false, error: error.message }; }
+  };
 
   const addSchool = async data => { const schoolCode = text(data?.school_code || data?.school_id || data?.code).toUpperCase(); if (!schoolCode) return { success: false, error: 'School code is required.' }; return save('/schools', 'POST', { ...data, school_code: schoolCode }); };
   const updateSchool = (id, data) => save(`/schools/${encodeURIComponent(id)}`, 'PUT', data);
@@ -130,7 +174,7 @@ export function DataProvider({ children }) {
   const saveStudentReview = data => save('/assessments', 'POST', data), deleteStudentReview = id => remove(`/assessments/${encodeURIComponent(id)}`), createQuiz = data => save('/quizzes', 'POST', data), updateQuiz = (id, data) => save(`/quizzes/${encodeURIComponent(id)}`, 'PUT', data), deleteQuiz = id => remove(`/quizzes/${encodeURIComponent(id)}`), submitQuizAttempt = data => save('/quiz-submissions', 'POST', data);
   const allowQuizReattempt = () => ({ success: false, error: 'Quiz reattempt is controlled by the quiz lifecycle and is not exposed as a generic override.' });
   const deleteQuizSubmission = () => ({ success: false, error: 'Quiz attempts are retained for assessment history.' });
-  const uploadFile = async file => { if (!file) return { success: false, error: 'No file selected.' }; const form = new FormData(); form.append('file', file); try { const data = await apiRequest('/upload', { method: 'POST', body: form }); return { success: true, url: data.url, filename: data.filename }; } catch (error) { return { success: false, error: error.message }; } };
+  const uploadFile = async file => { if (!file) return { success: false, error: 'No file selected.' }; const form = new FormData(); form.append('file', file); try { const data = await apiRequest('/upload', { method: 'POST', body: form }); scheduleRefresh(); return { success: true, url: data.url, filename: data.filename }; } catch (error) { return { success: false, error: error.message }; } };
   const classKits = {};
   const updateClassKitComponent = () => ({ success: false, error: 'Class kit blueprints are no longer stored in frontend state. Use the database-backed Kit Components workflow.' });
   const addComponentToClassKit = () => ({ success: false, error: 'Class kit components are persisted through the database-backed Kit Components workflow.' });
