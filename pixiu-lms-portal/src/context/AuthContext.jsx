@@ -18,6 +18,27 @@ function saveSession(access, refresh, user) {
   if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
 }
 
+async function fetchWithRetry(url, options = {}) {
+  const method = String(options.method || 'GET').toUpperCase();
+  const retryable = method === 'GET' || method === 'HEAD';
+  const delays = retryable ? [0, 800, 2000] : [0];
+  let lastResponse;
+  let lastError;
+  for (let attempt = 0; attempt < delays.length; attempt += 1) {
+    if (delays[attempt]) await new Promise(resolve => setTimeout(resolve, delays[attempt]));
+    try {
+      const response = await fetch(url, options);
+      lastResponse = response;
+      if (response.ok || !retryable || ![502, 503, 504].includes(response.status) || attempt === delays.length - 1) return response;
+    } catch (error) {
+      lastError = error;
+      if (!retryable || attempt === delays.length - 1) throw error;
+    }
+  }
+  if (lastResponse) return lastResponse;
+  throw lastError || new Error('Request failed.');
+}
+
 async function refreshAccessToken() {
   const refresh = localStorage.getItem(REFRESH_KEY);
   if (!refresh) return null;
@@ -39,7 +60,7 @@ export async function apiFetch(path, options = {}) {
     const headers = new Headers(options.headers || {});
     if (options.body && !(options.body instanceof FormData) && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
     if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
-    return fetch(`${API_BASE}${path}`, { ...options, headers, cache: options.cache || 'no-store' });
+    return fetchWithRetry(`${API_BASE}${path}`, { ...options, headers, cache: options.cache || 'no-store' });
   };
 
   let accessToken = localStorage.getItem(TOKEN_KEY);
