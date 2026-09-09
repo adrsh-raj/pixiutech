@@ -8,7 +8,7 @@ from audit.views import AuditLogViewSet
 from billing.contract_views import ContractViewSet, billing_summary
 from billing.views import InvoiceLineItemViewSet, InvoiceViewSet, PaymentViewSet, ReceiptViewSet
 from inventory.views import KitComponentViewSet, KitMaintenanceViewSet, KitViewSet
-from learning.views import SessionActivityViewSet
+from learning.views import SessionActivityViewSet, QuizQuestionViewSet, QuizAssignmentViewSet, ProjectEvidenceViewSet
 from .analytics import SchoolPerformanceView, StudentProgressView, TrainerPerformanceView
 from .class_ranking import ClassRankingView
 from .api_v1_compat import (
@@ -21,6 +21,7 @@ from .phase7_compat_extras import ContractBillingFullViewSet, ContractCommunicat
 from .phase7_contract_overrides import ContractSessionCompatViewSet
 from .trainer_materials import TrainerMaterialDetailView, TrainerMaterialFileView, TrainerMaterialListCreateView
 from notifications.views import NotificationPortalViewSet
+from learning.quiz_portal import QuizSingleAttemptView, QuizReviewView
 
 router = DefaultRouter(trailing_slash=False)
 router.register("schools", ContractSchoolViewSet, basename="v1-school")
@@ -34,10 +35,13 @@ router.register("attendance", ContractAttendanceViewSet, basename="v1-attendance
 router.register("curriculum", ContractCurriculumViewSet, basename="v1-curriculum")
 router.register("content", ContractContentViewSet, basename="v1-content")
 router.register("quizzes", ContractQuizViewSet, basename="v1-quiz")
+router.register("quiz-questions", QuizQuestionViewSet, basename="v1-quiz-question")
+router.register("quiz-assignments", QuizAssignmentViewSet, basename="v1-quiz-assignment")
 router.register("quiz-submissions", ContractQuizAttemptViewSet, basename="v1-quiz-submission")
 router.register("reviews", ContractReviewViewSet, basename="v1-review")
 router.register("assessments", ContractAssessmentViewSet, basename="v1-assessment")
 router.register("projects", ContractProjectViewSet, basename="v1-project")
+router.register("project-evidence", ProjectEvidenceViewSet, basename="v1-project-evidence")
 router.register("billing", ContractBillingFullViewSet, basename="v1-billing-compat")
 router.register("invoices", InvoiceViewSet, basename="v1-invoice")
 router.register("contracts", ContractViewSet, basename="v1-contract")
@@ -70,4 +74,6 @@ urlpatterns = [
     path("student-progress", StudentProgressView.as_view(), name="v1-student-progress"),
     path("trainer-performance", TrainerPerformanceView.as_view(), name="v1-trainer-performance"),
     path("school-performance", SchoolPerformanceView.as_view(), name="v1-school-performance"),
+    path("quizzes/<uuid:pk>/single-attempt", QuizSingleAttemptView.as_view(), name="v1-quiz-single-attempt"),
+    path("quiz-review", QuizReviewView.as_view(), name="v1-quiz-review"),
 ] + router.urls
