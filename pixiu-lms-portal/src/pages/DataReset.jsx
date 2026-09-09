@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { AlertTriangle, ArrowLeft, ShieldCheck, Trash2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { apiFetch } from '../context/AuthContext';
+import { API_BASE } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 
@@ -29,10 +30,13 @@ export default function DataReset() {
     }
     setResetting(true);
     try {
-      const response = await apiFetch('/phase6/controlled-reset/', {
+      const phase6Base = API_BASE.replace(/\/api\/v1\/?$/, '/api');
+      const accessToken = localStorage.getItem('pixiu_auth_token');
+      const response = await fetch(`${phase6Base}/phase6/controlled-reset/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) },
         body: JSON.stringify({ scope, confirmation: confirmation.trim() }),
+        cache: 'no-store',
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || payload.detail || `Reset failed (${response.status}).`);
