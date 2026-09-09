@@ -9,11 +9,11 @@ export const PORTAL_NAVIGATION = {
     { title: 'SYSTEM', links: [{ name: 'Trainer Credentials', href: '/trainer-credentials', icon: KeyRound }, { name: 'School Credentials', href: '/school-credentials', icon: KeyRound }, { name: 'Settings', href: '/settings', icon: Settings }] },
   ],
   student: [
-    { title: 'MY LEARNING', links: [{ name: 'Overview', key: 'overview', icon: LayoutDashboard }, { name: 'My Classes', key: 'classes', icon: School }, { name: 'Lessons', key: 'learning', icon: BookOpen }, { name: 'Quizzes', href: '/quizzes', icon: ClipboardCheck }, { name: 'Projects', href: '/projects', icon: FolderKanban }] },
+    { title: 'MY LEARNING', links: [{ name: 'Overview', key: 'overview', icon: LayoutDashboard }, { name: 'My Classes', href: '/sessions', icon: School }, { name: 'Lessons', key: 'learning', icon: BookOpen }, { name: 'Quizzes', href: '/quizzes', icon: ClipboardCheck }, { name: 'Projects', href: '/projects', icon: FolderKanban }] },
     { title: 'MY PERFORMANCE', links: [{ name: 'Attendance', key: 'attendance', icon: CalendarDays }, { name: 'My Progress', href: '/student-progress', icon: BarChart3 }, { name: 'My Certificates', key: 'certificates', icon: Trophy }] },
     { title: 'MY CLASS', links: [{ name: 'Class Ranking', href: '/student-ranking', icon: Trophy }, { name: 'Leaderboard', href: '/student-ranking', icon: Trophy }] },
     { title: 'COMMUNICATION', links: [{ name: 'Announcements', key: 'announcements', icon: Megaphone }, { name: 'Notifications', href: '/notifications', icon: ReceiptText }] },
-    { title: 'EXPLORE', links: [{ name: 'Virtual Arduino Lab', href: '/simulation', icon: Cpu }, { name: 'Learning Materials', href: '/content', icon: PlaySquare }] },
+    { title: 'EXPLORE', links: [{ name: 'Virtual Arduino Lab', href: '/simulation', icon: Cpu }, { name: 'Learning Materials', href: '/content', icon: PlaySquare }, { name: 'Hardware & Kits', href: '/inventory', icon: Box }] },
   ],
   school: [
     { title: 'MY SCHOOL', links: [{ name: 'Overview', key: 'overview', icon: LayoutDashboard }, { name: 'My Classes', key: 'classes', icon: School }, { name: 'Students', key: 'students', icon: Users }, { name: 'Trainers', key: 'trainers', icon: GraduationCap }] },
