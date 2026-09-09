@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Outlet, Navigate, Link } from 'react-rout
 import PortalShell from './components/PortalShell';
 import AdminCommandCenter from './pages/AdminCommandCenter';
 import Students from './pages/Students';
-import KitInventoryCenter from './pages/KitInventoryCenter';
+import HardwareKitsV2 from './pages/HardwareKitsV2';
 import TrainerOperationsV2 from './pages/TrainerOperationsV2';
 import TrainerAssignments from './pages/TrainerAssignments';
 import TrainerWorkspace from './pages/TrainerWorkspace';
@@ -82,7 +82,7 @@ export default function App() {
     <Route path="/trainer-performance" element={<RoleRoute roles={['admin', 'superadmin', 'trainer']}><TrainerPerformanceRoute /></RoleRoute>} />
     <Route path="/school-performance" element={<RoleRoute roles={['admin', 'superadmin', 'school']}><SchoolPerformanceRoute /></RoleRoute>} />
     <Route path="/billing" element={<RoleRoute roles={['admin', 'superadmin', 'school']}><BillingCenter /></RoleRoute>} />
-    <Route path="/inventory" element={<RoleRoute roles={['admin', 'superadmin', 'school', 'trainer', 'student']}><KitInventoryCenter /></RoleRoute>} />
+    <Route path="/inventory" element={<RoleRoute roles={['admin', 'superadmin', 'school', 'trainer', 'student']}><HardwareKitsV2 /></RoleRoute>} />
     <Route path="/quizzes" element={<RoleRoute roles={['student', 'trainer', 'admin', 'superadmin']}><QuizHub /></RoleRoute>} />
     <Route path="/projects" element={<RoleRoute roles={['student', 'trainer', 'admin', 'superadmin']}><ProjectHubV2 /></RoleRoute>} />
     <Route path="/trainer-reviews" element={<RoleRoute roles={['trainer', 'admin', 'superadmin']}><TrainerReviews /></RoleRoute>} />
