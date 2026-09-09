@@ -10,7 +10,7 @@ export const PORTAL_NAVIGATION = {
   ],
   student: [
     { title: 'MY LEARNING', links: [{ name: 'Overview', key: 'overview', icon: LayoutDashboard }, { name: 'My Classes', href: '/sessions', icon: School }, { name: 'Lessons', key: 'learning', icon: BookOpen }, { name: 'Quizzes', href: '/quizzes', icon: ClipboardCheck }, { name: 'Projects', href: '/projects', icon: FolderKanban }] },
-    { title: 'MY PERFORMANCE', links: [{ name: 'Attendance', key: 'attendance', icon: CalendarDays }, { name: 'My Progress', href: '/student-progress', icon: BarChart3 }, { name: 'My Certificates', key: 'certificates', icon: Trophy }] },
+    { title: 'MY PERFORMANCE', links: [{ name: 'Attendance', key: 'attendance', icon: CalendarDays }, { name: 'My Progress', href: '/student-progress', icon: BarChart3 }, { name: 'Certificates', href: '/student-progress', icon: Trophy }] },
     { title: 'MY CLASS', links: [{ name: 'Class Ranking', href: '/student-ranking', icon: Trophy }, { name: 'Leaderboard', href: '/student-ranking', icon: Trophy }] },
     { title: 'COMMUNICATION', links: [{ name: 'Announcements', key: 'announcements', icon: Megaphone }, { name: 'Notifications', href: '/notifications', icon: ReceiptText }] },
     { title: 'EXPLORE', links: [{ name: 'Virtual Arduino Lab', href: '/simulation', icon: Cpu }, { name: 'Learning Materials', href: '/content', icon: PlaySquare }, { name: 'Hardware & Kits', href: '/inventory', icon: Box }] },
