@@ -26,12 +26,12 @@ import SchoolPortal from './pages/SchoolPortal';
 import AuditLogs from './pages/AuditLogs';
 import ClassRankingPage from './pages/ClassRankingPage';
 import AttendanceCenter from './pages/AttendanceCenter';
-import SessionManager from './pages/SessionManager';
 import StudentProgressPage from './pages/StudentProgressPage';
 import PerformanceAnalyticsPage from './pages/PerformanceAnalyticsPage';
 import BillingCenter from './pages/BillingCenter';
 import QuizHub from './pages/QuizHub';
 import ProjectHub from './pages/ProjectHub';
+import ClassesSessionsCenter from './pages/ClassesSessionsCenter';
 import { DataProvider } from './context/DataContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
@@ -74,7 +74,7 @@ export default function App() {
     <Route path="/school-ranking" element={<SchoolRoleRoute />} />
     <Route path="/trainer-ranking" element={<TrainerRoleRoute />} />
     <Route path="/attendance" element={<RoleRoute roles={['admin', 'superadmin', 'school', 'trainer']}><AttendanceRoute /></RoleRoute>} />
-    <Route path="/sessions" element={<RoleRoute roles={['admin', 'superadmin', 'school', 'trainer']}><SessionManager /></RoleRoute>} />
+    <Route path="/sessions" element={<RoleRoute roles={['admin', 'superadmin', 'school', 'trainer', 'student']}><ClassesSessionsCenter /></RoleRoute>} />
     <Route path="/student-progress" element={<RoleRoute roles={['student']}><StudentProgressPage /></RoleRoute>} />
     <Route path="/trainer-performance" element={<RoleRoute roles={['admin', 'superadmin', 'trainer']}><TrainerPerformanceRoute /></RoleRoute>} />
     <Route path="/school-performance" element={<RoleRoute roles={['admin', 'superadmin', 'school']}><SchoolPerformanceRoute /></RoleRoute>} />
