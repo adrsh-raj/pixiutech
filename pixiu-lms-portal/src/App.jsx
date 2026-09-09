@@ -10,6 +10,8 @@ import TrainerWorkspace from './pages/TrainerWorkspace';
 import TrainerClasses from './pages/TrainerClasses';
 import TrainerAttendance from './pages/TrainerAttendance';
 import TrainerMaterials from './pages/TrainerMaterials';
+import TrainerReviews from './pages/TrainerReviews';
+import StudentClasses from './pages/StudentClasses';
 import TrainerCredentials from './pages/TrainerCredentials';
 import SchoolCredentials from './pages/SchoolCredentials';
 import DataReset from './pages/DataReset';
@@ -30,7 +32,7 @@ import StudentProgressPage from './pages/StudentProgressPage';
 import PerformanceAnalyticsPage from './pages/PerformanceAnalyticsPage';
 import BillingCenter from './pages/BillingCenter';
 import QuizHub from './pages/QuizHub';
-import ProjectHub from './pages/ProjectHub';
+import ProjectHubV2 from './pages/ProjectHubV2';
 import ClassesSessionsCenter from './pages/ClassesSessionsCenter';
 import { DataProvider } from './context/DataContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -63,6 +65,7 @@ function TrainerRoleRoute() { const { isAuthenticated, user, loading } = useAuth
 function SchoolRoleRoute() { const { isAuthenticated, user, loading } = useAuth(); if (loading) return <LoadingScreen />; if (!isAuthenticated) return <Navigate to="/login" replace />; if (user?.role !== 'school') return <Navigate to="/" replace />; return <ClassRankingPage />; }
 function TrainerPerformanceRoute() { const { user } = useAuth(); const role = user?.role === 'admin' || user?.role === 'superadmin' ? 'admin' : 'trainer'; return <PerformanceAnalyticsPage role={role} />; }
 function SchoolPerformanceRoute() { return <PerformanceAnalyticsPage role="school" />; }
+function SessionsRoute() { const { user } = useAuth(); return user?.role === 'student' ? <StudentClasses /> : <ClassesSessionsCenter />; }
 
 export default function App() {
   return <ToastProvider><AuthProvider><DataProvider><BrowserRouter><Routes>
@@ -74,14 +77,15 @@ export default function App() {
     <Route path="/school-ranking" element={<SchoolRoleRoute />} />
     <Route path="/trainer-ranking" element={<TrainerRoleRoute />} />
     <Route path="/attendance" element={<RoleRoute roles={['admin', 'superadmin', 'school', 'trainer']}><AttendanceRoute /></RoleRoute>} />
-    <Route path="/sessions" element={<RoleRoute roles={['admin', 'superadmin', 'school', 'trainer', 'student']}><ClassesSessionsCenter /></RoleRoute>} />
+    <Route path="/sessions" element={<RoleRoute roles={['admin', 'superadmin', 'school', 'trainer', 'student']}><SessionsRoute /></RoleRoute>} />
     <Route path="/student-progress" element={<RoleRoute roles={['student']}><StudentProgressPage /></RoleRoute>} />
     <Route path="/trainer-performance" element={<RoleRoute roles={['admin', 'superadmin', 'trainer']}><TrainerPerformanceRoute /></RoleRoute>} />
     <Route path="/school-performance" element={<RoleRoute roles={['admin', 'superadmin', 'school']}><SchoolPerformanceRoute /></RoleRoute>} />
     <Route path="/billing" element={<RoleRoute roles={['admin', 'superadmin', 'school']}><BillingCenter /></RoleRoute>} />
     <Route path="/inventory" element={<RoleRoute roles={['admin', 'superadmin', 'school', 'trainer', 'student']}><KitInventoryCenter /></RoleRoute>} />
     <Route path="/quizzes" element={<RoleRoute roles={['student', 'trainer', 'admin', 'superadmin']}><QuizHub /></RoleRoute>} />
-    <Route path="/projects" element={<RoleRoute roles={['student', 'trainer', 'admin', 'superadmin']}><ProjectHub /></RoleRoute>} />
+    <Route path="/projects" element={<RoleRoute roles={['student', 'trainer', 'admin', 'superadmin']}><ProjectHubV2 /></RoleRoute>} />
+    <Route path="/trainer-reviews" element={<RoleRoute roles={['trainer', 'admin', 'superadmin']}><TrainerReviews /></RoleRoute>} />
     <Route path="/" element={<ProtectedLayout />}>
       <Route index element={<AdminOnly><AdminCommandCenter /></AdminOnly>} />
       <Route path="leads" element={<AdminOnly><Leads /></AdminOnly>} />
@@ -96,6 +100,7 @@ export default function App() {
       <Route path="trainer-assignments" element={<AdminOnly><TrainerAssignments /></AdminOnly>} />
       <Route path="trainer-classes" element={<RoleRoute roles={['trainer']}><TrainerClasses /></RoleRoute>} />
       <Route path="trainer-materials" element={<RoleRoute roles={['admin', 'superadmin', 'trainer']}><TrainerMaterials /></RoleRoute>} />
+      <Route path="trainer-reviews" element={<RoleRoute roles={['admin', 'superadmin', 'trainer']}><TrainerReviews /></RoleRoute>} />
       <Route path="trainer-credentials" element={<AdminOnly><TrainerCredentials /></AdminOnly>} />
       <Route path="school-credentials" element={<AdminOnly><SchoolCredentials /></AdminOnly>} />
       <Route path="data-reset" element={<AdminOnly><DataReset /></AdminOnly>} />
