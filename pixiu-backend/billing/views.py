@@ -84,7 +84,7 @@ class InvoiceViewSet(BillingScopedMixin,viewsets.ModelViewSet):
         invoice.status=BillingStatus.VOID
         invoice.save(update_fields=["status","updated_at"])
         record_audit(actor=request.user,action="void",entity_type="Invoice",entity_id=invoice.id,summary=f"Voided invoice {invoice.invoice_number}",changes={"status":"void"},request=request)
-        return Response(self.get_serializer(invoice).data
+        return Response(self.get_serializer(invoice).data)
 
 
 class InvoiceLineItemViewSet(BillingScopedMixin,viewsets.ModelViewSet):
