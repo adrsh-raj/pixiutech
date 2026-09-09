@@ -31,6 +31,9 @@ def create_school_account(*, school: School) -> User:
     user.role = UserRole.SCHOOL
     user.display_name = school.name
     user.email = school.email
+    # Keep the school profile's business status independent from portal credentials.
+    # A newly onboarded school can be active in the academic database while its
+    # login account remains disabled until an administrator sets a password.
     user.status = UserStatus.INACTIVE
     user.is_active = False
     user.set_unusable_password()
