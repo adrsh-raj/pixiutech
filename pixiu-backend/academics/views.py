@@ -21,11 +21,14 @@ class Phase3ViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsActiveAccount, HasActionPermission, ScopePermission]
     ACTION_TO_BUSINESS = {"list": "VIEW", "retrieve": "VIEW", "create": "CREATE", "update": "EDIT", "partial_update": "EDIT", "destroy": "DELETE"}
     def initial(self, request, *args, **kwargs): self.required_action = self.ACTION_TO_BUSINESS.get(self.action, "VIEW"); super().initial(request, *args, **kwargs)
-    def get_queryset(self): return self.scoped_queryset() if self.action == "list" else self.queryset
+    def get_queryset(self): return self.scoped_queryset()
     def scoped_queryset(self): return self.queryset
     def get_object(self):
-        queryset = self.queryset if self.action in {"retrieve", "update", "partial_update", "destroy"} else self.scoped_queryset(); queryset = self.filter_queryset(queryset)
-        obj = queryset.get(**{self.lookup_field: self.kwargs[self.lookup_url_kwarg or self.lookup_field]}); self.check_object_permissions(self.request, obj); return obj
+        queryset = self.scoped_queryset()
+        queryset = self.filter_queryset(queryset)
+        obj = queryset.get(**{self.lookup_field: self.kwargs[self.lookup_url_kwarg or self.lookup_field]})
+        self.check_object_permissions(self.request, obj)
+        return obj
     def assert_role(self, *roles):
         if self.request.user.role not in roles: raise PermissionDenied("Your role cannot perform this operation.")
 
