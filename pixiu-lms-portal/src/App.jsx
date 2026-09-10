@@ -30,6 +30,7 @@ import ClassRankingPage from './pages/ClassRankingPage';
 import AttendanceCenter from './pages/AttendanceCenter';
 import StudentProgressPage from './pages/StudentProgressPage';
 import PerformanceAnalyticsPage from './pages/PerformanceAnalyticsPage';
+import SchoolProgressReports from './pages/SchoolProgressReports';
 import BillingCenter from './pages/BillingCenter';
 import QuizHub from './pages/QuizHub';
 import ProjectHubV2 from './pages/ProjectHubV2';
@@ -72,8 +73,6 @@ function SchoolRouteGuard() { const { isAuthenticated, user, loading } = useAuth
 function GuestRouteGuard({ children }) { const { isAuthenticated, user, loading } = useAuth(); if (loading) return <LoadingScreen />; if (isAuthenticated && user) { const destination = user.role === 'student' ? '/student-portal' : user.role === 'school' ? '/school-portal' : user.role === 'trainer' ? '/trainers' : '/'; return <Navigate to={destination} replace />; } return children; }
 function StudentRoleRoute() { const { isAuthenticated, user, loading } = useAuth(); if (loading) return <LoadingScreen />; if (!isAuthenticated) return <Navigate to="/login" replace />; if (user?.role !== 'student') return <Navigate to="/" replace />; return <ClassRankingPage />; }
 function TrainerRoleRoute() { const { isAuthenticated, user, loading } = useAuth(); if (loading) return <LoadingScreen />; if (!isAuthenticated) return <Navigate to="/login" replace />; if (!['trainer', 'admin', 'superadmin'].includes(user?.role)) return <Navigate to="/" replace />; return <ClassRankingPage />; }
-function SchoolRoleRoute() { const { isAuthenticated, user, loading } = useAuth(); if (loading) return <LoadingScreen />; if (!isAuthenticated) return <Navigate to="/login" replace />; if (user?.role !== 'school') return <Navigate to="/" replace />; return <ClassRankingPage />; }
-function TrainerPerformanceRoute() { const { user } = useAuth(); const role = user?.role === 'admin' || user?.role === 'superadmin' ? 'admin' : 'trainer'; return <PerformanceAnalyticsPage role={role} />; }
 function SchoolPerformanceRoute() { return <PerformanceAnalyticsPage role="school" />; }
 function SessionsRoute() { const { user } = useAuth(); return user?.role === 'student' ? <StudentClasses /> : <ClassesSessionsCenter />; }
 
@@ -105,16 +104,17 @@ export default function App() {
       <Route path="attendance" element={<RoleRoute roles={['admin', 'superadmin', 'school', 'trainer']}><AttendanceRoute /></RoleRoute>} />
       <Route path="sessions" element={<RoleRoute roles={['admin', 'superadmin', 'school', 'trainer', 'student']}><SessionsRoute /></RoleRoute>} />
       <Route path="student-progress" element={<RoleRoute roles={['student']}><StudentProgressPage /></RoleRoute>} />
-      <Route path="trainer-performance" element={<RoleRoute roles={['admin', 'superadmin', 'trainer']}><TrainerPerformanceRoute /></RoleRoute>} />
+      <Route path="trainer-performance" element={<RoleRoute roles={['admin', 'superadmin', 'trainer']}><PerformanceAnalyticsPage role="trainer" /></RoleRoute>} />
       <Route path="school-performance" element={<RoleRoute roles={['admin', 'superadmin', 'school']}><SchoolPerformanceRoute /></RoleRoute>} />
+      <Route path="school-progress-reports" element={<RoleRoute roles={['school']}><SchoolProgressReports /></RoleRoute>} />
+      <Route path="school-ranking" element={<RoleRoute roles={['school']}><Navigate to="/school-progress-reports" replace /></RoleRoute>} />
+      <Route path="trainer-ranking" element={<TrainerRoleRoute />} />
+      <Route path="student-ranking" element={<StudentRoleRoute />} />
       <Route path="billing" element={<RoleRoute roles={['admin', 'superadmin', 'school']}><BillingCenter /></RoleRoute>} />
       <Route path="inventory" element={<RoleRoute roles={['admin', 'superadmin', 'school', 'trainer', 'student']}><HardwareKitsV2 /></RoleRoute>} />
       <Route path="quizzes" element={<RoleRoute roles={['student', 'trainer', 'admin', 'superadmin']}><QuizHub /></RoleRoute>} />
       <Route path="projects" element={<RoleRoute roles={['student', 'trainer', 'admin', 'superadmin']}><ProjectHubV2 /></RoleRoute>} />
       <Route path="trainer-reviews" element={<RoleRoute roles={['trainer', 'admin', 'superadmin']}><TrainerReviews /></RoleRoute>} />
-      <Route path="student-ranking" element={<StudentRoleRoute />} />
-      <Route path="school-ranking" element={<SchoolRoleRoute />} />
-      <Route path="trainer-ranking" element={<TrainerRoleRoute />} />
     </Route>
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes></BrowserRouter></DataProvider></AuthProvider></ToastProvider>;
