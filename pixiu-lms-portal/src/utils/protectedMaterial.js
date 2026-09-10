@@ -2,26 +2,21 @@ import { API_BASE } from '../config/api';
 
 const token = () => localStorage.getItem('pixiu_auth_token');
 
-export async function openProtectedMaterial(materialOrUrl) {
+export async function openProtectedMaterial(materialOrUrl, legacyTitle = '') {
   const raw = materialOrUrl && typeof materialOrUrl === 'object'
     ? materialOrUrl
-    : { url: materialOrUrl };
+    : { url: materialOrUrl, title: legacyTitle };
   const id = String(raw.id || '').trim();
   const suppliedUrl = String(raw.url || '').trim();
+  const title = String(raw.title || 'Learning-Material').trim();
 
-  let endpoint = '';
-  let suggestedName = raw.title ? `${String(raw.title).replace(/[^A-Za-z0-9._ -]/g, '')}` : 'learning-material';
+  let endpoint;
   if (id) {
     endpoint = `${API_BASE}/content/${encodeURIComponent(id)}/file`;
-    const ext = String(raw.content_type || '').toLowerCase() === 'image' ? '.png' : '.pdf';
-    suggestedName += ext;
   } else if (suppliedUrl) {
-    const parsed = new URL(suppliedUrl, window.location.origin);
-    if (parsed.origin !== window.location.origin && !parsed.protocol.startsWith('http')) {
-      throw new Error('Invalid material URL.');
-    }
-    endpoint = suppliedUrl.startsWith(API_BASE) ? suppliedUrl : suppliedUrl;
-    suggestedName += String(parsed.pathname).match(/\.(pdf|png|jpe?g|webp)$/i)?.[0] || '.pdf';
+    if (suppliedUrl.startsWith('/content/')) endpoint = `${API_BASE}${suppliedUrl}`;
+    else if (suppliedUrl.startsWith('/api/')) endpoint = suppliedUrl;
+    else endpoint = suppliedUrl;
   } else {
     throw new Error('Material file is not configured.');
   }
@@ -39,14 +34,16 @@ export async function openProtectedMaterial(materialOrUrl) {
   }
 
   const blob = await response.blob();
-  const blobUrl = URL.createObjectURL(blob);
+  const extension = response.headers.get('content-type')?.includes('image/') ? '.png' : '.pdf';
+  const safeTitle = title.replace(/[^A-Za-z0-9._ -]/g, '') || 'Learning-Material';
+  const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
-  link.href = blobUrl;
+  link.href = url;
   link.target = '_blank';
   link.rel = 'noopener';
-  link.download = suggestedName;
+  link.download = `${safeTitle}${extension}`;
   document.body.appendChild(link);
   link.click();
   link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+  window.setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
