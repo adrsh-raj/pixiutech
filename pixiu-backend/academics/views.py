@@ -1,6 +1,7 @@
 import json
 
 from django.db import transaction
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -26,7 +27,7 @@ class Phase3ViewSet(viewsets.ModelViewSet):
     def get_object(self):
         queryset = self.scoped_queryset()
         queryset = self.filter_queryset(queryset)
-        obj = queryset.get(**{self.lookup_field: self.kwargs[self.lookup_url_kwarg or self.lookup_field]})
+        obj = get_object_or_404(queryset, **{self.lookup_field: self.kwargs[self.lookup_url_kwarg or self.lookup_field]})
         self.check_object_permissions(self.request, obj)
         return obj
     def assert_role(self, *roles):
@@ -122,8 +123,7 @@ class TrainerSchoolAssignmentViewSet(Phase3ViewSet):
         self.assert_role(UserRole.ADMIN); assignment = serializer.save(); record_audit(actor=self.request.user, action="assignment_change", entity_type="trainer_school_assignment", entity_id=assignment.id, summary=f"Trainer {assignment.trainer.trainer_id} assigned to {assignment.school.school_code}", changes={"trainer": assignment.trainer.trainer_id, "school": assignment.school.school_code, "status": assignment.status}, request=self.request)
     def perform_update(self, serializer):
         self.assert_role(UserRole.ADMIN); assignment = serializer.save(); record_audit(actor=self.request.user, action="assignment_change", entity_type="trainer_school_assignment", entity_id=assignment.id, summary=f"Assignment for {assignment.trainer.trainer_id} updated", changes={"school": assignment.school.school_code, "status": assignment.status}, request=self.request)
-    def perform_destroy(self, instance):
-        self.assert_role(UserRole.ADMIN); instance.status = "inactive"; instance.save(update_fields=["status"]); record_audit(actor=self.request.user, action="assignment_change", entity_type="trainer_school_assignment", entity_id=instance.id, summary=f"Trainer {instance.trainer.trainer_id} assignment to {instance.school.school_code} deactivated", changes={"status": "inactive"}, request=self.request)
+    def perform_destroy(self, instance): self.assert_role(UserRole.ADMIN); instance.status = "inactive"; instance.save(update_fields=["status"]); record_audit(actor=self.request.user, action="assignment_change", entity_type="trainer_school_assignment", entity_id=instance.id, summary=f"Trainer {instance.trainer.trainer_id} assignment to {instance.school.school_code} deactivated", changes={"status": "inactive"}, request=self.request)
 
 
 class SchoolClassViewSet(Phase3ViewSet):
@@ -133,8 +133,7 @@ class SchoolClassViewSet(Phase3ViewSet):
         self.assert_role(UserRole.ADMIN, UserRole.SCHOOL); obj = serializer.save(); record_audit(actor=self.request.user, action="create", entity_type="class", entity_id=obj.id, summary=f"Class {obj.display_name} created", request=self.request)
     def perform_update(self, serializer):
         self.assert_role(UserRole.ADMIN, UserRole.SCHOOL); obj = serializer.save(); record_audit(actor=self.request.user, action="update", entity_type="class", entity_id=obj.id, summary=f"Class {obj.display_name} updated", request=self.request)
-    def perform_destroy(self, instance):
-        self.assert_role(UserRole.ADMIN, UserRole.SCHOOL); instance.status = "inactive"; instance.save(update_fields=["status", "updated_at"]); record_audit(actor=self.request.user, action="update", entity_type="class", entity_id=instance.id, summary=f"Class {instance.display_name} deactivated", request=self.request)
+    def perform_destroy(self, instance): self.assert_role(UserRole.ADMIN, UserRole.SCHOOL); instance.status = "inactive"; instance.save(update_fields=["status", "updated_at"]); record_audit(actor=self.request.user, action="update", entity_type="class", entity_id=instance.id, summary=f"Class {instance.display_name} deactivated", request=self.request)
 
 
 class StudentViewSet(Phase3ViewSet):
@@ -147,10 +146,8 @@ class StudentViewSet(Phase3ViewSet):
     def perform_create(self, serializer):
         self.assert_role(UserRole.ADMIN, UserRole.SCHOOL, UserRole.TRAINER); serializer.save()
         student = serializer.instance; record_audit(actor=self.request.user, action="create", entity_type="student", entity_id=student.id, summary=f"Student {student.student_id} created", request=self.request)
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data); serializer.is_valid(raise_exception=True); self.perform_create(serializer); student = serializer.instance; payload = StudentReadSerializer(student, context={"request": request}).data; payload["initial_password"] = serializer.generated_password; return Response(payload, status=status.HTTP_201_CREATED, headers=self.get_success_headers(payload))
-    def perform_update(self, serializer):
-        self.assert_role(UserRole.ADMIN, UserRole.SCHOOL, UserRole.TRAINER); student = serializer.save(); record_audit(actor=self.request.user, action="update", entity_type="student", entity_id=student.id, summary=f"Student {student.student_id} updated", request=self.request)
+    def create(self, request, *args, **kwargs): serializer = self.get_serializer(data=request.data); serializer.is_valid(raise_exception=True); self.perform_create(serializer); student = serializer.instance; payload = StudentReadSerializer(student, context={"request": request}).data; payload["initial_password"] = serializer.generated_password; return Response(payload, status=status.HTTP_201_CREATED, headers=self.get_success_headers(payload))
+    def perform_update(self, serializer): self.assert_role(UserRole.ADMIN, UserRole.SCHOOL, UserRole.TRAINER); student = serializer.save(); record_audit(actor=self.request.user, action="update", entity_type="student", entity_id=student.id, summary=f"Student {student.student_id} updated", request=self.request)
     def perform_destroy(self, instance): self.assert_role(UserRole.ADMIN); raise ValidationError("Students are deactivated instead of hard-deleted.")
     @action(detail=True, methods=["post"], url_path="deactivate")
     def deactivate(self, request, pk=None):
