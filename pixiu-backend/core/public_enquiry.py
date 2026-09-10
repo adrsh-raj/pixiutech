@@ -6,7 +6,7 @@ from rest_framework.views import APIView
 from accounts.models import UserRole, UserStatus
 from audit.models import AuditAction
 from audit.services import record_audit
-from .models import Lead, LeadSource, LeadStatus
+from crm.models import Lead, LeadSource, LeadStatus
 
 User = get_user_model()
 
