@@ -24,7 +24,8 @@ from .scoped_contract_views import (
     ScopedContractCurriculumViewSet, ScopedContractInventoryViewSet, ScopedContractLeadViewSet,
     ScopedContractProjectViewSet, ScopedContractQuizAttemptViewSet, ScopedContractQuizViewSet,
     ScopedContractReviewViewSet, ScopedContractSchoolViewSet, ScopedContractStudentViewSet,
-    ScopedContractTrainerViewSet, ScopedContractBillingFullViewSet,
+    ScopedContractTrainerViewSet, ScopedContractBillingFullViewSet, ScopedContractSessionCompatViewSet,
+    ScopedStableAttendanceViewSet,
 )
 from .trainer_materials import TrainerMaterialDetailView, TrainerMaterialFileView, TrainerMaterialListCreateView
 from notifications.views import NotificationPortalViewSet
@@ -36,9 +37,9 @@ router.register("trainers", ScopedContractTrainerViewSet, basename="v1-trainer")
 router.register("trainer-school-assignments", TrainerSchoolAssignmentViewSet, basename="v1-trainer-school-assignment")
 router.register("classes", ScopedContractClassViewSet, basename="v1-class")
 router.register("students", ScopedContractStudentViewSet, basename="v1-student")
-router.register("sessions", ContractSessionCompatViewSet, basename="v1-session")
+router.register("sessions", ScopedContractSessionCompatViewSet, basename="v1-session")
 router.register("session-activities", SessionActivityViewSet, basename="v1-session-activity")
-router.register("attendance", StableAttendanceViewSet, basename="v1-attendance")
+router.register("attendance", ScopedStableAttendanceViewSet, basename="v1-attendance")
 router.register("curriculum", ScopedContractCurriculumViewSet, basename="v1-curriculum")
 router.register("content", ScopedContractContentViewSet, basename="v1-content")
 router.register("quizzes", ScopedContractQuizViewSet, basename="v1-quiz")
