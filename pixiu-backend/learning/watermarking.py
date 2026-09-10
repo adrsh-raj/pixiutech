@@ -60,7 +60,8 @@ def _font(size):
 
 
 def watermark_image(raw_bytes):
-    source = Image.open(io.BytesIO(raw_bytes)).convert("RGBA")
+    original = Image.open(io.BytesIO(raw_bytes))
+    source = original.convert("RGBA")
     overlay = Image.new("RGBA", source.size, (255, 255, 255, 0))
     draw = ImageDraw.Draw(overlay)
     font = _font(max(16, int(min(source.size) / 16)))
@@ -73,7 +74,7 @@ def watermark_image(raw_bytes):
             draw.text((x, y), WATERMARK_TEXT, font=font, fill=(55, 65, 81, 52), stroke_width=1, stroke_fill=(255, 255, 255, 80))
     merged = Image.alpha_composite(source, overlay)
     output = io.BytesIO()
-    original_format = Image.open(io.BytesIO(raw_bytes)).format or "PNG"
+    original_format = original.format or "PNG"
     save_format = "JPEG" if original_format.upper() in {"JPG", "JPEG"} else original_format
     if save_format.upper() == "WEBP":
         merged.save(output, format="WEBP", quality=92)
@@ -84,11 +85,9 @@ def watermark_image(raw_bytes):
     return output.getvalue()
 
 
-def prepare_uploaded_file(uploaded_file, target_role):
+def prepare_uploaded_file(uploaded_file, target_role, watermark_enabled=True):
     role = str(target_role or "student").strip().lower()
-    if role == "trainer":
-        return uploaded_file, False
-    if role not in STUDENT_ROLES:
+    if not watermark_enabled or role == "trainer" or role not in STUDENT_ROLES:
         return uploaded_file, False
 
     extension = Path(uploaded_file.name or "").suffix.lower()
@@ -103,13 +102,13 @@ def prepare_uploaded_file(uploaded_file, target_role):
     return ContentFile(processed, name=_safe_filename(uploaded_file.name)), True
 
 
-def prepare_stored_file(field_file, target_role):
+def prepare_stored_file(field_file, target_role, watermark_enabled=True):
     role = str(target_role or "student").strip().lower()
-    if role == "trainer" or role not in STUDENT_ROLES or not field_file:
+    if not watermark_enabled or role == "trainer" or role not in STUDENT_ROLES or not field_file:
         return field_file, False
     field_file.open("rb")
     try:
         content = ContentFile(field_file.read(), name=field_file.name)
     finally:
         field_file.close()
-    return prepare_uploaded_file(content, target_role)
+    return prepare_uploaded_file(content, target_role, watermark_enabled=True)
