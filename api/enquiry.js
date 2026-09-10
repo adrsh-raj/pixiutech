@@ -24,6 +24,13 @@ function checkRateLimit(ip) {
   return recent.length <= RATE_LIMIT;
 }
 
+function getLmsEnquiryEndpoint() {
+  const explicit = process.env.LMS_ENQUIRY_ENDPOINT?.trim();
+  if (explicit) return explicit;
+  const portal = (process.env.VITE_LMS_URL || 'https://portal.pixiutech.com').trim().replace(/\/+$/, '');
+  return `${portal}/api/v1/public/enquiries`;
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
@@ -56,34 +63,22 @@ export default async function handler(req, res) {
   }
   if (!validEmail(email)) return res.status(400).json({ error: 'Please provide a valid email address.' });
 
-  const endpoint = process.env.ENQUIRY_DELIVERY_ENDPOINT?.trim();
-  if (!endpoint) {
-    console.error('ENQUIRY_DELIVERY_ENDPOINT is not configured.');
-    return res.status(503).json({ error: 'Enquiry service is temporarily unavailable.' });
-  }
+  const endpoint = getLmsEnquiryEndpoint();
 
   try {
     const delivery = await fetch(endpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({
-        'School Name': school,
-        'Contact Person': person,
-        Phone: phone,
-        Email: email,
-        City: city,
-        'Student Strength': strength,
-        Message: message,
-        Source: 'pixiutech.com enquiry form'
-      })
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-Pixiu-Website-Source': 'pixiutech.com' },
+      body: JSON.stringify({ school, person, phone, email, city, strength, message, website: '' })
     });
 
+    const payload = await delivery.json().catch(() => ({}));
     if (!delivery.ok) {
       console.error(`Enquiry delivery failed with status ${delivery.status}.`);
-      return res.status(502).json({ error: 'We could not deliver your enquiry right now. Please try again.' });
+      return res.status(502).json({ error: payload.error || 'We could not deliver your enquiry right now. Please try again.' });
     }
 
-    return res.status(200).json({ success: true });
+    return res.status(200).json({ success: true, lead_id: payload.lead_id || null });
   } catch (error) {
     console.error('Enquiry delivery error:', error.message);
     return res.status(502).json({ error: 'We could not deliver your enquiry right now. Please try again.' });
