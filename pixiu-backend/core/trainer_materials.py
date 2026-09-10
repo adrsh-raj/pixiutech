@@ -102,7 +102,7 @@ class TrainerMaterialListCreateView(APIView):
             level=level,
             target_role="trainer",
             status="published",
-            is_watermarked=True,
+            is_watermarked=False,
             created_by=request.user,
         )
         try:
