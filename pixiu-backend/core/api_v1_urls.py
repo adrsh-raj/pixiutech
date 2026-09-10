@@ -9,7 +9,8 @@ from audit.views import AuditLogViewSet
 from billing.contract_views import ContractViewSet, billing_summary
 from billing.views import InvoiceLineItemViewSet, InvoiceViewSet, PaymentViewSet, ReceiptViewSet
 from inventory.views import KitComponentViewSet, KitMaintenanceViewSet, KitViewSet
-from learning.views import SessionActivityViewSet, QuizQuestionViewSet, QuizAssignmentViewSet, ProjectEvidenceViewSet
+from learning.views import SessionActivityViewSet, ProjectEvidenceViewSet
+from learning.views import QuizAssignmentViewSet
 from .analytics import SchoolPerformanceView, StudentProgressView, TrainerPerformanceView
 from .class_ranking import ClassRankingView
 from .api_v1_compat import (
@@ -20,6 +21,7 @@ from .api_v1_compat import (
 )
 from .phase7_compat_extras import ContractBillingFullViewSet, ContractCommunicationLogViewSet
 from .phase7_contract_overrides import ContractSessionCompatViewSet
+from .learning_contract_overrides import StableQuizQuestionViewSet
 from .trainer_materials import TrainerMaterialDetailView, TrainerMaterialFileView, TrainerMaterialListCreateView
 from notifications.views import NotificationPortalViewSet
 from learning.quiz_portal import QuizSingleAttemptView, QuizReviewView
@@ -36,7 +38,7 @@ router.register("attendance", ContractAttendanceViewSet, basename="v1-attendance
 router.register("curriculum", ContractCurriculumViewSet, basename="v1-curriculum")
 router.register("content", ContractContentViewSet, basename="v1-content")
 router.register("quizzes", ContractQuizViewSet, basename="v1-quiz")
-router.register("quiz-questions", QuizQuestionViewSet, basename="v1-quiz-question")
+router.register("quiz-questions", StableQuizQuestionViewSet, basename="v1-quiz-question")
 router.register("quiz-assignments", QuizAssignmentViewSet, basename="v1-quiz-assignment")
 router.register("quiz-submissions", ContractQuizAttemptViewSet, basename="v1-quiz-submission")
 router.register("reviews", ContractReviewViewSet, basename="v1-review")
