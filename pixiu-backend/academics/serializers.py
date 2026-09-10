@@ -37,15 +37,24 @@ class TrainerSerializer(serializers.ModelSerializer):
             "status", "created_at", "updated_at",
         ]
         read_only_fields = ["id", "account_username", "created_at", "updated_at"]
-        extra_kwargs = {"trainer_id": {"required": False, "allow_blank": True}}
+        extra_kwargs = {"trainer_id": {"required": False, "allow_blank": True, "allow_null": True}}
 
     def validate_trainer_id(self, value):
+        if value in (None, ""):
+            return value
         value = value.strip().upper()
         if self.instance is not None and value != self.instance.trainer_id:
             raise serializers.ValidationError("Trainer ID is immutable because it is the account username.")
         if Trainer.objects.filter(trainer_id=value).exclude(pk=getattr(self.instance, "pk", None)).exists():
             raise serializers.ValidationError("Trainer ID already exists.")
         return value
+
+    def validate_status(self, value):
+        normalized = str(value or "").strip().lower()
+        aliases = {"active": "active", "inactive": "inactive", "enabled": "active", "disabled": "inactive"}
+        if normalized not in aliases:
+            raise serializers.ValidationError("Status must be active or inactive.")
+        return aliases[normalized]
 
 
 class TrainerSchoolAssignmentSerializer(serializers.ModelSerializer):
