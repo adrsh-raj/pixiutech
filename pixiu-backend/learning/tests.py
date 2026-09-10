@@ -10,7 +10,7 @@ from academics.services import provision_student
 
 from .models import AttendanceRecord, CurriculumClassAssignment, CurriculumUnit, LearningContent, Project, ProjectEvidence, Quiz, QuizClassAssignment, QuizQuestion, Session, StudentAssessment
 from .serializers import AttendanceRecordSerializer, ContentClassAssignmentSerializer, CurriculumClassAssignmentSerializer, LearningContentSerializer, ProjectSerializer, QuizClassAssignmentSerializer
-from .services import grade_attempt
+from .services import accessible_quizzes, grade_attempt
 from .views import AttendanceViewSet, CurriculumAssignmentViewSet, ProjectViewSet, QuizViewSet, SessionViewSet
 
 
@@ -99,6 +99,11 @@ class Phase4DomainTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertNotIn("correct_option", str(response.data))
         self.assertNotIn("explanation", str(response.data))
+
+    def test_trainer_sees_owned_quiz_even_before_class_assignment(self):
+        quiz = Quiz.objects.create(title="Trainer Draft Quiz", grade="8", level="Level 1", status="active", created_by=self.trainer_user)
+        visible = accessible_quizzes(self.trainer_user).filter(pk=quiz.pk).exists()
+        self.assertTrue(visible)
 
     def test_quiz_attempt_limit_is_enforced(self):
         quiz = Quiz.objects.create(title="Retry Test", grade="8", level="Level 1", max_attempts=1, status="active", created_by=self.admin)
