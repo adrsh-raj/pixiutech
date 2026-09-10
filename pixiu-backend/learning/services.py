@@ -2,6 +2,7 @@ from datetime import datetime, time, timedelta
 from decimal import Decimal
 
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
@@ -80,7 +81,7 @@ def accessible_quizzes(user):
     if user.role == UserRole.STUDENT:
         return qs.filter(status="active", class_assignments__school_class_id__in=assigned_class_ids(user)).distinct()
     if user.role == UserRole.TRAINER:
-        return qs.filter(class_assignments__school_class_id__in=assigned_class_ids(user)).distinct()
+        return qs.filter(Q(created_by_id=user.id) | Q(class_assignments__school_class_id__in=assigned_class_ids(user))).distinct()
     if user.role == UserRole.SCHOOL:
         return qs.filter(class_assignments__school_class_id__in=assigned_class_ids(user)).distinct()
     return qs.none()
@@ -332,4 +333,5 @@ def grade_attempt(*, quiz, student: Student, answers: dict, time_taken_seconds=0
         normalized[str(question.id)] = selected; attempted += 1
         if selected == question.correct_option: correct += 1; score += Decimal(question.points)
     percentage = (score / total * Decimal("100")) if total else Decimal("0")
-    return QuizAttempt.objects.create(quiz=locked_quiz, student=student, attempt_number=existing + 1, answers=normalized, score=score, total_marks=total, percentage=percentage.quantize(Decimal("0.01")), correct_count=correct, attempted_count=attempted, total_questions=len(questions), time_taken_seconds=max(0, int(time_taken_seconds or 0)), violation_count=max(0, int(violation_count or 0)))
+    attempt = QuizAttempt.objects.create(quiz=locked_quiz, student=student, attempt_number=existing + 1, answers=normalized, score=score, total_marks=total, percentage=percentage.quantize(Decimal("0.01")), correct_count=correct, attempted_count=attempted, total_questions=len(questions), time_taken_seconds=max(0, int(time_taken_seconds or 0)), violation_count=max(0, int(violation_count or 0)), status="completed")
+    return attempt
