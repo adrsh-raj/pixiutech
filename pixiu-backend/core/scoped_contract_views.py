@@ -10,7 +10,9 @@ from .api_v1_compat import (
 )
 from .phase7_contract_overrides import ContractSessionCompatViewSet
 from .learning_attendance_overrides import StableAttendanceViewSet
+from learning.models import ContentClassAssignment, SchoolClass
 from learning.views import ProjectEvidenceViewSet, QuizAssignmentViewSet, SessionActivityViewSet
+from learning.watermarking import prepare_uploaded_file
 from .learning_contract_overrides import StableQuizQuestionViewSet
 
 
@@ -20,8 +22,7 @@ class ScopedDetailMixin:
         scoped = getattr(self, "scoped_queryset", None)
         queryset = scoped() if callable(scoped) else self.get_queryset()
         queryset = self.filter_queryset(queryset)
-        lookup = self.lookup_url_kwarg or self.lookup_field
-        obj = get_object_or_404(queryset, **{self.lookup_field: self.kwargs[lookup]})
+        obj = get_object_or_404(queryset, **{self.lookup_field: self.kwargs[self.lookup_url_kwarg or self.lookup_field]})
         self.check_object_permissions(self.request, obj)
         return obj
 
@@ -29,7 +30,6 @@ class ScopedDetailMixin:
 class ScopedContractAssessmentViewSet(ScopedDetailMixin, ContractAssessmentViewSet): pass
 class ScopedContractAttendanceViewSet(ScopedDetailMixin, ContractAttendanceViewSet): pass
 class ScopedContractClassViewSet(ScopedDetailMixin, ContractClassViewSet): pass
-class ScopedContractContentViewSet(ScopedDetailMixin, ContractContentViewSet): pass
 class ScopedContractCurriculumViewSet(ScopedDetailMixin, ContractCurriculumViewSet): pass
 class ScopedContractInventoryViewSet(ScopedDetailMixin, ContractInventoryViewSet): pass
 class ScopedContractLeadViewSet(ScopedDetailMixin, ContractLeadViewSet): pass
@@ -73,6 +73,42 @@ class ScopedContractTrainerViewSet(ScopedDetailMixin, ContractTrainerViewSet):
         assignments = obj.school_assignments.filter(status="active").select_related("school")
         payload["assigned_schools"] = [assignment.school.school_code for assignment in assignments]
         return payload
+
+
+class ScopedContractContentViewSet(ScopedDetailMixin, ContractContentViewSet):
+    def _prepare_content_file(self, serializer):
+        upload = serializer.validated_data.get("file")
+        if upload is None:
+            return
+        enabled_raw = self.request.data.get("is_watermarked", "true")
+        enabled = str(enabled_raw).strip().lower() not in {"false", "0", "no", "off"}
+        target_role = serializer.validated_data.get("target_role", "student")
+        processed, watermarked = prepare_uploaded_file(upload, target_role, enabled)
+        serializer.validated_data["file"] = processed
+        serializer.validated_data["is_watermarked"] = watermarked
+
+    def perform_create(self, serializer):
+        self.role_only("admin")
+        self._prepare_content_file(serializer)
+        serializer.save(created_by=self.request.user)
+        self._ensure_grade_assignments(serializer.instance)
+
+    def perform_update(self, serializer):
+        self.role_only("admin")
+        self._prepare_content_file(serializer)
+        serializer.save()
+        self._ensure_grade_assignments(serializer.instance)
+
+    def _ensure_grade_assignments(self, content):
+        target_role = str(content.target_role or "student").lower()
+        if target_role not in {"student", "trainer", "all"} or not str(content.grade or "").strip().isdigit():
+            return
+        classes = SchoolClass.objects.filter(status="active", grade=str(content.grade).strip()).only("id")
+        existing = set(content.class_assignments.values_list("school_class_id", flat=True))
+        missing = [ContentClassAssignment(content=content, school_class_id=school_class_id, assigned_by=self.request.user) for school_class_id in classes.values_list("id", flat=True) if school_class_id not in existing]
+        if missing:
+            ContentClassAssignment.objects.bulk_create(missing, ignore_conflicts=True)
+
 
 class ScopedContractBillingFullViewSet(ScopedDetailMixin, ContractBillingFullViewSet): pass
 class ScopedStableAttendanceViewSet(ScopedDetailMixin, StableAttendanceViewSet): pass
