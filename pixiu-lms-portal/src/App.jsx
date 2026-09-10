@@ -18,6 +18,7 @@ import SchoolCredentials from './pages/SchoolCredentials';
 import DataReset from './pages/DataReset';
 import Comms from './pages/Comms';
 import Leads from './pages/Leads';
+import WebsiteEnquiries from './pages/WebsiteEnquiries';
 import SchoolsV2 from './pages/SchoolsV2';
 import Payments from './pages/Payments';
 import Notifications from './pages/Notifications';
@@ -86,6 +87,7 @@ export default function App() {
     <Route path="/" element={<ProtectedLayout />}>
       <Route index element={<AdminOnly><AdminCommandCenter /></AdminOnly>} />
       <Route path="leads" element={<AdminOnly><Leads /></AdminOnly>} />
+      <Route path="website-enquiries" element={<AdminOnly><WebsiteEnquiries /></AdminOnly>} />
       <Route path="schools" element={<AdminOnly><SchoolsV2 /></AdminOnly>} />
       <Route path="payments" element={<AdminOnly><Payments /></AdminOnly>} />
       <Route path="notifications" element={<RoleRoute roles={['admin', 'superadmin', 'school', 'trainer', 'student']}><Notifications /></RoleRoute>} />
