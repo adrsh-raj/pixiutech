@@ -19,16 +19,27 @@ function saveSession(access, refresh, user) {
   if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
 }
 
+async function fetchOnce(url, options = {}, timeoutMs = 20000) {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const signal = options.signal || controller.signal;
+    return await fetch(url, { ...options, signal });
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
 async function fetchWithRetry(url, options = {}) {
   const method = String(options.method || 'GET').toUpperCase();
   const retryable = method === 'GET' || method === 'HEAD';
-  const delays = retryable ? [0, 800, 2000] : [0];
+  const delays = retryable ? [0, 1500, 4000] : [0];
   let lastResponse;
   let lastError;
   for (let attempt = 0; attempt < delays.length; attempt += 1) {
     if (delays[attempt]) await new Promise(resolve => setTimeout(resolve, delays[attempt]));
     try {
-      const response = await fetch(url, options);
+      const response = await fetchOnce(url, options, 20000);
       lastResponse = response;
       if (response.ok || !retryable || ![502, 503, 504].includes(response.status) || attempt === delays.length - 1) return response;
     } catch (error) {
@@ -46,20 +57,13 @@ async function refreshAccessToken() {
     const refresh = localStorage.getItem(REFRESH_KEY);
     if (!refresh) return null;
     try {
-      const response = await fetch(`${API_BASE}/auth/refresh/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refresh }),
-        cache: 'no-store'
-      });
+      const response = await fetchOnce(`${API_BASE}/auth/refresh/`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh }), cache: 'no-store' }, 20000);
       const data = await readJson(response);
       if (!response.ok || !data.access) return null;
       localStorage.setItem(TOKEN_KEY, data.access);
       if (data.refresh) localStorage.setItem(REFRESH_KEY, data.refresh);
       return data.access;
-    } finally {
-      refreshPromise = null;
-    }
+    } finally { refreshPromise = null; }
   })();
   return refreshPromise;
 }
@@ -71,7 +75,6 @@ export async function apiFetch(path, options = {}) {
     if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
     return fetchWithRetry(`${API_BASE}${path}`, { ...options, headers, cache: options.cache || 'no-store' });
   };
-
   let accessToken = localStorage.getItem(TOKEN_KEY);
   let response = await request(accessToken);
   if (response.status === 401 && !String(path).startsWith('/auth/')) {
@@ -82,9 +85,7 @@ export async function apiFetch(path, options = {}) {
 }
 
 export function clearAuthStorage() {
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(REFRESH_KEY);
-  localStorage.removeItem(USER_KEY);
+  localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(REFRESH_KEY); localStorage.removeItem(USER_KEY);
 }
 
 export function AuthProvider({ children }) {
@@ -96,26 +97,15 @@ export function AuthProvider({ children }) {
     let active = true;
     const restoreSession = async () => {
       const savedToken = localStorage.getItem(TOKEN_KEY);
-      if (!savedToken) {
-        if (active) { setToken(null); setUser(null); setLoading(false); }
-        return;
-      }
+      if (!savedToken) { if (active) { setToken(null); setUser(null); setLoading(false); } return; }
       try {
         const response = await apiFetch('/auth/me/');
         if (!response.ok) throw new Error('Session expired');
         const data = await readJson(response);
         if (!data.user?.id || !data.user?.role) throw new Error('Invalid session response');
-        if (active) {
-          setToken(localStorage.getItem(TOKEN_KEY));
-          setUser(data.user);
-          localStorage.setItem(USER_KEY, JSON.stringify(data.user));
-        }
-      } catch {
-        clearAuthStorage();
-        if (active) { setToken(null); setUser(null); }
-      } finally {
-        if (active) setLoading(false);
-      }
+        if (active) { setToken(localStorage.getItem(TOKEN_KEY)); setUser(data.user); localStorage.setItem(USER_KEY, JSON.stringify(data.user)); }
+      } catch { clearAuthStorage(); if (active) { setToken(null); setUser(null); } }
+      finally { if (active) setLoading(false); }
     };
     restoreSession();
     return () => { active = false; };
@@ -123,10 +113,7 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     if (!token) return undefined;
-    const refresh = async () => {
-      const next = await refreshAccessToken();
-      if (next) setToken(next);
-    };
+    const refresh = async () => { const next = await refreshAccessToken(); if (next) setToken(next); };
     const onVisible = () => { if (document.visibilityState === 'visible') refresh(); };
     const interval = window.setInterval(refresh, 15 * 60 * 1000);
     document.addEventListener('visibilitychange', onVisible);
@@ -134,49 +121,33 @@ export function AuthProvider({ children }) {
   }, [token]);
 
   const login = async (username, password, expectedRole = null) => {
-    const cleanUsername = username?.trim();
-    const cleanPassword = password ?? '';
+    const cleanUsername = username?.trim(); const cleanPassword = password ?? '';
     if (!cleanUsername || !cleanPassword) return { success: false, error: 'Username and password are required.' };
-    try {
-      const response = await fetch(`${API_BASE}/auth/login/`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: cleanUsername, password: cleanPassword, role: expectedRole || undefined }), cache: 'no-store'
-      });
-      const data = await readJson(response);
-      if (!response.ok || !data.access || !data.refresh || !data.user) return { success: false, error: data.detail || data.error || 'Invalid username or password.' };
-      setToken(data.access); setUser(data.user); saveSession(data.access, data.refresh, data.user);
-      window.dispatchEvent(new Event('pixiu_auth_state_changed'));
-      return { success: true, user: data.user };
-    } catch {
-      return { success: false, error: 'Authentication service is unavailable. Please try again shortly.' };
+    const body = JSON.stringify({ username: cleanUsername, password: cleanPassword, role: expectedRole || undefined });
+    let lastError = null;
+    for (const delay of [0, 2000, 5000]) {
+      if (delay) await new Promise(resolve => setTimeout(resolve, delay));
+      try {
+        const response = await fetchOnce(`${API_BASE}/auth/login/`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, cache: 'no-store' }, 25000);
+        const data = await readJson(response);
+        if (response.ok && data.access && data.refresh && data.user) {
+          setToken(data.access); setUser(data.user); saveSession(data.access, data.refresh, data.user); window.dispatchEvent(new Event('pixiu_auth_state_changed')); return { success: true, user: data.user };
+        }
+        if (![502, 503, 504].includes(response.status)) return { success: false, error: data.detail || data.error || 'Invalid username or password.' };
+        lastError = new Error(data.detail || 'Authentication service is waking up.');
+      } catch (error) { lastError = error; }
     }
+    return { success: false, error: lastError?.name === 'AbortError' ? 'Authentication service is taking too long to respond. Please try again.' : 'Authentication service is waking up or temporarily unavailable. Please try again.' };
   };
 
   const logout = async () => {
-    const currentToken = token || localStorage.getItem(TOKEN_KEY);
-    const refresh = localStorage.getItem(REFRESH_KEY);
-    try {
-      if (currentToken && refresh) {
-        await fetch(`${API_BASE}/auth/logout/`, {
-          method: 'POST', headers: { Authorization: `Bearer ${currentToken}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refresh }), cache: 'no-store'
-        });
-      }
-    } catch {
-      // Local cleanup still happens if the API is unavailable.
-    } finally {
-      setUser(null); setToken(null); clearAuthStorage();
-      Object.keys(localStorage).filter(key => key.startsWith('pixiu_') && key.includes(':')).forEach(key => localStorage.removeItem(key));
-      window.dispatchEvent(new Event('pixiu_auth_state_changed'));
+    const currentToken = token || localStorage.getItem(TOKEN_KEY); const refresh = localStorage.getItem(REFRESH_KEY);
+    try { if (currentToken && refresh) await fetchOnce(`${API_BASE}/auth/logout/`, { method: 'POST', headers: { Authorization: `Bearer ${currentToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh }), cache: 'no-store' }, 15000); } catch {} finally {
+      setUser(null); setToken(null); clearAuthStorage(); Object.keys(localStorage).filter(key => key.startsWith('pixiu_') && key.includes(':')).forEach(key => localStorage.removeItem(key)); window.dispatchEvent(new Event('pixiu_auth_state_changed'));
     }
   };
 
   const value = useMemo(() => ({ user, token, role: user?.role || null, isAuthenticated: Boolean(user && token), loading, login, logout }), [user, token, loading]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth must be used inside AuthProvider');
-  return context;
-};
+export const useAuth = () => { const context = useContext(AuthContext); if (!context) throw new Error('useAuth must be used inside AuthProvider'); return context; };
