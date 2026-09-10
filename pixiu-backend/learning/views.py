@@ -40,8 +40,7 @@ class LearningViewSet(viewsets.ModelViewSet):
         super().initial(request, *args, **kwargs)
 
     def get_object(self):
-        queryset = self.scoped_queryset()
-        queryset = self.filter_queryset(queryset)
+        queryset = self.filter_queryset(self.queryset)
         obj = get_object_or_404(queryset, **{self.lookup_field: self.kwargs[self.lookup_url_kwarg or self.lookup_field]})
         self.check_object_permissions(self.request, obj)
         return obj
@@ -79,7 +78,7 @@ class SessionViewSet(LearningViewSet):
 class SessionActivityViewSet(LearningViewSet):
     queryset = SessionActivity.objects.select_related("session", "created_by")
     serializer_class = SessionActivitySerializer
-    def scoped_queryset(self): return self.queryset.filter(session_id__in=accessible_sessions(self.request.user).values("id"))
+    def scoped_queryset(self.scoped_queryset): return self.queryset.filter(session_id__in=accessible_sessions(self.request.user).values("id"))
     def perform_create(self, serializer):
         self.role_only(UserRole.ADMIN, UserRole.SCHOOL, UserRole.TRAINER)
         session = serializer.validated_data["session"]
