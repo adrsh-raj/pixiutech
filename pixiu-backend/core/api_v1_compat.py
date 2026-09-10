@@ -98,11 +98,14 @@ def _legacy_school(obj):
 
 
 def _legacy_trainer(obj):
-    return {"id": str(obj.pk), "trainer_id": obj.trainer_id, "name": obj.name, "email": getattr(obj.account, "email", "") if obj.account_id else "", "phone": obj.phone, "status": obj.status}
+    assignments = TrainerSchoolAssignment.objects.filter(trainer=obj, status="active").select_related("school")
+    assigned_codes = [assignment.school.school_code for assignment in assignments]
+    return {"id": str(obj.pk), "trainer_id": obj.trainer_id, "name": obj.name, "email": getattr(obj.account, "email", "") if obj.account_id else "", "phone": obj.phone, "status": obj.status, "assigned_schools": assigned_codes}
 
 
 def _legacy_student(obj):
-    return {"id": str(obj.pk), "student_id": obj.student_id, "name": obj.name, "email": getattr(obj.account, "email", "") if obj.account_id else "", "status": obj.status, "class_id": str(obj.school_class_id) if obj.school_class_id else ""}
+    school = obj.school_class.school if obj.school_class_id else None
+    return {"id": str(obj.pk), "student_id": obj.student_id, "name": obj.name, "email": getattr(obj.account, "email", "") if obj.account_id else "", "status": obj.status, "class_id": str(obj.school_class_id) if obj.school_class_id else "", "class_name": obj.school_class.display_name if obj.school_class_id else "", "school_id": school.school_code if school else "", "school_code": school.school_code if school else "", "school": school.name if school else "", "school_name": school.name if school else "", "roll_number": obj.roll_number}
 
 
 def _legacy_class(obj):
@@ -187,6 +190,15 @@ class ContractStudentViewSet(LegacyShapeMixin, StudentViewSet):
 
     def map_out(self, obj):
         return _legacy_student(obj)
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=self.map_in(request.data))
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        student = serializer.instance
+        payload = _legacy_student(student)
+        payload["initial_password"] = serializer.generated_password
+        return Response(payload, status=status.HTTP_201_CREATED, headers=self.get_success_headers(payload))
 
 
 class ContractSessionViewSet(LegacyShapeMixin, SessionViewSet):
