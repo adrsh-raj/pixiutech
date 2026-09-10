@@ -12,43 +12,44 @@ from inventory.views import KitMaintenanceViewSet
 from learning.views import SessionActivityViewSet, ProjectEvidenceViewSet, QuizAssignmentViewSet
 from .analytics import SchoolPerformanceView, StudentProgressView, TrainerPerformanceView
 from .class_ranking import ClassRankingView
-from .api_v1_compat import (
-    ContractAssessmentViewSet, ContractClassViewSet, ContractContentViewSet,
-    ContractCurriculumViewSet, ContractInventoryViewSet, ContractLeadViewSet,
-    ContractProjectViewSet, ContractQuizAttemptViewSet, ContractQuizViewSet,
-    ContractReviewViewSet, ContractSchoolViewSet, ContractStudentViewSet,
-    ContractTrainerViewSet, health, upload,
-)
-from .phase7_compat_extras import ContractBillingFullViewSet, ContractCommunicationLogViewSet
+from .api_v1_compat import health, upload
+from .phase7_compat_extras import ContractCommunicationLogViewSet
 from .phase7_contract_overrides import ContractSessionCompatViewSet
 from .learning_contract_overrides import StableQuizQuestionViewSet
 from .learning_attendance_overrides import StableAttendanceViewSet
 from .inventory_contract_overrides import JsonKitComponentViewSet, JsonKitViewSet
 from .billing_contract_overrides import TransactionalInvoiceViewSet
+from .scoped_contract_views import (
+    ScopedContractAssessmentViewSet, ScopedContractClassViewSet, ScopedContractContentViewSet,
+    ScopedContractCurriculumViewSet, ScopedContractInventoryViewSet, ScopedContractLeadViewSet,
+    ScopedContractProjectViewSet, ScopedContractQuizAttemptViewSet, ScopedContractQuizViewSet,
+    ScopedContractReviewViewSet, ScopedContractSchoolViewSet, ScopedContractStudentViewSet,
+    ScopedContractTrainerViewSet, ScopedContractBillingFullViewSet,
+)
 from .trainer_materials import TrainerMaterialDetailView, TrainerMaterialFileView, TrainerMaterialListCreateView
 from notifications.views import NotificationPortalViewSet
 from learning.quiz_portal import QuizSingleAttemptView, QuizReviewView
 
 router = DefaultRouter(trailing_slash=False)
-router.register("schools", ContractSchoolViewSet, basename="v1-school")
-router.register("trainers", ContractTrainerViewSet, basename="v1-trainer")
+router.register("schools", ScopedContractSchoolViewSet, basename="v1-school")
+router.register("trainers", ScopedContractTrainerViewSet, basename="v1-trainer")
 router.register("trainer-school-assignments", TrainerSchoolAssignmentViewSet, basename="v1-trainer-school-assignment")
-router.register("classes", ContractClassViewSet, basename="v1-class")
-router.register("students", ContractStudentViewSet, basename="v1-student")
+router.register("classes", ScopedContractClassViewSet, basename="v1-class")
+router.register("students", ScopedContractStudentViewSet, basename="v1-student")
 router.register("sessions", ContractSessionCompatViewSet, basename="v1-session")
 router.register("session-activities", SessionActivityViewSet, basename="v1-session-activity")
 router.register("attendance", StableAttendanceViewSet, basename="v1-attendance")
-router.register("curriculum", ContractCurriculumViewSet, basename="v1-curriculum")
-router.register("content", ContractContentViewSet, basename="v1-content")
-router.register("quizzes", ContractQuizViewSet, basename="v1-quiz")
+router.register("curriculum", ScopedContractCurriculumViewSet, basename="v1-curriculum")
+router.register("content", ScopedContractContentViewSet, basename="v1-content")
+router.register("quizzes", ScopedContractQuizViewSet, basename="v1-quiz")
 router.register("quiz-questions", StableQuizQuestionViewSet, basename="v1-quiz-question")
 router.register("quiz-assignments", QuizAssignmentViewSet, basename="v1-quiz-assignment")
-router.register("quiz-submissions", ContractQuizAttemptViewSet, basename="v1-quiz-submission")
-router.register("reviews", ContractReviewViewSet, basename="v1-review")
-router.register("assessments", ContractAssessmentViewSet, basename="v1-assessment")
-router.register("projects", ContractProjectViewSet, basename="v1-project")
+router.register("quiz-submissions", ScopedContractQuizAttemptViewSet, basename="v1-quiz-submission")
+router.register("reviews", ScopedContractReviewViewSet, basename="v1-review")
+router.register("assessments", ScopedContractAssessmentViewSet, basename="v1-assessment")
+router.register("projects", ScopedContractProjectViewSet, basename="v1-project")
 router.register("project-evidence", ProjectEvidenceViewSet, basename="v1-project-evidence")
-router.register("billing", ContractBillingFullViewSet, basename="v1-billing-compat")
+router.register("billing", ScopedContractBillingFullViewSet, basename="v1-billing-compat")
 router.register("invoices", TransactionalInvoiceViewSet, basename="v1-invoice")
 router.register("contracts", ContractViewSet, basename="v1-contract")
 router.register("billing-lines", InvoiceLineItemViewSet, basename="v1-billing-line")
@@ -57,8 +58,8 @@ router.register("receipts", ReceiptViewSet, basename="v1-receipt")
 router.register("kits", JsonKitViewSet, basename="v1-kit")
 router.register("kit-components", JsonKitComponentViewSet, basename="v1-kit-component")
 router.register("kit-maintenance", KitMaintenanceViewSet, basename="v1-kit-maintenance")
-router.register("inventory", ContractInventoryViewSet, basename="v1-inventory")
-router.register("leads", ContractLeadViewSet, basename="v1-lead")
+router.register("inventory", ScopedContractInventoryViewSet, basename="v1-inventory")
+router.register("leads", ScopedContractLeadViewSet, basename="v1-lead")
 router.register("notifications", NotificationPortalViewSet, basename="v1-notification")
 router.register("comms", ContractCommunicationLogViewSet, basename="v1-comms")
 router.register("logs", AuditLogViewSet, basename="v1-audit-log")
