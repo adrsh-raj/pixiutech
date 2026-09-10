@@ -12,8 +12,7 @@ def validate_indian_phone(value, field_name="Phone"):
     value = str(value or "").strip().replace(" ", "")
     if not value:
         return ""
-    if not serializers.RegexField(regex=PHONE_RE).run_validation(value):
-        raise serializers.ValidationError(f"{field_name} must contain exactly 10 digits.")
+    serializers.RegexField(regex=PHONE_RE).run_validation(value)
     return value
 
 
@@ -43,6 +42,7 @@ class SchoolSerializer(serializers.ModelSerializer):
 
 class TrainerSerializer(serializers.ModelSerializer):
     account_username = serializers.CharField(source="account.username", read_only=True)
+    status = serializers.CharField(required=False, allow_blank=False)
 
     class Meta:
         model = Trainer
@@ -106,14 +106,11 @@ class SchoolClassSerializer(serializers.ModelSerializer):
         school = attrs.get("school", current_school)
         grade = str(attrs.get("grade", getattr(self.instance, "grade", ""))).strip().upper()
         section = str(attrs.get("section", getattr(self.instance, "section", ""))).strip().upper()
-
         if request.user.role == "school" and (not school or school.account_id != request.user.id):
             raise serializers.ValidationError("A school can only manage its own classes.")
-
         if self.instance is not None and self.instance.students.exists():
             if school != self.instance.school or grade != self.instance.grade or section != self.instance.section:
                 raise serializers.ValidationError("A class with students cannot change school, grade, or section because those fields define student IDs.")
-
         if school and SchoolClass.objects.filter(school=school, grade=grade, section=section).exclude(pk=getattr(self.instance, "pk", None)).exists():
             raise serializers.ValidationError("This class already exists for the school.")
         attrs["grade"] = grade
