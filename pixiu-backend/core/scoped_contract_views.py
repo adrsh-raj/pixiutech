@@ -1,22 +1,12 @@
 from django.shortcuts import get_object_or_404
+from rest_framework import status
+from rest_framework.response import Response
 
 from .api_v1_compat import (
-    ContractAssessmentViewSet,
-    ContractAttendanceViewSet,
-    ContractClassViewSet,
-    ContractContentViewSet,
-    ContractCurriculumViewSet,
-    ContractInventoryViewSet,
-    ContractLeadViewSet,
-    ContractProjectViewSet,
-    ContractQuizAttemptViewSet,
-    ContractQuizViewSet,
-    ContractReviewViewSet,
-    ContractSchoolViewSet,
-    ContractSessionViewSet,
-    ContractStudentViewSet,
-    ContractTrainerViewSet,
-    ContractBillingFullViewSet,
+    ContractAssessmentViewSet, ContractAttendanceViewSet, ContractClassViewSet, ContractContentViewSet,
+    ContractCurriculumViewSet, ContractInventoryViewSet, ContractLeadViewSet, ContractProjectViewSet,
+    ContractQuizAttemptViewSet, ContractQuizViewSet, ContractReviewViewSet, ContractSchoolViewSet,
+    ContractSessionViewSet, ContractStudentViewSet, ContractTrainerViewSet, ContractBillingFullViewSet,
 )
 from .phase7_contract_overrides import ContractSessionCompatViewSet
 from .learning_attendance_overrides import StableAttendanceViewSet
@@ -26,7 +16,6 @@ from .learning_contract_overrides import StableQuizQuestionViewSet
 
 class ScopedDetailMixin:
     """Make legacy compatibility detail operations use the same scope as list operations."""
-
     def get_object(self):
         scoped = getattr(self, "scoped_queryset", None)
         queryset = scoped() if callable(scoped) else self.get_queryset()
@@ -51,8 +40,40 @@ class ScopedContractReviewViewSet(ScopedDetailMixin, ContractReviewViewSet): pas
 class ScopedContractSchoolViewSet(ScopedDetailMixin, ContractSchoolViewSet): pass
 class ScopedContractSessionViewSet(ScopedDetailMixin, ContractSessionViewSet): pass
 class ScopedContractSessionCompatViewSet(ScopedDetailMixin, ContractSessionCompatViewSet): pass
-class ScopedContractStudentViewSet(ScopedDetailMixin, ContractStudentViewSet): pass
-class ScopedContractTrainerViewSet(ScopedDetailMixin, ContractTrainerViewSet): pass
+
+class ScopedContractStudentViewSet(ScopedDetailMixin, ContractStudentViewSet):
+    def map_out(self, obj):
+        payload = super().map_out(obj)
+        school = getattr(getattr(obj, "school_class", None), "school", None)
+        school_class = getattr(obj, "school_class", None)
+        payload.update({
+            "school_id": school.school_code if school else "",
+            "school_code": school.school_code if school else "",
+            "school_name": school.name if school else "",
+            "class_name": school_class.display_name if school_class else "",
+            "roll_number": obj.roll_number,
+            "account_username": getattr(obj.account, "username", "") if obj.account_id else "",
+        })
+        return payload
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=self.map_in(request.data))
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        payload = self.map_out(serializer.instance)
+        password = getattr(serializer, "generated_password", None)
+        if password:
+            payload["initial_password"] = password
+        return Response(payload, status=status.HTTP_201_CREATED, headers=self.get_success_headers(payload))
+
+
+class ScopedContractTrainerViewSet(ScopedDetailMixin, ContractTrainerViewSet):
+    def map_out(self, obj):
+        payload = super().map_out(obj)
+        assignments = obj.school_assignments.filter(status="active").select_related("school")
+        payload["assigned_schools"] = [assignment.school.school_code for assignment in assignments]
+        return payload
+
 class ScopedContractBillingFullViewSet(ScopedDetailMixin, ContractBillingFullViewSet): pass
 class ScopedStableAttendanceViewSet(ScopedDetailMixin, StableAttendanceViewSet): pass
 class ScopedSessionActivityViewSet(ScopedDetailMixin, SessionActivityViewSet): pass
