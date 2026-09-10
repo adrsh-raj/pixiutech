@@ -1,3 +1,5 @@
+from urllib.parse import quote
+
 from django.conf import settings
 from django.db import transaction
 from django.http import JsonResponse
@@ -68,7 +70,7 @@ def _public_payload(student, request=None):
     verified = bool(issuance and certified and completed >= COMPLETION_LEVELS)
     certificate_ref = _certificate_ref(student, issuance)
     public_origin = str(getattr(settings, 'PUBLIC_APP_URL', 'https://pixiutech.com')).rstrip('/')
-    verify_url = f"{public_origin}/verify?id={student.student_id}"
+    verify_url = f"{public_origin}/verify?id={quote(str(student.student_id).strip())}"
     project_rows = [
         {'title': project.title, 'status': project.status, 'score': float(project.score) if project.score is not None else None, 'completed_at': project.completed_at.isoformat() if project.completed_at else None}
         for project in student.projects.all().order_by('-updated_at')
@@ -95,7 +97,7 @@ def _public_payload(student, request=None):
         'completion_count': completed,
         'required_completion_count': COMPLETION_LEVELS,
         'issued': bool(issuance and certified),
-        'issued_by': issuance.actor.display_name if issuance and issuance.actor else '' if issuance else '',
+        'issued_by': issuance.actor.display_name if issuance and issuance.actor else '',
         'issued_at': issuance.created_at.isoformat() if issuance else None,
         'assessments': [
             {'level': row.level, 'unit_code': row.unit_code, 'title': row.title, 'score': float(row.score) if row.score is not None else None, 'rating': float(row.rating) if row.rating is not None else None, 'feedback': row.feedback, 'assessment_date': row.assessment_date.isoformat(), 'trainer_name': row.trainer.name}
