@@ -12,6 +12,7 @@ from inventory.views import KitMaintenanceViewSet
 from .analytics import SchoolPerformanceView, StudentProgressView, TrainerPerformanceView
 from .class_ranking import ClassRankingView
 from .api_v1_compat import health, upload
+from .certificate_views import IssueCertificateView, VerifyCertificateView
 from .phase7_compat_extras import ContractCommunicationLogViewSet
 from .learning_contract_overrides import StableQuizQuestionViewSet
 from .learning_attendance_overrides import StableAttendanceViewSet
@@ -72,6 +73,8 @@ urlpatterns = [
     path("auth/refresh/", RefreshView.as_view(), name="v1-refresh"),
     path("auth/logout/", LogoutView.as_view(), name="v1-logout"),
     path("auth/me/", MeView.as_view(), name="v1-me"),
+    path("certificates/issue/<uuid:pk>", IssueCertificateView.as_view(), name="v1-certificate-issue"),
+    path("public/certificates/verify/<str:student_id>", VerifyCertificateView.as_view(), name="v1-certificate-verify"),
     path("schools/<uuid:pk>/reset-password", SchoolProfilePasswordResetView.as_view(), name="v1-school-password-reset"),
     path("schools/<uuid:pk>/activate", activate_school, name="v1-school-activate"),
     path("trainers/<uuid:pk>/reset-password", TrainerProfilePasswordResetView.as_view(), name="v1-trainer-password-reset"),
