@@ -11,6 +11,7 @@ import TrainerClasses from './pages/TrainerClasses';
 import TrainerAttendance from './pages/TrainerAttendance';
 import TrainerMaterials from './pages/TrainerMaterials';
 import TrainerReviews from './pages/TrainerReviews';
+import TrainerCertificates from './pages/TrainerCertificates';
 import StudentClasses from './pages/StudentClasses';
 import TrainerCredentials from './pages/TrainerCredentials';
 import SchoolCredentials from './pages/SchoolCredentials';
@@ -97,6 +98,7 @@ export default function App() {
       <Route path="trainer-classes" element={<RoleRoute roles={['trainer']}><TrainerClasses /></RoleRoute>} />
       <Route path="trainer-materials" element={<RoleRoute roles={['admin', 'superadmin', 'trainer']}><TrainerMaterials /></RoleRoute>} />
       <Route path="trainer-credentials" element={<AdminOnly><TrainerCredentials /></AdminOnly>} />
+      <Route path="trainer-certificates" element={<RoleRoute roles={['admin', 'superadmin', 'trainer']}><TrainerCertificates /></RoleRoute>} />
       <Route path="school-credentials" element={<AdminOnly><SchoolCredentials /></AdminOnly>} />
       <Route path="data-reset" element={<AdminOnly><DataReset /></AdminOnly>} />
       <Route path="content" element={<RoleRoute roles={['admin', 'superadmin', 'trainer', 'student']}><ContentHub /></RoleRoute>} />
