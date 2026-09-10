@@ -29,6 +29,7 @@ from .scoped_contract_views import (
     ScopedStableAttendanceViewSet, ScopedSessionActivityViewSet, ScopedStableQuizQuestionViewSet,
     ScopedQuizAssignmentViewSet, ScopedProjectEvidenceViewSet,
 )
+from .learning_content_files import LearningContentFileView
 from .trainer_materials import TrainerMaterialDetailView, TrainerMaterialFileView, TrainerMaterialListCreateView
 from notifications.views import NotificationPortalViewSet
 from learning.quiz_portal import QuizSingleAttemptView, QuizReviewView
@@ -83,6 +84,7 @@ urlpatterns = [
     path("trainer-materials", TrainerMaterialListCreateView.as_view(), name="v1-trainer-material-list-create"),
     path("trainer-materials/<uuid:pk>", TrainerMaterialDetailView.as_view(), name="v1-trainer-material-detail"),
     path("trainer-materials/<uuid:pk>/file", TrainerMaterialFileView.as_view(), name="v1-trainer-material-file"),
+    path("content/<uuid:pk>/file", LearningContentFileView.as_view(), name="v1-learning-content-file"),
     path("billing-summary", billing_summary, name="v1-billing-summary"),
     path("class-ranking", ClassRankingView.as_view(), name="v1-class-ranking"),
     path("student-progress", StudentProgressView.as_view(), name="v1-student-progress"),
