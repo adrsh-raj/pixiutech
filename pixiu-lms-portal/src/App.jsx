@@ -70,7 +70,6 @@ function AttendanceRoute() { const { user } = useAuth(); return user?.role === '
 function StudentRouteGuard() { const { isAuthenticated, user, loading } = useAuth(); if (loading) return <LoadingScreen />; if (!isAuthenticated) return <Navigate to="/login" replace />; if (user?.role !== 'student') return <Navigate to="/" replace />; return <StudentPortal />; }
 function SchoolRouteGuard() { const { isAuthenticated, user, loading } = useAuth(); if (loading) return <LoadingScreen />; if (!isAuthenticated) return <Navigate to="/login" replace />; if (user?.role !== 'school') return <Navigate to="/" replace />; return <SchoolPortal />; }
 function GuestRouteGuard({ children }) { const { isAuthenticated, user, loading } = useAuth(); if (loading) return <LoadingScreen />; if (isAuthenticated && user) { const destination = user.role === 'student' ? '/student-portal' : user.role === 'school' ? '/school-portal' : user.role === 'trainer' ? '/trainers' : '/'; return <Navigate to={destination} replace />; } return children; }
-function StudentRoleRoute() { const { isAuthenticated, user, loading } = useAuth(); if (loading) return <LoadingScreen />; if (!isAuthenticated) return <Navigate to="/login" replace />; if (user?.role !== 'student') return <Navigate to="/" replace />; return <ClassRankingPage />; }
 function TrainerRoleRoute() { const { isAuthenticated, user, loading } = useAuth(); if (loading) return <LoadingScreen />; if (!isAuthenticated) return <Navigate to="/login" replace />; if (!['trainer', 'admin', 'superadmin'].includes(user?.role)) return <Navigate to="/" replace />; return <ClassRankingPage />; }
 function SchoolPerformanceRoute() { return <PerformanceAnalyticsPage role="school" />; }
 function SessionsRoute() { const { user } = useAuth(); return user?.role === 'student' ? <StudentClasses /> : <ClassesSessionsCenter />; }
@@ -108,7 +107,6 @@ export default function App() {
       <Route path="school-progress-reports" element={<RoleRoute roles={['school']}><SchoolProgressReports /></RoleRoute>} />
       <Route path="school-ranking" element={<RoleRoute roles={['school']}><Navigate to="/school-progress-reports" replace /></RoleRoute>} />
       <Route path="trainer-ranking" element={<TrainerRoleRoute />} />
-      <Route path="student-ranking" element={<StudentRoleRoute />} />
       <Route path="billing" element={<RoleRoute roles={['admin', 'superadmin', 'school']}><BillingCenter /></RoleRoute>} />
       <Route path="inventory" element={<RoleRoute roles={['admin', 'superadmin', 'school', 'trainer', 'student']}><HardwareKitsV2 /></RoleRoute>} />
       <Route path="quizzes" element={<RoleRoute roles={['student', 'trainer', 'admin', 'superadmin']}><QuizHub /></RoleRoute>} />
