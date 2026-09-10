@@ -16,9 +16,9 @@ export const PORTAL_NAVIGATION = {
     { title: 'EXPLORE', links: [{ name: 'Virtual Arduino Lab', href: '/simulation', icon: Cpu }, { name: 'Learning Materials', href: '/content', icon: PlaySquare }, { name: 'Hardware & Kits', href: '/inventory', icon: Box }] },
   ],
   school: [
-    { title: 'MY SCHOOL', links: [{ name: 'Overview', key: 'overview', icon: LayoutDashboard }, { name: 'My Classes', key: 'classes', icon: School }, { name: 'Students', key: 'students', icon: Users }, { name: 'Trainers', key: 'trainers', icon: GraduationCap }] },
-    { title: 'ACADEMICS', links: [{ name: 'Attendance', href: '/attendance', icon: CalendarDays }, { name: 'Sessions', href: '/sessions', icon: CalendarDays }, { name: 'Curriculum', key: 'curriculum', icon: BookOpen }, { name: 'Learning Materials', href: '/content', icon: PlaySquare }] },
-    { title: 'PERFORMANCE', links: [{ name: 'School Performance', href: '/school-performance', icon: BarChart3 }, { name: 'Class Performance', href: '/school-ranking', icon: Trophy }, { name: 'Student Rankings', href: '/school-ranking', icon: Trophy }, { name: 'Progress', key: 'progress', icon: WalletCards }] },
+    { title: 'MY SCHOOL', links: [{ name: 'Overview', key: 'overview', icon: LayoutDashboard }, { name: 'Students', key: 'students', icon: Users }, { name: 'Trainers', key: 'trainers', icon: GraduationCap }] },
+    { title: 'ACADEMICS', links: [{ name: 'Attendance', href: '/attendance', icon: CalendarDays }] },
+    { title: 'PERFORMANCE', links: [{ name: 'Progress Reports', href: '/school-progress-reports', icon: BarChart3 }, { name: 'School Performance', href: '/school-performance', icon: BarChart3 }] },
     { title: 'FINANCE', links: [{ name: 'Billing & Contracts', href: '/billing', icon: WalletCards }] },
     { title: 'COMMUNICATION', links: [{ name: 'Announcements', key: 'announcements', icon: Megaphone }, { name: 'Notifications', href: '/notifications', icon: ReceiptText }] },
     { title: 'LAB', links: [{ name: 'Virtual Arduino Lab', href: '/simulation', icon: Cpu }, { name: 'Hardware & Kits', href: '/inventory', icon: Box }] },
