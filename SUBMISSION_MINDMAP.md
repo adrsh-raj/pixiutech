@@ -19,6 +19,14 @@ mindmap
         School scoped
         Class scoped
         Active/inactive lifecycle
+        Edit student profile data
+        Keep Student ID + class canonical
+      Student PDF
+        Live attendance
+        Live assessments
+        Live projects
+        Pixiu Tech branded transcript
+        Certificate mode only after verified issuance
     Academic workflow
       Classes & Sessions
         Scope by school/trainer
@@ -33,6 +41,24 @@ mindmap
         Server grading
         Attempt limits
         No answer leakage
+    Trainer review & certification
+      Publish six unit evaluations
+      Check 6/6 completion
+      Trainer school-assignment permission
+      Issue graduate certificate from server
+      Record certificate issuance in audit log
+      Generate official certificate report
+      QR points to pixiutech.com/verify
+    Public certificate verification
+      /verify page is public
+      Enter Student ID
+      Open QR verification URL
+      Read server-authoritative registry
+      Show verified / not verified
+      Show student + school + class
+      Show completion + attendance
+      Show assessments + projects
+      Print / Save verified certificate
     Project workflow
       Create project
       Add evidence/photo
@@ -52,6 +78,7 @@ mindmap
       Invoices
       Payments + receipts
       Server-calculated totals
+      Branded invoice PDF
       School cannot create admin-only records
       Clear empty contract state
     Notifications
@@ -76,6 +103,7 @@ mindmap
       Django check
       deploy check
       migrations check
+      certificate routes
       70+ backend tests
       compileall
       frontend build/lint
@@ -84,6 +112,6 @@ mindmap
 
 ## Submission gate
 
-**Must be green before school demo:** login → role dashboard → add student → create class/session → attendance → quiz/project → billing view → kit image flow → notifications → reload and verify saved data.
+**Must be green before school demo:** login → role dashboard → add/edit student → create class/session → attendance → quiz → trainer review → certificate issue → QR `/verify` → project/evidence → billing/invoice PDF → kit image flow → notifications → reload and verify saved data.
 
-**Known external checks:** Render environment variables and persistent object storage cannot be proven from repository source alone; verify these in the deployment dashboard before the live demo.
+**Known external checks:** Render/Vercel environment variables, deployed commit, live CORS/CSRF, persistent object storage and production smoke testing cannot be proven from repository source alone; verify these in the deployment dashboards before the live demo.
