@@ -1,8 +1,7 @@
 from rest_framework import serializers
 
-from academics.services import accessible_class_queryset, accessible_school_queryset, accessible_trainer_queryset
-from accounts.models import UserRole
-from .models import Invoice, InvoiceLineItem, Payment, Receipt, SchoolContract
+from academics.services import accessible_school_queryset
+from .models import Invoice, InvoiceLineItem, Payment, Receipt
 
 
 class InvoiceLineItemSerializer(serializers.ModelSerializer):
@@ -55,10 +54,12 @@ class PaymentRecordSerializer(serializers.ModelSerializer):
 
 class PaymentSerializer(serializers.ModelSerializer):
     receipt_number = serializers.CharField(source="receipt.receipt_number", read_only=True)
+    invoice_number = serializers.CharField(source="invoice.invoice_number", read_only=True)
+    school_code = serializers.CharField(source="invoice.school.school_code", read_only=True)
     class Meta:
         model = Payment
-        fields = ["id", "invoice", "amount", "method", "status", "transaction_reference", "payment_date", "notes", "recorded_by", "created_at", "receipt_number"]
-        read_only_fields = ["id", "status", "recorded_by", "created_at", "receipt_number"]
+        fields = ["id", "invoice", "invoice_number", "school_code", "amount", "method", "status", "transaction_reference", "payment_date", "notes", "recorded_by", "created_at", "receipt_number"]
+        read_only_fields = ["id", "status", "recorded_by", "created_at", "receipt_number", "invoice_number", "school_code"]
 
 
 class ReceiptSerializer(serializers.ModelSerializer):
