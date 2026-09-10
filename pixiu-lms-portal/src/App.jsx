@@ -97,10 +97,10 @@ export default function App() {
       <Route path="trainer-credentials" element={<AdminOnly><TrainerCredentials /></AdminOnly>} />
       <Route path="school-credentials" element={<AdminOnly><SchoolCredentials /></AdminOnly>} />
       <Route path="data-reset" element={<AdminOnly><DataReset /></AdminOnly>} />
-      <Route path="content" element={<RoleRoute roles={['admin', 'superadmin', 'school', 'trainer', 'student']}><ContentHub /></RoleRoute>} />
-      <Route path="curriculum" element={<RoleRoute roles={['admin', 'superadmin', 'school', 'trainer', 'student']}><Curriculum /></RoleRoute>} />
+      <Route path="content" element={<RoleRoute roles={['admin', 'superadmin', 'trainer', 'student']}><ContentHub /></RoleRoute>} />
+      <Route path="curriculum" element={<RoleRoute roles={['admin', 'superadmin', 'trainer', 'student']}><Curriculum /></RoleRoute>} />
       <Route path="attendance" element={<RoleRoute roles={['admin', 'superadmin', 'school', 'trainer']}><AttendanceRoute /></RoleRoute>} />
-      <Route path="sessions" element={<RoleRoute roles={['admin', 'superadmin', 'school', 'trainer', 'student']}><SessionsRoute /></RoleRoute>} />
+      <Route path="sessions" element={<RoleRoute roles={['admin', 'superadmin', 'trainer', 'student']}><SessionsRoute /></RoleRoute>} />
       <Route path="student-progress" element={<RoleRoute roles={['student']}><StudentProgressPage /></RoleRoute>} />
       <Route path="trainer-performance" element={<RoleRoute roles={['admin', 'superadmin', 'trainer']}><PerformanceAnalyticsPage role="trainer" /></RoleRoute>} />
       <Route path="school-performance" element={<RoleRoute roles={['admin', 'superadmin', 'school']}><SchoolPerformanceRoute /></RoleRoute>} />
