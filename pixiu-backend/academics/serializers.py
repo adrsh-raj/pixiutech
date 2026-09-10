@@ -5,6 +5,18 @@ from .models import School, SchoolClass, Student, Trainer, TrainerSchoolAssignme
 from .services import accessible_class_queryset, provision_student
 
 
+PHONE_RE = r"^[0-9]{10}$"
+
+
+def validate_indian_phone(value, field_name="Phone"):
+    value = str(value or "").strip().replace(" ", "")
+    if not value:
+        return ""
+    if not serializers.RegexField(regex=PHONE_RE).run_validation(value):
+        raise serializers.ValidationError(f"{field_name} must contain exactly 10 digits.")
+    return value
+
+
 class SchoolSerializer(serializers.ModelSerializer):
     account_username = serializers.CharField(source="account.username", read_only=True)
 
@@ -24,6 +36,9 @@ class SchoolSerializer(serializers.ModelSerializer):
         if School.objects.filter(school_code=value).exclude(pk=getattr(self.instance, "pk", None)).exists():
             raise serializers.ValidationError("School code already exists.")
         return value
+
+    def validate_phone(self, value):
+        return validate_indian_phone(value, "School phone")
 
 
 class TrainerSerializer(serializers.ModelSerializer):
@@ -48,6 +63,9 @@ class TrainerSerializer(serializers.ModelSerializer):
         if Trainer.objects.filter(trainer_id=value).exclude(pk=getattr(self.instance, "pk", None)).exists():
             raise serializers.ValidationError("Trainer ID already exists.")
         return value
+
+    def validate_phone(self, value):
+        return validate_indian_phone(value, "Trainer phone")
 
     def validate_status(self, value):
         normalized = str(value or "").strip().lower()
@@ -136,6 +154,12 @@ class StudentCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("That roll number is already used in this class.")
         return attrs
 
+    def validate_phone(self, value):
+        return validate_indian_phone(value, "Student phone")
+
+    def validate_guardian_phone(self, value):
+        return validate_indian_phone(value, "Guardian phone")
+
     def create(self, validated_data):
         with transaction.atomic():
             student = Student.objects.create(**validated_data)
@@ -151,6 +175,12 @@ class StudentUpdateSerializer(serializers.ModelSerializer):
             "name", "date_of_birth", "gender", "email", "phone", "guardian_name", "guardian_phone",
             "guardian_email", "address", "current_level", "status",
         ]
+
+    def validate_phone(self, value):
+        return validate_indian_phone(value, "Student phone")
+
+    def validate_guardian_phone(self, value):
+        return validate_indian_phone(value, "Guardian phone")
 
     def update(self, instance, validated_data):
         result = super().update(instance, validated_data)
