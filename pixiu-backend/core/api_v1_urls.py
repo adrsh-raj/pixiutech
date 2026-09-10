@@ -9,19 +9,20 @@ from audit.views import AuditLogViewSet
 from billing.contract_views import ContractViewSet, billing_summary
 from billing.views import InvoiceLineItemViewSet, InvoiceViewSet, PaymentViewSet, ReceiptViewSet
 from inventory.views import KitComponentViewSet, KitMaintenanceViewSet, KitViewSet
-from learning.views import SessionActivityViewSet, ProjectEvidenceViewSet
-from learning.views import QuizAssignmentViewSet
+from learning.views import SessionActivityViewSet, ProjectEvidenceViewSet, QuizAssignmentViewSet
 from .analytics import SchoolPerformanceView, StudentProgressView, TrainerPerformanceView
 from .class_ranking import ClassRankingView
 from .api_v1_compat import (
-    ContractAssessmentViewSet, ContractAttendanceViewSet, ContractClassViewSet, ContractContentViewSet,
-    ContractCurriculumViewSet, ContractInventoryViewSet, ContractLeadViewSet, ContractProjectViewSet,
-    ContractQuizAttemptViewSet, ContractQuizViewSet, ContractReviewViewSet, ContractSessionViewSet,
-    ContractSchoolViewSet, ContractStudentViewSet, ContractTrainerViewSet, health, upload,
+    ContractAssessmentViewSet, ContractClassViewSet, ContractContentViewSet,
+    ContractCurriculumViewSet, ContractInventoryViewSet, ContractLeadViewSet,
+    ContractProjectViewSet, ContractQuizAttemptViewSet, ContractQuizViewSet,
+    ContractReviewViewSet, ContractSessionViewSet, ContractSchoolViewSet,
+    ContractStudentViewSet, ContractTrainerViewSet, health, upload,
 )
 from .phase7_compat_extras import ContractBillingFullViewSet, ContractCommunicationLogViewSet
 from .phase7_contract_overrides import ContractSessionCompatViewSet
 from .learning_contract_overrides import StableQuizQuestionViewSet
+from .learning_attendance_overrides import StableAttendanceViewSet
 from .trainer_materials import TrainerMaterialDetailView, TrainerMaterialFileView, TrainerMaterialListCreateView
 from notifications.views import NotificationPortalViewSet
 from learning.quiz_portal import QuizSingleAttemptView, QuizReviewView
@@ -34,7 +35,7 @@ router.register("classes", ContractClassViewSet, basename="v1-class")
 router.register("students", ContractStudentViewSet, basename="v1-student")
 router.register("sessions", ContractSessionCompatViewSet, basename="v1-session")
 router.register("session-activities", SessionActivityViewSet, basename="v1-session-activity")
-router.register("attendance", ContractAttendanceViewSet, basename="v1-attendance")
+router.register("attendance", StableAttendanceViewSet, basename="v1-attendance")
 router.register("curriculum", ContractCurriculumViewSet, basename="v1-curriculum")
 router.register("content", ContractContentViewSet, basename="v1-content")
 router.register("quizzes", ContractQuizViewSet, basename="v1-quiz")
