@@ -80,7 +80,6 @@ urlpatterns = [
     path("schools/<uuid:pk>/reset-password", SchoolProfilePasswordResetView.as_view(), name="v1-school-password-reset"),
     path("schools/<uuid:pk>/activate", activate_school, name="v1-school-activate"),
     path("trainers/<uuid:pk>/reset-password", TrainerProfilePasswordResetView.as_view(), name="v1-trainer-password-reset"),
-    path("trainers/<uuid:pk>/reset-password", TrainerProfilePasswordResetView.as_view(), name="v1-trainer-password-reset"),
     path("trainer-materials", TrainerMaterialListCreateView.as_view(), name="v1-trainer-material-list-create"),
     path("trainer-materials/<uuid:pk>", TrainerMaterialDetailView.as_view(), name="v1-trainer-material-detail"),
     path("trainer-materials/<uuid:pk>/file", TrainerMaterialFileView.as_view(), name="v1-trainer-material-file"),
