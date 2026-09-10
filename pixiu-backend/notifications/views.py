@@ -40,10 +40,12 @@ class NotificationPortalViewSet(viewsets.ModelViewSet):
     http_method_names = ["get", "post", "head", "options"]
 
     def get_queryset(self):
-        if self.action in {"read", "read_all"}:
-            return self.queryset.filter(recipient=self.request.user)
-        if self.request.user.role == UserRole.ADMIN:
-            return self.queryset
+        # A portal inbox is always recipient-scoped.  Admins may create
+        # notifications, but they must not see school/trainer/student copies
+        # merely because they are the sender.  This also makes read/read-all
+        # operate on the exact same recipient-scoped queryset and prevents a
+        # false 404/"No Notification matches the given query" when an admin
+        # clicks a notification that belongs to another user.
         return self.queryset.filter(recipient=self.request.user)
 
     @staticmethod
