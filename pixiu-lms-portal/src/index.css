@@ -32,7 +32,15 @@ body {
   background-color: var(--color-pixiu-gray);
   color: #1e293b;
   font-family: var(--font-sans);
+  margin: 0;
+  min-width: 0;
+  overflow-x: hidden;
 }
+
+*, *::before, *::after { box-sizing: border-box; }
+img, video, canvas { max-width: 100%; height: auto; }
+button, input, select, textarea { max-width: 100%; }
+input, select, textarea { min-width: 0; }
 
 /* Ultra-thin custom scrollbars */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
@@ -49,32 +57,38 @@ body {
 }
 
 /* Selection styling */
-::selection {
-  background-color: #1D6EFF;
-  color: white;
+::selection { background-color: #1D6EFF; color: white; }
+
+/* Keep wide tables/forms inside the page and make their own containers scroll. */
+.overflow-x-auto, .overflow-x-scroll { max-width: 100%; -webkit-overflow-scrolling: touch; }
+
+@media (max-width: 767px) {
+  .grid.grid-cols-2 { grid-template-columns: minmax(0, 1fr) !important; }
+  .grid.grid-cols-3 { grid-template-columns: minmax(0, 1fr) !important; }
+  .grid.grid-cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .grid.grid-cols-6 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+
+  table { min-width: max-content; }
+  .min-w-\[220px\], .min-w-\[240px\], .min-w-\[260px\] { min-width: min(100%, calc(100vw - 1.5rem)) !important; }
+
+  /* Prevent iOS from zooming inputs and keep dialogs usable on short screens. */
+  .field, input, select, textarea { max-width: 100%; }
+  .fixed.inset-0 > [class*="bg-white"] { max-height: calc(100dvh - 1.25rem); overflow-y: auto; }
 }
 
 /* ============================================================
    BLOCKLY SVG & PRESENTATION FIXES
    ============================================================ */
-/* Fix SVG presentation attributes like display="none" being overridden by Tailwind CSS resets */
 svg[display="none"],
 g[display="none"],
-[display="none"] {
-  display: none !important;
-}
+[display="none"] { display: none !important; }
 
-/* Explicitly ensure hidden Blockly scrollbars and flyout components never render when closed */
 .blocklyFlyoutScrollbar[display="none"],
 .blocklyScrollbarVertical[display="none"],
 .blocklyScrollbarHorizontal[display="none"],
 .blocklyScrollbar[display="none"],
-.blocklyFlyout[display="none"] {
-  display: none !important;
-}
+.blocklyFlyout[display="none"] { display: none !important; }
 
 .blocklySvg,
 .blocklySvg svg,
-.blocklySvg g {
-  max-width: none !important;
-}
+.blocklySvg g { max-width: none !important; }
