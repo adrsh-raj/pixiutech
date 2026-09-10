@@ -25,8 +25,7 @@ class Phase3ViewSet(viewsets.ModelViewSet):
     def get_queryset(self): return self.scoped_queryset()
     def scoped_queryset(self): return self.queryset
     def get_object(self):
-        queryset = self.scoped_queryset()
-        queryset = self.filter_queryset(queryset)
+        queryset = self.filter_queryset(self.queryset)
         obj = get_object_or_404(queryset, **{self.lookup_field: self.kwargs[self.lookup_url_kwarg or self.lookup_field]})
         self.check_object_permissions(self.request, obj)
         return obj
@@ -123,7 +122,7 @@ class TrainerSchoolAssignmentViewSet(Phase3ViewSet):
         self.assert_role(UserRole.ADMIN); assignment = serializer.save(); record_audit(actor=self.request.user, action="assignment_change", entity_type="trainer_school_assignment", entity_id=assignment.id, summary=f"Trainer {assignment.trainer.trainer_id} assigned to {assignment.school.school_code}", changes={"trainer": assignment.trainer.trainer_id, "school": assignment.school.school_code, "status": assignment.status}, request=self.request)
     def perform_update(self, serializer):
         self.assert_role(UserRole.ADMIN); assignment = serializer.save(); record_audit(actor=self.request.user, action="assignment_change", entity_type="trainer_school_assignment", entity_id=assignment.id, summary=f"Assignment for {assignment.trainer.trainer_id} updated", changes={"school": assignment.school.school_code, "status": assignment.status}, request=self.request)
-    def perform_destroy(self, instance): self.assert_role(UserRole.ADMIN); instance.status = "inactive"; instance.save(update_fields=["status"]); record_audit(actor=self.request.user, action="assignment_change", entity_type="trainer_school_assignment", entity_id=instance.id, summary=f"Trainer {instance.trainer.trainer_id} assignment to {instance.school.school_code} deactivated", changes={"status": "inactive"}, request=self.request)
+    def perform_destroy(self, instance): self.assert_role(UserRole.ADMIN); instance.status = "inactive"; instance.save(update_fields=["status"]); record_audit(actor=self.request.user, action="assignment_change", entity_type="trainer_school_assignment", entity_id=instance.id, summary=f"Trainer {instance.trainer.trainer_id} assignment to {instance.school.school_code} deactivated", request=self.request)
 
 
 class SchoolClassViewSet(Phase3ViewSet):
