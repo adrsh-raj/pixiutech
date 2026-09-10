@@ -57,6 +57,20 @@ class NotificationAPITests(APITestCase):
         recipients = {item["recipient_id"] for item in response.data}
         self.assertEqual(recipients, {str(self.student_user.id)})
 
+    def test_admin_does_not_receive_school_targeted_notification(self):
+        school_user = User.objects.create_user("notif-school", "StrongSchoolPass!123", role=UserRole.SCHOOL, status="active")
+        self.school.account = school_user
+        self.school.save(update_fields=["account"])
+        self.authenticate(self.admin)
+        response = self.client.post("/api/v1/notifications", {"target_type": "specific_school", "target_school_id": str(self.school.id), "title": "School Notice", "message": "Classes start tomorrow"}, format="json")
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data[0]["recipient_id"], str(school_user.id))
+        school_notification_id = response.data[0]["id"]
+        admin_inbox = self.client.get("/api/v1/notifications")
+        self.assertEqual(admin_inbox.status_code, 200)
+        self.assertFalse(any(item["id"] == school_notification_id for item in admin_inbox.data))
+        self.assertEqual(self.client.post(f"/api/v1/notifications/{school_notification_id}/read").status_code, 404)
+
     def test_student_cannot_read_another_users_notification(self):
         notification = Notification.objects.create(recipient=self.other_student_user, notification_type="info", title="Private", message="Only for other student", event_key="private:test")
         self.authenticate(self.student_user)
