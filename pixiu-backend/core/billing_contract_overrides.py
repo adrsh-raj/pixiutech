@@ -14,7 +14,7 @@ class TransactionalInvoiceViewSet(InvoiceViewSet):
     @action(detail=False, methods=["post"], url_path="create-with-lines")
     def create_with_lines(self, request):
         self.required_action = "CREATE"
-        self.role_only(UserRole.ADMIN, UserRole.SCHOOL)
+        self.role_only(UserRole.ADMIN)
 
         payload = request.data.copy()
         lines = payload.pop("lines", [])
@@ -26,7 +26,6 @@ class TransactionalInvoiceViewSet(InvoiceViewSet):
             serializer.is_valid(raise_exception=True)
             self.perform_create(serializer)
             invoice = serializer.instance
-
             for index, raw in enumerate(lines):
                 if not isinstance(raw, dict):
                     raise ValidationError({"lines": {index: "Each line must be an object."}})
@@ -43,6 +42,5 @@ class TransactionalInvoiceViewSet(InvoiceViewSet):
                 if unit_price < 0:
                     raise ValidationError({"lines": {index: "Unit price cannot be negative."}})
                 add_invoice_line(invoice=invoice, description=description, quantity=quantity, unit_price=unit_price)
-
             invoice.refresh_from_db()
             return Response(self.get_serializer(invoice).data, status=201)
