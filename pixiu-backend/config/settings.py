@@ -21,7 +21,9 @@ INSTALLED_APPS = [
     "billing", "inventory", "notifications", "crm", "audit",
 ]
 MIDDLEWARE = [
-    "django.middleware.security.SecurityMiddleware", "whitenoise.middleware.WhiteNoiseMiddleware", "corsheaders.middleware.CorsMiddleware",
+    "django.middleware.security.SecurityMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware", "django.middleware.common.CommonMiddleware", "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware", "django.contrib.messages.middleware.MessageMiddleware", "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -32,20 +34,16 @@ ASGI_APPLICATION = "config.asgi.application"
 AUTH_USER_MODEL = "accounts.User"
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
-if not DATABASE_URL:
-    raise RuntimeError("DATABASE_URL must be configured.")
+if not DATABASE_URL: raise RuntimeError("DATABASE_URL must be configured.")
 parsed = urlparse(DATABASE_URL)
-if parsed.scheme not in {"postgres", "postgresql"}:
-    raise RuntimeError("DATABASE_URL must use a PostgreSQL URL.")
-if not parsed.hostname or not parsed.path.lstrip("/"):
-    raise RuntimeError("DATABASE_URL must include a PostgreSQL host and database name.")
+if parsed.scheme not in {"postgres", "postgresql"}: raise RuntimeError("DATABASE_URL must use a PostgreSQL URL.")
+if not parsed.hostname or not parsed.path.lstrip("/"): raise RuntimeError("DATABASE_URL must include a PostgreSQL host and database name.")
 query_options = parse_qs(parsed.query)
 sslmode = (query_options.get("sslmode") or [os.environ.get("DJANGO_DB_SSLMODE", "")])[0]
 DATABASE_OPTIONS = {"sslmode": sslmode} if sslmode else {}
 DATABASES = {"default":{"ENGINE":"django.db.backends.postgresql","NAME":unquote(parsed.path.lstrip("/")),"USER":unquote(parsed.username or ""),"PASSWORD":unquote(parsed.password or ""),"HOST":parsed.hostname,"PORT":parsed.port or "5432","OPTIONS":DATABASE_OPTIONS,"CONN_MAX_AGE":int(os.environ.get("DJANGO_DB_CONN_MAX_AGE","60")),"CONN_HEALTH_CHECKS":True}}
 EXPECTED_DATABASE_NAME = os.environ.get("DJANGO_EXPECTED_DATABASE_NAME", "").strip()
-if EXPECTED_DATABASE_NAME and DATABASES["default"]["NAME"] != EXPECTED_DATABASE_NAME:
-    raise RuntimeError("DATABASE_URL points to a database different from DJANGO_EXPECTED_DATABASE_NAME. Refusing to start to protect the Django rebuild from accidental legacy DB usage.")
+if EXPECTED_DATABASE_NAME and DATABASES["default"]["NAME"] != EXPECTED_DATABASE_NAME: raise RuntimeError("DATABASE_URL points to a database different from DJANGO_EXPECTED_DATABASE_NAME. Refusing to start to protect the Django rebuild from accidental legacy DB usage.")
 
 REST_FRAMEWORK = {"DEFAULT_AUTHENTICATION_CLASSES":["rest_framework_simplejwt.authentication.JWTAuthentication"],"DEFAULT_PERMISSION_CLASSES":["rest_framework.permissions.IsAuthenticated"],"DEFAULT_RENDERER_CLASSES":["rest_framework.renderers.JSONRenderer"],"DEFAULT_THROTTLE_CLASSES":["rest_framework.throttling.ScopedRateThrottle"],"DEFAULT_THROTTLE_RATES":{"login":os.environ.get("DJANGO_LOGIN_RATE","10/min")},"EXCEPTION_HANDLER":"core.exception_handler.custom_exception_handler"}
 SIMPLE_JWT = {"ACCESS_TOKEN_LIFETIME":timedelta(minutes=int(os.environ.get("JWT_ACCESS_MINUTES","30"))),"REFRESH_TOKEN_LIFETIME":timedelta(days=int(os.environ.get("JWT_REFRESH_DAYS","7"))),"ROTATE_REFRESH_TOKENS":True,"BLACKLIST_AFTER_ROTATION":True,"UPDATE_LAST_LOGIN":False,"AUTH_HEADER_TYPES":("Bearer",)}
@@ -55,26 +53,10 @@ AUTH_PASSWORD_VALIDATORS = [{"NAME":"django.contrib.auth.password_validation.Use
 LANGUAGE_CODE="en-us"; TIME_ZONE="Asia/Kolkata"; USE_I18N=True; USE_TZ=True
 STATIC_URL="static/"; STATIC_ROOT=BASE_DIR / "staticfiles"; MEDIA_URL="media/"; MEDIA_ROOT=BASE_DIR / "media"; DEFAULT_AUTO_FIELD="django.db.models.BigAutoField"
 STORAGES = {"default": {"BACKEND": "django.core.files.storage.FileSystemStorage"}, "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"}}
-
-# Render's local filesystem is ephemeral. Set AWS_STORAGE_BUCKET_NAME (S3, R2 or another
-# S3-compatible provider) in production to make kit/component and learning uploads persistent.
 AWS_BUCKET = os.environ.get("AWS_STORAGE_BUCKET_NAME", "").strip()
 if AWS_BUCKET:
     INSTALLED_APPS.append("storages")
-    STORAGES["default"] = {
-        "BACKEND": "storages.backends.s3.S3Storage",
-        "OPTIONS": {
-            "bucket_name": AWS_BUCKET,
-            "region_name": os.environ.get("AWS_S3_REGION_NAME") or None,
-            "endpoint_url": os.environ.get("AWS_S3_ENDPOINT_URL") or None,
-            "access_key_id": os.environ.get("AWS_ACCESS_KEY_ID") or None,
-            "secret_access_key": os.environ.get("AWS_SECRET_ACCESS_KEY") or None,
-            "location": os.environ.get("AWS_LOCATION", "pixiu-media").strip("/"),
-            "file_overwrite": False,
-            "querystring_auth": os.environ.get("AWS_QUERYSTRING_AUTH", "True").lower() == "true",
-            "querystring_expire": int(os.environ.get("AWS_QUERYSTRING_EXPIRE", "3600")),
-        },
-    }
+    STORAGES["default"] = {"BACKEND": "storages.backends.s3.S3Storage", "OPTIONS": {"bucket_name": AWS_BUCKET, "region_name": os.environ.get("AWS_S3_REGION_NAME") or None, "endpoint_url": os.environ.get("AWS_S3_ENDPOINT_URL") or None, "access_key_id": os.environ.get("AWS_ACCESS_KEY_ID") or None, "secret_access_key": os.environ.get("AWS_SECRET_ACCESS_KEY") or None, "location": os.environ.get("AWS_LOCATION", "pixiu-media").strip("/"), "file_overwrite": False, "querystring_auth": os.environ.get("AWS_QUERYSTRING_AUTH", "True").lower() == "true", "querystring_expire": int(os.environ.get("AWS_QUERYSTRING_EXPIRE", "3600"))}}
     MEDIA_URL = os.environ.get("AWS_CUSTOM_DOMAIN", "").strip()
     if MEDIA_URL and not MEDIA_URL.endswith("/"): MEDIA_URL += "/"
 
