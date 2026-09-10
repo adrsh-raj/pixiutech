@@ -78,7 +78,7 @@ class SessionViewSet(LearningViewSet):
 class SessionActivityViewSet(LearningViewSet):
     queryset = SessionActivity.objects.select_related("session", "created_by")
     serializer_class = SessionActivitySerializer
-    def scoped_queryset(self.scoped_queryset): return self.queryset.filter(session_id__in=accessible_sessions(self.request.user).values("id"))
+    def scoped_queryset(self): return self.queryset.filter(session_id__in=accessible_sessions(self.request.user).values("id"))
     def perform_create(self, serializer):
         self.role_only(UserRole.ADMIN, UserRole.SCHOOL, UserRole.TRAINER)
         session = serializer.validated_data["session"]
