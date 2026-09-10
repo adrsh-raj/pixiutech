@@ -1,3 +1,5 @@
+from django.shortcuts import get_object_or_404
+
 from .api_v1_compat import (
     ContractAssessmentViewSet,
     ContractAttendanceViewSet,
@@ -30,7 +32,7 @@ class ScopedDetailMixin:
         queryset = scoped() if callable(scoped) else self.get_queryset()
         queryset = self.filter_queryset(queryset)
         lookup = self.lookup_url_kwarg or self.lookup_field
-        obj = queryset.get(**{self.lookup_field: self.kwargs[lookup]})
+        obj = get_object_or_404(queryset, **{self.lookup_field: self.kwargs[lookup]})
         self.check_object_permissions(self.request, obj)
         return obj
 
@@ -53,8 +55,6 @@ class ScopedContractStudentViewSet(ScopedDetailMixin, ContractStudentViewSet): p
 class ScopedContractTrainerViewSet(ScopedDetailMixin, ContractTrainerViewSet): pass
 class ScopedContractBillingFullViewSet(ScopedDetailMixin, ContractBillingFullViewSet): pass
 class ScopedStableAttendanceViewSet(ScopedDetailMixin, StableAttendanceViewSet): pass
-
-
 class ScopedSessionActivityViewSet(ScopedDetailMixin, SessionActivityViewSet): pass
 class ScopedStableQuizQuestionViewSet(ScopedDetailMixin, StableQuizQuestionViewSet): pass
 class ScopedQuizAssignmentViewSet(ScopedDetailMixin, QuizAssignmentViewSet): pass
