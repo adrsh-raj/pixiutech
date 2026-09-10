@@ -1,5 +1,5 @@
 import { Bell, CheckCircle2, X, AlertCircle, Check } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useToast } from '../context/ToastContext';
@@ -12,6 +12,13 @@ export default function NotificationCenter() {
   const visible = useMemo(() => (Array.isArray(notifications) ? notifications : []), [notifications]);
   const unread = visible.filter(item => !item.read);
   const loadError = endpointErrors['/notifications'] || '';
+
+  useEffect(() => {
+    const poll = window.setInterval(() => {
+      if (document.visibilityState === 'visible' && !busy) refreshAll();
+    }, 60000);
+    return () => window.clearInterval(poll);
+  }, [busy, refreshAll]);
 
   const markRead = async id => {
     if (!id || busy) return;
