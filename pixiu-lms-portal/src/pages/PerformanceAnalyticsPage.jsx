@@ -30,7 +30,10 @@ export default function PerformanceAnalyticsPage({ role = 'trainer' }) {
       const endpoint = isSchool ? '/school-performance' : isAdmin ? `/trainer-performance?trainer_id=${encodeURIComponent(selectedTrainer)}` : '/trainer-performance';
       const response = await apiFetch(endpoint, { cache: 'no-store' });
       const type = response.headers.get('content-type') || '';
-      const payload = type.includes('application/json') ? await response.json().catch(() => ({})) : {};
+      if (!type.includes('application/json')) {
+        throw new Error('Performance API returned a non-JSON response. The frontend/API deployment is out of sync.');
+      }
+      const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.detail || payload.error || `Request failed (${response.status})`);
       setData(payload);
     } catch (err) {
