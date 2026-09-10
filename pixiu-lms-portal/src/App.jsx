@@ -23,6 +23,7 @@ import Notifications from './pages/Notifications';
 import ContentHub from './pages/ContentHub';
 import Curriculum from './pages/Curriculum';
 import Login from './pages/Login';
+import Verify from './pages/Verify';
 import StudentPortal from './pages/StudentPortal';
 import SchoolPortal from './pages/SchoolPortal';
 import AuditLogs from './pages/AuditLogs';
@@ -76,6 +77,7 @@ function SessionsRoute() { const { user } = useAuth(); return user?.role === 'st
 
 export default function App() {
   return <ToastProvider><AuthProvider><DataProvider><BrowserRouter><Routes>
+    <Route path="/verify" element={<Verify />} />
     <Route path="/login" element={<GuestRouteGuard><Login /></GuestRouteGuard>} />
     <Route path="/simulation" element={<ChunkErrorBoundary><Suspense fallback={<LoadingScreen />}><Simulation /></Suspense></ChunkErrorBoundary>} />
     <Route path="/student-portal" element={<StudentRouteGuard />} />
