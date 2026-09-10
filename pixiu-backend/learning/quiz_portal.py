@@ -54,7 +54,7 @@ class QuizReviewView(APIView):
     permission_classes = [IsAuthenticated, IsActiveAccount]
 
     def get(self, request):
-        if request.user.role not in {UserRole.ADMIN, UserRole.SUPERADMIN if hasattr(UserRole, "SUPERADMIN") else UserRole.ADMIN, UserRole.TRAINER}:
+        if request.user.role not in {UserRole.ADMIN, UserRole.TRAINER}:
             raise PermissionDenied("Trainer or administrator access is required.")
 
         queryset = QuizAttempt.objects.select_related("quiz", "student", "student__school_class").prefetch_related("quiz__questions")
@@ -62,11 +62,10 @@ class QuizReviewView(APIView):
         if quiz_id:
             queryset = queryset.filter(quiz_id=quiz_id)
         if request.user.role == UserRole.TRAINER:
-            accessible_classes = accessible_class_queryset(request.user).values("id")
-            queryset = queryset.filter(student__school_class_id__in=accessible_classes)
+            queryset = queryset.filter(student__school_class_id__in=accessible_class_queryset(request.user).values("id"))
 
         payload = []
-        for attempt in queryset.order_by("-submitted_at"):
+        for attempt in queryset.order_by("-completed_at"):
             questions = {str(question.id): question for question in attempt.quiz.questions.all()}
             answer_rows = []
             for question_id, selected in (attempt.answers or {}).items():
@@ -76,12 +75,7 @@ class QuizReviewView(APIView):
                 answer_rows.append({
                     "question_id": str(question.id),
                     "question": question.question_text,
-                    "options": {
-                        "A": question.option_a,
-                        "B": question.option_b,
-                        "C": question.option_c,
-                        "D": question.option_d,
-                    },
+                    "options": {"A": question.option_a, "B": question.option_b, "C": question.option_c, "D": question.option_d},
                     "selected": selected,
                     "correct": question.correct_option,
                     "is_correct": str(selected).upper() == str(question.correct_option).upper(),
@@ -96,10 +90,10 @@ class QuizReviewView(APIView):
                 "student_name": attempt.student.name,
                 "student_id": attempt.student.student_id,
                 "score": float(attempt.score),
-                "total_points": float(attempt.total_points),
-                "correct_answers": attempt.correct_answers,
-                "wrong_answers": attempt.wrong_answers,
-                "submitted_at": attempt.submitted_at,
+                "total_points": float(attempt.total_marks),
+                "correct_answers": attempt.correct_count,
+                "wrong_answers": max(attempt.total_questions - attempt.correct_count, 0),
+                "submitted_at": attempt.completed_at,
                 "answers": answer_rows,
             })
         return Response(payload)
