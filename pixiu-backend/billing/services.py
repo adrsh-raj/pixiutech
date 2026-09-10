@@ -18,11 +18,7 @@ def _notify(recipient_id, *, title, message, notification_type=NotificationType.
     if not recipient_id:
         return None
     key = event_key or f"billing:{uuid4()}"
-    obj, _ = Notification.objects.get_or_create(
-        recipient_id=recipient_id,
-        event_key=f"{key}:{recipient_id}",
-        defaults={"notification_type": notification_type, "title": title[:200], "message": message, "metadata": metadata or {}},
-    )
+    obj, _ = Notification.objects.get_or_create(recipient_id=recipient_id, event_key=f"{key}:{recipient_id}", defaults={"notification_type": notification_type, "title": title[:200], "message": message, "metadata": metadata or {}})
     return obj
 
 
@@ -33,7 +29,7 @@ def notify_school(school, *, title, message, event_key, metadata=None):
 
 
 def notify_admins(*, title, message, event_key, metadata=None):
-    recipients = User.objects.filter(role="admin", is_active=True).values_list("id", flat=True)
+    recipients = User.objects.filter(role__in=["admin", "superadmin"], is_active=True).values_list("id", flat=True)
     return [_notify(user_id, title=title, message=message, event_key=event_key, metadata=metadata) for user_id in recipients]
 
 
@@ -72,9 +68,7 @@ def update_invoice_line(*, line: InvoiceLineItem, description: str, quantity, un
     invoice = Invoice.objects.select_for_update().get(pk=locked_line.invoice_id)
     if invoice.status not in {BillingStatus.DRAFT, BillingStatus.ISSUED}:
         raise ValidationError("Only draft or issued invoices can be edited.")
-    locked_line.description = description.strip()
-    locked_line.quantity = quantity
-    locked_line.unit_price = unit_price
+    locked_line.description = description.strip(); locked_line.quantity = quantity; locked_line.unit_price = unit_price
     locked_line.line_total = (Decimal(quantity) * Decimal(unit_price)).quantize(TWOPLACES)
     locked_line.save(update_fields=["description", "quantity", "unit_price", "line_total"])
     recalculate_invoice(invoice)
@@ -95,7 +89,6 @@ def record_payment(*, invoice: Invoice, amount, method: str, payment_date, recor
         raise ValidationError({"amount": "Payment exceeds the outstanding invoice balance."})
     if payment_status == PaymentStatus.PENDING and Payment.objects.filter(invoice=locked_invoice, status=PaymentStatus.PENDING).exists():
         raise ValidationError({"invoice": "A payment is already pending verification for this invoice."})
-
     payment = Payment.objects.create(invoice=locked_invoice, amount=amount, method=method, status=payment_status, payment_date=payment_date, transaction_reference=transaction_reference.strip(), notes=notes.strip(), recorded_by=recorded_by)
     receipt = None
     if payment_status == PaymentStatus.SUCCESS:
