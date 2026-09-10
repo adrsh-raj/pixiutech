@@ -1,3 +1,4 @@
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -39,9 +40,9 @@ class LearningViewSet(viewsets.ModelViewSet):
         super().initial(request, *args, **kwargs)
 
     def get_object(self):
-        queryset = self.queryset if self.action in {"retrieve", "update", "partial_update", "destroy"} else self.scoped_queryset()
+        queryset = self.scoped_queryset()
         queryset = self.filter_queryset(queryset)
-        obj = queryset.get(**{self.lookup_field: self.kwargs[self.lookup_url_kwarg or self.lookup_field]})
+        obj = get_object_or_404(queryset, **{self.lookup_field: self.kwargs[self.lookup_url_kwarg or self.lookup_field]})
         self.check_object_permissions(self.request, obj)
         return obj
 
