@@ -7,8 +7,8 @@ from academics.views import TrainerSchoolAssignmentViewSet
 from academics.school_activation import activate_school
 from audit.views import AuditLogViewSet
 from billing.contract_views import ContractViewSet, billing_summary
-from billing.views import InvoiceLineItemViewSet, InvoiceViewSet, PaymentViewSet, ReceiptViewSet
-from inventory.views import KitComponentViewSet, KitMaintenanceViewSet, KitViewSet
+from billing.views import InvoiceLineItemViewSet, PaymentViewSet, ReceiptViewSet
+from inventory.views import KitMaintenanceViewSet
 from learning.views import SessionActivityViewSet, ProjectEvidenceViewSet, QuizAssignmentViewSet
 from .analytics import SchoolPerformanceView, StudentProgressView, TrainerPerformanceView
 from .class_ranking import ClassRankingView
@@ -16,13 +16,15 @@ from .api_v1_compat import (
     ContractAssessmentViewSet, ContractClassViewSet, ContractContentViewSet,
     ContractCurriculumViewSet, ContractInventoryViewSet, ContractLeadViewSet,
     ContractProjectViewSet, ContractQuizAttemptViewSet, ContractQuizViewSet,
-    ContractReviewViewSet, ContractSessionViewSet, ContractSchoolViewSet,
-    ContractStudentViewSet, ContractTrainerViewSet, health, upload,
+    ContractReviewViewSet, ContractSchoolViewSet, ContractStudentViewSet,
+    ContractTrainerViewSet, health, upload,
 )
 from .phase7_compat_extras import ContractBillingFullViewSet, ContractCommunicationLogViewSet
 from .phase7_contract_overrides import ContractSessionCompatViewSet
 from .learning_contract_overrides import StableQuizQuestionViewSet
 from .learning_attendance_overrides import StableAttendanceViewSet
+from .inventory_contract_overrides import JsonKitComponentViewSet, JsonKitViewSet
+from .billing_contract_overrides import TransactionalInvoiceViewSet
 from .trainer_materials import TrainerMaterialDetailView, TrainerMaterialFileView, TrainerMaterialListCreateView
 from notifications.views import NotificationPortalViewSet
 from learning.quiz_portal import QuizSingleAttemptView, QuizReviewView
@@ -47,13 +49,13 @@ router.register("assessments", ContractAssessmentViewSet, basename="v1-assessmen
 router.register("projects", ContractProjectViewSet, basename="v1-project")
 router.register("project-evidence", ProjectEvidenceViewSet, basename="v1-project-evidence")
 router.register("billing", ContractBillingFullViewSet, basename="v1-billing-compat")
-router.register("invoices", InvoiceViewSet, basename="v1-invoice")
+router.register("invoices", TransactionalInvoiceViewSet, basename="v1-invoice")
 router.register("contracts", ContractViewSet, basename="v1-contract")
 router.register("billing-lines", InvoiceLineItemViewSet, basename="v1-billing-line")
 router.register("payments", PaymentViewSet, basename="v1-payment")
 router.register("receipts", ReceiptViewSet, basename="v1-receipt")
-router.register("kits", KitViewSet, basename="v1-kit")
-router.register("kit-components", KitComponentViewSet, basename="v1-kit-component")
+router.register("kits", JsonKitViewSet, basename="v1-kit")
+router.register("kit-components", JsonKitComponentViewSet, basename="v1-kit-component")
 router.register("kit-maintenance", KitMaintenanceViewSet, basename="v1-kit-maintenance")
 router.register("inventory", ContractInventoryViewSet, basename="v1-inventory")
 router.register("leads", ContractLeadViewSet, basename="v1-lead")
