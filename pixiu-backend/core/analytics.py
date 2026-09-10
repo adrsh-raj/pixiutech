@@ -9,7 +9,7 @@ from rest_framework.views import APIView
 
 from accounts.models import UserRole
 from accounts.permissions import IsActiveAccount
-from academics.models import Student, Trainer
+from academics.models import School, Student, Trainer
 from learning.models import AttendanceRecord, CurriculumClassAssignment, Project, QuizAttempt, Session, StudentAssessment
 from .class_ranking import _student_components
 
@@ -151,11 +151,19 @@ class SchoolPerformanceView(APIView):
     permission_classes = [IsAuthenticated, IsActiveAccount]
 
     def get(self, request):
-        if request.user.role != UserRole.SCHOOL:
-            return Response({"detail": "School performance is only available to school accounts."}, status=403)
-        school = getattr(request.user, "school_profile", None)
+        if request.user.role == UserRole.SCHOOL:
+            school = getattr(request.user, "school_profile", None)
+        elif request.user.role == UserRole.ADMIN:
+            selector = request.query_params.get("school") or request.query_params.get("school_id") or request.query_params.get("school_code")
+            if not selector:
+                return Response({"detail": "A school id or school code is required for admin school performance."}, status=400)
+            school = School.objects.filter(pk=selector).first()
+            if not school:
+                school = School.objects.filter(school_code=str(selector).strip().upper()).first()
+        else:
+            return Response({"detail": "School performance is not available for this account."}, status=403)
         if not school:
-            return Response({"detail": "School profile is not linked to this account."}, status=404)
+            return Response({"detail": "School profile is not linked to an active school record."}, status=404)
         classes = school.classes.filter(status="active")
         students = Student.objects.filter(school_class__school=school, status="active")
         attendance = AttendanceRecord.objects.filter(student__school_class__school=school)
