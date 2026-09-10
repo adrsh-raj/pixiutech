@@ -2,7 +2,7 @@ import { lazy, Suspense, Component } from 'react';
 import { BrowserRouter, Routes, Route, Outlet, Navigate, Link } from 'react-router-dom';
 import PortalShell from './components/PortalShell';
 import AdminCommandCenter from './pages/AdminCommandCenter';
-import Students from './pages/Students';
+import Students from './pages/StudentsV2';
 import HardwareKitsV2 from './pages/HardwareKitsV2';
 import TrainerOperationsV2 from './pages/TrainerOperationsV2';
 import TrainerAssignments from './pages/TrainerAssignments';
@@ -63,7 +63,6 @@ function ProtectedLayout() {
   const role = user?.role || 'admin';
   return <PortalShell role={role === 'superadmin' ? 'admin' : role} title={roleLabel[role] || 'Pixiu Tech Console'} subtitle={roleSubtitle[role] || 'Pixiu Tech Operating System'}><Outlet /></PortalShell>;
 }
-
 function AdminOnly({ children }) { const { user } = useAuth(); return user?.role === 'admin' || user?.role === 'superadmin' ? children : <Navigate to="/" replace />; }
 function RoleRoute({ roles, children }) { const { isAuthenticated, user, loading } = useAuth(); if (loading) return <LoadingScreen />; if (!isAuthenticated) return <Navigate to="/login" replace />; if (!roles.includes(user?.role)) return <Navigate to="/" replace />; return children; }
 function TrainerConsoleRoute() { const { user } = useAuth(); return user?.role === 'trainer' ? <TrainerWorkspace /> : <AdminOnly><TrainerOperationsV2 /></AdminOnly>; }
