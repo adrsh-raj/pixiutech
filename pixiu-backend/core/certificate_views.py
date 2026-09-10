@@ -12,6 +12,7 @@ from audit.models import AuditAction, AuditLog
 from learning.models import AssessmentStatus, AttendanceStatus, StudentAssessment
 
 COMPLETION_LEVELS = 6
+CERTIFICATE_ENTITY = 'student_certificate'
 
 
 def _level_key(assessment):
@@ -28,13 +29,23 @@ def _completion_assessments(student):
     return list(unique.values())
 
 
+def _latest_issuance(student):
+    return AuditLog.objects.filter(
+        entity_type=CERTIFICATE_ENTITY,
+        entity_id=str(student.pk),
+        action=AuditAction.OTHER,
+    ).order_by('-created_at').first()
+
+
 def _is_certified(student):
     return 'certified graduate' in str(student.current_level or '').lower()
 
 
-def _certificate_ref(student):
+def _certificate_ref(student, issuance=None):
+    if issuance and isinstance(issuance.changes, dict) and issuance.changes.get('certificate_ref'):
+        return str(issuance.changes['certificate_ref'])
     school = student.school_class.school
-    year = timezone.localdate().year
+    year = issuance.created_at.year if issuance else timezone.localdate().year
     return f"PIXIU-{school.school_code}-{str(student.student_id).replace(' ', '')}-{year}"
 
 
@@ -52,9 +63,10 @@ def _public_payload(student, request=None):
     school = school_class.school
     assessments = _completion_assessments(student)
     certified = _is_certified(student)
+    issuance = _latest_issuance(student)
     completed = len(assessments)
-    verified = certified and completed >= COMPLETION_LEVELS
-    certificate_ref = _certificate_ref(student)
+    verified = bool(issuance and certified and completed >= COMPLETION_LEVELS)
+    certificate_ref = _certificate_ref(student, issuance)
     public_origin = str(getattr(settings, 'PUBLIC_APP_URL', 'https://pixiutech.com')).rstrip('/')
     verify_url = f"{public_origin}/verify?id={student.student_id}"
     project_rows = [
@@ -65,7 +77,10 @@ def _public_payload(student, request=None):
     return {
         'verified': verified,
         'status': 'verified' if verified else 'not_verified',
-        'reason': None if verified else ('Certificate has not been issued by an authorised trainer.' if not certified else f'Course completion requires {COMPLETION_LEVELS} published unit evaluations; {completed} are currently recorded.'),
+        'reason': None if verified else (
+            'Certificate has not been issued by an authorised trainer or administrator.' if not issuance or not certified
+            else f'Course completion requires {COMPLETION_LEVELS} published unit evaluations; {completed} are currently recorded.'
+        ),
         'student_id': student.student_id,
         'student_name': student.name,
         'school_name': school.name,
@@ -79,6 +94,9 @@ def _public_payload(student, request=None):
         'attendance_rate': _attendance_rate(student),
         'completion_count': completed,
         'required_completion_count': COMPLETION_LEVELS,
+        'issued': bool(issuance and certified),
+        'issued_by': issuance.actor.display_name if issuance and issuance.actor else '' if issuance else '',
+        'issued_at': issuance.created_at.isoformat() if issuance else None,
         'assessments': [
             {'level': row.level, 'unit_code': row.unit_code, 'title': row.title, 'score': float(row.score) if row.score is not None else None, 'rating': float(row.rating) if row.rating is not None else None, 'feedback': row.feedback, 'assessment_date': row.assessment_date.isoformat(), 'trainer_name': row.trainer.name}
             for row in assessments
@@ -106,9 +124,21 @@ class IssueCertificateView(APIView):
         with transaction.atomic():
             student.current_level = 'Level 5 (Certified Graduate)'
             student.save(update_fields=['current_level', 'updated_at'])
-            AuditLog.objects.create(actor=request.user, action=AuditAction.OTHER, entity_type='student_certificate', entity_id=str(student.pk), summary=f'Graduate certificate issued for {student.student_id}.', changes={'student_id': student.student_id, 'certificate_ref': _certificate_ref(student), 'completion_count': len(assessments)}, ip_address=request.META.get('REMOTE_ADDR'), user_agent=request.META.get('HTTP_USER_AGENT', ''))
+            AuditLog.objects.create(
+                actor=request.user,
+                action=AuditAction.OTHER,
+                entity_type=CERTIFICATE_ENTITY,
+                entity_id=str(student.pk),
+                summary=f'Graduate certificate issued for {student.student_id}.',
+                changes={
+                    'student_id': student.student_id,
+                    'certificate_ref': _certificate_ref(student),
+                    'completion_count': len(assessments),
+                },
+                ip_address=request.META.get('REMOTE_ADDR'),
+                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            )
         payload = _public_payload(student, request)
-        payload.update({'issued': True, 'issued_by': request.user.display_name or request.user.username, 'issued_at': timezone.now().isoformat()})
         return JsonResponse(payload, status=200)
 
 
