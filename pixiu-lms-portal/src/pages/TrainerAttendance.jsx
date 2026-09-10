@@ -59,11 +59,8 @@ export default function TrainerAttendance() {
     setBusy(true); setError('');
     try {
       const entries = roster.map(student => ({ student: student.id, status: norm(marks[String(student.id)] || marks[String(student.student_id)] || 'absent') }));
-      if (complete) {
-        await request('/attendance/bulk-complete', 'POST', { session: selectedSession.id, entries });
-      } else {
-        await request('/attendance/bulk', 'POST', { session: selectedSession.id, entries });
-      }
+      await request('/attendance/bulk', 'POST', { session: selectedSession.id, entries });
+      if (complete) await request(`/sessions/${encodeURIComponent(selectedSession.id)}/complete`, 'POST', {});
       await refreshAll();
       if (complete) setSelectedId('');
     } catch (err) { setError(err.message); } finally { setBusy(false); }
