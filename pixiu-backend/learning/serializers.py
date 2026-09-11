@@ -170,7 +170,6 @@ class QuizSerializer(serializers.ModelSerializer):
         return serializer(obj.questions.all(), many=True, context=self.context).data
 
 class QuizClassAssignmentSerializer(serializers.ModelSerializer):
-    class_name = serializers.CharField(source="school_class.display_name", read_only=True)
     class Meta:
         model = QuizClassAssignment
         fields = ["id", "quiz", "school_class", "class_name", "assigned_by", "assigned_at"]
@@ -180,7 +179,7 @@ class QuizClassAssignmentSerializer(serializers.ModelSerializer):
         user = self.context["request"].user; school_class = attrs.get("school_class", getattr(self.instance, "school_class", None)); quiz = attrs.get("quiz", getattr(self.instance, "quiz", None))
         if not school_class or not quiz: raise serializers.ValidationError("Both quiz and class are required.")
         if not accessible_class_queryset(user).filter(pk=school_class.pk).exists(): raise serializers.ValidationError("You cannot assign this quiz to the selected class.")
-        if str(quiz.grade).upper() != str(school_class.grade).upper(): raise serializers.ValidationError("Quiz grade must match class grade.")
+        if str(quiz.grade).upper() != str(school_class.grade).upper(): raise serializers.ValidationError("Quiz grade must match the class grade.")
         if quiz.status == "closed": raise serializers.ValidationError("Closed quizzes cannot be assigned.")
         if self.instance and quiz != self.instance.quiz: raise serializers.ValidationError("Quiz cannot be changed after assignment.")
         return attrs
@@ -205,50 +204,57 @@ class QuizAttemptCreateSerializer(serializers.Serializer):
         attrs["student"] = student; return attrs
     def create(self, validated_data): return grade_attempt(**validated_data)
 
+
 class StudentAssessmentSerializer(serializers.ModelSerializer):
-    student_id = serializers.CharField(source="student.student_id", read_only=True); trainer_id = serializers.CharField(source="trainer.trainer_id", read_only=True)
+    student_id = serializers.CharField(source="student.student_id", read_only=True)
+    trainer_id = serializers.CharField(source="trainer.trainer_id", read_only=True)
+
     class Meta:
         model = StudentAssessment
         fields = ["id", "student", "student_id", "trainer", "trainer_id", "unit_code", "level", "title", "score", "rating", "status", "feedback", "assessment_date", "created_at", "updated_at"]
         read_only_fields = ["id", "student_id", "trainer_id", "created_at", "updated_at"]
+
+    def to_internal_value(self, data):
+        payload = data.copy()
+        raw_student = payload.get("student")
+        if raw_student not in (None, ""):
+            student = Student.objects.filter(pk=raw_student).first()
+            if student is None:
+                student = Student.objects.filter(student_id=str(raw_student).strip().upper()).first()
+            if student is not None:
+                payload["student"] = student.pk
+        raw_trainer = payload.get("trainer")
+        if raw_trainer not in (None, ""):
+            trainer = Trainer.objects.filter(pk=raw_trainer).first()
+            if trainer is None:
+                trainer = Trainer.objects.filter(trainer_id=str(raw_trainer).strip().upper()).first()
+            if trainer is not None:
+                payload["trainer"] = trainer.pk
+        return super().to_internal_value(payload)
+
     def validate(self, attrs):
         from academics.services import accessible_student_queryset
-        user = self.context["request"].user; student = attrs.get("student", getattr(self.instance, "student", None)); trainer = attrs.get("trainer", getattr(self.instance, "trainer", None))
-        if student and not accessible_student_queryset(user).filter(pk=student.pk).exists(): raise serializers.ValidationError("You cannot assess this student.")
+        user = self.context["request"].user
+        student = attrs.get("student", getattr(self.instance, "student", None))
+        trainer = attrs.get("trainer", getattr(self.instance, "trainer", None))
+        if not student:
+            raise serializers.ValidationError({"student": "Select a student for this review."})
+        if not student.school_class_id:
+            raise serializers.ValidationError({"student": "Student is not assigned to a class."})
+        if not accessible_student_queryset(user).filter(pk=student.pk).exists():
+            raise serializers.ValidationError({"student": "You cannot assess this student."})
         if user.role == UserRole.TRAINER:
-            if trainer and trainer.account_id != user.id: raise serializers.ValidationError("A trainer can only submit their own assessments.")
-            attrs["trainer"] = trainer or user.trainer_profile; trainer = attrs["trainer"]
-        if trainer and student and user.role != UserRole.ADMIN and not trainer.school_assignments.filter(school_id=student.school_class.school_id, status="active").exists(): raise serializers.ValidationError("Trainer is not assigned to the student's school.")
+            own_trainer = getattr(user, "trainer_profile", None)
+            if own_trainer is None:
+                raise serializers.ValidationError({"trainer": "This trainer account is not linked to a trainer profile."})
+            if trainer and trainer.account_id != user.id:
+                raise serializers.ValidationError({"trainer": "A trainer can only submit their own assessments."})
+            attrs["trainer"] = own_trainer
+            trainer = own_trainer
+        if trainer is None:
+            raise serializers.ValidationError({"trainer": "Trainer is required for this review."})
+        if user.role != UserRole.ADMIN and not trainer.school_assignments.filter(school_id=student.school_class.school_id, status="active").exists():
+            raise serializers.ValidationError({"trainer": "Trainer is not assigned to the student's school."})
+        if not str(attrs.get("title", getattr(self.instance, "title", ""))).strip():
+            raise serializers.ValidationError({"title": "Review title is required."})
         return attrs
-
-class ProjectSerializer(serializers.ModelSerializer):
-    student_id = serializers.CharField(source="student.student_id", read_only=True)
-    cover_image_url = serializers.SerializerMethodField()
-    class Meta:
-        model = Project
-        fields = ["id", "student", "student_id", "title", "description", "status", "score", "trainer_feedback", "submitted_at", "completed_at", "created_at", "updated_at", "cover_image_url"]
-        read_only_fields = ["id", "student_id", "submitted_at", "completed_at", "created_at", "updated_at", "cover_image_url"]
-    def get_cover_image_url(self, obj):
-        for item in obj.evidence.all():
-            try:
-                if item.file and item.file.url:
-                    name = str(item.file.name or '').lower()
-                    if name.endswith(('.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp')): return item.file.url
-            except ValueError: pass
-        return ""
-    def validate(self, attrs):
-        from academics.services import accessible_student_queryset
-        user = self.context["request"].user; student = attrs.get("student", getattr(self.instance, "student", None))
-        if user.role == UserRole.STUDENT:
-            if {"score", "status", "trainer_feedback"}.intersection(attrs): raise serializers.ValidationError("Students cannot change evaluation fields.")
-            if self.instance and student and student.account_id != user.id: raise serializers.ValidationError("Students can only edit their own projects.")
-            attrs["student"] = user.student_profile
-            if self.instance and self.instance.status not in {"draft", "returned"}: raise serializers.ValidationError("Only draft or returned projects can be edited.")
-        elif student and not accessible_student_queryset(user).filter(pk=student.pk).exists(): raise serializers.ValidationError("You cannot manage this student's project.")
-        return attrs
-
-class ProjectEvidenceSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ProjectEvidence
-        fields = ["id", "project", "title", "note", "file", "external_url", "uploaded_by", "created_at"]
-        read_only_fields = ["id", "uploaded_by", "created_at"]
