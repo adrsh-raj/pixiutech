@@ -1,6 +1,7 @@
 from rest_framework.exceptions import ValidationError
 
 from accounts.models import UserRole
+from academics.models import SchoolClass
 from academics.services import (
     accessible_assignment_queryset,
     accessible_class_queryset,
@@ -9,7 +10,7 @@ from academics.services import (
     accessible_trainer_queryset,
 )
 from academics.views import TrainerSchoolAssignmentViewSet
-from learning.models import Quiz, QuizClassAssignment, QuizQuestion, SessionActivity
+from learning.models import ContentClassAssignment, LearningContent, Quiz, QuizClassAssignment, QuizQuestion, SessionActivity
 from learning.services import (
     accessible_assessments,
     accessible_attendance,
@@ -38,6 +39,8 @@ from .scoped_contract_views import (
 )
 from .quiz_contract_view import ScopedContractQuizViewSetStrict
 from .strict_session_views import StrictScopedSessionViewSet
+from learning.watermarking import prepare_uploaded_file
+from django.db import transaction
 
 
 def _accessible_quiz_queryset(user):
@@ -130,6 +133,74 @@ class SafeScopedContentViewSet(ScopedContractContentViewSet):
         return accessible_content(self.request.user)
     def scoped_queryset(self):
         return self.get_queryset()
+
+    def _target_school(self):
+        school_id = self.request.data.get("school") or self.request.data.get("school_id")
+        if not school_id:
+            raise ValidationError({"school": "Select the school that should receive this content."})
+        school = accessible_school_queryset(self.request.user).filter(pk=school_id).first()
+        if not school:
+            # Also accept a school code for legacy/front-end compatibility.
+            school = accessible_school_queryset(self.request.user).filter(school_code=str(school_id).strip().upper()).first()
+        if not school:
+            raise ValidationError({"school": "You cannot share content to this school."})
+        return school
+
+    def _target_grade(self):
+        grade = str(self.request.data.get("grade") or "").strip()
+        if not grade.isdigit():
+            raise ValidationError({"grade": "A numeric grade is required for scoped content sharing."})
+        return grade
+
+    def _prepare_content_file(self, serializer):
+        upload = serializer.validated_data.get("file")
+        if upload is None:
+            return
+        enabled_raw = self.request.data.get("is_watermarked", "true")
+        enabled = str(enabled_raw).strip().lower() not in {"false", "0", "no", "off"}
+        target_role = serializer.validated_data.get("target_role", "student")
+        processed, watermarked = prepare_uploaded_file(upload, target_role, enabled)
+        serializer.validated_data["file"] = processed
+        serializer.validated_data["is_watermarked"] = watermarked
+
+    @transaction.atomic
+    def _save_scoped_content(self, serializer, *, update=False):
+        user = self.request.user
+        if user.role not in {UserRole.ADMIN, UserRole.TRAINER}:
+            raise ValidationError({"detail": "Only administrators and trainers can create learning content."})
+
+        target_role = str(serializer.validated_data.get("target_role", getattr(serializer.instance, "target_role", "student")) or "student").strip().lower()
+        if user.role == UserRole.TRAINER and target_role != "student":
+            raise ValidationError({"target_role": "Trainers can share learning content with students only."})
+
+        if update and user.role == UserRole.TRAINER and serializer.instance.created_by_id != user.id:
+            raise ValidationError({"detail": "Trainers can edit only content they created."})
+
+        school = self._target_school()
+        grade = self._target_grade()
+        active_classes = SchoolClass.objects.filter(school_id=school.id, grade=grade, status="active").only("id")
+        class_ids = list(active_classes.values_list("id", flat=True))
+        if not class_ids:
+            raise ValidationError({"grade": f"School {school.school_code} has no active class in Grade {grade}."})
+
+        self._prepare_content_file(serializer)
+        if update:
+            content = serializer.save(created_by=user if user.role == UserRole.TRAINER else serializer.instance.created_by)
+            ContentClassAssignment.objects.filter(content=content).delete()
+        else:
+            content = serializer.save(created_by=user)
+
+        ContentClassAssignment.objects.bulk_create(
+            [ContentClassAssignment(content=content, school_class_id=class_id, assigned_by=user) for class_id in class_ids],
+            ignore_conflicts=True,
+        )
+        return content
+
+    def perform_create(self, serializer):
+        self._save_scoped_content(serializer, update=False)
+
+    def perform_update(self, serializer):
+        self._save_scoped_content(serializer, update=True)
 
 
 class SafeScopedQuizViewSet(ScopedContractQuizViewSetStrict):
