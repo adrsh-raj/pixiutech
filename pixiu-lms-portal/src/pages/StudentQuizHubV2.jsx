@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, ClipboardCheck, Clock3, Download, Eye, RefreshCw, ShieldCheck, X } from 'lucide-react';
-import { apiFetch, useAuth } from '../context/AuthContext';
+import { apiFetch } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import QuizExamEngine from '../components/quiz/QuizExamEngine';
 
 const rows = value => Array.isArray(value) ? value : Array.isArray(value?.results) ? value.results : Array.isArray(value?.data) ? value.data : [];
 const text = value => String(value ?? '').trim();
-const field = 'w-full h-11 rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-slate-800 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10';
 
 async function request(path, method = 'GET', body) {
   const response = await apiFetch(path, { method, cache: 'no-store', ...(body !== undefined ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}) });
@@ -65,7 +64,6 @@ function ResultModal({ result, onClose }) {
 }
 
 export default function StudentQuizHubV2() {
-  const { user } = useAuth();
   const { quizzes = [], students = [], refreshAll, loading } = useData();
   const student = students[0] || null;
   const [attempts, setAttempts] = useState([]);
@@ -83,22 +81,19 @@ export default function StudentQuizHubV2() {
   const attemptedByQuiz = useMemo(() => new Map(attempts.filter(a => text(a.status).toLowerCase() === 'completed').map(a => [String(a.quiz), a])), [attempts]);
 
   const startQuiz = async quiz => {
+    if (!student) { setError('Student profile is not available for this account.'); return; }
     setBusy(true); setError('');
     try {
       const started = await request(`/quizzes/${encodeURIComponent(quiz.id)}/start`, 'POST', {});
-      setExam({ ...quiz, __attemptId: started.attempt_id, __startedAt: started.started_at, __duration: started.duration_seconds });
+      setExam({ ...quiz, duration_minutes: Math.max(1, Math.ceil(Number(started.duration_seconds || quiz.duration_seconds || 60) / 60)), __attemptId: started.attempt_id, __startedAt: started.started_at, __duration: started.duration_seconds });
     } catch (err) { setError(err.message || 'Unable to start quiz.'); } finally { setBusy(false); }
   };
 
   const submitQuiz = async payload => {
+    if (!exam) return;
     setBusy(true); setError('');
     try {
-      const response = await request(`/quizzes/${encodeURIComponent(exam.id)}/single-attempt`, 'POST', {
-        attempt_id: exam.__attemptId,
-        answers: payload.answers,
-        time_taken_seconds: payload.time_taken_seconds,
-        violation_count: payload.violation_count,
-      });
+      const response = await request(`/quizzes/${encodeURIComponent(exam.id)}/single-attempt`, 'POST', { attempt_id: exam.__attemptId, answers: payload.answers, time_taken_seconds: payload.time_taken_seconds, violation_count: payload.violation_count });
       setResult(response);
       setExam(null);
       setAttempts(prev => [response, ...prev.filter(a => String(a.id) !== String(response.id))]);
@@ -123,7 +118,7 @@ export default function StudentQuizHubV2() {
         <div className="flex items-center justify-between gap-3"><div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center"><ClipboardCheck size={18}/></div>{attempt ? <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-[9px] font-black uppercase inline-flex items-center gap-1"><CheckCircle2 size={11}/> Attempted</span> : <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 text-[9px] font-black uppercase">Available</span>}</div>
         <h2 className="font-black text-slate-900 mt-4">{quiz.title}</h2><p className="text-xs text-slate-500 mt-1">Grade {quiz.grade || '—'} · {quiz.level || '—'} · {quiz.unit_code || '—'}</p><p className="text-[10px] text-slate-400 mt-3">{rows(quiz.questions).length} questions · <Clock3 size={10} className="inline"/> {quiz.duration_seconds || 60}s</p>
         {attempt && <div className="mt-4 rounded-2xl bg-emerald-50 border border-emerald-100 p-4"><p className="text-[9px] uppercase font-black text-emerald-700">Final score</p><p className="text-3xl font-black text-emerald-900 mt-1">{attempt.score} <span className="text-base text-emerald-600">/ {attempt.total_marks}</span></p><p className="text-xs font-bold text-emerald-700 mt-1">{attempt.percentage}% · {attempt.correct_count} correct</p></div>}
-        <div className="flex flex-wrap gap-2 mt-4">{attempt ? <><button type="button" onClick={() => viewResult(attempt)} disabled={busy} className="px-3 py-2 rounded-lg bg-slate-100 text-slate-700 text-[10px] font-black inline-flex items-center gap-1.5"><Eye size={12}/> View result</button><button type="button" onClick={async () => { try { const r = await request(`/quiz-results/${attempt.id}`); setResult(r); } catch (err) { setError(err.message); } }} disabled={busy} className="px-3 py-2 rounded-lg bg-blue-50 text-blue-700 text-[10px] font-black inline-flex items-center gap-1.5"><Download size={12}/> PDFs</button></> : <button type="button" onClick={() => startQuiz(quiz)} disabled={busy || text(quiz.status).toLowerCase() !== 'active'} className="px-4 py-2.5 rounded-lg bg-blue-600 text-white text-[10px] font-black disabled:opacity-40">Start exam</button>}</div>
+        <div className="flex flex-wrap gap-2 mt-4">{attempt ? <><button type="button" onClick={() => viewResult(attempt)} disabled={busy} className="px-3 py-2 rounded-lg bg-slate-100 text-slate-700 text-[10px] font-black inline-flex items-center gap-1.5"><Eye size={12}/> View result</button><button type="button" onClick={() => viewResult(attempt)} disabled={busy} className="px-3 py-2 rounded-lg bg-blue-50 text-blue-700 text-[10px] font-black inline-flex items-center gap-1.5"><Download size={12}/> PDFs</button></> : <button type="button" onClick={() => startQuiz(quiz)} disabled={busy || text(quiz.status).toLowerCase() !== 'active'} className="px-4 py-2.5 rounded-lg bg-blue-600 text-white text-[10px] font-black disabled:opacity-40">Start exam</button>}</div>
       </article>;
     })}</section>}
     {result && <ResultModal result={result} onClose={() => setResult(null)} />}
