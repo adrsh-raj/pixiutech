@@ -13,9 +13,9 @@ from .scoped_contract_views import ScopedContractSessionCompatViewSet
 class StrictScopedSessionViewSet(ScopedContractSessionCompatViewSet):
     """Canonical session create/update adapter for the portal.
 
-    The portal sends legacy class/trainer keys plus curriculum_unit. This adapter
-    resolves those ids, validates the trainer/class relationship explicitly, and
-    persists the curriculum binding in the existing session metadata marker.
+    The portal sends class/trainer keys plus curriculum_unit. The adapter resolves
+    and validates the exact class, trainer and curriculum assignment, then stores
+    the curriculum id in the existing session note metadata for backward compatibility.
     """
 
     def _resolve_class(self, value):
@@ -29,9 +29,9 @@ class StrictScopedSessionViewSet(ScopedContractSessionCompatViewSet):
         return obj
 
     def _resolve_trainer(self, value, school_class):
-        trainer = Trainer.objects.filter(pk=value).first()
-        if not trainer:
-            trainer = Trainer.objects.filter(trainer_id=str(value).strip().upper()).first()
+        trainer = Trainer.objects.filter(pk=value).first() or Trainer.objects.filter(
+            trainer_id=str(value).strip().upper()
+        ).first()
         if not trainer:
             raise self._validation({"trainer": "Selected trainer was not found."})
         if trainer.status != "active":
@@ -69,9 +69,7 @@ class StrictScopedSessionViewSet(ScopedContractSessionCompatViewSet):
         curriculum = get_object_or_404(CurriculumUnit, pk=curriculum_id)
         if str(curriculum.grade).strip().upper() != str(school_class.grade).strip().upper():
             raise self._validation({"curriculum_unit": "Curriculum grade must match the selected class grade."})
-        if not CurriculumClassAssignment.objects.filter(
-            curriculum_unit=curriculum, school_class=school_class
-        ).exists():
+        if not CurriculumClassAssignment.objects.filter(curriculum_unit=curriculum, school_class=school_class).exists():
             raise self._validation({"curriculum_unit": "This curriculum unit is not assigned to the selected class."})
 
         payload = request.data.copy()
@@ -79,14 +77,17 @@ class StrictScopedSessionViewSet(ScopedContractSessionCompatViewSet):
         payload["trainer"] = str(trainer.pk)
         payload["topic"] = str(payload.get("topic") or curriculum.topic or curriculum.title).strip()
         payload["notes"] = str(payload.get("notes") or "").strip()
+        payload.pop("curriculum_unit", None)
+        payload.pop("curriculum", None)
+        payload.pop("curriculum_unit_id", None)
 
         normalized = super().map_in(payload)
         serializer = SessionSerializer(data=normalized, context={"request": request})
         serializer.is_valid(raise_exception=True)
-        session = serializer.save(created_by=request.user)
+        session = serializer.save()
 
-        clean_notes = str(session.notes or "")
         marker = "__PIXIU_CURRICULUM_UNIT_ID__:{0}__".format(curriculum.pk)
+        clean_notes = str(session.notes or "")
         if marker not in clean_notes:
             session.notes = (clean_notes + " " + marker).strip()
             session.save(update_fields=["notes", "updated_at"])
