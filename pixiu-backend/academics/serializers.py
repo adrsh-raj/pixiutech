@@ -16,6 +16,17 @@ def validate_indian_phone(value, field_name="Phone"):
     return value
 
 
+class FlexibleDateField(serializers.DateField):
+    """Accept a date or an ISO datetime string and normalize it to a date."""
+
+    def to_internal_value(self, value):
+        if value not in (None, ""):
+            raw = str(value).strip()
+            if len(raw) >= 10 and raw[4] == "-" and raw[7] == "-":
+                value = raw[:10]
+        return super().to_internal_value(value)
+
+
 class SchoolSerializer(serializers.ModelSerializer):
     account_username = serializers.CharField(source="account.username", read_only=True)
 
@@ -94,11 +105,15 @@ class TrainerSchoolAssignmentSerializer(serializers.ModelSerializer):
 
 class SchoolClassSerializer(serializers.ModelSerializer):
     school_code = serializers.CharField(source="school.school_code", read_only=True)
+    active_student_count = serializers.SerializerMethodField()
 
     class Meta:
         model = SchoolClass
-        fields = ["id", "school", "school_code", "grade", "section", "display_name", "status", "created_at", "updated_at"]
-        read_only_fields = ["id", "school_code", "created_at", "updated_at"]
+        fields = ["id", "school", "school_code", "grade", "section", "display_name", "status", "active_student_count", "created_at", "updated_at"]
+        read_only_fields = ["id", "school_code", "active_student_count", "created_at", "updated_at"]
+
+    def get_active_student_count(self, obj):
+        return obj.students.filter(status="active").count()
 
     def validate(self, attrs):
         request = self.context["request"]
@@ -166,6 +181,8 @@ class StudentCreateSerializer(serializers.ModelSerializer):
 
 
 class StudentUpdateSerializer(serializers.ModelSerializer):
+    date_of_birth = FlexibleDateField(required=False, allow_null=True)
+
     class Meta:
         model = Student
         fields = [
