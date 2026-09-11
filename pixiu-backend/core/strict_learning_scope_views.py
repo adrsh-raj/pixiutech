@@ -140,7 +140,6 @@ class SafeScopedContentViewSet(ScopedContractContentViewSet):
             raise ValidationError({"school": "Select the school that should receive this content."})
         school = accessible_school_queryset(self.request.user).filter(pk=school_id).first()
         if not school:
-            # Also accept a school code for legacy/front-end compatibility.
             school = accessible_school_queryset(self.request.user).filter(school_code=str(school_id).strip().upper()).first()
         if not school:
             raise ValidationError({"school": "You cannot share content to this school."})
@@ -243,8 +242,36 @@ class SafeScopedAssessmentViewSet(ScopedContractAssessmentViewSet):
         if self.request.user.role == UserRole.TRAINER:
             qs = qs.filter(student__school_class_id__in=accessible_class_queryset(self.request.user).values("id"))
         return qs
+
     def scoped_queryset(self):
         return self.get_queryset()
+
+    def create(self, request, *args, **kwargs):
+        """Inject the authenticated trainer before serializer validation.
+
+        StudentAssessmentSerializer has a required trainer FK. DRF validates the
+        serializer before perform_create(), so assigning trainer only in
+        perform_create() is too late and produced `trainer: This field is required.`
+        The authenticated trainer is authoritative and cannot be chosen by the UI.
+        """
+        if request.user.role == UserRole.TRAINER:
+            trainer = getattr(request.user, "trainer_profile", None)
+            if trainer is None:
+                raise ValidationError({"trainer": "Your account has no trainer profile."})
+            payload = request.data.copy()
+            payload["trainer"] = str(trainer.pk)
+            serializer = self.get_serializer(data=payload)
+        else:
+            serializer = self.get_serializer(data=request.data)
+
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return __import__("rest_framework.response", fromlist=["Response"]).Response(
+            self.map_out(serializer.instance) if hasattr(self, "map_out") else serializer.data,
+            status=201,
+            headers=headers,
+        )
 
 
 class SafeScopedProjectViewSet(ScopedContractProjectViewSet):
