@@ -9,7 +9,7 @@ from academics.services import (
     accessible_trainer_queryset,
 )
 from academics.views import TrainerSchoolAssignmentViewSet
-from learning.models import QuizClassAssignment, QuizQuestion, SessionActivity
+from learning.models import Quiz, QuizClassAssignment, QuizQuestion, SessionActivity
 from learning.services import (
     accessible_assessments,
     accessible_attendance,
@@ -17,7 +17,6 @@ from learning.services import (
     accessible_curriculum,
     accessible_evidence,
     accessible_projects,
-    accessible_quizzes,
     accessible_sessions,
     accessible_attempts,
 )
@@ -117,8 +116,15 @@ class SafeScopedContentViewSet(ScopedContractContentViewSet):
 
 
 class SafeScopedQuizViewSet(ScopedContractQuizViewSetStrict):
+    def _accessible_quiz_queryset(self):
+        if self.request.user.role == UserRole.ADMIN:
+            return Quiz.objects.all()
+        return Quiz.objects.filter(
+            class_assignments__school_class_id__in=accessible_class_queryset(self.request.user).values("id")
+        ).distinct()
+
     def get_queryset(self):
-        return accessible_quizzes(self.request.user)
+        return self._accessible_quiz_queryset().select_related("created_by").prefetch_related("questions")
     def scoped_queryset(self):
         return self.get_queryset()
 
@@ -126,7 +132,9 @@ class SafeScopedQuizViewSet(ScopedContractQuizViewSetStrict):
 class SafeScopedQuizQuestionViewSet(StableQuizQuestionViewSet):
     def get_queryset(self):
         return QuizQuestion.objects.filter(
-            quiz_id__in=accessible_quizzes(self.request.user).values("id")
+            quiz_id__in=SafeScopedQuizViewSet._accessible_quiz_queryset(self) if isinstance(self, SafeScopedQuizViewSet) else QuizClassAssignment.objects.filter(
+                school_class_id__in=accessible_class_queryset(self.request.user).values("id")
+            ).values("quiz_id")
         ).select_related("quiz")
     def scoped_queryset(self):
         return self.get_queryset()
