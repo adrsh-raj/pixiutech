@@ -16,12 +16,10 @@ from .certificate_views import IssueCertificateView, VerifyCertificateView
 from .public_enquiry import PublicEnquiryView
 from .phase7_compat_extras import ContractCommunicationLogViewSet
 from .billing_contract_overrides import TransactionalInvoiceViewSet
-from .quiz_contract_view import ScopedContractQuizViewSetStrict
-from .scoped_contract_views import (
-    ScopedContractLeadViewSet, ScopedContractSchoolViewSet, ScopedContractTrainerViewSet,
-    ScopedContractBillingFullViewSet, ScopedSessionActivityViewSet,
-)
+from .learning_contract_overrides import StableQuizQuestionViewSet
 from .inventory_contract_overrides import JsonKitComponentViewSet, JsonKitViewSet
+from .scoped_contract_views import ScopedContractBillingFullViewSet, ScopedContractLeadViewSet, ScopedContractSchoolViewSet
+from .scoped_contract_views import ScopedContractTrainerViewSet, ScopedSessionActivityViewSet, ScopedQuizAssignmentViewSet, ScopedContractReviewViewSet, ScopedContractInventoryViewSet
 from .learning_content_files import LearningContentFileView
 from .trainer_materials import TrainerMaterialDetailView, TrainerMaterialFileView, TrainerMaterialListCreateView
 from notifications.views import NotificationPortalViewSet
@@ -45,10 +43,10 @@ router.register("attendance", SafeScopedAttendanceViewSet, basename="v1-attendan
 router.register("curriculum", SafeScopedCurriculumViewSet, basename="v1-curriculum")
 router.register("content", SafeScopedContentViewSet, basename="v1-content")
 router.register("quizzes", SafeScopedQuizViewSet, basename="v1-quiz")
-router.register("quiz-questions", __import__('core.learning_contract_overrides', fromlist=['StableQuizQuestionViewSet']).StableQuizQuestionViewSet, basename="v1-quiz-question")
-router.register("quiz-assignments", __import__('core.scoped_contract_views', fromlist=['ScopedQuizAssignmentViewSet']).ScopedQuizAssignmentViewSet, basename="v1-quiz-assignment")
+router.register("quiz-questions", StableQuizQuestionViewSet, basename="v1-quiz-question")
+router.register("quiz-assignments", ScopedQuizAssignmentViewSet, basename="v1-quiz-assignment")
 router.register("quiz-submissions", SafeScopedQuizAttemptViewSet, basename="v1-quiz-submission")
-router.register("reviews", __import__('core.scoped_contract_views', fromlist=['ScopedContractReviewViewSet']).ScopedContractReviewViewSet, basename="v1-review")
+router.register("reviews", ScopedContractReviewViewSet, basename="v1-review")
 router.register("assessments", SafeScopedAssessmentViewSet, basename="v1-assessment")
 router.register("projects", SafeScopedProjectViewSet, basename="v1-project")
 router.register("project-evidence", SafeScopedEvidenceViewSet, basename="v1-project-evidence")
@@ -61,7 +59,7 @@ router.register("receipts", ReceiptViewSet, basename="v1-receipt")
 router.register("kits", JsonKitViewSet, basename="v1-kit")
 router.register("kit-components", JsonKitComponentViewSet, basename="v1-kit-component")
 router.register("kit-maintenance", KitMaintenanceViewSet, basename="v1-kit-maintenance")
-router.register("inventory", __import__('core.scoped_contract_views', fromlist=['ScopedContractInventoryViewSet']).ScopedContractInventoryViewSet, basename="v1-inventory")
+router.register("inventory", ScopedContractInventoryViewSet, basename="v1-inventory")
 router.register("leads", ScopedContractLeadViewSet, basename="v1-lead")
 router.register("notifications", NotificationPortalViewSet, basename="v1-notification")
 router.register("comms", ContractCommunicationLogViewSet, basename="v1-comms")
