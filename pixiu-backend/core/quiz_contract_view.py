@@ -17,7 +17,7 @@ from .scoped_contract_views import ScopedContractQuizViewSet
 
 
 class ScopedContractQuizViewSetStrict(ScopedContractQuizViewSet):
-    """Quiz endpoint with a mandatory exact class assignment."""
+    """Quiz endpoint with one mandatory exact class assignment."""
 
     @action(detail=False, methods=["post"], url_path="create-with-questions")
     @transaction.atomic
@@ -42,15 +42,13 @@ class ScopedContractQuizViewSetStrict(ScopedContractQuizViewSet):
             raise ValidationError({"school_class": "Selected active class was not found."})
         if not accessible_class_queryset(request.user).filter(pk=school_class.pk).exists():
             raise ValidationError({"school_class": "You cannot assign a quiz to this class."})
-        grade = str(payload.get("grade", "")).strip()
-        if grade != str(school_class.grade).strip():
-            raise ValidationError({"school_class": "Quiz grade must match the selected class grade."})
 
+        # Grade is derived from the selected class; the client cannot create a
+        # quiz for a different grade.
+        payload["grade"] = str(school_class.grade).strip()
         serializer = QuizSerializer(data=payload, context={"request": request})
         serializer.is_valid(raise_exception=True)
         quiz = serializer.save(created_by=request.user, duration_minutes=1)
-        quiz.duration_seconds = 30
-        quiz.save(update_fields=["duration_seconds", "updated_at"])
 
         for index, question in enumerate(raw_questions, start=1):
             text = str(question.get("question_text") or "").strip()
@@ -78,5 +76,10 @@ class ScopedContractQuizViewSetStrict(ScopedContractQuizViewSet):
                 explanation=str(question.get("explanation") or "").strip(),
                 points=points,
             )
-        QuizClassAssignment.objects.get_or_create(quiz=quiz, school_class=school_class, defaults={"assigned_by": request.user})
+
+        QuizClassAssignment.objects.get_or_create(
+            quiz=quiz,
+            school_class=school_class,
+            defaults={"assigned_by": request.user},
+        )
         return Response(ScopedQuizSerializer(quiz, context={"request": request}).data, status=status.HTTP_201_CREATED)
