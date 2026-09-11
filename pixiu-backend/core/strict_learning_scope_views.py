@@ -5,7 +5,8 @@ from academics.services import (
     accessible_student_queryset,
     accessible_trainer_queryset,
 )
-from learning.models import QuizClassAssignment, QuizQuestion
+from academics.views import TrainerSchoolAssignmentViewSet
+from learning.models import QuizClassAssignment, QuizQuestion, SessionActivity
 from learning.services import (
     accessible_assessments,
     accessible_attendance,
@@ -18,6 +19,7 @@ from learning.services import (
     accessible_attempts,
 )
 from .api_v1_compat import ContractTrainerViewSet
+from .learning_contract_overrides import StableQuizQuestionViewSet
 from .scoped_contract_views import (
     ScopedContractAssessmentViewSet,
     ScopedContractAttendanceViewSet,
@@ -34,7 +36,6 @@ from .scoped_contract_views import (
 )
 from .quiz_contract_view import ScopedContractQuizViewSetStrict
 from .strict_session_views import StrictScopedSessionViewSet
-from academics.views import TrainerSchoolAssignmentViewSet
 
 
 class SafeScopedSchoolViewSet(ScopedContractSchoolViewSet):
@@ -83,9 +84,9 @@ class SafeScopedAttendanceViewSet(ScopedContractAttendanceViewSet):
 
 class SafeScopedSessionActivityViewSet(ScopedSessionActivityViewSet):
     def get_queryset(self):
-        return __import__('learning.models', fromlist=['SessionActivity']).SessionActivity.objects.filter(
-            session_id__in=accessible_sessions(self.request.user).values('id')
-        ).select_related('session')
+        return SessionActivity.objects.filter(
+            session_id__in=accessible_sessions(self.request.user).values("id")
+        ).select_related("session")
     def scoped_queryset(self):
         return self.get_queryset()
 
@@ -111,20 +112,22 @@ class SafeScopedQuizViewSet(ScopedContractQuizViewSetStrict):
         return self.get_queryset()
 
 
-class SafeScopedQuizQuestionViewSet(__import__('core.learning_contract_overrides', fromlist=['StableQuizQuestionViewSet']).StableQuizQuestionViewSet):
+class SafeScopedQuizQuestionViewSet(StableQuizQuestionViewSet):
     def get_queryset(self):
-        return QuizQuestion.objects.filter(quiz_id__in=accessible_quizzes(self.request.user).values('id')).select_related('quiz')
+        return QuizQuestion.objects.filter(
+            quiz_id__in=accessible_quizzes(self.request.user).values("id")
+        ).select_related("quiz")
     def scoped_queryset(self):
         return self.get_queryset()
 
 
 class SafeScopedQuizAssignmentViewSet(ScopedQuizAssignmentViewSet):
     def get_queryset(self):
-        if self.request.user.role == 'admin':
-            return QuizClassAssignment.objects.select_related('quiz', 'school_class')
+        if self.request.user.role == "admin":
+            return QuizClassAssignment.objects.select_related("quiz", "school_class")
         return QuizClassAssignment.objects.filter(
-            school_class_id__in=accessible_class_queryset(self.request.user).values('id')
-        ).select_related('quiz', 'school_class')
+            school_class_id__in=accessible_class_queryset(self.request.user).values("id")
+        ).select_related("quiz", "school_class")
     def scoped_queryset(self):
         return self.get_queryset()
 
