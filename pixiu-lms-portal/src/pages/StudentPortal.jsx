@@ -36,6 +36,10 @@ export default function StudentPortal() {
     return () => { active = false; };
   }, [student?.id]);
 
+  // DataProvider loads the student collection asynchronously on the first render.
+  // Never show the "record unavailable" state during that initial hydration window.
+  if (loading && !student) return <PortalShell role="student" title="Student Portal" subtitle="Loading your learning workspace"><div className="space-y-5 pb-10"><div className="h-28 animate-pulse rounded-3xl bg-slate-100"/><div className="grid grid-cols-2 xl:grid-cols-4 gap-3"><div className="h-28 animate-pulse rounded-2xl bg-slate-100"/><div className="h-28 animate-pulse rounded-2xl bg-slate-100"/><div className="h-28 animate-pulse rounded-2xl bg-slate-100"/><div className="h-28 animate-pulse rounded-2xl bg-slate-100"/></div><div className="h-64 animate-pulse rounded-2xl bg-slate-100"/></div></PortalShell>;
+
   if (!student) return <div className="min-h-dvh flex items-center justify-center bg-slate-50 p-6"><div className="max-w-md w-full bg-white border border-slate-200 rounded-2xl p-8 text-center"><Award className="mx-auto text-rose-500"/><h1 className="text-xl font-black text-slate-900 mt-4">Student record unavailable</h1><p className="text-sm text-slate-500 mt-2">No student profile is linked to this authenticated account.</p><button type="button" onClick={refreshAll} className="mt-4 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold">Try again</button></div></div>;
 
   const school = schools.find(item => String(item.id) === String(student.school_id) || String(item.school_code) === String(student.school_code));
