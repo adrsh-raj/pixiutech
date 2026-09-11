@@ -33,8 +33,10 @@ export default function AttendanceCenter() {
   const [searchParams] = useSearchParams();
   const requestedSessionId = searchParams.get('session') || '';
   const [selectedSessionId, setSelectedSessionId] = useState(requestedSessionId);
+  const [trainerSessions, setTrainerSessions] = useState([]);
+  const [trainerAttendance, setTrainerAttendance] = useState([]);
+  const [date, setDate] = useState('');
   const [marks, setMarks] = useState({});
-  const [date, setDate] = useState(today());
   const [schoolFilter, setSchoolFilter] = useState('');
   const [classFilter, setClassFilter] = useState('');
   const [trainerFilter, setTrainerFilter] = useState('');
@@ -44,21 +46,28 @@ export default function AttendanceCenter() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const selectedSession = useMemo(
-    () => sessions.find(session => String(session.id) === String(selectedSessionId)) || null,
-    [sessions, selectedSessionId],
-  );
+  const selectedSession = useMemo(() => {
+    const all = [...trainerSessions, ...sessions];
+    return all.find(session => String(session.id) === String(selectedSessionId)) || null;
+  }, [trainerSessions, sessions, selectedSessionId]);
 
-  const trainerSessions = useMemo(() => {
-    const active = sessions.filter(session => {
-      const isSameDate = String(session.date || '').slice(0, 10) === date;
-      const isEditable = !['completed', 'cancelled'].includes(norm(session.status));
-      return isSameDate && isEditable;
+  const sessionSource = useMemo(() => {
+    const merged = new Map();
+    [...sessions, ...trainerSessions].forEach(session => {
+      if (session?.id) merged.set(String(session.id), session);
     });
-    if (!requestedSessionId || !selectedSession) return active;
-    if (active.some(session => String(session.id) === String(selectedSession.id))) return active;
-    return [selectedSession, ...active];
-  }, [sessions, date, requestedSessionId, selectedSession]);
+    return [...merged.values()];
+  }, [sessions, trainerSessions]);
+
+  const visibleTrainerSessions = useMemo(() => {
+    const rows = sessionSource
+      .filter(session => !['completed', 'cancelled'].includes(norm(session.status)))
+      .filter(session => !date || String(session.date || '').slice(0, 10) === date)
+      .sort((a, b) => `${a.date || ''}${a.start_time || ''}`.localeCompare(`${b.date || ''}${b.start_time || ''}`));
+    if (!requestedSessionId || !selectedSession) return rows;
+    if (rows.some(session => String(session.id) === String(selectedSession.id))) return rows;
+    return [selectedSession, ...rows];
+  }, [sessionSource, date, requestedSessionId, selectedSession]);
 
   const roster = useMemo(() => {
     const classId = String(selectedSession?.school_class || selectedSession?.class_id || '');
@@ -68,8 +77,9 @@ export default function AttendanceCenter() {
 
   const selectSession = session => {
     setSelectedSessionId(String(session.id));
+    const source = trainerAttendance.length ? trainerAttendance : attendance;
     const nextMarks = {};
-    attendance
+    source
       .filter(record => String(record.session || record.session_id) === String(session.id))
       .forEach(record => {
         nextMarks[String(record.student || record.student_id)] = norm(record.status);
@@ -79,11 +89,31 @@ export default function AttendanceCenter() {
     if (session.date) setDate(String(session.date).slice(0, 10));
   };
 
+  const loadTrainerData = async () => {
+    if (user?.role !== 'trainer') return;
+    try {
+      const [sessionRows, attendanceRows] = await Promise.all([
+        request('/sessions'),
+        request('/attendance'),
+      ]);
+      const normalizeRows = value => Array.isArray(value) ? value : Array.isArray(value?.results) ? value.results : Array.isArray(value?.data) ? value.data : [];
+      setTrainerSessions(normalizeRows(sessionRows));
+      setTrainerAttendance(normalizeRows(attendanceRows));
+    } catch (err) {
+      setError(err.message || 'Unable to load trainer attendance data.');
+    }
+  };
+
+  useEffect(() => {
+    loadTrainerData();
+  }, [user?.role, requestedSessionId]);
+
   useEffect(() => {
     if (!requestedSessionId) return;
-    const session = sessions.find(item => String(item.id) === String(requestedSessionId));
+    const all = [...trainerSessions, ...sessions];
+    const session = all.find(item => String(item.id) === String(requestedSessionId));
     if (session) selectSession(session);
-  }, [requestedSessionId, sessions, attendance]);
+  }, [requestedSessionId, trainerSessions, sessions, trainerAttendance, attendance]);
 
   const saveAttendance = async () => {
     if (!selectedSession || !roster.length) return false;
@@ -97,7 +127,7 @@ export default function AttendanceCenter() {
           status: marks[String(student.id)] || 'absent',
         })),
       });
-      await refreshAll();
+      await Promise.all([refreshAll(), loadTrainerData()]);
       return true;
     } catch (err) {
       setError(err.message);
@@ -113,7 +143,7 @@ export default function AttendanceCenter() {
     setError('');
     try {
       await request(`/sessions/${selectedSession.id}/${action}`, 'POST', {});
-      await refreshAll();
+      await Promise.all([refreshAll(), loadTrainerData()]);
       return true;
     } catch (err) {
       setError(err.message);
@@ -129,22 +159,25 @@ export default function AttendanceCenter() {
         <PageHeader
           eyebrow="Trainer"
           title="Attendance"
-          description="Attendance is always tied to the exact scheduled session and its class roster."
-          actions={<RefreshButton onRefresh={refreshAll} loading={loading || saving} />}
+          description="Open a scheduled session, start it, mark the class roster, then save the attendance record."
+          actions={<RefreshButton onRefresh={async () => { await refreshAll(); await loadTrainerData(); }} loading={loading || saving} />}
         />
         {error && <ErrorState title="Attendance action failed" description={error} onRetry={() => setError('')} />}
 
         <section className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-5">
           <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-            <div className="p-4 border-b border-slate-100 flex items-center justify-between gap-3">
+            <div className="p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="font-black">Scheduled sessions</p>
-                <p className="text-xs text-slate-400 mt-1">{trainerSessions.length} session(s) for {date}</p>
+                <p className="text-xs text-slate-400 mt-1">{visibleTrainerSessions.length} active session(s)</p>
               </div>
-              <input type="date" className="field w-auto" value={date} onChange={event => setDate(event.target.value)} />
+              <div className="flex items-center gap-2">
+                {date && <button type="button" onClick={() => setDate('')} className="px-2.5 py-2 rounded-lg bg-slate-100 text-[10px] font-black text-slate-600">All dates</button>}
+                <input aria-label="Filter sessions by date" type="date" className="field w-auto" value={date} onChange={event => setDate(event.target.value)} />
+              </div>
             </div>
             <div className="divide-y divide-slate-100">
-              {trainerSessions.map(session => (
+              {visibleTrainerSessions.map(session => (
                 <button
                   key={session.id}
                   type="button"
@@ -152,13 +185,13 @@ export default function AttendanceCenter() {
                   className={`w-full text-left p-4 transition ${String(selectedSessionId) === String(session.id) ? 'bg-blue-50 border-l-4 border-blue-600' : 'hover:bg-slate-50'}`}
                 >
                   <p className="font-black text-sm">{session.topic || 'Scheduled session'}</p>
-                  <p className="text-xs text-slate-500 mt-1">{session.class_name || session.class_id || 'Class'} · {session.start_time || '—'}</p>
+                  <p className="text-xs text-slate-500 mt-1">{session.class_name || session.class_id || 'Class'} · {session.date || '—'} · {session.start_time || '—'}</p>
                   <span className="inline-flex mt-2 px-2 py-1 rounded-lg bg-slate-100 text-[10px] font-black uppercase">{session.status}</span>
                 </button>
               ))}
-              {!trainerSessions.length && (
+              {!visibleTrainerSessions.length && (
                 <div className="p-6">
-                  <EmptyState icon={<CalendarDays size={19} />} title="No scheduled sessions" description="Create a session from Classes & Sessions first." />
+                  <EmptyState icon={<CalendarDays size={19} />} title="No scheduled sessions" description="Your authorised scheduled sessions will appear here automatically, including future dates." />
                 </div>
               )}
             </div>
@@ -166,7 +199,7 @@ export default function AttendanceCenter() {
 
           <div className="space-y-4">
             {!selectedSession ? (
-              <EmptyState icon={<Users size={20} />} title="Select a session" description="Opening Attendance from a scheduled session automatically selects that exact session." />
+              <EmptyState icon={<Users size={20} />} title="Select a session" description="Use the scheduled-session list or open Attendance from Classes & Sessions to select the exact session." />
             ) : (
               <>
                 <div className="bg-white rounded-2xl border border-slate-200 p-5">
@@ -177,11 +210,7 @@ export default function AttendanceCenter() {
                       <p className="text-xs text-slate-500 mt-1">{selectedSession.class_name || selectedSession.class_id} · {selectedSession.date} · {selectedSession.start_time}</p>
                       <p className="text-[10px] text-slate-400 mt-2">Curriculum: {selectedSession.curriculum_unit || '—'}</p>
                     </div>
-                    {norm(selectedSession.status) === 'planned' && (
-                      <button type="button" disabled={saving} onClick={() => sessionAction('start')} className="px-4 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-black">
-                        Start class
-                      </button>
-                    )}
+                    {norm(selectedSession.status) === 'planned' && <button type="button" disabled={saving} onClick={() => sessionAction('start')} className="px-4 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-black">Start class</button>}
                   </div>
                 </div>
 
@@ -195,22 +224,9 @@ export default function AttendanceCenter() {
                     const current = marks[key] || 'absent';
                     return (
                       <div key={key} className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:justify-between gap-3">
-                        <div>
-                          <p className="font-bold">{student.name}</p>
-                          <p className="text-[10px] font-mono text-slate-400">{student.student_id} · Roll {student.roll_number}</p>
-                        </div>
+                        <div><p className="font-bold">{student.name}</p><p className="text-[10px] font-mono text-slate-400">{student.student_id} · Roll {student.roll_number}</p></div>
                         <div className="flex gap-1.5 flex-wrap">
-                          {statuses.map(status => (
-                            <button
-                              key={status}
-                              type="button"
-                              disabled={saving || norm(selectedSession.status) !== 'in_progress'}
-                              onClick={() => setMarks(value => ({ ...value, [key]: status }))}
-                              className={`px-3 py-1.5 rounded-lg text-[11px] font-black ${current === status ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'}`}
-                            >
-                              {status}
-                            </button>
-                          ))}
+                          {statuses.map(status => <button key={status} type="button" disabled={saving || norm(selectedSession.status) !== 'in_progress'} onClick={() => setMarks(value => ({ ...value, [key]: status }))} className={`px-3 py-1.5 rounded-lg text-[11px] font-black ${current === status ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'}`}>{status}</button>)}
                         </div>
                       </div>
                     );
@@ -220,20 +236,8 @@ export default function AttendanceCenter() {
 
                 {norm(selectedSession.status) === 'in_progress' && (
                   <>
-                    <button type="button" disabled={saving} onClick={saveAttendance} className="w-full py-3 rounded-xl bg-blue-600 text-white text-sm font-black inline-flex items-center justify-center gap-2">
-                      <Save size={15} /> Save attendance
-                    </button>
-                    <button
-                      type="button"
-                      disabled={saving}
-                      onClick={async () => {
-                        const saved = await saveAttendance();
-                        if (saved) await sessionAction('complete');
-                      }}
-                      className="w-full py-3 rounded-xl bg-emerald-600 text-white text-sm font-black"
-                    >
-                      Save & complete session
-                    </button>
+                    <button type="button" disabled={saving} onClick={saveAttendance} className="w-full py-3 rounded-xl bg-blue-600 text-white text-sm font-black inline-flex items-center justify-center gap-2"><Save size={15} /> Save attendance</button>
+                    <button type="button" disabled={saving} onClick={async () => { const saved = await saveAttendance(); if (saved) await sessionAction('complete'); }} className="w-full py-3 rounded-xl bg-emerald-600 text-white text-sm font-black">Save & complete session</button>
                   </>
                 )}
               </>
@@ -244,14 +248,8 @@ export default function AttendanceCenter() {
     );
   }
 
-  const filteredClasses = useMemo(
-    () => (schoolFilter ? classes.filter(item => same(item.school_id || item.school_code, schoolFilter)) : classes),
-    [classes, schoolFilter],
-  );
-  const filteredTrainers = useMemo(
-    () => (trainerFilter ? trainers.filter(item => String(item.id) === String(trainerFilter)) : trainers),
-    [trainers, trainerFilter],
-  );
+  const filteredClasses = useMemo(() => (schoolFilter ? classes.filter(item => same(item.school_id || item.school_code, schoolFilter)) : classes), [classes, schoolFilter]);
+  const filteredTrainers = useMemo(() => (trainerFilter ? trainers.filter(item => String(item.id) === String(trainerFilter)) : trainers), [trainers, trainerFilter]);
   const records = useMemo(() => attendance.filter(record => {
     if (schoolFilter && !same(record.school_code || record.school_id, schoolFilter)) return false;
     if (classFilter && !same(record.class_id || record.school_class, classFilter)) return false;
