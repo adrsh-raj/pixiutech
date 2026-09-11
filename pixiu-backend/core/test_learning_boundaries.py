@@ -199,4 +199,4 @@ class LearningBoundaryTests(APITestCase):
             format="json",
         )
         self.assertEqual(response.status_code, 400)
-        self.assertIn("level", response.data)
+        self.assertIn("level", response.data.get("fields", {}))
