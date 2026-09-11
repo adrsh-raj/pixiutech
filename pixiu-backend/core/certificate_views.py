@@ -11,9 +11,8 @@ from rest_framework.views import APIView
 from accounts.models import UserRole
 from academics.models import Student, TrainerSchoolAssignment
 from audit.models import AuditAction, AuditLog
-from learning.models import AssessmentStatus, AttendanceStatus, StudentAssessment
+from learning.models import AssessmentStatus, AttendanceStatus, CurriculumClassAssignment, StudentAssessment
 
-COMPLETION_LEVELS = 6
 CERTIFICATE_ENTITY = 'student_certificate'
 
 
@@ -29,6 +28,29 @@ def _completion_assessments(student):
         if key:
             unique[key] = row
     return list(unique.values())
+
+
+def _required_units(student):
+    return list(
+        CurriculumClassAssignment.objects.filter(
+            school_class=student.school_class,
+            curriculum_unit__status='published',
+        )
+        .select_related('curriculum_unit')
+        .order_by('curriculum_unit__unit_code')
+    )
+
+
+def _completed_required_units(student):
+    required = _required_units(student)
+    required_codes = {str(item.curriculum_unit.unit_code).strip().upper() for item in required}
+    assessments = _completion_assessments(student)
+    completed_codes = {
+        str(item.unit_code).strip().upper()
+        for item in assessments
+        if str(item.unit_code or '').strip().upper() in required_codes
+    }
+    return required, completed_codes
 
 
 def _latest_issuance(student):
@@ -64,10 +86,12 @@ def _public_payload(student, request=None):
     school_class = student.school_class
     school = school_class.school
     assessments = _completion_assessments(student)
+    required_units, completed_required_codes = _completed_required_units(student)
+    required_count = len(required_units)
+    completed = len(completed_required_codes)
     certified = _is_certified(student)
     issuance = _latest_issuance(student)
-    completed = len(assessments)
-    verified = bool(issuance and certified and completed >= COMPLETION_LEVELS)
+    verified = bool(issuance and certified and required_count > 0 and completed >= required_count)
     certificate_ref = _certificate_ref(student, issuance)
     public_origin = str(getattr(settings, 'PUBLIC_APP_URL', 'https://pixiutech.com')).rstrip('/')
     verify_url = f"{public_origin}/verify?id={quote(str(student.student_id).strip())}"
@@ -81,7 +105,7 @@ def _public_payload(student, request=None):
         'status': 'verified' if verified else 'not_verified',
         'reason': None if verified else (
             'Certificate has not been issued by an authorised trainer or administrator.' if not issuance or not certified
-            else f'Course completion requires {COMPLETION_LEVELS} published unit evaluations; {completed} are currently recorded.'
+            else f'Certificate completion requires {required_count} published curriculum units; {completed} are currently evaluated.'
         ),
         'student_id': student.student_id,
         'student_name': student.name,
@@ -95,10 +119,14 @@ def _public_payload(student, request=None):
         'verification_url': verify_url,
         'attendance_rate': _attendance_rate(student),
         'completion_count': completed,
-        'required_completion_count': COMPLETION_LEVELS,
+        'required_completion_count': required_count,
         'issued': bool(issuance and certified),
         'issued_by': issuance.actor.display_name if issuance and issuance.actor else '',
         'issued_at': issuance.created_at.isoformat() if issuance else None,
+        'required_units': [
+            {'unit_code': item.curriculum_unit.unit_code, 'title': item.curriculum_unit.title, 'level': item.curriculum_unit.level}
+            for item in required_units
+        ],
         'assessments': [
             {'level': row.level, 'unit_code': row.unit_code, 'title': row.title, 'score': float(row.score) if row.score is not None else None, 'rating': float(row.rating) if row.rating is not None else None, 'feedback': row.feedback, 'assessment_date': row.assessment_date.isoformat(), 'trainer_name': row.trainer.name}
             for row in assessments
@@ -120,11 +148,18 @@ class IssueCertificateView(APIView):
         student = get_object_or_404(Student.objects.select_related('school_class__school', 'account'), pk=pk)
         if request.user.role == UserRole.TRAINER and not TrainerSchoolAssignment.objects.filter(trainer__account=request.user, school=student.school_class.school, status='active').exists():
             return JsonResponse({'detail': 'Student is outside your active school assignment.'}, status=403)
-        assessments = _completion_assessments(student)
-        if len(assessments) < COMPLETION_LEVELS:
-            return JsonResponse({'detail': f'Certificate requires {COMPLETION_LEVELS} distinct published unit evaluations.', 'completion_count': len(assessments), 'required_completion_count': COMPLETION_LEVELS}, status=400)
+        required_units, completed_required_codes = _completed_required_units(student)
+        required_count = len(required_units)
+        completed = len(completed_required_codes)
+        if required_count == 0:
+            return JsonResponse({'detail': 'Certificate cannot be issued because no published curriculum units are assigned to the student class.', 'completion_count': 0, 'required_completion_count': 0}, status=400)
+        if completed < required_count:
+            missing = [item.curriculum_unit.unit_code for item in required_units if str(item.curriculum_unit.unit_code).strip().upper() not in completed_required_codes]
+            return JsonResponse({'detail': f'Certificate requires completion of all {required_count} published curriculum units.', 'completion_count': completed, 'required_completion_count': required_count, 'missing_units': missing}, status=400)
+        final_unit = required_units[-1].curriculum_unit
+        certified_level = f"{final_unit.level} (Certified Graduate)"
         with transaction.atomic():
-            student.current_level = 'Level 5 (Certified Graduate)'
+            student.current_level = certified_level
             student.save(update_fields=['current_level', 'updated_at'])
             AuditLog.objects.create(
                 actor=request.user,
@@ -135,7 +170,9 @@ class IssueCertificateView(APIView):
                 changes={
                     'student_id': student.student_id,
                     'certificate_ref': _certificate_ref(student),
-                    'completion_count': len(assessments),
+                    'completion_count': completed,
+                    'required_completion_count': required_count,
+                    'final_level': final_unit.level,
                 },
                 ip_address=request.META.get('REMOTE_ADDR'),
                 user_agent=request.META.get('HTTP_USER_AGENT', ''),
