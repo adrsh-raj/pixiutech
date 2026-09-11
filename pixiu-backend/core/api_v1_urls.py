@@ -23,6 +23,7 @@ from .scoped_contract_views import (
 )
 from .trainer_materials import TrainerMaterialDetailView, TrainerMaterialFileView, TrainerMaterialListCreateView
 from .learning_content_files import LearningContentFileView
+from .quiz_documents import QuizResultPdfView, QuizResultView
 from notifications.views import NotificationPortalViewSet
 from learning.quiz_portal import QuizSingleAttemptView, QuizStartView, QuizReviewView
 from .strict_learning_scope_views import (
@@ -93,4 +94,6 @@ urlpatterns = [
     path("quizzes/<uuid:pk>/start", QuizStartView.as_view(), name="v1-quiz-start"),
     path("quizzes/<uuid:pk>/single-attempt", QuizSingleAttemptView.as_view(), name="v1-quiz-single-attempt"),
     path("quiz-review", QuizReviewView.as_view(), name="v1-quiz-review"),
+    path("quiz-results/<uuid:pk>", QuizResultView.as_view(), name="v1-quiz-result"),
+    path("quiz-results/<uuid:pk>/pdf", QuizResultPdfView.as_view(), name="v1-quiz-result-pdf"),
 ] + router.urls
