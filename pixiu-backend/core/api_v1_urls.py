@@ -21,14 +21,16 @@ from .inventory_contract_overrides import JsonKitComponentViewSet, JsonKitViewSe
 from .billing_contract_overrides import TransactionalInvoiceViewSet
 from .phase7_contract_overrides import ContractSessionCompatViewSet
 from .quiz_contract_view import ScopedContractQuizViewSetStrict
+from .strict_session_views import StrictScopedSessionViewSet
 from .scoped_contract_views import (
     ScopedContractAssessmentViewSet, ScopedContractClassViewSet, ScopedContractContentViewSet,
     ScopedContractCurriculumViewSet, ScopedContractInventoryViewSet, ScopedContractLeadViewSet,
     ScopedContractProjectViewSet, ScopedContractQuizAttemptViewSet,
     ScopedContractReviewViewSet, ScopedContractSchoolViewSet, ScopedContractStudentViewSet,
-    ScopedContractTrainerViewSet, ScopedContractBillingFullViewSet, ScopedContractSessionCompatViewSet,
+    ScopedContractTrainerViewSet, ScopedContractSessionCompatViewSet,
     ScopedStableAttendanceViewSet, ScopedSessionActivityViewSet, ScopedStableQuizQuestionViewSet,
     ScopedQuizAssignmentViewSet, ScopedProjectEvidenceViewSet,
+    ScopedContractBillingFullViewSet,
 )
 from .learning_content_files import LearningContentFileView
 from .trainer_materials import TrainerMaterialDetailView, TrainerMaterialFileView, TrainerMaterialListCreateView
@@ -41,7 +43,7 @@ router.register("trainers", ScopedContractTrainerViewSet, basename="v1-trainer")
 router.register("trainer-school-assignments", TrainerSchoolAssignmentViewSet, basename="v1-trainer-school-assignment")
 router.register("classes", ScopedContractClassViewSet, basename="v1-class")
 router.register("students", ScopedContractStudentViewSet, basename="v1-student")
-router.register("sessions", ScopedContractSessionCompatViewSet, basename="v1-session")
+router.register("sessions", StrictScopedSessionViewSet, basename="v1-session")
 router.register("session-activities", ScopedSessionActivityViewSet, basename="v1-session-activity")
 router.register("attendance", ScopedStableAttendanceViewSet, basename="v1-attendance")
 router.register("curriculum", ScopedContractCurriculumViewSet, basename="v1-curriculum")
