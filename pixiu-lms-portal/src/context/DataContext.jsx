@@ -6,6 +6,15 @@ const DataContext = createContext(null);
 const collection = payload => Array.isArray(payload) ? payload : Array.isArray(payload?.results) ? payload.results : Array.isArray(payload?.data) ? payload.data : [];
 const text = value => String(value ?? '').trim();
 const lower = value => text(value).toLowerCase();
+const normalizeDateOnly = value => {
+  const raw = text(value);
+  if (!raw) return null;
+  const iso = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (iso) return iso[1];
+  const dmy = raw.match(/^(\d{2})[-/](\d{2})[-/](\d{4})$/);
+  if (dmy) return `${dmy[3]}-${dmy[2]}-${dmy[1]}`;
+  return raw;
+};
 
 function formatApiError(payload, status) {
   if (typeof payload === 'string' && payload.trim()) return payload.trim();
@@ -145,8 +154,8 @@ export function DataProvider({ children }) {
   const deleteSchool = id => remove(`/schools/${encodeURIComponent(id)}`);
   const resolveClassId = (value, schoolCode = '') => { const raw = text(value); if (!raw) return ''; const exact = classes.find(item => String(item.id) === raw); if (exact) return exact.id; const byName = classes.find(item => (!schoolCode || text(item.school_id || item.school_code).toUpperCase() === schoolCode.toUpperCase()) && text(item.display_name).toUpperCase() === raw.toUpperCase()); return byName?.id || raw; };
   const addClass = data => { const school = text(data?.school || data?.school_id || data?.school_code); return save('/classes', 'POST', { ...data, school: school || data?.school }); };
-  const addStudent = data => { const schoolCode = text(data?.school_code || data?.schoolCode || data?.school_id).toUpperCase(); const schoolClass = resolveClassId(data?.school_class || data?.class_id || data?.class, schoolCode); const rollNumber = Number(data?.roll_number ?? data?.roll); if (!schoolClass || !Number.isInteger(rollNumber) || rollNumber <= 0) return Promise.resolve({ success: false, error: 'A valid class and positive roll number are required.' }); return save('/students', 'POST', { school_class: schoolClass, roll_number: rollNumber, name: text(data?.name), date_of_birth: data?.date_of_birth || null, gender: data?.gender || '', email: data?.email || '', phone: data?.phone || '', guardian_name: data?.guardian_name || data?.parent || '', guardian_phone: data?.guardian_phone || '', guardian_email: data?.guardian_email || '', address: data?.address || '', current_level: data?.current_level || data?.level || '', status: lower(data?.status || 'active') }); };
-  const updateStudent = (id, data) => save(`/students/${encodeURIComponent(id)}`, 'PUT', data);
+  const addStudent = data => { const schoolCode = text(data?.school_code || data?.schoolCode || data?.school_id).toUpperCase(); const schoolClass = resolveClassId(data?.school_class || data?.class_id || data?.class, schoolCode); const rollNumber = Number(data?.roll_number ?? data?.roll); if (!schoolClass || !Number.isInteger(rollNumber) || rollNumber <= 0) return Promise.resolve({ success: false, error: 'A valid class and positive roll number are required.' }); return save('/students', 'POST', { school_class: schoolClass, roll_number: rollNumber, name: text(data?.name), date_of_birth: normalizeDateOnly(data?.date_of_birth), gender: data?.gender || '', email: data?.email || '', phone: data?.phone || '', guardian_name: data?.guardian_name || data?.parent || '', guardian_phone: data?.guardian_phone || '', guardian_email: data?.guardian_email || '', address: data?.address || '', current_level: data?.current_level || data?.level || '', status: lower(data?.status || 'active') }); };
+  const updateStudent = (id, data) => save(`/students/${encodeURIComponent(id)}`, 'PUT', { ...data, date_of_birth: normalizeDateOnly(data?.date_of_birth) });
   const deleteStudent = id => remove(`/students/${encodeURIComponent(id)}`);
   const getNextRollNumber = (schoolCode, grade, section) => { const school = text(schoolCode).toUpperCase(); const cls = classes.find(item => text(item.school_id || item.school_code).toUpperCase() === school && text(item.grade).toUpperCase() === text(grade).toUpperCase() && text(item.section).toUpperCase() === text(section).toUpperCase()); const cohort = cls ? students.filter(student => String(student.class_id) === String(cls.id)) : []; const maxRoll = Math.max(0, ...cohort.map(student => Number(student.roll_number) || 0)); return String(maxRoll + 1).padStart(2, '0'); };
   const getStudentAttendance = studentId => { const key = text(studentId).toUpperCase().replace(/\s+/g, ''); if (!key) return 0; const rows = attendance.filter(row => text(row.student_id).toUpperCase().replace(/\s+/g, '') === key); if (!rows.length) return 0; const present = rows.filter(row => ['present', 'late'].includes(lower(row.status))).length; return Math.round((present / rows.length) * 100); };
