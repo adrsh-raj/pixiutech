@@ -36,8 +36,10 @@ import PerformanceAnalyticsPage from './pages/PerformanceAnalyticsPage';
 import SchoolProgressReports from './pages/SchoolProgressReports';
 import BillingCenter from './pages/BillingCenter';
 import QuizHub from './pages/QuizHub';
+import StudentQuizHubV2 from './pages/StudentQuizHubV2';
 import ProjectHubV2 from './pages/ProjectHubV2';
 import ClassesSessionsCenter from './pages/ClassesSessionsCenter';
+import SessionSchedulerV2 from './pages/SessionSchedulerV2';
 import { DataProvider } from './context/DataContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
@@ -75,7 +77,8 @@ function SchoolRouteGuard() { const { isAuthenticated, user, loading } = useAuth
 function GuestRouteGuard({ children }) { const { isAuthenticated, user, loading } = useAuth(); if (loading) return <LoadingScreen />; if (isAuthenticated && user) { const destination = user.role === 'student' ? '/student-portal' : user.role === 'school' ? '/school-portal' : user.role === 'trainer' ? '/trainers' : '/'; return <Navigate to={destination} replace />; } return children; }
 function TrainerRoleRoute() { const { isAuthenticated, user, loading } = useAuth(); if (loading) return <LoadingScreen />; if (!isAuthenticated) return <Navigate to="/login" replace />; if (!['trainer', 'admin', 'superadmin'].includes(user?.role)) return <Navigate to="/" replace />; return <ClassRankingPage />; }
 function SchoolPerformanceRoute() { return <PerformanceAnalyticsPage role="school" />; }
-function SessionsRoute() { const { user } = useAuth(); return user?.role === 'student' ? <StudentClasses /> : <ClassesSessionsCenter />; }
+function SessionsRoute() { const { user } = useAuth(); return user?.role === 'student' ? <StudentClasses /> : <SessionSchedulerV2 />; }
+function QuizzesRoute() { const { user } = useAuth(); return user?.role === 'student' ? <StudentQuizHubV2 /> : <QuizHub />; }
 
 export default function App() {
   return <ToastProvider><AuthProvider><DataProvider><BrowserRouter><Routes>
@@ -115,7 +118,7 @@ export default function App() {
       <Route path="trainer-ranking" element={<TrainerRoleRoute />} />
       <Route path="billing" element={<RoleRoute roles={['admin', 'superadmin', 'school']}><BillingCenter /></RoleRoute>} />
       <Route path="inventory" element={<RoleRoute roles={['admin', 'superadmin', 'school', 'trainer', 'student']}><HardwareKitsV2 /></RoleRoute>} />
-      <Route path="quizzes" element={<RoleRoute roles={['student', 'trainer', 'admin', 'superadmin']}><QuizHub /></RoleRoute>} />
+      <Route path="quizzes" element={<RoleRoute roles={['student', 'trainer', 'admin', 'superadmin']}><QuizzesRoute /></RoleRoute>} />
       <Route path="projects" element={<RoleRoute roles={['student', 'trainer', 'admin', 'superadmin']}><ProjectHubV2 /></RoleRoute>} />
       <Route path="trainer-reviews" element={<RoleRoute roles={['trainer', 'admin', 'superadmin']}><TrainerReviews /></RoleRoute>} />
     </Route>
