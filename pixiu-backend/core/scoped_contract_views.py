@@ -14,10 +14,11 @@ from .api_v1_compat import (
 )
 from .phase7_contract_overrides import ContractSessionCompatViewSet
 from .learning_attendance_overrides import StableAttendanceViewSet
-from learning.models import ContentClassAssignment, QuizClassAssignment
+from learning.models import ContentClassAssignment, CurriculumClassAssignment, QuizClassAssignment
 from learning.views import ProjectEvidenceViewSet, QuizAssignmentViewSet, SessionActivityViewSet
 from learning.watermarking import prepare_uploaded_file
 from .learning_contract_overrides import StableQuizQuestionViewSet
+from academics.services import accessible_class_queryset
 
 
 class ScopedDetailMixin:
@@ -69,7 +70,108 @@ class ScopedContractContentViewSet(ScopedDetailMixin, ContractContentViewSet):
             ContentClassAssignment.objects.bulk_create(missing, ignore_conflicts=True)
 
 
-class ScopedContractCurriculumViewSet(ScopedDetailMixin, ContractCurriculumViewSet): pass
+class ScopedContractCurriculumViewSet(ScopedDetailMixin, ContractCurriculumViewSet):
+    """Compatibility curriculum endpoint used by the trainer portal.
+
+    The legacy UI sends class_grade/week/unit_level/topic/objectives/status while
+    the canonical model expects grade/level/unit_code/title/... . Normalize that
+    contract here and make newly-created plans visible to the creator's accessible
+    classes. Curriculum units are intentionally unique by grade+unit_code, so a
+    repeated Unit N reuses/updates the existing unit instead of creating a duplicate.
+    """
+    def _accessible_target_classes(self, grade):
+        return SchoolClass.objects.filter(
+            pk__in=accessible_class_queryset(self.request.user).values("id"),
+            status="active",
+            grade=str(grade).strip(),
+        )
+
+    def scoped_queryset(self):
+        return super().scoped_queryset()
+
+    def map_in(self, data):
+        payload = dict(data)
+        grade = str(data.get("grade") or data.get("class_grade") or "").strip()
+        week = str(data.get("week") or "").strip()
+        level = str(data.get("level") or data.get("unit_level") or "").strip()
+        topic = str(data.get("topic") or data.get("title") or "").strip()
+        objectives = str(data.get("objectives") or "").strip()
+        unit_match = __import__("re").search(r"(\d+)", week)
+        unit_number = unit_match.group(1) if unit_match else str(data.get("unit_code") or "1").strip()
+        unit_code = str(data.get("unit_code") or f"U{int(unit_number)}").strip().upper()
+        if not level:
+            level = f"Level {max(int(unit_number) - 1, 0)}"
+        if not topic:
+            topic = week or f"Unit {unit_number}"
+        status_value = str(data.get("status") or "Upcoming").strip().lower()
+        status_map = {
+            "upcoming": "draft",
+            "untaught": "draft",
+            "draft": "draft",
+            "completed": "published",
+            "taught": "published",
+            "published": "published",
+            "archived": "archived",
+        }
+        payload.update({
+            "grade": grade,
+            "level": level,
+            "unit_code": unit_code,
+            "title": str(data.get("title") or f"Unit {unit_number} — {topic}").strip(),
+            "week": week or f"Unit {unit_number}",
+            "topic": topic,
+            "objectives": objectives,
+            "status": status_map.get(status_value, "draft"),
+        })
+        return payload
+
+    def map_out(self, obj):
+        payload = super().map_out(obj)
+        status_value = str(payload.get("status") or "draft").lower()
+        unit_number = str(payload.get("unit_code") or "U1").replace("UNIT-", "").replace("U", "", 1)
+        payload.update({
+            "class_grade": str(payload.get("grade") or ""),
+            "unit_level": str(payload.get("level") or ""),
+            "status": "Completed" if status_value == "published" else "Upcoming",
+            "week": payload.get("week") or f"Unit {unit_number}",
+        })
+        return payload
+
+    def _save_and_assign(self, validated_data):
+        from learning.models import CurriculumUnit
+        grade = str(validated_data.get("grade") or "").strip()
+        unit_code = str(validated_data.get("unit_code") or "").strip().upper()
+        existing = CurriculumUnit.objects.filter(grade=grade, unit_code=unit_code).first()
+        if existing is None:
+            unit = CurriculumUnit.objects.create(created_by=self.request.user, **validated_data)
+        else:
+            for field in ("level", "title", "week", "topic", "objectives", "status"):
+                if field in validated_data:
+                    setattr(existing, field, validated_data[field])
+            existing.save(update_fields=["level", "title", "week", "topic", "objectives", "status", "updated_at"])
+            unit = existing
+
+        target_classes = self._accessible_target_classes(grade) if self.request.user.role != UserRole.ADMIN else SchoolClass.objects.filter(status="active", grade=grade)
+        existing_class_ids = set(unit.class_assignments.values_list("school_class_id", flat=True))
+        missing = [
+            CurriculumClassAssignment(curriculum_unit=unit, school_class_id=cls.id, assigned_by=self.request.user)
+            for cls in target_classes
+            if cls.id not in existing_class_ids
+        ]
+        if missing:
+            CurriculumClassAssignment.objects.bulk_create(missing, ignore_conflicts=True)
+        return unit
+
+    def perform_create(self, serializer):
+        self.role_only(UserRole.ADMIN, UserRole.SCHOOL, UserRole.TRAINER)
+        unit = self._save_and_assign(serializer.validated_data)
+        serializer.instance = unit
+
+    def perform_update(self, serializer):
+        self.role_only(UserRole.ADMIN, UserRole.SCHOOL, UserRole.TRAINER)
+        unit = self._save_and_assign(serializer.validated_data | {"grade": serializer.instance.grade, "unit_code": serializer.instance.unit_code})
+        serializer.instance = unit
+
 class ScopedContractInventoryViewSet(ScopedDetailMixin, ContractInventoryViewSet): pass
 class ScopedContractLeadViewSet(ScopedDetailMixin, ContractLeadViewSet): pass
 class ScopedContractProjectViewSet(ScopedDetailMixin, ContractProjectViewSet): pass
@@ -88,7 +190,6 @@ class ScopedContractQuizViewSet(ScopedDetailMixin, ContractQuizViewSet):
         return qs
 
     def _accessible_class_ids(self):
-        from academics.services import accessible_class_queryset
         return accessible_class_queryset(self.request.user).values("id")
 
 class ScopedContractReviewViewSet(ScopedDetailMixin, ContractReviewViewSet): pass
