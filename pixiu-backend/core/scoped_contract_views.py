@@ -1,7 +1,10 @@
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.db.models import Q
 from rest_framework import status
+from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from accounts.models import UserRole
@@ -14,8 +17,9 @@ from .api_v1_compat import (
 )
 from .phase7_contract_overrides import ContractSessionCompatViewSet
 from .learning_attendance_overrides import StableAttendanceViewSet
-from learning.models import ContentClassAssignment, CurriculumClassAssignment, QuizClassAssignment
+from learning.models import ContentClassAssignment, CurriculumClassAssignment, QuizClassAssignment, QuizQuestion
 from learning.views import ProjectEvidenceViewSet, QuizAssignmentViewSet, SessionActivityViewSet
+from learning.serializers import QuizSerializer
 from learning.watermarking import prepare_uploaded_file
 from .learning_contract_overrides import StableQuizQuestionViewSet
 from academics.services import accessible_class_queryset
@@ -35,6 +39,8 @@ class ScopedDetailMixin:
 class ScopedContractAssessmentViewSet(ScopedDetailMixin, ContractAssessmentViewSet): pass
 class ScopedContractAttendanceViewSet(ScopedDetailMixin, ContractAttendanceViewSet): pass
 class ScopedContractClassViewSet(ScopedDetailMixin, ContractClassViewSet): pass
+
+
 class ScopedContractContentViewSet(ScopedDetailMixin, ContractContentViewSet):
     def _prepare_content_file(self, serializer):
         upload = serializer.validated_data.get("file")
@@ -47,14 +53,50 @@ class ScopedContractContentViewSet(ScopedDetailMixin, ContractContentViewSet):
         serializer.validated_data["file"] = processed
         serializer.validated_data["is_watermarked"] = watermarked
 
+    def _target_class(self):
+        class_id = self.request.data.get("school_class") or self.request.data.get("class_id")
+        if not class_id:
+            raise ValidationError({"school_class": "Select a class for student material sharing."})
+        school_class = SchoolClass.objects.filter(pk=class_id).first()
+        if not school_class:
+            raise ValidationError({"school_class": "Selected class was not found."})
+        if not accessible_class_queryset(self.request.user).filter(pk=school_class.pk).exists():
+            raise ValidationError({"school_class": "You cannot share material to this class."})
+        return school_class
+
     def perform_create(self, serializer):
-        self.role_only("admin")
+        if self.request.user.role == UserRole.TRAINER:
+            target_role = str(serializer.validated_data.get("target_role") or "student").lower()
+            if target_role != "student":
+                raise ValidationError({"target_role": "Trainers can share learning material only with students."})
+            target_class = self._target_class()
+            self._prepare_content_file(serializer)
+            serializer.save(created_by=self.request.user)
+            ContentClassAssignment.objects.get_or_create(
+                content=serializer.instance,
+                school_class=target_class,
+                defaults={"assigned_by": self.request.user},
+            )
+            return
+        self.role_only(UserRole.ADMIN)
         self._prepare_content_file(serializer)
         serializer.save(created_by=self.request.user)
         self._ensure_grade_assignments(serializer.instance)
 
     def perform_update(self, serializer):
-        self.role_only("admin")
+        if self.request.user.role == UserRole.TRAINER:
+            if serializer.instance.created_by_id != self.request.user.id:
+                raise ValidationError({"detail": "Trainers can edit only material they created."})
+            target_role = str(serializer.validated_data.get("target_role", serializer.instance.target_role) or "student").lower()
+            if target_role != "student":
+                raise ValidationError({"target_role": "Trainers can share learning material only with students."})
+            target_class = self._target_class()
+            self._prepare_content_file(serializer)
+            serializer.save(created_by=self.request.user)
+            ContentClassAssignment.objects.filter(content=serializer.instance).delete()
+            ContentClassAssignment.objects.create(content=serializer.instance, school_class=target_class, assigned_by=self.request.user)
+            return
+        self.role_only(UserRole.ADMIN)
         self._prepare_content_file(serializer)
         serializer.save()
         self._ensure_grade_assignments(serializer.instance)
@@ -71,14 +113,7 @@ class ScopedContractContentViewSet(ScopedDetailMixin, ContractContentViewSet):
 
 
 class ScopedContractCurriculumViewSet(ScopedDetailMixin, ContractCurriculumViewSet):
-    """Compatibility curriculum endpoint used by the trainer portal.
-
-    The legacy UI sends class_grade/week/unit_level/topic/objectives/status while
-    the canonical model expects grade/level/unit_code/title/... . Normalize that
-    contract here and make newly-created plans visible to the creator's accessible
-    classes. Curriculum units are intentionally unique by grade+unit_code, so a
-    repeated Unit N reuses/updates the existing unit instead of creating a duplicate.
-    """
+    """Compatibility curriculum endpoint used by the trainer portal."""
     def _accessible_target_classes(self, grade):
         return SchoolClass.objects.filter(
             pk__in=accessible_class_queryset(self.request.user).values("id"),
@@ -104,23 +139,11 @@ class ScopedContractCurriculumViewSet(ScopedDetailMixin, ContractCurriculumViewS
         if not topic:
             topic = week or f"Unit {unit_number}"
         status_value = str(data.get("status") or "Upcoming").strip().lower()
-        status_map = {
-            "upcoming": "draft",
-            "untaught": "draft",
-            "draft": "draft",
-            "completed": "published",
-            "taught": "published",
-            "published": "published",
-            "archived": "archived",
-        }
+        status_map = {"upcoming": "draft", "untaught": "draft", "draft": "draft", "completed": "published", "taught": "published", "published": "published", "archived": "archived"}
         payload.update({
-            "grade": grade,
-            "level": level,
-            "unit_code": unit_code,
+            "grade": grade, "level": level, "unit_code": unit_code,
             "title": str(data.get("title") or f"Unit {unit_number} — {topic}").strip(),
-            "week": week or f"Unit {unit_number}",
-            "topic": topic,
-            "objectives": objectives,
+            "week": week or f"Unit {unit_number}", "topic": topic, "objectives": objectives,
             "status": status_map.get(status_value, "draft"),
         })
         return payload
@@ -130,8 +153,7 @@ class ScopedContractCurriculumViewSet(ScopedDetailMixin, ContractCurriculumViewS
         status_value = str(payload.get("status") or "draft").lower()
         unit_number = str(payload.get("unit_code") or "U1").replace("UNIT-", "").replace("U", "", 1)
         payload.update({
-            "class_grade": str(payload.get("grade") or ""),
-            "unit_level": str(payload.get("level") or ""),
+            "class_grade": str(payload.get("grade") or ""), "unit_level": str(payload.get("level") or ""),
             "status": "Completed" if status_value == "published" else "Upcoming",
             "week": payload.get("week") or f"Unit {unit_number}",
         })
@@ -150,14 +172,9 @@ class ScopedContractCurriculumViewSet(ScopedDetailMixin, ContractCurriculumViewS
                     setattr(existing, field, validated_data[field])
             existing.save(update_fields=["level", "title", "week", "topic", "objectives", "status", "updated_at"])
             unit = existing
-
         target_classes = self._accessible_target_classes(grade) if self.request.user.role != UserRole.ADMIN else SchoolClass.objects.filter(status="active", grade=grade)
         existing_class_ids = set(unit.class_assignments.values_list("school_class_id", flat=True))
-        missing = [
-            CurriculumClassAssignment(curriculum_unit=unit, school_class_id=cls.id, assigned_by=self.request.user)
-            for cls in target_classes
-            if cls.id not in existing_class_ids
-        ]
+        missing = [CurriculumClassAssignment(curriculum_unit=unit, school_class_id=cls.id, assigned_by=self.request.user) for cls in target_classes if cls.id not in existing_class_ids]
         if missing:
             CurriculumClassAssignment.objects.bulk_create(missing, ignore_conflicts=True)
         return unit
@@ -172,10 +189,12 @@ class ScopedContractCurriculumViewSet(ScopedDetailMixin, ContractCurriculumViewS
         unit = self._save_and_assign(serializer.validated_data | {"grade": serializer.instance.grade, "unit_code": serializer.instance.unit_code})
         serializer.instance = unit
 
+
 class ScopedContractInventoryViewSet(ScopedDetailMixin, ContractInventoryViewSet): pass
 class ScopedContractLeadViewSet(ScopedDetailMixin, ContractLeadViewSet): pass
 class ScopedContractProjectViewSet(ScopedDetailMixin, ContractProjectViewSet): pass
 class ScopedContractQuizAttemptViewSet(ScopedDetailMixin, ContractQuizAttemptViewSet): pass
+
 
 class ScopedContractQuizViewSet(ScopedDetailMixin, ContractQuizViewSet):
     def scoped_queryset(self):
@@ -192,10 +211,83 @@ class ScopedContractQuizViewSet(ScopedDetailMixin, ContractQuizViewSet):
     def _accessible_class_ids(self):
         return accessible_class_queryset(self.request.user).values("id")
 
+    @action(detail=False, methods=["post"], url_path="create-with-questions")
+    @transaction.atomic
+    def create_with_questions(self, request):
+        self.required_action = "CREATE"
+        self.role_only(UserRole.ADMIN, UserRole.TRAINER)
+
+        payload = request.data.copy()
+        raw_questions = payload.pop("questions", [])
+        if isinstance(raw_questions, str):
+            import json
+            try:
+                raw_questions = json.loads(raw_questions)
+            except json.JSONDecodeError:
+                raise ValidationError({"questions": "Questions must be a JSON array."})
+        if not isinstance(raw_questions, list) or not raw_questions:
+            raise ValidationError({"questions": "At least one MCQ question is required."})
+
+        class_id = payload.get("school_class") or payload.get("class_id")
+        payload.pop("school_class", None)
+        payload.pop("class_id", None)
+        if request.user.role == UserRole.TRAINER and not class_id:
+            raise ValidationError({"school_class": "Select the class for this quiz."})
+
+        if class_id:
+            school_class = SchoolClass.objects.filter(pk=class_id).first()
+            if not school_class:
+                raise ValidationError({"school_class": "Selected class was not found."})
+            if not accessible_class_queryset(request.user).filter(pk=school_class.pk).exists():
+                raise ValidationError({"school_class": "You cannot assign a quiz to this class."})
+            if str(payload.get("grade", "")).strip() != str(school_class.grade).strip():
+                raise ValidationError({"school_class": "Quiz grade must match the selected class grade."})
+        else:
+            school_class = None
+
+        serializer = QuizSerializer(data=payload, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        quiz = serializer.save(created_by=request.user)
+
+        for index, question in enumerate(raw_questions, start=1):
+            text = str(question.get("question_text") or "").strip()
+            options = {key: str(question.get(key) or "").strip() for key in ("option_a", "option_b", "option_c", "option_d")}
+            correct = str(question.get("correct_option") or "A").strip().upper()
+            try:
+                points = int(question.get("points", 1))
+            except (TypeError, ValueError):
+                points = 1
+            if not text or not all(options.values()):
+                raise ValidationError({"questions": [f"Question {index} needs text and all four options."]})
+            if correct not in {"A", "B", "C", "D"}:
+                raise ValidationError({"questions": [f"Question {index} has an invalid correct option."]})
+            if points <= 0:
+                raise ValidationError({"questions": [f"Question {index} must have positive points."]})
+            QuizQuestion.objects.create(
+                quiz=quiz,
+                question_order=index,
+                question_text=text,
+                option_a=options["option_a"], option_b=options["option_b"],
+                option_c=options["option_c"], option_d=options["option_d"],
+                correct_option=correct,
+                explanation=str(question.get("explanation") or "").strip(),
+                points=points,
+            )
+
+        if school_class:
+            QuizClassAssignment.objects.get_or_create(
+                quiz=quiz,
+                school_class=school_class,
+                defaults={"assigned_by": request.user},
+            )
+        return Response(QuizSerializer(quiz, context={"request": request}).data, status=status.HTTP_201_CREATED)
+
+
 class ScopedContractReviewViewSet(ScopedDetailMixin, ContractReviewViewSet): pass
 class ScopedContractSchoolViewSet(ScopedDetailMixin, ContractSchoolViewSet): pass
 class ScopedContractSessionViewSet(ScopedDetailMixin, ContractSessionViewSet): pass
 class ScopedContractSessionCompatViewSet(ScopedDetailMixin, ContractSessionCompatViewSet): pass
+
 
 class ScopedContractStudentViewSet(ScopedDetailMixin, ContractStudentViewSet):
     def map_out(self, obj):
@@ -203,12 +295,9 @@ class ScopedContractStudentViewSet(ScopedDetailMixin, ContractStudentViewSet):
         school = getattr(getattr(obj, "school_class", None), "school", None)
         school_class = getattr(obj, "school_class", None)
         payload.update({
-            "school_id": school.school_code if school else "",
-            "school_code": school.school_code if school else "",
-            "school_name": school.name if school else "",
-            "class_name": school_class.display_name if school_class else "",
-            "roll_number": obj.roll_number,
-            "account_username": getattr(obj.account, "username", "") if obj.account_id else "",
+            "school_id": school.school_code if school else "", "school_code": school.school_code if school else "",
+            "school_name": school.name if school else "", "class_name": school_class.display_name if school_class else "",
+            "roll_number": obj.roll_number, "account_username": getattr(obj.account, "username", "") if obj.account_id else "",
         })
         return payload
 
