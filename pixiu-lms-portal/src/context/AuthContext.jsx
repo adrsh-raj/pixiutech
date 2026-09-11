@@ -5,6 +5,7 @@ const AuthContext = createContext(null);
 const TOKEN_KEY = 'pixiu_auth_token';
 const REFRESH_KEY = 'pixiu_auth_refresh_token';
 const USER_KEY = 'pixiu_auth_user';
+const AUTH_EVENT = 'pixiu_auth_state_changed';
 let refreshPromise = null;
 
 async function readJson(response) {
@@ -79,19 +80,39 @@ export async function apiFetch(path, options = {}) {
   let response = await request(accessToken);
   if (response.status === 401 && !String(path).startsWith('/auth/')) {
     accessToken = await refreshAccessToken();
-    if (accessToken) response = await request(accessToken);
+    if (accessToken) {
+      response = await request(accessToken);
+    } else {
+      clearAuthStorage();
+      window.dispatchEvent(new Event(AUTH_EVENT));
+    }
   }
   return response;
 }
 
 export function clearAuthStorage() {
-  localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(REFRESH_KEY); localStorage.removeItem(USER_KEY);
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(REFRESH_KEY);
+  localStorage.removeItem(USER_KEY);
 }
 
 export function AuthProvider({ children }) {
   const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY));
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const syncAuthState = () => {
+      const nextToken = localStorage.getItem(TOKEN_KEY);
+      const savedUser = localStorage.getItem(USER_KEY);
+      let nextUser = null;
+      try { nextUser = savedUser ? JSON.parse(savedUser) : null; } catch { nextUser = null; }
+      setToken(nextToken);
+      setUser(nextToken ? nextUser : null);
+    };
+    window.addEventListener(AUTH_EVENT, syncAuthState);
+    return () => window.removeEventListener(AUTH_EVENT, syncAuthState);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -113,9 +134,19 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     if (!token) return undefined;
-    const refresh = async () => { const next = await refreshAccessToken(); if (next) setToken(next); };
+    const refresh = async () => {
+      const next = await refreshAccessToken();
+      if (next) {
+        setToken(next);
+      } else {
+        clearAuthStorage();
+        setToken(null);
+        setUser(null);
+        window.dispatchEvent(new Event(AUTH_EVENT));
+      }
+    };
     const onVisible = () => { if (document.visibilityState === 'visible') refresh(); };
-    const interval = window.setInterval(refresh, 15 * 60 * 1000);
+    const interval = window.setInterval(refresh, 10 * 60 * 1000);
     document.addEventListener('visibilitychange', onVisible);
     return () => { window.clearInterval(interval); document.removeEventListener('visibilitychange', onVisible); };
   }, [token]);
@@ -131,7 +162,11 @@ export function AuthProvider({ children }) {
         const response = await fetchOnce(`${API_BASE}/auth/login/`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, cache: 'no-store' }, 25000);
         const data = await readJson(response);
         if (response.ok && data.access && data.refresh && data.user) {
-          setToken(data.access); setUser(data.user); saveSession(data.access, data.refresh, data.user); window.dispatchEvent(new Event('pixiu_auth_state_changed')); return { success: true, user: data.user };
+          setToken(data.access);
+          setUser(data.user);
+          saveSession(data.access, data.refresh, data.user);
+          window.dispatchEvent(new Event(AUTH_EVENT));
+          return { success: true, user: data.user };
         }
         if (![502, 503, 504].includes(response.status)) return { success: false, error: data.detail || data.error || 'Invalid username or password.' };
         lastError = new Error(data.detail || 'Authentication service is waking up.');
@@ -143,7 +178,9 @@ export function AuthProvider({ children }) {
   const logout = async () => {
     const currentToken = token || localStorage.getItem(TOKEN_KEY); const refresh = localStorage.getItem(REFRESH_KEY);
     try { if (currentToken && refresh) await fetchOnce(`${API_BASE}/auth/logout/`, { method: 'POST', headers: { Authorization: `Bearer ${currentToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh }), cache: 'no-store' }, 15000); } catch {} finally {
-      setUser(null); setToken(null); clearAuthStorage(); Object.keys(localStorage).filter(key => key.startsWith('pixiu_') && key.includes(':')).forEach(key => localStorage.removeItem(key)); window.dispatchEvent(new Event('pixiu_auth_state_changed'));
+      setUser(null); setToken(null); clearAuthStorage();
+      Object.keys(localStorage).filter(key => key.startsWith('pixiu_') && key.includes(':')).forEach(key => localStorage.removeItem(key));
+      window.dispatchEvent(new Event(AUTH_EVENT));
     }
   };
 
