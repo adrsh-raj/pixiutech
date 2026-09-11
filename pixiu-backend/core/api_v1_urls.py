@@ -20,10 +20,11 @@ from .learning_attendance_overrides import StableAttendanceViewSet
 from .inventory_contract_overrides import JsonKitComponentViewSet, JsonKitViewSet
 from .billing_contract_overrides import TransactionalInvoiceViewSet
 from .phase7_contract_overrides import ContractSessionCompatViewSet
+from .quiz_contract_view import ScopedContractQuizViewSetStrict
 from .scoped_contract_views import (
     ScopedContractAssessmentViewSet, ScopedContractClassViewSet, ScopedContractContentViewSet,
     ScopedContractCurriculumViewSet, ScopedContractInventoryViewSet, ScopedContractLeadViewSet,
-    ScopedContractProjectViewSet, ScopedContractQuizAttemptViewSet, ScopedContractQuizViewSet,
+    ScopedContractProjectViewSet, ScopedContractQuizAttemptViewSet,
     ScopedContractReviewViewSet, ScopedContractSchoolViewSet, ScopedContractStudentViewSet,
     ScopedContractTrainerViewSet, ScopedContractBillingFullViewSet, ScopedContractSessionCompatViewSet,
     ScopedStableAttendanceViewSet, ScopedSessionActivityViewSet, ScopedStableQuizQuestionViewSet,
@@ -45,7 +46,7 @@ router.register("session-activities", ScopedSessionActivityViewSet, basename="v1
 router.register("attendance", ScopedStableAttendanceViewSet, basename="v1-attendance")
 router.register("curriculum", ScopedContractCurriculumViewSet, basename="v1-curriculum")
 router.register("content", ScopedContractContentViewSet, basename="v1-content")
-router.register("quizzes", ScopedContractQuizViewSet, basename="v1-quiz")
+router.register("quizzes", ScopedContractQuizViewSetStrict, basename="v1-quiz")
 router.register("quiz-questions", ScopedStableQuizQuestionViewSet, basename="v1-quiz-question")
 router.register("quiz-assignments", ScopedQuizAssignmentViewSet, basename="v1-quiz-assignment")
 router.register("quiz-submissions", ScopedContractQuizAttemptViewSet, basename="v1-quiz-submission")
