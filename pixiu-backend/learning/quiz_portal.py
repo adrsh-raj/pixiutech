@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone as dt_timezone
 from decimal import Decimal
 
 from django.db import transaction
@@ -19,6 +19,7 @@ from .serializers import QuizAttemptReadSerializer
 
 EXAM_LIMIT_SECONDS = 30
 EXAM_GRACE_SECONDS = 2
+START_META_KEY = "__pixiu_exam_started_at"
 
 
 def _student_for(user):
@@ -39,12 +40,32 @@ def _check_quiz_for_student(quiz, student):
         raise ValidationError("This quiz has no questions.")
 
 
+def _now_iso():
+    return timezone.now().isoformat()
+
+
+def _started_at(attempt):
+    raw = (attempt.answers or {}).get(START_META_KEY)
+    if not raw:
+        return None
+    try:
+        value = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+        return value if value.tzinfo else value.replace(tzinfo=dt_timezone.utc)
+    except (TypeError, ValueError):
+        return None
+
+
+def _answers_without_meta(answers):
+    return {str(key): value for key, value in (answers or {}).items() if str(key) != START_META_KEY}
+
+
 def _normalize_answers(quiz, answers):
     if not isinstance(answers, dict):
         raise ValidationError({"answers": "Answers must be an object keyed by question ID."})
+    answers = _answers_without_meta(answers)
     questions = list(quiz.questions.all())
     valid_ids = {str(question.id) for question in questions}
-    unknown = set(str(key) for key in answers) - valid_ids
+    unknown = set(str(question_id) for question_id in answers) - valid_ids
     if unknown:
         raise ValidationError({"answers": "Answers contain a question that does not belong to this quiz."})
     normalized = {}
@@ -69,6 +90,18 @@ def _normalize_answers(quiz, answers):
     return normalized, score, total, percentage.quantize(Decimal("0.01")), correct, attempted, len(questions)
 
 
+def _new_attempt(quiz, student):
+    started = timezone.now()
+    return QuizAttempt.objects.create(
+        quiz=quiz,
+        student=student,
+        attempt_number=1,
+        answers={START_META_KEY: started.isoformat()},
+        status="in_progress",
+        total_questions=quiz.questions.count(),
+    ), started
+
+
 class QuizStartView(APIView):
     permission_classes = [IsAuthenticated, IsActiveAccount]
 
@@ -81,9 +114,17 @@ class QuizStartView(APIView):
         _check_quiz_for_student(quiz, student)
         if QuizAttempt.objects.filter(quiz=quiz, student=student).exists():
             raise ValidationError("This quiz allows one attempt only and has already been started or submitted.")
-        started_at = timezone.now()
-        attempt = QuizAttempt.objects.create(quiz=quiz, student=student, attempt_number=1, status="in_progress", started_at=started_at, total_questions=quiz.questions.count())
-        return Response({"attempt_id": str(attempt.id), "quiz_id": str(quiz.id), "started_at": started_at.isoformat(), "expires_at": (started_at + timedelta(seconds=EXAM_LIMIT_SECONDS)).isoformat(), "duration_seconds": EXAM_LIMIT_SECONDS}, status=status.HTTP_201_CREATED)
+        attempt, started_at = _new_attempt(quiz, student)
+        return Response(
+            {
+                "attempt_id": str(attempt.id),
+                "quiz_id": str(quiz.id),
+                "started_at": started_at.isoformat(),
+                "expires_at": (started_at + timedelta(seconds=EXAM_LIMIT_SECONDS)).isoformat(),
+                "duration_seconds": EXAM_LIMIT_SECONDS,
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class QuizSingleAttemptView(APIView):
@@ -96,24 +137,34 @@ class QuizSingleAttemptView(APIView):
         if quiz is None:
             raise ValidationError("Quiz is not available.")
         _check_quiz_for_student(quiz, student)
-        attempt = QuizAttempt.objects.select_for_update().filter(quiz=quiz, student=student, status="in_progress").first()
+
+        attempt = QuizAttempt.objects.select_for_update().filter(
+            quiz=quiz, student=student, status="in_progress"
+        ).first()
         if attempt is None:
             if QuizAttempt.objects.filter(quiz=quiz, student=student).exists():
                 raise ValidationError("This quiz allows one attempt only and has already been submitted.")
-            attempt = QuizAttempt.objects.create(quiz=quiz, student=student, attempt_number=1, status="in_progress", started_at=timezone.now(), total_questions=quiz.questions.count())
-        started_at = attempt.started_at or timezone.now()
-        elapsed = max(0, int((timezone.now() - started_at).total_seconds()))
+            attempt, started = _new_attempt(quiz, student)
+        else:
+            started = _started_at(attempt) or timezone.now()
+
+        elapsed = max(0, int((timezone.now() - started).total_seconds()))
         if elapsed > EXAM_LIMIT_SECONDS + EXAM_GRACE_SECONDS:
             attempt.status = "invalidated"
-            attempt.completed_at = timezone.now()
             attempt.time_taken_seconds = EXAM_LIMIT_SECONDS
-            attempt.save(update_fields=["status", "completed_at", "time_taken_seconds"])
+            attempt.violation_count = max(0, int(request.data.get("violation_count", 0) or 0))
+            attempt.completed_at = timezone.now()
+            attempt.answers = _answers_without_meta(attempt.answers)
+            attempt.save(update_fields=["status", "time_taken_seconds", "violation_count", "completed_at", "answers"])
             raise ValidationError("Exam time expired before the server received the submission.")
+
         try:
             violations = max(0, int(request.data.get("violation_count", 0) or 0))
         except (TypeError, ValueError):
             violations = 0
-        normalized, score, total, percentage, correct, attempted, total_questions = _normalize_answers(quiz, request.data.get("answers", {}))
+        normalized, score, total, percentage, correct, attempted, total_questions = _normalize_answers(
+            quiz, request.data.get("answers", {})
+        )
         attempt.answers = normalized
         attempt.score = score
         attempt.total_marks = total
@@ -125,7 +176,13 @@ class QuizSingleAttemptView(APIView):
         attempt.violation_count = violations
         attempt.status = "completed"
         attempt.completed_at = timezone.now()
-        attempt.save(update_fields=["answers", "score", "total_marks", "percentage", "correct_count", "attempted_count", "total_questions", "time_taken_seconds", "violation_count", "status", "completed_at"])
+        attempt.save(
+            update_fields=[
+                "answers", "score", "total_marks", "percentage", "correct_count",
+                "attempted_count", "total_questions", "time_taken_seconds", "violation_count",
+                "status", "completed_at",
+            ]
+        )
         return Response(QuizAttemptReadSerializer(attempt, context={"request": request}).data, status=status.HTTP_201_CREATED)
 
 
@@ -135,20 +192,57 @@ class QuizReviewView(APIView):
     def get(self, request):
         if request.user.role not in {UserRole.ADMIN, UserRole.SCHOOL, UserRole.TRAINER}:
             raise PermissionDenied("Trainer, school or administrator access is required.")
-        queryset = QuizAttempt.objects.select_related("quiz", "student", "student__school_class", "student__school_class__school").prefetch_related("quiz__questions")
+
+        queryset = QuizAttempt.objects.select_related(
+            "quiz", "student", "student__school_class", "student__school_class__school"
+        ).prefetch_related("quiz__questions")
         quiz_id = request.query_params.get("quiz")
         if quiz_id:
             queryset = queryset.filter(quiz_id=quiz_id)
         if request.user.role in {UserRole.SCHOOL, UserRole.TRAINER}:
-            queryset = queryset.filter(student__school_class_id__in=accessible_class_queryset(request.user).values("id"))
+            queryset = queryset.filter(
+                student__school_class_id__in=accessible_class_queryset(request.user).values("id")
+            )
+
         payload = []
-        for attempt in queryset.order_by("-completed_at", "-started_at"):
+        for attempt in queryset.order_by("-completed_at", "-id"):
             questions = {str(question.id): question for question in attempt.quiz.questions.all()}
             answer_rows = []
             for question_id, selected in (attempt.answers or {}).items():
                 question = questions.get(str(question_id))
                 if question is None:
                     continue
-                answer_rows.append({"question_id": str(question.id), "question": question.question_text, "options": {"A": question.option_a, "B": question.option_b, "C": question.option_c, "D": question.option_d}, "selected": selected, "correct": question.correct_option, "is_correct": str(selected).upper() == str(question.correct_option).upper(), "explanation": question.explanation, "points": float(question.points)})
-            payload.append({"id": str(attempt.id), "quiz": str(attempt.quiz_id), "quiz_title": attempt.quiz.title, "student": str(attempt.student_id), "student_name": attempt.student.name, "student_id": attempt.student.student_id, "class_name": attempt.student.school_class.display_name, "school_name": attempt.student.school_class.school.name, "score": float(attempt.score), "total_points": float(attempt.total_marks), "percentage": float(attempt.percentage), "correct_answers": attempt.correct_count, "wrong_answers": max(attempt.total_questions - attempt.correct_count, 0), "submitted_at": attempt.completed_at, "time_taken_seconds": attempt.time_taken_seconds, "violation_count": attempt.violation_count, "answers": answer_rows})
+                answer_rows.append(
+                    {
+                        "question_id": str(question.id),
+                        "question": question.question_text,
+                        "options": {"A": question.option_a, "B": question.option_b, "C": question.option_c, "D": question.option_d},
+                        "selected": selected,
+                        "correct": question.correct_option,
+                        "is_correct": str(selected).upper() == str(question.correct_option).upper(),
+                        "explanation": question.explanation,
+                        "points": float(question.points),
+                    }
+                )
+            payload.append(
+                {
+                    "id": str(attempt.id),
+                    "quiz": str(attempt.quiz_id),
+                    "quiz_title": attempt.quiz.title,
+                    "student": str(attempt.student_id),
+                    "student_name": attempt.student.name,
+                    "student_id": attempt.student.student_id,
+                    "class_name": attempt.student.school_class.display_name,
+                    "school_name": attempt.student.school_class.school.name,
+                    "score": float(attempt.score),
+                    "total_points": float(attempt.total_marks),
+                    "percentage": float(attempt.percentage),
+                    "correct_answers": attempt.correct_count,
+                    "wrong_answers": max(attempt.total_questions - attempt.correct_count, 0),
+                    "submitted_at": attempt.completed_at,
+                    "time_taken_seconds": attempt.time_taken_seconds,
+                    "violation_count": attempt.violation_count,
+                    "answers": answer_rows,
+                }
+            )
         return Response(payload)
