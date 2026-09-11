@@ -1,293 +1,151 @@
-import { useState } from 'react';
-import { BookOpen, Clock, Plus, Target, CheckCircle2, X, Layers, Check, Circle } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { BookOpen, Plus, Target, CheckCircle2, X, Pencil, Circle } from 'lucide-react';
+import { apiFetch } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useToast } from '../context/ToastContext';
+import ErrorState from '../components/ui/ErrorState';
+
+const norm = value => String(value ?? '').trim();
+const gradeOf = value => norm(value?.grade ?? value?.class_grade);
+const unitNumber = value => {
+  const raw = norm(value);
+  const match = raw.match(/\d+/);
+  return match ? Number(match[0]) : 0;
+};
+const unitLabel = value => {
+  const n = unitNumber(value);
+  return n ? `Unit ${n}` : norm(value) || 'Unit';
+};
+
+async function request(path, method = 'GET', body) {
+  const response = await apiFetch(path, {
+    method,
+    ...(body !== undefined ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}),
+    cache: 'no-store',
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const field = Object.entries(payload || {}).find(([key]) => !['detail', 'error', 'message'].includes(key));
+    throw new Error(payload.detail || payload.error || payload.message || (field ? `${field[0]}: ${String(field[1])}` : `Request failed (${response.status})`));
+  }
+  return payload;
+}
 
 export default function Curriculum() {
-  const { curriculum, addCurriculumPlan, updateCurriculumStatus } = useData();
+  const { user } = useAuth();
+  const { curriculum = [], classes = [], refreshAll } = useData();
   const toast = useToast();
-  const [selectedGrade, setSelectedGrade] = useState('6');
+  const [selectedClassId, setSelectedClassId] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [formData, setFormData] = useState({ unit_number: '', level: '', topic: '', objectives: '', status: 'Upcoming' });
 
-  const gradeList = [
-    { grade: '6', title: 'Class 6 Syllabus' },
-    { grade: '7', title: 'Class 7 Syllabus' },
-    { grade: '8', title: 'Class 8 Syllabus' },
-    { grade: '9', title: 'Class 9 Syllabus' },
-    { grade: '11', title: 'Class 11 Syllabus' },
-  ];
+  const activeClasses = useMemo(() => classes.filter(item => String(item.status || 'active').toLowerCase() !== 'inactive'), [classes]);
+  const selectedClass = useMemo(() => activeClasses.find(item => String(item.id) === String(selectedClassId)) || activeClasses[0] || null, [activeClasses, selectedClassId]);
+  const selectedClassIdSafe = selectedClass?.id || '';
 
-  const getUnitLevelTag = (weekStr) => {
-    if (weekStr === 'Unit 1') return { label: 'Intro (Level 0)', bg: 'bg-slate-100 text-slate-700 border-slate-300' };
-    if (weekStr === 'Unit 2') return { label: 'Level 1', bg: 'bg-blue-50 text-pixiu-blue border-blue-200' };
-    if (weekStr === 'Unit 3') return { label: 'Level 2', bg: 'bg-indigo-50 text-indigo-700 border-indigo-200' };
-    if (weekStr === 'Unit 4') return { label: 'Level 3', bg: 'bg-purple-50 text-purple-700 border-purple-200' };
-    if (weekStr === 'Unit 5') return { label: 'Level 4', bg: 'bg-cyan-50 text-cyan-700 border-cyan-200' };
-    if (weekStr === 'Unit 6') return { label: 'Level 5 (Capstone)', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
-    return { label: 'Level 1', bg: 'bg-slate-100 text-slate-700 border-slate-200' };
+  const visibleCurriculum = useMemo(() => {
+    const grade = gradeOf(selectedClass);
+    return curriculum
+      .filter(item => !grade || gradeOf(item) === grade)
+      .sort((a, b) => unitNumber(a.unit_code || a.week) - unitNumber(b.unit_code || b.week) || norm(a.unit_code).localeCompare(norm(b.unit_code)));
+  }, [curriculum, selectedClass]);
+
+  const openCreate = () => {
+    setError('');
+    const used = new Set(visibleCurriculum.map(item => unitNumber(item.unit_code || item.week)).filter(Boolean));
+    let next = 1;
+    while (used.has(next)) next += 1;
+    setEditing(null);
+    setFormData({ unit_number: String(next), level: '', topic: '', objectives: '', status: 'Upcoming' });
+    setIsModalOpen(true);
   };
 
-  const [formData, setFormData] = useState({
-    week: 'Unit 1',
-    unit_level: 'Level 0',
-    class_grade: '6',
-    topic: '',
-    objectives: '',
-    status: 'Upcoming'
-  });
-
-  const filteredCurriculum = curriculum.filter(c => {
-    if (c.class_grade) return c.class_grade === selectedGrade;
-    if (selectedGrade === '6') return c.level === 'Level 1';
-    if (selectedGrade === '7') return c.level === 'Level 2';
-    if (selectedGrade === '8') return c.level === 'Level 3';
-    if (selectedGrade === '9') return c.level === 'Level 4';
-    if (selectedGrade === '11') return c.level === 'Level 5';
-    return true;
-  });
-
-  const handleToggleStatus = async (session) => {
-    const newStatus = session.status === 'Completed' ? 'Upcoming' : 'Completed';
-    await updateCurriculumStatus(session.id, newStatus);
-    if (newStatus === 'Completed') {
-      toast.success(`"${session.topic}" marked as Taught!`, 'Curriculum Progress Updated');
-    } else {
-      toast.info(`"${session.topic}" set back to Untaught/Upcoming.`, 'Status Updated');
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    await addCurriculumPlan({
-      ...formData,
-      class_grade: selectedGrade,
-      level: formData.unit_level
-    });
-    setIsModalOpen(false);
+  const openEdit = item => {
+    setError('');
+    setEditing(item);
     setFormData({
-      week: `Unit ${filteredCurriculum.length + 1}`,
-      unit_level: `Level ${filteredCurriculum.length}`,
-      class_grade: selectedGrade,
-      topic: '',
-      objectives: '',
-      status: 'Upcoming'
+      unit_number: String(unitNumber(item.unit_code || item.week) || ''),
+      level: norm(item.level),
+      topic: norm(item.topic || item.title),
+      objectives: norm(item.objectives),
+      status: String(item.status).toLowerCase() === 'published' ? 'Completed' : 'Upcoming',
     });
+    setIsModalOpen(true);
   };
 
-  return (
-    <div className="pb-10">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">Curriculum & Session Plans</h1>
-          <p className="text-slate-500">Structured syllabus for Classes 6, 7, 8, 9, 11 with Unit Level Tags (Unit 1: Intro Level 0, Unit 2: Level 1, etc.).</p>
-        </div>
-        <button 
-          onClick={() => setIsModalOpen(true)}
-          className="bg-pixiu-blue text-white px-5 py-2.5 rounded-lg font-medium flex items-center gap-2 hover:bg-blue-600 transition-colors shadow-sm cursor-pointer"
-        >
-          <Plus size={18} /> Add Session Plan
-        </button>
-      </div>
+  const save = async event => {
+    event.preventDefault();
+    if (!selectedClass || !formData.unit_number || !/^[0-9]+$/.test(String(formData.unit_number).trim())) return setError('Select a class and enter a valid unit number.');
+    if (!norm(formData.level) || !norm(formData.topic) || !norm(formData.objectives)) return setError('Level, topic and objectives are required.');
+    setSaving(true); setError('');
+    try {
+      const number = Number(formData.unit_number);
+      const payload = {
+        grade: gradeOf(selectedClass),
+        level: norm(formData.level),
+        unit_code: `U${number}`,
+        title: norm(formData.topic),
+        week: unitLabel(formData.unit_number),
+        topic: norm(formData.topic),
+        objectives: norm(formData.objectives),
+        status: formData.status === 'Completed' ? 'published' : 'draft',
+      };
+      const saved = await request(editing?.id ? `/curriculum/${encodeURIComponent(editing.id)}` : '/curriculum', editing?.id ? 'PATCH' : 'POST', payload);
+      await refreshAll?.();
+      setIsModalOpen(false);
+      toast.success(`${unitLabel(number)} saved for Grade ${gradeOf(selectedClass)}.`, 'Curriculum updated');
+      return saved;
+    } catch (err) {
+      setError(err.message || 'Unable to save curriculum unit.');
+    } finally { setSaving(false); }
+  };
 
-      {/* Class Syllabus Tabs */}
-      <div className="flex gap-2 mb-8 border-b border-slate-200 overflow-x-auto pb-1">
-        {gradeList.map(item => {
-          const count = curriculum.filter(c => {
-            if (c.class_grade) return c.class_grade === item.grade;
-            if (item.grade === '6') return c.level === 'Level 1';
-            if (item.grade === '7') return c.level === 'Level 2';
-            if (item.grade === '8') return c.level === 'Level 3';
-            if (item.grade === '9') return c.level === 'Level 4';
-            if (item.grade === '11') return c.level === 'Level 5';
-            return false;
-          }).length;
+  const toggleStatus = async item => {
+    setSaving(true); setError('');
+    try {
+      const next = String(item.status).toLowerCase() === 'published' ? 'draft' : 'published';
+      const response = await request(`/curriculum/${encodeURIComponent(item.id)}/status`, 'PUT', { status: next });
+      await refreshAll?.();
+      toast.success(`${item.title} marked ${next === 'published' ? 'Completed' : 'Upcoming'}.`, 'Curriculum status updated');
+      return response;
+    } catch (err) { setError(err.message || 'Unable to update curriculum status.'); }
+    finally { setSaving(false); }
+  };
 
-          return (
-            <button 
-              key={item.grade}
-              onClick={() => {
-                setSelectedGrade(item.grade);
-                setFormData(prev => ({ ...prev, class_grade: item.grade }));
-              }}
-              className={`px-5 py-3 font-bold text-sm border-b-2 transition-all cursor-pointer whitespace-nowrap ${
-                selectedGrade === item.grade 
-                  ? 'border-pixiu-blue text-pixiu-blue bg-blue-50/40 rounded-t-lg' 
-                  : 'border-transparent text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              {item.title} ({count || 6} Units)
-            </button>
-          );
-        })}
-      </div>
+  if (!activeClasses.length) {
+    return <div className="space-y-6 pb-10"><div><p className="text-[10px] uppercase tracking-[0.2em] font-black text-blue-600">Academic</p><h1 className="text-2xl font-black text-slate-900 mt-1">Curriculum & Session Plans</h1><p className="text-sm text-slate-500 mt-1">Curriculum is driven by the active classes created in your authorised school scope.</p></div><div className="p-12 text-center border-2 border-dashed border-slate-200 rounded-2xl bg-white"><BookOpen size={36} className="mx-auto text-slate-300 mb-3"/><h3 className="font-bold text-slate-700">No active classes</h3><p className="text-sm text-slate-400 mt-1">Create an active class first. No classes or units are hardcoded here.</p></div></div>;
+  }
 
-      {/* Session Plan Cards */}
-      <div className="max-w-4xl space-y-4">
-        {filteredCurriculum.map((session, i) => {
-          const unitTag = getUnitLevelTag(session.week);
+  return <div className="pb-10 space-y-6">
+    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"><div><p className="text-[10px] uppercase tracking-[0.2em] font-black text-blue-600">Academic</p><h1 className="text-2xl font-black text-slate-900 mt-1">Curriculum & Session Plans</h1><p className="text-sm text-slate-500 mt-1">Classes come from the live database. Units and levels are created manually and become the single curriculum record used across the portal.</p></div><button type="button" onClick={openCreate} className="w-full sm:w-auto bg-blue-600 text-white px-5 py-2.5 rounded-lg font-black flex items-center justify-center gap-2 shadow-sm"><Plus size={18}/> Add Unit</button></div>
 
-          return (
-            <div 
-              key={session.id || i} 
-              className={`p-6 rounded-2xl border transition-all ${
-                session.status === 'Completed' 
-                  ? 'border-emerald-200 bg-white shadow-xs' 
-                  : 'border-slate-200 bg-white shadow-xs hover:border-slate-300'
-              }`}
-            >
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
-                <div className="flex items-center gap-2.5 flex-wrap">
-                  <div className={`px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wider ${
-                    session.status === 'Completed' 
-                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
-                      : 'bg-slate-100 text-slate-700'
-                  }`}>
-                    {session.week}
-                  </div>
+    {error && <ErrorState title="Curriculum action failed" description={error} onRetry={() => setError('')}/>} 
 
-                  {/* Level Badge Tag on Unit */}
-                  <span className={`px-2.5 py-0.5 rounded-md text-[11px] font-bold border ${unitTag.bg}`}>
-                    {unitTag.label}
-                  </span>
-
-                  <h3 className="text-base sm:text-lg font-bold text-slate-800">{session.topic}</h3>
-                </div>
-
-                {/* Interactive Taught Toggle Button */}
-                <button
-                  onClick={() => handleToggleStatus(session)}
-                  className={`text-xs font-bold px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer border shrink-0 ${
-                    session.status === 'Completed' 
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100 shadow-xs' 
-                      : 'bg-slate-50 text-slate-600 border-slate-300 hover:bg-slate-100 hover:border-slate-400'
-                  }`}
-                  title={session.status === 'Completed' ? 'Click to mark Untaught' : 'Click to mark as Taught'}
-                >
-                  {session.status === 'Completed' ? (
-                    <>
-                      <CheckCircle2 size={15} className="text-emerald-600" />
-                      <span>Taught (Completed)</span>
-                    </>
-                  ) : (
-                    <>
-                      <Circle size={14} className="text-slate-400" />
-                      <span>Untaught • Mark as Taught</span>
-                    </>
-                  )}
-                </button>
-              </div>
-              
-              <div className="pl-1">
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1">
-                  <Target size={14}/> Key Learning Objectives & Hands-on Activity
-                </p>
-                <div className="text-sm text-slate-600 bg-slate-50 p-4 rounded-xl border border-slate-100 leading-relaxed">
-                  {session.objectives}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-
-        {filteredCurriculum.length === 0 && (
-          <div className="p-12 text-center border-2 border-dashed border-slate-200 rounded-2xl bg-white">
-            <BookOpen size={36} className="mx-auto text-slate-300 mb-3" />
-            <h3 className="font-bold text-slate-700">No sessions defined for Class {selectedGrade} yet</h3>
-            <p className="text-sm text-slate-400 mt-1 mb-4">Add lesson objectives and hardware tasks for your trainers.</p>
-            <button 
-              onClick={() => setIsModalOpen(true)}
-              className="bg-pixiu-blue text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm cursor-pointer"
-            >
-              + Create Unit 1 Plan
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Add Session Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
-            <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-              <div>
-                <h2 className="text-lg font-bold text-slate-800">Add Session Plan (Class {selectedGrade})</h2>
-                <p className="text-xs text-slate-500">Define lesson objectives and required practical kit build</p>
-              </div>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-700 cursor-pointer"><X size={20}/></button>
-            </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Unit Number</label>
-                  <select 
-                    value={formData.week} 
-                    onChange={e => setFormData({ ...formData, week: e.target.value })} 
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-pixiu-blue bg-white"
-                  >
-                    <option value="Unit 1">Unit 1 (Intro Level 0)</option>
-                    <option value="Unit 2">Unit 2 (Level 1)</option>
-                    <option value="Unit 3">Unit 3 (Level 2)</option>
-                    <option value="Unit 4">Unit 4 (Level 3)</option>
-                    <option value="Unit 5">Unit 5 (Level 4)</option>
-                    <option value="Unit 6">Unit 6 (Level 5 Capstone)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Status</label>
-                  <select 
-                    value={formData.status} 
-                    onChange={e => setFormData({ ...formData, status: e.target.value })} 
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-pixiu-blue bg-white"
-                  >
-                    <option value="Upcoming">Upcoming (Untaught)</option>
-                    <option value="Completed">Completed (Taught)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Topic Title</label>
-                <input 
-                  type="text" 
-                  placeholder="e.g. Ultrasonic Sonar Radar & Distance Detection" 
-                  value={formData.topic} 
-                  onChange={e => setFormData({ ...formData, topic: e.target.value })} 
-                  required 
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-pixiu-blue"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Learning Objectives & Practical Task</label>
-                <textarea 
-                  rows="3" 
-                  placeholder="List key electronics theory and hands-on robot build tasks..." 
-                  value={formData.objectives} 
-                  onChange={e => setFormData({ ...formData, objectives: e.target.value })} 
-                  required 
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-pixiu-blue"
-                ></textarea>
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
-                <button 
-                  type="button" 
-                  onClick={() => setIsModalOpen(false)} 
-                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium text-sm transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="submit" 
-                  className="bg-pixiu-blue text-white px-5 py-2 rounded-lg font-medium text-sm hover:bg-blue-600 transition-colors shadow-sm cursor-pointer"
-                >
-                  Save Unit Plan
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+    <div className="flex gap-2 border-b border-slate-200 overflow-x-auto pb-1">
+      {activeClasses.map(item => {
+        const count = curriculum.filter(unit => gradeOf(unit) === gradeOf(item)).length;
+        const active = String(selectedClassIdSafe) === String(item.id);
+        return <button key={item.id} type="button" onClick={() => setSelectedClassId(item.id)} className={`px-5 py-3 font-bold text-sm border-b-2 whitespace-nowrap ${active ? 'border-blue-600 text-blue-600 bg-blue-50/40 rounded-t-lg' : 'border-transparent text-slate-500 hover:text-slate-800'}`}><span>{item.display_name || `${item.grade}-${item.section}`}</span><span className="ml-2 text-[10px] text-slate-400">Grade {item.grade} · {count} unit{count === 1 ? '' : 's'}</span></button>;
+      })}
     </div>
-  );
+
+    <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 text-xs text-blue-900"><b>Master curriculum:</b> Grade {gradeOf(selectedClass)} currently has <b>{visibleCurriculum.length}</b> manually configured unit{visibleCurriculum.length === 1 ? '' : 's'}. Every unit has its own Level. Updating the unit updates the same canonical curriculum record used by sessions, progress and certificate eligibility.</div>
+
+    <div className="max-w-5xl space-y-4">
+      {visibleCurriculum.map((session, index) => {
+        const completed = String(session.status).toLowerCase() === 'published';
+        return <div key={session.id || index} className={`p-5 sm:p-6 rounded-2xl border transition-all ${completed ? 'border-emerald-200 bg-white shadow-sm' : 'border-slate-200 bg-white shadow-sm'}`}>
+          <div className="flex flex-col sm:flex-row justify-between gap-3 mb-4"><div className="flex items-center gap-2.5 flex-wrap"><span className={`px-2.5 py-1 rounded-md text-xs font-bold uppercase ${completed ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'}`}>{unitLabel(session.unit_code || session.week)}</span><span className="px-2.5 py-0.5 rounded-md text-[11px] font-bold border border-blue-200 bg-blue-50 text-blue-700">{session.level || 'No level'}</span><h3 className="text-base sm:text-lg font-bold text-slate-800">{session.topic || session.title}</h3></div><div className="flex gap-2 shrink-0"><button type="button" onClick={() => openEdit(session)} className="text-xs font-bold px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-600 inline-flex items-center gap-1.5"><Pencil size={14}/> Edit</button><button type="button" onClick={() => toggleStatus(session)} disabled={saving} className={`text-xs font-bold px-3 py-1.5 rounded-xl border inline-flex items-center gap-1.5 ${completed ? 'bg-emerald-50 text-emerald-700 border-emerald-300' : 'bg-slate-50 text-slate-600 border-slate-300'}`}>{completed ? <CheckCircle2 size={15}/> : <Circle size={14}/>} {completed ? 'Completed' : 'Upcoming'}</button></div></div>
+          <div className="pl-1"><p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1"><Target size={14}/> Learning Objectives & Practical Task</p><div className="text-sm text-slate-600 bg-slate-50 p-4 rounded-xl border border-slate-100 leading-relaxed whitespace-pre-wrap">{session.objectives}</div></div>
+        </div>;
+      })}
+      {!visibleCurriculum.length && <div className="p-12 text-center border-2 border-dashed border-slate-200 rounded-2xl bg-white"><BookOpen size={36} className="mx-auto text-slate-300 mb-3"/><h3 className="font-bold text-slate-700">No units configured for this grade</h3><p className="text-sm text-slate-400 mt-1 mb-4">Create the first unit and choose its Level manually.</p><button type="button" onClick={openCreate} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold">+ Create Unit</button></div>}
+    </div>
+
+    {isModalOpen && <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4"><div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200"><div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50"><div><h2 className="text-lg font-bold text-slate-800">{editing ? 'Edit Curriculum Unit' : `Add Curriculum Unit · Grade ${gradeOf(selectedClass)}`}</h2><p className="text-xs text-slate-500 mt-1">Unit number and Level are data, not hardcoded UI assumptions.</p></div><button type="button" onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-700"><X size={20}/></button></div><form onSubmit={save} className="p-6 space-y-4"><div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Unit Number *</label><input type="number" min="1" step="1" value={formData.unit_number} onChange={e => setFormData(v => ({...v, unit_number: e.target.value}))} disabled={Boolean(editing)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white" required/><p className="text-[10px] text-slate-400 mt-1">Example: 1, 2, 3, 6. Any number is allowed.</p></div><div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Level *</label><input type="text" value={formData.level} onChange={e => setFormData(v => ({...v, level: e.target.value}))} placeholder="e.g. Level 0 / Level 1 / Advanced" className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" required/></div></div><div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Topic *</label><input type="text" value={formData.topic} onChange={e => setFormData(v => ({...v, topic: e.target.value}))} placeholder="e.g. Sensors & Distance Detection" className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" required/></div><div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Learning Objectives & Practical Task *</label><textarea rows="4" value={formData.objectives} onChange={e => setFormData(v => ({...v, objectives: e.target.value}))} placeholder="What students should learn/build" className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" required/></div><div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Status</label><select value={formData.status} onChange={e => setFormData(v => ({...v, status: e.target.value}))} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"><option value="Upcoming">Upcoming</option><option value="Completed">Completed</option></select></div><div className="flex justify-end gap-3 pt-4 border-t border-slate-100"><button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium text-sm">Cancel</button><button type="submit" disabled={saving} className="bg-blue-600 text-white px-5 py-2 rounded-lg font-black text-sm disabled:opacity-50">{saving ? 'Saving…' : editing ? 'Update Unit' : 'Create Unit'}</button></div></form></div></div>}
+  </div>;
 }
