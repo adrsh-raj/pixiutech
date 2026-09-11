@@ -6,6 +6,7 @@ from rest_framework.test import APITestCase
 
 from academics.models import School, SchoolClass, Student, Trainer, TrainerSchoolAssignment
 from learning.models import (
+    AttendanceRecord,
     ContentClassAssignment,
     CurriculumClassAssignment,
     CurriculumUnit,
@@ -182,6 +183,48 @@ class LearningBoundaryTests(APITestCase):
         self.assertEqual(created.school_class_id, self.class_a.id)
         self.assertEqual(created.curriculum_unit_id, self.unit_a.id)
         self.assertEqual(response.data["curriculum_unit"], str(self.unit_a.id))
+
+    def test_session_to_attendance_and_persisted_record_chain(self):
+        self.client.force_authenticate(self.trainer_user)
+
+        start_response = self.client.post(
+            reverse("v1-session-start", kwargs={"pk": self.session_a.id}), format="json"
+        )
+        self.assertEqual(start_response.status_code, 200, start_response.data)
+        self.session_a.refresh_from_db()
+        self.assertEqual(self.session_a.status, "in_progress")
+        self.assertEqual(self.session_a.curriculum_unit_id, self.unit_a.id)
+
+        attendance_response = self.client.post(
+            reverse("v1-attendance-bulk"),
+            {
+                "session": str(self.session_a.id),
+                "entries": [{"student": str(self.student_a.id), "status": "present"}],
+            },
+            format="json",
+        )
+        self.assertEqual(attendance_response.status_code, 200, attendance_response.data)
+        record = AttendanceRecord.objects.get(session=self.session_a, student=self.student_a)
+        self.assertEqual(record.status, "present")
+        self.assertEqual(record.session.curriculum_unit_id, self.unit_a.id)
+
+        attendance_list = self.client.get(reverse("v1-attendance-list"), {"session": str(self.session_a.id)})
+        self.assertEqual(attendance_list.status_code, 200, attendance_list.data)
+        self.assertEqual({row["id"] for row in attendance_list.data}, {str(record.id)})
+        self.assertEqual(attendance_list.data[0]["student_id"], self.student_a.student_id)
+        self.assertEqual(attendance_list.data[0]["class_id"], str(self.class_a.id))
+        self.assertEqual(attendance_list.data[0]["school_code"], self.school_a.school_code)
+
+        progress_before = self.client.get(reverse("v1-student-progress"))
+        self.assertEqual(progress_before.status_code, 403)
+
+        self.client.force_authenticate(self.student_a_user)
+        progress_response = self.client.get(reverse("v1-student-progress"))
+        self.assertEqual(progress_response.status_code, 200, progress_response.data)
+        unit_row = next(row for row in progress_response.data["progress"]["unit_timeline"] if row["unit_code"] == "U1")
+        self.assertEqual(unit_row["attendance_records"], 1)
+        self.assertEqual(unit_row["attendance_rate"], 100.0)
+        self.assertEqual(unit_row["sessions_count"], 1)
 
     def test_curriculum_level_is_manual(self):
         self.client.force_authenticate(self.trainer_user)
