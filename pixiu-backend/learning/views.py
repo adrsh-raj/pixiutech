@@ -39,8 +39,14 @@ class LearningViewSet(viewsets.ModelViewSet):
         self.required_action = self.ACTIONS.get(self.action, "VIEW")
         super().initial(request, *args, **kwargs)
 
+    def scoped_queryset(self):
+        return self.queryset
+
+    def get_queryset(self):
+        return self.scoped_queryset()
+
     def get_object(self):
-        queryset = self.filter_queryset(self.queryset)
+        queryset = self.filter_queryset(self.get_queryset())
         obj = get_object_or_404(queryset, **{self.lookup_field: self.kwargs[self.lookup_url_kwarg or self.lookup_field]})
         self.check_object_permissions(self.request, obj)
         return obj
