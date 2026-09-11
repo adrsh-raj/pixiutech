@@ -1,3 +1,6 @@
+from rest_framework.exceptions import ValidationError
+
+from accounts.models import UserRole
 from academics.services import (
     accessible_assignment_queryset,
     accessible_class_queryset,
@@ -55,6 +58,8 @@ class SafeScopedTrainerViewSet(ContractTrainerViewSet):
 class SafeScopedTrainerSchoolAssignmentViewSet(TrainerSchoolAssignmentViewSet):
     def get_queryset(self):
         return accessible_assignment_queryset(self.request.user)
+    def scoped_queryset(self):
+        return self.get_queryset()
 
 
 class SafeScopedClassViewSet(ScopedContractClassViewSet):
@@ -92,6 +97,12 @@ class SafeScopedSessionActivityViewSet(ScopedSessionActivityViewSet):
 
 
 class SafeScopedCurriculumViewSet(ScopedContractCurriculumViewSet):
+    def map_in(self, data):
+        level = str(data.get("level") or data.get("unit_level") or "").strip()
+        if not level:
+            raise ValidationError({"level": "Level is required. Enter the level manually for this unit."})
+        return super().map_in(data)
+
     def get_queryset(self):
         return accessible_curriculum(self.request.user)
     def scoped_queryset(self):
@@ -123,7 +134,7 @@ class SafeScopedQuizQuestionViewSet(StableQuizQuestionViewSet):
 
 class SafeScopedQuizAssignmentViewSet(ScopedQuizAssignmentViewSet):
     def get_queryset(self):
-        if self.request.user.role == "admin":
+        if self.request.user.role == UserRole.ADMIN:
             return QuizClassAssignment.objects.select_related("quiz", "school_class")
         return QuizClassAssignment.objects.filter(
             school_class_id__in=accessible_class_queryset(self.request.user).values("id")
