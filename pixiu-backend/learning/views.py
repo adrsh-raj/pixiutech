@@ -39,16 +39,12 @@ class LearningViewSet(viewsets.ModelViewSet):
         self.required_action = self.ACTIONS.get(self.action, "VIEW")
         super().initial(request, *args, **kwargs)
 
-    def scoped_queryset(self):
-        return self.queryset
-
     def get_queryset(self):
-        # Collection/list endpoints must use each resource's role/school/class scope.
         return self.scoped_queryset()
 
     def get_object(self):
-        # Retrieve/update/delete should resolve the object first so object-level
-        # permissions can return the established 403 for an inaccessible object.
+        # Resolve from the base queryset first so object-level permissions can
+        # return the established 403 for cross-school/cross-scope objects.
         queryset = self.filter_queryset(self.queryset)
         obj = get_object_or_404(queryset, **{self.lookup_field: self.kwargs[self.lookup_url_kwarg or self.lookup_field]})
         self.check_object_permissions(self.request, obj)
@@ -110,7 +106,7 @@ class SessionActivityViewSet(LearningViewSet):
 class AttendanceViewSet(LearningViewSet):
     queryset = AttendanceRecord.objects.select_related("session__school_class__school", "session__trainer", "student", "marked_by")
     serializer_class = AttendanceRecordSerializer
-    def scoped_queryset(self.request):
+    def scoped_queryset(self):
         qs = accessible_attendance(self.request.user); p = self.request.query_params
         if p.get("session"): qs = qs.filter(session_id=p["session"])
         if p.get("student"): qs = qs.filter(student_id=p["student"])
@@ -154,7 +150,7 @@ class CurriculumUnitViewSet(LearningViewSet):
     def perform_destroy(self, instance): self.role_only(UserRole.ADMIN); instance.status = "archived"; instance.save(update_fields=["status", "updated_at"])
 
 class CurriculumAssignmentViewSet(LearningViewSet):
-    queryset = CurriculumClassAssignment.objects.select_related("curriculum_unit", "school_class", "assigned_by"); serializer_class = CurriculumAssignmentSerializer
+    queryset = CurriculumClassAssignment.objects.select_related("curriculum_unit", "school_class", "assigned_by"); serializer_class = CurriculumClassAssignmentSerializer
     def scoped_queryset(self):
         if self.request.user.role == UserRole.ADMIN: return self.queryset
         return self.queryset.filter(school_class__id__in=accessible_class_queryset(self.request.user).values("id"))
