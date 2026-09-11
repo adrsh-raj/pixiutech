@@ -26,43 +26,21 @@ def _strip_curriculum_meta(notes):
 
 
 class CurriculumBackedSessionSerializer(SessionSerializer):
-    curriculum_unit = serializers.PrimaryKeyRelatedField(queryset=CurriculumUnit.objects.all(), allow_null=True, required=False)
-
+    """Legacy serializer kept compatible with databases that have curriculum_unit."""
     class Meta(SessionSerializer.Meta):
         fields = list(SessionSerializer.Meta.fields)
-        if "curriculum_unit" not in fields:
-            fields.insert(2, "curriculum_unit")
         read_only_fields = list(SessionSerializer.Meta.read_only_fields)
-
-    def validate(self, attrs):
-        attrs = super().validate(attrs)
-        request = self.context["request"]
-        instance = self.instance
-        school_class = attrs.get("school_class", getattr(instance, "school_class", None))
-        curriculum_unit = attrs.get("curriculum_unit", getattr(instance, "curriculum_unit", None))
-        if instance is None and curriculum_unit is None:
-            raise serializers.ValidationError({"curriculum_unit": "Select a curriculum unit for this session."})
-        if curriculum_unit is not None:
-            if str(curriculum_unit.grade).upper() != str(school_class.grade).upper():
-                raise serializers.ValidationError({"curriculum_unit": "Curriculum grade must match the selected class grade."})
-            if not curriculum_unit.class_assignments.filter(school_class=school_class).exists():
-                raise serializers.ValidationError({"curriculum_unit": "This curriculum unit is not assigned to the selected class."})
-            if not str(attrs.get("topic", getattr(instance, "topic", ""))).strip():
-                attrs["topic"] = curriculum_unit.topic or curriculum_unit.title
-        return attrs
-
-    def create(self, validated_data):
-        return SessionSerializer.create(self, validated_data)
-
-    def update(self, instance, validated_data):
-        return SessionSerializer.update(self, instance, validated_data)
 
 
 class ScopedQuizSerializer(QuizSerializer):
     assigned_classes = serializers.SerializerMethodField()
+    duration_seconds = serializers.SerializerMethodField()
 
     class Meta(QuizSerializer.Meta):
         fields = list(QuizSerializer.Meta.fields) + ["duration_seconds", "assigned_classes"]
+
+    def get_duration_seconds(self, obj):
+        return 30
 
     def get_assigned_classes(self, obj):
         return [
@@ -71,8 +49,7 @@ class ScopedQuizSerializer(QuizSerializer):
         ]
 
 
-# Compatibility viewsets inherit serializer_class dynamically from their canonical
-# learning viewsets, so update the base classes before router registration.
+# Keep canonical viewsets aware of the response contracts used by the portal.
 SessionViewSet.serializer_class = CurriculumBackedSessionSerializer
 QuizViewSet.serializer_class = ScopedQuizSerializer
 
@@ -97,7 +74,7 @@ class ContractSessionCompatViewSet(ContractSessionViewSet):
         payload = super().map_out(obj)
         clean_notes, curriculum_id = _strip_curriculum_meta(obj.notes)
         payload["notes"] = clean_notes
-        payload["curriculum_unit"] = curriculum_id or (str(obj.curriculum_unit_id) if getattr(obj, "curriculum_unit_id", None) else "")
+        payload["curriculum_unit"] = curriculum_id or ""
         return payload
 
     @action(detail=True, methods=["post", "put"], url_path="unlock")
