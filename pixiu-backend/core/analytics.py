@@ -1,7 +1,7 @@
 from datetime import timedelta
 from decimal import Decimal, ROUND_HALF_UP
 
-from django.db.models import Avg, Count, Q
+from django.db.models import Avg, Count, F, Q
 from django.utils import timezone
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -12,6 +12,8 @@ from accounts.permissions import IsActiveAccount
 from academics.models import School, Student, Trainer
 from learning.models import AttendanceRecord, CurriculumClassAssignment, Project, QuizAttempt, Session, StudentAssessment
 from .class_ranking import _student_components
+
+_CURRICULUM_PREFIX = "__PIXIU_CURRICULUM_UNIT_ID__:"
 
 
 def _pct(value):
@@ -39,6 +41,15 @@ def _streak(dates, today=None):
     return total
 
 
+def _curriculum_id_from_notes(notes):
+    raw = str(notes or "")
+    marker = raw.find(_CURRICULUM_PREFIX)
+    if marker < 0:
+        return ""
+    tail = raw[marker + len(_CURRICULUM_PREFIX):]
+    return tail.split("__", 1)[0].strip()
+
+
 def _student_snapshot(student):
     attempts = list(QuizAttempt.objects.filter(student=student, status="completed").order_by("completed_at"))
     quiz_avg = _pct(sum(float(item.percentage or 0) for item in attempts) / len(attempts)) if attempts else None
@@ -49,15 +60,41 @@ def _student_snapshot(student):
     attendance_present = AttendanceRecord.objects.filter(student=student, status__in=["present", "late"]).count()
     attendance = _pct(attendance_present / attendance_total * 100) if attendance_total else None
     reviews = StudentAssessment.objects.filter(student=student, status="published")
-    units = list(CurriculumClassAssignment.objects.filter(school_class=student.school_class).select_related("curriculum_unit").order_by("curriculum_unit__unit_code").values("curriculum_unit__unit_code", "curriculum_unit__title", "curriculum_unit__level"))
+    units = list(CurriculumClassAssignment.objects.filter(school_class=student.school_class).select_related("curriculum_unit").order_by("curriculum_unit__unit_code"))
+    session_rows = list(Session.objects.filter(school_class=student.school_class).only("id", "status", "notes"))
+    session_unit_map = {}
+    for row in session_rows:
+        curriculum_id = _curriculum_id_from_notes(row.notes)
+        if curriculum_id:
+            session_unit_map.setdefault(curriculum_id, []).append(row)
+    attendance_rows = list(AttendanceRecord.objects.filter(student=student, session__school_class=student.school_class).select_related("session").only("status", "session_id", "session__notes"))
+    attendance_by_unit = {}
+    for row in attendance_rows:
+        curriculum_id = _curriculum_id_from_notes(row.session.notes)
+        if curriculum_id:
+            attendance_by_unit.setdefault(curriculum_id, []).append(row)
     timeline = []
-    for unit in units:
-        code = unit["curriculum_unit__unit_code"]
+    for assignment in units:
+        curriculum_unit = assignment.curriculum_unit
+        code = curriculum_unit.unit_code
+        unit_sessions = session_unit_map.get(str(curriculum_unit.id), [])
+        unit_attendance = attendance_by_unit.get(str(curriculum_unit.id), [])
+        unit_present = sum(1 for row in unit_attendance if row.status in ["present", "late"])
+        unit_attendance_rate = _pct(unit_present / len(unit_attendance) * 100) if unit_attendance else None
         complete = (
             QuizAttempt.objects.filter(student=student, quiz__unit_code=code, status="completed").exists()
             or reviews.filter(unit_code=code).exists()
         )
-        timeline.append({"unit_code": code, "title": unit["curriculum_unit__title"], "level": unit["curriculum_unit__level"], "complete": complete})
+        timeline.append({
+            "unit_code": code,
+            "title": curriculum_unit.title,
+            "level": curriculum_unit.level,
+            "complete": complete,
+            "sessions_count": len(unit_sessions),
+            "completed_sessions": sum(1 for session in unit_sessions if session.status == "completed"),
+            "attendance_records": len(unit_attendance),
+            "attendance_rate": unit_attendance_rate,
+        })
     completed_units = sum(1 for unit in timeline if unit["complete"])
     progress = _pct(completed_units / len(timeline) * 100) if timeline else None
     improvement = None
