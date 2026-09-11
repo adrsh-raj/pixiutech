@@ -12,6 +12,9 @@ from learning.services import accessible_sessions
 from .scoped_contract_views import ScopedContractSessionCompatViewSet
 
 
+_CURRICULUM_PREFIX = "__PIXIU_CURRICULUM_UNIT_ID__:"
+
+
 class StrictScopedSessionViewSet(ScopedContractSessionCompatViewSet):
     """Canonical session endpoint with real curriculum FK persistence and scope isolation."""
 
@@ -49,8 +52,9 @@ class StrictScopedSessionViewSet(ScopedContractSessionCompatViewSet):
 
     def map_out(self, obj):
         payload = super().map_out(obj)
-        payload["curriculum_unit"] = str(obj.curriculum_unit_id) if obj.curriculum_unit_id else ""
-        payload["curriculum_unit_id"] = str(obj.curriculum_unit_id) if obj.curriculum_unit_id else ""
+        curriculum_id = str(obj.curriculum_unit_id) if obj.curriculum_unit_id else ""
+        payload["curriculum_unit"] = curriculum_id
+        payload["curriculum_unit_id"] = curriculum_id
         return payload
 
     def create(self, request, *args, **kwargs):
@@ -78,13 +82,13 @@ class StrictScopedSessionViewSet(ScopedContractSessionCompatViewSet):
         payload = dict(request.data)
         payload["school_class"] = str(school_class.pk)
         payload["trainer"] = str(trainer.pk)
-        payload["curriculum_unit"] = str(curriculum.pk)
         payload["topic"] = str(payload.get("topic") or curriculum.topic or curriculum.title).strip()
         payload["notes"] = str(payload.get("notes") or "").strip()
-        # Do not use the legacy note marker as the source of truth anymore.
         payload = super().map_in(payload)
-        payload["notes"] = str(request.data.get("notes") or "").strip()
-        payload["curriculum_unit"] = curriculum.pk
+        # Keep the legacy marker only for existing progress rows that still parse it;
+        # the real database FK below is now the source of truth for all new sessions.
+        clean_notes = str(request.data.get("notes") or "").strip()
+        payload["notes"] = f"{clean_notes} {_CURRICULUM_PREFIX}{curriculum.pk}__".strip()
 
         serializer = SessionSerializer(data=payload, context={"request": request})
         serializer.is_valid(raise_exception=True)
