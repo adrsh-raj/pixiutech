@@ -69,6 +69,7 @@ class AssessmentStatus(models.TextChoices):
 class Session(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     school_class = models.ForeignKey(SchoolClass, on_delete=models.PROTECT, related_name="sessions")
+    curriculum_unit = models.ForeignKey("learning.CurriculumUnit", on_delete=models.SET_NULL, null=True, blank=True, related_name="sessions")
     trainer = models.ForeignKey(Trainer, on_delete=models.PROTECT, related_name="sessions")
     date = models.DateField()
     start_time = models.TimeField()
@@ -200,6 +201,7 @@ class Quiz(models.Model):
     level = models.CharField(max_length=50)
     unit_code = models.CharField(max_length=30, blank=True)
     duration_minutes = models.PositiveSmallIntegerField(default=10, validators=[MinValueValidator(1), MaxValueValidator(240)])
+    duration_seconds = models.PositiveIntegerField(null=True, blank=True, validators=[MinValueValidator(10), MaxValueValidator(14400)])
     max_attempts = models.PositiveSmallIntegerField(default=1, validators=[MinValueValidator(1), MaxValueValidator(20)])
     status = models.CharField(max_length=20, choices=QuizStatus.choices, default=QuizStatus.DRAFT)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_quizzes")
@@ -263,10 +265,11 @@ class QuizAttempt(models.Model):
     time_taken_seconds = models.PositiveIntegerField(default=0)
     violation_count = models.PositiveIntegerField(default=0)
     status = models.CharField(max_length=20, choices=AttemptStatus.choices, default=AttemptStatus.COMPLETED)
-    completed_at = models.DateTimeField(auto_now_add=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        ordering = ["-completed_at"]
+        ordering = ["-completed_at", "-started_at"]
         constraints = [
             models.UniqueConstraint(fields=["quiz", "student", "attempt_number"], name="uniq_quiz_student_attempt"),
         ]
