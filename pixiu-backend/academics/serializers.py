@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from django.db import transaction
 from rest_framework import serializers
 
@@ -17,13 +19,37 @@ def validate_indian_phone(value, field_name="Phone"):
 
 
 class FlexibleDateField(serializers.DateField):
-    """Accept a date or an ISO datetime string and normalize it to a date."""
+    """Accept common browser/API date representations and normalize to a date."""
 
     def to_internal_value(self, value):
         if value not in (None, ""):
             raw = str(value).strip()
-            if len(raw) >= 10 and raw[4] == "-" and raw[7] == "-":
-                value = raw[:10]
+            if raw:
+                # ISO date or ISO datetime: keep only the calendar date.
+                if len(raw) >= 10 and raw[4] == "-" and raw[7] == "-":
+                    value = raw[:10]
+                else:
+                    # Accept DD-MM-YYYY / DD/MM/YYYY and D-M-YYYY / D/M/YYYY.
+                    for separator in ("-", "/"):
+                        parts = raw.split(separator)
+                        if len(parts) == 3 and all(part.isdigit() for part in parts):
+                            first, second, year = parts
+                            if len(year) == 4 and len(first) <= 2 and len(second) <= 2:
+                                day = int(first)
+                                month = int(second)
+                                if day > 12 and month <= 12:
+                                    day, month = month, day
+                                if 1 <= day <= 31 and 1 <= month <= 12:
+                                    value = f"{year}-{month:02d}-{day:02d}"
+                                break
+                    # Accept a small set of common textual dates as a final fallback.
+                    if value == raw:
+                        for fmt in ("%d %m %Y", "%d %b %Y", "%d %B %Y"):
+                            try:
+                                value = datetime.strptime(raw, fmt).date().isoformat()
+                                break
+                            except ValueError:
+                                continue
         return super().to_internal_value(value)
 
 
@@ -150,6 +176,8 @@ class StudentReadSerializer(serializers.ModelSerializer):
 
 
 class StudentCreateSerializer(serializers.ModelSerializer):
+    date_of_birth = FlexibleDateField(required=False, allow_null=True)
+
     class Meta:
         model = Student
         fields = [
