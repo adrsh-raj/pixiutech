@@ -32,7 +32,7 @@ from .scoped_contract_views import (
 from .learning_content_files import LearningContentFileView
 from .trainer_materials import TrainerMaterialDetailView, TrainerMaterialFileView, TrainerMaterialListCreateView
 from notifications.views import NotificationPortalViewSet
-from learning.quiz_portal import QuizSingleAttemptView, QuizReviewView
+from learning.quiz_portal import QuizSingleAttemptView, QuizStartView, QuizReviewView
 
 router = DefaultRouter(trailing_slash=False)
 router.register("schools", ScopedContractSchoolViewSet, basename="v1-school")
@@ -90,6 +90,7 @@ urlpatterns = [
     path("student-progress", StudentProgressView.as_view(), name="v1-student-progress"),
     path("trainer-performance", TrainerPerformanceView.as_view(), name="v1-trainer-performance"),
     path("school-performance", SchoolPerformanceView.as_view(), name="v1-school-performance"),
+    path("quizzes/<uuid:pk>/start", QuizStartView.as_view(), name="v1-quiz-start"),
     path("quizzes/<uuid:pk>/single-attempt", QuizSingleAttemptView.as_view(), name="v1-quiz-single-attempt"),
     path("quiz-review", QuizReviewView.as_view(), name="v1-quiz-review"),
 ] + router.urls
