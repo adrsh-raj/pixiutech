@@ -40,6 +40,14 @@ from .quiz_contract_view import ScopedContractQuizViewSetStrict
 from .strict_session_views import StrictScopedSessionViewSet
 
 
+def _accessible_quiz_queryset(user):
+    if user.role == UserRole.ADMIN:
+        return Quiz.objects.all()
+    return Quiz.objects.filter(
+        class_assignments__school_class_id__in=accessible_class_queryset(user).values("id")
+    ).distinct()
+
+
 class SafeScopedSchoolViewSet(ScopedContractSchoolViewSet):
     def get_queryset(self):
         return accessible_school_queryset(self.request.user)
@@ -116,15 +124,8 @@ class SafeScopedContentViewSet(ScopedContractContentViewSet):
 
 
 class SafeScopedQuizViewSet(ScopedContractQuizViewSetStrict):
-    def _accessible_quiz_queryset(self):
-        if self.request.user.role == UserRole.ADMIN:
-            return Quiz.objects.all()
-        return Quiz.objects.filter(
-            class_assignments__school_class_id__in=accessible_class_queryset(self.request.user).values("id")
-        ).distinct()
-
     def get_queryset(self):
-        return self._accessible_quiz_queryset().select_related("created_by").prefetch_related("questions")
+        return _accessible_quiz_queryset(self.request.user).select_related("created_by").prefetch_related("questions")
     def scoped_queryset(self):
         return self.get_queryset()
 
@@ -132,9 +133,7 @@ class SafeScopedQuizViewSet(ScopedContractQuizViewSetStrict):
 class SafeScopedQuizQuestionViewSet(StableQuizQuestionViewSet):
     def get_queryset(self):
         return QuizQuestion.objects.filter(
-            quiz_id__in=SafeScopedQuizViewSet._accessible_quiz_queryset(self) if isinstance(self, SafeScopedQuizViewSet) else QuizClassAssignment.objects.filter(
-                school_class_id__in=accessible_class_queryset(self.request.user).values("id")
-            ).values("quiz_id")
+            quiz_id__in=_accessible_quiz_queryset(self.request.user).values("id")
         ).select_related("quiz")
     def scoped_queryset(self):
         return self.get_queryset()
@@ -142,11 +141,9 @@ class SafeScopedQuizQuestionViewSet(StableQuizQuestionViewSet):
 
 class SafeScopedQuizAssignmentViewSet(ScopedQuizAssignmentViewSet):
     def get_queryset(self):
-        if self.request.user.role == UserRole.ADMIN:
-            return QuizClassAssignment.objects.select_related("quiz", "school_class")
         return QuizClassAssignment.objects.filter(
             school_class_id__in=accessible_class_queryset(self.request.user).values("id")
-        ).select_related("quiz", "school_class")
+        ).select_related("quiz", "school_class") if self.request.user.role != UserRole.ADMIN else QuizClassAssignment.objects.select_related("quiz", "school_class")
     def scoped_queryset(self):
         return self.get_queryset()
 
