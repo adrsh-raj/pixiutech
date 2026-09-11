@@ -16,7 +16,7 @@ export default function StudentClasses() {
   const classId = String(student?.school_class || student?.class_id || '');
   const myClass = useMemo(() => classes.find(item => String(item.id) === classId), [classes, classId]);
   const mySessions = useMemo(() => sessions.filter(item => String(item.school_class || item.class_id) === classId && norm(item.status) !== 'cancelled').sort((a,b) => `${a.date || ''}${a.start_time || ''}`.localeCompare(`${b.date || ''}${b.start_time || ''}`)), [sessions, classId]);
-  const rosterCount = students.filter(item => String(item.school_class || item.class_id) === classId && norm(item.status) !== 'inactive').length;
+  const rosterCount = Number(myClass?.active_student_count ?? 0);
   const error = endpointErrors['/classes'] || endpointErrors['/sessions'] || '';
 
   if (!student) return <div className="space-y-5"><PageHeader eyebrow="Student" title="My Classes" description="Your classes and sessions from the live academic database."/><ErrorState title="Student record unavailable" description="The authenticated account is not linked to a student record. No other student's data is shown." onRetry={refreshAll}/></div>;
