@@ -37,6 +37,29 @@ def _first(data, *keys, default=None):
     return default
 
 
+def _date_only(value):
+    if value in (None, ""):
+        return None
+    raw = str(value).strip()
+    if not raw:
+        return None
+    if len(raw) >= 10 and raw[4] == "-" and raw[7] == "-":
+        return raw[:10]
+    for separator in ("-", "/"):
+        parts = raw.split(separator)
+        if len(parts) == 3 and all(part.isdigit() for part in parts):
+            first, second, year = parts
+            if len(year) == 4 and len(first) in (1, 2) and len(second) in (1, 2):
+                first_num, second_num = int(first), int(second)
+                if first_num > 12 and second_num <= 12:
+                    day, month = first_num, second_num
+                else:
+                    month, day = first_num, second_num
+                if 1 <= day <= 31 and 1 <= month <= 12:
+                    return f"{year}-{month:02d}-{day:02d}"
+    return raw
+
+
 def _school(value):
     if not value:
         return None
@@ -105,7 +128,7 @@ def _legacy_trainer(obj):
 
 def _legacy_student(obj):
     school = obj.school_class.school if obj.school_class_id else None
-    return {"id": str(obj.pk), "student_id": obj.student_id, "name": obj.name, "email": getattr(obj.account, "email", "") if obj.account_id else "", "status": obj.status, "class_id": str(obj.school_class_id) if obj.school_class_id else "", "class_name": obj.school_class.display_name if obj.school_class_id else "", "school_id": school.school_code if school else "", "school_code": school.school_code if school else "", "school": school.name if school else "", "school_name": school.name if school else "", "roll_number": obj.roll_number}
+    return {"id": str(obj.pk), "student_id": obj.student_id, "name": obj.name, "email": getattr(obj.account, "email", "") if obj.account_id else "", "status": obj.status, "class_id": str(obj.school_class_id) if obj.school_class_id else "", "class_name": obj.school_class.display_name if obj.school_class_id else "", "school_id": school.school_code if school else "", "school_code": school.school_code if school else "", "school": school.name if school else "", "school_name": school.name if school else "", "roll_number": obj.roll_number, "date_of_birth": obj.date_of_birth.isoformat() if obj.date_of_birth else None, "gender": obj.gender, "phone": obj.phone, "guardian_name": obj.guardian_name, "guardian_phone": obj.guardian_phone, "guardian_email": obj.guardian_email, "address": obj.address, "current_level": obj.current_level}
 
 
 def _legacy_class(obj):
@@ -186,6 +209,7 @@ class ContractStudentViewSet(LegacyShapeMixin, StudentViewSet):
             payload["school_class"] = str(school_class.pk)
         payload["student_id"] = _first(data, "student_id", "id", default=None)
         payload["name"] = _first(data, "name", "student_name", default="")
+        payload["date_of_birth"] = _date_only(data.get("date_of_birth"))
         return payload
 
     def map_out(self, obj):
