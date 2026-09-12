@@ -8,6 +8,7 @@ from academics.models import SchoolClass, Student
 from academics.services import accessible_class_queryset, accessible_student_queryset
 from learning.course_completion_v3 import admin_complete, certificate_payload, ensure_scope, evaluate_last_session, issue_certificate, policy_for, request_completion, serialize_policy, summary, update_policy
 from learning.course_completion_models import Certificate, Technology
+from learning.services import accessible_sessions
 
 
 def _error(exc, code=400):
@@ -80,9 +81,8 @@ class EvaluateLastSessionView(APIView):
         if request.user.role not in {UserRole.ADMIN, UserRole.TRAINER}: return _error(PermissionError('Only trainers and administrators can evaluate a unit.'), 403)
         from learning.models import Session
         session = get_object_or_404(Session.objects.select_related('school_class', 'curriculum_unit'), pk=session_id)
-        if request.user.role == UserRole.TRAINER:
-            student = accessible_student_queryset(request.user).filter(school_class=session.school_class).first()
-            if not student: return _error(PermissionError('This session is outside your authorised school scope.'), 403)
+        if request.user.role == UserRole.TRAINER and not accessible_sessions(request.user).filter(pk=session.pk).exists():
+            return _error(PermissionError('This session is outside your authorised trainer scope.'), 403)
         try:
             rows = evaluate_last_session(session)
             return Response({'session_id': str(session.id), 'unit_code': session.curriculum_unit.unit_code, 'evaluated_students': len(rows), 'passed': sum(row.status == 'passed' for row in rows), 'failed_or_pending': sum(row.status != 'passed' for row in rows)})
@@ -123,15 +123,20 @@ class IssueProgrammeCertificateView(APIView):
 class VerifyProgrammeCertificateView(APIView):
     permission_classes = [AllowAny]
     def get(self, request, student_id=None):
-        key = str(request.query_params.get('certificate') or request.query_params.get('cert') or request.query_params.get('id') or student_id or '').strip()
+        if student_id:
+            return Response({'verified': False, 'status': 'legacy_not_supported', 'reason': 'Student ID verification is disabled. Use the certificate ID or QR verification link.'}, status=410)
+
+        key = str(request.query_params.get('certificate') or request.query_params.get('cert') or '').strip()
         token = str(request.query_params.get('token') or '').strip()
+        if not key and not token:
+            return Response({'verified': False, 'status': 'invalid_request', 'reason': 'Certificate ID or verification token is required.'}, status=400)
+
         certificate = Certificate.objects.filter(verification_token=token).first() if token else None
         if certificate is None and key:
             certificate = Certificate.objects.filter(certificate_id__iexact=key).first()
-        if certificate is not None: return Response(certificate_payload(certificate), status=200)
-        if key:
-            # Preserve verification for credentials issued by the legacy registry before the new Certificate table existed.
-            from .certificate_views import _public_payload
-            legacy_student = Student.objects.select_related('school_class__school').filter(student_id__iexact=key).first()
-            if legacy_student: return Response(_public_payload(legacy_student, request), status=200)
+        if certificate is not None:
+            payload = certificate_payload(certificate)
+            payload.pop('verification_token', None)
+            payload.pop('rank_portal', None)
+            return Response(payload, status=200)
         return Response({'verified': False, 'status': 'not_found', 'reason': 'No Pixiu Tech certificate matches this verification code.'}, status=404)
