@@ -2,13 +2,13 @@ from datetime import date, time
 from decimal import Decimal
 
 from django.test import TestCase
+from django.utils import timezone
 
 from accounts.models import User, UserRole
 from academics.models import School, SchoolClass, Student, Trainer, TrainerSchoolAssignment
 from learning.course_completion_v3 import admin_complete, evaluate_last_session, issue_certificate, request_completion, summary
 from learning.course_completion_models import Certificate, CompletionPolicy, CurriculumUnitProfile, ProgrammeCompletion, SessionWorkflow, Technology, UnitCompletion
 from learning.models import AttendanceRecord, CurriculumClassAssignment, CurriculumUnit, Quiz, QuizClassAssignment, QuizQuestion, QuizAttempt, Session, StudentAssessment
-from learning.services import grade_attempt
 
 
 class CourseCompletionWorkflowTests(TestCase):
@@ -31,9 +31,7 @@ class CourseCompletionWorkflowTests(TestCase):
         self.quiz = Quiz.objects.create(title='Robotics Unit Quiz', grade='6', level='Level 1', unit_code='R-01', status='active', created_by=self.admin)
         QuizClassAssignment.objects.create(quiz=self.quiz, school_class=self.cls, assigned_by=self.admin)
         question = QuizQuestion.objects.create(quiz=self.quiz, question_order=1, question_text='Robot brain?', option_a='Arduino', option_b='Wire', option_c='Wheel', option_d='Battery', correct_option='A', points=10)
-        attempt = QuizAttempt.objects.create(quiz=self.quiz, student=self.student, attempt_number=1, status='completed', total_marks=10, total_questions=1, attempted_count=1, correct_count=1, score=10, percentage=100, answers={str(question.id): 'A'})
-        attempt.completed_at = timezone.now()
-        attempt.save(update_fields=['completed_at'])
+        QuizAttempt.objects.create(quiz=self.quiz, student=self.student, attempt_number=1, status='completed', total_marks=10, total_questions=1, attempted_count=1, correct_count=1, score=10, percentage=100, answers={str(question.id): 'A'}, completed_at=timezone.now())
         StudentAssessment.objects.create(student=self.student, trainer=self.trainer, unit_code='R-01', level='Level 1', title='Robotics final assessment', score=80, rating=4, status='published', assessment_date=date(2026, 9, 12), feedback='Good build')
 
     def test_last_session_requires_all_enabled_criteria(self):
@@ -85,6 +83,7 @@ class CourseCompletionWorkflowTests(TestCase):
         class_policy.delete()
 
     def test_certificate_uses_snapshot_and_combined_technology_list(self):
+        request_completion(self.trainer_user, self.student)
         admin_complete(self.admin, self.student)
         certificate = issue_certificate(self.trainer_user, self.student)
         self.assertEqual(Certificate.objects.filter(student=self.student).count(), 1)
