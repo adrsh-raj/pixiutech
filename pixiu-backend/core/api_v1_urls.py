@@ -12,6 +12,12 @@ from .analytics import SchoolPerformanceView, StudentProgressView, TrainerPerfor
 from .class_ranking import ClassRankingView
 from .api_v1_compat import health, upload
 from .certificate_views import IssueCertificateView, VerifyCertificateView
+from .course_completion_views import (
+    AdminCompleteProgrammeView, CourseCompletionDetailView, CourseCompletionListView,
+    EvaluateLastSessionView, IssueProgrammeCertificateView, RequestProgrammeCompletionView,
+    TechnologyListCreateView, VerifyProgrammeCertificateView,
+)
+from .course_completion_session import CourseAwareSessionViewSet
 from .public_enquiry import PublicEnquiryView
 from .phase7_compat_extras import ContractCommunicationLogViewSet
 from .billing_contract_overrides import TransactionalInvoiceViewSet
@@ -31,7 +37,7 @@ from .strict_learning_scope_views import (
     SafeScopedContentViewSet, SafeScopedCurriculumViewSet, SafeScopedEvidenceViewSet,
     SafeScopedProjectViewSet, SafeScopedQuizAssignmentViewSet, SafeScopedQuizAttemptViewSet,
     SafeScopedQuizQuestionViewSet, SafeScopedQuizViewSet, SafeScopedSessionActivityViewSet,
-    SafeScopedSessionViewSet, SafeScopedStudentViewSet, SafeScopedTrainerSchoolAssignmentViewSet,
+    SafeScopedStudentViewSet, SafeScopedTrainerSchoolAssignmentViewSet,
     SafeScopedSchoolViewSet, SafeScopedTrainerViewSet,
 )
 
@@ -41,7 +47,7 @@ router.register("trainers", SafeScopedTrainerViewSet, basename="v1-trainer")
 router.register("trainer-school-assignments", SafeScopedTrainerSchoolAssignmentViewSet, basename="v1-trainer-school-assignment")
 router.register("classes", SafeScopedClassViewSet, basename="v1-class")
 router.register("students", SafeScopedStudentViewSet, basename="v1-student")
-router.register("sessions", SafeScopedSessionViewSet, basename="v1-session")
+router.register("sessions", CourseAwareSessionViewSet, basename="v1-session")
 router.register("session-activities", SafeScopedSessionActivityViewSet, basename="v1-session-activity")
 router.register("attendance", SafeScopedAttendanceViewSet, basename="v1-attendance")
 router.register("curriculum", SafeScopedCurriculumViewSet, basename="v1-curriculum")
@@ -76,8 +82,16 @@ urlpatterns = [
     path("auth/refresh/", RefreshView.as_view(), name="v1-refresh"),
     path("auth/logout/", LogoutView.as_view(), name="v1-logout"),
     path("auth/me/", MeView.as_view(), name="v1-me"),
-    path("certificates/issue/<uuid:pk>", IssueCertificateView.as_view(), name="v1-certificate-issue"),
-    path("public/certificates/verify/<str:student_id>", VerifyCertificateView.as_view(), name="v1-certificate-verify"),
+    path("certificates/issue/<uuid:pk>", IssueProgrammeCertificateView.as_view(), name="v1-certificate-issue"),
+    path("public/certificates/verify/<str:student_id>", VerifyCertificateView.as_view(), name="v1-certificate-verify-legacy"),
+    path("public/certificates/verify", VerifyProgrammeCertificateView.as_view(), name="v1-certificate-verify"),
+    path("technologies", TechnologyListCreateView.as_view(), name="v1-technologies"),
+    path("course-completion", CourseCompletionListView.as_view(), name="v1-course-completion-list"),
+    path("course-completion/<uuid:student_id>", CourseCompletionDetailView.as_view(), name="v1-course-completion-detail"),
+    path("course-completion/session/<uuid:session_id>/evaluate", EvaluateLastSessionView.as_view(), name="v1-course-completion-session-evaluate"),
+    path("course-completion/<uuid:student_id>/request", RequestProgrammeCompletionView.as_view(), name="v1-course-completion-request"),
+    path("course-completion/<uuid:student_id>/complete", AdminCompleteProgrammeView.as_view(), name="v1-course-completion-complete"),
+    path("course-completion/<uuid:student_id>/certificate", IssueProgrammeCertificateView.as_view(), name="v1-course-completion-certificate"),
     path("public/enquiries", PublicEnquiryView.as_view(), name="v1-public-enquiry"),
     path("schools/<uuid:pk>/reset-password", SchoolProfilePasswordResetView.as_view(), name="v1-school-password-reset"),
     path("schools/<uuid:pk>/activate", activate_school, name="v1-school-activate"),
