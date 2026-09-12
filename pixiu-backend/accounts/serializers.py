@@ -14,7 +14,21 @@ class LoginSerializer(serializers.Serializer):
     def validate(self, attrs):
         request = self.context.get("request")
         username = normalize_login_username(attrs["username"])
-        user = authenticate(request=request, username=username, password=attrs["password"])
+
+        # Django's default ModelBackend performs an exact username lookup. Login IDs
+        # such as TR-001 are operational identifiers and may be entered with different
+        # casing, so resolve an unambiguous case-insensitive match first, then ask
+        # Django to verify the password against the canonical stored username.
+        user = User.objects.filter(username=username).first()
+        if user is None:
+            candidates = User.objects.filter(username__iexact=username)
+            if candidates.count() == 1:
+                user = candidates.first()
+
+        if user is None:
+            raise serializers.ValidationError({"detail": "Invalid username or password."})
+
+        user = authenticate(request=request, username=user.username, password=attrs["password"])
         if user is None:
             raise serializers.ValidationError({"detail": "Invalid username or password."})
         if not user.is_active or user.status != UserStatus.ACTIVE:
