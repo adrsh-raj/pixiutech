@@ -1,5 +1,7 @@
 from rest_framework.routers import DefaultRouter
+from django.urls import path
 
+from .trainer_units import TrainerUnitListCreateView
 from .views import (
     AssessmentViewSet, AttendanceViewSet, ContentAssignmentViewSet, ContentViewSet,
     CurriculumAssignmentViewSet, CurriculumUnitViewSet, ProjectEvidenceViewSet, ProjectViewSet,
@@ -21,4 +23,5 @@ router.register("assessments", AssessmentViewSet, basename="student-assessment")
 router.register("projects", ProjectViewSet, basename="learning-project")
 router.register("project-evidence", ProjectEvidenceViewSet, basename="project-evidence")
 
-urlpatterns = router.urls
+urlpatterns = [path("trainer-units", TrainerUnitListCreateView.as_view(), name="trainer-session-units")]
+urlpatterns += router.urls
