@@ -1,7 +1,9 @@
-from django.db.models.signals import pre_save
+from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from rest_framework.exceptions import ValidationError
 
+from .certificate_qr import generate_verification_qr
+from .course_completion_models import Certificate
 from .models import LearningContent
 from .watermarking import prepare_stored_file
 
@@ -40,3 +42,20 @@ def enforce_learning_content_watermark(sender, instance, **kwargs):
                 pass
         instance.file = prepared
     instance.is_watermarked = watermarked
+
+
+@receiver(post_save, sender=Certificate)
+def generate_certificate_verification_qr(sender, instance, created, **kwargs):
+    """Generate a stable first-party QR image after certificate issuance."""
+    if not created:
+        return
+    snapshot = dict(instance.snapshot or {})
+    verification_url = str(snapshot.get("verification_url") or "").strip()
+    if not verification_url:
+        return
+    qr_url = generate_verification_qr(
+        verification_url=verification_url,
+        certificate_id=instance.certificate_id,
+    )
+    snapshot["verification_qr_url"] = qr_url
+    sender.objects.filter(pk=instance.pk).update(snapshot=snapshot)
