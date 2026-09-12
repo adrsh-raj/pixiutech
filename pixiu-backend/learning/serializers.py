@@ -1,7 +1,7 @@
 from accounts.models import UserRole
 from academics.models import Student, Trainer
 from rest_framework import serializers
-from .models import AttendanceRecord, ContentClassAssignment, CurriculumClassAssignment, CurriculumUnit, LearningContent, Project, ProjectEvidence, Quiz, QuizAttempt, QuizClassAssignment, QuizQuestion, Session, SessionActivity, StudentAssessment
+from .models import (AttendanceRecord, ContentClassAssignment, CurriculumClassAssignment, CurriculumUnit, LearningContent, Project, ProjectEvidence, Quiz, QuizAttempt, QuizClassAssignment, QuizQuestion, Session, SessionActivity, StudentAssessment)
 from .services import accessible_quizzes, create_attendance, grade_attempt
 
 class SessionSerializer(serializers.ModelSerializer):
