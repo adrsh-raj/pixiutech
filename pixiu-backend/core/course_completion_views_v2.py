@@ -1,0 +1,112 @@
+from django.shortcuts import get_object_or_404
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from accounts.models import UserRole
+from academics.models import Student
+from academics.services import accessible_student_queryset
+from learning.course_completion_v2 import admin_complete, certificate_payload, ensure_scope, evaluate_last_session, issue_certificate, request_completion, summary
+from learning.course_completion_models import Certificate, Technology
+
+
+def _error(exc, code=400):
+    return Response({'detail': str(exc)}, status=code)
+
+
+def _student_for(user, key):
+    qs = accessible_student_queryset(user).select_related('school_class__school')
+    student = qs.filter(pk=key).first()
+    return student or get_object_or_404(qs, student_id__iexact=str(key).strip())
+
+
+class TechnologyListCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request):
+        return Response(list(Technology.objects.filter(active=True).values('id', 'code', 'name', 'sort_order')))
+    def post(self, request):
+        if request.user.role not in {UserRole.ADMIN, UserRole.SUPERADMIN}:
+            return _error(PermissionError('Only administrators can manage the technology catalogue.'), 403)
+        name = str(request.data.get('name') or '').strip()
+        code = str(request.data.get('code') or name).strip().lower().replace(' ', '-')
+        if not name: return _error(ValueError('Technology name is required.'))
+        technology, created = Technology.objects.get_or_create(code=code, defaults={'name': name, 'sort_order': int(request.data.get('sort_order') or 0)})
+        if not created:
+            technology.name, technology.active = name, bool(request.data.get('active', True))
+            technology.save(update_fields=['name', 'active', 'updated_at'])
+        return Response({'id': str(technology.id), 'code': technology.code, 'name': technology.name, 'sort_order': technology.sort_order}, status=201 if created else 200)
+
+
+class CourseCompletionListView(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request):
+        students = accessible_student_queryset(request.user).select_related('school_class__school').filter(status='active')[:500]
+        return Response([summary(student) for student in students])
+
+
+class CourseCompletionDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request, student_key):
+        student = _student_for(request.user, student_key)
+        try:
+            ensure_scope(request.user, student)
+            return Response(summary(student))
+        except PermissionError as exc: return _error(exc, 403)
+
+
+class EvaluateLastSessionView(APIView):
+    permission_classes = [IsAuthenticated]
+    def post(self, request, session_id):
+        if request.user.role not in {UserRole.ADMIN, UserRole.SUPERADMIN, UserRole.TRAINER}:
+            return _error(PermissionError('Only trainers and administrators can evaluate a unit.'), 403)
+        from learning.models import Session
+        session = get_object_or_404(Session.objects.select_related('school_class', 'curriculum_unit'), pk=session_id)
+        if request.user.role == UserRole.TRAINER:
+            student = accessible_student_queryset(request.user).filter(school_class=session.school_class).first()
+            if not student: return _error(PermissionError('This session is outside your authorised school scope.'), 403)
+        try:
+            rows = evaluate_last_session(session)
+            return Response({'session_id': str(session.id), 'unit_code': session.curriculum_unit.unit_code, 'evaluated_students': len(rows), 'passed': sum(row.status == 'passed' for row in rows), 'failed_or_pending': sum(row.status != 'passed' for row in rows)})
+        except ValueError as exc: return _error(exc)
+
+
+class RequestProgrammeCompletionView(APIView):
+    permission_classes = [IsAuthenticated]
+    def post(self, request, student_key):
+        student = _student_for(request.user, student_key)
+        try:
+            programme = request_completion(request.user, student)
+            return Response({'status': programme.status, 'student_id': student.student_id, 'overall_score': float(programme.overall_score), 'detail': 'Course completion requested from Admin.'})
+        except PermissionError as exc: return _error(exc, 403)
+        except ValueError as exc: return _error(exc)
+
+
+class AdminCompleteProgrammeView(APIView):
+    permission_classes = [IsAuthenticated]
+    def post(self, request, student_key):
+        if request.user.role not in {UserRole.ADMIN, UserRole.SUPERADMIN}: return _error(PermissionError('Only administrators can mark a programme completed.'), 403)
+        student = get_object_or_404(Student.objects.select_related('school_class__school'), pk=student_key) if str(student_key).count('-') == 4 else get_object_or_404(Student.objects.select_related('school_class__school'), student_id__iexact=str(student_key).strip())
+        try:
+            programme = admin_complete(request.user, student)
+            return Response({'status': programme.status, 'student_id': student.student_id, 'overall_score': float(programme.overall_score), 'detail': 'Programme marked completed.'})
+        except ValueError as exc: return _error(exc)
+
+
+class IssueProgrammeCertificateView(APIView):
+    permission_classes = [IsAuthenticated]
+    def post(self, request, student_key):
+        student = _student_for(request.user, student_key)
+        try: return Response(certificate_payload(issue_certificate(request.user, student)))
+        except PermissionError as exc: return _error(exc, 403)
+        except ValueError as exc: return _error(exc)
+
+
+class VerifyProgrammeCertificateView(APIView):
+    permission_classes = [AllowAny]
+    def get(self, request):
+        cert_id = str(request.query_params.get('certificate') or request.query_params.get('cert') or request.query_params.get('id') or '').strip()
+        token = str(request.query_params.get('token') or '').strip()
+        certificate = Certificate.objects.filter(verification_token=token).first() if token else None
+        if certificate is None and cert_id: certificate = Certificate.objects.filter(certificate_id__iexact=cert_id).first() or Certificate.objects.filter(student__student_id__iexact=cert_id, status='issued').order_by('-issued_at').first()
+        if certificate is None: return Response({'verified': False, 'status': 'not_found', 'reason': 'No Pixiu Tech certificate matches this verification code.'}, status=404)
+        return Response(certificate_payload(certificate))
