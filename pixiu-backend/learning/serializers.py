@@ -1,15 +1,8 @@
 from accounts.models import UserRole
 from academics.models import Student, Trainer
-
 from rest_framework import serializers
-
-from .models import (
-    AttendanceRecord, ContentClassAssignment, CurriculumClassAssignment, CurriculumUnit,
-    LearningContent, Project, ProjectEvidence, Quiz, QuizAttempt, QuizClassAssignment,
-    QuizQuestion, Session, SessionActivity, StudentAssessment,
-)
+from .models import AttendanceRecord, ContentClassAssignment, CurriculumClassAssignment, CurriculumUnit, LearningContent, Project, ProjectEvidence, Quiz, QuizAttempt, QuizClassAssignment, QuizQuestion, Session, SessionActivity, StudentAssessment
 from .services import accessible_quizzes, create_attendance, grade_attempt
-
 
 class SessionSerializer(serializers.ModelSerializer):
     school_id = serializers.CharField(source="school_class.school.school_code", read_only=True)
@@ -37,7 +30,6 @@ class SessionSerializer(serializers.ModelSerializer):
     def create(self, validated_data): return Session.objects.create(created_by=self.context["request"].user, **validated_data)
     def get_activities(self, obj): return SessionActivitySerializer(obj.activities.all(), many=True, context=self.context).data
 
-
 class SessionActivitySerializer(serializers.ModelSerializer):
     class Meta:
         model = SessionActivity
@@ -49,10 +41,8 @@ class SessionActivitySerializer(serializers.ModelSerializer):
         if not session: raise serializers.ValidationError({"session": "Session is required."})
         return attrs
 
-
 class AttendanceRecordSerializer(serializers.ModelSerializer):
-    student_id = serializers.CharField(source="student.student_id", read_only=True); student_name = serializers.CharField(source="student.name", read_only=True); roll_number = serializers.IntegerField(source="student.roll_number", read_only=True)
-    class_id = serializers.SerializerMethodField(); class_name = serializers.CharField(source="session.school_class.display_name", read_only=True); school_code = serializers.CharField(source="session.school_class.school.school_code", read_only=True); trainer_id = serializers.CharField(source="session.trainer.trainer_id", read_only=True); session_topic = serializers.CharField(source="session.topic", read_only=True); date = serializers.DateField(source="session.date", read_only=True); time = serializers.TimeField(source="session.start_time", read_only=True); marked_by_username = serializers.CharField(source="marked_by.username", read_only=True)
+    student_id = serializers.CharField(source="student.student_id", read_only=True); student_name = serializers.CharField(source="student.name", read_only=True); roll_number = serializers.IntegerField(source="student.roll_number", read_only=True); class_id = serializers.SerializerMethodField(); class_name = serializers.CharField(source="session.school_class.display_name", read_only=True); school_code = serializers.CharField(source="session.school_class.school.school_code", read_only=True); trainer_id = serializers.CharField(source="session.trainer.trainer_id", read_only=True); session_topic = serializers.CharField(source="session.topic", read_only=True); date = serializers.DateField(source="session.date", read_only=True); time = serializers.TimeField(source="session.start_time", read_only=True); marked_by_username = serializers.CharField(source="marked_by.username", read_only=True)
     class Meta:
         model = AttendanceRecord
         fields = ["id", "session", "student", "student_id", "student_name", "roll_number", "class_id", "class_name", "school_code", "trainer_id", "session_topic", "date", "time", "status", "marked_by", "marked_by_username", "marked_at", "note"]
@@ -60,7 +50,6 @@ class AttendanceRecordSerializer(serializers.ModelSerializer):
     def get_class_id(self, obj): return str(obj.session.school_class_id)
     def create(self, validated_data): return create_attendance(user=self.context["request"].user, **validated_data)
     def update(self, instance, validated_data): return create_attendance(user=self.context["request"].user, session=instance.session, student=instance.student, status=validated_data.get("status", instance.status), note=validated_data.get("note", instance.note))
-
 
 class CurriculumUnitSerializer(serializers.ModelSerializer):
     class_count = serializers.IntegerField(source="class_assignments.count", read_only=True)
@@ -73,7 +62,6 @@ class CurriculumUnitSerializer(serializers.ModelSerializer):
             if field in attrs and not str(attrs[field]).strip(): raise serializers.ValidationError({field: "This field cannot be blank."})
         if "grade" in attrs and not str(attrs["grade"]).strip().isdigit(): raise serializers.ValidationError({"grade": "Grade must be numeric."})
         return attrs
-
 
 class CurriculumClassAssignmentSerializer(serializers.ModelSerializer):
     class_name = serializers.CharField(source="school_class.display_name", read_only=True)
@@ -91,7 +79,6 @@ class CurriculumClassAssignmentSerializer(serializers.ModelSerializer):
         return attrs
     def create(self, validated_data): return CurriculumClassAssignment.objects.create(assigned_by=self.context["request"].user, **validated_data)
 
-
 class LearningContentSerializer(serializers.ModelSerializer):
     class Meta:
         model = LearningContent
@@ -105,7 +92,6 @@ class LearningContentSerializer(serializers.ModelSerializer):
         if content_status == "published" and not url and not file_value: raise serializers.ValidationError("Published content must have a URL or file.")
         if content_type == "link" and not url: raise serializers.ValidationError({"url": "Link content requires a URL."})
         return attrs
-
 
 class ContentClassAssignmentSerializer(serializers.ModelSerializer):
     class_name = serializers.CharField(source="school_class.display_name", read_only=True)
@@ -123,7 +109,6 @@ class ContentClassAssignmentSerializer(serializers.ModelSerializer):
         if self.instance and content != self.instance.content: raise serializers.ValidationError("Content cannot be changed after assignment.")
         return attrs
     def create(self, validated_data): return ContentClassAssignment.objects.create(assigned_by=self.context["request"].user, **validated_data)
-
 
 class QuizQuestionWriteSerializer(serializers.ModelSerializer):
     class Meta:
@@ -153,18 +138,11 @@ class QuizSerializer(serializers.ModelSerializer):
         grade = attrs.get("grade", getattr(self.instance, "grade", "")); title = attrs.get("title", getattr(self.instance, "title", "")); duration_seconds = attrs.get("duration_seconds", getattr(self.instance, "duration_seconds", None))
         if not str(grade).strip().isdigit(): raise serializers.ValidationError({"grade": "Grade must be numeric."})
         if not str(title).strip(): raise serializers.ValidationError({"title": "Title is required."})
-        if duration_seconds is None:
-            duration_seconds = max(60, int(attrs.get("duration_minutes", getattr(self.instance, "duration_minutes", 1)) or 1) * 60)
+        if duration_seconds is None: duration_seconds = max(60, int(attrs.get("duration_minutes", getattr(self.instance, "duration_minutes", 1)) or 1) * 60)
         if not 10 <= int(duration_seconds) <= 14400: raise serializers.ValidationError({"duration_seconds": "Timer must be between 10 seconds and 4 hours."})
-        attrs["duration_seconds"] = int(duration_seconds)
-        attrs["max_attempts"] = 1
-        return attrs
-    def create(self, validated_data):
-        validated_data["max_attempts"] = 1
-        return super().create(validated_data)
-    def update(self, instance, validated_data):
-        validated_data["max_attempts"] = 1
-        return super().update(instance, validated_data)
+        attrs["duration_seconds"] = int(duration_seconds); attrs["max_attempts"] = 1; return attrs
+    def create(self, validated_data): validated_data["max_attempts"] = 1; return super().create(validated_data)
+    def update(self, instance, validated_data): validated_data["max_attempts"] = 1; return super().update(instance, validated_data)
     def get_questions(self, obj):
         serializer = QuizQuestionStudentSerializer if self.context["request"].user.role == UserRole.STUDENT else QuizQuestionWriteSerializer
         return serializer(obj.questions.all(), many=True, context=self.context).data
@@ -204,100 +182,60 @@ class QuizAttemptCreateSerializer(serializers.Serializer):
         attrs["student"] = student; return attrs
     def create(self, validated_data): return grade_attempt(**validated_data)
 
-
 class StudentAssessmentSerializer(serializers.ModelSerializer):
-    student_id = serializers.CharField(source="student.student_id", read_only=True)
-    trainer_id = serializers.CharField(source="trainer.trainer_id", read_only=True)
-
+    student_id = serializers.CharField(source="student.student_id", read_only=True); trainer_id = serializers.CharField(source="trainer.trainer_id", read_only=True)
     class Meta:
         model = StudentAssessment
         fields = ["id", "student", "student_id", "trainer", "trainer_id", "unit_code", "level", "title", "score", "rating", "status", "feedback", "assessment_date", "created_at", "updated_at"]
         read_only_fields = ["id", "student_id", "trainer_id", "created_at", "updated_at"]
-
     def to_internal_value(self, data):
-        payload = data.copy()
-        raw_student = payload.get("student")
+        payload = data.copy(); raw_student = payload.get("student")
         if raw_student not in (None, ""):
-            student = Student.objects.filter(pk=raw_student).first()
-            if student is None:
-                student = Student.objects.filter(student_id=str(raw_student).strip().upper()).first()
-            if student is not None:
-                payload["student"] = student.pk
+            student = Student.objects.filter(pk=raw_student).first() or Student.objects.filter(student_id=str(raw_student).strip().upper()).first()
+            if student is not None: payload["student"] = student.pk
         raw_trainer = payload.get("trainer")
         if raw_trainer not in (None, ""):
-            trainer = Trainer.objects.filter(pk=raw_trainer).first()
-            if trainer is None:
-                trainer = Trainer.objects.filter(trainer_id=str(raw_trainer).strip().upper()).first()
-            if trainer is not None:
-                payload["trainer"] = trainer.pk
+            trainer = Trainer.objects.filter(pk=raw_trainer).first() or Trainer.objects.filter(trainer_id=str(raw_trainer).strip().upper()).first()
+            if trainer is not None: payload["trainer"] = trainer.pk
         return super().to_internal_value(payload)
-
     def validate(self, attrs):
         from academics.services import accessible_student_queryset
-        user = self.context["request"].user
-        student = attrs.get("student", getattr(self.instance, "student", None))
-        trainer = attrs.get("trainer", getattr(self.instance, "trainer", None))
-        if not student:
-            raise serializers.ValidationError({"student": "Select a student for this review."})
-        if not student.school_class_id:
-            raise serializers.ValidationError({"student": "Student is not assigned to a class."})
-        if not accessible_student_queryset(user).filter(pk=student.pk).exists():
-            raise serializers.ValidationError({"student": "You cannot assess this student."})
+        user = self.context["request"].user; student = attrs.get("student", getattr(self.instance, "student", None)); trainer = attrs.get("trainer", getattr(self.instance, "trainer", None))
+        if not student: raise serializers.ValidationError({"student": "Select a student for this review."})
+        if not student.school_class_id: raise serializers.ValidationError({"student": "Student is not assigned to a class."})
+        if not accessible_student_queryset(user).filter(pk=student.pk).exists(): raise serializers.ValidationError({"student": "You cannot assess this student."})
         if user.role == UserRole.TRAINER:
             own_trainer = getattr(user, "trainer_profile", None)
-            if own_trainer is None:
-                raise serializers.ValidationError({"trainer": "This trainer account is not linked to a trainer profile."})
-            if trainer and trainer.account_id != user.id:
-                raise serializers.ValidationError({"trainer": "A trainer can only submit their own assessments."})
-            attrs["trainer"] = own_trainer
-            trainer = own_trainer
-        if trainer is None:
-            raise serializers.ValidationError({"trainer": "Trainer is required for this review."})
-        if user.role != UserRole.ADMIN and not trainer.school_assignments.filter(school_id=student.school_class.school_id, status="active").exists():
-            raise serializers.ValidationError({"trainer": "Trainer is not assigned to the student's school."})
-        if not str(attrs.get("title", getattr(self.instance, "title", ""))).strip():
-            raise serializers.ValidationError({"title": "Review title is required."})
+            if own_trainer is None: raise serializers.ValidationError({"trainer": "This trainer account is not linked to a trainer profile."})
+            if trainer and trainer.account_id != user.id: raise serializers.ValidationError({"trainer": "A trainer can only submit their own assessments."})
+            attrs["trainer"] = own_trainer; trainer = own_trainer
+        if trainer is None: raise serializers.ValidationError({"trainer": "Trainer is required for this review."})
+        if user.role != UserRole.ADMIN and not trainer.school_assignments.filter(school_id=student.school_class.school_id, status="active").exists(): raise serializers.ValidationError({"trainer": "Trainer is not assigned to the student's school."})
+        if not str(attrs.get("title", getattr(self.instance, "title", ""))).strip(): raise serializers.ValidationError({"title": "Review title is required."})
         return attrs
-
 
 class ProjectEvidenceSerializer(serializers.ModelSerializer):
     uploaded_by_username = serializers.CharField(source="uploaded_by.username", read_only=True)
-
     class Meta:
         model = ProjectEvidence
         fields = ["id", "project", "title", "note", "file", "external_url", "uploaded_by", "uploaded_by_username", "created_at"]
         read_only_fields = ["id", "uploaded_by", "uploaded_by_username", "created_at"]
-
     def validate(self, attrs):
-        file_value = attrs.get("file", getattr(self.instance, "file", None))
-        external_url = attrs.get("external_url", getattr(self.instance, "external_url", ""))
-        if not file_value and not str(external_url or "").strip():
-            raise serializers.ValidationError("Evidence must include a file or an external URL.")
+        file_value = attrs.get("file", getattr(self.instance, "file", None)); external_url = attrs.get("external_url", getattr(self.instance, "external_url", ""))
+        if not file_value and not str(external_url or "").strip(): raise serializers.ValidationError("Evidence must include a file or an external URL.")
         return attrs
 
-
 class ProjectSerializer(serializers.ModelSerializer):
-    student_id = serializers.CharField(source="student.student_id", read_only=True)
-    student_name = serializers.CharField(source="student.name", read_only=True)
-    evidence = ProjectEvidenceSerializer(many=True, read_only=True)
-
+    student_id = serializers.CharField(source="student.student_id", read_only=True); student_name = serializers.CharField(source="student.name", read_only=True); evidence = ProjectEvidenceSerializer(many=True, read_only=True)
     class Meta:
         model = Project
-        fields = [
-            "id", "student", "student_id", "student_name", "title", "description", "status",
-            "score", "trainer_feedback", "submitted_at", "completed_at", "created_at", "updated_at", "evidence",
-        ]
+        fields = ["id", "student", "student_id", "student_name", "title", "description", "status", "score", "trainer_feedback", "submitted_at", "completed_at", "created_at", "updated_at", "evidence"]
         read_only_fields = ["id", "student_id", "student_name", "submitted_at", "completed_at", "created_at", "updated_at", "evidence"]
-
     def validate(self, attrs):
         from academics.services import accessible_student_queryset
-        request = self.context["request"]
-        student = attrs.get("student", getattr(self.instance, "student", None))
-        if student is None:
-            raise serializers.ValidationError({"student": "Student is required."})
-        if not accessible_student_queryset(request.user).filter(pk=student.pk).exists():
-            raise serializers.ValidationError({"student": "You cannot manage a project for this student."})
+        request = self.context["request"]; student = attrs.get("student", getattr(self.instance, "student", None))
+        if student is None: raise serializers.ValidationError({"student": "Student is required."})
+        if not accessible_student_queryset(request.user).filter(pk=student.pk).exists(): raise serializers.ValidationError({"student": "You cannot manage a project for this student."})
         title = attrs.get("title", getattr(self.instance, "title", ""))
-        if not str(title).strip():
-            raise serializers.ValidationError({"title": "Project title is required."})
+        if not str(title).strip(): raise serializers.ValidationError({"title": "Project title is required."})
         return attrs
