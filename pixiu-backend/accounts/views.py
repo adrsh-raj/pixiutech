@@ -1,17 +1,38 @@
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework_simplejwt.views import TokenRefreshView
 
 from audit.services import record_audit
 from .credentials import create_or_reset_managed_account, revoke_all_refresh_tokens, set_managed_password
 from .models import User, UserRole
 from .permissions import IsAdminRole, IsActiveAccount
 from .serializers import ChangeOwnPasswordSerializer, LoginSerializer, ManagedAccountSerializer, ResetManagedPasswordSerializer, UserMeSerializer
+
+
+def _set_refresh_cookie(response, refresh_token: str) -> None:
+    response.set_cookie(
+        settings.JWT_REFRESH_COOKIE_NAME,
+        refresh_token,
+        max_age=settings.JWT_REFRESH_COOKIE_MAX_AGE,
+        httponly=True,
+        secure=settings.JWT_COOKIE_SECURE,
+        samesite=settings.JWT_COOKIE_SAMESITE,
+        path=settings.JWT_REFRESH_COOKIE_PATH,
+    )
+
+
+def _clear_refresh_cookie(response) -> None:
+    response.delete_cookie(
+        settings.JWT_REFRESH_COOKIE_NAME,
+        path=settings.JWT_REFRESH_COOKIE_PATH,
+        samesite=settings.JWT_COOKIE_SAMESITE,
+    )
 
 
 class LoginView(APIView):
@@ -29,7 +50,9 @@ class LoginView(APIView):
         user.last_login = timezone.now()
         user.save(update_fields=["last_login"])
         record_audit(actor=user, action="login", entity_type="user", entity_id=user.id, summary=f"{user.role} account authenticated", request=request)
-        return Response({"success": True, "access": serializer.validated_data["access"], "refresh": serializer.validated_data["refresh"], "user": UserMeSerializer(user).data})
+        response = Response({"success": True, "access": serializer.validated_data["access"], "user": UserMeSerializer(user).data})
+        _set_refresh_cookie(response, serializer.validated_data["refresh"])
+        return response
 
 
 class MeView(APIView):
@@ -38,19 +61,44 @@ class MeView(APIView):
 
 
 class LogoutView(APIView):
-    permission_classes = [IsAuthenticated, IsActiveAccount]
-    def post(self, request):
-        refresh_token = request.data.get("refresh")
-        if not refresh_token: return Response({"detail": "Refresh token is required."}, status=status.HTTP_400_BAD_REQUEST)
-        try: RefreshToken(refresh_token).blacklist()
-        except Exception: return Response({"detail": "Invalid refresh token."}, status=status.HTTP_400_BAD_REQUEST)
-        record_audit(actor=request.user, action="logout", entity_type="user", entity_id=request.user.id, summary="Account logged out", request=request)
-        return Response({"success": True}, status=status.HTTP_205_RESET_CONTENT)
-
-
-class RefreshView(TokenRefreshView):
     permission_classes = [AllowAny]
     authentication_classes = []
+
+    def post(self, request):
+        refresh_token = request.COOKIES.get(settings.JWT_REFRESH_COOKIE_NAME)
+        if refresh_token:
+            try:
+                RefreshToken(refresh_token).blacklist()
+            except Exception:
+                pass
+        response = Response({"success": True}, status=status.HTTP_205_RESET_CONTENT)
+        _clear_refresh_cookie(response)
+        if request.user.is_authenticated:
+            record_audit(actor=request.user, action="logout", entity_type="user", entity_id=request.user.id, summary="Account logged out", request=request)
+        return response
+
+
+class RefreshView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        refresh_token = request.COOKIES.get(settings.JWT_REFRESH_COOKIE_NAME)
+        if not refresh_token:
+            return Response({"detail": "Refresh session is not available."}, status=status.HTTP_401_UNAUTHORIZED)
+        serializer = TokenRefreshSerializer(data={"refresh": refresh_token})
+        try:
+            serializer.is_valid(raise_exception=True)
+        except Exception:
+            response = Response({"detail": "Refresh session is invalid or expired."}, status=status.HTTP_401_UNAUTHORIZED)
+            _clear_refresh_cookie(response)
+            return response
+        data = serializer.validated_data
+        response = Response({"success": True, "access": data["access"]}, status=status.HTTP_200_OK)
+        rotated_refresh = data.get("refresh")
+        if rotated_refresh:
+            _set_refresh_cookie(response, rotated_refresh)
+        return response
 
 
 class ChangeOwnPasswordView(APIView):
@@ -58,8 +106,10 @@ class ChangeOwnPasswordView(APIView):
     def post(self, request):
         serializer = ChangeOwnPasswordSerializer(data=request.data, context={"request": request}); serializer.is_valid(raise_exception=True)
         user = request.user; user.set_password(serializer.validated_data["new_password"]); user.must_change_password = False; user.save(update_fields=["password", "must_change_password"]); revoke_all_refresh_tokens(user)
+        response = Response({"success": True, "detail": "Password changed successfully."})
+        _clear_refresh_cookie(response)
         record_audit(actor=user, action="password_reset", entity_type="user", entity_id=user.id, summary="Own password changed", request=request)
-        return Response({"success": True, "detail": "Password changed successfully."})
+        return response
 
 
 class ManagedAccountView(APIView):
