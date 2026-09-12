@@ -7,7 +7,7 @@ import { generateCombinedCertificate } from '../utils/certificateGenerator';
 const text=v=>String(v??'').trim();
 export default function VerifyV2(){
  const [params]=useSearchParams(); const [data,setData]=useState(null); const [loading,setLoading]=useState(true); const [error,setError]=useState('');
- const key=params.get('cert')||params.get('certificate')||params.get('id')||''; const token=params.get('token')||'';
+ const key=params.get('cert')||params.get('certificate')||''; const token=params.get('token')||'';
  useEffect(()=>{let alive=true;(async()=>{setLoading(true);setError('');try{const query=token?`?token=${encodeURIComponent(token)}`:`?certificate=${encodeURIComponent(key)}`;const r=await apiFetch(`/public/certificates/verify${query}`,{cache:'no-store'});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d?.reason||d?.detail||'Certificate could not be verified.');if(alive)setData(d)}catch(e){if(alive)setError(e.message)}finally{if(alive)setLoading(false)}})();return()=>{alive=false}},[key,token]);
  if(loading)return <div className="min-h-screen bg-slate-50 flex items-center justify-center"><Loader2 className="animate-spin text-blue-600"/></div>;
  if(error||!data?.verified)return <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6"><div className="w-full max-w-lg bg-white rounded-3xl border border-slate-200 p-8 text-center shadow-sm"><XCircle size={42} className="mx-auto text-rose-500"/><h1 className="mt-4 text-2xl font-black text-slate-900">Certificate not verified</h1><p className="mt-2 text-sm text-slate-500">{error||data?.reason||'No valid Pixiu Tech certificate was found.'}</p><p className="mt-5 font-mono text-xs text-slate-400 break-all">{key}</p></div></div>;
