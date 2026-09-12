@@ -10,7 +10,7 @@ from inventory.views import KitMaintenanceViewSet
 from .analytics import SchoolPerformanceView, StudentProgressView, TrainerPerformanceView
 from .class_ranking import ClassRankingView
 from .api_v1_compat import health, upload
-from .course_completion_views_v2 import AdminCompleteProgrammeView, CourseCompletionDetailView, CourseCompletionListView, EvaluateLastSessionView, IssueProgrammeCertificateView, RequestProgrammeCompletionView, TechnologyListCreateView, VerifyProgrammeCertificateView
+from .course_completion_views_v3 import AdminCompleteProgrammeView, CompletionPolicyView, CourseCompletionDetailView, CourseCompletionListView, EvaluateLastSessionView, IssueProgrammeCertificateView, RequestProgrammeCompletionView, TechnologyListCreateView, VerifyProgrammeCertificateView
 from .course_completion_session import CourseAwareSessionViewSet
 from .public_enquiry import PublicEnquiryView
 from .phase7_compat_extras import ContractCommunicationLogViewSet
@@ -71,6 +71,7 @@ urlpatterns = [
     path('technologies', TechnologyListCreateView.as_view(), name='v1-technologies'),
     path('course-completion', CourseCompletionListView.as_view(), name='v1-course-completion-list'),
     path('course-completion/<str:student_key>', CourseCompletionDetailView.as_view(), name='v1-course-completion-detail'),
+    path('course-completion/policy/<uuid:class_key>', CompletionPolicyView.as_view(), name='v1-course-completion-policy'),
     path('course-completion/session/<uuid:session_id>/evaluate', EvaluateLastSessionView.as_view(), name='v1-course-completion-session-evaluate'),
     path('course-completion/<str:student_key>/request', RequestProgrammeCompletionView.as_view(), name='v1-course-completion-request'),
     path('course-completion/<str:student_key>/complete', AdminCompleteProgrammeView.as_view(), name='v1-course-completion-complete'),
