@@ -6,6 +6,7 @@ from django.db import models
 from django.db.models import Q
 
 from academics.models import SchoolClass, Student, Trainer
+from .course_completion_models import Certificate, CompletionPolicy, CurriculumUnitProfile, ProgrammeCompletion, SessionWorkflow, Technology, UnitCompletion
 
 
 class Lifecycle(models.TextChoices):
