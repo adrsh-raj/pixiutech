@@ -11,6 +11,7 @@ from .models import User, UserRole, UserStatus
 
 
 TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
+TURNSTILE_ACTION = "login"
 
 
 def verify_turnstile_token(token, remote_ip=None):
@@ -37,7 +38,10 @@ def verify_turnstile_token(token, remote_ip=None):
         # Fail closed: a verifier/network error must never turn the public login
         # endpoint into an unprotected password-checking endpoint.
         return False
-    return bool(result.get("success"))
+
+    # Bind this token to the login surface. This prevents a valid token minted for
+    # another Turnstile action from being replayed against the login endpoint.
+    return bool(result.get("success")) and result.get("action") == TURNSTILE_ACTION
 
 
 class LoginSerializer(serializers.Serializer):
