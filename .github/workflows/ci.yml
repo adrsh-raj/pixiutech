@@ -59,6 +59,7 @@ jobs:
           DJANGO_CORS_ALLOWED_ORIGINS: http://localhost:5173
           DJANGO_CSRF_TRUSTED_ORIGINS: http://localhost:5173
           DJANGO_SECURE_SSL_REDIRECT: "False"
+          CLOUDFLARE_TURNSTILE_ENABLED: "False"
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
