@@ -170,24 +170,20 @@ export function AuthProvider({ children }) {
       role: expectedRole || undefined,
       turnstile_token: turnstileToken || undefined,
     });
-    let lastError = null;
-    for (const delay of [0, 2000, 5000]) {
-      if (delay) await new Promise(resolve => setTimeout(resolve, delay));
-      try {
-        const response = await fetchOnce(`${API_BASE}/auth/login/`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, cache: 'no-store', credentials: 'include' }, 25000);
-        const data = await readJson(response);
-        if (response.ok && data.access && data.user) {
-          accessTokenMemory = data.access;
-          setToken(data.access);
-          setUser(data.user);
-          broadcastAuthChange();
-          return { success: true, user: data.user };
-        }
-        if (![502, 503, 504].includes(response.status)) return { success: false, error: data.detail || data.error || 'Invalid username or password.' };
-        lastError = new Error(data.detail || 'Authentication service is waking up.');
-      } catch (error) { lastError = error; }
+    try {
+      const response = await fetchOnce(`${API_BASE}/auth/login/`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, cache: 'no-store', credentials: 'include' }, 25000);
+      const data = await readJson(response);
+      if (response.ok && data.access && data.user) {
+        accessTokenMemory = data.access;
+        setToken(data.access);
+        setUser(data.user);
+        broadcastAuthChange();
+        return { success: true, user: data.user };
+      }
+      return { success: false, error: data.detail || data.error || 'Invalid username or password.' };
+    } catch (error) {
+      return { success: false, error: error?.name === 'AbortError' ? 'Authentication service is taking too long to respond. Please try again.' : 'Authentication service is temporarily unavailable. Please try again.' };
     }
-    return { success: false, error: lastError?.name === 'AbortError' ? 'Authentication service is taking too long to respond. Please try again.' : 'Authentication service is waking up or temporarily unavailable. Please try again.' };
   };
 
   const logout = async () => {
