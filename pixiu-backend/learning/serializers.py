@@ -55,8 +55,8 @@ class AttendanceRecordSerializer(serializers.ModelSerializer):
     class_id = serializers.SerializerMethodField(); class_name = serializers.CharField(source="session.school_class.display_name", read_only=True); school_code = serializers.CharField(source="session.school_class.school.school_code", read_only=True); trainer_id = serializers.CharField(source="session.trainer.trainer_id", read_only=True); session_topic = serializers.CharField(source="session.topic", read_only=True); date = serializers.DateField(source="session.date", read_only=True); time = serializers.TimeField(source="session.start_time", read_only=True); marked_by_username = serializers.CharField(source="marked_by.username", read_only=True)
     class Meta:
         model = AttendanceRecord
-        fields = ["id", "session", "student", "student_id", "student_name", "roll_number", "class_id", "class_name", "school_code", "trainer_id", "session_topic", "date", "time", "status", "marked_by", "marked_at", "note"]
-        read_only_fields = ["id", "student_id", "student_name", "roll_number", "class_id", "class_name", "school_code", "trainer_id", "session_topic", "date", "time", "marked_by", "marked_at"]
+        fields = ["id", "session", "student", "student_id", "student_name", "roll_number", "class_id", "class_name", "school_code", "trainer_id", "session_topic", "date", "time", "status", "marked_by", "marked_by_username", "marked_at", "note"]
+        read_only_fields = ["id", "student_id", "student_name", "roll_number", "class_id", "class_name", "school_code", "trainer_id", "session_topic", "date", "time", "marked_by", "marked_by_username", "marked_at"]
     def get_class_id(self, obj): return str(obj.session.school_class_id)
     def create(self, validated_data): return create_attendance(user=self.context["request"].user, **validated_data)
     def update(self, instance, validated_data): return create_attendance(user=self.context["request"].user, session=instance.session, student=instance.student, status=validated_data.get("status", instance.status), note=validated_data.get("note", instance.note))
