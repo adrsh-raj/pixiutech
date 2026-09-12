@@ -1,3 +1,7 @@
+import json
+from urllib import parse, request as urllib_request
+
+from django.conf import settings
 from django.contrib.auth import authenticate
 from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -6,13 +10,52 @@ from .credentials import normalize_login_username, validate_managed_password
 from .models import User, UserRole, UserStatus
 
 
+TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
+
+
+def verify_turnstile_token(token, remote_ip=None):
+    """Validate a Turnstile token server-side with Cloudflare."""
+    secret = settings.CLOUDFLARE_TURNSTILE_SECRET_KEY
+    if not secret:
+        raise RuntimeError("CLOUDFLARE_TURNSTILE_SECRET_KEY is not configured.")
+
+    payload = {"secret": secret, "response": token}
+    if remote_ip:
+        payload["remoteip"] = remote_ip
+
+    body = parse.urlencode(payload).encode("utf-8")
+    req = urllib_request.Request(
+        TURNSTILE_VERIFY_URL,
+        data=body,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        method="POST",
+    )
+    try:
+        with urllib_request.urlopen(req, timeout=5) as response:
+            result = json.loads(response.read().decode("utf-8"))
+    except Exception:
+        # Fail closed: a verifier/network error must never turn the public login
+        # endpoint into an unprotected password-checking endpoint.
+        return False
+    return bool(result.get("success"))
+
+
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField(max_length=150)
     password = serializers.CharField(write_only=True, trim_whitespace=False)
     role = serializers.ChoiceField(choices=UserRole.choices, required=False)
+    turnstile_token = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
     def validate(self, attrs):
         request = self.context.get("request")
+
+        if settings.CLOUDFLARE_TURNSTILE_ENABLED:
+            token = attrs.get("turnstile_token", "").strip()
+            if not token:
+                raise serializers.ValidationError({"detail": "Please complete the security check."})
+            if not verify_turnstile_token(token, request.META.get("REMOTE_ADDR") if request else None):
+                raise serializers.ValidationError({"detail": "Security verification failed. Please try again."})
+
         username = normalize_login_username(attrs["username"])
 
         # Django's default ModelBackend performs an exact username lookup. Login IDs
