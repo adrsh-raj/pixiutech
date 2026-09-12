@@ -10,7 +10,7 @@ from accounts.models import UserRole
 from academics.models import Student, TrainerSchoolAssignment
 from audit.models import AuditAction, AuditLog
 from .models import AttendanceStatus, AssessmentStatus, CurriculumClassAssignment, Quiz, QuizAttempt, Session, StudentAssessment
-from .course_completion_models import Certificate, CompletionPolicy, ProgrammeCompletion, SessionWorkflow, Technology, UnitCompletion
+from .course_completion_models import Certificate, CompletionPolicy, CurriculumUnitProfile, ProgrammeCompletion, SessionWorkflow, Technology, UnitCompletion
 
 ISSUER_ROLES = {UserRole.TRAINER}
 
@@ -70,14 +70,15 @@ def update_policy(school_class, data):
         'weight_trainer_review': (0, 100),
     }
     for field, (lo, hi) in ranges.items():
-        if field in data:
-            try:
-                value = float(data[field])
-            except (TypeError, ValueError):
-                raise ValueError(f'{field} must be numeric.')
-            if not lo <= value <= hi:
-                raise ValueError(f'{field} must be between {lo} and {hi}.')
-            setattr(policy, field, value)
+        if field not in data:
+            continue
+        try:
+            value = float(data[field])
+        except (TypeError, ValueError):
+            raise ValueError(f'{field} must be numeric.')
+        if not lo <= value <= hi:
+            raise ValueError(f'{field} must be between {lo} and {hi}.')
+        setattr(policy, field, value)
     weights = sum(float(getattr(policy, field)) for field in ('weight_practical', 'weight_quiz', 'weight_attendance', 'weight_trainer_review'))
     if weights <= 0:
         raise ValueError('At least one scoring weight must be greater than zero.')
@@ -89,15 +90,14 @@ def required_units(student):
     assignments = (
         CurriculumClassAssignment.objects
         .filter(school_class=student.school_class, curriculum_unit__status='published')
-        .select_related('curriculum_unit', 'curriculum_unit__completion_profile__technology')
+        .select_related('curriculum_unit', 'curriculum_unit__completion_profile')
         .order_by('curriculum_unit__unit_code')
     )
-    units = []
-    for assignment in assignments:
-        profile = getattr(assignment.curriculum_unit, 'completion_profile', None)
-        if profile is None or profile.certificate_required:
-            units.append(assignment.curriculum_unit)
-    return units
+    return [
+        assignment.curriculum_unit
+        for assignment in assignments
+        if getattr(getattr(assignment.curriculum_unit, 'completion_profile', None), 'certificate_required', True)
+    ]
 
 
 def unit_sessions(student, unit):
@@ -105,13 +105,18 @@ def unit_sessions(student, unit):
         school_class=student.school_class,
         curriculum_unit=unit,
         status='completed',
-    ).order_by('date', 'start_time')
+    ).order_by('date', 'start_time', 'id')
 
 
 def final_session(student, unit):
     return (
         Session.objects
-        .filter(school_class=student.school_class, curriculum_unit=unit, status='completed', workflow__is_last_session_for_unit=True)
+        .filter(
+            school_class=student.school_class,
+            curriculum_unit=unit,
+            status='completed',
+            workflow__is_last_session_for_unit=True,
+        )
         .order_by('-date', '-start_time', '-id')
         .first()
     )
@@ -269,50 +274,79 @@ def programme_state(student):
 def unit_technology(unit, school_class):
     profile = getattr(unit, 'completion_profile', None)
     if profile and profile.technology_id:
-        return profile.technology
-    workflow = (
+        # Preserve an explicit curriculum mapping only when there are no completed
+        # session workflows for the unit; session-level technology is authoritative.
+        completed = (
+            SessionWorkflow.objects
+            .filter(session__school_class=school_class, session__curriculum_unit=unit, session__status='completed')
+            .select_related('technology')
+            .order_by('-session__date', '-session__start_time', '-session__id')
+            .first()
+        )
+        return completed.technology if completed else profile.technology
+    completed = (
         SessionWorkflow.objects
         .filter(session__school_class=school_class, session__curriculum_unit=unit, session__status='completed')
         .select_related('technology')
         .order_by('-session__date', '-session__start_time', '-session__id')
         .first()
     )
-    return workflow.technology if workflow else None
+    return completed.technology if completed else None
 
 
-def cohort_rank(student):
-    ranked = []
-    people = Student.objects.filter(school_class=student.school_class, status='active').order_by('student_id')
-    for person in people:
-        units, completions, score = programme_state(person)
-        if units and all(row.status == 'passed' for row in completions):
-            completed_at = max((row.completed_at for row in completions if row.completed_at), default=timezone.now())
-            ranked.append((person.pk, score, completed_at, str(person.student_id)))
-    ranked.sort(key=lambda row: (-row[1], row[2], row[3]))
-    for position, row in enumerate(ranked, 1):
-        if row[0] == student.pk:
-            return position
-    return None
+def session_technologies(student, units):
+    unit_ids = [unit.id for unit in units]
+    workflows = (
+        SessionWorkflow.objects
+        .filter(session__school_class=student.school_class, session__curriculum_unit_id__in=unit_ids)
+        .select_related('technology')
+        .exclude(session__status='cancelled')
+        .order_by('technology__sort_order', 'technology__name')
+    )
+    result = {}
+    for workflow in workflows:
+        result[workflow.technology.code] = {
+            'id': str(workflow.technology.id),
+            'code': workflow.technology.code,
+            'name': workflow.technology.name,
+        }
+    return list(result.values())
+
+
+def session_counts_by_technology(student, units):
+    unit_ids = [unit.id for unit in units]
+    rows = (
+        SessionWorkflow.objects
+        .filter(session__school_class=student.school_class, session__curriculum_unit_id__in=unit_ids)
+        .select_related('technology')
+        .exclude(session__status='cancelled')
+    )
+    counts = {}
+    for row in rows:
+        counts[row.technology.code] = counts.get(row.technology.code, 0) + 1
+    techs = Technology.objects.filter(code__in=list(counts), active=True).order_by('sort_order', 'name')
+    return [{'technology': tech.name, 'sessions': counts.get(tech.code, 0), 'code': tech.code} for tech in techs]
 
 
 def summary(student):
     units, completions, overall_score = programme_state(student)
     policy = policy_for(student.school_class)
-    technology_map = {}
+    technology_map = {item['code']: item for item in session_technologies(student, units)}
+    if not technology_map:
+        for unit in units:
+            technology = unit_technology(unit, student.school_class)
+            if technology:
+                technology_map[technology.code] = {'id': str(technology.id), 'code': technology.code, 'name': technology.name}
     unit_rows = []
     for unit, completion in zip(units, completions):
         technology = unit_technology(unit, student.school_class)
-        technology_payload = None
-        if technology:
-            technology_payload = {'id': str(technology.id), 'code': technology.code, 'name': technology.name}
-            technology_map[technology.code] = technology_payload
         unit_rows.append({
             'id': str(unit.id),
             'unit_code': unit.unit_code,
             'title': unit.title,
             'level': unit.level,
-            'technology': technology_payload,
-            'sessions': Session.objects.filter(school_class=student.school_class, curriculum_unit=unit).exclude(status='cancelled').count(),
+            'technology': {'id': str(technology.id), 'code': technology.code, 'name': technology.name} if technology else None,
+            'sessions': unit_sessions(student, unit).count(),
             'status': completion.status,
             'attendance_pct': float(completion.attendance_pct),
             'quiz_pct': float(completion.quiz_pct) if completion.quiz_pct is not None else None,
@@ -322,6 +356,7 @@ def summary(student):
             'reasons': completion.reasons or [],
             'last_session': bool(completion.final_session_id),
             'completed_at': completion.completed_at.isoformat() if completion.completed_at else None,
+            'criteria': effective_criteria(unit, policy),
         })
     programme = ProgrammeCompletion.objects.filter(student=student).first()
     return {
@@ -338,16 +373,7 @@ def summary(student):
         'policy': serialize_policy(policy),
         'technologies': list(technology_map.values()),
         'units': unit_rows,
-        'sessions_by_technology': [
-            {
-                'technology': item['name'],
-                'sessions': SessionWorkflow.objects.filter(
-                    technology_id=item['id'],
-                    session__school_class=student.school_class,
-                ).exclude(session__status='cancelled').count(),
-            }
-            for item in technology_map.values()
-        ],
+        'sessions_by_technology': session_counts_by_technology(student, units),
         'trainer_requested_at': programme.requested_at.isoformat() if programme and programme.requested_at else None,
         'admin_completed_at': programme.completed_at.isoformat() if programme and programme.completed_at else None,
         'certificate_id': Certificate.objects.filter(student=student, status='issued').order_by('-issued_at').values_list('certificate_id', flat=True).first(),
@@ -377,8 +403,6 @@ def request_completion(user, student):
     if missing:
         raise ValueError(f'Programme is not ready. Pending units: {", ".join(missing)}.')
     programme, _ = ProgrammeCompletion.objects.get_or_create(student=student)
-    if programme.status == 'admin_completed':
-        raise ValueError('Programme is already completed by Admin.')
     programme.status = 'trainer_requested'
     programme.overall_score = score
     programme.requested_by = user
@@ -424,29 +448,40 @@ def issue_certificate(user, student):
     existing = Certificate.objects.filter(student=student, status='issued').order_by('-issued_at').first()
     if existing:
         return existing
+
     units, completions, score = programme_state(student)
     ranked = cohort_rank(student)
-    technology_snapshot = []
+    tech_snapshot = session_technologies(student, units)
+    if not tech_snapshot:
+        tech_snapshot = [
+            {'code': technology.code, 'name': technology.name}
+            for unit in units
+            if (technology := unit_technology(unit, student.school_class)) is not None
+        ]
+        deduped = {}
+        for item in tech_snapshot:
+            deduped[item['code']] = item
+        tech_snapshot = list(deduped.values())
+
     unit_snapshot = []
-    seen = set()
     for unit, completion in zip(units, completions):
         technology = unit_technology(unit, student.school_class)
-        if technology and technology.code not in seen:
-            technology_snapshot.append({'code': technology.code, 'name': technology.name})
-            seen.add(technology.code)
         unit_snapshot.append({
             'unit_code': unit.unit_code,
             'title': unit.title,
             'level': unit.level,
             'technology': technology.name if technology else '',
-            'sessions': Session.objects.filter(school_class=student.school_class, curriculum_unit=unit).exclude(status='cancelled').count(),
+            'sessions': SessionWorkflow.objects.filter(
+                session__school_class=student.school_class,
+                session__curriculum_unit=unit,
+            ).exclude(session__status='cancelled').count(),
             'score': float(completion.score),
         })
+
     cert_id = f"PX-{student.school_class.school.school_code}-{str(student.student_id).replace(' ', '')}-{timezone.localdate().year}-{uuid.uuid4().hex[:6].upper()}"
     origin = str(getattr(settings, 'PUBLIC_APP_URL', 'https://pixiutech.com')).rstrip('/')
     verify_url = f"{origin}/verify?cert={quote(cert_id)}"
     rank_printed = bool(ranked and ranked <= 10)
-    issued_at = timezone.now()
     snapshot = {
         'certificate_id': cert_id,
         'certificate_ref': cert_id,
@@ -460,8 +495,8 @@ def issue_certificate(user, student):
         'school_code': student.school_class.school.school_code,
         'class_name': student.school_class.display_name,
         'current_level': student.current_level,
-        'technologies': technology_snapshot,
-        'completed_technologies': technology_snapshot,
+        'technologies': tech_snapshot,
+        'completed_technologies': tech_snapshot,
         'units': unit_snapshot,
         'overall_score': score,
         'rank': ranked if rank_printed else None,
@@ -469,14 +504,13 @@ def issue_certificate(user, student):
         'completion_count': sum(row.status == 'passed' for row in completions),
         'required_completion_count': len(units),
         'issued_by': user.display_name or user.username,
-        'issued_at': issued_at.isoformat(),
     }
     with transaction.atomic():
         certificate = Certificate.objects.create(
             certificate_id=cert_id,
             student=student,
             school_class=student.school_class,
-            technologies_snapshot=technology_snapshot,
+            technologies_snapshot=tech_snapshot,
             units_snapshot=unit_snapshot,
             overall_score=score,
             rank=ranked,
@@ -496,7 +530,7 @@ def issue_certificate(user, student):
             entity_type='student_certificate',
             entity_id=str(student.pk),
             summary=f'Graduate certificate issued for {student.student_id}.',
-            changes={'certificate_id': cert_id, 'technologies': technology_snapshot, 'rank': ranked, 'score': score},
+            changes={'certificate_id': cert_id, 'technologies': tech_snapshot, 'rank': ranked, 'score': score},
         )
     return certificate
 
@@ -510,13 +544,11 @@ def certificate_payload(certificate):
         'certificate_id': certificate.certificate_id,
         'certificate_ref': certificate.certificate_id,
         'verification_token': str(certificate.verification_token),
-        'verification_url': data.get('verification_url') or f"{str(getattr(settings, 'PUBLIC_APP_URL', 'https://pixiutech.com')).rstrip('/')}/verify?token={quote(str(certificate.verification_token))}",
-        'issued_at': certificate.issued_at.isoformat() if certificate.issued_at else data.get('issued_at'),
-        'rank': certificate.rank if certificate.rank_printed else None,
-        'rank_portal': certificate.rank,
         'technologies': certificate.technologies_snapshot,
         'completed_technologies': certificate.technologies_snapshot,
         'units': certificate.units_snapshot,
-        'overall_score': float(certificate.overall_score),
+        'rank': certificate.rank if certificate.rank_printed else None,
+        'rank_portal': certificate.rank,
+        'issued_at': certificate.issued_at.isoformat(),
     })
     return data
