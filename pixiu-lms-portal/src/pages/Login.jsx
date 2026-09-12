@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { ShieldCheck, Lock, User, ArrowRight, GraduationCap, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -45,7 +45,16 @@ export default function Login() {
       setSelectedRoleTab('student');
     } else if (upper.startsWith('SCH') || upper.includes('SCHOOL')) {
       setSelectedRoleTab('school');
-    } else if (upper === 'ADARSHRAJ' || upper.startsWith('TRN') || upper.includes('TRAINER')) {
+    } else if (
+      upper === 'ADARSHRAJ' ||
+      upper.startsWith('TR-') ||
+      upper.startsWith('TRN') ||
+      upper.includes('TRAINER') ||
+      upper.includes('FACULTY')
+    ) {
+      // Trainer accounts are generated as TR-001, TR-002, etc. Detect those IDs
+      // automatically so entering a trainer ID from the default tab cannot send
+      // the login request as a student.
       setSelectedRoleTab('trainer');
     }
   };
@@ -56,8 +65,6 @@ export default function Login() {
     setLoading(true);
 
     const cleanUsername = username.trim();
-    // Admin account adarshraj is intentionally authenticated through the
-    // Trainer / Faculty entry point, while ordinary trainers use trainer role.
     const expectedRole = selectedRoleTab === 'trainer' && cleanUsername.toLowerCase() === 'adarshraj'
       ? 'admin'
       : TAB_TO_ROLE[selectedRoleTab];
