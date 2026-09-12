@@ -2,12 +2,9 @@ from datetime import date, time
 from decimal import Decimal
 
 from django.test import TestCase
-from rest_framework.exceptions import ValidationError
 
 from accounts.models import User, UserRole
 from academics.models import School, SchoolClass, Student, Trainer, TrainerSchoolAssignment
-from audit.models import AuditAction
-from learning.course_completion import *  # noqa: F401,F403
 from learning.course_completion_v3 import admin_complete, evaluate_last_session, issue_certificate, request_completion, summary
 from learning.course_completion_models import Certificate, CompletionPolicy, CurriculumUnitProfile, ProgrammeCompletion, SessionWorkflow, Technology, UnitCompletion
 from learning.models import AttendanceRecord, CurriculumClassAssignment, CurriculumUnit, Quiz, QuizClassAssignment, QuizQuestion, QuizAttempt, Session, StudentAssessment
@@ -34,13 +31,15 @@ class CourseCompletionWorkflowTests(TestCase):
         self.quiz = Quiz.objects.create(title='Robotics Unit Quiz', grade='6', level='Level 1', unit_code='R-01', status='active', created_by=self.admin)
         QuizClassAssignment.objects.create(quiz=self.quiz, school_class=self.cls, assigned_by=self.admin)
         question = QuizQuestion.objects.create(quiz=self.quiz, question_order=1, question_text='Robot brain?', option_a='Arduino', option_b='Wire', option_c='Wheel', option_d='Battery', correct_option='A', points=10)
-        grade_attempt(quiz=self.quiz, student=self.student, answers={str(question.id): 'A'})
+        attempt = QuizAttempt.objects.create(quiz=self.quiz, student=self.student, attempt_number=1, status='completed', total_marks=10, total_questions=1, attempted_count=1, correct_count=1, score=10, percentage=100, answers={str(question.id): 'A'})
+        attempt.completed_at = timezone.now()
+        attempt.save(update_fields=['completed_at'])
         StudentAssessment.objects.create(student=self.student, trainer=self.trainer, unit_code='R-01', level='Level 1', title='Robotics final assessment', score=80, rating=4, status='published', assessment_date=date(2026, 9, 12), feedback='Good build')
 
     def test_last_session_requires_all_enabled_criteria(self):
         completion = evaluate_last_session(self.session)[0]
         self.assertEqual(completion.status, 'passed')
-        self.assertEqual(completion.quiz_pct, Decimal('100'))
+        self.assertEqual(completion.quiz_pct, 100.0)
         self.assertEqual(completion.practical_pct, Decimal('80'))
         self.assertEqual(completion.trainer_review_avg, Decimal('4'))
         self.assertEqual(completion.attendance_pct, Decimal('100'))
@@ -51,8 +50,9 @@ class CourseCompletionWorkflowTests(TestCase):
         self.session.workflow.save(update_fields=['is_last_session_for_unit', 'updated_at'])
         with self.assertRaises(ValueError): evaluate_last_session(self.session)
 
-    def test_programme_requires_all_units_and_admin_gate_before_certificate(self):
+    def test_programme_requires_trainer_request_then_admin_gate_then_certificate(self):
         self.assertRaises(ValueError, issue_certificate, self.trainer_user, self.student)
+        with self.assertRaises(ValueError): admin_complete(self.admin, self.student)
         request_completion(self.trainer_user, self.student)
         programme = ProgrammeCompletion.objects.get(student=self.student)
         self.assertEqual(programme.status, 'trainer_requested')
