@@ -1,5 +1,6 @@
 from django.db import transaction
 from django.db.models import Q
+from django.utils import timezone
 
 from accounts.credentials import build_student_password, build_student_username, create_or_reset_managed_account
 from accounts.models import User, UserRole, UserStatus
@@ -22,6 +23,15 @@ def next_trainer_id() -> str:
     return f"TR-{number:03d}"
 
 
+def _current_trainer_school_ids(user):
+    today = timezone.localdate()
+    return TrainerSchoolAssignment.objects.filter(
+        trainer__account_id=user.id,
+        status="active",
+        assigned_from__lte=today,
+    ).filter(Q(assigned_to__isnull=True) | Q(assigned_to__gte=today)).values("school_id")
+
+
 def create_school_account(*, school: School) -> User:
     username = school.school_code
     existing = User.objects.filter(username=username).first()
@@ -31,9 +41,6 @@ def create_school_account(*, school: School) -> User:
     user.role = UserRole.SCHOOL
     user.display_name = school.name
     user.email = school.email
-    # Keep the school profile's business status independent from portal credentials.
-    # A newly onboarded school can be active in the academic database while its
-    # login account remains disabled until an administrator sets a password.
     user.status = UserStatus.INACTIVE
     user.is_active = False
     user.set_unusable_password()
@@ -108,7 +115,8 @@ def assert_school_access(user, school: School) -> bool:
             trainer__account_id=user.id,
             school_id=school.id,
             status="active",
-        ).exists()
+            assigned_from__lte=timezone.localdate(),
+        ).filter(Q(assigned_to__isnull=True) | Q(assigned_to__gte=timezone.localdate())).exists()
     if user.role == UserRole.STUDENT:
         return Student.objects.filter(account_id=user.id, school_class__school_id=school.id).exists()
     return False
@@ -121,7 +129,7 @@ def accessible_school_queryset(user):
     if user.role == UserRole.SCHOOL:
         return qs.filter(account_id=user.id)
     if user.role == UserRole.TRAINER:
-        return qs.filter(trainer_assignments__trainer__account_id=user.id, trainer_assignments__status="active").distinct()
+        return qs.filter(id__in=_current_trainer_school_ids(user)).distinct()
     if user.role == UserRole.STUDENT:
         return qs.filter(classes__students__account_id=user.id).distinct()
     return qs.none()
@@ -134,7 +142,7 @@ def accessible_class_queryset(user):
     if user.role == UserRole.SCHOOL:
         return qs.filter(school__account_id=user.id)
     if user.role == UserRole.TRAINER:
-        return qs.filter(school__trainer_assignments__trainer__account_id=user.id, school__trainer_assignments__status="active").distinct()
+        return qs.filter(school_id__in=_current_trainer_school_ids(user)).distinct()
     if user.role == UserRole.STUDENT:
         return qs.filter(students__account_id=user.id).distinct()
     return qs.none()
@@ -147,10 +155,7 @@ def accessible_student_queryset(user):
     if user.role == UserRole.SCHOOL:
         return qs.filter(school_class__school__account_id=user.id)
     if user.role == UserRole.TRAINER:
-        return qs.filter(
-            school_class__school__trainer_assignments__trainer__account_id=user.id,
-            school_class__school__trainer_assignments__status="active",
-        ).distinct()
+        return qs.filter(school_class__school_id__in=_current_trainer_school_ids(user)).distinct()
     if user.role == UserRole.STUDENT:
         return qs.filter(account_id=user.id)
     return qs.none()
