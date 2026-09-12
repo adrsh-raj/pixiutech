@@ -67,6 +67,14 @@ JWT_COOKIE_SAMESITE = os.environ.get("JWT_COOKIE_SAMESITE", "Lax" if DEBUG else 
 JWT_REFRESH_COOKIE_PATH = "/api/v1/auth/refresh/"
 JWT_REFRESH_COOKIE_MAX_AGE = int(os.environ.get("JWT_REFRESH_COOKIE_MAX_AGE", str(int(timedelta(days=int(os.environ.get("JWT_REFRESH_DAYS", "7"))).total_seconds()))))
 
+# Cloudflare Turnstile protects the public login endpoint. The secret key must only
+# exist in the backend environment (for example Render); never expose it to the SPA.
+CLOUDFLARE_TURNSTILE_SECRET_KEY = os.environ.get("CLOUDFLARE_TURNSTILE_SECRET_KEY", "").strip()
+CLOUDFLARE_TURNSTILE_ENABLED = os.environ.get(
+    "CLOUDFLARE_TURNSTILE_ENABLED",
+    "False" if DEBUG else "True",
+).lower() == "true"
+
 SECURE_CONTENT_TYPE_NOSNIFF=True; X_FRAME_OPTIONS="DENY"; SECURE_REFERRER_POLICY="strict-origin-when-cross-origin"
 if not DEBUG:
     SECURE_SSL_REDIRECT=os.environ.get("DJANGO_SECURE_SSL_REDIRECT","True").lower()=="true"; SESSION_COOKIE_SECURE=True; CSRF_COOKIE_SECURE=True; SECURE_HSTS_SECONDS=int(os.environ.get("DJANGO_HSTS_SECONDS","31536000")); SECURE_HSTS_INCLUDE_SUBDOMAINS=True; SECURE_HSTS_PRELOAD=True
