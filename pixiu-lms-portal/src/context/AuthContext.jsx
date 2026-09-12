@@ -161,10 +161,15 @@ export function AuthProvider({ children }) {
     return () => { window.clearInterval(interval); document.removeEventListener('visibilitychange', onVisible); };
   }, [token]);
 
-  const login = async (username, password, expectedRole = null) => {
+  const login = async (username, password, expectedRole = null, turnstileToken = null) => {
     const cleanUsername = username?.trim(); const cleanPassword = password ?? '';
     if (!cleanUsername || !cleanPassword) return { success: false, error: 'Username and password are required.' };
-    const body = JSON.stringify({ username: cleanUsername, password: cleanPassword, role: expectedRole || undefined });
+    const body = JSON.stringify({
+      username: cleanUsername,
+      password: cleanPassword,
+      role: expectedRole || undefined,
+      turnstile_token: turnstileToken || undefined,
+    });
     let lastError = null;
     for (const delay of [0, 2000, 5000]) {
       if (delay) await new Promise(resolve => setTimeout(resolve, delay));
