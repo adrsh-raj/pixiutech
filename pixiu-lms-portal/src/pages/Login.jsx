@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ShieldCheck, Lock, User, ArrowRight, GraduationCap, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -10,10 +10,17 @@ const TAB_TO_ROLE = {
   trainer: 'trainer'
 };
 
+const TURNSTILE_SITE_KEY = import.meta.env.VITE_CLOUDFLARE_TURNSTILE_SITE_KEY || '0x4AAAAAAExglu7cgD5W2LoK';
+const TURNSTILE_SCRIPT_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+
 export default function Login() {
   const { login, isAuthenticated, user, loading: authLoading } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
+  const turnstileContainerRef = useRef(null);
+  const turnstileWidgetRef = useRef(null);
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const [turnstileReady, setTurnstileReady] = useState(false);
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -32,6 +39,46 @@ export default function Login() {
     } catch (e) {}
     return '';
   });
+
+  useEffect(() => {
+    let cancelled = false;
+    const renderWidget = () => {
+      if (cancelled || !window.turnstile || !turnstileContainerRef.current || turnstileWidgetRef.current !== null) return;
+      turnstileWidgetRef.current = window.turnstile.render(turnstileContainerRef.current, {
+        sitekey: TURNSTILE_SITE_KEY,
+        theme: 'dark',
+        callback: (token) => setTurnstileToken(token),
+        'expired-callback': () => setTurnstileToken(''),
+        'error-callback': () => setTurnstileToken(''),
+      });
+      setTurnstileReady(true);
+    };
+
+    if (window.turnstile) {
+      renderWidget();
+      return () => { cancelled = true; };
+    }
+
+    const existing = document.querySelector(`script[src="${TURNSTILE_SCRIPT_SRC}"]`);
+    const script = existing || document.createElement('script');
+    script.src = TURNSTILE_SCRIPT_SRC;
+    script.async = true;
+    script.defer = true;
+    script.addEventListener('load', renderWidget);
+    if (!existing) document.head.appendChild(script);
+
+    return () => {
+      cancelled = true;
+      script.removeEventListener('load', renderWidget);
+    };
+  }, []);
+
+  const resetTurnstile = () => {
+    setTurnstileToken('');
+    if (window.turnstile && turnstileWidgetRef.current !== null) {
+      window.turnstile.reset(turnstileWidgetRef.current);
+    }
+  };
 
   const handleRolePreset = (role) => {
     setSelectedRoleTab(role);
@@ -52,9 +99,6 @@ export default function Login() {
       upper.includes('TRAINER') ||
       upper.includes('FACULTY')
     ) {
-      // Trainer accounts are generated as TR-001, TR-002, etc. Detect those IDs
-      // automatically so entering a trainer ID from the default tab cannot send
-      // the login request as a student.
       setSelectedRoleTab('trainer');
     }
   };
@@ -62,6 +106,12 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    if (!turnstileToken) {
+      setError(turnstileReady ? 'Please complete the security check.' : 'Security check is still loading. Please wait a moment.');
+      return;
+    }
+
     setLoading(true);
 
     const cleanUsername = username.trim();
@@ -69,7 +119,7 @@ export default function Login() {
       ? 'admin'
       : TAB_TO_ROLE[selectedRoleTab];
 
-    const res = await login(cleanUsername, password, expectedRole);
+    const res = await login(cleanUsername, password, expectedRole, turnstileToken);
     setLoading(false);
 
     if (res.success) {
@@ -82,6 +132,7 @@ export default function Login() {
     } else {
       setError(res.error || 'Invalid credentials');
       toast.error(res.error || 'Invalid credentials.', 'Login Failed');
+      resetTurnstile();
     }
   };
 
@@ -156,7 +207,11 @@ export default function Login() {
             </div>
           </div>
 
-          <button type="submit" disabled={loading} className="w-full bg-pixiu-blue hover:bg-blue-600 active:scale-98 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 text-xs sm:text-sm transition-all cursor-pointer mt-2">
+          <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 px-2 py-2 min-h-[76px] flex items-center justify-center overflow-hidden">
+            <div ref={turnstileContainerRef} aria-label="Cloudflare security check" />
+          </div>
+
+          <button type="submit" disabled={loading || !turnstileToken} className="w-full bg-pixiu-blue hover:bg-blue-600 active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 text-xs sm:text-sm transition-all cursor-pointer mt-2">
             {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <><span>Sign In</span><ArrowRight size={15} /></>}
           </button>
         </form>
