@@ -6,9 +6,16 @@ from rest_framework.views import APIView
 from accounts.models import UserRole
 from academics.models import SchoolClass, Student
 from academics.services import accessible_class_queryset, accessible_student_queryset
+from learning import course_completion_v3 as completion_service
+from learning.cohort_rank import cohort_rank
 from learning.course_completion_v3 import admin_complete, certificate_payload, ensure_scope, evaluate_last_session, issue_certificate, policy_for, request_completion, serialize_policy, summary, update_policy
 from learning.course_completion_models import Certificate, Technology
 from learning.services import accessible_sessions
+
+# course_completion_v3 uses this helper when calculating programme/rank details.
+# Keep the helper in its own module so the service remains testable and avoids a
+# missing-symbol crash on the completion registry endpoint.
+completion_service.cohort_rank = cohort_rank
 
 
 def _error(exc, code=400):
@@ -50,7 +57,11 @@ class TechnologyListCreateView(APIView):
 class CourseCompletionListView(APIView):
     permission_classes = [IsAuthenticated]
     def get(self, request):
-        return Response([summary(student) for student in accessible_student_queryset(request.user).select_related('school_class__school').filter(status='active')[:500]])
+        students = accessible_student_queryset(request.user).select_related('school_class__school').filter(status='active')[:500]
+        rows = []
+        for student in students:
+            rows.append(summary(student))
+        return Response(rows)
 
 
 class CourseCompletionDetailView(APIView):
