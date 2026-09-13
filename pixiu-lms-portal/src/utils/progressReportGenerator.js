@@ -13,11 +13,6 @@ const score10 = row => {
   const rating = Number(row?.rating);
   return Number.isFinite(rating) ? Math.max(0, Math.min(10, rating * 2)) : null;
 };
-const fallbackUnits = grade => Array.from({ length: 6 }, (_, i) => ({
-  level: `Level ${i}`,
-  unit_code: `Unit ${i + 1}`,
-  title: `Grade ${grade || '—'} Learning Unit ${i + 1}`,
-}));
 
 function openPrint(title, body) {
   const popup = window.open('', '_blank', 'width=1100,height=850');
@@ -33,8 +28,18 @@ function openPrint(title, body) {
 
 function unitRowsFor({ student, studentReviews = [], curriculum = [] }) {
   const grade = gradeOf(student);
-  const curriculumRows = Array.isArray(curriculum) ? curriculum.filter(row => !grade || !row?.grade || String(row.grade) === grade).map(row => ({ level: row.level || 'Level', unit_code: row.unit_code || row.unitCode || 'Unit', title: row.title || row.topic || row.unit_code || 'Learning Unit' })) : [];
-  const units = curriculumRows.length ? curriculumRows : fallbackUnits(grade);
+  const curriculumRows = Array.isArray(curriculum)
+    ? curriculum
+        .filter(row => !grade || !row?.grade || String(row.grade) === grade)
+        .filter(row => !['draft', 'archived', 'inactive'].includes(norm(row?.status)))
+        .map(row => ({
+          level: row.level || 'Level',
+          unit_code: row.unit_code || row.unitCode || 'Unit',
+          title: row.title || row.topic || row.unit_code || 'Learning Unit',
+          status: row.status || 'published',
+        }))
+    : [];
+  const units = curriculumRows;
   const reviews = (studentReviews || []).filter(row => sameStudent(row, student));
   return units.map(unit => {
     const candidates = reviews.filter(row => norm(row.level) === norm(unit.level) || norm(row.unit_code || row.unitCode) === norm(unit.unit_code));
@@ -50,7 +55,9 @@ export function generateStudentProgressPDF({ student, school, attendanceRate = 0
   const totalScore = evaluated.reduce((sum, row) => sum + row.score, 0);
   const projectsForStudent = (projects || []).filter(project => sameStudent(project, student));
   const grade = gradeOf(student);
-  const reviewRows = rows.map(row => `<tr><td><b>${esc(row.level)}</b></td><td>${esc(row.unit_code)}</td><td><b>${esc(row.title)}</b></td><td>${row.score === null ? '<span class="pill pending">Pending</span>' : `<b>${row.score.toFixed(1)}/10</b>`}</td><td><span class="pill ${row.score !== null ? 'verified' : 'pending'}">${esc(row.status)}</span></td><td>${esc(row.review?.feedback || (row.score === null ? 'Trainer evaluation pending.' : 'Competency evaluated and recorded in the LMS.'))}</td></tr>`).join('');
+  const reviewRows = rows.length
+    ? rows.map(row => `<tr><td><b>${esc(row.level)}</b></td><td>${esc(row.unit_code)}</td><td><b>${esc(row.title)}</b></td><td>${row.score === null ? '<span class="pill pending">Pending</span>' : `<b>${row.score.toFixed(1)}/10</b>`}</td><td><span class="pill ${row.score !== null ? 'verified' : 'pending'}">${esc(row.status)}</span></td><td>${esc(row.review?.feedback || (row.score === null ? 'Trainer evaluation pending.' : 'Competency evaluated and recorded in the LMS.'))}</td></tr>`).join('')
+    : '<tr><td colspan="6" style="text-align:center;color:#94a3b8">No published curriculum units are assigned to this student\'s grade.</td></tr>';
   const projectRows = projectsForStudent.length ? projectsForStudent.map(project => `<tr><td>${esc(project.title || 'Project')}</td><td>${esc(project.score ?? '—')}</td><td><span class="pill ${norm(project.status) === 'completed' ? 'verified' : ''}">${esc(project.status || '—')}</span></td><td>${esc(project.trainer_feedback || project.description || '—')}</td></tr>`).join('') : '<tr><td colspan="4" style="text-align:center;color:#94a3b8">No project records recorded.</td></tr>';
   const body = `<div class="sheet"><div class="header"><div><div class="brand-title">PIXIU <span>TECH</span></div><div class="muted">Robotics • AI • IoT • STEM Education</div></div><div style="text-align:right"><span class="badge">Student Progress Report</span><div class="muted" style="margin-top:5px">Report ID: ${esc(student.student_id || student.id || '—')}</div></div></div><div style="text-align:center;margin:16px 0"><h1 style="margin:0;font-size:19px;text-transform:uppercase">STEM & Robotics Laboratory Progress Report</h1><p class="muted" style="margin:4px 0">Current academic progress generated from recorded LMS activity.</p></div><div class="profile"><div class="card"><div class="label">Student</div><div class="value">${esc(student.name || '—')}</div><div class="muted">ID: ${esc(student.student_id || student.id || '—')}</div><div class="muted">Class: ${esc(student.class_name || '—')}</div><div class="muted">Grade: ${esc(grade || '—')}</div></div><div class="card"><div class="label">Partner Institution</div><div class="value">${esc(typeof school === 'string' ? school : school?.name || student.school_name || 'PIXIU Tech Partner School')}</div><div class="muted">School Code: ${esc(student.school_code || school?.school_code || '—')}</div><div class="muted">Academic Year: 2026–2027</div></div></div><div class="kpis"><div class="kpi"><div class="label">Lab Attendance</div><div class="n">${esc(attendanceRate)}%</div></div><div class="kpi"><div class="label">Mastery Level</div><div class="n">${esc(student.current_level || student.tech_level || 'Level 0')}</div></div><div class="kpi"><div class="label">Cumulative Score</div><div class="n">${totalScore.toFixed(1)} / ${rows.length * 10}</div></div><div class="kpi"><div class="label">Units Evaluated</div><div class="n">${evaluated.length} / ${rows.length}</div></div></div><div class="section"><h2>Unit & Level Competency Progression</h2><table class="table"><thead><tr><th>Level</th><th>Unit</th><th>Module</th><th>Score</th><th>Status</th><th>Trainer Evaluation</th></tr></thead><tbody>${reviewRows}</tbody></table></div><div class="section"><h2>Laboratory Projects</h2><table class="table"><thead><tr><th>Project</th><th>Score</th><th>Status</th><th>Technical Evidence / Feedback</th></tr></thead><tbody>${projectRows}</tbody></table></div><div class="sig"><div><div class="line">${esc(student.trainer_name || 'Trainer Faculty')}</div><div class="muted">Trainer / Faculty</div></div><div style="text-align:right"><div class="line">Authorized Signatory</div><div class="muted">PIXIU Tech LLP</div></div></div><div class="footer">PIXIU Tech LLP · Generated from the current server-authoritative LMS record</div></div>`;
   openPrint(`Progress Report — ${student.name || 'Student'}`, body);
