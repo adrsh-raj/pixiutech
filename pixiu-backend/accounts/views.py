@@ -1,3 +1,5 @@
+import logging
+
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
@@ -13,6 +15,8 @@ from .credentials import create_or_reset_managed_account, revoke_all_refresh_tok
 from .models import User, UserRole
 from .permissions import IsAdminRole, IsActiveAccount
 from .serializers import ChangeOwnPasswordSerializer, LoginSerializer, ManagedAccountSerializer, ResetManagedPasswordSerializer, UserMeSerializer
+
+logger = logging.getLogger(__name__)
 
 
 def _set_refresh_cookie(response, refresh_token: str) -> None:
@@ -46,11 +50,52 @@ class LoginView(APIView):
             if "selected login type" in str(serializer.errors):
                 return Response(serializer.errors, status=status.HTTP_403_FORBIDDEN)
             return Response(serializer.errors, status=status.HTTP_401_UNAUTHORIZED)
+
         user = serializer.validated_data["user"]
-        user.last_login = timezone.now()
-        user.save(update_fields=["last_login"])
-        record_audit(actor=user, action="login", entity_type="user", entity_id=user.id, summary=f"{user.role} account authenticated", request=request)
-        response = Response({"success": True, "access": serializer.validated_data["access"], "user": UserMeSerializer(user).data})
+
+        # Authentication itself must not be turned into a 500 by non-critical
+        # bookkeeping (last_login or audit persistence).
+        try:
+            user.last_login = timezone.now()
+            user.save(update_fields=["last_login"])
+        except Exception:
+            logger.exception("Login succeeded but last_login could not be updated", extra={"username": user.username})
+
+        try:
+            record_audit(
+                actor=user,
+                action="login",
+                entity_type="user",
+                entity_id=user.id,
+                summary=f"{user.role} account authenticated",
+                request=request,
+            )
+        except Exception:
+            logger.exception("Login succeeded but audit record could not be written", extra={"username": user.username})
+
+        try:
+            user_data = UserMeSerializer(user).data
+        except Exception:
+            # A missing/stale optional school/trainer/student relation must not prevent
+            # a successfully authenticated account from receiving its access token.
+            logger.exception("User profile serialization failed during login", extra={"username": user.username})
+            user_data = {
+                "id": user.id,
+                "username": user.username,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "full_name": user.get_full_name().strip() or user.display_name or user.username,
+                "name": user.get_full_name().strip() or user.display_name or user.username,
+                "display_name": user.display_name,
+                "email": user.email,
+                "role": user.role,
+                "status": user.status,
+                "must_change_password": user.must_change_password,
+                "related_id": None,
+                "school_id": None,
+            }
+
+        response = Response({"success": True, "access": serializer.validated_data["access"], "user": user_data})
         _set_refresh_cookie(response, serializer.validated_data["refresh"])
         return response
 
@@ -74,7 +119,10 @@ class LogoutView(APIView):
         response = Response({"success": True}, status=status.HTTP_205_RESET_CONTENT)
         _clear_refresh_cookie(response)
         if request.user.is_authenticated:
-            record_audit(actor=request.user, action="logout", entity_type="user", entity_id=request.user.id, summary="Account logged out", request=request)
+            try:
+                record_audit(actor=request.user, action="logout", entity_type="user", entity_id=request.user.id, summary="Account logged out", request=request)
+            except Exception:
+                logger.exception("Logout audit record could not be written", extra={"username": request.user.username})
         return response
 
 
