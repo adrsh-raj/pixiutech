@@ -21,6 +21,7 @@ from .inventory_contract_overrides import JsonKitComponentViewSet, JsonKitViewSe
 from .scoped_contract_views import ScopedContractBillingFullViewSet, ScopedContractInventoryViewSet, ScopedContractLeadViewSet, ScopedContractReviewViewSet
 from .trainer_materials import TrainerMaterialDetailView, TrainerMaterialFileView, TrainerMaterialListCreateView
 from .learning_content_files import LearningContentFileView
+from .quiz_documents import QuizResultPdfView, QuizResultView
 from learning.trainer_units import TrainerUnitListCreateView
 from notifications.views import NotificationPortalViewSet
 from learning.quiz_portal import QuizSingleAttemptView, QuizStartView, QuizReviewView
