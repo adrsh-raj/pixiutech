@@ -1,15 +1,10 @@
-import { API_BASE } from '../config/api';
-
-const token = () => localStorage.getItem('pixiu_auth_token');
+import { apiFetch } from '../context/AuthContext';
 
 async function request(path, options = {}) {
-  const headers = new Headers(options.headers || {});
-  const authToken = token();
-  if (authToken) headers.set('Authorization', `Bearer ${authToken}`);
-  const response = await fetch(`${API_BASE}${path}`, { ...options, headers, cache: options.method ? undefined : 'no-store' });
+  const response = await apiFetch(path, { ...options, cache: options.method ? undefined : 'no-store' });
   const contentType = response.headers.get('content-type') || '';
   const payload = contentType.includes('application/json') ? await response.json().catch(() => ({})) : null;
-  if (!response.ok) throw new Error(payload?.error || `Request failed (${response.status})`);
+  if (!response.ok) throw new Error(payload?.detail || payload?.error || payload?.message || `Request failed (${response.status})`);
   return payload;
 }
 
@@ -33,13 +28,10 @@ export function deleteTrainerMaterial(id) {
 }
 
 export async function openTrainerMaterial(id, suggestedName = 'Trainer-Material.pdf') {
-  const authToken = token();
-  const response = await fetch(`${API_BASE}/trainer-materials/${encodeURIComponent(id)}/file`, {
-    headers: authToken ? { Authorization: `Bearer ${authToken}` } : {}
-  });
+  const response = await apiFetch(`/trainer-materials/${encodeURIComponent(id)}/file`, { cache: 'no-store' });
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
-    throw new Error(payload?.error || `Unable to open material (${response.status})`);
+    throw new Error(payload?.detail || payload?.error || payload?.message || `Unable to open material (${response.status})`);
   }
   const blob = await response.blob();
   const url = URL.createObjectURL(blob);
