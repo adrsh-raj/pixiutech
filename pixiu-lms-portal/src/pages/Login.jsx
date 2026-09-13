@@ -42,42 +42,92 @@ export default function Login() {
 
   useEffect(() => {
     let cancelled = false;
+    let retryTimer = null;
+
     const renderWidget = () => {
-      if (cancelled || !window.turnstile || !turnstileContainerRef.current || turnstileWidgetRef.current !== null) return;
+      if (
+        cancelled ||
+        !window.turnstile ||
+        !turnstileContainerRef.current ||
+        turnstileWidgetRef.current !== null
+      ) return;
+
+      try {
+        turnstileWidgetRef.current = window.turnstile.render(turnstileContainerRef.current, {
+          sitekey: TURNSTILE_SITE_KEY,
+          action: 'login',
+          theme: 'dark',
+          callback: (token) => setTurnstileToken(token),
+          'expired-callback': () => setTurnstileToken(''),
+          'timeout-callback': () => setTurnstileToken(''),
+          'error-callback': () => setTurnstileToken(''),
+        });
+        setTurnstileReady(true);
+      } catch {
+        turnstileWidgetRef.current = null;
+        setTurnstileReady(false);
+        if (!cancelled) retryTimer = window.setTimeout(renderWidget, 500);
+      }
+    };
+
+    const existing = document.querySelector(`script[src="${TURNSTILE_SCRIPT_SRC}"]`);
+
+    if (window.turnstile) {
+      renderWidget();
+    } else {
+      const script = existing || document.createElement('script');
+      script.src = TURNSTILE_SCRIPT_SRC;
+      script.async = true;
+      script.defer = true;
+      script.addEventListener('load', renderWidget);
+      if (!existing) document.head.appendChild(script);
+
+      const poll = () => {
+        if (cancelled || turnstileWidgetRef.current !== null) return;
+        if (window.turnstile) renderWidget();
+        else retryTimer = window.setTimeout(poll, 250);
+      };
+      poll();
+    }
+
+    return () => {
+      cancelled = true;
+      if (retryTimer) window.clearTimeout(retryTimer);
+      // Do not call turnstile.remove/reset during React unmount. Cloudflare may
+      // already have retired the widget id, which causes the console error shown
+      // by the current SPA navigation/remount flow. The DOM is discarded naturally.
+    };
+  }, []);
+
+  const resetTurnstile = () => {
+    setTurnstileToken('');
+    if (!window.turnstile || !turnstileContainerRef.current) return;
+
+    const currentWidget = turnstileWidgetRef.current;
+    if (currentWidget !== null) {
+      try {
+        window.turnstile.reset(currentWidget);
+        return;
+      } catch {
+        turnstileWidgetRef.current = null;
+      }
+    }
+
+    try {
+      turnstileContainerRef.current.replaceChildren();
       turnstileWidgetRef.current = window.turnstile.render(turnstileContainerRef.current, {
         sitekey: TURNSTILE_SITE_KEY,
         action: 'login',
         theme: 'dark',
         callback: (token) => setTurnstileToken(token),
         'expired-callback': () => setTurnstileToken(''),
+        'timeout-callback': () => setTurnstileToken(''),
         'error-callback': () => setTurnstileToken(''),
       });
       setTurnstileReady(true);
-    };
-
-    if (window.turnstile) {
-      renderWidget();
-      return () => { cancelled = true; };
-    }
-
-    const existing = document.querySelector(`script[src="${TURNSTILE_SCRIPT_SRC}"]`);
-    const script = existing || document.createElement('script');
-    script.src = TURNSTILE_SCRIPT_SRC;
-    script.async = true;
-    script.defer = true;
-    script.addEventListener('load', renderWidget);
-    if (!existing) document.head.appendChild(script);
-
-    return () => {
-      cancelled = true;
-      script.removeEventListener('load', renderWidget);
-    };
-  }, []);
-
-  const resetTurnstile = () => {
-    setTurnstileToken('');
-    if (window.turnstile && turnstileWidgetRef.current !== null) {
-      window.turnstile.reset(turnstileWidgetRef.current);
+    } catch {
+      turnstileWidgetRef.current = null;
+      setTurnstileReady(false);
     }
   };
 
