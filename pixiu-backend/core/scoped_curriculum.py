@@ -1,13 +1,13 @@
 from rest_framework.exceptions import ValidationError
 
-from academics.models import SchoolClass
+from accounts.models import UserRole
 from academics.services import accessible_class_queryset
 from learning.models import CurriculumClassAssignment, CurriculumUnit
 from .strict_learning_scope_views import SafeScopedCurriculumViewSet
 
 
 class ScopedCurriculumViewSet(SafeScopedCurriculumViewSet):
-    """Curriculum is shared as a master unit but assigned explicitly to real classes."""
+    """Master curriculum units are assigned explicitly to real classes."""
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -81,7 +81,7 @@ class ScopedCurriculumViewSet(SafeScopedCurriculumViewSet):
             existing.save(update_fields=["level", "title", "week", "topic", "objectives", "status", "updated_at"])
             unit = existing
 
-        target_class = self._target_class(existing if existing is not None else unit)
+        target_class = self._target_class(unit)
         if str(target_class.grade).strip() != grade:
             raise ValidationError({"school_class": "Selected class grade must match the curriculum grade."})
         CurriculumClassAssignment.objects.get_or_create(
@@ -92,12 +92,14 @@ class ScopedCurriculumViewSet(SafeScopedCurriculumViewSet):
         return unit
 
     def perform_create(self, serializer):
-        self.role_only(UserRole.ADMIN, UserRole.SCHOOL, UserRole.TRAINER)
+        if self.request.user.role not in {UserRole.ADMIN, UserRole.SCHOOL, UserRole.TRAINER}:
+            raise ValidationError({"detail": "You do not have permission to manage curriculum."})
         unit = self._save_and_assign(serializer.validated_data)
         serializer.instance = unit
 
     def perform_update(self, serializer):
-        self.role_only(UserRole.ADMIN, UserRole.SCHOOL, UserRole.TRAINER)
+        if self.request.user.role not in {UserRole.ADMIN, UserRole.SCHOOL, UserRole.TRAINER}:
+            raise ValidationError({"detail": "You do not have permission to manage curriculum."})
         data = dict(serializer.validated_data)
         data["grade"] = serializer.instance.grade
         data["unit_code"] = serializer.instance.unit_code
