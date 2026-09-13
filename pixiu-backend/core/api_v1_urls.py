@@ -10,6 +10,7 @@ from inventory.views import KitMaintenanceViewSet
 from .analytics import SchoolPerformanceView, StudentProgressView, TrainerPerformanceView
 from .class_ranking import ClassRankingView
 from .api_v1_compat import health, upload
+from .assessment_views_v2 import IdempotentAssessmentViewSet
 from .course_completion_views_v3 import AdminCompleteProgrammeView, CompletionPolicyView, CourseCompletionDetailView, CourseCompletionListView, EvaluateLastSessionView, IssueProgrammeCertificateView, RequestProgrammeCompletionView, TechnologyListCreateView, VerifyProgrammeCertificateView
 from .course_completion_session_v3 import CourseAwareSessionViewSet
 from .course_completion_compat import cohort_rank
@@ -24,7 +25,7 @@ from .quiz_documents import QuizResultPdfView, QuizResultView
 from learning.trainer_units import TrainerUnitListCreateView
 from notifications.views import NotificationPortalViewSet
 from learning.quiz_portal import QuizSingleAttemptView, QuizStartView, QuizReviewView
-from .strict_learning_scope_views import SafeScopedAssessmentViewSet, SafeScopedAttendanceViewSet, SafeScopedClassViewSet, SafeScopedContentViewSet, SafeScopedCurriculumViewSet, SafeScopedEvidenceViewSet, SafeScopedProjectViewSet, SafeScopedQuizAssignmentViewSet, SafeScopedQuizAttemptViewSet, SafeScopedQuizQuestionViewSet, SafeScopedQuizViewSet, SafeScopedSessionActivityViewSet, SafeScopedStudentViewSet, SafeScopedTrainerSchoolAssignmentViewSet, SafeScopedSchoolViewSet, SafeScopedTrainerViewSet
+from .strict_learning_scope_views import SafeScopedAttendanceViewSet, SafeScopedClassViewSet, SafeScopedContentViewSet, SafeScopedCurriculumViewSet, SafeScopedEvidenceViewSet, SafeScopedProjectViewSet, SafeScopedQuizAssignmentViewSet, SafeScopedQuizAttemptViewSet, SafeScopedQuizQuestionViewSet, SafeScopedQuizViewSet, SafeScopedSessionActivityViewSet, SafeScopedStudentViewSet, SafeScopedTrainerSchoolAssignmentViewSet, SafeScopedSchoolViewSet, SafeScopedTrainerViewSet
 
 router = DefaultRouter(trailing_slash=False)
 router.register('schools', SafeScopedSchoolViewSet, basename='v1-school')
@@ -42,7 +43,7 @@ router.register('quiz-questions', SafeScopedQuizQuestionViewSet, basename='v1-qu
 router.register('quiz-assignments', SafeScopedQuizAssignmentViewSet, basename='v1-quiz-assignment')
 router.register('quiz-submissions', SafeScopedQuizAttemptViewSet, basename='v1-quiz-submission')
 router.register('reviews', ScopedContractReviewViewSet, basename='v1-review')
-router.register('assessments', SafeScopedAssessmentViewSet, basename='v1-assessment')
+router.register('assessments', IdempotentAssessmentViewSet, basename='v1-assessment')
 router.register('projects', SafeScopedProjectViewSet, basename='v1-project')
 router.register('project-evidence', SafeScopedEvidenceViewSet, basename='v1-project-evidence')
 router.register('billing', ScopedContractBillingFullViewSet, basename='v1-billing-compat')
