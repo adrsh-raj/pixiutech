@@ -14,6 +14,8 @@ if not ALLOWED_HOSTS and os.environ.get("RENDER_EXTERNAL_HOSTNAME"):
 elif not ALLOWED_HOSTS and DEBUG:
     ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
 
+PERF_DIAGNOSTICS = os.environ.get("PERF_DIAGNOSTICS", "False").lower() == "true"
+
 INSTALLED_APPS = [
     "django.contrib.admin", "django.contrib.auth", "django.contrib.contenttypes", "django.contrib.sessions",
     "django.contrib.messages", "django.contrib.staticfiles", "corsheaders", "rest_framework",
@@ -27,6 +29,8 @@ MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware", "django.middleware.common.CommonMiddleware", "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware", "django.contrib.messages.middleware.MessageMiddleware", "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
+if PERF_DIAGNOSTICS:
+    MIDDLEWARE.insert(-1, "core.performance_middleware.PerformanceDiagnosticsMiddleware")
 ROOT_URLCONF = "config.urls"
 TEMPLATES = [{"BACKEND":"django.template.backends.django.DjangoTemplates","DIRS":[],"APP_DIRS":True,"OPTIONS":{"context_processors":["django.template.context_processors.request","django.contrib.auth.context_processors.auth","django.contrib.messages.context_processors.messages"]}}]
 WSGI_APPLICATION = "config.wsgi.application"
@@ -85,7 +89,7 @@ JWT_REFRESH_COOKIE_NAME = os.environ.get("JWT_REFRESH_COOKIE_NAME", "pixiu_refre
 JWT_COOKIE_SECURE = os.environ.get("JWT_COOKIE_SECURE", "False" if DEBUG else "True").lower() == "true"
 JWT_COOKIE_SAMESITE = os.environ.get("JWT_COOKIE_SAMESITE", "Lax" if DEBUG else "None")
 JWT_REFRESH_COOKIE_PATH = "/api/v1/auth/refresh/"
-JWT_REFRESH_COOKIE_MAX_AGE = int(os.environ.get("JWT_REFRESH_COOKIE_MAX_AGE", str(int(timedelta(days=int(os.environ.get("JWT_REFRESH_DAYS", "7"))).total_seconds()))))
+JWT_REFRESH_COOKIE_MAX_AGE = int(os.environ.get("JWT_REFRESH_COOKIE_MAX_AGE", str(int(timedelta(days=int(os.environ.get("JWT_REFRESH_DAYS", "7")).total_seconds()))))
 
 # Cloudflare Turnstile protects the public login endpoint. The secret key must only
 # exist in the backend environment (for example Render); never expose it to the SPA.
