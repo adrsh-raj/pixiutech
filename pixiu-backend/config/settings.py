@@ -85,7 +85,7 @@ else:
         }
     }
 
-REST_FRAMEWORK = {"DEFAULT_AUTHENTICATION_CLASSES":["rest_framework_simplejwt.authentication.JWTAuthentication"],"DEFAULT_PERMISSION_CLASSES":["rest_framework.permissions.IsAuthenticated"],"DEFAULT_RENDERER_CLASSES":["rest_framework.renderers.JSONRenderer"],"DEFAULT_THROTTLE_CLASSES":["rest_framework.throttling.ScopedRateThrottle"],"DEFAULT_THROTTLE_RATES":{"login":os.environ.get("DJANGO_LOGIN_RATE","10/min")},"EXCEPTION_HANDLER":"core.exception_handler.custom_exception_handler"}
+REST_FRAMEWORK = {"DEFAULT_AUTHENTICATION_CLASSES":["accounts.authentication.CachedJWTAuthentication"],"DEFAULT_PERMISSION_CLASSES":["rest_framework.permissions.IsAuthenticated"],"DEFAULT_RENDERER_CLASSES":["rest_framework.renderers.JSONRenderer"],"DEFAULT_THROTTLE_CLASSES":["rest_framework.throttling.ScopedRateThrottle"],"DEFAULT_THROTTLE_RATES":{"login":os.environ.get("DJANGO_LOGIN_RATE","10/min")},"EXCEPTION_HANDLER":"core.exception_handler.custom_exception_handler"}
 SIMPLE_JWT = {"ACCESS_TOKEN_LIFETIME":timedelta(minutes=int(os.environ.get("JWT_ACCESS_MINUTES","30"))),"REFRESH_TOKEN_LIFETIME":timedelta(days=int(os.environ.get("JWT_REFRESH_DAYS","7"))),"ROTATE_REFRESH_TOKENS":True,"BLACKLIST_AFTER_ROTATION":True,"UPDATE_LAST_LOGIN":False,"AUTH_HEADER_TYPES":("Bearer",)}
 CORS_ALLOWED_ORIGINS = [x.strip() for x in os.environ.get("DJANGO_CORS_ALLOWED_ORIGINS","").split(",") if x.strip()]
 CORS_ALLOW_CREDENTIALS = True
