@@ -27,15 +27,7 @@ class ScopedCurriculumViewSet(SafeScopedCurriculumViewSet):
     def _target_class(self, unit=None):
         raw = self.request.data.get("school_class") or self.request.data.get("class_id")
         if not raw and unit is not None:
-            raw = (
-                CurriculumClassAssignment.objects
-                .filter(
-                    curriculum_unit=unit,
-                    school_class_id__in=accessible_class_queryset(self.request.user).values("id"),
-                )
-                .values_list("school_class_id", flat=True)
-                .first()
-            )
+            raw = (CurriculumClassAssignment.objects.filter(curriculum_unit=unit, school_class_id__in=accessible_class_queryset(self.request.user).values("id")).values_list("school_class_id", flat=True).first())
         if not raw:
             raise ValidationError({"school_class": "Select the school/class for this curriculum unit."})
         school_class = accessible_class_queryset(self.request.user).filter(pk=raw).first()
@@ -45,24 +37,8 @@ class ScopedCurriculumViewSet(SafeScopedCurriculumViewSet):
 
     def map_out(self, obj):
         payload = super().map_out(obj)
-        assignments = (
-            obj.class_assignments
-            .select_related("school_class__school")
-            .filter(school_class_id__in=accessible_class_queryset(self.request.user).values("id"))
-            .order_by("school_class__school__name", "school_class__grade", "school_class__section")
-        )
-        payload["assigned_classes"] = [
-            {
-                "id": str(item.school_class_id),
-                "display_name": item.school_class.display_name,
-                "grade": str(item.school_class.grade),
-                "section": item.school_class.section,
-                "school_id": str(item.school_class.school_id),
-                "school_code": item.school_class.school.school_code,
-                "school_name": item.school_class.school.name,
-            }
-            for item in assignments
-        ]
+        assignments = (obj.class_assignments.select_related("school_class__school").filter(school_class_id__in=accessible_class_queryset(self.request.user).values("id")).order_by("school_class__school__name", "school_class__grade", "school_class__section"))
+        payload["assigned_classes"] = [{"id": str(item.school_class_id), "display_name": item.school_class.display_name, "grade": str(item.school_class.grade), "section": item.school_class.section, "school_id": str(item.school_class.school_id), "school_code": item.school_class.school.school_code, "school_name": item.school_class.school.name} for item in assignments]
         return payload
 
     def _save_and_assign(self, validated_data):
@@ -70,25 +46,19 @@ class ScopedCurriculumViewSet(SafeScopedCurriculumViewSet):
         unit_code = str(validated_data.get("unit_code") or "").strip().upper()
         if not grade or not unit_code:
             raise ValidationError({"unit_code": "Grade and unit code are required."})
-
         existing = CurriculumUnit.objects.filter(grade=grade, unit_code=unit_code).first()
         if existing is None:
             unit = CurriculumUnit.objects.create(created_by=self.request.user, **validated_data)
         else:
-            for field in ("level", "title", "week", "topic", "objectives", "status"):
+            for field in ("title", "week", "topic", "objectives", "status"):
                 if field in validated_data:
                     setattr(existing, field, validated_data[field])
-            existing.save(update_fields=["level", "title", "week", "topic", "objectives", "status", "updated_at"])
+            existing.save(update_fields=["title", "week", "topic", "objectives", "status", "updated_at"])
             unit = existing
-
         target_class = self._target_class(unit)
         if str(target_class.grade).strip() != grade:
             raise ValidationError({"school_class": "Selected class grade must match the curriculum grade."})
-        CurriculumClassAssignment.objects.get_or_create(
-            curriculum_unit=unit,
-            school_class=target_class,
-            defaults={"assigned_by": self.request.user},
-        )
+        CurriculumClassAssignment.objects.get_or_create(curriculum_unit=unit, school_class=target_class, defaults={"assigned_by": self.request.user})
         return unit
 
     def perform_create(self, serializer):

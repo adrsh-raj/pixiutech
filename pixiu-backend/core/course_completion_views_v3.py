@@ -28,8 +28,6 @@ from learning.services import accessible_sessions
 
 logger = logging.getLogger(__name__)
 
-# Keep the legacy service helper available for older callers while making the
-# module self-contained instead of depending on import-time monkey-patching.
 completion_service.cohort_rank = cohort_rank
 
 
@@ -49,7 +47,6 @@ def _class_for(user, key):
 
 
 def _read_summary(student):
-    """Read one student's live completion state without mutating the ledger."""
     return summary(student)
 
 
@@ -93,7 +90,7 @@ def _read_summary_from_ledger(student):
         if status == 'passed':
             passed_scores.append(score)
         rows.append({
-            'id': str(unit.id), 'unit_code': unit.unit_code, 'title': unit.title, 'level': unit.level,
+            'id': str(unit.id), 'unit_code': unit.unit_code, 'title': unit.title,
             'technology': {'id': str(technology.id), 'code': technology.code, 'name': technology.name} if technology else None,
             'sessions': completion_service.unit_sessions(student, unit).count(), 'status': status,
             **metrics, 'score': score, 'reasons': reasons, 'last_session': last_session,
@@ -124,7 +121,6 @@ def _read_summary_from_ledger(student):
 
 
 def _safe_minimal_student_summary(student):
-    """Last-resort 200-safe payload: no completion calculation can break the registry."""
     school = getattr(getattr(student, 'school_class', None), 'school', None)
     school_class = getattr(student, 'school_class', None)
     return {
@@ -149,97 +145,52 @@ def _safe_minimal_student_summary(student):
 
 
 def _list_rows(user):
-    students = list(
-        accessible_student_queryset(user)
-        .select_related('school_class__school')
-        .filter(status='active')[:500]
-    )
+    students = list(accessible_student_queryset(user).select_related('school_class__school').filter(status='active')[:500])
     if not students:
         return []
-
     student_ids = [student.id for student in students]
     class_ids = sorted({student.school_class_id for student in students})
-    assignments = list(
-        CurriculumClassAssignment.objects
-        .filter(school_class_id__in=class_ids, curriculum_unit__status='published')
-        .select_related('curriculum_unit__completion_profile__technology')
-        .order_by('school_class_id', 'curriculum_unit__unit_code')
-    )
+    assignments = list(CurriculumClassAssignment.objects.filter(school_class_id__in=class_ids, curriculum_unit__status='published').select_related('curriculum_unit__completion_profile__technology').order_by('school_class_id', 'curriculum_unit__unit_code'))
     units_by_class = {}
     unit_ids = []
     for assignment in assignments:
         units_by_class.setdefault(assignment.school_class_id, []).append(assignment.curriculum_unit)
         unit_ids.append(assignment.curriculum_unit_id)
-
-    completions = list(
-        UnitCompletion.objects
-        .filter(student_id__in=student_ids, curriculum_unit_id__in=set(unit_ids) if unit_ids else [])
-        .only('student_id', 'curriculum_unit_id', 'status', 'score')
-    )
+    completions = list(UnitCompletion.objects.filter(student_id__in=student_ids, curriculum_unit_id__in=set(unit_ids) if unit_ids else []).only('student_id', 'curriculum_unit_id', 'status', 'score'))
     completion_map = {(row.student_id, row.curriculum_unit_id): row for row in completions}
-
-    programmes = list(
-        ProgrammeCompletion.objects
-        .filter(student_id__in=student_ids)
-        .only('student_id', 'status', 'overall_score')
-    )
+    programmes = list(ProgrammeCompletion.objects.filter(student_id__in=student_ids).only('student_id', 'status', 'overall_score'))
     programme_map = {row.student_id: row for row in programmes}
-
-    certificates = list(
-        Certificate.objects
-        .filter(student_id__in=student_ids, status='issued')
-        .only('student_id', 'certificate_id')
-        .order_by('-issued_at')
-    )
+    certificates = list(Certificate.objects.filter(student_id__in=student_ids, status='issued').only('student_id', 'certificate_id').order_by('-issued_at'))
     certificate_map = {}
-    for row in certificates:
-        certificate_map.setdefault(row.student_id, row.certificate_id)
-
-    workflows = list(
-        SessionWorkflow.objects
-        .filter(session__school_class_id__in=class_ids, session__curriculum_unit_id__in=set(unit_ids) if unit_ids else [])
-        .select_related('technology')
-        .exclude(session__status='cancelled')
-    )
+    for row in certificates: certificate_map.setdefault(row.student_id, row.certificate_id)
+    workflows = list(SessionWorkflow.objects.filter(session__school_class_id__in=class_ids, session__curriculum_unit_id__in=set(unit_ids) if unit_ids else []).select_related('technology').exclude(session__status='cancelled'))
     tech_counts_by_class = {}
     for workflow in workflows:
         bucket = tech_counts_by_class.setdefault(workflow.session.school_class_id, {})
         code = workflow.technology.code
         item = bucket.setdefault(code, {'id': str(workflow.technology_id), 'code': code, 'name': workflow.technology.name, 'sessions': 0})
         item['sessions'] += 1
-
     global_policy = CompletionPolicy.objects.filter(school_class__isnull=True, active=True).first()
-    class_policies = {
-        row.school_class_id: row
-        for row in CompletionPolicy.objects.filter(school_class_id__in=class_ids, active=True)
-    }
-
+    class_policies = {row.school_class_id: row for row in CompletionPolicy.objects.filter(school_class_id__in=class_ids, active=True)}
     programme_scores_by_class = {}
     for student in students:
         programme = programme_map.get(student.id)
-        if programme:
-            programme_scores_by_class.setdefault(student.school_class_id, []).append((student.id, float(programme.overall_score)))
+        if programme: programme_scores_by_class.setdefault(student.school_class_id, []).append((student.id, float(programme.overall_score)))
     rank_map = {}
     for class_id, scores in programme_scores_by_class.items():
         ordered = sorted(scores, key=lambda item: (-item[1], str(item[0])))
         rank_map.update({student_id: index for index, (student_id, _) in enumerate(ordered, 1)})
-
     rows = []
     for student in students:
         units = units_by_class.get(student.school_class_id, [])
-        passed = [
-            completion_map[(student.id, unit.id)]
-            for unit in units
-            if (student.id, unit.id) in completion_map and completion_map[(student.id, unit.id)].status == 'passed'
-        ]
+        passed = [completion_map[(student.id, unit.id)] for unit in units if (student.id, unit.id) in completion_map and completion_map[(student.id, unit.id)].status == 'passed']
         programme = programme_map.get(student.id)
         technologies = dict(tech_counts_by_class.get(student.school_class_id, {}))
         if not technologies:
             for unit in units:
                 profile = getattr(unit, 'completion_profile', None)
                 technology = getattr(profile, 'technology', None)
-                if technology:
-                    technologies[technology.code] = {'id': str(technology.id), 'code': technology.code, 'name': technology.name, 'sessions': 0}
+                if technology: technologies[technology.code] = {'id': str(technology.id), 'code': technology.code, 'name': technology.name, 'sessions': 0}
         rows.append({
             'student_id': student.student_id,
             'student_name': student.name,
@@ -254,10 +205,7 @@ def _list_rows(user):
             'policy': serialize_policy(class_policies.get(student.school_class_id) or global_policy) if (class_policies.get(student.school_class_id) or global_policy) else None,
             'technologies': list(technologies.values()),
             'units': [],
-            'sessions_by_technology': [
-                {'technology': item['name'], 'sessions': item['sessions'], 'code': item['code']}
-                for item in technologies.values()
-            ],
+            'sessions_by_technology': [{'technology': item['name'], 'sessions': item['sessions'], 'code': item['code']} for item in technologies.values()],
             'trainer_requested_at': programme.requested_at.isoformat() if programme and programme.requested_at else None,
             'admin_completed_at': programme.completed_at.isoformat() if programme and programme.completed_at else None,
             'certificate_id': certificate_map.get(student.id),
@@ -279,150 +227,101 @@ def _list_rows_safe(user):
 
 class TechnologyListCreateView(APIView):
     permission_classes = [IsAuthenticated]
-
     def get(self, request):
         return Response(list(Technology.objects.filter(active=True).values('id', 'code', 'name', 'sort_order')))
-
     def post(self, request):
-        if request.user.role != UserRole.ADMIN:
-            return _error(PermissionError('Only administrators can manage the technology catalogue.'), 403)
-        name = str(request.data.get('name') or '').strip()
-        code = str(request.data.get('code') or name).strip().lower().replace(' ', '-')
-        if not name or not code:
-            return _error(ValueError('Technology name is required.'))
-        raw_active = request.data.get('active', True)
-        active = raw_active if isinstance(raw_active, bool) else str(raw_active).strip().lower() not in {'false', '0', 'no', 'off'}
-        try:
-            sort_order = int(request.data.get('sort_order') or 0)
-        except (TypeError, ValueError):
-            sort_order = 0
-        technology, created = Technology.objects.get_or_create(code=code, defaults={'name': name, 'sort_order': sort_order, 'active': active})
+        if request.user.role != UserRole.ADMIN: return _error(PermissionError('Only administrators can manage the technology catalogue.'), 403)
+        name = str(request.data.get('name') or '').strip(); code = str(request.data.get('code') or name).strip().lower().replace(' ', '-')
+        if not name or not code: return _error(ValueError('Technology name is required.'))
+        raw_active = request.data.get('active', True); active = raw_active if isinstance(raw_active, bool) else str(raw_active).strip().lower() not in {'false','0','no','off'}
+        try: sort_order = int(request.data.get('sort_order') or 0)
+        except (TypeError, ValueError): sort_order = 0
+        technology, created = Technology.objects.get_or_create(code=code, defaults={'name':name,'sort_order':sort_order,'active':active})
         if not created:
             technology.name, technology.sort_order, technology.active = name, sort_order, active
-            technology.save(update_fields=['name', 'sort_order', 'active', 'updated_at'])
-        return Response({'id': str(technology.id), 'code': technology.code, 'name': technology.name, 'sort_order': technology.sort_order, 'active': technology.active}, status=201 if created else 200)
+            technology.save(update_fields=['name','sort_order','active','updated_at'])
+        return Response({'id':str(technology.id),'code':technology.code,'name':technology.name,'sort_order':technology.sort_order,'active':technology.active}, status=201 if created else 200)
 
 
 class CourseCompletionListView(APIView):
     permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        return Response(_list_rows_safe(request.user))
+    def get(self, request): return Response(_list_rows_safe(request.user))
 
 
 class CourseCompletionDetailView(APIView):
     permission_classes = [IsAuthenticated]
-
     def get(self, request, student_key):
-        student = _student_for(request.user, student_key)
-        return Response(_summary_for_request(student))
+        student = _student_for(request.user, student_key); return Response(_summary_for_request(student))
 
 
 class CompletionPolicyView(APIView):
     permission_classes = [IsAuthenticated]
-
     def get(self, request, class_key):
-        school_class = _class_for(request.user, class_key)
-        first_student = school_class.students.first()
+        school_class = _class_for(request.user, class_key); first_student = school_class.students.first()
         if first_student:
-            try:
-                ensure_scope(request.user, first_student)
-            except PermissionError:
-                return _error(PermissionError('Class is outside your authorised scope.'), 403)
+            try: ensure_scope(request.user, first_student)
+            except PermissionError: return _error(PermissionError('Class is outside your authorised scope.'), 403)
         return Response(serialize_policy(policy_for(school_class)))
-
     def put(self, request, class_key):
-        if request.user.role != UserRole.ADMIN:
-            return _error(PermissionError('Only administrators can edit completion criteria.'), 403)
+        if request.user.role != UserRole.ADMIN: return _error(PermissionError('Only administrators can edit completion criteria.'), 403)
         school_class = get_object_or_404(SchoolClass, pk=class_key)
-        try:
-            return Response(serialize_policy(update_policy(school_class, request.data)))
-        except (TypeError, ValueError) as exc:
-            return _error(exc)
+        try: return Response(serialize_policy(update_policy(school_class, request.data)))
+        except (TypeError, ValueError) as exc: return _error(exc)
 
 
 class EvaluateLastSessionView(APIView):
     permission_classes = [IsAuthenticated]
-
     def post(self, request, session_id):
-        if request.user.role not in {UserRole.ADMIN, UserRole.TRAINER}:
-            return _error(PermissionError('Only trainers and administrators can evaluate a unit.'), 403)
+        if request.user.role not in {UserRole.ADMIN, UserRole.TRAINER}: return _error(PermissionError('Only trainers and administrators can evaluate a unit.'), 403)
         from learning.models import Session
-        session = get_object_or_404(Session.objects.select_related('school_class', 'curriculum_unit'), pk=session_id)
-        if request.user.role == UserRole.TRAINER and not accessible_sessions(request.user).filter(pk=session.pk).exists():
-            return _error(PermissionError('This session is outside your authorised trainer scope.'), 403)
+        session = get_object_or_404(Session.objects.select_related('school_class','curriculum_unit'), pk=session_id)
+        if request.user.role == UserRole.TRAINER and not accessible_sessions(request.user).filter(pk=session.pk).exists(): return _error(PermissionError('This session is outside your authorised trainer scope.'), 403)
         try:
             rows = evaluate_last_session(session)
-            return Response({
-                'session_id': str(session.id),
-                'unit_code': session.curriculum_unit.unit_code,
-                'evaluated_students': len(rows),
-                'passed': sum(row.status == 'passed' for row in rows),
-                'failed_or_pending': sum(row.status != 'passed' for row in rows),
-            })
-        except ValueError as exc:
-            return _error(exc)
+            return Response({'session_id':str(session.id),'unit_code':session.curriculum_unit.unit_code,'evaluated_students':len(rows),'passed':sum(row.status=='passed' for row in rows),'failed_or_pending':sum(row.status!='passed' for row in rows)})
+        except ValueError as exc: return _error(exc)
 
 
 class RequestProgrammeCompletionView(APIView):
-    permission_classes = [IsAuthenticated]
-
+    permission_classes=[IsAuthenticated]
     def post(self, request, student_key):
-        student = _student_for(request.user, student_key)
+        student=_student_for(request.user,student_key)
         try:
-            programme = request_completion(request.user, student)
-            return Response({'status': programme.status, 'student_id': student.student_id, 'overall_score': float(programme.overall_score), 'detail': 'Course completion requested from Admin.'})
-        except PermissionError as exc:
-            return _error(exc, 403)
-        except ValueError as exc:
-            return _error(exc)
+            programme=request_completion(request.user,student)
+            return Response({'status':programme.status,'student_id':student.student_id,'overall_score':float(programme.overall_score),'detail':'Course completion requested from Admin.'})
+        except PermissionError as exc: return _error(exc,403)
+        except ValueError as exc: return _error(exc)
 
 
 class AdminCompleteProgrammeView(APIView):
-    permission_classes = [IsAuthenticated]
-
+    permission_classes=[IsAuthenticated]
     def post(self, request, student_key):
-        if request.user.role != UserRole.ADMIN:
-            return _error(PermissionError('Only administrators can mark a programme completed.'), 403)
-        student = _student_for(request.user, student_key)
+        if request.user.role!=UserRole.ADMIN: return _error(PermissionError('Only administrators can mark a programme completed.'),403)
+        student=_student_for(request.user,student_key)
         try:
-            programme = admin_complete(request.user, student)
-            return Response({'status': programme.status, 'student_id': student.student_id, 'overall_score': float(programme.overall_score), 'detail': 'Programme marked completed.'})
-        except PermissionError as exc:
-            return _error(exc, 403)
-        except ValueError as exc:
-            return _error(exc)
+            programme=admin_complete(request.user,student)
+            return Response({'status':programme.status,'student_id':student.student_id,'overall_score':float(programme.overall_score),'detail':'Programme marked completed.'})
+        except PermissionError as exc: return _error(exc,403)
+        except ValueError as exc: return _error(exc)
 
 
 class IssueProgrammeCertificateView(APIView):
-    permission_classes = [IsAuthenticated]
-
+    permission_classes=[IsAuthenticated]
     def post(self, request, student_key):
-        student = _student_for(request.user, student_key)
-        try:
-            return Response(certificate_payload(issue_certificate(request.user, student)))
-        except PermissionError as exc:
-            return _error(exc, 403)
-        except ValueError as exc:
-            return _error(exc)
+        student=_student_for(request.user,student_key)
+        try: return Response(certificate_payload(issue_certificate(request.user,student)))
+        except PermissionError as exc: return _error(exc,403)
+        except ValueError as exc: return _error(exc)
 
 
 class VerifyProgrammeCertificateView(APIView):
-    permission_classes = [AllowAny]
-
+    permission_classes=[AllowAny]
     def get(self, request, student_id=None):
-        if student_id:
-            return Response({'verified': False, 'status': 'legacy_not_supported', 'reason': 'Student ID verification is disabled. Use the certificate ID or QR verification link.'}, status=410)
-        key = str(request.query_params.get('certificate') or request.query_params.get('cert') or '').strip()
-        token = str(request.query_params.get('token') or '').strip()
-        if not key and not token:
-            return Response({'verified': False, 'status': 'invalid_request', 'reason': 'Certificate ID or verification token is required.'}, status=400)
-        certificate = Certificate.objects.filter(verification_token=token).first() if token else None
-        if certificate is None and key:
-            certificate = Certificate.objects.filter(certificate_id__iexact=key).first()
+        if student_id: return Response({'verified':False,'status':'legacy_not_supported','reason':'Student ID verification is disabled. Use the certificate ID or QR verification link.'},status=410)
+        key=str(request.query_params.get('certificate') or request.query_params.get('cert') or '').strip(); token=str(request.query_params.get('token') or '').strip()
+        if not key and not token: return Response({'verified':False,'status':'invalid_request','reason':'Certificate ID or verification token is required.'},status=400)
+        certificate=Certificate.objects.filter(verification_token=token).first() if token else None
+        if certificate is None and key: certificate=Certificate.objects.filter(certificate_id__iexact=key).first()
         if certificate is not None:
-            payload = certificate_payload(certificate)
-            payload.pop('verification_token', None)
-            payload.pop('rank_portal', None)
-            return Response(payload, status=200)
-        return Response({'verified': False, 'status': 'not_found', 'reason': 'No Pixiu Tech certificate matches this verification code.'}, status=404)
+            payload=certificate_payload(certificate); payload.pop('verification_token',None); payload.pop('rank_portal',None); return Response(payload,status=200)
+        return Response({'verified':False,'status':'not_found','reason':'No Pixiu Tech certificate matches this verification code.'},status=404)
