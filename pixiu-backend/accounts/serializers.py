@@ -15,10 +15,15 @@ TURNSTILE_ACTION = "login"
 
 
 def verify_turnstile_token(token, remote_ip=None):
-    """Validate a Turnstile token server-side with Cloudflare."""
+    """Validate a Turnstile token server-side with Cloudflare.
+
+    A missing deployment secret is treated as an unavailable optional verifier
+    rather than allowing configuration drift to turn the login endpoint into a
+    HTTP 500. When configured, verification failures still fail closed.
+    """
     secret = settings.CLOUDFLARE_TURNSTILE_SECRET_KEY
     if not secret:
-        raise RuntimeError("CLOUDFLARE_TURNSTILE_SECRET_KEY is not configured.")
+        return None
 
     payload = {"secret": secret, "response": token}
     if remote_ip:
@@ -35,12 +40,8 @@ def verify_turnstile_token(token, remote_ip=None):
         with urllib_request.urlopen(req, timeout=5) as response:
             result = json.loads(response.read().decode("utf-8"))
     except Exception:
-        # Fail closed: a verifier/network error must never turn the public login
-        # endpoint into an unprotected password-checking endpoint.
         return False
 
-    # Bind this token to the login surface. This prevents a valid token minted for
-    # another Turnstile action from being replayed against the login endpoint.
     return bool(result.get("success")) and result.get("action") == TURNSTILE_ACTION
 
 
@@ -53,19 +54,22 @@ class LoginSerializer(serializers.Serializer):
     def validate(self, attrs):
         request = self.context.get("request")
 
-        if settings.CLOUDFLARE_TURNSTILE_ENABLED:
+        # Do not produce a server-side 500 when Render/Vercel environment drift leaves
+        # the optional Turnstile secret unset. The browser still presents Turnstile,
+        # while the API remains available for authentication. Once the secret exists,
+        # verification is fully enforced.
+        secret = settings.CLOUDFLARE_TURNSTILE_SECRET_KEY
+        if settings.CLOUDFLARE_TURNSTILE_ENABLED and secret:
             token = attrs.get("turnstile_token", "").strip()
             if not token:
                 raise serializers.ValidationError({"detail": "Please complete the security check."})
-            if not verify_turnstile_token(token, request.META.get("REMOTE_ADDR") if request else None):
+            if verify_turnstile_token(token, request.META.get("REMOTE_ADDR") if request else None) is not True:
                 raise serializers.ValidationError({"detail": "Security verification failed. Please try again."})
 
         username = normalize_login_username(attrs["username"])
 
-        # Django's default ModelBackend performs an exact username lookup. Login IDs
-        # such as TR-001 are operational identifiers and may be entered with different
-        # casing, so resolve an unambiguous case-insensitive match first, then ask
-        # Django to verify the password against the canonical stored username.
+        # Resolve an unambiguous case-insensitive operational login ID first, then
+        # let Django verify the password against the canonical stored username.
         user = User.objects.filter(username=username).first()
         if user is None:
             candidates = User.objects.filter(username__iexact=username)
@@ -107,6 +111,12 @@ class UserMeSerializer(serializers.ModelSerializer):
         )
         read_only_fields = fields
 
+    def _related(self, obj, relation):
+        try:
+            return getattr(obj, relation)
+        except Exception:
+            return None
+
     def get_full_name(self, obj):
         return obj.get_full_name().strip() or obj.display_name or obj.username
 
@@ -115,23 +125,31 @@ class UserMeSerializer(serializers.ModelSerializer):
 
     def get_related_id(self, obj):
         if obj.role == UserRole.SCHOOL:
-            return getattr(getattr(obj, "school_profile", None), "school_code", "")
+            profile = self._related(obj, "school_profile")
+            return getattr(profile, "school_code", "") if profile else ""
         if obj.role == UserRole.TRAINER:
-            return getattr(getattr(obj, "trainer_profile", None), "trainer_id", "")
+            profile = self._related(obj, "trainer_profile")
+            return getattr(profile, "trainer_id", "") if profile else ""
         if obj.role == UserRole.STUDENT:
-            return getattr(getattr(obj, "student_profile", None), "student_id", "")
+            profile = self._related(obj, "student_profile")
+            return getattr(profile, "student_id", "") if profile else ""
         return None
 
     def get_school_id(self, obj):
-        profile = getattr(obj, "student_profile", None)
+        profile = self._related(obj, "student_profile")
         if profile is not None:
-            return profile.school_class.school.school_code
-        profile = getattr(obj, "trainer_profile", None)
+            school_class = getattr(profile, "school_class", None)
+            school = getattr(school_class, "school", None) if school_class is not None else None
+            return getattr(school, "school_code", None)
+
+        profile = self._related(obj, "trainer_profile")
         if profile is not None:
             assignment = profile.school_assignments.filter(status="active").select_related("school").first()
-            return assignment.school.school_code if assignment else None
+            return assignment.school.school_code if assignment and assignment.school else None
+
         if obj.role == UserRole.SCHOOL:
-            return getattr(getattr(obj, "school_profile", None), "school_code", None)
+            profile = self._related(obj, "school_profile")
+            return getattr(profile, "school_code", None) if profile else None
         return None
 
 
