@@ -86,3 +86,4 @@ jobs:
           ! grep -RInE 'window\.location\.reload\s*\(' src --exclude-dir=node_modules
           ! grep -RInE 'localStorage\.(getItem|setItem|removeItem).*\b(notification|attendance|ranking|revenue|student|trainer|school)\b' src --exclude-dir=node_modules --ignore-case
           npm run build
+          node ../tools/frontend_bundle_report.mjs dist/assets
