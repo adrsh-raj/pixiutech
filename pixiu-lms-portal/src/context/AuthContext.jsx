@@ -1,8 +1,9 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { API_BASE } from '../config/api';
 
 const AuthContext = createContext(null);
 const AUTH_EVENT = 'pixiu_auth_state_changed';
+const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 let accessTokenMemory = null;
 let refreshPromise = null;
 
@@ -106,6 +107,7 @@ export function AuthProvider({ children }) {
   const [token, setToken] = useState(() => accessTokenMemory);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const idleTimerRef = useRef(null);
 
   useEffect(() => {
     clearLegacyAuthStorage();
@@ -193,6 +195,35 @@ export function AuthProvider({ children }) {
       setUser(null); setToken(null); clearAuthStorage(); broadcastAuthChange();
     }
   };
+
+  useEffect(() => {
+    if (!token) {
+      if (idleTimerRef.current) window.clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = null;
+      return undefined;
+    }
+
+    let lastActivity = 0;
+    const armIdleTimer = () => {
+      if (idleTimerRef.current) window.clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = window.setTimeout(() => { void logout(); }, IDLE_TIMEOUT_MS);
+    };
+    const onActivity = () => {
+      const now = Date.now();
+      if (now - lastActivity < 1000) return;
+      lastActivity = now;
+      armIdleTimer();
+    };
+    const events = ['pointerdown', 'keydown', 'scroll', 'wheel', 'touchstart'];
+    events.forEach(event => window.addEventListener(event, onActivity, { passive: true }));
+    armIdleTimer();
+
+    return () => {
+      if (idleTimerRef.current) window.clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = null;
+      events.forEach(event => window.removeEventListener(event, onActivity));
+    };
+  }, [token]);
 
   const value = useMemo(() => ({ user, token, role: user?.role || null, isAuthenticated: Boolean(user && token), loading, login, logout }), [user, token, loading]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
