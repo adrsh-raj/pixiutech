@@ -4,8 +4,40 @@ import { API_BASE } from '../config/api';
 const AuthContext = createContext(null);
 const AUTH_EVENT = 'pixiu_auth_state_changed';
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+const API_READ_CACHE_TTL_MS = 30 * 1000;
+const API_READ_CACHE_MAX_ENTRIES = 250;
 let accessTokenMemory = null;
 let refreshPromise = null;
+const apiReadCache = new Map();
+
+function clearApiReadCache() {
+  apiReadCache.clear();
+}
+
+function pruneApiReadCache(now = Date.now()) {
+  for (const [key, entry] of apiReadCache) {
+    if (now - entry.createdAt > API_READ_CACHE_TTL_MS) apiReadCache.delete(key);
+  }
+  while (apiReadCache.size > API_READ_CACHE_MAX_ENTRIES) {
+    const oldestKey = apiReadCache.keys().next().value;
+    if (oldestKey === undefined) break;
+    apiReadCache.delete(oldestKey);
+  }
+}
+
+function isCacheableRead(path, method, accessToken) {
+  if (!accessToken || !['GET', 'HEAD'].includes(method)) return false;
+  const normalizedPath = String(path || '');
+  if (normalizedPath.startsWith('/auth/')) return false;
+  if (normalizedPath === '/health' || normalizedPath.startsWith('/health/')) return false;
+  return true;
+}
+
+function buildReadCacheKey(path, method, accessToken) {
+  // Scope the application cache to the current authenticated session so data
+  // from one signed-in user can never be reused by another user in this tab.
+  return `${method}:${accessToken}:${path}`;
+}
 
 function broadcastAuthChange() {
   window.dispatchEvent(new Event(AUTH_EVENT));
@@ -65,41 +97,85 @@ async function refreshAccessToken() {
       const data = await readJson(response);
       if (!response.ok || !data.access) {
         accessTokenMemory = null;
+        clearApiReadCache();
         return null;
       }
       accessTokenMemory = data.access;
       return data.access;
     } catch {
       accessTokenMemory = null;
+      clearApiReadCache();
       return null;
     } finally { refreshPromise = null; }
   })();
   return refreshPromise;
 }
 
+function responseFromCache(entry) {
+  return new Response(entry.body, {
+    status: entry.status,
+    statusText: entry.statusText,
+    headers: new Headers(entry.headers),
+  });
+}
+
 export async function apiFetch(path, options = {}) {
+  const method = String(options.method || 'GET').toUpperCase();
   const request = async (accessToken) => {
     const headers = new Headers(options.headers || {});
     if (options.body && !(options.body instanceof FormData) && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
     if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
-    return fetchWithRetry(`${API_BASE}${path}`, { ...options, headers, cache: options.cache || 'no-store', credentials: 'include' });
+
+    const cacheableRead = isCacheableRead(path, method, accessToken);
+    const cacheKey = cacheableRead ? buildReadCacheKey(path, method, accessToken) : null;
+    if (cacheKey) {
+      const now = Date.now();
+      pruneApiReadCache(now);
+      const cached = apiReadCache.get(cacheKey);
+      if (cached && now - cached.createdAt <= API_READ_CACHE_TTL_MS) return responseFromCache(cached);
+      if (cached) apiReadCache.delete(cacheKey);
+    }
+
+    const response = await fetchWithRetry(`${API_BASE}${path}`, {
+      ...options,
+      headers,
+      // Application-level caching is used above; keep browser HTTP caching
+      // disabled for authenticated data so responses never persist outside
+      // this controlled per-session cache.
+      cache: cacheableRead ? 'no-store' : (options.cache || 'no-store'),
+      credentials: 'include',
+    });
+
+    if (response.ok && cacheKey) {
+      const body = await response.clone().text();
+      apiReadCache.set(cacheKey, {
+        createdAt: Date.now(),
+        status: response.status,
+        statusText: response.statusText,
+        headers: Array.from(response.headers.entries()),
+        body,
+      });
+      pruneApiReadCache();
+    }
+    return response;
   };
 
   let response = await request(accessTokenMemory);
   if (response.status === 401 && !String(path).startsWith('/auth/')) {
     const nextToken = await refreshAccessToken();
-    if (nextToken) {
-      response = await request(nextToken);
-    } else {
+    if (nextToken) response = await request(nextToken);
+    else {
       clearAuthStorage();
       broadcastAuthChange();
     }
   }
+  if (response.ok && !['GET', 'HEAD'].includes(method)) clearApiReadCache();
   return response;
 }
 
 export function clearAuthStorage() {
   accessTokenMemory = null;
+  clearApiReadCache();
   clearLegacyAuthStorage();
 }
 
@@ -176,6 +252,7 @@ export function AuthProvider({ children }) {
       const response = await fetchOnce(`${API_BASE}/auth/login/`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, cache: 'no-store', credentials: 'include' }, 25000);
       const data = await readJson(response);
       if (response.ok && data.access && data.user) {
+        clearApiReadCache();
         accessTokenMemory = data.access;
         setToken(data.access);
         setUser(data.user);
