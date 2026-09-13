@@ -1,6 +1,4 @@
-import { API_BASE } from '../config/api';
-
-const token = () => localStorage.getItem('pixiu_auth_token');
+import { apiFetch } from '../context/AuthContext';
 
 export async function openProtectedMaterial(materialOrUrl, legacyTitle = '') {
   const raw = materialOrUrl && typeof materialOrUrl === 'object'
@@ -9,15 +7,22 @@ export async function openProtectedMaterial(materialOrUrl, legacyTitle = '') {
   const id = String(raw.id || '').trim();
   const suppliedUrl = String(raw.url || '').trim();
   const title = String(raw.title || 'Learning Material').trim();
-  let endpoint;
-  if (id) endpoint = `${API_BASE}/content/${encodeURIComponent(id)}/file`;
-  else if (suppliedUrl.startsWith('/content/')) endpoint = `${API_BASE}${suppliedUrl}`;
-  else if (suppliedUrl) endpoint = suppliedUrl;
-  else throw new Error('Material file is not configured.');
+  let path;
+  if (id) path = `/content/${encodeURIComponent(id)}/file`;
+  else if (suppliedUrl.startsWith('/content/')) path = suppliedUrl;
+  else if (suppliedUrl) {
+    const direct = window.open(suppliedUrl, '_blank', 'noopener,noreferrer');
+    if (!direct) throw new Error('Please allow pop-ups to view the material.');
+    return;
+  } else {
+    throw new Error('Material file is not configured.');
+  }
 
-  const authToken = token();
-  if (!authToken) throw new Error('Authentication required.');
-  const response = await fetch(endpoint, { headers: { Authorization: `Bearer ${authToken}` }, cache: 'no-store' });
+  // Use the shared authenticated API client so an expired in-memory access
+  // token can be refreshed from the HttpOnly refresh cookie before fetching
+  // the protected binary file. The previous implementation read a legacy
+  // localStorage token, which is intentionally no longer persisted.
+  const response = await apiFetch(path, { cache: 'no-store' });
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
     throw new Error(payload?.error || payload?.detail || `Unable to open material (${response.status})`);
