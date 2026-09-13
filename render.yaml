@@ -39,3 +39,7 @@ services:
         value: require
       - key: DJANGO_DB_CONN_MAX_AGE
         value: "60"
+      - key: CLOUDFLARE_TURNSTILE_SECRET_KEY
+        sync: false
+      - key: CLOUDFLARE_TURNSTILE_ENABLED
+        value: "True"
