@@ -1,5 +1,5 @@
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Q, Count
 from django.utils import timezone
 
 from accounts.credentials import build_student_password, build_student_username, create_or_reset_managed_account
@@ -136,7 +136,13 @@ def accessible_school_queryset(user):
 
 
 def accessible_class_queryset(user):
-    qs = SchoolClass.objects.select_related("school")
+    qs = SchoolClass.objects.select_related("school").annotate(
+        active_student_count=Count(
+            "students",
+            filter=Q(students__status="active"),
+            distinct=True,
+        )
+    )
     if user.role == UserRole.ADMIN:
         return qs
     if user.role == UserRole.SCHOOL:
