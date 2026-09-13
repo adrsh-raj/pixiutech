@@ -6,12 +6,13 @@ from academics.school_activation import activate_school
 from audit.views import AuditLogViewSet
 from billing.contract_views import ContractViewSet, billing_summary
 from billing.views import InvoiceLineItemViewSet, PaymentViewSet, ReceiptViewSet
-from inventory.views import KitMaintenanceViewSet
+from inventory.contract_views import KitMaintenanceViewSet
 from .analytics import SchoolPerformanceView, StudentProgressView, TrainerPerformanceView
 from .class_ranking import ClassRankingView
 from .api_v1_compat import health, upload
 from .course_completion_views_v3 import AdminCompleteProgrammeView, CompletionPolicyView, CourseCompletionDetailView, CourseCompletionListView, EvaluateLastSessionView, IssueProgrammeCertificateView, RequestProgrammeCompletionView, TechnologyListCreateView, VerifyProgrammeCertificateView
 from .course_completion_session_v3 import CourseAwareSessionViewSet
+from .course_completion_compat import cohort_rank
 from .public_enquiry import PublicEnquiryView
 from .phase7_compat_extras import ContractCommunicationLogViewSet
 from .billing_contract_overrides import TransactionalInvoiceViewSet
