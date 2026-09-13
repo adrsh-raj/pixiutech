@@ -127,7 +127,6 @@ class AttendanceRecord(models.Model):
 class CurriculumUnit(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     grade = models.CharField(max_length=10)
-    level = models.CharField(max_length=50)
     unit_code = models.CharField(max_length=30)
     title = models.CharField(max_length=250)
     week = models.CharField(max_length=30, blank=True)
@@ -139,14 +138,13 @@ class CurriculumUnit(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["grade", "level", "unit_code"]
+        ordering = ["grade", "unit_code"]
         constraints = [
             models.UniqueConstraint(fields=["grade", "unit_code"], name="uniq_curriculum_grade_unit"),
         ]
 
     def save(self, *args, **kwargs):
         self.grade = str(self.grade).strip().upper()
-        self.level = str(self.level).strip()
         self.unit_code = str(self.unit_code).strip().upper()
         super().save(*args, **kwargs)
 
@@ -170,7 +168,6 @@ class LearningContent(models.Model):
     description = models.TextField(blank=True)
     content_type = models.CharField(max_length=20, choices=ContentType.choices, default=ContentType.PDF)
     grade = models.CharField(max_length=10, blank=True)
-    level = models.CharField(max_length=50, blank=True)
     unit_code = models.CharField(max_length=30, blank=True)
     url = models.URLField(blank=True)
     file = models.FileField(upload_to="learning/materials/%Y/%m/", null=True, blank=True)
@@ -199,7 +196,6 @@ class Quiz(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     title = models.CharField(max_length=250)
     grade = models.CharField(max_length=10)
-    level = models.CharField(max_length=50)
     unit_code = models.CharField(max_length=30, blank=True)
     duration_minutes = models.PositiveSmallIntegerField(default=10, validators=[MinValueValidator(1), MaxValueValidator(240)])
     duration_seconds = models.PositiveIntegerField(null=True, blank=True, validators=[MinValueValidator(10), MaxValueValidator(14400)])
@@ -281,7 +277,6 @@ class StudentAssessment(models.Model):
     student = models.ForeignKey(Student, on_delete=models.PROTECT, related_name="assessments")
     trainer = models.ForeignKey(Trainer, on_delete=models.PROTECT, related_name="student_assessments")
     unit_code = models.CharField(max_length=30, blank=True)
-    level = models.CharField(max_length=50, blank=True)
     title = models.CharField(max_length=250, blank=True)
     score = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True, validators=[MinValueValidator(0), MaxValueValidator(100)])
     rating = models.DecimalField(max_digits=3, decimal_places=2, null=True, blank=True, validators=[MinValueValidator(0), MaxValueValidator(5)])
