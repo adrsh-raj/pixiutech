@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { API_BASE } from '../config/api';
+import { recordApiPerformance } from '../lib/performanceDiagnostics';
 
 const AuthContext = createContext(null);
 const AUTH_EVENT = 'pixiu_auth_state_changed';
@@ -34,8 +35,6 @@ function isCacheableRead(path, method, accessToken) {
 }
 
 function buildReadCacheKey(path, method, accessToken) {
-  // Scope the application cache to the current authenticated session so data
-  // from one signed-in user can never be reused by another user in this tab.
   return `${method}:${accessToken}:${path}`;
 }
 
@@ -60,9 +59,20 @@ async function readJson(response) {
 async function fetchOnce(url, options = {}, timeoutMs = 20000) {
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  const method = String(options.method || 'GET').toUpperCase();
+  const started = typeof performance !== 'undefined' ? performance.now() : Date.now();
   try {
     const signal = options.signal || controller.signal;
-    return await fetch(url, { ...options, signal, credentials: options.credentials || 'include' });
+    const response = await fetch(url, { ...options, signal, credentials: options.credentials || 'include' });
+    const ended = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    const safePath = String(url).startsWith(API_BASE) ? String(url).slice(API_BASE.length) : '/external';
+    recordApiPerformance(safePath, method, { durationMs: ended - started, status: response.status, cached: false });
+    return response;
+  } catch (error) {
+    const ended = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    const safePath = String(url).startsWith(API_BASE) ? String(url).slice(API_BASE.length) : '/external';
+    recordApiPerformance(safePath, method, { durationMs: ended - started, status: 0, cached: false });
+    throw error;
   } finally {
     window.clearTimeout(timer);
   }
@@ -112,6 +122,7 @@ async function refreshAccessToken() {
 }
 
 function responseFromCache(entry) {
+  recordApiPerformance(entry.path || '/', entry.method || 'GET', { durationMs: 0, status: entry.status, cached: true });
   return new Response(entry.body, {
     status: entry.status,
     statusText: entry.statusText,
@@ -132,16 +143,15 @@ export async function apiFetch(path, options = {}) {
       const now = Date.now();
       pruneApiReadCache(now);
       const cached = apiReadCache.get(cacheKey);
-      if (cached && now - cached.createdAt <= API_READ_CACHE_TTL_MS) return responseFromCache(cached);
+      if (cached && now - cached.createdAt <= API_READ_CACHE_TTL_MS) {
+        return responseFromCache({ ...cached, path, method });
+      }
       if (cached) apiReadCache.delete(cacheKey);
     }
 
     const response = await fetchWithRetry(`${API_BASE}${path}`, {
       ...options,
       headers,
-      // Application-level caching is used above; keep browser HTTP caching
-      // disabled for authenticated data so responses never persist outside
-      // this controlled per-session cache.
       cache: cacheableRead ? 'no-store' : (options.cache || 'no-store'),
       credentials: 'include',
     });
@@ -242,12 +252,7 @@ export function AuthProvider({ children }) {
   const login = async (username, password, expectedRole = null, turnstileToken = null) => {
     const cleanUsername = username?.trim(); const cleanPassword = password ?? '';
     if (!cleanUsername || !cleanPassword) return { success: false, error: 'Username and password are required.' };
-    const body = JSON.stringify({
-      username: cleanUsername,
-      password: cleanPassword,
-      role: expectedRole || undefined,
-      turnstile_token: turnstileToken || undefined,
-    });
+    const body = JSON.stringify({ username: cleanUsername, password: cleanPassword, role: expectedRole || undefined, turnstile_token: turnstileToken || undefined });
     try {
       const response = await fetchOnce(`${API_BASE}/auth/login/`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, cache: 'no-store', credentials: 'include' }, 25000);
       const data = await readJson(response);
