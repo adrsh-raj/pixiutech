@@ -172,7 +172,6 @@ class Student(models.Model):
     guardian_phone = models.CharField(max_length=30, blank=True)
     guardian_email = models.EmailField(blank=True)
     address = models.TextField(blank=True)
-    current_level = models.CharField(max_length=50, blank=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
