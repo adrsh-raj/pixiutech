@@ -19,12 +19,14 @@ class PerformanceDiagnosticsMiddleware:
     Disabled unless PERF_DIAGNOSTICS=true. When enabled, logs only method,
     route pattern, status and aggregate timing/query counts. It never logs
     request paths, query strings, bodies, headers, tokens, user IDs, roles,
-    SQL text, or SQL parameters.
+    SQL text, SQL parameters, or response bodies.
     """
 
     def __init__(self, get_response):
         self.get_response = get_response
         self.enabled = os.environ.get("PERF_DIAGNOSTICS", "False").lower() == "true"
+        if self.enabled:
+            logger.setLevel(logging.INFO)
 
     def __call__(self, request):
         if not self.enabled:
