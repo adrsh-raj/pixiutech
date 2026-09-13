@@ -12,7 +12,8 @@ from academics.services import accessible_class_queryset
 from learning.models import AttendanceRecord, Project, QuizAttempt, StudentAssessment
 
 
-WEIGHTS = {"quiz": 40, "project": 25, "trainer_assessment": 15, "attendance": 20}
+# Pixiu programme/ranking weighting: practical 40%, quiz 25%, attendance 20%, trainer review 15%.
+WEIGHTS = {"practical": 40, "quiz": 25, "attendance": 20, "trainer_review": 15}
 
 
 def _percent(value):
@@ -23,33 +24,33 @@ def _student_components(students):
     """Build ranking inputs in bulk so class pages do not issue N+1 queries."""
     student_ids = [student.id for student in students]
     result = {
-        student.id: {"quiz": 0, "project": 0, "review": 0, "attendance": 0, "score": 0}
+        student.id: {"practical": 0, "quiz": 0, "attendance": 0, "trainer_review": 0, "score": 0}
         for student in students
     }
     if not student_ids:
         return result
 
     quiz_rows = QuizAttempt.objects.filter(student_id__in=student_ids, status="completed").values("student_id").annotate(avg=Avg("percentage"))
-    project_rows = Project.objects.filter(student_id__in=student_ids, score__isnull=False).values("student_id").annotate(avg=Avg("score"))
-    review_rows = StudentAssessment.objects.filter(student_id__in=student_ids, status="published", score__isnull=False).values("student_id").annotate(avg=Avg("score"))
+    practical_rows = Project.objects.filter(student_id__in=student_ids, score__isnull=False).values("student_id").annotate(avg=Avg("score"))
+    review_rows = StudentAssessment.objects.filter(student_id__in=student_ids, status="published", rating__isnull=False).values("student_id").annotate(avg=Avg("rating"))
     attendance_rows = AttendanceRecord.objects.filter(student_id__in=student_ids).values("student_id").annotate(total=Count("id"), present=Count("id", filter=Q(status__in=["present", "late"])))
 
     for row in quiz_rows:
         result[row["student_id"]]["quiz"] = _percent(row["avg"])
-    for row in project_rows:
-        result[row["student_id"]]["project"] = _percent(row["avg"])
+    for row in practical_rows:
+        result[row["student_id"]]["practical"] = _percent(row["avg"])
     for row in review_rows:
-        result[row["student_id"]]["review"] = _percent(row["avg"])
+        result[row["student_id"]]["trainer_review"] = _percent((row["avg"] or 0) * 20)
     for row in attendance_rows:
         total = row["total"] or 0
         result[row["student_id"]]["attendance"] = _percent((row["present"] / total * 100) if total else 0)
 
     for values in result.values():
         values["score"] = _percent(
-            values["quiz"] * WEIGHTS["quiz"] / 100
-            + values["project"] * WEIGHTS["project"] / 100
-            + values["review"] * WEIGHTS["trainer_assessment"] / 100
+            values["practical"] * WEIGHTS["practical"] / 100
+            + values["quiz"] * WEIGHTS["quiz"] / 100
             + values["attendance"] * WEIGHTS["attendance"] / 100
+            + values["trainer_review"] * WEIGHTS["trainer_review"] / 100
         )
     return result
 
@@ -58,7 +59,7 @@ class ClassRankingView(APIView):
     permission_classes = [IsAuthenticated, IsActiveAccount]
 
     def _empty_response(self):
-        return Response({"class": None, "ranking": [], "student": None, "total_students": 0, "summary": {"students": 0, "attendance": None, "quiz": None, "project": None, "trainer_assessment": None, "score": None}, "formula": WEIGHTS})
+        return Response({"class": None, "ranking": [], "student": None, "total_students": 0, "summary": {"students": 0, "attendance": None, "quiz": None, "practical": None, "trainer_review": None, "score": None}, "formula": WEIGHTS})
 
     def get(self, request):
         requested_class_id = request.query_params.get("class_id")
@@ -85,7 +86,7 @@ class ClassRankingView(APIView):
 
         rows = []
         for student in students:
-            component = components.get(student.id, {"quiz": 0, "project": 0, "review": 0, "attendance": 0, "score": 0})
+            component = components.get(student.id, {"practical": 0, "quiz": 0, "attendance": 0, "trainer_review": 0, "score": 0})
             rows.append({"student_id": student.student_id, "name": student.name, "roll_number": student.roll_number, "learning_level": student.current_level or "", **component})
 
         rows.sort(key=lambda row: (-row["score"], -row["attendance"], row["roll_number"], row["student_id"]))
@@ -99,6 +100,6 @@ class ClassRankingView(APIView):
             values = [row[key] for row in rows if row[key] is not None]
             return _percent(sum(values) / len(values)) if values else None
 
-        summary = {"students": len(rows), "attendance": average("attendance"), "quiz": average("quiz"), "project": average("project"), "trainer_assessment": average("review"), "score": average("score")}
+        summary = {"students": len(rows), "attendance": average("attendance"), "quiz": average("quiz"), "practical": average("practical"), "trainer_review": average("trainer_review"), "score": average("score")}
 
         return Response({"class": {"id": str(school_class.id), "grade": school_class.grade, "section": school_class.section, "name": school_class.display_name, "school_code": school_class.school.school_code, "school_name": school_class.school.name}, "ranking": rows, "student": current, "total_students": len(rows), "summary": summary, "formula": WEIGHTS})
