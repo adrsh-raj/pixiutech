@@ -55,10 +55,10 @@ class CurriculumUnitSerializer(serializers.ModelSerializer):
     class_count = serializers.IntegerField(source="class_assignments.count", read_only=True)
     class Meta:
         model = CurriculumUnit
-        fields = ["id", "grade", "level", "unit_code", "title", "week", "topic", "objectives", "status", "created_by", "class_count", "created_at", "updated_at"]
+        fields = ["id", "grade", "unit_code", "title", "week", "topic", "objectives", "status", "created_by", "class_count", "created_at", "updated_at"]
         read_only_fields = ["id", "created_by", "class_count", "created_at", "updated_at"]
     def validate(self, attrs):
-        for field in ("grade", "level", "unit_code", "title", "objectives"):
+        for field in ("grade", "unit_code", "title", "objectives"):
             if field in attrs and not str(attrs[field]).strip(): raise serializers.ValidationError({field: "This field cannot be blank."})
         if "grade" in attrs and not str(attrs["grade"]).strip().isdigit(): raise serializers.ValidationError({"grade": "Grade must be numeric."})
         return attrs
@@ -82,7 +82,7 @@ class CurriculumClassAssignmentSerializer(serializers.ModelSerializer):
 class LearningContentSerializer(serializers.ModelSerializer):
     class Meta:
         model = LearningContent
-        fields = ["id", "title", "description", "content_type", "grade", "level", "unit_code", "url", "file", "target_role", "status", "is_watermarked", "created_by", "created_at", "updated_at"]
+        fields = ["id", "title", "description", "content_type", "grade", "unit_code", "url", "file", "target_role", "status", "is_watermarked", "created_by", "created_at", "updated_at"]
         read_only_fields = ["id", "created_by", "created_at", "updated_at"]
     def validate(self, attrs):
         title = attrs.get("title", getattr(self.instance, "title", "")); grade = attrs.get("grade", getattr(self.instance, "grade", "")); target_role = attrs.get("target_role", getattr(self.instance, "target_role", "student")); url = attrs.get("url", getattr(self.instance, "url", "")); file_value = attrs.get("file", getattr(self.instance, "file", None)); content_type = attrs.get("content_type", getattr(self.instance, "content_type", "")); content_status = attrs.get("status", getattr(self.instance, "status", "draft"))
@@ -132,7 +132,7 @@ class QuizSerializer(serializers.ModelSerializer):
     questions = serializers.SerializerMethodField()
     class Meta:
         model = Quiz
-        fields = ["id", "title", "grade", "level", "unit_code", "duration_minutes", "duration_seconds", "max_attempts", "status", "created_by", "questions", "created_at", "updated_at"]
+        fields = ["id", "title", "grade", "unit_code", "duration_minutes", "duration_seconds", "max_attempts", "status", "created_by", "questions", "created_at", "updated_at"]
         read_only_fields = ["id", "created_by", "questions", "created_at", "updated_at", "max_attempts"]
     def validate(self, attrs):
         grade = attrs.get("grade", getattr(self.instance, "grade", "")); title = attrs.get("title", getattr(self.instance, "title", "")); duration_seconds = attrs.get("duration_seconds", getattr(self.instance, "duration_seconds", None))
@@ -186,7 +186,7 @@ class StudentAssessmentSerializer(serializers.ModelSerializer):
     student_id = serializers.CharField(source="student.student_id", read_only=True); trainer_id = serializers.CharField(source="trainer.trainer_id", read_only=True)
     class Meta:
         model = StudentAssessment
-        fields = ["id", "student", "student_id", "trainer", "trainer_id", "unit_code", "level", "title", "score", "rating", "status", "feedback", "assessment_date", "created_at", "updated_at"]
+        fields = ["id", "student", "student_id", "trainer", "trainer_id", "unit_code", "title", "score", "rating", "status", "feedback", "assessment_date", "created_at", "updated_at"]
         read_only_fields = ["id", "student_id", "trainer_id", "created_at", "updated_at"]
     def to_internal_value(self, data):
         payload = data.copy(); raw_student = payload.get("student")
