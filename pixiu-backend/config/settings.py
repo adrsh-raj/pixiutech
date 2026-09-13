@@ -89,7 +89,7 @@ JWT_REFRESH_COOKIE_NAME = os.environ.get("JWT_REFRESH_COOKIE_NAME", "pixiu_refre
 JWT_COOKIE_SECURE = os.environ.get("JWT_COOKIE_SECURE", "False" if DEBUG else "True").lower() == "true"
 JWT_COOKIE_SAMESITE = os.environ.get("JWT_COOKIE_SAMESITE", "Lax" if DEBUG else "None")
 JWT_REFRESH_COOKIE_PATH = "/api/v1/auth/refresh/"
-JWT_REFRESH_COOKIE_MAX_AGE = int(os.environ.get("JWT_REFRESH_COOKIE_MAX_AGE", str(int(timedelta(days=int(os.environ.get("JWT_REFRESH_DAYS", "7")).total_seconds()))))
+JWT_REFRESH_COOKIE_MAX_AGE = int(os.environ.get("JWT_REFRESH_COOKIE_MAX_AGE", str(int(timedelta(days=int(os.environ.get("JWT_REFRESH_DAYS", "7"))).total_seconds()))))
 
 # Cloudflare Turnstile protects the public login endpoint. The secret key must only
 # exist in the backend environment (for example Render); never expose it to the SPA.
