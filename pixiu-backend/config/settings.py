@@ -16,6 +16,27 @@ elif not ALLOWED_HOSTS and DEBUG:
 
 PERF_DIAGNOSTICS = os.environ.get("PERF_DIAGNOSTICS", "False").lower() == "true"
 
+# Keep performance diagnostics visible in Render logs without allowing the
+# diagnostics logger to inherit a production handler that might format or emit
+# unrelated request/application data.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "performance_console": {
+            "class": "logging.StreamHandler",
+            "level": "INFO",
+        },
+    },
+    "loggers": {
+        "performance": {
+            "handlers": ["performance_console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+    },
+}
+
 INSTALLED_APPS = [
     "django.contrib.admin", "django.contrib.auth", "django.contrib.contenttypes", "django.contrib.sessions",
     "django.contrib.messages", "django.contrib.staticfiles", "corsheaders", "rest_framework",
@@ -32,7 +53,7 @@ MIDDLEWARE = [
 if PERF_DIAGNOSTICS:
     MIDDLEWARE.insert(-1, "core.performance_middleware.PerformanceDiagnosticsMiddleware")
 ROOT_URLCONF = "config.urls"
-TEMPLATES = [{"BACKEND":"django.template.backends.django.DjangoTemplates","DIRS":[],"APP_DIRS":True,"OPTIONS":{"context_processors":["django.template.context_processors.request","django.contrib.auth.context_processors.auth","django.contrib.messages.context_processors.messages"]}}]
+TEMPLATES = [{"BACKEND":"django.core.templates.backends.django.DjangoTemplates","DIRS":[],"APP_DIRS":True,"OPTIONS":{"context_processors":["django.template.context_processors.request","django.contrib.auth.context_processors.auth","django.contrib.messages.context_processors.messages"]}}]
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 AUTH_USER_MODEL = "accounts.User"
