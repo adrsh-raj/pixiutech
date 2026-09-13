@@ -6,7 +6,7 @@ from academics.school_activation import activate_school
 from audit.views import AuditLogViewSet
 from billing.contract_views import ContractViewSet, billing_summary
 from billing.views import InvoiceLineItemViewSet, PaymentViewSet, ReceiptViewSet
-from inventory.contract_views import KitMaintenanceViewSet
+from inventory.views import KitMaintenanceViewSet
 from .analytics import SchoolPerformanceView, StudentProgressView, TrainerPerformanceView
 from .class_ranking import ClassRankingView
 from .api_v1_compat import health, upload
