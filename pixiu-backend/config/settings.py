@@ -16,9 +16,6 @@ elif not ALLOWED_HOSTS and DEBUG:
 
 PERF_DIAGNOSTICS = os.environ.get("PERF_DIAGNOSTICS", "False").lower() == "true"
 
-# Keep performance diagnostics visible in Render logs without allowing the
-# diagnostics logger to inherit a production handler that might format or emit
-# unrelated request/application data.
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -53,7 +50,7 @@ MIDDLEWARE = [
 if PERF_DIAGNOSTICS:
     MIDDLEWARE.insert(-1, "core.performance_middleware.PerformanceDiagnosticsMiddleware")
 ROOT_URLCONF = "config.urls"
-TEMPLATES = [{"BACKEND":"django.core.templates.backends.django.DjangoTemplates","DIRS":[],"APP_DIRS":True,"OPTIONS":{"context_processors":["django.template.context_processors.request","django.contrib.auth.context_processors.auth","django.contrib.messages.context_processors.messages"]}}]
+TEMPLATES = [{"BACKEND":"django.template.backends.django.DjangoTemplates","DIRS":[],"APP_DIRS":True,"OPTIONS":{"context_processors":["django.template.context_processors.request","django.contrib.auth.context_processors.auth","django.contrib.messages.context_processors.messages"]}}]
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 AUTH_USER_MODEL = "accounts.User"
@@ -70,8 +67,6 @@ DATABASES = {"default":{"ENGINE":"django.db.backends.postgresql","NAME":unquote(
 EXPECTED_DATABASE_NAME = os.environ.get("DJANGO_EXPECTED_DATABASE_NAME", "").strip()
 if EXPECTED_DATABASE_NAME and DATABASES["default"]["NAME"] != EXPECTED_DATABASE_NAME: raise RuntimeError("DATABASE_URL points to a database different from DJANGO_EXPECTED_DATABASE_NAME. Refusing to start to protect the Django rebuild from accidental legacy DB usage.")
 
-# Use a shared Redis cache when REDIS_URL is configured. The in-process
-# fallback keeps local/CI environments functional without requiring Redis.
 REDIS_URL = os.environ.get("REDIS_URL", "").strip()
 if REDIS_URL:
     CACHES = {
@@ -112,8 +107,6 @@ JWT_COOKIE_SAMESITE = os.environ.get("JWT_COOKIE_SAMESITE", "Lax" if DEBUG else 
 JWT_REFRESH_COOKIE_PATH = "/api/v1/auth/refresh/"
 JWT_REFRESH_COOKIE_MAX_AGE = int(os.environ.get("JWT_REFRESH_COOKIE_MAX_AGE", str(int(timedelta(days=int(os.environ.get("JWT_REFRESH_DAYS", "7"))).total_seconds()))))
 
-# Cloudflare Turnstile protects the public login endpoint. The secret key must only
-# exist in the backend environment (for example Render); never expose it to the SPA.
 CLOUDFLARE_TURNSTILE_SECRET_KEY = os.environ.get("CLOUDFLARE_TURNSTILE_SECRET_KEY", "").strip()
 CLOUDFLARE_TURNSTILE_ENABLED = os.environ.get(
     "CLOUDFLARE_TURNSTILE_ENABLED",
