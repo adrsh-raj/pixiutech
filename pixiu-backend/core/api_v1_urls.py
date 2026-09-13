@@ -18,14 +18,14 @@ from .public_enquiry import PublicEnquiryView
 from .phase7_compat_extras import ContractCommunicationLogViewSet
 from .billing_contract_overrides import TransactionalInvoiceViewSet
 from .inventory_contract_overrides import JsonKitComponentViewSet, JsonKitViewSet
-from .scoped_contract_views import ScopedContractBillingFullViewSet, ScopedContractInventoryViewSet, ScopedContractLeadViewSet, ScopedContractReviewViewSet, ScopedContractSchoolViewSet, ScopedContractTrainerViewSet
+from .scoped_contract_views import ScopedContractBillingFullViewSet, ScopedContractInventoryViewSet, ScopedContractLeadViewSet, ScopedContractReviewViewSet
 from .trainer_materials import TrainerMaterialDetailView, TrainerMaterialFileView, TrainerMaterialListCreateView
 from .learning_content_files import LearningContentFileView
-from .quiz_documents import QuizResultPdfView, QuizResultView
 from learning.trainer_units import TrainerUnitListCreateView
 from notifications.views import NotificationPortalViewSet
 from learning.quiz_portal import QuizSingleAttemptView, QuizStartView, QuizReviewView
-from .strict_learning_scope_views import SafeScopedAttendanceViewSet, SafeScopedClassViewSet, SafeScopedContentViewSet, SafeScopedCurriculumViewSet, SafeScopedEvidenceViewSet, SafeScopedProjectViewSet, SafeScopedQuizAssignmentViewSet, SafeScopedQuizAttemptViewSet, SafeScopedQuizQuestionViewSet, SafeScopedQuizViewSet, SafeScopedSessionActivityViewSet, SafeScopedStudentViewSet, SafeScopedTrainerSchoolAssignmentViewSet, SafeScopedSchoolViewSet, SafeScopedTrainerViewSet
+from .scoped_curriculum import ScopedCurriculumViewSet
+from .strict_learning_scope_views import SafeScopedAttendanceViewSet, SafeScopedClassViewSet, SafeScopedContentViewSet, SafeScopedEvidenceViewSet, SafeScopedProjectViewSet, SafeScopedQuizAssignmentViewSet, SafeScopedQuizAttemptViewSet, SafeScopedQuizQuestionViewSet, SafeScopedQuizViewSet, SafeScopedSessionActivityViewSet, SafeScopedStudentViewSet, SafeScopedTrainerSchoolAssignmentViewSet, SafeScopedSchoolViewSet, SafeScopedTrainerViewSet
 
 router = DefaultRouter(trailing_slash=False)
 router.register('schools', SafeScopedSchoolViewSet, basename='v1-school')
@@ -36,7 +36,7 @@ router.register('students', SafeScopedStudentViewSet, basename='v1-student')
 router.register('sessions', CourseAwareSessionViewSet, basename='v1-session')
 router.register('session-activities', SafeScopedSessionActivityViewSet, basename='v1-session-activity')
 router.register('attendance', SafeScopedAttendanceViewSet, basename='v1-attendance')
-router.register('curriculum', SafeScopedCurriculumViewSet, basename='v1-curriculum')
+router.register('curriculum', ScopedCurriculumViewSet, basename='v1-curriculum')
 router.register('content', SafeScopedContentViewSet, basename='v1-content')
 router.register('quizzes', SafeScopedQuizViewSet, basename='v1-quiz')
 router.register('quiz-questions', SafeScopedQuizQuestionViewSet, basename='v1-quiz-question')

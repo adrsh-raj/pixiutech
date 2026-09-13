@@ -27,8 +27,8 @@ function checkRateLimit(ip) {
 function getLmsEnquiryEndpoint() {
   const explicit = process.env.LMS_ENQUIRY_ENDPOINT?.trim();
   if (explicit) return explicit;
-  const portal = (process.env.VITE_LMS_URL || 'https://portal.pixiutech.com').trim().replace(/\/+$/, '');
-  return `${portal}/api/v1/public/enquiries`;
+  const base = (process.env.VITE_API_URL?.trim() || 'https://pixiu-django-api.onrender.com/api/v1').replace(/\/+$/, '');
+  return `${base}/public/enquiries`;
 }
 
 export default async function handler(req, res) {
@@ -36,16 +36,11 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ error: 'Method not allowed.' });
   }
-
-  if (!isAllowedOrigin(req)) {
-    return res.status(403).json({ error: 'Origin not allowed.' });
-  }
+  if (!isAllowedOrigin(req)) return res.status(403).json({ error: 'Origin not allowed.' });
 
   const forwarded = req.headers['x-forwarded-for'];
   const ip = clean(Array.isArray(forwarded) ? forwarded[0] : forwarded?.split(',')[0], 100) || 'unknown';
-  if (!checkRateLimit(ip)) {
-    return res.status(429).json({ error: 'Too many enquiries from this connection. Please try again later.' });
-  }
+  if (!checkRateLimit(ip)) return res.status(429).json({ error: 'Too many enquiries from this connection. Please try again later.' });
 
   const body = req.body && typeof req.body === 'object' ? req.body : {};
   const school = clean(body.school, 160);
@@ -58,26 +53,20 @@ export default async function handler(req, res) {
   const honeypot = clean(body.website, 120);
 
   if (honeypot) return res.status(400).json({ error: 'Unable to process this enquiry.' });
-  if (!school || !person || !phone || !email) {
-    return res.status(400).json({ error: 'School name, contact person, phone and email are required.' });
-  }
+  if (!school || !person || !phone || !email) return res.status(400).json({ error: 'School name, contact person, phone and email are required.' });
   if (!validEmail(email)) return res.status(400).json({ error: 'Please provide a valid email address.' });
 
-  const endpoint = getLmsEnquiryEndpoint();
-
   try {
-    const delivery = await fetch(endpoint, {
+    const delivery = await fetch(getLmsEnquiryEndpoint(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-Pixiu-Website-Source': 'pixiutech.com' },
       body: JSON.stringify({ school, person, phone, email, city, strength, message, website: '' })
     });
-
     const payload = await delivery.json().catch(() => ({}));
     if (!delivery.ok) {
       console.error(`Enquiry delivery failed with status ${delivery.status}.`);
       return res.status(502).json({ error: payload.error || 'We could not deliver your enquiry right now. Please try again.' });
     }
-
     return res.status(200).json({ success: true, lead_id: payload.lead_id || null });
   } catch (error) {
     console.error('Enquiry delivery error:', error.message);
