@@ -1,49 +1,51 @@
 import { lazy, Suspense, Component } from 'react';
 import { BrowserRouter, Routes, Route, Outlet, Navigate, Link } from 'react-router-dom';
 import PortalShell from './components/PortalShell';
-import AdminCommandCenter from './pages/AdminCommandCenter';
-import Students from './pages/StudentsV2';
-import HardwareKitsV2 from './pages/HardwareKitsV2';
-import TrainerOperationsV2 from './pages/TrainerOperationsV2';
-import TrainerAssignments from './pages/TrainerAssignments';
-import TrainerWorkspace from './pages/TrainerWorkspace';
-import TrainerClasses from './pages/TrainerClasses';
-import TrainerAttendance from './pages/TrainerAttendance';
-import TrainerMaterials from './pages/TrainerMaterials';
-import TrainerReviewsV2 from './pages/TrainerReviewsV2';
-import TrainerCertificates from './pages/TrainerCertificates';
-import StudentClasses from './pages/StudentClasses';
-import TrainerCredentials from './pages/TrainerCredentials';
-import SchoolCredentials from './pages/SchoolCredentials';
-import DataReset from './pages/DataReset';
-import Comms from './pages/Comms';
-import Leads from './pages/Leads';
-import WebsiteEnquiries from './pages/WebsiteEnquiries';
-import SchoolsV2 from './pages/SchoolsV2';
-import Payments from './pages/Payments';
-import Notifications from './pages/Notifications';
-import ContentHub from './pages/ContentHub';
-import Curriculum from './pages/Curriculum';
-import Login from './pages/Login';
-import VerifyV2 from './pages/VerifyV2';
-import StudentPortal from './pages/StudentPortal';
-import SchoolPortal from './pages/SchoolPortal';
-import AuditLogs from './pages/AuditLogs';
-import ClassRankingPage from './pages/ClassRankingPage';
-import AttendanceCenter from './pages/AttendanceCenter';
-import StudentProgressPage from './pages/StudentProgressPage';
-import PerformanceAnalyticsPage from './pages/PerformanceAnalyticsPage';
-import SchoolProgressReports from './pages/SchoolProgressReports';
-import BillingCenter from './pages/BillingCenter';
-import QuizHub from './pages/QuizHub';
-import StudentQuizHubV2 from './pages/StudentQuizHubV2';
-import ProjectHubV2 from './pages/ProjectHubV2';
-import SessionSchedulerV4 from './pages/SessionSchedulerV4';
-import CourseCompletionV2 from './pages/CourseCompletionV2';
 import { DataProvider } from './context/DataContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 
+// Keep the application shell small. Feature pages are loaded only when their
+// route is visited so the browser does not download the entire LMS at startup.
+const AdminCommandCenter = lazy(() => import('./pages/AdminCommandCenter'));
+const Students = lazy(() => import('./pages/StudentsV2'));
+const HardwareKitsV2 = lazy(() => import('./pages/HardwareKitsV2'));
+const TrainerOperationsV2 = lazy(() => import('./pages/TrainerOperationsV2'));
+const TrainerAssignments = lazy(() => import('./pages/TrainerAssignments'));
+const TrainerWorkspace = lazy(() => import('./pages/TrainerWorkspace'));
+const TrainerClasses = lazy(() => import('./pages/TrainerClasses'));
+const TrainerAttendance = lazy(() => import('./pages/TrainerAttendance'));
+const TrainerMaterials = lazy(() => import('./pages/TrainerMaterials'));
+const TrainerReviewsV2 = lazy(() => import('./pages/TrainerReviewsV2'));
+const TrainerCertificates = lazy(() => import('./pages/TrainerCertificates'));
+const StudentClasses = lazy(() => import('./pages/StudentClasses'));
+const TrainerCredentials = lazy(() => import('./pages/TrainerCredentials'));
+const SchoolCredentials = lazy(() => import('./pages/SchoolCredentials'));
+const DataReset = lazy(() => import('./pages/DataReset'));
+const Comms = lazy(() => import('./pages/Comms'));
+const Leads = lazy(() => import('./pages/Leads'));
+const WebsiteEnquiries = lazy(() => import('./pages/WebsiteEnquiries'));
+const SchoolsV2 = lazy(() => import('./pages/SchoolsV2'));
+const Payments = lazy(() => import('./pages/Payments'));
+const Notifications = lazy(() => import('./pages/Notifications'));
+const ContentHub = lazy(() => import('./pages/ContentHub'));
+const Curriculum = lazy(() => import('./pages/Curriculum'));
+const Login = lazy(() => import('./pages/Login'));
+const VerifyV2 = lazy(() => import('./pages/VerifyV2'));
+const StudentPortal = lazy(() => import('./pages/StudentPortal'));
+const SchoolPortal = lazy(() => import('./pages/SchoolPortal'));
+const AuditLogs = lazy(() => import('./pages/AuditLogs'));
+const ClassRankingPage = lazy(() => import('./pages/ClassRankingPage'));
+const AttendanceCenter = lazy(() => import('./pages/AttendanceCenter'));
+const StudentProgressPage = lazy(() => import('./pages/StudentProgressPage'));
+const PerformanceAnalyticsPage = lazy(() => import('./pages/PerformanceAnalyticsPage'));
+const SchoolProgressReports = lazy(() => import('./pages/SchoolProgressReports'));
+const BillingCenter = lazy(() => import('./pages/BillingCenter'));
+const QuizHub = lazy(() => import('./pages/QuizHub'));
+const StudentQuizHubV2 = lazy(() => import('./pages/StudentQuizHubV2'));
+const ProjectHubV2 = lazy(() => import('./pages/ProjectHubV2'));
+const SessionSchedulerV4 = lazy(() => import('./pages/SessionSchedulerV4'));
+const CourseCompletionV2 = lazy(() => import('./pages/CourseCompletionV2'));
 const Simulation = lazy(() => import('./pages/Simulation'));
 
 class ChunkErrorBoundary extends Component {
@@ -76,7 +78,7 @@ function ProtectedLayout() {
   if (loading) return <LoadingScreen />;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   const role = user?.role || 'admin';
-  return <PortalShell role={role === 'superadmin' ? 'admin' : role} title={roleLabel[role] || 'Pixiu Tech Console'} subtitle={roleSubtitle[role] || 'Pixiu Tech Operating System'}><Outlet /></PortalShell>;
+  return <PortalShell role={role === 'superadmin' ? 'admin' : role} title={roleLabel[role] || 'Pixiu Tech Console'} subtitle={roleSubtitle[role] || 'Pixiu Tech Operating System'}><Suspense fallback={<LoadingScreen />}><Outlet /></Suspense></PortalShell>;
 }
 function AdminOnly({ children }) {
   const { user } = useAuth();
@@ -140,10 +142,10 @@ function QuizzesRoute() {
 }
 
 export default function App() {
-  return <ToastProvider><AuthProvider><DataProvider><BrowserRouter><Routes>
+  return <ToastProvider><AuthProvider><DataProvider><BrowserRouter><Suspense fallback={<LoadingScreen />}><Routes>
     <Route path="/verify" element={<VerifyV2 />} />
     <Route path="/login" element={<GuestRouteGuard><Login /></GuestRouteGuard>} />
-    <Route path="/simulation" element={<ChunkErrorBoundary><Suspense fallback={<LoadingScreen />}><Simulation /></Suspense></ChunkErrorBoundary>} />
+    <Route path="/simulation" element={<ChunkErrorBoundary><Simulation /></ChunkErrorBoundary>} />
     <Route path="/student-portal" element={<StudentRouteGuard />} />
     <Route path="/school-portal" element={<SchoolRouteGuard />} />
     <Route path="/" element={<ProtectedLayout />}>
@@ -183,5 +185,5 @@ export default function App() {
       <Route path="trainer-reviews" element={<RoleRoute roles={['trainer','admin','superadmin']}><TrainerReviewsV2 /></RoleRoute>} />
     </Route>
     <Route path="*" element={<Navigate to="/" replace />} />
-  </Routes></BrowserRouter></DataProvider></AuthProvider></ToastProvider>;
+  </Routes></Suspense></BrowserRouter></DataProvider></AuthProvider></ToastProvider>;
 }
