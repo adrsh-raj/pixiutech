@@ -15,20 +15,20 @@ class AttendanceAdmin(admin.ModelAdmin):
 
 @admin.register(CurriculumUnit)
 class CurriculumUnitAdmin(admin.ModelAdmin):
-    list_display=("grade","unit_code","level","title","status")
-    list_filter=("grade","level","status")
+    list_display=("grade","unit_code","title","status")
+    list_filter=("grade","status")
     search_fields=("unit_code","title","topic")
 
 @admin.register(LearningContent)
 class LearningContentAdmin(admin.ModelAdmin):
-    list_display=("title","content_type","grade","level","target_role","status","created_by")
+    list_display=("title","content_type","grade","target_role","status","created_by")
     list_filter=("content_type","grade","target_role","status","is_watermarked")
     search_fields=("title","description","unit_code")
 
 @admin.register(Quiz)
 class QuizAdmin(admin.ModelAdmin):
-    list_display=("title","grade","level","status","duration_minutes","max_attempts","created_by")
-    list_filter=("grade","level","status")
+    list_display=("title","grade","status","duration_minutes","max_attempts","created_by")
+    list_filter=("grade","status")
     search_fields=("title","unit_code")
 
 @admin.register(QuizQuestion)
