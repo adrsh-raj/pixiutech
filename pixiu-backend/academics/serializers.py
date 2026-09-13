@@ -105,7 +105,11 @@ class SchoolClassSerializer(serializers.ModelSerializer):
         model = SchoolClass
         fields = ["id", "school", "school_code", "grade", "section", "display_name", "status", "active_student_count", "created_at", "updated_at"]
         read_only_fields = ["id", "school_code", "active_student_count", "created_at", "updated_at"]
-    def get_active_student_count(self, obj): return obj.students.filter(status="active").count()
+    def get_active_student_count(self, obj):
+        annotated_count = getattr(obj, "active_student_count", None)
+        if annotated_count is not None:
+            return annotated_count
+        return obj.students.filter(status="active").count()
     def validate(self, attrs):
         request = self.context["request"]; current_school = getattr(self.instance, "school", None); school = attrs.get("school", current_school)
         grade = str(attrs.get("grade", getattr(self.instance, "grade", ""))).strip().upper(); section = str(attrs.get("section", getattr(self.instance, "section", ""))).strip().upper()
