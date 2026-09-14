@@ -33,27 +33,14 @@ async function apiRequest(path, options = {}) {
   if (options.body && !(options.body instanceof FormData) && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
   const method = String(options.method || 'GET').toUpperCase();
   const retryable = method === 'GET' || method === 'HEAD';
-  const delays = retryable ? [0, 1200, 3000] : [0];
-  let lastError;
-  for (let attempt = 0; attempt < delays.length; attempt += 1) {
-    if (delays[attempt]) await new Promise(resolve => setTimeout(resolve, delays[attempt]));
-    try {
-      const response = await apiFetch(path, { ...options, headers, cache: retryable ? 'no-store' : options.cache });
-      const type = response.headers.get('content-type') || '';
-      const payload = type.includes('application/json') ? await response.json().catch(() => ({})) : {};
-      if (response.ok) return payload;
-      const error = new Error(formatApiError(payload, response.status));
-      if (!retryable || ![502, 503, 504].includes(response.status) || attempt === delays.length - 1) throw error;
-      lastError = error;
-    } catch (error) {
-      lastError = error;
-      if (!retryable || attempt === delays.length - 1) throw error;
-    }
-  }
-  throw lastError || new Error('Request failed.');
+  const response = await apiFetch(path, { ...options, headers, cache: retryable ? 'no-store' : options.cache });
+  const type = response.headers.get('content-type') || '';
+  const payload = type.includes('application/json') ? await response.json().catch(() => ({})) : {};
+  if (response.ok) return payload;
+  throw new Error(formatApiError(payload, response.status));
 }
 
-async function mapWithConcurrency(items, worker, limit = 4) {
+async function mapWithConcurrency(items, worker, limit = 6) {
   const results = new Array(items.length);
   let nextIndex = 0;
   async function runner() {
@@ -75,8 +62,32 @@ function normalizeClass(row) { return { ...row, school_class: row.id, school_id:
 function normalizeStudent(row) { return { ...row, school_id: row.school_id || row.school_code || '', class_id: row.class_id || row.school_class || '' }; }
 function normalizeAttendance(row) { return { ...row, status: lower(row.status), session_id: row.session_id || row.session || '', student_id: row.student_id || row.student || '' }; }
 
+const ALL_ENDPOINTS = [
+  ['/schools', 'schools'], ['/classes', 'classes'], ['/students', 'students'], ['/trainers', 'trainers'],
+  ['/sessions', 'sessions'], ['/attendance', 'attendance'], ['/leads', 'leads'], ['/content', 'content'],
+  ['/curriculum', 'curriculum'], ['/inventory', 'inventory'], ['/billing', 'billing'], ['/comms', 'comms'],
+  ['/projects', 'projects'], ['/notifications', 'notifications'], ['/reviews', 'reviews'], ['/quizzes', 'quizzes'],
+  ['/quiz-submissions', 'quizSubmissions'],
+];
+
+const ROLE_ENDPOINTS = {
+  admin: new Set(ALL_ENDPOINTS.map(([path]) => path)),
+  superadmin: new Set(ALL_ENDPOINTS.map(([path]) => path)),
+  trainer: new Set([
+    '/schools', '/classes', '/students', '/trainers', '/sessions', '/attendance',
+    '/content', '/curriculum', '/projects', '/notifications', '/reviews', '/quizzes', '/quiz-submissions',
+  ]),
+  school: new Set([
+    '/schools', '/classes', '/students', '/trainers', '/attendance', '/notifications', '/billing',
+  ]),
+  student: new Set([
+    '/schools', '/classes', '/students', '/sessions', '/attendance', '/content', '/curriculum',
+    '/projects', '/notifications', '/reviews', '/quizzes', '/quiz-submissions',
+  ]),
+};
+
 export function DataProvider({ children }) {
-  const { isAuthenticated, loading: authLoading } = useAuth();
+  const { isAuthenticated, loading: authLoading, role } = useAuth();
   const [schools, setSchools] = useState([]), [classes, setClasses] = useState([]), [students, setStudents] = useState([]), [trainers, setTrainers] = useState([]);
   const [sessions, setSessions] = useState([]), [attendance, setAttendance] = useState([]), [leads, setLeads] = useState([]), [content, setContent] = useState([]);
   const [curriculum, setCurriculum] = useState([]), [inventory, setInventory] = useState([]), [billing, setBilling] = useState([]), [comms, setComms] = useState([]);
@@ -85,18 +96,32 @@ export function DataProvider({ children }) {
   const [endpointErrors, setEndpointErrors] = useState({});
   const refreshPromiseRef = useRef(null), refreshTimerRef = useRef(null), backgroundTimerRef = useRef(null);
 
-  const endpoints = useCallback(() => ([
-    ['/schools', rows => setSchools(rows.map(normalizeSchool))], ['/classes', rows => setClasses(rows.map(normalizeClass))],
-    ['/students', rows => setStudents(rows.map(normalizeStudent))], ['/trainers', rows => setTrainers(rows.map(normalizeTrainer))],
-    ['/sessions', rows => setSessions(rows)], ['/attendance', rows => setAttendance(rows.map(normalizeAttendance))], ['/leads', rows => setLeads(rows)],
-    ['/content', rows => setContent(rows)], ['/curriculum', rows => setCurriculum(rows)], ['/inventory', rows => setInventory(rows)],
-    ['/billing', rows => setBilling(rows)], ['/comms', rows => setComms(rows)], ['/projects', rows => setProjects(rows)],
-    ['/notifications', rows => setNotifications(rows)], ['/reviews', rows => setStudentReviews(rows)], ['/quizzes', rows => setQuizzes(rows)],
-    ['/quiz-submissions', rows => setQuizSubmissions(rows)],
-  ]), []);
+  const endpoints = useCallback(() => {
+    const setters = {
+      '/schools': rows => setSchools(rows.map(normalizeSchool)),
+      '/classes': rows => setClasses(rows.map(normalizeClass)),
+      '/students': rows => setStudents(rows.map(normalizeStudent)),
+      '/trainers': rows => setTrainers(rows.map(normalizeTrainer)),
+      '/sessions': rows => setSessions(rows),
+      '/attendance': rows => setAttendance(rows.map(normalizeAttendance)),
+      '/leads': rows => setLeads(rows),
+      '/content': rows => setContent(rows),
+      '/curriculum': rows => setCurriculum(rows),
+      '/inventory': rows => setInventory(rows),
+      '/billing': rows => setBilling(rows),
+      '/comms': rows => setComms(rows),
+      '/projects': rows => setProjects(rows),
+      '/notifications': rows => setNotifications(rows),
+      '/reviews': rows => setStudentReviews(rows),
+      '/quizzes': rows => setQuizzes(rows),
+      '/quiz-submissions': rows => setQuizSubmissions(rows),
+    };
+    const allowed = ROLE_ENDPOINTS[role] || ROLE_ENDPOINTS.student;
+    return ALL_ENDPOINTS.filter(([path]) => allowed.has(path)).map(([path]) => [path, setters[path]]);
+  }, [role]);
 
   const loadEndpoints = useCallback(async endpointSubset => {
-    const results = await mapWithConcurrency(endpointSubset, ([path]) => apiRequest(path), 4);
+    const results = await mapWithConcurrency(endpointSubset, ([path]) => apiRequest(path), 6);
     setEndpointErrors(previous => {
       const next = { ...previous };
       results.forEach((result, index) => {
@@ -125,14 +150,21 @@ export function DataProvider({ children }) {
   const bootstrap = useCallback(async () => {
     if (authLoading || !isAuthenticated) return;
     const all = endpoints();
-    const corePaths = new Set(['/schools', '/classes', '/students', '/trainers', '/sessions', '/attendance', '/billing', '/inventory']);
+    const corePathsByRole = {
+      admin: new Set(['/schools', '/classes', '/students', '/trainers', '/sessions', '/attendance', '/billing', '/inventory']),
+      superadmin: new Set(['/schools', '/classes', '/students', '/trainers', '/sessions', '/attendance', '/billing', '/inventory']),
+      trainer: new Set(['/schools', '/classes', '/students', '/trainers', '/sessions', '/attendance']),
+      school: new Set(['/schools', '/classes', '/students', '/trainers', '/attendance', '/billing', '/notifications']),
+      student: new Set(['/schools', '/classes', '/students', '/sessions', '/attendance', '/content', '/notifications']),
+    };
+    const corePaths = corePathsByRole[role] || corePathsByRole.student;
     const core = all.filter(([path]) => corePaths.has(path));
     const secondary = all.filter(([path]) => !corePaths.has(path));
     setLoading(true);
     try { await loadEndpoints(core); } finally { setLoading(false); }
     if (backgroundTimerRef.current) window.clearTimeout(backgroundTimerRef.current);
     backgroundTimerRef.current = window.setTimeout(() => { backgroundTimerRef.current = null; loadEndpoints(secondary); }, 250);
-  }, [authLoading, isAuthenticated, endpoints, loadEndpoints]);
+  }, [authLoading, isAuthenticated, role, endpoints, loadEndpoints]);
 
   const scheduleRefresh = useCallback(() => {
     if (refreshTimerRef.current) window.clearTimeout(refreshTimerRef.current);
