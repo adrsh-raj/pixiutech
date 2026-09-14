@@ -31,6 +31,9 @@ function isCacheableRead(path, method, accessToken) {
   const normalizedPath = String(path || '');
   if (normalizedPath.startsWith('/auth/')) return false;
   if (normalizedPath === '/health' || normalizedPath.startsWith('/health/')) return false;
+  // Protected document/image responses are binary and must never be converted
+  // to text and placed in the application JSON-style read cache.
+  if (/^\/content\/[^/]+\/file\/?$/.test(normalizedPath)) return false;
   return true;
 }
 
