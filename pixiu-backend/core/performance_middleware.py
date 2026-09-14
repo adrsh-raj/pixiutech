@@ -14,12 +14,12 @@ def _safe_route(request):
 
 
 class PerformanceDiagnosticsMiddleware:
-    """Opt-in request/DB timing diagnostics with no user-data logging.
+    """Opt-in request/DB timing diagnostics with safe response headers.
 
-    Disabled unless PERF_DIAGNOSTICS=true. When enabled, logs only method,
-    route pattern, status and aggregate timing/query counts. It never logs
-    request paths, query strings, bodies, headers, tokens, user IDs, roles,
-    SQL text, SQL parameters, or response bodies.
+    When PERF_DIAGNOSTICS=true, logs aggregate request/DB metrics and exposes
+    the same aggregate values in response headers for the read-only baseline
+    tooling. No request paths, query strings, bodies, auth values, user IDs,
+    roles, SQL text or response bodies are logged or exposed.
     """
 
     def __init__(self, get_response):
@@ -45,19 +45,23 @@ class PerformanceDiagnosticsMiddleware:
                 query_count += 1
                 db_time += time.perf_counter() - qstart
 
+        response = None
         try:
             with connection.execute_wrapper(collect_execute):
                 response = self.get_response(request)
+            duration_ms = (time.perf_counter() - start) * 1000
+            response["X-Pixiu-Perf-Duration-Ms"] = f"{duration_ms:.2f}"
+            response["X-Pixiu-Perf-DB-Queries"] = str(query_count)
+            response["X-Pixiu-Perf-DB-Time-Ms"] = f"{db_time * 1000:.2f}"
+            return response
         finally:
             duration_ms = (time.perf_counter() - start) * 1000
             logger.info(
                 "perf request method=%s route=%s status=%s duration_ms=%.2f db_queries=%d db_time_ms=%.2f",
                 request.method,
                 _safe_route(request),
-                getattr(locals().get("response"), "status_code", "error"),
+                getattr(response, "status_code", "error"),
                 duration_ms,
                 query_count,
                 db_time * 1000,
             )
-
-        return response
