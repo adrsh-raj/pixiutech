@@ -6,48 +6,77 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import { markPerformance, measurePerformance } from './lib/performanceDiagnostics';
 
+const CHUNK_RECOVERY_KEY = 'pixiu_chunk_recovery_attempted';
+
+function lazyWithChunkRecovery(importer) {
+  return lazy(() => importer().then(module => {
+    try { sessionStorage.removeItem(CHUNK_RECOVERY_KEY); } catch (e) {}
+    return module;
+  }).catch(error => {
+    const message = String(error?.message || error || '');
+    const isChunkError = /Failed to fetch dynamically imported module|Importing a module script failed|ChunkLoadError|dynamically imported module/i.test(message);
+    if (!isChunkError) throw error;
+
+    let shouldReload = false;
+    try {
+      shouldReload = sessionStorage.getItem(CHUNK_RECOVERY_KEY) !== '1';
+      if (shouldReload) sessionStorage.setItem(CHUNK_RECOVERY_KEY, '1');
+    } catch (e) {
+      shouldReload = true;
+    }
+
+    if (shouldReload && typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('chunk_recovery', String(Date.now()));
+      window.location.replace(url.toString());
+      return new Promise(() => {});
+    }
+    throw error;
+  }));
+}
+
 // Keep the application shell small. Feature pages are loaded only when their
 // route is visited so the browser does not download the entire LMS at startup.
-const AdminCommandCenter = lazy(() => import('./pages/AdminCommandCenter'));
-const Students = lazy(() => import('./pages/StudentsV2'));
-const HardwareKitsV2 = lazy(() => import('./pages/HardwareKitsV2'));
-const TrainerOperationsV2 = lazy(() => import('./pages/TrainerOperationsV2'));
-const TrainerAssignments = lazy(() => import('./pages/TrainerAssignments'));
-const TrainerWorkspace = lazy(() => import('./pages/TrainerWorkspace'));
-const TrainerClasses = lazy(() => import('./pages/TrainerClasses'));
-const TrainerAttendance = lazy(() => import('./pages/TrainerAttendance'));
-const TrainerMaterials = lazy(() => import('./pages/TrainerMaterials'));
-const TrainerReviewsV2 = lazy(() => import('./pages/TrainerReviewsV2'));
-const TrainerCertificates = lazy(() => import('./pages/TrainerCertificates'));
-const StudentClasses = lazy(() => import('./pages/StudentClasses'));
-const TrainerCredentials = lazy(() => import('./pages/TrainerCredentials'));
-const SchoolCredentials = lazy(() => import('./pages/SchoolCredentials'));
-const DataReset = lazy(() => import('./pages/DataReset'));
-const Comms = lazy(() => import('./pages/Comms'));
-const Leads = lazy(() => import('./pages/Leads'));
-const WebsiteEnquiries = lazy(() => import('./pages/WebsiteEnquiries'));
-const SchoolsV2 = lazy(() => import('./pages/SchoolsV2'));
-const Payments = lazy(() => import('./pages/Payments'));
-const Notifications = lazy(() => import('./pages/Notifications'));
-const ContentHub = lazy(() => import('./pages/ContentHub'));
-const Curriculum = lazy(() => import('./pages/Curriculum'));
-const Login = lazy(() => import('./pages/Login'));
-const VerifyV2 = lazy(() => import('./pages/VerifyV2'));
-const StudentPortal = lazy(() => import('./pages/StudentPortal'));
-const SchoolPortal = lazy(() => import('./pages/SchoolPortal'));
-const AuditLogs = lazy(() => import('./pages/AuditLogs'));
-const ClassRankingPage = lazy(() => import('./pages/ClassRankingPage'));
-const AttendanceCenter = lazy(() => import('./pages/AttendanceCenter'));
-const StudentProgressPage = lazy(() => import('./pages/StudentProgressPage'));
-const PerformanceAnalyticsPage = lazy(() => import('./pages/PerformanceAnalyticsPage'));
-const SchoolProgressReports = lazy(() => import('./pages/SchoolProgressReports'));
-const BillingCenter = lazy(() => import('./pages/BillingCenter'));
-const QuizHub = lazy(() => import('./pages/QuizHub'));
-const StudentQuizHubV2 = lazy(() => import('./pages/StudentQuizHubV2'));
-const ProjectHubV2 = lazy(() => import('./pages/ProjectHubV2'));
-const SessionSchedulerV4 = lazy(() => import('./pages/SessionSchedulerV4'));
-const CourseCompletionV2 = lazy(() => import('./pages/CourseCompletionV2'));
-const Simulation = lazy(() => import('./pages/Simulation'));
+const AdminCommandCenter = lazyWithChunkRecovery(() => import('./pages/AdminCommandCenter'));
+const Students = lazyWithChunkRecovery(() => import('./pages/StudentsV2'));
+const HardwareKitsV2 = lazyWithChunkRecovery(() => import('./pages/HardwareKitsV2'));
+const TrainerOperationsV2 = lazyWithChunkRecovery(() => import('./pages/TrainerOperationsV2'));
+const TrainerAssignments = lazyWithChunkRecovery(() => import('./pages/TrainerAssignments'));
+const TrainerWorkspace = lazyWithChunkRecovery(() => import('./pages/TrainerWorkspace'));
+const TrainerClasses = lazyWithChunkRecovery(() => import('./pages/TrainerClasses'));
+const TrainerAttendance = lazyWithChunkRecovery(() => import('./pages/TrainerAttendance'));
+const TrainerMaterials = lazyWithChunkRecovery(() => import('./pages/TrainerMaterials'));
+const TrainerReviewsV2 = lazyWithChunkRecovery(() => import('./pages/TrainerReviewsV2'));
+const TrainerCertificates = lazyWithChunkRecovery(() => import('./pages/TrainerCertificates'));
+const StudentClasses = lazyWithChunkRecovery(() => import('./pages/StudentClasses'));
+const TrainerCredentials = lazyWithChunkRecovery(() => import('./pages/TrainerCredentials'));
+const SchoolCredentials = lazyWithChunkRecovery(() => import('./pages/SchoolCredentials'));
+const DataReset = lazyWithChunkRecovery(() => import('./pages/DataReset'));
+const Comms = lazyWithChunkRecovery(() => import('./pages/Comms'));
+const Leads = lazyWithChunkRecovery(() => import('./pages/Leads'));
+const WebsiteEnquiries = lazyWithChunkRecovery(() => import('./pages/WebsiteEnquiries'));
+const SchoolsV2 = lazyWithChunkRecovery(() => import('./pages/SchoolsV2'));
+const Payments = lazyWithChunkRecovery(() => import('./pages/Payments'));
+const Notifications = lazyWithChunkRecovery(() => import('./pages/Notifications'));
+const ContentHub = lazyWithChunkRecovery(() => import('./pages/ContentHub'));
+const Curriculum = lazyWithChunkRecovery(() => import('./pages/Curriculum'));
+const Login = lazyWithChunkRecovery(() => import('./pages/Login'));
+const VerifyV2 = lazyWithChunkRecovery(() => import('./pages/VerifyV2'));
+const StudentPortal = lazyWithChunkRecovery(() => import('./pages/StudentPortal'));
+const SchoolPortal = lazyWithChunkRecovery(() => import('./pages/SchoolPortal'));
+const AuditLogs = lazyWithChunkRecovery(() => import('./pages/AuditLogs'));
+const ClassRankingPage = lazyWithChunkRecovery(() => import('./pages/ClassRankingPage'));
+const AttendanceCenter = lazyWithChunkRecovery(() => import('./pages/AttendanceCenter'));
+const StudentProgressPage = lazyWithChunkRecovery(() => import('./pages/StudentProgressPage'));
+const PerformanceAnalyticsPage = lazyWithChunkRecovery(() => import('./pages/PerformanceAnalyticsPage'));
+const SchoolProgressReports = lazyWithChunkRecovery(() => import('./pages/SchoolProgressReports'));
+const BillingCenter = lazyWithChunkRecovery(() => import('./pages/BillingCenter'));
+const QuizHub = lazyWithChunkRecovery(() => import('./pages/QuizHub'));
+const StudentQuizHubV2 = lazyWithChunkRecovery(() => import('./pages/StudentQuizHubV2'));
+const ProjectHubV2 = lazyWithChunkRecovery(() => import('./pages/ProjectHubV2'));
+const SessionSchedulerV4 = lazyWithChunkRecovery(() => import('./pages/SessionSchedulerV4'));
+const CourseCompletionV2 = lazyWithChunkRecovery(() => import('./pages/CourseCompletionV2'));
+const Simulation = lazyWithChunkRecovery(() => import('./pages/Simulation'));
 
 class ChunkErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { hasError: false }; }
