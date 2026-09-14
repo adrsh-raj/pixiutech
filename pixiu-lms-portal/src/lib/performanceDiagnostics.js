@@ -1,6 +1,7 @@
 const ENABLED = String(import.meta.env.VITE_PERF_DIAGNOSTICS || '').toLowerCase() === 'true';
 const MAX_ENTRIES = 500;
 const entries = [];
+const measures = new Map();
 
 const SAFE_ACTIONS = new Set([
   'status', 'stage', 'complete', 'unlock', 'issue', 'void', 'admin-override',
@@ -35,6 +36,10 @@ function pushEntry(entry) {
 
 function snapshot() {
   return entries.map(entry => ({ ...entry }));
+}
+
+function measureSnapshot() {
+  return [...measures.values()].map(item => ({ ...item }));
 }
 
 function summary() {
@@ -76,7 +81,9 @@ export function measurePerformance(name, startMark) {
   if (!ENABLED || typeof performance === 'undefined' || typeof performance.measure !== 'function') return null;
   try {
     const measure = performance.measure(`pixiu:${String(name)}`, `pixiu:${String(startMark)}`);
-    return Number(measure.duration.toFixed(2));
+    const durationMs = Number(measure.duration.toFixed(2));
+    measures.set(String(name), Object.freeze({ name: String(name), durationMs, ts: Date.now() }));
+    return durationMs;
   } catch {
     return null;
   }
@@ -87,6 +94,7 @@ if (ENABLED && typeof window !== 'undefined') {
     enabled: true,
     snapshot,
     summary,
-    clear: () => { entries.length = 0; },
+    measures: measureSnapshot,
+    clear: () => { entries.length = 0; measures.clear(); },
   });
 }
