@@ -18,7 +18,9 @@ class ErrorBoundary extends Component {
   }
 
   handleRetry = () => {
-    window.location.reload();
+    const url = new URL(window.location.href);
+    url.searchParams.set('portal_recovery', String(Date.now()));
+    window.location.replace(url.toString());
   };
 
   handleLoginRecovery = () => {
@@ -28,7 +30,9 @@ class ErrorBoundary extends Component {
       localStorage.removeItem('pixiu_auth_user');
       Object.keys(localStorage).filter(key => key.startsWith('pixiu_') && key.includes(':')).forEach(key => localStorage.removeItem(key));
     } catch (e) {}
-    window.location.href = '/login';
+    const url = new URL('/login', window.location.origin);
+    url.searchParams.set('portal_recovery', String(Date.now()));
+    window.location.replace(url.toString());
   };
 
   render() {
