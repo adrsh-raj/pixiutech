@@ -114,6 +114,7 @@ export default function Login() {
       const dest = res.user.role === 'student' ? '/student-portal' : res.user.role === 'school' ? '/school-portal' : (res.user.role === 'admin' || res.user.role === 'superadmin') ? '/' : '/trainers';
       markPerformance('dashboard:navigation');
       navigate(dest, { replace: true });
+      requestAnimationFrame(() => requestAnimationFrame(() => measurePerformance('dashboard_tti', 'dashboard:navigation')));
     } else {
       markPerformance('login:failed');
       setError(res.error || 'Invalid credentials');
