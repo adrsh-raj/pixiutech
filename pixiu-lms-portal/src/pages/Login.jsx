@@ -3,6 +3,7 @@ import { ShieldCheck, Lock, User, ArrowRight, GraduationCap, AlertCircle, Eye, E
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useNavigate } from 'react-router-dom';
+import { markPerformance, measurePerformance } from '../lib/performanceDiagnostics';
 
 const TAB_TO_ROLE = {
   student: 'student',
@@ -164,6 +165,7 @@ export default function Login() {
     }
 
     setLoading(true);
+    markPerformance('login:e2e:start');
 
     const cleanUsername = username.trim();
     const expectedRole = selectedRoleTab === 'trainer' && cleanUsername.toLowerCase() === 'adarshraj'
@@ -174,13 +176,17 @@ export default function Login() {
     setLoading(false);
 
     if (res.success) {
+      measurePerformance('login_api_e2e', 'login:e2e:start');
+      markPerformance('login:authenticated');
       toast.success(`Welcome back, ${res.user.name || res.user.username}!`, 'Authenticated');
       const dest = res.user.role === 'student' ? '/student-portal'
                  : res.user.role === 'school' ? '/school-portal'
                  : (res.user.role === 'admin' || res.user.role === 'superadmin') ? '/'
                  : '/trainers';
+      markPerformance('dashboard:navigation');
       navigate(dest, { replace: true });
     } else {
+      markPerformance('login:failed');
       setError(res.error || 'Invalid credentials');
       toast.error(res.error || 'Invalid credentials.', 'Login Failed');
       resetTurnstile();
@@ -214,7 +220,7 @@ export default function Login() {
           <button type="button" onClick={() => handleRolePreset('student')} className={`py-2 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${selectedRoleTab === 'student' ? 'bg-pixiu-blue text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}>
             <GraduationCap size={14} /> Student
           </button>
-          <button type="button" onClick={() => handleRolePreset('trainer')} className={`py-2 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${selectedRoleTab === 'trainer' ? 'bg-pixiu-blue text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}>
+          <button type="button" onClick={() => handleRolePreset('trainer')} className={`py-2 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${selectedRoleTab === 'trainer' ? 'bg-pixiu-blue text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}>`
             <User size={14} /> Trainer / Faculty
           </button>
           <button type="button" onClick={() => handleRolePreset('school')} className={`py-2 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${selectedRoleTab === 'school' ? 'bg-pixiu-blue text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}>
