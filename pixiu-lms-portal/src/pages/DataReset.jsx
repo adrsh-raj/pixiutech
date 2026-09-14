@@ -15,7 +15,7 @@ const RESET_SCOPES = [
 ];
 
 export default function DataReset() {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
   const [scope, setScope] = useState('all_operational');
@@ -28,13 +28,19 @@ export default function DataReset() {
       toast.warning('Type RESET PIXIU DATA exactly to confirm.', 'Confirmation required');
       return;
     }
+    if (!token) {
+      toast.error('Your administrator session has expired. Please sign in again.', 'Authentication required');
+      return;
+    }
     setResetting(true);
     try {
       const phase6Base = API_BASE.replace(/\/api\/v1\/?$/, '/api');
-      const accessToken = localStorage.getItem('pixiu_auth_token');
       const response = await fetch(`${phase6Base}/phase6/controlled-reset/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({ scope, confirmation: confirmation.trim() }),
         cache: 'no-store',
       });
