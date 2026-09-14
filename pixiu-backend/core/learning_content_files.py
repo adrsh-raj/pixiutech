@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from django.core.files.storage import default_storage
-from django.db import connection
+from django.db import DatabaseError, connection
 from django.http import FileResponse, HttpResponse
 from django.shortcuts import get_object_or_404
 from rest_framework.permissions import IsAuthenticated
@@ -15,12 +15,17 @@ from learning.services import accessible_content
 
 
 def _backup_file(content_id):
-    with connection.cursor() as cursor:
-        cursor.execute(
-            "SELECT file_name, content_type, data FROM learning_content_file_backup WHERE content_id = %s",
-            [str(content_id)],
-        )
-        return cursor.fetchone()
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT file_name, content_type, data FROM learning_content_file_backup WHERE content_id = %s",
+                [str(content_id)],
+            )
+            return cursor.fetchone()
+    except DatabaseError:
+        # A rollout can briefly run before the backup migration is available.
+        # File delivery must degrade to the normal storage path/404, never 500.
+        return None
 
 
 class LearningContentFileView(APIView):
@@ -43,6 +48,7 @@ class LearningContentFileView(APIView):
 
             response = FileResponse(handle, content_type=content_type)
             response["Content-Disposition"] = f'inline; filename="{filename}"'
+            response["Cache-Control"] = "private, no-store, max-age=0"
             response["X-Content-Type-Options"] = "nosniff"
             return response
 
@@ -54,6 +60,7 @@ class LearningContentFileView(APIView):
             backup_name, backup_type, data = backup
             response = HttpResponse(bytes(data), content_type=backup_type or "application/octet-stream")
             response["Content-Disposition"] = f'inline; filename="{backup_name}"'
+            response["Cache-Control"] = "private, no-store, max-age=0"
             response["X-Content-Type-Options"] = "nosniff"
             return response
 
