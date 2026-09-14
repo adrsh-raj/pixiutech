@@ -1,10 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, Calendar, Clock, Download, RefreshCw, Search, ShieldCheck } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, apiFetch } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { API_BASE } from '../config/api';
-
-const getToken = () => localStorage.getItem('pixiu_auth_token');
 
 function normalizeLog(log) {
   const created = log.created_at || log.timestamp || log.createdAt;
@@ -35,11 +32,12 @@ export default function AuditLogs() {
   const loadLogs = async () => {
     setLoading(true); setError('');
     try {
-      const token = getToken();
-      const response = await fetch(`${API_BASE}/logs`, { headers: token ? { Authorization: `Bearer ${token}` } : {}, cache: 'no-store' });
+      const response = await apiFetch('/logs', { method: 'GET', cache: 'no-store' });
       const contentType = response.headers.get('content-type') || '';
       const payload = contentType.includes('application/json') ? await response.json().catch(() => ({})) : {};
-      if (!response.ok) throw new Error(payload.detail || payload.error || `Request failed (${response.status})`);
+      if (!response.ok) {
+        throw new Error(payload.detail || payload.error || payload.message || `Request failed (${response.status})`);
+      }
       const rows = Array.isArray(payload) ? payload : Array.isArray(payload?.results) ? payload.results : Array.isArray(payload?.data) ? payload.data : [];
       setLogs(rows.map(normalizeLog));
     } catch (requestError) {
