@@ -86,15 +86,27 @@ const ROLE_ENDPOINTS = {
   ]),
 };
 
+const CORE_PATHS_BY_ROLE = {
+  admin: new Set(['/schools', '/classes', '/students', '/trainers', '/sessions', '/attendance', '/billing', '/inventory']),
+  superadmin: new Set(['/schools', '/classes', '/students', '/trainers', '/sessions', '/attendance', '/billing', '/inventory']),
+  trainer: new Set(['/schools', '/classes', '/students', '/trainers', '/sessions', '/attendance']),
+  school: new Set(['/schools', '/classes', '/students', '/trainers', '/attendance', '/billing', '/notifications']),
+  student: new Set(['/schools', '/classes', '/students', '/sessions', '/attendance', '/notifications']),
+};
+
 export function DataProvider({ children }) {
   const { isAuthenticated, loading: authLoading, role } = useAuth();
   const [schools, setSchools] = useState([]), [classes, setClasses] = useState([]), [students, setStudents] = useState([]), [trainers, setTrainers] = useState([]);
   const [sessions, setSessions] = useState([]), [attendance, setAttendance] = useState([]), [leads, setLeads] = useState([]), [content, setContent] = useState([]);
   const [curriculum, setCurriculum] = useState([]), [inventory, setInventory] = useState([]), [billing, setBilling] = useState([]), [comms, setComms] = useState([]);
   const [projects, setProjects] = useState([]), [notifications, setNotifications] = useState([]), [studentReviews, setStudentReviews] = useState([]), [quizzes, setQuizzes] = useState([]), [quizSubmissions, setQuizSubmissions] = useState([]);
+  const [kits, setKits] = useState([]), [kitsLoading, setKitsLoading] = useState(false), [kitsError, setKitsError] = useState('');
   const [loading, setLoading] = useState(false);
   const [endpointErrors, setEndpointErrors] = useState({});
   const refreshPromiseRef = useRef(null), refreshTimerRef = useRef(null), backgroundTimerRef = useRef(null);
+  const inflightEndpointsRef = useRef(new Map());
+  const loadedEndpointsRef = useRef(new Set());
+  const kitLoadPromiseRef = useRef(null);
 
   const endpoints = useCallback(() => {
     const setters = {
@@ -120,18 +132,62 @@ export function DataProvider({ children }) {
     return ALL_ENDPOINTS.filter(([path]) => allowed.has(path)).map(([path]) => [path, setters[path]]);
   }, [role]);
 
-  const loadEndpoints = useCallback(async endpointSubset => {
-    const results = await mapWithConcurrency(endpointSubset, ([path]) => apiRequest(path), 6);
-    setEndpointErrors(previous => {
-      const next = { ...previous };
-      results.forEach((result, index) => {
-        const [path, setter] = endpointSubset[index];
-        if (result.status === 'fulfilled') { setter(collection(result.value)); delete next[path]; }
-        else next[path] = result.reason?.message || `Unable to load ${path.slice(1) || 'data'}.`;
-      });
-      return next;
-    });
-    return results;
+  const loadEndpoints = useCallback(async (endpointSubset, { force = false } = {}) => {
+    const loadOne = async ([path, setter]) => {
+      if (!force && loadedEndpointsRef.current.has(path)) return { status: 'fulfilled', skipped: true };
+      let requestPromise = inflightEndpointsRef.current.get(path);
+      if (!requestPromise) {
+        requestPromise = apiRequest(path);
+        inflightEndpointsRef.current.set(path, requestPromise);
+      }
+      try {
+        const payload = await requestPromise;
+        setter(collection(payload));
+        loadedEndpointsRef.current.add(path);
+        setEndpointErrors(previous => {
+          if (!previous[path]) return previous;
+          const next = { ...previous };
+          delete next[path];
+          return next;
+        });
+        return { status: 'fulfilled', value: payload };
+      } catch (reason) {
+        setEndpointErrors(previous => ({ ...previous, [path]: reason?.message || `Unable to load ${path.slice(1) || 'data'}.` }));
+        return { status: 'rejected', reason };
+      } finally {
+        if (inflightEndpointsRef.current.get(path) === requestPromise) inflightEndpointsRef.current.delete(path);
+      }
+    };
+    return Promise.all(endpointSubset.map(loadOne));
+  }, []);
+
+  const loadData = useCallback(async paths => {
+    const wanted = new Set(paths || []);
+    const subset = endpoints().filter(([path]) => wanted.has(path));
+    if (!subset.length) return [];
+    return loadEndpoints(subset);
+  }, [endpoints, loadEndpoints]);
+
+  const loadKits = useCallback(async () => {
+    if (kitLoadPromiseRef.current) return kitLoadPromiseRef.current;
+    kitLoadPromiseRef.current = (async () => {
+      setKitsLoading(true);
+      setKitsError('');
+      try {
+        const payload = await apiRequest('/kits');
+        const rows = collection(payload);
+        setKits(rows);
+        return { success: true, data: rows };
+      } catch (error) {
+        const message = error?.message || 'Unable to load kit data.';
+        setKitsError(message);
+        return { success: false, error: message };
+      } finally {
+        setKitsLoading(false);
+        kitLoadPromiseRef.current = null;
+      }
+    })();
+    return kitLoadPromiseRef.current;
   }, []);
 
   const refreshAll = useCallback(async () => {
@@ -140,7 +196,7 @@ export function DataProvider({ children }) {
     refreshPromiseRef.current = (async () => {
       setLoading(true);
       try {
-        const results = await loadEndpoints(endpoints());
+        const results = await loadEndpoints(endpoints(), { force: true });
         return { success: results.some(r => r.status === 'fulfilled'), failed: results.filter(r => r.status === 'rejected').length };
       } finally { setLoading(false); refreshPromiseRef.current = null; }
     })();
@@ -150,26 +206,31 @@ export function DataProvider({ children }) {
   const bootstrap = useCallback(async () => {
     if (authLoading || !isAuthenticated) return;
     const all = endpoints();
-    const corePathsByRole = {
-      admin: new Set(['/schools', '/classes', '/students', '/trainers', '/sessions', '/attendance', '/billing', '/inventory']),
-      superadmin: new Set(['/schools', '/classes', '/students', '/trainers', '/sessions', '/attendance', '/billing', '/inventory']),
-      trainer: new Set(['/schools', '/classes', '/students', '/trainers', '/sessions', '/attendance']),
-      school: new Set(['/schools', '/classes', '/students', '/trainers', '/attendance', '/billing', '/notifications']),
-      student: new Set(['/schools', '/classes', '/students', '/sessions', '/attendance', '/content', '/notifications']),
-    };
-    const corePaths = corePathsByRole[role] || corePathsByRole.student;
+    const corePaths = CORE_PATHS_BY_ROLE[role] || CORE_PATHS_BY_ROLE.student;
     const core = all.filter(([path]) => corePaths.has(path));
     const secondary = all.filter(([path]) => !corePaths.has(path));
     setLoading(true);
     try { await loadEndpoints(core); } finally { setLoading(false); }
     if (backgroundTimerRef.current) window.clearTimeout(backgroundTimerRef.current);
-    backgroundTimerRef.current = window.setTimeout(() => { backgroundTimerRef.current = null; loadEndpoints(secondary); }, 250);
+    if (!secondary.length) return;
+    backgroundTimerRef.current = window.setTimeout(async () => {
+      backgroundTimerRef.current = null;
+      for (let index = 0; index < secondary.length; index += 3) {
+        await loadEndpoints(secondary.slice(index, index + 3));
+        if (index + 3 < secondary.length) await new Promise(resolve => window.setTimeout(resolve, 400));
+      }
+    }, 1500);
   }, [authLoading, isAuthenticated, role, endpoints, loadEndpoints]);
 
   const scheduleRefresh = useCallback(() => {
     if (refreshTimerRef.current) window.clearTimeout(refreshTimerRef.current);
     refreshTimerRef.current = window.setTimeout(() => { refreshTimerRef.current = null; refreshAll(); }, 150);
   }, [refreshAll]);
+
+  useEffect(() => {
+    loadedEndpointsRef.current.clear();
+    setEndpointErrors({});
+  }, [role, isAuthenticated]);
 
   useEffect(() => {
     if (!authLoading && isAuthenticated) bootstrap();
@@ -243,7 +304,7 @@ export function DataProvider({ children }) {
   const resolveAlertAction = useCallback(async () => ({ success: false, error: 'No operational alert action is connected.' }), []);
 
   const value = {
-    loading, endpointErrors, refreshAll,
+    loading, endpointErrors, refreshAll, loadData,
     schools, addSchool, updateSchool, deleteSchool,
     classes, addClass,
     students, addStudent, updateStudent, deleteStudent, getNextRollNumber, getStudentAttendance, getStudentAttendanceRecords,
@@ -253,6 +314,7 @@ export function DataProvider({ children }) {
     leads, addLead, updateLeadStage, deleteLead, convertLeadToSchool,
     content, uploadContent, deleteContent, curriculum, addCurriculumPlan, updateCurriculumStatus,
     inventory, addInventoryKit, updateKitStatus, deleteKit, classKits, updateClassKitComponent, addComponentToClassKit,
+    kits, loadKits, kitsLoading, kitsError,
     billing, createInvoice, updateInvoiceStatus, confirmPaymentReceipt, updateBillingInvoice, deleteBillingInvoice,
     comms, sendCommsMessage, projects, addProject, deleteProject, uploadFile, resolveAlertAction,
     notifications, sendBroadcastNotification, updateNotification, deleteNotification, pushSchoolNotification,
