@@ -73,12 +73,12 @@ export function recordApiPerformance(path, method, data) {
 }
 
 export function markPerformance(name) {
-  if (!ENABLED || typeof performance === 'undefined' || typeof performance.mark !== 'function') return;
-  performance.mark(`pixiu:${String(name)}`);
+  if (typeof performance === 'undefined' || typeof performance.mark !== 'function') return;
+  try { performance.mark(`pixiu:${String(name)}`); } catch {}
 }
 
 export function measurePerformance(name, startMark) {
-  if (!ENABLED || typeof performance === 'undefined' || typeof performance.measure !== 'function') return null;
+  if (typeof performance === 'undefined' || typeof performance.measure !== 'function') return null;
   try {
     const measure = performance.measure(`pixiu:${String(name)}`, `pixiu:${String(startMark)}`);
     const durationMs = Number(measure.duration.toFixed(2));
@@ -89,9 +89,12 @@ export function measurePerformance(name, startMark) {
   }
 }
 
-if (ENABLED && typeof window !== 'undefined') {
+// User-timing measurements are always available so production can be measured
+// without enabling request-level diagnostics or logging extra application data.
+if (typeof window !== 'undefined') {
   window.__PIXIU_PERF__ = Object.freeze({
     enabled: true,
+    apiDiagnosticsEnabled: ENABLED,
     snapshot,
     summary,
     measures: measureSnapshot,
