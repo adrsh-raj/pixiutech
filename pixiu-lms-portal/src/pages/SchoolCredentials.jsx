@@ -1,13 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { KeyRound, ShieldCheck, RefreshCw, Eye, EyeOff, ArrowLeft, Building2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { API_BASE } from '../config/api';
-import { useAuth } from '../context/AuthContext';
+import { apiFetch, useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-
-function getToken() {
-  return localStorage.getItem('pixiu_auth_token');
-}
 
 export default function SchoolCredentials() {
   const { user } = useAuth();
@@ -22,13 +17,10 @@ export default function SchoolCredentials() {
   const loadSchools = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/schools`, {
-        headers: { Authorization: `Bearer ${getToken() || ''}` },
-        cache: 'no-store'
-      });
+      const response = await apiFetch('/schools', { cache: 'no-store' });
       const payload = await response.json().catch(() => []);
-      if (!response.ok) throw new Error(payload.error || 'Unable to load schools.');
-      const rows = Array.isArray(payload) ? payload : payload.data || [];
+      if (!response.ok) throw new Error(payload.error || payload.detail || payload.message || 'Unable to load schools.');
+      const rows = Array.isArray(payload) ? payload : payload.data || payload.results || [];
       setSchools(rows);
       setForms(prev => rows.reduce((acc, school) => ({ ...acc, [school.id]: prev[school.id] || '' }), {}));
     } catch (error) {
@@ -53,16 +45,13 @@ export default function SchoolCredentials() {
 
     setSavingId(school.id);
     try {
-      const response = await fetch(`${API_BASE}/schools/${encodeURIComponent(school.id)}/reset-password`, {
+      const response = await apiFetch(`/schools/${encodeURIComponent(school.id)}/reset-password`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${getToken() || ''}`
-        },
-        body: JSON.stringify({ password })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
       });
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.error || 'Unable to save school password.');
+      if (!response.ok) throw new Error(payload.error || payload.detail || payload.message || 'Unable to save school password.');
       setForms(prev => ({ ...prev, [school.id]: '' }));
       setVisible(prev => ({ ...prev, [school.id]: false }));
       toast.success(`${school.name} can now sign in using the school ID and new password.`, 'School password saved');
