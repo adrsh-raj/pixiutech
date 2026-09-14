@@ -1,4 +1,5 @@
 from django.db import transaction
+from django.db.models import Q
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -48,9 +49,9 @@ class TrainerUnitListCreateView(APIView):
         units = (
             CurriculumUnit.objects.filter(
                 class_assignments__school_class_id=class_id,
-                completion_profile__technology_id=technology_id,
                 status__in=["draft", "published"],
             )
+            .filter(Q(completion_profile__technology_id=technology_id) | Q(completion_profile__isnull=True))
             .select_related("completion_profile__technology")
             .distinct()
         )
