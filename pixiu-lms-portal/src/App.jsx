@@ -1,4 +1,4 @@
-import { lazy, Suspense, Component, useEffect } from 'react';
+import { lazy, Suspense, Component, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Outlet, Navigate, Link, useLocation } from 'react-router-dom';
 import PortalShell from './components/PortalShell';
 import { DataProvider } from './context/DataContext';
@@ -65,12 +65,26 @@ const roleSubtitle = { admin: 'Robotics & AI Operating System', superadmin: 'Rob
 
 function RoutePerformance({ children }) {
   const location = useLocation();
+  const measuredKeyRef = useRef('');
   useEffect(() => {
-    markPerformance(`route:render:${location.pathname}`);
-    const measured = measurePerformance('dashboard_tti', 'dashboard:navigation');
-    if (measured !== null && typeof window !== 'undefined' && window.__PIXIU_PERF__) {
-      window.__PIXIU_PERF__.lastDashboardTTI = measured;
-    }
+    let firstFrame = 0;
+    let secondFrame = 0;
+    const routeKey = `${location.pathname}`;
+    const navMark = 'dashboard:navigation';
+    const hasNavStart = typeof performance !== 'undefined' && typeof performance.getEntriesByName === 'function'
+      && performance.getEntriesByName('pixiu:dashboard:navigation').length > 0;
+    if (!hasNavStart) markPerformance(navMark);
+    firstFrame = requestAnimationFrame(() => {
+      secondFrame = requestAnimationFrame(() => {
+        if (measuredKeyRef.current === routeKey) return;
+        measuredKeyRef.current = routeKey;
+        measurePerformance('dashboard_tti', navMark);
+      });
+    });
+    return () => {
+      cancelAnimationFrame(firstFrame);
+      cancelAnimationFrame(secondFrame);
+    };
   }, [location.pathname]);
   return children;
 }
