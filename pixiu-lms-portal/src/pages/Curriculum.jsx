@@ -73,20 +73,65 @@ export default function Curriculum() {
     setSaving(true); setError('');
     try {
       const number = Number(formData.unit_number);
-      await request(editing?.id ? `/curriculum/${encodeURIComponent(editing.id)}` : '/curriculum', editing?.id ? 'PATCH' : 'POST', {
-        school_class: selectedClass.id,
-        grade: gradeOf(selectedClass),
-        unit_code: `U${number}`,
-        title: norm(formData.topic),
-        week: unitLabel(number),
-        topic: norm(formData.topic),
-        objectives: norm(formData.objectives),
-        status: formData.status === 'published' ? 'published' : 'draft',
-      });
-      await refreshAll?.(); setIsModalOpen(false);
+      let unitId = editing?.id || null;
+
+      if (editing?.id) {
+        await request(`/curriculum/${encodeURIComponent(editing.id)}`, 'PATCH', {
+          school_class: selectedClass.id,
+          status: formData.status === 'published' ? 'published' : 'draft',
+          title: norm(formData.topic),
+          topic: norm(formData.topic),
+          objectives: norm(formData.objectives),
+        });
+      } else {
+        const existingMaster = curriculum.find(item => (
+          gradeOf(item) === gradeOf(selectedClass) &&
+          unitNumber(item.unit_code || item.week) === number
+        ));
+
+        if (existingMaster?.id) {
+          unitId = existingMaster.id;
+          if (norm(existingMaster.status).toLowerCase() !== (formData.status === 'published' ? 'published' : 'draft') || norm(existingMaster.topic || existingMaster.title) !== norm(formData.topic) || norm(existingMaster.objectives) !== norm(formData.objectives)) {
+            await request(`/curriculum/${encodeURIComponent(existingMaster.id)}`, 'PATCH', {
+              title: norm(formData.topic),
+              topic: norm(formData.topic),
+              objectives: norm(formData.objectives),
+              status: formData.status === 'published' ? 'published' : 'draft',
+            });
+          }
+        } else {
+          const created = await request('/curriculum', 'POST', {
+            grade: gradeOf(selectedClass),
+            unit_code: `U${number}`,
+            title: norm(formData.topic),
+            week: unitLabel(number),
+            topic: norm(formData.topic),
+            objectives: norm(formData.objectives),
+            status: formData.status === 'published' ? 'published' : 'draft',
+          });
+          unitId = created?.id;
+          if (!unitId) throw new Error('Curriculum unit was created but no unit id was returned.');
+        }
+      }
+
+      if (!editing?.id && unitId) {
+        const assignedAlready = visibleCurriculum.some(item => String(item.id) === String(unitId));
+        if (!assignedAlready) {
+          await request('/curriculum-assignments', 'POST', {
+            curriculum_unit: unitId,
+            school_class: selectedClass.id,
+          });
+        }
+      }
+
+      await refreshAll?.();
+      setIsModalOpen(false);
       toast.success(`${unitLabel(number)} saved for ${selectedClass.display_name || `${selectedClass.grade}-${selectedClass.section}`}.`, 'Curriculum updated');
-    } catch (err) { setError(err.message || 'Unable to save curriculum unit.'); }
-    finally { setSaving(false); }
+    } catch (err) {
+      setError(err.message || 'Unable to save curriculum unit.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const togglePublication = async item => {
@@ -94,7 +139,7 @@ export default function Curriculum() {
     setSaving(true); setError('');
     try {
       const next = norm(item.status).toLowerCase() === 'published' ? 'draft' : 'published';
-      await request(`/curriculum/${encodeURIComponent(item.id)}`, 'PATCH', { school_class: selectedClass.id, status: next });
+      await request(`/curriculum/${encodeURIComponent(item.id)}`, 'PATCH', { status: next });
       await refreshAll?.(); toast.success(`${item.title} is now ${next === 'published' ? 'published' : 'draft'}.`, 'Curriculum status updated');
     } catch (err) { setError(err.message || 'Unable to update curriculum status.'); }
     finally { setSaving(false); }
