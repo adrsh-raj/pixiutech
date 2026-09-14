@@ -1,5 +1,6 @@
 const ENABLED = String(import.meta.env.VITE_PERF_DIAGNOSTICS || '').toLowerCase() === 'true';
 const MAX_ENTRIES = 500;
+const STORAGE_KEY = 'pixiu_phase0_perf';
 const entries = [];
 const measures = new Map();
 
@@ -19,6 +20,31 @@ function safePath(path) {
     else safe.push(':id');
   }
   return safe.join('/');
+}
+
+function restoreMeasures() {
+  if (typeof window === 'undefined') return;
+  try {
+    const raw = window.sessionStorage.getItem(STORAGE_KEY);
+    const saved = raw ? JSON.parse(raw) : null;
+    if (!Array.isArray(saved)) return;
+    saved.forEach(item => {
+      if (item?.name && Number.isFinite(Number(item.durationMs))) {
+        measures.set(String(item.name), Object.freeze({
+          name: String(item.name),
+          durationMs: Number(item.durationMs),
+          ts: Number(item.ts) || Date.now(),
+        }));
+      }
+    });
+  } catch {}
+}
+
+function persistMeasures() {
+  if (typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify([...measures.values()]));
+  } catch {}
 }
 
 function pushEntry(entry) {
@@ -83,6 +109,7 @@ export function measurePerformance(name, startMark) {
     const measure = performance.measure(`pixiu:${String(name)}`, `pixiu:${String(startMark)}`);
     const durationMs = Number(measure.duration.toFixed(2));
     measures.set(String(name), Object.freeze({ name: String(name), durationMs, ts: Date.now() }));
+    persistMeasures();
     return durationMs;
   } catch {
     return null;
@@ -92,12 +119,17 @@ export function measurePerformance(name, startMark) {
 // User-timing measurements are always available so production can be measured
 // without enabling request-level diagnostics or logging extra application data.
 if (typeof window !== 'undefined') {
+  restoreMeasures();
   window.__PIXIU_PERF__ = Object.freeze({
     enabled: true,
     apiDiagnosticsEnabled: ENABLED,
     snapshot,
     summary,
     measures: measureSnapshot,
-    clear: () => { entries.length = 0; measures.clear(); },
+    clear: () => {
+      entries.length = 0;
+      measures.clear();
+      try { window.sessionStorage.removeItem(STORAGE_KEY); } catch {}
+    },
   });
 }
