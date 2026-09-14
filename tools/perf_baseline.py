@@ -101,21 +101,27 @@ def run(url: str, token: str | None, total: int, concurrency: int, timeout: floa
 
 def summarize(endpoint: str, concurrency: int, results: list[Result]) -> dict[str, object]:
     elapsed = [item.elapsed_ms for item in results]
-    errors = [item for item in results if item.error or item.status == 0 or item.status >= 500]
+    successes = [item for item in results if 200 <= item.status < 400]
+    http_errors = [item for item in results if 400 <= item.status < 600]
+    server_errors = [item for item in results if item.status >= 500 or (item.status == 0 and item.error)]
     db_queries = [float(item.db_queries) for item in results if item.db_queries is not None]
     db_time = [item.db_time_ms for item in results if item.db_time_ms is not None]
     server_duration = [item.server_duration_ms for item in results if item.server_duration_ms is not None]
     breakdown: dict[str, int] = {}
-    for item in errors:
-        key = str(item.status) if item.status else (item.error or "transport_error")
+    for item in http_errors:
+        key = str(item.status)
         breakdown[key] = breakdown.get(key, 0) + 1
+    for item in results:
+        if item.status == 0 and item.error:
+            breakdown[item.error] = breakdown.get(item.error, 0) + 1
 
     return {
         "endpoint": endpoint,
         "requests": len(results),
         "concurrency": concurrency,
-        "successes": len(results) - len(errors),
-        "errors": len(errors),
+        "success_2xx_3xx": len(successes),
+        "http_errors_4xx_5xx": len(http_errors),
+        "server_or_transport_errors": len(server_errors),
         "error_breakdown": ",".join(f"{k}:{v}" for k, v in sorted(breakdown.items())),
         "p50_ms": round(percentile(elapsed, 50) or 0, 2),
         "p95_ms": round(percentile(elapsed, 95) or 0, 2),
@@ -180,7 +186,8 @@ def main() -> int:
             rows.append(row)
             print(
                 f"endpoint={endpoint} concurrency={concurrency} requests={row['requests']} "
-                f"successes={row['successes']} errors={row['errors']} "
+                f"2xx_3xx={row['success_2xx_3xx']} 4xx_5xx={row['http_errors_4xx_5xx']} "
+                f"server_transport_errors={row['server_or_transport_errors']} "
                 f"p50_ms={row['p50_ms']:.2f} p95_ms={row['p95_ms']:.2f} p99_ms={row['p99_ms']:.2f} "
                 f"db_queries_p50={row['db_queries_p50']} db_time_p50_ms={row['db_time_p50_ms']}"
             )
@@ -194,7 +201,7 @@ def main() -> int:
             writer.writerows(rows)
         print(f"csv_written={destination}")
 
-    return 0 if all(row["errors"] == 0 for row in rows) else 2
+    return 0 if all(row["server_or_transport_errors"] == 0 for row in rows) else 2
 
 
 if __name__ == "__main__":
