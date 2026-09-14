@@ -21,20 +21,18 @@ class TrainerUnitListCreateView(APIView):
         return None
 
     def _serialize(self, unit):
-        profile = CurriculumUnitProfile.objects.filter(curriculum_unit=unit).select_related("technology").first()
-        number = unit.week.replace("Unit ", "", 1).strip() if str(unit.week or "").lower().startswith("unit ") else unit.unit_code
+        profile = getattr(unit, "completion_profile", None)
         return {
             "id": str(unit.id),
-            "unit_number": number,
+            "unit_number": unit.week.replace("Unit ", "", 1).strip() if str(unit.week or "").lower().startswith("unit ") else unit.unit_code,
             "unit_code": unit.unit_code,
             "title": unit.title,
             "topic": unit.topic or unit.title,
-            "level": unit.level,
             "objectives": unit.objectives,
             "status": unit.status,
             "grade": unit.grade,
             "technology_id": str(profile.technology_id) if profile else None,
-            "technology_name": profile.technology.name if profile else "",
+            "technology_name": profile.technology.name if profile and getattr(profile, "technology", None) else "",
         }
 
     def get(self, request):
@@ -47,11 +45,15 @@ class TrainerUnitListCreateView(APIView):
             return Response({"detail": "class_id and technology are required."}, status=400)
         if not accessible_class_queryset(request.user).filter(pk=class_id).exists():
             return Response({"detail": "You cannot view units for this class."}, status=403)
-        units = CurriculumUnit.objects.filter(
-            class_assignments__school_class_id=class_id,
-            completion_profile__technology_id=technology_id,
-            status__in=["draft", "published"],
-        ).select_related("completion_profile__technology").distinct()
+        units = (
+            CurriculumUnit.objects.filter(
+                class_assignments__school_class_id=class_id,
+                completion_profile__technology_id=technology_id,
+                status__in=["draft", "published"],
+            )
+            .select_related("completion_profile__technology")
+            .distinct()
+        )
         return Response([self._serialize(unit) for unit in units])
 
     @transaction.atomic
@@ -66,7 +68,6 @@ class TrainerUnitListCreateView(APIView):
         technology_id = request.data.get("technology") or request.data.get("technology_id")
         unit_number = str(request.data.get("unit_number") or "").strip()
         title = str(request.data.get("title") or request.data.get("topic") or "").strip()
-        level = str(request.data.get("level") or "Level 1").strip()
         objectives = str(request.data.get("objectives") or "").strip()
 
         if not class_id or not technology_id or not unit_number or not title or not objectives:
@@ -91,7 +92,6 @@ class TrainerUnitListCreateView(APIView):
             unit_code = f"{technology.code.upper()}-U{int(unit_number)}"
             unit = CurriculumUnit.objects.create(
                 grade=school_class.grade,
-                level=level,
                 unit_code=unit_code,
                 title=title,
                 week=f"Unit {int(unit_number)}",
