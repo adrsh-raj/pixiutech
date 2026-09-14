@@ -30,9 +30,7 @@ def _pdf_overlay(width, height):
     page.setFont("Helvetica-Bold", max(18, min(36, int(min(float(width), float(height)) / 18))))
     page.translate(float(width) / 2, float(height) / 2)
     page.rotate(32)
-    step = max(90, min(150, int(min(float(width), float(height)) / 7)))
-    for y in range(-int(height) * 2, int(height) * 2, step):
-        page.drawCentredString(0, y, WATERMARK_TEXT)
+    page.drawCentredString(0, 0, WATERMARK_TEXT)
     page.restoreState()
     page.save()
     return buffer.getvalue()
@@ -63,15 +61,33 @@ def watermark_image(raw_bytes):
     original = Image.open(io.BytesIO(raw_bytes))
     source = original.convert("RGBA")
     overlay = Image.new("RGBA", source.size, (255, 255, 255, 0))
-    draw = ImageDraw.Draw(overlay)
+    text_layer = Image.new("RGBA", source.size, (255, 255, 255, 0))
+    draw = ImageDraw.Draw(text_layer)
     font = _font(max(16, int(min(source.size) / 16)))
-    text_width = max(240, int(source.width * 0.34))
-    while font and draw.textbbox((0, 0), WATERMARK_TEXT, font=font)[2] > text_width and getattr(font, "size", 0) > 10:
+    max_width = int(source.width * 0.34)
+    while font and draw.textbbox((0, 0), WATERMARK_TEXT, font=font)[2] > max_width and getattr(font, "size", 0) > 10:
         font = _font(max(10, getattr(font, "size", 24) - 2))
-    spacing = max(120, int(min(source.size) / 5))
-    for y in range(-source.height, source.height * 2, spacing):
-        for x in range(-source.width, source.width * 2, max(spacing * 2, 180)):
-            draw.text((x, y), WATERMARK_TEXT, font=font, fill=(55, 65, 81, 52), stroke_width=1, stroke_fill=(255, 255, 255, 80))
+
+    bbox = draw.textbbox((0, 0), WATERMARK_TEXT, font=font, stroke_width=1)
+    text_width = bbox[2] - bbox[0]
+    text_height = bbox[3] - bbox[1]
+    pad = 12
+    text_image = Image.new("RGBA", (text_width + pad * 2, text_height + pad * 2), (255, 255, 255, 0))
+    text_draw = ImageDraw.Draw(text_image)
+    text_draw.text(
+        (pad - bbox[0], pad - bbox[1]),
+        WATERMARK_TEXT,
+        font=font,
+        fill=(55, 65, 81, 52),
+        stroke_width=1,
+        stroke_fill=(255, 255, 255, 80),
+    )
+    rotated = text_image.rotate(-32, expand=True, resample=Image.Resampling.BICUBIC)
+    x = (source.width - rotated.width) // 2
+    y = (source.height - rotated.height) // 2
+    text_layer.alpha_composite(rotated, (x, y))
+
+    overlay = Image.alpha_composite(overlay, text_layer)
     merged = Image.alpha_composite(source, overlay)
     output = io.BytesIO()
     original_format = original.format or "PNG"
