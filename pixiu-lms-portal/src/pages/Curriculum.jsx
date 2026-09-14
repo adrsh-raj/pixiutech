@@ -77,7 +77,6 @@ export default function Curriculum() {
 
       if (editing?.id) {
         await request(`/curriculum/${encodeURIComponent(editing.id)}`, 'PATCH', {
-          school_class: selectedClass.id,
           status: formData.status === 'published' ? 'published' : 'draft',
           title: norm(formData.topic),
           topic: norm(formData.topic),
