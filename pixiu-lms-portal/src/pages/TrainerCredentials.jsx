@@ -1,11 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { KeyRound, ShieldCheck, RefreshCw, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { API_BASE } from '../config/api';
-import { useAuth } from '../context/AuthContext';
+import { apiFetch, useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-
-function getToken() { return localStorage.getItem('pixiu_auth_token'); }
 
 export default function TrainerCredentials() {
   const { user } = useAuth();
@@ -20,9 +17,9 @@ export default function TrainerCredentials() {
   const loadTrainers = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/trainers`, { headers: { Authorization: `Bearer ${getToken() || ''}` }, cache: 'no-store' });
+      const response = await apiFetch('/trainers', { cache: 'no-store' });
       const payload = await response.json().catch(() => []);
-      if (!response.ok) throw new Error(payload.error || payload.detail || 'Unable to load trainers.');
+      if (!response.ok) throw new Error(payload.error || payload.detail || payload.message || 'Unable to load trainers.');
       const rows = Array.isArray(payload) ? payload : payload.results || payload.data || [];
       setTrainers(rows);
       setForms(prev => rows.reduce((acc, trainer) => ({ ...acc, [trainer.id]: prev[trainer.id] || '' }), {}));
@@ -39,11 +36,13 @@ export default function TrainerCredentials() {
     if (password.length < 12) { toast.warning('Use a password with at least 12 characters.', 'Password too short'); return; }
     setSavingId(trainer.id);
     try {
-      const response = await fetch(`${API_BASE}/trainers/${encodeURIComponent(trainer.id)}/reset-password`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken() || ''}` }, body: JSON.stringify({ password })
+      const response = await apiFetch(`/trainers/${encodeURIComponent(trainer.id)}/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
       });
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.error || payload.detail || 'Unable to reset password.');
+      if (!response.ok) throw new Error(payload.error || payload.detail || payload.message || 'Unable to reset password.');
       setForms(prev => ({ ...prev, [trainer.id]: '' }));
       setVisible(prev => ({ ...prev, [trainer.id]: false }));
       toast.success(`${trainer.name} can now sign in with the new password.`, 'Password reset');
