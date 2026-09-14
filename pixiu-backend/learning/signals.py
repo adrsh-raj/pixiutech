@@ -1,5 +1,9 @@
+from pathlib import Path
+
+from django.db import connection
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
+from django.core.files.storage import default_storage
 from rest_framework.exceptions import ValidationError
 
 from .certificate_qr import generate_verification_qr
@@ -42,6 +46,63 @@ def enforce_learning_content_watermark(sender, instance, **kwargs):
                 pass
         instance.file = prepared
     instance.is_watermarked = watermarked
+
+
+@receiver(post_save, sender=LearningContent)
+def backup_learning_content_file(sender, instance, **kwargs):
+    """Persist PDF/image uploads so they survive Render filesystem resets."""
+    if not instance.file or instance.content_type not in {"pdf", "image"}:
+        return
+
+    file_name = str(instance.file.name or "").strip()
+    if not file_name:
+        return
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT file_name FROM learning_content_file_backup WHERE content_id = %s",
+                [str(instance.pk)],
+            )
+            row = cursor.fetchone()
+            if row and row[0] == file_name:
+                return
+
+        if not default_storage.exists(file_name):
+            return
+
+        with instance.file.open("rb") as handle:
+            data = handle.read()
+        if not data:
+            return
+
+        content_type = "application/pdf"
+        if instance.content_type == "image":
+            suffix = Path(file_name).suffix.lower()
+            content_type = {
+                ".jpg": "image/jpeg",
+                ".jpeg": "image/jpeg",
+                ".png": "image/png",
+                ".webp": "image/webp",
+            }.get(suffix, "application/octet-stream")
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO learning_content_file_backup
+                    (content_id, file_name, content_type, data, updated_at)
+                VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP)
+                ON CONFLICT (content_id) DO UPDATE SET
+                    file_name = EXCLUDED.file_name,
+                    content_type = EXCLUDED.content_type,
+                    data = EXCLUDED.data,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                [str(instance.pk), Path(file_name).name[:255], content_type, data],
+            )
+    except Exception:
+        # Never make a valid content save fail because the backup path is unavailable.
+        return
 
 
 @receiver(post_save, sender=Certificate)
