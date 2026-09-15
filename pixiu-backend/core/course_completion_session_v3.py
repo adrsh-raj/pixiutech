@@ -48,12 +48,26 @@ class CourseAwareSessionViewSet(SafeScopedSessionViewSet):
     def map_out(self, obj):
         payload = super().map_out(obj)
         workflow = SessionWorkflow.objects.filter(session=obj).select_related('technology').first()
+        curriculum = getattr(obj, 'curriculum_unit', None)
+        school_class = getattr(obj, 'school_class', None)
+        school = getattr(school_class, 'school', None)
         payload.update({
             'technology': str(workflow.technology_id) if workflow else None,
             'technology_id': str(workflow.technology_id) if workflow else None,
             'technology_name': workflow.technology.name if workflow else '',
             'is_last_session_for_unit': bool(workflow.is_last_session_for_unit) if workflow else False,
             'last_session': bool(workflow.is_last_session_for_unit) if workflow else False,
+            'school_class_id': str(obj.school_class_id) if obj.school_class_id else None,
+            'school_class_school': str(school.id) if school else None,
+            'school_name': school.name if school else '',
+            'school_code': school.school_code if school else '',
+            'class_name': school_class.display_name if school_class else '',
+            'curriculum_unit_id': str(obj.curriculum_unit_id) if obj.curriculum_unit_id else None,
+            'curriculum_unit_name': curriculum.title if curriculum else '',
+            'curriculum_unit_title': curriculum.title if curriculum else '',
+            'curriculum_unit_code': curriculum.unit_code if curriculum else '',
+            'curriculum_unit_week': curriculum.week if curriculum else '',
+            'curriculum_unit_topic': curriculum.topic if curriculum else '',
         })
         return payload
 
