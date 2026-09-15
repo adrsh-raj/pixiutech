@@ -7,6 +7,7 @@ from accounts.models import UserRole
 from academics.models import Student
 from learning.course_completion_models import CurriculumUnitProfile, SessionWorkflow, Technology
 from learning.models import AttendanceRecord, CurriculumUnit, Session
+from learning.serializers import SessionSerializer
 from learning.course_completion_v3 import evaluate_last_session
 from .strict_learning_scope_views import SafeScopedSessionViewSet
 
@@ -52,10 +53,6 @@ class CourseAwareSessionViewSet(SafeScopedSessionViewSet):
         school_class = getattr(obj, 'school_class', None)
         school = getattr(school_class, 'school', None)
 
-        # Older sessions were created before SessionWorkflow technology metadata
-        # was introduced. Their technology is still determinable from the
-        # curriculum unit profile, so the API must not return an empty technology
-        # field and force the editor to ask for it again.
         technology = workflow.technology if workflow and workflow.technology_id else None
         if technology is None and curriculum is not None:
             profile = CurriculumUnitProfile.objects.filter(curriculum_unit=curriculum).select_related('technology').first()
@@ -158,6 +155,22 @@ class CourseAwareSessionViewSet(SafeScopedSessionViewSet):
         workflow.save(update_fields=['technology', 'is_last_session_for_unit', 'updated_at'])
         if workflow.is_last_session_for_unit:
             self._set_last_session(session, True)
-        response = super().update(request, *args, **kwargs)
-        response.data = self.map_out(Session.objects.get(pk=session.pk))
-        return response
+
+        # The legacy compatibility update() path inserts absent required foreign
+        # keys as null before serializer validation. Build the update explicitly
+        # from the persisted session, so editing does not require re-selecting the
+        # already-assigned class or trainer and PATCH cannot fail on null FKs.
+        payload = request.data.copy()
+        payload['school_class'] = str(session.school_class_id)
+        payload['trainer'] = str(session.trainer_id)
+        payload['curriculum_unit'] = str(session.curriculum_unit_id) if session.curriculum_unit_id else ''
+        serializer = SessionSerializer(
+            session,
+            data=payload,
+            partial=str(request.method).upper() == 'PATCH',
+            context={'request': request},
+        )
+        serializer.is_valid(raise_exception=True)
+        updated = serializer.save()
+        updated = Session.objects.select_related('school_class__school', 'trainer', 'curriculum_unit').get(pk=updated.pk)
+        return Response(self.map_out(updated))
