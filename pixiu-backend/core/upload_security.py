@@ -13,11 +13,6 @@ from django.core.files.uploadedfile import UploadedFile
 from rest_framework.exceptions import ParseError
 from rest_framework.parsers import MultiPartParser as DRFMultiPartParser
 
-MAX_UPLOAD_BYTES = int(getattr(settings, "SECURE_UPLOAD_MAX_BYTES", 20 * 1024 * 1024))
-MAX_MULTIPART_BYTES = int(
-    getattr(settings, "SECURE_UPLOAD_MAX_MULTIPART_BYTES", MAX_UPLOAD_BYTES + 5 * 1024 * 1024)
-)
-
 # Product-supported binary formats. Active-content formats such as SVG, HTML,
 # JavaScript and executable/archive formats are intentionally excluded.
 ALLOWED_UPLOADS = {
@@ -39,6 +34,20 @@ MAGIC_BYTES = {
 
 class SecureUploadError(DjangoValidationError):
     """Validation error raised for unsafe uploads."""
+
+
+def max_upload_bytes() -> int:
+    return int(getattr(settings, "SECURE_UPLOAD_MAX_BYTES", 20 * 1024 * 1024))
+
+
+def max_multipart_bytes() -> int:
+    return int(
+        getattr(
+            settings,
+            "SECURE_UPLOAD_MAX_MULTIPART_BYTES",
+            max_upload_bytes() + 5 * 1024 * 1024,
+        )
+    )
 
 
 def _clean_original_name(name: str | None) -> str:
@@ -72,8 +81,8 @@ def _assert_valid_image(uploaded: UploadedFile, extension: str) -> None:
         return
     try:
         from PIL import Image
-    except ImportError:
-        raise SecureUploadError("Image validation is unavailable on this server.")
+    except ImportError as exc:
+        raise SecureUploadError("Image validation is unavailable on this server.") from exc
 
     position = uploaded.tell() if hasattr(uploaded, "tell") else 0
     try:
@@ -114,13 +123,14 @@ def validate_uploaded_file(uploaded: UploadedFile | None) -> UploadedFile:
     size = getattr(uploaded, "size", None)
     if size is None or int(size) <= 0:
         raise SecureUploadError("Uploaded file is empty.")
-    if int(size) > MAX_UPLOAD_BYTES:
-        raise SecureUploadError(f"File must be {MAX_UPLOAD_BYTES // (1024 * 1024)} MB or smaller.")
+    if int(size) > max_upload_bytes():
+        raise SecureUploadError(
+            f"File must be {max_upload_bytes() // (1024 * 1024)} MB or smaller."
+        )
 
     declared_type = str(getattr(uploaded, "content_type", "") or "").split(";", 1)[0].strip().lower()
     expected_types = set(ALLOWED_UPLOADS[extension])
     if declared_type and declared_type not in expected_types:
-        guessed = mimetypes.guess_type(original_name)[0]
         raise SecureUploadError(
             f"File content type does not match the .{extension.lstrip('.')} extension."
         )
@@ -135,9 +145,7 @@ def validate_uploaded_file(uploaded: UploadedFile | None) -> UploadedFile:
 
 def validate_file_field_value(value):
     """Validator compatible with Django/DRF FileField validation."""
-    if value is None:
-        return value
-    if getattr(value, "_committed", False):
+    if value is None or getattr(value, "_committed", False):
         return value
     uploaded = getattr(value, "file", value)
     validate_uploaded_file(uploaded)
@@ -154,9 +162,9 @@ class SecureMultiPartParser(DRFMultiPartParser):
         raw_length = getattr(request, "META", {}).get("CONTENT_LENGTH") if request else None
         if raw_length:
             try:
-                if int(raw_length) > MAX_MULTIPART_BYTES:
+                if int(raw_length) > max_multipart_bytes():
                     raise ParseError(
-                        f"Multipart request exceeds the {MAX_MULTIPART_BYTES // (1024 * 1024)} MB limit."
+                        f"Multipart request exceeds the {max_multipart_bytes() // (1024 * 1024)} MB limit."
                     )
             except (TypeError, ValueError):
                 pass
@@ -176,9 +184,9 @@ class SecureUploadSizeHandler(FileUploadHandler):
 
     def receive_data_chunk(self, raw_data, start):
         self._received += len(raw_data)
-        if self._received > MAX_UPLOAD_BYTES:
+        if self._received > max_upload_bytes():
             raise ParseError(
-                f"File exceeds the {MAX_UPLOAD_BYTES // (1024 * 1024)} MB upload limit."
+                f"File exceeds the {max_upload_bytes() // (1024 * 1024)} MB upload limit."
             )
         return raw_data
 
