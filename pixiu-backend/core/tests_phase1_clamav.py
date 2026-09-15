@@ -1,4 +1,5 @@
-from unittest.mock import MagicMock, patch
+import os
+from unittest import TestCase, skipUnless, patch
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, override_settings
@@ -44,7 +45,7 @@ class ClamAVProtocolTests(SimpleTestCase):
         CLAMAV_CHUNK_SIZE=8,
     )
     @patch("core.clamav_client.socket.create_connection")
-    def test_streams_upload_using_instrem_and_accepts_clean_verdict(self, create_connection):
+    def test_streams_upload_using_instream_and_accepts_clean_verdict(self, create_connection):
         upload = SimpleTestUploadedFile(b"clean-pdf")
         fake_socket = _SocketResponse(b"stream: OK\0")
         create_connection.return_value = fake_socket
@@ -87,8 +88,19 @@ class ClamAVProtocolTests(SimpleTestCase):
         self.assertEqual(raised.exception.messages, ["Malware scanning is currently unavailable."])
         scan_mock.assert_called_once()
 
-    def test_placeholder_socket_class_does_not_depend_on_external_packages(self):
-        self.assertTrue(MagicMock)
+    @skipUnless(os.environ.get("CLAMAV_INTEGRATION") == "1", "live ClamAV integration test is CI-only")
+    @override_settings(
+        CLAMAV_ENABLED=True,
+        CLAMAV_REQUIRED=True,
+        CLAMAV_HOST="127.0.0.1",
+        CLAMAV_PORT=3310,
+        CLAMAV_TIMEOUT_SECONDS=30,
+        CLAMAV_CHUNK_SIZE=1024 * 1024,
+    )
+    def test_live_clamav_scans_a_real_upload(self):
+        upload = SimpleUploadedFile("live.pdf", b"%PDF-1.7\nclean integration test\n", content_type="application/pdf")
+        scan_uploaded_file(upload)
+        self.assertEqual(upload.tell(), 0)
 
 
 class SimpleTestUploadedFile(SimpleUploadedFile):
