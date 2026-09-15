@@ -10,13 +10,7 @@ from .scoped_contract_views import ScopedContractCurriculumViewSet
 
 
 class ScopedCurriculumViewSet(ScopedContractCurriculumViewSet):
-    """Master curriculum units assigned explicitly to real classes.
-
-    This endpoint is deliberately based on the current scoped contract, not the
-    legacy SafeScopedCurriculumViewSet, whose map_in still enforced the retired
-    `level` field.  That legacy validator was the source of the recurring
-    `Request validation failed` error on edit/publish.
-    """
+    """Class-scoped curriculum endpoint using the current curriculum contract."""
 
     def get_queryset(self):
         qs = accessible_curriculum(self.request.user)
@@ -34,44 +28,65 @@ class ScopedCurriculumViewSet(ScopedContractCurriculumViewSet):
         return self.get_queryset()
 
     def map_in(self, data):
-        """Normalize the current curriculum contract; `level` is retired."""
+        """Normalize current fields without inventing missing values on PATCH."""
         payload = dict(data)
-        payload.pop("level", None)
-        payload.pop("unit_level", None)
-        payload.pop("school_class", None)
-        payload.pop("class_id", None)
-        payload.pop("technology", None)
-        payload.pop("technology_id", None)
+        for key in ("level", "unit_level", "school_class", "class_id", "technology", "technology_id"):
+            payload.pop(key, None)
 
-        grade = str(data.get("grade") or data.get("class_grade") or "").strip()
-        week = str(data.get("week") or "").strip()
-        topic = str(data.get("topic") or data.get("title") or "").strip()
-        objectives = str(data.get("objectives") or "").strip()
-        unit_code = str(data.get("unit_code") or "").strip().upper()
-        if not unit_code:
-            unit_number = next((part for part in week.replace("-", " ").split() if part.isdigit()), "1")
-            unit_code = f"U{unit_number}"
-        if not topic:
-            topic = week or f"Unit {unit_code.lstrip('U')}"
-        status = str(data.get("status") or "draft").strip().lower()
-        status_map = {
-            "upcoming": "draft",
-            "untaught": "draft",
-            "draft": "draft",
-            "completed": "published",
-            "taught": "published",
-            "published": "published",
-            "archived": "archived",
-        }
-        payload.update({
-            "grade": grade,
-            "unit_code": unit_code,
-            "title": str(data.get("title") or topic).strip(),
-            "week": week or f"Unit {unit_code.lstrip('U')}",
-            "topic": topic,
-            "objectives": objectives,
-            "status": status_map.get(status, "draft"),
-        })
+        is_partial = str(getattr(self.request, "method", "")).upper() == "PATCH"
+        grade_value = data.get("grade") or data.get("class_grade")
+        unit_code_value = data.get("unit_code")
+        week_value = data.get("week")
+        topic_value = data.get("topic") or data.get("title")
+        objectives_value = data.get("objectives")
+        status_value = data.get("status")
+
+        if grade_value not in (None, ""):
+            payload["grade"] = str(grade_value).strip()
+        elif not is_partial:
+            payload["grade"] = ""
+
+        if unit_code_value not in (None, ""):
+            payload["unit_code"] = str(unit_code_value).strip().upper()
+        elif not is_partial:
+            week_text = str(week_value or "").strip()
+            digits = __import__("re").search(r"(\d+)", week_text)
+            unit_number = digits.group(1) if digits else "1"
+            payload["unit_code"] = f"U{unit_number}"
+
+        if week_value not in (None, ""):
+            payload["week"] = str(week_value).strip()
+        elif not is_partial:
+            payload["week"] = f"Unit {str(payload.get('unit_code', 'U1')).lstrip('U')}"
+
+        if topic_value not in (None, ""):
+            payload["topic"] = str(topic_value).strip()
+            payload["title"] = str(data.get("title") or topic_value).strip()
+        elif not is_partial:
+            topic = str(week_value or "").strip() or f"Unit {str(payload.get('unit_code', 'U1')).lstrip('U')}"
+            payload["topic"] = topic
+            payload["title"] = topic
+
+        if objectives_value not in (None, ""):
+            payload["objectives"] = str(objectives_value).strip()
+        elif objectives_value == "" and not is_partial:
+            payload["objectives"] = ""
+
+        if status_value not in (None, ""):
+            status_map = {
+                "upcoming": "draft",
+                "untaught": "draft",
+                "draft": "draft",
+                "completed": "published",
+                "taught": "published",
+                "published": "published",
+                "archived": "archived",
+            }
+            normalized = str(status_value).strip().lower()
+            payload["status"] = status_map.get(normalized, normalized)
+        elif not is_partial:
+            payload["status"] = "published"
+
         return payload
 
     def _target_class(self, unit=None):
@@ -135,26 +150,34 @@ class ScopedCurriculumViewSet(ScopedContractCurriculumViewSet):
         return payload
 
     @transaction.atomic
-    def _save_and_assign(self, validated_data):
-        grade = str(validated_data.get("grade") or "").strip()
-        unit_code = str(validated_data.get("unit_code") or "").strip().upper()
-        if not grade or not unit_code:
-            raise ValidationError({"unit_code": "Grade and unit code are required."})
+    def _save_and_assign(self, validated_data, existing_unit=None):
+        if existing_unit is not None:
+            unit = existing_unit
+            grade = str(unit.grade).strip()
+            unit_code = str(unit.unit_code).strip().upper()
+        else:
+            grade = str(validated_data.get("grade") or "").strip()
+            unit_code = str(validated_data.get("unit_code") or "").strip().upper()
+            if not grade or not unit_code:
+                raise ValidationError({"unit_code": "Grade and unit code are required."})
+            unit = CurriculumUnit.objects.filter(grade=grade, unit_code=unit_code).first()
 
-        existing = CurriculumUnit.objects.filter(grade=grade, unit_code=unit_code).first()
-        target_class = self._target_class(existing)
-        technology = self._technology(existing)
-        if existing is None and technology is None:
+        target_class = self._target_class(unit)
+        technology = self._technology(unit)
+        if unit is None and technology is None:
             raise ValidationError({"technology_id": "Technology is required when creating a curriculum unit."})
 
-        if existing is None:
+        if unit is None:
             unit = CurriculumUnit.objects.create(created_by=self.request.user, **validated_data)
         else:
+            update_fields = []
             for field in ("title", "week", "topic", "objectives", "status"):
                 if field in validated_data:
-                    setattr(existing, field, validated_data[field])
-            existing.save(update_fields=["title", "week", "topic", "objectives", "status", "updated_at"])
-            unit = existing
+                    setattr(unit, field, validated_data[field])
+                    update_fields.append(field)
+            if update_fields:
+                update_fields.append("updated_at")
+                unit.save(update_fields=update_fields)
 
         if str(target_class.grade).strip() != grade:
             raise ValidationError({"school_class": "Selected class grade must match the curriculum grade."})
@@ -181,8 +204,5 @@ class ScopedCurriculumViewSet(ScopedContractCurriculumViewSet):
     def perform_update(self, serializer):
         if self.request.user.role not in {UserRole.ADMIN, UserRole.SCHOOL, UserRole.TRAINER}:
             raise ValidationError({"detail": "You do not have permission to manage curriculum."})
-        data = dict(serializer.validated_data)
-        data["grade"] = serializer.instance.grade
-        data["unit_code"] = serializer.instance.unit_code
-        unit = self._save_and_assign(data)
+        unit = self._save_and_assign(dict(serializer.validated_data), existing_unit=serializer.instance)
         serializer.instance = unit
