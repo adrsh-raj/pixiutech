@@ -9,7 +9,8 @@ from billing.views import InvoiceLineItemViewSet, PaymentViewSet, ReceiptViewSet
 from inventory.views import KitMaintenanceViewSet
 from .analytics import SchoolPerformanceView, StudentProgressView, TrainerPerformanceView
 from .class_ranking import ClassRankingView
-from .api_v1_compat import health, upload
+from .api_v1_compat import health
+from .secure_upload import SecureUploadView
 from .assessment_views_v2 import IdempotentAssessmentViewSet
 from .course_completion_views_v3 import AdminCompleteProgrammeView, CompletionPolicyView, CourseCompletionDetailView, CourseCompletionListView, EvaluateLastSessionView, IssueProgrammeCertificateView, RequestProgrammeCompletionView, TechnologyListCreateView, VerifyProgrammeCertificateView
 from .course_completion_session_v3 import CourseAwareSessionViewSet
@@ -64,7 +65,7 @@ router.register('comms', ContractCommunicationLogViewSet, basename='v1-comms')
 router.register('logs', AuditLogViewSet, basename='v1-audit-log')
 
 urlpatterns = [
-    path('health/', health, name='v1-health'), path('upload/', upload, name='v1-upload'),
+    path('health/', health, name='v1-health'), path('upload/', SecureUploadView.as_view(), name='v1-upload'),
     path('auth/login/', LoginView.as_view(), name='v1-login'), path('auth/refresh/', RefreshView.as_view(), name='v1-refresh'),
     path('auth/logout/', LogoutView.as_view(), name='v1-logout'), path('auth/me/', MeView.as_view(), name='v1-me'),
     path('certificates/issue/<uuid:student_key>', IssueProgrammeCertificateView.as_view(), name='v1-certificate-issue'),
