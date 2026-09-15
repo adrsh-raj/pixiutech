@@ -11,7 +11,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.models import UserRole
-from .upload_security import SecureMultiPartParser, secure_storage_name, validate_uploaded_file
+from .upload_security import SecureMultiPartParser, SecureUploadError, validate_uploaded_file
 
 
 class SecureUploadView(APIView):
@@ -26,11 +26,14 @@ class SecureUploadView(APIView):
         if uploaded is None:
             raise ValidationError({"file": "A file is required."})
 
-        validate_uploaded_file(uploaded)
-        # validate_uploaded_file assigns a server-generated UUID filename.
-        filename = secure_storage_name(uploaded.name)
-        uploaded.name = filename
-        path = default_storage.save(f"private_uploads/{filename}", uploaded)
+        try:
+            validate_uploaded_file(uploaded)
+        except SecureUploadError as exc:
+            raise ValidationError({"file": exc.messages}) from exc
+
+        # The validator has replaced the client filename with a server-generated
+        # UUID filename. Never put the submitted filename into the storage path.
+        path = default_storage.save(f"private_uploads/{Path(uploaded.name).name}", uploaded)
 
         return Response(
             {
