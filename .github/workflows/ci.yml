@@ -93,6 +93,7 @@ jobs:
           CLOUDFLARE_TURNSTILE_ENABLED: "False"
           CLAMAV_ENABLED: "True"
           CLAMAV_REQUIRED: "True"
+          CLAMAV_INTEGRATION: "1"
           CLAMAV_HOST: 127.0.0.1
           CLAMAV_PORT: "3310"
           CLAMAV_TIMEOUT_SECONDS: "30"
