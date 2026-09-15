@@ -1,5 +1,5 @@
 import os
-from unittest import TestCase, skipUnless, patch
+from unittest import skipUnless, patch
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, override_settings
