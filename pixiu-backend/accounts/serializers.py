@@ -2,6 +2,7 @@ import json
 from urllib import parse, request as urllib_request
 
 from django.conf import settings
+from django.core.cache import cache
 from django.contrib.auth import authenticate
 from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -9,9 +10,9 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from .credentials import normalize_login_username, validate_managed_password
 from .models import User, UserRole, UserStatus
 
-
 TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
 TURNSTILE_ACTION = "login"
+USER_PROFILE_CACHE_TTL = 30
 
 
 def verify_turnstile_token(token, remote_ip=None):
@@ -24,11 +25,9 @@ def verify_turnstile_token(token, remote_ip=None):
     secret = settings.CLOUDFLARE_TURNSTILE_SECRET_KEY
     if not secret:
         return None
-
     payload = {"secret": secret, "response": token}
     if remote_ip:
         payload["remoteip"] = remote_ip
-
     body = parse.urlencode(payload).encode("utf-8")
     req = urllib_request.Request(
         TURNSTILE_VERIFY_URL,
@@ -41,7 +40,6 @@ def verify_turnstile_token(token, remote_ip=None):
             result = json.loads(response.read().decode("utf-8"))
     except Exception:
         return False
-
     return bool(result.get("success")) and result.get("action") == TURNSTILE_ACTION
 
 
@@ -53,11 +51,6 @@ class LoginSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         request = self.context.get("request")
-
-        # Do not produce a server-side 500 when Render/Vercel environment drift leaves
-        # the optional Turnstile secret unset. The browser still presents Turnstile,
-        # while the API remains available for authentication. Once the secret exists,
-        # verification is fully enforced.
         secret = settings.CLOUDFLARE_TURNSTILE_SECRET_KEY
         if settings.CLOUDFLARE_TURNSTILE_ENABLED and secret:
             token = attrs.get("turnstile_token", "").strip()
@@ -65,20 +58,14 @@ class LoginSerializer(serializers.Serializer):
                 raise serializers.ValidationError({"detail": "Please complete the security check."})
             if verify_turnstile_token(token, request.META.get("REMOTE_ADDR") if request else None) is not True:
                 raise serializers.ValidationError({"detail": "Security verification failed. Please try again."})
-
         username = normalize_login_username(attrs["username"])
-
-        # Resolve an unambiguous case-insensitive operational login ID first, then
-        # let Django verify the password against the canonical stored username.
         user = User.objects.filter(username=username).first()
         if user is None:
             candidates = User.objects.filter(username__iexact=username)
             if candidates.count() == 1:
                 user = candidates.first()
-
         if user is None:
             raise serializers.ValidationError({"detail": "Invalid username or password."})
-
         user = authenticate(request=request, username=user.username, password=attrs["password"])
         if user is None:
             raise serializers.ValidationError({"detail": "Invalid username or password."})
@@ -117,6 +104,34 @@ class UserMeSerializer(serializers.ModelSerializer):
         except Exception:
             return None
 
+    def _profile_scope(self, obj):
+        if obj.role == UserRole.ADMIN:
+            return {"related_id": None, "school_id": None}
+        key = f"user-me-profile:v1:{obj.pk}:{obj.role}"
+        cached = cache.get(key)
+        if cached is not None:
+            return cached
+        result = {"related_id": None, "school_id": None}
+        if obj.role == UserRole.SCHOOL:
+            profile = self._related(obj, "school_profile")
+            school_code = getattr(profile, "school_code", None) if profile else None
+            result = {"related_id": school_code or "", "school_id": school_code}
+        elif obj.role == UserRole.TRAINER:
+            profile = self._related(obj, "trainer_profile")
+            trainer_id = getattr(profile, "trainer_id", "") if profile else ""
+            assignment = profile.school_assignments.filter(status="active").select_related("school").first() if profile else None
+            school_code = assignment.school.school_code if assignment and assignment.school else None
+            result = {"related_id": trainer_id, "school_id": school_code}
+        elif obj.role == UserRole.STUDENT:
+            profile = self._related(obj, "student_profile")
+            student_id = getattr(profile, "student_id", "") if profile else ""
+            school_class = getattr(profile, "school_class", None) if profile else None
+            school = getattr(school_class, "school", None) if school_class else None
+            school_code = getattr(school, "school_code", None)
+            result = {"related_id": student_id, "school_id": school_code}
+        cache.set(key, result, USER_PROFILE_CACHE_TTL)
+        return result
+
     def get_full_name(self, obj):
         return obj.get_full_name().strip() or obj.display_name or obj.username
 
@@ -124,33 +139,10 @@ class UserMeSerializer(serializers.ModelSerializer):
         return self.get_full_name(obj)
 
     def get_related_id(self, obj):
-        if obj.role == UserRole.SCHOOL:
-            profile = self._related(obj, "school_profile")
-            return getattr(profile, "school_code", "") if profile else ""
-        if obj.role == UserRole.TRAINER:
-            profile = self._related(obj, "trainer_profile")
-            return getattr(profile, "trainer_id", "") if profile else ""
-        if obj.role == UserRole.STUDENT:
-            profile = self._related(obj, "student_profile")
-            return getattr(profile, "student_id", "") if profile else ""
-        return None
+        return self._profile_scope(obj)["related_id"]
 
     def get_school_id(self, obj):
-        profile = self._related(obj, "student_profile")
-        if profile is not None:
-            school_class = getattr(profile, "school_class", None)
-            school = getattr(school_class, "school", None) if school_class is not None else None
-            return getattr(school, "school_code", None)
-
-        profile = self._related(obj, "trainer_profile")
-        if profile is not None:
-            assignment = profile.school_assignments.filter(status="active").select_related("school").first()
-            return assignment.school.school_code if assignment and assignment.school else None
-
-        if obj.role == UserRole.SCHOOL:
-            profile = self._related(obj, "school_profile")
-            return getattr(profile, "school_code", None) if profile else None
-        return None
+        return self._profile_scope(obj)["school_id"]
 
 
 class ChangeOwnPasswordSerializer(serializers.Serializer):
