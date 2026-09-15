@@ -51,10 +51,20 @@ class CourseAwareSessionViewSet(SafeScopedSessionViewSet):
         curriculum = getattr(obj, 'curriculum_unit', None)
         school_class = getattr(obj, 'school_class', None)
         school = getattr(school_class, 'school', None)
+
+        # Older sessions were created before SessionWorkflow technology metadata
+        # was introduced. Their technology is still determinable from the
+        # curriculum unit profile, so the API must not return an empty technology
+        # field and force the editor to ask for it again.
+        technology = workflow.technology if workflow and workflow.technology_id else None
+        if technology is None and curriculum is not None:
+            profile = CurriculumUnitProfile.objects.filter(curriculum_unit=curriculum).select_related('technology').first()
+            technology = profile.technology if profile else None
+
         payload.update({
-            'technology': str(workflow.technology_id) if workflow else None,
-            'technology_id': str(workflow.technology_id) if workflow else None,
-            'technology_name': workflow.technology.name if workflow else '',
+            'technology': str(technology.id) if technology else None,
+            'technology_id': str(technology.id) if technology else None,
+            'technology_name': technology.name if technology else '',
             'is_last_session_for_unit': bool(workflow.is_last_session_for_unit) if workflow else False,
             'last_session': bool(workflow.is_last_session_for_unit) if workflow else False,
             'school_class_id': str(obj.school_class_id) if obj.school_class_id else None,
