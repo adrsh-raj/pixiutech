@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { API_BASE } from '../config/api';
-import { recordApiPerformance } from '../lib/performanceDiagnostics';
+import { measurePerformance, markPerformance, recordApiPerformance } from '../lib/performanceDiagnostics';
 
 const AuthContext = createContext(null);
 const AUTH_EVENT = 'pixiu_auth_state_changed';
@@ -31,8 +31,6 @@ function isCacheableRead(path, method, accessToken) {
   const normalizedPath = String(path || '');
   if (normalizedPath.startsWith('/auth/')) return false;
   if (normalizedPath === '/health' || normalizedPath.startsWith('/health/')) return false;
-  // Protected document/image responses are binary and must never be converted
-  // to text and placed in the application JSON-style read cache.
   if (/^\/content\/[^/]+\/file\/?$/.test(normalizedPath)) return false;
   return true;
 }
@@ -256,6 +254,7 @@ export function AuthProvider({ children }) {
     const cleanUsername = username?.trim(); const cleanPassword = password ?? '';
     if (!cleanUsername || !cleanPassword) return { success: false, error: 'Username and password are required.' };
     const body = JSON.stringify({ username: cleanUsername, password: cleanPassword, role: expectedRole || undefined, turnstile_token: turnstileToken || undefined });
+    markPerformance('login.e2e.start');
     try {
       const response = await fetchOnce(`${API_BASE}/auth/login/`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, cache: 'no-store', credentials: 'include' }, 25000);
       const data = await readJson(response);
@@ -265,10 +264,13 @@ export function AuthProvider({ children }) {
         setToken(data.access);
         setUser(data.user);
         broadcastAuthChange();
+        measurePerformance('login.e2e', 'login.e2e.start');
         return { success: true, user: data.user };
       }
+      measurePerformance('login.e2e.failed', 'login.e2e.start');
       return { success: false, error: data.detail || data.error || 'Invalid username or password.' };
     } catch (error) {
+      measurePerformance('login.e2e.failed', 'login.e2e.start');
       return { success: false, error: error?.name === 'AbortError' ? 'Authentication service is taking too long to respond. Please try again.' : 'Authentication service is temporarily unavailable. Please try again.' };
     }
   };
