@@ -6,6 +6,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.parsers import FormParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from accounts.models import UserRole
@@ -43,6 +44,9 @@ class TrainerMaterialListCreateView(APIView):
     permission_classes = [IsAuthenticated]
     parser_classes = [SecureMultiPartParser, FormParser]
     throttle_scope = "trainer_material_upload"
+
+    def get_throttles(self):
+        return [ScopedRateThrottle()] if self.request.method == "POST" else []
 
     def get(self, request):
         if request.user.role == UserRole.ADMIN:
