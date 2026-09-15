@@ -1,0 +1,1 @@
+Session PATCH fix: preserve persisted school_class and trainer foreign keys during edit updates. The client no longer needs to re-submit unchanged required foreign keys for a PATCH.
