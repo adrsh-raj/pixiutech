@@ -1,0 +1,1 @@
+Session PATCH root-cause note: legacy compatibility update() inserted absent school_class/trainer keys as null. CourseAwareSessionViewSet now validates and saves edits directly from the persisted session foreign keys, so unchanged class/trainer are not required from the client.
