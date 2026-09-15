@@ -3,7 +3,7 @@ from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.exceptions import PermissionDenied, ValidationError
-from rest_framework.parsers import FormParser, MultiPartParser
+from rest_framework.parsers import FormParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -12,7 +12,7 @@ from accounts.models import UserRole
 from academics.models import Trainer
 from learning.models import LearningContent
 from notifications.models import Notification, NotificationType
-from .upload_security import SecureUploadError, validate_uploaded_file
+from .upload_security import SecureMultiPartParser, SecureUploadError, validate_uploaded_file
 
 MATERIAL_MARKER = "trainer_material_id"
 MAX_FILE_SIZE = 20 * 1024 * 1024
@@ -41,7 +41,7 @@ def _allowed_material_ids(user):
 
 class TrainerMaterialListCreateView(APIView):
     permission_classes = [IsAuthenticated]
-    parser_classes = [MultiPartParser, FormParser]
+    parser_classes = [SecureMultiPartParser, FormParser]
 
     def get(self, request):
         if request.user.role == UserRole.ADMIN:
