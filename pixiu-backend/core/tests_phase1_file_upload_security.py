@@ -1,7 +1,9 @@
+from io import BytesIO
 from unittest.mock import patch
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, override_settings
+from PIL import Image
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from accounts.models import UserRole
@@ -20,6 +22,13 @@ def _upload(name, data, content_type):
     return SimpleUploadedFile(name=name, content=data, content_type=content_type)
 
 
+def _valid_png_bytes():
+    buffer = BytesIO()
+    Image.new("RGB", (1, 1), (0, 0, 0)).save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+@override_settings(CLAMAV_ENABLED=False, CLAMAV_REQUIRED=False)
 class SecureUploadValidationTests(SimpleTestCase):
     def test_accepts_valid_pdf_and_rewrites_filename(self):
         upload = _upload("lesson material.pdf", b"%PDF-1.7\n", "application/pdf")
@@ -27,11 +36,8 @@ class SecureUploadValidationTests(SimpleTestCase):
         self.assertRegex(upload.name, r"^[0-9a-f]{32}\.pdf$")
 
     def test_accepts_valid_png_and_rewrites_filename(self):
-        upload = _upload("image.png", b"\x89PNG\r\n\x1a\n" + b"0" * 32, "image/png")
-        # Signature validation is exercised here; Pillow validity is covered by
-        # the production path whenever a real image reaches the parser.
-        with patch("core.upload_security._assert_valid_image"):
-            validate_uploaded_file(upload)
+        upload = _upload("image.png", _valid_png_bytes(), "image/png")
+        validate_uploaded_file(upload)
         self.assertRegex(upload.name, r"^[0-9a-f]{32}\.png$")
 
     def test_rejects_active_content_extension(self):
@@ -54,7 +60,7 @@ class SecureUploadValidationTests(SimpleTestCase):
         with self.assertRaises(SecureUploadError):
             validate_uploaded_file(upload)
 
-    @override_settings(SECURE_UPLOAD_MAX_MB=1)
+    @override_settings(SECURE_UPLOAD_MAX_BYTES=1024 * 1024)
     def test_rejects_oversized_file(self):
         upload = _upload("large.pdf", b"%PDF-1.7\n" + b"x" * (1024 * 1024), "application/pdf")
         with self.assertRaises(SecureUploadError):
@@ -68,6 +74,7 @@ class SecureUploadValidationTests(SimpleTestCase):
         self.assertNotIn("\\", upload.name)
 
 
+@override_settings(CLAMAV_ENABLED=False, CLAMAV_REQUIRED=False)
 class SecureUploadEndpointTests(SimpleTestCase):
     def test_student_cannot_use_generic_upload_endpoint(self):
         factory = APIRequestFactory()
