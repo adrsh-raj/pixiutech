@@ -5,6 +5,15 @@ services:
     image:
       url: docker.io/clamav/clamav:1.5.4-debian13-slim
     plan: 2c-4g
+    envVars:
+      - key: CLAMD_CONF_StreamMaxLength
+        value: "30M"
+      - key: CLAMD_CONF_ConcurrentDatabaseReload
+        value: "no"
+      - key: CLAMD_CONF_MaxThreads
+        value: "4"
+      - key: FRESHCLAM_CHECKS
+        value: "24"
 
   - type: web
     name: pixiu-django-api
