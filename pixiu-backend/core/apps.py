@@ -7,9 +7,9 @@ class CoreConfig(AppConfig):
 
     def ready(self):
         # Session list serialization includes each activity's created_by field.
-        # The canonical session queryset already prefetches activities, but the
-        # activity queryset previously lacked created_by select_related(),
-        # producing one extra user query per activity row (N+1).
+        # The canonical session queryset already prefetches activities. Replace
+        # that plain prefetch with one that select_related()s created_by instead
+        # of registering two competing prefetches for the same relation.
         from django.db.models import Prefetch
         from learning.models import SessionActivity
         import learning.services as learning_services
@@ -21,7 +21,8 @@ class CoreConfig(AppConfig):
         activity_qs = SessionActivity.objects.select_related("created_by").order_by("created_at")
 
         def optimized_accessible_sessions(user):
-            return original(user).prefetch_related(
+            queryset = original(user).prefetch_related(None)
+            return queryset.prefetch_related(
                 Prefetch("activities", queryset=activity_qs)
             )
 
