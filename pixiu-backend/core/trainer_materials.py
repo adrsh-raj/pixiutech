@@ -42,6 +42,7 @@ def _allowed_material_ids(user):
 class TrainerMaterialListCreateView(APIView):
     permission_classes = [IsAuthenticated]
     parser_classes = [SecureMultiPartParser, FormParser]
+    throttle_scope = "trainer_material_upload"
 
     def get(self, request):
         if request.user.role == UserRole.ADMIN:
