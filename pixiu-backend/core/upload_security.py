@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import mimetypes
 from pathlib import Path
 from uuid import uuid4
 
@@ -12,6 +11,12 @@ from django.core.files.uploadhandler import FileUploadHandler
 from django.core.files.uploadedfile import UploadedFile
 from rest_framework.exceptions import ParseError
 from rest_framework.parsers import MultiPartParser as DRFMultiPartParser
+
+from .clamav_client import (
+    ClamAVMalwareDetectedError,
+    ClamAVUnavailableError,
+    ensure_clean_upload,
+)
 
 # Product-supported binary formats. Active-content formats such as SVG, HTML,
 # JavaScript and executable/archive formats are intentionally excluded.
@@ -107,7 +112,7 @@ def secure_storage_name(original_name: str | None, *, extension: str | None = No
 
 
 def validate_uploaded_file(uploaded: UploadedFile | None) -> UploadedFile:
-    """Validate an upload and replace its client-controlled storage filename."""
+    """Validate, malware-scan, and rename an upload before storage."""
     if uploaded is None:
         raise SecureUploadError("A file is required.")
     if not isinstance(uploaded, UploadedFile) and not hasattr(uploaded, "name"):
@@ -137,6 +142,13 @@ def validate_uploaded_file(uploaded: UploadedFile | None) -> UploadedFile:
 
     _assert_signature(uploaded, extension)
     _assert_valid_image(uploaded, extension)
+
+    try:
+        ensure_clean_upload(uploaded)
+    except ClamAVMalwareDetectedError as exc:
+        raise SecureUploadError("Uploaded file failed malware scanning.") from exc
+    except ClamAVUnavailableError as exc:
+        raise SecureUploadError("Malware scanning is currently unavailable.") from exc
 
     uploaded.name = secure_storage_name(original_name, extension=extension)
     setattr(uploaded, "_pixiu_secure_upload", True)
