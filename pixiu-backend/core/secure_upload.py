@@ -17,6 +17,7 @@ from .upload_security import SecureMultiPartParser, SecureUploadError, validate_
 class SecureUploadView(APIView):
     permission_classes = [IsAuthenticated]
     parser_classes = [SecureMultiPartParser, FormParser]
+    throttle_scope = "upload"
 
     def post(self, request):
         if request.user.role not in {UserRole.ADMIN, UserRole.TRAINER}:
