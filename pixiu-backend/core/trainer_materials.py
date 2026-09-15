@@ -12,6 +12,7 @@ from accounts.models import UserRole
 from academics.models import Trainer
 from learning.models import LearningContent
 from notifications.models import Notification, NotificationType
+from .upload_security import SecureUploadError, validate_uploaded_file
 
 MATERIAL_MARKER = "trainer_material_id"
 MAX_FILE_SIZE = 20 * 1024 * 1024
@@ -79,8 +80,12 @@ class TrainerMaterialListCreateView(APIView):
             raise ValidationError({"file": "A PDF file is required."})
         if uploaded.size > MAX_FILE_SIZE:
             raise ValidationError({"file": "PDF must be 20 MB or smaller."})
-        if uploaded.content_type != "application/pdf" and not uploaded.name.lower().endswith(".pdf"):
-            raise ValidationError({"file": "Only PDF files are allowed."})
+        try:
+            validate_uploaded_file(uploaded)
+        except SecureUploadError as exc:
+            raise ValidationError({"file": exc.messages}) from exc
+        if uploaded.name.rsplit(".", 1)[-1].lower() != "pdf":
+            raise ValidationError({"file": "Trainer materials must be PDF files."})
 
         grade = str(request.data.get("class_grade") or "").strip()
         if grade and not grade.isdigit():
