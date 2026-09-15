@@ -24,6 +24,47 @@ class ScopedCurriculumViewSet(SafeScopedCurriculumViewSet):
     def scoped_queryset(self):
         return self.get_queryset()
 
+    def map_in(self, data):
+        """Normalize the current curriculum contract without the retired level field."""
+        payload = dict(data)
+        payload.pop("level", None)
+        payload.pop("unit_level", None)
+        # These identify the assignment target and are consumed by _target_class;
+        # they are not CurriculumUnit model fields and must not reach the serializer.
+        payload.pop("school_class", None)
+        payload.pop("class_id", None)
+
+        grade = str(data.get("grade") or data.get("class_grade") or "").strip()
+        week = str(data.get("week") or "").strip()
+        topic = str(data.get("topic") or data.get("title") or "").strip()
+        objectives = str(data.get("objectives") or "").strip()
+        unit_code = str(data.get("unit_code") or "").strip().upper()
+        if not unit_code:
+            unit_number = next((part for part in week.replace("-", " ").split() if part.isdigit()), "1")
+            unit_code = f"U{unit_number}"
+        if not topic:
+            topic = week or f"Unit {unit_code.lstrip('U')}"
+        status = str(data.get("status") or "draft").strip().lower()
+        status_map = {
+            "upcoming": "draft",
+            "untaught": "draft",
+            "draft": "draft",
+            "completed": "published",
+            "taught": "published",
+            "published": "published",
+            "archived": "archived",
+        }
+        payload.update({
+            "grade": grade,
+            "unit_code": unit_code,
+            "title": str(data.get("title") or topic).strip(),
+            "week": week or f"Unit {unit_code.lstrip('U')}",
+            "topic": topic,
+            "objectives": objectives,
+            "status": status_map.get(status, "draft"),
+        })
+        return payload
+
     def _target_class(self, unit=None):
         raw = self.request.data.get("school_class") or self.request.data.get("class_id")
         if not raw and unit is not None:
@@ -37,6 +78,8 @@ class ScopedCurriculumViewSet(SafeScopedCurriculumViewSet):
 
     def map_out(self, obj):
         payload = super().map_out(obj)
+        payload.pop("level", None)
+        payload.pop("unit_level", None)
         assignments = (obj.class_assignments.select_related("school_class__school").filter(school_class_id__in=accessible_class_queryset(self.request.user).values("id")).order_by("school_class__school__name", "school_class__grade", "school_class__section"))
         payload["assigned_classes"] = [{"id": str(item.school_class_id), "display_name": item.school_class.display_name, "grade": str(item.school_class.grade), "section": item.school_class.section, "school_id": str(item.school_class.school_id), "school_code": item.school_class.school.school_code, "school_name": item.school_class.school.name} for item in assignments]
         return payload
