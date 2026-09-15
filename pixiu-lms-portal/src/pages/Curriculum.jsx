@@ -82,9 +82,10 @@ export default function Curriculum() {
       const number = Number(formData.unit_number);
       let unitId = editing?.id || null;
       const nextStatus = formData.status === 'published' ? 'published' : 'draft';
+      const target = { school_class: selectedClass.id };
 
       if (editing?.id) {
-        await request(`/curriculum/${encodeURIComponent(editing.id)}`, 'PATCH', { status: nextStatus, title: norm(formData.topic), topic: norm(formData.topic), objectives: norm(formData.objectives) });
+        await request(`/curriculum/${encodeURIComponent(editing.id)}`, 'PATCH', { ...target, status: nextStatus, title: norm(formData.topic), topic: norm(formData.topic), objectives: norm(formData.objectives) });
         setStatusOverrides(value => ({ ...value, [editing.id]: nextStatus }));
       } else {
         const existingMaster = curriculum.find(item => gradeOf(item) === gradeOf(selectedClass) && unitNumber(item.unit_code || item.week) === number);
@@ -92,20 +93,15 @@ export default function Curriculum() {
           unitId = existingMaster.id;
           const existingStatus = displayStatus(existingMaster);
           if (existingStatus !== nextStatus || norm(existingMaster.topic || existingMaster.title) !== norm(formData.topic) || norm(existingMaster.objectives) !== norm(formData.objectives)) {
-            await request(`/curriculum/${encodeURIComponent(existingMaster.id)}`, 'PATCH', { title: norm(formData.topic), topic: norm(formData.topic), objectives: norm(formData.objectives), status: nextStatus });
+            await request(`/curriculum/${encodeURIComponent(existingMaster.id)}`, 'PATCH', { ...target, title: norm(formData.topic), topic: norm(formData.topic), objectives: norm(formData.objectives), status: nextStatus });
             setStatusOverrides(value => ({ ...value, [existingMaster.id]: nextStatus }));
           }
         } else {
-          const created = await request('/curriculum', 'POST', { grade: gradeOf(selectedClass), unit_code: `U${number}`, title: norm(formData.topic), week: unitLabel(number), topic: norm(formData.topic), objectives: norm(formData.objectives), status: nextStatus });
+          const created = await request('/curriculum', 'POST', { ...target, grade: gradeOf(selectedClass), unit_code: `U${number}`, title: norm(formData.topic), week: unitLabel(number), topic: norm(formData.topic), objectives: norm(formData.objectives), status: nextStatus });
           unitId = created?.id;
           if (!unitId) throw new Error('Curriculum unit was created but no unit id was returned.');
           setStatusOverrides(value => ({ ...value, [unitId]: nextStatus }));
         }
-      }
-
-      if (!editing?.id && unitId) {
-        const assignedAlready = visibleCurriculum.some(item => String(item.id) === String(unitId));
-        if (!assignedAlready) await request('/curriculum-assignments', 'POST', { curriculum_unit: unitId, school_class: selectedClass.id });
       }
 
       setIsModalOpen(false);
@@ -121,7 +117,7 @@ export default function Curriculum() {
     setSaving(true); setError('');
     try {
       const next = displayStatus(item) === 'published' ? 'draft' : 'published';
-      await request(`/curriculum/${encodeURIComponent(item.id)}`, 'PATCH', { status: next });
+      await request(`/curriculum/${encodeURIComponent(item.id)}`, 'PATCH', { school_class: selectedClass.id, status: next });
       setStatusOverrides(value => ({ ...value, [item.id]: next }));
       toast.success(`${item.title} is now ${next === 'published' ? 'published' : 'draft'}.`, 'Curriculum status updated');
       void refreshQuietly();
