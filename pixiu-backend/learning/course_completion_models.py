@@ -29,7 +29,6 @@ class CurriculumUnitProfile(models.Model):
     curriculum_unit = models.OneToOneField("learning.CurriculumUnit", on_delete=models.CASCADE, related_name="completion_profile")
     technology = models.ForeignKey(Technology, on_delete=models.PROTECT, related_name="curriculum_units")
     certificate_required = models.BooleanField(default=True)
-    # Optional per-unit criteria overrides are retained for reporting/backward compatibility.
     requires_attendance = models.BooleanField(null=True, blank=True)
     min_attendance_pct = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, validators=[MinValueValidator(0), MaxValueValidator(100)])
     requires_quiz = models.BooleanField(null=True, blank=True)
@@ -45,9 +44,8 @@ class CurriculumUnitProfile(models.Model):
 class SessionWorkflow(models.Model):
     session = models.OneToOneField("learning.Session", on_delete=models.CASCADE, related_name="workflow")
     technology = models.ForeignKey(Technology, on_delete=models.PROTECT, related_name="session_workflows")
-    # Legacy unit-level marker. Programme completion uses the single class-level final marker below.
+    # Single legacy checkbox now represents the final programme session for the class.
     is_last_session_for_unit = models.BooleanField(default=False)
-    is_last_session_for_programme = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -92,17 +90,11 @@ class UnitCompletion(models.Model):
 
     class Meta:
         ordering = ["curriculum_unit__unit_code"]
-        constraints = [
-            models.UniqueConstraint(fields=["student", "curriculum_unit"], name="uniq_student_curriculum_completion"),
-        ]
+        constraints = [models.UniqueConstraint(fields=["student", "curriculum_unit"], name="uniq_student_curriculum_completion")]
 
 
 class ProgrammeCompletion(models.Model):
-    STATUS_CHOICES = [
-        ("in_progress", "In progress"),
-        ("trainer_requested", "Trainer requested"),
-        ("admin_completed", "Admin completed"),
-    ]
+    STATUS_CHOICES = [("in_progress", "In progress"), ("trainer_requested", "Trainer approved"), ("admin_completed", "Admin approved")]
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     student = models.OneToOneField(Student, on_delete=models.PROTECT, related_name="programme_completion")
     status = models.CharField(max_length=30, choices=STATUS_CHOICES, default="in_progress")
