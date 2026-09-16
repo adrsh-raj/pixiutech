@@ -88,7 +88,7 @@ class StudentCredentialBatch(models.Model):
         COMPLETED = "completed", "Completed"
         FAILED = "failed", "Failed"
 
-    id = models.UUIDField(primary_key=True, editable=False)
+    id = models.UUIDField(primary_key=True, default=__import__("uuid").uuid4, editable=False)
     created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="student_credential_batches")
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     student_ids = models.JSONField(default=list)
