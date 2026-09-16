@@ -12,6 +12,8 @@ from audit.models import AuditAction, AuditLog
 from .course_completion_models import Certificate, CompletionPolicy, ProgrammeCompletion, SessionWorkflow, Technology, UnitCompletion
 from .models import AttendanceStatus, AssessmentStatus, CurriculumClassAssignment, QuizAttempt, Session, StudentAssessment
 
+PASS_MARK = 70.0
+
 
 def _date_today():
     return timezone.localdate()
@@ -69,7 +71,8 @@ def update_policy(school_class, data):
         policy = CompletionPolicy.objects.create(school_class=school_class, name='Class completion policy')
     for field in ('requires_attendance', 'requires_quiz', 'requires_practical', 'requires_trainer_review', 'active'):
         if field in data:
-            setattr(policy, field, str(data[field]).lower() in ('1', 'true', 'yes', 'on') if not isinstance(data[field], bool) else data[field])
+            value = data[field]
+            setattr(policy, field, str(value).lower() in ('1', 'true', 'yes', 'on') if not isinstance(value, bool) else value)
     ranges = {'min_attendance_pct': (0, 100), 'min_quiz_pct': (0, 100), 'min_practical_pct': (0, 100), 'min_trainer_review_rating': (0, 5)}
     for field, (lo, hi) in ranges.items():
         if field in data:
@@ -83,7 +86,11 @@ def update_policy(school_class, data):
 
 def programme_final_session(student):
     return (
-        Session.objects.filter(school_class_id=student.school_class_id, status='completed', workflow__is_last_session_for_unit=True)
+        Session.objects.filter(
+            school_class_id=student.school_class_id,
+            status='completed',
+            workflow__is_last_session_for_unit=True,
+        )
         .select_related('curriculum_unit', 'workflow__technology')
         .order_by('-date', '-start_time', '-id')
         .first()
@@ -107,20 +114,68 @@ def completed_technologies(student):
     return list(result.values())
 
 
-def student_score(student):
-    scores = []
-    quiz = QuizAttempt.objects.filter(student=student, status='completed').aggregate(value=Max('percentage'))['value']
-    if quiz is not None:
-        scores.append(float(quiz))
-    assessment = StudentAssessment.objects.filter(student=student, status=AssessmentStatus.PUBLISHED, score__isnull=False).aggregate(value=Avg('score'))['value']
-    if assessment is not None:
-        scores.append(float(assessment))
+def _metric_inputs(student):
+    policy = policy_for(student.school_class)
     sessions = completed_sessions(student)
-    total = len(sessions)
-    if total:
-        present = student.attendance_records.filter(session_id__in=[s.id for s in sessions], status__in=[AttendanceStatus.PRESENT, AttendanceStatus.LATE, AttendanceStatus.EXCUSED]).count()
-        scores.append(round(present * 100 / total, 2))
-    return round(sum(scores) / len(scores), 2) if scores else 0
+    attendance = None
+    if sessions:
+        present = student.attendance_records.filter(
+            session_id__in=[session.id for session in sessions],
+            status__in=[AttendanceStatus.PRESENT, AttendanceStatus.LATE, AttendanceStatus.EXCUSED],
+        ).count()
+        attendance = round(present * 100 / len(sessions), 2)
+    quiz = QuizAttempt.objects.filter(student=student, status='completed').aggregate(value=Max('percentage'))['value']
+    practical = StudentAssessment.objects.filter(
+        student=student, status=AssessmentStatus.PUBLISHED, score__isnull=False,
+    ).aggregate(value=Avg('score'))['value']
+    review = StudentAssessment.objects.filter(
+        student=student, status=AssessmentStatus.PUBLISHED, rating__isnull=False,
+    ).aggregate(value=Avg('rating'))['value']
+    metrics = {
+        'attendance_pct': attendance,
+        'quiz_pct': float(quiz) if quiz is not None else None,
+        'practical_pct': float(practical) if practical is not None else None,
+        'trainer_review_pct': float(review) * 20 if review is not None else None,
+    }
+    return policy, metrics
+
+
+def student_score(student):
+    policy, metrics = _metric_inputs(student)
+    weighted_total = 0.0
+    weight_total = 0.0
+    fields = (
+        ('requires_practical', 'practical_pct', 'weight_practical'),
+        ('requires_quiz', 'quiz_pct', 'weight_quiz'),
+        ('requires_attendance', 'attendance_pct', 'weight_attendance'),
+        ('requires_trainer_review', 'trainer_review_pct', 'weight_trainer_review'),
+    )
+    for required_field, metric_field, weight_field in fields:
+        if not getattr(policy, required_field):
+            continue
+        value = metrics[metric_field]
+        weight = float(getattr(policy, weight_field))
+        if value is None:
+            return 0.0
+        weighted_total += value * weight
+        weight_total += weight
+    if weight_total <= 0:
+        return 0.0
+    return round(weighted_total / weight_total, 2)
+
+
+def score_breakdown(student):
+    policy, metrics = _metric_inputs(student)
+    return {
+        'attendance_pct': metrics['attendance_pct'],
+        'quiz_pct': metrics['quiz_pct'],
+        'practical_pct': metrics['practical_pct'],
+        'trainer_review_pct': metrics['trainer_review_pct'],
+        'overall_score': student_score(student),
+        'pass_mark': PASS_MARK,
+        'eligible': student_score(student) >= PASS_MARK,
+        'policy': serialize_policy(policy),
+    }
 
 
 def summary(student):
@@ -130,7 +185,10 @@ def summary(student):
     technologies = completed_technologies(student)
     sessions = completed_sessions(student)
     units = []
-    for assignment in CurriculumClassAssignment.objects.filter(school_class_id=student.school_class_id, curriculum_unit__status='published').select_related('curriculum_unit', 'curriculum_unit__completion_profile__technology').order_by('curriculum_unit__unit_code'):
+    for assignment in CurriculumClassAssignment.objects.filter(
+        school_class_id=student.school_class_id,
+        curriculum_unit__status='published',
+    ).select_related('curriculum_unit', 'curriculum_unit__completion_profile__technology').order_by('curriculum_unit__unit_code'):
         completion = UnitCompletion.objects.filter(student=student, curriculum_unit=assignment.curriculum_unit).first()
         technology = getattr(getattr(assignment.curriculum_unit, 'completion_profile', None), 'technology', None)
         units.append({
@@ -148,6 +206,7 @@ def summary(student):
             'reasons': completion.reasons if completion else [],
             'last_session': bool(completion and completion.final_session_id),
         })
+    score = student_score(student)
     return {
         'student_id': student.student_id,
         'student_name': student.name,
@@ -155,13 +214,14 @@ def summary(student):
         'school_code': student.school_class.school.school_code,
         'class_name': student.school_class.display_name,
         'status': programme.status if programme else 'in_progress',
-        'overall_score': float(programme.overall_score) if programme else student_score(student),
+        'overall_score': score,
+        'score_breakdown': score_breakdown(student),
         'required_units': len(units),
         'completed_units': sum(row['status'] == 'passed' for row in units),
         'units': units,
         'technologies': technologies,
         'sessions_by_technology': [
-            {'technology': item['name'], 'code': item['code'], 'sessions': sum(1 for s in sessions if getattr(getattr(s, 'workflow', None), 'technology', None) and s.workflow.technology.code == item['code'])}
+            {'technology': item['name'], 'code': item['code'], 'sessions': sum(1 for session in sessions if getattr(getattr(session, 'workflow', None), 'technology', None) and session.workflow.technology.code == item['code'])}
             for item in technologies
         ],
         'programme_final_session': {
@@ -171,8 +231,8 @@ def summary(student):
             'technology': getattr(getattr(final_session, 'workflow', None), 'technology', None).name if getattr(getattr(final_session, 'workflow', None), 'technology', None) else '',
         } if final_session else None,
         'final_session_ready': bool(final_session),
-        'trainer_approval_ready': bool(final_session and not certificate and (programme is None or programme.status == 'in_progress')),
-        'can_issue_certificate': bool(programme and programme.status == 'trainer_requested' and not certificate),
+        'trainer_approval_ready': bool(final_session and not certificate and (programme is None or programme.status == 'in_progress') and score >= PASS_MARK),
+        'can_issue_certificate': bool(programme and programme.status == 'trainer_requested' and not certificate and score >= PASS_MARK),
         'certificate_id': certificate.certificate_id if certificate else None,
         'policy': serialize_policy(policy_for(student.school_class)),
     }
@@ -186,19 +246,31 @@ def approve_programme(user, student):
     if not final_session:
         raise ValueError('No completed final programme session is marked for this class.')
     later = Session.objects.filter(school_class_id=student.school_class_id, status='completed').filter(
-        Q(date__gt=final_session.date) | Q(date=final_session.date, start_time__gt=final_session.start_time) | Q(date=final_session.date, start_time=final_session.start_time, id__gt=final_session.id)
+        Q(date__gt=final_session.date)
+        | Q(date=final_session.date, start_time__gt=final_session.start_time)
+        | Q(date=final_session.date, start_time=final_session.start_time, id__gt=final_session.id)
     ).exists()
     if later:
         raise ValueError('The marked final programme session must be the latest completed class session.')
+    score = student_score(student)
+    if score < PASS_MARK:
+        raise ValueError(f'Certificate cannot be approved. Overall score is {score:.2f}%; minimum required is {PASS_MARK:.0f}%.')
     programme, _ = ProgrammeCompletion.objects.get_or_create(student=student)
     programme.status = 'trainer_requested'
-    programme.overall_score = student_score(student)
+    programme.overall_score = score
     programme.requested_by = user
     programme.requested_at = timezone.now()
     programme.completed_by = None
     programme.completed_at = None
     programme.save(update_fields=['status', 'overall_score', 'requested_by', 'requested_at', 'completed_by', 'completed_at', 'updated_at'])
-    AuditLog.objects.create(actor=user, action=AuditAction.OTHER, entity_type='programme_completion', entity_id=str(student.pk), summary=f'Final programme session approved for {student.student_id}.', changes={'final_session_id': str(final_session.id), 'technologies': completed_technologies(student)})
+    AuditLog.objects.create(
+        actor=user,
+        action=AuditAction.OTHER,
+        entity_type='programme_completion',
+        entity_id=str(student.pk),
+        summary=f'Final programme session approved for {student.student_id}.',
+        changes={'final_session_id': str(final_session.id), 'technologies': completed_technologies(student), 'overall_score': score},
+    )
     return programme
 
 
@@ -209,6 +281,9 @@ def issue_certificate(user, student):
     programme = ProgrammeCompletion.objects.filter(student=student, status='trainer_requested').first()
     if programme is None:
         raise ValueError('Approve the final programme session before issuing the certificate.')
+    current_score = student_score(student)
+    if current_score < PASS_MARK:
+        raise ValueError(f'Certificate cannot be issued. Overall score is {current_score:.2f}%; minimum required is {PASS_MARK:.0f}%.')
     existing = Certificate.objects.filter(student=student, status='issued').order_by('-issued_at').first()
     if existing:
         return existing
@@ -242,7 +317,8 @@ def issue_certificate(user, student):
         'technologies': technologies,
         'completed_technologies': technologies,
         'units': units_snapshot,
-        'overall_score': float(programme.overall_score),
+        'overall_score': current_score,
+        'pass_mark': PASS_MARK,
         'programme_completion_type': 'single_final_session',
         'issued_by': user.display_name or user.username,
     }
@@ -254,15 +330,38 @@ def issue_certificate(user, student):
             programme_name='Pixiu Technology Programme',
             technologies_snapshot=technologies,
             units_snapshot=units_snapshot,
-            overall_score=programme.overall_score,
+            overall_score=current_score,
             issued_by=user,
             snapshot=snapshot,
         )
-        AuditLog.objects.create(actor=user, action=AuditAction.OTHER, entity_type='student_certificate', entity_id=str(student.pk), summary=f'Certificate issued for {student.student_id}.', changes={'certificate_id': certificate_id, 'technologies': technologies})
+        AuditLog.objects.create(
+            actor=user,
+            action=AuditAction.OTHER,
+            entity_type='student_certificate',
+            entity_id=str(student.pk),
+            summary=f'Certificate issued for {student.student_id}.',
+            changes={'certificate_id': certificate_id, 'technologies': technologies, 'overall_score': current_score},
+        )
     return certificate
 
 
 def certificate_payload(certificate):
     data = dict(certificate.snapshot or {})
-    data.update({'certificate_id': certificate.certificate_id, 'certificate_ref': certificate.certificate_id, 'verification_token': str(certificate.verification_token), 'verified': certificate.status == 'issued', 'issued': certificate.status == 'issued', 'status': 'verified' if certificate.status == 'issued' else 'revoked', 'technologies': certificate.technologies_snapshot, 'completed_technologies': certificate.technologies_snapshot, 'units': certificate.units_snapshot, 'overall_score': float(certificate.overall_score), 'issued_at': certificate.issued_at.isoformat()})
+    origin = str(getattr(settings, 'PUBLIC_APP_URL', 'https://pixiutech.com')).rstrip('/')
+    verification_url = str(data.get('verification_url') or f'{origin}/verify?cert={quote(certificate.certificate_id)}')
+    data.update({
+        'certificate_id': certificate.certificate_id,
+        'certificate_ref': certificate.certificate_id,
+        'verification_token': str(certificate.verification_token),
+        'verification_url': verification_url,
+        'verified': certificate.status == 'issued',
+        'issued': certificate.status == 'issued',
+        'status': 'verified' if certificate.status == 'issued' else 'revoked',
+        'technologies': certificate.technologies_snapshot,
+        'completed_technologies': certificate.technologies_snapshot,
+        'units': certificate.units_snapshot,
+        'overall_score': float(certificate.overall_score),
+        'pass_mark': PASS_MARK,
+        'issued_at': certificate.issued_at.isoformat(),
+    })
     return data
