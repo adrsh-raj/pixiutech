@@ -1,318 +1,58 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CalendarDays, CheckCircle2, Clock3, Edit3, Flag, Layers3, Plus, RefreshCw, Users, X } from 'lucide-react';
+import { CalendarDays, CheckCircle2, ChevronRight, Edit3, Flag, Layers3, Plus, RefreshCw, Users, X, AlertTriangle, Award } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { apiFetch, useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 
-const field = 'w-full h-11 rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-slate-800 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 disabled:bg-slate-50';
-const text = value => String(value ?? '').trim();
-const lower = value => text(value).toLowerCase();
-const key = value => text(value).toUpperCase();
-const unitNumber = value => { const match = text(value).match(/\d+/); return match ? Number(match[0]) : 0; };
-const cleanUnitLabel = unit => {
-  const number = unitNumber(unit?.unit_number || unit?.unit_code || unit?.week);
-  const title = text(unit?.title || unit?.topic || '').replace(/^unit\s*\d+\s*[—:-]?\s*/i, '').trim();
-  if (number && title) return `Unit ${number} — ${title}`;
-  if (number) return `Unit ${number}`;
-  return title || 'Unit / Chapter';
-};
+const field='w-full h-11 rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-slate-800 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 disabled:bg-slate-50';
+const text=v=>String(v??'').trim();
+const lower=v=>text(v).toLowerCase();
+const key=v=>text(v).toUpperCase();
+const unitNumber=v=>{const m=text(v).match(/\d+/);return m?Number(m[0]):0;};
+const cleanUnitLabel=unit=>{const n=unitNumber(unit?.unit_number||unit?.unit_code||unit?.week);const title=text(unit?.title||unit?.topic||'').replace(/^unit\s*\d+\s*[—:-]?\s*/i,'').trim();return n&&title?`Unit ${n} — ${title}`:n?`Unit ${n}`:title||'Unit / Chapter';};
 
-async function req(path, method = 'GET', body) {
-  const response = await apiFetch(path, {
-    method,
-    cache: 'no-store',
-    ...(body !== undefined ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}),
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const fieldError = Object.entries(data || {}).find(([name]) => !['detail', 'error', 'message'].includes(name));
-    const value = fieldError ? (Array.isArray(fieldError[1]) ? fieldError[1].join(', ') : String(fieldError[1])) : '';
-    throw new Error(data.detail || data.error || data.message || (fieldError ? `${fieldError[0]}: ${value}` : `Request failed (${response.status})`));
-  }
-  return data;
-}
+async function req(path,method='GET',body){const response=await apiFetch(path,{method,cache:'no-store',...(body!==undefined?{headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{})});const data=await response.json().catch(()=>({}));if(!response.ok){const fieldError=Object.entries(data||{}).find(([n])=>!['detail','error','message'].includes(n));const value=fieldError?(Array.isArray(fieldError[1])?fieldError[1].join(', '):String(fieldError[1])):'';throw new Error(data.detail||data.error||data.message||(fieldError?`${fieldError[0]}: ${value}`:`Request failed (${response.status})`));}return data;}
 
-export default function SessionSchedulerV4() {
-  const { user } = useAuth();
-  const { schools = [], classes = [], trainers = [], students = [], attendance = [], sessions = [], refreshAll, loading } = useData();
-  const trainerRole = user?.role === 'trainer';
-  const canCreateUnit = trainerRole;
-
-  const [techs, setTechs] = useState([]);
-  const [units, setUnits] = useState([]);
-  const [schoolId, setSchoolId] = useState('');
-  const [classId, setClassId] = useState('');
-  const [trainerId, setTrainerId] = useState('');
-  const [techId, setTechId] = useState('');
-  const [unitId, setUnitId] = useState('');
-  const [last, setLast] = useState(false);
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const [start, setStart] = useState('10:00');
-  const [end, setEnd] = useState('11:00');
-  const [topic, setTopic] = useState('');
-  const [notes, setNotes] = useState('');
-  const [busy, setBusy] = useState('');
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [editing, setEditing] = useState(null);
-  const [unitModalOpen, setUnitModalOpen] = useState(false);
-  const [unitSaving, setUnitSaving] = useState(false);
-  const [unitForm, setUnitForm] = useState({ unit_number: '1', title: '', objectives: '' });
-
-  const activeSchools = useMemo(() => schools.filter(school => lower(school.status || 'active') !== 'inactive'), [schools]);
-  const selectedSchool = activeSchools.find(school => String(school.id) === String(schoolId));
-  const activeClasses = useMemo(() => classes.filter(cls => {
-    if (lower(cls.status || 'active') === 'inactive' || !selectedSchool) return false;
-    const schoolKeys = [selectedSchool.id, selectedSchool.school_id, selectedSchool.school_code, selectedSchool.code].filter(Boolean).map(key);
-    const classKeys = [cls.school, cls.school_id, cls.school_code].filter(Boolean).map(key);
-    return classKeys.some(value => schoolKeys.includes(value));
-  }), [classes, selectedSchool]);
-  const selectedClass = activeClasses.find(cls => String(cls.id) === String(classId));
-  const activeTrainers = useMemo(() => trainers.filter(trainer => lower(trainer.status || 'active') !== 'inactive'), [trainers]);
-  const myTrainer = trainerRole ? activeTrainers.find(trainer => String(trainer.id) === String(user?.trainer_id) || String(trainer.trainer_id) === String(user?.trainer_id)) || activeTrainers[0] : null;
-
-  const visible = useMemo(() => {
-    const ids = new Set(activeClasses.map(cls => String(cls.id)));
-    const trainerKey = String(myTrainer?.id || myTrainer?.trainer_id || user?.trainer_id || '');
-    return sessions.filter(session => ids.has(String(session.school_class || session.class_id)) && (!trainerRole || String(session.trainer || session.trainer_id) === trainerKey));
-  }, [sessions, activeClasses, trainerRole, myTrainer, user]);
-
-  const activeStudentCountByClass = useMemo(() => {
-    const counts = {};
-    students.forEach(student => {
-      if (lower(student.status || 'active') === 'inactive') return;
-      const classKey = String(student.class_id || student.school_class || '');
-      if (classKey) counts[classKey] = (counts[classKey] || 0) + 1;
-    });
-    return counts;
-  }, [students]);
-
-  const attendanceCountBySession = useMemo(() => {
-    const counts = {};
-    attendance.forEach(row => {
-      const sessionKey = String(row.session || row.session_id || '');
-      if (sessionKey) counts[sessionKey] = (counts[sessionKey] || 0) + 1;
-    });
-    return counts;
-  }, [attendance]);
-
-  const unitSummaries = useMemo(() => {
-    const map = new Map();
-    visible.forEach(session => {
-      const unitKey = String(session.curriculum_unit_id || session.curriculum_unit || 'unassigned');
-      const existing = map.get(unitKey) || {
-        id: unitKey,
-        name: session.curriculum_unit_name || cleanUnitLabel({ unit_number: unitNumber(session.curriculum_unit), title: session.curriculum_unit_topic }),
-        technology: session.technology_name || '—',
-        sessions: 0,
-        completed: 0,
-        finalMarked: false,
-        marked: 0,
-        expected: 0,
-      };
-      const classKey = String(session.school_class || session.class_id || '');
-      const expected = activeStudentCountByClass[classKey] || 0;
-      existing.sessions += 1;
-      if (lower(session.status) === 'completed') existing.completed += 1;
-      if (session.is_last_session_for_unit) existing.finalMarked = true;
-      existing.marked += attendanceCountBySession[String(session.id)] || 0;
-      existing.expected += expected;
-      map.set(unitKey, existing);
-    });
-    return Array.from(map.values()).sort((a, b) => String(a.name).localeCompare(String(b.name), undefined, { numeric: true }));
-  }, [visible, activeStudentCountByClass, attendanceCountBySession]);
-
-  const loadTech = async () => {
-    try {
-      const data = await req('/technologies');
-      setTechs(Array.isArray(data) ? data.filter(item => item?.active !== false) : []);
-    } catch (err) {
-      setError(err.message || 'Unable to load technology catalogue.');
-    }
-  };
-
-  const loadUnits = async (nextClassId = classId, nextTechId = techId, preserveUnitId = unitId) => {
-    if (!nextClassId || !nextTechId) {
-      setUnits([]);
-      if (!preserveUnitId) setUnitId('');
-      return;
-    }
-    try {
-      const data = await req(`/trainer-units?class_id=${encodeURIComponent(nextClassId)}&technology=${encodeURIComponent(nextTechId)}`);
-      const rows = Array.isArray(data) ? data : [];
-      setUnits(rows);
-      if (preserveUnitId && rows.some(unit => String(unit.id) === String(preserveUnitId))) setUnitId(String(preserveUnitId));
-      else if (!editing) setUnitId('');
-    } catch (err) {
-      setUnits([]);
-      setError(err.message || 'Unable to load units for this technology and class.');
-    }
-  };
-
-  useEffect(() => { loadTech(); }, []);
-  useEffect(() => { if (trainerRole && myTrainer) setTrainerId(String(myTrainer.id)); }, [trainerRole, myTrainer]);
-  useEffect(() => { if (!schoolId && activeSchools.length === 1) setSchoolId(String(activeSchools[0].id)); }, [activeSchools, schoolId]);
-  useEffect(() => {
-    if (classId && !activeClasses.some(cls => String(cls.id) === String(classId))) setClassId('');
-  }, [activeClasses, classId]);
-  useEffect(() => {
-    if (classId && techId) void loadUnits(classId, techId, unitId);
-    else setUnits([]);
-  }, [classId, techId]);
-
-  const openUnitModal = () => {
-    if (!canCreateUnit || !classId || !techId) return;
-    const next = Math.max(0, ...units.map(unit => Number(unit.unit_number) || unitNumber(unit.unit_code) || 0)) + 1;
-    setUnitForm({ unit_number: String(next), title: '', objectives: '' });
-    setUnitModalOpen(true);
-    setError('');
-  };
-
-  const saveUnit = async event => {
-    event.preventDefault();
-    if (!classId || !techId) return setError('Select class and technology before adding a unit.');
-    if (!/^\d+$/.test(unitForm.unit_number) || Number(unitForm.unit_number) <= 0) return setError('Enter a valid positive unit number.');
-    if (!text(unitForm.title) || !text(unitForm.objectives)) return setError('Unit/chapter name and objectives are required.');
-    setUnitSaving(true); setError(''); setSuccess('');
-    try {
-      const created = await req('/trainer-units', 'POST', {
-        school_class: classId,
-        technology: techId,
-        unit_number: Number(unitForm.unit_number),
-        title: text(unitForm.title),
-        objectives: text(unitForm.objectives),
-      });
-      const createdId = String(created.id);
-      await loadUnits(classId, techId, createdId);
-      setUnitId(createdId);
-      setUnitModalOpen(false);
-      setSuccess(`${created.technology_name || 'Technology'} · ${cleanUnitLabel(created)} added for ${selectedClass?.display_name || 'this class'}.`);
-    } catch (err) {
-      setError(err.message || 'Unable to add unit.');
-    } finally {
-      setUnitSaving(false);
-    }
-  };
-
-  const reset = () => {
-    setClassId(''); setTechId(''); setUnitId(''); setUnits([]); setTopic(''); setNotes(''); setLast(false); setEditing(null); setDate(new Date().toISOString().slice(0, 10)); setStart('10:00'); setEnd('11:00');
-  };
-
-  const submit = async event => {
-    event.preventDefault(); setBusy('save'); setError(''); setSuccess('');
-    const effectiveTrainer = trainerRole ? (myTrainer?.id || myTrainer?.trainer_id || user?.trainer_id) : trainerId;
-    if (!schoolId || !classId || !effectiveTrainer || !techId || !unitId || !date || !start || !text(topic)) {
-      setBusy(''); setError('School, class, trainer, technology, unit/chapter, date, start time and topic are required.'); return;
-    }
-    if (end && end <= start) { setBusy(''); setError('End time must be later than start time.'); return; }
-    try {
-      if (editing) {
-        await req(`/sessions/${editing.id}`, 'PATCH', {
-          curriculum_unit: unitId,
-          technology: techId,
-          date,
-          start_time: start,
-          end_time: end || null,
-          topic: text(topic),
-          notes: text(notes),
-          is_last_session_for_unit: last,
-        });
-        setSuccess('Class session updated successfully.');
-      } else {
-        const data = await req('/sessions', 'POST', {
-          school_class: classId,
-          trainer: effectiveTrainer,
-          technology: techId,
-          curriculum_unit: unitId,
-          is_last_session_for_unit: last,
-          date,
-          start_time: start,
-          end_time: end || null,
-          topic: text(topic),
-          notes: text(notes),
-        });
-        setSuccess(`${data.technology_name || 'Technology'} · ${data.curriculum_unit_name || cleanUnitLabel({ unit_code: data.curriculum_unit_code })} scheduled for ${selectedClass?.display_name || 'this class'}.`);
-      }
-      await refreshAll();
-      reset();
-    } catch (err) {
-      setError(err.message || 'Unable to save class session.');
-    } finally { setBusy(''); }
-  };
-
-  const edit = session => {
-    const nextSchool = session.school_class_school || session.school_id || schoolId;
-    const nextClass = session.school_class_id || session.school_class || session.class_id || '';
-    const nextTech = session.technology_id || session.technology || '';
-    const nextUnit = session.curriculum_unit_id || session.curriculum_unit || '';
-    setEditing(session);
-    setSchoolId(String(nextSchool));
-    setClassId(String(nextClass));
-    setTechId(String(nextTech));
-    setUnitId(String(nextUnit));
-    setDate(session.date || date);
-    setStart(session.start_time || start);
-    setEnd(session.end_time || end);
-    setTopic(session.topic || '');
-    setNotes(session.notes || '');
-    setLast(Boolean(session.is_last_session_for_unit));
-    setError(''); setSuccess('');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const evaluate = async id => {
-    setBusy(`eval-${id}`); setError(''); setSuccess('');
-    try {
-      const data = await req(`/course-completion/session/${id}/evaluate`, 'POST', {});
-      setSuccess(`Unit evaluated for ${data.evaluated_students} students: ${data.passed} passed, ${data.failed_or_pending} pending/failed.`);
-      await refreshAll();
-    } catch (err) { setError(err.message || 'Unable to evaluate unit.'); }
-    finally { setBusy(''); }
-  };
-
-  const change = async (id, action) => {
-    setBusy(`status-${id}`); setError(''); setSuccess('');
-    try {
-      await req(`/sessions/${id}/${action}`, 'POST', {});
-      await refreshAll();
-      setSuccess(action === 'complete' ? 'Class session completed. Attendance remains stored per student for this class session.' : 'Class session started.');
-    } catch (err) { setError(err.message || 'Unable to update class session status.'); }
-    finally { setBusy(''); }
-  };
-
-  return <div className="space-y-6 pb-10">
-    <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
-      <div><p className="text-[10px] uppercase tracking-[.2em] font-black text-blue-600">Academic Operations</p><h1 className="text-2xl sm:text-3xl font-black">Sessions & Schedule</h1><p className="mt-1 text-sm text-slate-500">Technology → Unit / Chapter → Class session → Student attendance. One unit can contain multiple class sessions.</p></div>
-      <button onClick={() => { void refreshAll(); void loadTech(); if (classId && techId) void loadUnits(classId, techId, unitId); }} disabled={!!busy || loading || unitSaving} className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-xs font-black inline-flex items-center gap-2"><RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh</button>
-    </div>
-
-    {error && <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">{error}</div>}
-    {success && <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">{success}</div>}
-
-    <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="flex items-center justify-between"><div><p className="text-[10px] uppercase tracking-wider font-black text-blue-600">{editing ? 'Edit class session' : 'Create class session'}</p><h2 className="text-xl font-black mt-1">{editing ? 'Edit Session Details' : 'Schedule a Session'}</h2></div><CalendarDays size={20} className="text-slate-300" /></div>
-      <form onSubmit={submit} className="mt-5 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-        <div><label className="label">School *</label><select className={field} value={schoolId} onChange={event => { setSchoolId(event.target.value); setClassId(''); setTechId(''); setUnitId(''); setUnits([]); }} disabled={!!editing} required><option value="">Select school</option>{activeSchools.map(school => <option key={school.id} value={school.id}>{school.name} · {school.school_code}</option>)}</select></div>
-        <div><label className="label">Class *</label><select className={field} value={classId} onChange={event => { setClassId(event.target.value); setUnitId(''); setUnits([]); }} disabled={!schoolId || !!editing} required><option value="">Select class</option>{activeClasses.map(cls => <option key={cls.id} value={cls.id}>{cls.display_name || `${cls.grade}${cls.section || ''}`} · Grade {cls.grade}</option>)}</select></div>
-        <div><label className="label">Technology *</label><select className={field} value={techId} onChange={event => { setTechId(event.target.value); setUnitId(''); setUnits([]); }} disabled={!classId} required><option value="">Select technology</option>{techs.map(technology => <option key={technology.id} value={technology.id}>{technology.name}</option>)}</select></div>
-        <div><label className="label">Unit / Chapter *</label><div className="flex gap-2"><select className={`${field} min-w-0`} value={unitId} onChange={event => setUnitId(event.target.value)} disabled={!classId || !techId} required><option value="">{classId && techId && !units.length ? 'No units for this technology' : 'Select unit / chapter'}</option>{units.map(unit => <option key={unit.id} value={unit.id}>{cleanUnitLabel(unit)}</option>)}</select>{canCreateUnit && <button type="button" title="Add unit / chapter" onClick={openUnitModal} disabled={!classId || !techId || !!editing} className="h-11 w-11 shrink-0 rounded-xl bg-blue-600 text-white inline-flex items-center justify-center disabled:opacity-40"><Plus size={17} /></button>}</div>{classId && techId && !units.length && <p className="mt-1 text-[10px] font-semibold text-slate-400">No unit/chapter exists for this technology + class yet.{canCreateUnit ? ' Use + to add the first one.' : ''}</p>}</div>
-        <div><label className="label">Date *</label><input className={field} type="date" value={date} onChange={event => setDate(event.target.value)} required disabled={false} /></div>
-        <div><label className="label">Start time *</label><input className={field} type="time" value={start} onChange={event => setStart(event.target.value)} required /></div>
-        <div><label className="label">End time</label><input className={field} type="time" value={end} onChange={event => setEnd(event.target.value)} /></div>
-        <div><label className="label">Trainer *</label><select className={field} value={trainerId} onChange={event => setTrainerId(event.target.value)} disabled={trainerRole || !classId} required><option value="">Select trainer</option>{trainerRole && myTrainer && <option value={myTrainer.id}>{myTrainer.name || 'My trainer account'}</option>}{!trainerRole && activeTrainers.map(trainer => <option key={trainer.id} value={trainer.id}>{trainer.name} · {trainer.trainer_id}</option>)}</select></div>
-        <div className="sm:col-span-2 xl:col-span-2"><label className="label">Class topic / session title *</label><input className={field} value={topic} onChange={event => setTopic(event.target.value)} placeholder="What was taught in this class?" required /></div>
-        <div className="sm:col-span-2 xl:col-span-2"><label className="label">Notes</label><input className={field} value={notes} onChange={event => setNotes(event.target.value)} placeholder="Optional notes" /></div>
-        <div className="sm:col-span-2 xl:col-span-4"><label className="label">Is this the last session of this unit?</label><select className={`${field} max-w-xl`} value={last ? 'yes' : 'no'} onChange={event => setLast(event.target.value === 'yes')}><option value="no">No — more sessions remain</option><option value="yes">Yes — assessment follows</option></select></div>
-        {last && <div className="sm:col-span-2 xl:col-span-4 rounded-2xl border border-violet-100 bg-violet-50 p-4"><div className="flex items-center gap-2 text-xs font-black text-violet-800"><Flag size={14} /> Unit-end assessment stage</div><p className="mt-1 text-xs text-violet-700">This marks one final class for the unit. Attendance for every active student is required before completion/evaluation.</p></div>}
-        <div className="flex gap-2 sm:col-span-2 xl:col-span-4"><button disabled={!!busy} className="h-11 rounded-xl bg-blue-600 text-white px-4 text-xs font-black inline-flex items-center justify-center gap-2">{busy === 'save' ? <RefreshCw size={14} className="animate-spin" /> : <Plus size={14} />} {editing ? 'Save Changes' : 'Schedule Class'}</button>{editing && <button type="button" onClick={reset} className="h-11 rounded-xl border border-slate-200 px-4 text-xs font-black">Cancel</button>}</div>
-      </form>
-    </section>
-
-    {unitSummaries.length > 0 && <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center justify-between gap-3"><div><p className="text-[10px] uppercase tracking-wider font-black text-violet-600">Unit progress</p><h2 className="text-xl font-black mt-1">Technology → Unit / Chapter → Class sessions</h2><p className="text-xs text-slate-400 mt-1">Each unit can span multiple actual class sessions. Attendance belongs to each individual session.</p></div><Layers3 size={20} className="text-slate-300" /></div><div className="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">{unitSummaries.map(unit => { const attendancePct = unit.expected ? Math.min(100, Math.round((unit.marked / unit.expected) * 100)) : 0; return <div key={unit.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="flex items-start justify-between gap-3"><div><p className="text-[10px] uppercase font-black text-violet-600">{unit.technology}</p><h3 className="font-black text-slate-900 mt-1">{unit.name}</h3></div>{unit.finalMarked && <span className="inline-flex items-center gap-1 rounded-lg bg-amber-50 px-2 py-1 text-[9px] font-black text-amber-700"><Flag size={11}/> Final marked</span>}</div><div className="grid grid-cols-3 gap-2 mt-4"><div className="rounded-xl bg-white border border-slate-100 p-2"><p className="text-[9px] uppercase font-black text-slate-400">Classes</p><p className="text-lg font-black">{unit.sessions}</p></div><div className="rounded-xl bg-white border border-slate-100 p-2"><p className="text-[9px] uppercase font-black text-slate-400">Completed</p><p className="text-lg font-black">{unit.completed}</p></div><div className="rounded-xl bg-white border border-slate-100 p-2"><p className="text-[9px] uppercase font-black text-slate-400">Attendance</p><p className="text-lg font-black">{attendancePct}%</p></div></div></div>; })}</div></section>}
-
-    <section className="rounded-3xl border border-slate-200 bg-white overflow-hidden"><div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between"><div><p className="text-[10px] uppercase tracking-wider font-black text-violet-600">Class register</p><h2 className="text-xl font-black">Technology → Unit / Chapter → Classes</h2></div><Users size={18} className="text-slate-300" /></div><div className="overflow-x-auto"><table className="min-w-full"><thead className="bg-slate-50"><tr>{['Date','Technology','School / Class','Unit / Chapter / Topic','Attendance','Last session','Status','Actions'].map(header => <th key={header} className="px-4 py-3 text-left text-[9px] uppercase tracking-wider font-black text-slate-400">{header}</th>)}</tr></thead><tbody className="divide-y divide-slate-100">{visible.map(session => { const sessionStatus = lower(session.status); const classKey = String(session.school_class || session.class_id || ''); const expected = activeStudentCountByClass[classKey] || 0; const marked = attendanceCountBySession[String(session.id)] || 0; const coverage = expected ? Math.min(100, Math.round((marked / expected) * 100)) : 0; return <tr key={session.id}><td className="px-4 py-3 whitespace-nowrap font-semibold">{session.date || '—'}<div className="text-[10px] text-slate-400">{session.start_time || '—'}{session.end_time ? ` → ${session.end_time}` : ''}</div></td><td className="px-4 py-3"><span className="inline-flex items-center gap-1 rounded-lg bg-violet-50 px-2 py-1 text-[9px] font-black text-violet-700"><Layers3 size={11} />{session.technology_name || '—'}</span></td><td className="px-4 py-3"><b>{session.school_name || session.school_code || '—'}</b><div className="text-[10px] text-slate-400">{session.class_name || '—'}</div></td><td className="px-4 py-3 min-w-[270px]"><b>{session.curriculum_unit_name || cleanUnitLabel({ unit_code: session.curriculum_unit_code })}</b>{session.curriculum_unit_topic && session.curriculum_unit_topic !== session.curriculum_unit_name && <div className="text-[10px] text-slate-400">{session.curriculum_unit_topic}</div>}<div className="text-[10px] text-slate-400">{session.topic || '—'}</div></td><td className="px-4 py-3 min-w-[115px]"><div className="text-[10px] font-black text-slate-700">{marked}/{expected || '—'}</div><div className="mt-1 h-1.5 w-full rounded-full bg-slate-200 overflow-hidden"><div className="h-full bg-blue-600" style={{ width: `${coverage}%` }} /></div><div className="text-[9px] text-slate-400 mt-1">{expected ? `${coverage}% marked` : 'No active students'}</div></td><td className="px-4 py-3">{session.is_last_session_for_unit ? <span className="inline-flex items-center gap-1 rounded-lg bg-amber-50 px-2 py-1 text-[9px] font-black text-amber-700"><Flag size={11} /> Yes</span> : <span className="text-[10px] font-bold text-slate-400">No</span>}</td><td className="px-4 py-3"><span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-[9px] uppercase font-black">{sessionStatus === 'completed' ? <CheckCircle2 size={11} /> : <Clock3 size={11} />} {sessionStatus}</span></td><td className="px-4 py-3 flex gap-1.5 flex-wrap">{trainerRole && <Link to={`/attendance?session=${encodeURIComponent(session.id)}`} className="px-2.5 py-1.5 rounded-lg bg-slate-900 text-white text-[9px] font-black">{sessionStatus === 'completed' ? 'View attendance' : 'Attendance'}</Link>}{sessionStatus === 'planned' && <button disabled={!!busy} onClick={() => change(session.id, 'start')} className="px-2.5 py-1.5 rounded-lg bg-blue-600 text-white text-[9px] font-black">Start</button>}{sessionStatus === 'in_progress' && <button disabled={!!busy} onClick={() => change(session.id, 'complete')} className="px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white text-[9px] font-black">Complete</button>}{session.is_last_session_for_unit && sessionStatus === 'completed' && <button disabled={!!busy} onClick={() => evaluate(session.id)} className="px-2.5 py-1.5 rounded-lg bg-violet-600 text-white text-[9px] font-black">{busy === `eval-${session.id}` ? 'Evaluating…' : 'Evaluate unit'}</button>}<button disabled={!!busy} onClick={() => edit(session)} className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-[9px] font-black inline-flex items-center gap-1"><Edit3 size={11} /> Edit</button></td></tr>; })}{!visible.length && <tr><td colSpan={8} className="p-10 text-center text-slate-400">No class sessions in your current scope.</td></tr>}</tbody></table></div></section>
-
-    {canCreateUnit && unitModalOpen && <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm p-4 flex items-center justify-center"><div className="w-full max-w-lg rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden"><div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between"><div><p className="text-[10px] uppercase tracking-wider font-black text-blue-600">Trainer curriculum</p><h2 className="text-xl font-black">Add Unit / Chapter</h2><p className="text-xs text-slate-500 mt-1">{techs.find(item => String(item.id) === String(techId))?.name || 'Technology'} · {selectedClass?.display_name || 'Selected class'}</p></div><button type="button" onClick={() => setUnitModalOpen(false)} className="text-slate-400 hover:text-slate-700"><X size={20} /></button></div><form onSubmit={saveUnit} className="p-6 space-y-4"><div><label className="label">Unit number *</label><input className={field} type="number" min="1" step="1" value={unitForm.unit_number} onChange={event => setUnitForm(value => ({ ...value, unit_number: event.target.value }))} required /></div><div><label className="label">Unit / Chapter name *</label><input className={field} value={unitForm.title} onChange={event => setUnitForm(value => ({ ...value, title: event.target.value }))} placeholder="e.g. Sensors & Obstacle Detection" required /></div><div><label className="label">Learning objectives *</label><textarea rows="5" className={`${field} h-auto py-3`} value={unitForm.objectives} onChange={event => setUnitForm(value => ({ ...value, objectives: event.target.value }))} placeholder="What students will learn/build in this unit" required /></div><div className="rounded-2xl bg-blue-50 border border-blue-100 px-4 py-3 text-xs text-blue-900"><b>Flow:</b> add one named unit/chapter for this technology + class, then schedule multiple class sessions under it.</div><div className="flex justify-end gap-2 pt-3 border-t border-slate-100"><button type="button" onClick={() => setUnitModalOpen(false)} className="h-11 rounded-xl border border-slate-200 px-4 text-xs font-black">Cancel</button><button type="submit" disabled={unitSaving} className="h-11 rounded-xl bg-blue-600 text-white px-5 text-xs font-black inline-flex items-center gap-2">{unitSaving ? <RefreshCw size={14} className="animate-spin" /> : <Plus size={14} />} {unitSaving ? 'Adding…' : 'Add unit / chapter'}</button></div></form></div></div>}
-    <style>{`.label{display:block;margin-bottom:.35rem;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.05em;color:#64748b}`}</style>
-  </div>;
+export default function SessionSchedulerV4(){
+ const {user}=useAuth();
+ const {schools=[],classes=[],trainers=[],students=[],attendance=[],sessions=[],refreshAll,loading}=useData();
+ const trainerRole=user?.role==='trainer';
+ const [techs,setTechs]=useState([]),[units,setUnits]=useState([]),[schoolId,setSchoolId]=useState(''),[classId,setClassId]=useState(''),[trainerId,setTrainerId]=useState(''),[techId,setTechId]=useState(''),[unitId,setUnitId]=useState('');
+ const [last,setLast]=useState(false),[date,setDate]=useState(new Date().toISOString().slice(0,10)),[start,setStart]=useState('10:00'),[end,setEnd]=useState('11:00'),[topic,setTopic]=useState(''),[notes,setNotes]=useState('');
+ const [busy,setBusy]=useState(''),[error,setError]=useState(''),[success,setSuccess]=useState(''),[editing,setEditing]=useState(null),[evaluation,setEvaluation]=useState(null),[unitModal,setUnitModal]=useState(false),[unitSaving,setUnitSaving]=useState(false),[unitForm,setUnitForm]=useState({unit_number:'1',title:'',objectives:''});
+ const activeSchools=useMemo(()=>schools.filter(s=>lower(s.status||'active')!=='inactive'),[schools]);
+ const selectedSchool=activeSchools.find(s=>String(s.id)===String(schoolId));
+ const activeClasses=useMemo(()=>classes.filter(c=>lower(c.status||'active')!=='inactive'&&selectedSchool&&[c.school,c.school_id,c.school_code].filter(Boolean).map(key).some(v=>[selectedSchool.id,selectedSchool.school_id,selectedSchool.school_code,selectedSchool.code].filter(Boolean).map(key).includes(v))),[classes,selectedSchool]);
+ const selectedClass=activeClasses.find(c=>String(c.id)===String(classId));
+ const activeTrainers=useMemo(()=>trainers.filter(t=>lower(t.status||'active')!=='inactive'),[trainers]);
+ const myTrainer=trainerRole?activeTrainers.find(t=>String(t.id)===String(user?.trainer_id)||String(t.trainer_id)===String(user?.trainer_id))||activeTrainers[0]:null;
+ const visible=useMemo(()=>{const ids=new Set(activeClasses.map(c=>String(c.id)));const trainerKey=String(myTrainer?.id||myTrainer?.trainer_id||user?.trainer_id||'');return sessions.filter(s=>ids.has(String(s.school_class||s.class_id))&&(!trainerRole||String(s.trainer||s.trainer_id)===trainerKey));},[sessions,activeClasses,trainerRole,myTrainer,user]);
+ const activeStudentCountByClass=useMemo(()=>{const out={};students.forEach(s=>{if(lower(s.status||'active')==='inactive')return;const id=String(s.class_id||s.school_class||'');if(id)out[id]=(out[id]||0)+1;});return out;},[students]);
+ const attendanceCountBySession=useMemo(()=>{const out={};attendance.forEach(a=>{const id=String(a.session||a.session_id||'');if(id)out[id]=(out[id]||0)+1;});return out;},[attendance]);
+ useEffect(()=>{void loadTech();},[]);
+ useEffect(()=>{if(!schoolId&&activeSchools.length===1)setSchoolId(String(activeSchools[0].id));},[activeSchools,schoolId]);
+ useEffect(()=>{if(classId&&!activeClasses.some(c=>String(c.id)===String(classId)))setClassId('');},[activeClasses,classId]);
+ useEffect(()=>{if(classId&&techId)void loadUnits(classId,techId,unitId);else setUnits([]);},[classId,techId]);
+ useEffect(()=>{if(trainerRole&&myTrainer)setTrainerId(String(myTrainer.id));},[trainerRole,myTrainer]);
+ async function loadTech(){try{const d=await req('/technologies');setTechs(Array.isArray(d)?d.filter(x=>x?.active!==false):[]);}catch(e){setError(e.message);}}
+ async function loadUnits(cId=classId,tId=techId,preserve=unitId){if(!cId||!tId){setUnits([]);return;}try{const d=await req(`/trainer-units?class_id=${encodeURIComponent(cId)}&technology=${encodeURIComponent(tId)}`);const rows=Array.isArray(d)?d:[];setUnits(rows);if(preserve&&rows.some(u=>String(u.id)===String(preserve)))setUnitId(String(preserve));}catch(e){setUnits([]);setError(e.message);}}
+ const reset=()=>{setClassId('');setTechId('');setUnitId('');setUnits([]);setTopic('');setNotes('');setLast(false);setEditing(null);setDate(new Date().toISOString().slice(0,10));setStart('10:00');setEnd('11:00');};
+ const submit=async e=>{e.preventDefault();setBusy('save');setError('');setSuccess('');const effectiveTrainer=trainerRole?(myTrainer?.id||myTrainer?.trainer_id||user?.trainer_id):trainerId;if(!schoolId||!classId||!effectiveTrainer||!techId||!unitId||!date||!start||!text(topic)){setBusy('');setError('School, class, trainer, technology, unit/chapter, date, start time and topic are required.');return;}if(end&&end<=start){setBusy('');setError('End time must be later than start time.');return;}try{const body={school_class:classId,trainer:effectiveTrainer,technology:techId,curriculum_unit:unitId,is_last_session_for_unit:last,date,start_time:start,end_time:end||null,topic:text(topic),notes:text(notes)};await req(editing?`/sessions/${editing.id}`:'/sessions',editing?'PATCH':'POST',body);await refreshAll();setSuccess(editing?'Class session updated.':`${techs.find(t=>String(t.id)===String(techId))?.name||'Technology'} session scheduled.`);reset();}catch(e){setError(e.message);}finally{setBusy('');}};
+ const edit=session=>{setEditing(session);setSchoolId(String(session.school_class_school||session.school_id||''));setClassId(String(session.school_class_id||session.school_class||session.class_id||''));setTechId(String(session.technology_id||session.technology||''));setUnitId(String(session.curriculum_unit_id||session.curriculum_unit||''));setDate(session.date||date);setStart(session.start_time||start);setEnd(session.end_time||end);setTopic(session.topic||'');setNotes(session.notes||'');setLast(Boolean(session.is_last_session_for_unit));setError('');setSuccess('');window.scrollTo({top:0,behavior:'smooth'});};
+ const change=async(id,action)=>{setBusy(`status-${id}`);setError('');setSuccess('');try{await req(`/sessions/${id}/${action}`,'POST',{});await refreshAll();setSuccess(action==='complete'?'Class session completed.':'Class session started.');}catch(e){setError(e.message);}finally{setBusy('');}};
+ const evaluate=async id=>{setBusy(`eval-${id}`);setError('');setSuccess('');try{const d=await req(`/course-completion/session/${id}/evaluate`,'POST',{});setEvaluation(d);setSuccess(`${d.ready||0} student(s) ready for trainer approval; ${d.pending||0} pending; ${d.below_pass_mark||0} below 70%.`);await refreshAll();}catch(e){setError(e.message);}finally{setBusy('');}};
+ const approveAndIssue=async studentId=>{setBusy(`issue-${studentId}`);setError('');try{await req(`/course-completion/${encodeURIComponent(studentId)}/request`,'POST',{});const cert=await req(`/course-completion/${encodeURIComponent(studentId)}/certificate`,'POST',{});setSuccess(`${studentId}: certificate issued.`);if(cert?.verification_url)window.open(cert.verification_url,'_blank','noopener,noreferrer');setEvaluation(v=>v?({...v,results:v.results.map(r=>r.student_id===studentId?{...r,state:'ready_issued',ready_for_certificate:false}:r)}):v);await refreshAll();}catch(e){setError(e.message);}finally{setBusy('');}};
+ const openUnit=()=>{const next=Math.max(0,...units.map(u=>Number(u.unit_number)||unitNumber(u.unit_code)))+1;setUnitForm({unit_number:String(next),title:'',objectives:''});setUnitModal(true);setError('');};
+ const saveUnit=async e=>{e.preventDefault();if(!classId||!techId)return;setUnitSaving(true);setError('');try{const d=await req('/trainer-units','POST',{school_class:classId,technology:techId,unit_number:Number(unitForm.unit_number),title:text(unitForm.title),objectives:text(unitForm.objectives)});await loadUnits(classId,techId,d.id);setUnitId(String(d.id));setUnitModal(false);}catch(err){setError(err.message);}finally{setUnitSaving(false);}};
+ return <div className="space-y-6 pb-10">
+  <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4"><div><p className="text-[10px] uppercase tracking-[.2em] font-black text-blue-600">Academic Operations</p><h1 className="text-2xl sm:text-3xl font-black">Sessions & Schedule</h1><p className="mt-1 text-sm text-slate-500">Technology → Unit / Chapter → Class session → Attendance → final programme evaluation.</p></div><button onClick={()=>{void refreshAll();void loadTech();if(classId&&techId)void loadUnits(classId,techId,unitId);}} disabled={!!busy||loading||unitSaving} className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-xs font-black inline-flex items-center gap-2"><RefreshCw size={14} className={loading?'animate-spin':''}/>Refresh</button></div>
+  {error&&<div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">{error}</div>}{success&&<div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">{success}</div>}
+  <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><div><p className="text-[10px] uppercase tracking-wider font-black text-blue-600">{editing?'Edit class session':'Create class session'}</p><h2 className="text-xl font-black mt-1">{editing?'Edit Session Details':'Schedule a Session'}</h2></div><CalendarDays size={20} className="text-slate-300"/></div>
+   <form onSubmit={submit} className="mt-5 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3"><div><label className="label">School *</label><select className={field} value={schoolId} onChange={e=>{setSchoolId(e.target.value);setClassId('');setTechId('');setUnitId('');setUnits([]);}} disabled={!!editing} required><option value="">Select school</option>{activeSchools.map(s=><option key={s.id} value={s.id}>{s.name} · {s.school_code}</option>)}</select></div><div><label className="label">Class *</label><select className={field} value={classId} onChange={e=>{setClassId(e.target.value);setUnitId('');setUnits([]);}} disabled={!schoolId||!!editing} required><option value="">Select class</option>{activeClasses.map(c=><option key={c.id} value={c.id}>{c.display_name||`${c.grade}${c.section||''}`}</option>)}</select></div><div><label className="label">Technology *</label><select className={field} value={techId} onChange={e=>{setTechId(e.target.value);setUnitId('');setUnits([]);}} disabled={!classId} required><option value="">Select technology</option>{techs.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select></div><div><label className="label">Unit / Chapter *</label><div className="flex gap-2"><select className={`${field} min-w-0`} value={unitId} onChange={e=>setUnitId(e.target.value)} disabled={!classId||!techId} required><option value="">{!units.length?'No unit / chapter':'Select unit / chapter'}</option>{units.map(u=><option key={u.id} value={u.id}>{cleanUnitLabel(u)}</option>)}</select>{trainerRole&&<button type="button" onClick={openUnit} disabled={!classId||!techId||!!editing} className="h-11 w-11 shrink-0 rounded-xl bg-blue-600 text-white inline-flex items-center justify-center"><Plus size={17}/></button>}</div></div><div><label className="label">Date *</label><input className={field} type="date" value={date} onChange={e=>setDate(e.target.value)} required/></div><div><label className="label">Start time *</label><input className={field} type="time" value={start} onChange={e=>setStart(e.target.value)} required/></div><div><label className="label">End time</label><input className={field} type="time" value={end} onChange={e=>setEnd(e.target.value)}/></div><div><label className="label">Trainer *</label><select className={field} value={trainerId} onChange={e=>setTrainerId(e.target.value)} disabled={trainerRole||!classId} required><option value="">Select trainer</option>{trainerRole&&myTrainer&&<option value={myTrainer.id}>{myTrainer.name}</option>}{!trainerRole&&activeTrainers.map(t=><option key={t.id} value={t.id}>{t.name} · {t.trainer_id}</option>)}</select></div><div className="sm:col-span-2 xl:col-span-2"><label className="label">Class topic / session title *</label><input className={field} value={topic} onChange={e=>setTopic(e.target.value)} placeholder="What was taught in this class?" required/></div><div className="sm:col-span-2 xl:col-span-2"><label className="label">Notes</label><input className={field} value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Optional notes"/></div><div className="sm:col-span-2 xl:col-span-4"><label className="label">Is this the final programme session?</label><select className={`${field} max-w-xl`} value={last?'yes':'no'} onChange={e=>setLast(e.target.value==='yes')}><option value="no">No — more programme sessions remain</option><option value="yes">Yes — programme evaluation follows</option></select></div>{last&&<div className="sm:col-span-2 xl:col-span-4 rounded-2xl border border-violet-100 bg-violet-50 p-4"><div className="flex items-center gap-2 text-xs font-black text-violet-800"><Flag size={14}/> Final programme session</div><p className="mt-1 text-xs text-violet-700">After this class is completed, click Evaluate Final Programme. The trainer will see exactly which students still need attendance, quizzes or project completion.</p></div>}<div className="flex gap-2 sm:col-span-2 xl:col-span-4"><button disabled={!!busy} className="h-11 rounded-xl bg-blue-600 text-white px-4 text-xs font-black inline-flex items-center gap-2"><Plus size={14}/>{editing?'Save Changes':'Schedule Class'}</button>{editing&&<button type="button" onClick={reset} className="h-11 rounded-xl border border-slate-200 px-4 text-xs font-black">Cancel</button>}</div></form>
+  </section>
+  <section className="rounded-3xl border border-slate-200 bg-white overflow-hidden"><div className="px-5 py-4 border-b border-slate-100"><p className="text-[10px] uppercase tracking-wider font-black text-violet-600">Class register</p><h2 className="text-xl font-black">Technology → Unit / Chapter → Classes</h2></div><div className="overflow-x-auto"><table className="min-w-full"><thead className="bg-slate-50"><tr>{['Date','Technology','School / Class','Unit / Chapter / Topic','Attendance','Final','Status','Actions'].map(h=><th key={h} className="px-4 py-3 text-left text-[9px] uppercase tracking-wider font-black text-slate-400">{h}</th>)}</tr></thead><tbody className="divide-y divide-slate-100">{visible.map(s=>{const cls=String(s.school_class||s.class_id||'');const expected=activeStudentCountByClass[cls]||0;const marked=attendanceCountBySession[String(s.id)]||0;const pct=expected?Math.min(100,Math.round(marked*100/expected)):0;const st=lower(s.status);return <tr key={s.id}><td className="px-4 py-3 whitespace-nowrap font-semibold">{s.date}<div className="text-[10px] text-slate-400">{s.start_time}{s.end_time?` → ${s.end_time}`:''}</div></td><td className="px-4 py-3"><span className="rounded-lg bg-violet-50 text-violet-700 px-2 py-1 text-[9px] font-black">{s.technology_name||'—'}</span></td><td className="px-4 py-3"><b>{s.school_name||s.school_code||'—'}</b><div className="text-[10px] text-slate-400">{s.class_name||'—'}</div></td><td className="px-4 py-3 min-w-[260px]"><b>{s.curriculum_unit_name||'—'}</b><div className="text-[10px] text-slate-400">{s.topic||'—'}</div></td><td className="px-4 py-3 min-w-[110px]"><b>{marked}/{expected||'—'}</b><div className="mt-1 h-1.5 rounded-full bg-slate-200 overflow-hidden"><div className="h-full bg-blue-600" style={{width:`${pct}%`}}/></div><div className="text-[9px] text-slate-400 mt-1">{expected?`${pct}% marked`:'No active students'}</div></td><td className="px-4 py-3">{s.is_last_session_for_unit?<span className="inline-flex items-center gap-1 rounded-lg bg-amber-50 text-amber-700 px-2 py-1 text-[9px] font-black"><Flag size={11}/>Yes</span>:<span className="text-[10px] text-slate-400">No</span>}</td><td className="px-4 py-3"><span className="rounded-lg bg-slate-100 px-2 py-1 text-[9px] font-black uppercase">{st}</span></td><td className="px-4 py-3"><div className="flex flex-wrap gap-1.5">{trainerRole&&<Link to={`/attendance?session=${encodeURIComponent(s.id)}`} className="px-2.5 py-1.5 rounded-lg bg-slate-900 text-white text-[9px] font-black">{st==='completed'?'View attendance':'Attendance'}</Link>}{st==='planned'&&<button disabled={!!busy} onClick={()=>change(s.id,'start')} className="px-2.5 py-1.5 rounded-lg bg-blue-600 text-white text-[9px] font-black">Start</button>}{st==='in_progress'&&<button disabled={!!busy} onClick={()=>change(s.id,'complete')} className="px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white text-[9px] font-black">Complete</button>}{s.is_last_session_for_unit&&st==='completed'&&<button disabled={!!busy} onClick={()=>evaluate(s.id)} className="px-2.5 py-1.5 rounded-lg bg-violet-600 text-white text-[9px] font-black">{busy===`eval-${s.id}`?'Evaluating…':'Evaluate Final Programme'}</button>}<button disabled={!!busy} onClick={()=>edit(s)} className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-[9px] font-black inline-flex items-center gap-1"><Edit3 size={11}/>Edit</button></div></td></tr>})}{!visible.length&&<tr><td colSpan={8} className="p-10 text-center text-slate-400">No class sessions in your current scope.</td></tr>}</tbody></table></div></section>
+  {unitModal&&<div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm p-4 flex items-center justify-center"><div className="w-full max-w-lg rounded-3xl bg-white shadow-2xl"><div className="p-5 border-b border-slate-100 flex items-center justify-between"><div><p className="text-[10px] uppercase tracking-wider font-black text-blue-600">Trainer curriculum</p><h2 className="text-xl font-black">Add Unit / Chapter</h2></div><button onClick={()=>setUnitModal(false)}><X size={18}/></button></div><form onSubmit={saveUnit} className="p-5 space-y-4"><input className={field} type="number" min="1" value={unitForm.unit_number} onChange={e=>setUnitForm(v=>({...v,unit_number:e.target.value}))} placeholder="Unit number" required/><input className={field} value={unitForm.title} onChange={e=>setUnitForm(v=>({...v,title:e.target.value}))} placeholder="Unit / chapter name" required/><textarea rows="5" className={`${field} h-auto py-3`} value={unitForm.objectives} onChange={e=>setUnitForm(v=>({...v,objectives:e.target.value}))} placeholder="Learning objectives" required/><div className="flex justify-end gap-2"><button type="button" onClick={()=>setUnitModal(false)} className="h-11 rounded-xl border border-slate-200 px-4 text-xs font-black">Cancel</button><button disabled={unitSaving} className="h-11 rounded-xl bg-blue-600 text-white px-4 text-xs font-black">{unitSaving?'Adding…':'Add unit / chapter'}</button></div></form></div></div>}
+  {evaluation&&<div className="fixed inset-0 z-[100] bg-slate-950/65 backdrop-blur-sm p-4 flex items-center justify-center" onClick={()=>setEvaluation(null)}><section onClick={e=>e.stopPropagation()} className="w-full max-w-4xl max-h-[90vh] overflow-auto rounded-3xl bg-white shadow-2xl"><div className="sticky top-0 z-10 bg-white border-b border-slate-100 p-5 flex items-start justify-between gap-4"><div><p className="text-[10px] uppercase tracking-[.18em] font-black text-violet-600">Final Programme Evaluation</p><h2 className="text-2xl font-black">Student completion check</h2><p className="mt-1 text-xs text-slate-500">Only students whose attendance, assigned quizzes, project and overall score ≥70% are certificate-ready.</p></div><button onClick={()=>setEvaluation(null)} className="p-2 rounded-xl hover:bg-slate-100"><X size={18}/></button></div><div className="p-5"><div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5"><div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-4"><p className="text-[9px] uppercase font-black text-emerald-700">Ready</p><p className="text-2xl font-black">{evaluation.ready||0}</p></div><div className="rounded-2xl bg-amber-50 border border-amber-100 p-4"><p className="text-[9px] uppercase font-black text-amber-700">Pending</p><p className="text-2xl font-black">{evaluation.pending||0}</p></div><div className="rounded-2xl bg-rose-50 border border-rose-100 p-4"><p className="text-[9px] uppercase font-black text-rose-700">Below 70%</p><p className="text-2xl font-black">{evaluation.below_pass_mark||0}</p></div><div className="rounded-2xl bg-slate-50 border border-slate-200 p-4"><p className="text-[9px] uppercase font-black text-slate-500">Students</p><p className="text-2xl font-black">{evaluation.evaluated_students||0}</p></div></div><div className="space-y-3">{evaluation.results?.map(r=><div key={r.student_id} className="rounded-2xl border border-slate-200 p-4"><div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4"><div><div className="flex flex-wrap items-center gap-2"><b className="text-base">{r.student_name}</b><span className="font-mono text-[10px] text-slate-400">{r.student_id}</span><span className={`rounded-lg px-2 py-1 text-[9px] font-black uppercase ${r.state==='ready'?'bg-emerald-50 text-emerald-700':r.state==='below_pass_mark'?'bg-rose-50 text-rose-700':'bg-amber-50 text-amber-700'}`}>{r.state==='ready_issued'?'certificate issued':r.state.replaceAll('_',' ')}</span></div><p className="mt-1 text-xs text-slate-500">Overall {Number(r.overall_score||0).toFixed(2)}% / 70% minimum</p><div className="mt-3 flex flex-wrap gap-2 text-[10px] font-semibold"><span className={`rounded-lg px-2 py-1 ${r.attendance?.complete?'bg-emerald-50 text-emerald-700':'bg-rose-50 text-rose-700'}`}>Attendance {r.attendance?.attended??0}/{r.attendance?.total??0}{r.attendance?.missing?.length?` · ${r.attendance.missing.length} unmarked`:''}</span><span className={`rounded-lg px-2 py-1 ${r.quiz?.complete?'bg-emerald-50 text-emerald-700':'bg-rose-50 text-rose-700'}`}>Quiz {r.quiz?.completed??0}/{r.quiz?.assigned??0}</span><span className={`rounded-lg px-2 py-1 ${r.project?.complete?'bg-emerald-50 text-emerald-700':'bg-rose-50 text-rose-700'}`}>Project {r.project?.complete?'Completed':(r.project?.status||'Not submitted')}</span></div>{r.blockers?.length>0&&<div className="mt-3 space-y-1">{r.blockers.map((b,i)=><p key={i} className="text-xs text-rose-700 flex gap-2"><AlertTriangle size={13} className="mt-0.5 shrink-0"/>{b}</p>)}</div>}</div><div>{r.ready_for_certificate&&r.state==='ready'&&<button disabled={!!busy} onClick={()=>approveAndIssue(r.student_id)} className="rounded-xl bg-slate-900 text-white px-4 py-2.5 text-xs font-black inline-flex items-center gap-2"><Award size={14}/>{busy===`issue-${r.student_id}`?'Issuing…':'Approve & Issue Certificate'}</button>}</div></div></div>)}</div></div></section></div>}
+  <style>{`.label{display:block;margin-bottom:.35rem;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.05em;color:#64748b}`}</style>
+ </div>;
 }
