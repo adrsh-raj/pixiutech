@@ -29,7 +29,7 @@ class CurriculumUnitProfile(models.Model):
     curriculum_unit = models.OneToOneField("learning.CurriculumUnit", on_delete=models.CASCADE, related_name="completion_profile")
     technology = models.ForeignKey(Technology, on_delete=models.PROTECT, related_name="curriculum_units")
     certificate_required = models.BooleanField(default=True)
-    # Null means inherit the class/global CompletionPolicy. A value allows a unit to opt in/out or override its threshold.
+    # Optional per-unit criteria overrides are retained for reporting/backward compatibility.
     requires_attendance = models.BooleanField(null=True, blank=True)
     min_attendance_pct = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, validators=[MinValueValidator(0), MaxValueValidator(100)])
     requires_quiz = models.BooleanField(null=True, blank=True)
@@ -45,7 +45,9 @@ class CurriculumUnitProfile(models.Model):
 class SessionWorkflow(models.Model):
     session = models.OneToOneField("learning.Session", on_delete=models.CASCADE, related_name="workflow")
     technology = models.ForeignKey(Technology, on_delete=models.PROTECT, related_name="session_workflows")
+    # Legacy unit-level marker. Programme completion uses the single class-level final marker below.
     is_last_session_for_unit = models.BooleanField(default=False)
+    is_last_session_for_programme = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
