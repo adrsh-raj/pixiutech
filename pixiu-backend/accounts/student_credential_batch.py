@@ -3,16 +3,18 @@ import csv
 import hashlib
 import io
 import json
+from functools import lru_cache
+from urllib.request import Request, urlopen
 
 from cryptography.fernet import Fernet
 from django.conf import settings
 from django.db import transaction
 from django.http import HttpResponse
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_LEFT
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
+from reportlab.lib.utils import ImageReader
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from rest_framework.exceptions import ValidationError
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
@@ -23,6 +25,7 @@ from academics.models import Student
 
 BATCH_SIZE = 4
 PDF_ROW_LIMIT = 5000
+PIXIU_LOGO_URL = "https://pixiutech.com/img/logo.png"
 
 
 def _fernet():
@@ -208,6 +211,68 @@ def credential_csv_response(rows, filename="pixiu-student-temporary-pins.csv"):
     return response
 
 
+@lru_cache(maxsize=1)
+def _pixiu_logo_reader():
+    url = getattr(settings, "PIXIU_TECH_LOGO_URL", PIXIU_LOGO_URL)
+    try:
+        request = Request(url, headers={"User-Agent": "PixiuTech-LMS-PDF/1.0"})
+        with urlopen(request, timeout=4) as response:
+            data = response.read(2 * 1024 * 1024)
+        return ImageReader(io.BytesIO(data))
+    except Exception:
+        return None
+
+
+def _draw_pdf_letterhead(canvas, doc):
+    canvas.saveState()
+    page_width, page_height = A4
+    logo = _pixiu_logo_reader()
+    header_y = page_height - 10 * mm
+
+    if logo is not None:
+        iw, ih = logo.getSize()
+        target_h = 13 * mm
+        target_w = target_h * (iw / ih) if ih else 38 * mm
+        target_w = min(target_w, 48 * mm)
+        canvas.drawImage(
+            logo,
+            doc.leftMargin,
+            header_y - target_h,
+            width=target_w,
+            height=target_h,
+            preserveAspectRatio=True,
+            mask="auto",
+        )
+    else:
+        canvas.setFont("Helvetica-Bold", 17)
+        canvas.setFillColor(colors.HexColor("#0F172A"))
+        canvas.drawString(doc.leftMargin, header_y - 6 * mm, "PIXIU TECH")
+
+    canvas.setFont("Helvetica-Bold", 9)
+    canvas.setFillColor(colors.HexColor("#0F172A"))
+    canvas.drawRightString(page_width - doc.rightMargin, header_y - 4 * mm, "PIXIU TECH LLP")
+    canvas.setFont("Helvetica", 7)
+    canvas.setFillColor(colors.HexColor("#64748B"))
+    canvas.drawRightString(
+        page_width - doc.rightMargin,
+        header_y - 8 * mm,
+        "School Technology Infrastructure • Experiential Learning",
+    )
+
+    canvas.setStrokeColor(colors.HexColor("#2563EB"))
+    canvas.setLineWidth(1.2)
+    canvas.line(doc.leftMargin, page_height - 21 * mm, page_width - doc.rightMargin, page_height - 21 * mm)
+
+    canvas.setStrokeColor(colors.HexColor("#CBD5E1"))
+    canvas.setLineWidth(0.5)
+    canvas.line(doc.leftMargin, 13 * mm, page_width - doc.rightMargin, 13 * mm)
+    canvas.setFont("Helvetica", 7)
+    canvas.setFillColor(colors.HexColor("#64748B"))
+    canvas.drawString(doc.leftMargin, 8.5 * mm, "CONFIDENTIAL • Temporary student credentials")
+    canvas.drawRightString(page_width - doc.rightMargin, 8.5 * mm, f"Page {canvas.getPageNumber()}")
+    canvas.restoreState()
+
+
 def credential_pdf_response(rows, school_code="", class_name=""):
     clean_rows = _filtered_rows(rows, school_code, class_name)
     if not clean_rows or len(clean_rows) > PDF_ROW_LIMIT:
@@ -215,11 +280,59 @@ def credential_pdf_response(rows, school_code="", class_name=""):
 
     buffer = io.BytesIO()
     styles = getSampleStyleSheet()
-    title = ParagraphStyle("PixiuTitle", parent=styles["Title"], fontName="Helvetica-Bold", fontSize=18, leading=22, alignment=TA_LEFT, textColor=colors.HexColor("#0F172A"), spaceAfter=4)
-    subtitle = ParagraphStyle("PixiuSubtitle", parent=styles["Normal"], fontSize=9, leading=12, textColor=colors.HexColor("#64748B"), spaceAfter=8)
-    section = ParagraphStyle("PixiuSection", parent=styles["Heading2"], fontName="Helvetica-Bold", fontSize=12, leading=15, textColor=colors.HexColor("#1D4ED8"), spaceBefore=7, spaceAfter=5)
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=12 * mm, leftMargin=12 * mm, topMargin=13 * mm, bottomMargin=13 * mm, title="Pixiu Tech Student Temporary Credentials", author="Pixiu Tech")
-    story = [Paragraph("PIXIU TECH", title), Paragraph("Student Temporary Credentials", subtitle)]
+    title = ParagraphStyle(
+        "PixiuCredentialTitle",
+        parent=styles["Title"],
+        fontName="Helvetica-Bold",
+        fontSize=17,
+        leading=20,
+        alignment=1,
+        textColor=colors.HexColor("#0F172A"),
+        spaceAfter=3,
+    )
+    subtitle = ParagraphStyle(
+        "PixiuCredentialSubtitle",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=8.5,
+        leading=11,
+        alignment=1,
+        textColor=colors.HexColor("#64748B"),
+        spaceAfter=9,
+    )
+    section = ParagraphStyle(
+        "PixiuCredentialSection",
+        parent=styles["Heading2"],
+        fontName="Helvetica-Bold",
+        fontSize=11,
+        leading=14,
+        textColor=colors.HexColor("#1D4ED8"),
+        spaceBefore=5,
+        spaceAfter=5,
+    )
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=12 * mm,
+        leftMargin=12 * mm,
+        topMargin=26 * mm,
+        bottomMargin=18 * mm,
+        title="Pixiu Tech Student Temporary Credentials",
+        author="Pixiu Tech LLP",
+    )
+    scope = "All schools"
+    if school_code and class_name:
+        scope = f"{school_code} • {class_name}"
+    elif school_code:
+        scope = school_code
+    elif class_name:
+        scope = class_name
+
+    story = [
+        Paragraph("STUDENT TEMPORARY CREDENTIAL SHEET", title),
+        Paragraph(f"Secure administrative issue record • {scope}", subtitle),
+    ]
 
     grouped = {}
     for row in clean_rows:
@@ -228,25 +341,53 @@ def credential_pdf_response(rows, school_code="", class_name=""):
     for (school, cls), group in grouped.items():
         story.append(Paragraph(f"{school} · {cls}", section))
         data = [["#", "Student", "Student ID", "Username", "Temporary PIN"]]
-        data.extend([[str(i), r["name"], r["student_id"], r["username"], r["temporary_pin"]] for i, r in enumerate(group, 1)])
-        table = Table(data, colWidths=[9 * mm, 44 * mm, 33 * mm, 40 * mm, 36 * mm], repeatRows=1)
-        table.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0F172A")),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTNAME", (4, 1), (4, -1), "Courier-Bold"),
-            ("FONTSIZE", (0, 0), (-1, -1), 7.5),
-            ("ALIGN", (4, 1), (4, -1), "CENTER"),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
-            ("GRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#CBD5E1")),
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("TOPPADDING", (0, 0), (-1, -1), 5),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-        ]))
-        story.extend([table, Spacer(1, 5 * mm)])
+        data.extend(
+            [[str(i), r["name"], r["student_id"], r["username"], r["temporary_pin"]] for i, r in enumerate(group, 1)]
+        )
+        table = Table(
+            data,
+            colWidths=[9 * mm, 43 * mm, 34 * mm, 40 * mm, 36 * mm],
+            repeatRows=1,
+            hAlign="LEFT",
+        )
+        table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0F172A")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTNAME", (4, 1), (4, -1), "Courier-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 7.5),
+                    ("ALIGN", (4, 1), (4, -1), "CENTER"),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
+                    ("GRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#CBD5E1")),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("TOPPADDING", (0, 0), (-1, -1), 5),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                ]
+            )
+        )
+        story.extend([table, Spacer(1, 4 * mm)])
 
-    story.append(Paragraph("CONFIDENTIAL · Give each student only their own temporary PIN.", subtitle))
-    doc.build(story)
+    story.append(
+        Paragraph(
+            "Security notice: distribute each temporary PIN only to the student named on that row. Do not share or publish this document.",
+            ParagraphStyle(
+                "PixiuSecurityNote",
+                parent=styles["Normal"],
+                fontSize=8,
+                leading=11,
+                textColor=colors.HexColor("#475569"),
+                borderColor=colors.HexColor("#CBD5E1"),
+                borderWidth=0.5,
+                borderPadding=6,
+                backColor=colors.HexColor("#F8FAFC"),
+                spaceBefore=5,
+            ),
+        )
+    )
+
+    doc.build(story, onFirstPage=_draw_pdf_letterhead, onLaterPages=_draw_pdf_letterhead)
     response = HttpResponse(buffer.getvalue(), content_type="application/pdf")
     safe_school = (school_code or "all-schools").replace(" ", "-")
     safe_class = (class_name or "all-classes").replace(" ", "-")
