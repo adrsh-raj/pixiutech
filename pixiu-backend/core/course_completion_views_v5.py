@@ -66,12 +66,11 @@ class CourseCompletionListView(APIView):
                 rows.append({
                     'student_id': student.student_id, 'student_name': student.name,
                     'school_name': student.school_class.school.name, 'school_code': student.school_class.school.school_code,
-                    'class_name': student.school_class.display_name, 'status': 'in_progress',
-                    'overall_score': 0, 'score_breakdown': {'overall_score': 0, 'pass_mark': service.PASS_MARK, 'eligible': False},
+                    'class_name': student.school_class.display_name, 'status': 'in_progress', 'overall_score': 0,
+                    'score_breakdown': {'overall_score': 0, 'pass_mark': service.PASS_MARK, 'eligible': False},
                     'required_units': 0, 'completed_units': 0, 'units': [], 'technologies': [],
-                    'sessions_by_technology': [], 'programme_final_session': None,
-                    'final_session_ready': False, 'trainer_approval_ready': False,
-                    'can_issue_certificate': False, 'certificate_id': None, 'policy': None,
+                    'sessions_by_technology': [], 'programme_final_session': None, 'final_session_ready': False,
+                    'trainer_approval_ready': False, 'can_issue_certificate': False, 'certificate_id': None, 'policy': None,
                 })
         return Response(rows)
 
@@ -148,9 +147,9 @@ class CertificatePdfView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, student_key):
-        student = _student_for(request.user, student_key)
         if request.user.role not in {UserRole.ADMIN, UserRole.TRAINER}:
             return _error(PermissionError('Only authorised trainers or administrators can access certificate PDFs.'), 403)
+        student = _student_for(request.user, student_key)
         try:
             service.ensure_scope(request.user, student)
         except PermissionError as exc:
@@ -158,6 +157,16 @@ class CertificatePdfView(APIView):
         certificate = Certificate.objects.filter(student=student, status='issued').order_by('-issued_at').first()
         if certificate is None:
             return _error(ValueError('No issued certificate exists for this student.'), 404)
+        return build_certificate_pdf(certificate)
+
+
+class PublicCertificatePdfView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, certificate_id):
+        certificate = Certificate.objects.filter(certificate_id__iexact=str(certificate_id).strip(), status='issued').select_related('student__school_class__school', 'school_class__school').first()
+        if certificate is None:
+            return _error(ValueError('No issued Pixiu Tech certificate matches this certificate ID.'), 404)
         return build_certificate_pdf(certificate)
 
 
