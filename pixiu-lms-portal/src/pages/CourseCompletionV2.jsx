@@ -1,24 +1,146 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Award, CheckCircle2, ChevronRight, Flag, Layers3, RefreshCw, Save, Send, Settings2, ShieldCheck, X } from 'lucide-react';
+import { Award, ChevronRight, Flag, RefreshCw, School, ShieldCheck, X } from 'lucide-react';
 import { apiFetch, useAuth } from '../context/AuthContext';
-import { useData } from '../context/DataContext';
-const text=v=>String(v??'').trim();
-async function req(path,method='GET',body){const r=await apiFetch(path,{method,cache:'no-store',...(body!==undefined?{headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{})});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d?.detail||d?.error||d?.message||`Request failed (${r.status})`);return d;}
-const input='h-10 rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10';
-export default function CourseCompletionV2(){
- const {user}=useAuth(); const {classes=[]}=useData(); const isAdmin=['admin','superadmin'].includes(user?.role),isTrainer=user?.role==='trainer';
- const [students,setStudents]=useState([]),[selected,setSelected]=useState(null),[loading,setLoading]=useState(true),[busy,setBusy]=useState(''),[error,setError]=useState(''),[classFilter,setClassFilter]=useState(''),[policy,setPolicy]=useState(null),[policyOpen,setPolicyOpen]=useState(false),[saveMsg,setSaveMsg]=useState('');
- const scopedClasses=useMemo(()=>classes.filter(c=>(c.status||'active').toLowerCase()!=='inactive'),[classes]);
- const filtered=useMemo(()=>classFilter?students.filter(s=>String(s.class_name)===String(classFilter)):students,[students,classFilter]);
- const classFor=student=>scopedClasses.find(c=>String(c.display_name||`${c.grade}${c.section||''}`)===String(student.class_name)&&String(c.school_code||c.school||'')===String(student.school_code||''))||scopedClasses.find(c=>String(c.display_name||`${c.grade}${c.section||''}`)===String(student.class_name));
- const load=async()=>{setLoading(true);setError('');try{const d=await req('/course-completion');setStudents(Array.isArray(d)?d:[])}catch(e){setError(e.message)}finally{setLoading(false)}};
- useEffect(()=>{if(user?.role)load()},[user?.role]);
- const review=async s=>{setBusy('review-'+s.student_id);setError('');try{const d=await req(`/course-completion/${encodeURIComponent(s.student_id)}`);setSelected(d);setPolicy(d.policy||null);setPolicyOpen(false)}catch(e){setError(e.message)}finally{setBusy('')}};
- const action=async(s,name)=>{setBusy(`${name}-${s.student_id}`);setError('');try{const d=await req(`/course-completion/${encodeURIComponent(s.student_id)}/${name}`,'POST',{});await load();const fresh=await req(`/course-completion/${encodeURIComponent(s.student_id)}`);setSelected(fresh);setPolicy(fresh.policy||null);if(d?.verification_url)window.open(d.verification_url,'_blank','noopener,noreferrer')}catch(e){setError(e.message)}finally{setBusy('')}};
- const savePolicy=async()=>{if(!selected||!policy||!isAdmin)return;const target=classFor(selected);if(!target){setError('Could not identify this student\'s class record.');return}setBusy('policy');setError('');setSaveMsg('');try{const d=await req(`/course-completion/policy/${target.id}`,'PUT',policy);setPolicy(d);setSelected(s=>({...s,policy:d}));setSaveMsg('Criteria saved for this class.');await load()}catch(e){setError(e.message)}finally{setBusy('')}};
- if(!isAdmin&&!isTrainer)return null;
- return <div className="space-y-6 pb-10"><div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4"><div><p className="text-[10px] uppercase tracking-[.2em] font-black text-blue-600">Programme Operations</p><h1 className="text-2xl sm:text-3xl font-black">Course Completion</h1><p className="mt-1 text-sm text-slate-500">Technology → sessions → last session → assessment → unit complete → trainer requests → admin completes → trainer issues one combined certificate.</p></div><button onClick={load} disabled={loading||!!busy} className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-xs font-black inline-flex items-center gap-2"><RefreshCw size={14} className={loading?'animate-spin':''}/> Refresh</button></div>{error&&<div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">{error}</div>}{saveMsg&&<div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">{saveMsg}</div>}
- <section className="rounded-3xl border border-slate-200 bg-white shadow-sm overflow-hidden"><div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"><div><p className="text-[10px] uppercase tracking-wider font-black text-violet-600">Student completion registry</p><h2 className="text-xl font-black">Every technology and unit stays traceable</h2></div><select className={`${input} min-w-52`} value={classFilter} onChange={e=>setClassFilter(e.target.value)}><option value="">All classes</option>{[...new Set(scopedClasses.map(c=>c.display_name||`${c.grade}${c.section||''}`))].sort().map(c=><option key={c} value={c}>{c}</option>)}</select></div>{loading?<div className="p-12 text-center text-slate-400">Loading completion registry…</div>:<div className="divide-y divide-slate-100">{filtered.map(s=><div key={s.student_id} className="p-4 sm:p-5 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4"><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><b className="text-slate-900">{s.student_name}</b><span className="font-mono text-[10px] text-slate-400">{s.student_id}</span><span className="rounded-lg bg-slate-100 px-2 py-1 text-[9px] font-black uppercase">{s.status.replace('_',' ')}</span></div><p className="mt-1 text-xs text-slate-500">{s.school_name} · {s.class_name}</p><div className="mt-3 flex flex-wrap gap-2">{s.technologies.length?s.technologies.map(t=><span key={t.code} className="rounded-lg bg-violet-50 text-violet-700 px-2.5 py-1.5 text-[9px] font-black">{t.name} · {s.sessions_by_technology.find(x=>x.technology===t.name)?.sessions||0} sessions</span>):<span className="text-[10px] text-slate-400">Technologies appear as sessions are logged.</span>}</div></div><div className="flex flex-wrap gap-2 items-center"><span className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-[10px] font-black">Units {s.completed_units}/{s.required_units}</span><span className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-[10px] font-black">Score {s.overall_score}</span>{s.rank&&<span className="rounded-lg bg-amber-50 text-amber-700 px-3 py-2 text-[10px] font-black">Rank {s.rank}</span>}<button onClick={()=>review(s)} disabled={busy==='review-'+s.student_id} className="rounded-xl border border-slate-200 px-3 py-2 text-[10px] font-black inline-flex gap-1 items-center">Review <ChevronRight size={13}/></button>{isTrainer&&s.completed_units===s.required_units&&s.required_units>0&&s.status==='in_progress'&&<button onClick={()=>action(s,'request')} disabled={!!busy} className="rounded-xl bg-blue-600 text-white px-3 py-2 text-[10px] font-black inline-flex gap-1 items-center"><Send size={12}/> Request completion</button>}{isAdmin&&s.completed_units===s.required_units&&s.required_units>0&&s.status==='trainer_requested'&&<button onClick={()=>action(s,'complete')} disabled={!!busy} className="rounded-xl bg-emerald-600 text-white px-3 py-2 text-[10px] font-black inline-flex gap-1 items-center"><CheckCircle2 size={12}/> Mark programme completed</button>}{isTrainer&&s.status==='admin_completed'&&!s.certificate_id&&<button onClick={()=>action(s,'certificate')} disabled={!!busy} className="rounded-xl bg-slate-900 text-white px-3 py-2 text-[10px] font-black inline-flex gap-1 items-center"><Award size={12}/> Issue certificate</button>}{s.certificate_id&&<a href={`/verify?cert=${encodeURIComponent(s.certificate_id)}`} target="_blank" rel="noreferrer" className="rounded-xl bg-emerald-50 text-emerald-700 px-3 py-2 text-[10px] font-black inline-flex gap-1 items-center"><ShieldCheck size={13}/> Certificate</a>}</div></div>)}{!filtered.length&&!loading&&<div className="p-12 text-center text-slate-400">No students in this scope.</div>}</div>}</section>
- {selected&&<div className="fixed inset-0 z-[90] bg-slate-950/60 backdrop-blur-sm p-4 flex items-center justify-center" onClick={()=>setSelected(null)}><section onClick={e=>e.stopPropagation()} className="w-full max-w-6xl max-h-[92vh] overflow-auto rounded-3xl bg-white shadow-2xl"><div className="sticky top-0 z-10 bg-white border-b border-slate-100 p-5 flex justify-between gap-4"><div><p className="text-[10px] uppercase tracking-[.18em] font-black text-blue-600">Programme review</p><h2 className="text-xl font-black">{selected.student_name}</h2><p className="text-xs text-slate-500 mt-1">{selected.school_name} · {selected.class_name} · Overall {selected.overall_score}{selected.rank?` · Portal Rank ${selected.rank}`:''}</p></div><button onClick={()=>setSelected(null)} className="p-2 rounded-xl hover:bg-slate-100"><X size={18}/></button></div><div className="p-5 space-y-5"><div className="rounded-2xl border border-blue-100 bg-blue-50 p-4"><div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-wider text-blue-700">Completion criteria</p><p className="mt-1 text-xs text-blue-900">These rules are read from the class policy. Admin can edit them here.</p></div><Settings2 size={19} className="text-blue-600"/></div><div className="mt-4 grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs">{[['Attendance',policy?.requires_attendance?`≥ ${policy.min_attendance_pct}%`:'Not required'],['Quiz',policy?.requires_quiz?`≥ ${policy.min_quiz_pct}%`:'Not required'],['Practical',policy?.requires_practical?`≥ ${policy.min_practical_pct}%`:'Not required'],['Trainer review',policy?.requires_trainer_review?`≥ ${policy.min_trainer_review_rating}/5`:'Not required']].map(([l,v])=><div key={l} className="rounded-xl bg-white border border-blue-100 p-3"><p className="text-[9px] uppercase font-black text-slate-400">{l}</p><p className="mt-1 font-black">{v}</p></div>)}</div>{isAdmin&&<button onClick={()=>setPolicyOpen(v=>!v)} className="mt-3 rounded-xl bg-white border border-blue-100 px-3 py-2 text-[10px] font-black">{policyOpen?'Hide':'Edit'} criteria</button>}{policyOpen&&isAdmin&&<div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3"><label className="text-[9px] font-black">Attendance %<input type="number" min="0" max="100" step="0.1" className={`${input} mt-1 w-full`} value={policy.min_attendance_pct} onChange={e=>setPolicy({...policy,min_attendance_pct:e.target.value})}/></label><label className="text-[9px] font-black">Quiz %<input type="number" min="0" max="100" step="0.1" className={`${input} mt-1 w-full`} value={policy.min_quiz_pct} onChange={e=>setPolicy({...policy,min_quiz_pct:e.target.value})}/></label><label className="text-[9px] font-black">Practical %<input type="number" min="0" max="100" step="0.1" className={`${input} mt-1 w-full`} value={policy.min_practical_pct} onChange={e=>setPolicy({...policy,min_practical_pct:e.target.value})}/></label><label className="text-[9px] font-black">Review /5<input type="number" min="0" max="5" step="0.1" className={`${input} mt-1 w-full`} value={policy.min_trainer_review_rating} onChange={e=>setPolicy({...policy,min_trainer_review_rating:e.target.value})}/></label><div className="md:col-span-4 flex flex-wrap gap-2">{[['requires_attendance','Attendance'],['requires_quiz','Quiz'],['requires_practical','Practical'],['requires_trainer_review','Trainer review']].map(([f,l])=><label key={f} className="rounded-xl border bg-white px-3 py-2 text-[10px] font-black"><input type="checkbox" checked={!!policy[f]} onChange={e=>setPolicy({...policy,[f]:e.target.checked})} className="mr-2"/>{l} required</label>)}<button onClick={savePolicy} disabled={busy==='policy'} className="rounded-xl bg-slate-900 text-white px-4 py-2 text-[10px] font-black inline-flex items-center gap-1.5"><Save size={12}/>{busy==='policy'?'Saving…':'Save criteria'}</button></div></div>}</div><div className="space-y-3">{selected.units.map(u=><article key={u.id} className="rounded-2xl border border-slate-200 p-4"><div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4"><div className="min-w-0"><div className="flex flex-wrap gap-2 items-center"><span className="rounded-lg bg-violet-50 text-violet-700 px-2 py-1 text-[9px] font-black inline-flex items-center gap-1"><Layers3 size={11}/>{u.technology?.name||'Technology pending'}</span>{u.last_session&&<span className="rounded-lg bg-amber-50 text-amber-700 px-2 py-1 text-[9px] font-black inline-flex items-center gap-1"><Flag size={11}/> Last session complete</span>}<span className={`rounded-lg px-2 py-1 text-[9px] font-black uppercase ${u.status==='passed'?'bg-emerald-50 text-emerald-700':'bg-amber-50 text-amber-700'}`}>{u.status}</span></div><h3 className="mt-2 font-black">{u.title}</h3><p className="mt-1 text-xs text-slate-500">{u.unit_code} · {u.sessions} sessions</p></div><div className="grid grid-cols-2 sm:grid-cols-5 gap-2 min-w-[360px]">{[['Attendance',u.attendance_pct==null?'—':`${u.attendance_pct}%`],['Quiz',u.quiz_pct==null?'Pending':`${u.quiz_pct}%`],['Practical',u.practical_pct==null?'Pending':`${u.practical_pct}%`],['Review',u.trainer_review_avg==null?'Pending':`${u.trainer_review_avg}/5`],['Score',u.score]].map(([l,v])=><div key={l} className="rounded-xl bg-slate-50 px-2 py-2 text-center"><p className="text-[8px] uppercase font-black text-slate-400">{l}</p><p className="mt-1 text-[11px] font-black">{v}</p></div>)}</div></div>{u.reasons?.length>0&&<div className="mt-3 rounded-xl bg-amber-50 border border-amber-100 px-3 py-2 text-xs text-amber-800">{u.reasons.join(' · ')}</div>}</article>)}</div></div></section></div>}
- </div>;
+
+const input = 'h-11 rounded-xl border border-slate-200 bg-white px-3.5 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10';
+
+async function req(path, method = 'GET', body) {
+  const response = await apiFetch(path, {
+    method,
+    cache: 'no-store',
+    ...(body !== undefined ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data?.detail || data?.error || data?.message || `Request failed (${response.status})`);
+  return data;
+}
+
+export default function CourseCompletionV2() {
+  const { user } = useAuth();
+  const isAdmin = ['admin', 'superadmin'].includes(user?.role);
+  const isTrainer = user?.role === 'trainer';
+  const [scope, setScope] = useState({ schools: [], classes: [] });
+  const [schoolId, setSchoolId] = useState('');
+  const [classId, setClassId] = useState('');
+  const [students, setStudents] = useState([]);
+  const [selected, setSelected] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState('');
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  const loadScope = async () => {
+    try {
+      const data = await req('/course-completion/scope');
+      setScope(data || { schools: [], classes: [] });
+      const schools = Array.isArray(data?.schools) ? data.schools : [];
+      if (isTrainer && schools.length === 1) setSchoolId(String(schools[0].id));
+    } catch (e) { setError(e.message); }
+  };
+
+  const load = async (nextSchool = schoolId, nextClass = classId) => {
+    setLoading(true); setError('');
+    try {
+      const qs = new URLSearchParams();
+      if (nextSchool) qs.set('school_id', nextSchool);
+      if (nextClass) qs.set('class_id', nextClass);
+      const data = await req(`/course-completion${qs.toString() ? `?${qs}` : ''}`);
+      setStudents(Array.isArray(data) ? data : []);
+    } catch (e) { setStudents([]); setError(e.message); }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => {
+    if (!user?.role) return;
+    void loadScope();
+    void load('', '');
+  }, [user?.role]);
+
+  useEffect(() => {
+    if (schoolId) {
+      const valid = scope.classes.filter(c => String(c.school_id) === String(schoolId));
+      if (classId && !valid.some(c => String(c.id) === String(classId))) setClassId('');
+    }
+  }, [schoolId, scope.classes, classId]);
+
+  useEffect(() => {
+    if (user?.role && (schoolId || classId)) void load(schoolId, classId);
+  }, [schoolId, classId]);
+
+  const visibleClasses = useMemo(
+    () => scope.classes.filter(c => !schoolId || String(c.school_id) === String(schoolId)),
+    [scope.classes, schoolId],
+  );
+  const selectedSchool = scope.schools.find(s => String(s.id) === String(schoolId));
+  const selectedClass = visibleClasses.find(c => String(c.id) === String(classId));
+  const showSchoolFilter = isAdmin || scope.schools.length > 1;
+
+  const refresh = async () => {
+    await loadScope();
+    await load(schoolId, classId);
+  };
+
+  const openStudent = async student => {
+    setBusy(`open-${student.student_id}`); setError('');
+    try { setSelected(await req(`/course-completion/${encodeURIComponent(student.student_id)}`)); }
+    catch (e) { setError(e.message); }
+    finally { setBusy(''); }
+  };
+
+  const approve = async student => {
+    setBusy(`approve-${student.student_id}`); setError(''); setSuccess('');
+    try {
+      await req(`/course-completion/${encodeURIComponent(student.student_id)}/request`, 'POST', {});
+      setSuccess(`${student.student_name}: final programme session approved.`);
+      await load(schoolId, classId);
+      setSelected(await req(`/course-completion/${encodeURIComponent(student.student_id)}`));
+    } catch (e) { setError(e.message); }
+    finally { setBusy(''); }
+  };
+
+  const issue = async student => {
+    setBusy(`issue-${student.student_id}`); setError(''); setSuccess('');
+    try {
+      const data = await req(`/course-completion/${encodeURIComponent(student.student_id)}/certificate`, 'POST', {});
+      setSuccess(`${student.student_name}: certificate issued.`);
+      await load(schoolId, classId);
+      setSelected(await req(`/course-completion/${encodeURIComponent(student.student_id)}`));
+      if (data?.verification_url) window.open(data.verification_url, '_blank', 'noopener,noreferrer');
+    } catch (e) { setError(e.message); }
+    finally { setBusy(''); }
+  };
+
+  if (!isAdmin && !isTrainer) return null;
+
+  return <div className="space-y-6 pb-10">
+    <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+      <div>
+        <p className="text-[10px] uppercase tracking-[.2em] font-black text-blue-600">Programme Operations</p>
+        <h1 className="text-3xl font-black">Course Completion</h1>
+        <p className="mt-1 text-sm text-slate-500">Actual taught technologies → final class session → trainer approval → one combined certificate.</p>
+      </div>
+      <button onClick={refresh} disabled={loading || !!busy} className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-xs font-black inline-flex items-center gap-2"><RefreshCw size={14} className={loading ? 'animate-spin' : ''}/> Refresh</button>
+    </div>
+
+    {(error || success) && <div className={`rounded-2xl border px-4 py-3 text-sm font-semibold ${error ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}>{error || success}</div>}
+
+    <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex items-center gap-3"><div className="h-10 w-10 rounded-xl bg-blue-50 flex items-center justify-center"><School size={18} className="text-blue-600"/></div><div><p className="text-[10px] uppercase tracking-wider font-black text-blue-600">Completion scope</p><h2 className="text-xl font-black">{isTrainer && selectedSchool ? `${selectedSchool.name} · Assigned school` : isAdmin ? 'School and class filter' : 'Assigned school scope'}</h2></div></div>
+      <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-3">
+        {showSchoolFilter ? <div><label className="text-[10px] uppercase font-black text-slate-400">School</label><select className={`${input} mt-1 w-full`} value={schoolId} onChange={e => { setSchoolId(e.target.value); setClassId(''); }}><option value="">All schools</option>{scope.schools.map(s => <option key={s.id} value={s.id}>{s.name} · {s.school_code}</option>)}</select></div> : <div><label className="text-[10px] uppercase font-black text-slate-400">School</label><div className="mt-1 h-11 rounded-xl bg-slate-50 border border-slate-200 px-3.5 flex items-center text-sm font-bold text-slate-700">{selectedSchool?.name || 'Assigned school'}</div></div>}
+        <div><label className="text-[10px] uppercase font-black text-slate-400">Class</label><select className={`${input} mt-1 w-full`} value={classId} onChange={e => setClassId(e.target.value)}><option value="">All classes</option>{visibleClasses.map(c => <option key={c.id} value={c.id}>{c.display_name || `${c.grade}${c.section || ''}`}</option>)}</select></div>
+      </div>
+      {isTrainer && <p className="mt-3 text-xs text-slate-500">Trainer scope is automatically limited to your active school assignment(s).</p>}
+    </section>
+
+    <section className="rounded-3xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div className="px-5 py-4 border-b border-slate-100"><p className="text-[10px] uppercase tracking-wider font-black text-violet-600">Student completion registry</p><h2 className="text-xl font-black">Final-session based programme completion</h2><p className="mt-1 text-xs text-slate-400">AI, Robotics, 3D Printer, etc. are optional. Only technologies actually taught in completed sessions are recorded on the certificate.</p></div>
+      {loading ? <div className="p-12 text-center text-slate-400">Loading students…</div> : students.length ? <div className="divide-y divide-slate-100">{students.map(s => <div key={s.student_id} className="p-5 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+        <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><b>{s.student_name}</b><span className="font-mono text-[10px] text-slate-400">{s.student_id}</span><span className="rounded-lg bg-slate-100 px-2 py-1 text-[9px] font-black uppercase">{s.status.replace('_',' ')}</span></div><p className="mt-1 text-xs text-slate-500">{s.school_name} · {s.class_name}</p><div className="mt-3 flex flex-wrap gap-2">{s.technologies?.length ? s.technologies.map(t => <span key={t.code} className="rounded-lg bg-violet-50 text-violet-700 px-2.5 py-1.5 text-[9px] font-black">{t.name}</span>) : <span className="text-[10px] text-slate-400">No completed technology sessions yet.</span>}</div>{s.programme_final_session && <div className="mt-3 inline-flex items-center gap-2 rounded-xl bg-amber-50 px-3 py-2 text-[10px] font-bold text-amber-800"><Flag size={12}/> Final session: {s.programme_final_session.technology} · {s.programme_final_session.date} · {s.programme_final_session.topic}</div>}</div>
+        <div className="flex flex-wrap gap-2 items-center"><button onClick={() => openStudent(s)} disabled={!!busy} className="rounded-xl border border-slate-200 px-3 py-2 text-[10px] font-black inline-flex gap-1 items-center">Review <ChevronRight size={13}/></button>{isTrainer && s.trainer_approval_ready && <button onClick={() => approve(s)} disabled={!!busy} className="rounded-xl bg-blue-600 text-white px-3 py-2 text-[10px] font-black inline-flex gap-1 items-center">{busy===`approve-${s.student_id}`?'Approving…':'Approve final session'}</button>}{isTrainer && s.can_issue_certificate && <button onClick={() => issue(s)} disabled={!!busy} className="rounded-xl bg-slate-900 text-white px-3 py-2 text-[10px] font-black inline-flex gap-1 items-center"><Award size={12}/>{busy===`issue-${s.student_id}`?'Issuing…':'Issue certificate'}</button>}{s.certificate_id&&<a href={`/verify?cert=${encodeURIComponent(s.certificate_id)}`} target="_blank" rel="noreferrer" className="rounded-xl bg-emerald-50 text-emerald-700 px-3 py-2 text-[10px] font-black inline-flex gap-1 items-center"><ShieldCheck size={13}/> Certificate</a>}</div>
+      </div>)}</div> : <div className="p-12 text-center text-slate-400">No active students in this scope.</div>}
+    </section>
+
+    {selected && <div className="fixed inset-0 z-[90] bg-slate-950/60 backdrop-blur-sm p-4 flex items-center justify-center" onClick={() => setSelected(null)}><section onClick={e => e.stopPropagation()} className="w-full max-w-5xl max-h-[92vh] overflow-auto rounded-3xl bg-white shadow-2xl"><div className="sticky top-0 bg-white border-b border-slate-100 p-5 flex justify-between gap-4"><div><p className="text-[10px] uppercase tracking-wider font-black text-blue-600">Programme review</p><h2 className="text-xl font-black">{selected.student_name}</h2><p className="text-xs text-slate-500 mt-1">{selected.school_name} · {selected.class_name} · {selected.technologies?.length ? selected.technologies.map(t => t.name).join(' + ') : 'No technologies recorded yet'}</p></div><button onClick={() => setSelected(null)} className="p-2 rounded-xl hover:bg-slate-100"><X size={18}/></button></div><div className="p-5 space-y-4"><div className="rounded-2xl border border-amber-100 bg-amber-50 p-4"><p className="text-[10px] uppercase tracking-wider font-black text-amber-800">Final programme marker</p><p className="mt-1 text-sm text-amber-900">The latest completed session marked as <b>Last session</b> closes the programme. It does not require every technology to be used.</p>{selected.programme_final_session ? <p className="mt-3 text-xs font-bold text-amber-800">{selected.programme_final_session.technology} · {selected.programme_final_session.date} · {selected.programme_final_session.topic}</p> : <p className="mt-3 text-xs font-semibold text-amber-700">No final programme session has been marked and completed.</p>}</div><div className="rounded-2xl border border-slate-200 p-4"><p className="text-[9px] uppercase font-black text-slate-400">Certificate state</p><p className="mt-1 font-black">{selected.certificate_id ? `Issued · ${selected.certificate_id}` : selected.can_issue_certificate ? 'Trainer approved — ready to issue' : selected.trainer_approval_ready ? 'Final session ready — awaiting trainer approval' : 'In progress'}</p></div></div></section></div>}
+  </div>;
 }
