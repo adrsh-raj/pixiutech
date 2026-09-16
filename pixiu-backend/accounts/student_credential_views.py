@@ -21,7 +21,7 @@ class AdminStudentCredentialMigrationView(APIView):
         if request.data.get("confirm") != "RESET_ALL_STUDENT_CREDENTIALS":
             return Response({"detail": "Confirmation phrase is required."}, status=status.HTTP_400_BAD_REQUEST)
 
-        rows = migrate_student_credentials(actor=request.user)
+        rows = migrate_student_credentials()
         try:
             record_audit(actor=request.user, action="password_reset", entity_type="student_credentials", summary=f"Bulk student temporary PIN migration generated for {len(rows)} active students", request=request, changes={"count": len(rows)})
         except Exception:
