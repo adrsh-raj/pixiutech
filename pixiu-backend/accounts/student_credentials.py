@@ -63,9 +63,11 @@ def reset_student_to_temp_pin(student):
 
 @transaction.atomic
 def migrate_student_credentials():
+    # Lock only Student rows. The account relation is nullable, and locking a
+    # nullable outer-joined relation with PostgreSQL FOR UPDATE can fail.
     students = (
-        Student.objects.select_related("account", "school_class__school")
-        .select_for_update()
+        Student.objects.select_related("school_class__school")
+        .select_for_update(of=("self",))
         .filter(status="active")
         .order_by("school_class__school__school_code", "school_class__grade", "school_class__section", "roll_number", "id")
     )
