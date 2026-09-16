@@ -14,7 +14,7 @@ from .api_v1_compat import health
 from .secure_upload import SecureUploadView
 from .assessment_views_v2 import IdempotentAssessmentViewSet
 from .course_completion_views_v5 import ApproveFinalProgrammeView, CertificatePdfView, CompletionPolicyView, CourseCompletionDetailView, CourseCompletionListView, CourseCompletionScopeView, EvaluateLastSessionView, IssueProgrammeCertificateView, PublicCertificatePdfView, TechnologyListCreateView, VerifyProgrammeCertificateView
-from .course_completion_session_v3 import CourseAwareSessionViewSet
+from .course_completion_session_v4 import ProgrammeAwareSessionViewSet
 from .course_completion_compat import cohort_rank
 from .public_enquiry import PublicEnquiryView
 from .phase7_compat_extras import ContractCommunicationLogViewSet
@@ -37,7 +37,7 @@ router.register('trainers', SafeScopedTrainerViewSet, basename='v1-trainer')
 router.register('trainer-school-assignments', SafeScopedTrainerSchoolAssignmentViewSet, basename='v1-trainer-school-assignment')
 router.register('classes', SafeScopedClassViewSet, basename='v1-class')
 router.register('students', StudentPortalViewSet, basename='v1-student')
-router.register('sessions', CourseAwareSessionViewSet, basename='v1-session')
+router.register('sessions', ProgrammeAwareSessionViewSet, basename='v1-session')
 router.register('session-activities', SafeScopedSessionActivityViewSet, basename='v1-session-activity')
 router.register('attendance', SafeScopedAttendanceViewSet, basename='v1-attendance')
 router.register('curriculum', ScopedCurriculumViewSet, basename='v1-curriculum')
@@ -57,6 +57,8 @@ router.register('billing-lines', InvoiceLineItemViewSet, basename='v1-billing-li
 router.register('payments', PaymentViewSet, basename='v1-payment')
 router.register('receipts', ReceiptViewSet, basename='v1-receipt')
 router.register('kits', JsonKitViewSet, basename='v1-kit')
+router.register('kit-components', JsonKitComponentViewSet, basename='v1-kit-component')
+router.register('kit-maintenance', KitMaintenanceViewSet, basename='v1-kit-maintenance')
 router.register('kit-components', JsonKitComponentViewSet, basename='v1-kit-component')
 router.register('kit-maintenance', KitMaintenanceViewSet, basename='v1-kit-maintenance')
 router.register('inventory', ScopedContractInventoryViewSet, basename='v1-inventory')
