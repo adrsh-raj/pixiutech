@@ -22,6 +22,27 @@ from .student_credential_batch import (
 class AdminStudentCredentialMigrationView(APIView):
     permission_classes = [IsAuthenticated, IsActiveAccount]
 
+    def get(self, request):
+        if request.user.role != UserRole.ADMIN:
+            return Response({"detail": "Only administrators can access student credential exports."}, status=status.HTTP_403_FORBIDDEN)
+        batch = StudentCredentialBatch.objects.filter(
+            created_by=request.user,
+            status=StudentCredentialBatch.Status.COMPLETED,
+        ).first()
+        if not batch:
+            return Response({"success": True, "available": False})
+        schools, classes = get_batch_filters(batch)
+        return Response({
+            "success": True,
+            "available": True,
+            "batch_id": str(batch.id),
+            "total_count": batch.total_count,
+            "processed_count": batch.processed_count,
+            "status": batch.status,
+            "schools": schools,
+            "classes": classes,
+        })
+
     def post(self, request):
         if request.user.role != UserRole.ADMIN:
             return Response({"detail": "Only administrators can migrate student credentials."}, status=status.HTTP_403_FORBIDDEN)
@@ -46,7 +67,6 @@ class AdminStudentCredentialMigrationProcessView(APIView):
         except Exception as exc:
             StudentCredentialBatch.objects.filter(pk=batch.pk).update(status=StudentCredentialBatch.Status.FAILED, error=str(exc))
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-
         payload = {
             "success": True,
             "batch_id": str(batch.id),
