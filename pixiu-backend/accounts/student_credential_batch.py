@@ -99,6 +99,12 @@ def _prepare_student(student):
         school_class.section,
         student.roll_number,
     )
+    if student.student_id != username:
+        collision = Student.objects.filter(student_id=username).exclude(pk=student.pk).exists()
+        if collision:
+            raise ValidationError(f"Student ID collision detected for {username}.")
+        student.student_id = username
+
     account = student.account
     if account is not None and account.role != UserRole.STUDENT:
         raise ValidationError(f"Student {student.student_id} is linked to a non-student account.")
@@ -112,12 +118,12 @@ def _prepare_student(student):
         owner = User.objects.filter(username=username).exclude(pk=account.pk).first()
         if owner is not None:
             raise ValidationError(f"Username {username} is already used by another account.")
+
     pin = generate_student_temp_pin()
     account.role = UserRole.STUDENT
     account.username = username
     account.display_name = student.name
     account.email = student.email
-    account.password = account.password if False else account.password
     account.set_password(pin)
     account.must_change_password = True
     account.status = UserStatus.ACTIVE
@@ -145,25 +151,12 @@ def process_student_credential_batch(batch):
         students = _ordered_active_students(ids)
         prepared = [_prepare_student(student) for student in students]
 
-        existing_users = [account for _, account, _, _ in prepared if account.pk]
-        for student, account, pin, username in prepared:
-            account.save()
-        if existing_users:
-            User.objects.bulk_update(
-                existing_users,
-                ["username", "display_name", "email", "password", "role", "must_change_password", "status", "is_active"],
-            )
-
-        # Newly created users need normal inserts; existing users were just saved above.
-        # Re-fetching by username lets both paths converge safely.
         affected_user_ids = []
-        for student, account, pin, username in prepared:
-            if not account.pk:
-                account.save()
+        for student, account, _, _ in prepared:
+            account.save()
+            student.account_id = account.pk
+            student.save(update_fields=["student_id", "account", "updated_at"])
             affected_user_ids.append(account.pk)
-            if student.account_id != account.pk:
-                student.account_id = account.pk
-                student.save(update_fields=["account", "updated_at"])
 
         _bulk_revoke_refresh_tokens(affected_user_ids)
 
@@ -177,7 +170,7 @@ def process_student_credential_batch(batch):
                 "username": username,
                 "temporary_pin": pin,
             }
-            for student, account, pin, username in prepared
+            for student, _, pin, username in prepared
         ])
         batch.processed_count = min(batch.total_count, start + len(students))
         batch.encrypted_payload = _encrypt_rows(rows)
