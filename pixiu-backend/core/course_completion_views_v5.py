@@ -10,6 +10,7 @@ from academics.models import SchoolClass, Student
 from academics.services import accessible_class_queryset, accessible_school_queryset, accessible_student_queryset
 from learning import course_completion_v5 as service
 from learning.course_completion_models import Certificate, Technology
+from learning.course_completion_v3 import evaluate_last_session as evaluate_legacy_unit_last_session
 from learning.services import accessible_sessions
 
 logger = logging.getLogger(__name__)
@@ -26,12 +27,14 @@ def _student_for(user, key):
 
 class TechnologyListCreateView(APIView):
     permission_classes = [IsAuthenticated]
+
     def get(self, request):
         return Response(list(Technology.objects.filter(active=True).values('id', 'code', 'name', 'sort_order')))
 
 
 class CourseCompletionScopeView(APIView):
     permission_classes = [IsAuthenticated]
+
     def get(self, request):
         schools = list(accessible_school_queryset(request.user).order_by('name').values('id', 'name', 'school_code'))
         classes = list(accessible_class_queryset(request.user).order_by('school_id', 'display_name').values('id', 'display_name', 'grade', 'section', 'school_id'))
@@ -40,6 +43,7 @@ class CourseCompletionScopeView(APIView):
 
 class CourseCompletionListView(APIView):
     permission_classes = [IsAuthenticated]
+
     def get(self, request):
         school_id = str(request.query_params.get('school_id') or '').strip()
         class_id = str(request.query_params.get('class_id') or '').strip()
@@ -64,15 +68,18 @@ class CourseCompletionListView(APIView):
 
 class CourseCompletionDetailView(APIView):
     permission_classes = [IsAuthenticated]
+
     def get(self, request, student_key):
         return Response(service.summary(_student_for(request.user, student_key)))
 
 
 class CompletionPolicyView(APIView):
     permission_classes = [IsAuthenticated]
+
     def get(self, request, class_key):
         school_class = get_object_or_404(accessible_class_queryset(request.user), pk=class_key)
         return Response(service.serialize_policy(service.policy_for(school_class)))
+
     def put(self, request, class_key):
         if request.user.role != UserRole.ADMIN:
             return _error(PermissionError('Only administrators can edit completion criteria.'), 403)
@@ -85,6 +92,7 @@ class CompletionPolicyView(APIView):
 
 class EvaluateLastSessionView(APIView):
     permission_classes = [IsAuthenticated]
+
     def post(self, request, session_id):
         if request.user.role not in {UserRole.ADMIN, UserRole.TRAINER}:
             return _error(PermissionError('Only trainers and administrators can evaluate a session.'), 403)
@@ -93,14 +101,15 @@ class EvaluateLastSessionView(APIView):
         if request.user.role == UserRole.TRAINER and not accessible_sessions(request.user).filter(pk=session.pk).exists():
             return _error(PermissionError('This session is outside your authorised trainer scope.'), 403)
         try:
-            rows = service.evaluate_last_session(session)
-            return Response({'session_id': str(session.id), 'evaluated_students': len(rows), 'passed': len(rows), 'failed_or_pending': 0})
+            rows = evaluate_legacy_unit_last_session(session)
+            return Response({'session_id': str(session.id), 'evaluated_students': len(rows), 'passed': sum(row.status == 'passed' for row in rows), 'failed_or_pending': sum(row.status != 'passed' for row in rows)})
         except ValueError as exc:
             return _error(exc)
 
 
 class ApproveFinalProgrammeView(APIView):
     permission_classes = [IsAuthenticated]
+
     def post(self, request, student_key):
         student = _student_for(request.user, student_key)
         try:
@@ -114,6 +123,7 @@ class ApproveFinalProgrammeView(APIView):
 
 class IssueProgrammeCertificateView(APIView):
     permission_classes = [IsAuthenticated]
+
     def post(self, request, student_key):
         student = _student_for(request.user, student_key)
         try:
@@ -126,6 +136,7 @@ class IssueProgrammeCertificateView(APIView):
 
 class VerifyProgrammeCertificateView(APIView):
     permission_classes = [AllowAny]
+
     def get(self, request, student_id=None):
         if student_id:
             return Response({'verified': False, 'status': 'legacy_not_supported', 'reason': 'Use the certificate ID or verification token.'}, status=410)
