@@ -8,6 +8,7 @@ from accounts.models import User, UserRole, UserStatus
 from accounts.student_credential_views import StudentTemporaryPasswordResetView
 from academics.models import School, SchoolClass, Student, Trainer, TrainerSchoolAssignment
 from academics.services import accessible_student_queryset, provision_student, reset_student_to_temp_pin
+from accounts.student_credentials import migrate_student_credentials
 
 
 class StudentCredentialGenerationTests(TestCase):
@@ -36,6 +37,14 @@ class StudentCredentialGenerationTests(TestCase):
         self.assertFalse(student.account.check_password(old_pin))
         self.assertTrue(student.account.check_password(new_pin))
         self.assertTrue(student.account.must_change_password)
+
+    def test_migration_provisions_unlinked_active_student(self):
+        rows = migrate_student_credentials()
+        self.student.refresh_from_db()
+        self.assertEqual(len(rows), 1)
+        self.assertIsNotNone(self.student.account_id)
+        self.assertTrue(self.student.account.check_password(rows[0]["temporary_pin"]))
+        self.assertTrue(self.student.account.must_change_password)
 
 
 class StudentResetScopeTests(TestCase):
