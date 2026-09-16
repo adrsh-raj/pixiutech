@@ -2,6 +2,7 @@ from django.urls import path
 from rest_framework.routers import DefaultRouter
 from accounts.legacy_credential_routes import SchoolProfilePasswordResetView, TrainerProfilePasswordResetView
 from accounts.views import LoginView, LogoutView, MeView, RefreshView
+from accounts.student_credential_views import AdminStudentCredentialMigrationView, StudentTemporaryPasswordResetView
 from academics.school_activation import activate_school
 from audit.views import AuditLogViewSet
 from billing.contract_views import ContractViewSet, billing_summary
@@ -68,6 +69,8 @@ urlpatterns = [
     path('health/', health, name='v1-health'), path('upload/', SecureUploadView.as_view(), name='v1-upload'),
     path('auth/login/', LoginView.as_view(), name='v1-login'), path('auth/refresh/', RefreshView.as_view(), name='v1-refresh'),
     path('auth/logout/', LogoutView.as_view(), name='v1-logout'), path('auth/me/', MeView.as_view(), name='v1-me'),
+    path('students/credentials/migrate', AdminStudentCredentialMigrationView.as_view(), name='v1-student-credential-migrate'),
+    path('students/<uuid:pk>/reset-password', StudentTemporaryPasswordResetView.as_view(), name='v1-student-reset-password'),
     path('certificates/issue/<uuid:student_key>', IssueProgrammeCertificateView.as_view(), name='v1-certificate-issue'),
     path('public/certificates/verify/<str:student_id>', VerifyProgrammeCertificateView.as_view(), name='v1-certificate-verify-legacy'),
     path('public/certificates/verify', VerifyProgrammeCertificateView.as_view(), name='v1-certificate-verify'),
