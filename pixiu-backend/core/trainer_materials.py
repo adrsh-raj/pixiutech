@@ -10,6 +10,7 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from accounts.models import UserRole
+from accounts.permissions import IsActiveAccount
 from academics.models import Trainer
 from learning.models import LearningContent
 from notifications.models import Notification, NotificationType
@@ -41,7 +42,7 @@ def _allowed_material_ids(user):
 
 
 class TrainerMaterialListCreateView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsActiveAccount]
     parser_classes = [SecureMultiPartParser, FormParser]
     throttle_scope = "trainer_material_upload"
 
@@ -146,7 +147,7 @@ class TrainerMaterialListCreateView(APIView):
 
 
 class TrainerMaterialDetailView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsActiveAccount]
 
     def _get_material(self, pk):
         return get_object_or_404(
@@ -169,7 +170,7 @@ class TrainerMaterialDetailView(APIView):
 
 
 class TrainerMaterialFileView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsActiveAccount]
 
     def get(self, request, pk):
         material = get_object_or_404(
