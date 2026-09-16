@@ -1,11 +1,19 @@
+import base64
 import csv
+import hashlib
 import io
-import os
-from concurrent.futures import ThreadPoolExecutor
-from uuid import UUID
+import json
 
-from django.contrib.auth.hashers import make_password
+from cryptography.fernet import Fernet
+from django.conf import settings
+from django.db import transaction
 from django.http import HttpResponse
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_LEFT
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.units import mm
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from rest_framework.exceptions import ValidationError
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 
@@ -13,12 +21,24 @@ from accounts.credentials import build_student_username, generate_student_temp_p
 from accounts.models import StudentCredentialBatch, User, UserRole, UserStatus
 from academics.models import Student
 
-BATCH_SIZE = 20
+BATCH_SIZE = 4
 PDF_ROW_LIMIT = 5000
 
 
-def _hash_pin(pin):
-    return make_password(pin)
+def _fernet():
+    key = base64.urlsafe_b64encode(hashlib.sha256(settings.SECRET_KEY.encode("utf-8")).digest())
+    return Fernet(key)
+
+
+def _encrypt_rows(rows):
+    payload = json.dumps(rows, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    return _fernet().encrypt(payload).decode("ascii")
+
+
+def _decrypt_rows(value):
+    if not value:
+        return []
+    return json.loads(_fernet().decrypt(value.encode("ascii")).decode("utf-8"))
 
 
 def _ordered_active_students(student_ids):
@@ -32,6 +52,13 @@ def _ordered_active_students(student_ids):
 
 
 def start_student_credential_batch(admin_user):
+    existing = StudentCredentialBatch.objects.filter(
+        created_by=admin_user,
+        status__in=[StudentCredentialBatch.Status.PENDING, StudentCredentialBatch.Status.RUNNING],
+    ).first()
+    if existing:
+        return existing
+
     student_ids = list(
         Student.objects.filter(status="active")
         .order_by(
@@ -50,148 +77,135 @@ def start_student_credential_batch(admin_user):
     )
 
 
-def process_student_credential_batch(batch):
-    if batch.status == StudentCredentialBatch.Status.COMPLETED:
-        return [], True
-    if batch.status == StudentCredentialBatch.Status.FAILED:
-        raise ValidationError(batch.error or "Credential migration failed.")
+def _bulk_revoke_refresh_tokens(user_ids):
+    user_ids = [uid for uid in user_ids if uid]
+    if not user_ids:
+        return
+    token_ids = list(OutstandingToken.objects.filter(user_id__in=user_ids).values_list("id", flat=True))
+    if not token_ids:
+        return
+    existing = set(BlacklistedToken.objects.filter(token_id__in=token_ids).values_list("token_id", flat=True))
+    BlacklistedToken.objects.bulk_create(
+        [BlacklistedToken(token_id=token_id) for token_id in token_ids if token_id not in existing],
+        ignore_conflicts=True,
+    )
 
-    batch.status = StudentCredentialBatch.Status.RUNNING
-    batch.save(update_fields=["status", "updated_at"])
 
-    start = batch.processed_count
-    ids = batch.student_ids[start : start + BATCH_SIZE]
-    if not ids:
-        batch.status = StudentCredentialBatch.Status.COMPLETED
-        batch.save(update_fields=["status", "updated_at"])
-        return [], True
-
-    students = _ordered_active_students(ids)
-    usernames = []
-    for student in students:
-        school_class = student.school_class
-        student_id = build_student_username(
-            school_class.school.school_code,
-            school_class.grade,
-            school_class.section,
-            student.roll_number,
-        )
-        usernames.append(student_id)
-
-    duplicate_usernames = {name for name in usernames if usernames.count(name) > 1}
-    if duplicate_usernames:
-        raise ValidationError(f"Student username collision detected: {sorted(duplicate_usernames)[0]}.")
-
-    existing_accounts = {
-        user.username: user
-        for user in User.objects.filter(username__in=usernames)
-    }
-    for username in usernames:
-        account = existing_accounts.get(username)
+def _prepare_student(student):
+    school_class = student.school_class
+    username = build_student_username(
+        school_class.school.school_code,
+        school_class.grade,
+        school_class.section,
+        student.roll_number,
+    )
+    account = student.account
+    if account is not None and account.role != UserRole.STUDENT:
+        raise ValidationError(f"Student {student.student_id} is linked to a non-student account.")
+    if account is None:
+        account = User.objects.filter(username=username).first()
         if account is not None and account.role != UserRole.STUDENT:
             raise ValidationError(f"Username {username} is already used by another account role.")
-
-    pins = [generate_student_temp_pin() for _ in students]
-    workers = min(4, max(1, os.cpu_count() or 2))
-    with ThreadPoolExecutor(max_workers=workers) as executor:
-        hashes = list(executor.map(_hash_pin, pins))
-
-    account_updates = []
-    account_creates = []
-    student_updates = []
-    affected_user_ids = []
-
-    for student, username, pin_hash in zip(students, usernames, hashes):
-        account = existing_accounts.get(username)
         if account is None:
             account = User(username=username, role=UserRole.STUDENT)
-            account_creates.append(account)
-        account.role = UserRole.STUDENT
-        account.username = username
-        account.display_name = student.name
-        account.email = student.email
-        account.password = pin_hash
-        account.must_change_password = True
-        account.status = UserStatus.ACTIVE
-        account.is_active = True
-        if account.pk:
-            account_updates.append(account)
-            affected_user_ids.append(account.pk)
-        student.account = account
-        student_updates.append(student)
-
-    if account_creates:
-        User.objects.bulk_create(account_creates)
-        affected_user_ids.extend([account.pk for account in account_creates])
-
-    if account_updates:
-        User.objects.bulk_update(
-            account_updates,
-            ["username", "display_name", "email", "password", "must_change_password", "status", "is_active"],
-        )
-
-    if account_creates:
-        Student.objects.bulk_update(student_updates, ["account"])
     else:
-        Student.objects.bulk_update(student_updates, ["account"])
+        owner = User.objects.filter(username=username).exclude(pk=account.pk).first()
+        if owner is not None:
+            raise ValidationError(f"Username {username} is already used by another account.")
+    pin = generate_student_temp_pin()
+    account.role = UserRole.STUDENT
+    account.username = username
+    account.display_name = student.name
+    account.email = student.email
+    account.password = account.password if False else account.password
+    account.set_password(pin)
+    account.must_change_password = True
+    account.status = UserStatus.ACTIVE
+    account.is_active = True
+    return student, account, pin, username
 
-    if affected_user_ids:
-        outstanding = list(OutstandingToken.objects.filter(user_id__in=affected_user_ids).only("id"))
-        if outstanding:
-            BlacklistedToken.objects.bulk_create(
-                [BlacklistedToken(token=token) for token in outstanding],
-                ignore_conflicts=True,
+
+def process_student_credential_batch(batch):
+    with transaction.atomic():
+        batch = StudentCredentialBatch.objects.select_for_update().get(pk=batch.pk)
+        if batch.status == StudentCredentialBatch.Status.COMPLETED:
+            return [], True, batch
+        if batch.status == StudentCredentialBatch.Status.FAILED:
+            raise ValidationError(batch.error or "Credential migration failed.")
+
+        start = batch.processed_count
+        ids = batch.student_ids[start : start + BATCH_SIZE]
+        if not ids:
+            batch.status = StudentCredentialBatch.Status.COMPLETED
+            batch.save(update_fields=["status", "updated_at"])
+            return [], True, batch
+
+        batch.status = StudentCredentialBatch.Status.RUNNING
+        batch.save(update_fields=["status", "updated_at"])
+        students = _ordered_active_students(ids)
+        prepared = [_prepare_student(student) for student in students]
+
+        existing_users = [account for _, account, _, _ in prepared if account.pk]
+        for student, account, pin, username in prepared:
+            account.save()
+        if existing_users:
+            User.objects.bulk_update(
+                existing_users,
+                ["username", "display_name", "email", "password", "role", "must_change_password", "status", "is_active"],
             )
 
-    rows = []
-    for student, username, pin in zip(students, usernames, pins):
-        rows.append({
-            "student_id": student.student_id,
-            "name": student.name,
-            "school_code": student.school_class.school.school_code,
-            "class_name": student.school_class.display_name,
-            "username": username,
-            "temporary_pin": pin,
-        })
+        # Newly created users need normal inserts; existing users were just saved above.
+        # Re-fetching by username lets both paths converge safely.
+        affected_user_ids = []
+        for student, account, pin, username in prepared:
+            if not account.pk:
+                account.save()
+            affected_user_ids.append(account.pk)
+            if student.account_id != account.pk:
+                student.account_id = account.pk
+                student.save(update_fields=["account", "updated_at"])
 
-    batch.processed_count = start + len(ids)
-    if batch.processed_count >= batch.total_count:
-        batch.status = StudentCredentialBatch.Status.COMPLETED
-    batch.save(update_fields=["processed_count", "status", "updated_at"])
-    return rows, batch.status == StudentCredentialBatch.Status.COMPLETED
+        _bulk_revoke_refresh_tokens(affected_user_ids)
+
+        rows = _decrypt_rows(batch.encrypted_payload)
+        rows.extend([
+            {
+                "student_id": student.student_id,
+                "name": student.name,
+                "school_code": student.school_class.school.school_code,
+                "class_name": student.school_class.display_name,
+                "username": username,
+                "temporary_pin": pin,
+            }
+            for student, account, pin, username in prepared
+        ])
+        batch.processed_count = min(batch.total_count, start + len(students))
+        batch.encrypted_payload = _encrypt_rows(rows)
+        if batch.processed_count >= batch.total_count:
+            batch.processed_count = batch.total_count
+            batch.status = StudentCredentialBatch.Status.COMPLETED
+        batch.save(update_fields=["processed_count", "encrypted_payload", "status", "updated_at"])
+        return [], batch.status == StudentCredentialBatch.Status.COMPLETED, batch
+
+
+def get_batch_rows(batch):
+    return _decrypt_rows(batch.encrypted_payload)
+
+
+def get_batch_filters(batch):
+    rows = get_batch_rows(batch)
+    return sorted({row["school_code"] for row in rows}), sorted({row["class_name"] for row in rows})
 
 
 def _filtered_rows(rows, school_code="", class_name=""):
     school_code = str(school_code or "").strip()
     class_name = str(class_name or "").strip()
-    return [
-        row for row in rows
-        if (not school_code or row.get("school_code") == school_code)
-        and (not class_name or row.get("class_name") == class_name)
-    ]
-
-
-def _validate_rows(rows):
-    if not isinstance(rows, list) or len(rows) > PDF_ROW_LIMIT:
-        raise ValidationError("Invalid credential row set.")
-    required = {"student_id", "name", "school_code", "class_name", "username", "temporary_pin"}
-    clean = []
-    for row in rows:
-        if not isinstance(row, dict) or set(row.keys()) != required:
-            raise ValidationError("Invalid credential data.")
-        pin = str(row["temporary_pin"])
-        if len(pin) != 8 or not pin.isdigit():
-            raise ValidationError("Invalid temporary PIN format.")
-        clean.append({key: str(row[key]) for key in required})
-    return clean
+    return [row for row in rows if (not school_code or row.get("school_code") == school_code) and (not class_name or row.get("class_name") == class_name)]
 
 
 def credential_csv_response(rows, filename="pixiu-student-temporary-pins.csv"):
     output = io.StringIO()
-    writer = csv.DictWriter(
-        output,
-        fieldnames=["student_id", "name", "school_code", "class_name", "username", "temporary_pin"],
-    )
+    writer = csv.DictWriter(output, fieldnames=["student_id", "name", "school_code", "class_name", "username", "temporary_pin"])
     writer.writeheader()
     writer.writerows(rows)
     response = HttpResponse(output.getvalue(), content_type="text/csv; charset=utf-8")
@@ -202,60 +216,43 @@ def credential_csv_response(rows, filename="pixiu-student-temporary-pins.csv"):
 
 
 def credential_pdf_response(rows, school_code="", class_name=""):
-    from reportlab.lib import colors
-    from reportlab.lib.enums import TA_LEFT
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-    from reportlab.lib.units import mm
-    from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
-
-    clean_rows = _filtered_rows(_validate_rows(rows), school_code, class_name)
-    if not clean_rows:
-        raise ValidationError("No students match the selected filters.")
-
-    schools = sorted({row["school_code"] for row in clean_rows})
-    classes = sorted({row["class_name"] for row in clean_rows})
-    title_suffix = school_code or (schools[0] if len(schools) == 1 else "All Schools")
-    if class_name:
-        title_suffix += f" · {class_name}"
+    clean_rows = _filtered_rows(rows, school_code, class_name)
+    if not clean_rows or len(clean_rows) > PDF_ROW_LIMIT:
+        raise ValidationError("No students match the selected filters or export is too large.")
 
     buffer = io.BytesIO()
     styles = getSampleStyleSheet()
     title = ParagraphStyle("PixiuTitle", parent=styles["Title"], fontName="Helvetica-Bold", fontSize=18, leading=22, alignment=TA_LEFT, textColor=colors.HexColor("#0F172A"), spaceAfter=4)
     subtitle = ParagraphStyle("PixiuSubtitle", parent=styles["Normal"], fontSize=9, leading=12, textColor=colors.HexColor("#64748B"), spaceAfter=8)
     section = ParagraphStyle("PixiuSection", parent=styles["Heading2"], fontName="Helvetica-Bold", fontSize=12, leading=15, textColor=colors.HexColor("#1D4ED8"), spaceBefore=7, spaceAfter=5)
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=14 * mm, leftMargin=14 * mm, topMargin=14 * mm, bottomMargin=14 * mm, title="Pixiu Tech Student Temporary Credentials", author="Pixiu Tech")
-    story = [Paragraph("PIXIU TECH", title), Paragraph(f"Student Temporary Credentials · {title_suffix}", subtitle), Spacer(1, 2 * mm)]
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=12 * mm, leftMargin=12 * mm, topMargin=13 * mm, bottomMargin=13 * mm, title="Pixiu Tech Student Temporary Credentials", author="Pixiu Tech")
+    story = [Paragraph("PIXIU TECH", title), Paragraph("Student Temporary Credentials", subtitle)]
 
     grouped = {}
     for row in clean_rows:
-        key = (row["school_code"], row["class_name"])
-        grouped.setdefault(key, []).append(row)
+        grouped.setdefault((row["school_code"], row["class_name"]), []).append(row)
 
     for (school, cls), group in grouped.items():
         story.append(Paragraph(f"{school} · {cls}", section))
         data = [["#", "Student", "Student ID", "Username", "Temporary PIN"]]
-        for index, row in enumerate(group, 1):
-            data.append([str(index), row["name"], row["student_id"], row["username"], row["temporary_pin"]])
-        table = Table(data, colWidths=[9 * mm, 45 * mm, 32 * mm, 40 * mm, 35 * mm], repeatRows=1)
+        data.extend([[str(i), r["name"], r["student_id"], r["username"], r["temporary_pin"]] for i, r in enumerate(group, 1)])
+        table = Table(data, colWidths=[9 * mm, 44 * mm, 33 * mm, 40 * mm, 36 * mm], repeatRows=1)
         table.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0F172A")),
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
             ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, 0), 8),
             ("FONTNAME", (4, 1), (4, -1), "Courier-Bold"),
-            ("FONTSIZE", (0, 1), (-1, -1), 7.5),
+            ("FONTSIZE", (0, 0), (-1, -1), 7.5),
+            ("ALIGN", (4, 1), (4, -1), "CENTER"),
             ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
             ("GRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#CBD5E1")),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("LEFTPADDING", (0, 0), (-1, -1), 5),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 5),
             ("TOPPADDING", (0, 0), (-1, -1), 5),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
         ]))
         story.extend([table, Spacer(1, 5 * mm)])
 
-    story.append(Paragraph("CONFIDENTIAL · Temporary PINs are for controlled distribution to the named students only.", subtitle))
+    story.append(Paragraph("CONFIDENTIAL · Give each student only their own temporary PIN.", subtitle))
     doc.build(story)
     response = HttpResponse(buffer.getvalue(), content_type="application/pdf")
     safe_school = (school_code or "all-schools").replace(" ", "-")
