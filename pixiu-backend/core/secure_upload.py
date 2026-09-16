@@ -11,11 +11,12 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.models import UserRole
+from accounts.permissions import IsActiveAccount
 from .upload_security import SecureMultiPartParser, SecureUploadError, validate_uploaded_file
 
 
 class SecureUploadView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsActiveAccount]
     parser_classes = [SecureMultiPartParser, FormParser]
     throttle_scope = "upload"
 
