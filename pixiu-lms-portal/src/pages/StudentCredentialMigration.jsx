@@ -27,6 +27,7 @@ async function downloadExport(batchId, format, schoolCode, className) {
 export default function StudentCredentialMigration() {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
+  const [loadingLastBatch, setLoadingLastBatch] = useState(true);
   const [batchId, setBatchId] = useState('');
   const [progress, setProgress] = useState({ processed: 0, total: 0 });
   const [schools, setSchools] = useState([]);
@@ -35,10 +36,25 @@ export default function StudentCredentialMigration() {
   const [className, setClassName] = useState('');
   const [exporting, setExporting] = useState('');
 
-  useEffect(() => {
-    if (!batchId) return;
-    // The server owns the credential snapshot; this page only keeps the batch id and filters.
-  }, [batchId]);
+  const loadLastCompletedBatch = async () => {
+    setLoadingLastBatch(true);
+    try {
+      const response = await apiFetch('/students/credentials/migrate');
+      const data = await response.json().catch(() => ({}));
+      if (response.ok && data.available) {
+        setBatchId(data.batch_id);
+        setProgress({ processed: data.processed_count || 0, total: data.total_count || 0 });
+        setSchools(data.schools || []);
+        setClasses(data.classes || []);
+      }
+    } catch {
+      // Keep the page usable; migration can still be started manually.
+    } finally {
+      setLoadingLastBatch(false);
+    }
+  };
+
+  useEffect(() => { void loadLastCompletedBatch(); }, []);
 
   const filteredLabel = useMemo(() => {
     if (schoolCode && className) return `${schoolCode} · ${className}`;
@@ -101,17 +117,20 @@ export default function StudentCredentialMigration() {
     }
   };
 
+  const showExports = !busy && !!batchId && progress.total > 0 && progress.processed === progress.total;
+
   return <div className="max-w-4xl space-y-5 pb-10">
     <PageHeader eyebrow="System / Student Security" title="Student Credential Migration" description="Replace deterministic student passwords with cryptographically random 8-digit temporary PINs, processed in short secure batches." />
     <section className="rounded-3xl border border-rose-200 bg-rose-50 p-5 flex gap-3"><ShieldAlert size={20} className="shrink-0 text-rose-600"/><div><p className="font-black text-rose-950">Admin-only security operation</p><p className="mt-1 text-xs leading-5 text-rose-800">Every active student's current password will be invalidated. Keep credential exports private and distribute each PIN only to its named student.</p></div></section>
 
     <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="flex items-center gap-3"><span className="w-11 h-11 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center"><KeyRound size={20}/></span><div><h2 className="text-lg font-black text-slate-900">Generate student temporary PINs</h2><p className="mt-1 text-xs text-slate-500">Only a small batch is processed per request, so the browser never waits on the full roster in one request.</p></div></div>
+      {loadingLastBatch && <div className="mt-5 text-xs font-semibold text-slate-500">Checking for the latest completed credential batch…</div>}
       {busy && <div className="mt-6"><div className="flex items-center justify-between text-xs font-bold text-slate-600"><span>Generating credentials…</span><span>{progress.processed} / {progress.total}</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-blue-600 transition-all" style={{ width: `${progress.total ? (progress.processed / progress.total) * 100 : 0}%` }} /></div></div>}
-      <button disabled={busy} onClick={migrate} className="mt-6 inline-flex min-h-11 items-center gap-2 rounded-xl bg-blue-600 px-5 text-xs font-black text-white hover:bg-blue-700 disabled:opacity-50">{busy ? <Loader2 size={15} className="animate-spin"/> : <KeyRound size={15}/>} {busy ? `Generating ${progress.processed}/${progress.total}…` : 'Reset all active students & generate PINs'}</button>
+      <button disabled={busy || loadingLastBatch} onClick={migrate} className="mt-6 inline-flex min-h-11 items-center gap-2 rounded-xl bg-blue-600 px-5 text-xs font-black text-white hover:bg-blue-700 disabled:opacity-50">{busy ? <Loader2 size={15} className="animate-spin"/> : <KeyRound size={15}/>} {busy ? `Generating ${progress.processed}/${progress.total}…` : 'Reset all active students & generate PINs'}</button>
     </section>
 
-    {(!busy && batchId && progress.processed === progress.total && progress.total > 0) && <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-5">
+    {showExports && <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-5">
       <div><h2 className="text-lg font-black text-slate-900">Credential exports</h2><p className="mt-1 text-xs text-slate-500">{progress.total} students migrated. Select a school and/or class and download the designed credential sheet.</p></div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2"><label className="text-xs font-black text-slate-600">School<select value={schoolCode} onChange={e=>{setSchoolCode(e.target.value);setClassName('')}} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium outline-none focus:border-blue-500"><option value="">All schools</option>{schools.map(value=><option key={value} value={value}>{value}</option>)}</select></label><label className="text-xs font-black text-slate-600">Class<select value={className} onChange={e=>setClassName(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium outline-none focus:border-blue-500"><option value="">All classes</option>{classes.map(value=><option key={value} value={value}>{value}</option>)}</select></label></div>
       <div className="flex flex-col gap-3 rounded-2xl bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-black text-slate-800">{filteredLabel}</p><p className="mt-1 text-xs text-slate-500">PDF is grouped school-wise and class-wise with temporary PINs.</p></div><div className="flex flex-wrap gap-2"><button type="button" disabled={!!exporting} onClick={()=>exportFile('pdf')} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-slate-900 px-4 text-xs font-black text-white disabled:opacity-50">{exporting==='pdf'?<Loader2 size={14} className="animate-spin"/>:<FileText size={14}/>} Download PDF</button><button type="button" disabled={!!exporting} onClick={()=>exportFile('csv')} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-xs font-black text-slate-800 disabled:opacity-50">{exporting==='csv'?<Loader2 size={14} className="animate-spin"/>:<Download size={14}/>} Download CSV</button></div></div>
