@@ -79,3 +79,28 @@ class User(AbstractUser):
 
     def __str__(self):
         return f"{self.username} ({self.role})"
+
+
+class StudentCredentialBatch(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        RUNNING = "running", "Running"
+        COMPLETED = "completed", "Completed"
+        FAILED = "failed", "Failed"
+
+    id = models.UUIDField(primary_key=True, editable=False)
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="student_credential_batches")
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    student_ids = models.JSONField(default=list)
+    processed_count = models.PositiveIntegerField(default=0)
+    total_count = models.PositiveIntegerField(default=0)
+    encrypted_payload = models.TextField(blank=True)
+    error = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Student credential batch {self.id} ({self.status})"
