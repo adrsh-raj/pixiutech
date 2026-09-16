@@ -26,6 +26,40 @@ def _student_for(user, key):
     return qs.filter(pk=key).first() or get_object_or_404(qs, student_id__iexact=str(key).strip())
 
 
+def _basic_student_row(student):
+    school_class = getattr(student, 'school_class', None)
+    school = getattr(school_class, 'school', None)
+    return {
+        'student_id': student.student_id,
+        'student_name': student.name,
+        'school_name': school.name if school else '',
+        'school_code': school.school_code if school else '',
+        'class_name': school_class.display_name if school_class else '',
+        'status': 'in_progress',
+        'overall_score': 0,
+        'score_breakdown': {
+            'overall_score': 0,
+            'pass_mark': service.PASS_MARK,
+            'eligible': False,
+            'attendance_pct': None,
+            'quiz_pct': None,
+            'practical_pct': None,
+            'trainer_review_pct': None,
+        },
+        'required_units': 0,
+        'completed_units': 0,
+        'units': [],
+        'technologies': [],
+        'sessions_by_technology': [],
+        'programme_final_session': None,
+        'final_session_ready': False,
+        'trainer_approval_ready': False,
+        'can_issue_certificate': False,
+        'certificate_id': None,
+        'policy': None,
+    }
+
+
 class TechnologyListCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -48,30 +82,51 @@ class CourseCompletionListView(APIView):
     def get(self, request):
         school_id = str(request.query_params.get('school_id') or '').strip()
         class_id = str(request.query_params.get('class_id') or '').strip()
-        if school_id and not accessible_school_queryset(request.user).filter(pk=school_id).exists():
-            return _error(PermissionError('School is outside your authorised scope.'), 403)
-        if class_id and not accessible_class_queryset(request.user).filter(pk=class_id).exists():
-            return _error(PermissionError('Class is outside your authorised scope.'), 403)
-        qs = accessible_student_queryset(request.user).select_related('school_class__school').filter(status='active')
-        if school_id:
-            qs = qs.filter(school_class__school_id=school_id)
-        if class_id:
-            qs = qs.filter(school_class_id=class_id)
+
+        try:
+            school_scope = accessible_school_queryset(request.user)
+            class_scope = accessible_class_queryset(request.user)
+            if school_id and not school_scope.filter(pk=school_id).exists():
+                return _error(PermissionError('School is outside your authorised scope.'), 403)
+            if class_id and not class_scope.filter(pk=class_id).exists():
+                return _error(PermissionError('Class is outside your authorised scope.'), 403)
+
+            qs = accessible_student_queryset(request.user).select_related('school_class__school').filter(status='active')
+            if school_id:
+                qs = qs.filter(school_class__school_id=school_id)
+            if class_id:
+                qs = qs.filter(school_class_id=class_id)
+
+            # Materialise the roster query separately from completion calculations.
+            # This guarantees that completion aggregation cannot turn a healthy
+            # student registry into an HTTP 500 response.
+            students = list(qs.order_by('school_class__school__name', 'school_class__display_name', 'roll_number', 'student_id')[:500])
+        except Exception:
+            logger.exception('Course completion roster query failed')
+            # Last-resort scoped roster read. Keep student visibility functional
+            # even if an optional queryset annotation/join becomes unavailable.
+            try:
+                fallback = accessible_student_queryset(request.user)
+                if school_id:
+                    fallback = fallback.filter(school_class__school_id=school_id)
+                if class_id:
+                    fallback = fallback.filter(school_class_id=class_id)
+                students = list(
+                    fallback.filter(status='active')
+                    .select_related('school_class__school')
+                    .order_by('student_id')[:500]
+                )
+            except Exception:
+                logger.exception('Course completion fallback roster query failed')
+                return _error(ValueError('Unable to load the Course Completion student registry.'), 503)
+
         rows = []
-        for student in qs.order_by('school_class__school__name', 'school_class__display_name', 'roll_number', 'student_id')[:500]:
+        for student in students:
             try:
                 rows.append(service.summary(student))
             except Exception:
                 logger.exception('Course completion summary failed for %s', student.student_id)
-                rows.append({
-                    'student_id': student.student_id, 'student_name': student.name,
-                    'school_name': student.school_class.school.name, 'school_code': student.school_class.school.school_code,
-                    'class_name': student.school_class.display_name, 'status': 'in_progress', 'overall_score': 0,
-                    'score_breakdown': {'overall_score': 0, 'pass_mark': service.PASS_MARK, 'eligible': False},
-                    'required_units': 0, 'completed_units': 0, 'units': [], 'technologies': [],
-                    'sessions_by_technology': [], 'programme_final_session': None, 'final_session_ready': False,
-                    'trainer_approval_ready': False, 'can_issue_certificate': False, 'certificate_id': None, 'policy': None,
-                })
+                rows.append(_basic_student_row(student))
         return Response(rows)
 
 
