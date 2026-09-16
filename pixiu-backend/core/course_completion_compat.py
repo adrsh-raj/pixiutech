@@ -1,6 +1,5 @@
 import logging
 
-from django.db.models import Count
 from rest_framework.response import Response
 
 from academics.models import Student
@@ -24,21 +23,27 @@ completion.cohort_rank = cohort_rank
 
 
 def _safe_registry_rows(user):
-    """Build a read-only registry payload without any per-student completion writes."""
+    """Build a read-only registry payload without per-student completion writes."""
+    from learning.course_completion_models import Certificate, CompletionPolicy, ProgrammeCompletion, SessionWorkflow, UnitCompletion
+    from learning.models import CurriculumClassAssignment
+
     students = list(
         accessible_student_queryset(user)
         .select_related('school_class__school')
         .filter(status='active')
-        .order_by('school_class__school__school_code', 'school_class__grade', 'school_class__section', 'roll_number', 'student_id')[:500]
+        .order_by(
+            'school_class__school__school_code',
+            'school_class__grade',
+            'school_class__section',
+            'roll_number',
+            'student_id',
+        )[:500]
     )
     if not students:
         return []
 
     student_ids = [student.id for student in students]
     class_ids = sorted({student.school_class_id for student in students if student.school_class_id})
-
-    from learning.course_completion_models import Certificate, CompletionPolicy, ProgrammeCompletion, SessionWorkflow
-    from learning.models import CurriculumClassAssignment
 
     assignments = list(
         CurriculumClassAssignment.objects
@@ -52,7 +57,7 @@ def _safe_registry_rows(user):
 
     unit_ids = [assignment.curriculum_unit_id for assignment in assignments]
     completions = list(
-        __import__('learning.course_completion_models', fromlist=['UnitCompletion']).UnitCompletion.objects
+        UnitCompletion.objects
         .filter(student_id__in=student_ids, curriculum_unit_id__in=unit_ids)
         .only('student_id', 'curriculum_unit_id', 'status', 'score')
     ) if unit_ids else []
@@ -96,10 +101,6 @@ def _safe_registry_rows(user):
         row.school_class_id: row
         for row in CompletionPolicy.objects.filter(school_class_id__in=class_ids, active=True)
     }
-
-    programme_scores = {}
-    for row in programmes:
-        programme_scores.setdefault(row.student_id, float(row.overall_score))
 
     rank_map = {}
     for class_id in class_ids:
@@ -160,15 +161,14 @@ def _safe_registry_rows(user):
 
 
 def _safe_course_completion_get(self, request):
-    """Last-line registry guard: course-completion GET should never become a 500."""
+    """Last-line registry guard: course-completion GET should not return a 500."""
     try:
-        return Response(_safe_registry_rows(request.user))
+        return Response(_safe_registry_rows(request.user), status=200)
     except Exception:
         logger.exception('Course completion registry hard fallback failed')
         return Response([], status=200)
 
 
-# The list endpoint is intentionally made read-only and failure-tolerant here.
-# This compatibility hook runs after CourseCompletionListView has been imported
-# and prevents a single malformed completion record from taking down the whole registry.
+# The list endpoint is intentionally read-only and failure-tolerant. This hook
+# is applied after CourseCompletionListView has loaded in api_v1_urls.py.
 CourseCompletionListView.get = _safe_course_completion_get
