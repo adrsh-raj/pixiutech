@@ -1,4 +1,5 @@
 import csv
+
 from io import StringIO
 
 from django.db import transaction
@@ -11,18 +12,35 @@ from academics.models import Student
 
 def _set_student_temp_pin(student):
     school_class = student.school_class
-    generated_student_id = build_student_username(school_class.school.school_code, school_class.grade, school_class.section, student.roll_number)
+    generated_student_id = build_student_username(
+        school_class.school.school_code,
+        school_class.grade,
+        school_class.section,
+        student.roll_number,
+    )
     if student.student_id != generated_student_id:
+        collision = Student.objects.filter(student_id=generated_student_id).exclude(pk=student.pk).exists()
+        if collision:
+            raise ValueError(f"Student ID collision detected for {generated_student_id}.")
         student.student_id = generated_student_id
         student.save(update_fields=["student_id", "updated_at"])
 
     account = student.account
     if account is not None and account.role != UserRole.STUDENT:
         raise ValueError(f"Student {student.student_id} is linked to a non-student account.")
-    pin = generate_student_temp_pin()
+
     if account is None:
-        from accounts.models import User
-        account = User(username=student.student_id, role=UserRole.STUDENT)
+        account = User.objects.filter(username=student.student_id).first()
+        if account is not None and account.role != UserRole.STUDENT:
+            raise ValueError(f"Student ID {student.student_id} is already used by another account role.")
+        if account is None:
+            account = User(username=student.student_id, role=UserRole.STUDENT)
+    else:
+        username_owner = User.objects.filter(username=student.student_id).exclude(pk=account.pk).first()
+        if username_owner is not None:
+            raise ValueError(f"Student username {student.student_id} is already used by another account.")
+
+    pin = generate_student_temp_pin()
     account.role = UserRole.STUDENT
     account.username = student.student_id
     account.display_name = student.name
