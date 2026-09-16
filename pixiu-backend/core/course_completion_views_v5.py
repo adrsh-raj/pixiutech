@@ -9,6 +9,7 @@ from accounts.models import UserRole
 from academics.models import SchoolClass, Student
 from academics.services import accessible_class_queryset, accessible_school_queryset, accessible_student_queryset
 from learning import course_completion_v5 as service
+from learning.certificate_pdf import build_certificate_pdf
 from learning.course_completion_models import Certificate, Technology
 from learning.course_completion_v3 import evaluate_last_session as evaluate_legacy_unit_last_session
 from learning.services import accessible_sessions
@@ -62,7 +63,16 @@ class CourseCompletionListView(APIView):
                 rows.append(service.summary(student))
             except Exception:
                 logger.exception('Course completion summary failed for %s', student.student_id)
-                rows.append({'student_id': student.student_id, 'student_name': student.name, 'school_name': student.school_class.school.name, 'school_code': student.school_class.school.school_code, 'class_name': student.school_class.display_name, 'status': 'in_progress', 'overall_score': 0, 'required_units': 0, 'completed_units': 0, 'units': [], 'technologies': [], 'sessions_by_technology': [], 'programme_final_session': None, 'final_session_ready': False, 'trainer_approval_ready': False, 'can_issue_certificate': False, 'certificate_id': None, 'policy': None})
+                rows.append({
+                    'student_id': student.student_id, 'student_name': student.name,
+                    'school_name': student.school_class.school.name, 'school_code': student.school_class.school.school_code,
+                    'class_name': student.school_class.display_name, 'status': 'in_progress',
+                    'overall_score': 0, 'score_breakdown': {'overall_score': 0, 'pass_mark': service.PASS_MARK, 'eligible': False},
+                    'required_units': 0, 'completed_units': 0, 'units': [], 'technologies': [],
+                    'sessions_by_technology': [], 'programme_final_session': None,
+                    'final_session_ready': False, 'trainer_approval_ready': False,
+                    'can_issue_certificate': False, 'certificate_id': None, 'policy': None,
+                })
         return Response(rows)
 
 
@@ -114,7 +124,7 @@ class ApproveFinalProgrammeView(APIView):
         student = _student_for(request.user, student_key)
         try:
             programme = service.approve_programme(request.user, student)
-            return Response({'status': programme.status, 'student_id': student.student_id, 'overall_score': float(programme.overall_score), 'detail': 'Final programme session approved. Certificate is ready to issue.'})
+            return Response({'status': programme.status, 'student_id': student.student_id, 'overall_score': float(programme.overall_score), 'pass_mark': service.PASS_MARK, 'detail': 'Final programme session approved. Certificate is ready to issue.'})
         except PermissionError as exc:
             return _error(exc, 403)
         except ValueError as exc:
@@ -132,6 +142,23 @@ class IssueProgrammeCertificateView(APIView):
             return _error(exc, 403)
         except ValueError as exc:
             return _error(exc)
+
+
+class CertificatePdfView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, student_key):
+        student = _student_for(request.user, student_key)
+        if request.user.role not in {UserRole.ADMIN, UserRole.TRAINER}:
+            return _error(PermissionError('Only authorised trainers or administrators can access certificate PDFs.'), 403)
+        try:
+            service.ensure_scope(request.user, student)
+        except PermissionError as exc:
+            return _error(exc, 403)
+        certificate = Certificate.objects.filter(student=student, status='issued').order_by('-issued_at').first()
+        if certificate is None:
+            return _error(ValueError('No issued certificate exists for this student.'), 404)
+        return build_certificate_pdf(certificate)
 
 
 class VerifyProgrammeCertificateView(APIView):
