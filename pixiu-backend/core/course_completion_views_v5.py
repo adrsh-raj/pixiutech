@@ -29,6 +29,7 @@ def _student_for(user, key):
 def _basic_student_row(student):
     school_class = getattr(student, 'school_class', None)
     school = getattr(school_class, 'school', None)
+    pass_mark = float(getattr(service, 'PASS_MARK', 70.0))
     return {
         'student_id': student.student_id,
         'student_name': student.name,
@@ -37,15 +38,7 @@ def _basic_student_row(student):
         'class_name': school_class.display_name if school_class else '',
         'status': 'in_progress',
         'overall_score': 0,
-        'score_breakdown': {
-            'overall_score': 0,
-            'pass_mark': service.PASS_MARK,
-            'eligible': False,
-            'attendance_pct': None,
-            'quiz_pct': None,
-            'practical_pct': None,
-            'trainer_review_pct': None,
-        },
+        'score_breakdown': {'overall_score': 0, 'pass_mark': pass_mark, 'eligible': False, 'attendance_pct': None, 'quiz_pct': None, 'practical_pct': None, 'trainer_review_pct': None},
         'required_units': 0,
         'completed_units': 0,
         'units': [],
@@ -58,6 +51,58 @@ def _basic_student_row(student):
         'certificate_id': None,
         'policy': None,
     }
+
+
+def _fallback_registry_row(student):
+    row = _basic_student_row(student)
+    pass_mark = row['score_breakdown']['pass_mark']
+
+    try:
+        technologies = service.completed_technologies(student)
+    except Exception:
+        technologies = []
+        logger.exception('Technology fallback failed for %s', student.student_id)
+
+    row['technologies'] = technologies
+    row['sessions_by_technology'] = []
+    try:
+        sessions = service.completed_sessions(student)
+        for technology in technologies:
+            row['sessions_by_technology'].append({
+                'technology': technology.get('name') or technology.get('code') or '',
+                'code': technology.get('code') or '',
+                'sessions': sum(
+                    1 for session in sessions
+                    if getattr(getattr(session, 'workflow', None), 'technology', None)
+                    and session.workflow.technology.code == technology.get('code')
+                ),
+            })
+    except Exception:
+        logger.exception('Session technology fallback failed for %s', student.student_id)
+
+    try:
+        final = service.programme_final_session(student)
+        if final:
+            technology = getattr(getattr(final, 'workflow', None), 'technology', None)
+            row['programme_final_session'] = {
+                'id': str(final.id),
+                'topic': final.topic,
+                'date': str(final.date),
+                'technology': technology.name if technology else '',
+            }
+            row['final_session_ready'] = True
+    except Exception:
+        logger.exception('Final-session fallback failed for %s', student.student_id)
+
+    try:
+        score = float(service.student_score(student))
+        row['overall_score'] = score
+        row['score_breakdown']['overall_score'] = score
+        row['score_breakdown']['eligible'] = score >= pass_mark
+    except Exception:
+        logger.exception('Score fallback failed for %s', student.student_id)
+
+    return row
 
 
 class TechnologyListCreateView(APIView):
@@ -82,7 +127,6 @@ class CourseCompletionListView(APIView):
     def get(self, request):
         school_id = str(request.query_params.get('school_id') or '').strip()
         class_id = str(request.query_params.get('class_id') or '').strip()
-
         try:
             school_scope = accessible_school_queryset(request.user)
             class_scope = accessible_class_queryset(request.user)
@@ -96,29 +140,10 @@ class CourseCompletionListView(APIView):
                 qs = qs.filter(school_class__school_id=school_id)
             if class_id:
                 qs = qs.filter(school_class_id=class_id)
-
-            # Materialise the roster query separately from completion calculations.
-            # This guarantees that completion aggregation cannot turn a healthy
-            # student registry into an HTTP 500 response.
             students = list(qs.order_by('school_class__school__name', 'school_class__display_name', 'roll_number', 'student_id')[:500])
         except Exception:
             logger.exception('Course completion roster query failed')
-            # Last-resort scoped roster read. Keep student visibility functional
-            # even if an optional queryset annotation/join becomes unavailable.
-            try:
-                fallback = accessible_student_queryset(request.user)
-                if school_id:
-                    fallback = fallback.filter(school_class__school_id=school_id)
-                if class_id:
-                    fallback = fallback.filter(school_class_id=class_id)
-                students = list(
-                    fallback.filter(status='active')
-                    .select_related('school_class__school')
-                    .order_by('student_id')[:500]
-                )
-            except Exception:
-                logger.exception('Course completion fallback roster query failed')
-                return _error(ValueError('Unable to load the Course Completion student registry.'), 503)
+            return _error(ValueError('Unable to load the Course Completion student registry.'), 503)
 
         rows = []
         for student in students:
@@ -126,7 +151,7 @@ class CourseCompletionListView(APIView):
                 rows.append(service.summary(student))
             except Exception:
                 logger.exception('Course completion summary failed for %s', student.student_id)
-                rows.append(_basic_student_row(student))
+                rows.append(_fallback_registry_row(student))
         return Response(rows)
 
 
@@ -134,7 +159,7 @@ class CourseCompletionDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, student_key):
-        return Response(service.summary(_student_for(request.user, student_key)))
+        return Response(_fallback_registry_row(_student_for(request.user, student_key)))
 
 
 class CompletionPolicyView(APIView):
