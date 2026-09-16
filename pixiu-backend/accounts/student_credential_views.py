@@ -5,11 +5,11 @@ from rest_framework.views import APIView
 from rest_framework import status
 
 from academics.services import accessible_student_queryset, reset_student_to_temp_pin
-from accounts.models import UserRole
+from accounts.models import StudentCredentialBatch, UserRole
 from accounts.permissions import IsActiveAccount
 from audit.services import record_audit
 
-from .student_credentials import credential_csv_response, migrate_student_credentials
+from .student_credential_batch import credential_csv_response, credential_pdf_response, process_student_credential_batch, start_student_credential_batch
 
 
 class AdminStudentCredentialMigrationView(APIView):
@@ -20,13 +20,50 @@ class AdminStudentCredentialMigrationView(APIView):
             return Response({"detail": "Only administrators can migrate student credentials."}, status=status.HTTP_403_FORBIDDEN)
         if request.data.get("confirm") != "RESET_ALL_STUDENT_CREDENTIALS":
             return Response({"detail": "Confirmation phrase is required."}, status=status.HTTP_400_BAD_REQUEST)
-
-        rows = migrate_student_credentials()
         try:
-            record_audit(actor=request.user, action="password_reset", entity_type="student_credentials", summary=f"Bulk student temporary PIN migration generated for {len(rows)} active students", request=request, changes={"count": len(rows)})
-        except Exception:
-            pass
-        return credential_csv_response(rows)
+            batch = start_student_credential_batch(request.user)
+        except Exception as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"success": True, "batch_id": str(batch.id), "total_count": batch.total_count, "processed_count": 0, "status": batch.status})
+
+
+class AdminStudentCredentialMigrationProcessView(APIView):
+    permission_classes = [IsAuthenticated, IsActiveAccount]
+
+    def post(self, request, batch_id):
+        if request.user.role != UserRole.ADMIN:
+            return Response({"detail": "Only administrators can process credential migration."}, status=status.HTTP_403_FORBIDDEN)
+        batch = get_object_or_404(StudentCredentialBatch, id=batch_id, created_by=request.user)
+        try:
+            rows, complete = process_student_credential_batch(batch)
+        except Exception as exc:
+            batch.status = StudentCredentialBatch.Status.FAILED
+            batch.error = str(exc)
+            batch.save(update_fields=["status", "error", "updated_at"])
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        if complete:
+            try:
+                record_audit(actor=request.user, action="password_reset", entity_type="student_credentials", summary=f"Bulk student temporary PIN migration completed for {batch.total_count} active students", request=request, changes={"count": batch.total_count})
+            except Exception:
+                pass
+        return Response({"success": True, "batch_id": str(batch.id), "rows": rows, "processed_count": batch.processed_count, "total_count": batch.total_count, "status": batch.status, "complete": complete})
+
+
+class AdminStudentCredentialExportView(APIView):
+    permission_classes = [IsAuthenticated, IsActiveAccount]
+
+    def post(self, request, batch_id, export_format):
+        if request.user.role != UserRole.ADMIN:
+            return Response({"detail": "Only administrators can export student credentials."}, status=status.HTTP_403_FORBIDDEN)
+        batch = get_object_or_404(StudentCredentialBatch, id=batch_id, created_by=request.user, status=StudentCredentialBatch.Status.COMPLETED)
+        rows = request.data.get("rows")
+        school_code = request.data.get("school_code", "")
+        class_name = request.data.get("class_name", "")
+        if export_format == "pdf":
+            return credential_pdf_response(rows, school_code, class_name)
+        if export_format == "csv":
+            return credential_csv_response(rows, filename=f"pixiu-student-credentials-{school_code or 'all'}-{class_name or 'all'}.csv")
+        return Response({"detail": "Unsupported export format."}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class StudentTemporaryPasswordResetView(APIView):
