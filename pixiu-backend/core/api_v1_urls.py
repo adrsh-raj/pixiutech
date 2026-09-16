@@ -13,7 +13,7 @@ from .class_ranking import ClassRankingView
 from .api_v1_compat import health
 from .secure_upload import SecureUploadView
 from .assessment_views_v2 import IdempotentAssessmentViewSet
-from .course_completion_views_v3 import AdminCompleteProgrammeView, CompletionPolicyView, CourseCompletionDetailView, CourseCompletionListView, EvaluateLastSessionView, IssueProgrammeCertificateView, RequestProgrammeCompletionView, TechnologyListCreateView, VerifyProgrammeCertificateView
+from .course_completion_views_v4 import ApproveFinalProgrammeView, CompletionPolicyView, CourseCompletionDetailView, CourseCompletionListView, CourseCompletionScopeView, EvaluateLastSessionView, IssueProgrammeCertificateView, TechnologyListCreateView, VerifyProgrammeCertificateView
 from .course_completion_session_v3 import CourseAwareSessionViewSet
 from .course_completion_compat import cohort_rank
 from .public_enquiry import PublicEnquiryView
@@ -77,12 +77,13 @@ urlpatterns = [
     path('public/certificates/verify/<str:student_id>', VerifyProgrammeCertificateView.as_view(), name='v1-certificate-verify-legacy'),
     path('public/certificates/verify', VerifyProgrammeCertificateView.as_view(), name='v1-certificate-verify'),
     path('technologies', TechnologyListCreateView.as_view(), name='v1-technologies'),
+    path('course-completion/scope', CourseCompletionScopeView.as_view(), name='v1-course-completion-scope'),
     path('course-completion', CourseCompletionListView.as_view(), name='v1-course-completion-list'),
     path('course-completion/<str:student_key>', CourseCompletionDetailView.as_view(), name='v1-course-completion-detail'),
     path('course-completion/policy/<uuid:class_key>', CompletionPolicyView.as_view(), name='v1-course-completion-policy'),
     path('course-completion/session/<uuid:session_id>/evaluate', EvaluateLastSessionView.as_view(), name='v1-course-completion-session-evaluate'),
-    path('course-completion/<str:student_key>/request', RequestProgrammeCompletionView.as_view(), name='v1-course-completion-request'),
-    path('course-completion/<str:student_key>/complete', AdminCompleteProgrammeView.as_view(), name='v1-course-completion-complete'),
+    path('course-completion/<str:student_key>/request', ApproveFinalProgrammeView.as_view(), name='v1-course-completion-request'),
+    path('course-completion/<str:student_key>/complete', ApproveFinalProgrammeView.as_view(), name='v1-course-completion-complete'),
     path('course-completion/<str:student_key>/certificate', IssueProgrammeCertificateView.as_view(), name='v1-course-completion-certificate'),
     path('public/enquiries', PublicEnquiryView.as_view(), name='v1-public-enquiry'),
     path('schools/<uuid:pk>/reset-password', SchoolProfilePasswordResetView.as_view(), name='v1-school-password-reset'), path('schools/<uuid:pk>/activate', activate_school, name='v1-school-activate'),
