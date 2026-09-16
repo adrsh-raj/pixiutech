@@ -1,0 +1,9 @@
+import { KeyRound, ArrowRight } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
+
+export default function StudentPasswordPrompt() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  return <div className="min-h-screen bg-[#040810] flex items-center justify-center p-4 text-white"><div className="w-full max-w-lg rounded-3xl border border-slate-800 bg-[#0A0F1A] p-7 shadow-2xl"><div className="flex items-center gap-3"><span className="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-300 flex items-center justify-center"><KeyRound size={22}/></span><div><p className="text-[9px] font-black uppercase tracking-[0.16em] text-blue-400">Account security</p><h1 className="text-xl font-black mt-1">Your password is a temporary PIN</h1></div></div><p className="mt-5 text-sm leading-6 text-slate-300">Your current 8-digit PIN is valid until you change it. You can create your own password now, or continue using the PIN.</p><div className="mt-3 rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 text-xs leading-5 text-amber-200">This reminder will appear again each time you log in until you set a permanent password.</div><div className="mt-6 grid sm:grid-cols-2 gap-3"><button type="button" onClick={() => navigate('/student-password')} className="min-h-11 rounded-xl bg-blue-600 text-white text-xs font-black flex items-center justify-center gap-2 hover:bg-blue-700">Set permanent password <ArrowRight size={14}/></button><button type="button" onClick={() => navigate('/student-portal')} className="min-h-11 rounded-xl border border-slate-700 text-slate-200 text-xs font-black hover:bg-white/5">Continue with PIN</button></div><p className="mt-4 text-[10px] text-slate-500 text-center">Signed in as {user?.username || 'student'}.</p></div></div>;
+}
