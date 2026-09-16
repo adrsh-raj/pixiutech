@@ -9,7 +9,14 @@ from accounts.models import StudentCredentialBatch, UserRole
 from accounts.permissions import IsActiveAccount
 from audit.services import record_audit
 
-from .student_credential_batch import credential_csv_response, credential_pdf_response, process_student_credential_batch, start_student_credential_batch
+from .student_credential_batch import (
+    credential_csv_response,
+    credential_pdf_response,
+    get_batch_filters,
+    get_batch_rows,
+    process_student_credential_batch,
+    start_student_credential_batch,
+)
 
 
 class AdminStudentCredentialMigrationView(APIView):
@@ -24,7 +31,7 @@ class AdminStudentCredentialMigrationView(APIView):
             batch = start_student_credential_batch(request.user)
         except Exception as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-        return Response({"success": True, "batch_id": str(batch.id), "total_count": batch.total_count, "processed_count": 0, "status": batch.status})
+        return Response({"success": True, "batch_id": str(batch.id), "total_count": batch.total_count, "processed_count": batch.processed_count, "status": batch.status})
 
 
 class AdminStudentCredentialMigrationProcessView(APIView):
@@ -35,18 +42,27 @@ class AdminStudentCredentialMigrationProcessView(APIView):
             return Response({"detail": "Only administrators can process credential migration."}, status=status.HTTP_403_FORBIDDEN)
         batch = get_object_or_404(StudentCredentialBatch, id=batch_id, created_by=request.user)
         try:
-            rows, complete = process_student_credential_batch(batch)
+            _, complete, batch = process_student_credential_batch(batch)
         except Exception as exc:
-            batch.status = StudentCredentialBatch.Status.FAILED
-            batch.error = str(exc)
-            batch.save(update_fields=["status", "error", "updated_at"])
+            StudentCredentialBatch.objects.filter(pk=batch.pk).update(status=StudentCredentialBatch.Status.FAILED, error=str(exc))
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        payload = {
+            "success": True,
+            "batch_id": str(batch.id),
+            "processed_count": batch.processed_count,
+            "total_count": batch.total_count,
+            "status": batch.status,
+            "complete": complete,
+        }
         if complete:
+            schools, classes = get_batch_filters(batch)
+            payload.update({"schools": schools, "classes": classes})
             try:
                 record_audit(actor=request.user, action="password_reset", entity_type="student_credentials", summary=f"Bulk student temporary PIN migration completed for {batch.total_count} active students", request=request, changes={"count": batch.total_count})
             except Exception:
                 pass
-        return Response({"success": True, "batch_id": str(batch.id), "rows": rows, "processed_count": batch.processed_count, "total_count": batch.total_count, "status": batch.status, "complete": complete})
+        return Response(payload)
 
 
 class AdminStudentCredentialExportView(APIView):
@@ -55,14 +71,27 @@ class AdminStudentCredentialExportView(APIView):
     def post(self, request, batch_id, export_format):
         if request.user.role != UserRole.ADMIN:
             return Response({"detail": "Only administrators can export student credentials."}, status=status.HTTP_403_FORBIDDEN)
-        batch = get_object_or_404(StudentCredentialBatch, id=batch_id, created_by=request.user, status=StudentCredentialBatch.Status.COMPLETED)
-        rows = request.data.get("rows")
-        school_code = request.data.get("school_code", "")
-        class_name = request.data.get("class_name", "")
+        batch = get_object_or_404(
+            StudentCredentialBatch,
+            id=batch_id,
+            created_by=request.user,
+            status=StudentCredentialBatch.Status.COMPLETED,
+        )
+        school_code = str(request.data.get("school_code", "")).strip()
+        class_name = str(request.data.get("class_name", "")).strip()
+        rows = get_batch_rows(batch)
+        filtered = [
+            row for row in rows
+            if (not school_code or row.get("school_code") == school_code)
+            and (not class_name or row.get("class_name") == class_name)
+        ]
+        if not filtered:
+            return Response({"detail": "No students match the selected filters."}, status=status.HTTP_400_BAD_REQUEST)
         if export_format == "pdf":
             return credential_pdf_response(rows, school_code, class_name)
         if export_format == "csv":
-            return credential_csv_response(rows, filename=f"pixiu-student-credentials-{school_code or 'all'}-{class_name or 'all'}.csv")
+            filename = f"pixiu-student-credentials-{school_code or 'all'}-{class_name or 'all'}.csv".replace(" ", "-")
+            return credential_csv_response(filtered, filename=filename)
         return Response({"detail": "Unsupported export format."}, status=status.HTTP_400_BAD_REQUEST)
 
 
