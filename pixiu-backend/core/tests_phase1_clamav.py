@@ -88,7 +88,7 @@ class ClamAVProtocolTests(SimpleTestCase):
         self.assertEqual(raised.exception.messages, ["Malware scanning is currently unavailable."])
         scan_mock.assert_called_once()
 
-    @skipUnless(os.environ.get("CLAMAV_INTEGRATION") == "1", "live ClamAV integration test is CI-only")
+    @skipUnless(os.environ.get("CLAMAV_INTEGRATION") == "1", "live ClamAV integration tests are CI-only")
     @override_settings(
         CLAMAV_ENABLED=True,
         CLAMAV_REQUIRED=True,
@@ -97,9 +97,25 @@ class ClamAVProtocolTests(SimpleTestCase):
         CLAMAV_TIMEOUT_SECONDS=30,
         CLAMAV_CHUNK_SIZE=1024 * 1024,
     )
-    def test_live_clamav_scans_a_real_upload(self):
+    def test_live_clamav_scans_a_real_clean_upload(self):
         upload = SimpleUploadedFile("live.pdf", b"%PDF-1.7\nclean integration test\n", content_type="application/pdf")
         scan_uploaded_file(upload)
+        self.assertEqual(upload.tell(), 0)
+
+    @skipUnless(os.environ.get("CLAMAV_INTEGRATION") == "1", "live ClamAV integration tests are CI-only")
+    @override_settings(
+        CLAMAV_ENABLED=True,
+        CLAMAV_REQUIRED=True,
+        CLAMAV_HOST="127.0.0.1",
+        CLAMAV_PORT=3310,
+        CLAMAV_TIMEOUT_SECONDS=30,
+        CLAMAV_CHUNK_SIZE=1024 * 1024,
+    )
+    def test_live_clamav_detects_standard_antivirus_test_signature(self):
+        eicar = b"X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*\n"
+        upload = SimpleUploadedFile("scan-test.txt", eicar, content_type="text/plain")
+        with self.assertRaises(ClamAVMalwareDetectedError):
+            scan_uploaded_file(upload)
         self.assertEqual(upload.tell(), 0)
 
 
