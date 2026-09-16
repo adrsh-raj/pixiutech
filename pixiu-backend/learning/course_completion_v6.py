@@ -3,7 +3,7 @@ import uuid
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Avg, Max, Q
+from django.db.models import Max, Q
 from django.utils import timezone
 
 from accounts.models import UserRole
@@ -93,15 +93,14 @@ def programme_final_session(student):
 def final_session_is_latest(student, final_session):
     if not final_session:
         return False
-    later = Session.objects.filter(
+    return not Session.objects.filter(
         school_class_id=student.school_class_id,
         status='completed',
     ).filter(
         Q(date__gt=final_session.date)
         | Q(date=final_session.date, start_time__gt=final_session.start_time)
         | Q(date=final_session.date, start_time=final_session.start_time, id__gt=final_session.id)
-    )
-    return not later.exists()
+    ).exists()
 
 
 def completed_technologies(student):
@@ -118,21 +117,26 @@ def completed_technologies(student):
 
 
 def _taught_unit_codes(sessions):
-    return {str(session.curriculum_unit.unit_code).strip().upper() for session in sessions if session.curriculum_unit_id and session.curriculum_unit.unit_code}
+    return {
+        str(session.curriculum_unit.unit_code).strip().upper()
+        for session in sessions
+        if session.curriculum_unit_id and session.curriculum_unit.unit_code
+    }
 
 
 def attendance_metrics(student, sessions):
     session_ids = [session.id for session in sessions]
     rows = list(student.attendance_records.filter(session_id__in=session_ids).only('session_id', 'status'))
-    by_session = {}
-    for row in rows:
-        by_session[str(row.session_id)] = row.status
+    by_session = {str(row.session_id): row.status for row in rows}
     missing = [
         {'session_id': str(session.id), 'date': str(session.date), 'topic': session.topic}
         for session in sessions
         if str(session.id) not in by_session
     ]
-    attended = sum(1 for status in by_session.values() if status in {AttendanceStatus.PRESENT, AttendanceStatus.LATE, AttendanceStatus.EXCUSED})
+    attended = sum(
+        1 for status in by_session.values()
+        if status in {AttendanceStatus.PRESENT, AttendanceStatus.LATE, AttendanceStatus.EXCUSED}
+    )
     return {
         'percentage': round(attended * 100 / len(sessions), 2) if sessions else 0.0,
         'attended': attended,
@@ -144,18 +148,26 @@ def attendance_metrics(student, sessions):
 
 
 def quiz_metrics(student, taught_unit_codes):
-    # Optional technologies: only quizzes belonging to a unit that was actually
-    # taught in at least one completed session are certification requirements.
-    qs = Quiz.objects.filter(
-        status__in=['active', 'closed'],
-        class_assignments__school_class_id=student.school_class_id,
-    ).filter(unit_code__iexact__in=list(taught_unit_codes)) if taught_unit_codes else Quiz.objects.none()
-    # Django does not support __iexact__in; normalize in Python after the scoped DB query.
-    assigned = [q for q in Quiz.objects.filter(status__in=['active', 'closed'], class_assignments__school_class_id=student.school_class_id).distinct() if str(q.unit_code or '').strip().upper() in taught_unit_codes]
+    assigned = [
+        quiz for quiz in Quiz.objects.filter(
+            status__in=['active', 'closed'],
+            class_assignments__school_class_id=student.school_class_id,
+        ).distinct()
+        if str(quiz.unit_code or '').strip().upper() in taught_unit_codes
+    ]
     rows = []
     for quiz in assigned:
-        best = QuizAttempt.objects.filter(student=student, quiz=quiz, status='completed').aggregate(value=Max('percentage'))['value']
-        rows.append({'id': str(quiz.id), 'title': quiz.title, 'percentage': float(best) if best is not None else 0.0, 'complete': best is not None})
+        best = QuizAttempt.objects.filter(
+            student=student,
+            quiz=quiz,
+            status='completed',
+        ).aggregate(value=Max('percentage'))['value']
+        rows.append({
+            'id': str(quiz.id),
+            'title': quiz.title,
+            'percentage': float(best) if best is not None else 0.0,
+            'complete': best is not None,
+        })
     return {
         'percentage': round(sum(row['percentage'] for row in rows) / len(rows), 2) if rows else 0.0,
         'assigned': len(rows),
@@ -167,16 +179,29 @@ def quiz_metrics(student, taught_unit_codes):
 
 
 def assessment_metrics(student, taught_unit_codes):
-    practical_qs = StudentAssessment.objects.filter(student=student, status=AssessmentStatus.PUBLISHED, score__isnull=False)
-    review_qs = StudentAssessment.objects.filter(student=student, status=AssessmentStatus.PUBLISHED, rating__isnull=False)
-    # Blank unit_code is retained as an overall assessment; unit-specific assessments
-    # count only when that unit was actually taught in the completed programme sessions.
-    practical_values = [float(v) for v in practical_qs.values_list('score', 'unit_code') if not v[1] or str(v[1]).strip().upper() in taught_unit_codes]
-    review_values = [float(v) for v in review_qs.values_list('rating', 'unit_code') if not v[1] or str(v[1]).strip().upper() in taught_unit_codes]
+    practical_values = [
+        float(score)
+        for score, unit_code in StudentAssessment.objects.filter(
+            student=student,
+            status=AssessmentStatus.PUBLISHED,
+            score__isnull=False,
+        ).values_list('score', 'unit_code')
+        if not unit_code or str(unit_code).strip().upper() in taught_unit_codes
+    ]
+    review_values = [
+        float(rating)
+        for rating, unit_code in StudentAssessment.objects.filter(
+            student=student,
+            status=AssessmentStatus.PUBLISHED,
+            rating__isnull=False,
+        ).values_list('rating', 'unit_code')
+        if not unit_code or str(unit_code).strip().upper() in taught_unit_codes
+    ]
+    review_average = sum(review_values) / len(review_values) if review_values else None
     return {
         'practical_pct': round(sum(practical_values) / len(practical_values), 2) if practical_values else 0.0,
-        'trainer_review_pct': round((sum(review_values) / len(review_values)) * 20, 2) if review_values else 0.0,
-        'trainer_review_rating': round(sum(review_values) / len(review_values), 2) if review_values else None,
+        'trainer_review_pct': round(review_average * 20, 2) if review_average is not None else 0.0,
+        'trainer_review_rating': round(review_average, 2) if review_average is not None else None,
     }
 
 
@@ -278,14 +303,22 @@ def summary(student):
             {
                 'technology': tech['name'],
                 'code': tech['code'],
-                'sessions': sum(1 for session in sessions if getattr(getattr(session, 'workflow', None), 'technology', None) and session.workflow.technology.code == tech['code']),
+                'sessions': sum(
+                    1 for session in sessions
+                    if getattr(getattr(session, 'workflow', None), 'technology', None)
+                    and session.workflow.technology.code == tech['code']
+                ),
             }
             for tech in technologies
         ],
         'programme_final_session': state['final_session'],
         'final_session_ready': state['final_session_ready'],
-        'trainer_approval_ready': bool(state['ready'] and not certificate and (programme is None or programme.status == 'in_progress')),
-        'can_issue_certificate': bool(state['ready'] and not certificate and programme and programme.status == 'trainer_requested'),
+        'trainer_approval_ready': bool(
+            state['ready'] and not certificate and (programme is None or programme.status == 'in_progress')
+        ),
+        'can_issue_certificate': bool(
+            state['ready'] and not certificate and programme and programme.status == 'trainer_requested'
+        ),
         'certificate_id': certificate.certificate_id if certificate else None,
         'checklist': state,
         'policy': serialize_policy(policy_for(student.school_class)),
@@ -300,11 +333,14 @@ def evaluate_final_programme(session):
         raise ValueError('This session is not marked as the final programme session.')
     if session.status != 'completed':
         raise ValueError('Complete the final programme session before evaluating it.')
-    students = Student.objects.filter(school_class_id=session.school_class_id, status='active').select_related('school_class__school').order_by('roll_number', 'student_id')
+    students = Student.objects.filter(
+        school_class_id=session.school_class_id,
+        status='active',
+    ).select_related('school_class__school').order_by('roll_number', 'student_id')
     results = []
     for student in students:
         state = checklist(student)
-        non_score_blockers = [b for b in state['blockers'] if 'Overall score is ' not in b]
+        non_score_blockers = [blocker for blocker in state['blockers'] if 'Overall score is ' not in blocker]
         if state['ready']:
             status = 'ready'
             reason = f"Ready for trainer approval at {state['overall_score']:.2f}%."
