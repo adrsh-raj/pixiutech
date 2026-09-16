@@ -5,14 +5,13 @@ from rest_framework.test import APIRequestFactory, force_authenticate
 
 from accounts.credentials import generate_student_temp_pin
 from accounts.models import User, UserRole, UserStatus
+from accounts.student_credential_views import StudentTemporaryPasswordResetView
 from academics.models import School, SchoolClass, Student, Trainer, TrainerSchoolAssignment
 from academics.services import accessible_student_queryset, provision_student, reset_student_to_temp_pin
-from accounts.student_credential_views import StudentTemporaryPasswordResetView
 
 
 class StudentCredentialGenerationTests(TestCase):
     def setUp(self):
-        self.admin = User.objects.create_user(username="phase2-admin", password="AdminPassword!123", role=UserRole.ADMIN, status=UserStatus.ACTIVE, is_active=True)
         self.school = School.objects.create(school_code="P2SC", name="Phase 2 School", status="active")
         self.school_class = SchoolClass.objects.create(school=self.school, grade="8", section="A")
         self.student = Student.objects.create(school_class=self.school_class, roll_number=1, name="Student One", status="active")
@@ -28,7 +27,7 @@ class StudentCredentialGenerationTests(TestCase):
         self.assertTrue(pin.isdigit())
         self.assertTrue(student.account.check_password(pin))
         self.assertTrue(student.account.must_change_password)
-        self.assertFalse(pin.startswith("P2SCP2sc"))
+        self.assertNotEqual(pin, "P2SCP2sc8a1@hata")
 
     def test_reset_changes_pin_and_invalidates_old_password(self):
         student, old_pin = provision_student(student=self.student)
@@ -61,7 +60,7 @@ class StudentResetScopeTests(TestCase):
     def test_trainer_can_reset_assigned_student(self):
         response = self._post(self.student_a)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data["must_change_password"], True)
+        self.assertTrue(response.data["must_change_password"])
         self.assertEqual(len(response.data["temporary_pin"]), 8)
 
     def test_trainer_cannot_reset_other_school_student(self):
