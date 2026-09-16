@@ -3,15 +3,18 @@ from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.exceptions import PermissionDenied, ValidationError
-from rest_framework.parsers import FormParser, MultiPartParser
+from rest_framework.parsers import FormParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from accounts.models import UserRole
+from accounts.permissions import IsActiveAccount
 from academics.models import Trainer
 from learning.models import LearningContent
 from notifications.models import Notification, NotificationType
+from .upload_security import SecureMultiPartParser, SecureUploadError, validate_uploaded_file
 
 MATERIAL_MARKER = "trainer_material_id"
 MAX_FILE_SIZE = 20 * 1024 * 1024
@@ -39,8 +42,12 @@ def _allowed_material_ids(user):
 
 
 class TrainerMaterialListCreateView(APIView):
-    permission_classes = [IsAuthenticated]
-    parser_classes = [MultiPartParser, FormParser]
+    permission_classes = [IsAuthenticated, IsActiveAccount]
+    parser_classes = [SecureMultiPartParser, FormParser]
+    throttle_scope = "trainer_material_upload"
+
+    def get_throttles(self):
+        return [ScopedRateThrottle()] if self.request.method == "POST" else []
 
     def get(self, request):
         if request.user.role == UserRole.ADMIN:
@@ -79,8 +86,12 @@ class TrainerMaterialListCreateView(APIView):
             raise ValidationError({"file": "A PDF file is required."})
         if uploaded.size > MAX_FILE_SIZE:
             raise ValidationError({"file": "PDF must be 20 MB or smaller."})
-        if uploaded.content_type != "application/pdf" and not uploaded.name.lower().endswith(".pdf"):
-            raise ValidationError({"file": "Only PDF files are allowed."})
+        try:
+            validate_uploaded_file(uploaded)
+        except SecureUploadError as exc:
+            raise ValidationError({"file": exc.messages}) from exc
+        if uploaded.name.rsplit(".", 1)[-1].lower() != "pdf":
+            raise ValidationError({"file": "Trainer materials must be PDF files."})
 
         grade = str(request.data.get("class_grade") or "").strip()
         if grade and not grade.isdigit():
@@ -136,7 +147,7 @@ class TrainerMaterialListCreateView(APIView):
 
 
 class TrainerMaterialDetailView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsActiveAccount]
 
     def _get_material(self, pk):
         return get_object_or_404(
@@ -159,7 +170,7 @@ class TrainerMaterialDetailView(APIView):
 
 
 class TrainerMaterialFileView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsActiveAccount]
 
     def get(self, request, pk):
         material = get_object_or_404(

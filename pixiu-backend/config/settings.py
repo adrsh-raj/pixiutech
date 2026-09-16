@@ -24,10 +24,19 @@ LOGGING = {
             "class": "logging.StreamHandler",
             "level": "INFO",
         },
+        "security_console": {
+            "class": "logging.StreamHandler",
+            "level": "INFO",
+        },
     },
     "loggers": {
         "performance": {
             "handlers": ["performance_console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "security.uploads": {
+            "handlers": ["security_console"],
             "level": "INFO",
             "propagate": False,
         },
@@ -85,7 +94,41 @@ else:
         }
     }
 
-REST_FRAMEWORK = {"DEFAULT_AUTHENTICATION_CLASSES":["rest_framework_simplejwt.authentication.JWTAuthentication"],"DEFAULT_PERMISSION_CLASSES":["rest_framework.permissions.IsAuthenticated"],"DEFAULT_RENDERER_CLASSES":["rest_framework.renderers.JSONRenderer"],"DEFAULT_THROTTLE_CLASSES":["rest_framework.throttling.ScopedRateThrottle"],"DEFAULT_THROTTLE_RATES":{"login":os.environ.get("DJANGO_LOGIN_RATE","10/min")},"EXCEPTION_HANDLER":"core.exception_handler.custom_exception_handler"}
+# Uploads are accepted only through the centralized policy. The streaming
+# handler stops oversized multipart files while they are being received; the
+# parser additionally rejects oversized multipart requests using Content-Length.
+SECURE_UPLOAD_MAX_BYTES = int(os.environ.get("SECURE_UPLOAD_MAX_MB", "20")) * 1024 * 1024
+SECURE_UPLOAD_MAX_MULTIPART_BYTES = SECURE_UPLOAD_MAX_BYTES + 5 * 1024 * 1024
+FILE_UPLOAD_HANDLERS = [
+    "core.upload_security.SecureUploadSizeHandler",
+    "django.core.files.uploadhandler.MemoryFileUploadHandler",
+    "django.core.files.uploadhandler.TemporaryFileUploadHandler",
+]
+FILE_UPLOAD_MAX_MEMORY_SIZE = int(os.environ.get("FILE_UPLOAD_MAX_MEMORY_MB", "5")) * 1024 * 1024
+DATA_UPLOAD_MAX_MEMORY_SIZE = SECURE_UPLOAD_MAX_MULTIPART_BYTES
+
+# ClamAV runs as a private clamd service in production. Production fails closed
+# when the scanner is unavailable; local DEBUG environments can opt out.
+CLAMAV_ENABLED = os.environ.get("CLAMAV_ENABLED", "False" if DEBUG else "True").lower() == "true"
+CLAMAV_REQUIRED = os.environ.get("CLAMAV_REQUIRED", "False" if DEBUG else "True").lower() == "true"
+CLAMAV_HOST = os.environ.get("CLAMAV_HOST", "127.0.0.1").strip()
+CLAMAV_PORT = int(os.environ.get("CLAMAV_PORT", "3310"))
+CLAMAV_TIMEOUT_SECONDS = float(os.environ.get("CLAMAV_TIMEOUT_SECONDS", "30"))
+CLAMAV_CHUNK_SIZE = int(os.environ.get("CLAMAV_CHUNK_SIZE", str(1024 * 1024)))
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES":["rest_framework_simplejwt.authentication.JWTAuthentication"],
+    "DEFAULT_PERMISSION_CLASSES":["rest_framework.permissions.IsAuthenticated"],
+    "DEFAULT_RENDERER_CLASSES":["rest_framework.renderers.JSONRenderer"],
+    "DEFAULT_PARSER_CLASSES":["rest_framework.parsers.JSONParser","core.upload_security.SecureMultiPartParser","rest_framework.parsers.FormParser"],
+    "DEFAULT_THROTTLE_CLASSES":["rest_framework.throttling.ScopedRateThrottle"],
+    "DEFAULT_THROTTLE_RATES":{
+        "login":os.environ.get("DJANGO_LOGIN_RATE","10/min"),
+        "upload":os.environ.get("DJANGO_UPLOAD_RATE","30/hour"),
+        "trainer_material_upload":os.environ.get("DJANGO_TRAINER_MATERIAL_UPLOAD_RATE","30/hour"),
+    },
+    "EXCEPTION_HANDLER":"core.exception_handler.custom_exception_handler"
+}
 SIMPLE_JWT = {"ACCESS_TOKEN_LIFETIME":timedelta(minutes=int(os.environ.get("JWT_ACCESS_MINUTES","30"))),"REFRESH_TOKEN_LIFETIME":timedelta(days=int(os.environ.get("JWT_REFRESH_DAYS","7"))),"ROTATE_REFRESH_TOKENS":True,"BLACKLIST_AFTER_ROTATION":True,"UPDATE_LAST_LOGIN":False,"AUTH_HEADER_TYPES":("Bearer",)}
 CORS_ALLOWED_ORIGINS = [x.strip() for x in os.environ.get("DJANGO_CORS_ALLOWED_ORIGINS","").split(",") if x.strip()]
 CORS_ALLOW_CREDENTIALS = True

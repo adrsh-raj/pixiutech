@@ -27,6 +27,15 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+      clamav:
+        image: clamav/clamav:1.5.4-debian13-slim
+        ports:
+          - 3310:3310
+        env:
+          CLAMD_CONF_StreamMaxLength: 30M
+          CLAMD_CONF_ConcurrentDatabaseReload: "no"
+          CLAMD_CONF_MaxThreads: "4"
+          FRESHCLAM_CHECKS: "24"
 
     steps:
       - name: Checkout
@@ -48,6 +57,28 @@ jobs:
             package-lock.json
             pixiu-lms-portal/package-lock.json
 
+      - name: Wait for ClamAV
+        working-directory: pixiu-backend
+        run: |
+          python - <<'PY'
+          import socket
+          import time
+          deadline = time.time() + 180
+          while time.time() < deadline:
+              try:
+                  with socket.create_connection(("127.0.0.1", 3310), timeout=2) as sock:
+                      sock.settimeout(2)
+                      sock.sendall(b"zPING\0")
+                      reply = sock.recv(128).replace(b"\0", b"\n").decode("utf-8", "replace").strip()
+                      if reply == "PONG":
+                          print("ClamAV is ready")
+                          raise SystemExit(0)
+              except OSError:
+                  pass
+              time.sleep(2)
+          raise SystemExit("ClamAV did not become ready within 180 seconds")
+          PY
+
       - name: Verify Django backend
         working-directory: pixiu-backend
         env:
@@ -60,6 +91,13 @@ jobs:
           DJANGO_CSRF_TRUSTED_ORIGINS: http://localhost:5173
           DJANGO_SECURE_SSL_REDIRECT: "False"
           CLOUDFLARE_TURNSTILE_ENABLED: "False"
+          CLAMAV_ENABLED: "True"
+          CLAMAV_REQUIRED: "True"
+          CLAMAV_INTEGRATION: "1"
+          CLAMAV_HOST: 127.0.0.1
+          CLAMAV_PORT: "3310"
+          CLAMAV_TIMEOUT_SECONDS: "30"
+          CLAMAV_CHUNK_SIZE: "1048576"
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
