@@ -8,7 +8,7 @@ from academics.models import Student
 from learning.course_completion_models import CurriculumUnitProfile, SessionWorkflow, Technology
 from learning.models import AttendanceRecord, CurriculumUnit, Session
 from learning.serializers import SessionSerializer
-from learning.course_completion_v3 import evaluate_last_session
+from learning.course_completion_v4 import evaluate_last_session
 from .strict_learning_scope_views import SafeScopedSessionViewSet
 
 
@@ -38,13 +38,14 @@ class CourseAwareSessionViewSet(SafeScopedSessionViewSet):
             CurriculumUnitProfile.objects.create(curriculum_unit=curriculum, technology=technology, certificate_required=True)
 
     def _set_last_session(self, session, is_last):
-        if not is_last or not session.curriculum_unit_id:
+        if not is_last:
             return
+        # There is exactly one final-programme marker per class. The existing field
+        # is retained for backward-compatible clients but now has programme scope.
         SessionWorkflow.objects.filter(
             session__school_class=session.school_class,
-            session__curriculum_unit=session.curriculum_unit,
             is_last_session_for_unit=True,
-        ).exclude(session=session).update(is_last_session_for_unit=False, updated_at=session.updated_at)
+        ).exclude(session=session).update(is_last_session_for_unit=False)
 
     def map_out(self, obj):
         payload = super().map_out(obj)
@@ -52,18 +53,18 @@ class CourseAwareSessionViewSet(SafeScopedSessionViewSet):
         curriculum = getattr(obj, 'curriculum_unit', None)
         school_class = getattr(obj, 'school_class', None)
         school = getattr(school_class, 'school', None)
-
         technology = workflow.technology if workflow and workflow.technology_id else None
         if technology is None and curriculum is not None:
             profile = CurriculumUnitProfile.objects.filter(curriculum_unit=curriculum).select_related('technology').first()
             technology = profile.technology if profile else None
-
+        final_marker = bool(workflow.is_last_session_for_unit) if workflow else False
         payload.update({
             'technology': str(technology.id) if technology else None,
             'technology_id': str(technology.id) if technology else None,
             'technology_name': technology.name if technology else '',
-            'is_last_session_for_unit': bool(workflow.is_last_session_for_unit) if workflow else False,
-            'last_session': bool(workflow.is_last_session_for_unit) if workflow else False,
+            'is_last_session_for_unit': final_marker,
+            'is_last_programme_session': final_marker,
+            'last_session': final_marker,
             'school_class_id': str(obj.school_class_id) if obj.school_class_id else None,
             'school_class_school': str(school.id) if school else None,
             'school_name': school.name if school else '',
@@ -91,10 +92,7 @@ class CourseAwareSessionViewSet(SafeScopedSessionViewSet):
         response = super().create(request, *args, **kwargs)
         session = Session.objects.get(pk=response.data['id'])
         is_last = as_bool(request.data.get('is_last_session_for_unit', request.data.get('last_session', False)))
-        SessionWorkflow.objects.update_or_create(
-            session=session,
-            defaults={'technology': technology, 'is_last_session_for_unit': is_last},
-        )
+        SessionWorkflow.objects.update_or_create(session=session, defaults={'technology': technology, 'is_last_session_for_unit': is_last})
         if is_last:
             self._set_last_session(session, True)
         response.data = self.map_out(session)
@@ -107,22 +105,12 @@ class CourseAwareSessionViewSet(SafeScopedSessionViewSet):
         session = self.get_object()
         if request.user.role not in {UserRole.ADMIN, UserRole.SCHOOL, UserRole.TRAINER}:
             raise PermissionDenied('Your role cannot complete sessions.')
-
-        roster = list(
-            Student.objects.filter(school_class_id=session.school_class_id, status='active')
-            .order_by('roll_number', 'student_id')
-        )
+        roster = list(Student.objects.filter(school_class_id=session.school_class_id, status='active').order_by('roll_number', 'student_id'))
         roster_ids = {student.pk for student in roster}
-        marked_ids = set(
-            AttendanceRecord.objects.filter(session=session, student_id__in=roster_ids)
-            .values_list('student_id', flat=True)
-        )
+        marked_ids = set(AttendanceRecord.objects.filter(session=session, student_id__in=roster_ids).values_list('student_id', flat=True))
         missing = [student.student_id for student in roster if student.pk not in marked_ids]
         if missing:
-            raise ValidationError({
-                'attendance': f'Attendance is incomplete. Mark attendance for every active student before completing this session. Missing: {", ".join(missing)}.'
-            })
-
+            raise ValidationError({'attendance': f'Attendance is incomplete. Mark attendance for every active student before completing this session. Missing: {", ".join(missing)}.'})
         response = super().complete(request, pk=pk)
         completed = Session.objects.get(pk=session.pk)
         workflow = SessionWorkflow.objects.filter(session=completed).first()
@@ -144,10 +132,7 @@ class CourseAwareSessionViewSet(SafeScopedSessionViewSet):
         technology = self._technology(provided_technology, session.curriculum_unit) if provided_technology else self._technology(fallback_unit=session.curriculum_unit)
         if session.curriculum_unit_id:
             self._check_unit_technology(session.curriculum_unit, technology, create_profile=True)
-        workflow, _ = SessionWorkflow.objects.get_or_create(
-            session=session,
-            defaults={'technology': technology, 'is_last_session_for_unit': False},
-        )
+        workflow, _ = SessionWorkflow.objects.get_or_create(session=session, defaults={'technology': technology, 'is_last_session_for_unit': False})
         if provided_technology:
             workflow.technology = technology
         if 'is_last_session_for_unit' in request.data or 'last_session' in request.data:
@@ -155,21 +140,11 @@ class CourseAwareSessionViewSet(SafeScopedSessionViewSet):
         workflow.save(update_fields=['technology', 'is_last_session_for_unit', 'updated_at'])
         if workflow.is_last_session_for_unit:
             self._set_last_session(session, True)
-
-        # The legacy compatibility update() path inserts absent required foreign
-        # keys as null before serializer validation. Build the update explicitly
-        # from the persisted session, so editing does not require re-selecting the
-        # already-assigned class or trainer and PATCH cannot fail on null FKs.
         payload = request.data.copy()
         payload['school_class'] = str(session.school_class_id)
         payload['trainer'] = str(session.trainer_id)
         payload['curriculum_unit'] = str(session.curriculum_unit_id) if session.curriculum_unit_id else ''
-        serializer = SessionSerializer(
-            session,
-            data=payload,
-            partial=str(request.method).upper() == 'PATCH',
-            context={'request': request},
-        )
+        serializer = SessionSerializer(session, data=payload, partial=str(request.method).upper() == 'PATCH', context={'request': request})
         serializer.is_valid(raise_exception=True)
         updated = serializer.save()
         updated = Session.objects.select_related('school_class__school', 'trainer', 'curriculum_unit').get(pk=updated.pk)
