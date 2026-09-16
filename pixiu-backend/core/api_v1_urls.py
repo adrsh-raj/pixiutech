@@ -13,7 +13,7 @@ from .class_ranking import ClassRankingView
 from .api_v1_compat import health
 from .secure_upload import SecureUploadView
 from .assessment_views_v2 import IdempotentAssessmentViewSet
-from .course_completion_views_v4 import ApproveFinalProgrammeView, CompletionPolicyView, CourseCompletionDetailView, CourseCompletionListView, CourseCompletionScopeView, EvaluateLastSessionView, IssueProgrammeCertificateView, TechnologyListCreateView, VerifyProgrammeCertificateView
+from .course_completion_views_v5 import ApproveFinalProgrammeView, CompletionPolicyView, CourseCompletionDetailView, CourseCompletionListView, CourseCompletionScopeView, EvaluateLastSessionView, IssueProgrammeCertificateView, TechnologyListCreateView, VerifyProgrammeCertificateView
 from .course_completion_session_v3 import CourseAwareSessionViewSet
 from .course_completion_compat import cohort_rank
 from .public_enquiry import PublicEnquiryView
