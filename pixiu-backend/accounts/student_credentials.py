@@ -4,23 +4,37 @@ from io import StringIO
 from django.db import transaction
 from django.http import HttpResponse
 
-from accounts.credentials import generate_student_temp_pin, revoke_all_refresh_tokens
-from accounts.models import UserRole, UserStatus
+from accounts.credentials import build_student_username, generate_student_temp_pin, revoke_all_refresh_tokens
+from accounts.models import User, UserRole, UserStatus
 from academics.models import Student
 
 
 def _set_student_temp_pin(student):
-    if not student.account_id:
-        raise ValueError("Student does not have a linked login account.")
+    school_class = student.school_class
+    generated_student_id = build_student_username(school_class.school.school_code, school_class.grade, school_class.section, student.roll_number)
+    if student.student_id != generated_student_id:
+        student.student_id = generated_student_id
+        student.save(update_fields=["student_id", "updated_at"])
+
     account = student.account
-    if account.role != UserRole.STUDENT:
-        raise ValueError("Linked account is not a student account.")
+    if account is not None and account.role != UserRole.STUDENT:
+        raise ValueError(f"Student {student.student_id} is linked to a non-student account.")
     pin = generate_student_temp_pin()
+    if account is None:
+        from accounts.models import User
+        account = User(username=student.student_id, role=UserRole.STUDENT)
+    account.role = UserRole.STUDENT
+    account.username = student.student_id
+    account.display_name = student.name
+    account.email = student.email
     account.set_password(pin)
     account.must_change_password = True
-    account.status = UserStatus.ACTIVE if student.status == "active" else UserStatus.INACTIVE
-    account.is_active = student.status == "active"
-    account.save(update_fields=["password", "must_change_password", "status", "is_active"])
+    account.status = UserStatus.ACTIVE
+    account.is_active = True
+    account.save()
+    if student.account_id != account.id:
+        student.account = account
+        student.save(update_fields=["account", "updated_at"])
     revoke_all_refresh_tokens(account)
     return pin
 
@@ -34,7 +48,7 @@ def migrate_student_credentials():
     students = (
         Student.objects.select_related("account", "school_class__school")
         .select_for_update()
-        .filter(status="active", account__isnull=False, account__role=UserRole.STUDENT)
+        .filter(status="active")
         .order_by("school_class__school__school_code", "school_class__grade", "school_class__section", "roll_number", "id")
     )
     rows = []
