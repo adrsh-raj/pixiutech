@@ -10,8 +10,7 @@ from academics.models import SchoolClass, Student
 from academics.services import accessible_class_queryset, accessible_school_queryset, accessible_student_queryset
 from learning import course_completion_v5 as service
 from learning.certificate_pdf import build_certificate_pdf
-from learning.course_completion_models import Certificate, Technology
-from learning.course_completion_v3 import evaluate_last_session as evaluate_legacy_unit_last_session
+from learning.course_completion_models import Certificate, Technology, SessionWorkflow
 from learning.services import accessible_sessions
 
 logger = logging.getLogger(__name__)
@@ -105,6 +104,82 @@ def _fallback_registry_row(student):
     return row
 
 
+def _evaluate_final_programme_session(session):
+    """Evaluate the class against the programme's final-session certification rule.
+
+    This is intentionally NOT the legacy per-unit evaluator. Technologies are optional;
+    the one class-level final-session marker closes the programme. Each student's current
+    overall score is the certification gate, with missing required score inputs reported as
+    pending rather than being incorrectly marked as a unit failure.
+    """
+    workflow = SessionWorkflow.objects.filter(session=session).first()
+    if not workflow or not workflow.is_last_session_for_unit:
+        raise ValueError('This session is not marked as the final programme session.')
+    if session.status != 'completed':
+        raise ValueError('Complete the final programme session before evaluating it.')
+
+    students = list(
+        Student.objects.filter(school_class_id=session.school_class_id, status='active')
+        .select_related('school_class__school')
+        .order_by('roll_number', 'student_id')
+    )
+
+    pass_mark = float(getattr(service, 'PASS_MARK', 70.0))
+    results = []
+    for student in students:
+        try:
+            policy, metrics = service._metric_inputs(student)
+            score = float(service.student_score(student))
+            missing = [
+                label for enabled, value, label in (
+                    (getattr(policy, 'requires_attendance', True), metrics.get('attendance_pct'), 'Attendance'),
+                    (getattr(policy, 'requires_quiz', True), metrics.get('quiz_pct'), 'Quiz'),
+                    (getattr(policy, 'requires_practical', True), metrics.get('practical_pct'), 'Practical'),
+                    (getattr(policy, 'requires_trainer_review', True), metrics.get('trainer_review_pct'), 'Trainer review'),
+                )
+                if enabled and value is None
+            ]
+            if missing:
+                state = 'pending'
+                reason = f"Pending: {', '.join(missing)}."
+            elif score >= pass_mark:
+                state = 'passed'
+                reason = f'Eligible for trainer approval at {score:.2f}%.'
+            else:
+                state = 'below_pass_mark'
+                reason = f'Overall score {score:.2f}% is below the {pass_mark:.0f}% minimum.'
+        except Exception:
+            logger.exception('Final-programme evaluation failed for %s', student.student_id)
+            state = 'pending'
+            score = 0.0
+            reason = 'Evaluation is pending because one or more required evaluation values could not be read.'
+            missing = ['Evaluation data']
+
+        results.append({
+            'student_id': student.student_id,
+            'student_name': student.name,
+            'overall_score': score,
+            'state': state,
+            'reason': reason,
+            'missing': missing,
+        })
+
+    passed = sum(item['state'] == 'passed' for item in results)
+    below_pass_mark = sum(item['state'] == 'below_pass_mark' for item in results)
+    pending = sum(item['state'] == 'pending' for item in results)
+    return {
+        'session_id': str(session.id),
+        'evaluated_students': len(results),
+        'passed': passed,
+        'eligible': passed,
+        'below_pass_mark': below_pass_mark,
+        'pending': pending,
+        'failed_or_pending': below_pass_mark + pending,
+        'pass_mark': pass_mark,
+        'results': results,
+    }
+
+
 class TechnologyListCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -159,7 +234,12 @@ class CourseCompletionDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, student_key):
-        return Response(_fallback_registry_row(_student_for(request.user, student_key)))
+        student = _student_for(request.user, student_key)
+        try:
+            return Response(service.summary(student))
+        except Exception:
+            logger.exception('Course completion detail failed for %s', student.student_id)
+            return Response(_fallback_registry_row(student))
 
 
 class CompletionPolicyView(APIView):
@@ -190,8 +270,7 @@ class EvaluateLastSessionView(APIView):
         if request.user.role == UserRole.TRAINER and not accessible_sessions(request.user).filter(pk=session.pk).exists():
             return _error(PermissionError('This session is outside your authorised trainer scope.'), 403)
         try:
-            rows = evaluate_legacy_unit_last_session(session)
-            return Response({'session_id': str(session.id), 'evaluated_students': len(rows), 'passed': sum(row.status == 'passed' for row in rows), 'failed_or_pending': sum(row.status != 'passed' for row in rows)})
+            return Response(_evaluate_final_programme_session(session))
         except ValueError as exc:
             return _error(exc)
 
