@@ -1,7 +1,6 @@
 import logging
 from uuid import UUID
 
-from django.core.exceptions import ValidationError as DjangoValidationError
 from django.shortcuts import get_object_or_404
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -9,7 +8,11 @@ from rest_framework.views import APIView
 
 from accounts.models import UserRole
 from academics.models import SchoolClass, Student
-from academics.services import accessible_class_queryset, accessible_school_queryset, accessible_student_queryset
+from academics.services import (
+    accessible_class_queryset,
+    accessible_school_queryset,
+    accessible_student_queryset,
+)
 from learning import course_completion_final as service
 from learning.certificate_pdf import build_certificate_pdf
 from learning.course_completion_models import Certificate, Technology
@@ -24,12 +27,7 @@ def _error(exc, code=400):
 
 
 def _student_for(user, key):
-    """Resolve a scoped student by UUID primary key or human-facing student_id.
-
-    Student IDs such as ``XYZ6A 01`` are not UUIDs. Do not send those values
-    through the UUIDField lookup because Django can raise ValidationError while
-    coercing the query parameter before the fallback lookup is evaluated.
-    """
+    """Resolve a scoped student by UUID primary key or human-facing student_id."""
     qs = accessible_student_queryset(user).select_related('school_class__school')
     raw = str(key or '').strip()
     if not raw:
@@ -48,12 +46,191 @@ def _student_for(user, key):
     return get_object_or_404(qs, student_id__iexact=raw)
 
 
+def _safe_call(label, fn, default):
+    try:
+        return fn()
+    except Exception:
+        logger.exception('Course completion %s failed', label)
+        return default
+
+
+def _default_policy():
+    return {
+        'id': None,
+        'name': 'Standard Pixiu completion policy',
+        'school_class_id': None,
+        'requires_attendance': True,
+        'requires_quiz': True,
+        'requires_practical': True,
+        'requires_trainer_review': True,
+        'weight_practical': service.WEIGHT_PRACTICAL,
+        'weight_quiz': service.WEIGHT_QUIZ,
+        'weight_attendance': service.WEIGHT_ATTENDANCE,
+        'weight_trainer_review': service.WEIGHT_TRAINER_REVIEW,
+        'min_attendance_pct': 75.0,
+        'min_quiz_pct': 60.0,
+        'min_practical_pct': 70.0,
+        'min_trainer_review_rating': 3.0,
+        'active': True,
+    }
+
+
+def _fallback_summary(student):
+    """Build a real-data summary without allowing one calculation to blank the student."""
+    empty_sessions = []
+    sessions = _safe_call('completed_sessions', lambda: service.completed_sessions(student), empty_sessions)
+    technologies = _safe_call('completed_technologies', lambda: service.completed_technologies(student), [])
+    taught_codes = _safe_call('taught_unit_codes', lambda: service._taught_unit_codes(sessions), set())
+
+    attendance = _safe_call(
+        'attendance_metrics',
+        lambda: service.attendance_metrics(student, sessions),
+        {
+            'percentage': 0.0,
+            'attended': 0,
+            'total': len(sessions),
+            'marked': 0,
+            'missing': [],
+            'complete': False if sessions else True,
+        },
+    )
+    quiz = _safe_call(
+        'quiz_metrics',
+        lambda: service.quiz_metrics(student, taught_codes),
+        {'percentage': 0.0, 'assigned': 0, 'completed': 0, 'missing': [], 'complete': True, 'rows': []},
+    )
+    assessment = _safe_call(
+        'assessment_metrics',
+        lambda: service.assessment_metrics(student, taught_codes),
+        {'practical_pct': 0.0, 'trainer_review_pct': 0.0, 'trainer_review_rating': None},
+    )
+    project = _safe_call(
+        'project_metrics',
+        lambda: service.project_metrics(student),
+        {'complete': False, 'status': None, 'title': None, 'score': None},
+    )
+    final = _safe_call('programme_final_session', lambda: service.programme_final_session(student), None)
+    final_ready = bool(final and _safe_call('final_session_is_latest', lambda: service.final_session_is_latest(student, final), False))
+
+    overall = round(
+        float(assessment.get('practical_pct', 0.0)) * service.WEIGHT_PRACTICAL / 100
+        + float(quiz.get('percentage', 0.0)) * service.WEIGHT_QUIZ / 100
+        + float(attendance.get('percentage', 0.0)) * service.WEIGHT_ATTENDANCE / 100
+        + float(assessment.get('trainer_review_pct', 0.0)) * service.WEIGHT_TRAINER_REVIEW / 100,
+        2,
+    )
+
+    blockers = []
+    if not final_ready:
+        blockers.append('Mark and complete the final programme session; it must be the latest completed session.')
+    if attendance.get('missing'):
+        blockers.append('Attendance is unmarked for: ' + ', '.join(item['topic'] for item in attendance['missing']) + '.')
+    if quiz.get('missing'):
+        blockers.append('Quiz pending for: ' + ', '.join(item['title'] for item in quiz['missing']) + '.')
+    if not project.get('complete'):
+        blockers.append(f"Project is not marked completed (current status: {project.get('status') or 'not submitted'}).")
+    if overall < service.PASS_MARK:
+        blockers.append(f'Overall score is {overall:.2f}%; minimum required is {service.PASS_MARK:.0f}%.')
+
+    programme = _safe_call(
+        'programme_completion_lookup',
+        lambda: __import__('learning.course_completion_models', fromlist=['ProgrammeCompletion']).ProgrammeCompletion.objects.filter(student=student).first(),
+        None,
+    )
+    certificate = _safe_call(
+        'certificate_lookup',
+        lambda: Certificate.objects.filter(student=student, status='issued').order_by('-issued_at').first(),
+        None,
+    )
+    policy = _safe_call(
+        'policy_lookup',
+        lambda: service.serialize_policy(service.policy_for(student.school_class)),
+        _default_policy(),
+    )
+
+    final_payload = {
+        'id': str(final.id),
+        'topic': final.topic,
+        'date': str(final.date),
+        'technology': getattr(getattr(final, 'workflow', None), 'technology', None).name
+        if getattr(getattr(final, 'workflow', None), 'technology', None)
+        else '',
+    } if final else None
+
+    return {
+        'student_id': student.student_id,
+        'student_name': student.name,
+        'school_name': student.school_class.school.name,
+        'school_code': student.school_class.school.school_code,
+        'class_name': student.school_class.display_name,
+        'status': programme.status if programme else 'in_progress',
+        'overall_score': overall,
+        'pass_mark': service.PASS_MARK,
+        'score_breakdown': {
+            'attendance_pct': float(attendance.get('percentage', 0.0)),
+            'quiz_pct': float(quiz.get('percentage', 0.0)),
+            'practical_pct': float(assessment.get('practical_pct', 0.0)),
+            'trainer_review_pct': float(assessment.get('trainer_review_pct', 0.0)),
+            'overall_score': overall,
+            'pass_mark': service.PASS_MARK,
+            'eligible': overall >= service.PASS_MARK,
+        },
+        'required_units': 0,
+        'completed_units': 0,
+        'units': [],
+        'technologies': technologies,
+        'sessions_by_technology': [
+            {
+                'technology': tech['name'],
+                'code': tech['code'],
+                'sessions': sum(
+                    1
+                    for session in sessions
+                    if getattr(getattr(session, 'workflow', None), 'technology', None)
+                    and session.workflow.technology.code == tech['code']
+                ),
+            }
+            for tech in technologies
+        ],
+        'programme_final_session': final_payload,
+        'final_session_ready': final_ready,
+        'trainer_approval_ready': bool(not blockers and not certificate and (programme is None or programme.status == 'in_progress')),
+        'can_issue_certificate': bool(not blockers and not certificate and programme and programme.status == 'trainer_requested'),
+        'certificate_id': certificate.certificate_id if certificate else None,
+        'checklist': {
+            'ready': not blockers,
+            'final_session_ready': final_ready,
+            'attendance_complete': bool(attendance.get('complete')),
+            'quiz_complete': bool(quiz.get('complete')),
+            'project_complete': bool(project.get('complete')),
+            'score_eligible': overall >= service.PASS_MARK,
+            'blockers': blockers,
+            'attendance': attendance,
+            'quiz': quiz,
+            'project': project,
+            'overall_score': overall,
+            'assessment': assessment,
+            'final_session': final_payload,
+            'taught_unit_codes': sorted(taught_codes),
+        },
+        'policy': policy,
+        'project': project,
+        'quizzes': quiz,
+    }
+
+
 def _safe_summary(student):
     try:
-        return service.summary(student)
+        data = service.summary(student)
+        # A successful summary is trusted. An empty technology list alongside
+        # completed sessions is inconsistent with the certificate model, so use
+        # the real-data fallback instead of silently displaying zeros.
+        if service.completed_sessions(student) and not data.get('technologies'):
+            return _fallback_summary(student)
+        return data
     except Exception:
         logger.exception('Course completion summary failed for %s', student.student_id)
-        return {'student_id': student.student_id, 'student_name': student.name, 'school_name': student.school_class.school.name, 'school_code': student.school_class.school.school_code, 'class_name': student.school_class.display_name, 'status': 'in_progress', 'overall_score': 0, 'pass_mark': service.PASS_MARK, 'score_breakdown': {'attendance_pct': 0, 'quiz_pct': 0, 'practical_pct': 0, 'trainer_review_pct': 0, 'overall_score': 0, 'pass_mark': service.PASS_MARK, 'eligible': False}, 'required_units': 0, 'completed_units': 0, 'units': [], 'technologies': [], 'sessions_by_technology': [], 'programme_final_session': None, 'final_session_ready': False, 'trainer_approval_ready': False, 'can_issue_certificate': False, 'certificate_id': None, 'checklist': {'ready': False, 'blockers': ['Completion data is temporarily unavailable. Please refresh and retry.']}, 'project': {'complete': False, 'status': None, 'title': None, 'score': None}, 'quizzes': {'complete': False, 'missing': [], 'rows': []}, 'policy': service.serialize_policy(service.policy_for(student.school_class))}
+        return _fallback_summary(student)
 
 
 class TechnologyListCreateView(APIView):
