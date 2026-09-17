@@ -13,7 +13,8 @@ from .class_ranking import ClassRankingView
 from .api_v1_compat import health
 from .secure_upload import SecureUploadView
 from .assessment_views_v2 import IdempotentAssessmentViewSet
-from .course_completion_views_v5 import ApproveFinalProgrammeView, CertificatePdfView, CompletionPolicyView, CourseCompletionDetailView, CourseCompletionListView, CourseCompletionScopeView, EvaluateLastSessionView, IssueProgrammeCertificateView, PublicCertificatePdfView, TechnologyListCreateView, VerifyProgrammeCertificateView
+from .course_completion_views_v5 import ApproveFinalProgrammeView, CompletionPolicyView, CourseCompletionDetailView, CourseCompletionListView, CourseCompletionScopeView, EvaluateLastSessionView, IssueProgrammeCertificateView, TechnologyListCreateView, VerifyProgrammeCertificateView
+from .certificate_pdf_views_v2 import CertificatePdfViewV2, PublicCertificatePdfViewV2, ScorecardPdfViewV2
 from .course_completion_session_v4 import ProgrammeAwareSessionViewSet
 from .course_completion_compat import cohort_rank
 from .public_enquiry import PublicEnquiryView
@@ -74,8 +75,9 @@ urlpatterns = [
     path('students/credentials/migrate/<uuid:batch_id>/<str:export_format>', AdminStudentCredentialExportView.as_view(), name='v1-student-credential-export'),
     path('students/<uuid:pk>/reset-password', StudentTemporaryPasswordResetView.as_view(), name='v1-student-reset-password'),
     path('certificates/issue/<uuid:student_key>', IssueProgrammeCertificateView.as_view(), name='v1-certificate-issue'),
-    path('certificates/pdf/<str:student_key>', CertificatePdfView.as_view(), name='v1-certificate-pdf'),
-    path('public/certificates/pdf/<str:certificate_id>', PublicCertificatePdfView.as_view(), name='v1-public-certificate-pdf'),
+    path('certificates/pdf/<str:student_key>', CertificatePdfViewV2.as_view(), name='v1-certificate-pdf'),
+    path('certificates/scorecard/<str:student_key>', ScorecardPdfViewV2.as_view(), name='v1-certificate-scorecard-pdf'),
+    path('public/certificates/pdf/<str:certificate_id>', PublicCertificatePdfViewV2.as_view(), name='v1-public-certificate-pdf'),
     path('public/certificates/verify/<str:student_id>', VerifyProgrammeCertificateView.as_view(), name='v1-certificate-verify-legacy'),
     path('public/certificates/verify', VerifyProgrammeCertificateView.as_view(), name='v1-certificate-verify'),
     path('technologies', TechnologyListCreateView.as_view(), name='v1-technologies'),
