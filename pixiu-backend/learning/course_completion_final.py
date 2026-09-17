@@ -190,6 +190,63 @@ def _attach_scorecard_snapshot(certificate):
     return certificate
 
 
+def _certificate_unit_rows(certificate):
+    """Return deduplicated unit rows with the recorded practical score.
+
+    Older certificates stored one row per session and omitted unit scores.
+    This normalises those snapshots at read time so the public verification
+    page and certificate PDF show one row per taught unit with a real session
+    count and, when published, its unit assessment score.
+    """
+    source = certificate.units_snapshot or []
+    if not source:
+        source = (certificate.snapshot or {}).get('units') or []
+
+    cutoff = getattr(certificate.issued_at, 'date', lambda: timezone.localdate())()
+    score_rows = list(
+        StudentAssessment.objects.filter(
+            student=certificate.student,
+            status=AssessmentStatus.PUBLISHED,
+            score__isnull=False,
+            assessment_date__lte=cutoff,
+        ).values('unit_code').annotate(score=Avg('score'))
+    )
+    score_map = {
+        str(row['unit_code']).strip().upper(): float(row['score'])
+        for row in score_rows
+        if row.get('unit_code') and row.get('score') is not None
+    }
+
+    grouped = {}
+    for row in source:
+        if not isinstance(row, dict):
+            continue
+        technology = str(row.get('technology') or row.get('technology_name') or '').strip()
+        unit_code = str(row.get('unit_code') or row.get('code') or '').strip()
+        title = str(row.get('title') or row.get('topic') or 'Technology Unit').strip()
+        key = (technology.lower(), unit_code.upper(), title.lower())
+        item = grouped.setdefault(
+            key,
+            {
+                'technology': technology,
+                'unit_code': unit_code,
+                'title': title,
+                'sessions': 0,
+                'score': None,
+            },
+        )
+        item['sessions'] += int(row.get('sessions') or 1)
+        if row.get('score') is not None:
+            try:
+                item['score'] = float(row['score'])
+            except (TypeError, ValueError):
+                pass
+        if item['score'] is None and unit_code:
+            item['score'] = score_map.get(unit_code.upper())
+
+    return sorted(grouped.values(), key=lambda row: (row['technology'].lower(), row['unit_code'].upper(), row['title'].lower()))
+
+
 def issue_certificate(user, student):
     """Issue the certificate through the canonical engine and freeze ranking."""
     certificate = _engine_issue_certificate(user, student)
@@ -203,6 +260,10 @@ def issue_certificate(user, student):
 def certificate_payload(certificate):
     """Expose public certificate data without private class-ranking rows."""
     data = _engine_certificate_payload(certificate)
+    units = _certificate_unit_rows(certificate)
+    data['units'] = units
+    data['completion_count'] = len(units)
+    data['required_completion_count'] = len(units)
     for key in ('scorecard', 'class_rank', 'class_size'):
         data.pop(key, None)
     rank = certificate.rank
