@@ -15,7 +15,7 @@ from .secure_upload import SecureUploadView
 from .assessment_views_v2 import IdempotentAssessmentViewSet
 from .course_completion_views_v5 import ApproveFinalProgrammeView, CompletionPolicyView, CourseCompletionDetailView, CourseCompletionListView, CourseCompletionScopeView, EvaluateLastSessionView, IssueProgrammeCertificateView, TechnologyListCreateView, VerifyProgrammeCertificateView
 from .certificate_pdf_views_v2 import CertificatePdfViewV2, PublicCertificatePdfViewV2, ScorecardPdfViewV2
-from .cohort_evaluation_views import ClassEvaluationView
+from .cohort_evaluation_views import ClassEvaluationView, StudentProgressReportDataView
 from .course_completion_session_v4 import ProgrammeAwareSessionViewSet
 from .course_completion_compat import cohort_rank
 from .public_enquiry import PublicEnquiryView
@@ -87,6 +87,7 @@ urlpatterns = [
     path('course-completion/<str:student_key>', CourseCompletionDetailView.as_view(), name='v1-course-completion-detail'),
     path('course-completion/policy/<uuid:class_key>', CompletionPolicyView.as_view(), name='v1-course-completion-policy'),
     path('course-completion/class/<uuid:class_key>/evaluation', ClassEvaluationView.as_view(), name='v1-course-completion-class-evaluation'),
+    path('course-completion/student-report/<str:student_key>', StudentProgressReportDataView.as_view(), name='v1-course-completion-student-report'),
     path('course-completion/session/<uuid:session_id>/evaluate', EvaluateLastSessionView.as_view(), name='v1-course-completion-session-evaluate'),
     path('course-completion/<str:student_key>/request', ApproveFinalProgrammeView.as_view(), name='v1-course-completion-request'),
     path('course-completion/<str:student_key>/complete', ApproveFinalProgrammeView.as_view(), name='v1-course-completion-complete'),
