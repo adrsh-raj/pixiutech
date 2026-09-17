@@ -134,6 +134,7 @@ def _attach_scorecard_snapshot(certificate):
     snapshot["scorecard"] = scorecard
     snapshot["class_rank"] = scorecard["class_rank"]
     snapshot["class_size"] = scorecard["class_size"]
+    snapshot["rank_slots"] = scorecard.get("rank_slots", 0)
     snapshot["verification_url"] = f"{PUBLIC_VERIFY_URL}?cert={quote(certificate.certificate_id)}"
     certificate.rank = scorecard["class_rank"]
     certificate.snapshot = snapshot
@@ -212,9 +213,14 @@ def certificate_payload(certificate):
         data.pop(key, None)
     rank = certificate.rank
     class_size = None
+    rank_slots = None
     if isinstance(certificate.snapshot, dict):
         class_size = certificate.snapshot.get("class_size")
-    data["rank_display"] = f"{rank}/{class_size}" if rank and class_size and int(rank) <= 10 else "-"
+        rank_slots = certificate.snapshot.get("rank_slots")
+    allowed = False
+    if rank and class_size:
+        allowed = int(rank) <= int(rank_slots) if rank_slots is not None and int(rank_slots) > 0 else int(rank) <= ceil(int(class_size) * cohort.TOP_RANK_FRACTION)
+    data["rank_display"] = f"{rank}/{class_size}" if allowed else "-"
     data["verification_url"] = f"{PUBLIC_VERIFY_URL}?cert={quote(certificate.certificate_id)}"
     return data
 
