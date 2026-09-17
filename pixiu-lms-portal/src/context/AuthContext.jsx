@@ -5,6 +5,8 @@ import { measurePerformance, markPerformance, recordApiPerformance } from '../li
 const AuthContext = createContext(null);
 const AUTH_EVENT = 'pixiu_auth_state_changed';
 const SESSION_ROLE_KEY = 'pixiu_session_role';
+const AUTH_REQUEST_TIMEOUT_MS = 60000;
+const LOGIN_REQUEST_TIMEOUT_MS = 60000;
 const API_READ_CACHE_TTL_MS = 30 * 1000;
 const API_READ_CACHE_MAX_ENTRIES = 250;
 let accessTokenMemory = null;
@@ -88,18 +90,31 @@ async function fetchWithRetry(url, options = {}) {
   if (lastResponse) return lastResponse;
   throw lastError || new Error('Request failed.');
 }
+async function authPostWithRetry(url, options = {}) {
+  let lastError = null;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    if (attempt) await new Promise(resolve => setTimeout(resolve, 1500));
+    try {
+      return await fetchOnce(url, options, AUTH_REQUEST_TIMEOUT_MS);
+    } catch (error) {
+      lastError = error;
+      if (error?.name !== 'AbortError' || attempt === 1) throw error;
+    }
+  }
+  throw lastError || new Error('Authentication request failed.');
+}
 async function refreshAccessToken(roleHint = null) {
   if (refreshPromise) return refreshPromise;
   const role = String(roleHint || getSessionRole() || '').trim().toLowerCase();
   refreshPromise = (async () => {
     try {
-      const response = await fetchOnce(`${API_BASE}/auth/refresh/`, {
+      const response = await authPostWithRetry(`${API_BASE}/auth/refresh/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: role || undefined }),
         cache: 'no-store',
         credentials: 'include',
-      }, 20000);
+      });
       const data = await readJson(response);
       if (!response.ok || !data.access) return null;
       accessTokenMemory = data.access;
@@ -137,9 +152,10 @@ export async function apiFetch(path, options = {}) {
   };
   let response = await request(accessTokenMemory);
   if (response.status === 401 && !String(path).startsWith('/auth/')) {
+    const previousToken = accessTokenMemory;
     const nextToken = await refreshAccessToken(getSessionRole());
     if (nextToken) response = await request(nextToken);
-    else { clearAuthStorage(); broadcastAuthChange(); }
+    else accessTokenMemory = previousToken;
   }
   if (response.ok && !['GET', 'HEAD'].includes(method)) clearApiReadCache();
   return response;
@@ -173,7 +189,7 @@ export function AuthProvider({ children }) {
         if (!data.user?.id || !data.user?.role) throw new Error('Invalid session response');
         if (active) { accessTokenMemory = access; setToken(access); setUser(data.user); setSessionRole(data.user.role); }
       } catch {
-        clearAuthStorage();
+        clearAuthStorage({ clearRole: false });
         if (active) { setToken(null); setUser(null); }
       } finally { if (active) setLoading(false); }
     };
@@ -200,14 +216,14 @@ export function AuthProvider({ children }) {
     const body = JSON.stringify({ username: cleanUsername, password: cleanPassword, role: expectedRole || undefined, turnstile_token: turnstileToken || undefined });
     markPerformance('login.e2e.start');
     try {
-      const response = await fetchOnce(`${API_BASE}/auth/login/`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, cache: 'no-store', credentials: 'include' }, 25000);
+      const response = await fetchOnce(`${API_BASE}/auth/login/`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, cache: 'no-store', credentials: 'include' }, LOGIN_REQUEST_TIMEOUT_MS);
       const data = await readJson(response);
       if (response.ok && data.access && data.user) {
         clearApiReadCache(); accessTokenMemory = data.access; setToken(data.access); setUser(data.user); setSessionRole(data.user.role); broadcastAuthChange(); measurePerformance('login.e2e', 'login.e2e.start'); return { success: true, user: data.user };
       }
       measurePerformance('login.e2e.failed', 'login.e2e.start'); return { success: false, error: data.detail || data.error || 'Invalid username or password.' };
     } catch (error) {
-      measurePerformance('login.e2e.failed', 'login.e2e.start'); return { success: false, error: error?.name === 'AbortError' ? 'Authentication service is taking too long to respond. Please try again.' : 'Authentication service is temporarily unavailable. Please try again.' };
+      measurePerformance('login.e2e.failed', 'login.e2e.start'); return { success: false, error: error?.name === 'AbortError' ? 'Authentication service is taking too long to respond. Please wait a little longer and try again.' : 'Authentication service is temporarily unavailable. Please try again.' };
     }
   };
   const logout = async () => {
