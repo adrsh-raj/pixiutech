@@ -16,6 +16,7 @@ from django.utils import timezone
 from accounts.models import UserRole
 from academics.models import Student
 from audit.models import AuditAction
+from audit.services import record_audit
 
 from . import cohort_evaluation as cohort
 from . import course_completion_v6 as _engine
@@ -92,8 +93,6 @@ def assessment_metrics(student, taught_unit_codes=None):
     }
 
 
-# Keep the v6 engine's internal score_data()/checklist() aligned with the
-# canonical records used by the leaderboard and cohort evaluation.
 _engine.quiz_metrics = quiz_metrics
 _engine.assessment_metrics = assessment_metrics
 
