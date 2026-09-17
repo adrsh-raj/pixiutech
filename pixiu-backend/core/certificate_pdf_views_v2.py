@@ -34,7 +34,7 @@ def _scoped_student(user, key):
 
 
 class CertificatePdfViewV2(APIView):
-    """Authenticated official certificate PDF using the certificate-size layout."""
+    """Authenticated official certificate PDF using the A4 landscape layout."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request, student_key):
@@ -46,7 +46,7 @@ class CertificatePdfViewV2(APIView):
 
 
 class PublicCertificatePdfViewV2(APIView):
-    """Public certificate PDF. The certificate ID is the only lookup key."""
+    """Public A4 certificate PDF. The certificate ID is the only lookup key."""
     permission_classes = [AllowAny]
 
     def get(self, request, certificate_id):
@@ -60,7 +60,7 @@ class PublicCertificatePdfViewV2(APIView):
 
 
 class ScorecardPdfViewV2(APIView):
-    """Authenticated A4 scorecard containing the student's rank and top-10 class ranking."""
+    """Authenticated A4 scorecard containing the student's rank and top-25-percent passed ranking."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request, student_key):
