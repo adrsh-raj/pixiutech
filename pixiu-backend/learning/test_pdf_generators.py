@@ -2,8 +2,9 @@ from types import SimpleNamespace
 
 from django.test import SimpleTestCase
 from django.utils import timezone
+from reportlab.lib.pagesizes import A4, landscape
 
-from .certificate_pdf_v2 import CERTIFICATE_SIZE, build_certificate_pdf
+from .certificate_pdf import CERTIFICATE_SIZE, build_certificate_pdf
 from .scorecard_pdf import build_scorecard_pdf
 
 
@@ -30,8 +31,8 @@ class PdfGeneratorTests(SimpleTestCase):
             },
         )
 
-    def test_certificate_is_certificate_size(self):
-        self.assertEqual(CERTIFICATE_SIZE, (792.0, 612.0))
+    def test_certificate_is_a4_landscape(self):
+        self.assertEqual(CERTIFICATE_SIZE, landscape(A4))
         response = build_certificate_pdf(self.certificate)
         self.assertEqual(response['Content-Type'], 'application/pdf')
         self.assertTrue(response.content.startswith(b'%PDF'))
