@@ -40,6 +40,11 @@ function formatDate(value) {
   }).format(date)
 }
 
+function formatScore(value) {
+  const number = Number(value)
+  return Number.isFinite(number) ? `${number.toFixed(2)}%` : '—'
+}
+
 export default function Verify() {
   const initialCertificate = useMemo(() => {
     const params = new URLSearchParams(window.location.search)
@@ -57,7 +62,7 @@ export default function Verify() {
     setResult(null)
 
     if (!key) {
-      setError('Enter the certificate ID printed on the certificate.')
+      setError('Enter the certificate ID printed on the credential.')
       return
     }
 
@@ -110,6 +115,7 @@ export default function Verify() {
     : Array.isArray(result?.completed_technologies)
       ? result.completed_technologies
       : []
+  const units = Array.isArray(result?.units) ? result.units : []
 
   return (
     <div className="verify-page">
@@ -199,7 +205,7 @@ export default function Verify() {
                   <div className="verify-stat-row">
                     <div>
                       <span>Overall score</span>
-                      <strong>{result.overall_score != null ? `${result.overall_score}%` : '—'}</strong>
+                      <strong>{formatScore(result.overall_score)}</strong>
                     </div>
                     <div>
                       <span>Issued</span>
@@ -236,12 +242,8 @@ export default function Verify() {
                     </strong>
                   </div>
                   <div>
-                    <span>Completion</span>
-                    <strong>
-                      {result.completion_count != null && result.required_completion_count != null
-                        ? `${result.completion_count}/${result.required_completion_count}`
-                        : 'Recorded'}
-                    </strong>
+                    <span>Completed units</span>
+                    <strong>{result.completion_count != null ? `${result.completion_count}${result.required_completion_count != null ? ` / ${result.required_completion_count}` : ''}` : units.length || 'Recorded'}</strong>
                   </div>
                   <div>
                     <span>Attendance</span>
@@ -253,6 +255,41 @@ export default function Verify() {
                   </div>
                 </div>
               </div>
+
+              {verified && units.length > 0 && (
+                <div className="verify-card verify-card--wide">
+                  <div className="verify-wide-head">
+                    <div>
+                      <span className="verify-card-label">Completed Technology Units</span>
+                      <h3>Unit-wise completion and scores</h3>
+                    </div>
+                    <span className="verify-card-label">{units.length} unique units</span>
+                  </div>
+                  <div style={{ overflowX: 'auto', marginTop: 18 }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 650, fontSize: 12 }}>
+                      <thead>
+                        <tr style={{ background: '#F5F8FC' }}>
+                          {['Technology', 'Unit', 'Module', 'Sessions', 'Score'].map((heading) => (
+                            <th key={heading} style={{ padding: '12px 14px', textAlign: heading === 'Score' || heading === 'Sessions' ? 'center' : 'left', borderBottom: '1px solid #D9E2EE', color: '#64748B', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.12em' }}>{heading}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {units.map((unit, index) => (
+                          <tr key={`${unit.unit_code || 'unit'}-${index}`}>
+                            <td style={{ padding: '13px 14px', fontWeight: 800, borderBottom: '1px solid #EDF1F6' }}>{text(unit.technology) || '—'}</td>
+                            <td style={{ padding: '13px 14px', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 11, color: '#1768FF', borderBottom: '1px solid #EDF1F6' }}>{text(unit.unit_code) || '—'}</td>
+                            <td style={{ padding: '13px 14px', borderBottom: '1px solid #EDF1F6' }}>{text(unit.title) || '—'}</td>
+                            <td style={{ padding: '13px 14px', textAlign: 'center', fontWeight: 800, borderBottom: '1px solid #EDF1F6' }}>{unit.sessions ?? '—'}</td>
+                            <td style={{ padding: '13px 14px', textAlign: 'center', fontWeight: 900, color: '#071A33', borderBottom: '1px solid #EDF1F6' }}>{formatScore(unit.score)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p style={{ margin: '14px 0 0', color: '#94A3B8', fontSize: 10 }}>Unit scores are sourced from published LMS practical assessments; the overall programme score is the official weighted result.</p>
+                </div>
+              )}
 
               <div className="verify-trust">
                 <div>
