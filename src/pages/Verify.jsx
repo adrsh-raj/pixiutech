@@ -27,6 +27,7 @@ function normalizeApiBase(value) {
 }
 
 const API_BASE = normalizeApiBase(import.meta.env.VITE_API_URL || import.meta.env.VITE_DJANGO_API_URL)
+const TOKEN_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 function formatDate(value) {
   if (!value) return '—'
@@ -67,8 +68,7 @@ export default function Verify() {
 
     setLoading(true)
     try {
-      const isToken = key !== key.toUpperCase() && key.length > 30
-      const queryName = isToken ? 'token' : 'cert'
+      const queryName = TOKEN_PATTERN.test(key) ? 'token' : 'cert'
       const url = `${API_BASE}/public/certificates/verify?${queryName}=${encodeURIComponent(key)}`
       const response = await fetch(url, {
         method: 'GET',
@@ -105,6 +105,11 @@ export default function Verify() {
   const pdfUrl = resolvedCertificateId && API_BASE
     ? `${API_BASE}/public/certificates/pdf/${encodeURIComponent(resolvedCertificateId)}`
     : ''
+  const technologies = Array.isArray(result?.technologies)
+    ? result.technologies
+    : Array.isArray(result?.completed_technologies)
+      ? result.completed_technologies
+      : []
 
   return (
     <div className="verify-page">
@@ -225,8 +230,8 @@ export default function Verify() {
                   <div>
                     <span>Technologies completed</span>
                     <strong>
-                      {Array.isArray(result.technologies) && result.technologies.length
-                        ? result.technologies.map((item) => text(item?.name || item?.technology || item)).filter(Boolean).join(' · ')
+                      {technologies.length
+                        ? technologies.map((item) => text(item?.name || item?.technology || item)).filter(Boolean).join(' · ')
                         : '—'}
                     </strong>
                   </div>
