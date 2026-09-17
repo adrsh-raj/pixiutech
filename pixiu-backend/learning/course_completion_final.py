@@ -118,17 +118,20 @@ def approve_programme(user, student):
         raise ValueError('Programme is not ready: ' + ' '.join(state['blockers']))
 
     with transaction.atomic():
-        programme, _ = ProgrammeCompletion.objects.select_for_update().get_or_create(student=student)
+        programme, created = ProgrammeCompletion.objects.select_for_update().get_or_create(student=student)
         programme.status = 'trainer_requested'
         programme.overall_score = state['overall_score']
         programme.requested_by = user
         programme.requested_at = timezone.now()
         programme.completed_by = None
         programme.completed_at = None
-        programme.save(update_fields=[
-            'status', 'overall_score', 'requested_by', 'requested_at',
-            'completed_by', 'completed_at', 'updated_at',
-        ])
+        if created:
+            programme.save()
+        else:
+            programme.save(update_fields=[
+                'status', 'overall_score', 'requested_by', 'requested_at',
+                'completed_by', 'completed_at', 'updated_at',
+            ])
 
     try:
         record_audit(
