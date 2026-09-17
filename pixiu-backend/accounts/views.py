@@ -29,14 +29,19 @@ def _refresh_cookie_name(role):
 
 
 def _request_refresh_role(request):
-    """Resolve the browser/tab's refresh-session role.
+    """Resolve the refresh-session role without relying on a custom CORS header.
 
-    The role is carried in sessionStorage by the frontend and sent as a
-    harmless header. The HttpOnly cookie itself remains the credential. For a
-    single-role browser session we also support a headerless fallback so a
-    first page load after deployment can recover cleanly.
+    The frontend stores the active portal role in tab-local sessionStorage and
+    sends it in the JSON request body. A header is retained as a backwards-
+    compatibility fallback for already deployed clients. Finally, when there
+    is exactly one role cookie present, infer that role for legacy sessions.
     """
-    requested = str(request.headers.get('X-Pixiu-Session-Role') or '').strip().lower()
+    raw_body_role = None
+    try:
+        raw_body_role = request.data.get('role')
+    except Exception:
+        pass
+    requested = str(raw_body_role or request.headers.get('X-Pixiu-Session-Role') or '').strip().lower()
     if requested in _REFRESH_ROLES:
         return requested
     present = [role for role in _REFRESH_ROLES if request.COOKIES.get(_refresh_cookie_name(role))]
