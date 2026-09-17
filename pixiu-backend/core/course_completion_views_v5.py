@@ -1,5 +1,7 @@
 import logging
+from uuid import UUID
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.shortcuts import get_object_or_404
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -22,8 +24,28 @@ def _error(exc, code=400):
 
 
 def _student_for(user, key):
+    """Resolve a scoped student by UUID primary key or human-facing student_id.
+
+    Student IDs such as ``XYZ6A 01`` are not UUIDs. Do not send those values
+    through the UUIDField lookup because Django can raise ValidationError while
+    coercing the query parameter before the fallback lookup is evaluated.
+    """
     qs = accessible_student_queryset(user).select_related('school_class__school')
-    return qs.filter(pk=key).first() or get_object_or_404(qs, student_id__iexact=str(key).strip())
+    raw = str(key or '').strip()
+    if not raw:
+        raise get_object_or_404(qs, student_id__iexact=raw)
+
+    try:
+        uuid_key = UUID(raw)
+    except (ValueError, TypeError, AttributeError):
+        uuid_key = None
+
+    if uuid_key is not None:
+        student = qs.filter(pk=uuid_key).first()
+        if student is not None:
+            return student
+
+    return get_object_or_404(qs, student_id__iexact=raw)
 
 
 def _safe_summary(student):
