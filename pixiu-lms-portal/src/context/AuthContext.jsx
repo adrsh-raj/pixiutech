@@ -121,8 +121,13 @@ async function refreshAccessToken(roleHint = null) {
   refreshPromise = (async () => {
     try {
       const headers = { 'Content-Type': 'application/json' };
-      if (role) headers['X-Pixiu-Session-Role'] = role;
-      const response = await fetchOnce(`${API_BASE}/auth/refresh/`, { method: 'POST', headers, body: JSON.stringify({}), cache: 'no-store', credentials: 'include' }, 20000);
+      const response = await fetchOnce(`${API_BASE}/auth/refresh/`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ role: role || undefined }),
+        cache: 'no-store',
+        credentials: 'include',
+      }, 20000);
       const data = await readJson(response);
       if (!response.ok || !data.access) {
         accessTokenMemory = null;
@@ -293,9 +298,13 @@ export function AuthProvider({ children }) {
   const logout = async () => {
     const role = user?.role || getSessionRole();
     try {
-      const headers = { 'Content-Type': 'application/json' };
-      if (role) headers['X-Pixiu-Session-Role'] = role;
-      await fetchOnce(`${API_BASE}/auth/logout/`, { method: 'POST', headers, body: JSON.stringify({}), cache: 'no-store', credentials: 'include' }, 15000);
+      await fetchOnce(`${API_BASE}/auth/logout/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: role || undefined }),
+        cache: 'no-store',
+        credentials: 'include',
+      }, 15000);
     } catch {}
     finally {
       setUser(null);
