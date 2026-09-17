@@ -2,7 +2,8 @@
 
 All completion views import this module. The v6 engine remains the single
 source of truth for programme/final-session/certificate state; this wrapper
-normalises score inputs to the same activity records used by the leaderboard.
+normalises score inputs and keeps certificate ranking/scorecards tied to the
+same server-side score calculation.
 """
 
 import logging
@@ -12,22 +13,21 @@ from django.db.models import Avg, Max
 from django.utils import timezone
 
 from accounts.models import UserRole
+from academics.models import Student
 from audit.models import AuditAction
-from audit.services import record_audit
 
 from . import course_completion_v6 as _engine
 from .models import AssessmentStatus, Quiz, QuizAttempt, StudentAssessment
-from .course_completion_models import ProgrammeCompletion
+from .course_completion_models import Certificate, ProgrammeCompletion
 
 logger = logging.getLogger(__name__)
 
 
 def quiz_metrics(student, taught_unit_codes=None):
-    """Calculate quiz score from the student's actual completed attempts.
+    """Calculate quiz score from actual completed attempts.
 
-    Course Completion uses the same completed-attempt score source as the
-    leaderboard so a valid attempt cannot become 0 merely because a quiz's
-    curriculum-unit code differs from the session's code.
+    Course Completion uses the best completed attempt per quiz, matching the
+    score source used by the certificate and scorecard.
     """
     completed_attempts = list(
         QuizAttempt.objects.filter(student=student, status="completed")
@@ -68,7 +68,7 @@ def quiz_metrics(student, taught_unit_codes=None):
 
 
 def assessment_metrics(student, taught_unit_codes=None):
-    """Use the same published practical/review records as class ranking."""
+    """Use the published practical/review records as the score source."""
     practical = StudentAssessment.objects.filter(
         student=student,
         status=AssessmentStatus.PUBLISHED,
@@ -87,8 +87,6 @@ def assessment_metrics(student, taught_unit_codes=None):
 
 
 # Patch the engine's global helpers before re-exporting its public functions.
-# score_data(), checklist(), evaluate_final_programme(), and certificate flows
-# therefore all consume the same activity records as the leaderboard.
 _engine.quiz_metrics = quiz_metrics
 _engine.assessment_metrics = assessment_metrics
 
@@ -99,17 +97,124 @@ from .course_completion_v6 import (
     WEIGHT_PRACTICAL,
     WEIGHT_QUIZ,
     WEIGHT_TRAINER_REVIEW,
+    certificate_payload as _engine_certificate_payload,
+    issue_certificate as _engine_issue_certificate,
 )  # noqa: E402,F401
 
 
-def approve_programme(user, student):
-    """Perform the trainer approval as one controlled state transition.
+def _student_score_row(student):
+    _sessions, _taught_codes, attendance, quiz, assessment, overall = score_data(student)
+    return {
+        'student_id': student.student_id,
+        'student_name': student.name,
+        'roll_number': student.roll_number,
+        'attendance_pct': float(attendance.get('percentage', 0.0)),
+        'quiz_pct': float(quiz.get('percentage', 0.0)),
+        'practical_pct': float(assessment.get('practical_pct', 0.0)),
+        'trainer_review_pct': float(assessment.get('trainer_review_pct', 0.0)),
+        'overall_score': float(overall),
+    }
 
-    The certification gate is evaluated before writing anything. The programme
-    row is then updated transactionally. Audit logging is deliberately
-    non-blocking so an audit persistence problem can never turn a successful
-    approval into an HTTP 500.
-    """
+
+def class_ranking_data(student):
+    """Build the deterministic class ranking from the certificate score engine."""
+    students = list(
+        Student.objects.filter(
+            school_class_id=student.school_class_id,
+            status='active',
+        ).select_related('school_class__school').only(
+            'id', 'student_id', 'name', 'roll_number', 'school_class',
+        )
+    )
+    rows = [_student_score_row(peer) for peer in students]
+    rows.sort(
+        key=lambda row: (
+            -row['overall_score'],
+            -row['attendance_pct'],
+            row['roll_number'] if row['roll_number'] is not None else 10**9,
+            str(row['student_id']),
+        )
+    )
+    class_size = len(rows)
+    for index, row in enumerate(rows, start=1):
+        row['rank'] = index
+        row['rank_display'] = f'{index}/{class_size}' if index <= 10 else '-'
+
+    current = next((row for row in rows if str(row['student_id']) == str(student.student_id)), None)
+    top10 = [
+        {
+            'rank': row['rank'],
+            'rank_display': row['rank_display'],
+            'student_id': row['student_id'],
+            'student_name': row['student_name'],
+            'overall_score': row['overall_score'],
+        }
+        for row in rows[:10]
+    ]
+    return {
+        'class_size': class_size,
+        'class_rank': current['rank'] if current else None,
+        'rank_display': current['rank_display'] if current else '-',
+        'top10_ranking': top10,
+        'attendance_pct': current['attendance_pct'] if current else 0.0,
+        'quiz_pct': current['quiz_pct'] if current else 0.0,
+        'practical_pct': current['practical_pct'] if current else 0.0,
+        'trainer_review_pct': current['trainer_review_pct'] if current else 0.0,
+    }
+
+
+def scorecard_data(certificate):
+    """Return the frozen A4 scorecard data for an issued certificate."""
+    stored = dict(certificate.snapshot or {})
+    stored_scorecard = stored.get('scorecard') if isinstance(stored.get('scorecard'), dict) else None
+    if stored_scorecard:
+        data = dict(stored_scorecard)
+        data.setdefault('class_size', 0)
+        data.setdefault('class_rank', certificate.rank)
+        rank = data.get('class_rank')
+        class_size = int(data.get('class_size') or 0)
+        data['rank_display'] = f'{rank}/{class_size}' if rank and class_size and int(rank) <= 10 else '-'
+        return data
+    return class_ranking_data(certificate.student)
+
+
+def _attach_scorecard_snapshot(certificate):
+    scorecard = class_ranking_data(certificate.student)
+    snapshot = dict(certificate.snapshot or {})
+    snapshot['scorecard'] = scorecard
+    snapshot['class_rank'] = scorecard['class_rank']
+    snapshot['class_size'] = scorecard['class_size']
+    certificate.rank = scorecard['class_rank']
+    certificate.snapshot = snapshot
+    certificate.save(update_fields=['rank', 'snapshot'])
+    return certificate
+
+
+def issue_certificate(user, student):
+    """Issue the certificate through the canonical engine and freeze ranking."""
+    certificate = _engine_issue_certificate(user, student)
+    try:
+        return _attach_scorecard_snapshot(certificate)
+    except Exception:
+        logger.exception('Scorecard snapshot generation failed for %s', student.student_id)
+        return certificate
+
+
+def certificate_payload(certificate):
+    """Expose public certificate data without private class-ranking rows."""
+    data = _engine_certificate_payload(certificate)
+    for key in ('scorecard', 'class_rank', 'class_size'):
+        data.pop(key, None)
+    rank = certificate.rank
+    class_size = None
+    if isinstance(certificate.snapshot, dict):
+        class_size = certificate.snapshot.get('class_size')
+    data['rank_display'] = f'{rank}/{class_size}' if rank and class_size and int(rank) <= 10 else '-'
+    return data
+
+
+def approve_programme(user, student):
+    """Perform trainer approval as one controlled state transition."""
     if user.role != UserRole.TRAINER:
         raise PermissionError('Only a trainer can approve the final programme session.')
     ensure_scope(user, student)
