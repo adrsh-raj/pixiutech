@@ -20,7 +20,7 @@ function openPrint(title, body) {
   try { popup.opener = null; } catch (_) { /* browser may already isolate the opener */ }
   popup.document.open();
   popup.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>
-  @page{size:A4;margin:12mm 14mm}*{box-sizing:border-box}body{margin:0;color:#0f172a;background:#fff;font-family:Segoe UI,Arial,sans-serif;font-size:11px;line-height:1.45}.toolbar{max-width:900px;margin:0 auto 12px;display:flex;justify-content:flex-end;gap:8px}.btn{border:0;border-radius:9px;padding:8px 13px;font-size:11px;font-weight:800;cursor:pointer}.print{background:#1768ff;color:#fff}.close{background:#eef2f7;color:#334155}.sheet{max-width:900px;margin:0 auto;border:2px solid #0a1a33;border-radius:14px;padding:24px}.header{display:flex;align-items:center;justify-content:space-between;gap:20px;border-bottom:2px solid #1768ff;padding-bottom:16px}.brand-title{font-size:23px;font-weight:900;letter-spacing:.4px}.brand-title span{color:#1768ff}.muted{color:#64748b}.badge{padding:5px 9px;border-radius:999px;font-weight:900;font-size:9px;text-transform:uppercase;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}.profile,.kpis{display:grid;gap:10px}.profile{grid-template-columns:1fr 1fr;margin-top:16px}.card{border:1px solid #e2e8f0;border-radius:10px;padding:11px;background:#fff}.label{font-size:8px;text-transform:uppercase;font-weight:900;letter-spacing:.14em;color:#64748b}.value{font-size:12px;font-weight:800}.kpis{grid-template-columns:repeat(4,1fr);margin-top:14px}.kpi{text-align:center;border:1px solid #dbe3ef;border-radius:10px;padding:10px}.kpi .n{font-size:17px;font-weight:900;color:#1768ff;margin-top:2px}.section{margin-top:18px}.section h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid #dbe3ef;padding-bottom:5px;margin:0 0 8px}.table{width:100%;border-collapse:collapse;font-size:9.5px}.table th{background:#0a1a33;color:#fff;text-align:left;padding:7px}.table td{border:1px solid #e2e8f0;padding:7px;vertical-align:top}.pill{display:inline-block;padding:2px 6px;border-radius:5px;font-weight:800;font-size:8px;text-transform:uppercase;background:#f1f5f9;color:#475569}.verified{background:#ecfdf5;color:#047857;border:1px solid #a7f3d0}.pending{background:#fff7ed;color:#9a3412;border:1px solid #fed7aa}.sig{display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-top:26px}.line{border-top:1px solid #94a3b8;padding-top:6px;font-weight:800}.footer{text-align:center;border-top:1px dashed #cbd5e1;margin-top:16px;padding-top:9px;color:#94a3b8;font-size:8px}@media print{.toolbar{display:none}.sheet{border:0;padding:0}}
+  @page{size:A4;margin:12mm 14mm}*{box-sizing:border-box}body{margin:0;color:#0f172a;background:#fff;font-family:Segoe UI,Arial,sans-serif;font-size:11px;line-height:1.45}.toolbar{max-width:900px;margin:0 auto 12px;display:flex;justify-content:flex-end;gap:8px}.btn{border:0;border-radius:9px;padding:8px 13px;font-size:11px;font-weight:800;cursor:pointer}.print{background:#1768ff;color:#fff}.close{background:#eef2f7;color:#334155}.sheet{max-width:900px;margin:0 auto;border:2px solid #0a1a33;border-radius:14px;padding:24px}.header{display:flex;align-items:center;justify-content:space-between;gap:20px;border-bottom:2px solid #1768ff;padding-bottom:16px}.brand-title{font-size:23px;font-weight:900;letter-spacing:.4px}.brand-title span{color:#1768ff}.muted{color:#64748b}.badge{padding:5px 9px;border-radius:999px;font-weight:900;font-size:9px;text-transform:uppercase;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}.profile,.kpis{display:grid;gap:10px}.profile{grid-template-columns:1fr 1fr;margin-top:16px}.card{border:1px solid #e2e8f0;border-radius:10px;padding:11px;background:#fff}.label{font-size:8px;text-transform:uppercase;font-weight:900;letter-spacing:.14em;color:#64748b}.value{font-size:12px;font-weight:800}.kpis{grid-template-columns:repeat(4,1fr);margin-top:14px}.kpi{text-align:center;border:1px solid #dbe3ef;border-radius:10px;padding:10px}.kpi .n{font-size:17px;font-weight:900;color:#1768ff;margin-top:2px}.section{margin-top:18px}.section h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid #dbe3ef;padding-bottom:5px;margin:0 0 8px}.table{width:100%;border-collapse:collapse;font-size:9.5px}.table th{background:#0a1a33;color:#fff;text-align:left;padding:7px}.table td{border:1px solid #e2e8f0;padding:7px;vertical-align:top}.pill{display:inline-block;padding:2px 6px;border-radius:5px;font-weight:800;font-size:8px;text-transform:uppercase;background:#f1f5f9;color:#475569}.verified{background:#ecfdf5;color:#047857;border:1px solid #a7f3d0}.failed{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}.pending{background:#fff7ed;color:#9a3412;border:1px solid #fed7aa}.sig{display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-top:26px}.line{border-top:1px solid #94a3b8;padding-top:6px;font-weight:800}.footer{text-align:center;border-top:1px dashed #cbd5e1;margin-top:16px;padding-top:9px;color:#94a3b8;font-size:8px}@media print{.toolbar{display:none}.sheet{border:0;padding:0}}
   </style></head><body><div class="toolbar"><button class="btn close" onclick="window.close()">Close</button><button class="btn print" onclick="window.print()">Print / Save PDF</button></div>${body}<script>window.focus();</script></body></html>`);
   popup.document.close();
   popup.focus();
@@ -39,27 +39,72 @@ function unitRowsFor({ student, studentReviews = [], curriculum = [] }) {
           status: row.status || 'published',
         }))
     : [];
-  const units = curriculumRows;
   const reviews = (studentReviews || []).filter(row => sameStudent(row, student));
-  return units.map(unit => {
+  return curriculumRows.map(unit => {
     const candidates = reviews.filter(row => norm(row.level) === norm(unit.level) || norm(row.unit_code || row.unitCode) === norm(unit.unit_code));
     const review = candidates[0] || null;
     return { ...unit, review, score: score10(review), status: review?.status || 'Pending Evaluation' };
   });
 }
 
-export function generateStudentProgressPDF({ student, school, attendanceRate = 0, studentReviews = [], projects = [], curriculum = [] } = {}) {
+function completionRows(completion) {
+  const units = Array.isArray(completion?.units) ? completion.units : [];
+  return units.map((unit, index) => ({
+    level: unit.level || 'Programme',
+    unit_code: unit.unit_code || `UNIT-${index + 1}`,
+    title: unit.title || unit.topic || 'Learning Unit',
+    score: unit.score == null ? null : Number(unit.score) / 10,
+    raw_score: unit.score == null ? null : Number(unit.score),
+    sessions: Number(unit.completed_sessions ?? unit.sessions_count ?? 0),
+    sessions_count: Number(unit.sessions_count ?? 0),
+    status: unit.status === 'passed' || unit.status === 'failed' ? unit.status : 'pending',
+    technology: unit.technology || 'Technology',
+    feedback: Array.isArray(unit.reasons) && unit.reasons.length ? unit.reasons.join(' ') : '',
+  }));
+}
+
+export function generateStudentProgressPDF({ student, school, attendanceRate = 0, studentReviews = [], projects = [], curriculum = [], completion = null } = {}) {
   if (!student || typeof window === 'undefined') return;
-  const rows = unitRowsFor({ student, studentReviews, curriculum });
-  const evaluated = rows.filter(row => row.score !== null && norm(row.status) !== 'draft');
-  const totalScore = evaluated.reduce((sum, row) => sum + row.score, 0);
+
+  const serverRows = completionRows(completion);
+  const usingServer = Boolean(completion && Array.isArray(completion.units));
+  const rows = usingServer ? serverRows : unitRowsFor({ student, studentReviews, curriculum });
+  const evaluated = usingServer
+    ? rows.filter(row => row.status !== 'pending' && row.raw_score !== null)
+    : rows.filter(row => row.score !== null && norm(row.status) !== 'draft');
+  const serverScore = completion?.overall_score == null ? null : Number(completion.overall_score);
+  const totalScore = serverScore != null ? serverScore : evaluated.reduce((sum, row) => sum + row.score, 0);
+  const totalPossible = usingServer ? rows.length * 100 : rows.length * 10;
   const projectsForStudent = (projects || []).filter(project => sameStudent(project, student));
   const grade = gradeOf(student);
+  const effectiveAttendance = completion?.attendance?.percentage ?? completion?.checklist?.attendance?.percentage ?? attendanceRate;
+  const evaluationState = completion?.evaluation_state || completion?.state || (serverScore != null && serverScore >= 70 ? 'passed' : 'pending');
+  const stateLabel = evaluationState === 'passed' ? 'Passed' : evaluationState === 'not_passed' ? 'Not Passed' : 'Evaluation Pending';
+  const stateClass = evaluationState === 'passed' ? 'verified' : evaluationState === 'not_passed' ? 'failed' : 'pending';
+
   const reviewRows = rows.length
-    ? rows.map(row => `<tr><td><b>${esc(row.level)}</b></td><td>${esc(row.unit_code)}</td><td><b>${esc(row.title)}</b></td><td>${row.score === null ? '<span class="pill pending">Pending</span>' : `<b>${row.score.toFixed(1)}/10</b>`}</td><td><span class="pill ${row.score !== null ? 'verified' : 'pending'}">${esc(row.status)}</span></td><td>${esc(row.review?.feedback || (row.score === null ? 'Trainer evaluation pending.' : 'Competency evaluated and recorded in the LMS.'))}</td></tr>`).join('')
-    : '<tr><td colspan="6" style="text-align:center;color:#94a3b8">No published curriculum units are assigned to this student\'s grade.</td></tr>';
-  const projectRows = projectsForStudent.length ? projectsForStudent.map(project => `<tr><td>${esc(project.title || 'Project')}</td><td>${esc(project.score ?? '—')}</td><td><span class="pill ${norm(project.status) === 'completed' ? 'verified' : ''}">${esc(project.status || '—')}</span></td><td>${esc(project.trainer_feedback || project.description || '—')}</td></tr>`).join('') : '<tr><td colspan="4" style="text-align:center;color:#94a3b8">No project records recorded.</td></tr>';
-  const body = `<div class="sheet"><div class="header"><div><div class="brand-title">PIXIU <span>TECH</span></div><div class="muted">Robotics • AI • IoT • STEM Education</div></div><div style="text-align:right"><span class="badge">Student Progress Report</span><div class="muted" style="margin-top:5px">Report ID: ${esc(student.student_id || student.id || '—')}</div></div></div><div style="text-align:center;margin:16px 0"><h1 style="margin:0;font-size:19px;text-transform:uppercase">STEM & Robotics Laboratory Progress Report</h1><p class="muted" style="margin:4px 0">Current academic progress generated from recorded LMS activity.</p></div><div class="profile"><div class="card"><div class="label">Student</div><div class="value">${esc(student.name || '—')}</div><div class="muted">ID: ${esc(student.student_id || student.id || '—')}</div><div class="muted">Class: ${esc(student.class_name || '—')}</div><div class="muted">Grade: ${esc(grade || '—')}</div></div><div class="card"><div class="label">Partner Institution</div><div class="value">${esc(typeof school === 'string' ? school : school?.name || student.school_name || 'PIXIU Tech Partner School')}</div><div class="muted">School Code: ${esc(student.school_code || school?.school_code || '—')}</div><div class="muted">Academic Year: 2026–2027</div></div></div><div class="kpis"><div class="kpi"><div class="label">Lab Attendance</div><div class="n">${esc(attendanceRate)}%</div></div><div class="kpi"><div class="label">Mastery Level</div><div class="n">${esc(student.current_level || student.tech_level || 'Level 0')}</div></div><div class="kpi"><div class="label">Cumulative Score</div><div class="n">${totalScore.toFixed(1)} / ${rows.length * 10}</div></div><div class="kpi"><div class="label">Units Evaluated</div><div class="n">${evaluated.length} / ${rows.length}</div></div></div><div class="section"><h2>Unit & Level Competency Progression</h2><table class="table"><thead><tr><th>Level</th><th>Unit</th><th>Module</th><th>Score</th><th>Status</th><th>Trainer Evaluation</th></tr></thead><tbody>${reviewRows}</tbody></table></div><div class="section"><h2>Laboratory Projects</h2><table class="table"><thead><tr><th>Project</th><th>Score</th><th>Status</th><th>Technical Evidence / Feedback</th></tr></thead><tbody>${projectRows}</tbody></table></div><div class="sig"><div><div class="line">${esc(student.trainer_name || 'Trainer Faculty')}</div><div class="muted">Trainer / Faculty</div></div><div style="text-align:right"><div class="line">Authorized Signatory</div><div class="muted">PIXIU Tech LLP</div></div></div><div class="footer">PIXIU Tech LLP · Generated from the current server-authoritative LMS record</div></div>`;
+    ? rows.map(row => {
+        const scoreText = usingServer
+          ? (row.raw_score == null ? '<span class="pill pending">—</span>' : `<b>${row.raw_score.toFixed(2)}%</b>`)
+          : (row.score === null ? '<span class="pill pending">Pending</span>' : `<b>${row.score.toFixed(1)}/10</b>`);
+        const status = usingServer ? (row.status === 'passed' ? 'Passed' : row.status === 'failed' ? 'Not Passed' : 'Pending Evaluation') : (row.status || 'Pending Evaluation');
+        const pill = status === 'Passed' ? 'verified' : status === 'Not Passed' ? 'failed' : 'pending';
+        const sessions = usingServer ? `${row.sessions}/${row.sessions_count || row.sessions}` : 'Recorded in LMS';
+        return `<tr><td><b>${esc(row.technology || row.level)}</b></td><td>${esc(row.unit_code)}</td><td><b>${esc(row.title)}</b></td><td>${scoreText}</td><td>${esc(sessions)}</td><td><span class="pill ${pill}">${esc(status)}</span></td><td>${esc(row.feedback || (status === 'Pending Evaluation' ? 'Trainer evaluation or required activity pending.' : 'Evaluation recorded in the LMS.'))}</td></tr>`;
+      }).join('')
+    : '<tr><td colspan="7" style="text-align:center;color:#94a3b8">No taught programme units have been recorded for this student.</td></tr>';
+
+  const projectRows = projectsForStudent.length
+    ? projectsForStudent.map(project => `<tr><td>${esc(project.title || 'Project')}</td><td>${esc(project.score ?? '—')}</td><td><span class="pill ${norm(project.status) === 'completed' ? 'verified' : 'pending'}">${esc(project.status || '—')}</span></td><td>${esc(project.trainer_feedback || project.description || '—')}</td></tr>`).join('')
+    : '<tr><td colspan="4" style="text-align:center;color:#94a3b8">No project records recorded.</td></tr>';
+
+  const blockerText = Array.isArray(completion?.blockers) && completion.blockers.length
+    ? completion.blockers.join(' ')
+    : Array.isArray(completion?.checklist?.blockers) && completion.checklist.blockers.length
+      ? completion.checklist.blockers.join(' ')
+      : '';
+
+  const body = `<div class="sheet"><div class="header"><div><div class="brand-title">PIXIU <span>TECH</span></div><div class="muted">Robotics • AI • IoT • STEM Education</div></div><div style="text-align:right"><span class="badge">Student Progress Report</span><div class="muted" style="margin-top:5px">Report ID: ${esc(student.student_id || student.id || '—')}</div></div></div><div style="text-align:center;margin:16px 0"><h1 style="margin:0;font-size:19px;text-transform:uppercase">STEM & Robotics Laboratory Progress Report</h1><p class="muted" style="margin:4px 0">Server-authoritative academic record generated from the Pixiu Tech LMS.</p></div><div class="profile"><div class="card"><div class="label">Student</div><div class="value">${esc(student.name || completion?.student_name || '—')}</div><div class="muted">ID: ${esc(student.student_id || completion?.student_id || student.id || '—')}</div><div class="muted">Class: ${esc(student.class_name || completion?.class_name || '—')}</div><div class="muted">Grade: ${esc(grade || '—')}</div></div><div class="card"><div class="label">Partner Institution</div><div class="value">${esc(typeof school === 'string' ? school : school?.name || completion?.school_name || student.school_name || 'PIXIU Tech Partner School')}</div><div class="muted">School Code: ${esc(student.school_code || school?.school_code || completion?.school_code || '—')}</div><div class="muted">Evaluation: <span class="pill ${stateClass}">${esc(stateLabel)}</span></div></div></div><div class="kpis"><div class="kpi"><div class="label">Lab Attendance</div><div class="n">${esc(Number(effectiveAttendance || 0).toFixed(0))}%</div></div><div class="kpi"><div class="label">Programme Score</div><div class="n">${serverScore == null ? '—' : `${serverScore.toFixed(2)}%`}</div></div><div class="kpi"><div class="label">Evaluated Units</div><div class="n">${evaluated.length} / ${rows.length}</div></div><div class="kpi"><div class="label">Result</div><div class="n" style="font-size:14px">${esc(stateLabel)}</div></div></div>${blockerText ? `<div class="card" style="margin-top:12px;background:#fff7ed;border-color:#fed7aa"><div class="label" style="color:#9a3412">Evaluation Notes</div><div style="margin-top:4px;color:#7c2d12;font-size:10px">${esc(blockerText)}</div></div>` : ''}<div class="section"><h2>Technology & Unit Evaluation</h2><table class="table"><thead><tr><th>Technology</th><th>Unit</th><th>Module</th><th>Score</th><th>Sessions</th><th>Status</th><th>Trainer Evaluation</th></tr></thead><tbody>${reviewRows}</tbody></table></div><div class="section"><h2>Laboratory Projects</h2><table class="table"><thead><tr><th>Project</th><th>Score</th><th>Status</th><th>Technical Evidence / Feedback</th></tr></thead><tbody>${projectRows}</tbody></table></div><div class="sig"><div><div class="line">${esc(student.trainer_name || completion?.trainer_name || 'Trainer Faculty')}</div><div class="muted">Trainer / Faculty</div></div><div style="text-align:right"><div class="line">Authorized Signatory</div><div class="muted">PIXIU Tech LLP</div></div></div><div class="footer">PIXIU Tech LLP · Generated from the current server-authoritative LMS record · ${usingServer ? 'Evaluation data: class-wide completion engine' : 'Legacy client report fallback'}</div></div>`;
   openPrint(`Progress Report — ${student.name || 'Student'}`, body);
 }
 
