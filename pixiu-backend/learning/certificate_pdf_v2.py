@@ -1,231 +1,248 @@
 from io import BytesIO
-from pathlib import Path
 from urllib.parse import quote
 
 import qrcode
 from django.conf import settings
 from django.http import HttpResponse
 from reportlab.lib import colors
-from reportlab.lib.units import inch
+from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.pdfgen import canvas
 
 
-CERTIFICATE_SIZE = (11 * inch, 8.5 * inch)
+# Physical print format: A4 landscape (297 × 210 mm).
+CERTIFICATE_SIZE = landscape(A4)
 
 
-def _logo_path():
-    base = Path(settings.BASE_DIR)
-    candidates = [base / 'core' / 'assets' / 'pixiu-logo.png', base / 'core' / 'assets' / 'logo.png']
-    return next((path for path in candidates if path.exists()), None)
-
-
-def _fit_text(c, text, max_width, font='Helvetica-Bold', max_size=11, min_size=7.5):
-    value = str(text or '').strip()
+def _fit_text(c, value, max_width, font="Helvetica-Bold", max_size=12, min_size=7):
+    text = str(value or "").strip()
     size = max_size
-    while size > min_size and stringWidth(value, font, size) > max_width:
+    while size > min_size and stringWidth(text, font, size) > max_width:
         size -= 0.25
-    return value, size
+    return text, size
 
 
-def _draw_logo(c, x, y, width=1.55 * inch, height=0.72 * inch):
-    logo = _logo_path()
-    if logo:
-        c.drawImage(ImageReader(str(logo)), x, y, width=width, height=height, preserveAspectRatio=True, mask='auto')
-        return
-    navy = colors.HexColor('#081B36')
-    blue = colors.HexColor('#1768FF')
-    gold = colors.HexColor('#C8A04B')
+def _draw_wordmark(c, x, y, scale=1.0):
+    navy = colors.HexColor("#081B36")
+    blue = colors.HexColor("#1768FF")
+    gold = colors.HexColor("#C8A04B")
     c.setFillColor(navy)
-    c.setFont('Helvetica-Bold', 25)
-    c.drawString(x, y + 25, 'PIXIU')
-    c.setFillColor(blue)
-    c.setFont('Helvetica-Bold', 8)
-    c.drawString(x + 66, y + 10, 'TECH')
+    c.setFont("Helvetica-Bold", 24 * scale)
+    c.drawString(x, y, "PIXIU")
     c.setStrokeColor(blue)
-    c.setLineWidth(3)
-    c.line(x + 44, y + 32, x + 65, y + 53)
+    c.setLineWidth(2.6 * scale)
+    c.line(x + 58 * scale, y + 3 * scale, x + 78 * scale, y + 23 * scale)
     c.setFillColor(gold)
-    c.circle(x + 50, y + 39, 3.2, fill=1, stroke=0)
+    c.circle(x + 62 * scale, y + 9 * scale, 3.1 * scale, fill=1, stroke=0)
+    c.setFillColor(blue)
+    c.setFont("Helvetica-Bold", 8 * scale)
+    c.drawString(x + 66 * scale, y - 9 * scale, "TECH")
 
 
 def _qr_buffer(url):
-    qr_buffer = BytesIO()
+    buf = BytesIO()
     qr = qrcode.QRCode(version=None, error_correction=qrcode.constants.ERROR_CORRECT_M, box_size=7, border=2)
     qr.add_data(url)
     qr.make(fit=True)
-    qr.make_image(fill_color='#081B36', back_color='white').save(qr_buffer, format='PNG')
-    qr_buffer.seek(0)
-    return qr_buffer
+    qr.make_image(fill_color="#081B36", back_color="white").save(buf, format="PNG")
+    buf.seek(0)
+    return buf
 
 
 def build_certificate_pdf(certificate):
     payload = dict(certificate.snapshot or {})
-    technologies = certificate.technologies_snapshot or payload.get('technologies') or []
-    technology_names = []
+    technologies = certificate.technologies_snapshot or payload.get("technologies") or []
+    names = []
     for item in technologies:
-        value = item.get('name') or item.get('technology') if isinstance(item, dict) else item
-        value = str(value or '').strip()
-        if value and value not in technology_names:
-            technology_names.append(value)
+        value = item.get("name") or item.get("technology") if isinstance(item, dict) else item
+        value = str(value or "").strip()
+        if value and value not in names:
+            names.append(value)
 
-    verification_url = str(payload.get('verification_url') or f'https://pixiutech.com/verify?cert={quote(certificate.certificate_id)}')
+    verification_url = str(
+        payload.get("verification_url")
+        or f"https://pixiutech.com/verify?cert={quote(certificate.certificate_id)}"
+    )
     width, height = CERTIFICATE_SIZE
-    buffer = BytesIO()
-    c = canvas.Canvas(buffer, pagesize=CERTIFICATE_SIZE)
-    c.setTitle(f'Pixiu Tech Certificate - {certificate.student.name}')
-    c.setAuthor('Pixiu Tech LLP')
+    buf = BytesIO()
+    c = canvas.Canvas(buf, pagesize=CERTIFICATE_SIZE)
+    c.setTitle(f"Pixiu Tech Certificate - {certificate.student.name}")
+    c.setAuthor("Pixiu Tech LLP")
 
-    navy = colors.HexColor('#081B36')
-    blue = colors.HexColor('#1768FF')
-    gold = colors.HexColor('#C8A04B')
-    ink = colors.HexColor('#142235')
-    muted = colors.HexColor('#64748B')
-    border = colors.HexColor('#D8E0EA')
-    soft = colors.HexColor('#F5F8FC')
-    white = colors.white
+    navy = colors.HexColor("#081B36")
+    blue = colors.HexColor("#1768FF")
+    gold = colors.HexColor("#C8A04B")
+    ink = colors.HexColor("#142235")
+    muted = colors.HexColor("#64748B")
+    border = colors.HexColor("#D9E2EE")
+    soft = colors.HexColor("#F6F8FC")
 
-    c.setFillColor(white)
+    c.setFillColor(colors.white)
     c.rect(0, 0, width, height, fill=1, stroke=0)
 
-    # Certificate-size formal frame.
+    # Premium A4 frame with generous print-safe margins.
     c.setStrokeColor(navy)
-    c.setLineWidth(3.2)
-    c.rect(18, 18, width - 36, height - 36)
+    c.setLineWidth(3)
+    c.rect(22, 22, width - 44, height - 44)
     c.setStrokeColor(gold)
-    c.setLineWidth(1.1)
-    c.rect(29, 29, width - 58, height - 58)
+    c.setLineWidth(1)
+    c.rect(32, 32, width - 64, height - 64)
 
-    # Header.
-    _draw_logo(c, 52, height - 82, 125, 58)
+    # Brand header.
+    _draw_wordmark(c, 55, height - 70, 1.0)
+    c.setFillColor(muted)
+    c.setFont("Helvetica", 8)
+    c.drawString(55, height - 91, "School Technology Infrastructure  •  Experiential Learning")
+
     c.setFillColor(soft)
     c.setStrokeColor(border)
-    c.roundRect(width - 220, height - 74, 160, 27, 14, fill=1, stroke=1)
+    c.roundRect(width - 237, height - 87, 182, 31, 15.5, fill=1, stroke=1)
     c.setFillColor(blue)
-    c.circle(width - 203, height - 60.5, 4.5, fill=1, stroke=0)
+    c.circle(width - 219, height - 71.5, 4.5, fill=1, stroke=0)
     c.setFillColor(navy)
-    c.setFont('Helvetica-Bold', 8)
-    c.drawString(width - 192, height - 64, 'OFFICIAL DIGITAL CREDENTIAL')
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(width - 208, height - 75, "OFFICIAL DIGITAL CREDENTIAL")
     c.setStrokeColor(border)
-    c.setLineWidth(1)
-    c.line(52, height - 99, width - 52, height - 99)
+    c.line(55, height - 105, width - 55, height - 105)
 
-    # Main title.
+    # Formal title area.
     c.setFillColor(navy)
-    c.setFont('Times-Bold', 28)
-    c.drawCentredString(width / 2, height - 145, 'CERTIFICATE OF COMPLETION')
+    c.setFont("Times-Bold", 28)
+    c.drawCentredString(width / 2, height - 145, "CERTIFICATE OF COMPLETION")
     c.setFillColor(blue)
-    c.setFont('Helvetica-Bold', 9)
-    c.drawCentredString(width / 2, height - 164, str(certificate.programme_name or 'Pixiu Technology Programme').upper())
+    c.setFont("Helvetica-Bold", 9)
+    c.drawCentredString(width / 2, height - 163, str(certificate.programme_name or "PIXIU TECHNOLOGY PROGRAMME").upper())
 
-    student_name = str(payload.get('student_name') or certificate.student.name or '').strip().upper()
-    school_name = str(payload.get('school_name') or certificate.school_class.school.name or '').strip()
-    class_name = str(payload.get('class_name') or certificate.school_class.display_name or '').strip()
+    student_name, name_size = _fit_text(
+        c,
+        str(payload.get("student_name") or certificate.student.name).upper(),
+        500,
+        "Times-Bold",
+        30,
+        20,
+    )
+    school_name = str(payload.get("school_name") or certificate.school_class.school.name or "")
+    class_name = str(payload.get("class_name") or certificate.school_class.display_name or "")
     score = float(certificate.overall_score or 0)
 
     c.setFillColor(muted)
-    c.setFont('Helvetica', 10)
-    c.drawCentredString(width / 2, height - 196, 'This certificate is proudly presented to')
-    fitted_name, name_size = _fit_text(c, student_name, 480, 'Times-Bold', 28, 20)
+    c.setFont("Helvetica", 10.5)
+    c.drawCentredString(width / 2, height - 196, "This certificate is proudly presented to")
     c.setFillColor(navy)
-    c.setFont('Times-Bold', name_size)
-    c.drawCentredString(width / 2, height - 236, fitted_name)
+    c.setFont("Times-Bold", name_size)
+    c.drawCentredString(width / 2, height - 235, student_name)
     c.setStrokeColor(gold)
     c.setLineWidth(1.3)
-    c.line(width / 2 - 175, height - 248, width / 2 + 175, height - 248)
+    c.line(width / 2 - 180, height - 248, width / 2 + 180, height - 248)
 
     c.setFillColor(muted)
-    c.setFont('Helvetica', 10)
-    c.drawCentredString(width / 2, height - 276, 'for successfully completing the prescribed practical and experiential learning programme in')
-    tech_text = '  •  '.join(technology_names) if technology_names else 'Technology Programme'
-    fitted_tech, tech_size = _fit_text(c, tech_text.upper(), 430, 'Helvetica-Bold', 17, 11)
+    c.setFont("Helvetica", 10)
+    c.drawCentredString(width / 2, height - 273, "for successfully completing the prescribed practical and experiential learning programme in")
+    tech, tech_size = _fit_text(c, "  •  ".join(names).upper() if names else "TECHNOLOGY PROGRAMME", 510, "Helvetica-Bold", 17, 10)
     c.setFillColor(navy)
-    c.setFont('Helvetica-Bold', tech_size)
-    c.drawCentredString(width / 2, height - 301, fitted_tech)
+    c.setFont("Helvetica-Bold", tech_size)
+    c.drawCentredString(width / 2, height - 298, tech)
     c.setFillColor(muted)
-    c.setFont('Helvetica', 9.5)
-    c.drawCentredString(width / 2, height - 320, f'{school_name}  |  Class {class_name}  |  Overall Programme Score {score:.2f}%')
+    c.setFont("Helvetica", 9.5)
+    c.drawCentredString(width / 2, height - 318, f"{school_name}  |  Class {class_name}  |  Overall Programme Score {score:.2f}%")
 
-    # Score + authenticity area.
-    score_box_x, score_box_y = 70, height - 408
+    # Score panel.
+    panel_x, panel_y = 72, height - 405
     c.setFillColor(soft)
     c.setStrokeColor(border)
-    c.roundRect(score_box_x, score_box_y, 260, 62, 12, fill=1, stroke=1)
+    c.roundRect(panel_x, panel_y, 300, 62, 12, fill=1, stroke=1)
     c.setFillColor(muted)
-    c.setFont('Helvetica-Bold', 8)
-    c.drawString(score_box_x + 18, score_box_y + 43, 'PROGRAMME SCORE')
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(panel_x + 18, panel_y + 43, "PROGRAMME SCORE")
     c.setFillColor(navy)
-    c.setFont('Times-Bold', 25)
-    c.drawString(score_box_x + 18, score_box_y + 15, f'{score:.2f}%')
+    c.setFont("Times-Bold", 25)
+    c.drawString(panel_x + 18, panel_y + 15, f"{score:.2f}%")
     c.setFillColor(muted)
-    c.setFont('Helvetica', 8)
-    c.drawString(score_box_x + 122, score_box_y + 28, 'Official programme')
-    c.drawString(score_box_x + 122, score_box_y + 17, 'score recorded in LMS')
+    c.setFont("Helvetica", 8)
+    c.drawString(panel_x + 135, panel_y + 29, "Official programme score")
+    c.drawString(panel_x + 135, panel_y + 18, "recorded in the Pixiu Tech LMS")
     c.setFillColor(blue)
-    c.roundRect(score_box_x, score_box_y - 5, 260, 5, 2.5, fill=1, stroke=0)
+    c.roundRect(panel_x, panel_y - 5, 300, 5, 2.5, fill=1, stroke=0)
 
-    seal_x, seal_y = width / 2 + 15, score_box_y + 32
+    # Authenticity seal.
+    seal_x, seal_y = width / 2 + 20, panel_y + 31
     c.setStrokeColor(gold)
     c.setLineWidth(1.4)
-    c.circle(seal_x, seal_y, 28, fill=0, stroke=1)
-    c.circle(seal_x, seal_y, 22, fill=0, stroke=1)
+    c.circle(seal_x, seal_y, 30, fill=0, stroke=1)
+    c.setLineWidth(0.8)
+    c.circle(seal_x, seal_y, 24, fill=0, stroke=1)
     c.setFillColor(gold)
-    c.setFont('Helvetica-Bold', 6.2)
-    c.drawCentredString(seal_x, seal_y + 5, 'PIXIU TECH')
+    c.setFont("Helvetica-Bold", 6.8)
+    c.drawCentredString(seal_x, seal_y + 6, "PIXIU TECH")
     c.setFillColor(blue)
-    c.setFont('Helvetica-Bold', 5.2)
-    c.drawCentredString(seal_x, seal_y - 5, 'AUTHENTIC')
+    c.setFont("Helvetica-Bold", 5.7)
+    c.drawCentredString(seal_x, seal_y - 5, "AUTHENTIC")
+    c.setFillColor(muted)
+    c.setFont("Helvetica", 6.2)
+    c.drawCentredString(seal_x, seal_y - 14, "DIGITALLY VERIFIED")
 
-    # Metadata footer.
-    left = 70
-    base_y = 72
+    # Bottom credential metadata and QR.
+    base_y = 69
     c.setStrokeColor(border)
     c.setLineWidth(0.9)
-    c.line(left, base_y + 54, width - 190, base_y + 54)
+    c.line(55, base_y + 53, width - 195, base_y + 53)
     c.setFillColor(navy)
-    c.setFont('Helvetica-Bold', 8)
-    c.drawString(left, base_y + 37, 'CERTIFICATE ID')
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(55, base_y + 36, "CERTIFICATE ID")
+    cid, cid_size = _fit_text(c, certificate.certificate_id, 345, "Helvetica", 8.8, 6.4)
     c.setFillColor(muted)
-    cid, cid_size = _fit_text(c, certificate.certificate_id, 330, 'Helvetica', 9, 7)
-    c.setFont('Helvetica', cid_size)
-    c.drawString(left, base_y + 24, cid)
+    c.setFont("Helvetica", cid_size)
+    c.drawString(55, base_y + 23, cid)
     c.setFillColor(navy)
-    c.setFont('Helvetica-Bold', 8)
-    c.drawString(left, base_y + 8, 'ISSUED')
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(55, base_y + 7, "ISSUED")
     c.setFillColor(muted)
-    c.setFont('Helvetica', 9)
-    c.drawString(left, base_y - 5, certificate.issued_at.strftime('%d %B %Y'))
+    c.setFont("Helvetica", 8.8)
+    c.drawString(55, base_y - 6, certificate.issued_at.strftime("%d %B %Y"))
 
     c.setFillColor(navy)
-    c.setFont('Helvetica-Bold', 8)
-    c.drawString(width - 300, base_y + 37, 'VERIFY ONLINE')
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(width - 310, base_y + 36, "VERIFY ONLINE")
     c.setFillColor(muted)
-    c.setFont('Helvetica', 7.4)
-    c.drawString(width - 300, base_y + 24, 'Scan the QR code to verify this credential')
-    c.drawString(width - 300, base_y + 13, 'against the Pixiu Tech Central Registry.')
+    c.setFont("Helvetica", 7.2)
+    c.drawString(width - 310, base_y + 23, "Scan to verify this credential")
+    c.drawString(width - 310, base_y + 12, "against the Pixiu Tech Central Registry.")
 
-    qr_buf = _qr_buffer(verification_url)
-    qr_x, qr_y = width - 145, 54
-    c.setFillColor(white)
+    qr = _qr_buffer(verification_url)
+    qr_x, qr_y = width - 150, 48
+    c.setFillColor(colors.white)
     c.setStrokeColor(border)
-    c.setLineWidth(0.9)
-    c.roundRect(qr_x - 8, qr_y - 6, 102, 102, 11, fill=1, stroke=1)
-    c.drawImage(ImageReader(qr_buf), qr_x, qr_y, width=86, height=86, preserveAspectRatio=True, mask='auto')
+    c.roundRect(qr_x - 7, qr_y - 5, 99, 98, 10, fill=1, stroke=1)
+    c.drawImage(ImageReader(qr), qr_x, qr_y, width=85, height=85, mask="auto")
     c.setFillColor(navy)
-    c.setFont('Helvetica-Bold', 7)
-    c.drawCentredString(qr_x + 43, qr_y - 16, 'SCAN TO VERIFY')
+    c.setFont("Helvetica-Bold", 6.8)
+    c.drawCentredString(qr_x + 42.5, qr_y - 15, "SCAN TO VERIFY")
+
+    # Signature lines make this suitable for physical issue packs.
+    sig_y = 62
+    c.setStrokeColor(colors.HexColor("#9AA8BA"))
+    c.line(width / 2 - 230, sig_y, width / 2 - 70, sig_y)
+    c.line(width / 2 - 45, sig_y, width / 2 + 115, sig_y)
+    c.setFillColor(navy)
+    c.setFont("Helvetica-Bold", 7.5)
+    c.drawCentredString(width / 2 - 150, sig_y - 12, "TRAINER / FACULTY")
+    c.drawCentredString(width / 2 + 35, sig_y - 12, "AUTHORIZED SIGNATORY")
+    c.setFillColor(muted)
+    c.setFont("Helvetica", 6.7)
+    c.drawCentredString(width / 2 - 150, sig_y - 23, "Pixiu Tech Learning Programme")
+    c.drawCentredString(width / 2 + 35, sig_y - 23, "PIXIU TECH LLP")
 
     c.setFillColor(navy)
-    c.setFont('Helvetica-Bold', 7.8)
-    c.drawString(52, 37, 'PIXIU TECH LLP')
+    c.setFont("Helvetica-Bold", 7.2)
+    c.drawString(55, 34, "PIXIU TECH LLP")
     c.setFillColor(muted)
-    c.setFont('Helvetica', 7)
-    c.drawString(118, 37, 'School Technology Infrastructure  •  Experiential Learning')
-    c.drawRightString(width - 52, 37, 'Digitally verifiable certificate')
+    c.setFont("Helvetica", 6.7)
+    c.drawString(113, 34, "School Technology Infrastructure  •  Experiential Learning")
+    c.drawRightString(width - 55, 34, "Digitally verifiable certificate")
 
     c.save()
-    buffer.seek(0)
-    response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
-    response['Content-Disposition'] = f'inline; filename="{certificate.certificate_id}.pdf"'
+    buf.seek(0)
+    response = HttpResponse(buf.getvalue(), content_type="application/pdf")
+    response["Content-Disposition"] = f'inline; filename="{certificate.certificate_id}.pdf"'
     return response
