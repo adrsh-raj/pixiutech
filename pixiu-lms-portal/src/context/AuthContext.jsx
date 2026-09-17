@@ -4,6 +4,7 @@ import { measurePerformance, markPerformance, recordApiPerformance } from '../li
 
 const AuthContext = createContext(null);
 const AUTH_EVENT = 'pixiu_auth_state_changed';
+const SESSION_ROLE_KEY = 'pixiu_session_role';
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 const API_READ_CACHE_TTL_MS = 30 * 1000;
 const API_READ_CACHE_MAX_ENTRIES = 250;
@@ -39,9 +40,23 @@ function buildReadCacheKey(path, method, accessToken) {
   return `${method}:${accessToken}:${path}`;
 }
 
+function getSessionRole() {
+  try {
+    return String(window.sessionStorage.getItem(SESSION_ROLE_KEY) || '').trim().toLowerCase() || null;
+  } catch {
+    return null;
+  }
+}
+
+function setSessionRole(role) {
+  try {
+    if (role) window.sessionStorage.setItem(SESSION_ROLE_KEY, String(role).trim().toLowerCase());
+    else window.sessionStorage.removeItem(SESSION_ROLE_KEY);
+  } catch {}
+}
+
 function broadcastAuthChange() {
   window.dispatchEvent(new Event(AUTH_EVENT));
-  try { window.localStorage.setItem(`${AUTH_EVENT}:${Date.now()}`, '1'); } catch {}
 }
 
 function clearLegacyAuthStorage() {
@@ -100,11 +115,14 @@ async function fetchWithRetry(url, options = {}) {
   throw lastError || new Error('Request failed.');
 }
 
-async function refreshAccessToken() {
+async function refreshAccessToken(roleHint = null) {
   if (refreshPromise) return refreshPromise;
+  const role = String(roleHint || getSessionRole() || '').trim().toLowerCase();
   refreshPromise = (async () => {
     try {
-      const response = await fetchOnce(`${API_BASE}/auth/refresh/`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}), cache: 'no-store' }, 20000);
+      const headers = { 'Content-Type': 'application/json' };
+      if (role) headers['X-Pixiu-Session-Role'] = role;
+      const response = await fetchOnce(`${API_BASE}/auth/refresh/`, { method: 'POST', headers, body: JSON.stringify({}), cache: 'no-store', credentials: 'include' }, 20000);
       const data = await readJson(response);
       if (!response.ok || !data.access) {
         accessTokenMemory = null;
@@ -117,18 +135,16 @@ async function refreshAccessToken() {
       accessTokenMemory = null;
       clearApiReadCache();
       return null;
-    } finally { refreshPromise = null; }
+    } finally {
+      refreshPromise = null;
+    }
   })();
   return refreshPromise;
 }
 
 function responseFromCache(entry) {
   recordApiPerformance(entry.path || '/', entry.method || 'GET', { durationMs: 0, status: entry.status, cached: true });
-  return new Response(entry.body, {
-    status: entry.status,
-    statusText: entry.statusText,
-    headers: new Headers(entry.headers),
-  });
+  return new Response(entry.body, { status: entry.status, statusText: entry.statusText, headers: new Headers(entry.headers) });
 }
 
 export async function apiFetch(path, options = {}) {
@@ -144,9 +160,7 @@ export async function apiFetch(path, options = {}) {
       const now = Date.now();
       pruneApiReadCache(now);
       const cached = apiReadCache.get(cacheKey);
-      if (cached && now - cached.createdAt <= API_READ_CACHE_TTL_MS) {
-        return responseFromCache({ ...cached, path, method });
-      }
+      if (cached && now - cached.createdAt <= API_READ_CACHE_TTL_MS) return responseFromCache({ ...cached, path, method });
       if (cached) apiReadCache.delete(cacheKey);
     }
 
@@ -159,13 +173,7 @@ export async function apiFetch(path, options = {}) {
 
     if (response.ok && cacheKey) {
       const body = await response.clone().text();
-      apiReadCache.set(cacheKey, {
-        createdAt: Date.now(),
-        status: response.status,
-        statusText: response.statusText,
-        headers: Array.from(response.headers.entries()),
-        body,
-      });
+      apiReadCache.set(cacheKey, { createdAt: Date.now(), status: response.status, statusText: response.statusText, headers: Array.from(response.headers.entries()), body });
       pruneApiReadCache();
     }
     return response;
@@ -173,7 +181,7 @@ export async function apiFetch(path, options = {}) {
 
   let response = await request(accessTokenMemory);
   if (response.status === 401 && !String(path).startsWith('/auth/')) {
-    const nextToken = await refreshAccessToken();
+    const nextToken = await refreshAccessToken(getSessionRole());
     if (nextToken) response = await request(nextToken);
     else {
       clearAuthStorage();
@@ -188,6 +196,7 @@ export function clearAuthStorage() {
   accessTokenMemory = null;
   clearApiReadCache();
   clearLegacyAuthStorage();
+  setSessionRole(null);
 }
 
 export function AuthProvider({ children }) {
@@ -210,7 +219,8 @@ export function AuthProvider({ children }) {
     let active = true;
     const restoreSession = async () => {
       try {
-        const access = await refreshAccessToken();
+        const roleHint = getSessionRole();
+        const access = await refreshAccessToken(roleHint);
         if (!access) throw new Error('No refresh session');
         const response = await fetchWithRetry(`${API_BASE}/auth/me/`, { headers: { Authorization: `Bearer ${access}` }, cache: 'no-store', credentials: 'include' });
         if (!response.ok) throw new Error('Session expired');
@@ -220,11 +230,14 @@ export function AuthProvider({ children }) {
           accessTokenMemory = access;
           setToken(access);
           setUser(data.user);
+          setSessionRole(data.user.role);
         }
       } catch {
         clearAuthStorage();
         if (active) { setToken(null); setUser(null); }
-      } finally { if (active) setLoading(false); }
+      } finally {
+        if (active) setLoading(false);
+      }
     };
     restoreSession();
     return () => { active = false; };
@@ -233,7 +246,7 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     if (!token) return undefined;
     const refresh = async () => {
-      const next = await refreshAccessToken();
+      const next = await refreshAccessToken(getSessionRole());
       if (next) {
         accessTokenMemory = next;
         setToken(next);
@@ -251,7 +264,8 @@ export function AuthProvider({ children }) {
   }, [token]);
 
   const login = async (username, password, expectedRole = null, turnstileToken = null) => {
-    const cleanUsername = username?.trim(); const cleanPassword = password ?? '';
+    const cleanUsername = username?.trim();
+    const cleanPassword = password ?? '';
     if (!cleanUsername || !cleanPassword) return { success: false, error: 'Username and password are required.' };
     const body = JSON.stringify({ username: cleanUsername, password: cleanPassword, role: expectedRole || undefined, turnstile_token: turnstileToken || undefined });
     markPerformance('login.e2e.start');
@@ -263,6 +277,7 @@ export function AuthProvider({ children }) {
         accessTokenMemory = data.access;
         setToken(data.access);
         setUser(data.user);
+        setSessionRole(data.user.role);
         broadcastAuthChange();
         measurePerformance('login.e2e', 'login.e2e.start');
         return { success: true, user: data.user };
@@ -276,10 +291,17 @@ export function AuthProvider({ children }) {
   };
 
   const logout = async () => {
+    const role = user?.role || getSessionRole();
     try {
-      await fetchOnce(`${API_BASE}/auth/logout/`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}), cache: 'no-store', credentials: 'include' }, 15000);
-    } catch {} finally {
-      setUser(null); setToken(null); clearAuthStorage(); broadcastAuthChange();
+      const headers = { 'Content-Type': 'application/json' };
+      if (role) headers['X-Pixiu-Session-Role'] = role;
+      await fetchOnce(`${API_BASE}/auth/logout/`, { method: 'POST', headers, body: JSON.stringify({}), cache: 'no-store', credentials: 'include' }, 15000);
+    } catch {}
+    finally {
+      setUser(null);
+      setToken(null);
+      clearAuthStorage();
+      broadcastAuthChange();
     }
   };
 
@@ -315,4 +337,9 @@ export function AuthProvider({ children }) {
   const value = useMemo(() => ({ user, token, role: user?.role || null, isAuthenticated: Boolean(user && token), loading, login, logout }), [user, token, loading]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
-export const useAuth = () => { const context = useContext(AuthContext); if (!context) throw new Error('useAuth must be used inside AuthProvider'); return context; };
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) throw new Error('useAuth must be used inside AuthProvider');
+  return context;
+};
