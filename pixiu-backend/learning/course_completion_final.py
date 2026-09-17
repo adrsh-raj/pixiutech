@@ -2,11 +2,12 @@
 
 All completion views import this module. The v6 engine remains the single
 source of truth for programme/final-session/certificate state; this wrapper
-normalises score inputs and keeps certificate ranking/scorecards tied to the
-same server-side score calculation.
+keeps certificate, scorecard, ranking, and cohort evaluation on the same
+server-side score calculation.
 """
 
 import logging
+from urllib.parse import quote
 
 from django.db import transaction
 from django.db.models import Avg, Max
@@ -16,11 +17,13 @@ from accounts.models import UserRole
 from academics.models import Student
 from audit.models import AuditAction
 
+from . import cohort_evaluation as cohort
 from . import course_completion_v6 as _engine
-from .models import AssessmentStatus, Quiz, QuizAttempt, StudentAssessment
 from .course_completion_models import Certificate, ProgrammeCompletion
+from .models import AssessmentStatus, Quiz, QuizAttempt, StudentAssessment
 
 logger = logging.getLogger(__name__)
+PUBLIC_VERIFY_URL = "https://pixiutech.com/verify"
 
 
 def quiz_metrics(student, taught_unit_codes=None):
@@ -54,12 +57,15 @@ def quiz_metrics(student, taught_unit_codes=None):
         "assigned": len(assigned),
         "completed": len(completed_quiz_ids),
         "missing": missing,
-        "complete": bool(completed_scores) if not assigned else not missing,
+        "complete": bool(completed_quiz_ids) if not assigned else not missing,
         "rows": [
             {
                 "id": str(quiz.id),
                 "title": quiz.title,
-                "percentage": next((float(row["best"]) for row in completed_attempts if str(row["quiz_id"]) == str(quiz.id)), 0.0),
+                "percentage": next(
+                    (float(row["best"]) for row in completed_attempts if str(row["quiz_id"]) == str(quiz.id)),
+                    0.0,
+                ),
                 "complete": str(quiz.id) in completed_quiz_ids,
             }
             for quiz in assigned
@@ -86,7 +92,8 @@ def assessment_metrics(student, taught_unit_codes=None):
     }
 
 
-# Patch the engine's global helpers before re-exporting its public functions.
+# Keep the v6 engine's internal score_data()/checklist() aligned with the
+# canonical records used by the leaderboard and cohort evaluation.
 _engine.quiz_metrics = quiz_metrics
 _engine.assessment_metrics = assessment_metrics
 
@@ -102,191 +109,130 @@ from .course_completion_v6 import (
 )  # noqa: E402,F401
 
 
-def _student_score_row(student):
-    _sessions, _taught_codes, attendance, quiz, assessment, overall = score_data(student)
-    return {
-        'student_id': student.student_id,
-        'student_name': student.name,
-        'roll_number': student.roll_number,
-        'attendance_pct': float(attendance.get('percentage', 0.0)),
-        'quiz_pct': float(quiz.get('percentage', 0.0)),
-        'practical_pct': float(assessment.get('practical_pct', 0.0)),
-        'trainer_review_pct': float(assessment.get('trainer_review_pct', 0.0)),
-        'overall_score': float(overall),
-    }
-
-
 def class_ranking_data(student):
-    """Build the deterministic class ranking from the certificate score engine."""
-    students = list(
-        Student.objects.filter(
-            school_class_id=student.school_class_id,
-            status='active',
-        ).select_related('school_class__school').only(
-            'id', 'student_id', 'name', 'roll_number', 'school_class',
-        )
-    )
-    rows = [_student_score_row(peer) for peer in students]
-    rows.sort(
-        key=lambda row: (
-            -row['overall_score'],
-            -row['attendance_pct'],
-            row['roll_number'] if row['roll_number'] is not None else 10**9,
-            str(row['student_id']),
-        )
-    )
-    class_size = len(rows)
-    for index, row in enumerate(rows, start=1):
-        row['rank'] = index
-        row['rank_display'] = f'{index}/{class_size}' if index <= 10 else '-'
-
-    current = next((row for row in rows if str(row['student_id']) == str(student.student_id)), None)
-    top10 = [
-        {
-            'rank': row['rank'],
-            'rank_display': row['rank_display'],
-            'student_id': row['student_id'],
-            'student_name': row['student_name'],
-            'overall_score': row['overall_score'],
-        }
-        for row in rows[:10]
-    ]
-    return {
-        'class_size': class_size,
-        'class_rank': current['rank'] if current else None,
-        'rank_display': current['rank_display'] if current else '-',
-        'top10_ranking': top10,
-        'attendance_pct': current['attendance_pct'] if current else 0.0,
-        'quiz_pct': current['quiz_pct'] if current else 0.0,
-        'practical_pct': current['practical_pct'] if current else 0.0,
-        'trainer_review_pct': current['trainer_review_pct'] if current else 0.0,
-    }
+    """Return cohort-wide top-25% ranking from the canonical score engine."""
+    return cohort.class_ranking_data(student)
 
 
 def scorecard_data(certificate):
     """Return the frozen A4 scorecard data for an issued certificate."""
-    stored = dict(certificate.snapshot or {})
-    stored_scorecard = stored.get('scorecard') if isinstance(stored.get('scorecard'), dict) else None
-    if stored_scorecard:
-        data = dict(stored_scorecard)
-        data.setdefault('class_size', 0)
-        data.setdefault('class_rank', certificate.rank)
-        rank = data.get('class_rank')
-        class_size = int(data.get('class_size') or 0)
-        data['rank_display'] = f'{rank}/{class_size}' if rank and class_size and int(rank) <= 10 else '-'
-        return data
-    return class_ranking_data(certificate.student)
+    return cohort.scorecard_data(certificate)
+
+
+def class_evaluation_data(school_class, persist=False, evaluator=None):
+    """Evaluate or inspect every active student in a class."""
+    return cohort.class_evaluation_data(school_class, persist=persist, evaluator=evaluator)
+
+
+def student_report_data(student):
+    """Return server-authoritative progress data for print/report views."""
+    return cohort.student_report_data(student)
 
 
 def _attach_scorecard_snapshot(certificate):
-    scorecard = class_ranking_data(certificate.student)
+    scorecard = cohort.class_ranking_data(certificate.student)
     snapshot = dict(certificate.snapshot or {})
-    snapshot['scorecard'] = scorecard
-    snapshot['class_rank'] = scorecard['class_rank']
-    snapshot['class_size'] = scorecard['class_size']
-    certificate.rank = scorecard['class_rank']
+    snapshot["scorecard"] = scorecard
+    snapshot["class_rank"] = scorecard["class_rank"]
+    snapshot["class_size"] = scorecard["class_size"]
+    snapshot["verification_url"] = f"{PUBLIC_VERIFY_URL}?cert={quote(certificate.certificate_id)}"
+    certificate.rank = scorecard["class_rank"]
     certificate.snapshot = snapshot
-    certificate.save(update_fields=['rank', 'snapshot'])
+    certificate.save(update_fields=["rank", "snapshot"])
     return certificate
 
 
-def _certificate_unit_rows(certificate):
-    """Return deduplicated unit rows with the recorded practical score.
+def issue_certificate(user, student):
+    """Issue only after every active student in the class is fully evaluated."""
+    cohort.assert_certificate_issuable(student)
+    certificate = _engine_issue_certificate(user, student)
+    snapshot = dict(certificate.snapshot or {})
+    snapshot["verification_url"] = f"{PUBLIC_VERIFY_URL}?cert={quote(certificate.certificate_id)}"
+    certificate.snapshot = snapshot
+    certificate.save(update_fields=["snapshot"])
+    try:
+        return _attach_scorecard_snapshot(certificate)
+    except Exception:
+        logger.exception("Scorecard snapshot generation failed for %s", student.student_id)
+        return certificate
 
-    Older certificates stored one row per session and omitted unit scores.
-    This normalises those snapshots at read time so the public verification
-    page and certificate PDF show one row per taught unit with a real session
-    count and, when published, its unit assessment score.
-    """
+
+def _certificate_unit_rows(certificate):
+    """Return deduplicated unit rows with the recorded practical score."""
     source = certificate.units_snapshot or []
     if not source:
-        source = (certificate.snapshot or {}).get('units') or []
+        source = (certificate.snapshot or {}).get("units") or []
 
-    cutoff = getattr(certificate.issued_at, 'date', lambda: timezone.localdate())()
+    cutoff = getattr(certificate.issued_at, "date", lambda: timezone.localdate())()
     score_rows = list(
         StudentAssessment.objects.filter(
             student=certificate.student,
             status=AssessmentStatus.PUBLISHED,
             score__isnull=False,
             assessment_date__lte=cutoff,
-        ).values('unit_code').annotate(score=Avg('score'))
+        ).values("unit_code").annotate(score=Avg("score"))
     )
     score_map = {
-        str(row['unit_code']).strip().upper(): float(row['score'])
+        str(row["unit_code"]).strip().upper(): float(row["score"])
         for row in score_rows
-        if row.get('unit_code') and row.get('score') is not None
+        if row.get("unit_code") and row.get("score") is not None
     }
 
     grouped = {}
     for row in source:
         if not isinstance(row, dict):
             continue
-        technology = str(row.get('technology') or row.get('technology_name') or '').strip()
-        unit_code = str(row.get('unit_code') or row.get('code') or '').strip()
-        title = str(row.get('title') or row.get('topic') or 'Technology Unit').strip()
+        technology = str(row.get("technology") or row.get("technology_name") or "").strip()
+        unit_code = str(row.get("unit_code") or row.get("code") or "").strip()
+        title = str(row.get("title") or row.get("topic") or "Technology Unit").strip()
         key = (technology.lower(), unit_code.upper(), title.lower())
         item = grouped.setdefault(
             key,
-            {
-                'technology': technology,
-                'unit_code': unit_code,
-                'title': title,
-                'sessions': 0,
-                'score': None,
-            },
+            {"technology": technology, "unit_code": unit_code, "title": title, "sessions": 0, "score": None},
         )
-        item['sessions'] += int(row.get('sessions') or 1)
-        if row.get('score') is not None:
+        item["sessions"] += int(row.get("sessions") or 1)
+        if row.get("score") is not None:
             try:
-                item['score'] = float(row['score'])
+                item["score"] = float(row["score"])
             except (TypeError, ValueError):
                 pass
-        if item['score'] is None and unit_code:
-            item['score'] = score_map.get(unit_code.upper())
+        if item["score"] is None and unit_code:
+            item["score"] = score_map.get(unit_code.upper())
 
-    return sorted(grouped.values(), key=lambda row: (row['technology'].lower(), row['unit_code'].upper(), row['title'].lower()))
-
-
-def issue_certificate(user, student):
-    """Issue the certificate through the canonical engine and freeze ranking."""
-    certificate = _engine_issue_certificate(user, student)
-    try:
-        return _attach_scorecard_snapshot(certificate)
-    except Exception:
-        logger.exception('Scorecard snapshot generation failed for %s', student.student_id)
-        return certificate
+    return sorted(grouped.values(), key=lambda row: (row["technology"].lower(), row["unit_code"].upper(), row["title"].lower()))
 
 
 def certificate_payload(certificate):
     """Expose public certificate data without private class-ranking rows."""
     data = _engine_certificate_payload(certificate)
     units = _certificate_unit_rows(certificate)
-    data['units'] = units
-    data['completion_count'] = len(units)
-    data['required_completion_count'] = len(units)
-    for key in ('scorecard', 'class_rank', 'class_size'):
+    data["units"] = units
+    data["completion_count"] = len(units)
+    data["required_completion_count"] = len(units)
+    for key in ("scorecard", "class_rank", "class_size"):
         data.pop(key, None)
     rank = certificate.rank
     class_size = None
     if isinstance(certificate.snapshot, dict):
-        class_size = certificate.snapshot.get('class_size')
-    data['rank_display'] = f'{rank}/{class_size}' if rank and class_size and int(rank) <= 10 else '-'
+        class_size = certificate.snapshot.get("class_size")
+    data["rank_display"] = f"{rank}/{class_size}" if rank and class_size and int(rank) <= 10 else "-"
+    data["verification_url"] = f"{PUBLIC_VERIFY_URL}?cert={quote(certificate.certificate_id)}"
     return data
 
 
 def approve_programme(user, student):
     """Perform trainer approval as one controlled state transition."""
     if user.role != UserRole.TRAINER:
-        raise PermissionError('Only a trainer can approve the final programme session.')
+        raise PermissionError("Only a trainer can approve the final programme session.")
     ensure_scope(user, student)
     state = checklist(student)
-    if not state['ready']:
-        raise ValueError('Programme is not ready: ' + ' '.join(state['blockers']))
+    if not state["ready"]:
+        raise ValueError("Programme is not ready: " + " ".join(state["blockers"]))
 
     with transaction.atomic():
         programme, created = ProgrammeCompletion.objects.select_for_update().get_or_create(student=student)
-        programme.status = 'trainer_requested'
-        programme.overall_score = state['overall_score']
+        programme.status = "trainer_requested"
+        programme.overall_score = state["overall_score"]
         programme.requested_by = user
         programme.requested_at = timezone.now()
         programme.completed_by = None
@@ -295,24 +241,24 @@ def approve_programme(user, student):
             programme.save()
         else:
             programme.save(update_fields=[
-                'status', 'overall_score', 'requested_by', 'requested_at',
-                'completed_by', 'completed_at', 'updated_at',
+                "status", "overall_score", "requested_by", "requested_at",
+                "completed_by", "completed_at", "updated_at",
             ])
 
     try:
         record_audit(
             actor=user,
             action=AuditAction.APPROVE,
-            entity_type='programme_completion',
+            entity_type="programme_completion",
             entity_id=str(student.pk),
-            summary=f'Final programme approved for {student.student_id}.',
+            summary=f"Final programme approved for {student.student_id}.",
             changes={
-                'overall_score': state['overall_score'],
-                'technologies': completed_technologies(student),
-                'final_session_id': state['final_session']['id'] if state['final_session'] else None,
+                "overall_score": state["overall_score"],
+                "technologies": completed_technologies(student),
+                "final_session_id": state["final_session"]["id"] if state["final_session"] else None,
             },
         )
     except Exception:
-        logger.exception('Programme approval succeeded but audit logging failed for %s', student.student_id)
+        logger.exception("Programme approval succeeded but audit logging failed for %s", student.student_id)
 
     return programme
