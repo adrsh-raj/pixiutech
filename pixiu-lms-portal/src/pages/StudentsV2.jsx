@@ -5,7 +5,7 @@ import { useData } from '../context/DataContext';
 import { useToast } from '../context/ToastContext';
 import EmptyState from '../components/ui/EmptyState';
 import PageHeader from '../components/ui/PageHeader';
-import { generateStudentTranscriptPDF } from '../utils/transcriptGenerator';
+import { generateStudentProgressPDF } from '../utils/progressReportGenerator';
 
 const text = value => String(value ?? '').trim();
 const norm = value => text(value).toUpperCase();
@@ -50,7 +50,28 @@ export default function StudentsV2() {
   const submit = async e => { e.preventDefault(); if (!form.school_class) return toast.error('Select an active class.'); if (!Number.isInteger(Number(form.roll_number)) || Number(form.roll_number) <= 0) return toast.error('Enter a valid positive roll number.'); setSaving(true); const result = await addStudent({ ...form, school_code: selectedSchool?.school_code || selectedSchool?.code || user?.school_code || '' }); setSaving(false); if (!result?.success) return toast.error(result?.error || 'Student registration failed.'); const created = result.data || {}; setModalOpen(false); setCredentials({ student_id: created.student_id || '—', username: created.account_username || created.student_id || '—', password: created.initial_password || 'Not returned by server' }); toast.success(`${created.name || form.name} enrolled successfully.`, 'Student Registered'); };
   const startEdit = student => { setEditing(student); setEditForm({ id: student.id, name: student.name || '', date_of_birth: student.date_of_birth || '', gender: student.gender || '', email: student.email || '', phone: student.phone || '', guardian_name: student.guardian_name || '', guardian_phone: student.guardian_phone || '', guardian_email: student.guardian_email || '', address: student.address || '', current_level: student.current_level || student.tech_level || '', status: student.status || 'active' }); };
   const saveEdit = async e => { e.preventDefault(); setSaving(true); const { id, ...payload } = editForm; const result = await updateStudent(id, payload); setSaving(false); if (!result?.success) return toast.error(result?.error || 'Student update failed.'); setEditing(null); toast.success('Student details updated successfully.', 'Student Updated'); };
-  const printStudent = student => { const sid = text(student.student_id || student.id); const reviews = studentReviews.filter(r => text(r.student_id || r.student).toUpperCase().replace(/\s+/g, '') === text(student.student_id || student.id).toUpperCase().replace(/\s+/g, '')); const studentProjects = projects.filter(p => text(p.student_id || p.student).toUpperCase().replace(/\s+/g, '') === text(student.student_id || student.id).toUpperCase().replace(/\s+/g, '')); generateStudentTranscriptPDF({ student, school: selectedSchool || { name: student.school_name || '—', school_code: student.school_code || '' }, attendanceRate: getStudentAttendance(sid), studentReviews: reviews, projects: studentProjects, curriculum: [], isOfficialCertificate: /certified graduate/i.test(text(student.current_level)) }); };
+  const fetchCompletionReport = async studentKey => {
+    const response = await apiFetch(`/course-completion/student-report/${encodeURIComponent(studentKey)}`, { cache: 'no-store' });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.detail || `Unable to load the live progress record (${response.status}).`);
+    return { completion: payload, student: student, school: selectedSchool };
+  };
+  const printStudent = async student => {
+    const sid = text(student.student_id || student.id);
+    try {
+      const response = await fetchCompletionReport(sid);
+      generateStudentProgressPDF({
+        student: response.student || student,
+        school: response.school || selectedSchool || { name: student.school_name || '—', school_code: student.school_code || '' },
+        attendanceRate: response.completion?.attendance?.percentage ?? getStudentAttendance(sid),
+        studentReviews: studentReviews.filter(r => text(r.student_id || r.student).toUpperCase().replace(/\s+/g, '') === sid.toUpperCase().replace(/\s+/g, '')),
+        projects: projects.filter(p => text(p.student_id || p.student).toUpperCase().replace(/\s+/g, '') === sid.toUpperCase().replace(/\s+/g, '')),
+        completion: response.completion,
+      });
+    } catch (error) {
+      window.alert(error?.message || 'Unable to generate the live student progress report.');
+    }
+  };
 
   return <div className="space-y-5 pb-10"><PageHeader eyebrow="Academics" title="Student Directory" description={trainer ? 'Students visible through your active school assignments.' : 'Enroll, edit and generate live student academic records.'} actions={<button type="button" onClick={openEnroll} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-blue-600 px-4 text-xs font-black text-white hover:bg-blue-700"><UserPlus size={14}/> Enroll Student</button>}/>
     <section className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 md:grid-cols-[1fr_1fr_1.4fr]">{!trainer && <label><span className="mb-1 block text-[9px] font-black uppercase tracking-[0.15em] text-slate-400">School</span><select value={schoolId} onChange={e => { setSchoolId(e.target.value); setClassId('all'); }} className={fieldClass}><option value="">Select school</option>{visibleSchools.map(s => <option key={s.id} value={s.id}>{s.name} ({s.school_code})</option>)}</select></label>}<label><span className="mb-1 block text-[9px] font-black uppercase tracking-[0.15em] text-slate-400">Class</span><select value={classId} onChange={e => setClassId(e.target.value)} disabled={!selectedSchool} className={fieldClass}><option value="all">All classes</option>{visibleClasses.map(c => <option key={c.id} value={c.id}>{c.display_name || `${c.grade}${c.section || ''}`}</option>)}</select></label><label><span className="mb-1 block text-[9px] font-black uppercase tracking-[0.15em] text-slate-400">Search</span><div className="relative"><Search size={15} className="absolute left-3 top-3 text-slate-400"/><input value={search} onChange={e => setSearch(e.target.value)} className={`${fieldClass} pl-9`} placeholder="Student, ID, guardian or class…"/></div></label></section>
