@@ -109,10 +109,7 @@ def _certificate_page_bytes(certificate):
     programme = str(certificate.programme_name or "Pixiu Technology Programme").strip()
     score = float(certificate.overall_score or 0)
     issued_at = certificate.issued_at or timezone.now()
-    verification_url = str(
-        payload.get("verification_url")
-        or f"https://pixiutech.com/verify?cert={quote(certificate.certificate_id)}"
-    )
+    verification_url = f"https://pixiutech.com/verify?cert={quote(certificate.certificate_id)}"
 
     width, height = CERTIFICATE_SIZE
     buffer = BytesIO()
