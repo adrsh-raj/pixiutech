@@ -127,8 +127,46 @@ def issue_certificate(user, student):
     certificate = _engine_issue_certificate(user, student)
     snapshot = dict(certificate.snapshot or {})
     snapshot["verification_url"] = f"{PUBLIC_VERIFY_URL}?cert={quote(certificate.certificate_id)}"
+
+    # Freeze the published marks at certificate issuance time. Verification
+    # must not change later if an LMS assessment row is edited.
+    try:
+        evaluation = cohort.evaluate_student(student)
+        unit_evaluations = {
+            str(row.get("unit_code") or "").strip().upper(): row
+            for row in evaluation.get("units", [])
+            if row.get("unit_code")
+        }
+
+        frozen_units = []
+        for row in (certificate.units_snapshot or snapshot.get("units") or []):
+            item = dict(row) if isinstance(row, dict) else {"title": str(row)}
+            unit_code = str(item.get("unit_code") or "").strip().upper()
+            unit_eval = unit_evaluations.get(unit_code, {})
+            unit_score = unit_eval.get("score")
+            if unit_score is not None:
+                item["score"] = float(unit_score)
+                item["marks"] = float(unit_score)
+                item["status"] = unit_eval.get("status")
+            frozen_units.append(item)
+
+        certificate.units_snapshot = frozen_units
+        snapshot["units"] = frozen_units
+        snapshot["marks"] = frozen_units
+        snapshot["score_breakdown"] = {
+            "overall_score": float(evaluation.get("overall_score", certificate.overall_score or 0)),
+            "attendance_pct": float(evaluation.get("attendance", {}).get("percentage", 0)),
+            "quiz_pct": float(evaluation.get("quiz", {}).get("percentage", 0)),
+            "practical_pct": float(evaluation.get("assessment", {}).get("practical_pct", 0)),
+            "trainer_review_pct": float(evaluation.get("assessment", {}).get("trainer_review_pct", 0)),
+            "pass_mark": PASS_MARK,
+        }
+    except Exception:
+        logger.exception("Immutable marks snapshot failed for %s", student.student_id)
+
     certificate.snapshot = snapshot
-    certificate.save(update_fields=["snapshot"])
+    certificate.save(update_fields=["snapshot", "units_snapshot"])
+
     try:
         return _attach_scorecard_snapshot(certificate)
     except Exception:
@@ -168,6 +206,11 @@ def _certificate_unit_rows(certificate):
                 item["score"] = float(row["score"])
             except (TypeError, ValueError):
                 pass
+        if row.get("marks") is not None and item["score"] is None:
+            try:
+                item["score"] = float(row["marks"])
+            except (TypeError, ValueError):
+                pass
         if item["score"] is None and unit_code:
             item["score"] = score_map.get(unit_code.upper())
     return sorted(grouped.values(), key=lambda row: (row["technology"].lower(), row["unit_code"].upper(), row["title"].lower()))
@@ -177,20 +220,62 @@ def certificate_payload(certificate):
     data = _engine_certificate_payload(certificate)
     units = _certificate_unit_rows(certificate)
     data["units"] = units
+    data["marks"] = units
     data["completion_count"] = len(units)
     data["required_completion_count"] = len(units)
-    for key in ("scorecard", "class_rank", "class_size"):
-        data.pop(key, None)
+
+    # Public verification exposes the verified student's published rank
+    # metadata only. The authenticated LMS retains the full leaderboard.
+    stored_scorecard = data.get("scorecard") if isinstance(data.get("scorecard"), dict) else {}
+    class_size = stored_scorecard.get("class_size") or data.get("class_size")
+    rank_slots = stored_scorecard.get("rank_slots") or data.get("rank_slots")
     rank = certificate.rank
-    class_size = None
-    rank_slots = None
-    if isinstance(certificate.snapshot, dict):
-        class_size = certificate.snapshot.get("class_size")
-        rank_slots = certificate.snapshot.get("rank_slots")
-    allowed = False
-    if rank and class_size:
-        allowed = int(rank) <= int(rank_slots) if rank_slots is not None and int(rank_slots) > 0 else int(rank) <= cohort.ceil(int(class_size) * cohort.TOP_RANK_FRACTION)
-    data["rank_display"] = f"{rank}/{class_size}" if allowed else "-"
+
+    try:
+        class_size = int(class_size) if class_size is not None else None
+    except (TypeError, ValueError):
+        class_size = None
+
+    if rank_slots is None and class_size:
+        rank_slots = cohort.ceil(class_size * cohort.TOP_RANK_FRACTION)
+
+    try:
+        rank_slots = int(rank_slots) if rank_slots is not None else None
+    except (TypeError, ValueError):
+        rank_slots = None
+
+    try:
+        rank = int(rank) if rank is not None else None
+    except (TypeError, ValueError):
+        rank = None
+
+    is_top25 = bool(rank and rank_slots and rank <= rank_slots)
+    data["class_rank"] = rank if is_top25 else None
+    data["class_size"] = class_size
+    data["rank_slots"] = rank_slots or 0
+    data["is_top25"] = is_top25
+    data["rank_display"] = f"{rank}/{class_size}" if is_top25 and class_size else "-"
+    data["ranking_scope"] = "top_25_percent"
+    data["ranking_public"] = True
+
+    snapshot_breakdown = data.get("score_breakdown")
+    if not isinstance(snapshot_breakdown, dict) or not snapshot_breakdown:
+        snapshot_breakdown = stored_scorecard
+
+    data["score_breakdown"] = {
+        "overall_score": float(snapshot_breakdown.get("overall_score", certificate.overall_score or 0)),
+        "attendance_pct": float(snapshot_breakdown.get("attendance_pct", 0)),
+        "quiz_pct": float(snapshot_breakdown.get("quiz_pct", 0)),
+        "practical_pct": float(snapshot_breakdown.get("practical_pct", 0)),
+        "trainer_review_pct": float(snapshot_breakdown.get("trainer_review_pct", 0)),
+        "pass_mark": float(snapshot_breakdown.get("pass_mark", PASS_MARK)),
+    }
+
+    # Do not expose the full top-ranking list on a public certificate page.
+    data.pop("scorecard", None)
+    data.pop("top_ranking", None)
+    data.pop("top25_ranking", None)
+
     data["verification_url"] = f"{PUBLIC_VERIFY_URL}?cert={quote(certificate.certificate_id)}"
     return data
 
