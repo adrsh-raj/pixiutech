@@ -1,8 +1,10 @@
+from io import BytesIO
 from types import SimpleNamespace
 
 from django.test import SimpleTestCase
 from django.utils import timezone
-from reportlab.lib.pagesizes import A4, landscape
+from pypdf import PdfReader
+from reportlab.lib.pagesizes import A4
 
 from .certificate_pdf import CERTIFICATE_SIZE, build_certificate_pdf
 from .scorecard_pdf import build_scorecard_pdf
@@ -31,11 +33,32 @@ class PdfGeneratorTests(SimpleTestCase):
             },
         )
 
-    def test_certificate_is_a4_landscape(self):
-        self.assertEqual(CERTIFICATE_SIZE, landscape(A4))
-        response = build_certificate_pdf(self.certificate)
+    def test_certificate_is_two_page_a4_portrait_pack(self):
+        self.assertEqual(CERTIFICATE_SIZE, A4)
+        from unittest.mock import patch
+
+        scorecard = {
+            'class_size': 35,
+            'class_rank': 1,
+            'rank_display': '1/35',
+            'attendance_pct': 92.0,
+            'quiz_pct': 88.0,
+            'practical_pct': 84.0,
+            'trainer_review_pct': 90.0,
+            'top_ranking': [
+                {'rank': 1, 'rank_display': '1/35', 'student_name': 'AKASH K', 'overall_score': 95.0}
+            ],
+        }
+        with patch('learning.course_completion_final.scorecard_data', return_value=scorecard):
+            response = build_certificate_pdf(self.certificate)
+
         self.assertEqual(response['Content-Type'], 'application/pdf')
         self.assertTrue(response.content.startswith(b'%PDF'))
+        reader = PdfReader(BytesIO(response.content))
+        self.assertEqual(len(reader.pages), 2)
+        for page in reader.pages:
+            self.assertAlmostEqual(float(page.mediabox.width), A4[0], places=2)
+            self.assertAlmostEqual(float(page.mediabox.height), A4[1], places=2)
 
     def test_scorecard_generates_a4_pdf(self):
         scorecard = {
