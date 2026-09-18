@@ -522,7 +522,7 @@ def student_report_data(student):
     if not technologies:
         technologies = [
             item["name"]
-            for item in (service_completed_technologies := completed_technologies(student))
+            for item in completed_technologies(student)
             if isinstance(item, dict) and item.get("name")
         ]
     if not technologies:
@@ -532,10 +532,13 @@ def student_report_data(student):
 
     live_score = float(result.get("overall_score") or 0)
     has_live_evaluation = bool(
-        result.get("units")
-        or result.get("quiz", {}).get("assigned")
+        result.get("quiz", {}).get("assigned")
         or result.get("assessment", {}).get("has_practical")
         or result.get("assessment", {}).get("has_review")
+        or any(
+            unit.get("status") != "pending" and unit.get("score") is not None
+            for unit in result.get("units", [])
+        )
     )
     persisted_score = float(programme.overall_score or 0) if programme else 0.0
     overall_score = live_score if has_live_evaluation else persisted_score
@@ -553,8 +556,12 @@ def student_report_data(student):
         "class_name": student.school_class.display_name,
         "overall_score": overall_score,
         "evaluation_state": result["state"] if has_live_evaluation else (
-            "passed" if persisted_score >= PASS_MARK and programme and programme.completed_at else
-            "pending"
+            "passed"
+            if persisted_score >= PASS_MARK and programme and (
+                programme.completed_at
+                or programme.status in {"trainer_requested", "admin_completed"}
+            )
+            else "pending"
         ),
         "evaluated_units": evaluated_unit_count,
         "required_units": live_unit_count,
