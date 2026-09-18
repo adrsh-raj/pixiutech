@@ -65,7 +65,7 @@ def _safe_float(value, default=0.0):
         return default
 
 
-def build_scorecard_pdf(certificate, scorecard):
+def build_scorecard_pdf(certificate, scorecard, include_ranking=True):
     scorecard = dict(scorecard or {})
     student = certificate.student
     school_class = certificate.school_class
@@ -173,67 +173,72 @@ def build_scorecard_pdf(certificate, scorecard):
         c.setFont('Helvetica', 7.5)
         c.drawString(84 * mm, y - 4.2 * mm, desc)
 
-    # Dynamic top-25% ranking. Ranking data is supplied by the server-side
-    # cohort evaluator and already contains only students who passed.
-    ranking = scorecard.get('top_ranking') or scorecard.get('top25_ranking') or scorecard.get('top10_ranking') or []
-    table_top = row_y - len(summary_rows) * (row_h + 1.2 * mm) - 9 * mm
-    c.setFillColor(navy)
-    c.setFont('Helvetica-Bold', 12)
-    c.drawString(18 * mm, table_top, f"TOP {len(ranking)} CLASS RANKING")
-    c.setFillColor(muted)
-    c.setFont('Helvetica', 7.5)
-    c.drawRightString(width - 18 * mm, table_top, f"Top 25% of {int(scorecard.get('class_size') or 0)} students • Passed students only")
-
-    table_y = table_top - 8 * mm
-    col_x = [18 * mm, 38 * mm, 66 * mm, 132 * mm, 172 * mm]
-    col_w = [20 * mm, 28 * mm, 66 * mm, 40 * mm, width - 18 * mm - 172 * mm]
-    headers = ['#', 'RANK', 'STUDENT', 'SCORE', 'RESULT']
-    header_h = 8 * mm
-    c.setFillColor(navy)
-    c.rect(18 * mm, table_y - header_h, width - 36 * mm, header_h, fill=1, stroke=0)
-    c.setFillColor(white)
-    c.setFont('Helvetica-Bold', 7)
-    for idx, label in enumerate(headers):
-        c.drawCentredString(col_x[idx] + col_w[idx] / 2, table_y - 5.4 * mm, label)
-
-    row_h_rank = 7.2 * mm
-    for idx, row in enumerate(ranking):
-        y = table_y - header_h - (idx + 1) * row_h_rank
-        c.setFillColor(soft if idx % 2 == 0 else white)
-        c.setStrokeColor(line)
-        c.rect(18 * mm, y, width - 36 * mm, row_h_rank, fill=1, stroke=1)
-        values = [
-            str(idx + 1),
-            str(row.get('rank_display') or f"{idx + 1}/{scorecard.get('class_size') or 0}"),
-            str(row.get('student_name') or '—'),
-            f"{_safe_float(row.get('overall_score')):.2f}%",
-            'PASSED',
-        ]
+    # Class ranking is intentionally optional. Public certificate PDFs do
+    # not expose classmates' names/scores; the public verification page
+    # shows only the verified student's top-25% status.
+    if include_ranking:
+        # Dynamic top-25% ranking. Ranking data is supplied by the server-side
+        # cohort evaluator and already contains only students who passed.
+        ranking = scorecard.get('top_ranking') or scorecard.get('top25_ranking') or scorecard.get('top10_ranking') or []
+        table_top = row_y - len(summary_rows) * (row_h + 1.2 * mm) - 9 * mm
         c.setFillColor(navy)
-        c.setFont('Helvetica-Bold', 7)
-        c.drawCentredString(col_x[0] + col_w[0] / 2, y + 2.6 * mm, values[0])
-        c.setFillColor(blue)
-        c.drawCentredString(col_x[1] + col_w[1] / 2, y + 2.6 * mm, values[1])
-        c.setFillColor(ink)
-        fitted_name, fs = _fit_text(c, values[2], col_w[2] - 7 * mm, 'Helvetica-Bold', 7, 5.8)
-        c.setFont('Helvetica-Bold', fs)
-        c.drawString(col_x[2] + 3 * mm, y + 2.6 * mm, fitted_name)
-        c.setFillColor(navy)
-        c.setFont('Helvetica-Bold', 7)
-        c.drawCentredString(col_x[3] + col_w[3] / 2, y + 2.6 * mm, values[3])
-        c.setFillColor(good)
-        c.drawCentredString(col_x[4] + col_w[4] / 2, y + 2.6 * mm, values[4])
-
-    # If there are no passed students, make this explicit rather than showing
-    # an empty table that can be mistaken for missing data.
-    if not ranking:
-        y = table_y - header_h - row_h_rank
-        c.setFillColor(soft)
-        c.setStrokeColor(line)
-        c.rect(18 * mm, y, width - 36 * mm, row_h_rank, fill=1, stroke=1)
+        c.setFont('Helvetica-Bold', 12)
+        c.drawString(18 * mm, table_top, f"TOP {len(ranking)} CLASS RANKING")
         c.setFillColor(muted)
-        c.setFont('Helvetica-Bold', 7.2)
-        c.drawCentredString(width / 2, y + 2.6 * mm, 'No passed students are available for ranking.')
+        c.setFont('Helvetica', 7.5)
+        c.drawRightString(width - 18 * mm, table_top, f"Top 25% of {int(scorecard.get('class_size') or 0)} students • Passed students only")
+
+        table_y = table_top - 8 * mm
+        col_x = [18 * mm, 38 * mm, 66 * mm, 132 * mm, 172 * mm]
+        col_w = [20 * mm, 28 * mm, 66 * mm, 40 * mm, width - 18 * mm - 172 * mm]
+        headers = ['#', 'RANK', 'STUDENT', 'SCORE', 'RESULT']
+        header_h = 8 * mm
+        c.setFillColor(navy)
+        c.rect(18 * mm, table_y - header_h, width - 36 * mm, header_h, fill=1, stroke=0)
+        c.setFillColor(white)
+        c.setFont('Helvetica-Bold', 7)
+        for idx, label in enumerate(headers):
+            c.drawCentredString(col_x[idx] + col_w[idx] / 2, table_y - 5.4 * mm, label)
+
+        row_h_rank = 7.2 * mm
+        for idx, row in enumerate(ranking):
+            y = table_y - header_h - (idx + 1) * row_h_rank
+            c.setFillColor(soft if idx % 2 == 0 else white)
+            c.setStrokeColor(line)
+            c.rect(18 * mm, y, width - 36 * mm, row_h_rank, fill=1, stroke=1)
+            values = [
+                str(idx + 1),
+                str(row.get('rank_display') or f"{idx + 1}/{scorecard.get('class_size') or 0}"),
+                str(row.get('student_name') or '—'),
+                f"{_safe_float(row.get('overall_score')):.2f}%",
+                'PASSED',
+            ]
+            c.setFillColor(navy)
+            c.setFont('Helvetica-Bold', 7)
+            c.drawCentredString(col_x[0] + col_w[0] / 2, y + 2.6 * mm, values[0])
+            c.setFillColor(blue)
+            c.drawCentredString(col_x[1] + col_w[1] / 2, y + 2.6 * mm, values[1])
+            c.setFillColor(ink)
+            fitted_name, fs = _fit_text(c, values[2], col_w[2] - 7 * mm, 'Helvetica-Bold', 7, 5.8)
+            c.setFont('Helvetica-Bold', fs)
+            c.drawString(col_x[2] + 3 * mm, y + 2.6 * mm, fitted_name)
+            c.setFillColor(navy)
+            c.setFont('Helvetica-Bold', 7)
+            c.drawCentredString(col_x[3] + col_w[3] / 2, y + 2.6 * mm, values[3])
+            c.setFillColor(good)
+            c.drawCentredString(col_x[4] + col_w[4] / 2, y + 2.6 * mm, values[4])
+
+        # If there are no passed students, make this explicit rather than showing
+        # an empty table that can be mistaken for missing data.
+        if not ranking:
+            y = table_y - header_h - row_h_rank
+            c.setFillColor(soft)
+            c.setStrokeColor(line)
+            c.rect(18 * mm, y, width - 36 * mm, row_h_rank, fill=1, stroke=1)
+            c.setFillColor(muted)
+            c.setFont('Helvetica-Bold', 7.2)
+            c.drawCentredString(width / 2, y + 2.6 * mm, 'No passed students are available for ranking.')
+
 
     # Footer / verification.
     footer_y = 20 * mm
