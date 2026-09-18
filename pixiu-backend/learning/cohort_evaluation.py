@@ -457,6 +457,10 @@ def student_report_data(student):
         "project": result["project"],
         "blockers": result["blockers"],
         "pass_mark": PASS_MARK,
+        "trainer_name": trainer_name,
+        "trainer_id": trainer_id,
+        "technologies": technologies,
+        "report_updated_at": timezone.now().isoformat(),
     }
 
 
