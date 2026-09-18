@@ -323,6 +323,16 @@ def _certificate_page_bytes(certificate):
         qr_card_y + 3.5 * mm,
         "SCAN TO VERIFY",
     )
+    c.linkURL(
+        verification_url,
+        (
+            qr_card_x,
+            qr_card_y,
+            qr_card_x + qr_card_w,
+            qr_card_y + qr_card_h,
+        ),
+        relative=0,
+    )
 
     c.setFillColor(MUTED)
     c.setFont("Helvetica", 6.8)
@@ -349,6 +359,28 @@ def _certificate_page_bytes(certificate):
     c.setFillColor(MUTED)
     c.setFont("Helvetica", 6.2)
     c.drawString(28 * mm, 23 * mm, "Verification: pixiutech.com/verify")
+    verify_text, verify_size = _fit_text(
+        c,
+        verification_url,
+        width - 105 * mm,
+        "Helvetica",
+        6.2,
+        4.5,
+    )
+    c.setFont("Helvetica", verify_size)
+    c.drawString(28 * mm, 19 * mm, verify_text)
+    c.linkURL(
+        verification_url,
+        (
+            28 * mm,
+            18 * mm,
+            28 * mm + stringWidth(verify_text, "Helvetica", verify_size),
+            22 * mm,
+        ),
+        relative=0,
+    )
+    c.setFillColor(NAVY)
+    c.setFont("Helvetica-Bold", 6.2)
     c.drawRightString(width - 28 * mm, 23 * mm, "PIXIU TECH LLP")
 
     c.save()
@@ -359,14 +391,43 @@ def _certificate_page_bytes(certificate):
 def build_certificate_pdf(certificate):
     """
     Return one official two-page A4 portrait credential pack:
-    1) score card
+    1) student score card
     2) certificate with QR verification.
+
+    The issued certificate snapshot is authoritative. Public PDF generation
+    must not depend on a fresh class-wide ranking calculation.
     """
-    from . import course_completion_final as completion_service
     from .scorecard_pdf import build_scorecard_pdf
 
-    scorecard = completion_service.scorecard_data(certificate)
-    scorecard_response = build_scorecard_pdf(certificate, scorecard)
+    snapshot = dict(certificate.snapshot or {})
+    stored_scorecard = snapshot.get("scorecard")
+
+    if isinstance(stored_scorecard, dict):
+        scorecard = dict(stored_scorecard)
+    else:
+        scorecard = {
+            "class_size": snapshot.get("class_size") or 0,
+            "class_rank": certificate.rank,
+            "rank_display": "-",
+            "rank_slots": snapshot.get("rank_slots") or 0,
+            "attendance_pct": snapshot.get("attendance_pct") or 0,
+            "quiz_pct": snapshot.get("quiz_pct") or 0,
+            "practical_pct": snapshot.get("practical_pct") or 0,
+            "trainer_review_pct": snapshot.get("trainer_review_pct") or 0,
+            "top_ranking": [],
+        }
+
+    # Ranking is a website-only public feature. Do not print classmates'
+    # names/scores into the downloadable public credential.
+    scorecard["top_ranking"] = []
+    scorecard["top25_ranking"] = []
+    scorecard["top10_ranking"] = []
+    scorecard["rank_display"] = "-"
+    scorecard_response = build_scorecard_pdf(
+        certificate,
+        scorecard,
+        include_ranking=False,
+    )
     scorecard_bytes = bytes(scorecard_response.content)
     certificate_page_bytes = _certificate_page_bytes(certificate)
 
@@ -385,4 +446,5 @@ def build_certificate_pdf(certificate):
         f'inline; filename="{certificate.certificate_id}.pdf"'
     )
     response["X-Content-Type-Options"] = "nosniff"
+    response["Cache-Control"] = "no-store"
     return response
