@@ -455,6 +455,7 @@ def student_report_data(student):
         "quiz": result["quiz"],
         "assessment": result["assessment"],
         "project": result["project"],
+        "final_session": result["final_session"],
         "blockers": result["blockers"],
         "pass_mark": PASS_MARK,
         "trainer_name": trainer_name,
