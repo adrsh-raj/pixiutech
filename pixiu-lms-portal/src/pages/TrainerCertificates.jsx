@@ -84,7 +84,7 @@ export default function TrainerCertificates() {
       <div>
         <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-blue-600"><ShieldCheck size={14}/> Server-authoritative credential issuance</div>
         <h1 className="mt-1 text-2xl font-black text-slate-900">Graduate Certificates</h1>
-        <p className="mt-1 text-sm text-slate-500">Each issued credential now produces two official papers from the backend: a certificate-size graduate certificate and an A4 student score card with class ranking.</p>
+        <p className="mt-1 text-sm text-slate-500">Each issued credential now produces one official two-page A4 portrait pack: page 1 is the student score card and page 2 is the certificate with QR verification.</p>
       </div>
       <div className="flex gap-2"><button type="button" onClick={loadStudents} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50"><RefreshCw size={14}/> Refresh</button><Link to="/verify" target="_blank" className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white"><ExternalLink size={14}/> Verify Page</Link></div>
     </div>
