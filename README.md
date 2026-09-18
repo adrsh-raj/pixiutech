@@ -20,8 +20,11 @@ Set:
 
 ```env
 VITE_LMS_URL=https://portal.pixiutech.com
+VITE_API_URL=https://<your-django-api-host>/api/v1
 ENQUIRY_DELIVERY_ENDPOINT=https://formspree.io/f/<form-id>
 ```
+
+`VITE_API_URL` is required by the public `/verify` page so certificate verification can query the canonical Django API.
 
 `VITE_LMS_URL` is consumed by `src/config/runtime.js` as the single LMS URL authority. The enquiry form posts only to the same-origin `/api/enquiry` Vercel function. `ENQUIRY_DELIVERY_ENDPOINT` is server-side configuration and must not use the `VITE_` prefix.
 
