@@ -473,6 +473,145 @@ def student_report_data(student):
                 "reasons": list(row.reasons or []),
                 "final_session_id": str(row.final_session_id) if row.final_session_id else None,
             })
+    if not unit_rows:
+        assessment_rows = list(
+            StudentAssessment.objects.filter(
+                student=student,
+                status=AssessmentStatus.PUBLISHED,
+            ).order_by("unit_code", "assessment_date", "id")
+        )
+        completed_sessions = list(
+            Session.objects.filter(
+                school_class_id=student.school_class_id,
+                status="completed",
+            ).select_related("curriculum_unit", "workflow__technology").order_by("date", "start_time", "id")
+        )
+        units_by_code = {}
+        for session in completed_sessions:
+            code = str(
+                getattr(getattr(session, "curriculum_unit", None), "unit_code", "") or ""
+            ).strip().upper()
+            if not code:
+                continue
+            units_by_code.setdefault(code, []).append(session)
+
+        assessment_by_code = {}
+        for row in assessment_rows:
+            code = str(getattr(row, "unit_code", "") or "").strip().upper()
+            if code:
+                assessment_by_code.setdefault(code, []).append(row)
+
+        fallback_codes = sorted(set(units_by_code) | set(assessment_by_code))
+        for code in fallback_codes:
+            sessions_for_unit = units_by_code.get(code, [])
+            assessments_for_unit = assessment_by_code.get(code, [])
+            practical_values = [
+                float(row.score) for row in assessments_for_unit
+                if getattr(row, "score", None) is not None
+            ]
+            review_values = [
+                float(row.rating) for row in assessments_for_unit
+                if getattr(row, "rating", None) is not None
+            ]
+            practical_pct = (
+                round(sum(practical_values) / len(practical_values), 2)
+                if practical_values else 0.0
+            )
+            review_pct = (
+                round(sum(review_values) / len(review_values) * 20, 2)
+                if review_values else 0.0
+            )
+            attendance_pct = 0.0
+            if sessions_for_unit:
+                attendance_rows = list(
+                    student.attendance_records.filter(
+                        session_id__in=[item.id for item in sessions_for_unit]
+                    ).only("status")
+                )
+                attended = sum(
+                    1 for attendance_row in attendance_rows
+                    if attendance_row.status in {
+                        AttendanceStatus.PRESENT,
+                        AttendanceStatus.LATE,
+                        AttendanceStatus.EXCUSED,
+                    }
+                )
+                attendance_pct = round(
+                    attended * 100 / len(sessions_for_unit), 2
+                )
+
+            quiz_rows = [
+                row for row in result.get("quiz", {}).get("rows", [])
+                if str(row.get("unit_code") or "").strip().upper() == code
+            ]
+            quiz_scores = [
+                float(row.get("percentage", 0))
+                for row in quiz_rows
+                if row.get("complete")
+            ]
+            quiz_pct = (
+                round(sum(quiz_scores) / len(quiz_scores), 2)
+                if quiz_scores else 0.0
+            )
+            unit_score = round(
+                practical_pct * 0.40
+                + quiz_pct * 0.25
+                + attendance_pct * 0.20
+                + review_pct * 0.15,
+                2,
+            )
+
+            session = sessions_for_unit[0] if sessions_for_unit else None
+            curriculum_unit = getattr(session, "curriculum_unit", None)
+            assessment_title = (
+                getattr(assessments_for_unit[0], "title", "") if assessments_for_unit else ""
+            )
+            title = (
+                getattr(curriculum_unit, "title", "") or
+                assessment_title or
+                code or
+                "Learning Unit"
+            )
+            technology = ""
+            if session:
+                technology = str(
+                    getattr(getattr(getattr(session, "workflow", None), "technology", None), "name", "")
+                    or ""
+                ).strip()
+            if not technology:
+                technology = str(
+                    (result.get("final_session") or {}).get("technology") or ""
+                ).strip()
+
+            is_evaluated = bool(
+                sessions_for_unit
+                and assessments_for_unit
+                and practical_values
+                and review_values
+            )
+            unit_rows.append({
+                "curriculum_unit_id": str(curriculum_unit.id) if curriculum_unit else None,
+                "technology": technology,
+                "unit_code": code,
+                "title": title,
+                "sessions_count": len(sessions_for_unit),
+                "completed_sessions": len(sessions_for_unit),
+                "attendance_pct": attendance_pct,
+                "quiz_pct": quiz_pct,
+                "practical_pct": practical_pct,
+                "trainer_review_pct": review_pct,
+                "trainer_review_rating": (
+                    round(sum(review_values) / len(review_values), 2)
+                    if review_values else None
+                ),
+                "score": unit_score if is_evaluated else None,
+                "status": "passed" if is_evaluated and unit_score >= PASS_MARK else (
+                    "pending" if not is_evaluated else "failed"
+                ),
+                "reasons": [] if is_evaluated else ["Legacy progress data reconstructed from published LMS activity."],
+                "final_session_id": str(session.id) if session else None,
+            })
+
 
     trainer_name = str(
         (result.get("final_session") or {}).get("trainer_name") or ""
