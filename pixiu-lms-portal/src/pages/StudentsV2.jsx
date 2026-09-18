@@ -54,15 +54,15 @@ export default function StudentsV2() {
     const response = await apiFetch(`/course-completion/student-report/${encodeURIComponent(studentKey)}`, { cache: 'no-store' });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.detail || `Unable to load the live progress record (${response.status}).`);
-    return { completion: payload, student: student, school: selectedSchool };
+    return { completion: payload };
   };
   const printStudent = async student => {
     const sid = text(student.student_id || student.id);
     try {
       const response = await fetchCompletionReport(sid);
       generateStudentProgressPDF({
-        student: response.student || student,
-        school: response.school || selectedSchool || { name: student.school_name || '—', school_code: student.school_code || '' },
+        student,
+        school: selectedSchool || { name: student.school_name || '—', school_code: student.school_code || '' },
         attendanceRate: response.completion?.attendance?.percentage ?? getStudentAttendance(sid),
         studentReviews: studentReviews.filter(r => text(r.student_id || r.student).toUpperCase().replace(/\s+/g, '') === sid.toUpperCase().replace(/\s+/g, '')),
         projects: projects.filter(p => text(p.student_id || p.student).toUpperCase().replace(/\s+/g, '') === sid.toUpperCase().replace(/\s+/g, '')),
