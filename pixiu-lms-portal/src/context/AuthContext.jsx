@@ -22,8 +22,9 @@ function pruneApiReadCache(now = Date.now()) {
     apiReadCache.delete(oldestKey);
   }
 }
-function isCacheableRead(path, method, accessToken) {
+function isCacheableRead(path, method, accessToken, requestedCache = '') {
   if (!accessToken || !['GET', 'HEAD'].includes(method)) return false;
+  if (String(requestedCache || '').toLowerCase() === 'no-store') return false;
   const normalizedPath = String(path || '');
   if (normalizedPath.startsWith('/auth/')) return false;
   if (normalizedPath === '/health' || normalizedPath.startsWith('/health/')) return false;
@@ -134,7 +135,7 @@ export async function apiFetch(path, options = {}) {
     const headers = new Headers(options.headers || {});
     if (options.body && !(options.body instanceof FormData) && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
     if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
-    const cacheableRead = isCacheableRead(path, method, accessToken);
+    const cacheableRead = isCacheableRead(path, method, accessToken, options.cache);
     const cacheKey = cacheableRead ? buildReadCacheKey(path, method, accessToken) : null;
     if (cacheKey) {
       const now = Date.now(); pruneApiReadCache(now);
