@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, Download, ExternalLink, Search, ShieldCheck, XCircle } from 'lucide-react'
+import { Check, CheckCircle2, Copy, Download, ExternalLink, Search, ShieldCheck, XCircle } from 'lucide-react'
 import '../styles/verify.css'
 
 const text = (value) => String(value ?? '').trim()
@@ -48,6 +48,7 @@ export default function Verify() {
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [copied, setCopied] = useState(false)
 
   const verify = async (value = certificateId) => {
     const key = text(value)
@@ -79,8 +80,24 @@ export default function Verify() {
   const resolvedCertificateId = text(result?.certificate_id || result?.certificate_ref || certificateId)
   const pdfUrl = resolvedCertificateId && API_BASE ? `${API_BASE}/public/certificates/pdf/${encodeURIComponent(resolvedCertificateId)}` : ''
   const technologies = Array.isArray(result?.technologies) ? result.technologies : Array.isArray(result?.completed_technologies) ? result.completed_technologies : []
-  const units = Array.isArray(result?.units) ? result.units : []
+  const units = Array.isArray(result?.units) ? result.units : Array.isArray(result?.marks) ? result.marks : []
+  const breakdown = result?.score_breakdown && typeof result.score_breakdown === 'object' ? result.score_breakdown : {}
+  const classSize = Number(result?.class_size) || 0
+  const rankSlots = Number(result?.rank_slots) || Math.ceil(classSize * 0.25)
+  const classRank = Number(result?.class_rank) || 0
+  const top25 = result?.is_top25 === true || (classRank > 0 && rankSlots > 0 && classRank <= rankSlots)
+  const rankDisplay = text(result?.rank_display) || '—'
   const publicVerificationUrl = `${PUBLIC_VERIFY_BASE}?cert=${encodeURIComponent(resolvedCertificateId)}`
+
+  const copyVerificationLink = async () => {
+    try {
+      await navigator.clipboard.writeText(publicVerificationUrl)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1800)
+    } catch {
+      setCopied(false)
+    }
+  }
 
   return (
     <div className="verify-page">
@@ -88,15 +105,148 @@ export default function Verify() {
       <section className="verify-content"><div className="shell verify-shell">
         <form className="verify-search-card" onSubmit={event => { event.preventDefault(); verify(certificateId) }}><div className="verify-search-input"><Search size={18} aria-hidden="true" /><input value={certificateId} onChange={event => setCertificateId(event.target.value)} placeholder="e.g. PX-XYZ-XYZ6A 01-2026-54D0DD" aria-label="Certificate ID" spellCheck="false" /></div><button className="btn btn--primary verify-search-btn" type="submit" disabled={loading}>{loading ? 'Checking Registry…' : 'Verify Certificate'}</button></form>
         {error && <div className="verify-alert verify-alert--error" role="alert"><XCircle size={20} /><div><strong>Certificate not verified</strong><span>{error}</span></div></div>}
+
         {result && <div className="verify-result">
-          <div className={`verify-status ${verified ? 'verify-status--verified' : 'verify-status--warning'}`}><div className="verify-status-icon">{verified ? <CheckCircle2 size={30} /> : <XCircle size={30} />}</div><div><span className="verify-status-kicker">{verified ? 'Credential verified' : 'Record returned'}</span><h2>{verified ? 'Official Pixiu Tech Certificate' : 'Certificate is not currently verified'}</h2><p>{verified ? 'The certificate ID matches an issued credential in the Pixiu Tech verification registry.' : text(result.reason) || 'The registry returned a record, but the credential did not satisfy verification requirements.'}</p></div></div>
-          <div className="verify-grid">
-            <article className="verify-card"><span className="verify-card-label">Student</span><h3>{text(result.student_name) || '—'}</h3><div className="verify-card-meta"><span>Student ID</span><strong>{text(result.student_id) || '—'}</strong></div><div className="verify-card-meta"><span>School</span><strong>{text(result.school_name) || '—'}</strong></div><div className="verify-card-meta"><span>Class</span><strong>{text(result.class_name) || '—'}</strong></div></article>
-            <article className="verify-card"><span className="verify-card-label">Certificate</span><h3 className="verify-mono">{resolvedCertificateId || '—'}</h3><div className="verify-stat-row"><div><span>Overall score</span><strong>{formatScore(result.overall_score)}</strong></div><div><span>Issued</span><strong>{formatDate(result.issued_at)}</strong></div></div><div className="verify-card-meta"><span>Programme</span><strong>{text(result.programme_name) || 'Pixiu Technology Programme'}</strong></div></article>
+          <div className={`verify-status ${verified ? 'verify-status--verified' : 'verify-status--warning'}`}>
+            <div className="verify-status-icon">{verified ? <CheckCircle2 size={30} /> : <XCircle size={30} />}</div>
+            <div>
+              <span className="verify-status-kicker">{verified ? 'Credential verified' : 'Record returned'}</span>
+              <h2>{verified ? 'Official Pixiu Tech Certificate' : 'Certificate is not currently verified'}</h2>
+              <p>{verified ? 'The certificate ID matches an issued credential in the Pixiu Tech verification registry.' : text(result.reason) || 'The registry returned a record, but the credential did not satisfy verification requirements.'}</p>
+            </div>
           </div>
-          <div className="verify-card verify-card--wide"><div className="verify-wide-head"><div><span className="verify-card-label">Completion record</span><h3>Programme evidence</h3></div>{verified && pdfUrl && <a className="btn btn--primary verify-download" href={pdfUrl} target="_blank" rel="noreferrer"><Download size={16} /> View Certificate PDF</a>}</div><div className="verify-evidence-grid"><div><span>Technologies completed</span><strong>{technologies.length ? technologies.map(item => text(item?.name || item?.technology || item)).filter(Boolean).join(' · ') : '—'}</strong></div><div><span>Completed units</span><strong>{result.completion_count != null ? `${result.completion_count}${result.required_completion_count != null ? ` / ${result.required_completion_count}` : ''}` : units.length || 'Recorded'}</strong></div><div><span>Attendance</span><strong>{result.attendance_rate != null ? `${result.attendance_rate}%` : '—'}</strong></div><div><span>Issued by</span><strong>{text(result.issued_by || result.trainer_name) || 'Pixiu Tech LLP'}</strong></div></div></div>
-          {verified && units.length > 0 && <div className="verify-card verify-card--wide"><div className="verify-wide-head"><div><span className="verify-card-label">Completed Technology Units</span><h3>Unit-wise completion and scores</h3></div><span className="verify-card-label">{units.length} unique units</span></div><div style={{ overflowX: 'auto', marginTop: 18 }}><table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 650, fontSize: 12 }}><thead><tr style={{ background: '#F5F8FC' }}>{['Technology', 'Unit', 'Module', 'Sessions', 'Score'].map(heading => <th key={heading} style={{ padding: '12px 14px', textAlign: heading === 'Score' || heading === 'Sessions' ? 'center' : 'left', borderBottom: '1px solid #D9E2EE', color: '#64748B', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.12em' }}>{heading}</th>)}</tr></thead><tbody>{units.map((unit, index) => <tr key={`${unit.unit_code || 'unit'}-${index}`}><td style={{ padding: '13px 14px', fontWeight: 800, borderBottom: '1px solid #EDF1F6' }}>{text(unit.technology) || '—'}</td><td style={{ padding: '13px 14px', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 11, color: '#1768FF', borderBottom: '1px solid #EDF1F6' }}>{text(unit.unit_code) || '—'}</td><td style={{ padding: '13px 14px', borderBottom: '1px solid #EDF1F6' }}>{text(unit.title) || '—'}</td><td style={{ padding: '13px 14px', textAlign: 'center', fontWeight: 800, borderBottom: '1px solid #EDF1F6' }}>{unit.sessions ?? '—'}</td><td style={{ padding: '13px 14px', textAlign: 'center', fontWeight: 900, color: '#071A33', borderBottom: '1px solid #EDF1F6' }}>{formatScore(unit.score)}</td></tr>)}</tbody></table></div><p style={{ margin: '14px 0 0', color: '#94A3B8', fontSize: 10 }}>Unit scores are sourced from published LMS practical assessments; the overall programme score is the official weighted result.</p></div>}
-          <div className="verify-trust"><div><span>Verification URL</span><strong>{publicVerificationUrl}</strong></div><a href="/" className="verify-home-link">Return to Pixiu Tech <ExternalLink size={14} /></a></div>
+
+          <div className="verify-grid">
+            <article className="verify-card">
+              <span className="verify-card-label">Student</span>
+              <h3>{text(result.student_name) || '—'}</h3>
+              <div className="verify-card-meta"><span>Student ID</span><strong>{text(result.student_id) || '—'}</strong></div>
+              <div className="verify-card-meta"><span>School</span><strong>{text(result.school_name) || '—'}</strong></div>
+              <div className="verify-card-meta"><span>Class</span><strong>{text(result.class_name) || '—'}</strong></div>
+            </article>
+
+            <article className="verify-card">
+              <span className="verify-card-label">Certificate</span>
+              <h3 className="verify-mono">{resolvedCertificateId || '—'}</h3>
+              <div className="verify-stat-row">
+                <div><span>Overall score</span><strong>{formatScore(result.overall_score)}</strong></div>
+                <div><span>Issued</span><strong>{formatDate(result.issued_at)}</strong></div>
+              </div>
+              <div className="verify-card-meta"><span>Programme</span><strong>{text(result.programme_name) || 'Pixiu Technology Programme'}</strong></div>
+            </article>
+          </div>
+
+          {verified && <section className="verify-card verify-card--wide verify-marks-card">
+            <div className="verify-wide-head">
+              <div>
+                <span className="verify-card-label">Verified marks</span>
+                <h3>Academic performance</h3>
+              </div>
+              <span className="verify-verified-chip"><CheckCircle2 size={14} /> Verified record</span>
+            </div>
+
+            <div className="verify-overall-strip">
+              <div>
+                <span>Official overall score</span>
+                <strong>{formatScore(breakdown.overall_score ?? result.overall_score)}</strong>
+              </div>
+              <div>
+                <span>Pass mark</span>
+                <strong>{formatScore(breakdown.pass_mark)}</strong>
+              </div>
+              <div>
+                <span>Units completed</span>
+                <strong>{result.completion_count != null ? `${result.completion_count}${result.required_completion_count != null ? ` / ${result.required_completion_count}` : ''}` : units.length || 'Recorded'}</strong>
+              </div>
+            </div>
+
+            <div className="verify-metrics-grid">
+              <div className="verify-mark-metric"><span>Attendance</span><strong>{formatScore(breakdown.attendance_pct ?? result.attendance_rate)}</strong></div>
+              <div className="verify-mark-metric"><span>Knowledge / Quiz</span><strong>{formatScore(breakdown.quiz_pct)}</strong></div>
+              <div className="verify-mark-metric"><span>Practical Evaluation</span><strong>{formatScore(breakdown.practical_pct)}</strong></div>
+              <div className="verify-mark-metric"><span>Trainer Review</span><strong>{formatScore(breakdown.trainer_review_pct)}</strong></div>
+            </div>
+
+            <div className="verify-tech-row">
+              <span>Technologies completed</span>
+              <strong>{technologies.length ? technologies.map(item => text(item?.name || item?.technology || item)).filter(Boolean).join(' · ') : '—'}</strong>
+            </div>
+
+            {units.length > 0 && <div className="verify-marks-table-wrap">
+              <div className="verify-table-title">
+                <div>
+                  <span className="verify-card-label">Unit-wise marks</span>
+                  <strong>Published learning record</strong>
+                </div>
+                <span>{units.length} units</span>
+              </div>
+              <div className="verify-table-scroll">
+                <table className="verify-marks-table">
+                  <thead>
+                    <tr>{['Technology', 'Unit', 'Module', 'Sessions', 'Marks'].map(heading => <th key={heading}>{heading}</th>)}</tr>
+                  </thead>
+                  <tbody>
+                    {units.map((unit, index) => (
+                      <tr key={`${unit.unit_code || 'unit'}-${index}`}>
+                        <td>{text(unit.technology) || '—'}</td>
+                        <td className="verify-table-code">{text(unit.unit_code) || '—'}</td>
+                        <td>{text(unit.title) || '—'}</td>
+                        <td className="verify-table-number">{unit.sessions ?? unit.sessions_count ?? '—'}</td>
+                        <td className="verify-table-score">{formatScore(unit.marks ?? unit.score)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="verify-footnote">Marks shown here are the published certificate record. The overall programme result is the official weighted score stored by Pixiu Tech.</p>
+            </div>}
+          </section>}
+
+          {verified && <section className="verify-card verify-card--wide verify-ranking-card">
+            <div className="verify-wide-head">
+              <div>
+                <span className="verify-card-label">Class ranking · public view</span>
+                <h3>{top25 ? 'Ranked within the top 25%' : 'Public ranking band'}</h3>
+              </div>
+              <span className="verify-ranking-policy">Top 25% only</span>
+            </div>
+
+            <div className={`verify-ranking-main ${top25 ? 'verify-ranking-main--active' : ''}`}>
+              <div>
+                <span>Published class rank</span>
+                <strong>{top25 ? rankDisplay : 'Not published'}</strong>
+              </div>
+              <div>
+                <span>Class size</span>
+                <strong>{classSize || '—'}</strong>
+              </div>
+              <div>
+                <span>Published positions</span>
+                <strong>{rankSlots || '—'}</strong>
+              </div>
+            </div>
+
+            <div className="verify-ranking-note">
+              {top25
+                ? 'This certificate is within the published top 25% of its class. Rank is shown only within that public band.'
+                : 'For student privacy, the public verification page does not publish ranks outside the top 25% or expose classmates’ names and scores. Full ranking remains inside the authenticated LMS.'}
+            </div>
+          </section>}
+
+          <div className="verify-trust">
+            <div>
+              <span>Verification URL</span>
+              <strong>{publicVerificationUrl}</strong>
+            </div>
+            <div className="verify-trust-actions">
+              <button className="verify-copy-btn" type="button" onClick={copyVerificationLink} disabled={!resolvedCertificateId}>
+                {copied ? <Check size={15} /> : <Copy size={15} />}
+                {copied ? 'Copied' : 'Copy link'}
+              </button>
+              {verified && pdfUrl && <a className="btn btn--primary verify-download" href={pdfUrl} target="_blank" rel="noreferrer"><Download size={16} /> View Certificate PDF</a>}
+              <a href="/" className="verify-home-link">Return to Pixiu Tech <ExternalLink size={14} /></a>
+            </div>
+          </div>
         </div>}
         {!result && !loading && !error && <div className="verify-empty"><ShieldCheck size={28} /><h2>Ready to verify</h2><p>Use the certificate ID printed on the PDF or open this page from its verification link.</p></div>}
       </div></section>
