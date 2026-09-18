@@ -2,7 +2,7 @@ from collections import OrderedDict
 from math import ceil
 
 from django.db import transaction
-from django.db.models import Max, Q
+from django.db.models import Count, Max, Q
 from django.utils import timezone
 
 from .course_completion_models import CompletionPolicy, ProgrammeCompletion, UnitCompletion
@@ -414,9 +414,93 @@ def class_ranking_data(student):
 
 def student_report_data(student):
     result = evaluate_student(student)
-    final_session = result.get("final_session") or {}
-    trainer_name = str(final_session.get("trainer_name") or "").strip()
-    trainer_id = str(final_session.get("trainer_id") or "").strip()
+    programme = (
+        ProgrammeCompletion.objects.filter(student=student)
+        .only("status", "overall_score", "completed_at", "updated_at")
+        .first()
+    )
+
+    # Progress reports are live, but they must remain consistent with a
+    # completed programme when some legacy records no longer carry a
+    # curriculum_unit link or a directly recomputable assessment row.
+    unit_rows = list(result.get("units") or [])
+    persisted_units = list(
+        UnitCompletion.objects.filter(student=student)
+        .select_related(
+            "curriculum_unit",
+            "curriculum_unit__completion_profile__technology",
+            "final_session__workflow__technology",
+            "final_session__trainer",
+        )
+        .order_by("curriculum_unit__unit_code")
+    )
+
+    if not unit_rows and persisted_units:
+        unit_ids = [row.curriculum_unit_id for row in persisted_units]
+        session_counts = {
+            str(row["curriculum_unit_id"]): row["total"]
+            for row in (
+                Session.objects.filter(
+                    school_class_id=student.school_class_id,
+                    status="completed",
+                    curriculum_unit_id__in=unit_ids,
+                )
+                .values("curriculum_unit_id")
+                .annotate(total=Count("id"))
+            )
+        }
+        unit_rows = []
+        for row in persisted_units:
+            final_session = getattr(row, "final_session", None)
+            workflow = getattr(final_session, "workflow", None)
+            technology = getattr(getattr(workflow, "technology", None), "name", "") or ""
+            if not technology:
+                technology = getattr(
+                    getattr(getattr(row.curriculum_unit, "completion_profile", None), "technology", None),
+                    "name",
+                    "",
+                ) or ""
+            unit_rows.append({
+                "curriculum_unit_id": str(row.curriculum_unit_id),
+                "technology": technology,
+                "unit_code": str(row.curriculum_unit.unit_code or "").strip().upper(),
+                "title": row.curriculum_unit.title,
+                "sessions_count": session_counts.get(str(row.curriculum_unit_id), 0),
+                "completed_sessions": session_counts.get(str(row.curriculum_unit_id), 0),
+                "attendance_pct": float(row.attendance_pct or 0),
+                "quiz_pct": float(row.quiz_pct or 0),
+                "practical_pct": float(row.practical_pct or 0),
+                "trainer_review_pct": float(row.trainer_review_avg or 0) * 20,
+                "trainer_review_rating": float(row.trainer_review_avg) if row.trainer_review_avg is not None else None,
+                "score": float(row.score or 0),
+                "status": row.status,
+                "reasons": list(row.reasons or []),
+                "final_session_id": str(row.final_session_id) if row.final_session_id else None,
+            })
+
+    trainer_name = str(
+        (result.get("final_session") or {}).get("trainer_name") or ""
+    ).strip()
+    trainer_id = str(
+        (result.get("final_session") or {}).get("trainer_id") or ""
+    ).strip()
+    if not trainer_name and persisted_units:
+        trainer_names = [
+            str(getattr(getattr(row, "final_session", None), "trainer", None).name or "").strip()
+            for row in persisted_units
+            if getattr(getattr(row, "final_session", None), "trainer", None)
+        ]
+        trainer_name = next((value for value in trainer_names if value), "")
+        trainer_id = next(
+            (
+                str(getattr(getattr(getattr(row, "final_session", None), "trainer", None), "trainer_id", "") or "").strip()
+                for row in persisted_units
+                if getattr(getattr(row, "final_session", None), "trainer", None)
+                and getattr(getattr(row, "final_session", None), "trainer", None).trainer_id
+            ),
+            "",
+        )
+
     if not trainer_name:
         assignment = (
             student.school_class.school.trainer_assignments
@@ -431,14 +515,35 @@ def student_report_data(student):
             trainer_id = str(getattr(assignment.trainer, "trainer_id", "") or "").strip()
 
     technologies = []
-    for unit in result.get("units", []):
+    for unit in unit_rows:
         value = str(unit.get("technology") or "").strip()
         if value and value not in technologies:
             technologies.append(value)
     if not technologies:
-        final_technology = str(final_session.get("technology") or "").strip()
+        technologies = [
+            item["name"]
+            for item in (service_completed_technologies := completed_technologies(student))
+            if isinstance(item, dict) and item.get("name")
+        ]
+    if not technologies:
+        final_technology = str((result.get("final_session") or {}).get("technology") or "").strip()
         if final_technology:
             technologies.append(final_technology)
+
+    live_score = float(result.get("overall_score") or 0)
+    has_live_evaluation = bool(
+        result.get("units")
+        or result.get("quiz", {}).get("assigned")
+        or result.get("assessment", {}).get("has_practical")
+        or result.get("assessment", {}).get("has_review")
+    )
+    persisted_score = float(programme.overall_score or 0) if programme else 0.0
+    overall_score = live_score if has_live_evaluation else persisted_score
+
+    live_unit_count = len(unit_rows)
+    evaluated_unit_count = sum(
+        1 for unit in unit_rows if str(unit.get("status") or "").lower() != "pending"
+    )
 
     return {
         "student_id": result["student_id"],
@@ -446,22 +551,27 @@ def student_report_data(student):
         "school_name": student.school_class.school.name,
         "school_code": student.school_class.school.school_code,
         "class_name": student.school_class.display_name,
-        "overall_score": result["overall_score"],
-        "evaluation_state": result["state"],
-        "evaluated_units": result["evaluated_units"],
-        "required_units": result["required_units"],
-        "units": result["units"],
+        "overall_score": overall_score,
+        "evaluation_state": result["state"] if has_live_evaluation else (
+            "passed" if persisted_score >= PASS_MARK and programme and programme.completed_at else
+            "pending"
+        ),
+        "evaluated_units": evaluated_unit_count,
+        "required_units": live_unit_count,
+        "units": unit_rows,
         "attendance": result["attendance"],
         "quiz": result["quiz"],
         "assessment": result["assessment"],
         "project": result["project"],
-        "final_session": result["final_session"],
+        "final_session": result.get("final_session"),
         "blockers": result["blockers"],
         "pass_mark": PASS_MARK,
         "trainer_name": trainer_name,
         "trainer_id": trainer_id,
         "technologies": technologies,
         "report_updated_at": timezone.now().isoformat(),
+        "programme_completion_status": programme.status if programme else "in_progress",
+        "programme_completed_at": programme.completed_at.isoformat() if programme and programme.completed_at else None,
     }
 
 
