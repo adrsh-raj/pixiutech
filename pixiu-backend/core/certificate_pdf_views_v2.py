@@ -8,7 +8,7 @@ from rest_framework.views import APIView
 from academics.models import Student
 from academics.services import accessible_student_queryset
 from learning import course_completion_final as service
-from learning.certificate_pdf_v2 import build_certificate_pdf
+from learning.certificate_pdf import build_certificate_pdf
 from learning.course_completion_models import Certificate
 from learning.scorecard_pdf import build_scorecard_pdf
 
