@@ -56,7 +56,7 @@ class PublicCertificatePdfViewV2(APIView):
         ).first()
         if certificate is None:
             return _error('No issued Pixiu Tech certificate matches this certificate ID.', 404)
-        return build_certificate_pdf(certificate)
+        return build_certificate_pdf(certificate, include_scorecard=False)
 
 
 class ScorecardPdfViewV2(APIView):
