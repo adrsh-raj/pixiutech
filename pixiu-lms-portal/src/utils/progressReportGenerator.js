@@ -75,7 +75,7 @@ export function generateStudentProgressPDF({ student, school, attendanceRate = 0
   const serverScore = completion?.overall_score == null ? null : Number(completion.overall_score);
   const totalScore = serverScore != null ? serverScore : evaluated.reduce((sum, row) => sum + row.score, 0);
   const totalPossible = usingServer ? rows.length * 100 : rows.length * 10;
-  const projectsForStudent = (projects || []).filter(project => sameStudent(project, student));
+  const clientProjectsForStudent = (projects || []).filter(project => sameStudent(project, student));
   const grade = gradeOf(student);
   const effectiveAttendance = completion?.attendance?.percentage ?? completion?.checklist?.attendance?.percentage ?? attendanceRate;
   const evaluationState = completion?.evaluation_state || completion?.state || (serverScore != null && serverScore >= 70 ? 'passed' : 'pending');
@@ -89,6 +89,10 @@ export function generateStudentProgressPDF({ student, school, attendanceRate = 0
   const reportUpdatedAt = completion?.report_updated_at ? new Date(completion.report_updated_at) : new Date();
   const reportUpdatedText = Number.isNaN(reportUpdatedAt.getTime()) ? 'Current LMS record' : reportUpdatedAt.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
+  const projectsForReport = usingServer
+    ? (completion?.project && typeof completion.project === 'object' ? [completion.project] : [])
+    : clientProjectsForStudent;
+
   const reviewRows = rows.length
     ? rows.map(row => {
         const scoreText = usingServer
@@ -101,8 +105,8 @@ export function generateStudentProgressPDF({ student, school, attendanceRate = 0
       }).join('')
     : '<tr><td colspan="7" style="text-align:center;color:#94a3b8">No taught programme units have been recorded for this student.</td></tr>';
 
-  const projectRows = projectsForStudent.length
-    ? projectsForStudent.map(project => `<tr><td>${esc(project.title || 'Project')}</td><td>${esc(project.score ?? '—')}</td><td><span class="pill ${norm(project.status) === 'completed' ? 'verified' : 'pending'}">${esc(project.status || '—')}</span></td><td>${esc(project.trainer_feedback || project.description || '—')}</td></tr>`).join('')
+  const projectRows = projectsForReport.length
+    ? projectsForReport.map(project => `<tr><td>${esc(project.title || 'Project')}</td><td>${esc(project.score ?? '—')}</td><td><span class="pill ${norm(project.status) === 'completed' ? 'verified' : 'pending'}">${esc(project.status || '—')}</span></td><td>${esc(project.trainer_feedback || project.feedback || project.description || '—')}</td></tr>`).join('')
     : '<tr><td colspan="4" style="text-align:center;color:#94a3b8">No project records recorded.</td></tr>';
 
   const blockerText = Array.isArray(completion?.blockers) && completion.blockers.length
