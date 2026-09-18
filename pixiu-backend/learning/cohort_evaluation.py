@@ -2,7 +2,7 @@ from collections import OrderedDict
 from math import ceil
 
 from django.db import transaction
-from django.db.models import Max
+from django.db.models import Max, Q
 from django.utils import timezone
 
 from .course_completion_models import CompletionPolicy, ProgrammeCompletion, UnitCompletion
@@ -23,7 +23,7 @@ def _policy(school_class):
 def _completed_sessions(school_class):
     return list(
         Session.objects.filter(school_class=school_class, status="completed")
-        .select_related("curriculum_unit", "workflow__technology")
+        .select_related("curriculum_unit", "workflow__technology", "trainer")
         .order_by("date", "start_time", "id")
     )
 
@@ -262,6 +262,8 @@ def evaluate_student(student, sessions=None, policy=None):
             "date": str(final.date),
             "topic": final.topic,
             "technology": getattr(getattr(final, "workflow", None), "technology", None).name if getattr(getattr(final, "workflow", None), "technology", None) else "",
+            "trainer_name": getattr(getattr(final, "trainer", None), "name", "") or "",
+            "trainer_id": getattr(getattr(final, "trainer", None), "trainer_id", "") or "",
         } if final else None,
         "units": units,
         "evaluated_units": len(evaluated_units),
@@ -386,6 +388,10 @@ def class_evaluation_data(school_class, persist=False, evaluator=None):
         ],
         "evaluated_programmes": evaluated_programmes,
         "pass_mark": PASS_MARK,
+        "trainer_name": trainer_name,
+        "trainer_id": trainer_id,
+        "technologies": technologies,
+        "report_updated_at": timezone.now().isoformat(),
     }
 
 
@@ -408,6 +414,32 @@ def class_ranking_data(student):
 
 def student_report_data(student):
     result = evaluate_student(student)
+    final_session = result.get("final_session") or {}
+    trainer_name = str(final_session.get("trainer_name") or "").strip()
+    trainer_id = str(final_session.get("trainer_id") or "").strip()
+    if not trainer_name:
+        assignment = (
+            student.school_class.school.trainer_assignments
+            .filter(status="active", assigned_from__lte=timezone.localdate())
+            .filter(Q(assigned_to__isnull=True) | Q(assigned_to__gte=timezone.localdate()))
+            .select_related("trainer")
+            .order_by("-assigned_from", "trainer__trainer_id")
+            .first()
+        )
+        if assignment:
+            trainer_name = str(getattr(assignment.trainer, "name", "") or "").strip()
+            trainer_id = str(getattr(assignment.trainer, "trainer_id", "") or "").strip()
+
+    technologies = []
+    for unit in result.get("units", []):
+        value = str(unit.get("technology") or "").strip()
+        if value and value not in technologies:
+            technologies.append(value)
+    if not technologies:
+        final_technology = str(final_session.get("technology") or "").strip()
+        if final_technology:
+            technologies.append(final_technology)
+
     return {
         "student_id": result["student_id"],
         "student_name": result["student_name"],
