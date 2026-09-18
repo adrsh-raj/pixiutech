@@ -388,10 +388,6 @@ def class_evaluation_data(school_class, persist=False, evaluator=None):
         ],
         "evaluated_programmes": evaluated_programmes,
         "pass_mark": PASS_MARK,
-        "trainer_name": trainer_name,
-        "trainer_id": trainer_id,
-        "technologies": technologies,
-        "report_updated_at": timezone.now().isoformat(),
     }
 
 
