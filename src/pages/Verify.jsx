@@ -24,7 +24,12 @@ function normalizeApiBase(value) {
   }
 }
 
-const API_BASE = normalizeApiBase(import.meta.env.VITE_API_URL || import.meta.env.VITE_DJANGO_API_URL)
+const configuredApiBase = normalizeApiBase(import.meta.env.VITE_API_URL || import.meta.env.VITE_DJANGO_API_URL)
+const API_CANDIDATES = [
+  configuredApiBase,
+  'https://pixiu-django-api.onrender.com/api/v1',
+  'https://api.pixiutech.com/api/v1',
+].filter((value, index, values) => value && values.indexOf(value) === index)
 const TOKEN_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 function formatDate(value) {
@@ -49,28 +54,67 @@ export default function Verify() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
+  const [apiBase, setApiBase] = useState(configuredApiBase)
 
   const verify = async (value = certificateId) => {
     const key = text(value)
     setError('')
     setResult(null)
-    if (!key) { setError('Enter the certificate ID printed on the credential.'); return }
-    if (!API_BASE) { setError('The verification service is not configured on this website. Set VITE_API_URL to the Pixiu Tech Django API root and redeploy.'); return }
+
+    if (!key) {
+      setError('Enter the certificate ID printed on the credential.')
+      return
+    }
+
+    if (!API_CANDIDATES.length) {
+      setError('The verification service is not configured on this website.')
+      return
+    }
+
     setLoading(true)
+    let lastError = 'Unable to reach the Pixiu Tech verification registry.'
+
     try {
       const queryName = TOKEN_PATTERN.test(key) ? 'token' : 'cert'
-      const response = await fetch(`${API_BASE}/public/certificates/verify?${queryName}=${encodeURIComponent(key)}`, { method: 'GET', headers: { Accept: 'application/json' }, cache: 'no-store' })
-      const payload = await response.json().catch(() => ({}))
-      if (response.status === 404) throw new Error(payload.reason || 'No Pixiu Tech certificate matches this verification code.')
-      if (!response.ok) throw new Error(payload.detail || payload.reason || `Verification failed (${response.status}).`)
-      setResult(payload)
-      const canonicalId = text(payload.certificate_id || payload.certificate_ref || key)
-      window.history.replaceState({}, '', `/verify?cert=${encodeURIComponent(canonicalId)}`)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to reach the Pixiu Tech verification registry.')
-    } finally { setLoading(false) }
-  }
 
+      for (const candidate of API_CANDIDATES) {
+        try {
+          const response = await fetch(
+            `${candidate}/public/certificates/verify?${queryName}=${encodeURIComponent(key)}`,
+            {
+              method: 'GET',
+              headers: { Accept: 'application/json' },
+              cache: 'no-store',
+            },
+          )
+
+          const payload = await response.json().catch(() => ({}))
+
+          if (response.ok) {
+            setApiBase(candidate)
+            setResult(payload)
+            const canonicalId = text(payload.certificate_id || payload.certificate_ref || key)
+            window.history.replaceState({}, '', `/verify?cert=${encodeURIComponent(canonicalId)}`)
+            return
+          }
+
+          lastError = payload.detail || payload.reason || `Verification failed (${response.status}).`
+        } catch (candidateError) {
+          lastError = candidateError instanceof Error
+            ? candidateError.message
+            : lastError
+        }
+      }
+
+      if (lastError && /404|matches this verification code|certificate/i.test(lastError)) {
+        setError(lastError)
+      } else {
+        setError('The Pixiu Tech verification registry could not be reached. Please try again in a moment.')
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
   useEffect(() => {
     if (initialCertificate) verify(initialCertificate)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -78,13 +122,14 @@ export default function Verify() {
 
   const verified = result?.verified === true
   const resolvedCertificateId = text(result?.certificate_id || result?.certificate_ref || certificateId)
-  const pdfUrl = resolvedCertificateId && API_BASE ? `${API_BASE}/public/certificates/pdf/${encodeURIComponent(resolvedCertificateId)}` : ''
+  const pdfUrl = resolvedCertificateId && apiBase ? `${apiBase}/public/certificates/pdf/${encodeURIComponent(resolvedCertificateId)}` : ''
   const technologies = Array.isArray(result?.technologies) ? result.technologies : Array.isArray(result?.completed_technologies) ? result.completed_technologies : []
   const units = Array.isArray(result?.units) ? result.units : Array.isArray(result?.marks) ? result.marks : []
   const breakdown = result?.score_breakdown && typeof result.score_breakdown === 'object' ? result.score_breakdown : {}
-  const classSize = Number(result?.class_size) || 0
-  const rankSlots = Number(result?.rank_slots) || Math.ceil(classSize * 0.25)
-  const classRank = Number(result?.class_rank) || 0
+  const ranking = result?.ranking && typeof result.ranking === 'object' ? result.ranking : {}
+  const classSize = Number(result?.class_size ?? ranking.class_size) || 0
+  const rankSlots = Number(result?.rank_slots ?? ranking.rank_slots) || Math.ceil(classSize * 0.25)
+  const classRank = Number(result?.class_rank ?? ranking.class_rank) || 0
   const top25 = result?.is_top25 === true || (classRank > 0 && rankSlots > 0 && classRank <= rankSlots)
   const rankDisplay = text(result?.rank_display) || '—'
   const publicVerificationUrl = `${PUBLIC_VERIFY_BASE}?cert=${encodeURIComponent(resolvedCertificateId)}`
