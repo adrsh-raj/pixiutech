@@ -35,12 +35,12 @@ class PdfGeneratorTests(SimpleTestCase):
 
     def test_certificate_is_two_page_a4_portrait_pack(self):
         self.assertEqual(CERTIFICATE_SIZE, A4)
-        from unittest.mock import patch
 
-        scorecard = {
+        self.certificate.snapshot['scorecard'] = {
             'class_size': 35,
             'class_rank': 1,
             'rank_display': '1/35',
+            'rank_slots': 9,
             'attendance_pct': 92.0,
             'quiz_pct': 88.0,
             'practical_pct': 84.0,
@@ -49,8 +49,8 @@ class PdfGeneratorTests(SimpleTestCase):
                 {'rank': 1, 'rank_display': '1/35', 'student_name': 'AKASH K', 'overall_score': 95.0}
             ],
         }
-        with patch('learning.course_completion_final.scorecard_data', return_value=scorecard):
-            response = build_certificate_pdf(self.certificate)
+
+        response = build_certificate_pdf(self.certificate)
 
         self.assertEqual(response['Content-Type'], 'application/pdf')
         self.assertTrue(response.content.startswith(b'%PDF'))
@@ -59,6 +59,10 @@ class PdfGeneratorTests(SimpleTestCase):
         for page in reader.pages:
             self.assertAlmostEqual(float(page.mediabox.width), A4[0], places=2)
             self.assertAlmostEqual(float(page.mediabox.height), A4[1], places=2)
+
+        extracted = '\n'.join(page.extract_text() or '' for page in reader.pages)
+        self.assertNotIn('CLASS RANKING', extracted)
+        self.assertNotIn('RANK DISPLAY RULE', extracted)
 
     def test_scorecard_generates_a4_pdf(self):
         scorecard = {
