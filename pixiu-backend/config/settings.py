@@ -105,7 +105,12 @@ SIMPLE_JWT = {
     "UPDATE_LAST_LOGIN": False,
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
-CORS_ALLOWED_ORIGINS = [x.strip() for x in os.environ.get("DJANGO_CORS_ALLOWED_ORIGINS", "").split(",") if x.strip()]
+_cors_env = [x.strip() for x in os.environ.get("DJANGO_CORS_ALLOWED_ORIGINS", "").split(",") if x.strip()]
+CORS_ALLOWED_ORIGINS = list(dict.fromkeys(_cors_env + [
+    "https://pixiutech.com",
+    "https://www.pixiutech.com",
+    "https://portal.pixiutech.com",
+]))
 CORS_ALLOW_CREDENTIALS = True
 CSRF_TRUSTED_ORIGINS = [x.strip() for x in os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",") if x.strip()]
 AUTH_PASSWORD_VALIDATORS = [{"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"}, {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"}, {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"}, {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"}]
