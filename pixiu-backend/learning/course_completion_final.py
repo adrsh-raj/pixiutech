@@ -241,7 +241,7 @@ def certificate_payload(certificate):
     stored_scorecard = data.get("scorecard") if isinstance(data.get("scorecard"), dict) else {}
     class_size = stored_scorecard.get("class_size") or data.get("class_size")
     rank_slots = stored_scorecard.get("rank_slots") or data.get("rank_slots")
-    rank = certificate.rank
+    rank = certificate.rank or stored_scorecard.get("class_rank") or data.get("class_rank")
 
     try:
         class_size = int(class_size) if class_size is not None else None
@@ -272,7 +272,11 @@ def certificate_payload(certificate):
 
     snapshot_breakdown = data.get("score_breakdown")
     if not isinstance(snapshot_breakdown, dict) or not snapshot_breakdown:
-        snapshot_breakdown = stored_scorecard
+        snapshot_breakdown = (
+            stored_scorecard
+            or (certificate.snapshot or {}).get("score_breakdown")
+            or {}
+        )
 
     data["score_breakdown"] = {
         "overall_score": float(snapshot_breakdown.get("overall_score", certificate.overall_score or 0)),
