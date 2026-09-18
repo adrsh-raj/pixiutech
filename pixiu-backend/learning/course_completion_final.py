@@ -124,7 +124,19 @@ def _attach_scorecard_snapshot(certificate):
 
 def issue_certificate(user, student):
     cohort.assert_certificate_issuable(student)
+
+    # Let the canonical engine perform its permission/scope checks even when
+    # a certificate already exists. Never rewrite an issued credential merely
+    # because someone opens the issue operation again.
+    existing = Certificate.objects.filter(
+        student=student,
+        status="issued",
+    ).order_by("-issued_at").first()
+
     certificate = _engine_issue_certificate(user, student)
+    if existing and certificate.pk == existing.pk:
+        return certificate
+
     snapshot = dict(certificate.snapshot or {})
     snapshot["verification_url"] = f"{PUBLIC_VERIFY_URL}?cert={quote(certificate.certificate_id)}"
 
