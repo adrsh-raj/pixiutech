@@ -19,7 +19,19 @@ export default function StudentPassword() {
     const response = await apiFetch('/auth/password/change/', { method: 'POST', body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }) });
     const data = await response.json().catch(() => ({}));
     setSaving(false);
-    if (!response.ok) return toast.error(data.detail || data.current_password?.[0] || data.new_password?.[0] || 'Unable to change password.');
+    if (!response.ok) {
+      const fieldError =
+        data.fields?.current_password?.[0] ||
+        data.fields?.new_password?.[0] ||
+        data.current_password?.[0] ||
+        data.new_password?.[0];
+      return toast.error(
+        fieldError ||
+        (typeof data.detail === 'string' && data.detail !== 'Request validation failed.' ? data.detail : null) ||
+        data.error ||
+        'Unable to change password.'
+      );
+    }
     setCurrentPassword(''); setNewPassword(''); setConfirm('');
     toast.success('Your permanent password has been saved.');
     window.location.href = '/student-portal';
