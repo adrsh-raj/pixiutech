@@ -28,7 +28,6 @@ const configuredApiBase = normalizeApiBase(import.meta.env.VITE_API_URL || impor
 const API_CANDIDATES = [
   configuredApiBase,
   'https://pixiu-django-api.onrender.com/api/v1',
-  'https://api.pixiutech.com/api/v1',
 ].filter((value, index, values) => value && values.indexOf(value) === index)
 const TOKEN_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
