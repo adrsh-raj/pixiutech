@@ -309,15 +309,24 @@ def _certificate_page_bytes(certificate):
     buffer.seek(0)
     return buffer.getvalue()
 
-def build_certificate_pdf(certificate):
+def build_certificate_pdf(certificate, include_scorecard=True):
     """
-    Return one official two-page A4 portrait credential pack:
-    1) student score card
-    2) certificate with QR verification.
+    Build the official credential.
 
-    The issued certificate snapshot is authoritative. Public PDF generation
-    must not depend on a fresh class-wide ranking calculation.
+    Authenticated portal requests may include the scorecard as a second page.
+    Public certificate links intentionally return only the certificate page;
+    marks and top-25 ranking belong on the public verification website.
     """
+    if not include_scorecard:
+        output = BytesIO(_certificate_page_bytes(certificate))
+        response = HttpResponse(output.getvalue(), content_type="application/pdf")
+        response["Content-Disposition"] = (
+            f'inline; filename="{certificate.certificate_id}.pdf"'
+        )
+        response["X-Content-Type-Options"] = "nosniff"
+        response["Cache-Control"] = "no-store"
+        return response
+
     from .scorecard_pdf import build_scorecard_pdf
 
     snapshot = dict(certificate.snapshot or {})
@@ -338,12 +347,12 @@ def build_certificate_pdf(certificate):
             "top_ranking": [],
         }
 
-    # Ranking is a website-only public feature. Do not print classmates'
-    # names/scores into the downloadable public credential.
+    # The public ranking stays on the verification website, not in the PDF.
     scorecard["top_ranking"] = []
     scorecard["top25_ranking"] = []
     scorecard["top10_ranking"] = []
     scorecard["rank_display"] = "-"
+
     scorecard_response = build_scorecard_pdf(
         certificate,
         scorecard,
@@ -369,3 +378,4 @@ def build_certificate_pdf(certificate):
     response["X-Content-Type-Options"] = "nosniff"
     response["Cache-Control"] = "no-store"
     return response
+
