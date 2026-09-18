@@ -118,14 +118,16 @@ def build_scorecard_pdf(certificate, scorecard, include_ranking=True):
     c.setFont('Helvetica-Bold', cert_size)
     c.drawRightString(width - 26 * mm, box_y + 8 * mm, cert_id)
 
-    # KPI row.
+    # KPI row. Public credential packs deliberately omit class-ranking
+    # details; the public verification website is the place where the
+    # student's top-25% status may be displayed.
     kpi_y = height - 102 * mm
     box_w = (width - 36 * mm - 10 * mm) / 3
     rank_display = str(scorecard.get('rank_display') or '-')
     kpis = [
         ('OVERALL SCORE', f"{_safe_float(certificate.overall_score):.2f}%"),
         ('CLASS SIZE', f"{int(scorecard.get('class_size') or 0)} Students"),
-        ('CLASS RANK', rank_display),
+        ('CLASS RANK' if include_ranking else 'CREDENTIAL', rank_display if include_ranking else 'VERIFIED'),
     ]
     for idx, (label, value) in enumerate(kpis):
         x = 18 * mm + idx * (box_w + 5 * mm)
@@ -139,10 +141,11 @@ def build_scorecard_pdf(certificate, scorecard, include_ranking=True):
         c.setFont('Helvetica-Bold', 20 if idx != 2 else 19)
         c.drawString(x + 5 * mm, kpi_y + 7 * mm, value)
 
-    c.setFillColor(muted)
-    c.setFont('Helvetica', 7)
-    rank_slots = int(scorecard.get('rank_slots') or 0)
-    c.drawRightString(width - 18 * mm, kpi_y - 6 * mm, f'Ranking: top 25% of the class, up to {rank_slots} passed students.')
+    if include_ranking:
+        c.setFillColor(muted)
+        c.setFont('Helvetica', 7)
+        rank_slots = int(scorecard.get('rank_slots') or 0)
+        c.drawRightString(width - 18 * mm, kpi_y - 6 * mm, f'Ranking: top 25% of the class, up to {rank_slots} passed students.')
 
     # Assessment summary.
     summary_top = height - 121 * mm
