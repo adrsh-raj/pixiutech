@@ -13,10 +13,10 @@ export default function NotFound() {
         <div className="shell">
           <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
             <Link className="btn btn--primary" to="/">
-              Back to home <span className="arw">→</span>
+              Return to Pixiu Tech <span className="arw">→</span>
             </Link>
             <Link className="btn btn--outline" to="/contact">
-              Contact us
+              Talk to Pixiu Tech
             </Link>
           </div>
         </div>
