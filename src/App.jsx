@@ -13,7 +13,7 @@ import Simulation from './pages/Simulation.jsx'
 import Verify from './pages/Verify.jsx'
 import PrivacyPolicy from './pages/PrivacyPolicy.jsx'
 import AnalyticsTracker from './components/AnalyticsTracker.jsx'
-import SiteTitle from './components/SiteTitle.jsx'
+import SiteMeta from './components/SiteMeta.jsx'
 import TermsAndConditions from './pages/TermsAndConditions.jsx'
 import NotFound from './pages/NotFound.jsx'
 import { LMS_LOGIN_URL } from './config/runtime.js'
@@ -31,7 +31,7 @@ export default function App() {
     <>
       <ScrollToTop />
       <AnalyticsTracker />
-      <SiteTitle />
+      <SiteMeta />
       <Nav />
       <main>
         <Routes>
