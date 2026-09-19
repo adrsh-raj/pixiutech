@@ -22,8 +22,8 @@ export const SOLUTIONS = [
     title: 'Robotics Lab',
     short: 'Build, program, and control real machines.',
     desc: 'Complete robotics lab setup with Arduino, sensors, motors, and chassis kits. Students build traffic lights, smart dustbins, obstacle-avoiding robots, and line followers — progressing from Class 6 to Class 11.',
-    img: '/img/real_robotics_workshop.jpg',
-    alt: 'Students learning robotics with a Pixiu Tech kit in a school lab',
+    img: '/img/robotics_solution.jpg',
+    alt: 'Students building and programming a robotics project in a school lab',
     features: ['Arduino & microcontrollers', 'Sensors & actuators', 'Graded project kits', 'Competition-ready builds'],
   },
   {
@@ -31,8 +31,8 @@ export const SOLUTIONS = [
     title: 'AI & Machine Learning',
     short: 'Teach machines to see, hear, and decide.',
     desc: 'Introduce students to computer vision, natural language processing, and data science using age-appropriate tools. From block-based AI for younger students to Python-based ML for seniors.',
-    img: '/img/real_ai_classroom.jpg',
-    alt: 'Students learning artificial intelligence in a Pixiu Tech school classroom',
+    img: '/img/ai_solution.jpg',
+    alt: 'Students learning AI and machine learning in a school technology lab',
     features: ['Computer vision projects', 'Chatbot building', 'Data science basics', 'Python & block coding'],
   },
   {
