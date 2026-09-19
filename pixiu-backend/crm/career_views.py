@@ -97,7 +97,8 @@ class PublicCareerApplicationView(APIView):
             secure_cv, sha256 = validate_career_cv(uploaded)
         except SecureUploadError as exc:
             message = '; '.join(str(item) for item in getattr(exc, 'messages', [str(exc)]))
-            if 'temporarily unavailable' in message.lower():
+            lowered = message.lower()
+            if 'temporarily unavailable' in lowered or 'security scanning failed' in lowered:
                 return Response({'success': False, 'error': message}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
             raise ValidationError({'cv': getattr(exc, 'messages', [str(exc)])}) from exc
 
