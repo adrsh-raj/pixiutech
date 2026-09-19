@@ -5,7 +5,6 @@ from urllib import parse, request as urllib_request
 from django.conf import settings
 from django.core.cache import cache
 from django.contrib.auth.hashers import check_password, make_password
-from django.contrib.auth.hashers import make_password
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import serializers
