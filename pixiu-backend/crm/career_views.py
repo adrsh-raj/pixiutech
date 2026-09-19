@@ -87,7 +87,7 @@ class PublicCareerApplicationView(APIView):
         serializer.is_valid(raise_exception=True)
         uploaded = serializer.validated_data['cv']
         original_filename = Path(str(getattr(uploaded, 'name', 'resume.pdf')).replace('\\', '/')).name
-        if not original_filename or any(char in original_filename for char in '\\x00\\r\\n'):
+        if not original_filename or any(char in original_filename for char in ('\x00', '\r', '\n')):
             raise ValidationError({'cv': ['Invalid CV filename.']})
         original_filename = original_filename[:255]
 
