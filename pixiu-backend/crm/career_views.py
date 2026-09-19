@@ -1,6 +1,8 @@
 from django.db import transaction
 from django.http import FileResponse
 from pathlib import Path
+
+from django.core.files.storage import default_storage
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -94,7 +96,10 @@ class PublicCareerApplicationView(APIView):
         try:
             secure_cv, sha256 = validate_career_cv(uploaded)
         except SecureUploadError as exc:
-            raise ValidationError({'cv': exc.messages}) from exc
+            message = '; '.join(str(item) for item in getattr(exc, 'messages', [str(exc)]))
+            if 'temporarily unavailable' in message.lower():
+                return Response({'success': False, 'error': message}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+            raise ValidationError({'cv': getattr(exc, 'messages', [str(exc)])}) from exc
 
         opening = serializer.validated_data.get('opening')
         application = CareerApplication(
@@ -109,7 +114,17 @@ class PublicCareerApplicationView(APIView):
         )
         secure_cv.name = application.id.hex + '.pdf'
         application.cv = secure_cv
-        application.save()
+        try:
+            application.save()
+        except Exception as exc:
+            stored_name = getattr(application.cv, 'name', '')
+            if stored_name:
+                try:
+                    default_storage.delete(stored_name)
+                except Exception:
+                    logger.exception('Career CV cleanup failed after storage error', extra={'application_id': str(application.id)})
+            logger.exception('Career application could not be persisted', extra={'application_id': str(application.id)})
+            return Response({'success': False, 'error': 'We could not securely store your CV right now. Please try again shortly.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
         role_name = opening.title if opening else 'General Application'
         try:
