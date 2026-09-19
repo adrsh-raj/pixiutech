@@ -112,8 +112,9 @@ export default function PrivacyPolicy() {
               <p>
                 We may use essential cookies, browser storage, or similar mechanisms to keep the portal
                 secure, maintain login sessions, remember necessary preferences, and support service
-                controls can be used to block or delete cookies. The portal also records limited performance
-                diagnostics to help us identify reliability or loading issues.
+                functionality. The website does not use Google Analytics or other non-essential
+                analytics cookies. Browser controls can also be used to block or delete cookies. The portal
+                records limited performance diagnostics to help us identify reliability or loading issues.
               </p>
             </section>
 
