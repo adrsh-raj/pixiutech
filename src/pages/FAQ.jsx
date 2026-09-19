@@ -3,7 +3,6 @@ import PageHead from '../components/PageHead.jsx'
 import Reveal from '../components/Reveal.jsx'
 import '../styles/faq.css'
 
-export { FAQ_ITEMS } from '../data/faq.js'
 import { FAQ_ITEMS } from '../data/faq.js'
 export default function FAQ() {
   return (
