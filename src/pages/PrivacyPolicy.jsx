@@ -1,4 +1,5 @@
 import PageHead from '../components/PageHead.jsx'
+import '../styles/legal.css'
 
 const LAST_UPDATED = '19 September 2026'
 
