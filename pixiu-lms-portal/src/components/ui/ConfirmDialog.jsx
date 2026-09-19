@@ -30,7 +30,7 @@ export default function ConfirmDialog({
 
   return (
     <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-slate-950/55  p-3 sm:p-5" role="presentation" onMouseDown={() => !loading && onCancel?.()}>
-      <div className="w-full max-w-md rounded-2xl bg-white border border-slate-200 shadow-2xl overflow-hidden" role="alertdialog" aria-modal="true" aria-labelledby="confirm-dialog-title" aria-describedby="confirm-dialog-description" onMouseDown={(event) => event.stopPropagation()}>
+      <div className="w-full max-w-md rounded-xl bg-white border border-slate-200 shadow-2xl overflow-hidden" role="alertdialog" aria-modal="true" aria-labelledby="confirm-dialog-title" aria-describedby="confirm-dialog-description" onMouseDown={(event) => event.stopPropagation()}>
         <div className="p-5 sm:p-6">
           <div className="flex items-start gap-3">
             <div className={`w-10 h-10 shrink-0 rounded-xl flex items-center justify-center ${destructive ? 'bg-rose-50 text-rose-600' : 'bg-[#F0F7F5] text-[#27786D]'}`}>
