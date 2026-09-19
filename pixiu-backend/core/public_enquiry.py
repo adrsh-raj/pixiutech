@@ -17,6 +17,8 @@ def _clean(value, max_length):
 
 class PublicEnquiryView(APIView):
     permission_classes = [AllowAny]
+    authentication_classes = []
+    throttle_scope = 'public_enquiry'
 
     def post(self, request):
         website = _clean(request.data.get('website'), 120)
