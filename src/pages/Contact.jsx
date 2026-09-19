@@ -29,14 +29,14 @@ export default function Contact() {
       <PageHead
         crumb="Contact"
         title="Let's Build Your School's Innovation Lab"
-        intro="Tell us about your school. We'll come back with a custom plan and proposal."
+        intro="Tell us what your school needs. We'll review your requirements and come back with a custom plan and proposal."
       />
 
       <section className="band band--gray" id="enquiry">
         <div className="shell contact__grid">
           <Reveal>
             <p className="eyebrow">Get In Touch</p>
-            <h2 className="h-sect">Start With a Free Consultation</h2>
+            <h2 className="h-sect">Tell Us What You Want to Build</h2>
             <p className="lede">
               The first conversation costs nothing and commits you to nothing. We'll want to know which grades the lab should serve, what space you have, and what you already run.
             </p>
