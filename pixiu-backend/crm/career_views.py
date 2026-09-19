@@ -2,17 +2,20 @@ from django.db import transaction
 from django.http import FileResponse
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounts.models import UserRole
 from accounts.permissions import IsActiveAccount, IsAdminRole
 from audit.services import record_audit
+import logging
 from core.upload_security import CareerCVMultipartParser, SecureUploadError, validate_career_cv
 from .models import CareerApplication, CareerOpening, CareerOpeningStatus
 from .serializers import CareerApplicationSerializer, CareerOpeningSerializer, PublicCareerApplicationSerializer, PublicCareerOpeningSerializer
+
+
+logger = logging.getLogger('careers')
 
 
 class CareerAdminMixin:
@@ -105,12 +108,15 @@ class PublicCareerApplicationView(APIView):
         application.save()
 
         role_name = opening.title if opening else 'General Application'
-        record_audit(
-            actor=None,
-            action='create',
-            entity_type='CareerApplication',
-            entity_id=application.id,
-            summary=f'New career application received for {role_name}',
-            request=request,
-        )
+        try:
+            record_audit(
+                actor=None,
+                action='create',
+                entity_type='CareerApplication',
+                entity_id=application.id,
+                summary=f'New career application received for {role_name}',
+                request=request,
+            )
+        except Exception:
+            logger.exception('Career application saved but audit event failed', extra={'application_id': str(application.id)})
         return Response({'success': True, 'message': 'Application received successfully.'}, status=status.HTTP_201_CREATED)
