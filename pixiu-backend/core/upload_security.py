@@ -237,8 +237,12 @@ def validate_career_cv(uploaded: UploadedFile | None) -> tuple[UploadedFile, str
 
     position = uploaded.tell() if hasattr(uploaded, "tell") else 0
     try:
-        uploaded.seek(0)
-        raw = uploaded.read()
+        try:
+            uploaded.seek(0)
+            raw = uploaded.read()
+        except (AttributeError, OSError, ValueError) as exc:
+            raise SecureUploadError("CV could not be read safely.") from exc
+
         # Reject common PDF active-content/attachment primitives. This is
         # additional defense-in-depth; ClamAV remains the primary malware scan.
         if re.search(rb"/(?:javascript|js|openaction|aa|embeddedfile|filespec)\b", raw, flags=re.IGNORECASE):
@@ -265,9 +269,11 @@ def validate_career_cv(uploaded: UploadedFile | None) -> tuple[UploadedFile, str
     except ClamAVMalwareDetectedError as exc:
         raise SecureUploadError("Uploaded CV failed malware scanning and was rejected.") from exc
     except ClamAVUnavailableError as exc:
-        # Never convert an unavailable required scanner into an unhandled 500.
-        # The API layer can return a safe service-unavailable response.
         raise SecureUploadError("CV security scanning is temporarily unavailable. Please try again shortly.") from exc
+    except Exception as exc:
+        # Defense-in-depth: an unexpected scanner integration failure must
+        # never become a raw 500 response or accidentally bypass scanning.
+        raise SecureUploadError("CV security scanning failed. Please try again shortly.") from exc
 
     import hashlib
     digest = hashlib.sha256(raw).hexdigest()
