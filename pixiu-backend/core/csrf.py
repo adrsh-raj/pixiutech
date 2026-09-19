@@ -8,7 +8,10 @@ from django.middleware.csrf import CsrfViewMiddleware, get_token
 
 def csrf_token_view(request):
     """Issue a CSRF token to the browser without exposing any session data."""
-    return JsonResponse({"csrfToken": get_token(request)})
+    response = JsonResponse({"csrfToken": get_token(request)})
+    response["Cache-Control"] = "no-store, private"
+    response["X-Content-Type-Options"] = "nosniff"
+    return response
 
 
 def require_api_csrf(view_func):
