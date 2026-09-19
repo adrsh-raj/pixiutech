@@ -203,7 +203,7 @@ export default function Careers() {
               </div>
               {status && <p className={`form__status ${status.kind === 'success' ? '' : 'err'}`} role="status" aria-live="polite">{status.kind === 'success' ? <CheckCircle2 size={16} /> : null}{status.text}</p>}
             </form>
-            )
+            )}
           </Reveal>
         </div>
       </section>
