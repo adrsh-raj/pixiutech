@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, FileText, MapPin, BriefcaseBusiness, Clock3 } from 'lucide-react'
+import { CheckCircle2, FileText, MapPin, Clock3 } from 'lucide-react'
 import PageHead from '../components/PageHead.jsx'
 import Reveal from '../components/Reveal.jsx'
 
