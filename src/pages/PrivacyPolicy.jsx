@@ -34,8 +34,10 @@ export default function PrivacyPolicy() {
               </p>
               <h3>Career applications</h3>
               <p>
-                Career submissions may include your name, email address, the position you are applying
-                for, and the information you provide in your application message.
+                Career submissions may include your name, email address, phone number, the position you are
+                applying for, your application message, and the PDF CV/resume you choose to upload. CV files
+                are restricted to PDF uploads up to 2 MB and are kept in a private application storage path
+                for authorised recruitment review rather than being published as public website content.
               </p>
               <h3>Learning portal records</h3>
               <p>
