@@ -45,9 +45,9 @@ export default function PortalShell({ role, title, subtitle, children }) {
       <div className="min-w-0 flex-1 flex flex-col w-full">
         <header className="sticky top-0 z-30 min-h-[62px] sm:min-h-[68px] bg-white/90 backdrop-blur-xl border-b border-slate-200/80 flex items-center justify-between gap-2 px-3 sm:px-6 lg:px-9 py-2.5">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0 overflow-hidden">
-            <button type="button" onClick={() => setMobileOpen(true)} className="md:hidden w-9 h-9 shrink-0 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 flex items-center justify-center" aria-label="Open navigation"><Menu size={17} /></button>
+            <button type="button" onClick={() => setMobileOpen((value) => !value)} className="md:hidden w-9 h-9 shrink-0 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 flex items-center justify-center" aria-label={mobileOpen ? "Close navigation" : "Open navigation"} aria-expanded={mobileOpen} aria-controls="portal-sidebar"><Menu size={17} aria-hidden="true" /></button>
             <div className="min-w-0">
-              <p className="hidden sm:flex items-center gap-1.5 text-[9px] font-extrabold tracking-[0.16em] uppercase text-blue-600"><Sparkles size={11} /> {roleMeta.name} workspace</p>
+              <p className="hidden sm:flex items-center gap-1.5 text-[9px] font-extrabold tracking-[0.16em] uppercase text-blue-600"><Sparkles size={11} aria-hidden="true" /> {roleMeta.name} workspace</p>
               <h1 className="text-sm sm:text-base font-black text-slate-900 truncate">{title || roleMeta.name}</h1>
               {subtitle && <p className="hidden md:block text-[10px] sm:text-[11px] text-slate-500 truncate mt-0.5">{subtitle}</p>}
             </div>
@@ -56,7 +56,7 @@ export default function PortalShell({ role, title, subtitle, children }) {
             <RefreshButton onRefresh={handleRefresh} loading={loading} />
             <NotificationCenter />
             <div className={`hidden xl:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-[10px] font-bold ${online ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-amber-50 border-amber-200 text-amber-700'}`} title={online ? 'Network connection available' : 'Network connection unavailable'}>
-              {online ? <Wifi size={12} /> : <WifiOff size={12} />}
+              {online ? <Wifi size={12} aria-hidden="true" /> : <WifiOff size={12} aria-hidden="true" />}
               <span>{online ? 'Online' : 'Offline'}</span>
             </div>
             <div className="hidden md:flex items-center gap-2 pl-2 border-l border-slate-200 max-w-44 min-w-0">
