@@ -68,6 +68,30 @@ for (const [file, source] of textByFile) {
   }
 }
 
+
+const publicSource = files
+  .filter(file => file.includes(path.sep + 'src' + path.sep))
+  .filter(file => !file.includes(path.sep + 'pixiu-lms-portal' + path.sep))
+  .map(file => [file, fs.readFileSync(file, 'utf8')]);
+
+for (const [file, source] of publicSource) {
+  if (/IntersectionObserver|class(Name)?=.*\brev\b|cursor[-_ ]?(beam|spotlight)|pointermove|mousemove/i.test(source)) {
+    failures.push(path.relative(root, file) + ' -> interactive cursor/scroll reveal pattern detected');
+  }
+}
+const revealFile = path.join(SRC, 'components', 'Reveal.jsx');
+if (fs.existsSync(revealFile)) {
+  const revealSource = fs.readFileSync(revealFile, 'utf8');
+  if (/IntersectionObserver|opacity:\s*0|translateY\(/i.test(revealSource)) {
+    failures.push('src/components/Reveal.jsx -> scroll reveal animation has returned');
+  }
+}
+
+const globalCss = fs.readFileSync(path.join(SRC, 'styles', 'global.css'), 'utf8');
+if (/\.btn[^\{]*\{[^}]*opacity|\.btn:hover[^}]*opacity\s*:\s*0/i.test(globalCss)) {
+  failures.push('src/styles/global.css -> button opacity/fade interaction detected');
+}
+
 if (failures.length) {
   console.error('SITE AUDIT FAILED');
   console.error(failures.join('\n'));
