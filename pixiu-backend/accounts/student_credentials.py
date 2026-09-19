@@ -15,7 +15,7 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-from accounts.credentials import build_student_username, generate_student_temp_pin, invalidate_user_sessions
+from accounts.credentials import build_student_username, generate_student_temp_pin, invalidate_user_sessions, bump_auth_version
 from accounts.models import BlacklistedToken, OutstandingToken, User, UserRole, UserStatus
 from academics.models import Student
 
@@ -83,8 +83,9 @@ def _set_student_temp_pin(student, *, revoke_tokens=True):
         student.account = account
         student.save(update_fields=["account", "updated_at"])
 
+    bump_auth_version(account)
     if revoke_tokens:
-        invalidate_user_sessions(account)
+        revoke_all_refresh_tokens(account)
     return pin
 
 
