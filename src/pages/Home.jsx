@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom'
-import { ClipboardList, GraduationCap, Hammer, Handshake, Link2, School, Users, Wrench, Settings2 } from 'lucide-react'
 import Reveal from '../components/Reveal.jsx'
 import CTAStrip from '../components/CTAStrip.jsx'
 import CountUp from '../components/CountUp.jsx'
@@ -46,7 +45,7 @@ export default function Home() {
           <div className="stats-bar__grid">
             {STATS.map((s) => (
               <div className="stat" key={s.label}>
-                <span className="stat__icon" aria-hidden="true">{(() => { const Icon = ICONS[s.icon] || Settings2; return <Icon size={22} strokeWidth={1.8} /> })()}</span>
+                <span className="stat__icon" aria-hidden="true">·</span>
                 <span className="stat__number"><CountUp text={s.number} /></span>
                 <span className="stat__label">{s.label}</span>
               </div>
@@ -115,7 +114,7 @@ export default function Home() {
             <div className="process-grid">
               {PROCESS.map((p, i) => (
                 <div className="process-step" key={p.no}>
-                  <div className="process-step__no" aria-hidden="true">{(() => { const Icon = ICONS[p.icon] || Settings2; return <Icon size={28} strokeWidth={1.7} /> })()}</div>
+                  <div className="process-step__no" aria-hidden="true">{p.no}</div>
                   <h3>{p.name}</h3>
                   <p>{p.text}</p>
                   {i < PROCESS.length - 1 && <div className="process-step__arrow">→</div>}
@@ -167,7 +166,7 @@ export default function Home() {
             <div className="why-v2">
               {WHY.map((w) => (
                 <div className="why-v2__item" key={w.title}>
-                  <span className="why-v2__icon" aria-hidden="true">{(() => { const Icon = ICONS[w.icon] || Settings2; return <Icon size={28} strokeWidth={1.7} /> })()}</span>
+                  <span className="why-v2__icon" aria-hidden="true">—</span>
                   <h3>{w.title}</h3>
                   <p>{w.desc}</p>
                 </div>
