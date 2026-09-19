@@ -21,8 +21,8 @@ jobs:
   smoke:
     runs-on: ubuntu-latest
     env:
-      FRONTEND_URL: \${{ inputs.frontend_url || 'https://www.pixiutech.com' }}
-      API_URL: \${{ inputs.api_url || 'https://pixiu-django-api.onrender.com/api/v1' }}
+      FRONTEND_URL: ${{ inputs.frontend_url || 'https://www.pixiutech.com' }}
+      API_URL: ${{ inputs.api_url || 'https://pixiu-django-api.onrender.com/api/v1' }}
 
     steps:
       - name: Frontend availability
@@ -54,7 +54,7 @@ jobs:
 
       - name: Static frontend secret scan
         env:
-          FRONTEND_URL: \${{ inputs.frontend_url || 'https://www.pixiutech.com' }}
+          FRONTEND_URL: ${{ inputs.frontend_url || 'https://www.pixiutech.com' }}
         run: |
           set -euo pipefail
           curl -fsSL --retry 3 --retry-delay 2 --max-time 30 "$FRONTEND_URL/" -o /tmp/index.html
