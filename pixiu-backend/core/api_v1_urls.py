@@ -19,6 +19,7 @@ from .cohort_evaluation_views import ClassEvaluationView, StudentProgressReportD
 from .course_completion_session_v4 import ProgrammeAwareSessionViewSet
 from .course_completion_compat import cohort_rank
 from .public_enquiry import PublicEnquiryView
+from .career_views import CareerApplicationViewSet, CareerOpeningViewSet, PublicCareerApplicationView, PublicCareerOpeningsView
 from .phase7_compat_extras import ContractCommunicationLogViewSet
 from .billing_contract_overrides import TransactionalInvoiceViewSet
 from .inventory_contract_overrides import JsonKitComponentViewSet, JsonKitViewSet
@@ -65,6 +66,8 @@ router.register('inventory', ScopedContractInventoryViewSet, basename='v1-invent
 router.register('leads', ScopedContractLeadViewSet, basename='v1-lead')
 router.register('notifications', NotificationPortalViewSet, basename='v1-notification')
 router.register('comms', ContractCommunicationLogViewSet, basename='v1-comms')
+router.register('careers/openings', CareerOpeningViewSet, basename='v1-career-opening')
+router.register('careers/applications', CareerApplicationViewSet, basename='v1-career-application')
 router.register('logs', AuditLogViewSet, basename='v1-audit-log')
 
 urlpatterns = [
@@ -93,6 +96,8 @@ urlpatterns = [
     path('course-completion/<str:student_key>/complete', ApproveFinalProgrammeView.as_view(), name='v1-course-completion-complete'),
     path('course-completion/<str:student_key>/certificate', IssueProgrammeCertificateView.as_view(), name='v1-course-completion-certificate'),
     path('public/enquiries', PublicEnquiryView.as_view(), name='v1-public-enquiry'),
+    path('public/careers/openings', PublicCareerOpeningsView.as_view(), name='v1-public-career-openings'),
+    path('public/careers/apply', PublicCareerApplicationView.as_view(), name='v1-public-career-apply'),
     path('schools/<uuid:pk>/reset-password', SchoolProfilePasswordResetView.as_view(), name='v1-school-password-reset'), path('schools/<uuid:pk>/activate', activate_school, name='v1-school-activate'),
     path('trainers/<uuid:pk>/reset-password', TrainerProfilePasswordResetView.as_view(), name='v1-trainer-password-reset'),
     path('trainer-materials', TrainerMaterialListCreateView.as_view(), name='v1-trainer-material-list-create'), path('trainer-materials/<uuid:pk>', TrainerMaterialDetailView.as_view(), name='v1-trainer-material-detail'), path('trainer-materials/<uuid:pk>/file', TrainerMaterialFileView.as_view(), name='v1-trainer-material-file'),
