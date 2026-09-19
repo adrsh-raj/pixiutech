@@ -12,7 +12,6 @@ import Contact from './pages/Contact.jsx'
 import Simulation from './pages/Simulation.jsx'
 import Verify from './pages/Verify.jsx'
 import PrivacyPolicy from './pages/PrivacyPolicy.jsx'
-import AnalyticsTracker from './components/AnalyticsTracker.jsx'
 import SiteMeta from './components/SiteMeta.jsx'
 import TermsAndConditions from './pages/TermsAndConditions.jsx'
 import NotFound from './pages/NotFound.jsx'
@@ -30,7 +29,6 @@ export default function App() {
   return (
     <>
       <ScrollToTop />
-      <AnalyticsTracker />
       <SiteMeta />
       <a className="skip-link" href="#main-content">Skip to main content</a>
       <Nav />
