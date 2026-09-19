@@ -13,6 +13,7 @@ from .serializers import ResetManagedPasswordSerializer
 
 
 class _ProfilePasswordResetView(APIView):
+    throttle_scope = 'password_reset'
     permission_classes = [IsAuthenticated, IsActiveAccount, IsAdminRole]
     profile_model = None
     role = None
