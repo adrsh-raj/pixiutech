@@ -93,8 +93,6 @@ class LoginView(APIView):
     def post(self, request):
         serializer = LoginSerializer(data=request.data, context={'request': request})
         if not serializer.is_valid():
-            if 'selected login type' in str(serializer.errors):
-                return Response(serializer.errors, status=status.HTTP_403_FORBIDDEN)
             return Response(serializer.errors, status=status.HTTP_401_UNAUTHORIZED)
 
         user = serializer.validated_data['user']
