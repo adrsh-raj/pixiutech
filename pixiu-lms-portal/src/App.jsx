@@ -5,6 +5,7 @@ import { DataProvider } from './context/DataContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import { markPerformance, measurePerformance } from './lib/performanceDiagnostics';
+import AnalyticsTracker from './components/AnalyticsTracker';
 
 const CHUNK_RECOVERY_KEY = 'pixiu_chunk_recovery_attempted';
 
@@ -104,7 +105,7 @@ function SchoolPerformanceRoute() { return <PerformanceAnalyticsPage role="schoo
 function SessionsRoute() { const { user } = useAuth(); return user?.role === 'student' ? <StudentClasses /> : <SessionSchedulerV4 />; }
 function QuizzesRoute() { const { user } = useAuth(); return user?.role === 'student' ? <StudentQuizHubV2 /> : <QuizHub />; }
 
-export default function App() { return <ToastProvider><AuthProvider><DataProvider><BrowserRouter><Suspense fallback={<LoadingScreen />}><Routes>
+export default function App() { return <ToastProvider><AuthProvider><DataProvider><BrowserRouter><AnalyticsTracker /><Suspense fallback={<LoadingScreen />}><Routes>
   <Route path="/verify" element={<VerifyV2 />} />
   <Route path="/privacy" element={<PrivacyPolicy />} />
   <Route path="/terms" element={<TermsAndConditions />} />
