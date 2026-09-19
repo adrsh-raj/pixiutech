@@ -8,7 +8,7 @@ const sections = [
     content: [
       'The portal processes account and authentication information and education-related records such as student or staff names, student IDs, school and class information, attendance, sessions, quizzes, practical assessments, trainer reviews, projects, certificates, and related learning activity.',
       'When a certificate is checked through the public verification service, the verification page may display limited credential information such as the learner name, student ID, school, class, programme, score, issue date, certificate ID, technologies completed, and the public ranking band where applicable.',
-      'We may also receive limited technical and security information needed to operate and protect the service, including device or browser information, network information, request logs, and security signals. Cloudflare Turnstile may be used as an anti-abuse measure during login.',
+      'We do not currently use an app-level visitor analytics tracker such as Google Analytics or PostHog. Normal hosting, CDN, browser, and security infrastructure may still generate technical request data needed to deliver and protect the service. Our backend audit system records IP address and user-agent information for certain auditable actions, including authenticated portal activity. Cloudflare Turnstile may be used as an anti-abuse measure during login.',
     ],
   },
   {
