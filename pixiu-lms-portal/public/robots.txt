@@ -1,0 +1,6 @@
+User-agent: *
+Disallow: /
+Allow: /privacy
+Allow: /terms
+
+Sitemap: https://portal.pixiutech.com/sitemap.xml
