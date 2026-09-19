@@ -53,9 +53,11 @@ export default function PrivacyPolicy() {
               </p>
               <h3>Technical and security information</h3>
               <p>
-                We do not currently use an app-level visitor analytics tracker on the public website such as Google Analytics or PostHog.
-                Normal hosting, CDN, browser, and security infrastructure may still generate technical request data needed to
-                deliver and protect the services. Our backend audit system also records IP address and user-agent information
+                We use Google Analytics 4 (GA4) on the website to understand page visits and general website usage. GA4 uses cookies and similar
+                measurement technologies; we configure it for aggregated website measurement and do not intentionally send names, email
+                addresses, phone numbers, certificate IDs, student IDs, marks, passwords, or other directly identifying information to GA4.
+                Normal hosting, CDN, browser, and security infrastructure may also generate technical request data needed to deliver and
+                protect the services. Our backend audit system also records IP address and user-agent information
                 for certain auditable actions, including website enquiries and authenticated portal activity. The portal may
                 use Cloudflare Turnstile as an anti-abuse measure during login.
               </p>
