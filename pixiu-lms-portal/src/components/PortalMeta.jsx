@@ -49,7 +49,7 @@ function upsertRobots(content) {
 export default function PortalMeta() {
   const { pathname } = useLocation()
   useEffect(() => {
-    const path = pathname === '/' ? '/' : pathname.replace(//+$/, '')
+    const path = pathname === '/' ? '/' : pathname.replace(/\/+$/, '')
     const meta = META[path] || {
       title: 'Pixiu Tech Learning Portal',
       description: 'Pixiu Tech Learning Management Portal for students, trainers, schools and administrators.',
