@@ -8,7 +8,7 @@ const sections = [
     content: [
       'The portal processes account and authentication information and education-related records such as student or staff names, student IDs, school and class information, attendance, sessions, quizzes, practical assessments, trainer reviews, projects, certificates, and related learning activity.',
       'When a certificate is checked through the public verification service, the verification page may display limited credential information such as the learner name, student ID, school, class, programme, score, issue date, certificate ID, technologies completed, and the public ranking band where applicable.',
-      'We use Google Analytics 4 (GA4) to understand general portal usage and page navigation. We configure analytics for aggregated measurement and do not intentionally send names, email addresses, phone numbers, student IDs, certificate IDs, marks, passwords, or other directly identifying information to GA4. Normal hosting, CDN, browser, and security infrastructure may also generate technical request data needed to deliver and protect the service. Our backend audit system records IP address and user-agent information for certain auditable actions, including authenticated portal activity. Cloudflare Turnstile may be used as an anti-abuse measure during login.',
+      'Normal hosting, CDN, browser, and security infrastructure may generate technical request data needed to deliver and protect the service. Our backend audit system records IP address and user-agent information for certain auditable actions, including authenticated portal activity. Cloudflare Turnstile may be used as an anti-abuse measure during login.',
     ],
   },
   {
