@@ -29,6 +29,7 @@ function isCacheableRead(path, method, accessToken, requestedCache = '') {
   if (normalizedPath.startsWith('/auth/')) return false;
   if (normalizedPath === '/health' || normalizedPath.startsWith('/health/')) return false;
   if (/^\/content\/[^/]+\/file\/?$/.test(normalizedPath)) return false;
+  if (/^\/careers\/applications\/[^/]+\/cv\/?$/.test(normalizedPath)) return false;
   return true;
 }
 function buildReadCacheKey(path, method, accessToken) { return `${method}:${accessToken}:${path}`; }
