@@ -11,9 +11,9 @@ export const NAV = [
 ]
 
 export const STATS = [
-  { number: '1', label: 'Partner School', icon: '🏫' },
-  { number: '5+', label: 'Workshops Delivered', icon: '🔧' },
-  { number: '1000+', label: 'Students Influenced', icon: '👩‍🎓' },
+  { number: '1', label: 'Partner School', icon: 'school' },
+  { number: '5+', label: 'Workshops Delivered', icon: 'wrench' },
+  { number: '1000+', label: 'Students Influenced', icon: 'users' },
 ]
 
 export const SOLUTIONS = [
@@ -74,14 +74,14 @@ export const SOLUTIONS = [
 ]
 
 export const PROCESS = [
-  { no: '01', name: 'Plan', text: 'We assess your space, budget, and goals. You get a detailed lab blueprint and curriculum map.', icon: '📋' },
-  { no: '02', name: 'Build', text: 'We set up the lab — tables, equipment, kits, software — ready to teach from Day 1.', icon: '🔨' },
-  { no: '03', name: 'Teach', text: 'Our trained instructors deliver weekly sessions. Your teachers learn alongside.', icon: '🎓' },
-  { no: '04', name: 'Support', text: 'Ongoing maintenance, kit replacements, curriculum updates, and term reviews.', icon: '🤝' },
+  { no: '01', name: 'Plan', text: 'We assess your space, budget, and goals. You get a detailed lab blueprint and curriculum map.', icon: 'clipboard' },
+  { no: '02', name: 'Build', text: 'We set up the lab — tables, equipment, kits, software — ready to teach from Day 1.', icon: 'hammer' },
+  { no: '03', name: 'Teach', text: 'Our trained instructors deliver weekly sessions. Your teachers learn alongside.', icon: 'graduation' },
+  { no: '04', name: 'Support', text: 'Ongoing maintenance, kit replacements, curriculum updates, and term reviews.', icon: 'handshake' },
 ]
 
 export const WHY = [
-  { title: 'End-to-End', desc: 'One partner for lab setup, hardware, curriculum, instructors, and support. No juggling vendors.', icon: '🔗' },
-  { title: 'Hands-On Learning', desc: 'Every session has a build. Students make real things, not watch slideshows.', icon: '🛠️' },
-  { title: 'Long-Term Partner', desc: "We don't install and leave. Ongoing classes, support, and curriculum updates term after term.", icon: '🤝' },
+  { title: 'End-to-End', desc: 'One partner for lab setup, hardware, curriculum, instructors, and support. No juggling vendors.', icon: 'link' },
+  { title: 'Hands-On Learning', desc: 'Every session has a build. Students make real things, not watch slideshows.', icon: 'tools' },
+  { title: 'Long-Term Partner', desc: "We don't install and leave. Ongoing classes, support, and curriculum updates term after term.", icon: 'handshake' },
 ]
