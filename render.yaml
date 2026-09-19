@@ -47,6 +47,8 @@ services:
         value: 30/hour
       - key: DJANGO_CAREER_APPLY_RATE
         value: 5/hour
+      - key: DJANGO_PUBLIC_ENQUIRY_RATE
+        value: 10/hour
       - key: CAREER_CV_MAX_MB
         value: "2"
       - key: DJANGO_ALLOWED_HOSTS
