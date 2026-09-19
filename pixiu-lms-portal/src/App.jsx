@@ -42,6 +42,7 @@ const DataReset = lazyWithChunkRecovery(() => import('./pages/DataReset'));
 const Comms = lazyWithChunkRecovery(() => import('./pages/Comms'));
 const Leads = lazyWithChunkRecovery(() => import('./pages/Leads'));
 const WebsiteEnquiries = lazyWithChunkRecovery(() => import('./pages/WebsiteEnquiries'));
+const CareerManagement = lazyWithChunkRecovery(() => import('./pages/CareerManagement'));
 const SchoolsV2 = lazyWithChunkRecovery(() => import('./pages/SchoolsV2'));
 const Payments = lazyWithChunkRecovery(() => import('./pages/Payments'));
 const Notifications = lazyWithChunkRecovery(() => import('./pages/Notifications'));
@@ -118,6 +119,7 @@ export default function App() { return <ToastProvider><AuthProvider><DataProvide
     <Route index element={<AdminOnly><AdminCommandCenter /></AdminOnly>} />
     <Route path="leads" element={<AdminOnly><Leads /></AdminOnly>} />
     <Route path="website-enquiries" element={<AdminOnly><WebsiteEnquiries /></AdminOnly>} />
+    <Route path="careers" element={<AdminOnly><CareerManagement /></AdminOnly>} />
     <Route path="schools" element={<AdminOnly><SchoolsV2 /></AdminOnly>} />
     <Route path="payments" element={<AdminOnly><Payments /></AdminOnly>} />
     <Route path="notifications" element={<RoleRoute roles={['admin','superadmin','school','trainer','student']}><Notifications /></RoleRoute>} />
