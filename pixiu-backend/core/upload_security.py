@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+import logging
 import re
+from io import BytesIO
 from pathlib import Path
 from uuid import uuid4
 
 from django.conf import settings
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.files.uploadhandler import FileUploadHandler
-from django.core.files.uploadedfile import UploadedFile
+from django.core.files.uploadedfile import SimpleUploadedFile, UploadedFile
 from rest_framework.exceptions import ParseError
 from rest_framework.parsers import MultiPartParser as DRFMultiPartParser
 
@@ -21,6 +23,9 @@ from .clamav_client import (
 
 # Product-supported binary formats. Active-content formats such as SVG, HTML,
 # JavaScript and executable/archive formats are intentionally excluded.
+logger = logging.getLogger("security.uploads")
+
+
 ALLOWED_UPLOADS = {
     ".pdf": ("application/pdf",),
     ".png": ("image/png",),
@@ -212,6 +217,39 @@ def career_cv_max_bytes() -> int:
     return int(getattr(settings, "CAREER_CV_MAX_BYTES", 2 * 1024 * 1024))
 
 
+def _sanitize_career_pdf(raw: bytes) -> bytes:
+    """Create a conservative PDF derivative when antivirus service is unavailable.
+
+    The derivative keeps page content but drops common interactive/active PDF
+    structures such as annotations, actions, forms, names, and embedded-file
+    references. This is a fallback only; a live ClamAV verdict remains preferred.
+    """
+    try:
+        from pypdf import PdfReader, PdfWriter
+
+        reader = PdfReader(BytesIO(raw), strict=True)
+        writer = PdfWriter()
+        for page in reader.pages:
+            for key in ("/Annots", "/AA", "/PieceInfo", "/Metadata"):
+                page.pop(key, None)
+            writer.add_page(page)
+
+        catalog = writer._root_object
+        for key in ("/OpenAction", "/AA", "/Names", "/AcroForm", "/Metadata"):
+            catalog.pop(key, None)
+
+        output = BytesIO()
+        writer.write(output)
+        sanitized = output.getvalue()
+        if not sanitized:
+            raise SecureUploadError("CV PDF could not be safely rebuilt.")
+        return sanitized
+    except SecureUploadError:
+        raise
+    except Exception as exc:
+        raise SecureUploadError("CV PDF could not be safely rebuilt.") from exc
+
+
 def validate_career_cv(uploaded: UploadedFile | None) -> tuple[UploadedFile, str]:
     """Validate a CV as a small, non-active PDF and return its SHA-256."""
     if uploaded is None:
@@ -268,17 +306,31 @@ def validate_career_cv(uploaded: UploadedFile | None) -> tuple[UploadedFile, str
         ensure_clean_upload(uploaded)
     except ClamAVMalwareDetectedError as exc:
         raise SecureUploadError("Uploaded CV failed malware scanning and was rejected.") from exc
-    except ClamAVUnavailableError as exc:
-        raise SecureUploadError("CV security scanning is temporarily unavailable. Please try again shortly.") from exc
+    except ClamAVUnavailableError:
+        # A CV submission must not dead-end because the AV sidecar is starting,
+        # restarting, or temporarily unreachable. The PDF has already passed
+        # signature, size, strict parsing, and active-content checks above.
+        # Rebuild it into a conservative derivative before storage so the
+        # application can proceed without exposing the scanner outage to users.
+        logger.warning("ClamAV unavailable for career CV; storing sanitized PDF derivative")
+        sanitized = _sanitize_career_pdf(raw)
+        if len(sanitized) > career_cv_max_bytes():
+            raise SecureUploadError("CV PDF could not be safely stored within the size limit.")
+        uploaded = SimpleUploadedFile(
+            secure_storage_name(original_name, extension=".pdf"),
+            sanitized,
+            content_type="application/pdf",
+        )
+        raw = sanitized
     except Exception as exc:
-        # Defense-in-depth: an unexpected scanner integration failure must
-        # never become a raw 500 response or accidentally bypass scanning.
-        raise SecureUploadError("CV security scanning failed. Please try again shortly.") from exc
+        # Unexpected scanner integration failures are still fail-closed.
+        raise SecureUploadError("CV security validation failed. Please try again shortly.") from exc
 
     import hashlib
     digest = hashlib.sha256(raw).hexdigest()
-    uploaded.name = secure_storage_name(original_name, extension=".pdf")
-    setattr(uploaded, "_pixiu_secure_upload", True)
+    if not getattr(uploaded, "_pixiu_secure_upload", False):
+        uploaded.name = secure_storage_name(original_name, extension=".pdf")
+        setattr(uploaded, "_pixiu_secure_upload", True)
     return uploaded, digest
 
 
