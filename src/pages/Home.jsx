@@ -6,8 +6,6 @@ import { STATS, SOLUTIONS, PROCESS, WHY } from '../data/site.js'
 import { FAQ_ITEMS } from '../data/faq.js'
 import '../styles/faq.css'
 
-const ICONS = { school: School, wrench: Wrench, users: Users, clipboard: ClipboardList, hammer: Hammer, graduation: GraduationCap, handshake: Handshake, link: Link2, tools: Settings2 }
-
 export default function Home() {
   return (
     <>
