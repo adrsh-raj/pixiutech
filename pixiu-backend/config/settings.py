@@ -72,6 +72,7 @@ else:
 }
 
 SECURE_UPLOAD_MAX_BYTES = int(os.environ.get("SECURE_UPLOAD_MAX_MB", "20")) * 1024 * 1024
+CAREER_CV_MAX_BYTES = int(os.environ.get("CAREER_CV_MAX_MB", "2")) * 1024 * 1024
 SECURE_UPLOAD_MAX_MULTIPART_BYTES = SECURE_UPLOAD_MAX_BYTES + 5 * 1024 * 1024
 FILE_UPLOAD_HANDLERS = ["core.upload_security.SecureUploadSizeHandler", "django.core.files.uploadhandler.MemoryFileUploadHandler", "django.core.files.uploadhandler.TemporaryFileUploadHandler"]
 FILE_UPLOAD_MAX_MEMORY_SIZE = int(os.environ.get("FILE_UPLOAD_MAX_MEMORY_MB", "5")) * 1024 * 1024
@@ -90,9 +91,11 @@ REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
     "DEFAULT_PARSER_CLASSES": ["rest_framework.parsers.JSONParser", "core.upload_security.SecureMultiPartParser", "rest_framework.parsers.FormParser"],
     "DEFAULT_THROTTLE_CLASSES": ["rest_framework.throttling.ScopedRateThrottle"],
-    "DEFAULT_THROTTLE_RATES": {"login": os.environ.get("DJANGO_LOGIN_RATE", "10/min"), "upload": os.environ.get("DJANGO_UPLOAD_RATE", "30/hour"), "trainer_material_upload": os.environ.get("DJANGO_TRAINER_MATERIAL_UPLOAD_RATE", "30/hour")},
+    "DEFAULT_THROTTLE_RATES": {"login": os.environ.get("DJANGO_LOGIN_RATE", "10/min"), "upload": os.environ.get("DJANGO_UPLOAD_RATE", "30/hour"), "trainer_material_upload": os.environ.get("DJANGO_TRAINER_MATERIAL_UPLOAD_RATE", "30/hour"), "career_apply": os.environ.get("DJANGO_CAREER_APPLY_RATE", "5/hour")},
     "EXCEPTION_HANDLER": "core.exception_handler.custom_exception_handler",
 }
+
+# Public career applications are rate-limited and CVs are kept outside public static paths.
 
 # Refresh sessions are role-isolated and deliberately non-rotating. This avoids
 # concurrent-tab/device refresh races where one refresh invalidates another
