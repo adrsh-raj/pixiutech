@@ -177,8 +177,10 @@ a{color:inherit;text-decoration:none}
 }
 .hero-v2__content{position:relative;z-index:2;padding-block:clamp(80px,10vw,140px);max-width:720px}
 .hero-v2__tag{
-  font-family:var(--f-mono);font-size:13px;letter-spacing:.3em;
-  color:var(--gold);text-transform:uppercase;margin-bottom:28px;
+  display:block;
+  font-family:var(--f-mono);font-size:11px;letter-spacing:.18em;
+  color:var(--gold);text-transform:uppercase;margin-bottom:20px;
+  padding:0 0 10px;border-bottom:1px solid rgba(198,154,82,.32);width:max-content;max-width:100%;
 }
 .hero-v2__title{
   font-size:clamp(36px,5.5vw,64px);color:#fff;
@@ -191,15 +193,16 @@ a{color:inherit;text-decoration:none}
 
 /* ======================== STATS BAR ======================== */
 .stats-bar{background:var(--navy-800);padding-block:clamp(32px,4vw,48px);border-bottom:1px solid var(--line-dark)}
-.stats-bar__grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2rem;text-align:center}
-.stat{display:flex;flex-direction:column;align-items:center;gap:6px}
-.stat__icon{font-size:2rem}
+.stats-bar__grid{display:grid;grid-template-columns:repeat(3,1fr);gap:0;text-align:left}
+.stat{display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:14px;row-gap:2px;padding:4px clamp(14px,2.5vw,30px);border-left:1px solid var(--line-dark)}
+.stat:first-child{border-left:0;padding-left:0}
+.stat__icon{grid-row:1 / span 2;align-self:center;color:var(--gold);width:22px;height:22px}
 .stat__number{
   font-family:var(--f-display);font-size:clamp(28px,3.5vw,42px);font-weight:800;color:#fff;
   font-stretch:118%;font-variation-settings:'wdth' 118;
 }
 .stat__label{font-family:var(--f-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted-dark)}
-@media(max-width:640px){.stats-bar__grid{grid-template-columns:repeat(2,1fr);gap:2rem}}
+@media(max-width:640px){.stats-bar__grid{grid-template-columns:1fr;gap:0}.stat,.stat:first-child{border-left:0;border-top:1px solid var(--line-dark);padding:16px 0}.stat:first-child{border-top:0}}
 
 /* ==================== SOLUTIONS GRID ===================== */
 .solutions-grid{
@@ -235,7 +238,7 @@ a{color:inherit;text-decoration:none}
   text-align:center;padding:clamp(24px,3vw,36px);background:#fff;
   border:1px solid var(--gray-300);border-radius:12px;position:relative;
 }
-.process-step__no{font-size:2.5rem;margin-bottom:16px;display:block}
+.process-step__no{font-family:var(--f-mono);font-size:12px;letter-spacing:.16em;color:var(--gold);margin-bottom:18px;display:inline-flex;align-items:center;gap:8px}
 .process-step h3{font-size:1.2rem;margin-bottom:10px}
 .process-step p{font-size:.95rem;color:var(--muted);line-height:1.5}
 .process-step__arrow{
@@ -264,8 +267,8 @@ a{color:inherit;text-decoration:none}
 .check-list--light li::before{color:var(--blue-soft)}
 
 /* ==================== WHY V2 ============================= */
-.why-v2{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(24px,3vw,44px);margin-top:50px}
-.why-v2__item{padding:clamp(24px,3vw,36px);border:1px solid var(--line-dark);border-radius:12px;background:rgba(255,255,255,.03)}
+.why-v2{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(20px,2.6vw,34px);margin-top:42px}
+.why-v2__item{padding:clamp(22px,2.6vw,30px);border:1px solid var(--line-dark);border-radius:10px;background:transparent}
 .why-v2__icon{font-size:2rem;display:block;margin-bottom:16px}
 .why-v2__item h3{font-size:1.15rem;color:#fff;margin-bottom:10px}
 .why-v2__item p{color:var(--muted-dark);font-size:.95rem;line-height:1.5}
@@ -443,3 +446,11 @@ a{color:inherit;text-decoration:none}
 /* Hero typography: solid fills only, no gradient text treatment. */
 .hero-v2__title,.hero-v2__accent{background:none !important;background-image:none !important;-webkit-background-clip:initial !important;background-clip:initial !important;-webkit-text-fill-color:currentColor !important}
 .hero-v2__accent{color:var(--gold) !important}
+
+
+/* Interaction policy: no opacity/fade hover treatment on primary actions. */
+.btn{transition:background .16s ease,border-color .16s ease,color .16s ease,box-shadow .16s ease,transform .16s ease}
+.btn:hover{opacity:1}
+
+/* Spacing scale used by the public site. */
+:root{--space-1:6px;--space-2:10px;--space-3:14px;--space-4:18px;--space-5:24px;--space-6:32px;--space-7:40px;--space-8:48px}
