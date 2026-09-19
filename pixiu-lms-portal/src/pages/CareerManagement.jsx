@@ -79,8 +79,8 @@ export default function CareerManagement() {
       if (!response.ok) throw new Error('CV could not be downloaded.');
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a'); anchor.href = url; anchor.download = application.cv_original_name || 'resume.pdf'; anchor.click();
-      URL.revokeObjectURL(url);
+      const anchor = document.createElement('a'); anchor.href = url; anchor.download = application.cv_original_name || 'resume.pdf'; document.body.appendChild(anchor); anchor.click(); anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (error) { toast.error(error.message || 'CV download failed.'); }
   };
 
