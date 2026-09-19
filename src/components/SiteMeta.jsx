@@ -1,6 +1,5 @@
 import { useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
-import CookieConsent from './CookieConsent.jsx'
 
 const SITE = 'https://www.pixiutech.com'
 const DEFAULT_IMAGE = `${SITE}/img/real_ai_classroom.jpg`
@@ -79,6 +78,6 @@ export default function SiteMeta() {
     upsertMeta('meta[name="twitter:image"]', 'name', 'twitter:image', DEFAULT_IMAGE)
     upsertCanonical(canonical)
   }, [pathname])
-  return <CookieConsent />
+  return null
 }
 export { META }
