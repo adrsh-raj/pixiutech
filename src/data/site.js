@@ -78,18 +78,3 @@ export const WHY = [
   { title: 'Hands-On Learning', desc: 'Every session has a build. Students make real things, not watch slideshows.', icon: '🛠️' },
   { title: 'Long-Term Partner', desc: "We don't install and leave. Ongoing classes, support, and curriculum updates term after term.", icon: '🤝' },
 ]
-
-export const CAREERS = [
-  {
-    title: 'STEM Instructor',
-    location: 'Hata, UP',
-    type: 'Full-time',
-    desc: 'Deliver robotics and coding sessions in partner schools. Train students from Class 3 to 11 (except 10) on Arduino, sensors, and project-based learning.',
-  },
-  {
-    title: 'Curriculum Developer',
-    location: 'Remote',
-    type: 'Part-time',
-    desc: 'Design graded STEM curriculum, write student workbooks, and create project guides aligned with CBSE/ICSE standards.',
-  },
-]
