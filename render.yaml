@@ -14,6 +14,10 @@ services:
         value: "4"
       - key: FRESHCLAM_CHECKS
         value: "24"
+      - key: CLAMAV_NO_MILTERD
+        value: "true"
+      - key: CLAMD_STARTUP_TIMEOUT
+        value: "1800"
 
   - type: web
     name: pixiu-django-api
@@ -73,6 +77,11 @@ services:
         value: "True"
       - key: CLAMAV_REQUIRED
         value: "True"
+      - key: CLAMAV_HOSTPORT
+        fromService:
+          type: pserv
+          name: pixiu-clamav
+          property: hostport
       - key: CLAMAV_HOST
         fromService:
           type: pserv
@@ -82,5 +91,9 @@ services:
         value: "3310"
       - key: CLAMAV_TIMEOUT_SECONDS
         value: "30"
+      - key: CLAMAV_RETRY_ATTEMPTS
+        value: "3"
+      - key: CLAMAV_RETRY_BACKOFF_SECONDS
+        value: "1"
       - key: CLAMAV_CHUNK_SIZE
         value: "1048576"
