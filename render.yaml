@@ -8,6 +8,10 @@ services:
     envVars:
       - key: CLAMD_CONF_StreamMaxLength
         value: "30M"
+      - key: CLAMD_CONF_TCPSocket
+        value: "3310"
+      - key: CLAMD_CONF_TCPAddr
+        value: "0.0.0.0"
       - key: CLAMD_CONF_ConcurrentDatabaseReload
         value: "no"
       - key: CLAMD_CONF_MaxThreads
