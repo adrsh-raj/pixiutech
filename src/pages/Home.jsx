@@ -3,8 +3,6 @@ import Reveal from '../components/Reveal.jsx'
 import CTAStrip from '../components/CTAStrip.jsx'
 import CountUp from '../components/CountUp.jsx'
 import { STATS, SOLUTIONS, PROCESS, WHY } from '../data/site.js'
-import { FAQ_ITEMS } from '../data/faq.js'
-import '../styles/faq.css'
 
 export default function Home() {
   return (
@@ -168,33 +166,6 @@ export default function Home() {
                 </div>
               ))}
             </div>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* ========================== FAQ ========================== */}
-      <section className="band band--gray">
-        <div className="shell" style={{ maxWidth: 920 }}>
-          <Reveal>
-            <p className="eyebrow">FAQ</p>
-            <h2 className="h-sect">Questions Schools Usually Ask</h2>
-          </Reveal>
-          <Reveal delay={80}>
-            <div className="faq-list" style={{ marginTop: 26 }}>
-              {FAQ_ITEMS.slice(0, 5).map((item) => (
-                <details className="faq-item" key={item.q}>
-                  <summary>{item.q}<span aria-hidden="true">+</span></summary>
-                  <div className="faq-item__answer">{item.a}</div>
-                </details>
-              ))}
-            </div>
-          </Reveal>
-          <Reveal delay={120}>
-            <p style={{ marginTop: 28, textAlign: 'center' }}>
-              <Link className="btn btn--outline" to="/faq">
-                View all FAQs <span className="arw">→</span>
-              </Link>
-            </p>
           </Reveal>
         </div>
       </section>
