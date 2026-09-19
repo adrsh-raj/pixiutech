@@ -17,4 +17,5 @@ class CareerApplicationAdmin(admin.ModelAdmin):
     list_display = ("name", "email", "phone", "opening", "status", "created_at")
     list_filter = ("status", "opening")
     search_fields = ("name", "email", "phone", "opening__title")
-    readonly_fields = ("id", "opening", "name", "email", "phone", "cover_message", "cv", "cv_original_name", "cv_size", "cv_sha256", "created_at", "updated_at")
+    readonly_fields = ("id", "opening", "name", "email", "phone", "cover_message", "cv_original_name", "cv_size", "cv_sha256", "created_at", "updated_at")
+    exclude = ("cv",)
