@@ -53,10 +53,11 @@ export default function PrivacyPolicy() {
               </p>
               <h3>Technical and security information</h3>
               <p>
-                We may receive limited technical information needed to operate and secure the services,
-                such as device or browser information, network information, request logs, and security
-                signals. The portal may also use Cloudflare Turnstile as an anti-abuse measure during
-                login.
+                We do not currently use an app-level visitor analytics tracker on the public website such as Google Analytics or PostHog.
+                Normal hosting, CDN, browser, and security infrastructure may still generate technical request data needed to
+                deliver and protect the services. Our backend audit system also records IP address and user-agent information
+                for certain auditable actions, including website enquiries and authenticated portal activity. The portal may
+                use Cloudflare Turnstile as an anti-abuse measure during login.
               </p>
             </section>
 
@@ -106,7 +107,7 @@ export default function PrivacyPolicy() {
             </section>
 
             <section>
-              <h2>5. Cookies, storage, and similar technologies</h2>
+              <h2>5. Website visits, cookies, storage, and similar technologies</h2>
               <p>
                 We may use essential cookies, browser storage, or similar mechanisms to keep the portal
                 secure, maintain login sessions, remember necessary preferences, and support service
