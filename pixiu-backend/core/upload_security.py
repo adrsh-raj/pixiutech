@@ -239,12 +239,10 @@ def validate_career_cv(uploaded: UploadedFile | None) -> tuple[UploadedFile, str
     try:
         uploaded.seek(0)
         raw = uploaded.read()
-        lowered = raw.lower()
         # Reject common PDF active-content/attachment primitives. This is
         # additional defense-in-depth; ClamAV remains the primary malware scan.
-        for marker in (b"/javascript", b"/js", b"/openaction", b"/aa", b"/embeddedfile", b"/filespec"):
-            if marker in lowered:
-                raise SecureUploadError("CV PDF contains unsupported active or embedded content.")
+        if re.search(rb"/(?:javascript|js|openaction|aa|embeddedfile|filespec)\\b", raw, flags=re.IGNORECASE):
+            raise SecureUploadError("CV PDF contains unsupported active or embedded content.")
 
         try:
             from pypdf import PdfReader
