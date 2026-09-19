@@ -169,7 +169,7 @@ g[display="none"],
   --color-slate-300: #C1CAC4;
   --color-slate-400: #AAB7B0;
   --color-slate-500: #89978F;
-  --color-slate-600: #69766F;
+  --color-slate-600: #5B6761;
   --color-slate-700: #4C5952;
   --color-slate-800: #313D37;
   --color-slate-900: #1E2925;
@@ -219,11 +219,35 @@ g[display="none"],
 /* dark workspace contrast guards: secondary labels stay readable without turning the UI bright */
 [class~="bg-[#15201d]"] [class~="text-slate-500"],
 [class~="bg-[#15201d]"] [class~="text-slate-600"],
+[class~="bg-[#15201d]"] [class~="text-slate-700"],
 [class~="bg-[#111817]"] [class~="text-slate-500"],
-[class~="bg-[#111817]"] [class~="text-slate-600"]{
+[class~="bg-[#111817]"] [class~="text-slate-600"],
+[class~="bg-[#111817]"] [class~="text-slate-700"],
+[class~="bg-slate-950"] [class~="text-slate-500"],
+[class~="bg-slate-950"] [class~="text-slate-600"],
+[class~="bg-slate-950"] [class~="text-slate-700"]{
   color:#AAB7B0 !important;
 }
 [class~="bg-[#15201d]"] [class~="text-slate-400"],
-[class~="bg-[#111817]"] [class~="text-slate-400"]{
+[class~="bg-[#111817]"] [class~="text-slate-400"],
+[class~="bg-slate-950"] [class~="text-slate-400"]{
   color:#B8C4BE !important;
+}
+[class~="bg-[#15201d]"] [class~="text-blue-300"],
+[class~="bg-[#111817]"] [class~="text-blue-300"],
+[class~="bg-slate-950"] [class~="text-blue-300"]{
+  color:#96C5BB !important;
+}
+[class~="bg-[#15201d]"] [class~="text-blue-400"],
+[class~="bg-[#111817]"] [class~="text-blue-400"],
+[class~="bg-slate-950"] [class~="text-blue-400"]{
+  color:#6CAEA1 !important;
+}
+[class~="bg-[#15201d]"] [class~="text-blue-500"],
+[class~="bg-[#111817]"] [class~="text-blue-500"],
+[class~="bg-slate-950"] [class~="text-blue-500"],
+[class~="bg-[#15201d]"] [class~="text-blue-600"],
+[class~="bg-[#111817]"] [class~="text-blue-600"],
+[class~="bg-slate-950"] [class~="text-blue-600"]{
+  color:#6CAEA1 !important;
 }
