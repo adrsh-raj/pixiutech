@@ -6,6 +6,7 @@ import './styles/variables.css'
 import './styles/global.css'
 import { initAnalytics } from './utils/analytics.js'
 
+// Start GA4 only when a previously saved analytics consent exists.
 initAnalytics()
 
 // Production build marker: canonical root stylesheet imports only.
