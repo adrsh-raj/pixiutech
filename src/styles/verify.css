@@ -522,7 +522,7 @@
 }
 
 .verify-table-code {
-  color: #1768ff !important;
+  color: #1f776c !important;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 11px;
 }
@@ -533,7 +533,7 @@
 
 .verify-table-score {
   font-weight: 900;
-  color: #071a33 !important;
+  color: #17332e !important;
 }
 
 .verify-footnote {
