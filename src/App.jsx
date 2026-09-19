@@ -6,6 +6,7 @@ import ScrollToTop from './components/ScrollToTop.jsx'
 import Home from './pages/Home.jsx'
 import Solutions from './pages/Solutions.jsx'
 import Careers from './pages/Careers.jsx'
+import FAQ from './pages/FAQ.jsx'
 import PortalBridge from './pages/PortalBridge.jsx'
 import Contact from './pages/Contact.jsx'
 import Simulation from './pages/Simulation.jsx'
@@ -35,6 +36,7 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/solutions" element={<Solutions />} />
           <Route path="/careers" element={<Careers />} />
+          <Route path="/faq" element={<FAQ />} />
           <Route path="/portal" element={<PortalBridge />} />
           <Route path="/hub" element={<PortalBridge />} />
           <Route path="/login" element={<ProductionLoginRedirect />} />
