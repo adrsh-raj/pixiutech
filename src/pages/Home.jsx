@@ -12,7 +12,7 @@ export default function Home() {
       {/* ============================= HERO ============================= */}
       <section className="hero-v2">
         <div className="hero-v2__bg">
-          <img src="/img/hero_lab.jpg" alt="Pixiu Tech classroom session on AI and machine learning" />
+          <img src="/img/hero_lab.jpg" alt="Pixiu Tech classroom session on AI and machine learning" loading="eager" fetchPriority="high" decoding="async" />
           <div className="hero-v2__overlay" />
         </div>
         <div className="shell hero-v2__content">
@@ -68,7 +68,7 @@ export default function Home() {
               {SOLUTIONS.map((s) => (
                 <Link to={`/solutions#${s.id}`} className="sol-card" key={s.id}>
                   <div className="sol-card__img">
-                    <img src={s.img} alt={s.alt || s.title} loading="lazy" />
+                    <img src={s.img} alt={s.alt || s.title} loading="lazy" decoding="async" />
                   </div>
                   <div className="sol-card__body">
                     <h3>{s.title}</h3>
@@ -94,7 +94,7 @@ export default function Home() {
         <div className="shell">
           <Reveal>
             <div className="wide-img">
-              <img src="/img/workshop_action.jpg" alt="Students in an energetic STEM robotics workshop" loading="lazy" />
+              <img src="/img/workshop_action.jpg" alt="Students in an energetic STEM robotics workshop" loading="lazy" decoding="async" />
               <p className="wide-img__caption">Live workshops — where students build, fail, fix, and celebrate</p>
             </div>
           </Reveal>
@@ -128,7 +128,7 @@ export default function Home() {
         <div className="shell split">
           <Reveal>
             <div className="split__img">
-              <img src="/img/teacher_training.jpg" alt="Teacher training workshop" loading="lazy" />
+              <img src="/img/teacher_training.jpg" alt="Teacher training workshop" loading="lazy" decoding="async" />
             </div>
           </Reveal>
           <Reveal delay={80}>
