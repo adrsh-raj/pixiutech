@@ -214,3 +214,16 @@ g[display="none"],
 }
 
 /* Remove the default Vite starter visual language if legacy classes are still mounted. */
+
+
+/* dark workspace contrast guards: secondary labels stay readable without turning the UI bright */
+[class~="bg-[#15201d]"] [class~="text-slate-500"],
+[class~="bg-[#15201d]"] [class~="text-slate-600"],
+[class~="bg-[#111817]"] [class~="text-slate-500"],
+[class~="bg-[#111817]"] [class~="text-slate-600"]{
+  color:#AAB7B0 !important;
+}
+[class~="bg-[#15201d]"] [class~="text-slate-400"],
+[class~="bg-[#111817]"] [class~="text-slate-400"]{
+  color:#B8C4BE !important;
+}
