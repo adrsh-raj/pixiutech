@@ -8,6 +8,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
+
 class CsrfTokenView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
@@ -22,6 +23,8 @@ class CsrfTokenView(APIView):
 
 
 csrf_token_view = CsrfTokenView.as_view()
+
+
 def require_api_csrf(view_func):
     """Apply Django's real CSRF checks to DRF APIViews that receive cookies.
 
