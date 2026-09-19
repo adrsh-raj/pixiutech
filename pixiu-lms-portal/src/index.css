@@ -251,3 +251,10 @@ g[display="none"],
 [class~="bg-slate-950"] [class~="text-blue-600"]{
   color:#6CAEA1 !important;
 }
+
+
+/* interaction consistency guards */
+[class*="hover:opacity-"]{opacity:1 !important}
+[class~="transition-all"]{transition-property:color,background-color,border-color,box-shadow,transform !important}
+[class~="transition-opacity"]{transition:none !important}
+[class*="hover:-translate-"]{transform:none}
