@@ -31,7 +31,14 @@ export default function Footer() {
               <Link to="/contact#enquiry">Contact Us</Link>
               <a href="mailto:director@pixiutech.com">Email Us</a>
               <Link to="/careers">Careers</Link>
+            </nav>
+          </div>
+
+          <div className="foot__links-group">
+            <h4>Legal</h4>
+            <nav className="foot__nav-col">
               <Link to="/privacy">Privacy Policy</Link>
+              <Link to="/terms">Terms &amp; Conditions</Link>
             </nav>
           </div>
         </div>
