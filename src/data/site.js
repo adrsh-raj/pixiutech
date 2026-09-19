@@ -23,6 +23,7 @@ export const SOLUTIONS = [
     short: 'Build, program, and control real machines.',
     desc: 'Complete robotics lab setup with Arduino, sensors, motors, and chassis kits. Students build traffic lights, smart dustbins, obstacle-avoiding robots, and line followers — progressing from Class 6 to Class 11.',
     img: '/img/robotics_solution.jpg',
+    alt: 'Students building and programming a robotics project in a school lab',
     features: ['Arduino & microcontrollers', 'Sensors & actuators', 'Graded project kits', 'Competition-ready builds'],
   },
   {
@@ -31,6 +32,7 @@ export const SOLUTIONS = [
     short: 'Teach machines to see, hear, and decide.',
     desc: 'Introduce students to computer vision, natural language processing, and data science using age-appropriate tools. From block-based AI for younger students to Python-based ML for seniors.',
     img: '/img/ai_solution.jpg',
+    alt: 'Students learning AI and machine learning in a school technology lab',
     features: ['Computer vision projects', 'Chatbot building', 'Data science basics', 'Python & block coding'],
   },
   {
@@ -39,6 +41,7 @@ export const SOLUTIONS = [
     short: 'Design on screen, print in hand.',
     desc: 'CAD modeling, 3D printing, and laser cutting integrated into the curriculum. Students learn to design mechanical parts, artistic models, and functional prototypes.',
     img: '/img/comp_design.jpg',
+    alt: 'Students creating 3D designs and prototypes in an innovation lab',
     features: ['3D modeling & CAD', '3D printer setup', 'Laser cutting', 'Prototype fabrication'],
   },
   {
@@ -47,6 +50,7 @@ export const SOLUTIONS = [
     short: 'Fly, navigate, and program aerial systems.',
     desc: 'Educational drone kits for understanding flight dynamics, GPS navigation, and autonomous programming. Safe, supervised outdoor flying integrated with physics and math.',
     img: '/img/drone_solution.jpg',
+    alt: 'Educational drone technology project for school students',
     features: ['Quadcopter assembly', 'Flight dynamics', 'GPS & navigation', 'Aerial photography'],
   },
   {
@@ -55,6 +59,7 @@ export const SOLUTIONS = [
     short: 'Connect the physical world to the digital.',
     desc: 'Internet of Things projects using sensors, Wi-Fi modules, and cloud dashboards. Students build smart weather stations, automated gardens, and security systems.',
     img: '/img/iot_solution.jpg',
+    alt: 'Students building an IoT smart system with sensors',
     features: ['Sensor networks', 'Wi-Fi & Bluetooth', 'Cloud dashboards', 'Home automation'],
   },
   {
@@ -63,6 +68,7 @@ export const SOLUTIONS = [
     short: 'Your school, your lab, your way.',
     desc: 'Every school is different — different budgets, different spaces, different boards, different goals. We sit with your management to understand exactly what your school needs and design a fully customised solution around it. Whether you want a small robotics corner for primary classes or a full-scale innovation lab for senior students, we tailor the hardware, curriculum, session frequency, and instructor deployment to match your specific requirements and academic calendar.',
     img: '/img/workshop_action.jpg',
+    alt: 'Students working with robotics kits during a hands-on STEM workshop',
     features: ['Tailored to your board (CBSE / ICSE / State)', 'Budget-flexible lab configurations', 'Custom curriculum mapped to your academic calendar', 'Choose domains — mix Robotics, AI, IoT, Drones as needed', 'Space planning for any room size'],
   },
 ]
