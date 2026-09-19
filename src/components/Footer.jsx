@@ -30,7 +30,6 @@ export default function Footer() {
             <nav className="foot__nav-col">
               <Link to="/contact#enquiry">Contact Us</Link>
               <a href="mailto:director@pixiutech.com">Email Us</a>
-              <Link to="/careers">Careers</Link>
             </nav>
           </div>
 
