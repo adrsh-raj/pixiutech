@@ -125,6 +125,8 @@ SIMPLE_JWT = {
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
 _cors_env = [x.strip() for x in os.environ.get("DJANGO_CORS_ALLOWED_ORIGINS", "").split(",") if x.strip()]
+if "*" in _cors_env:
+    raise RuntimeError("Wildcard CORS is forbidden for the credentialed Pixiu API.")
 CORS_ALLOWED_ORIGINS = list(dict.fromkeys(_cors_env + [
     "https://pixiutech.com",
     "https://www.pixiutech.com",
