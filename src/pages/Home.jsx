@@ -1,10 +1,13 @@
 import { Link } from 'react-router-dom'
+import { ClipboardList, GraduationCap, Hammer, Handshake, Link2, School, Users, Wrench, Settings2 } from 'lucide-react'
 import Reveal from '../components/Reveal.jsx'
 import CTAStrip from '../components/CTAStrip.jsx'
 import CountUp from '../components/CountUp.jsx'
 import { STATS, SOLUTIONS, PROCESS, WHY } from '../data/site.js'
 import { FAQ_ITEMS } from '../data/faq.js'
 import '../styles/faq.css'
+
+const ICONS = { school: School, wrench: Wrench, users: Users, clipboard: ClipboardList, hammer: Hammer, graduation: GraduationCap, handshake: Handshake, link: Link2, tools: Settings2 }
 
 export default function Home() {
   return (
@@ -43,7 +46,7 @@ export default function Home() {
           <div className="stats-bar__grid">
             {STATS.map((s) => (
               <div className="stat" key={s.label}>
-                <span className="stat__icon">{s.icon}</span>
+                <span className="stat__icon" aria-hidden="true">{(() => { const Icon = ICONS[s.icon] || Settings2; return <Icon size={22} strokeWidth={1.8} /> })()}</span>
                 <span className="stat__number"><CountUp text={s.number} /></span>
                 <span className="stat__label">{s.label}</span>
               </div>
@@ -112,7 +115,7 @@ export default function Home() {
             <div className="process-grid">
               {PROCESS.map((p, i) => (
                 <div className="process-step" key={p.no}>
-                  <div className="process-step__no">{p.icon}</div>
+                  <div className="process-step__no" aria-hidden="true">{(() => { const Icon = ICONS[p.icon] || Settings2; return <Icon size={28} strokeWidth={1.7} /> })()}</div>
                   <h3>{p.name}</h3>
                   <p>{p.text}</p>
                   {i < PROCESS.length - 1 && <div className="process-step__arrow">→</div>}
