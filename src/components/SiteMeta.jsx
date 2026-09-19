@@ -58,7 +58,7 @@ function upsertRobots(content) {
 export default function SiteMeta() {
   const { pathname } = useLocation()
   useEffect(() => {
-    const path = pathname === '/' ? '/' : pathname.replace(//+$/, '')
+    const path = pathname === '/' ? '/' : pathname.replace(/\/+$/, '')
     const meta = META[path] || { title: 'Page Not Found | Pixiu Tech', description: 'The requested Pixiu Tech page could not be found.', imageAlt: 'Pixiu Tech' }
     const canonicalPath = META[path] ? path : (CANONICAL_REDIRECTS[path] || '')
     const canonical = `${SITE}${canonicalPath}`
