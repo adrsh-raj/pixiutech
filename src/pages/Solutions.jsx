@@ -44,6 +44,11 @@ export default function Solutions() {
                       <li key={f}>{f}</li>
                     ))}
                   </ul>
+                  <p style={{ marginTop: 24 }}>
+                    <Link className="btn btn--outline" to={`/contact?intent=proposal#demo-form`}>
+                      Discuss this solution <span className="arw">→</span>
+                    </Link>
+                  </p>
                 </div>
               </div>
             </Reveal>
@@ -71,6 +76,11 @@ export default function Solutions() {
                   <li>Assessment & grading frameworks</li>
                   <li>Ongoing mentorship from Pixiu team</li>
                 </ul>
+                <p style={{ marginTop: 24 }}>
+                  <Link className="btn btn--ghost-light" to="/contact?intent=proposal#demo-form">
+                    Plan your training <span className="arw">→</span>
+                  </Link>
+                </p>
               </div>
             </div>
           </Reveal>
@@ -98,14 +108,14 @@ export default function Solutions() {
           <Reveal delay={120}>
             <p style={{ marginTop: 34 }}>
               <Link className="btn btn--primary btn--lg" to="/contact#demo-form">
-                Book a Free Demo for Your School <span className="arw">→</span>
+                Book a Free Consultation for Your School <span className="arw">→</span>
               </Link>
             </p>
           </Reveal>
         </div>
       </section>
 
-      <CTAStrip title="Ready to Transform Your School?" primary="Book a Free Demo" />
+      <CTAStrip title="Ready to Transform Your School?" primary="Book a Free Consultation" />
     </>
   )
 }
