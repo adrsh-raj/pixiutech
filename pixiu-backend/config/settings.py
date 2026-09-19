@@ -81,8 +81,11 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = SECURE_UPLOAD_MAX_MULTIPART_BYTES
 CLAMAV_ENABLED = os.environ.get("CLAMAV_ENABLED", "False" if DEBUG else "True").lower() == "true"
 CLAMAV_REQUIRED = os.environ.get("CLAMAV_REQUIRED", "False" if DEBUG else "True").lower() == "true"
 CLAMAV_HOST = os.environ.get("CLAMAV_HOST", "127.0.0.1").strip()
+CLAMAV_HOSTPORT = os.environ.get("CLAMAV_HOSTPORT", "").strip()
 CLAMAV_PORT = int(os.environ.get("CLAMAV_PORT", "3310"))
 CLAMAV_TIMEOUT_SECONDS = float(os.environ.get("CLAMAV_TIMEOUT_SECONDS", "30"))
+CLAMAV_RETRY_ATTEMPTS = int(os.environ.get("CLAMAV_RETRY_ATTEMPTS", "3"))
+CLAMAV_RETRY_BACKOFF_SECONDS = float(os.environ.get("CLAMAV_RETRY_BACKOFF_SECONDS", "1"))
 CLAMAV_CHUNK_SIZE = int(os.environ.get("CLAMAV_CHUNK_SIZE", str(1024 * 1024)))
 
 REST_FRAMEWORK = {
