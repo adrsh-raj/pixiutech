@@ -1,6 +1,7 @@
 import re
 import secrets
 
+from django.conf import settings
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.utils import timezone
@@ -11,8 +12,14 @@ from .models import User, UserRole, UserStatus
 
 STUDENT_TEMP_PIN_LENGTH = 8
 STUDENT_TEMP_PIN_ALPHABET = "0123456789"
-LOGIN_MAX_FAILED_ATTEMPTS = 5
-LOGIN_LOCKOUT_MINUTES = 15
+
+
+def login_max_failed_attempts() -> int:
+    return max(1, int(getattr(settings, "LOGIN_MAX_FAILED_ATTEMPTS", 5)))
+
+
+def login_lockout_minutes() -> int:
+    return max(1, int(getattr(settings, "LOGIN_LOCKOUT_MINUTES", 15)))
 
 
 def login_is_locked(user, now=None):
@@ -31,9 +38,10 @@ def clear_login_failures(user):
 def record_failed_login(user, now=None):
     now = now or timezone.now()
     attempts = int(user.failed_login_attempts or 0) + 1
-    user.failed_login_attempts = min(attempts, LOGIN_MAX_FAILED_ATTEMPTS)
-    if attempts >= LOGIN_MAX_FAILED_ATTEMPTS:
-        user.locked_until = now + timedelta(minutes=LOGIN_LOCKOUT_MINUTES)
+    max_attempts = login_max_failed_attempts()
+    user.failed_login_attempts = min(attempts, max_attempts)
+    if attempts >= max_attempts:
+        user.locked_until = now + timedelta(minutes=login_lockout_minutes())
     user.save(update_fields=["failed_login_attempts", "locked_until"])
     return attempts
 
