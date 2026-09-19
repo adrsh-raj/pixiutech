@@ -2,7 +2,7 @@ from django.db import transaction
 from django.db.models import Q, Count
 from django.utils import timezone
 
-from accounts.credentials import build_student_username, create_or_reset_managed_account, generate_student_temp_pin, revoke_all_refresh_tokens
+from accounts.credentials import build_student_username, create_or_reset_managed_account, generate_student_temp_pin, revoke_all_refresh_tokens, invalidate_user_sessions
 from accounts.models import User, UserRole, UserStatus
 
 from .models import School, SchoolClass, Student, Trainer, TrainerSchoolAssignment
@@ -63,7 +63,7 @@ def reset_student_to_temp_pin(student: Student) -> str:
     if account.role != UserRole.STUDENT: raise ValueError("Linked account is not a student account.")
     temp_pin = generate_student_temp_pin()
     account.set_password(temp_pin); account.must_change_password = True; account.status = UserStatus.ACTIVE if student.status == "active" else UserStatus.INACTIVE; account.is_active = student.status == "active"
-    account.save(update_fields=["password", "must_change_password", "status", "is_active"]); revoke_all_refresh_tokens(account)
+    account.save(update_fields=["password", "must_change_password", "status", "is_active"]); invalidate_user_sessions(account)
     return temp_pin
 
 
