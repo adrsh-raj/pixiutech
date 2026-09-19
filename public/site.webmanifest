@@ -1,0 +1,15 @@
+{
+  "name": "Pixiu Tech",
+  "short_name": "Pixiu Tech",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0A1A33",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "type": "image/png",
+      "sizes": "any"
+    }
+  ]
+}
