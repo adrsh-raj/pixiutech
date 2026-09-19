@@ -1,4 +1,5 @@
 const MEASUREMENT_ID = String(import.meta.env.VITE_GA_MEASUREMENT_ID || '').trim()
+const CONSENT_KEY = 'pixiu_analytics_consent'
 
 function gtag(...args) {
   if (typeof window === 'undefined') return
@@ -7,18 +8,35 @@ function gtag(...args) {
   window.gtag(...args)
 }
 
-export function initAnalytics() {
-  if (!MEASUREMENT_ID || typeof window === 'undefined' || typeof document === 'undefined') return
-  if (document.querySelector('script[data-pixiu-ga="true"]')) return
+export function getAnalyticsConsent() {
+  if (typeof window === 'undefined') return null
+  const value = window.localStorage.getItem(CONSENT_KEY)
+  return value === 'granted' || value === 'denied' ? value : null
+}
 
-  // Google Consent Mode keeps analytics storage denied by default and disables
-  // advertising/personalisation signals. There is no visible analytics UI.
-  gtag('consent', 'default', {
-    analytics_storage: 'denied',
+export function setAnalyticsConsent(value) {
+  if (typeof window === 'undefined') return
+  const consent = value === 'granted' ? 'granted' : 'denied'
+  window.localStorage.setItem(CONSENT_KEY, consent)
+  gtag('consent', 'update', {
+    analytics_storage: consent,
     ad_storage: 'denied',
     ad_user_data: 'denied',
     ad_personalization: 'denied',
-    wait_for_update: 500,
+  })
+}
+
+export function initAnalytics() {
+  if (getAnalyticsConsent() !== 'granted') return
+  if (!MEASUREMENT_ID || typeof window === 'undefined' || typeof document === 'undefined') return
+  if (document.querySelector('script[data-pixiu-ga="true"]')) return
+
+  // Analytics is loaded only after the visitor explicitly allows analytics.
+  gtag('consent', 'default', {
+    analytics_storage: 'granted',
+    ad_storage: 'denied',
+    ad_user_data: 'denied',
+    ad_personalization: 'denied',
   })
   gtag('js', new Date())
   gtag('config', MEASUREMENT_ID, {
@@ -35,7 +53,7 @@ export function initAnalytics() {
 }
 
 export function trackPageView(pathname) {
-  if (!MEASUREMENT_ID || typeof window === 'undefined') return
+  if (getAnalyticsConsent() !== 'granted' || !MEASUREMENT_ID || typeof window === 'undefined') return
   initAnalytics()
   if (typeof window.gtag !== 'function') return
 
