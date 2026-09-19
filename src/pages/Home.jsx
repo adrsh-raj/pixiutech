@@ -25,7 +25,7 @@ export default function Home() {
             </p>
             <div className="hero-v2__cta">
               <Link className="btn btn--primary btn--lg" to="/contact#demo-form">
-                Book a Free Demo <span className="arw">→</span>
+                Book a Free Consultation <span className="arw">→</span>
               </Link>
               <Link className="btn btn--ghost-light" to="/solutions">
                 Explore Solutions
@@ -143,7 +143,7 @@ export default function Home() {
               </ul>
               <p style={{ marginTop: 24 }}>
                 <Link className="btn btn--outline" to="/contact#demo-form">
-                  Enquire about training <span className="arw">→</span>
+                  Discuss Teacher Training <span className="arw">→</span>
                 </Link>
               </p>
             </div>
