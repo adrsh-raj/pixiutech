@@ -47,7 +47,8 @@ const Notifications = lazyWithChunkRecovery(() => import('./pages/Notifications'
 const ContentHub = lazyWithChunkRecovery(() => import('./pages/ContentHub'));
 const Curriculum = lazyWithChunkRecovery(() => import('./pages/Curriculum'));
 const Login = lazyWithChunkRecovery(() => import('./pages/Login'));
-const VerifyV2 = lazyWithChunkRecovery(() => import('./pages/VerifyV2'));
+const VerifyV2 = lazyWithChunkRecovery(() => import('./pages/VerifyV2')); 
+const PrivacyPolicy = lazyWithChunkRecovery(() => import('./pages/PrivacyPolicy'));
 const StudentPortal = lazyWithChunkRecovery(() => import('./pages/StudentPortal'));
 const SchoolPortal = lazyWithChunkRecovery(() => import('./pages/SchoolPortal'));
 const AuditLogs = lazyWithChunkRecovery(() => import('./pages/AuditLogs'));
@@ -104,6 +105,7 @@ function QuizzesRoute() { const { user } = useAuth(); return user?.role === 'stu
 
 export default function App() { return <ToastProvider><AuthProvider><DataProvider><BrowserRouter><Suspense fallback={<LoadingScreen />}><Routes>
   <Route path="/verify" element={<VerifyV2 />} />
+  <Route path="/privacy" element={<PrivacyPolicy />} />
   <Route path="/login" element={<GuestRouteGuard><Login /></GuestRouteGuard>} />
   <Route path="/student-forgot-password" element={<StudentForgotPassword />} />
   <Route path="/simulation" element={<ChunkErrorBoundary><Simulation /></ChunkErrorBoundary>} />
