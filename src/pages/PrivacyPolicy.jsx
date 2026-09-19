@@ -55,8 +55,8 @@ export default function PrivacyPolicy() {
               </p>
               <h3>Technical and security information</h3>
               <p>
-                We use Google Analytics 4 (GA4) on the website to understand page visits and general website usage. GA4 uses cookies and similar
-                measurement technologies; we configure it for aggregated website measurement and do not intentionally send names, email
+                We use Google Analytics 4 (GA4) on the website to understand page visits and general website usage. GA4 is enabled automatically and uses cookies and similar
+                measurement technologies. We configure it for aggregated website measurement, disable Google Signals and ad-personalisation signals, and do not intentionally send names, email
                 addresses, phone numbers, certificate IDs, student IDs, marks, passwords, or other directly identifying information to GA4.
                 Normal hosting, CDN, browser, and security infrastructure may also generate technical request data needed to deliver and
                 protect the services. Our backend audit system also records IP address and user-agent information
@@ -115,8 +115,9 @@ export default function PrivacyPolicy() {
               <p>
                 We may use essential cookies, browser storage, or similar mechanisms to keep the portal
                 secure, maintain login sessions, remember necessary preferences, and support service
-                functionality. The portal also records limited performance diagnostics to help us
-                identify reliability or loading issues.
+                functionality. The website also uses GA4 cookies for page-visit measurement. Browser
+                controls can be used to block or delete cookies. The portal also records limited performance
+                diagnostics to help us identify reliability or loading issues.
               </p>
             </section>
 
