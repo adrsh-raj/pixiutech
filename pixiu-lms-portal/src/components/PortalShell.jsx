@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import RefreshButton from './ui/RefreshButton';
 import Breadcrumbs from './ui/Breadcrumbs';
+import PortalFooter from './PortalFooter';
 
 export default function PortalShell({ role, title, subtitle, children }) {
   const { user } = useAuth();
@@ -70,6 +71,7 @@ export default function PortalShell({ role, title, subtitle, children }) {
             {children}
           </div>
         </main>
+        <PortalFooter />
       </div>
     </div>
   );
