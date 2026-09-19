@@ -61,8 +61,8 @@
   --color-sky-800: #194A43;
   --color-sky-900: #143A35;
 
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-sans: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 }
 
 html { scroll-behavior: smooth; }
@@ -143,3 +143,74 @@ g[display="none"],
 .blocklySvg,
 .blocklySvg svg,
 .blocklySvg g { max-width: none !important; }
+
+
+/* ==================== PIXIU PORTAL DESIGN SYSTEM ==================== */
+/* Use neutral surfaces and solid panels instead of glassmorphism. */
+[class*="backdrop-blur"]{backdrop-filter:none !important;-webkit-backdrop-filter:none !important}
+[class~="bg-white/95"],[class~="bg-white/90"],[class~="bg-white/80"],[class~="bg-white/70"]{background-color:#ffffff !important}
+
+/* Keep decorative cards on one quiet border system; semantic alert borders can opt out. */
+[class~="border-blue-50"],[class~="border-blue-100"],[class~="border-blue-200"],
+[class~="border-indigo-50"],[class~="border-indigo-100"],[class~="border-indigo-200"],
+[class~="border-violet-50"],[class~="border-violet-100"],[class~="border-violet-200"],
+[class~="border-purple-50"],[class~="border-purple-100"],[class~="border-purple-200"],
+[class~="border-cyan-50"],[class~="border-cyan-100"],[class~="border-cyan-200"],
+[class~="border-sky-50"],[class~="border-sky-100"],[class~="border-sky-200"]{
+  border-color:var(--color-border) !important;
+}
+
+/* Stronger slate contrast for dark workspaces and small supporting text. */
+
+@theme {
+  --color-slate-50: #F3F1EA;
+  --color-slate-100: #E8EAE4;
+  --color-slate-200: #D8DDD7;
+  --color-slate-300: #C1CAC4;
+  --color-slate-400: #AAB7B0;
+  --color-slate-500: #89978F;
+  --color-slate-600: #69766F;
+  --color-slate-700: #4C5952;
+  --color-slate-800: #313D37;
+  --color-slate-900: #1E2925;
+  --color-slate-950: #101714;
+
+  /* Mute secondary accent families so cards do not become a rainbow of borders. */
+  --color-indigo-50: #F3F5F1;
+  --color-indigo-100: #E4E8E1;
+  --color-indigo-200: #D3DBD2;
+  --color-indigo-300: #B7C6BC;
+  --color-indigo-400: #8DA99B;
+  --color-indigo-500: #6E9181;
+  --color-indigo-600: #577A6C;
+  --color-indigo-700: #47655A;
+  --color-indigo-800: #375047;
+  --color-indigo-900: #293D36;
+  --color-indigo-950: #1B2A25;
+
+  --color-violet-50: #F6F2E9;
+  --color-violet-100: #EDE5D5;
+  --color-violet-200: #E0D2B9;
+  --color-violet-300: #CBB795;
+  --color-violet-400: #B39A68;
+  --color-violet-500: #9C824F;
+  --color-violet-600: #806936;
+  --color-violet-700: #67542C;
+  --color-violet-800: #503F25;
+  --color-violet-900: #3C301F;
+  --color-violet-950: #281F16;
+
+  --color-purple-50: #F6F3EB;
+  --color-purple-100: #ECE6D7;
+  --color-purple-200: #DED2B8;
+  --color-purple-300: #C9B897;
+  --color-purple-400: #AD985F;
+  --color-purple-500: #957E4C;
+  --color-purple-600: #79653A;
+  --color-purple-700: #604F2E;
+  --color-purple-800: #4B3D28;
+  --color-purple-900: #372E21;
+  --color-purple-950: #241E17;
+}
+
+/* Remove the default Vite starter visual language if legacy classes are still mounted. */
