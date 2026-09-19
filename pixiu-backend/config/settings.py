@@ -9,6 +9,10 @@ if not SECRET_KEY:
     raise RuntimeError("DJANGO_SECRET_KEY must be configured.")
 DEBUG = os.environ.get("DJANGO_DEBUG", "False").lower() == "true"
 ALLOWED_HOSTS = [h.strip() for h in os.environ.get("DJANGO_ALLOWED_HOSTS", "").split(",") if h.strip()]
+DJANGO_ADMIN_ENABLED = os.environ.get("DJANGO_ADMIN_ENABLED", "True" if DEBUG else "False").lower() == "true"
+DJANGO_ADMIN_PATH = os.environ.get("DJANGO_ADMIN_PATH", "admin" if DEBUG else "").strip().strip("/")
+if not DEBUG and DJANGO_ADMIN_ENABLED and (not DJANGO_ADMIN_PATH or DJANGO_ADMIN_PATH.lower() == "admin"):
+    raise RuntimeError("Production Django admin requires an explicit non-default DJANGO_ADMIN_PATH.")
 if not ALLOWED_HOSTS and os.environ.get("RENDER_EXTERNAL_HOSTNAME"):
     ALLOWED_HOSTS = [os.environ["RENDER_EXTERNAL_HOSTNAME"]]
 elif not ALLOWED_HOSTS and DEBUG:
@@ -16,16 +20,25 @@ elif not ALLOWED_HOSTS and DEBUG:
 
 PERF_DIAGNOSTICS = os.environ.get("PERF_DIAGNOSTICS", "False").lower() == "true"
 
+# Portal security policy. The browser enforces the 10-minute inactivity timer;
+# backend credentials are independently invalidated on password changes.
+PORTAL_IDLE_TIMEOUT_SECONDS = int(os.environ.get("DJANGO_PORTAL_IDLE_TIMEOUT_SECONDS", "600"))
+LOGIN_MAX_FAILED_ATTEMPTS = int(os.environ.get("DJANGO_LOGIN_MAX_FAILED_ATTEMPTS", "5"))
+LOGIN_LOCKOUT_MINUTES = int(os.environ.get("DJANGO_LOGIN_LOCKOUT_MINUTES", "15"))
+PASSWORD_RESET_TIMEOUT = int(os.environ.get("DJANGO_PASSWORD_RESET_TIMEOUT", str(60 * 60)))
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
     "handlers": {
         "performance_console": {"class": "logging.StreamHandler", "level": "INFO"},
         "security_console": {"class": "logging.StreamHandler", "level": "INFO"},
+        "security_auth_console": {"class": "logging.StreamHandler", "level": "WARNING"},
     },
     "loggers": {
         "performance": {"handlers": ["performance_console"], "level": "INFO", "propagate": False},
         "security.uploads": {"handlers": ["security_console"], "level": "INFO", "propagate": False},
+        "security.auth": {"handlers": ["security_auth_console"], "level": "WARNING", "propagate": False},
     },
 }
 
@@ -94,7 +107,7 @@ REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
     "DEFAULT_PARSER_CLASSES": ["rest_framework.parsers.JSONParser", "core.upload_security.SecureMultiPartParser", "rest_framework.parsers.FormParser"],
     "DEFAULT_THROTTLE_CLASSES": ["rest_framework.throttling.ScopedRateThrottle"],
-    "DEFAULT_THROTTLE_RATES": {"login": os.environ.get("DJANGO_LOGIN_RATE", "10/min"), "upload": os.environ.get("DJANGO_UPLOAD_RATE", "30/hour"), "trainer_material_upload": os.environ.get("DJANGO_TRAINER_MATERIAL_UPLOAD_RATE", "30/hour"), "career_apply": os.environ.get("DJANGO_CAREER_APPLY_RATE", "5/hour"), "public_enquiry": os.environ.get("DJANGO_PUBLIC_ENQUIRY_RATE", "10/hour")},
+    "DEFAULT_THROTTLE_RATES": {"login": os.environ.get("DJANGO_LOGIN_RATE", "10/min"), "upload": os.environ.get("DJANGO_UPLOAD_RATE", "30/hour"), "trainer_material_upload": os.environ.get("DJANGO_TRAINER_MATERIAL_UPLOAD_RATE", "30/hour"), "career_apply": os.environ.get("DJANGO_CAREER_APPLY_RATE", "5/hour"), "public_enquiry": os.environ.get("DJANGO_PUBLIC_ENQUIRY_RATE", "10/hour"), "password_reset": os.environ.get("DJANGO_PASSWORD_RESET_RATE", "10/hour"), "student_password_reset": os.environ.get("DJANGO_STUDENT_PASSWORD_RESET_RATE", "20/hour"), "csrf_token": os.environ.get("DJANGO_CSRF_TOKEN_RATE", "30/hour")},
     "EXCEPTION_HANDLER": "core.exception_handler.custom_exception_handler",
 }
 
@@ -118,7 +131,12 @@ CORS_ALLOWED_ORIGINS = list(dict.fromkeys(_cors_env + [
     "https://portal.pixiutech.com",
 ]))
 CORS_ALLOW_CREDENTIALS = True
-CSRF_TRUSTED_ORIGINS = [x.strip() for x in os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",") if x.strip()]
+_csrf_env = [x.strip() for x in os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",") if x.strip()]
+CSRF_TRUSTED_ORIGINS = list(dict.fromkeys(_csrf_env + [
+    "https://pixiutech.com",
+    "https://www.pixiutech.com",
+    "https://portal.pixiutech.com",
+]))
 AUTH_PASSWORD_VALIDATORS = [{"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"}, {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"}, {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"}, {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"}]
 LANGUAGE_CODE = "en-us"; TIME_ZONE = "Asia/Kolkata"; USE_I18N = True; USE_TZ = True
 STATIC_URL = "static/"; STATIC_ROOT = BASE_DIR / "staticfiles"; MEDIA_URL = "media/"; MEDIA_ROOT = BASE_DIR / "media"; DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
@@ -132,7 +150,15 @@ if AWS_BUCKET:
 
 JWT_REFRESH_COOKIE_NAME = os.environ.get("JWT_REFRESH_COOKIE_NAME", "pixiu_refresh")
 JWT_COOKIE_SECURE = os.environ.get("JWT_COOKIE_SECURE", "False" if DEBUG else "True").lower() == "true"
+# The production portal and API currently live on different origins, so the
+# refresh cookie must remain cross-site capable and is protected by explicit
+# CSRF validation on auth endpoints.
 JWT_COOKIE_SAMESITE = os.environ.get("JWT_COOKIE_SAMESITE", "Lax" if DEBUG else "None")
+JWT_COOKIE_HTTPONLY = True
+CSRF_COOKIE_SECURE = os.environ.get("DJANGO_CSRF_COOKIE_SECURE", "False" if DEBUG else "True").lower() == "true"
+CSRF_COOKIE_HTTPONLY = False
+CSRF_COOKIE_SAMESITE = os.environ.get("DJANGO_CSRF_COOKIE_SAMESITE", "Lax" if DEBUG else "None")
+CSRF_COOKIE_NAME = os.environ.get("DJANGO_CSRF_COOKIE_NAME", "pixiu_csrf")
 # Send the role-specific refresh cookie to all auth endpoints so refresh and
 # logout can both see and manage the same HttpOnly session.
 JWT_REFRESH_COOKIE_PATH = "/api/v1/auth/"
@@ -141,5 +167,8 @@ JWT_REFRESH_COOKIE_MAX_AGE = int(os.environ.get("JWT_REFRESH_COOKIE_MAX_AGE", st
 CLOUDFLARE_TURNSTILE_SECRET_KEY = os.environ.get("CLOUDFLARE_TURNSTILE_SECRET_KEY", "").strip()
 CLOUDFLARE_TURNSTILE_ENABLED = os.environ.get("CLOUDFLARE_TURNSTILE_ENABLED", "False" if DEBUG else "True").lower() == "true"
 SECURE_CONTENT_TYPE_NOSNIFF = True; X_FRAME_OPTIONS = "DENY"; SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = os.environ.get("DJANGO_SESSION_COOKIE_SAMESITE", "Lax")
+
 if not DEBUG:
     SECURE_SSL_REDIRECT = os.environ.get("DJANGO_SECURE_SSL_REDIRECT", "True").lower() == "true"; SESSION_COOKIE_SECURE = True; CSRF_COOKIE_SECURE = True; SECURE_HSTS_SECONDS = int(os.environ.get("DJANGO_HSTS_SECONDS", "31536000")); SECURE_HSTS_INCLUDE_SUBDOMAINS = True; SECURE_HSTS_PRELOAD = True
