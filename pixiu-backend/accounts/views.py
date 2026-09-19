@@ -260,6 +260,7 @@ class ManagedAccountView(APIView):
 
 
 class ManagedPasswordResetView(APIView):
+    throttle_scope = 'password_reset'
     permission_classes = [IsAuthenticated, IsActiveAccount, IsAdminRole]
 
     @transaction.atomic
