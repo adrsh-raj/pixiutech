@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom'
 import CookieConsent from './CookieConsent.jsx'
 
 const SITE = 'https://www.pixiutech.com'
-const DEFAULT_IMAGE = `${SITE}/img/hero_lab.jpg`
+const DEFAULT_IMAGE = `${SITE}/img/real_ai_classroom.jpg`
 
 const CANONICAL_REDIRECTS = {
   '/hub': '/portal',
