@@ -69,7 +69,7 @@ export default function AnalyticsTracker() {
 
   useEffect(() => {
     if (consent === 'accepted') ensureGoogleTag();
-    if (consent === 'declined') revokeGoogleTagConsent();
+    else revokeGoogleTagConsent();
   }, [consent]);
 
   useEffect(() => {
