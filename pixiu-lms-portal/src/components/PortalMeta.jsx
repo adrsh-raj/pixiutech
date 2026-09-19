@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
+import CookieConsent from './CookieConsent'
 
 const SITE = 'https://portal.pixiutech.com'
 const SHARE_IMAGE = 'https://pixiutech.com/img/hero_lab.jpg'
@@ -35,11 +36,20 @@ function upsertCanonical(href) {
   node.href = href
 }
 
+function upsertRobots(content) {
+  let node = document.head.querySelector('meta[name="robots"]')
+  if (!node) {
+    node = document.createElement('meta')
+    node.name = 'robots'
+    document.head.appendChild(node)
+  }
+  node.content = content
+}
+
 export default function PortalMeta() {
   const { pathname } = useLocation()
-
   useEffect(() => {
-    const path = pathname === '/' ? '/' : pathname.replace(/\/+$/, '')
+    const path = pathname === '/' ? '/' : pathname.replace(//+$/, '')
     const meta = META[path] || {
       title: 'Pixiu Tech Learning Portal',
       description: 'Pixiu Tech Learning Management Portal for students, trainers, schools and administrators.',
@@ -48,6 +58,7 @@ export default function PortalMeta() {
     const canonical = `${SITE}${indexable ? path : '/'}`
 
     document.title = meta.title
+    upsertRobots(indexable ? 'index,follow' : 'noindex,nofollow')
     upsertMeta('meta[name="description"]', 'name', 'description', meta.description)
     upsertMeta('meta[property="og:title"]', 'property', 'og:title', meta.title)
     upsertMeta('meta[property="og:description"]', 'property', 'og:description', meta.description)
@@ -63,6 +74,5 @@ export default function PortalMeta() {
     upsertMeta('meta[name="twitter:image"]', 'name', 'twitter:image', SHARE_IMAGE)
     upsertCanonical(canonical)
   }, [pathname])
-
-  return null
+  return <CookieConsent />
 }
