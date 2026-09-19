@@ -110,13 +110,14 @@ export default function PrivacyPolicy() {
             <section>
               <h2>5. Website visits, cookies, storage, and similar technologies</h2>
               <p>
-                We may use essential cookies, browser storage, or similar mechanisms to keep the portal
-                secure, maintain login sessions, remember necessary preferences, and support service
-                functionality. The public website may use Google Analytics 4 for aggregate traffic and page-usage
-                measurement. Analytics storage is denied by default and advertising/personalisation signals are
-                disabled; this configuration is intended to avoid Google Analytics cookies while still allowing
-                basic measurement signals. Browser controls can also be used to block or delete cookies. The portal
-                records limited performance diagnostics to help us identify reliability or loading issues.
+                We use essential cookies, browser storage, or similar mechanisms where needed to keep the
+                portal secure, maintain login sessions, remember necessary preferences, and support service
+                functionality. On the public website, Google Analytics 4 is an optional analytics technology.
+                It is loaded only after you choose <strong>Allow analytics</strong> in the privacy banner. If you
+                choose <strong>Decline</strong>, Google Analytics is not loaded. You can change this choice later
+                using <strong>Privacy choices</strong> in the website footer. We do not use analytics for advertising
+                personalisation on the site. Browser controls can also be used to block or delete cookies. The
+                portal records limited performance diagnostics to help us identify reliability or loading issues.
               </p>
             </section>
 
