@@ -38,6 +38,7 @@ export default function Footer() {
             <nav className="foot__nav-col">
               <Link to="/privacy">Privacy Policy</Link>
               <Link to="/terms">Terms &amp; Conditions</Link>
+              <button className="foot__privacy-btn" type="button" onClick={() => window.dispatchEvent(new Event('pixiu:privacy-open'))}>Privacy choices</button>
             </nav>
           </div>
         </div>
