@@ -1,10 +1,7 @@
 from django.contrib import admin
-from .models import Lead, LeadActivity, LeadContact
+
+from .models import CareerApplication, CareerOpening, Lead, LeadActivity, LeadContact
 admin.site.register([Lead, LeadActivity, LeadContact])
-
-
-
-from .models import CareerApplication, CareerOpening
 
 
 @admin.register(CareerOpening)
