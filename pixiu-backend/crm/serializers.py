@@ -1,6 +1,14 @@
 from rest_framework import serializers
 
-from .models import CommunicationLog, Lead, LeadActivity, LeadContact
+from .models import (
+    CareerApplication,
+    CareerOpening,
+    CareerOpeningStatus,
+    CommunicationLog,
+    Lead,
+    LeadActivity,
+    LeadContact,
+)
 
 
 class LeadContactSerializer(serializers.ModelSerializer):
@@ -35,12 +43,6 @@ class CommunicationLogSerializer(serializers.ModelSerializer):
         fields = ["id", "student", "student_id", "recipient", "channel", "template", "message", "status", "sent_at", "actor"]
         read_only_fields = ["id", "student_id", "sent_at", "actor"]
 
-
-from .models import (
-    CareerApplication,
-    CareerOpening,
-    CareerOpeningStatus,
-)
 
 
 class CareerOpeningSerializer(serializers.ModelSerializer):
