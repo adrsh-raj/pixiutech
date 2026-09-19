@@ -86,7 +86,7 @@ export default function Careers() {
                     </div>
                     <p>{c.desc}</p>
                   </div>
-                  <a href="#apply" className="btn btn--outline">Apply Now</a>
+                  <a href="#apply" className="btn btn--outline">Apply for this role</a>
                 </article>
               ))}
             </div>
