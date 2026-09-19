@@ -360,7 +360,7 @@ a{color:inherit;text-decoration:none}
 
 /* =========================== FOOTER ========================== */
 .foot{background:var(--navy-900);color:#8AA1C0;padding-block:52px 40px;border-top:1px solid var(--line-dark)}
-.foot__grid{display:grid;grid-template-columns:2fr 1fr 1fr;gap:clamp(24px,4vw,56px);padding-bottom:30px;border-bottom:1px solid var(--line-dark)}
+.foot__grid{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:clamp(24px,4vw,48px);padding-bottom:30px;border-bottom:1px solid var(--line-dark)}
 .foot__desc{margin-top:16px;font-size:.95rem;color:var(--muted-dark);line-height:1.6;max-width:36ch}
 .foot__links-group h4{
   font-family:var(--f-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;
@@ -373,6 +373,7 @@ a{color:inherit;text-decoration:none}
   display:flex;flex-wrap:wrap;gap:14px;justify-content:space-between;margin-top:26px;
   font-family:var(--f-mono);font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;
 }
+@media(max-width:960px){.foot__grid{grid-template-columns:2fr 1fr 1fr}}
 @media(max-width:700px){.foot__grid{grid-template-columns:1fr}}
 
 /* ---- image plate (legacy support) ---- */
