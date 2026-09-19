@@ -101,7 +101,7 @@ export default function Solutions() {
           </Reveal>
           <Reveal delay={80}>
             <div className="wide-img" style={{ marginTop: 40 }}>
-              <img src="/img/real_ai_classroom.jpg" alt="Pixiu Tech students learning AI in a classroom" loading="lazy" />
+              <img src="/img/hero_lab.jpg" alt="Complete innovation lab setup" loading="lazy" />
               <p className="wide-img__caption">A fully operational Pixiu Tech innovation lab — designed for real teaching</p>
             </div>
           </Reveal>
