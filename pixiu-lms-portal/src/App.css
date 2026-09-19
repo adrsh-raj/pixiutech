@@ -194,8 +194,8 @@
 }
 
 .input:focus {
-  outline: 2px solid rgba(37, 99, 235, 0.18);
-  border-color: #2563eb;
+  outline: 2px solid rgba(39, 120, 109, 0.18);
+  border-color: #27786D;
 }
 
 .btn-primary,
@@ -211,8 +211,8 @@
 }
 
 .btn-primary {
-  border: 1px solid #2563eb;
-  background: #2563eb;
+  border: 1px solid #27786D;
+  background: #27786D;
   color: #fff;
 }
 
