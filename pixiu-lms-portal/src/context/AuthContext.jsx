@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { API_BASE } from '../config/api';
 import { measurePerformance, markPerformance, recordApiPerformance } from '../lib/performanceDiagnostics';
 
@@ -7,10 +7,15 @@ const AUTH_EVENT = 'pixiu_auth_state_changed';
 const SESSION_ROLE_KEY = 'pixiu_session_role';
 const AUTH_REQUEST_TIMEOUT_MS = 60000;
 const LOGIN_REQUEST_TIMEOUT_MS = 60000;
+const PORTAL_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
+const PORTAL_ACTIVITY_PERSIST_MS = 15 * 1000;
+const PORTAL_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+const PORTAL_IDLE_MESSAGE = 'You were signed out after 10 minutes of inactivity. Please sign in again.';
 const API_READ_CACHE_TTL_MS = 30 * 1000;
 const API_READ_CACHE_MAX_ENTRIES = 250;
 let accessTokenMemory = null;
 let refreshPromise = null;
+let csrfTokenMemory = null;
 const apiReadCache = new Map();
 
 function clearApiReadCache() { apiReadCache.clear(); }
@@ -92,12 +97,33 @@ async function fetchWithRetry(url, options = {}) {
   if (lastResponse) return lastResponse;
   throw lastError || new Error('Request failed.');
 }
+async function getCsrfToken(force = false) {
+  if (csrfTokenMemory && !force) return csrfTokenMemory;
+  const response = await fetchOnce(`${API_BASE}/auth/csrf/`, {
+    method: 'GET',
+    cache: 'no-store',
+    credentials: 'include',
+    headers: { Accept: 'application/json' },
+  }, 15000);
+  const data = await readJson(response);
+  if (!response.ok || !data.csrfToken) throw new Error('Unable to initialize the security token.');
+  csrfTokenMemory = String(data.csrfToken);
+  return csrfTokenMemory;
+}
 async function authPostWithRetry(url, options = {}) {
   let lastError = null;
+  const cookieAuthEndpoint = /\/auth\/(login|refresh|logout)\/$/.test(String(url));
   for (let attempt = 0; attempt < 2; attempt += 1) {
     if (attempt) await new Promise(resolve => setTimeout(resolve, 1500));
     try {
-      return await fetchOnce(url, options, AUTH_REQUEST_TIMEOUT_MS);
+      const headers = new Headers(options.headers || {});
+      if (cookieAuthEndpoint) headers.set('X-CSRFToken', await getCsrfToken(attempt > 0));
+      const response = await fetchOnce(url, { ...options, headers }, AUTH_REQUEST_TIMEOUT_MS);
+      if (response.status === 403 && cookieAuthEndpoint && attempt === 0) {
+        csrfTokenMemory = null;
+        continue;
+      }
+      return response;
     } catch (error) {
       lastError = error;
       if (error?.name !== 'AbortError' || attempt === 1) throw error;
@@ -164,6 +190,7 @@ export async function apiFetch(path, options = {}) {
 }
 export function clearAuthStorage({ clearRole = true } = {}) {
   accessTokenMemory = null;
+  csrfTokenMemory = null;
   clearApiReadCache();
   clearLegacyAuthStorage();
   if (clearRole) setSessionRole(null);
@@ -198,16 +225,23 @@ export function AuthProvider({ children }) {
     restoreSession();
     return () => { active = false; };
   }, []);
+  const lastActivityRef = useRef(Date.now());
+
   useEffect(() => {
     if (!token) return undefined;
     const refresh = async () => {
+      if (Date.now() - lastActivityRef.current >= PORTAL_IDLE_TIMEOUT_MS) return;
       const previousToken = accessTokenMemory;
       const next = await refreshAccessToken(getSessionRole());
       if (next) { accessTokenMemory = next; setToken(next); }
       else accessTokenMemory = previousToken;
     };
-    const onVisible = () => { if (document.visibilityState === 'visible') void refresh(); };
-    const interval = window.setInterval(refresh, 10 * 60 * 1000);
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (Date.now() - lastActivityRef.current >= PORTAL_IDLE_TIMEOUT_MS) return;
+      void refresh();
+    };
+    const interval = window.setInterval(refresh, PORTAL_REFRESH_INTERVAL_MS);
     document.addEventListener('visibilitychange', onVisible);
     return () => { window.clearInterval(interval); document.removeEventListener('visibilitychange', onVisible); };
   }, [token]);
@@ -218,7 +252,7 @@ export function AuthProvider({ children }) {
     const body = JSON.stringify({ username: cleanUsername, password: cleanPassword, role: expectedRole || undefined, turnstile_token: turnstileToken || undefined });
     markPerformance('login.e2e.start');
     try {
-      const response = await fetchOnce(`${API_BASE}/auth/login/`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, cache: 'no-store', credentials: 'include' }, LOGIN_REQUEST_TIMEOUT_MS);
+      const response = await authPostWithRetry(`${API_BASE}/auth/login/`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, cache: 'no-store', credentials: 'include' });
       const data = await readJson(response);
       if (response.ok && data.access && data.user) {
         clearApiReadCache(); accessTokenMemory = data.access; setToken(data.access); setUser(data.user); setSessionRole(data.user.role); broadcastAuthChange(); measurePerformance('login.e2e', 'login.e2e.start'); return { success: true, user: data.user };
@@ -228,13 +262,80 @@ export function AuthProvider({ children }) {
       measurePerformance('login.e2e.failed', 'login.e2e.start'); return { success: false, error: error?.name === 'AbortError' ? 'Authentication service is taking too long to respond. Please wait a little longer and try again.' : 'Authentication service is temporarily unavailable. Please try again.' };
     }
   };
-  const logout = async () => {
+  const logout = async ({ reason = '' } = {}) => {
+    if (reason === 'idle') {
+      try { window.sessionStorage.setItem('pixiu_idle_logout_msg', PORTAL_IDLE_MESSAGE); } catch {}
+    }
     const role = user?.role || getSessionRole();
     try {
-      await fetchOnce(`${API_BASE}/auth/logout/`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role: role || undefined }), cache: 'no-store', credentials: 'include' }, 15000);
+      await authPostWithRetry(`${API_BASE}/auth/logout/`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role: role || undefined }), cache: 'no-store', credentials: 'include' });
     } catch {}
     finally { setUser(null); setToken(null); clearAuthStorage(); broadcastAuthChange(); }
   };
+
+  useEffect(() => {
+    if (!token || !user?.id || !user?.role) return undefined;
+
+    const storageKey = `pixiu_portal_last_activity:${user.id}:${user.role}`;
+    const now = Date.now();
+    let persisted = 0;
+    try { persisted = Number(window.localStorage.getItem(storageKey) || 0) || 0; } catch {}
+
+    if (persisted && now - persisted >= PORTAL_IDLE_TIMEOUT_MS) {
+      void logout({ reason: 'idle' });
+      return undefined;
+    }
+
+    lastActivityRef.current = now;
+    let lastPersisted = now;
+    try { window.localStorage.setItem(storageKey, String(now)); } catch {}
+
+    let lastEvent = 0;
+    let idleLogoutStarted = false;
+
+    const markActivity = () => {
+      const current = Date.now();
+      if (current - lastEvent < 1000) return;
+      lastEvent = current;
+      lastActivityRef.current = current;
+      if (current - lastPersisted >= PORTAL_ACTIVITY_PERSIST_MS) {
+        try { window.localStorage.setItem(storageKey, String(current)); } catch {}
+        lastPersisted = current;
+      }
+    };
+
+    const checkIdle = () => {
+      if (idleLogoutStarted) return;
+      if (Date.now() - lastActivityRef.current < PORTAL_IDLE_TIMEOUT_MS) return;
+      idleLogoutStarted = true;
+      void logout({ reason: 'idle' });
+    };
+
+    const onStorage = event => {
+      if (event.key !== storageKey || !event.newValue) return;
+      const next = Number(event.newValue) || 0;
+      if (next > lastActivityRef.current) lastActivityRef.current = next;
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState !== 'visible') return;
+      checkIdle();
+      if (!idleLogoutStarted) markActivity();
+    };
+
+    const events = ['pointerdown', 'pointermove', 'keydown', 'wheel', 'touchstart', 'scroll', 'click'];
+    events.forEach(eventName => window.addEventListener(eventName, markActivity, { passive: true }));
+    window.addEventListener('storage', onStorage);
+    document.addEventListener('visibilitychange', onVisibility);
+    const interval = window.setInterval(checkIdle, 1000);
+
+    return () => {
+      window.clearInterval(interval);
+      events.forEach(eventName => window.removeEventListener(eventName, markActivity));
+      window.removeEventListener('storage', onStorage);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [token, user?.id, user?.role]);
   const value = useMemo(() => ({ user, token, role: user?.role || null, isAuthenticated: Boolean(user && token), loading, login, logout }), [user, token, loading]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
