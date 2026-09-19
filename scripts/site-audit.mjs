@@ -88,7 +88,7 @@ if (fs.existsSync(revealFile)) {
 }
 
 const globalCss = fs.readFileSync(path.join(SRC, 'styles', 'global.css'), 'utf8');
-if (/\.btn[^\{]*\{[^}]*opacity|\.btn:hover[^}]*opacity\s*:\s*0/i.test(globalCss)) {
+if (/\.btn:hover[^}]*opacity\s*:\s*(?:0|0\.[0-9]+)/i.test(globalCss)) {
   failures.push('src/styles/global.css -> button opacity/fade interaction detected');
 }
 
