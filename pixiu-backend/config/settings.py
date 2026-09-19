@@ -102,7 +102,7 @@ CLAMAV_RETRY_BACKOFF_SECONDS = float(os.environ.get("CLAMAV_RETRY_BACKOFF_SECOND
 CLAMAV_CHUNK_SIZE = int(os.environ.get("CLAMAV_CHUNK_SIZE", str(1024 * 1024)))
 
 REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": ["rest_framework_simplejwt.authentication.JWTAuthentication"],
+    "DEFAULT_AUTHENTICATION_CLASSES": ["accounts.authentication.CachedJWTAuthentication"],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
     "DEFAULT_PARSER_CLASSES": ["rest_framework.parsers.JSONParser", "core.upload_security.SecureMultiPartParser", "rest_framework.parsers.FormParser"],
