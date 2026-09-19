@@ -92,6 +92,14 @@ if (/\.btn:hover[^}]*opacity\s*:\s*(?:0|0\.[0-9]+)/i.test(globalCss)) {
   failures.push('src/styles/global.css -> button opacity/fade interaction detected');
 }
 
+const designFiles = files.filter(file => file.startsWith(SRC + path.sep) || file.startsWith(path.join(root, 'pixiu-lms-portal', 'src') + path.sep));
+for (const file of designFiles) {
+  const source = fs.readFileSync(file, 'utf8');
+  if (/Space Grotesk|Instrument Serif|font-serif|font-style\\s*:\\s*italic|\\bitalic\\b/i.test(source)) failures.push(path.relative(root, file) + ' -> forbidden serif/italic design pattern detected');
+  if (/\\bgrain\\b|\\bnoise\\b/i.test(source)) failures.push(path.relative(root, file) + ' -> grain/noise texture pattern detected');
+  if (/—/.test(source) && !file.endsWith('Verify.jsx')) failures.push(path.relative(root, file) + ' -> em dash found in UI/copy; prefer punctuation with clearer rhythm');
+}
+
 if (failures.length) {
   console.error('SITE AUDIT FAILED');
   console.error(failures.join('\n'));
