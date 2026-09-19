@@ -1,26 +1,50 @@
 import { Link } from 'react-router-dom'
-import PageHead from '../components/PageHead.jsx'
+import { ArrowLeft, ArrowRight, Compass, Mail } from 'lucide-react'
+import Reveal from '../components/Reveal.jsx'
+import '../styles/notfound.css'
 
 export default function NotFound() {
   return (
-    <>
-      <PageHead
-        crumb="404"
-        title="This Page Isn't Here."
-        intro="The link may be out of date, or the address may have a typo in it."
-      />
-      <section className="band">
-        <div className="shell">
-          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
-            <Link className="btn btn--primary" to="/">
-              Return to Pixiu Tech <span className="arw">→</span>
-            </Link>
-            <Link className="btn btn--outline" to="/contact">
-              Talk to Pixiu Tech
-            </Link>
+    <div className="notfound" aria-labelledby="notfound-title">
+      <section className="notfound__hero">
+        <div className="shell notfound__shell">
+          <Reveal>
+            <div className="notfound__code" aria-hidden="true">404</div>
+            <p className="eyebrow">Page not found</p>
+            <h1 id="notfound-title">This page isn’t available.</h1>
+            <p className="notfound__lead">
+              The link may be outdated or the address may contain a typo. The page you were looking for is not part of the current Pixiu Tech website.
+            </p>
+            <div className="notfound__actions">
+              <Link className="btn btn--primary" to="/">
+                <ArrowLeft size={16} aria-hidden="true" /> Back to homepage
+              </Link>
+              <Link className="btn btn--outline" to="/solutions">
+                Explore solutions <ArrowRight size={16} aria-hidden="true" />
+              </Link>
+              <Link className="notfound__contact" to="/contact">
+                <Mail size={15} aria-hidden="true" /> Contact Pixiu Tech
+              </Link>
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
+      <section className="band band--gray">
+        <div className="shell notfound__help">
+          <div className="notfound__help-icon" aria-hidden="true"><Compass size={22} /></div>
+          <div>
+            <h2>Looking for something specific?</h2>
+            <p>Start with our solutions, verify a certificate, read the FAQs, or tell us what your school needs.</p>
+          </div>
+          <div className="notfound__quicklinks">
+            <Link to="/solutions">School solutions</Link>
+            <Link to="/verify">Certificate verification</Link>
+            <Link to="/faq">Frequently asked questions</Link>
+            <Link to="/contact">School enquiry</Link>
           </div>
         </div>
       </section>
-    </>
+    </div>
   )
 }
