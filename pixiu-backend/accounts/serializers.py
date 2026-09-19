@@ -4,14 +4,14 @@ from urllib import parse, request as urllib_request
 
 from django.conf import settings
 from django.core.cache import cache
-from django.contrib.auth import authenticate
+from django.contrib.auth.hashers import check_password, make_password
 from django.contrib.auth.hashers import make_password
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .credentials import LOGIN_LOCKOUT_MINUTES, LOGIN_MAX_FAILED_ATTEMPTS, clear_login_failures, login_is_locked, normalize_login_username, record_failed_login, validate_managed_password
+from .credentials import clear_login_failures, login_is_locked, login_lockout_minutes, login_max_failed_attempts, normalize_login_username, record_failed_login, validate_managed_password
 from .models import User, UserRole, UserStatus
 
 TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
@@ -77,7 +77,6 @@ class LoginSerializer(serializers.Serializer):
             if user is None:
                 # Perform an equivalent password-hash operation for unknown users
                 # so username existence is harder to infer from response timing.
-                from django.contrib.auth.hashers import check_password
                 check_password(attrs["password"], DUMMY_PASSWORD_HASH)
                 raise serializers.ValidationError({"detail": LOGIN_GENERIC_ERROR})
 
@@ -94,8 +93,8 @@ class LoginSerializer(serializers.Serializer):
             password_ok = user.check_password(attrs["password"])
             if not password_ok:
                 attempts = record_failed_login(user, now)
-                if attempts >= LOGIN_MAX_FAILED_ATTEMPTS:
-                    logger.warning("Account temporarily locked after repeated login failures", extra={"user_id": user.pk, "role": user.role, "lockout_minutes": LOGIN_LOCKOUT_MINUTES})
+                if attempts >= login_max_failed_attempts():
+                    logger.warning("Account temporarily locked after repeated login failures", extra={"user_id": user.pk, "role": user.role, "lockout_minutes": login_lockout_minutes()})
                 raise serializers.ValidationError({"detail": LOGIN_GENERIC_ERROR})
 
             if not user.is_active or user.status != UserStatus.ACTIVE:
