@@ -92,3 +92,86 @@ class CommunicationLog(models.Model):
 
     class Meta:
         ordering = ["-sent_at"]
+
+
+
+class CareerOpeningStatus(models.TextChoices):
+    DRAFT = "draft", "Draft"
+    PUBLISHED = "published", "Published"
+    CLOSED = "closed", "Closed"
+
+
+class CareerApplicationStatus(models.TextChoices):
+    NEW = "new", "New"
+    REVIEWED = "reviewed", "Reviewed"
+    SHORTLISTED = "shortlisted", "Shortlisted"
+    REJECTED = "rejected", "Rejected"
+    HIRED = "hired", "Hired"
+
+
+def career_cv_upload_to(instance, filename):
+    safe_id = str(instance.id or uuid.uuid4())
+    return f"private_career_cvs/{safe_id}.pdf"
+
+
+class CareerOpening(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    title = models.CharField(max_length=180)
+    location = models.CharField(max_length=180, blank=True)
+    employment_type = models.CharField(max_length=80, blank=True)
+    description = models.TextField()
+    requirements = models.TextField(blank=True)
+    status = models.CharField(
+        max_length=20,
+        choices=CareerOpeningStatus.choices,
+        default=CareerOpeningStatus.DRAFT,
+    )
+    sort_order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["sort_order", "-created_at"]
+        indexes = [
+            models.Index(fields=["status", "sort_order"], name="career_open_status_idx"),
+        ]
+
+    def __str__(self):
+        return self.title
+
+
+class CareerApplication(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    opening = models.ForeignKey(
+        CareerOpening,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="applications",
+    )
+    name = models.CharField(max_length=160)
+    email = models.EmailField(max_length=254)
+    phone = models.CharField(max_length=10)
+    cover_message = models.TextField(blank=True, max_length=4000)
+    cv = models.FileField(upload_to=career_cv_upload_to, max_length=300)
+    cv_original_name = models.CharField(max_length=255)
+    cv_size = models.PositiveIntegerField()
+    cv_sha256 = models.CharField(max_length=64)
+    status = models.CharField(
+        max_length=20,
+        choices=CareerApplicationStatus.choices,
+        default=CareerApplicationStatus.NEW,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["status", "created_at"], name="career_app_status_idx"),
+            models.Index(fields=["opening", "created_at"], name="career_app_opening_idx"),
+        ]
+
+    def __str__(self):
+        role = self.opening.title if self.opening_id else "General Application"
+        return f"{self.name} — {role}"
