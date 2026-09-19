@@ -50,6 +50,9 @@ class User(AbstractUser):
     )
     must_change_password = models.BooleanField(default=False)
     display_name = models.CharField(max_length=200, blank=True)
+    auth_version = models.PositiveIntegerField(default=0)
+    failed_login_attempts = models.PositiveSmallIntegerField(default=0)
+    locked_until = models.DateTimeField(null=True, blank=True)
 
     objects = AccountUserManager()
     REQUIRED_FIELDS = []
