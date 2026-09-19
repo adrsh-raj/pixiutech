@@ -16,6 +16,7 @@ import SiteMeta from './components/SiteMeta.jsx'
 import TermsAndConditions from './pages/TermsAndConditions.jsx'
 import NotFound from './pages/NotFound.jsx'
 import { LMS_LOGIN_URL } from './config/runtime.js'
+import CookieConsent from './components/CookieConsent.jsx'
 
 function ProductionLoginRedirect() {
   useEffect(() => {
@@ -53,6 +54,7 @@ export default function App() {
         </Routes>
       </main>
       <Footer />
+      <CookieConsent />
     </>
   )
 }
