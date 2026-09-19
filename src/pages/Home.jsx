@@ -4,6 +4,7 @@ import CTAStrip from '../components/CTAStrip.jsx'
 import CountUp from '../components/CountUp.jsx'
 import { STATS, SOLUTIONS, PROCESS, WHY } from '../data/site.js'
 import { FAQ_ITEMS } from '../data/faq.js'
+import '../styles/faq.css'
 
 export default function Home() {
   return (
