@@ -1,10 +1,12 @@
 from io import BytesIO
+from unittest.mock import patch
 
 from django.test import override_settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APITestCase
-from pypdf import PdfWriter
+from pypdf import PdfReader, PdfWriter
 
+from core.clamav_client import ClamAVUnavailableError
 from .models import CareerOpening, CareerOpeningStatus, CareerApplication
 
 
@@ -43,6 +45,20 @@ class CareerPublicApiTests(APITestCase):
         self.assertEqual(application.cv_size, len(valid_pdf_bytes()))
         self.assertNotIn('/', application.cv_original_name)
         self.assertNotIn('\\\\', application.cv_original_name)
+
+
+    @override_settings(CLAMAV_ENABLED=True, CLAMAV_REQUIRED=True, CAREER_CV_MAX_BYTES=2 * 1024 * 1024)
+    @patch('core.upload_security.ensure_clean_upload', side_effect=ClamAVUnavailableError('scanner down'))
+    def test_application_survives_scanner_outage_with_sanitized_pdf(self, scanner):
+        opening = CareerOpening.objects.create(title='STEM Instructor', description='Teach STEM', status=CareerOpeningStatus.PUBLISHED)
+        pdf = SimpleUploadedFile('My Resume.pdf', valid_pdf_bytes(), content_type='application/pdf')
+        response = self.client.post('/api/v1/public/careers/apply', {'opening': str(opening.id), 'name': 'Fallback Candidate', 'email': 'fallback@example.com', 'phone': '9876543210', 'cv': pdf}, format='multipart')
+        self.assertEqual(response.status_code, 201)
+        scanner.assert_called_once()
+        application = CareerApplication.objects.get(email='fallback@example.com')
+        stored = application.cv.open('rb').read()
+        reader = PdfReader(BytesIO(stored), strict=True)
+        self.assertEqual(len(reader.pages), 1)
 
     def test_application_rejects_invalid_phone(self):
         opening = CareerOpening.objects.create(title='STEM Instructor', description='Teach STEM', status=CareerOpeningStatus.PUBLISHED)
