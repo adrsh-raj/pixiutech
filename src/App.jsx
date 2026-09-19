@@ -18,11 +18,10 @@ import TermsAndConditions from './pages/TermsAndConditions.jsx'
 import NotFound from './pages/NotFound.jsx'
 import { LMS_LOGIN_URL } from './config/runtime.js'
 
-function ProductionLoginRedirect() {
+function ExternalLoginRedirect() {
   useEffect(() => {
     window.location.replace(LMS_LOGIN_URL)
   }, [])
-
   return null
 }
 
@@ -32,24 +31,21 @@ export default function App() {
       <ScrollToTop />
       <AnalyticsTracker />
       <SiteMeta />
+      <a className="skip-link" href="#main-content">Skip to main content</a>
       <Nav />
-      <main>
+      <main id="main-content" tabIndex={-1}>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/solutions" element={<Solutions />} />
           <Route path="/careers" element={<Careers />} />
           <Route path="/faq" element={<FAQ />} />
           <Route path="/portal" element={<PortalBridge />} />
-          <Route path="/hub" element={<PortalBridge />} />
-          <Route path="/login" element={<ProductionLoginRedirect />} />
+          <Route path="/contact" element={<Contact />} />
           <Route path="/simulation" element={<Simulation />} />
           <Route path="/verify" element={<Verify />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/terms" element={<TermsAndConditions />} />
-          <Route path="/contact" element={<Contact />} />
-          <Route path="/curriculum" element={<Navigate to="/solutions" replace />} />
-          <Route path="/partnership" element={<Navigate to="/" replace />} />
-          <Route path="/about" element={<Navigate to="/" replace />} />
+          <Route path="/login" element={<ExternalLoginRedirect />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
