@@ -1,5 +1,6 @@
 from django.db import transaction
 from django.http import FileResponse
+from pathlib import Path
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -85,7 +86,10 @@ class PublicCareerApplicationView(APIView):
         serializer = PublicCareerApplicationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         uploaded = serializer.validated_data['cv']
-        original_filename = str(getattr(uploaded, 'name', 'resume.pdf'))[:255]
+        original_filename = Path(str(getattr(uploaded, 'name', 'resume.pdf')).replace('\\', '/')).name
+        if not original_filename or any(char in original_filename for char in '\\x00\\r\\n'):
+            raise ValidationError({'cv': ['Invalid CV filename.']})
+        original_filename = original_filename[:255]
 
         try:
             secure_cv, sha256 = validate_career_cv(uploaded)
