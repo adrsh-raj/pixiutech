@@ -1,11 +1,7 @@
 import uuid
 from django.db import migrations, models
+from crm.models import career_cv_upload_to
 import django.db.models.deletion
-
-
-def career_cv_upload_to(instance, filename):
-    safe_id = str(instance.id or uuid.uuid4())
-    return f'private_career_cvs/{safe_id}.pdf'
 
 
 class Migration(migrations.Migration):
