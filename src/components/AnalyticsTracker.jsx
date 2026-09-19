@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 
-const GA_ID = 'G-MFQTQS9VNK';
+const GA_ID = 'G-LFBYYQ92YK';
 
 function ensureGoogleTag() {
   if (typeof window === 'undefined') return;
