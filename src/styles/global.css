@@ -124,10 +124,9 @@ a{color:inherit;text-decoration:none}
 
 /* ============================ NAV ============================ */
 .nav{
-  position:sticky;top:0;z-index:60;background:rgba(255,255,255,.95);
-  backdrop-filter:saturate(150%) blur(14px);-webkit-backdrop-filter:saturate(150%) blur(14px);
+  position:sticky;top:0;z-index:60;background:#fff;
   border-bottom:1px solid var(--line-light);
-  transition:background .3s,box-shadow .3s;
+  transition:box-shadow .2s;
 }
 .nav--scrolled{background:rgba(255,255,255,1);box-shadow:0 4px 14px rgba(0,0,0,.08)}
 .nav__in{display:flex;align-items:center;justify-content:space-between;gap:24px;height:76px}
@@ -439,3 +438,8 @@ a{color:inherit;text-decoration:none}
 
 /* Route loading state for client-side navigation */
 .route-loading{min-height:50vh;display:grid;place-items:center;padding:48px;font-family:var(--f-mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);background:var(--white)}
+
+
+/* Hero typography: solid fills only, no gradient text treatment. */
+.hero-v2__title,.hero-v2__accent{background:none !important;background-image:none !important;-webkit-background-clip:initial !important;background-clip:initial !important;-webkit-text-fill-color:currentColor !important}
+.hero-v2__accent{color:var(--gold) !important}
