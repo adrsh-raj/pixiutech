@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from uuid import uuid4
-import re
 
 from django.conf import settings
 from django.core.exceptions import ValidationError as DjangoValidationError
