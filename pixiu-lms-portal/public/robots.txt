@@ -2,5 +2,6 @@ User-agent: *
 Disallow: /
 Allow: /privacy
 Allow: /terms
+Allow: /sitemap.xml
 
 Sitemap: https://portal.pixiutech.com/sitemap.xml
