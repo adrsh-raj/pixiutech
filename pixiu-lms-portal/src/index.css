@@ -1,65 +1,65 @@
 @import "tailwindcss";
 
 @theme {
-  /* Pixiu portal palette: graphite, eucalyptus teal, warm brass. */
-  --color-pixiu-dark: #121A18;
-  --color-pixiu-blue: #27786D;
+  /* Pixiu portal palette: charcoal, petrol green, and cool ice. */
+  --color-pixiu-dark: #0D1212;
+  --color-pixiu-blue: #236F69;
   --color-pixiu-cyan: #5F9185;
-  --color-pixiu-gold: #C49A59;
-  --color-pixiu-gray: #F3F1EA;
-  --color-background: #F3F1EA;
-  --color-foreground: #18231F;
+  --color-pixiu-gold: #B8D4D0;
+  --color-pixiu-gray: #F2F5F4;
+  --color-background: #F2F5F4;
+  --color-foreground: #17201E;
   --color-card: #FFFFFF;
-  --color-card-foreground: #18231F;
-  --color-border: #D9DDD6;
-  --color-sidebar: #15201D;
-  --color-sidebar-foreground: #F7F6F0;
-  --color-muted: #EEF0EC;
-  --color-muted-foreground: #6A766F;
-  --color-accent: #C49A59;
-  --color-accent-foreground: #18231F;
-  --color-primary: #27786D;
+  --color-card-foreground: #17201E;
+  --color-border: #CFD9D6;
+  --color-sidebar: #101917;
+  --color-sidebar-foreground: #F4F7F6;
+  --color-muted: #E8EEEC;
+  --color-muted-foreground: #697773;
+  --color-accent: #B8D4D0;
+  --color-accent-foreground: #17201E;
+  --color-primary: #236F69;
   --color-primary-foreground: #FFFFFF;
-  --color-secondary: #E8EBE6;
+  --color-secondary: #E2E9E7;
   --color-secondary-foreground: #24322D;
   --color-destructive: #B84B3D;
 
   /* Remap common Tailwind blue utilities to the portal's teal family. */
-  --color-blue-50: #F0F7F5;
-  --color-blue-100: #DCECE8;
-  --color-blue-200: #BEDBD5;
-  --color-blue-300: #96C5BB;
-  --color-blue-400: #6CAEA1;
-  --color-blue-500: #3B907F;
-  --color-blue-600: #2A776A;
-  --color-blue-700: #215F55;
-  --color-blue-800: #194A43;
-  --color-blue-900: #143A35;
+  --color-blue-50: #EFF6F4;
+  --color-blue-100: #D8EAE7;
+  --color-blue-200: #BFDCD7;
+  --color-blue-300: #94C6BE;
+  --color-blue-400: #6EAAA1;
+  --color-blue-500: #3C8D80;
+  --color-blue-600: #286F67;
+  --color-blue-700: #205B54;
+  --color-blue-800: #194B45;
+  --color-blue-900: #143B37;
   --color-blue-950: #0D2926;
 
   /* Keep cyan useful for lab visualisation, but move it toward mint. */
-  --color-cyan-50: #F2F7F4;
-  --color-cyan-100: #DEECE7;
-  --color-cyan-200: #BED8CE;
-  --color-cyan-300: #9CC1B4;
-  --color-cyan-400: #7CA99A;
-  --color-cyan-500: #5E9183;
-  --color-cyan-600: #4A776B;
-  --color-cyan-700: #3A6257;
-  --color-cyan-800: #304F47;
-  --color-cyan-900: #263F39;
+  --color-cyan-50: #F0F5F4;
+  --color-cyan-100: #D9E9E5;
+  --color-cyan-200: #C0DCD7;
+  --color-cyan-300: #96C8BE;
+  --color-cyan-400: #75AFA4;
+  --color-cyan-500: #5C8F84;
+  --color-cyan-600: #496F66;
+  --color-cyan-700: #3B5F57;
+  --color-cyan-800: #36534D;
+  --color-cyan-900: #29443E;
 
   /* Common sky utilities follow the same restrained palette. */
-  --color-sky-50: #F0F7F5;
-  --color-sky-100: #DCECE8;
-  --color-sky-200: #BEDBD5;
-  --color-sky-300: #96C5BB;
-  --color-sky-400: #6CAEA1;
-  --color-sky-500: #3B907F;
-  --color-sky-600: #2A776A;
-  --color-sky-700: #215F55;
-  --color-sky-800: #194A43;
-  --color-sky-900: #143A35;
+  --color-sky-50: #EFF6F4;
+  --color-sky-100: #D8EAE7;
+  --color-sky-200: #BFDCD7;
+  --color-sky-300: #94C6BE;
+  --color-sky-400: #6EAAA1;
+  --color-sky-500: #3C8D80;
+  --color-sky-600: #286F67;
+  --color-sky-700: #205B54;
+  --color-sky-800: #194B45;
+  --color-sky-900: #143B37;
 
   --font-sans: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
@@ -88,12 +88,12 @@ input, select, textarea { min-width: 0; }
 
 .bg-grid-tech {
   background-image:
-    linear-gradient(rgba(53, 73, 66, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(53, 73, 66, 0.035) 1px, transparent 1px);
+    linear-gradient(rgba(35, 111, 105, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(35, 111, 105, 0.035) 1px, transparent 1px);
   background-size: 32px 32px;
 }
 
-::selection { background-color: #2A776A; color: white; }
+::selection { background-color: #286F67; color: white; }
 
 .overflow-x-auto, .overflow-x-scroll { max-width: 100%; -webkit-overflow-scrolling: touch; }
 
@@ -163,54 +163,54 @@ g[display="none"],
 /* Stronger slate contrast for dark workspaces and small supporting text. */
 
 @theme {
-  --color-slate-50: #F3F1EA;
-  --color-slate-100: #E8EAE4;
-  --color-slate-200: #D8DDD7;
-  --color-slate-300: #C1CAC4;
-  --color-slate-400: #AAB7B0;
-  --color-slate-500: #89978F;
-  --color-slate-600: #5B6761;
-  --color-slate-700: #4C5952;
-  --color-slate-800: #313D37;
-  --color-slate-900: #1E2925;
-  --color-slate-950: #101714;
+  --color-slate-50: #F2F5F4;
+  --color-slate-100: #E7ECEA;
+  --color-slate-200: #D7E0DD;
+  --color-slate-300: #BECBC7;
+  --color-slate-400: #A6B8B3;
+  --color-slate-500: #879994;
+  --color-slate-600: #5E6A67;
+  --color-slate-700: #4A5954;
+  --color-slate-800: #303F3A;
+  --color-slate-900: #1D2926;
+  --color-slate-950: #0D1513;
 
   /* Mute secondary accent families so cards do not become a rainbow of borders. */
-  --color-indigo-50: #F3F5F1;
-  --color-indigo-100: #E4E8E1;
-  --color-indigo-200: #D3DBD2;
-  --color-indigo-300: #B7C6BC;
-  --color-indigo-400: #8DA99B;
-  --color-indigo-500: #6E9181;
-  --color-indigo-600: #577A6C;
-  --color-indigo-700: #47655A;
-  --color-indigo-800: #375047;
-  --color-indigo-900: #293D36;
-  --color-indigo-950: #1B2A25;
+  --color-indigo-50: #F0F5F4;
+  --color-indigo-100: #DDE9E6;
+  --color-indigo-200: #C9DDD8;
+  --color-indigo-300: #A9C9C2;
+  --color-indigo-400: #7FADA3;
+  --color-indigo-500: #63968B;
+  --color-indigo-600: #527F76;
+  --color-indigo-700: #456962;
+  --color-indigo-800: #36534D;
+  --color-indigo-900: #29413C;
+  --color-indigo-950: #1C2D29;
 
-  --color-violet-50: #F6F2E9;
-  --color-violet-100: #EDE5D5;
-  --color-violet-200: #E0D2B9;
-  --color-violet-300: #CBB795;
-  --color-violet-400: #B39A68;
-  --color-violet-500: #9C824F;
-  --color-violet-600: #806936;
-  --color-violet-700: #67542C;
-  --color-violet-800: #503F25;
-  --color-violet-900: #3C301F;
-  --color-violet-950: #281F16;
+  --color-violet-50: #F1F5F4;
+  --color-violet-100: #DDEAE7;
+  --color-violet-200: #C6DDD8;
+  --color-violet-300: #A8C9C1;
+  --color-violet-400: #7EAAA1;
+  --color-violet-500: #64958B;
+  --color-violet-600: #527C73;
+  --color-violet-700: #46665F;
+  --color-violet-800: #38514B;
+  --color-violet-900: #2C413C;
+  --color-violet-950: #20302D;
 
-  --color-purple-50: #F6F3EB;
-  --color-purple-100: #ECE6D7;
-  --color-purple-200: #DED2B8;
-  --color-purple-300: #C9B897;
-  --color-purple-400: #AD985F;
-  --color-purple-500: #957E4C;
-  --color-purple-600: #79653A;
-  --color-purple-700: #604F2E;
-  --color-purple-800: #4B3D28;
-  --color-purple-900: #372E21;
-  --color-purple-950: #241E17;
+  --color-purple-50: #F1F5F4;
+  --color-purple-100: #DEEAE7;
+  --color-purple-200: #C7DDD8;
+  --color-purple-300: #A8CAC2;
+  --color-purple-400: #7EA9A0;
+  --color-purple-500: #64958B;
+  --color-purple-600: #527C73;
+  --color-purple-700: #46665F;
+  --color-purple-800: #38514B;
+  --color-purple-900: #2C413C;
+  --color-purple-950: #20302D;
 }
 
 /* Remove the default Vite starter visual language if legacy classes are still mounted. */
@@ -226,22 +226,22 @@ g[display="none"],
 [class~="bg-slate-950"] [class~="text-slate-500"],
 [class~="bg-slate-950"] [class~="text-slate-600"],
 [class~="bg-slate-950"] [class~="text-slate-700"]{
-  color:#AAB7B0 !important;
+  color:#A6B8B3 !important;
 }
 [class~="bg-[#15201d]"] [class~="text-slate-400"],
 [class~="bg-[#111817]"] [class~="text-slate-400"],
 [class~="bg-slate-950"] [class~="text-slate-400"]{
-  color:#B8C4BE !important;
+  color:#B8C8C4 !important;
 }
 [class~="bg-[#15201d]"] [class~="text-blue-300"],
 [class~="bg-[#111817]"] [class~="text-blue-300"],
 [class~="bg-slate-950"] [class~="text-blue-300"]{
-  color:#96C5BB !important;
+  color:#94C6BE !important;
 }
 [class~="bg-[#15201d]"] [class~="text-blue-400"],
 [class~="bg-[#111817]"] [class~="text-blue-400"],
 [class~="bg-slate-950"] [class~="text-blue-400"]{
-  color:#6CAEA1 !important;
+  color:#6EAAA1 !important;
 }
 [class~="bg-[#15201d]"] [class~="text-blue-500"],
 [class~="bg-[#111817]"] [class~="text-blue-500"],
@@ -249,7 +249,7 @@ g[display="none"],
 [class~="bg-[#15201d]"] [class~="text-blue-600"],
 [class~="bg-[#111817]"] [class~="text-blue-600"],
 [class~="bg-slate-950"] [class~="text-blue-600"]{
-  color:#6CAEA1 !important;
+  color:#6EAAA1 !important;
 }
 
 
