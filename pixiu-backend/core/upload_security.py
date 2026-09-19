@@ -260,7 +260,14 @@ def validate_career_cv(uploaded: UploadedFile | None) -> tuple[UploadedFile, str
         except (AttributeError, OSError):
             pass
 
-    ensure_clean_upload(uploaded)
+    try:
+        ensure_clean_upload(uploaded)
+    except ClamAVMalwareDetectedError as exc:
+        raise SecureUploadError("Uploaded CV failed malware scanning and was rejected.") from exc
+    except ClamAVUnavailableError as exc:
+        # Never convert an unavailable required scanner into an unhandled 500.
+        # The API layer can return a safe service-unavailable response.
+        raise SecureUploadError("CV security scanning is temporarily unavailable. Please try again shortly.") from exc
 
     import hashlib
     digest = hashlib.sha256(raw).hexdigest()
