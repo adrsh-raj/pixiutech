@@ -41,6 +41,8 @@ class CareerPublicApiTests(APITestCase):
         self.assertNotEqual(application.cv_original_name, application.cv.name.split('/')[-1])
         self.assertTrue(application.cv.name.startswith('private_career_cvs/'))
         self.assertEqual(application.cv_size, len(valid_pdf_bytes()))
+        self.assertNotIn('/', application.cv_original_name)
+        self.assertNotIn('\\\\', application.cv_original_name)
 
     def test_application_rejects_invalid_phone(self):
         opening = CareerOpening.objects.create(title='STEM Instructor', description='Teach STEM', status=CareerOpeningStatus.PUBLISHED)
