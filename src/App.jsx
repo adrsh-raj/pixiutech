@@ -18,10 +18,11 @@ import TermsAndConditions from './pages/TermsAndConditions.jsx'
 import NotFound from './pages/NotFound.jsx'
 import { LMS_LOGIN_URL } from './config/runtime.js'
 
-function ExternalLoginRedirect() {
+function ProductionLoginRedirect() {
   useEffect(() => {
     window.location.replace(LMS_LOGIN_URL)
   }, [])
+
   return null
 }
 
@@ -40,12 +41,16 @@ export default function App() {
           <Route path="/careers" element={<Careers />} />
           <Route path="/faq" element={<FAQ />} />
           <Route path="/portal" element={<PortalBridge />} />
-          <Route path="/contact" element={<Contact />} />
+          <Route path="/hub" element={<PortalBridge />} />
+          <Route path="/login" element={<ProductionLoginRedirect />} />
           <Route path="/simulation" element={<Simulation />} />
           <Route path="/verify" element={<Verify />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/terms" element={<TermsAndConditions />} />
-          <Route path="/login" element={<ExternalLoginRedirect />} />
+          <Route path="/contact" element={<Contact />} />
+          <Route path="/curriculum" element={<Navigate to="/solutions" replace />} />
+          <Route path="/partnership" element={<Navigate to="/" replace />} />
+          <Route path="/about" element={<Navigate to="/" replace />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
