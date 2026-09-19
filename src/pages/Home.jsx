@@ -68,7 +68,7 @@ export default function Home() {
               {SOLUTIONS.map((s) => (
                 <Link to={`/solutions#${s.id}`} className="sol-card" key={s.id}>
                   <div className="sol-card__img">
-                    <img src={s.img} alt={s.title} loading="lazy" />
+                    <img src={s.img} alt={s.alt || s.title} loading="lazy" />
                   </div>
                   <div className="sol-card__body">
                     <h3>{s.title}</h3>
