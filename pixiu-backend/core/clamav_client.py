@@ -11,9 +11,11 @@ from __future__ import annotations
 import logging
 import socket
 import struct
+import time
 from typing import BinaryIO
 
 from django.conf import settings
+
 
 logger = logging.getLogger("security.uploads")
 
@@ -41,6 +43,19 @@ def clamav_required() -> bool:
 def _scanner_address() -> tuple[str, int]:
     host = str(getattr(settings, "CLAMAV_HOST", "127.0.0.1")).strip()
     port = int(getattr(settings, "CLAMAV_PORT", 3310))
+    hostport = str(getattr(settings, "CLAMAV_HOSTPORT", "")).strip()
+
+    if hostport:
+        if hostport.startswith("[") and "]" in hostport:
+            host, _, tail = hostport[1:].partition("]")
+            if tail.startswith(":"):
+                port = int(tail[1:])
+        elif hostport.count(":") == 1:
+            host, port_text = hostport.rsplit(":", 1)
+            port = int(port_text)
+        else:
+            host = hostport
+
     if not host:
         raise ClamAVUnavailableError("ClamAV host is not configured.")
     if not 1 <= port <= 65535:
@@ -89,34 +104,51 @@ def scan_uploaded_file(uploaded: BinaryIO) -> None:
     original_position = uploaded.tell() if hasattr(uploaded, "tell") else 0
     chunk_size = int(getattr(settings, "CLAMAV_CHUNK_SIZE", 1024 * 1024))
     timeout = float(getattr(settings, "CLAMAV_TIMEOUT_SECONDS", 30))
+    attempts = max(1, int(getattr(settings, "CLAMAV_RETRY_ATTEMPTS", 3)))
+    backoff = max(0.0, float(getattr(settings, "CLAMAV_RETRY_BACKOFF_SECONDS", 1)))
+
     if chunk_size <= 0 or chunk_size > 4 * 1024 * 1024:
         raise ClamAVUnavailableError("ClamAV chunk size is invalid.")
     if timeout <= 0:
         raise ClamAVUnavailableError("ClamAV timeout is invalid.")
 
+    last_error: ClamAVUnavailableError | None = None
+
     try:
-        uploaded.seek(0)
-        host, port = _scanner_address()
-        with socket.create_connection((host, port), timeout=timeout) as sock:
-            sock.settimeout(timeout)
-            _stream(sock, uploaded, chunk_size=chunk_size)
-            verdict = _read_reply(sock)
-    except ClamAVMalwareDetectedError:
-        raise
-    except (OSError, ValueError, struct.error, ClamAVUnavailableError) as exc:
-        raise ClamAVUnavailableError("Unable to obtain a ClamAV verdict.") from exc
+        for attempt in range(attempts):
+            try:
+                host, port = _scanner_address()
+                uploaded.seek(0)
+
+                with socket.create_connection((host, port), timeout=timeout) as sock:
+                    sock.settimeout(timeout)
+                    _stream(sock, uploaded, chunk_size=chunk_size)
+                    verdict = _read_reply(sock)
+            except (OSError, ValueError, struct.error, ClamAVUnavailableError) as exc:
+                last_error = ClamAVUnavailableError("Unable to obtain a ClamAV verdict.")
+                logger.warning(
+                    "ClamAV scan attempt failed (%s/%s): %s",
+                    attempt + 1,
+                    attempts,
+                    exc.__class__.__name__,
+                )
+            else:
+                normalized = verdict.lower()
+                if normalized.endswith("found") or " found" in normalized:
+                    raise ClamAVMalwareDetectedError(verdict)
+                if normalized.endswith("ok") or normalized == "stream: ok" or normalized.endswith(": ok"):
+                    return
+                last_error = ClamAVUnavailableError("ClamAV returned an unexpected verdict.")
+
+            if attempt < attempts - 1:
+                time.sleep(min(backoff * (2 ** attempt), 5))
+
+        raise last_error or ClamAVUnavailableError("Unable to obtain a ClamAV verdict.")
     finally:
         try:
             uploaded.seek(original_position)
         except (AttributeError, OSError):
             pass
-
-    normalized = verdict.lower()
-    if normalized.endswith("found") or " found" in normalized:
-        raise ClamAVMalwareDetectedError(verdict)
-    if normalized.endswith("ok") or normalized == "stream: ok" or normalized.endswith(": ok"):
-        return
-    raise ClamAVUnavailableError("ClamAV returned an unexpected verdict.")
 
 
 def ensure_clean_upload(uploaded: BinaryIO) -> None:
@@ -125,10 +157,10 @@ def ensure_clean_upload(uploaded: BinaryIO) -> None:
         return
     try:
         scan_uploaded_file(uploaded)
-    except ClamAVMalwareDetectedError as exc:
+    except ClamAVMalwareDetectedError:
         logger.warning("Upload rejected by antivirus scanner: malware_detected")
         raise
-    except ClamAVUnavailableError as exc:
+    except ClamAVUnavailableError:
         if clamav_required():
             logger.error("Upload rejected because required antivirus scanner is unavailable")
             raise
