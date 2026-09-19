@@ -435,3 +435,7 @@ a{color:inherit;text-decoration:none}
 }
 .skip-link:focus,
 .skip-link:focus-visible{transform:translateY(0);outline:3px solid rgba(37,108,255,.35);outline-offset:2px}
+
+
+/* Route loading state for client-side navigation */
+.route-loading{min-height:50vh;display:grid;place-items:center;padding:48px;font-family:var(--f-mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);background:var(--white)}
