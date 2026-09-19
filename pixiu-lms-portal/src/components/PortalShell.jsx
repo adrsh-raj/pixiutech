@@ -39,13 +39,13 @@ export default function PortalShell({ role, title, subtitle, children }) {
   };
 
   return (
-    <div className="min-h-dvh w-full overflow-x-hidden bg-[#f5f7fb] text-slate-900 flex font-sans">
+    <div className="min-h-dvh w-full overflow-x-hidden bg-[#f3f1ea] text-slate-900 flex font-sans">
       <a href="#portal-main" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[100] focus:rounded-xl focus:bg-slate-900 focus:px-4 focus:py-2 focus:text-xs focus:font-bold focus:text-white">Skip to content</a>
       <PortalSidebar role={role} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
       <div className="min-w-0 flex-1 flex flex-col w-full">
         <header className="sticky top-0 z-30 min-h-[62px] sm:min-h-[68px] bg-white/90 backdrop-blur-xl border-b border-slate-200/80 flex items-center justify-between gap-2 px-3 sm:px-6 lg:px-9 py-2.5">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0 overflow-hidden">
-            <button type="button" onClick={() => setMobileOpen((value) => !value)} className="md:hidden w-9 h-9 shrink-0 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 flex items-center justify-center" aria-label={mobileOpen ? "Close navigation" : "Open navigation"} aria-expanded={mobileOpen} aria-controls="portal-sidebar"><Menu size={17} aria-hidden="true" /></button>
+            <button type="button" onClick={() => setMobileOpen((value) => !value)} className="md:hidden w-9 h-9 shrink-0 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 flex items-center justify-center" aria-label={mobileOpen ? "Close navigation" : "Open navigation"} aria-expanded={mobileOpen} aria-controls="portal-sidebar"><Menu size={17} aria-hidden="true" /></button>
             <div className="min-w-0">
               <p className="hidden sm:flex items-center gap-1.5 text-[9px] font-extrabold tracking-[0.16em] uppercase text-blue-600"><Sparkles size={11} aria-hidden="true" /> {roleMeta.name} workspace</p>
               <h1 className="text-sm sm:text-base font-black text-slate-900 truncate">{title || roleMeta.name}</h1>
