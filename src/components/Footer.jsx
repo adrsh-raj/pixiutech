@@ -18,7 +18,7 @@ export default function Footer() {
 
           <div className="foot__links-group">
             <h4>Quick Links</h4>
-            <nav className="foot__nav-col" aria-label="Footer">
+            <nav className="foot__nav-col" aria-label="Footer quick links">
               {NAV.filter((n) => n.to !== '/contact').map((n) => (
                 <Link key={n.to} to={n.to}>{n.label}</Link>
               ))}
