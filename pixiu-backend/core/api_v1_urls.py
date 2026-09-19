@@ -19,7 +19,7 @@ from .cohort_evaluation_views import ClassEvaluationView, StudentProgressReportD
 from .course_completion_session_v4 import ProgrammeAwareSessionViewSet
 from .course_completion_compat import cohort_rank
 from .public_enquiry import PublicEnquiryView
-from .career_views import CareerApplicationViewSet, CareerOpeningViewSet, PublicCareerApplicationView, PublicCareerOpeningsView
+from crm.career_views import CareerApplicationViewSet, CareerOpeningViewSet, PublicCareerApplicationView, PublicCareerOpeningsView
 from .phase7_compat_extras import ContractCommunicationLogViewSet
 from .billing_contract_overrides import TransactionalInvoiceViewSet
 from .inventory_contract_overrides import JsonKitComponentViewSet, JsonKitViewSet
