@@ -4,4 +4,4 @@ Disallow: /login
 Disallow: /api/
 Disallow: /admin/
 
-Sitemap: https://pixiutech.com/sitemap.xml
+Sitemap: https://www.pixiutech.com/sitemap.xml
