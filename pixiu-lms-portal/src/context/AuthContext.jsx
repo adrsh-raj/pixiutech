@@ -4,6 +4,7 @@ import { measurePerformance, markPerformance, recordApiPerformance } from '../li
 
 const AuthContext = createContext(null);
 const AUTH_EVENT = 'pixiu_auth_state_changed';
+const AUTH_LOGOUT_KEY = 'pixiu_portal_logout_at';
 const SESSION_ROLE_KEY = 'pixiu_session_role';
 const AUTH_REQUEST_TIMEOUT_MS = 60000;
 const LOGIN_REQUEST_TIMEOUT_MS = 60000;
@@ -205,8 +206,20 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     clearLegacyAuthStorage();
     const syncAuthState = () => { setToken(accessTokenMemory); if (!accessTokenMemory) setUser(null); };
+    const syncCrossTabLogout = event => {
+      if (event.key !== AUTH_LOGOUT_KEY || !event.newValue) return;
+      accessTokenMemory = null;
+      clearApiReadCache();
+      setToken(null);
+      setUser(null);
+      setSessionRole(null);
+    };
     window.addEventListener(AUTH_EVENT, syncAuthState);
-    return () => window.removeEventListener(AUTH_EVENT, syncAuthState);
+    window.addEventListener('storage', syncCrossTabLogout);
+    return () => {
+      window.removeEventListener(AUTH_EVENT, syncAuthState);
+      window.removeEventListener('storage', syncCrossTabLogout);
+    };
   }, []);
   useEffect(() => {
     let active = true;
@@ -273,7 +286,13 @@ export function AuthProvider({ children }) {
     try {
       await authPostWithRetry(`${API_BASE}/auth/logout/`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role: role || undefined }), cache: 'no-store', credentials: 'include' });
     } catch {}
-    finally { setUser(null); setToken(null); clearAuthStorage(); broadcastAuthChange(); }
+    finally {
+      setUser(null);
+      setToken(null);
+      clearAuthStorage();
+      try { window.localStorage.setItem(AUTH_LOGOUT_KEY, String(Date.now())); } catch {}
+      broadcastAuthChange();
+    }
   };
 
   useEffect(() => {
