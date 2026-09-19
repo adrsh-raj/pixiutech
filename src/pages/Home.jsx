@@ -43,7 +43,6 @@ export default function Home() {
           <div className="stats-bar__grid">
             {STATS.map((s) => (
               <div className="stat" key={s.label}>
-                <span className="stat__icon" aria-hidden="true">·</span>
                 <span className="stat__number"><CountUp text={s.number} /></span>
                 <span className="stat__label">{s.label}</span>
               </div>
@@ -164,7 +163,6 @@ export default function Home() {
             <div className="why-v2">
               {WHY.map((w) => (
                 <div className="why-v2__item" key={w.title}>
-                  <span className="why-v2__icon" aria-hidden="true">—</span>
                   <h3>{w.title}</h3>
                   <p>{w.desc}</p>
                 </div>
