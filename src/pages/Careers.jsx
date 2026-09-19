@@ -15,6 +15,7 @@ export default function Careers() {
   const [values, setValues] = useState(emptyForm)
   const [selectedOpening, setSelectedOpening] = useState('')
   const [status, setStatus] = useState(null)
+  const [submittedName, setSubmittedName] = useState('')
   const [sending, setSending] = useState(false)
 
   const loadOpenings = async () => {
@@ -92,10 +93,16 @@ export default function Careers() {
       const response = await fetch(`${API_BASE}/public/careers/apply`, { method: 'POST', body: data, headers: { Accept: 'application/json' }, cache: 'no-store' })
       const payload = await response.json().catch(() => ({}))
       if (!response.ok) {
-        const error = payload.cv?.[0] || payload.detail || payload.error || 'Application could not be submitted.'
-        throw new Error(String(error))
+        const rawError = payload.cv?.[0] || payload.detail || payload.error || 'Application could not be submitted.'
+        const error = String(rawError)
+        if (/clamav|malware scan|security scan|scanner/i.test(error)) {
+          throw new Error('Application could not be submitted. Please try again shortly.')
+        }
+        throw new Error(error)
       }
-      setStatus({ kind: 'success', text: 'Application received. We will review your profile and contact you using the details provided.' })
+      const applicantName = values.name.trim()
+      setSubmittedName(applicantName)
+      setStatus({ kind: 'success', text: 'Your application has been submitted successfully.' })
       setValues(emptyForm)
       setSelectedOpening('')
     } catch (error) {
@@ -164,6 +171,21 @@ export default function Careers() {
           </Reveal>
 
           <Reveal delay={80}>
+            {status?.kind === 'success' ? (
+              <div className="form__done" role="status" aria-live="polite" style={{ marginTop: 24 }}>
+                <CheckCircle2 size={22} color="var(--blue)" />
+                <h3>Thank you, {submittedName}.</h3>
+                <p>{status.text} Our team will review your application and contact you using the details provided.</p>
+                <button
+                  className="btn btn--outline"
+                  type="button"
+                  style={{ marginTop: 18 }}
+                  onClick={() => { setStatus(null); setSubmittedName('') }}
+                >
+                  Submit another application
+                </button>
+              </div>
+            ) : (
             <form className="form" style={{ marginTop: 24 }} onSubmit={send}>
               {selectedRole && <div className="field field--wide"><label>Applying for</label><input value={selectedRole.title} readOnly /></div>}
               {!selectedRole && openings.length > 0 && <div className="field field--wide"><label htmlFor="career-opening">Position</label><select id="career-opening" value={values.opening} onChange={event => { setSelectedOpening(event.target.value); setValues(previous => ({ ...previous, opening: event.target.value })) }}><option value="">General application</option>{openings.map(opening => <option key={opening.id} value={opening.id}>{opening.title}</option>)}</select></div>}
@@ -181,6 +203,7 @@ export default function Careers() {
               </div>
               {status && <p className={`form__status ${status.kind === 'success' ? '' : 'err'}`} role="status" aria-live="polite">{status.kind === 'success' ? <CheckCircle2 size={16} /> : null}{status.text}</p>}
             </form>
+            )
           </Reveal>
         </div>
       </section>
