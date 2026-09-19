@@ -116,6 +116,7 @@ class AdminStudentCredentialExportView(APIView):
 
 
 class StudentTemporaryPasswordResetView(APIView):
+    throttle_scope = 'student_password_reset'
     permission_classes = [IsAuthenticated, IsActiveAccount]
 
     def post(self, request, pk):
