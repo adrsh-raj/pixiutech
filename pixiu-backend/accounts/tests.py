@@ -27,7 +27,7 @@ class AuthenticationAndCredentialTests(APITestCase):
     def csrf_headers(self):
         response = self.client.get(reverse("v1-csrf-token"))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        return {"HTTP_X_CSRFTOKEN": response.data["csrfToken"]}
+        return {"HTTP_X_CSRFTOKEN": response.json()["csrfToken"]}
 
     def test_password_is_hashed_not_stored_plaintext(self):
         self.assertNotEqual(self.student.password, "StudentStrong!123")
