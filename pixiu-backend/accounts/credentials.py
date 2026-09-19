@@ -38,12 +38,17 @@ def record_failed_login(user, now=None):
     return attempts
 
 
-def invalidate_user_sessions(user):
-    """Invalidate existing access and refresh tokens after a credential change."""
+def bump_auth_version(user):
+    """Invalidate all access tokens issued before this credential change."""
     user.auth_version = int(user.auth_version or 0) + 1
     user.failed_login_attempts = 0
     user.locked_until = None
     user.save(update_fields=["auth_version", "failed_login_attempts", "locked_until"])
+
+
+def invalidate_user_sessions(user):
+    """Invalidate existing access and refresh tokens after a credential change."""
+    bump_auth_version(user)
     revoke_all_refresh_tokens(user)
 
 
