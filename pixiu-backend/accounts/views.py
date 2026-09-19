@@ -3,6 +3,7 @@ import logging
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
+from django.utils.decorators import method_decorator
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -11,7 +12,8 @@ from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from audit.services import record_audit
-from .credentials import create_or_reset_managed_account, revoke_all_refresh_tokens, set_managed_password
+from core.csrf import require_api_csrf
+from .credentials import create_or_reset_managed_account, invalidate_user_sessions, set_managed_password
 from .models import User, UserRole
 from .permissions import IsAdminRole, IsActiveAccount
 from .serializers import ChangeOwnPasswordSerializer, LoginSerializer, ManagedAccountSerializer, ResetManagedPasswordSerializer, UserMeSerializer
@@ -82,6 +84,7 @@ def _clear_legacy_refresh_cookie(response) -> None:
     )
 
 
+@method_decorator(require_api_csrf, name="post")
 class LoginView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
@@ -144,6 +147,7 @@ class MeView(APIView):
         return Response({'success': True, 'user': UserMeSerializer(request.user).data})
 
 
+@method_decorator(require_api_csrf, name="post")
 class LogoutView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
@@ -164,6 +168,7 @@ class LogoutView(APIView):
         return response
 
 
+@method_decorator(require_api_csrf, name="post")
 class RefreshView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
@@ -180,9 +185,18 @@ class RefreshView(APIView):
             unverified = RefreshToken(refresh_token)
             token_role = str(unverified.get('role') or '').strip().lower()
             if token_role and token_role != role:
-                return Response({'detail': 'Refresh session belongs to a different portal role.'}, status=status.HTTP_401_UNAUTHORIZED)
+                return Response({'detail': 'Refresh session is invalid or expired.'}, status=status.HTTP_401_UNAUTHORIZED)
+            token_user_id = unverified.get('user_id')
+            user = User.objects.filter(pk=token_user_id).only('auth_version', 'is_active', 'status').first()
+            token_version = int(unverified.get('auth_version', 0) or 0)
+            if not user or not user.is_active or user.status != 'active' or token_version != int(user.auth_version or 0):
+                response = Response({'detail': 'Refresh session is invalid or expired.'}, status=status.HTTP_401_UNAUTHORIZED)
+                _clear_refresh_cookie(response, role)
+                return response
         except Exception:
-            pass
+            response = Response({'detail': 'Refresh session is invalid or expired.'}, status=status.HTTP_401_UNAUTHORIZED)
+            _clear_refresh_cookie(response, role)
+            return response
 
         serializer = TokenRefreshSerializer(data={'refresh': refresh_token})
         try:
@@ -209,7 +223,7 @@ class ChangeOwnPasswordView(APIView):
         user.set_password(serializer.validated_data['new_password'])
         user.must_change_password = False
         user.save(update_fields=['password', 'must_change_password'])
-        revoke_all_refresh_tokens(user)
+        invalidate_user_sessions(user)
         response = Response({'success': True, 'detail': 'Password changed successfully.'})
         _clear_refresh_cookie(response, user.role)
         record_audit(actor=user, action='password_reset', entity_type='user', entity_id=user.id, summary='Own password changed', request=request)
