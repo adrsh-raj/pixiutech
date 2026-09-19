@@ -33,7 +33,7 @@ export default function Solutions() {
             <Reveal>
               <div className={`sol-detail ${i % 2 !== 0 ? 'sol-detail--reverse' : ''}`}>
                 <div className="sol-detail__img">
-                  <img src={s.img} alt={s.alt || s.title} loading="lazy" />
+                  <img src={s.img} alt={s.alt || s.title} loading="lazy" decoding="async" />
                 </div>
                 <div className="sol-detail__body">
                   <p className="eyebrow">{s.id.toUpperCase()}</p>
@@ -62,7 +62,7 @@ export default function Solutions() {
           <Reveal>
             <div className="sol-detail">
               <div className="sol-detail__img">
-                <img src="/img/teacher_training.jpg" alt="Teacher training workshop" loading="lazy" />
+                <img src="/img/teacher_training.jpg" alt="Teacher training workshop" loading="lazy" decoding="async" />
               </div>
               <div className="sol-detail__body">
                 <p className="eyebrow">TEACHER TRAINING</p>
@@ -101,7 +101,7 @@ export default function Solutions() {
           </Reveal>
           <Reveal delay={80}>
             <div className="wide-img" style={{ marginTop: 40 }}>
-              <img src="/img/hero_lab.jpg" alt="Complete innovation lab setup" loading="lazy" />
+              <img src="/img/hero_lab.jpg" alt="Complete innovation lab setup" loading="lazy" decoding="async" />
               <p className="wide-img__caption">A fully operational Pixiu Tech innovation lab — designed for real teaching</p>
             </div>
           </Reveal>
