@@ -1,0 +1,15 @@
+{
+  "name": "Pixiu Tech Learning Portal",
+  "short_name": "Pixiu Portal",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#040810",
+  "theme_color": "#0A1A33",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "type": "image/png",
+      "sizes": "any"
+    }
+  ]
+}
