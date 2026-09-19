@@ -180,7 +180,6 @@ export async function apiFetch(path, options = {}) {
   };
   let response = await request(accessTokenMemory);
   if (response.status === 401 && !String(path).startsWith('/auth/')) {
-    const previousToken = accessTokenMemory;
     const nextToken = await refreshAccessToken(getSessionRole());
     if (nextToken) response = await request(nextToken);
     else {
