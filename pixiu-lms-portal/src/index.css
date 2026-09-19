@@ -2,64 +2,64 @@
 
 @theme {
   /* Pixiu portal palette: charcoal, petrol green, and cool ice. */
-  --color-pixiu-dark: #101512;
-  --color-pixiu-blue: #285F55;
-  --color-pixiu-cyan: #6B9E91;
-  --color-pixiu-gold: #B7D2CC;
-  --color-pixiu-gray: #F3F5F3;
-  --color-background: #F3F5F3;
-  --color-foreground: #18221F;
+  --color-pixiu-dark: #0D1212;
+  --color-pixiu-blue: #236F69;
+  --color-pixiu-cyan: #5F9185;
+  --color-pixiu-gold: #B8D4D0;
+  --color-pixiu-gray: #F2F5F4;
+  --color-background: #F2F5F4;
+  --color-foreground: #17201E;
   --color-card: #FFFFFF;
-  --color-card-foreground: #18221F;
-  --color-border: #D0D8D3;
-  --color-sidebar: #121A16;
-  --color-sidebar-foreground: #F4F7F5;
-  --color-muted: #E9EFEC;
-  --color-muted-foreground: #66736D;
-  --color-accent: #B7D2CC;
-  --color-accent-foreground: #18221F;
-  --color-primary: #285F55;
+  --color-card-foreground: #17201E;
+  --color-border: #CFD9D6;
+  --color-sidebar: #101917;
+  --color-sidebar-foreground: #F4F7F6;
+  --color-muted: #E8EEEC;
+  --color-muted-foreground: #697773;
+  --color-accent: #B8D4D0;
+  --color-accent-foreground: #17201E;
+  --color-primary: #236F69;
   --color-primary-foreground: #FFFFFF;
-  --color-secondary: #E3EBE7;
+  --color-secondary: #E2E9E7;
   --color-secondary-foreground: #24322D;
   --color-destructive: #B84B3D;
 
   /* Remap common Tailwind blue utilities to the portal's teal family. */
-  --color-blue-50: #F0F6F2;
-  --color-blue-100: #DDEBE5;
-  --color-blue-200: #C4DDD4;
-  --color-blue-300: #9AC5B8;
-  --color-blue-400: #78AE9F;
-  --color-blue-500: #4A8A79;
-  --color-blue-600: #2A705F;
-  --color-blue-700: #245A4D;
-  --color-blue-800: #1C493F;
-  --color-blue-900: #173A32;
-  --color-blue-950: #102C25;
+  --color-blue-50: #EFF6F4;
+  --color-blue-100: #D8EAE7;
+  --color-blue-200: #BFDCD7;
+  --color-blue-300: #94C6BE;
+  --color-blue-400: #6EAAA1;
+  --color-blue-500: #3C8D80;
+  --color-blue-600: #286F67;
+  --color-blue-700: #205B54;
+  --color-blue-800: #194B45;
+  --color-blue-900: #143B37;
+  --color-blue-950: #0D2926;
 
   /* Keep cyan useful for lab visualisation, but move it toward mint. */
-  --color-cyan-50: #F1F6F3;
-  --color-cyan-100: #DFECE6;
-  --color-cyan-200: #C5DED5;
-  --color-cyan-300: #9BC7B9;
-  --color-cyan-400: #79AF9F;
-  --color-cyan-500: #639C8B;
-  --color-cyan-600: #52796D;
-  --color-cyan-700: #3F6257;
-  --color-cyan-800: #38584E;
-  --color-cyan-900: #2D443B;
+  --color-cyan-50: #F0F5F4;
+  --color-cyan-100: #D9E9E5;
+  --color-cyan-200: #C0DCD7;
+  --color-cyan-300: #96C8BE;
+  --color-cyan-400: #75AFA4;
+  --color-cyan-500: #5C8F84;
+  --color-cyan-600: #496F66;
+  --color-cyan-700: #3B5F57;
+  --color-cyan-800: #36534D;
+  --color-cyan-900: #29443E;
 
   /* Common sky utilities follow the same restrained palette. */
-  --color-sky-50: #F0F6F2;
-  --color-sky-100: #DDEBE5;
-  --color-sky-200: #C4DDD4;
-  --color-sky-300: #9AC5B8;
-  --color-sky-400: #78AE9F;
-  --color-sky-500: #4A8A79;
-  --color-sky-600: #2A705F;
-  --color-sky-700: #245A4D;
-  --color-sky-800: #1C493F;
-  --color-sky-900: #173A32;
+  --color-sky-50: #EFF6F4;
+  --color-sky-100: #D8EAE7;
+  --color-sky-200: #BFDCD7;
+  --color-sky-300: #94C6BE;
+  --color-sky-400: #6EAAA1;
+  --color-sky-500: #3C8D80;
+  --color-sky-600: #286F67;
+  --color-sky-700: #205B54;
+  --color-sky-800: #194B45;
+  --color-sky-900: #143B37;
 
   --font-sans: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
@@ -88,12 +88,12 @@ input, select, textarea { min-width: 0; }
 
 .bg-grid-tech {
   background-image:
-    linear-gradient(rgba(40, 95, 85, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(40, 95, 85, 0.035) 1px, transparent 1px);
+    linear-gradient(rgba(35, 111, 105, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(35, 111, 105, 0.035) 1px, transparent 1px);
   background-size: 32px 32px;
 }
 
-::selection { background-color: #2A705F; color: white; }
+::selection { background-color: #286F67; color: white; }
 
 .overflow-x-auto, .overflow-x-scroll { max-width: 100%; -webkit-overflow-scrolling: touch; }
 
@@ -163,54 +163,54 @@ g[display="none"],
 /* Stronger slate contrast for dark workspaces and small supporting text. */
 
 @theme {
-  --color-slate-50: #F3F5F3;
-  --color-slate-100: #E8ECE9;
-  --color-slate-200: #D8E0DB;
-  --color-slate-300: #BCCAC3;
-  --color-slate-400: #A7B8B1;
-  --color-slate-500: #879890;
-  --color-slate-600: #5F6B65;
-  --color-slate-700: #4B5953;
-  --color-slate-800: #313E38;
-  --color-slate-900: #1D2925;
-  --color-slate-950: #101613;
+  --color-slate-50: #F2F5F4;
+  --color-slate-100: #E7ECEA;
+  --color-slate-200: #D7E0DD;
+  --color-slate-300: #BECBC7;
+  --color-slate-400: #A6B8B3;
+  --color-slate-500: #879994;
+  --color-slate-600: #5E6A67;
+  --color-slate-700: #4A5954;
+  --color-slate-800: #303F3A;
+  --color-slate-900: #1D2926;
+  --color-slate-950: #0D1513;
 
   /* Mute secondary accent families so cards do not become a rainbow of borders. */
-  --color-indigo-50: #F1F6F3;
-  --color-indigo-100: #E0ECE7;
-  --color-indigo-200: #C9DED5;
-  --color-indigo-300: #A6C9BB;
-  --color-indigo-400: #7CAE9F;
-  --color-indigo-500: #659D8D;
-  --color-indigo-600: #557E70;
-  --color-indigo-700: #466D62;
-  --color-indigo-800: #38584E;
-  --color-indigo-900: #2B463C;
-  --color-indigo-950: #1D3029;
+  --color-indigo-50: #F0F5F4;
+  --color-indigo-100: #DDE9E6;
+  --color-indigo-200: #C9DDD8;
+  --color-indigo-300: #A9C9C2;
+  --color-indigo-400: #7FADA3;
+  --color-indigo-500: #63968B;
+  --color-indigo-600: #527F76;
+  --color-indigo-700: #456962;
+  --color-indigo-800: #36534D;
+  --color-indigo-900: #29413C;
+  --color-indigo-950: #1C2D29;
 
-  --color-violet-50: #F2F6F4;
+  --color-violet-50: #F1F5F4;
   --color-violet-100: #DDEAE7;
-  --color-violet-200: #C9DED6;
-  --color-violet-300: #A6C8BA;
-  --color-violet-400: #79AB9C;
-  --color-violet-500: #659B8A;
-  --color-violet-600: #547A6C;
-  --color-violet-700: #466A5F;
+  --color-violet-200: #C6DDD8;
+  --color-violet-300: #A8C9C1;
+  --color-violet-400: #7EAAA1;
+  --color-violet-500: #64958B;
+  --color-violet-600: #527C73;
+  --color-violet-700: #46665F;
   --color-violet-800: #38514B;
-  --color-violet-900: #2D433B;
-  --color-violet-950: #21352E;
+  --color-violet-900: #2C413C;
+  --color-violet-950: #20302D;
 
-  --color-purple-50: #F2F6F4;
+  --color-purple-50: #F1F5F4;
   --color-purple-100: #DEEAE7;
   --color-purple-200: #C7DDD8;
   --color-purple-300: #A8CAC2;
   --color-purple-400: #7EA9A0;
-  --color-purple-500: #659B8A;
-  --color-purple-600: #547A6C;
-  --color-purple-700: #466A5F;
+  --color-purple-500: #64958B;
+  --color-purple-600: #527C73;
+  --color-purple-700: #46665F;
   --color-purple-800: #38514B;
-  --color-purple-900: #2D433B;
-  --color-purple-950: #21352E;
+  --color-purple-900: #2C413C;
+  --color-purple-950: #20302D;
 }
 
 /* Remove the default Vite starter visual language if legacy classes are still mounted. */
@@ -226,22 +226,22 @@ g[display="none"],
 [class~="bg-slate-950"] [class~="text-slate-500"],
 [class~="bg-slate-950"] [class~="text-slate-600"],
 [class~="bg-slate-950"] [class~="text-slate-700"]{
-  color:#A7B8B1 !important;
+  color:#A6B8B3 !important;
 }
 [class~="bg-[#15201d]"] [class~="text-slate-400"],
 [class~="bg-[#111817]"] [class~="text-slate-400"],
 [class~="bg-slate-950"] [class~="text-slate-400"]{
-  color:#B9C9C3 !important;
+  color:#B8C8C4 !important;
 }
 [class~="bg-[#15201d]"] [class~="text-blue-300"],
 [class~="bg-[#111817]"] [class~="text-blue-300"],
 [class~="bg-slate-950"] [class~="text-blue-300"]{
-  color:#9AC5B8 !important;
+  color:#94C6BE !important;
 }
 [class~="bg-[#15201d]"] [class~="text-blue-400"],
 [class~="bg-[#111817]"] [class~="text-blue-400"],
 [class~="bg-slate-950"] [class~="text-blue-400"]{
-  color:#78AE9F !important;
+  color:#6EAAA1 !important;
 }
 [class~="bg-[#15201d]"] [class~="text-blue-500"],
 [class~="bg-[#111817]"] [class~="text-blue-500"],
@@ -249,7 +249,7 @@ g[display="none"],
 [class~="bg-[#15201d]"] [class~="text-blue-600"],
 [class~="bg-[#111817]"] [class~="text-blue-600"],
 [class~="bg-slate-950"] [class~="text-blue-600"]{
-  color:#78AE9F !important;
+  color:#6EAAA1 !important;
 }
 
 
