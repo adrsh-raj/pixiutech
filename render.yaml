@@ -57,6 +57,24 @@ services:
         value: 5/hour
       - key: DJANGO_PUBLIC_ENQUIRY_RATE
         value: 10/hour
+      - key: DJANGO_PORTAL_IDLE_TIMEOUT_SECONDS
+        value: "600"
+      - key: DJANGO_LOGIN_MAX_FAILED_ATTEMPTS
+        value: "5"
+      - key: DJANGO_LOGIN_LOCKOUT_MINUTES
+        value: "15"
+      - key: DJANGO_PASSWORD_RESET_TIMEOUT
+        value: "3600"
+      - key: DJANGO_PASSWORD_RESET_RATE
+        value: 10/hour
+      - key: DJANGO_STUDENT_PASSWORD_RESET_RATE
+        value: 20/hour
+      - key: DJANGO_CSRF_TOKEN_RATE
+        value: 30/hour
+      - key: DJANGO_ADMIN_ENABLED
+        value: "False"
+      - key: DJANGO_ADMIN_PATH
+        value: ""
       - key: CAREER_CV_MAX_MB
         value: "2"
       - key: DJANGO_ALLOWED_HOSTS
