@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { ArrowLeft, KeyRound, ShieldCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { apiFetch } from '../context/AuthContext';
+import { apiFetch, useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import PageHeader from '../components/ui/PageHeader';
 
 export default function StudentPassword() {
   const toast = useToast();
+  const { logout } = useAuth();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -33,8 +34,9 @@ export default function StudentPassword() {
       );
     }
     setCurrentPassword(''); setNewPassword(''); setConfirm('');
-    toast.success('Your permanent password has been saved.');
-    window.location.href = '/student-portal';
+    toast.success('Password changed. Please sign in again.');
+    await logout();
+    window.location.href = '/login';
   };
 
   return <div className="max-w-xl space-y-5 pb-10">

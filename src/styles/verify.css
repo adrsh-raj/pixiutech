@@ -6,7 +6,7 @@
 .verify-hero {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(135deg, #071a33 0%, #0b2344 52%, #0d2d5b 100%);
+  background: #142521;
   color: #fff;
   padding: 88px 0 108px;
 }
@@ -51,7 +51,7 @@
   font-weight: 800;
   letter-spacing: 0.13em;
   text-transform: uppercase;
-  color: #cfe0ff;
+  color: #d3c39d;
 }
 
 .verify-hero h1 {
@@ -65,7 +65,7 @@
 .verify-hero p {
   max-width: 680px;
   margin: 0;
-  color: #b7c7dd;
+  color: #b6c1bb;
   font-size: 15px;
   line-height: 1.8;
 }
@@ -178,7 +178,7 @@
 
 .verify-status--verified {
   border-color: #b8e4c9;
-  background: linear-gradient(180deg, #f4fff8 0%, #ecfbf2 100%);
+  background: #f1f7f2;
 }
 
 .verify-status--warning {
@@ -381,7 +381,7 @@
 }
 
 .verify-overall-strip > div:first-child {
-  background: linear-gradient(135deg, #eef5ff 0%, #f8fbff 100%);
+  background: #f4f1e9;
   border-color: #d7e5ff;
 }
 
@@ -406,7 +406,7 @@
 }
 
 .verify-overall-strip > div:first-child strong {
-  color: #1768ff;
+  color: #1f776c;
   font-size: 25px;
 }
 
@@ -522,7 +522,7 @@
 }
 
 .verify-table-code {
-  color: #1768ff !important;
+  color: #1f776c !important;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 11px;
 }
@@ -533,7 +533,7 @@
 
 .verify-table-score {
   font-weight: 900;
-  color: #071a33 !important;
+  color: #17332e !important;
 }
 
 .verify-footnote {
@@ -547,7 +547,7 @@
 }
 
 .verify-ranking-card {
-  background: linear-gradient(180deg, #fff 0%, #fbfcff 100%);
+  background: #fff;
 }
 
 .verify-ranking-policy {
@@ -555,9 +555,9 @@
   align-items: center;
   border-radius: 999px;
   padding: 7px 10px;
-  background: #f0f5ff;
-  border: 1px solid #d9e6ff;
-  color: #1768ff;
+  background: #f2f5ee;
+  border: 1px solid #d5ddcf;
+  color: #1f776c;
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -579,8 +579,8 @@
 }
 
 .verify-ranking-main--active > div:first-child {
-  border-color: #cfe0ff;
-  background: #f4f8ff;
+  border-color: #d3c39d;
+  background: #f3f6f1;
 }
 
 .verify-ranking-main strong {
@@ -591,7 +591,7 @@
 }
 
 .verify-ranking-main--active strong {
-  color: #1768ff;
+  color: #1f776c;
   font-size: 24px;
 }
 
@@ -663,7 +663,7 @@
   align-items: center;
   gap: 6px;
   flex: 0 0 auto;
-  color: #1768ff;
+  color: #1f776c;
   font-size: 11px;
   font-weight: 800;
   text-decoration: none;
@@ -677,7 +677,7 @@
 }
 
 .verify-empty > svg {
-  color: #1768ff;
+  color: #1f776c;
 }
 
 .verify-empty h2 {

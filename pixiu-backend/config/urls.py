@@ -1,11 +1,16 @@
 from django.contrib import admin
+from django.conf import settings
 from django.urls import include, path
 
 handler400 = "rest_framework.exceptions.bad_request"
 handler500 = "rest_framework.exceptions.server_error"
 
-urlpatterns = [
-    path("admin/", admin.site.urls),
+urlpatterns = []
+
+if settings.DJANGO_ADMIN_ENABLED and settings.DJANGO_ADMIN_PATH:
+    urlpatterns.append(path(f"{settings.DJANGO_ADMIN_PATH}/", admin.site.urls))
+
+urlpatterns += [
     path("api/", include("core.urls")),
     path("api/v1/", include("core.api_v1_urls")),
     path("api/accounts/", include("accounts.urls")),

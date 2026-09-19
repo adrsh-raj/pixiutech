@@ -40,12 +40,12 @@ export default function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-slate-950/60 backdrop-blur-sm p-2.5 sm:p-5"
+      className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-slate-950/60  p-2.5 sm:p-5"
       onMouseDown={() => closeOnBackdrop && onClose?.()}
       role="presentation"
     >
       <div
-        className={`w-full ${sizeClasses[size] || sizeClasses.md} max-h-[94dvh] sm:max-h-[90dvh] rounded-2xl sm:rounded-3xl bg-white border border-slate-200/80 shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95`}
+        className={`w-full ${sizeClasses[size] || sizeClasses.md} max-h-[94dvh] sm:max-h-[90dvh] rounded-xl bg-white border border-slate-200 shadow-2xl overflow-hidden flex flex-col `}
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? 'pixiu-modal-title' : undefined}
@@ -59,7 +59,7 @@ export default function Modal({
                 ref={closeRef}
                 type="button"
                 onClick={onClose}
-                className="shrink-0 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl p-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                className="shrink-0 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl p-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#27786D]"
                 aria-label="Close modal"
               >
                 <X size={18} />

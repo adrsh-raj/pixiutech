@@ -1,4 +1,5 @@
 from django.urls import path
+from .csrf import csrf_token_view
 from rest_framework.routers import DefaultRouter
 from accounts.legacy_credential_routes import SchoolProfilePasswordResetView, TrainerProfilePasswordResetView
 from accounts.views import ChangeOwnPasswordView, LoginView, LogoutView, MeView, RefreshView
@@ -72,7 +73,7 @@ router.register('logs', AuditLogViewSet, basename='v1-audit-log')
 
 urlpatterns = [
     path('health/', health, name='v1-health'), path('upload/', SecureUploadView.as_view(), name='v1-upload'),
-    path('auth/login/', LoginView.as_view(), name='v1-login'), path('auth/refresh/', RefreshView.as_view(), name='v1-refresh'),
+    path('auth/csrf/', csrf_token_view, name='v1-csrf-token'), path('auth/login/', LoginView.as_view(), name='v1-login'), path('auth/refresh/', RefreshView.as_view(), name='v1-refresh'),
     path('auth/logout/', LogoutView.as_view(), name='v1-logout'), path('auth/me/', MeView.as_view(), name='v1-me'), path('auth/password/change/', ChangeOwnPasswordView.as_view(), name='v1-password-change'),
     path('students/credentials/migrate', AdminStudentCredentialMigrationView.as_view(), name='v1-student-credential-migrate'),
     path('students/credentials/migrate/<uuid:batch_id>/process', AdminStudentCredentialMigrationProcessView.as_view(), name='v1-student-credential-migrate-process'),

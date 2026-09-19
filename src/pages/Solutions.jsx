@@ -22,8 +22,8 @@ export default function Solutions() {
     <>
       <PageHead
         crumb="Solutions"
-        title="End-to-End Innovation Lab Solutions"
-        intro="Six technology domains, one complete ecosystem. We handle lab setup, hardware, curriculum, instructor deployment, and ongoing support."
+        title="School Lab Setup Across Six Technology Domains"
+        intro="We handle lab setup, hardware, curriculum, instructor deployment, and ongoing support across six technology domains."
       />
 
       {/* ==================== SOLUTION DEEP DIVES ==================== */}
@@ -33,7 +33,7 @@ export default function Solutions() {
             <Reveal>
               <div className={`sol-detail ${i % 2 !== 0 ? 'sol-detail--reverse' : ''}`}>
                 <div className="sol-detail__img">
-                  <img src={s.img} alt={s.alt || s.title} loading="lazy" />
+                  <img src={s.img} alt={s.alt || s.title} loading="lazy" decoding="async" />
                 </div>
                 <div className="sol-detail__body">
                   <p className="eyebrow">{s.id.toUpperCase()}</p>
@@ -62,13 +62,13 @@ export default function Solutions() {
           <Reveal>
             <div className="sol-detail">
               <div className="sol-detail__img">
-                <img src="/img/teacher_training.jpg" alt="Teacher training workshop" loading="lazy" />
+                <img src="/img/teacher_training.jpg" alt="Teacher training workshop" loading="lazy" decoding="async" />
               </div>
               <div className="sol-detail__body">
                 <p className="eyebrow">TEACHER TRAINING</p>
                 <h2 className="h-sect">Instructor Upskilling Programme</h2>
                 <p className="lede">
-                  We don't just teach students — we train your teachers to become confident STEM facilitators. By the end of the academic year, your staff can independently deliver sessions, manage the lab, and mentor student projects.
+                  We teach students while training your teachers to deliver STEM sessions. Your staff learn the lesson flow, lab routines, and project guidance needed to manage classes and mentor student work.
                 </p>
                 <ul className="check-list check-list--light">
                   <li>Hands-on Arduino & electronics workshops</li>
@@ -91,18 +91,18 @@ export default function Solutions() {
       <section className="band">
         <div className="shell" style={{ textAlign: 'center' }}>
           <Reveal>
-            <p className="eyebrow">Complete Lab Transformation</p>
-            <h2 className="h-sect">From Empty Room to Working Innovation Lab</h2>
+            <p className="eyebrow">Lab Setup and Delivery</p>
+            <h2 className="h-sect">From an Empty Room to a Working Lab</h2>
             <p className="lede" style={{ maxWidth: '64ch', margin: '0 auto' }}>
               You don't need to source hardware, hire instructors, or design a curriculum separately. 
-              Pixiu Tech handles the entire lifecycle — planning, setup, delivery, and long-term support — 
+              Pixiu Tech handles the full delivery cycle, from planning and setup to teaching and long-term support, 
               under a single partnership.
             </p>
           </Reveal>
           <Reveal delay={80}>
             <div className="wide-img" style={{ marginTop: 40 }}>
-              <img src="/img/hero_lab.jpg" alt="Complete innovation lab setup" loading="lazy" />
-              <p className="wide-img__caption">A fully operational Pixiu Tech innovation lab — designed for real teaching</p>
+              <img src="/img/hero_lab.jpg" alt="Complete innovation lab setup" loading="lazy" decoding="async" />
+              <p className="wide-img__caption">A working Pixiu Tech lab designed for weekly teaching</p>
             </div>
           </Reveal>
           <Reveal delay={120}>
@@ -115,7 +115,7 @@ export default function Solutions() {
         </div>
       </section>
 
-      <CTAStrip title="Ready to Transform Your School?" primary="Book a Free Consultation" />
+      <CTAStrip title="Planning a School Lab?" primary="Book a Free Consultation" />
     </>
   )
 }

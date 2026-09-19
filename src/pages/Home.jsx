@@ -12,18 +12,18 @@ export default function Home() {
       {/* ============================= HERO ============================= */}
       <section className="hero-v2">
         <div className="hero-v2__bg">
-          <img src="/img/hero_lab.jpg" alt="Pixiu Tech classroom session on AI and machine learning" />
+          <img src="/img/hero_lab.jpg" alt="Pixiu Tech classroom session on AI and machine learning" loading="eager" fetchPriority="high" decoding="async" />
           <div className="hero-v2__overlay" />
         </div>
         <div className="shell hero-v2__content">
           <Reveal>
             <p className="hero-v2__tag">STEM · Robotics · AI · IoT · Drones</p>
             <h1 className="hero-v2__title">
-              Empowering Schools with<br />
-              <span className="hero-v2__accent">Future-Ready Innovation Labs</span>
+              Helping Schools Build and Run<br />
+              <span className="hero-v2__accent">Working STEM & Technology Labs</span>
             </h1>
             <p className="hero-v2__sub">
-              End-to-end lab setup, hands-on curriculum, trained instructors, and ongoing support — everything your school needs to teach STEM, Robotics, and AI.
+              Lab setup, practical curriculum, trained instructors, and ongoing support. Your school gets the equipment, teaching plan, and delivery team needed to run STEM, Robotics, and AI classes.
             </p>
             <div className="hero-v2__cta">
               <Link className="btn btn--primary btn--lg" to="/contact#demo-form">
@@ -43,7 +43,6 @@ export default function Home() {
           <div className="stats-bar__grid">
             {STATS.map((s) => (
               <div className="stat" key={s.label}>
-                <span className="stat__icon">{s.icon}</span>
                 <span className="stat__number"><CountUp text={s.number} /></span>
                 <span className="stat__label">{s.label}</span>
               </div>
@@ -56,10 +55,10 @@ export default function Home() {
       <section className="band">
         <div className="shell">
           <Reveal>
-            <p className="eyebrow">Comprehensive Tech Domains</p>
-            <h2 className="h-sect">One Managed Ecosystem. Six Innovation Domains.</h2>
+            <p className="eyebrow">Technology Domains</p>
+            <h2 className="h-sect">Six Technology Domains, One Delivery Team</h2>
             <p className="lede">
-              From robotics and AI to drones and 3D printing — we cover every domain your school needs to deliver future-ready education.
+              Robotics, AI, IoT, drones, computational design, and 3D printing, with the lab setup and teaching support needed to use each domain in school.
             </p>
           </Reveal>
 
@@ -68,7 +67,7 @@ export default function Home() {
               {SOLUTIONS.map((s) => (
                 <Link to={`/solutions#${s.id}`} className="sol-card" key={s.id}>
                   <div className="sol-card__img">
-                    <img src={s.img} alt={s.alt || s.title} loading="lazy" />
+                    <img src={s.img} alt={s.alt || s.title} loading="lazy" decoding="async" />
                   </div>
                   <div className="sol-card__body">
                     <h3>{s.title}</h3>
@@ -94,8 +93,8 @@ export default function Home() {
         <div className="shell">
           <Reveal>
             <div className="wide-img">
-              <img src="/img/workshop_action.jpg" alt="Students in an energetic STEM robotics workshop" loading="lazy" />
-              <p className="wide-img__caption">Live workshops — where students build, fail, fix, and celebrate</p>
+              <img src="/img/workshop_action.jpg" alt="Students in an energetic STEM robotics workshop" loading="lazy" decoding="async" />
+              <p className="wide-img__caption">Live workshops where students build, test, fix, and improve</p>
             </div>
           </Reveal>
         </div>
@@ -106,13 +105,13 @@ export default function Home() {
         <div className="shell">
           <Reveal>
             <p className="eyebrow">How It Works</p>
-            <h2 className="h-sect">Deploying Your Innovation Hub in 4 Seamless Steps</h2>
+            <h2 className="h-sect">How We Take a Lab from Plan to Weekly Classes</h2>
           </Reveal>
           <Reveal delay={80}>
             <div className="process-grid">
               {PROCESS.map((p, i) => (
                 <div className="process-step" key={p.no}>
-                  <div className="process-step__no">{p.icon}</div>
+                  <div className="process-step__no" aria-hidden="true">{p.no}</div>
                   <h3>{p.name}</h3>
                   <p>{p.text}</p>
                   {i < PROCESS.length - 1 && <div className="process-step__arrow">→</div>}
@@ -128,15 +127,15 @@ export default function Home() {
         <div className="shell split">
           <Reveal>
             <div className="split__img">
-              <img src="/img/teacher_training.jpg" alt="Teacher training workshop" loading="lazy" />
+              <img src="/img/teacher_training.jpg" alt="Teacher training workshop" loading="lazy" decoding="async" />
             </div>
           </Reveal>
           <Reveal delay={80}>
             <div>
               <p className="eyebrow">Teacher Training</p>
-              <h2 className="h-sect">Empowering Your Teaching Faculty</h2>
+              <h2 className="h-sect">Train Your Teachers to Run STEM Sessions</h2>
               <p className="lede">
-                Our instructors don't just teach students — they upskill your existing faculty. By the end of the year, your teachers can independently run STEM sessions.
+                Our instructors teach students while training your faculty. Over the academic year, teachers learn the tools, lesson flow, and lab routines needed to run STEM sessions independently.
               </p>
               <ul className="check-list">
                 <li>Hands-on Arduino & electronics training</li>
@@ -158,13 +157,12 @@ export default function Home() {
         <div className="shell">
           <Reveal>
             <p className="eyebrow">Why Pixiu Tech</p>
-            <h2 className="h-sect">The Premium Corporate Approach — Engineered for Action, Not Just Exhibition.</h2>
+            <h2 className="h-sect">Built for Implementation, Not a One-Time Installation</h2>
           </Reveal>
           <Reveal delay={80}>
             <div className="why-v2">
               {WHY.map((w) => (
                 <div className="why-v2__item" key={w.title}>
-                  <span className="why-v2__icon">{w.icon}</span>
                   <h3>{w.title}</h3>
                   <p>{w.desc}</p>
                 </div>

@@ -1,14 +1,66 @@
 import re
 import secrets
+from datetime import timedelta
 
+from django.conf import settings
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
+from django.utils import timezone
+from django.db.models import F
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 
 from .models import User, UserRole, UserStatus
 
 STUDENT_TEMP_PIN_LENGTH = 8
 STUDENT_TEMP_PIN_ALPHABET = "0123456789"
+
+
+def login_max_failed_attempts() -> int:
+    return max(1, int(getattr(settings, "LOGIN_MAX_FAILED_ATTEMPTS", 5)))
+
+
+def login_lockout_minutes() -> int:
+    return max(1, int(getattr(settings, "LOGIN_LOCKOUT_MINUTES", 15)))
+
+
+def login_is_locked(user, now=None):
+    now = now or timezone.now()
+    return bool(user.locked_until and user.locked_until > now)
+
+
+def clear_login_failures(user):
+    changed = user.failed_login_attempts != 0 or user.locked_until is not None
+    if changed:
+        user.failed_login_attempts = 0
+        user.locked_until = None
+    return changed
+
+
+def record_failed_login(user, now=None):
+    now = now or timezone.now()
+    attempts = int(user.failed_login_attempts or 0) + 1
+    max_attempts = login_max_failed_attempts()
+    user.failed_login_attempts = min(attempts, max_attempts)
+    if attempts >= max_attempts:
+        user.locked_until = now + timedelta(minutes=login_lockout_minutes())
+    user.save(update_fields=["failed_login_attempts", "locked_until"])
+    return attempts
+
+
+def bump_auth_version(user):
+    """Atomically invalidate all access tokens issued before this credential change."""
+    User.objects.filter(pk=user.pk).update(
+        auth_version=F("auth_version") + 1,
+        failed_login_attempts=0,
+        locked_until=None,
+    )
+    user.refresh_from_db(fields=["auth_version", "failed_login_attempts", "locked_until"])
+
+
+def invalidate_user_sessions(user):
+    """Invalidate existing access and refresh tokens after a credential change."""
+    bump_auth_version(user)
+    revoke_all_refresh_tokens(user)
 
 
 def validate_managed_password(password: str, role: str) -> None:
@@ -66,7 +118,7 @@ def set_managed_password(user: User, password: str, *, must_change: bool = True)
     user.status = UserStatus.ACTIVE
     user.is_active = True
     user.save(update_fields=["password", "must_change_password", "status", "is_active"])
-    revoke_all_refresh_tokens(user)
+    invalidate_user_sessions(user)
     return user
 
 
@@ -91,5 +143,5 @@ def create_or_reset_managed_account(*, username: str, password: str, role: str, 
     user.is_staff = False
     user.is_superuser = False
     user.save()
-    revoke_all_refresh_tokens(user)
+    invalidate_user_sessions(user)
     return user, created

@@ -1,22 +1,24 @@
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Nav from './components/Nav.jsx'
 import Footer from './components/Footer.jsx'
 import ScrollToTop from './components/ScrollToTop.jsx'
-import Home from './pages/Home.jsx'
-import Solutions from './pages/Solutions.jsx'
-import Careers from './pages/Careers.jsx'
-import FAQ from './pages/FAQ.jsx'
-import PortalBridge from './pages/PortalBridge.jsx'
-import Contact from './pages/Contact.jsx'
-import Simulation from './pages/Simulation.jsx'
-import Verify from './pages/Verify.jsx'
-import PrivacyPolicy from './pages/PrivacyPolicy.jsx'
 import SiteMeta from './components/SiteMeta.jsx'
-import TermsAndConditions from './pages/TermsAndConditions.jsx'
-import NotFound from './pages/NotFound.jsx'
 import { LMS_LOGIN_URL } from './config/runtime.js'
 import CookieConsent from './components/CookieConsent.jsx'
+
+const Home = lazy(() => import('./pages/Home.jsx'))
+const Solutions = lazy(() => import('./pages/Solutions.jsx'))
+const Careers = lazy(() => import('./pages/Careers.jsx'))
+const FAQ = lazy(() => import('./pages/FAQ.jsx'))
+const PortalBridge = lazy(() => import('./pages/PortalBridge.jsx'))
+const Contact = lazy(() => import('./pages/Contact.jsx'))
+const Simulation = lazy(() => import('./pages/Simulation.jsx'))
+const Verify = lazy(() => import('./pages/Verify.jsx'))
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy.jsx'))
+const TermsAndConditions = lazy(() => import('./pages/TermsAndConditions.jsx'))
+const NotFound = lazy(() => import('./pages/NotFound.jsx'))
+
 
 function ProductionLoginRedirect() {
   useEffect(() => {
@@ -34,6 +36,7 @@ export default function App() {
       <a className="skip-link" href="#main-content">Skip to main content</a>
       <Nav />
       <main id="main-content" tabIndex={-1}>
+        <Suspense fallback={<div className="route-loading" role="status" aria-live="polite">Loading…</div>}>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/solutions" element={<Solutions />} />
@@ -52,6 +55,7 @@ export default function App() {
           <Route path="/about" element={<Navigate to="/" replace />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
+        </Suspense>
       </main>
       <Footer />
       <CookieConsent />

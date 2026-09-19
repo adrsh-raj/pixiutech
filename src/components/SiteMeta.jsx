@@ -13,7 +13,7 @@ const CANONICAL_REDIRECTS = {
 }
 
 const META = {
-  '/': { title: 'Pixiu Tech | STEM, Robotics & AI Labs for Schools', description: 'Pixiu Tech helps schools design, build and manage STEM, Robotics, AI, IoT and innovation learning ecosystems with labs, curriculum, instructors and ongoing support.', imageAlt: 'Pixiu Tech school innovation lab for STEM, Robotics and AI learning' },
+  '/': { title: 'Pixiu Tech | STEM, Robotics & AI Labs for Schools', description: 'Pixiu Tech helps schools plan, equip and run STEM, Robotics, AI and IoT programmes with labs, curriculum, instructors and ongoing support.', imageAlt: 'Pixiu Tech school innovation lab for STEM, Robotics and AI learning' },
   '/solutions': { title: 'School STEM, Robotics & AI Solutions | Pixiu Tech', description: 'Explore Pixiu Tech solutions for school Robotics, AI and Machine Learning, IoT, Drone Technology, Computational Design and custom innovation labs.', imageAlt: 'Pixiu Tech technology solutions for school innovation labs' },
   '/faq': { title: 'FAQs | STEM, Robotics & AI Labs for Schools | Pixiu Tech', description: 'Find answers about Pixiu Tech school innovation labs, hardware, curriculum, instructors, teacher training, board alignment and getting started.', imageAlt: 'Pixiu Tech school STEM and robotics programme' },
   '/portal': { title: 'Pixiu Tech Learning Portal', description: 'Access the Pixiu Tech Learning Portal for student learning, school operations, trainer workflows and programme progress.', imageAlt: 'Pixiu Tech Learning Portal' },

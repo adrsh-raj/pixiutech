@@ -36,7 +36,7 @@ export default function Contact() {
         <div className="shell contact__grid">
           <Reveal>
             <p className="eyebrow">Get In Touch</p>
-            <h2 className="h-sect">Tell Us What You Want to Build</h2>
+            <h2 className="h-sect">Tell Us What Your School Needs</h2>
             <p className="lede">
               The first conversation costs nothing and commits you to nothing. We'll want to know which grades the lab should serve, what space you have, and what you already run.
             </p>

@@ -1,18 +1,28 @@
 import json
+import logging
 from urllib import parse, request as urllib_request
 
 from django.conf import settings
 from django.core.cache import cache
-from django.contrib.auth import authenticate
+from django.contrib.auth.hashers import check_password, make_password
+from django.db import transaction
+from django.utils import timezone
 from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .credentials import normalize_login_username, validate_managed_password
+from .credentials import clear_login_failures, login_is_locked, login_lockout_minutes, login_max_failed_attempts, normalize_login_username, record_failed_login, validate_managed_password
 from .models import User, UserRole, UserStatus
 
 TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
 TURNSTILE_ACTION = "login"
 USER_PROFILE_CACHE_TTL = 30
+LOGIN_GENERIC_ERROR = "Invalid username or password."
+DUMMY_PASSWORD_HASH = make_password("PixiuDummyPasswordOnlyForTimingProtection!2026")
+logger = logging.getLogger("security.auth")
+
+
+def _dummy_auth_work(password):
+    check_password(str(password or ""), DUMMY_PASSWORD_HASH)
 
 
 def verify_turnstile_token(token, remote_ip=None):
@@ -58,30 +68,60 @@ class LoginSerializer(serializers.Serializer):
                 raise serializers.ValidationError({"detail": "Please complete the security check."})
             if verify_turnstile_token(token, request.META.get("REMOTE_ADDR") if request else None) is not True:
                 raise serializers.ValidationError({"detail": "Security verification failed. Please try again."})
+
         username = normalize_login_username(attrs["username"])
-        user = User.objects.filter(username=username).first()
-        if user is None:
-            candidates = User.objects.filter(username__iexact=username)
-            if candidates.count() == 1:
-                user = candidates.first()
-        if user is None:
-            raise serializers.ValidationError({"detail": "Invalid username or password."})
-        user = authenticate(request=request, username=user.username, password=attrs["password"])
-        if user is None:
-            raise serializers.ValidationError({"detail": "Invalid username or password."})
-        if not user.is_active or user.status != UserStatus.ACTIVE:
-            raise serializers.ValidationError({"detail": "This account is not active."})
-        requested_role = attrs.get("role")
-        if requested_role and user.role != requested_role:
-            raise serializers.ValidationError({"detail": "This account is not permitted to use the selected login type."})
-        refresh = RefreshToken.for_user(user)
-        refresh["role"] = user.role
-        refresh["username"] = user.username
-        refresh["display_name"] = user.display_name or user.get_full_name() or user.username
-        attrs["user"] = user
-        attrs["access"] = str(refresh.access_token)
-        attrs["refresh"] = str(refresh)
-        return attrs
+        with transaction.atomic():
+            user = User.objects.select_for_update().filter(username=username).first()
+            if user is None:
+                candidates = User.objects.select_for_update().filter(username__iexact=username)
+                if candidates.count() == 1:
+                    user = candidates.first()
+
+            if user is None:
+                # Perform an equivalent password-hash operation for unknown users
+                # so username existence is harder to infer from response timing.
+                _dummy_auth_work(attrs["password"])
+                raise serializers.ValidationError({"detail": LOGIN_GENERIC_ERROR})
+
+            now = timezone.now()
+            if user.locked_until and user.locked_until <= now:
+                user.failed_login_attempts = 0
+                user.locked_until = None
+                user.save(update_fields=["failed_login_attempts", "locked_until"])
+
+            if login_is_locked(user, now):
+                logger.warning("Login blocked by temporary account lockout", extra={"user_id": user.pk, "role": user.role})
+                _dummy_auth_work(attrs["password"])
+                raise serializers.ValidationError({"detail": LOGIN_GENERIC_ERROR})
+
+            password_ok = user.check_password(attrs["password"])
+            if not password_ok:
+                attempts = record_failed_login(user, now)
+                if attempts >= login_max_failed_attempts():
+                    logger.warning("Account temporarily locked after repeated login failures", extra={"user_id": user.pk, "role": user.role, "lockout_minutes": login_lockout_minutes()})
+                raise serializers.ValidationError({"detail": LOGIN_GENERIC_ERROR})
+
+            if not user.is_active or user.status != UserStatus.ACTIVE:
+                _dummy_auth_work(attrs["password"])
+                raise serializers.ValidationError({"detail": LOGIN_GENERIC_ERROR})
+
+            requested_role = attrs.get("role")
+            if requested_role and user.role != requested_role:
+                _dummy_auth_work(attrs["password"])
+                raise serializers.ValidationError({"detail": LOGIN_GENERIC_ERROR})
+
+            if clear_login_failures(user):
+                user.save(update_fields=["failed_login_attempts", "locked_until"])
+
+            refresh = RefreshToken.for_user(user)
+            refresh["role"] = user.role
+            refresh["username"] = user.username
+            refresh["display_name"] = user.display_name or user.get_full_name() or user.username
+            refresh["auth_version"] = int(user.auth_version or 0)
+            attrs["user"] = user
+            attrs["access"] = str(refresh.access_token)
+            attrs["refresh"] = str(refresh)
+            return attrs
 
 
 class UserMeSerializer(serializers.ModelSerializer):

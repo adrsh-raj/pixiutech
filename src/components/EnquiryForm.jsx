@@ -19,6 +19,7 @@ export default function EnquiryForm({ intent }) {
   const [errors, setErrors] = useState([])
   const [status, setStatus] = useState(null)
   const [sent, setSent] = useState(false)
+  const [sending, setSending] = useState(false)
 
   const set = (id) => (e) => setValues((v) => ({ ...v, [id]: e.target.value }))
 
@@ -44,6 +45,7 @@ export default function EnquiryForm({ intent }) {
 
     setErrors([])
     setStatus({ kind: '', text: 'Sending your enquiry...' })
+    setSending(true)
 
     try {
       const response = await fetch('/api/enquiry', {
@@ -61,6 +63,8 @@ export default function EnquiryForm({ intent }) {
       setSent(true)
     } catch (error) {
       setStatus({ kind: 'err', text: error.message || 'Network error. Please check your connection and try again.' })
+    } finally {
+      setSending(false)
     }
   }
 
@@ -124,8 +128,8 @@ export default function EnquiryForm({ intent }) {
       </div>
 
       <div className="form__foot">
-        <button className="btn btn--primary" type="button" onClick={send}>
-          Send enquiry <span className="arw">→</span>
+        <button className="btn btn--primary" type="button" onClick={send} disabled={sending} aria-busy={sending}>
+          {sending ? 'Sending…' : 'Send enquiry'} <span className="arw">→</span>
         </button>
         <span className="form__note">We reply in less than 24 hours.</span>
       </div>

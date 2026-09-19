@@ -1,4 +1,4 @@
-// Pixiu Tech — all site copy lives here so it can be edited without touching layout code.
+// Pixiu Tech: all site copy lives here so it can be edited without touching layout code.
 
 export const NAV = [
   { to: '/', label: 'Home' },
@@ -11,9 +11,9 @@ export const NAV = [
 ]
 
 export const STATS = [
-  { number: '1', label: 'Partner School', icon: '🏫' },
-  { number: '5+', label: 'Workshops Delivered', icon: '🔧' },
-  { number: '1000+', label: 'Students Influenced', icon: '👩‍🎓' },
+  { number: '1', label: 'Partner School' },
+  { number: '5+', label: 'Workshops Delivered' },
+  { number: '1000+', label: 'Students Influenced' },
 ]
 
 export const SOLUTIONS = [
@@ -21,7 +21,7 @@ export const SOLUTIONS = [
     id: 'robotics',
     title: 'Robotics Lab',
     short: 'Build, program, and control real machines.',
-    desc: 'Complete robotics lab setup with Arduino, sensors, motors, and chassis kits. Students build traffic lights, smart dustbins, obstacle-avoiding robots, and line followers — progressing from Class 6 to Class 11.',
+    desc: 'Complete robotics lab setup with Arduino, sensors, motors, and chassis kits. Students build traffic lights, smart dustbins, obstacle-avoiding robots, and line followers, with projects progressing from Class 6 to Class 11.',
     img: '/img/robotics_solution.jpg',
     alt: 'Students building and programming a robotics project in a school lab',
     features: ['Arduino & microcontrollers', 'Sensors & actuators', 'Graded project kits', 'Competition-ready builds'],
@@ -66,22 +66,22 @@ export const SOLUTIONS = [
     id: 'custom',
     title: 'Custom School Solutions',
     short: 'Your school, your lab, your way.',
-    desc: 'Every school is different — different budgets, different spaces, different boards, different goals. We sit with your management to understand exactly what your school needs and design a fully customised solution around it. Whether you want a small robotics corner for primary classes or a full-scale innovation lab for senior students, we tailor the hardware, curriculum, session frequency, and instructor deployment to match your specific requirements and academic calendar.',
+    desc: 'Every school has different budgets, spaces, boards, and teaching goals. We work with your management to define the requirement and design the lab around it. That can be a small robotics corner for primary classes or a full innovation lab for senior students, with the hardware, curriculum, session frequency, and instructor deployment matched to your academic calendar.',
     img: '/img/workshop_action.jpg',
     alt: 'Students working with robotics kits during a hands-on STEM workshop',
-    features: ['Tailored to your board (CBSE / ICSE / State)', 'Budget-flexible lab configurations', 'Custom curriculum mapped to your academic calendar', 'Choose domains — mix Robotics, AI, IoT, Drones as needed', 'Space planning for any room size'],
+    features: ['Mapped to CBSE, ICSE, or State requirements', 'Budget-based lab configurations', 'Curriculum mapped to your academic calendar', 'Choose the technology domains you need', 'Space planning for any room size'],
   },
 ]
 
 export const PROCESS = [
-  { no: '01', name: 'Plan', text: 'We assess your space, budget, and goals. You get a detailed lab blueprint and curriculum map.', icon: '📋' },
-  { no: '02', name: 'Build', text: 'We set up the lab — tables, equipment, kits, software — ready to teach from Day 1.', icon: '🔨' },
-  { no: '03', name: 'Teach', text: 'Our trained instructors deliver weekly sessions. Your teachers learn alongside.', icon: '🎓' },
-  { no: '04', name: 'Support', text: 'Ongoing maintenance, kit replacements, curriculum updates, and term reviews.', icon: '🤝' },
+  { no: '01', name: 'Plan', text: 'We assess your space, budget, and goals. You get a detailed lab blueprint and curriculum map.' },
+  { no: '02', name: 'Build', text: 'We set up the lab, including tables, equipment, kits, and software, ready for classes from Day 1.' },
+  { no: '03', name: 'Teach', text: 'Our trained instructors deliver weekly sessions. Your teachers learn alongside.' },
+  { no: '04', name: 'Support', text: 'Ongoing maintenance, kit replacements, curriculum updates, and term reviews.' },
 ]
 
 export const WHY = [
-  { title: 'End-to-End', desc: 'One partner for lab setup, hardware, curriculum, instructors, and support. No juggling vendors.', icon: '🔗' },
-  { title: 'Hands-On Learning', desc: 'Every session has a build. Students make real things, not watch slideshows.', icon: '🛠️' },
-  { title: 'Long-Term Partner', desc: "We don't install and leave. Ongoing classes, support, and curriculum updates term after term.", icon: '🤝' },
+  { title: 'End-to-End', desc: 'One partner for lab setup, hardware, curriculum, instructors, and support. No juggling vendors.' },
+  { title: 'Hands-On Learning', desc: 'Every session has a build. Students make real things, not watch slideshows.' },
+  { title: 'Long-Term Partner', desc: "We don't install and leave. Ongoing classes, support, and curriculum updates term after term." },
 ]

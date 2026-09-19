@@ -11,5 +11,5 @@
 .legal-doc a{color:var(--blue-600);text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px}
 .legal-doc a:hover{color:var(--blue)}
 .legal-contact{padding-top:8px}
-.legal-note{margin-top:42px;padding:18px 20px;border:1px solid rgba(29,110,255,.22);border-left:4px solid var(--blue);border-radius:10px;background:rgba(29,110,255,.05);font-size:14px;color:var(--muted);line-height:1.65}
+.legal-note{margin-top:42px;padding:18px 20px;border:1px solid rgba(196,154,80,.28);border-left:4px solid var(--gold);border-radius:10px;background:rgba(196,154,80,.06);font-size:14px;color:var(--muted);line-height:1.65}
 @media(max-width:640px){.legal-doc{padding:24px 20px}.legal-doc>p,.legal-doc section p,.legal-doc li{font-size:15px}}

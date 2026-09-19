@@ -1,29 +1,68 @@
 @import "tailwindcss";
 
 @theme {
-  --color-pixiu-dark: #070B14;
-  --color-pixiu-blue: #1D6EFF;
-  --color-pixiu-cyan: #00D2FF;
-  --color-pixiu-gold: #C9A227;
-  --color-pixiu-gray: #F7F8FA;
-  --color-background: #0f172a;
-  --color-foreground: #f8fafc;
-  --color-card: #1e293b;
-  --color-card-foreground: #f8fafc;
-  --color-border: #334155;
-  --color-sidebar: #131d31;
-  --color-sidebar-foreground: #f8fafc;
-  --color-muted: #1e293b;
-  --color-muted-foreground: #94a3b8;
-  --color-accent: #38bdf8;
-  --color-accent-foreground: #0f172a;
-  --color-primary: #00878F;
-  --color-primary-foreground: #ffffff;
-  --color-secondary: #253349;
-  --color-secondary-foreground: #f8fafc;
-  --color-destructive: #ef4444;
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  /* Pixiu portal palette: graphite, eucalyptus teal, warm brass. */
+  --color-pixiu-dark: #121A18;
+  --color-pixiu-blue: #27786D;
+  --color-pixiu-cyan: #5F9185;
+  --color-pixiu-gold: #C49A59;
+  --color-pixiu-gray: #F3F1EA;
+  --color-background: #F3F1EA;
+  --color-foreground: #18231F;
+  --color-card: #FFFFFF;
+  --color-card-foreground: #18231F;
+  --color-border: #D9DDD6;
+  --color-sidebar: #15201D;
+  --color-sidebar-foreground: #F7F6F0;
+  --color-muted: #EEF0EC;
+  --color-muted-foreground: #6A766F;
+  --color-accent: #C49A59;
+  --color-accent-foreground: #18231F;
+  --color-primary: #27786D;
+  --color-primary-foreground: #FFFFFF;
+  --color-secondary: #E8EBE6;
+  --color-secondary-foreground: #24322D;
+  --color-destructive: #B84B3D;
+
+  /* Remap common Tailwind blue utilities to the portal's teal family. */
+  --color-blue-50: #F0F7F5;
+  --color-blue-100: #DCECE8;
+  --color-blue-200: #BEDBD5;
+  --color-blue-300: #96C5BB;
+  --color-blue-400: #6CAEA1;
+  --color-blue-500: #3B907F;
+  --color-blue-600: #2A776A;
+  --color-blue-700: #215F55;
+  --color-blue-800: #194A43;
+  --color-blue-900: #143A35;
+  --color-blue-950: #0D2926;
+
+  /* Keep cyan useful for lab visualisation, but move it toward mint. */
+  --color-cyan-50: #F2F7F4;
+  --color-cyan-100: #DEECE7;
+  --color-cyan-200: #BED8CE;
+  --color-cyan-300: #9CC1B4;
+  --color-cyan-400: #7CA99A;
+  --color-cyan-500: #5E9183;
+  --color-cyan-600: #4A776B;
+  --color-cyan-700: #3A6257;
+  --color-cyan-800: #304F47;
+  --color-cyan-900: #263F39;
+
+  /* Common sky utilities follow the same restrained palette. */
+  --color-sky-50: #F0F7F5;
+  --color-sky-100: #DCECE8;
+  --color-sky-200: #BEDBD5;
+  --color-sky-300: #96C5BB;
+  --color-sky-400: #6CAEA1;
+  --color-sky-500: #3B907F;
+  --color-sky-600: #2A776A;
+  --color-sky-700: #215F55;
+  --color-sky-800: #194A43;
+  --color-sky-900: #143A35;
+
+  --font-sans: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 }
 
 html { scroll-behavior: smooth; }
@@ -49,12 +88,12 @@ input, select, textarea { min-width: 0; }
 
 .bg-grid-tech {
   background-image:
-    linear-gradient(rgba(30, 41, 59, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(30, 41, 59, 0.03) 1px, transparent 1px);
+    linear-gradient(rgba(53, 73, 66, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(53, 73, 66, 0.035) 1px, transparent 1px);
   background-size: 32px 32px;
 }
 
-::selection { background-color: #1D6EFF; color: white; }
+::selection { background-color: #2A776A; color: white; }
 
 .overflow-x-auto, .overflow-x-scroll { max-width: 100%; -webkit-overflow-scrolling: touch; }
 
@@ -104,3 +143,118 @@ g[display="none"],
 .blocklySvg,
 .blocklySvg svg,
 .blocklySvg g { max-width: none !important; }
+
+
+/* ==================== PIXIU PORTAL DESIGN SYSTEM ==================== */
+/* Use neutral surfaces and solid panels instead of glassmorphism. */
+[class*="backdrop-blur"]{backdrop-filter:none !important;-webkit-backdrop-filter:none !important}
+[class~="bg-white/95"],[class~="bg-white/90"],[class~="bg-white/80"],[class~="bg-white/70"]{background-color:#ffffff !important}
+
+/* Keep decorative cards on one quiet border system; semantic alert borders can opt out. */
+[class~="border-blue-50"],[class~="border-blue-100"],[class~="border-blue-200"],
+[class~="border-indigo-50"],[class~="border-indigo-100"],[class~="border-indigo-200"],
+[class~="border-violet-50"],[class~="border-violet-100"],[class~="border-violet-200"],
+[class~="border-purple-50"],[class~="border-purple-100"],[class~="border-purple-200"],
+[class~="border-cyan-50"],[class~="border-cyan-100"],[class~="border-cyan-200"],
+[class~="border-sky-50"],[class~="border-sky-100"],[class~="border-sky-200"]{
+  border-color:var(--color-border) !important;
+}
+
+/* Stronger slate contrast for dark workspaces and small supporting text. */
+
+@theme {
+  --color-slate-50: #F3F1EA;
+  --color-slate-100: #E8EAE4;
+  --color-slate-200: #D8DDD7;
+  --color-slate-300: #C1CAC4;
+  --color-slate-400: #AAB7B0;
+  --color-slate-500: #89978F;
+  --color-slate-600: #5B6761;
+  --color-slate-700: #4C5952;
+  --color-slate-800: #313D37;
+  --color-slate-900: #1E2925;
+  --color-slate-950: #101714;
+
+  /* Mute secondary accent families so cards do not become a rainbow of borders. */
+  --color-indigo-50: #F3F5F1;
+  --color-indigo-100: #E4E8E1;
+  --color-indigo-200: #D3DBD2;
+  --color-indigo-300: #B7C6BC;
+  --color-indigo-400: #8DA99B;
+  --color-indigo-500: #6E9181;
+  --color-indigo-600: #577A6C;
+  --color-indigo-700: #47655A;
+  --color-indigo-800: #375047;
+  --color-indigo-900: #293D36;
+  --color-indigo-950: #1B2A25;
+
+  --color-violet-50: #F6F2E9;
+  --color-violet-100: #EDE5D5;
+  --color-violet-200: #E0D2B9;
+  --color-violet-300: #CBB795;
+  --color-violet-400: #B39A68;
+  --color-violet-500: #9C824F;
+  --color-violet-600: #806936;
+  --color-violet-700: #67542C;
+  --color-violet-800: #503F25;
+  --color-violet-900: #3C301F;
+  --color-violet-950: #281F16;
+
+  --color-purple-50: #F6F3EB;
+  --color-purple-100: #ECE6D7;
+  --color-purple-200: #DED2B8;
+  --color-purple-300: #C9B897;
+  --color-purple-400: #AD985F;
+  --color-purple-500: #957E4C;
+  --color-purple-600: #79653A;
+  --color-purple-700: #604F2E;
+  --color-purple-800: #4B3D28;
+  --color-purple-900: #372E21;
+  --color-purple-950: #241E17;
+}
+
+/* Remove the default Vite starter visual language if legacy classes are still mounted. */
+
+
+/* dark workspace contrast guards: secondary labels stay readable without turning the UI bright */
+[class~="bg-[#15201d]"] [class~="text-slate-500"],
+[class~="bg-[#15201d]"] [class~="text-slate-600"],
+[class~="bg-[#15201d]"] [class~="text-slate-700"],
+[class~="bg-[#111817]"] [class~="text-slate-500"],
+[class~="bg-[#111817]"] [class~="text-slate-600"],
+[class~="bg-[#111817]"] [class~="text-slate-700"],
+[class~="bg-slate-950"] [class~="text-slate-500"],
+[class~="bg-slate-950"] [class~="text-slate-600"],
+[class~="bg-slate-950"] [class~="text-slate-700"]{
+  color:#AAB7B0 !important;
+}
+[class~="bg-[#15201d]"] [class~="text-slate-400"],
+[class~="bg-[#111817]"] [class~="text-slate-400"],
+[class~="bg-slate-950"] [class~="text-slate-400"]{
+  color:#B8C4BE !important;
+}
+[class~="bg-[#15201d]"] [class~="text-blue-300"],
+[class~="bg-[#111817]"] [class~="text-blue-300"],
+[class~="bg-slate-950"] [class~="text-blue-300"]{
+  color:#96C5BB !important;
+}
+[class~="bg-[#15201d]"] [class~="text-blue-400"],
+[class~="bg-[#111817]"] [class~="text-blue-400"],
+[class~="bg-slate-950"] [class~="text-blue-400"]{
+  color:#6CAEA1 !important;
+}
+[class~="bg-[#15201d]"] [class~="text-blue-500"],
+[class~="bg-[#111817]"] [class~="text-blue-500"],
+[class~="bg-slate-950"] [class~="text-blue-500"],
+[class~="bg-[#15201d]"] [class~="text-blue-600"],
+[class~="bg-[#111817]"] [class~="text-blue-600"],
+[class~="bg-slate-950"] [class~="text-blue-600"]{
+  color:#6CAEA1 !important;
+}
+
+
+/* interaction consistency guards */
+[class*="hover:opacity-"]{opacity:1 !important}
+[class~="transition-all"]{transition-property:color,background-color,border-color,box-shadow,transform !important}
+[class~="transition-opacity"]{transition:none !important}
+[class*="hover:-translate-"]{transform:none}
