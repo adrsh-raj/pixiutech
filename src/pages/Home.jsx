@@ -167,7 +167,7 @@ export default function Home() {
             <div className="why-v2">
               {WHY.map((w) => (
                 <div className="why-v2__item" key={w.title}>
-                  <span className="why-v2__icon">{w.icon}</span>
+                  <span className="why-v2__icon" aria-hidden="true">{(() => { const Icon = ICONS[w.icon] || Settings2; return <Icon size={28} strokeWidth={1.7} /> })()}</span>
                   <h3>{w.title}</h3>
                   <p>{w.desc}</p>
                 </div>
