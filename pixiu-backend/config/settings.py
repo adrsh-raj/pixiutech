@@ -91,7 +91,7 @@ REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
     "DEFAULT_PARSER_CLASSES": ["rest_framework.parsers.JSONParser", "core.upload_security.SecureMultiPartParser", "rest_framework.parsers.FormParser"],
     "DEFAULT_THROTTLE_CLASSES": ["rest_framework.throttling.ScopedRateThrottle"],
-    "DEFAULT_THROTTLE_RATES": {"login": os.environ.get("DJANGO_LOGIN_RATE", "10/min"), "upload": os.environ.get("DJANGO_UPLOAD_RATE", "30/hour"), "trainer_material_upload": os.environ.get("DJANGO_TRAINER_MATERIAL_UPLOAD_RATE", "30/hour"), "career_apply": os.environ.get("DJANGO_CAREER_APPLY_RATE", "5/hour")},
+    "DEFAULT_THROTTLE_RATES": {"login": os.environ.get("DJANGO_LOGIN_RATE", "10/min"), "upload": os.environ.get("DJANGO_UPLOAD_RATE", "30/hour"), "trainer_material_upload": os.environ.get("DJANGO_TRAINER_MATERIAL_UPLOAD_RATE", "30/hour"), "career_apply": os.environ.get("DJANGO_CAREER_APPLY_RATE", "5/hour"), "public_enquiry": os.environ.get("DJANGO_PUBLIC_ENQUIRY_RATE", "10/hour")},
     "EXCEPTION_HANDLER": "core.exception_handler.custom_exception_handler",
 }
 
