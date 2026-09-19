@@ -79,7 +79,7 @@ export default function Careers() {
     if (values.website) return
 
     const data = new FormData()
-    data.append('opening', values.opening || '')
+    if (values.opening) data.append('opening', values.opening)
     data.append('name', values.name.trim())
     data.append('email', values.email.trim().toLowerCase())
     data.append('phone', cleanPhone)
