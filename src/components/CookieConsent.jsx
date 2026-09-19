@@ -25,7 +25,7 @@ export default function CookieConsent() {
     setOpen(false)
   }
 
-  if (!open || choice) {
+  if (!open) {
     return null
   }
 
