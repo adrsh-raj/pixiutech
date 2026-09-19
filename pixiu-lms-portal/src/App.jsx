@@ -5,7 +5,6 @@ import { DataProvider } from './context/DataContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import { markPerformance, measurePerformance } from './lib/performanceDiagnostics';
-import AnalyticsTracker from './components/AnalyticsTracker';
 import PortalMeta from './components/PortalMeta';
 
 const CHUNK_RECOVERY_KEY = 'pixiu_chunk_recovery_attempted';
