@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { BriefcaseBusiness, Download, Edit3, Eye, Plus, Trash2, Users, X } from 'lucide-react';
+import { BriefcaseBusiness, Download, Edit3, Plus, Trash2, Users, X } from 'lucide-react';
 import { apiFetch } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 
