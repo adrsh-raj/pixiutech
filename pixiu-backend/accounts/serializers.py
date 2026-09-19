@@ -21,6 +21,10 @@ DUMMY_PASSWORD_HASH = make_password("PixiuDummyPasswordOnlyForTimingProtection!2
 logger = logging.getLogger("security.auth")
 
 
+def _dummy_auth_work(password):
+    check_password(str(password or ""), DUMMY_PASSWORD_HASH)
+
+
 def verify_turnstile_token(token, remote_ip=None):
     """Validate a Turnstile token server-side with Cloudflare.
 
@@ -76,7 +80,7 @@ class LoginSerializer(serializers.Serializer):
             if user is None:
                 # Perform an equivalent password-hash operation for unknown users
                 # so username existence is harder to infer from response timing.
-                check_password(attrs["password"], DUMMY_PASSWORD_HASH)
+                _dummy_auth_work(attrs["password"])
                 raise serializers.ValidationError({"detail": LOGIN_GENERIC_ERROR})
 
             now = timezone.now()
@@ -87,6 +91,7 @@ class LoginSerializer(serializers.Serializer):
 
             if login_is_locked(user, now):
                 logger.warning("Login blocked by temporary account lockout", extra={"user_id": user.pk, "role": user.role})
+                _dummy_auth_work(attrs["password"])
                 raise serializers.ValidationError({"detail": LOGIN_GENERIC_ERROR})
 
             password_ok = user.check_password(attrs["password"])
@@ -97,10 +102,12 @@ class LoginSerializer(serializers.Serializer):
                 raise serializers.ValidationError({"detail": LOGIN_GENERIC_ERROR})
 
             if not user.is_active or user.status != UserStatus.ACTIVE:
+                _dummy_auth_work(attrs["password"])
                 raise serializers.ValidationError({"detail": LOGIN_GENERIC_ERROR})
 
             requested_role = attrs.get("role")
             if requested_role and user.role != requested_role:
+                _dummy_auth_work(attrs["password"])
                 raise serializers.ValidationError({"detail": LOGIN_GENERIC_ERROR})
 
             if clear_login_failures(user):
