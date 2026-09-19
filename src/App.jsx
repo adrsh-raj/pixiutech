@@ -10,6 +10,7 @@ import PortalBridge from './pages/PortalBridge.jsx'
 import Contact from './pages/Contact.jsx'
 import Simulation from './pages/Simulation.jsx'
 import Verify from './pages/Verify.jsx'
+import PrivacyPolicy from './pages/PrivacyPolicy.jsx'
 import NotFound from './pages/NotFound.jsx'
 import { LMS_LOGIN_URL } from './config/runtime.js'
 
@@ -36,6 +37,7 @@ export default function App() {
           <Route path="/login" element={<ProductionLoginRedirect />} />
           <Route path="/simulation" element={<Simulation />} />
           <Route path="/verify" element={<Verify />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/curriculum" element={<Navigate to="/solutions" replace />} />
           <Route path="/partnership" element={<Navigate to="/" replace />} />
