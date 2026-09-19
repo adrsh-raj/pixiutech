@@ -4,9 +4,16 @@ from functools import wraps
 
 from django.http import JsonResponse
 from django.middleware.csrf import CsrfViewMiddleware, get_token
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
+from rest_framework.permissions import AllowAny
+from rest_framework.throttling import ScopedRateThrottle
 
 
+@api_view(["GET"])
+@permission_classes([AllowAny])
+@throttle_classes([ScopedRateThrottle])
 def csrf_token_view(request):
+    csrf_token_view.throttle_scope = "csrf_token"
     """Issue a CSRF token to the browser without exposing any session data."""
     response = JsonResponse({"csrfToken": get_token(request)})
     response["Cache-Control"] = "no-store, private"
