@@ -6,6 +6,8 @@ const TITLES = {
   '/solutions': 'School STEM, Robotics & AI Solutions | Pixiu Tech',
   '/faq': 'FAQs | STEM, Robotics & AI Labs for Schools | Pixiu Tech',
   '/portal': 'Pixiu Tech Learning Portal',
+  '/hub': 'Pixiu Tech Learning Portal',
+  '/login': 'Pixiu Tech Learning Portal',
   '/verify': 'Certificate Verification | Pixiu Tech',
   '/careers': 'Careers at Pixiu Tech',
   '/contact': 'Contact Pixiu Tech | School Technology Solutions',
