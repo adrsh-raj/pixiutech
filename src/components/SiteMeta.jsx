@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
+import { trackPageView } from '../utils/analytics.js'
 
 const SITE = 'https://www.pixiutech.com'
 const DEFAULT_IMAGE = `${SITE}/img/hero_lab.jpg`
@@ -77,6 +78,7 @@ export default function SiteMeta() {
     upsertMeta('meta[name="twitter:description"]', 'name', 'twitter:description', meta.description)
     upsertMeta('meta[name="twitter:image"]', 'name', 'twitter:image', DEFAULT_IMAGE)
     upsertCanonical(canonical)
+    trackPageView(path)
   }, [pathname])
   return null
 }
