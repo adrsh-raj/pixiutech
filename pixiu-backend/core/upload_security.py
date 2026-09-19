@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from uuid import uuid4
+import re
 
 from django.conf import settings
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -204,3 +205,113 @@ class SecureUploadSizeHandler(FileUploadHandler):
 
     def file_complete(self, file_size):
         return None
+
+
+
+def career_cv_max_bytes() -> int:
+    return int(getattr(settings, "CAREER_CV_MAX_BYTES", 2 * 1024 * 1024))
+
+
+def validate_career_cv(uploaded: UploadedFile | None) -> tuple[UploadedFile, str]:
+    """Validate a CV as a small, non-active PDF and return its SHA-256."""
+    if uploaded is None:
+        raise SecureUploadError("A CV PDF is required.")
+
+    original_name = _clean_original_name(getattr(uploaded, "name", None))
+    if Path(original_name).suffix.lower() != ".pdf":
+        raise SecureUploadError("CV must be a PDF file.")
+
+    size = getattr(uploaded, "size", None)
+    if size is None or int(size) <= 0:
+        raise SecureUploadError("CV file is empty.")
+    if int(size) > career_cv_max_bytes():
+        raise SecureUploadError(
+            f"CV must be {career_cv_max_bytes() // (1024 * 1024)} MB or smaller."
+        )
+
+    declared_type = str(getattr(uploaded, "content_type", "") or "").split(";", 1)[0].strip().lower()
+    if declared_type and declared_type != "application/pdf":
+        raise SecureUploadError("CV content type must be application/pdf.")
+
+    _assert_signature(uploaded, ".pdf")
+
+    position = uploaded.tell() if hasattr(uploaded, "tell") else 0
+    try:
+        uploaded.seek(0)
+        raw = uploaded.read()
+        lowered = raw.lower()
+        # Reject common PDF active-content/attachment primitives. This is
+        # additional defense-in-depth; ClamAV remains the primary malware scan.
+        for marker in (b"/javascript", b"/js", b"/openaction", b"/aa", b"/embeddedfile", b"/filespec"):
+            if marker in lowered:
+                raise SecureUploadError("CV PDF contains unsupported active or embedded content.")
+
+        try:
+            from pypdf import PdfReader
+            import io
+            reader = PdfReader(io.BytesIO(raw), strict=True)
+            if not reader.pages:
+                raise SecureUploadError("CV PDF does not contain a readable page.")
+        except SecureUploadError:
+            raise
+        except Exception as exc:
+            raise SecureUploadError("CV PDF is invalid or could not be safely parsed.") from exc
+    finally:
+        try:
+            uploaded.seek(position)
+        except (AttributeError, OSError):
+            pass
+
+    ensure_clean_upload(uploaded)
+
+    import hashlib
+    digest = hashlib.sha256(raw).hexdigest()
+    uploaded.name = secure_storage_name(original_name, extension=".pdf")
+    setattr(uploaded, "_pixiu_secure_upload", True)
+    return uploaded, digest
+
+
+class CareerCVSizeHandler(FileUploadHandler):
+    """Streaming 2 MB cap for public career CV uploads."""
+
+    def __init__(self, request=None):
+        super().__init__(request)
+        self._received = 0
+
+    def new_file(self, *args, **kwargs):
+        self._received = 0
+        return super().new_file(*args, **kwargs)
+
+    def receive_data_chunk(self, raw_data, start):
+        self._received += len(raw_data)
+        if self._received > career_cv_max_bytes():
+            raise ParseError(
+                f"CV exceeds the {career_cv_max_bytes() // (1024 * 1024)} MB upload limit."
+            )
+        return raw_data
+
+    def file_complete(self, file_size):
+        return None
+
+
+class CareerCVMultipartParser(DRFMultiPartParser):
+    """Use the tighter career CV upload handler for this endpoint only."""
+
+    def parse(self, stream, media_type=None, parser_context=None):
+        request = (parser_context or {}).get("request")
+        if request is not None:
+            request._request.upload_handlers = [
+                CareerCVSizeHandler(request._request),
+                __import__("django.core.files.uploadhandler", fromlist=["MemoryFileUploadHandler"]).MemoryFileUploadHandler(request._request),
+                __import__("django.core.files.uploadhandler", fromlist=["TemporaryFileUploadHandler"]).TemporaryFileUploadHandler(request._request),
+            ]
+            raw_length = getattr(request, "META", {}).get("CONTENT_LENGTH")
+            if raw_length:
+                try:
+                    if int(raw_length) > career_cv_max_bytes() + 512 * 1024:
+                        raise ParseError(
+                            f"Career application upload exceeds the allowed CV request size."
+                        )
+                except (TypeError, ValueError):
+                    pass
+        return super().parse(stream, media_type=media_type, parser_context=parser_context)
