@@ -33,7 +33,7 @@ export default function Solutions() {
             <Reveal>
               <div className={`sol-detail ${i % 2 !== 0 ? 'sol-detail--reverse' : ''}`}>
                 <div className="sol-detail__img">
-                  <img src={s.img} alt={s.title} loading="lazy" />
+                  <img src={s.img} alt={s.alt || s.title} loading="lazy" />
                 </div>
                 <div className="sol-detail__body">
                   <p className="eyebrow">{s.id.toUpperCase()}</p>
