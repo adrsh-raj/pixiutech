@@ -183,7 +183,11 @@ export async function apiFetch(path, options = {}) {
     const previousToken = accessTokenMemory;
     const nextToken = await refreshAccessToken(getSessionRole());
     if (nextToken) response = await request(nextToken);
-    else accessTokenMemory = previousToken;
+    else {
+      accessTokenMemory = null;
+      clearApiReadCache();
+      window.dispatchEvent(new Event(AUTH_EVENT));
+    }
   }
   if (response.ok && !['GET', 'HEAD'].includes(method)) clearApiReadCache();
   return response;
