@@ -45,7 +45,7 @@ export default function Modal({
       role="presentation"
     >
       <div
-        className={`w-full ${sizeClasses[size] || sizeClasses.md} max-h-[94dvh] sm:max-h-[90dvh] rounded-2xl sm:rounded-3xl bg-white border border-slate-200/80 shadow-2xl overflow-hidden flex flex-col `}
+        className={`w-full ${sizeClasses[size] || sizeClasses.md} max-h-[94dvh] sm:max-h-[90dvh] rounded-xl bg-white border border-slate-200 shadow-2xl overflow-hidden flex flex-col `}
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? 'pixiu-modal-title' : undefined}
