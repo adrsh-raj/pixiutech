@@ -32,7 +32,7 @@ export default function Nav() {
 
         <div className="nav__right">
           <Link className="btn btn--primary btn--sm" to="/contact#demo-form">
-            Book a Consultation
+            Book a Free Consultation
           </Link>
           <button
             className="burger"
