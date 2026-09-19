@@ -4,23 +4,24 @@ from functools import wraps
 
 from django.http import JsonResponse
 from django.middleware.csrf import CsrfViewMiddleware, get_token
-from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.throttling import ScopedRateThrottle
+from rest_framework.views import APIView
+
+class CsrfTokenView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "csrf_token"
+
+    def get(self, request):
+        response = JsonResponse({"csrfToken": get_token(request)})
+        response["Cache-Control"] = "no-store, private"
+        response["X-Content-Type-Options"] = "nosniff"
+        return response
 
 
-@api_view(["GET"])
-@permission_classes([AllowAny])
-@throttle_classes([ScopedRateThrottle])
-def csrf_token_view(request):
-    csrf_token_view.throttle_scope = "csrf_token"
-    """Issue a CSRF token to the browser without exposing any session data."""
-    response = JsonResponse({"csrfToken": get_token(request)})
-    response["Cache-Control"] = "no-store, private"
-    response["X-Content-Type-Options"] = "nosniff"
-    return response
-
-
+csrf_token_view = CsrfTokenView.as_view()
 def require_api_csrf(view_func):
     """Apply Django's real CSRF checks to DRF APIViews that receive cookies.
 
