@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /login
+Disallow: /api/
+Disallow: /admin/
+
+Sitemap: https://pixiutech.com/sitemap.xml
