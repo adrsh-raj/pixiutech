@@ -3,29 +3,20 @@ from django.http import FileResponse
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.models import UserRole
-from accounts.permissions import IsActiveAccount
+from accounts.permissions import IsActiveAccount, IsAdminRole
 from audit.services import record_audit
 from core.upload_security import CareerCVMultipartParser, SecureUploadError, validate_career_cv
 from .models import CareerApplication, CareerOpening, CareerOpeningStatus
 from .serializers import CareerApplicationSerializer, CareerOpeningSerializer, PublicCareerApplicationSerializer, PublicCareerOpeningSerializer
 
 
-def is_admin(user):
-    return getattr(user, 'role', None) in {UserRole.ADMIN, getattr(UserRole, 'SUPERADMIN', 'superadmin')}
-
-
 class CareerAdminMixin:
-    permission_classes = [IsAuthenticated, IsActiveAccount]
-
-    def initial(self, request, *args, **kwargs):
-        super().initial(request, *args, **kwargs)
-        if not is_admin(request.user):
-            raise PermissionDenied('Administrator access is required.')
+    permission_classes = [IsActiveAccount, IsAdminRole]
 
 
 class CareerOpeningViewSet(CareerAdminMixin, viewsets.ModelViewSet):
