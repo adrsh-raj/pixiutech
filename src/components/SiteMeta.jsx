@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 
 const SITE = 'https://www.pixiutech.com'
-const DEFAULT_IMAGE = `${SITE}/img/real_ai_classroom.jpg`
+const DEFAULT_IMAGE = `${SITE}/img/hero_lab.jpg`
 
 const CANONICAL_REDIRECTS = {
   '/hub': '/portal',
