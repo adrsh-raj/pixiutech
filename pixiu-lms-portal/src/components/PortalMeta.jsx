@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom'
 import CookieConsent from './CookieConsent'
 
 const SITE = 'https://portal.pixiutech.com'
-const SHARE_IMAGE = 'https://pixiutech.com/img/hero_lab.jpg'
+const SHARE_IMAGE = 'https://www.pixiutech.com/img/hero_lab.jpg'
 
 const META = {
   '/privacy': {
