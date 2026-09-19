@@ -12,7 +12,7 @@ export default function Home() {
       {/* ============================= HERO ============================= */}
       <section className="hero-v2">
         <div className="hero-v2__bg">
-          <img src="/img/real_ai_classroom.jpg" alt="Pixiu Tech classroom session on AI and machine learning" />
+          <img src="/img/hero_lab.jpg" alt="Pixiu Tech classroom session on AI and machine learning" />
           <div className="hero-v2__overlay" />
         </div>
         <div className="shell hero-v2__content">
