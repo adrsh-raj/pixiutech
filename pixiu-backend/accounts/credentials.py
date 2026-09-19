@@ -1,11 +1,12 @@
 import re
 import secrets
+from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-from datetime import timedelta
+from django.db.models import F
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 
 from .models import User, UserRole, UserStatus
@@ -47,11 +48,13 @@ def record_failed_login(user, now=None):
 
 
 def bump_auth_version(user):
-    """Invalidate all access tokens issued before this credential change."""
-    user.auth_version = int(user.auth_version or 0) + 1
-    user.failed_login_attempts = 0
-    user.locked_until = None
-    user.save(update_fields=["auth_version", "failed_login_attempts", "locked_until"])
+    """Atomically invalidate all access tokens issued before this credential change."""
+    User.objects.filter(pk=user.pk).update(
+        auth_version=F("auth_version") + 1,
+        failed_login_attempts=0,
+        locked_until=None,
+    )
+    user.refresh_from_db(fields=["auth_version", "failed_login_attempts", "locked_until"])
 
 
 def invalidate_user_sessions(user):
