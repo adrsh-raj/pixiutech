@@ -1,6 +1,7 @@
 from decimal import Decimal, ROUND_HALF_UP
 from uuid import uuid4
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
