@@ -83,6 +83,16 @@ services:
         sync: false
       - key: DJANGO_CSRF_TRUSTED_ORIGINS
         sync: false
+      - key: PIXIU_BILLING_ACCOUNT_NAME
+        sync: false
+      - key: PIXIU_BILLING_BANK_NAME
+        sync: false
+      - key: PIXIU_BILLING_ACCOUNT_NUMBER
+        sync: false
+      - key: PIXIU_BILLING_IFSC
+        sync: false
+      - key: PIXIU_BILLING_UPI
+        sync: false
       - key: DATABASE_URL
         sync: false
       - key: DJANGO_EXPECTED_DATABASE_NAME

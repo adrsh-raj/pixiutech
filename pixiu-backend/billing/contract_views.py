@@ -1,5 +1,7 @@
 from decimal import Decimal
 
+from django.conf import settings
+
 from django.db.models import Sum, Q
 from rest_framework import serializers, viewsets
 from rest_framework.permissions import IsAuthenticated
@@ -88,3 +90,19 @@ def billing_summary(request):
         contracts = contracts.filter(Q(school__school_code=value.upper()) | Q(school_id=value))
     contract_value = contracts.exclude(status=ContractStatus.TERMINATED).aggregate(total=Sum("total_value"))["total"] or Decimal("0")
     return Response({"contract_value": contract_value, "invoiced": invoiced, "collected": collected, "pending": max(invoiced - collected, Decimal("0")), "invoice_count": active.count(), "void_invoice_count": qs.filter(status=BillingStatus.VOID).count()})
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated, IsActiveAccount])
+def billing_profile(request):
+    if request.user.role not in {UserRole.ADMIN, UserRole.SCHOOL}:
+        raise PermissionDenied("Only Pixiu Tech administrators and school accounts can view payment details.")
+    profile = {
+        "account_name": getattr(settings, "PIXIU_BILLING_ACCOUNT_NAME", ""),
+        "bank_name": getattr(settings, "PIXIU_BILLING_BANK_NAME", ""),
+        "account_number": getattr(settings, "PIXIU_BILLING_ACCOUNT_NUMBER", ""),
+        "ifsc": getattr(settings, "PIXIU_BILLING_IFSC", ""),
+        "upi": getattr(settings, "PIXIU_BILLING_UPI", ""),
+    }
+    profile["configured"] = bool(profile["account_name"] and (profile["account_number"] or profile["upi"]))
+    return Response(profile)

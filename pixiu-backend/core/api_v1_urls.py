@@ -6,7 +6,7 @@ from accounts.views import ChangeOwnPasswordView, LoginView, LogoutView, MeView,
 from accounts.student_credential_views import AdminStudentCredentialExportView, AdminStudentCredentialMigrationProcessView, AdminStudentCredentialMigrationView, StudentTemporaryPasswordResetView
 from academics.school_activation import activate_school
 from audit.views import AuditLogViewSet
-from billing.contract_views import ContractViewSet, billing_summary
+from billing.contract_views import ContractViewSet, billing_summary, billing_profile
 from billing.views import InvoiceLineItemViewSet, PaymentViewSet, ReceiptViewSet
 from inventory.views import KitMaintenanceViewSet
 from .analytics import SchoolPerformanceView, StudentProgressView, TrainerPerformanceView
@@ -102,7 +102,7 @@ urlpatterns = [
     path('schools/<uuid:pk>/reset-password', SchoolProfilePasswordResetView.as_view(), name='v1-school-password-reset'), path('schools/<uuid:pk>/activate', activate_school, name='v1-school-activate'),
     path('trainers/<uuid:pk>/reset-password', TrainerProfilePasswordResetView.as_view(), name='v1-trainer-password-reset'),
     path('trainer-materials', TrainerMaterialListCreateView.as_view(), name='v1-trainer-material-list-create'), path('trainer-materials/<uuid:pk>', TrainerMaterialDetailView.as_view(), name='v1-trainer-material-detail'), path('trainer-materials/<uuid:pk>/file', TrainerMaterialFileView.as_view(), name='v1-trainer-material-file'),
-    path('content/<uuid:pk>/file', LearningContentFileView.as_view(), name='v1-learning-content-file'), path('billing-summary', billing_summary, name='v1-billing-summary'),
+    path('content/<uuid:pk>/file', LearningContentFileView.as_view(), name='v1-learning-content-file'), path('billing-summary', billing_summary, name='v1-billing-summary'), path('billing-profile', billing_profile, name='v1-billing-profile'),
     path('class-ranking', ClassRankingView.as_view(), name='v1-class-ranking'), path('student-progress', StudentProgressView.as_view(), name='v1-student-progress'), path('trainer-performance', TrainerPerformanceView.as_view(), name='v1-trainer-performance'), path('school-performance', SchoolPerformanceView.as_view(), name='v1-school-performance'),
     path('quizzes/<uuid:pk>/start', QuizStartView.as_view(), name='v1-quiz-start'), path('quizzes/<uuid:pk>/single-attempt', QuizSingleAttemptView.as_view(), name='v1-quiz-single-attempt'),
     path('quiz-review', QuizReviewView.as_view(), name='v1-quiz-review'), path('quiz-results/<uuid:pk>', QuizResultView.as_view(), name='v1-quiz-result'), path('quiz-results/<uuid:pk>/pdf', QuizResultPdfView.as_view(), name='v1-quiz-result-pdf'),

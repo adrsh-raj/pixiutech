@@ -7,6 +7,7 @@ from rest_framework.test import APITestCase
 from accounts.models import User, UserRole
 from academics.models import School
 from .models import BillingStatus, Invoice, PaymentStatus
+from notifications.models import Notification
 from .services import add_invoice_line
 
 
@@ -32,6 +33,36 @@ class BillingApiTests(APITestCase):
         self.assertEqual(invoice.status, BillingStatus.ISSUED)
         self.assertEqual(invoice.total_amount, Decimal("100.00"))
         return invoice
+
+    def test_create_with_lines_issues_invoice_and_notifies_school(self):
+        self.client.force_authenticate(self.admin)
+        response = self.client.post(
+            "/api/v1/invoices/create-with-lines",
+            {
+                "school": str(self.school.id),
+                "issue_date": date.today().isoformat(),
+                "due_date": date.today().isoformat(),
+                "tax_amount": "0",
+                "lines": [{"description": "Quarterly robotics programme", "quantity": 1, "unit_price": "15000"}],
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data["status"], BillingStatus.ISSUED)
+        invoice = Invoice.objects.get(pk=response.data["id"])
+        self.assertEqual(invoice.status, BillingStatus.ISSUED)
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.school_user,
+                event_key=f"invoice-issued:{invoice.id}:{self.school_user.id}",
+            ).exists()
+        )
+
+    def test_billing_profile_endpoint_is_available_to_authenticated_school(self):
+        self.client.force_authenticate(self.school_user)
+        response = self.client.get("/api/v1/billing-profile")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("configured", response.data)
 
     def test_admin_can_issue_invoice(self):
         self.issue_invoice()

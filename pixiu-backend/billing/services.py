@@ -33,6 +33,34 @@ def notify_admins(*, title, message, event_key, metadata=None):
     return [_notify(user_id, title=title, message=message, event_key=event_key, metadata=metadata) for user_id in recipients]
 
 
+@transaction.atomic
+def issue_invoice(*, invoice: Invoice, issued_by) -> Invoice:
+    locked_invoice = Invoice.objects.select_for_update().select_related("school").get(pk=invoice.pk)
+    if locked_invoice.status != BillingStatus.DRAFT:
+        raise ValidationError("Only draft invoices can be issued.")
+    recalculate_invoice(locked_invoice)
+    if locked_invoice.total_amount <= 0:
+        raise ValidationError("An invoice must have a positive total before it can be issued.")
+    locked_invoice.status = BillingStatus.ISSUED
+    locked_invoice.save(update_fields=["status", "updated_at"])
+    notify_school(
+        locked_invoice.school,
+        title=f"New Pixiu Tech invoice {locked_invoice.invoice_number}",
+        message=f"Invoice {locked_invoice.invoice_number} for ₹{locked_invoice.total_amount:.2f} is ready. Open Billing to review the bill and payment details.",
+        event_key=f"invoice-issued:{locked_invoice.id}",
+        metadata={"invoice_id": str(locked_invoice.id), "status": locked_invoice.status, "amount": str(locked_invoice.total_amount)},
+    )
+    record_audit(
+        actor=issued_by,
+        action="update",
+        entity_type="Invoice",
+        entity_id=locked_invoice.id,
+        summary=f"Issued invoice {locked_invoice.invoice_number}",
+        changes={"status": "issued", "amount": str(locked_invoice.total_amount)},
+    )
+    return locked_invoice
+
+
 def recalculate_invoice(invoice: Invoice) -> Invoice:
     subtotal = sum((line.quantity * line.unit_price for line in invoice.lines.all()), Decimal("0"))
     subtotal = subtotal.quantize(TWOPLACES, rounding=ROUND_HALF_UP)

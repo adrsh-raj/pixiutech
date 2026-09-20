@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from academics.services import accessible_school_queryset
+from django.conf import settings
 from .models import Invoice, InvoiceLineItem, Payment, Receipt
 
 
@@ -15,11 +16,22 @@ class InvoiceLineItemSerializer(serializers.ModelSerializer):
 class InvoiceSerializer(serializers.ModelSerializer):
     lines = InvoiceLineItemSerializer(many=True, read_only=True)
     school_code = serializers.CharField(source="school.school_code", read_only=True)
+    school_name = serializers.CharField(source="school.name", read_only=True)
+    billing_profile = serializers.SerializerMethodField()
     contract_number = serializers.CharField(source="contract.contract_number", read_only=True)
     class Meta:
         model = Invoice
-        fields = ["id", "invoice_number", "contract", "contract_number", "school", "school_code", "school_class", "trainer", "status", "issue_date", "due_date", "notes", "subtotal", "tax_amount", "total_amount", "amount_paid", "lines", "created_by", "created_at", "updated_at"]
+        fields = ["id", "invoice_number", "contract", "contract_number", "school", "school_code", "school_name", "school_class", "trainer", "status", "issue_date", "due_date", "notes", "subtotal", "tax_amount", "total_amount", "amount_paid", "lines", "billing_profile", "created_by", "created_at", "updated_at"]
         read_only_fields = ["id", "invoice_number", "status", "subtotal", "total_amount", "amount_paid", "created_by", "created_at", "updated_at"]
+    def get_billing_profile(self, obj):
+        return {
+            "account_name": getattr(settings, "PIXIU_BILLING_ACCOUNT_NAME", ""),
+            "bank_name": getattr(settings, "PIXIU_BILLING_BANK_NAME", ""),
+            "account_number": getattr(settings, "PIXIU_BILLING_ACCOUNT_NUMBER", ""),
+            "ifsc": getattr(settings, "PIXIU_BILLING_IFSC", ""),
+            "upi": getattr(settings, "PIXIU_BILLING_UPI", ""),
+        }
+
     def validate(self, attrs):
         user = self.context["request"].user
         school = attrs.get("school", getattr(self.instance, "school", None))
