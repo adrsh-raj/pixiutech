@@ -49,14 +49,16 @@ async function checkPublicFormValidation(baseUrl, apiBaseUrl) {
 
   const career = await fetch(joinUrl(apiBaseUrl, '/public/careers/apply'), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
-    body: new URLSearchParams({
-      name: 'Smoke Test',
-      email: 'smoke@example.com',
-      phone: '9876543210',
-      cover_message: '',
-      website: '',
-    }),
+    headers: { Accept: 'application/json' },
+    body: (() => {
+      const form = new FormData();
+      form.set('name', 'Smoke Test');
+      form.set('email', 'smoke@example.com');
+      form.set('phone', '9876543210');
+      form.set('cover_message', '');
+      form.set('website', '');
+      return form;
+    })(),
   });
   if (career.status < 400 || career.status >= 500) {
     throw new Error('Career form validation returned unexpected HTTP ' + career.status + '.');
