@@ -120,3 +120,18 @@ class Receipt(models.Model):
     issued_at = models.DateTimeField()
     issued_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="issued_receipts")
     class Meta: ordering=["-issued_at"]
+
+
+class BillingProfile(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    school = models.OneToOneField(School, on_delete=models.PROTECT, related_name="billing_profile")
+    account_name = models.CharField(max_length=200)
+    bank_name = models.CharField(max_length=150)
+    account_number = models.CharField(max_length=80)
+    ifsc = models.CharField(max_length=30)
+    upi = models.CharField(max_length=120, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["school__school_code", "-created_at"]
