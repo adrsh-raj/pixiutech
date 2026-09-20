@@ -31,8 +31,9 @@ async function checkPublicRoutes(baseUrl) {
   }
 
   const missing = await fetch(joinUrl(baseUrl, '/this-route-should-404'), { redirect: 'follow' });
-  if (missing.status !== 404) {
-    throw new Error('Custom 404 smoke check expected HTTP 404, received ' + missing.status + '.');
+  const missingType = missing.headers.get('content-type') || '';
+  if (!missing.ok || !missingType.includes('text/html')) {
+    throw new Error('SPA fallback for an unknown route did not return the public HTML shell.');
   }
   console.log('Public route smoke checks passed: ' + (routes.length + 1) + ' paths');
 }
