@@ -698,7 +698,7 @@ export function Workbench() {
   }, [])
 
   return (
-    <div className="flex h-screen flex-col bg-background text-foreground overflow-hidden select-none">
+    <div className="circuit-lab-blue-theme flex h-screen flex-col bg-background text-foreground overflow-hidden select-none">
       <Toolbar
         view={view}
         onViewChange={setView}
