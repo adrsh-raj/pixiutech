@@ -39,7 +39,7 @@ class Migration(migrations.Migration):
                 ("updated_at", models.DateTimeField(auto_now=True)),
                 ("school", models.OneToOneField(on_delete=django.db.models.deletion.PROTECT, related_name="billing_profile", to="academics.school")),
             ],
-            options={"ordering": ["school__school_code", "-created_at"]},
+            options={"ordering": ["school_id", "-created_at"]},
         ),
         migrations.RunPython(backfill_billing_profiles, migrations.RunPython.noop),
     ]
