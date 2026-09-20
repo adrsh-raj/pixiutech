@@ -350,6 +350,11 @@ export default function BillingCenter() {
                 </div>
                 <button type="button" onClick={() => setShowBillForm(value => !value)} className="rounded-xl bg-[#236F69] px-4 py-2.5 text-xs font-black text-white">{showBillForm ? 'Close bill form' : 'Create new bill'}</button>
               </div>
+              {!billingProfile?.configured && (
+                <div className="border-t border-amber-100 bg-amber-50 px-5 py-3 text-xs text-amber-800">
+                  Pixiu Tech payment details are not configured on the server. Bank details will not appear on new invoices until they are configured.
+                </div>
+              )}
               {showBillForm && (
                 <form onSubmit={createBill} className="grid gap-3 p-5 lg:grid-cols-2">
                   <label className="block lg:col-span-2"><span className="mb-1.5 block text-[9px] font-black uppercase tracking-wide text-slate-400">What are you billing for?</span><input className={fieldClass} value={billForm.description} onChange={e => setBillForm(v => ({ ...v, description: e.target.value }))} placeholder="e.g. Robotics programme, July–September" required /></label>
