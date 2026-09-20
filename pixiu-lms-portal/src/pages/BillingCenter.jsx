@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, FileText, LogIn, ReceiptText, WalletCards, X, XCircle } from 'lucide-react';
+import { X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch, useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
