@@ -41,6 +41,21 @@ class CRMTests(TestCase):
         self.assertIn('Interested in a robotics lab.', lead.notes)
         self.assertTrue(AuditLog.objects.filter(entity_type='Lead', entity_id=str(lead.id), action='create').exists())
 
+    def test_public_enquiry_strips_markup_before_storage(self):
+        client = APIClient()
+        response = client.post('/api/v1/public/enquiries', {
+            'school': '<strong>Safe School</strong>',
+            'person': '<script>alert(1)</script>Principal',
+            'phone': '9876543210',
+            'email': 'principal@example.com',
+            'message': '<img src=x onerror=alert(1)>Need a robotics lab.',
+        }, format='json')
+        self.assertEqual(response.status_code, 201)
+        lead = Lead.objects.get(organization_name='Safe School')
+        self.assertEqual(lead.contact_name, 'Principal')
+        self.assertNotIn('<', lead.notes)
+        self.assertIn('Need a robotics lab.', lead.notes)
+
     def test_public_enquiry_honeypot_is_rejected(self):
         client = APIClient()
         response = client.post('/api/v1/public/enquiries', {
