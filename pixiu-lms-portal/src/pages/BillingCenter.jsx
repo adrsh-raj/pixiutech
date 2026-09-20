@@ -196,10 +196,26 @@ export default function BillingCenter() {
     payments.forEach(payment => {
       if (payment.status === 'pending') map.set(String(payment.invoice), payment);
     });
+    invoices.forEach(invoice => {
+      if (invoice.pending_payment) {
+        map.set(String(invoice.id), invoice.pending_payment);
+      }
+    });
     return map;
-  }, [payments]);
+  }, [payments, invoices]);
 
-  const pendingPayments = payments.filter(payment => payment.status === 'pending');
+  const pendingPayments = useMemo(() => {
+    const map = new Map();
+    payments.forEach(payment => {
+      if (payment.status === 'pending') map.set(String(payment.id), payment);
+    });
+    invoices.forEach(invoice => {
+      const payment = invoice.pending_payment;
+      if (payment) map.set(String(payment.id), payment);
+    });
+    return Array.from(map.values());
+  }, [payments, invoices]);
+
   const verifiedPayments = payments.filter(payment => payment.status === 'success').slice(0, 8);
 
   const resetBill = () => setBillForm({
@@ -458,49 +474,6 @@ export default function BillingCenter() {
             </section>
           )}
 
-          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-            <SectionTitle eyebrow="Bills" title={isAdmin ? `Bills for ${school.name}` : 'Bills from Pixiu Tech'} description={isAdmin ? 'Create and issue bills here. Payment verification stays separate below.' : 'Only bills issued to your school appear here.'} />
-            {!invoices.length ? (
-              <div className="p-8"><EmptyState title="No bills yet" description={isAdmin ? 'Create the first bill for this school.' : 'Pixiu Tech has not issued a bill to your school yet.'} /></div>
-            ) : (
-              <div className="divide-y divide-slate-100">
-                {invoices.map(invoice => {
-                  const outstanding = Number.isFinite(Number(invoice.balance_due))
-                    ? Math.max(Number(invoice.balance_due), 0)
-                    : Math.max(Number(invoice.total_amount || 0) - Number(invoice.amount_paid || 0), 0);
-                  const pending = paymentByInvoice.get(String(invoice.id));
-                  const canPay = !isAdmin && !pending && outstanding > 0 && ['issued', 'partially_paid', 'overdue'].includes(invoice.status);
-                  return (
-                    <article key={invoice.id} className="p-5">
-                      <div className="flex flex-col gap-4 xl:flex-row xl:items-center">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="font-black text-slate-900">{invoice.invoice_number}</p>
-                            <Status status={invoice.status} pending={Boolean(pending)} />
-                          </div>
-                          <p className="mt-1 text-xs text-slate-500">{invoice.issue_date} · Due {invoice.due_date}</p>
-                          <p className="mt-1 text-xs leading-relaxed text-slate-500">{invoice.lines?.map(line => `${line.description} × ${line.quantity}`).join(' · ') || 'Invoice details available in PDF.'}</p>
-                        </div>
-                        <div className="xl:text-right">
-                          <p className="text-[9px] font-black uppercase tracking-[.12em] text-slate-400">Total bill</p>
-                          <p className="text-lg font-black text-slate-900">{money(invoice.total_amount)}</p>
-                          <p className="mt-1 text-[10px] font-bold text-[#236F69]">Amount due {money(outstanding)}</p>
-                          <p className="mt-1 text-[10px] text-slate-500">Paid {money(invoice.amount_paid)}</p>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          {canPay && <button type="button" onClick={() => openPayment(invoice)} disabled={busy} className="rounded-xl bg-[#236F69] px-3.5 py-2 text-[10px] font-black text-white disabled:opacity-50">I've paid</button>}
-                          {pending && !isAdmin && <span className="rounded-xl bg-amber-50 px-3.5 py-2 text-[10px] font-black text-amber-700">Awaiting bank verification</span>}
-                          {isAdmin && invoice.status !== 'paid' && invoice.status !== 'void' && <button type="button" onClick={() => runAction(async () => { await request(`/invoices/${encodeURIComponent(invoice.id)}/void`, 'POST', {}); await load(); await refreshAll(); })} disabled={busy} className="rounded-xl border border-rose-200 px-3.5 py-2 text-[10px] font-black text-rose-600">Void</button>}
-                          <button type="button" onClick={() => generateInvoicePDF(invoice, billingSchool)} className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[10px] font-black text-slate-700">View invoice</button>
-                        </div>
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-
           {isAdmin && (
             <section className="overflow-hidden rounded-2xl border border-amber-200 bg-white">
               <SectionTitle eyebrow="Action required" title={pendingPayments.length ? `${pendingPayments.length} payment waiting for verification` : 'No payment waiting for verification'} description={pendingPayments.length ? 'Check the bank statement / UTR first, then complete or reject the payment here.' : 'When a school marks a bill as paid, it will appear here automatically.'} />
@@ -524,6 +497,51 @@ export default function BillingCenter() {
               )}
             </section>
           )}
+
+
+          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+            <SectionTitle eyebrow="Bills" title={isAdmin ? `Bills for ${school.name}` : 'Bills from Pixiu Tech'} description={isAdmin ? 'Create and issue bills here. Payment verification stays separate below.' : 'Only bills issued to your school appear here.'} />
+            {!invoices.length ? (
+              <div className="p-8"><EmptyState title="No bills yet" description={isAdmin ? 'Create the first bill for this school.' : 'Pixiu Tech has not issued a bill to your school yet.'} /></div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {invoices.map(invoice => {
+                  const outstanding = Number.isFinite(Number(invoice.balance_due))
+                    ? Math.max(Number(invoice.balance_due), 0)
+                    : Math.max(Number(invoice.total_amount || 0) - Number(invoice.amount_paid || 0), 0);
+                  const pending = paymentByInvoice.get(String(invoice.id)) || invoice.pending_payment;
+                  const canPay = !isAdmin && !pending && outstanding > 0 && ['issued', 'partially_paid', 'overdue'].includes(invoice.status);
+                  return (
+                    <article key={invoice.id} className="p-5">
+                      <div className="flex flex-col gap-4 xl:flex-row xl:items-center">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-black text-slate-900">{invoice.invoice_number}</p>
+                            <Status status={invoice.status} pending={Boolean(pending)} />
+                          </div>
+                          <p className="mt-1 text-xs text-slate-500">{invoice.issue_date} · Due {invoice.due_date}</p>
+                          <p className="mt-1 text-xs leading-relaxed text-slate-500">{invoice.lines?.map(line => `${line.description} × ${line.quantity}`).join(' · ') || 'Invoice details available in PDF.'}</p>
+                        </div>
+                        <div className="xl:text-right">
+                          <p className="text-[9px] font-black uppercase tracking-[.12em] text-slate-400">Total bill</p>
+                          <p className="text-lg font-black text-slate-900">{money(invoice.total_amount)}</p>
+                          <p className="mt-1 text-[10px] font-bold text-[#236F69]">Amount due {money(outstanding)}</p>
+                          <p className="mt-1 text-[10px] text-slate-500">Paid {money(invoice.amount_paid)}</p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {canPay && <button type="button" onClick={() => openPayment(invoice)} disabled={busy} className="rounded-xl bg-[#236F69] px-3.5 py-2 text-[10px] font-black text-white disabled:opacity-50">I've paid</button>}
+                          {pending && !isAdmin && <span className="rounded-xl bg-amber-50 px-3.5 py-2 text-[10px] font-black text-amber-700">Awaiting bank verification</span>}
+                          {isAdmin && pending && <button type="button" onClick={() => verifyPayment(pending.id, 'verify')} disabled={busy} className="rounded-xl bg-emerald-600 px-3.5 py-2 text-[10px] font-black text-white disabled:opacity-50">Verify payment</button>}
+                          {isAdmin && invoice.status !== 'paid' && invoice.status !== 'void' && <button type="button" onClick={() => runAction(async () => { await request(`/invoices/${encodeURIComponent(invoice.id)}/void`, 'POST', {}); await load(); await refreshAll(); })} disabled={busy} className="rounded-xl border border-rose-200 px-3.5 py-2 text-[10px] font-black text-rose-600">Void</button>}
+                          <button type="button" onClick={() => generateInvoicePDF(invoice, billingSchool)} className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[10px] font-black text-slate-700">View invoice</button>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </section>
 
           <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
             <SectionTitle eyebrow="Receipts" title="Payment history" description="Successful payments automatically create a receipt. Nothing needs to be created manually." />
