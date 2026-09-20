@@ -117,13 +117,14 @@ export default function BillingCenter() {
     }
     setError('');
     try {
-      const [invoicePayload, paymentPayload, summaryPayload, profilePayload, contractPayload] = await Promise.all([
+      const requests = [
         request(`/invoices${scope}`),
         request(`/payments${scope}`),
         request(`/billing-summary${scope}`),
         request('/billing-profile'),
-        request(`/contracts${scope}`),
-      ]);
+      ];
+      if (isAdmin) requests.push(request(`/contracts${scope}`));
+      const [invoicePayload, paymentPayload, summaryPayload, profilePayload, contractPayload = []] = await Promise.all(requests);
       setInvoices(rows(invoicePayload));
       setPayments(rows(paymentPayload));
       setSummary(summaryPayload || null);
@@ -184,7 +185,6 @@ export default function BillingCenter() {
     await runAction(async () => {
       await request('/invoices/create-with-lines', 'POST', {
         school: school.id,
-        contract: billForm.contract || null,
         issue_date: today(),
         due_date: billForm.due_date,
         tax_amount: tax,
@@ -326,6 +326,14 @@ export default function BillingCenter() {
             ))}
           </section>
 
+          {!isAdmin && (
+            <section className="rounded-2xl border border-[#D4E0DD] bg-[#F4F8F7] p-5">
+              <p className="text-[9px] font-black uppercase tracking-[.16em] text-[#236F69]">Payment process</p>
+              <p className="mt-2 text-sm font-bold text-slate-800">Pixiu Tech bill → Pay → Mark as paid → Pixiu Tech verifies → Receipt</p>
+              <p className="mt-1 text-xs leading-relaxed text-slate-500">A bill appears here only after Pixiu Tech issues it to this school. After you pay, submit the UTR/reference so the payment can be verified.</p>
+            </section>
+          )}
+
           {!isAdmin && billingProfile && (
             <section className="rounded-2xl border border-slate-200 bg-white">
               <SectionTitle eyebrow="Payment details" title="Pay Pixiu Tech" description="Use these details when paying a Pixiu Tech bill. Keep the transaction reference for verification." />
@@ -361,7 +369,6 @@ export default function BillingCenter() {
                   <label className="block"><span className="mb-1.5 block text-[9px] font-black uppercase tracking-wide text-slate-400">Amount</span><input className={fieldClass} type="number" min="0.01" step="0.01" value={billForm.amount} onChange={e => setBillForm(v => ({ ...v, amount: e.target.value }))} placeholder="0.00" required /></label>
                   <label className="block"><span className="mb-1.5 block text-[9px] font-black uppercase tracking-wide text-slate-400">Due date</span><input className={fieldClass} type="date" value={billForm.due_date} onChange={e => setBillForm(v => ({ ...v, due_date: e.target.value }))} required /></label>
                   <label className="block"><span className="mb-1.5 block text-[9px] font-black uppercase tracking-wide text-slate-400">Tax (optional)</span><input className={fieldClass} type="number" min="0" step="0.01" value={billForm.tax_amount} onChange={e => setBillForm(v => ({ ...v, tax_amount: e.target.value }))} placeholder="0.00" /></label>
-                  <label className="block"><span className="mb-1.5 block text-[9px] font-black uppercase tracking-wide text-slate-400">Contract (optional)</span><select className={fieldClass} value={billForm.contract} onChange={e => setBillForm(v => ({ ...v, contract: e.target.value }))}><option value="">No contract linked</option>{contracts.map(contract => <option key={contract.id} value={contract.id}>{contract.contract_number}</option>)}</select></label>
                   <label className="block lg:col-span-2"><span className="mb-1.5 block text-[9px] font-black uppercase tracking-wide text-slate-400">Notes (optional)</span><textarea className={`${fieldClass} min-h-20 py-3`} value={billForm.notes} onChange={e => setBillForm(v => ({ ...v, notes: e.target.value }))} placeholder="Payment or billing note for the school" /></label>
                   <div className="lg:col-span-2 flex flex-col gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between"><p className="text-[11px] text-slate-500">This creates the invoice and issues it immediately. The school is notified automatically.</p><button disabled={busy} className="rounded-xl bg-slate-900 px-5 py-2.5 text-xs font-black text-white disabled:opacity-50">{busy ? 'Creating…' : 'Create & send bill'}</button></div>
                 </form>
@@ -379,6 +386,32 @@ export default function BillingCenter() {
                   <button disabled={busy} className="rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-black text-white disabled:opacity-50">{busy ? 'Saving…' : 'Save contract'}</button>
                 </form>
               )}
+            </section>
+          )}
+
+          {isAdmin && contracts.length > 0 && (
+            <section className="rounded-2xl border border-slate-200 bg-white">
+              <SectionTitle eyebrow="Contract records" title="Existing contracts" description="Contracts are records only. To charge a school, create a bill. Use a contract below to prefill a bill when needed." />
+              <div className="divide-y divide-slate-100">
+                {contracts.map(contract => (
+                  <div key={contract.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-black text-slate-900">{contract.contract_number}</p>
+                      <p className="mt-1 text-xs text-slate-500">{contract.start_date} to {contract.end_date} · {money(contract.total_value)} · {String(contract.status || '').toUpperCase()}</p>
+                    </div>
+                    <button type="button" onClick={() => {
+                      setBillForm(v => ({
+                        ...v,
+                        description: `Contract ${contract.contract_number}`,
+                        amount: String(contract.total_value || ''),
+                      }));
+                      setShowBillForm(true);
+                    }} className="rounded-xl border border-[#236F69] px-3.5 py-2 text-[10px] font-black text-[#236F69]">
+                      Use for new bill
+                    </button>
+                  </div>
+                ))}
+              </div>
             </section>
           )}
 
