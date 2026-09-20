@@ -8,10 +8,40 @@ from rest_framework.exceptions import ValidationError
 
 from audit.services import record_audit
 from notifications.models import Notification, NotificationType
-from .models import Invoice, InvoiceLineItem, Payment, PaymentStatus, Receipt, BillingStatus
+from .models import BillingProfile, Invoice, InvoiceLineItem, Payment, PaymentStatus, Receipt, BillingStatus
 
 User = get_user_model()
 TWOPLACES = Decimal("0.01")
+
+BILLING_PROFILE_FIELDS = ("account_name", "bank_name", "account_number", "ifsc", "upi")
+
+
+def default_billing_profile_data():
+    return {
+        "account_name": getattr(settings, "PIXIU_BILLING_ACCOUNT_NAME", "").strip(),
+        "bank_name": getattr(settings, "PIXIU_BILLING_BANK_NAME", "").strip(),
+        "account_number": getattr(settings, "PIXIU_BILLING_ACCOUNT_NUMBER", "").strip(),
+        "ifsc": getattr(settings, "PIXIU_BILLING_IFSC", "").strip(),
+        "upi": getattr(settings, "PIXIU_BILLING_UPI", "").strip(),
+    }
+
+
+def ensure_school_billing_profile(*, school):
+    defaults = default_billing_profile_data()
+    profile, created = BillingProfile.objects.get_or_create(school=school, defaults=defaults)
+    if not created:
+        changed = []
+        for field in BILLING_PROFILE_FIELDS:
+            value = getattr(profile, field, "")
+            default = defaults.get(field, "")
+            if not value and default:
+                setattr(profile, field, default)
+                changed.append(field)
+        if changed:
+            changed.append("updated_at")
+            profile.save(update_fields=changed)
+    return profile
+
 
 
 def _notify(recipient_id, *, title, message, notification_type=NotificationType.PAYMENT, event_key=None, metadata=None):
