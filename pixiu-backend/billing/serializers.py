@@ -18,22 +18,33 @@ class InvoiceSerializer(serializers.ModelSerializer):
     school_code = serializers.CharField(source="school.school_code", read_only=True)
     school_name = serializers.CharField(source="school.name", read_only=True)
     billing_profile = serializers.SerializerMethodField()
+    balance_due = serializers.SerializerMethodField()
     contract_number = serializers.CharField(source="contract.contract_number", read_only=True)
     class Meta:
         model = Invoice
-        fields = ["id", "invoice_number", "contract", "contract_number", "school", "school_code", "school_name", "school_class", "trainer", "status", "issue_date", "due_date", "notes", "subtotal", "tax_amount", "total_amount", "amount_paid", "lines", "billing_profile", "created_by", "created_at", "updated_at"]
-        read_only_fields = ["id", "invoice_number", "status", "subtotal", "total_amount", "amount_paid", "created_by", "created_at", "updated_at"]
+        fields = ["id", "invoice_number", "contract", "contract_number", "school", "school_code", "school_name", "school_class", "trainer", "status", "issue_date", "due_date", "notes", "subtotal", "tax_amount", "total_amount", "amount_paid", "balance_due", "lines", "billing_profile", "created_by", "created_at", "updated_at"]
+        read_only_fields = ["id", "invoice_number", "status", "subtotal", "total_amount", "amount_paid", "balance_due", "created_by", "created_at", "updated_at"]
+    def get_balance_due(self, obj):
+        return max(obj.total_amount - obj.amount_paid, 0)
+
     def get_billing_profile(self, obj):
         request = self.context.get("request")
         role = getattr(getattr(request, "user", None), "role", "")
         if role not in {"admin", "school"}:
             return {}
+        profile = getattr(obj.school, "billing_profile", None)
+        if not profile:
+            return {}
         return {
-            "account_name": getattr(settings, "PIXIU_BILLING_ACCOUNT_NAME", ""),
-            "bank_name": getattr(settings, "PIXIU_BILLING_BANK_NAME", ""),
-            "account_number": getattr(settings, "PIXIU_BILLING_ACCOUNT_NUMBER", ""),
-            "ifsc": getattr(settings, "PIXIU_BILLING_IFSC", ""),
-            "upi": getattr(settings, "PIXIU_BILLING_UPI", ""),
+            "school_id": str(obj.school_id),
+            "school_code": obj.school.school_code,
+            "school_name": obj.school.name,
+            "account_name": profile.account_name,
+            "bank_name": profile.bank_name,
+            "account_number": profile.account_number,
+            "ifsc": profile.ifsc,
+            "upi": profile.upi,
+            "configured": bool(profile.account_name and profile.bank_name and profile.account_number and profile.ifsc),
         }
 
     def validate(self, attrs):
