@@ -97,7 +97,25 @@ for (const file of designFiles) {
   const source = fs.readFileSync(file, 'utf8');
   if (/Space Grotesk|Instrument Serif|font-serif|font-style\\s*:\\s*italic|\\bitalic\\b/i.test(source)) failures.push(path.relative(root, file) + ' -> forbidden serif/italic design pattern detected');
   if (/\\bgrain\\b|\\bnoise\\b/i.test(source)) failures.push(path.relative(root, file) + ' -> grain/noise texture pattern detected');
-  if (/—/.test(source) && !file.endsWith('Verify.jsx')) failures.push(path.relative(root, file) + ' -> em dash found in UI/copy; prefer punctuation with clearer rhythm');
+  if (/—/.test(source)) failures.push(path.relative(root, file) + ' -> em dash found in UI/copy; use direct punctuation or wording');
+  if (/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(source)) failures.push(path.relative(root, file) + ' -> decorative emoji found in public UI/copy');
+  if (/lucide-react/.test(source) && !file.endsWith(path.sep + 'Verify.jsx')) failures.push(path.relative(root, file) + ' -> decorative Lucide icon dependency found; use typography or CSS for public marketing UI');
+}
+
+const entryHtml = textByFile.get(path.join(root, 'index.html')) || '';
+if (!/name="viewport"[^>]*content="[^"]*width=device-width/i.test(entryHtml)) failures.push('index.html -> responsive viewport meta is missing');
+if (!/:focus-visible\s*\{/.test(globalCss)) failures.push('src/styles/global.css -> visible keyboard focus styling is missing');
+
+const distAssets = path.join(root, 'dist', 'assets');
+if (fs.existsSync(distAssets)) {
+  const built = [];
+  for (const file of walk(distAssets)) built.push({ file, bytes: fs.statSync(file).size });
+  const totalJs = built.filter(item => item.file.endsWith('.js')).reduce((sum, item) => sum + item.bytes, 0);
+  const totalCss = built.filter(item => item.file.endsWith('.css')).reduce((sum, item) => sum + item.bytes, 0);
+  console.log('Build assets: JS ' + (totalJs / 1024).toFixed(1) + ' KiB, CSS ' + (totalCss / 1024).toFixed(1) + ' KiB');
+  for (const item of built.filter(item => item.file.endsWith('.js')).sort((a, b) => b.bytes - a.bytes).slice(0, 5)) {
+    console.log('Largest JS: ' + path.basename(item.file) + ' ' + (item.bytes / 1024).toFixed(1) + ' KiB');
+  }
 }
 
 if (failures.length) {
