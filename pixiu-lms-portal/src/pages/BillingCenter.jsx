@@ -108,17 +108,36 @@ export default function BillingCenter() {
   const billingSchool = useMemo(() => {
     if (school) return school;
     if (isAdmin) return null;
+
+    // A school account owns at most one accessible school. Prefer that
+    // authoritative row, then fall back to invoice identity, then auth identity
+    // so Billing never becomes a blank screen because another data request is late.
+    const accessibleSchool = schools[0];
+    if (accessibleSchool) return accessibleSchool;
+
     const firstInvoice = invoices[0];
-    if (!firstInvoice) return null;
+    if (firstInvoice) {
+      return {
+        id: firstInvoice.school,
+        school_id: firstInvoice.school,
+        school_code: firstInvoice.school_code,
+        code: firstInvoice.school_code,
+        name: firstInvoice.school_name || firstInvoice.school_code || 'School',
+        email: '',
+      };
+    }
+
+    const fallbackKey = user?.school_id || user?.school_code;
+    if (!fallbackKey) return null;
     return {
-      id: firstInvoice.school,
-      school_id: firstInvoice.school,
-      school_code: firstInvoice.school_code,
-      code: firstInvoice.school_code,
-      name: firstInvoice.school_name || firstInvoice.school_code || 'School',
+      id: user?.school_id || fallbackKey,
+      school_id: user?.school_id || fallbackKey,
+      school_code: user?.school_code || fallbackKey,
+      code: user?.school_code || fallbackKey,
+      name: 'Your school',
       email: '',
     };
-  }, [school, isAdmin, invoices]);
+  }, [school, isAdmin, schools, invoices, user?.school_id, user?.school_code]);
 
   // Admin uses the selected-school filter. School accounts rely on backend
   // account scoping, so billing cannot disappear while /schools is still loading.
