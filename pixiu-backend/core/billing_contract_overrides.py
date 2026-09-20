@@ -6,7 +6,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from accounts.models import UserRole
-from billing.services import add_invoice_line
+from billing.services import add_invoice_line, issue_invoice
 from billing.views import InvoiceViewSet
 
 
@@ -43,4 +43,5 @@ class TransactionalInvoiceViewSet(InvoiceViewSet):
                     raise ValidationError({"lines": {index: "Unit price cannot be negative."}})
                 add_invoice_line(invoice=invoice, description=description, quantity=quantity, unit_price=unit_price)
             invoice.refresh_from_db()
+            invoice = issue_invoice(invoice=invoice, issued_by=request.user)
             return Response(self.get_serializer(invoice).data, status=201)
