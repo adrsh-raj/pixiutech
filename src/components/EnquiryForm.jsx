@@ -108,6 +108,8 @@ export default function EnquiryForm({ intent }) {
               value={values[f.id]}
               onChange={set(f.id)}
               autoComplete={f.autoComplete}
+              required={Boolean(f.req)}
+              aria-invalid={errors.includes(f.id)}
               className={errors.includes(f.id) ? 'bad' : ''}
             />
           </div>
@@ -135,7 +137,7 @@ export default function EnquiryForm({ intent }) {
       </div>
 
       {status && (
-        <p className={`form__status ${status.kind}`} role="status" aria-live="polite">
+        <p id="enquiry-form-status" className={`form__status ${status.kind}`} role="status" aria-live="polite">
           {status.text}
         </p>
       )}
