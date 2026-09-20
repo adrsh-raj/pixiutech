@@ -107,7 +107,7 @@ def billing_profile(request):
         target = schools.first()
     elif requested:
         target = schools.filter(
-            Q(school__school_code=requested.upper()) | Q(pk=requested)
+            Q(school_code=requested.upper()) | Q(pk=requested)
         ).first()
 
     if not target:
