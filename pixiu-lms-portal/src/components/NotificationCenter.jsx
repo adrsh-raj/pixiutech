@@ -5,7 +5,7 @@ import { useData } from '../context/DataContext';
 import { useToast } from '../context/ToastContext';
 
 export default function NotificationCenter() {
-  const { notifications = [], endpointErrors = {}, refreshAll } = useData();
+  const { notifications = [], endpointErrors = {}, refreshAll, loadData } = useData();
   const toast = useToast();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -15,10 +15,12 @@ export default function NotificationCenter() {
 
   useEffect(() => {
     const poll = window.setInterval(() => {
-      if (document.visibilityState === 'visible' && !busy) refreshAll();
-    }, 60000);
+      if (document.visibilityState === 'visible' && !busy) {
+        loadData(['/notifications']).catch(() => {});
+      }
+    }, 15000);
     return () => window.clearInterval(poll);
-  }, [busy, refreshAll]);
+  }, [busy, loadData]);
 
   const markRead = async id => {
     if (!id || busy) return;
