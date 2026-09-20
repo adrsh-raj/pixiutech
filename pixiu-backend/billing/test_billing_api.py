@@ -85,6 +85,12 @@ class BillingApiTests(APITestCase):
         self.assertEqual(submit.status_code, 201, submit.data)
         payment_id = submit.data["payment"]["id"]
         self.assertEqual(submit.data["payment"]["status"], PaymentStatus.PENDING)
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.admin,
+                event_key=f"payment-pending:{payment_id}:{self.admin.id}",
+            ).exists()
+        )
 
         self.client.force_authenticate(self.admin)
         verify = self.client.post(f"/api/v1/payments/{payment_id}/verify", {}, format="json")
@@ -95,3 +101,9 @@ class BillingApiTests(APITestCase):
         invoice.refresh_from_db()
         self.assertEqual(invoice.status, BillingStatus.PAID)
         self.assertEqual(invoice.amount_paid, Decimal("100.00"))
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.school_user,
+                event_key=f"payment-verified:{payment_id}:{self.school_user.id}",
+            ).exists()
+        )
