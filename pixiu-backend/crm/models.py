@@ -5,6 +5,7 @@ from django.db import models
 from django.db.models import Q
 
 from academics.models import School
+from core.input_sanitization import sanitize_plain_text
 
 
 class LeadStatus(models.TextChoices):
@@ -44,8 +45,9 @@ class Lead(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def save(self, *args, **kwargs):
-        self.organization_name = self.organization_name.strip()
-        self.contact_name = self.contact_name.strip()
+        self.organization_name = sanitize_plain_text(self.organization_name, 250)
+        self.contact_name = sanitize_plain_text(self.contact_name, 200)
+        self.notes = sanitize_plain_text(self.notes, 10000, preserve_newlines=True)
         super().save(*args, **kwargs)
 
 
@@ -58,6 +60,12 @@ class LeadActivity(models.Model):
     detail = models.TextField(blank=True)
     next_follow_up = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        self.activity_type = sanitize_plain_text(self.activity_type, 50)
+        self.summary = sanitize_plain_text(self.summary, 250)
+        self.detail = sanitize_plain_text(self.detail, 10000, preserve_newlines=True)
+        super().save(*args, **kwargs)
 
     class Meta:
         ordering = ["-created_at"]
@@ -72,6 +80,11 @@ class LeadContact(models.Model):
     phone = models.CharField(max_length=30, blank=True)
     is_primary = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        self.name = sanitize_plain_text(self.name, 200)
+        self.designation = sanitize_plain_text(self.designation, 150)
+        super().save(*args, **kwargs)
 
     class Meta:
         constraints = [
@@ -89,6 +102,14 @@ class CommunicationLog(models.Model):
     message = models.TextField()
     status = models.CharField(max_length=40, default="Delivered")
     sent_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        self.recipient = sanitize_plain_text(self.recipient, 200)
+        self.channel = sanitize_plain_text(self.channel, 30)
+        self.template = sanitize_plain_text(self.template, 120)
+        self.message = sanitize_plain_text(self.message, 12000, preserve_newlines=True)
+        self.status = sanitize_plain_text(self.status, 40)
+        super().save(*args, **kwargs)
 
     class Meta:
         ordering = ["-sent_at"]
@@ -136,6 +157,14 @@ class CareerOpening(models.Model):
             models.Index(fields=["status", "sort_order"], name="career_open_status_idx"),
         ]
 
+    def save(self, *args, **kwargs):
+        self.title = sanitize_plain_text(self.title, 180)
+        self.location = sanitize_plain_text(self.location, 180)
+        self.employment_type = sanitize_plain_text(self.employment_type, 80)
+        self.description = sanitize_plain_text(self.description, 12000, preserve_newlines=True)
+        self.requirements = sanitize_plain_text(self.requirements, 12000, preserve_newlines=True)
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return self.title
 
@@ -171,6 +200,14 @@ class CareerApplication(models.Model):
             models.Index(fields=["status", "created_at"], name="career_app_status_idx"),
             models.Index(fields=["opening", "created_at"], name="career_app_opening_idx"),
         ]
+
+    def save(self, *args, **kwargs):
+        self.name = sanitize_plain_text(self.name, 160)
+        self.email = sanitize_plain_text(self.email, 254).lower()
+        self.phone = sanitize_plain_text(self.phone, 10)
+        self.cover_message = sanitize_plain_text(self.cover_message, 4000, preserve_newlines=True)
+        self.cv_original_name = sanitize_plain_text(self.cv_original_name, 255)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         role = self.opening.title if self.opening_id else "General Application"
