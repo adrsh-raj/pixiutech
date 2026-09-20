@@ -44,7 +44,6 @@ const Leads = lazyWithChunkRecovery(() => import('./pages/Leads'));
 const WebsiteEnquiries = lazyWithChunkRecovery(() => import('./pages/WebsiteEnquiries'));
 const CareerManagement = lazyWithChunkRecovery(() => import('./pages/CareerManagement'));
 const SchoolsV2 = lazyWithChunkRecovery(() => import('./pages/SchoolsV2'));
-const Payments = lazyWithChunkRecovery(() => import('./pages/Payments'));
 const Notifications = lazyWithChunkRecovery(() => import('./pages/Notifications'));
 const ContentHub = lazyWithChunkRecovery(() => import('./pages/ContentHub'));
 const Curriculum = lazyWithChunkRecovery(() => import('./pages/Curriculum'));
