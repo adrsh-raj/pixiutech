@@ -38,7 +38,7 @@ def _school_filter(qs, request, field="school"):
 
 class InvoiceViewSet(BillingScopedMixin, viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsActiveAccount, HasActionPermission]
-    queryset = Invoice.objects.select_related("school", "school_class", "trainer", "contract", "created_by").prefetch_related("lines", "payments__receipt")
+    queryset = Invoice.objects.select_related("school", "school__billing_profile", "school_class", "trainer", "contract", "created_by").prefetch_related("lines", "payments__receipt")
     serializer_class = InvoiceSerializer
 
     def get_queryset(self):
