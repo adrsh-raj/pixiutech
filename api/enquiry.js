@@ -3,7 +3,8 @@ const RATE_LIMIT = 5;
 const attempts = new Map();
 
 function clean(value, maxLength) {
-  return String(value ?? '').trim().slice(0, maxLength);
+  const text = String(value ?? '').replace(/<[^>]*>/g, ' ');
+  return text.replace(/[\\u0000-\\u0008\\u000B\\u000C\\u000E-\\u001F\\u007F]/g, '').trim().slice(0, maxLength);
 }
 
 function validEmail(value) {
