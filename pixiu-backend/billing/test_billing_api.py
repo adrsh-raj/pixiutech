@@ -6,7 +6,7 @@ from rest_framework.test import APITestCase
 
 from accounts.models import User, UserRole
 from academics.models import School
-from .models import BillingStatus, Invoice, PaymentStatus
+from .models import BillingProfile, BillingStatus, Invoice, PaymentStatus
 from notifications.models import Notification
 from .services import add_invoice_line
 
@@ -63,6 +63,62 @@ class BillingApiTests(APITestCase):
         response = self.client.get("/api/v1/billing-profile")
         self.assertEqual(response.status_code, 200)
         self.assertIn("configured", response.data)
+
+    def test_school_receives_persistent_billing_profile_on_creation(self):
+        profile = BillingProfile.objects.get(school=self.school)
+        self.assertEqual(profile.account_name, "PIXIU TECH LLP")
+        self.assertEqual(profile.bank_name, "CENTRAL BANK OF INDIA")
+        self.assertTrue(profile.account_number)
+        self.assertTrue(profile.ifsc)
+
+    def test_school_can_see_issued_invoice_and_balance_due(self):
+        self.client.force_authenticate(self.admin)
+        response = self.client.post(
+            "/api/v1/invoices/create-with-lines",
+            {
+                "school": str(self.school.id),
+                "issue_date": date.today().isoformat(),
+                "due_date": date.today().isoformat(),
+                "tax_amount": "0",
+                "lines": [{"description": "School programme", "quantity": 1, "unit_price": "10000"}],
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        invoice_id = response.data["id"]
+        self.assertEqual(response.data["total_amount"], "10000.00")
+
+        self.client.force_authenticate(self.school_user)
+        visible = self.client.get("/api/v1/invoices")
+        self.assertEqual(visible.status_code, 200, visible.data)
+        row = next(item for item in visible.data if str(item["id"]) == str(invoice_id))
+        self.assertEqual(row["total_amount"], "10000.00")
+        self.assertEqual(row["balance_due"], "10000.00")
+        self.assertEqual(row["status"], BillingStatus.ISSUED)
+        self.assertEqual(row["billing_profile"]["bank_name"], "CENTRAL BANK OF INDIA")
+        self.assertTrue(row["billing_profile"]["account_number"])
+        self.assertTrue(row["billing_profile"]["ifsc"])
+
+    def test_school_payment_is_visible_as_pending_after_marking_paid(self):
+        invoice = self.issue_invoice()
+        self.client.force_authenticate(self.school_user)
+        submit = self.client.post(
+            "/api/v1/payments/record",
+            {
+                "invoice": str(invoice.pk),
+                "amount": "100.00",
+                "method": "bank_transfer",
+                "payment_date": date.today().isoformat(),
+                "transaction_reference": "UTR-VISIBLE-001",
+                "notes": "Paid",
+            },
+            format="json",
+        )
+        self.assertEqual(submit.status_code, 201, submit.data)
+        payments = self.client.get("/api/v1/payments")
+        self.assertEqual(payments.status_code, 200, payments.data)
+        row = next(item for item in payments.data if item["id"] == submit.data["payment"]["id"])
+        self.assertEqual(row["status"], PaymentStatus.PENDING)
 
     def test_admin_can_issue_invoice(self):
         self.issue_invoice()
