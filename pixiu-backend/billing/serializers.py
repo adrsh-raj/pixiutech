@@ -24,6 +24,10 @@ class InvoiceSerializer(serializers.ModelSerializer):
         fields = ["id", "invoice_number", "contract", "contract_number", "school", "school_code", "school_name", "school_class", "trainer", "status", "issue_date", "due_date", "notes", "subtotal", "tax_amount", "total_amount", "amount_paid", "lines", "billing_profile", "created_by", "created_at", "updated_at"]
         read_only_fields = ["id", "invoice_number", "status", "subtotal", "total_amount", "amount_paid", "created_by", "created_at", "updated_at"]
     def get_billing_profile(self, obj):
+        request = self.context.get("request")
+        role = getattr(getattr(request, "user", None), "role", "")
+        if role not in {"admin", "school"}:
+            return {}
         return {
             "account_name": getattr(settings, "PIXIU_BILLING_ACCOUNT_NAME", ""),
             "bank_name": getattr(settings, "PIXIU_BILLING_BANK_NAME", ""),
