@@ -211,4 +211,4 @@ class CareerApplication(models.Model):
 
     def __str__(self):
         role = self.opening.title if self.opening_id else "General Application"
-        return f"{self.name} — {role}"
+        return f"{self.name} - {role}"
