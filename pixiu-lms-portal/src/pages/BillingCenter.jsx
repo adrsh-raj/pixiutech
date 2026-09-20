@@ -488,7 +488,7 @@ export default function BillingCenter() {
                         <p className="mt-1 text-[10px] text-slate-400">Payment date: {payment.payment_date ? String(payment.payment_date).slice(0, 10) : 'Not provided'}</p>
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        <button type="button" onClick={() => verifyPayment(payment.id, 'verify')} disabled={busy} className="rounded-xl bg-emerald-600 px-4 py-2.5 text-[10px] font-black text-white disabled:opacity-50">Verify & complete payment</button>
+                        <button type="button" onClick={() => verifyPayment(payment.id, 'verify')} disabled={busy} className="rounded-xl bg-emerald-600 px-4 py-2.5 text-[10px] font-black text-white disabled:opacity-50">Confirm & complete payment</button>
                         <button type="button" onClick={() => verifyPayment(payment.id, 'reject')} disabled={busy} className="rounded-xl border border-rose-200 bg-white px-4 py-2.5 text-[10px] font-black text-rose-600 disabled:opacity-50">Reject payment</button>
                       </div>
                     </div>
@@ -531,7 +531,7 @@ export default function BillingCenter() {
                         <div className="flex flex-wrap gap-2">
                           {canPay && <button type="button" onClick={() => openPayment(invoice)} disabled={busy} className="rounded-xl bg-[#236F69] px-3.5 py-2 text-[10px] font-black text-white disabled:opacity-50">I've paid</button>}
                           {pending && !isAdmin && <span className="rounded-xl bg-amber-50 px-3.5 py-2 text-[10px] font-black text-amber-700">Awaiting bank verification</span>}
-                          {isAdmin && pending && <button type="button" onClick={() => verifyPayment(pending.id, 'verify')} disabled={busy} className="rounded-xl bg-emerald-600 px-3.5 py-2 text-[10px] font-black text-white disabled:opacity-50">Verify payment</button>}
+                          {isAdmin && pending && <button type="button" onClick={() => verifyPayment(pending.id, 'verify')} disabled={busy} className="rounded-xl bg-emerald-600 px-3.5 py-2 text-[10px] font-black text-white disabled:opacity-50">Confirm & complete payment</button>}
                           {isAdmin && invoice.status !== 'paid' && invoice.status !== 'void' && <button type="button" onClick={() => runAction(async () => { await request(`/invoices/${encodeURIComponent(invoice.id)}/void`, 'POST', {}); await load(); await refreshAll(); })} disabled={busy} className="rounded-xl border border-rose-200 px-3.5 py-2 text-[10px] font-black text-rose-600">Void</button>}
                           <button type="button" onClick={() => generateInvoicePDF(invoice, billingSchool)} className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[10px] font-black text-slate-700">View invoice</button>
                         </div>
