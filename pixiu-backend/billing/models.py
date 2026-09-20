@@ -134,4 +134,4 @@ class BillingProfile(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["school__school_code", "-created_at"]
+        ordering = ["school_id", "-created_at"]
