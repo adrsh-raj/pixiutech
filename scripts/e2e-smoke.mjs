@@ -21,6 +21,49 @@ async function assertOk(url, label, options = {}) {
   return response;
 }
 
+async function checkPublicRoutes(baseUrl) {
+  const routes = ['/', '/solutions', '/faq', '/careers', '/contact', '/verify', '/privacy', '/terms', '/robots.txt', '/sitemap.xml'];
+  for (const route of routes) {
+    const response = await fetch(joinUrl(baseUrl, route), { redirect: 'follow' });
+    if (!response.ok) {
+      throw new Error('Public route ' + route + ' failed: HTTP ' + response.status);
+    }
+  }
+
+  const missing = await fetch(joinUrl(baseUrl, '/this-route-should-404'), { redirect: 'follow' });
+  if (missing.status !== 404) {
+    throw new Error('Custom 404 smoke check expected HTTP 404, received ' + missing.status + '.');
+  }
+  console.log('Public route smoke checks passed: ' + (routes.length + 1) + ' paths');
+}
+
+async function checkPublicFormValidation(baseUrl, apiBaseUrl) {
+  const enquiry = await fetch(joinUrl(baseUrl, '/api/enquiry'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ school: '', person: '', phone: '', email: '', website: '' }),
+  });
+  if (enquiry.status < 400 || enquiry.status >= 500) {
+    throw new Error('Public enquiry validation returned unexpected HTTP ' + enquiry.status + '.');
+  }
+
+  const career = await fetch(joinUrl(apiBaseUrl, '/public/careers/apply'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
+    body: new URLSearchParams({
+      name: 'Smoke Test',
+      email: 'smoke@example.com',
+      phone: '9876543210',
+      cover_message: '',
+      website: '',
+    }),
+  });
+  if (career.status < 400 || career.status >= 500) {
+    throw new Error('Career form validation returned unexpected HTTP ' + career.status + '.');
+  }
+  console.log('Public form validation smoke checks passed');
+}
+
 async function checkFrontendOrApiTarget(url) {
   const response = await assertOk(url, "Deployment target");
   const contentType = response.headers.get("content-type") || "";
@@ -44,6 +87,11 @@ async function checkFrontendOrApiTarget(url) {
 try {
   if (baseUrl) {
     await checkFrontendOrApiTarget(baseUrl);
+    await checkPublicRoutes(baseUrl);
+  }
+
+  if (baseUrl && apiUrl && process.env.E2E_TEST_FORMS === '1') {
+    await checkPublicFormValidation(baseUrl, apiUrl);
   }
 
   if (apiUrl) {
