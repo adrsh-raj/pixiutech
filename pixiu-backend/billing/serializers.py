@@ -19,13 +19,37 @@ class InvoiceSerializer(serializers.ModelSerializer):
     school_name = serializers.CharField(source="school.name", read_only=True)
     billing_profile = serializers.SerializerMethodField()
     balance_due = serializers.SerializerMethodField()
+    pending_payment = serializers.SerializerMethodField()
     contract_number = serializers.CharField(source="contract.contract_number", read_only=True)
     class Meta:
         model = Invoice
-        fields = ["id", "invoice_number", "contract", "contract_number", "school", "school_code", "school_name", "school_class", "trainer", "status", "issue_date", "due_date", "notes", "subtotal", "tax_amount", "total_amount", "amount_paid", "balance_due", "lines", "billing_profile", "created_by", "created_at", "updated_at"]
+        fields = ["id", "invoice_number", "contract", "contract_number", "school", "school_code", "school_name", "school_class", "trainer", "status", "issue_date", "due_date", "notes", "subtotal", "tax_amount", "total_amount", "amount_paid", "balance_due", "pending_payment", "lines", "billing_profile", "created_by", "created_at", "updated_at"]
         read_only_fields = ["id", "invoice_number", "status", "subtotal", "total_amount", "amount_paid", "balance_due", "created_by", "created_at", "updated_at"]
     def get_balance_due(self, obj):
         return max(obj.total_amount - obj.amount_paid, 0)
+
+    def get_pending_payment(self, obj):
+        request = self.context.get("request")
+        role = getattr(getattr(request, "user", None), "role", "")
+        if role != "admin":
+            return None
+        for payment in obj.payments.all():
+            if payment.status == "pending":
+                return {
+                    "id": str(payment.id),
+                    "invoice": str(payment.invoice_id),
+                    "invoice_number": obj.invoice_number,
+                    "school_id": str(obj.school_id),
+                    "school_code": obj.school.school_code,
+                    "school_name": obj.school.name,
+                    "amount": payment.amount,
+                    "method": payment.method,
+                    "status": payment.status,
+                    "transaction_reference": payment.transaction_reference,
+                    "payment_date": payment.payment_date,
+                    "notes": payment.notes,
+                }
+        return None
 
     def get_billing_profile(self, obj):
         request = self.context.get("request")
