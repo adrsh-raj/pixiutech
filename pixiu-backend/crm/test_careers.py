@@ -60,6 +60,30 @@ class CareerPublicApiTests(APITestCase):
         reader = PdfReader(BytesIO(stored), strict=True)
         self.assertEqual(len(reader.pages), 1)
 
+    def test_application_sanitizes_plain_text_fields(self):
+        opening = CareerOpening.objects.create(
+            title='<strong>STEM Instructor</strong>',
+            description='<script>alert(1)</script>Teach STEM',
+            status=CareerOpeningStatus.PUBLISHED,
+        )
+        pdf = SimpleUploadedFile('resume.pdf', valid_pdf_bytes(), content_type='application/pdf')
+        response = self.client.post(
+            '/api/v1/public/careers/apply',
+            {
+                'opening': str(opening.id),
+                'name': '<b>Test Candidate</b>',
+                'email': 'test2@example.com',
+                'phone': '9876543210',
+                'cover_message': '<script>alert(1)</script>Interested in the role.',
+                'cv': pdf,
+            },
+            format='multipart',
+        )
+        self.assertEqual(response.status_code, 201)
+        application = CareerApplication.objects.get(email='test2@example.com')
+        self.assertEqual(application.name, 'Test Candidate')
+        self.assertEqual(application.cover_message, 'Interested in the role.')
+
     def test_application_rejects_invalid_phone(self):
         opening = CareerOpening.objects.create(title='STEM Instructor', description='Teach STEM', status=CareerOpeningStatus.PUBLISHED)
         pdf = SimpleUploadedFile('resume.pdf', valid_pdf_bytes(), content_type='application/pdf')
