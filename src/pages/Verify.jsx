@@ -32,7 +32,7 @@ const API_CANDIDATES = [
 const TOKEN_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 function formatDate(value) {
-  if (!value) return '—'
+  if (!value) return 'N/A'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return text(value)
   return new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'long', year: 'numeric' }).format(date)
@@ -40,7 +40,7 @@ function formatDate(value) {
 
 function formatScore(value) {
   const number = Number(value)
-  return Number.isFinite(number) ? `${number.toFixed(2)}%` : '—'
+  return Number.isFinite(number) ? `${number.toFixed(2)}%` : 'N/A'
 }
 
 export default function Verify() {
@@ -130,7 +130,7 @@ export default function Verify() {
   const rankSlots = Number(result?.rank_slots ?? ranking.rank_slots) || Math.ceil(classSize * 0.25)
   const classRank = Number(result?.class_rank ?? ranking.class_rank) || 0
   const top25 = result?.is_top25 === true || (classRank > 0 && rankSlots > 0 && classRank <= rankSlots)
-  const rankDisplay = text(result?.rank_display) || '—'
+  const rankDisplay = text(result?.rank_display) || 'N/A'
   const publicVerificationUrl = `${PUBLIC_VERIFY_BASE}?cert=${encodeURIComponent(resolvedCertificateId)}`
 
   const copyVerificationLink = async () => {
@@ -163,15 +163,15 @@ export default function Verify() {
           <div className="verify-grid">
             <article className="verify-card">
               <span className="verify-card-label">Student</span>
-              <h3>{text(result.student_name) || '—'}</h3>
-              <div className="verify-card-meta"><span>Student ID</span><strong>{text(result.student_id) || '—'}</strong></div>
-              <div className="verify-card-meta"><span>School</span><strong>{text(result.school_name) || '—'}</strong></div>
-              <div className="verify-card-meta"><span>Class</span><strong>{text(result.class_name) || '—'}</strong></div>
+              <h3>{text(result.student_name) || 'N/A'}</h3>
+              <div className="verify-card-meta"><span>Student ID</span><strong>{text(result.student_id) || 'N/A'}</strong></div>
+              <div className="verify-card-meta"><span>School</span><strong>{text(result.school_name) || 'N/A'}</strong></div>
+              <div className="verify-card-meta"><span>Class</span><strong>{text(result.class_name) || 'N/A'}</strong></div>
             </article>
 
             <article className="verify-card">
               <span className="verify-card-label">Certificate</span>
-              <h3 className="verify-mono">{resolvedCertificateId || '—'}</h3>
+              <h3 className="verify-mono">{resolvedCertificateId || 'N/A'}</h3>
               <div className="verify-stat-row">
                 <div><span>Overall score</span><strong>{formatScore(result.overall_score)}</strong></div>
                 <div><span>Issued</span><strong>{formatDate(result.issued_at)}</strong></div>
@@ -213,7 +213,7 @@ export default function Verify() {
 
             <div className="verify-tech-row">
               <span>Technologies completed</span>
-              <strong>{technologies.length ? technologies.map(item => text(item?.name || item?.technology || item)).filter(Boolean).join(' · ') : '—'}</strong>
+              <strong>{technologies.length ? technologies.map(item => text(item?.name || item?.technology || item)).filter(Boolean).join(' · ') : 'N/A'}</strong>
             </div>
 
             {units.length > 0 && <div className="verify-marks-table-wrap">
@@ -232,10 +232,10 @@ export default function Verify() {
                   <tbody>
                     {units.map((unit, index) => (
                       <tr key={`${unit.unit_code || 'unit'}-${index}`}>
-                        <td>{text(unit.technology) || '—'}</td>
-                        <td className="verify-table-code">{text(unit.unit_code) || '—'}</td>
-                        <td>{text(unit.title) || '—'}</td>
-                        <td className="verify-table-number">{unit.sessions ?? unit.sessions_count ?? '—'}</td>
+                        <td>{text(unit.technology) || 'N/A'}</td>
+                        <td className="verify-table-code">{text(unit.unit_code) || 'N/A'}</td>
+                        <td>{text(unit.title) || 'N/A'}</td>
+                        <td className="verify-table-number">{unit.sessions ?? unit.sessions_count ?? 'N/A'}</td>
                         <td className="verify-table-score">{formatScore(unit.marks ?? unit.score)}</td>
                       </tr>
                     ))}
@@ -262,11 +262,11 @@ export default function Verify() {
               </div>
               <div>
                 <span>Class size</span>
-                <strong>{classSize || '—'}</strong>
+                <strong>{classSize || 'N/A'}</strong>
               </div>
               <div>
                 <span>Published positions</span>
-                <strong>{rankSlots || '—'}</strong>
+                <strong>{rankSlots || 'N/A'}</strong>
               </div>
             </div>
 
