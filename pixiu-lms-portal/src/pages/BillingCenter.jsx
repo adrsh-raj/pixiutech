@@ -240,7 +240,9 @@ export default function BillingCenter() {
   };
 
   const openPayment = invoice => {
-    const outstanding = Math.max(Number(invoice.total_amount || 0) - Number(invoice.amount_paid || 0), 0);
+    const outstanding = Number.isFinite(Number(invoice.balance_due))
+      ? Math.max(Number(invoice.balance_due), 0)
+      : Math.max(Number(invoice.total_amount || 0) - Number(invoice.amount_paid || 0), 0);
     setPaymentInvoice(invoice);
     setPaymentForm({
       amount: outstanding ? String(outstanding) : '',
@@ -256,7 +258,9 @@ export default function BillingCenter() {
     event.preventDefault();
     if (!paymentInvoice) return;
     const amount = Number(paymentForm.amount);
-    const outstanding = Math.max(Number(paymentInvoice.total_amount || 0) - Number(paymentInvoice.amount_paid || 0), 0);
+    const outstanding = Number.isFinite(Number(paymentInvoice.balance_due))
+      ? Math.max(Number(paymentInvoice.balance_due), 0)
+      : Math.max(Number(paymentInvoice.total_amount || 0) - Number(paymentInvoice.amount_paid || 0), 0);
     if (!Number.isFinite(amount) || amount <= 0 || amount > outstanding) {
       return setError(`Payment must be greater than 0 and no more than ${money(outstanding)}.`);
     }
