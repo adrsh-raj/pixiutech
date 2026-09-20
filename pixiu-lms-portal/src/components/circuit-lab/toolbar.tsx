@@ -84,7 +84,7 @@ export function Toolbar({
           <span className="hidden md:inline">Portal</span>
         </Link>
         <div className="flex items-center gap-1.5 sm:gap-2">
-          <div className="grid h-7 w-7 sm:h-8 sm:w-8 place-items-center rounded-lg bg-[#2563eb] text-white shadow-sm shrink-0">
+          <div className="grid h-7 w-7 sm:h-8 sm:w-8 place-items-center rounded-lg bg-[#1D6EFF] text-white shadow-sm shrink-0">
             <CircuitBoard className="h-4 w-4 sm:h-5 sm:w-5" />
           </div>
           <div className="leading-tight">
