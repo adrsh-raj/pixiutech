@@ -105,7 +105,27 @@ export default function BillingCenter() {
     return schools.find(item => [item.id, item.school_id, item.school_code, item.code].filter(Boolean).map(normalize).includes(key)) || null;
   }, [isAdmin, selectedSchool, schools, user?.school_id, user?.school_code]);
 
-  const scope = school ? `?school=${encodeURIComponent(school.id)}` : '';
+  const billingSchool = useMemo(() => {
+    if (school) return school;
+    if (isAdmin) return null;
+    const firstInvoice = invoices[0];
+    if (!firstInvoice) return null;
+    return {
+      id: firstInvoice.school,
+      school_id: firstInvoice.school,
+      school_code: firstInvoice.school_code,
+      code: firstInvoice.school_code,
+      name: firstInvoice.school_name || firstInvoice.school_code || 'School',
+      email: '',
+    };
+  }, [school, isAdmin, invoices]);
+
+  // Admin uses the selected-school filter. School accounts rely on backend
+  // account scoping, so billing cannot disappear while /schools is still loading.
+  const scope = isAdmin && school ? `?school=${encodeURIComponent(school.id)}` : '';
+  const billingProfilePath = isAdmin && school
+    ? `/billing-profile?school=${encodeURIComponent(school.id)}`
+    : '/billing-profile';
 
   const load = async () => {
     if (authLoading || (isAdmin && !school)) {
@@ -121,7 +141,7 @@ export default function BillingCenter() {
         request(`/invoices${scope}`),
         request(`/payments${scope}`),
         request(`/billing-summary${scope}`),
-        request('/billing-profile'),
+        request(billingProfilePath),
       ];
       if (isAdmin) requests.push(request(`/contracts${scope}`));
       const [invoicePayload, paymentPayload, summaryPayload, profilePayload, contractPayload = []] = await Promise.all(requests);
@@ -141,7 +161,7 @@ export default function BillingCenter() {
     }
   };
 
-  useEffect(() => { void load(); }, [scope, authLoading, isAdmin, school?.id]);
+  useEffect(() => { void load(); }, [scope, billingProfilePath, authLoading, isAdmin, school?.id]);
 
   const runAction = async action => {
     try {
@@ -310,7 +330,7 @@ export default function BillingCenter() {
         </section>
       )}
 
-      {school && (
+      {billingSchool && (
         <>
           <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             {[
@@ -422,7 +442,9 @@ export default function BillingCenter() {
             ) : (
               <div className="divide-y divide-slate-100">
                 {invoices.map(invoice => {
-                  const outstanding = Math.max(Number(invoice.total_amount || 0) - Number(invoice.amount_paid || 0), 0);
+                  const outstanding = Number.isFinite(Number(invoice.balance_due))
+                    ? Math.max(Number(invoice.balance_due), 0)
+                    : Math.max(Number(invoice.total_amount || 0) - Number(invoice.amount_paid || 0), 0);
                   const pending = paymentByInvoice.get(String(invoice.id));
                   const canPay = !isAdmin && !pending && outstanding > 0 && ['issued', 'partially_paid', 'overdue'].includes(invoice.status);
                   return (
@@ -437,14 +459,16 @@ export default function BillingCenter() {
                           <p className="mt-1 text-xs leading-relaxed text-slate-500">{invoice.lines?.map(line => `${line.description} × ${line.quantity}`).join(' · ') || 'Invoice details available in PDF.'}</p>
                         </div>
                         <div className="xl:text-right">
+                          <p className="text-[9px] font-black uppercase tracking-[.12em] text-slate-400">Total bill</p>
                           <p className="text-lg font-black text-slate-900">{money(invoice.total_amount)}</p>
-                          <p className="mt-1 text-[10px] text-slate-500">Paid {money(invoice.amount_paid)} · Due {money(outstanding)}</p>
+                          <p className="mt-1 text-[10px] font-bold text-[#236F69]">Amount due {money(outstanding)}</p>
+                          <p className="mt-1 text-[10px] text-slate-500">Paid {money(invoice.amount_paid)}</p>
                         </div>
                         <div className="flex flex-wrap gap-2">
                           {canPay && <button type="button" onClick={() => openPayment(invoice)} disabled={busy} className="rounded-xl bg-[#236F69] px-3.5 py-2 text-[10px] font-black text-white disabled:opacity-50">I've paid</button>}
                           {pending && !isAdmin && <span className="rounded-xl bg-amber-50 px-3.5 py-2 text-[10px] font-black text-amber-700">Awaiting bank verification</span>}
                           {isAdmin && invoice.status !== 'paid' && invoice.status !== 'void' && <button type="button" onClick={() => runAction(async () => { await request(`/invoices/${encodeURIComponent(invoice.id)}/void`, 'POST', {}); await load(); await refreshAll(); })} disabled={busy} className="rounded-xl border border-rose-200 px-3.5 py-2 text-[10px] font-black text-rose-600">Void</button>}
-                          <button type="button" onClick={() => generateInvoicePDF(invoice, school)} className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[10px] font-black text-slate-700">View invoice</button>
+                          <button type="button" onClick={() => generateInvoicePDF(invoice, billingSchool)} className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[10px] font-black text-slate-700">View invoice</button>
                         </div>
                       </div>
                     </article>
