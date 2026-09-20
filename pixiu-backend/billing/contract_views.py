@@ -95,6 +95,8 @@ def billing_summary(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated, IsActiveAccount])
 def billing_profile(request):
+    if request.user.role not in {UserRole.ADMIN, UserRole.SCHOOL}:
+        raise PermissionDenied("Only Pixiu Tech administrators and school accounts can view payment details.")
     profile = {
         "account_name": getattr(settings, "PIXIU_BILLING_ACCOUNT_NAME", ""),
         "bank_name": getattr(settings, "PIXIU_BILLING_BANK_NAME", ""),
