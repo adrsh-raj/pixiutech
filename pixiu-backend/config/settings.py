@@ -23,6 +23,13 @@ PERF_DIAGNOSTICS = os.environ.get("PERF_DIAGNOSTICS", "False").lower() == "true"
 # Portal security policy. The browser enforces the 10-minute inactivity timer;
 # backend credentials are independently invalidated on password changes.
 PORTAL_IDLE_TIMEOUT_SECONDS = int(os.environ.get("DJANGO_PORTAL_IDLE_TIMEOUT_SECONDS", "600"))
+
+# Pixiu Tech billing profile. Keep these values in the server environment rather than source control.
+PIXIU_BILLING_ACCOUNT_NAME = os.environ.get("PIXIU_BILLING_ACCOUNT_NAME", os.environ.get("PIXIU_BANK_ACCOUNT_NAME", "")).strip()
+PIXIU_BILLING_BANK_NAME = os.environ.get("PIXIU_BILLING_BANK_NAME", os.environ.get("PIXIU_BANK_NAME", "")).strip()
+PIXIU_BILLING_ACCOUNT_NUMBER = os.environ.get("PIXIU_BILLING_ACCOUNT_NUMBER", os.environ.get("PIXIU_BANK_ACCOUNT_NUMBER", "")).strip()
+PIXIU_BILLING_IFSC = os.environ.get("PIXIU_BILLING_IFSC", os.environ.get("PIXIU_BANK_IFSC", "")).strip()
+PIXIU_BILLING_UPI = os.environ.get("PIXIU_BILLING_UPI", os.environ.get("PIXIU_UPI_ID", "")).strip()
 LOGIN_MAX_FAILED_ATTEMPTS = int(os.environ.get("DJANGO_LOGIN_MAX_FAILED_ATTEMPTS", "5"))
 LOGIN_LOCKOUT_MINUTES = int(os.environ.get("DJANGO_LOGIN_LOCKOUT_MINUTES", "15"))
 PASSWORD_RESET_TIMEOUT = int(os.environ.get("DJANGO_PASSWORD_RESET_TIMEOUT", str(60 * 60)))
