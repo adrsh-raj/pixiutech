@@ -1,0 +1,136 @@
+/*
+ * Dedicated Virtual Arduino Lab theme.
+ * This file intentionally restores the lab's original blue/navy engineering
+ * palette without changing the rest of the Pixiu portal.
+ */
+
+.circuit-lab-blue-theme {
+  --color-pixiu-dark: #070B14;
+  --color-pixiu-blue: #1D6EFF;
+  --color-pixiu-cyan: #00D2FF;
+  --color-pixiu-gold: #C9A227;
+  --color-pixiu-gray: #F7F8FA;
+
+  --color-background: #0F172A !important;
+  --color-foreground: #F8FAFC !important;
+  --color-card: #1E293B !important;
+  --color-card-foreground: #F8FAFC !important;
+  --color-border: #334155 !important;
+  --color-sidebar: #131D31 !important;
+  --color-sidebar-foreground: #F8FAFC !important;
+  --color-muted: #1E293B !important;
+  --color-muted-foreground: #94A3B8 !important;
+  --color-accent: #38BDF8 !important;
+  --color-accent-foreground: #0F172A !important;
+  --color-primary: #1D6EFF !important;
+  --color-primary-foreground: #FFFFFF !important;
+  --color-secondary: #253349 !important;
+  --color-secondary-foreground: #F8FAFC !important;
+
+  --color-blue-50: #EFF6FF !important;
+  --color-blue-100: #DBEAFE !important;
+  --color-blue-200: #BFDBFE !important;
+  --color-blue-300: #93C5FD !important;
+  --color-blue-400: #60A5FA !important;
+  --color-blue-500: #3B82F6 !important;
+  --color-blue-600: #2563EB !important;
+  --color-blue-700: #1D4ED8 !important;
+  --color-blue-800: #1E40AF !important;
+  --color-blue-900: #1E3A8A !important;
+  --color-blue-950: #172554 !important;
+
+  --color-cyan-300: #67E8F9 !important;
+  --color-cyan-400: #22D3EE !important;
+  --color-cyan-500: #06B6D4 !important;
+  --color-cyan-600: #0891B2 !important;
+  --color-cyan-700: #0E7490 !important;
+  --color-cyan-800: #155E75 !important;
+  --color-cyan-900: #164E63 !important;
+
+  --color-slate-50: #F8FAFC !important;
+  --color-slate-100: #F1F5F9 !important;
+  --color-slate-200: #E2E8F0 !important;
+  --color-slate-300: #CBD5E1 !important;
+  --color-slate-400: #94A3B8 !important;
+  --color-slate-500: #64748B !important;
+  --color-slate-600: #475569 !important;
+  --color-slate-700: #334155 !important;
+  --color-slate-800: #1E293B !important;
+  --color-slate-900: #0F172A !important;
+  --color-slate-950: #020617 !important;
+
+  --color-indigo-400: #818CF8 !important;
+  --color-indigo-500: #6366F1 !important;
+  --color-indigo-600: #4F46E5 !important;
+  --color-purple-400: #C084FC !important;
+  --color-purple-500: #A855F7 !important;
+  --color-purple-600: #9333EA !important;
+  --color-amber-400: #FBBF24 !important;
+  --color-amber-500: #F59E0B !important;
+  --color-amber-600: #D97706 !important;
+}
+
+/* Hard overrides for the semantic utility classes used by the lab. */
+.circuit-lab-blue-theme .bg-background,
+.circuit-lab-blue-theme [class*="bg-background/"] {
+  background-color: #0F172A !important;
+}
+
+.circuit-lab-blue-theme .bg-card,
+.circuit-lab-blue-theme [class*="bg-card/"] {
+  background-color: #1E293B !important;
+}
+
+.circuit-lab-blue-theme .bg-sidebar {
+  background-color: #131D31 !important;
+}
+
+.circuit-lab-blue-theme .bg-secondary,
+.circuit-lab-blue-theme [class*="bg-secondary/"] {
+  background-color: #253349 !important;
+}
+
+.circuit-lab-blue-theme .text-foreground {
+  color: #F8FAFC !important;
+}
+
+.circuit-lab-blue-theme .text-muted-foreground,
+.circuit-lab-blue-theme [class*="text-muted-foreground/"] {
+  color: #94A3B8 !important;
+}
+
+.circuit-lab-blue-theme .text-primary {
+  color: #1D6EFF !important;
+}
+
+.circuit-lab-blue-theme .border-border,
+.circuit-lab-blue-theme [class*="border-border/"] {
+  border-color: #334155 !important;
+}
+
+.circuit-lab-blue-theme .text-blue-300 { color: #93C5FD !important; }
+.circuit-lab-blue-theme .text-blue-400 { color: #60A5FA !important; }
+.circuit-lab-blue-theme .text-blue-500 { color: #3B82F6 !important; }
+.circuit-lab-blue-theme .text-blue-600 { color: #2563EB !important; }
+
+.circuit-lab-blue-theme .text-cyan-300 { color: #67E8F9 !important; }
+.circuit-lab-blue-theme .text-cyan-400 { color: #22D3EE !important; }
+.circuit-lab-blue-theme .text-cyan-500 { color: #06B6D4 !important; }
+
+.circuit-lab-blue-theme .bg-slate-800,
+.circuit-lab-blue-theme [class*="bg-slate-800/"] { background-color: #1E293B !important; }
+.circuit-lab-blue-theme .bg-slate-900,
+.circuit-lab-blue-theme [class*="bg-slate-900/"] { background-color: #0F172A !important; }
+.circuit-lab-blue-theme .bg-slate-950,
+.circuit-lab-blue-theme [class*="bg-slate-950/"] { background-color: #020617 !important; }
+
+.circuit-lab-blue-theme .text-slate-200 { color: #E2E8F0 !important; }
+.circuit-lab-blue-theme .text-slate-300 { color: #CBD5E1 !important; }
+.circuit-lab-blue-theme .text-slate-400 { color: #94A3B8 !important; }
+.circuit-lab-blue-theme .text-slate-500 { color: #64748B !important; }
+.circuit-lab-blue-theme .text-slate-600 { color: #475569 !important; }
+
+.circuit-lab-blue-theme .border-slate-700,
+.circuit-lab-blue-theme [class*="border-slate-700/"] { border-color: #334155 !important; }
+.circuit-lab-blue-theme .border-slate-800,
+.circuit-lab-blue-theme [class*="border-slate-800/"] { border-color: #1E293B !important; }
