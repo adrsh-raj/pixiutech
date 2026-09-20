@@ -97,7 +97,11 @@ for (const file of designFiles) {
   const source = fs.readFileSync(file, 'utf8');
   if (/Space Grotesk|Instrument Serif|font-serif|font-style\\s*:\\s*italic|\\bitalic\\b/i.test(source)) failures.push(path.relative(root, file) + ' -> forbidden serif/italic design pattern detected');
   if (/\\bgrain\\b|\\bnoise\\b/i.test(source)) failures.push(path.relative(root, file) + ' -> grain/noise texture pattern detected');
-  if (/—/.test(source)) failures.push(path.relative(root, file) + ' -> em dash found in UI/copy; use direct punctuation or wording');
+
+}
+
+for (const [file, source] of publicSource) {
+  if (/—/.test(source)) failures.push(path.relative(root, file) + ' -> em dash found in public UI/copy; use direct punctuation or wording');
   if (/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(source)) failures.push(path.relative(root, file) + ' -> decorative emoji found in public UI/copy');
   if (/lucide-react/.test(source) && !file.endsWith(path.sep + 'Verify.jsx')) failures.push(path.relative(root, file) + ' -> decorative Lucide icon dependency found; use typography or CSS for public marketing UI');
 }
