@@ -1,4 +1,5 @@
 "use client"
+import "./workbench.css"
 
 import { useCallback, useMemo, useRef, useState, useEffect } from "react"
 import type { CircuitState, PartType, PinRef, PlacedPart } from "@/lib/circuit-types"
