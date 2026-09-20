@@ -1,23 +1,21 @@
 .notfound{min-height:58vh;background:var(--white)}
-.notfound__hero{padding:clamp(72px,11vw,150px) 0 clamp(60px,8vw,110px);background:var(--navy)}
+.notfound__hero{padding:clamp(72px,11vw,150px) 0 clamp(60px,8vw,110px);background:var(--navy-900)}
 .notfound__shell{max-width:960px;text-align:center;color:#fff}
 .notfound__code{font-family:var(--f-mono);font-size:clamp(72px,16vw,150px);font-weight:500;line-height:.8;letter-spacing:-.08em;color:rgba(255,255,255,.14);margin-bottom:24px}
-.notfound__hero .eyebrow{color:#d0b77e}
+.notfound__hero .eyebrow{color:var(--blue-soft)}
 .notfound__hero h1{max-width:14ch;margin:0 auto;color:#fff;font-size:clamp(40px,6vw,72px);line-height:1.02;letter-spacing:-.045em}
-.notfound__lead{max-width:62ch;margin:22px auto 0;color:#b7c0bb;font-size:17px;line-height:1.75}
+.notfound__lead{max-width:62ch;margin:22px auto 0;color:var(--muted-dark);font-size:17px;line-height:1.75}
 .notfound__actions{display:flex;justify-content:center;align-items:center;gap:12px;flex-wrap:wrap;margin-top:30px}
 .notfound__actions .btn{display:inline-flex;align-items:center;gap:8px}
-.notfound__contact{display:inline-flex;align-items:center;gap:7px;color:#ded9ca;font-weight:700;text-decoration:none;padding:12px 10px}
+.notfound__contact{display:inline-flex;align-items:center;gap:7px;color:#d5e1dd;font-weight:700;text-decoration:none;padding:12px 10px}
 .notfound__contact:hover{text-decoration:underline;text-underline-offset:4px}
-.notfound__help{display:grid;grid-template-columns:auto 1fr;gap:10px 16px;align-items:start;padding-top:38px;padding-bottom:38px}
-.notfound__help-icon{width:42px;height:42px;border-radius:12px;background:#f2eee4;color:var(--blue);display:grid;place-items:center}
-.notfound__help h2{margin:0;font-size:24px;color:var(--ink)}
+.notfound__help{display:block;padding-top:38px;padding-bottom:38px}
+ .notfound__help h2{margin:0;font-size:24px;color:var(--ink)}
 .notfound__help p{margin:6px 0 0;color:var(--muted);line-height:1.6}
-.notfound__quicklinks{grid-column:2;display:flex;flex-wrap:wrap;gap:10px 22px;margin-top:4px}
+.notfound__quicklinks{display:flex;flex-wrap:wrap;gap:10px 22px;margin-top:4px}
 .notfound__quicklinks a{color:var(--blue-600);font-weight:700;text-decoration:none}
 .notfound__quicklinks a:hover{text-decoration:underline;text-underline-offset:4px}
 @media(max-width:640px){
   .notfound__hero{padding:64px 0 52px}
-  .notfound__help{grid-template-columns:auto 1fr}
-  .notfound__quicklinks{grid-column:1 / -1;padding-left:58px}
+  .notfound__quicklinks{padding-left:0}
 }

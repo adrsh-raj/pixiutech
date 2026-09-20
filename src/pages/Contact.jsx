@@ -50,15 +50,15 @@ export default function Contact() {
                 <a href="https://wa.me/917985403186" target="_blank" rel="noreferrer">+91 7985403186</a>
               </div>
               <div className="contact-info__item">
-                <strong>📧 Email</strong>
+                <strong>Email</strong>
                 <a href="mailto:director@pixiutech.com">director@pixiutech.com</a>
               </div>
               <div className="contact-info__item">
-                <strong>🏢 Company</strong>
+                <strong>Company</strong>
                 <span>Pixiu Tech LLP</span>
               </div>
               <div className="contact-info__item">
-                <strong>⏰ Response Time</strong>
+                <strong>Response Time</strong>
                 <span>Less than 24 hours</span>
               </div>
             </div>

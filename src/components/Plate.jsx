@@ -1,4 +1,4 @@
-// A framed image. Swap `src` for a real photograph when one is available —
+// A framed image. Swap `src` for a real photograph when one is available.
 // nothing else needs to change.
 export default function Plate({ src, alt, caption }) {
   return (

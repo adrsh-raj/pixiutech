@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, FileText, MapPin, Clock3 } from 'lucide-react'
 import PageHead from '../components/PageHead.jsx'
 import Reveal from '../components/Reveal.jsx'
 
@@ -147,8 +146,9 @@ export default function Careers() {
                     <div className="career-card__body">
                       <h3>{opening.title}</h3>
                       <div className="career-card__meta">
-                        {opening.location && <span><MapPin size={14} /> {opening.location}</span>}
-                        {opening.employment_type && <span><Clock3 size={14} /> {opening.employment_type}</span>}
+                        {opening.location && <span>{opening.location}</span>}
+                        {opening.location && opening.employment_type && <span aria-hidden="true">·</span>}
+                        {opening.employment_type && <span>{opening.employment_type}</span>}
                       </div>
                       <p>{opening.description}</p>
                       {opening.requirements && <div style={{ marginTop: 14 }}><strong style={{ color: 'var(--ink)' }}>What you'll work on</strong><p style={{ whiteSpace: 'pre-line', marginTop: 6 }}>{opening.requirements}</p></div>}
@@ -173,7 +173,7 @@ export default function Careers() {
           <Reveal delay={80}>
             {status?.kind === 'success' ? (
               <div className="form__done" role="status" aria-live="polite" style={{ marginTop: 24 }}>
-                <CheckCircle2 size={22} color="var(--blue)" />
+                <span className="form__status-mark" aria-hidden="true">✓</span>
                 <h3>Thank you, {submittedName}.</h3>
                 <p>{status.text} Our team will review your application and contact you using the details provided.</p>
                 <button
@@ -187,13 +187,13 @@ export default function Careers() {
               </div>
             ) : (
             <form className="form" style={{ marginTop: 24 }} onSubmit={send}>
-              {selectedRole && <div className="field field--wide"><label>Applying for</label><input value={selectedRole.title} readOnly /></div>}
+              {selectedRole && <div className="field field--wide"><label htmlFor="career-selected-opening">Applying for</label><input id="career-selected-opening" value={selectedRole.title} readOnly /></div>}
               {!selectedRole && openings.length > 0 && <div className="field field--wide"><label htmlFor="career-opening">Position</label><select id="career-opening" value={values.opening} onChange={event => { setSelectedOpening(event.target.value); setValues(previous => ({ ...previous, opening: event.target.value })) }}><option value="">General application</option>{openings.map(opening => <option key={opening.id} value={opening.id}>{opening.title}</option>)}</select></div>}
               <div className="form__grid">
                 <div className="field"><label htmlFor="career-name">Full name</label><input id="career-name" value={values.name} onChange={set('name')} placeholder="Your name" autoComplete="name" required /></div>
                 <div className="field"><label htmlFor="career-email">Email</label><input id="career-email" type="email" value={values.email} onChange={set('email')} placeholder="you@email.com" autoComplete="email" required /></div>
                 <div className="field"><label htmlFor="career-phone">Phone (10 digits)</label><input id="career-phone" type="tel" inputMode="numeric" maxLength={10} value={values.phone} onChange={event => setValues(previous => ({ ...previous, phone: event.target.value.replace(/\D/g, '').slice(0, 10) }))} placeholder="9876543210" autoComplete="tel" required /></div>
-                <div className="field"><label htmlFor="career-cv">CV / Resume (PDF)</label><input id="career-cv" type="file" accept="application/pdf,.pdf" onChange={handleCv} required /><span style={{ display: 'block', marginTop: 6, fontSize: 12, color: 'var(--muted)' }}><FileText size={13} style={{ verticalAlign: 'text-bottom' }} /> PDF only · maximum 2 MB</span></div>
+                <div className="field"><label htmlFor="career-cv">CV / Resume (PDF)</label><input id="career-cv" type="file" accept="application/pdf,.pdf" onChange={handleCv} required /><span style={{ display: 'block', marginTop: 6, fontSize: 12, color: 'var(--muted)' }}>PDF only · maximum 2 MB</span></div>
                 <div className="field field--wide"><label htmlFor="career-message">Message</label><textarea id="career-message" value={values.cover_message} onChange={set('cover_message')} placeholder="Tell us briefly about your background and what you would like to contribute." /></div>
               </div>
               <div className="field" aria-hidden="true" style={{ position: 'absolute', left: '-10000px', width: 1, height: 1, overflow: 'hidden' }}><label htmlFor="career-website">Website</label><input id="career-website" value={values.website} onChange={set('website')} tabIndex={-1} autoComplete="off" /></div>
@@ -201,7 +201,7 @@ export default function Careers() {
                 <button className="btn btn--primary" type="submit" disabled={sending}>{sending ? 'Submitting…' : 'Submit Application'} <span className="arw">→</span></button>
                 <span className="form__note">Your CV is submitted securely for recruitment review.</span>
               </div>
-              {status && <p className={`form__status ${status.kind === 'success' ? '' : 'err'}`} role="status" aria-live="polite">{status.kind === 'success' ? <CheckCircle2 size={16} /> : null}{status.text}</p>}
+              {status && <p className={`form__status ${status.kind === 'success' ? '' : 'err'}`} role="status" aria-live="polite">{status.kind === 'success' ? <span aria-hidden="true" className="form__status-mark">✓</span> : null}{status.text}</p>}
             </form>
             )}
           </Reveal>

@@ -6,13 +6,14 @@ from rest_framework.views import APIView
 from accounts.models import UserRole, UserStatus
 from audit.models import AuditAction
 from audit.services import record_audit
+from core.input_sanitization import sanitize_plain_text
 from crm.models import Lead, LeadSource, LeadStatus
 
 User = get_user_model()
 
 
-def _clean(value, max_length):
-    return str(value or '').strip()[:max_length]
+def _clean(value, max_length, *, preserve_newlines=False):
+    return sanitize_plain_text(value, max_length, preserve_newlines=preserve_newlines)
 
 
 class PublicEnquiryView(APIView):
@@ -30,7 +31,7 @@ class PublicEnquiryView(APIView):
         phone = _clean(request.data.get('phone'), 30)
         email = _clean(request.data.get('email'), 254)
         city = _clean(request.data.get('city'), 120)
-        message = _clean(request.data.get('message'), 4000)
+        message = _clean(request.data.get('message'), 4000, preserve_newlines=True)
         raw_strength = _clean(request.data.get('strength'), 10)
 
         if not school or not person or not phone or not email:

@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, Compass, Mail } from 'lucide-react'
 import Reveal from '../components/Reveal.jsx'
 import '../styles/notfound.css'
 
@@ -17,13 +16,13 @@ export default function NotFound() {
             </p>
             <div className="notfound__actions">
               <Link className="btn btn--primary" to="/">
-                <ArrowLeft size={16} aria-hidden="true" /> Back to homepage
+                <span aria-hidden="true">←</span> Back to homepage
               </Link>
               <Link className="btn btn--outline" to="/solutions">
-                Explore solutions <ArrowRight size={16} aria-hidden="true" />
+                Explore solutions <span aria-hidden="true">→</span>
               </Link>
               <Link className="notfound__contact" to="/contact">
-                <Mail size={15} aria-hidden="true" /> Contact Pixiu Tech
+                Contact Pixiu Tech
               </Link>
             </div>
           </Reveal>
@@ -32,7 +31,6 @@ export default function NotFound() {
 
       <section className="band band--gray">
         <div className="shell notfound__help">
-          <div className="notfound__help-icon" aria-hidden="true"><Compass size={22} /></div>
           <div>
             <h2>Looking for something specific?</h2>
             <p>Start with our solutions, verify a certificate, read the FAQs, or tell us what your school needs.</p>

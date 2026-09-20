@@ -114,6 +114,7 @@ jobs:
         run: |
           npm ci
           npm run build
+          npm run audit:site
 
       - name: Verify LMS lint, safety scans, and production build
         working-directory: pixiu-lms-portal
@@ -126,3 +127,10 @@ jobs:
           ! grep -RInE 'localStorage\.(getItem|setItem|removeItem).*\b(notification|attendance|ranking|revenue|student|trainer|school)\b' src --exclude-dir=node_modules --ignore-case
           npm run build
           node ../tools/frontend_bundle_report.mjs dist/assets
+      - name: Run live launch smoke checks
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        env:
+          E2E_BASE_URL: https://www.pixiutech.com
+          E2E_API_URL: https://pixiu-django-api.onrender.com/api/v1
+          E2E_TEST_FORMS: "1"
+        run: node scripts/e2e-smoke.mjs
