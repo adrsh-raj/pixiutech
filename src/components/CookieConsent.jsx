@@ -22,7 +22,6 @@ export default function CookieConsent() {
 
   const choose = (value) => {
     setAnalyticsConsent(value)
-    setChoice(value)
     if (value === 'granted') {
       initAnalytics()
       trackPageView(window.location.pathname)
