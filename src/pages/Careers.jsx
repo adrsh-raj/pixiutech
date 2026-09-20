@@ -187,7 +187,7 @@ export default function Careers() {
               </div>
             ) : (
             <form className="form" style={{ marginTop: 24 }} onSubmit={send}>
-              {selectedRole && <div className="field field--wide"><label>Applying for</label><input value={selectedRole.title} readOnly /></div>}
+              {selectedRole && <div className="field field--wide"><label htmlFor="career-selected-opening">Applying for</label><input id="career-selected-opening" value={selectedRole.title} readOnly /></div>}
               {!selectedRole && openings.length > 0 && <div className="field field--wide"><label htmlFor="career-opening">Position</label><select id="career-opening" value={values.opening} onChange={event => { setSelectedOpening(event.target.value); setValues(previous => ({ ...previous, opening: event.target.value })) }}><option value="">General application</option>{openings.map(opening => <option key={opening.id} value={opening.id}>{opening.title}</option>)}</select></div>}
               <div className="form__grid">
                 <div className="field"><label htmlFor="career-name">Full name</label><input id="career-name" value={values.name} onChange={set('name')} placeholder="Your name" autoComplete="name" required /></div>
