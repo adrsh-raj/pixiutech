@@ -13,6 +13,7 @@ from accounts.models import UserRole
 from accounts.permissions import HasActionPermission, IsActiveAccount
 from academics.services import accessible_school_queryset
 from audit.services import record_audit
+from .services import ensure_school_billing_profile
 from .models import SchoolContract, ContractStatus, Invoice, BillingStatus
 
 
@@ -97,12 +98,50 @@ def billing_summary(request):
 def billing_profile(request):
     if request.user.role not in {UserRole.ADMIN, UserRole.SCHOOL}:
         raise PermissionDenied("Only Pixiu Tech administrators and school accounts can view payment details.")
-    profile = {
-        "account_name": getattr(settings, "PIXIU_BILLING_ACCOUNT_NAME", ""),
-        "bank_name": getattr(settings, "PIXIU_BILLING_BANK_NAME", ""),
-        "account_number": getattr(settings, "PIXIU_BILLING_ACCOUNT_NUMBER", ""),
-        "ifsc": getattr(settings, "PIXIU_BILLING_IFSC", ""),
-        "upi": getattr(settings, "PIXIU_BILLING_UPI", ""),
-    }
-    profile["configured"] = bool(profile["account_name"] and (profile["account_number"] or profile["upi"]))
-    return Response(profile)
+
+    requested = str(request.query_params.get("school") or "").strip()
+    schools = accessible_school_queryset(request.user)
+    target = None
+
+    if request.user.role == UserRole.SCHOOL:
+        target = schools.first()
+    elif requested:
+        target = schools.filter(
+            Q(school__school_code=requested.upper()) | Q(pk=requested)
+        ).first()
+
+    if not target:
+        return Response({
+            "school_id": None,
+            "school_code": None,
+            "school_name": None,
+            "account_name": getattr(settings, "PIXIU_BILLING_ACCOUNT_NAME", ""),
+            "bank_name": getattr(settings, "PIXIU_BILLING_BANK_NAME", ""),
+            "account_number": getattr(settings, "PIXIU_BILLING_ACCOUNT_NUMBER", ""),
+            "ifsc": getattr(settings, "PIXIU_BILLING_IFSC", ""),
+            "upi": getattr(settings, "PIXIU_BILLING_UPI", ""),
+            "configured": bool(
+                getattr(settings, "PIXIU_BILLING_ACCOUNT_NAME", "")
+                and getattr(settings, "PIXIU_BILLING_BANK_NAME", "")
+                and getattr(settings, "PIXIU_BILLING_ACCOUNT_NUMBER", "")
+                and getattr(settings, "PIXIU_BILLING_IFSC", "")
+            ),
+        })
+
+    profile = ensure_school_billing_profile(school=target)
+    return Response({
+        "school_id": str(target.id),
+        "school_code": target.school_code,
+        "school_name": target.name,
+        "account_name": profile.account_name,
+        "bank_name": profile.bank_name,
+        "account_number": profile.account_number,
+        "ifsc": profile.ifsc,
+        "upi": profile.upi,
+        "configured": bool(
+            profile.account_name
+            and profile.bank_name
+            and profile.account_number
+            and profile.ifsc
+        ),
+    })
