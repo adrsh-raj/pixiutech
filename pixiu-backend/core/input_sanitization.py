@@ -11,13 +11,13 @@ import re
 import unicodedata
 from html import unescape
 
-_TAG_RE = re.compile(r"<[^>]*>")
+_DANGEROUS_BLOCK_RE = re.compile(r"<(?:script|style|iframe|object|embed)\\b[^>]*>.*?</(?:script|style|iframe|object|embed)\\s*>", re.IGNORECASE | re.DOTALL)\n_TAG_RE = re.compile(r"<[^>]*>")
 
 
 def sanitize_plain_text(value, max_length: int, *, preserve_newlines: bool = False) -> str:
     """Strip markup/control characters and normalize whitespace before storage."""
     text = unescape(str(value or ""))
-    text = _TAG_RE.sub(" ", text)
+    text = _DANGEROUS_BLOCK_RE.sub(" ", text)\n    text = _TAG_RE.sub(" ", text)
     cleaned = []
     for char in text:
         category = unicodedata.category(char)
