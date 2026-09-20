@@ -11,7 +11,7 @@ from accounts.permissions import HasActionPermission, IsActiveAccount
 from audit.services import record_audit
 from .models import BillingStatus, Invoice, InvoiceLineItem, Payment, PaymentStatus, Receipt
 from .serializers import InvoiceLineItemSerializer, InvoiceLineItemWriteSerializer, InvoiceSerializer, PaymentRecordSerializer, PaymentSerializer, ReceiptSerializer
-from .services import add_invoice_line, notify_admins, notify_school, record_payment, recalculate_invoice, update_invoice_line, verify_pending_payment
+from .services import add_invoice_line, notify_admins, notify_school, record_payment, recalculate_invoice, update_invoice_line, verify_pending_payment, issue_invoice
 
 
 class BillingScopedMixin:
@@ -74,15 +74,7 @@ class InvoiceViewSet(BillingScopedMixin, viewsets.ModelViewSet):
     def issue(self, request, pk=None):
         self.role_only(UserRole.ADMIN)
         invoice = self.get_object()
-        if invoice.status != BillingStatus.DRAFT:
-            raise ValidationError("Only draft invoices can be issued.")
-        recalculate_invoice(invoice)
-        if invoice.total_amount <= 0:
-            raise ValidationError("An invoice must have a positive total before it can be issued.")
-        invoice.status = BillingStatus.ISSUED
-        invoice.save(update_fields=["status", "updated_at"])
-        notify_school(invoice.school, title=f"New invoice {invoice.invoice_number}", message=f"Pixiu Tech has issued an invoice of ₹{invoice.total_amount:.2f}. Please review it in Billing & Contracts. Payment status: unpaid.", event_key=f"invoice-issued:{invoice.id}", metadata={"invoice_id": str(invoice.id), "status": invoice.status, "amount": str(invoice.total_amount)})
-        record_audit(actor=request.user, action="update", entity_type="Invoice", entity_id=invoice.id, summary=f"Issued invoice {invoice.invoice_number}", changes={"status": "issued"}, request=request)
+        invoice = issue_invoice(invoice=invoice, issued_by=request.user)
         return Response(self.get_serializer(invoice).data)
 
     @action(detail=True, methods=["post"])
