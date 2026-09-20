@@ -34,10 +34,10 @@ export default function CookieConsent() {
   }
 
   return (
-    <aside className="privacy-consent" role="dialog" aria-modal="true" aria-label="Cookie preferences" aria-describedby="privacy-consent-copy" aria-live="polite">
+    <aside className="privacy-consent" role="dialog" aria-modal="true" aria-label="Cookie preferences" aria-labelledby="privacy-consent-title" aria-describedby="privacy-consent-description" aria-live="polite">
       <div className="privacy-consent__copy">
-        <strong id="privacy-consent-copy">Privacy choices</strong>
-        <p>We use optional analytics cookies to understand how visitors use Pixiu Tech. Essential site functions work without them.</p>
+        <strong id="privacy-consent-title">Privacy choices</strong>
+        <p id="privacy-consent-description">We use optional analytics cookies to understand how visitors use Pixiu Tech. Essential site functions work without them.</p>
         <Link to="/privacy">Read our Privacy Policy</Link>
       </div>
       <div className="privacy-consent__actions">
