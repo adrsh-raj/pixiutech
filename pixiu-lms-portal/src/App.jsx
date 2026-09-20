@@ -121,7 +121,7 @@ export default function App() { return <ToastProvider><AuthProvider><DataProvide
     <Route path="website-enquiries" element={<AdminOnly><WebsiteEnquiries /></AdminOnly>} />
     <Route path="careers" element={<AdminOnly><CareerManagement /></AdminOnly>} />
     <Route path="schools" element={<AdminOnly><SchoolsV2 /></AdminOnly>} />
-    <Route path="payments" element={<AdminOnly><Payments /></AdminOnly>} />
+    <Route path="payments" element={<AdminOnly><Navigate to="/billing" replace /></AdminOnly>} />
     <Route path="notifications" element={<RoleRoute roles={['admin','superadmin','school','trainer','student']}><Notifications /></RoleRoute>} />
     <Route path="settings" element={<AdminOnly><Settings /></AdminOnly>} />
     <Route path="logs" element={<AdminOnly><AuditLogs /></AdminOnly>} />
