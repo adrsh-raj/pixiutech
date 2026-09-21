@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom"
-import { CircuitBoard, Play, Square, Trash2, ArrowLeft, Undo2, Redo2, Save, Upload, Download, FolderOpen, Terminal, Volume2, VolumeX, Sparkles, Camera, Sliders, Pause, StepForward, FastForward } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
+import { CircuitBoard, Play, Square, Trash2, ArrowLeft, Undo2, Redo2, Save, Download, FolderOpen, Terminal, Volume2, VolumeX, Sparkles, Camera, Sliders, Pause, StepForward, FastForward, MoreHorizontal, HelpCircle } from "lucide-react"
 
 export type WorkbenchView = "circuit" | "code" | "3d"
 
@@ -17,6 +18,7 @@ interface Props {
   onUpload?: () => void
   onExport?: () => void
   onOpenProjects?: () => void
+  onOpenGuide?: () => void
   isSerialOpen?: boolean
   onToggleSerial?: () => void
   isAiCameraOpen?: boolean
@@ -58,6 +60,7 @@ export function Toolbar({
   onUpload,
   onExport,
   onOpenProjects,
+  onOpenGuide,
   isSerialOpen = false,
   onToggleSerial,
   isAiCameraOpen = false,
@@ -77,6 +80,17 @@ export function Toolbar({
   onDebugSpeedChange,
   activeStepLabel,
 }: Props) {
+  const [toolsOpen, setToolsOpen] = useState(false)
+  const toolsRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    const close = (event: MouseEvent) => {
+      if (toolsRef.current && !toolsRef.current.contains(event.target as Node)) setToolsOpen(false)
+    }
+    document.addEventListener("mousedown", close)
+    return () => document.removeEventListener("mousedown", close)
+  }, [])
+
   return (
     <header className="flex h-12 md:h-14 shrink-0 items-center justify-between border-b border-border bg-card px-2.5 sm:px-4 gap-1.5 sm:gap-2">
       {/* LEFT: Back + CyberLab Logo */}
@@ -204,145 +218,120 @@ export function Toolbar({
         </div>
       </div>
 
-      {/* RIGHT: Secondary Tools & Utilities */}
-      <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-        {/* Project Manager */}
-      {onOpenProjects && (
-        <button
-          onClick={onOpenProjects}
-          className="flex items-center gap-1.5 rounded-lg border border-blue-400/30 bg-blue-500/10 px-2 sm:px-2.5 py-1.5 text-xs font-bold text-blue-200 transition hover:bg-blue-500/15 cursor-pointer"
-          title="Open project manager: save, load, import and download circuits"
-        >
-          <FolderOpen size={13} />
-          <span className="hidden md:inline">Projects</span>
-        </button>
-      )}
-
-      {/* Project File Controls */}
-        {onSave && (
+      {/* RIGHT: compact grouped tools */}
+      <div className="flex items-center gap-1.5 shrink-0" ref={toolsRef}>
+        {onOpenProjects && (
           <button
-            onClick={onSave}
-            className="hidden lg:flex items-center gap-1 rounded-lg border border-primary/30 bg-primary/10 hover:bg-primary/15 text-primary px-2 sm:px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer"
-            title="Save this circuit to this browser"
+            onClick={onOpenProjects}
+            className="flex items-center gap-1.5 rounded-lg border border-blue-400/30 bg-blue-500/10 px-2.5 py-1.5 text-xs font-bold text-blue-100 transition hover:bg-blue-500/15 cursor-pointer"
+            title="Projects: save, load, import and export"
           >
-            <Save size={13} />
-            <span className="hidden xl:inline">Save</span>
+            <FolderOpen size={14} />
+            <span className="hidden lg:inline">Projects</span>
           </button>
         )}
 
-        {onUpload && (
+        <div className="relative">
           <button
-            onClick={onUpload}
-            className="hidden lg:flex items-center gap-1 rounded-lg border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/15 text-blue-600 dark:text-blue-300 px-2 sm:px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer"
-            title="Upload a .pixiu circuit file"
+            onClick={() => setToolsOpen((value) => !value)}
+            aria-expanded={toolsOpen}
+            aria-haspopup="menu"
+            className={"flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold transition cursor-pointer " + (
+              toolsOpen ? "border-primary/50 bg-primary/10 text-primary" : "border-border bg-background text-muted-foreground hover:bg-secondary hover:text-foreground"
+            )}
+            title="Open lab tools"
           >
-            <Upload size={13} />
-            <span className="hidden xl:inline">Upload</span>
+            <MoreHorizontal size={15} />
+            <span className="hidden lg:inline">Tools</span>
           </button>
-        )}
 
-        {onExport && (
-          <button
-            onClick={onExport}
-            className="hidden lg:flex items-center gap-1 rounded-lg border border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-700 px-2 sm:px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer"
-            title="Download this circuit as a .pixiu file"
-          >
-            <Download size={13} />
-            <span className="hidden xl:inline">Download</span>
-          </button>
-        )}
+          {toolsOpen && (
+            <div
+              role="menu"
+              className="absolute right-0 top-[calc(100%+7px)] z-[70] w-64 overflow-hidden rounded-2xl border border-border bg-slate-950/95 p-1.5 shadow-2xl backdrop-blur-xl"
+            >
+              <div className="px-2 py-1.5 text-[9px] font-mono uppercase tracking-[0.18em] text-slate-500">Lab tools</div>
 
-        {/* Templates (Desktop) */}
-        {onOpenTemplates && (
-          <button
-            onClick={onOpenTemplates}
-            className="hidden lg:flex items-center gap-1 rounded-lg border border-indigo-500/30 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 px-2 sm:px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer"
-            title="Browse Curriculum Project Templates"
-          >
-            <Sparkles size={13} />
-            <span className="hidden xl:inline">Templates</span>
-          </button>
-        )}
+              {onOpenGuide && (
+                <button
+                  onClick={() => { setToolsOpen(false); onOpenGuide() }}
+                  className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-xs font-semibold text-slate-200 hover:bg-slate-800"
+                  role="menuitem"
+                >
+                  <HelpCircle size={14} className="text-cyan-300" />
+                  <span><span className="block">Guided tour</span><span className="text-[9px] font-normal text-slate-500">Learn the studio in one minute</span></span>
+                </button>
+              )}
 
-        {/* Delete Selected Wire button */}
-        {selectedWireId && onDeleteSelectedWire && (
-          <button
-            onClick={onDeleteSelectedWire}
-            className="flex items-center gap-1 rounded-lg border border-red-500/40 bg-red-500/15 text-red-400 px-2 sm:px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer"
-            title="Delete Selected Wire"
-          >
-            <Trash2 size={13} />
-            <span className="hidden sm:inline">Delete</span>
-          </button>
-        )}
+              {onOpenTemplates && (
+                <button
+                  onClick={() => { setToolsOpen(false); onOpenTemplates() }}
+                  className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-xs font-semibold text-slate-200 hover:bg-slate-800"
+                  role="menuitem"
+                >
+                  <Sparkles size={14} className="text-violet-300" />
+                  <span><span className="block">Templates</span><span className="text-[9px] font-normal text-slate-500">Start from a curriculum project</span></span>
+                </button>
+              )}
 
-        {/* AI Vision Camera Toggle */}
-        {onToggleAiCamera && (
-          <button
-            onClick={onToggleAiCamera}
-            title="Toggle AI Vision Camera"
-            className={`flex items-center gap-1 rounded-lg border px-2 sm:px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer ${
-              isAiCameraOpen
-                ? "border-purple-500 bg-purple-500/25 text-purple-300 shadow-sm shadow-purple-500/30"
-                : "border-border text-muted-foreground hover:bg-purple-950/20 hover:text-purple-300 hover:border-purple-500/40"
-            }`}
-          >
-            <Camera className="h-3.5 w-3.5 text-purple-400" />
-            <span className="hidden xl:inline">AI Camera</span>
-          </button>
-        )}
+              {onToggleAiCamera && (
+                <button
+                  onClick={() => { setToolsOpen(false); onToggleAiCamera() }}
+                  className="flex w-full items-center justify-between gap-2 rounded-xl px-2.5 py-2 text-left text-xs font-semibold text-slate-200 hover:bg-slate-800"
+                  role="menuitem"
+                >
+                  <span className="flex items-center gap-2"><Camera size={14} className="text-purple-300" />AI Camera</span>
+                  <span className="text-[9px] text-slate-500">{isAiCameraOpen ? "ON" : "OFF"}</span>
+                </button>
+              )}
 
-        {/* Inspector Panel Toggle (Desktop) */}
-        {onToggleInspector && (
-          <button
-            onClick={onToggleInspector}
-            title="Toggle Inspector Panel (Properties & Stats)"
-            className={`hidden md:flex items-center gap-1 rounded-lg border px-2 sm:px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer ${
-              isInspectorOpen
-                ? "border-primary bg-primary/10 text-primary"
-                : "border-border text-muted-foreground hover:bg-secondary hover:text-foreground"
-            }`}
-          >
-            <Sliders className="h-3.5 w-3.5" />
-            <span className="hidden xl:inline">Inspector</span>
-          </button>
-        )}
+              <div className="my-1 border-t border-slate-800" />
 
-        {/* Serial Monitor Toggle */}
-        {onToggleSerial && (
-          <button
-            onClick={onToggleSerial}
-            className={`hidden sm:flex items-center gap-1 rounded-lg border px-2 sm:px-2.5 py-1.5 text-xs font-mono transition cursor-pointer ${
-              isSerialOpen
-                ? "border-primary bg-primary/10 text-primary"
-                : "border-border text-muted-foreground hover:bg-secondary hover:text-foreground"
-            }`}
-            title="Toggle Serial Monitor"
-          >
-            <Terminal className="h-3.5 w-3.5" />
-            <span className="hidden xl:inline">Serial</span>
-          </button>
-        )}
+              {onToggleInspector && (
+                <button
+                  onClick={() => { setToolsOpen(false); onToggleInspector() }}
+                  className="flex w-full items-center justify-between gap-2 rounded-xl px-2.5 py-2 text-left text-xs font-semibold text-slate-200 hover:bg-slate-800"
+                  role="menuitem"
+                >
+                  <span className="flex items-center gap-2"><Sliders size={14} />Inspector</span>
+                  <span className="text-[9px] text-slate-500">{isInspectorOpen ? "VISIBLE" : "HIDDEN"}</span>
+                </button>
+              )}
 
-        {/* Mute Audio */}
-        <button
-          onClick={onToggleMute}
-          className="hidden md:flex p-1.5 rounded-lg border border-border text-muted-foreground hover:bg-secondary hover:text-foreground transition cursor-pointer"
-          title={isMuted ? "Unmute Sound" : "Mute Sound"}
-        >
-          {isMuted ? <VolumeX className="h-4 w-4 text-red-400" /> : <Volume2 className="h-4 w-4" />}
-        </button>
+              {onToggleSerial && (
+                <button
+                  onClick={() => { setToolsOpen(false); onToggleSerial() }}
+                  className="flex w-full items-center justify-between gap-2 rounded-xl px-2.5 py-2 text-left text-xs font-semibold text-slate-200 hover:bg-slate-800"
+                  role="menuitem"
+                >
+                  <span className="flex items-center gap-2"><Terminal size={14} />Serial monitor</span>
+                  <span className="text-[9px] text-slate-500">{isSerialOpen ? "OPEN" : "CLOSED"}</span>
+                </button>
+              )}
 
-        {/* Clear Canvas */}
-        <button
-          onClick={onClear}
-          className="hidden md:flex items-center gap-1 rounded-lg border border-border px-2 sm:px-2.5 py-1.5 text-xs text-muted-foreground transition hover:bg-destructive/15 hover:text-destructive hover:border-destructive/40 cursor-pointer"
-          title="Clear Canvas"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-          <span className="hidden 2xl:inline">Clear</span>
-        </button>
+              {onToggleMute && (
+                <button
+                  onClick={() => { setToolsOpen(false); onToggleMute() }}
+                  className="flex w-full items-center justify-between gap-2 rounded-xl px-2.5 py-2 text-left text-xs font-semibold text-slate-200 hover:bg-slate-800"
+                  role="menuitem"
+                >
+                  <span className="flex items-center gap-2">{isMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}Sound</span>
+                  <span className="text-[9px] text-slate-500">{isMuted ? "MUTED" : "ON"}</span>
+                </button>
+              )}
+
+              <div className="my-1 border-t border-slate-800" />
+
+              {onClear && (
+                <button
+                  onClick={() => { setToolsOpen(false); onClear() }}
+                  className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-xs font-semibold text-red-300 hover:bg-red-500/10"
+                  role="menuitem"
+                >
+                  <Trash2 size={14} />Clear canvas
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
-    </header>
-  )
-}
