@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom"
 import { useEffect, useRef, useState } from "react"
-import { CircuitBoard, Play, Square, Trash2, ArrowLeft, Undo2, Redo2, Save, Download, FolderOpen, Terminal, Volume2, VolumeX, Sparkles, Camera, Sliders, Pause, StepForward, FastForward, MoreHorizontal, HelpCircle } from "lucide-react"
+import { CircuitBoard, Play, Square, Trash2, ArrowLeft, Undo2, Redo2, FolderOpen, Terminal, Volume2, VolumeX, Sparkles, Camera, Sliders, Pause, StepForward, FastForward, MoreHorizontal, HelpCircle } from "lucide-react"
 
 export type WorkbenchView = "circuit" | "code" | "3d"
 
@@ -14,9 +14,6 @@ interface Props {
   onUndo?: () => void
   canRedo?: boolean
   onRedo?: () => void
-  onSave?: () => void
-  onUpload?: () => void
-  onExport?: () => void
   onOpenProjects?: () => void
   onOpenGuide?: () => void
   isSerialOpen?: boolean
@@ -56,9 +53,6 @@ export function Toolbar({
   onUndo,
   canRedo = false,
   onRedo,
-  onSave,
-  onUpload,
-  onExport,
   onOpenProjects,
   onOpenGuide,
   isSerialOpen = false,
