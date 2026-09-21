@@ -385,9 +385,9 @@ export const LESSONS: Lesson[] = [
         instructions: "Wire D13 → resistor A, resistor B → LED anode, and LED cathode → GND.",
         kind: "build",
         checks: [{ kind: "connections", requirements: [
-          { from: { partType: "arduino-uno", pinId: "d13" }, to: { partType: "resistor", pinId: "a" } },
-          { from: { partType: "resistor", pinId: "b" }, to: { partType: "led", pinId: "anode" } },
-          { from: { partType: "led", pinId: "cathode" }, to: { partType: "arduino-uno", pinId: "gnd" } },
+          { from: { partType: "arduino-uno", pinId: "d13", partId: "uno" }, to: { partType: "resistor", pinId: "a", partId: "r1" } },
+          { from: { partType: "resistor", pinId: "b", partId: "r1" }, to: { partType: "led", pinId: "anode", partId: "led1" } },
+          { from: { partType: "led", pinId: "cathode", partId: "led1" }, to: { partType: "arduino-uno", pinId: "gnd", partId: "uno" } },
         ] }],
         success: "The LED loop is wired correctly.",
       },
@@ -441,9 +441,9 @@ export const LESSONS: Lesson[] = [
         instructions: "Connect D12, D11 and D10 through their own resistors to the three LED anodes. Connect all cathodes to GND.",
         kind: "build",
         checks: [{ kind: "connections", requirements: [
-          { from: { partType: "arduino-uno", pinId: "d12" }, to: { partType: "resistor", pinId: "a" } },
-          { from: { partType: "arduino-uno", pinId: "d11" }, to: { partType: "resistor", pinId: "a" } },
-          { from: { partType: "arduino-uno", pinId: "d10" }, to: { partType: "resistor", pinId: "a" } },
+          { from: { partType: "arduino-uno", pinId: "d12", partId: "uno" }, to: { partType: "resistor", pinId: "a", partId: "r1" } },
+          { from: { partType: "arduino-uno", pinId: "d11", partId: "uno" }, to: { partType: "resistor", pinId: "a", partId: "r2" } },
+          { from: { partType: "arduino-uno", pinId: "d10", partId: "uno" }, to: { partType: "resistor", pinId: "a", partId: "r3" } },
         ] }],
         success: "All three control lines are connected.",
       },
@@ -463,8 +463,10 @@ export const LESSONS: Lesson[] = [
         title: "Watch the intersection",
         instructions: "Run the simulation and check this step. One of the signal LEDs should be active as the sequence progresses.",
         kind: "run",
-        checks: [{ kind: "running" }, { kind: "runtime", requirements: [
+        checks: [{ kind: "running" }, { kind: "runtime-any", requirements: [
           { partId: "red_led", field: "level", min: 0.05 },
+          { partId: "yellow_led", field: "level", min: 0.05 },
+          { partId: "green_led", field: "level", min: 0.05 },
         ] }],
         success: "The traffic-light program is driving the red channel.",
       },
