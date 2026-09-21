@@ -107,7 +107,7 @@ const TOOLBOX = {
         { kind: 'block', type: 'joystick_button' },
         { kind: 'block', type: 'soil_moisture_read' },
         { kind: 'block', type: 'encoder_read' },
-        { kind: 'keypad_read' },
+        { kind: 'block', type: 'keypad_read' },
       ],
     },
     {
