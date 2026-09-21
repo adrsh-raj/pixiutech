@@ -1,4 +1,4 @@
-import type { PartType, PartEducationalMeta } from "./circuit-types"
+import type { PartType, PartEducationalMeta, PinDef } from "./circuit-types"
 import { CATALOG, PALETTE_ORDER } from "./components-catalog"
 
 export type ComponentCategory = "controller" | "basic" | "sensor" | "display" | "output" | "motor" | "driver" | "input"
@@ -7,6 +7,7 @@ export interface ComponentRegistryEntry {
   type: PartType
   name: string
   category: ComponentCategory
+  pins: PinDef[]
   visualModel: string
   electricalModel: string
   runtimeModel: string
@@ -172,6 +173,7 @@ function createEntry(type: PartType): ComponentRegistryEntry {
     type,
     name: def.name,
     category,
+    pins: def.pins,
     visualModel: "PartArt:" + type,
     electricalModel: override.electricalModel ?? "passive-or-module-default",
     runtimeModel: override.runtimeModel ?? "catalog-runtime:" + type,
