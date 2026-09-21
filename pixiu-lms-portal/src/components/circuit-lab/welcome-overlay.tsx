@@ -119,7 +119,7 @@ export function WelcomeOverlay({ onOpenProjects }: { onOpenProjects: () => void 
             <div className="relative grid w-full max-w-xs gap-3">
               {["Palette → Canvas", "Interactive Inspector", "Run + Scope", "Projects + .pixiu"].map((label, i) => (
                 <div key={label} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-950/65 p-3 backdrop-blur">
-                  <div className="grid h-9 w-9 place-items-center rounded-xl bg-blue-500/15 text-blue-300">{[CircuitBoard, MousePointer2, Zap, CheckCircle2][i]({ size: 16 })}</div>
+                  <div className="grid h-9 w-9 place-items-center rounded-xl bg-blue-500/15 text-blue-300">{(() => { const MiniIcon = [CircuitBoard, MousePointer2, Zap, CheckCircle2][i]; return <MiniIcon size={16} /> })()}</div>
                   <div>
                     <p className="text-xs font-bold">{label}</p>
                     <p className="text-[10px] text-slate-500">{["Wire without fear.", "Touch the controls.", "See the physics.", "Carry your work."][i]}</p>
