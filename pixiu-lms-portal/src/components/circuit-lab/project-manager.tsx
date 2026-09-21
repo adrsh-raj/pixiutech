@@ -65,6 +65,7 @@ export function ProjectManager({
   onImport,
   onLoad,
   onExportCurrent,
+  isSaving,
 }: Props) {
   const [projects, setProjects] = useState<SavedCircuit[]>([])
   const [name, setName] = useState(currentProjectName)
