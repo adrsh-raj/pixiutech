@@ -122,11 +122,9 @@ export function Multimeter({
   }
 
   // Dynamically solve exact nodal potentials across entire circuit network
-  const pinStatesJson = useMemo(() => JSON.stringify(pinStates), [pinStates])
-
   const nodalSolution = useMemo(() => {
     return solveCircuitNodalPotentials(state, new Set(), pinStates, running)
-  }, [state, pinStatesJson, running])
+  }, [state, pinStates, running])
 
   const infoRed = useMemo(() => nodalSolution.getPinInfo(probeRed), [nodalSolution, probeRed])
   const infoBlack = useMemo(() => nodalSolution.getPinInfo(probeBlack), [nodalSolution, probeBlack])
