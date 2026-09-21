@@ -328,8 +328,8 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "no", label: "NO", x: 40, y: 4, kind: "passive" },
       { id: "nc", label: "NC", x: 65, y: 4, kind: "passive" },
     ],
-  },,
-  relay: {
+  },
+
     type: "relay",
     name: "Relay Module",
     blurb: "5V single-channel relay for controlled switching",
