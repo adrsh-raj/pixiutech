@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom"
-import { CircuitBoard, Play, Square, Trash2, ArrowLeft, Undo2, Redo2, Save, Upload, Download, Terminal, Volume2, VolumeX, Sparkles, Camera, Sliders, Pause, StepForward, FastForward } from "lucide-react"
+import { CircuitBoard, Play, Square, Trash2, ArrowLeft, Undo2, Redo2, Save, Upload, Download, FolderOpen, Terminal, Volume2, VolumeX, Sparkles, Camera, Sliders, Pause, StepForward, FastForward } from "lucide-react"
 
 export type WorkbenchView = "circuit" | "code" | "3d"
 
@@ -16,6 +16,7 @@ interface Props {
   onSave?: () => void
   onUpload?: () => void
   onExport?: () => void
+  onOpenProjects?: () => void
   isSerialOpen?: boolean
   onToggleSerial?: () => void
   isAiCameraOpen?: boolean
@@ -56,6 +57,7 @@ export function Toolbar({
   onSave,
   onUpload,
   onExport,
+  onOpenProjects,
   isSerialOpen = false,
   onToggleSerial,
   isAiCameraOpen = false,
@@ -204,7 +206,19 @@ export function Toolbar({
 
       {/* RIGHT: Secondary Tools & Utilities */}
       <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-        {/* Project File Controls */}
+        {/* Project Manager */}
+      {onOpenProjects && (
+        <button
+          onClick={onOpenProjects}
+          className="flex items-center gap-1.5 rounded-lg border border-blue-400/30 bg-blue-500/10 px-2 sm:px-2.5 py-1.5 text-xs font-bold text-blue-200 transition hover:bg-blue-500/15 cursor-pointer"
+          title="Open project manager: save, load, import and download circuits"
+        >
+          <FolderOpen size={13} />
+          <span className="hidden md:inline">Projects</span>
+        </button>
+      )}
+
+      {/* Project File Controls */}
         {onSave && (
           <button
             onClick={onSave}
