@@ -4,7 +4,7 @@
  * palette without changing the rest of the Pixiu portal.
  */
 
-.circuit-lab-blue-theme {
+:root .circuit-lab-blue-theme {
   --color-pixiu-dark: #070B14;
   --color-pixiu-blue: #1D6EFF;
   --color-pixiu-cyan: #00D2FF;
@@ -71,66 +71,66 @@
 }
 
 /* Hard overrides for the semantic utility classes used by the lab. */
-.circuit-lab-blue-theme .bg-background,
-.circuit-lab-blue-theme [class*="bg-background/"] {
+:root .circuit-lab-blue-theme .bg-background,
+:root .circuit-lab-blue-theme [class*="bg-background/"] {
   background-color: #0F172A !important;
 }
 
-.circuit-lab-blue-theme .bg-card,
-.circuit-lab-blue-theme [class*="bg-card/"] {
+:root .circuit-lab-blue-theme .bg-card,
+:root .circuit-lab-blue-theme [class*="bg-card/"] {
   background-color: #1E293B !important;
 }
 
-.circuit-lab-blue-theme .bg-sidebar {
+:root .circuit-lab-blue-theme .bg-sidebar {
   background-color: #131D31 !important;
 }
 
-.circuit-lab-blue-theme .bg-secondary,
-.circuit-lab-blue-theme [class*="bg-secondary/"] {
+:root .circuit-lab-blue-theme .bg-secondary,
+:root .circuit-lab-blue-theme [class*="bg-secondary/"] {
   background-color: #253349 !important;
 }
 
-.circuit-lab-blue-theme .text-foreground {
+:root .circuit-lab-blue-theme .text-foreground {
   color: #F8FAFC !important;
 }
 
-.circuit-lab-blue-theme .text-muted-foreground,
-.circuit-lab-blue-theme [class*="text-muted-foreground/"] {
+:root .circuit-lab-blue-theme .text-muted-foreground,
+:root .circuit-lab-blue-theme [class*="text-muted-foreground/"] {
   color: #94A3B8 !important;
 }
 
-.circuit-lab-blue-theme .text-primary {
+:root .circuit-lab-blue-theme .text-primary {
   color: #1D6EFF !important;
 }
 
-.circuit-lab-blue-theme .border-border,
-.circuit-lab-blue-theme [class*="border-border/"] {
+:root .circuit-lab-blue-theme .border-border,
+:root .circuit-lab-blue-theme [class*="border-border/"] {
   border-color: #334155 !important;
 }
 
-.circuit-lab-blue-theme .text-blue-300 { color: #93C5FD !important; }
-.circuit-lab-blue-theme .text-blue-400 { color: #60A5FA !important; }
-.circuit-lab-blue-theme .text-blue-500 { color: #3B82F6 !important; }
-.circuit-lab-blue-theme .text-blue-600 { color: #2563EB !important; }
+:root .circuit-lab-blue-theme .text-blue-300 { color: #93C5FD !important; }
+:root .circuit-lab-blue-theme .text-blue-400 { color: #60A5FA !important; }
+:root .circuit-lab-blue-theme .text-blue-500 { color: #3B82F6 !important; }
+:root .circuit-lab-blue-theme .text-blue-600 { color: #2563EB !important; }
 
-.circuit-lab-blue-theme .text-cyan-300 { color: #67E8F9 !important; }
-.circuit-lab-blue-theme .text-cyan-400 { color: #22D3EE !important; }
-.circuit-lab-blue-theme .text-cyan-500 { color: #06B6D4 !important; }
+:root .circuit-lab-blue-theme .text-cyan-300 { color: #67E8F9 !important; }
+:root .circuit-lab-blue-theme .text-cyan-400 { color: #22D3EE !important; }
+:root .circuit-lab-blue-theme .text-cyan-500 { color: #06B6D4 !important; }
 
-.circuit-lab-blue-theme .bg-slate-800,
-.circuit-lab-blue-theme [class*="bg-slate-800/"] { background-color: #1E293B !important; }
-.circuit-lab-blue-theme .bg-slate-900,
-.circuit-lab-blue-theme [class*="bg-slate-900/"] { background-color: #0F172A !important; }
-.circuit-lab-blue-theme .bg-slate-950,
-.circuit-lab-blue-theme [class*="bg-slate-950/"] { background-color: #020617 !important; }
+:root .circuit-lab-blue-theme .bg-slate-800,
+:root .circuit-lab-blue-theme [class*="bg-slate-800/"] { background-color: #1E293B !important; }
+:root .circuit-lab-blue-theme .bg-slate-900,
+:root .circuit-lab-blue-theme [class*="bg-slate-900/"] { background-color: #0F172A !important; }
+:root .circuit-lab-blue-theme .bg-slate-950,
+:root .circuit-lab-blue-theme [class*="bg-slate-950/"] { background-color: #020617 !important; }
 
-.circuit-lab-blue-theme .text-slate-200 { color: #E2E8F0 !important; }
-.circuit-lab-blue-theme .text-slate-300 { color: #CBD5E1 !important; }
-.circuit-lab-blue-theme .text-slate-400 { color: #94A3B8 !important; }
-.circuit-lab-blue-theme .text-slate-500 { color: #64748B !important; }
-.circuit-lab-blue-theme .text-slate-600 { color: #475569 !important; }
+:root .circuit-lab-blue-theme .text-slate-200 { color: #E2E8F0 !important; }
+:root .circuit-lab-blue-theme .text-slate-300 { color: #CBD5E1 !important; }
+:root .circuit-lab-blue-theme .text-slate-400 { color: #94A3B8 !important; }
+:root .circuit-lab-blue-theme .text-slate-500 { color: #64748B !important; }
+:root .circuit-lab-blue-theme .text-slate-600 { color: #475569 !important; }
 
-.circuit-lab-blue-theme .border-slate-700,
-.circuit-lab-blue-theme [class*="border-slate-700/"] { border-color: #334155 !important; }
-.circuit-lab-blue-theme .border-slate-800,
-.circuit-lab-blue-theme [class*="border-slate-800/"] { border-color: #1E293B !important; }
+:root .circuit-lab-blue-theme .border-slate-700,
+:root .circuit-lab-blue-theme [class*="border-slate-700/"] { border-color: #334155 !important; }
+:root .circuit-lab-blue-theme .border-slate-800,
+:root .circuit-lab-blue-theme [class*="border-slate-800/"] { border-color: #1E293B !important; }
