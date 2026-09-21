@@ -48,11 +48,15 @@ export function Oscilloscope({
   const [isHold, setIsHold] = useState(false)
   const [minimized, setMinimized] = useState(false)
   const [timebaseIndex, setTimebaseIndex] = useState(2) // 250ms / 2.5s window default
-  const [position, setPosition] = useState<{ x: number; y: number } | null>(null)
   const [isDragging, setIsDragging] = useState(false)
-  const [history, setHistory] = useState<WaveformPoint[]>([])
+  const [renderTick, setRenderTick] = useState(0)
 
   const historyRef = useRef<WaveformPoint[]>([])
+  const positionRef = useRef<{ x: number; y: number } | null>(null)
+  const hasCustomPositionRef = useRef(false)
+  const pinStatesRef = useRef(pinStates)
+  const runtimeRef = useRef(runtime)
+  const stateRef = useRef(state)
   const dragStartRef = useRef<{ mouseX: number; mouseY: number; startX: number; startY: number }>({
     mouseX: 0,
     mouseY: 0,
@@ -63,42 +67,72 @@ export function Oscilloscope({
 
   const activeWindowMs = TIMEBASE_OPTIONS[timebaseIndex].windowMs
 
-  // Real-time sampling loop (running at ~40-50Hz)
+  // Keep rapidly-changing simulation inputs in refs so the sampling interval
+  // does not get torn down and recreated on every simulation tick.
+  useEffect(() => {
+    pinStatesRef.current = pinStates
+  }, [pinStates])
+
+  useEffect(() => {
+    runtimeRef.current = runtime
+  }, [runtime])
+
+  useEffect(() => {
+    stateRef.current = state
+  }, [state])
+
+  // Real-time sampling loop. Sample at 40Hz but repaint the React/SVG view at ~13-15fps.
   useEffect(() => {
     if (!isOpen) return
 
+    let frameCounter = 0
     const interval = setInterval(() => {
       if (isHold) return
 
       const now = performance.now()
-      const v1 = running ? samplePinVoltage(probeCH1, state, pinStates, runtime, now) : 0
-      const v2 = running ? samplePinVoltage(probeCH2, state, pinStates, runtime, now) : 0
+      const currentState = stateRef.current
+      const currentPinStates = pinStatesRef.current
+      const currentRuntime = runtimeRef.current
+      const v1 = running
+        ? samplePinVoltage(probeCH1, currentState, currentPinStates, currentRuntime, now)
+        : 0
+      const v2 = running
+        ? samplePinVoltage(probeCH2, currentState, currentPinStates, currentRuntime, now)
+        : 0
 
-      const newPoint: WaveformPoint = { t: now, v1, v2 }
-      const updated = [...historyRef.current, newPoint]
+      const buf = historyRef.current
+      buf.push({ t: now, v1, v2 })
 
-      // Keep window of points matching activeWindowMs + buffer
       const cutoff = now - activeWindowMs * 1.2
-      const trimmed = updated.filter((p) => p.t >= cutoff).slice(-500)
+      while (buf.length > 0 && buf[0].t < cutoff) {
+        buf.shift()
+      }
 
-      historyRef.current = trimmed
-      setHistory(trimmed)
+      if (buf.length > 500) {
+        historyRef.current = buf.slice(-500)
+      }
+
+      frameCounter += 1
+      if (frameCounter % 3 === 0) {
+        setRenderTick((prev) => prev + 1)
+      }
     }, 25)
 
     return () => clearInterval(interval)
-  }, [isOpen, running, isHold, probeCH1, probeCH2, state, pinStates, runtime, activeWindowMs])
+  }, [isOpen, running, isHold, probeCH1, probeCH2, activeWindowMs])
 
-  // Compute live channel metrics
+  // Compute metrics from the ref-backed waveform only when a render tick is requested.
   const metricsCH1 = useMemo(
-    () => computeChannelMetrics(history, "v1", Boolean(probeCH1)),
-    [history, probeCH1]
+    () => computeChannelMetrics(historyRef.current, "v1", Boolean(probeCH1)),
+    [renderTick, probeCH1]
   )
   const metricsCH2 = useMemo(
-    () => computeChannelMetrics(history, "v2", Boolean(probeCH2)),
-    [history, probeCH2]
+    () => computeChannelMetrics(historyRef.current, "v2", Boolean(probeCH2)),
+    [renderTick, probeCH2]
   )
 
-  // Drag handlers
+  // Drag handlers: position the fixed panel directly in the DOM. React only
+  // toggles the positioning mode once per drag, avoiding pointer-move re-renders.
   const handlePointerDown = (e: React.PointerEvent) => {
     if ((e.target as HTMLElement).closest("button") || (e.target as HTMLElement).closest("input")) return
     const panel = panelRef.current
@@ -111,6 +145,14 @@ export function Oscilloscope({
       startX: rect.left,
       startY: rect.top,
     }
+
+    positionRef.current = { x: rect.left, y: rect.top }
+    hasCustomPositionRef.current = true
+    panel.style.left = `${rect.left}px`
+    panel.style.top = `${rect.top}px`
+    panel.style.right = "auto"
+    panel.style.bottom = "auto"
+
     setIsDragging(true)
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
   }
@@ -125,7 +167,12 @@ export function Oscilloscope({
 
     const newX = Math.max(10, Math.min(window.innerWidth - panelWidth - 10, dragStartRef.current.startX + dx))
     const newY = Math.max(10, Math.min(window.innerHeight - panelHeight - 10, dragStartRef.current.startY + dy))
-    setPosition({ x: newX, y: newY })
+    positionRef.current = { x: newX, y: newY }
+
+    if (panel) {
+      panel.style.left = `${newX}px`
+      panel.style.top = `${newY}px`
+    }
   }
 
   const handlePointerUp = (e: React.PointerEvent) => {
@@ -161,6 +208,7 @@ export function Oscilloscope({
   const vMaxScale = 5.5 // 0V to 5.5V full scale
 
   const generatePath = (channel: "v1" | "v2") => {
+    const history = historyRef.current
     if (history.length === 0) return ""
     const latestT = history[history.length - 1].t
     const startT = latestT - activeWindowMs
@@ -203,12 +251,9 @@ export function Oscilloscope({
   return (
     <div
       ref={panelRef}
-      style={{
-        transform: position ? `translate(${position.x}px, ${position.y}px)` : undefined,
-        touchAction: "none",
-      }}
+      style={{ touchAction: "none" }}
       className={`fixed z-30 transition-shadow select-none ${
-        position ? "" : "bottom-14 left-4 sm:left-76 md:left-80"
+        hasCustomPositionRef.current ? "" : "bottom-14 left-4 sm:left-76 md:left-80"
       }`}
     >
       {/* Minimized Pill */}
@@ -425,7 +470,7 @@ export function Oscilloscope({
                 <button
                   onClick={() => {
                     historyRef.current = []
-                    setHistory([])
+                    setRenderTick((prev) => prev + 1)
                   }}
                   className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition cursor-pointer"
                   title="Clear Buffer"
