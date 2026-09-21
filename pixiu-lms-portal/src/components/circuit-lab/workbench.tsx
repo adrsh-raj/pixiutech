@@ -10,7 +10,7 @@ import { defineArduinoBlocks } from "@/lib/arduino-blocks"
 import { runBlocklyProgram, type ExecutionEnvironment, type BlockStepInfo } from "@/lib/blockly-runner"
 import { audioEngine } from "@/lib/audio-engine"
 import { createHistory, pushState, undo as historyUndo, redo as historyRedo, canUndo, canRedo, type HistoryState } from "@/lib/history"
-import { saveCircuit, loadCircuit } from "@/lib/storage"
+import { saveCircuit, loadCircuit, importFromJSON, exportAsJSON } from "@/lib/storage"
 import * as Blockly from "blockly"
 import { Boxes, Camera, Sparkles, Terminal, Trash2, Gauge, Sliders } from "lucide-react"
 import { computeWireCurrents } from "@/lib/current-flow"
@@ -85,10 +85,20 @@ export function Workbench() {
   const debugSpeedRef = useRef<"normal" | "slow" | "step">("normal")
   const stepResolverRef = useRef<(() => void) | null>(null)
   const visualWorkspaceRef = useRef<Blockly.WorkspaceSvg | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     isPausedRef.current = isPaused
   }, [isPaused])
+
+  useEffect(() => {
+    const saved = loadCircuit("default")
+    if (!saved) return
+
+    setHistory(createHistory(saved.state))
+    setBlocklyXml(saved.blocklyXml || DEFAULT_XML)
+    setLastSaved(saved.savedAt)
+  }, [])
 
   useEffect(() => {
     debugSpeedRef.current = debugSpeed
@@ -686,9 +696,45 @@ export function Workbench() {
   }, [handleUndo, handleRedo, selectedWireId, selectedId, deleteWire, deletePart, rotatePart, duplicatePart, toggleRun, handleStepNext, handlePause, handleResume, isPaused, running])
 
   const handleSave = useCallback(() => {
+    const savedAt = new Date().toISOString()
     saveCircuit("default", state, blocklyXml)
-    setLastSaved(new Date().toISOString())
+    setLastSaved(savedAt)
   }, [state, blocklyXml])
+
+  const handleExport = useCallback(() => {
+    exportAsJSON("pixiu-circuit", state, blocklyXml)
+  }, [state, blocklyXml])
+
+  const handleUploadClick = useCallback(() => {
+    fileInputRef.current?.click()
+  }, [])
+
+  const handleUploadFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ""
+    if (!file) return
+
+    try {
+      const imported = await importFromJSON(file)
+      stopProgram()
+      setHistory(createHistory(imported.state))
+      setBlocklyXml(imported.blocklyXml || DEFAULT_XML)
+      setSelectedId(null)
+      setSelectedWireId(null)
+      setWiring(null)
+      setSerialLines([])
+      setIsAiCameraOpen(false)
+      setIsDmmOpen(false)
+      setIsScopeOpen(false)
+      setLastSaved(imported.savedAt || new Date().toISOString())
+
+      // Also make the uploaded project the browser's current saved project.
+      saveCircuit("default", imported.state, imported.blocklyXml || DEFAULT_XML)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to import this circuit file"
+      window.alert(message)
+    }
+  }, [stopProgram])
 
   const handleSelectTemplate = useCallback(
     (tmpl: ProjectTemplate) => {
@@ -730,6 +776,8 @@ export function Workbench() {
         canRedo={canRedo(history)}
         onRedo={handleRedo}
         onSave={handleSave}
+        onUpload={handleUploadClick}
+        onExport={handleExport}
         isSerialOpen={isSerialOpen}
         onToggleSerial={() => setIsSerialOpen((prev) => !prev)}
         isAiCameraOpen={isAiCameraOpen}
@@ -748,6 +796,16 @@ export function Workbench() {
         debugSpeed={debugSpeed}
         onDebugSpeedChange={handleDebugSpeedChange}
         activeStepLabel={activeStepBlock?.label ?? null}
+      />
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pixiu,.circuit.json,application/x-pixiu-circuit"
+        onChange={handleUploadFile}
+        className="hidden"
+        tabIndex={-1}
+        aria-hidden="true"
       />
 
       <TemplateBrowser
