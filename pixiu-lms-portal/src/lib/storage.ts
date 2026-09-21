@@ -1,5 +1,6 @@
 import type { CircuitState, PartType, PinRef } from "./circuit-types"
 import { CATALOG } from "./components-catalog"
+import { decodePixiuProtocol, encodePixiuProtocol } from "./pixiu-file-protocol"
 
 export const PIXIU_FILE_FORMAT = "pixiu-circuit"
 export const PIXIU_FILE_VERSION = 2
@@ -438,7 +439,12 @@ export async function deleteSavedCircuit(name: string): Promise<void> {
   }
 }
 
-export function exportAsJSON(name: string, state: CircuitState, blocklyXml: string): void {
+export async function exportAsJSON(
+  name: string,
+  state: CircuitState,
+  blocklyXml: string,
+  password?: string,
+): Promise<void> {
   if (!isBrowser()) throw new Error("Export is only available in the browser")
   if (!validateCircuitState(state)) throw new Error("Cannot export an invalid circuit")
 
@@ -454,7 +460,7 @@ export function exportAsJSON(name: string, state: CircuitState, blocklyXml: stri
     createdAt: now,
   }
 
-  const blob = new Blob([JSON.stringify(circuit, null, 2)], { type: "application/x-pixiu-circuit" })
+  const blob = await encodePixiuProtocol(circuit, password)
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement("a")
   anchor.href = url
@@ -465,7 +471,7 @@ export function exportAsJSON(name: string, state: CircuitState, blocklyXml: stri
   URL.revokeObjectURL(url)
 }
 
-export function importFromJSON(file: File): Promise<SavedCircuit> {
+export function importFromJSON(file: File, password?: string): Promise<SavedCircuit> {
   return new Promise((resolve, reject) => {
     const lowerName = file.name.toLowerCase()
     if (!lowerName.endsWith(".pixiu") && !lowerName.endsWith(".circuit.json")) {
@@ -479,7 +485,7 @@ export function importFromJSON(file: File): Promise<SavedCircuit> {
     }
 
     const reader = new FileReader()
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         const rawText = event.target?.result
         if (typeof rawText !== "string") throw new Error("Unable to read the selected file")
@@ -488,7 +494,7 @@ export function importFromJSON(file: File): Promise<SavedCircuit> {
           throw new Error("This circuit file is too large.")
         }
 
-        const parsed = JSON.parse(rawText) as Record<string, unknown>
+        const parsed = await decodePixiuProtocol(rawText, password) as Record<string, unknown>
         resolve(normalizeSavedCircuit(parsed))
       } catch (error) {
         reject(new Error(error instanceof Error ? error.message : String(error)))
