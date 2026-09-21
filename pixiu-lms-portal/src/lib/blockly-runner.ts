@@ -15,7 +15,10 @@ export interface ExecutionEnvironment {
   serialPrintln?: (text: string) => void
   setLcdText?: (col: number, row: number, text: string) => void
   clearLcd?: () => void
+  setOledText?: (line: number, text: string) => void
+  clearOled?: () => void
   getSensorValue?: (type: string, pin?: string) => number
+  getSensorText?: (type: string, id?: string) => string
   isAiDetected?: (cls: string) => boolean
   getAiDetectedClass?: () => string
   getAiConfidence?: () => number
@@ -42,6 +45,22 @@ export function evaluateNumber(target: Blockly.Block | null, env?: ExecutionEnvi
   if (target.type === "ultrasonic_read") {
     return env?.getSensorValue ? env.getSensorValue("ultrasonic") : 100
   }
+  if (target.type === "dht_temperature" || target.type === "dht_humidity") {
+    const id = target.getFieldValue("SENSOR") ?? ""
+    return env?.getSensorValue ? env.getSensorValue(target.type === "dht_temperature" ? "dht_temperature" : "dht_humidity", id) : 0
+  }
+  if (target.type === "joystick_x" || target.type === "joystick_y") {
+    const id = target.getFieldValue("SENSOR") ?? ""
+    return env?.getSensorValue ? env.getSensorValue(target.type === "joystick_x" ? "joystick_x" : "joystick_y", id) : 512
+  }
+  if (target.type === "soil_moisture_read") {
+    const id = target.getFieldValue("SENSOR") ?? ""
+    return env?.getSensorValue ? env.getSensorValue("soil", id) : 0
+  }
+  if (target.type === "encoder_read") {
+    const id = target.getFieldValue("SENSOR") ?? ""
+    return env?.getSensorValue ? env.getSensorValue("encoder", id) : 0
+  }
   if (target.type === "io_analogread") {
     const pin = target.getFieldValue("PIN") ?? "A0"
     return env?.getSensorValue ? env.getSensorValue("analog", pin) : 512
@@ -54,6 +73,14 @@ export function evaluateNumber(target: Blockly.Block | null, env?: ExecutionEnvi
 
 export function evaluateBoolean(target: Blockly.Block | null, env?: ExecutionEnvironment): boolean {
   if (!target) return false
+  if (target.type === "ir_read") {
+    const id = target.getFieldValue("SENSOR") ?? ""
+    return (env?.getSensorValue ? env.getSensorValue("ir", id) : 0) > 0
+  }
+  if (target.type === "joystick_button") {
+    const id = target.getFieldValue("SENSOR") ?? ""
+    return (env?.getSensorValue ? env.getSensorValue("joystick_button", id) : 0) > 0
+  }
   if (target.type === "ai_is_detected") {
     const cls = target.getFieldValue("CLASS") ?? "car"
     return env?.isAiDetected ? env.isAiDetected(cls) : false
@@ -114,6 +141,10 @@ function evaluateValueInput(block: Blockly.Block, inputName: string, env?: Execu
     const val = env?.getSensorValue ? env.getSensorValue("ultrasonic") : 100
     return String(val)
   }
+  if (target.type === "keypad_read") {
+    const id = target.getFieldValue("SENSOR") ?? ""
+    return env?.getSensorText ? env.getSensorText("keypad", id) : ""
+  }
   if (target.type === "ai_get_detected_class") {
     return env?.getAiDetectedClass ? env.getAiDetectedClass() : "none"
   }
@@ -150,7 +181,7 @@ function getBlockDescription(block: Blockly.Block, env: ExecutionEnvironment): s
       const pin = block.getFieldValue("PIN") ?? "8"
       return `noTone(Pin ${pin})`
     }
-    case "serial_begin": {
+    case "ir_read":\n    case "dht_temperature":\n    case "dht_humidity":\n    case "joystick_x":\n    case "joystick_y":\n    case "joystick_button":\n    case "soil_moisture_read":\n    case "encoder_read":\n    case "keypad_read": {\n      return `${block.type} (${block.getFieldValue("SENSOR") ?? "default"})`\n    }\n    case "oled_print": {\n      const value = evaluateValueInput(block, "TEXT", env, "")\n      return `OLED.print("${value}")`\n    }\n    case "oled_clear": {\n      return "OLED.clear()"\n    }\n    case "motor_driver_write": {\n      const speed = evaluateNumberInput(block, "SPEED", env, 180)\n      return `Motor driver ${block.getFieldValue("CHANNEL") ?? "A"} speed ${speed}`\n    }\n    case "serial_begin": {
       const baud = block.getFieldValue("BAUD") ?? "9600"
       return `Serial.begin(${baud})`
     }
@@ -262,7 +293,7 @@ async function executeSingleBlock(block: Blockly.Block, env: ExecutionEnvironmen
       break
     }
 
-    case "serial_begin": {
+    case "oled_print": {\n      const textValue = evaluateValueInput(block, "TEXT", env, "")\n      env.setOledText?.(1, textValue)\n      break\n    }\n\n    case "oled_clear": {\n      env.clearOled?.()\n      break\n    }\n\n    case "motor_driver_write": {\n      const channel = block.getFieldValue("CHANNEL") ?? "A"\n      const speed = Math.max(0, Math.min(255, evaluateNumberInput(block, "SPEED", env, 180)))\n      const enableField = channel === "A" ? "ENA" : "ENB"\n      const in1Field = channel === "A" ? "IN1" : "IN3"\n      const in2Field = channel === "A" ? "IN2" : "IN4"\n      const enable = String(block.getFieldValue(enableField) ?? (channel === "A" ? "5" : "6"))\n      const in1 = String(block.getFieldValue(in1Field) ?? (channel === "A" ? "7" : "9"))\n      const in2 = String(block.getFieldValue(in2Field) ?? (channel === "A" ? "8" : "10"))\n      const direction = block.getFieldValue("DIRECTION") ?? "CW"\n      env.setAnalogPin(enable, speed)\n      env.setDigitalPin(in1, direction === "CW" ? "HIGH" : "LOW")\n      env.setDigitalPin(in2, direction === "CW" ? "LOW" : "HIGH")\n      break\n    }\n\n    case "serial_begin": {
       const baud = block.getFieldValue("BAUD") ?? "9600"
       env.serialPrintln?.(`[System] Serial initialized at ${baud} baud.`)
       break
