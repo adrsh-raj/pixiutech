@@ -272,10 +272,14 @@ async function migrateLegacyCurrent(): Promise<SavedCircuit | null> {
   const legacyDefault = current ?? readLocal(LEGACY_PREFIX + "default")
   if (!legacyDefault) return null
 
+  const migrated = legacyDefault.name === "default"
+    ? { ...legacyDefault, name: "Untitled Circuit" }
+    : legacyDefault
+
   try {
-    return await putCircuit(legacyDefault)
+    return await putCircuit(migrated)
   } catch {
-    return legacyDefault
+    return migrated
   }
 }
 
