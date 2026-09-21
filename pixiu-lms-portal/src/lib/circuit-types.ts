@@ -31,6 +31,22 @@ export type PartType =
   | "dc-motor"
   | "npn-transistor"
   | "relay"
+  | "ir-sensor"
+  | "dht11"
+  | "oled-i2c"
+  | "joystick"
+  | "l298n"
+  | "rotary-encoder"
+  | "soil-moisture"
+  | "keypad-4x4"
+
+export interface PartEducationalMeta {
+  gradeBand: "6-8" | "8-10" | "9-11"
+  concept: string
+  realWorld: string
+  experiment: string
+  hint: string
+}
 
 export interface PartDef {
   type: PartType
@@ -43,6 +59,12 @@ export interface PartDef {
   pins: PinDef[]
   /** default editable properties */
   defaults?: Record<string, string | number>
+  /** Registry metadata used by palette, simulator and Blockly integrations. */
+  category?: "controller" | "input" | "sensor" | "output" | "display" | "motor" | "driver" | "logic"
+  electricalModel?: string
+  runtimeModel?: string
+  blockIds?: string[]
+  educational?: PartEducationalMeta
 }
 
 export interface PlacedPart {
