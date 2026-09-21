@@ -48,9 +48,12 @@ export function Multimeter({
 }: Props) {
   const [mode, setMode] = useState<DmmMode>("voltage")
   const [minimized, setMinimized] = useState(false)
-  const [position, setPosition] = useState<{ x: number; y: number } | null>(null)
   const [isDragging, setIsDragging] = useState(false)
+  const [hasCustomPosition, setHasCustomPosition] = useState(false)
   const [testedAudio, setTestedAudio] = useState(false)
+
+  const positionRef = useRef<{ x: number; y: number } | null>(null)
+  const continuityBeepActiveRef = useRef(false)
 
   const handleTestBeep = () => {
     audioEngine.unlockAudio()
@@ -82,6 +85,12 @@ export function Multimeter({
       startX: rect.left,
       startY: rect.top,
     }
+    positionRef.current = { x: rect.left, y: rect.top }
+    panel.style.left = `${rect.left}px`
+    panel.style.top = `${rect.top}px`
+    panel.style.right = "auto"
+    panel.style.bottom = "auto"
+    setHasCustomPosition(true)
     setIsDragging(true)
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
   }
@@ -96,7 +105,11 @@ export function Multimeter({
 
     const newX = Math.max(10, Math.min(window.innerWidth - panelWidth - 10, dragStartRef.current.startX + dx))
     const newY = Math.max(10, Math.min(window.innerHeight - panelHeight - 10, dragStartRef.current.startY + dy))
-    setPosition({ x: newX, y: newY })
+    positionRef.current = { x: newX, y: newY }
+    if (panel) {
+      panel.style.left = `${newX}px`
+      panel.style.top = `${newY}px`
+    }
   }
 
   const handlePointerUp = (e: React.PointerEvent) => {
@@ -109,9 +122,11 @@ export function Multimeter({
   }
 
   // Dynamically solve exact nodal potentials across entire circuit network
+  const pinStatesJson = useMemo(() => JSON.stringify(pinStates), [pinStates])
+
   const nodalSolution = useMemo(() => {
     return solveCircuitNodalPotentials(state, new Set(), pinStates, running)
-  }, [state, pinStates, running])
+  }, [state, pinStatesJson, running])
 
   const infoRed = useMemo(() => nodalSolution.getPinInfo(probeRed), [nodalSolution, probeRed])
   const infoBlack = useMemo(() => nodalSolution.getPinInfo(probeBlack), [nodalSolution, probeBlack])
@@ -222,15 +237,27 @@ export function Multimeter({
     }
   }, [mode, probeRed, probeBlack, state, nodalSolution, pinStates, infoRed, infoBlack, runtime])
 
-  // Play audio buzzer tone if in continuity mode and continuity is detected
+  // Keep the continuity oscillator alive while the state remains continuous;
+  // do not create/stop a new oscillator on every simulation tick.
   useEffect(() => {
-    if (mode === "continuity" && reading.isContinuityBeep) {
-      audioEngine.playTone(2400) // 2.4 kHz standard DMM continuity beeper tone
-    } else {
+    const shouldBeep = isOpen && mode === "continuity" && reading.isContinuityBeep
+
+    if (shouldBeep && !continuityBeepActiveRef.current) {
+      audioEngine.unlockAudio()
+      audioEngine.playTone(2400)
+      continuityBeepActiveRef.current = true
+    } else if (!shouldBeep && continuityBeepActiveRef.current) {
       audioEngine.stopTone()
+      continuityBeepActiveRef.current = false
     }
-    return () => audioEngine.stopTone()
-  }, [mode, reading.isContinuityBeep])
+
+    return () => {
+      if (continuityBeepActiveRef.current) {
+        audioEngine.stopTone()
+        continuityBeepActiveRef.current = false
+      }
+    }
+  }, [isOpen, mode, reading.isContinuityBeep])
 
   if (!isOpen) return null
 
@@ -242,25 +269,16 @@ export function Multimeter({
     <div
       ref={panelRef}
       className={`fixed z-40 rounded-2xl border border-slate-700/80 bg-slate-950/95 backdrop-blur-xl shadow-2xl text-white select-none font-sans transition-shadow duration-200 ${
-        position === null
+        !hasCustomPosition
           ? isAiCameraOpen
             ? "bottom-14 right-2 sm:right-[424px] max-w-[calc(100vw-16px)]"
             : "bottom-14 right-4 max-w-[calc(100vw-16px)]"
           : ""
       } ${minimized ? "w-auto min-w-[260px] p-2.5" : "w-80 sm:w-96 p-4 animate-in slide-in-from-bottom-5"}`}
-      style={
-        position !== null
-          ? {
-              left: `${position.x}px`,
-              top: `${position.y}px`,
-              bottom: "auto",
-              right: "auto",
-              boxShadow: "0 20px 50px rgba(0,0,0,0.6), 0 0 20px rgba(245, 158, 11, 0.15)",
-            }
-          : {
-              boxShadow: "0 20px 50px rgba(0,0,0,0.6), 0 0 20px rgba(245, 158, 11, 0.15)",
-            }
-      }
+      style={{
+        touchAction: "none",
+        boxShadow: "0 20px 50px rgba(0,0,0,0.6), 0 0 20px rgba(245, 158, 11, 0.15)",
+      }}
     >
       {/* Minimized View */}
       {minimized ? (
@@ -327,9 +345,18 @@ export function Multimeter({
               </div>
             </div>
             <div className="flex items-center gap-1">
-              {position !== null && (
+              {hasCustomPosition && (
                 <button
-                  onClick={() => setPosition(null)}
+                  onClick={() => {
+                    positionRef.current = null
+                    setHasCustomPosition(false)
+                    if (panelRef.current) {
+                      panelRef.current.style.left = ""
+                      panelRef.current.style.top = ""
+                      panelRef.current.style.right = ""
+                      panelRef.current.style.bottom = ""
+                    }
+                  }}
                   className="rounded-lg py-0.5 px-1.5 text-[9px] font-mono text-slate-400 hover:text-amber-300 hover:bg-slate-800 transition cursor-pointer"
                   title="Reset to default position"
                 >
