@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom"
 import { useEffect, useRef, useState } from "react"
-import { CircuitBoard, Play, Square, Trash2, ArrowLeft, Undo2, Redo2, FolderOpen, Terminal, Volume2, VolumeX, Sparkles, Camera, Sliders, Pause, StepForward, FastForward, MoreHorizontal, HelpCircle } from "lucide-react"
+import { CircuitBoard, Play, Square, Trash2, ArrowLeft, Undo2, Redo2, FolderOpen, BookOpen, Terminal, Volume2, VolumeX, Sparkles, Camera, Sliders, Pause, StepForward, FastForward, MoreHorizontal, HelpCircle } from "lucide-react"
 
 export type WorkbenchView = "circuit" | "code" | "3d"
 
@@ -15,6 +15,7 @@ interface Props {
   canRedo?: boolean
   onRedo?: () => void
   onOpenProjects?: () => void
+  onOpenLessons?: () => void
   onOpenGuide?: () => void
   isSerialOpen?: boolean
   onToggleSerial?: () => void
@@ -54,6 +55,7 @@ export function Toolbar({
   canRedo = false,
   onRedo,
   onOpenProjects,
+  onOpenLessons,
   onOpenGuide,
   isSerialOpen = false,
   onToggleSerial,
@@ -245,6 +247,17 @@ export function Toolbar({
               className="absolute right-0 top-[calc(100%+7px)] z-[70] w-64 overflow-hidden rounded-2xl border border-border bg-slate-950/95 p-1.5 shadow-2xl backdrop-blur-xl"
             >
               <div className="px-2 py-1.5 text-[9px] font-mono uppercase tracking-[0.18em] text-slate-500">Lab tools</div>
+
+              {onOpenLessons && (
+                <button
+                  onClick={() => { setToolsOpen(false); onOpenLessons() }}
+                  className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-xs font-semibold text-slate-200 hover:bg-slate-800"
+                  role="menuitem"
+                >
+                  <BookOpen size={14} className="text-cyan-300" />
+                  <span><span className="block">Lessons</span><span className="text-[9px] font-normal text-slate-500">Guided projects with auto-checks</span></span>
+                </button>
+              )}
 
               {onOpenGuide && (
                 <button
