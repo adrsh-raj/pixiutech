@@ -796,12 +796,14 @@ export function Workbench() {
     return () => window.clearTimeout(timer)
   }, [handleSave, isDirty, storageReady])
 
-  const handleExport = useCallback(() => {
-    exportAsJSON(currentProjectName, state, blocklyXml)
+  const handleExport = useCallback((password?: string) => {
+    void exportAsJSON(currentProjectName, state, blocklyXml, password).catch((error) => {
+      window.alert(error instanceof Error ? error.message : "Could not export this .pixiu file.")
+    })
   }, [blocklyXml, currentProjectName, state])
 
-  const handleUploadFile = useCallback(async (file: File): Promise<void> => {
-    const imported = await importFromJSON(file)
+  const handleUploadFile = useCallback(async (file: File, password?: string): Promise<void> => {
+    const imported = await importFromJSON(file, password)
     stopProgram()
 
     const saved = await saveCircuit(imported.name, imported.state, imported.blocklyXml || DEFAULT_XML)
