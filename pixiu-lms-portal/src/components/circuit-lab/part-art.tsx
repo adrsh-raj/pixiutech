@@ -623,6 +623,140 @@ export function PartArt({ part, runtime }: { part: PlacedPart; runtime?: PartRun
       )
     }
 
+    case "ir-sensor": {
+      const detected = Boolean(runtime?.sensorValue)
+      return (
+        <g>
+          <rect x="4" y="6" width="68" height="52" rx="10" fill="#162033" stroke="#3b82f6" strokeWidth="2" />
+          <circle cx="24" cy="24" r="9" fill="#020617" stroke="#475569" strokeWidth="2" />
+          <circle cx="52" cy="24" r="9" fill="#020617" stroke="#475569" strokeWidth="2" />
+          <circle cx="24" cy="24" r="4" fill={detected ? "#f43f5e" : "#334155"} />
+          <circle cx="52" cy="24" r="4" fill={detected ? "#f43f5e" : "#334155"} />
+          <rect x="17" y="40" width="42" height="10" rx="5" fill={detected ? "#f43f5e" : "#1e293b"} />
+          <text x="38" y="48" textAnchor="middle" fontSize="7" fill="#e2e8f0" fontFamily="monospace" fontWeight="700">{detected ? "OBJECT" : "CLEAR"}</text>
+        </g>
+      )
+    }
+
+    case "dht11": {
+      const temperature = Number(part.props.temperature ?? 25)
+      const humidity = Number(part.props.humidity ?? 55)
+      return (
+        <g>
+          <rect x="7" y="4" width="58" height="58" rx="8" fill="#e2e8f0" stroke="#94a3b8" strokeWidth="2" />
+          <rect x="14" y="12" width="44" height="34" rx="6" fill="#1e293b" />
+          <text x="36" y="27" textAnchor="middle" fontSize="8" fill="#7dd3fc" fontFamily="monospace">T {temperature}°</text>
+          <text x="36" y="39" textAnchor="middle" fontSize="8" fill="#67e8f9" fontFamily="monospace">H {humidity}%</text>
+          <circle cx="18" cy="55" r="2.5" fill="#22c55e" opacity="0.9" />
+        </g>
+      )
+    }
+
+    case "oled-i2c": {
+      const line1 = String(runtime?.lcdLine1 ?? part.props.line1 ?? "").slice(0, 18)
+      const line2 = String(runtime?.lcdLine2 ?? part.props.line2 ?? "").slice(0, 18)
+      const line3 = String(part.props.line3 ?? "").slice(0, 18)
+      return (
+        <g>
+          <rect x="2" y="3" width="146" height="86" rx="9" fill="#111827" stroke="#334155" strokeWidth="2" />
+          <rect x="12" y="14" width="126" height="60" rx="5" fill="#03111b" stroke="#0e7490" strokeWidth="1.5" />
+          <text x="20" y="31" fontSize="9" fill="#67e8f9" fontFamily="monospace">{line1 || "PIXIU OLED"}</text>
+          <text x="20" y="47" fontSize="9" fill="#22d3ee" fontFamily="monospace">{line2 || "READY"}</text>
+          <text x="20" y="63" fontSize="8" fill="#0891b2" fontFamily="monospace">{line3}</text>
+          <circle cx="126" cy="81" r="2" fill="#22d3ee" className={line1 || line2 ? "animate-pulse" : ""} />
+        </g>
+      )
+    }
+
+    case "joystick": {
+      const x = Math.max(0, Math.min(1023, Number(part.props.x ?? 512)))
+      const y = Math.max(0, Math.min(1023, Number(part.props.y ?? 512)))
+      const knobX = 43 + ((x - 512) / 512) * 22
+      const knobY = 43 + ((512 - y) / 512) * 22
+      const pressed = String(part.props.pressed ?? "false") === "true"
+      return (
+        <g>
+          <circle cx="43" cy="43" r="31" fill="#111827" stroke="#475569" strokeWidth="2" />
+          <circle cx={knobX} cy={knobY} r="13" fill="#2563eb" stroke="#93c5fd" strokeWidth="2" />
+          <circle cx={knobX - 3} cy={knobY - 3} r="3" fill="#dbeafe" opacity="0.8" />
+          <text x="43" y="12" textAnchor="middle" fontSize="7" fill="#94a3b8" fontFamily="monospace">Y+</text>
+          <text x="43" y="79" textAnchor="middle" fontSize="7" fill="#94a3b8" fontFamily="monospace">Y−</text>
+          <text x="8" y="46" textAnchor="middle" fontSize="7" fill="#94a3b8" fontFamily="monospace">X−</text>
+          <text x="78" y="46" textAnchor="middle" fontSize="7" fill="#94a3b8" fontFamily="monospace">X+</text>
+          <circle cx="72" cy="14" r="5" fill={pressed ? "#f59e0b" : "#334155"} stroke="#94a3b8" />
+        </g>
+      )
+    }
+
+    case "l298n": {
+      const speedA = Math.max(0, Math.min(255, Number(part.props.speedA ?? 0)))
+      const speedB = Math.max(0, Math.min(255, Number(part.props.speedB ?? 0)))
+      return (
+        <g>
+          <rect x="2" y="4" width="116" height="88" rx="7" fill="#153e75" stroke="#1d4ed8" strokeWidth="2" />
+          <rect x="46" y="16" width="28" height="36" rx="2" fill="#0f172a" stroke="#334155" />
+          <text x="60" y="37" textAnchor="middle" fontSize="8" fill="#cbd5e1" fontFamily="monospace" fontWeight="700">L298N</text>
+          <text x="12" y="68" fontSize="8" fill="#93c5fd" fontFamily="monospace">A:{speedA}</text>
+          <text x="65" y="68" fontSize="8" fill="#93c5fd" fontFamily="monospace">B:{speedB}</text>
+          <rect x="10" y="74" width="100" height="7" rx="3" fill="#0f172a" />
+          <rect x="11" y="75" width={98 * (speedA / 255)} height="5" rx="2" fill="#22c55e" />
+        </g>
+      )
+    }
+
+    case "rotary-encoder": {
+      const value = Number(part.props.value ?? 0)
+      const pressed = String(part.props.pressed ?? "false") === "true"
+      const angle = ((value % 20) / 20) * Math.PI * 2
+      const markerX = 37 + Math.cos(angle - Math.PI / 2) * 20
+      const markerY = 37 + Math.sin(angle - Math.PI / 2) * 20
+      return (
+        <g>
+          <circle cx="37" cy="37" r="29" fill="#1e293b" stroke="#64748b" strokeWidth="2" />
+          <circle cx="37" cy="37" r="18" fill="#0f172a" stroke="#334155" />
+          <line x1="37" y1="37" x2={markerX} y2={markerY} stroke="#60a5fa" strokeWidth="4" strokeLinecap="round" />
+          <circle cx={markerX} cy={markerY} r="3" fill="#dbeafe" />
+          <circle cx="37" cy="37" r={pressed ? 9 : 6} fill={pressed ? "#f59e0b" : "#334155"} stroke="#cbd5e1" strokeWidth="1.2" />
+          <text x="37" y="67" textAnchor="middle" fontSize="7" fill="#94a3b8" fontFamily="monospace">CNT {value}</text>
+        </g>
+      )
+    }
+
+    case "soil-moisture": {
+      const moisture = Math.max(0, Math.min(1023, Number(part.props.moisture ?? 620)))
+      const wet = moisture > 700
+      return (
+        <g>
+          <rect x="8" y="5" width="56" height="50" rx="8" fill="#92400e" stroke="#f59e0b" strokeWidth="2" />
+          <path d="M18 20 C22 13, 27 13, 31 20 C35 27, 31 34, 25 34 C19 34, 15 27, 18 20Z" fill={wet ? "#38bdf8" : "#a16207"} />
+          <path d="M37 16 C40 12, 44 13, 46 18 L52 34" fill="none" stroke="#cbd5e1" strokeWidth="3" strokeLinecap="round" />
+          <rect x="14" y="40" width="44" height="8" rx="4" fill="#451a03" />
+          <rect x="15" y="41" width={42 * (moisture / 1023)} height="6" rx="3" fill={wet ? "#38bdf8" : "#f59e0b"} />
+        </g>
+      )
+    }
+
+    case "keypad-4x4": {
+      const keys = [["1","2","3","A"],["4","5","6","B"],["7","8","9","C"],["*","0","#","D"]]
+      const lastKey = String(part.props.lastKey ?? "")
+      return (
+        <g>
+          <rect x="2" y="3" width="114" height="114" rx="8" fill="#111827" stroke="#475569" strokeWidth="2" />
+          {keys.flatMap((row, r) => row.map((label, col) => {
+            const x = 10 + col * 26
+            const y = 12 + r * 26
+            const active = label === lastKey
+            return (
+              <g key={label}>
+                <rect x={x} y={y} width="20" height="20" rx="5" fill={active ? "#2563eb" : "#1e293b"} stroke={active ? "#93c5fd" : "#475569"} />
+                <text x={x + 10} y={y + 13} textAnchor="middle" fontSize="8" fill="#e2e8f0" fontFamily="monospace" fontWeight="700">{label}</text>
+              </g>
+            )
+          }))}
+        </g>
+      )
+    }
+
     default:
       return null
   }
