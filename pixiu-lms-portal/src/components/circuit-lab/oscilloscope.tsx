@@ -237,10 +237,10 @@ export const Oscilloscope = memo(function Oscilloscope({
 
       if (pointsWritten === 0) {
         path = x > 0.5
-          ? \`M 0 \${y.toFixed(1)} L \${x.toFixed(1)} \${y.toFixed(1)}\`
-          : \`M \${x.toFixed(1)} \${y.toFixed(1)}\`
+          ? `M 0 ${y.toFixed(1)} L ${x.toFixed(1)} ${y.toFixed(1)}`
+          : `M ${x.toFixed(1)} ${y.toFixed(1)}`
       } else {
-        path += \` L \${x.toFixed(1)} \${y.toFixed(1)}\`
+        path += ` L ${x.toFixed(1)} ${y.toFixed(1)}`
       }
       pointsWritten += 1
     }
@@ -250,7 +250,7 @@ export const Oscilloscope = memo(function Oscilloscope({
       const x = Math.max(0, Math.min(screenWidth, ((last.t - startT) / activeWindowMs) * screenWidth))
       const voltage = Math.max(0, Math.min(vMaxScale, last[channel]))
       const y = screenHeight - (voltage / vMaxScale) * screenHeight
-      path += \` L \${x.toFixed(1)} \${y.toFixed(1)}\`
+      path += ` L ${x.toFixed(1)} ${y.toFixed(1)}`
     }
 
     return path
