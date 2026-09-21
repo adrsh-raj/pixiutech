@@ -28,10 +28,11 @@ interface Props {
   storageReady: boolean
   onClose: () => void
   onSave: (name: string) => Promise<void>
-  onNew: () => void
+  onNew: () => Promise<void>
   onImport: (file: File) => Promise<void>
   onLoad: (project: SavedCircuit) => Promise<void>
   onExportCurrent: () => void
+  isSaving: boolean
 }
 
 function formatDate(value: string | null): string {
@@ -225,11 +226,17 @@ export function ProjectManager({
                 </button>
                 <button
                   onClick={() => {
-                    onNew()
-                    setName("Untitled Circuit")
+                    if (dirty && !window.confirm("You have unsaved changes. Start a new circuit and discard them?")) return
+                    setBusyProject("__new__")
                     setError(null)
+                    void onNew()
+                      .catch((err) => setError(err instanceof Error ? err.message : "Could not create a new project."))
+                      .finally(() => {
+                        setBusyProject(null)
+                        setName("Untitled Circuit")
+                      })
                   }}
-                  disabled={busyProject !== null}
+                  disabled={busyProject !== null || isSaving}
                   className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5 text-xs font-bold text-slate-200 transition hover:bg-slate-800 disabled:opacity-50"
                 >
                   <Plus size={14} />
