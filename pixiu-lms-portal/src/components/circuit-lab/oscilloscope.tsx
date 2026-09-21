@@ -583,4 +583,10 @@ export const Oscilloscope = memo(function Oscilloscope({
       )}
     </div>
   )
-})
+}, (prevProps, nextProps) => (
+  prevProps.isOpen === nextProps.isOpen &&
+  prevProps.state === nextProps.state &&
+  prevProps.probeCH1 === nextProps.probeCH1 &&
+  prevProps.probeCH2 === nextProps.probeCH2 &&
+  prevProps.activeProbeToPlace === nextProps.activeProbeToPlace
+))
