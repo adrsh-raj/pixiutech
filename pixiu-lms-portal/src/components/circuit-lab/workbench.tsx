@@ -28,6 +28,7 @@ import { AiCameraPanel, type AiVisionState } from "./ai-camera-panel"
 import { ContextMenu, type ContextMenuTarget } from "./context-menu"
 import type { ProjectTemplate } from "@/lib/templates"
 import { ProjectManager } from "./project-manager"
+import { WelcomeOverlay } from "./welcome-overlay"
 
 const DEFAULT_XML = `<xml xmlns="https://developers.google.com/blockly/xml">
   <block type="arduino_program" x="40" y="40">
@@ -914,6 +915,8 @@ export function Workbench() {
         onDebugSpeedChange={handleDebugSpeedChange}
         activeStepLabel={activeStepBlock?.label ?? null}
       />
+
+      <WelcomeOverlay onOpenProjects={() => setIsProjectManagerOpen(true)} />
 
       <ProjectManager
         isOpen={isProjectManagerOpen}
