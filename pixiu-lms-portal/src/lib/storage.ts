@@ -89,12 +89,12 @@ export function exportAsJSON(name: string, state: CircuitState, blocklyXml: stri
     savedAt: new Date().toISOString()
   }
   
-  const blob = new Blob([JSON.stringify(saved, null, 2)], { type: 'application/json' })
+  const blob = new Blob([JSON.stringify(saved, null, 2)], { type: 'application/x-pixiu-circuit' })
   const url = URL.createObjectURL(blob)
   
   const a = document.createElement('a')
   a.href = url
-  a.download = `${name.replace(/\s+/g, '_')}.circuit.json`
+  a.download = `${name.replace(/\s+/g, '_')}.pixiu`
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)
@@ -106,6 +106,12 @@ export function exportAsJSON(name: string, state: CircuitState, blocklyXml: stri
  */
 export function importFromJSON(file: File): Promise<SavedCircuit> {
   return new Promise((resolve, reject) => {
+    const lowerName = file.name.toLowerCase()
+    if (!lowerName.endsWith('.pixiu') && !lowerName.endsWith('.circuit.json')) {
+      reject(new Error('Invalid file type. Please select a .pixiu circuit file'))
+      return
+    }
+
     const reader = new FileReader()
     reader.onload = (e) => {
       try {
