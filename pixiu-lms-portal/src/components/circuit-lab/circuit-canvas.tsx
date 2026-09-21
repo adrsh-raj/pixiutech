@@ -292,7 +292,7 @@ export function CircuitCanvas(props: Props) {
           {parts.map((part) => {
             const def = CATALOG[part.type]
             const selected = part.id === selectedId
-            const interactive = running && (part.type === "pushbutton" || part.type === "potentiometer")
+            const interactive = running && ["pushbutton", "potentiometer", "ir-sensor", "joystick", "rotary-encoder", "keypad-4x4"].includes(part.type)
             return (
               <g
                 key={part.id}
@@ -337,6 +337,71 @@ export function CircuitCanvas(props: Props) {
                         onPointerDown={(e) => {
                           e.stopPropagation()
                           onInteract(part.id, true)
+                        }}
+                      />
+                    )}
+
+                    {interactive && part.type === "ir-sensor" && (
+                      <rect
+                        x={0}
+                        y={0}
+                        width={def.width}
+                        height={def.height}
+                        fill="transparent"
+                        onPointerDown={(e) => {
+                          e.stopPropagation()
+                          onChangeProp?.(part.id, "detected", part.props.detected === "true" ? "false" : "true")
+                        }}
+                      />
+                    )}
+
+                    {interactive && part.type === "joystick" && (
+                      <circle
+                        cx={def.width / 2}
+                        cy={def.height / 2}
+                        r={def.width / 2}
+                        fill="transparent"
+                        onPointerDown={(e) => {
+                          e.stopPropagation()
+                          const rect = (e.currentTarget.ownerSVGElement as SVGSVGElement | null)?.getBoundingClientRect()
+                          if (!rect) return
+                          const px = (e.clientX - rect.left - view.tx) / view.scale - part.x
+                          const py = (e.clientY - rect.top - view.ty) / view.scale - part.y
+                          const x = Math.round(Math.max(0, Math.min(1023, (px / def.width) * 1023)))
+                          const y = Math.round(Math.max(0, Math.min(1023, (1 - py / def.height) * 1023)))
+                          onChangeProp?.(part.id, "x", x)
+                          onChangeProp?.(part.id, "y", y)
+                        }}
+                      />
+                    )}
+
+                    {interactive && part.type === "rotary-encoder" && (
+                      <rect
+                        x={0}
+                        y={0}
+                        width={def.width}
+                        height={def.height}
+                        fill="transparent"
+                        onPointerDown={(e) => {
+                          e.stopPropagation()
+                          onChangeProp?.(part.id, "value", Number(part.props.value ?? 0) + 1)
+                        }}
+                      />
+                    )}
+
+                    {interactive && part.type === "keypad-4x4" && (
+                      <rect
+                        x={0}
+                        y={0}
+                        width={def.width}
+                        height={def.height}
+                        fill="transparent"
+                        onPointerDown={(e) => {
+                          e.stopPropagation()
+                          const keys = ["1","2","3","A","4","5","6","B","7","8","9","C","*","0","#","D"]
+                          const current = String(part.props.lastKey ?? "")
+                          const index = Math.max(0, keys.indexOf(current))
+                          onChangeProp?.(part.id, "lastKey", keys[(index + 1) % keys.length])
                         }}
                       />
                     )}
