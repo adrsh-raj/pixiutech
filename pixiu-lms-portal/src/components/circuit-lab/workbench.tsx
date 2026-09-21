@@ -188,12 +188,13 @@ export function Workbench() {
   const selected = state.parts.find((p) => p.id === selectedId) ?? null
   const selectedWire = state.wires.find((w) => w.id === selectedWireId) ?? null
 
-  const pinStatesJsonForRuntime = useMemo(() => JSON.stringify(pinStates), [pinStates])
-
   const runtime = useMemo(
     () => (running ? computeRuntime(state, pressed, pinStates) : {}),
-    [running, state, pressed, pinStatesJsonForRuntime],
+    [running, state, pressed, pinStates],
   )
+
+  const oscilloscopeSimulationRef = useRef({ state, pinStates, running })
+  oscilloscopeSimulationRef.current = { state, pinStates, running }
 
   const wireCurrents = useMemo(
     () => (running ? computeWireCurrents(state, runtime, pinStates) : {}),
@@ -1189,9 +1190,7 @@ export function Workbench() {
         isOpen={isScopeOpen && view === "circuit"}
         onClose={() => setIsScopeOpen(false)}
         state={state}
-        runtime={runtime}
-        pinStates={pinStates}
-        running={running}
+        simulationRef={oscilloscopeSimulationRef}
         probeCH1={scopeProbeCH1}
         probeCH2={scopeProbeCH2}
         onSetProbeCH1={setScopeProbeCH1}
