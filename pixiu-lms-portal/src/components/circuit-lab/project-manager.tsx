@@ -149,7 +149,9 @@ export function ProjectManager({
     setError(null)
     try {
       await deleteSavedCircuit(project.name)
-      if (project.name === currentProjectName) onNew()
+      if (project.name === currentProjectName) {
+        await onNew()
+      }
       await refreshProjects()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not delete this project.")
