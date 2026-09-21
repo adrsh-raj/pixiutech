@@ -105,11 +105,17 @@ export function computeChannelMetrics(
   if (crossings.length >= 2) {
     const intervals: number[] = []
     for (let i = 1; i < crossings.length; i++) {
-      intervals.push(crossings[i] - crossings[i - 1])
+      const gap = crossings[i] - crossings[i - 1]
+      if (Number.isFinite(gap) && gap > 0.5) {
+        intervals.push(gap)
+      }
     }
-    const avgPeriodMs = intervals.reduce((a, b) => a + b, 0) / intervals.length
-    if (avgPeriodMs > 0) {
-      frequencyHz = Number((1000 / avgPeriodMs).toFixed(1))
+
+    if (intervals.length > 0) {
+      const avgPeriodMs = intervals.reduce((a, b) => a + b, 0) / intervals.length
+      if (Number.isFinite(avgPeriodMs) && avgPeriodMs > 0) {
+        frequencyHz = Math.round((1000 / avgPeriodMs) * 10) / 10
+      }
     }
   }
 
