@@ -37,6 +37,14 @@ export function WelcomeOverlay({ onOpenProjects }: { onOpenProjects: () => void 
     } catch {
       setShow(false)
     }
+
+    const openGuide = () => {
+      setShow(true)
+      setTourOpen(true)
+      setTourIndex(0)
+    }
+    window.addEventListener("pixiu-open-guide", openGuide)
+    return () => window.removeEventListener("pixiu-open-guide", openGuide)
   }, [])
 
   const dismiss = (remember = true) => {
