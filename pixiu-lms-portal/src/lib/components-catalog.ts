@@ -328,22 +328,8 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "no", label: "NO", x: 40, y: 4, kind: "passive" },
       { id: "nc", label: "NC", x: 65, y: 4, kind: "passive" },
     ],
-  },,
-  relay: {
-    type: "relay",
-    name: "Relay Module",
-    blurb: "5V single-channel relay for controlled switching",
-    width: 80,
-    height: 70,
-    pins: [
-      { id: "vcc", label: "VCC", x: 15, y: 66, kind: "power" },
-      { id: "gnd", label: "GND", x: 35, y: 66, kind: "ground" },
-      { id: "in", label: "IN", x: 55, y: 66, kind: "digital" },
-      { id: "com", label: "COM", x: 15, y: 4, kind: "passive" },
-      { id: "no", label: "NO", x: 40, y: 4, kind: "passive" },
-      { id: "nc", label: "NC", x: 65, y: 4, kind: "passive" },
-    ],
   },
+
   "ir-sensor": {
     type: "ir-sensor",
     name: "IR Obstacle Sensor",

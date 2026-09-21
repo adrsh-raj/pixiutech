@@ -329,3 +329,6 @@ export function Toolbar({
           )}
         </div>
       </div>
+    </header>
+  )
+}
