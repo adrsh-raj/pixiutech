@@ -896,6 +896,7 @@ export function Workbench() {
         onSave={handleSave}
         onExport={handleExport}
         onOpenProjects={() => setIsProjectManagerOpen(true)}
+        onOpenGuide={() => window.dispatchEvent(new Event("pixiu-open-guide"))}
         isSerialOpen={isSerialOpen}
         onToggleSerial={() => setIsSerialOpen((prev) => !prev)}
         isAiCameraOpen={isAiCameraOpen}
