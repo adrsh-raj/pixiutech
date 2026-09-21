@@ -855,14 +855,12 @@ export function Workbench() {
         onViewChange={setView}
         running={running}
         onToggleRun={toggleRun}
-        onOpenProjects={() => setIsProjectManagerOpen(true)}
         onClear={clearAll}
         canUndo={canUndo(history)}
         onUndo={handleUndo}
         canRedo={canRedo(history)}
         onRedo={handleRedo}
         onSave={handleSave}
-        onUpload={handleUploadClick}
         onExport={handleExport}
         onOpenProjects={() => setIsProjectManagerOpen(true)}
         isSerialOpen={isSerialOpen}
