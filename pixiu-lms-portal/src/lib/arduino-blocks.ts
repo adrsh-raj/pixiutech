@@ -33,7 +33,10 @@ function componentDropdown(types: string[], emptyLabel = "Add component first"):
   return () => {
     const options = currentCircuit.parts
       .filter((part) => types.includes(part.type))
-      .map((part) => [part.id, part.id] as [string, string])
+      .map((part) => [
+        (CATALOG[part.type as keyof typeof CATALOG]?.name ?? part.type) + " · " + part.id.slice(0, 6),
+        part.id,
+      ] as [string, string])
     return options.length > 0 ? options : [[emptyLabel, ""]]
   }
 }
