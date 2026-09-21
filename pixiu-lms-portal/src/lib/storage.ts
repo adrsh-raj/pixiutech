@@ -328,6 +328,46 @@ export async function loadCircuit(name: string): Promise<SavedCircuit | null> {
   return readLocal(IDB_PREFIX + key) ?? readLocal(LEGACY_PREFIX + name)
 }
 
+export async function saveCurrentCircuit(circuit: SavedCircuit): Promise<void> {
+  const normalized = normalizeSavedCircuit(circuit)
+  const current = toStored(normalized, CURRENT_ID, true)
+
+  const ok = await withIdb(async (db) => {
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, "readwrite")
+      tx.objectStore(STORE_NAME).put(current)
+      tx.oncomplete = () => resolve()
+      tx.onerror = () => reject(tx.error ?? new Error("Failed to update current project"))
+      tx.onabort = () => reject(tx.error ?? new Error("Current project update aborted"))
+    })
+    return true
+  })
+
+  if (ok !== null) {
+    removeLocal(LEGACY_PREFIX + "current")
+    return
+  }
+
+  writeLocal(IDB_PREFIX + "current", normalized)
+  writeLocal(LEGACY_PREFIX + "current", normalized)
+}
+
+export async function clearCurrentCircuit(): Promise<void> {
+  await withIdb(async (db) => {
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, "readwrite")
+      tx.objectStore(STORE_NAME).delete(CURRENT_ID)
+      tx.oncomplete = () => resolve()
+      tx.onerror = () => reject(tx.error ?? new Error("Failed to clear current project"))
+      tx.onabort = () => reject(tx.error ?? new Error("Current project clear aborted"))
+    })
+    return true
+  })
+
+  removeLocal(IDB_PREFIX + "current")
+  removeLocal(LEGACY_PREFIX + "current")
+}
+
 export async function loadCurrentCircuit(): Promise<SavedCircuit | null> {
   const idbResult = await withIdb(async (db) => {
     const tx = db.transaction(STORE_NAME, "readonly")
