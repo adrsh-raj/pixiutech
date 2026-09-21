@@ -181,7 +181,29 @@ function getBlockDescription(block: Blockly.Block, env: ExecutionEnvironment): s
       const pin = block.getFieldValue("PIN") ?? "8"
       return `noTone(Pin ${pin})`
     }
-    case "ir_read":\n    case "dht_temperature":\n    case "dht_humidity":\n    case "joystick_x":\n    case "joystick_y":\n    case "joystick_button":\n    case "soil_moisture_read":\n    case "encoder_read":\n    case "keypad_read": {\n      return `${block.type} (${block.getFieldValue("SENSOR") ?? "default"})`\n    }\n    case "oled_print": {\n      const value = evaluateValueInput(block, "TEXT", env, "")\n      return `OLED.print("${value}")`\n    }\n    case "oled_clear": {\n      return "OLED.clear()"\n    }\n    case "motor_driver_write": {\n      const speed = evaluateNumberInput(block, "SPEED", env, 180)\n      return `Motor driver ${block.getFieldValue("CHANNEL") ?? "A"} speed ${speed}`\n    }\n    case "serial_begin": {
+    case "ir_read":
+    case "dht_temperature":
+    case "dht_humidity":
+    case "joystick_x":
+    case "joystick_y":
+    case "joystick_button":
+    case "soil_moisture_read":
+    case "encoder_read":
+    case "keypad_read": {
+      return `${block.type} (${block.getFieldValue("SENSOR") ?? "default"})`
+    }
+    case "oled_print": {
+      const value = evaluateValueInput(block, "TEXT", env, "")
+      return `OLED.print("${value}")`
+    }
+    case "oled_clear": {
+      return "OLED.clear()"
+    }
+    case "motor_driver_write": {
+      const speed = evaluateNumberInput(block, "SPEED", env, 180)
+      return `Motor driver ${block.getFieldValue("CHANNEL") ?? "A"} speed ${speed}`
+    }
+    case "serial_begin": {
       const baud = block.getFieldValue("BAUD") ?? "9600"
       return `Serial.begin(${baud})`
     }
@@ -293,7 +315,34 @@ async function executeSingleBlock(block: Blockly.Block, env: ExecutionEnvironmen
       break
     }
 
-    case "oled_print": {\n      const textValue = evaluateValueInput(block, "TEXT", env, "")\n      env.setOledText?.(1, textValue)\n      break\n    }\n\n    case "oled_clear": {\n      env.clearOled?.()\n      break\n    }\n\n    case "motor_driver_write": {\n      const channel = block.getFieldValue("CHANNEL") ?? "A"\n      const speed = Math.max(0, Math.min(255, evaluateNumberInput(block, "SPEED", env, 180)))\n      const enableField = channel === "A" ? "ENA" : "ENB"\n      const in1Field = channel === "A" ? "IN1" : "IN3"\n      const in2Field = channel === "A" ? "IN2" : "IN4"\n      const enable = String(block.getFieldValue(enableField) ?? (channel === "A" ? "5" : "6"))\n      const in1 = String(block.getFieldValue(in1Field) ?? (channel === "A" ? "7" : "9"))\n      const in2 = String(block.getFieldValue(in2Field) ?? (channel === "A" ? "8" : "10"))\n      const direction = block.getFieldValue("DIRECTION") ?? "CW"\n      env.setAnalogPin(enable, speed)\n      env.setDigitalPin(in1, direction === "CW" ? "HIGH" : "LOW")\n      env.setDigitalPin(in2, direction === "CW" ? "LOW" : "HIGH")\n      break\n    }\n\n    case "serial_begin": {
+    case "oled_print": {
+      const textValue = evaluateValueInput(block, "TEXT", env, "")
+      env.setOledText?.(1, textValue)
+      break
+    }
+
+    case "oled_clear": {
+      env.clearOled?.()
+      break
+    }
+
+    case "motor_driver_write": {
+      const channel = block.getFieldValue("CHANNEL") ?? "A"
+      const speed = Math.max(0, Math.min(255, evaluateNumberInput(block, "SPEED", env, 180)))
+      const enableField = channel === "A" ? "ENA" : "ENB"
+      const in1Field = channel === "A" ? "IN1" : "IN3"
+      const in2Field = channel === "A" ? "IN2" : "IN4"
+      const enable = String(block.getFieldValue(enableField) ?? (channel === "A" ? "5" : "6"))
+      const in1 = String(block.getFieldValue(in1Field) ?? (channel === "A" ? "7" : "9"))
+      const in2 = String(block.getFieldValue(in2Field) ?? (channel === "A" ? "8" : "10"))
+      const direction = block.getFieldValue("DIRECTION") ?? "CW"
+      env.setAnalogPin(enable, speed)
+      env.setDigitalPin(in1, direction === "CW" ? "HIGH" : "LOW")
+      env.setDigitalPin(in2, direction === "CW" ? "LOW" : "HIGH")
+      break
+    }
+
+    case "serial_begin": {
       const baud = block.getFieldValue("BAUD") ?? "9600"
       env.serialPrintln?.(`[System] Serial initialized at ${baud} baud.`)
       break
