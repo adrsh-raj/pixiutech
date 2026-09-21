@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom"
-import { CircuitBoard, Play, Square, Trash2, ArrowLeft, Undo2, Redo2, Save, Terminal, Volume2, VolumeX, Sparkles, Camera, Sliders, Pause, StepForward, FastForward } from "lucide-react"
+import { CircuitBoard, Play, Square, Trash2, ArrowLeft, Undo2, Redo2, Save, Upload, Download, Terminal, Volume2, VolumeX, Sparkles, Camera, Sliders, Pause, StepForward, FastForward } from "lucide-react"
 
 export type WorkbenchView = "circuit" | "code" | "3d"
 
@@ -14,6 +14,8 @@ interface Props {
   canRedo?: boolean
   onRedo?: () => void
   onSave?: () => void
+  onUpload?: () => void
+  onExport?: () => void
   isSerialOpen?: boolean
   onToggleSerial?: () => void
   isAiCameraOpen?: boolean
@@ -52,6 +54,8 @@ export function Toolbar({
   canRedo = false,
   onRedo,
   onSave,
+  onUpload,
+  onExport,
   isSerialOpen = false,
   onToggleSerial,
   isAiCameraOpen = false,
@@ -200,6 +204,40 @@ export function Toolbar({
 
       {/* RIGHT: Secondary Tools & Utilities */}
       <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+        {/* Project File Controls */}
+        {onSave && (
+          <button
+            onClick={onSave}
+            className="hidden lg:flex items-center gap-1 rounded-lg border border-primary/30 bg-primary/10 hover:bg-primary/15 text-primary px-2 sm:px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer"
+            title="Save this circuit to this browser"
+          >
+            <Save size={13} />
+            <span className="hidden xl:inline">Save</span>
+          </button>
+        )}
+
+        {onUpload && (
+          <button
+            onClick={onUpload}
+            className="hidden lg:flex items-center gap-1 rounded-lg border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/15 text-blue-600 dark:text-blue-300 px-2 sm:px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer"
+            title="Upload a .pixiu circuit file"
+          >
+            <Upload size={13} />
+            <span className="hidden xl:inline">Upload</span>
+          </button>
+        )}
+
+        {onExport && (
+          <button
+            onClick={onExport}
+            className="hidden lg:flex items-center gap-1 rounded-lg border border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-700 px-2 sm:px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer"
+            title="Download this circuit as a .pixiu file"
+          >
+            <Download size={13} />
+            <span className="hidden xl:inline">Download</span>
+          </button>
+        )}
+
         {/* Templates (Desktop) */}
         {onOpenTemplates && (
           <button
