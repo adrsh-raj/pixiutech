@@ -147,24 +147,42 @@ export function computeRuntime(
       activeSources.push({ key: k("pos"), voltage: 9.0 })
       groundSinks.push(k("neg"))
     } else if (part.type === "ir-sensor") {
+      activeSources.push({ key: k("vcc"), voltage: 5.0 })
+      groundSinks.push(k("gnd"))
       activeSources.push({ key: k("out"), voltage: String(part.props.detected ?? "false") === "true" ? 5.0 : 0.0 })
       if (String(part.props.detected ?? "false") !== "true") groundSinks.push(k("out"))
     } else if (part.type === "joystick") {
+      activeSources.push({ key: k("vcc"), voltage: 5.0 })
+      groundSinks.push(k("gnd"))
       activeSources.push({ key: k("vrx"), voltage: Math.max(0, Math.min(5, Number(part.props.x ?? 512) / 1023 * 5)) })
       activeSources.push({ key: k("vry"), voltage: Math.max(0, Math.min(5, Number(part.props.y ?? 512) / 1023 * 5)) })
       if (String(part.props.pressed ?? "false") === "true") activeSources.push({ key: k("sw"), voltage: 5.0 })
       else groundSinks.push(k("sw"))
     } else if (part.type === "soil-moisture") {
+      activeSources.push({ key: k("vcc"), voltage: 5.0 })
+      groundSinks.push(k("gnd"))
       activeSources.push({ key: k("ao"), voltage: Math.max(0, Math.min(5, Number(part.props.moisture ?? 620) / 1023 * 5)) })
     } else if (part.type === "rotary-encoder") {
       const value = Number(part.props.value ?? 0)
+      activeSources.push({ key: k("vcc"), voltage: 5.0 })
+      groundSinks.push(k("gnd"))
       activeSources.push({ key: k("clk"), voltage: value % 2 ? 5.0 : 0.0 })
       activeSources.push({ key: k("dt"), voltage: Math.floor(value / 2) % 2 ? 5.0 : 0.0 })
       if (String(part.props.pressed ?? "false") === "true") activeSources.push({ key: k("sw"), voltage: 5.0 })
       else groundSinks.push(k("sw"))
-    } else if (part.type === "dht11" || part.type === "oled-i2c") {
-      activeSources.push({ key: k(part.type === "dht11" ? "data" : "sda"), voltage: 3.3 })
-      if (part.type === "oled-i2c") activeSources.push({ key: k("scl"), voltage: 3.3 })
+    } else if (part.type === "dht11") {
+      activeSources.push({ key: k("vcc"), voltage: 5.0 })
+      groundSinks.push(k("gnd"))
+      activeSources.push({ key: k("data"), voltage: 3.3 })
+    } else if (part.type === "oled-i2c") {
+      activeSources.push({ key: k("vcc"), voltage: 5.0 })
+      groundSinks.push(k("gnd"))
+      activeSources.push({ key: k("sda"), voltage: 3.3 })
+      activeSources.push({ key: k("scl"), voltage: 3.3 })
+    } else if (part.type === "l298n") {
+      activeSources.push({ key: k("vs"), voltage: 9.0 })
+      activeSources.push({ key: k("5v"), voltage: 5.0 })
+      groundSinks.push(k("gnd"))
     }
   }
 
