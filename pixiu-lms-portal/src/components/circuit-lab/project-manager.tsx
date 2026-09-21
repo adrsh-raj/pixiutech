@@ -29,9 +29,9 @@ interface Props {
   onClose: () => void
   onSave: (name: string) => Promise<void>
   onNew: () => Promise<void>
-  onImport: (file: File) => Promise<void>
+  onImport: (file: File, password?: string) => Promise<void>
   onLoad: (project: SavedCircuit) => Promise<void>
-  onExportCurrent: () => void
+  onExportCurrent: (password?: string) => Promise<void> | void
   isSaving: boolean
 }
 
@@ -73,6 +73,11 @@ export function ProjectManager({
   const [busyProject, setBusyProject] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isDraggingFile, setIsDraggingFile] = useState(false)
+  const [protectExport, setProtectExport] = useState(false)
+  const [exportPassword, setExportPassword] = useState("")
+  const [pendingImportFile, setPendingImportFile] = useState<File | null>(null)
+  const [importPassword, setImportPassword] = useState("")
+  const [passwordPromptOpen, setPasswordPromptOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement | null>(null)
 
   const refreshProjects = useCallback(async () => {
@@ -114,19 +119,34 @@ export function ProjectManager({
     }
   }
 
-  const handleImport = async (file: File | undefined) => {
+  const handleImport = async (file: File | undefined, password?: string) => {
     if (!file) return
     setError(null)
     setBusyProject("__import__")
     try {
-      await onImport(file)
+      await onImport(file, password)
       await refreshProjects()
+      setPasswordPromptOpen(false)
+      setPendingImportFile(null)
+      setImportPassword("")
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not import this file.")
+      const message = err instanceof Error ? err.message : "Could not import this file."
+      if (message === "PASSWORD_REQUIRED" || message === "WRONG_PASSWORD") {
+        setPendingImportFile(file)
+        setPasswordPromptOpen(true)
+        setError(message === "WRONG_PASSWORD" ? "That password did not unlock this .pixiu file." : "This .pixiu file is password protected.")
+      } else {
+        setError(message)
+      }
     } finally {
       setBusyProject(null)
       if (inputRef.current) inputRef.current.value = ""
     }
+  }
+
+  const handleProtectedImport = async () => {
+    if (!pendingImportFile || importPassword.length < 4) return
+    await handleImport(pendingImportFile, importPassword)
   }
 
   const handleLoad = async (project: SavedCircuit) => {
@@ -247,13 +267,40 @@ export function ProjectManager({
                 </button>
               </div>
 
-              <button
-                onClick={onExportCurrent}
-                className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-950/60 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:border-blue-400/40 hover:text-blue-200"
-              >
-                <Download size={14} />
-                Download current .pixiu
-              </button>
+              <div className="mt-2 rounded-xl border border-slate-700 bg-slate-950/50 p-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <button
+                    onClick={() => { setProtectExport((value) => !value); setExportPassword("") }}
+                    className={"flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[10px] font-bold transition " + (
+                      protectExport ? "bg-amber-500/15 text-amber-200 ring-1 ring-amber-400/30" : "bg-slate-900 text-slate-400 hover:text-slate-200"
+                    )}
+                  >
+                    <span>{protectExport ? "🔐" : "↗"}</span>
+                    {protectExport ? "Password protected" : "Portable protocol"}
+                  </button>
+                  <button
+                    onClick={() => void onExportCurrent(protectExport ? exportPassword : undefined)}
+                    disabled={protectExport && exportPassword.length < 4}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-2.5 py-1.5 text-[10px] font-bold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <Download size={13} />
+                    Download .pixiu
+                  </button>
+                </div>
+                {protectExport && (
+                  <div className="mt-2">
+                    <input
+                      type="password"
+                      value={exportPassword}
+                      onChange={(event) => setExportPassword(event.target.value)}
+                      minLength={4}
+                      placeholder="Create a file password"
+                      className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-2 text-[11px] text-white outline-none focus:border-amber-400"
+                    />
+                    <p className="mt-1 text-[9px] leading-4 text-slate-500">Uses AES-256-GCM + PBKDF2. The password is not stored in Pixiu.</p>
+                  </div>
+                )}
+              </div>
 
               <div className="mt-3 flex items-center gap-2 border-t border-blue-500/10 pt-3 text-[10px] text-slate-500">
                 <Clock3 size={12} />
@@ -298,6 +345,43 @@ export function ProjectManager({
               <HardDrive size={13} className="mt-0.5 shrink-0 text-slate-400" />
               <span>Projects are stored locally in this browser. The .pixiu file is the portable backup and transfer format.</span>
             </div>
+
+            {passwordPromptOpen && pendingImportFile && (
+              <div className="mt-3 rounded-2xl border border-amber-400/25 bg-amber-500/5 p-3">
+                <div className="flex items-start gap-2">
+                  <div className="text-base">🔐</div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-bold text-amber-100">Unlock this .pixiu</p>
+                    <p className="mt-1 text-[10px] leading-4 text-slate-500">Enter the password used when the project was protected.</p>
+                    <input
+                      type="password"
+                      value={importPassword}
+                      onChange={(event) => setImportPassword(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") void handleProtectedImport()
+                      }}
+                      placeholder="Project password"
+                      className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-2 text-[11px] text-white outline-none focus:border-amber-400"
+                    />
+                    <div className="mt-2 flex gap-1.5">
+                      <button
+                        onClick={() => void handleProtectedImport()}
+                        disabled={importPassword.length < 4 || busyProject !== null}
+                        className="rounded-lg bg-amber-500 px-2.5 py-1.5 text-[10px] font-bold text-slate-950 disabled:opacity-40"
+                      >
+                        Unlock
+                      </button>
+                      <button
+                        onClick={() => { setPasswordPromptOpen(false); setPendingImportFile(null); setImportPassword(""); setError(null) }}
+                        className="rounded-lg border border-slate-700 px-2.5 py-1.5 text-[10px] font-semibold text-slate-300"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {error && (
               <div className="mt-3 rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-[11px] leading-4 text-red-200">
@@ -363,7 +447,7 @@ export function ProjectManager({
                         Open
                       </button>
                       <button
-                        onClick={() => exportAsJSON(project.name, project.state, project.blocklyXml)}
+                        onClick={() => void exportAsJSON(project.name, project.state, project.blocklyXml)}
                         disabled={busyProject !== null}
                         className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-2.5 py-1.5 text-[10px] font-semibold text-slate-300 transition hover:bg-slate-800 disabled:opacity-50"
                       >

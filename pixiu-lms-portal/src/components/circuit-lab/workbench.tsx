@@ -28,6 +28,7 @@ import { AiCameraPanel, type AiVisionState } from "./ai-camera-panel"
 import { ContextMenu, type ContextMenuTarget } from "./context-menu"
 import type { ProjectTemplate } from "@/lib/templates"
 import { ProjectManager } from "./project-manager"
+import { WelcomeOverlay } from "./welcome-overlay"
 
 const DEFAULT_XML = `<xml xmlns="https://developers.google.com/blockly/xml">
   <block type="arduino_program" x="40" y="40">
@@ -496,16 +497,47 @@ export function Workbench() {
             lcd_line2: "" as any,
           }))
         },
+        setOledText: (line, text) => {
+          setPinStates((prev) => ({
+            ...prev,
+            [line === 1 ? "oled_line1" : line === 2 ? "oled_line2" : "oled_line3"]: text as any,
+          }))
+        },
+        clearOled: () => {
+          setPinStates((prev) => ({
+            ...prev,
+            oled_line1: "" as any,
+            oled_line2: "" as any,
+            oled_line3: "" as any,
+          }))
+        },
         getSensorValue: (type, pin) => {
-          const p = partsRef.current.find((pt) => pt.type === type)
+          const partId = pin && partsRef.current.some((pt) => pt.id === pin) ? pin : undefined
+          const p = partId
+            ? partsRef.current.find((pt) => pt.id === partId)
+            : partsRef.current.find((pt) => pt.type === type)
           if (type === "ultrasonic") return Number(p?.props?.distance ?? 100)
           if (type === "ldr") return Number(p?.props?.light ?? 512)
           if (type === "tmp36") return Number(p?.props?.temperature ?? 25)
+          if (type === "ir") return String(p?.props?.detected ?? "false") === "true" ? 1 : 0
+          if (type === "dht_temperature") return Number(p?.props?.temperature ?? 25)
+          if (type === "dht_humidity") return Number(p?.props?.humidity ?? 55)
+          if (type === "joystick_x") return Number(p?.props?.x ?? 512)
+          if (type === "joystick_y") return Number(p?.props?.y ?? 512)
+          if (type === "joystick_button") return String(p?.props?.pressed ?? "false") === "true" ? 1 : 0
+          if (type === "soil") return Number(p?.props?.moisture ?? 620)
+          if (type === "encoder") return Number(p?.props?.value ?? 0)
           if (type === "analog") {
             const pot = partsRef.current.find((pt) => pt.type === "potentiometer")
             return Number(pot?.props?.value ?? 512)
           }
           return 0
+        },
+        getSensorText: (type, id) => {
+          if (type !== "keypad") return ""
+          const keypad = partsRef.current.find((pt) => pt.id === id && pt.type === "keypad-4x4")
+            ?? partsRef.current.find((pt) => pt.type === "keypad-4x4")
+          return String(keypad?.props?.lastKey ?? "")
         },
         isAiDetected: (cls) => aiStateRef.current.detectedClass === cls,
         getAiDetectedClass: () => aiStateRef.current.detectedClass,
@@ -764,12 +796,14 @@ export function Workbench() {
     return () => window.clearTimeout(timer)
   }, [handleSave, isDirty, storageReady])
 
-  const handleExport = useCallback(() => {
-    exportAsJSON(currentProjectName, state, blocklyXml)
+  const handleExport = useCallback((password?: string) => {
+    void exportAsJSON(currentProjectName, state, blocklyXml, password).catch((error) => {
+      window.alert(error instanceof Error ? error.message : "Could not export this .pixiu file.")
+    })
   }, [blocklyXml, currentProjectName, state])
 
-  const handleUploadFile = useCallback(async (file: File): Promise<void> => {
-    const imported = await importFromJSON(file)
+  const handleUploadFile = useCallback(async (file: File, password?: string): Promise<void> => {
+    const imported = await importFromJSON(file, password)
     stopProgram()
 
     const saved = await saveCircuit(imported.name, imported.state, imported.blocklyXml || DEFAULT_XML)
@@ -861,9 +895,8 @@ export function Workbench() {
         onUndo={handleUndo}
         canRedo={canRedo(history)}
         onRedo={handleRedo}
-        onSave={handleSave}
-        onExport={handleExport}
-        onOpenProjects={() => setIsProjectManagerOpen(true)}
+         onOpenProjects={() => setIsProjectManagerOpen(true)}
+        onOpenGuide={() => window.dispatchEvent(new Event("pixiu-open-guide"))}
         isSerialOpen={isSerialOpen}
         onToggleSerial={() => setIsSerialOpen((prev) => !prev)}
         isAiCameraOpen={isAiCameraOpen}
@@ -883,6 +916,8 @@ export function Workbench() {
         onDebugSpeedChange={handleDebugSpeedChange}
         activeStepLabel={activeStepBlock?.label ?? null}
       />
+
+      <WelcomeOverlay onOpenProjects={() => setIsProjectManagerOpen(true)} />
 
       <ProjectManager
         isOpen={isProjectManagerOpen}

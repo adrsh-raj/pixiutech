@@ -1,6 +1,7 @@
 import * as Blockly from "blockly"
 import type { CircuitState } from "./circuit-types"
 import { getPinOptions } from "./pin-map"
+import { CATALOG } from "./components-catalog"
 
 /** Operator precedence buckets for the generated C++. */
 export const ORDER = {
@@ -27,6 +28,18 @@ function pinDropdown(): [string, string][] {
   const opts = getPinOptions(currentCircuit)
   if (opts.length === 0) return [["13", "13"]]
   return opts.map((o) => [o.label, o.code])
+}
+
+function componentDropdown(types: string[], emptyLabel = "Add component first"): () => [string, string][] {
+  return () => {
+    const options = currentCircuit.parts
+      .filter((part) => types.includes(part.type))
+      .map((part) => [
+        (CATALOG[part.type as keyof typeof CATALOG]?.name ?? part.type) + " · " + part.id.slice(0, 6),
+        part.id,
+      ] as [string, string])
+    return options.length > 0 ? options : [[emptyLabel, ""]]
+  }
 }
 
 let defined = false
@@ -231,6 +244,156 @@ export function defineArduinoBlocks() {
       this.setNextStatement(true)
       this.setColour(120)
       this.setTooltip('Clear LCD display')
+    }
+  }
+
+  Blockly.Blocks['ir_read'] = {
+    init() {
+      this.appendDummyInput()
+        .appendField('IR obstacle?')
+        .appendField(new Blockly.FieldDropdown(componentDropdown(['ir-sensor'])), 'SENSOR')
+      this.setOutput(true, 'Boolean')
+      this.setColour(230)
+      this.setTooltip('Read the virtual IR obstacle sensor.')
+    }
+  }
+
+  Blockly.Blocks['dht_temperature'] = {
+    init() {
+      this.appendDummyInput()
+        .appendField('DHT11 temperature')
+        .appendField(new Blockly.FieldDropdown(componentDropdown(['dht11'])), 'SENSOR')
+      this.setOutput(true, 'Number')
+      this.setColour(230)
+      this.setTooltip('Read temperature in degrees Celsius.')
+    }
+  }
+
+  Blockly.Blocks['dht_humidity'] = {
+    init() {
+      this.appendDummyInput()
+        .appendField('DHT11 humidity')
+        .appendField(new Blockly.FieldDropdown(componentDropdown(['dht11'])), 'SENSOR')
+      this.setOutput(true, 'Number')
+      this.setColour(230)
+      this.setTooltip('Read relative humidity percentage.')
+    }
+  }
+
+  Blockly.Blocks['joystick_x'] = {
+    init() {
+      this.appendDummyInput()
+        .appendField('Joystick X')
+        .appendField(new Blockly.FieldDropdown(componentDropdown(['joystick'])), 'SENSOR')
+      this.setOutput(true, 'Number')
+      this.setColour(210)
+      this.setTooltip('Read X axis from 0 to 1023.')
+    }
+  }
+
+  Blockly.Blocks['joystick_y'] = {
+    init() {
+      this.appendDummyInput()
+        .appendField('Joystick Y')
+        .appendField(new Blockly.FieldDropdown(componentDropdown(['joystick'])), 'SENSOR')
+      this.setOutput(true, 'Number')
+      this.setColour(210)
+      this.setTooltip('Read Y axis from 0 to 1023.')
+    }
+  }
+
+  Blockly.Blocks['joystick_button'] = {
+    init() {
+      this.appendDummyInput()
+        .appendField('Joystick button')
+        .appendField(new Blockly.FieldDropdown(componentDropdown(['joystick'])), 'SENSOR')
+      this.setOutput(true, 'Boolean')
+      this.setColour(210)
+      this.setTooltip('Read the joystick push button.')
+    }
+  }
+
+  Blockly.Blocks['soil_moisture_read'] = {
+    init() {
+      this.appendDummyInput()
+        .appendField('Soil moisture')
+        .appendField(new Blockly.FieldDropdown(componentDropdown(['soil-moisture'])), 'SENSOR')
+      this.setOutput(true, 'Number')
+      this.setColour(120)
+      this.setTooltip('Read simulated soil moisture from 0 to 1023.')
+    }
+  }
+
+  Blockly.Blocks['encoder_read'] = {
+    init() {
+      this.appendDummyInput()
+        .appendField('Encoder count')
+        .appendField(new Blockly.FieldDropdown(componentDropdown(['rotary-encoder'])), 'SENSOR')
+      this.setOutput(true, 'Number')
+      this.setColour(45)
+      this.setTooltip('Read the virtual rotary encoder count.')
+    }
+  }
+
+  Blockly.Blocks['keypad_read'] = {
+    init() {
+      this.appendDummyInput()
+        .appendField('Keypad key')
+        .appendField(new Blockly.FieldDropdown(componentDropdown(['keypad-4x4'])), 'SENSOR')
+      this.setOutput(true, 'String')
+      this.setColour(45)
+      this.setTooltip('Read the last virtual key pressed.')
+    }
+  }
+
+  Blockly.Blocks['oled_print'] = {
+    init() {
+      this.appendValueInput('TEXT').setCheck(null).appendField('OLED print')
+      this.setPreviousStatement(true)
+      this.setNextStatement(true)
+      this.setColour(120)
+      this.setTooltip('Print text to the connected OLED display.')
+    }
+  }
+
+  Blockly.Blocks['oled_clear'] = {
+    init() {
+      this.appendDummyInput().appendField('OLED clear')
+      this.setPreviousStatement(true)
+      this.setNextStatement(true)
+      this.setColour(120)
+      this.setTooltip('Clear the virtual OLED display.')
+    }
+  }
+
+  Blockly.Blocks['motor_driver_write'] = {
+    init() {
+      this.appendDummyInput()
+        .appendField('Motor driver')
+        .appendField(new Blockly.FieldDropdown([['A', 'A'], ['B', 'B']]), 'CHANNEL')
+        .appendField('direction')
+        .appendField(new Blockly.FieldDropdown([['CW', 'CW'], ['CCW', 'CCW'], ['STOP', 'STOP']]), 'DIRECTION')
+        .appendField('speed')
+      this.appendValueInput('SPEED').setCheck('Number')
+      this.appendDummyInput()
+        .appendField('pins ENA')
+        .appendField(new Blockly.FieldNumber(5, 0, 13), 'ENA')
+        .appendField('ENB')
+        .appendField(new Blockly.FieldNumber(6, 0, 13), 'ENB')
+      this.appendDummyInput()
+        .appendField('IN1')
+        .appendField(new Blockly.FieldNumber(7, 0, 13), 'IN1')
+        .appendField('IN2')
+        .appendField(new Blockly.FieldNumber(8, 0, 13), 'IN2')
+      this.appendDummyInput()
+        .appendField('IN3')
+        .appendField(new Blockly.FieldNumber(9, 0, 13), 'IN3')
+        .appendField('IN4')
+        .appendField(new Blockly.FieldNumber(10, 0, 13), 'IN4')
+      this.setPreviousStatement(true)
+      this.setNextStatement(true)
+      this.setColour(300)
+      this.setTooltip('Drive one channel of the L298N using Arduino output pins.')
     }
   }
 
@@ -515,6 +678,37 @@ arduino.forBlock['lcd_set_cursor'] = (block) => {
 }
 
 arduino.forBlock['lcd_clear'] = () => 'lcd.clear();\n'
+
+arduino.forBlock['ir_read'] = (block) => ['digitalRead(' + block.getFieldValue('SENSOR') + ')', ORDER.ATOMIC]
+arduino.forBlock['dht_temperature'] = (block, generator) => {
+  const sensor = block.getFieldValue('SENSOR') || 'dht'
+  ;(generator as ArduinoGen).definitions_[`dht_${sensor}`] = `// Add DHT11 setup for ${sensor} before uploading.\\n`
+  return [`dht_${sensor}.readTemperature()`, ORDER.ATOMIC]
+}
+arduino.forBlock['dht_humidity'] = (block) => [`dht_${block.getFieldValue('SENSOR') || 'dht'}.readHumidity()`, ORDER.ATOMIC]
+arduino.forBlock['joystick_x'] = (block) => [`analogRead(${block.getFieldValue('SENSOR') || 'A0'})`, ORDER.ATOMIC]
+arduino.forBlock['joystick_y'] = (block) => [`analogRead(${block.getFieldValue('SENSOR') || 'A1'})`, ORDER.ATOMIC]
+arduino.forBlock['joystick_button'] = (block) => [`digitalRead(${block.getFieldValue('SENSOR') || '2'})`, ORDER.ATOMIC]
+arduino.forBlock['soil_moisture_read'] = (block) => [`analogRead(${block.getFieldValue('SENSOR') || 'A0'})`, ORDER.ATOMIC]
+arduino.forBlock['encoder_read'] = (block) => [`readEncoder("${block.getFieldValue('SENSOR') || ''}")`, ORDER.ATOMIC]
+arduino.forBlock['keypad_read'] = (block) => [`readKeypad("${block.getFieldValue('SENSOR') || ''}")`, ORDER.ATOMIC]
+arduino.forBlock['oled_print'] = (block, generator) => {
+  const text = generator.valueToCode(block, 'TEXT', ORDER.NONE) || '""'
+  return 'oled.print(' + text + ');\\n'
+}
+arduino.forBlock['oled_clear'] = () => 'oled.clearDisplay(); oled.display();\\n'
+arduino.forBlock['motor_driver_write'] = (block, generator) => {
+  const channel = block.getFieldValue('CHANNEL') || 'A'
+  const speed = generator.valueToCode(block, 'SPEED', ORDER.NONE) || '0'
+  const direction = block.getFieldValue('DIRECTION') || 'STOP'
+  const ena = block.getFieldValue(channel === 'A' ? 'ENA' : 'ENB')
+  const in1 = block.getFieldValue(channel === 'A' ? 'IN1' : 'IN3')
+  const in2 = block.getFieldValue(channel === 'A' ? 'IN2' : 'IN4')
+  if (direction === 'STOP') return `analogWrite(${ena}, 0); digitalWrite(${in1}, LOW); digitalWrite(${in2}, LOW);\\n`
+  const highPin = direction === 'CW' ? in1 : in2
+  const lowPin = direction === 'CW' ? in2 : in1
+  return `analogWrite(${ena}, ${speed}); digitalWrite(${highPin}, HIGH); digitalWrite(${lowPin}, LOW);\\n`
+}
 
 arduino.forBlock['ultrasonic_read'] = (block) => {
   const trig = block.getFieldValue('TRIG')

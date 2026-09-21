@@ -146,6 +146,43 @@ export function computeRuntime(
     } else if (part.type === "battery") {
       activeSources.push({ key: k("pos"), voltage: 9.0 })
       groundSinks.push(k("neg"))
+    } else if (part.type === "ir-sensor") {
+      activeSources.push({ key: k("vcc"), voltage: 5.0 })
+      groundSinks.push(k("gnd"))
+      activeSources.push({ key: k("out"), voltage: String(part.props.detected ?? "false") === "true" ? 5.0 : 0.0 })
+      if (String(part.props.detected ?? "false") !== "true") groundSinks.push(k("out"))
+    } else if (part.type === "joystick") {
+      activeSources.push({ key: k("vcc"), voltage: 5.0 })
+      groundSinks.push(k("gnd"))
+      activeSources.push({ key: k("vrx"), voltage: Math.max(0, Math.min(5, Number(part.props.x ?? 512) / 1023 * 5)) })
+      activeSources.push({ key: k("vry"), voltage: Math.max(0, Math.min(5, Number(part.props.y ?? 512) / 1023 * 5)) })
+      if (String(part.props.pressed ?? "false") === "true") activeSources.push({ key: k("sw"), voltage: 5.0 })
+      else groundSinks.push(k("sw"))
+    } else if (part.type === "soil-moisture") {
+      activeSources.push({ key: k("vcc"), voltage: 5.0 })
+      groundSinks.push(k("gnd"))
+      activeSources.push({ key: k("ao"), voltage: Math.max(0, Math.min(5, Number(part.props.moisture ?? 620) / 1023 * 5)) })
+    } else if (part.type === "rotary-encoder") {
+      const value = Number(part.props.value ?? 0)
+      activeSources.push({ key: k("vcc"), voltage: 5.0 })
+      groundSinks.push(k("gnd"))
+      activeSources.push({ key: k("clk"), voltage: value % 2 ? 5.0 : 0.0 })
+      activeSources.push({ key: k("dt"), voltage: Math.floor(value / 2) % 2 ? 5.0 : 0.0 })
+      if (String(part.props.pressed ?? "false") === "true") activeSources.push({ key: k("sw"), voltage: 5.0 })
+      else groundSinks.push(k("sw"))
+    } else if (part.type === "dht11") {
+      activeSources.push({ key: k("vcc"), voltage: 5.0 })
+      groundSinks.push(k("gnd"))
+      activeSources.push({ key: k("data"), voltage: 3.3 })
+    } else if (part.type === "oled-i2c") {
+      activeSources.push({ key: k("vcc"), voltage: 5.0 })
+      groundSinks.push(k("gnd"))
+      activeSources.push({ key: k("sda"), voltage: 3.3 })
+      activeSources.push({ key: k("scl"), voltage: 3.3 })
+    } else if (part.type === "l298n") {
+      activeSources.push({ key: k("vs"), voltage: 9.0 })
+      activeSources.push({ key: k("5v"), voltage: 5.0 })
+      groundSinks.push(k("gnd"))
     }
   }
 
@@ -399,6 +436,78 @@ export function computeRuntime(
       if (conducting) {
         addEdge(key(part.id, "collector"), key(part.id, "emitter"), 0.2)
       }
+    } else if (part.type === "ir-sensor") {
+      const vccKey = k("vcc")
+      const gndKey = k("gnd")
+      const powered = Boolean(shortestResistance(activeSources, vccKey) && shortestResistance(groundSinks.map((g) => ({ key: g })), gndKey))
+      const detected = powered && String(part.props.detected ?? "false") === "true"
+      runtime[part.id] = { sensorValue: detected ? 1 : 0, level: detected ? 1 : 0 }
+
+    } else if (part.type === "dht11") {
+      const powered = Boolean(shortestResistance(activeSources, k("vcc")) && shortestResistance(groundSinks.map((g) => ({ key: g })), k("gnd")))
+      runtime[part.id] = {
+        sensorValue: powered ? Number(part.props.temperature ?? 25) : undefined,
+        dhtTemperature: powered ? Number(part.props.temperature ?? 25) : undefined,
+        dhtHumidity: powered ? Number(part.props.humidity ?? 55) : undefined,
+      }
+
+    } else if (part.type === "oled-i2c") {
+      const powered = Boolean(shortestResistance(activeSources, k("vcc")) && shortestResistance(groundSinks.map((g) => ({ key: g })), k("gnd")))
+      runtime[part.id] = {
+        lcdBacklight: powered,
+        lcdLine1: powered ? String(pinStates["oled_line1"] ?? part.props.line1 ?? "") : "",
+        lcdLine2: powered ? String(pinStates["oled_line2"] ?? part.props.line2 ?? "") : "",
+      }
+
+    } else if (part.type === "joystick") {
+      const powered = Boolean(shortestResistance(activeSources, k("vcc")) && shortestResistance(groundSinks.map((g) => ({ key: g })), k("gnd")))
+      runtime[part.id] = {
+        joystickX: powered ? Number(part.props.x ?? 512) : undefined,
+        joystickY: powered ? Number(part.props.y ?? 512) : undefined,
+        joystickButton: powered && String(part.props.pressed ?? "false") === "true",
+        sensorValue: powered ? Number(part.props.x ?? 512) : undefined,
+      }
+
+    } else if (part.type === "l298n") {
+      const speedA = Math.max(0, Math.min(255, Number(part.props.speedA ?? 0)))
+      const speedB = Math.max(0, Math.min(255, Number(part.props.speedB ?? 0)))
+      const readControl = (pin: string) => Boolean(shortestResistance(activeSources, k(pin)))
+      const in1 = readControl("in1")
+      const in2 = readControl("in2")
+      const in3 = readControl("in3")
+      const in4 = readControl("in4")
+      const ena = readControl("ena")
+      const enb = readControl("enb")
+      const directionA = !ena || speedA <= 0 ? "stopped" : in1 !== in2 ? (in1 ? "cw" : "ccw") : "stopped"
+      const directionB = !enb || speedB <= 0 ? "stopped" : in3 !== in4 ? (in3 ? "cw" : "ccw") : "stopped"
+      const rpmA = directionA === "stopped" ? 0 : Math.round((speedA / 255) * 1000)
+      const rpmB = directionB === "stopped" ? 0 : Math.round((speedB / 255) * 1000)
+      runtime[part.id] = { motorARpm: rpmA, motorBRpm: rpmB, motorADirection: directionA, motorBDirection: directionB }
+
+      if (directionA !== "stopped") {
+        addEdge(k("out1"), k("out2"), 2)
+      }
+      if (directionB !== "stopped") {
+        addEdge(k("out1"), k("out2"), 2)
+      }
+
+    } else if (part.type === "rotary-encoder") {
+      const value = Number(part.props.value ?? 0)
+      const prev = Number(part.props.previousValue ?? value)
+      const direction = value > prev ? "cw" : value < prev ? "ccw" : "idle"
+      runtime[part.id] = {
+        encoderValue: value,
+        encoderDirection: direction,
+        sensorValue: value,
+      }
+
+    } else if (part.type === "soil-moisture") {
+      const powered = Boolean(shortestResistance(activeSources, k("vcc")) && shortestResistance(groundSinks.map((g) => ({ key: g })), k("gnd")))
+      const moisture = powered ? Number(part.props.moisture ?? 620) : undefined
+      runtime[part.id] = { sensorValue: moisture }
+
+    } else if (part.type === "keypad-4x4") {
+      runtime[part.id] = { keypadKey: String(part.props.lastKey ?? "") }
     } else if (part.type === "relay") {
       // Relay: IN pin receives signal → COM connects to NO (normally open)
       const inKey = key(part.id, "in")

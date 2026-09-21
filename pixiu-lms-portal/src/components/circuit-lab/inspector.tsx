@@ -1,5 +1,6 @@
 import type { PlacedPart } from "@/lib/circuit-types"
 import { CATALOG } from "@/lib/components-catalog"
+import { getComponentMeta } from "@/lib/component-registry"
 import type { PartRuntime } from "./part-art"
 import { X } from "lucide-react"
 
@@ -90,6 +91,19 @@ export function Inspector({ part, runtime, partCount, wireCount, onChangeProp, o
             <div>
               <div className="font-medium text-foreground">{CATALOG[part.type].name}</div>
               <div className="font-mono text-[11px] text-muted-foreground">#{part.id.slice(0, 8)}</div>
+            </div>
+            <div className="rounded-xl border border-primary/20 bg-primary/5 p-3">
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-primary">Learn + Build</span>
+                <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[9px] font-mono text-muted-foreground">
+                  Grade {getComponentMeta(part.type).educational.gradeBand}
+                </span>
+              </div>
+              <p className="text-[11px] font-bold text-foreground">{getComponentMeta(part.type).educational.concept}</p>
+              <p className="mt-1 text-[10px] leading-4 text-muted-foreground">{getComponentMeta(part.type).educational.experiment}</p>
+              <div className="mt-2 rounded-lg border border-border/70 bg-background/50 p-2 text-[9px] leading-4 text-muted-foreground">
+                <span className="font-bold text-primary">Hint:</span> {getComponentMeta(part.type).educational.hint}
+              </div>
             </div>
 
             {part.type === "led" && (
@@ -359,6 +373,152 @@ export function Inspector({ part, runtime, partCount, wireCount, onChangeProp, o
                     }`}>
                       {s.toUpperCase()}
                     </span>
+                  ))}
+                </div>
+              </Field>
+            )}
+
+            {part.type === "ir-sensor" && (
+              <Field label="Virtual obstacle">
+                <button
+                  onClick={() => onChangeProp(part.id, "detected", part.props.detected === "true" ? "false" : "true")}
+                  className={"w-full rounded-xl border px-3 py-2 text-xs font-bold transition " + (
+                    part.props.detected === "true"
+                      ? "border-rose-400/50 bg-rose-500/15 text-rose-200"
+                      : "border-emerald-400/30 bg-emerald-500/10 text-emerald-200"
+                  )}
+                >
+                  {part.props.detected === "true" ? "🔴 Obstacle detected" : "🟢 Path clear"}
+                </button>
+              </Field>
+            )}
+
+            {part.type === "dht11" && (
+              <>
+                <Field label={"Temperature: " + (part.props.temperature ?? 25) + "°C"}>
+                  <input type="range" min={0} max={50} value={Number(part.props.temperature ?? 25)}
+                    onChange={(e) => onChangeProp(part.id, "temperature", Number(e.target.value))}
+                    className="w-full accent-sky-400" />
+                </Field>
+                <Field label={"Humidity: " + (part.props.humidity ?? 55) + "%"}>
+                  <input type="range" min={10} max={95} value={Number(part.props.humidity ?? 55)}
+                    onChange={(e) => onChangeProp(part.id, "humidity", Number(e.target.value))}
+                    className="w-full accent-cyan-400" />
+                </Field>
+              </>
+            )}
+
+            {part.type === "oled-i2c" && (
+              <>
+                <Field label="OLED line 1">
+                  <input value={String(part.props.line1 ?? "")} maxLength={18}
+                    onChange={(e) => onChangeProp(part.id, "line1", e.target.value)}
+                    className="w-full rounded-lg border border-border bg-background px-2.5 py-2 text-xs text-foreground" />
+                </Field>
+                <Field label="OLED line 2">
+                  <input value={String(part.props.line2 ?? "")} maxLength={18}
+                    onChange={(e) => onChangeProp(part.id, "line2", e.target.value)}
+                    className="w-full rounded-lg border border-border bg-background px-2.5 py-2 text-xs text-foreground" />
+                </Field>
+                <Field label="OLED line 3">
+                  <input value={String(part.props.line3 ?? "")} maxLength={18}
+                    onChange={(e) => onChangeProp(part.id, "line3", e.target.value)}
+                    className="w-full rounded-lg border border-border bg-background px-2.5 py-2 text-xs text-foreground" />
+                </Field>
+              </>
+            )}
+
+            {part.type === "joystick" && (
+              <>
+                <Field label={"X axis: " + (part.props.x ?? 512)}>
+                  <input type="range" min={0} max={1023} value={Number(part.props.x ?? 512)}
+                    onChange={(e) => onChangeProp(part.id, "x", Number(e.target.value))}
+                    className="w-full accent-blue-400" />
+                </Field>
+                <Field label={"Y axis: " + (part.props.y ?? 512)}>
+                  <input type="range" min={0} max={1023} value={Number(part.props.y ?? 512)}
+                    onChange={(e) => onChangeProp(part.id, "y", Number(e.target.value))}
+                    className="w-full accent-cyan-400" />
+                </Field>
+                <button
+                  onClick={() => onChangeProp(part.id, "pressed", part.props.pressed === "true" ? "false" : "true")}
+                  className={"w-full rounded-lg border px-3 py-2 text-xs font-bold " + (
+                    part.props.pressed === "true" ? "border-amber-400/50 bg-amber-500/15 text-amber-200" : "border-border bg-secondary text-muted-foreground"
+                  )}
+                >
+                  {part.props.pressed === "true" ? "🟡 Button pressed" : "○ Press joystick button"}
+                </button>
+              </>
+            )}
+
+            {part.type === "l298n" && (
+              <>
+                <Field label={"Motor A speed: " + (part.props.speedA ?? 0)}>
+                  <input type="range" min={0} max={255} value={Number(part.props.speedA ?? 0)}
+                    onChange={(e) => onChangeProp(part.id, "speedA", Number(e.target.value))}
+                    className="w-full accent-emerald-400" />
+                </Field>
+                <Field label={"Motor B speed: " + (part.props.speedB ?? 0)}>
+                  <input type="range" min={0} max={255} value={Number(part.props.speedB ?? 0)}
+                    onChange={(e) => onChangeProp(part.id, "speedB", Number(e.target.value))}
+                    className="w-full accent-emerald-400" />
+                </Field>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {["cw","ccw","stop"].map((dir) => (
+                    <button key={dir}
+                      onClick={() => onChangeProp(part.id, "directionA", dir)}
+                      className={"rounded-lg border px-2 py-1.5 text-[10px] font-bold " + (
+                        String(part.props.directionA ?? "stop") === dir ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-secondary"
+                      )}
+                    >
+                      {dir.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {part.type === "rotary-encoder" && (
+              <>
+                <Field label={"Count: " + (part.props.value ?? 0)}>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    <button onClick={() => onChangeProp(part.id, "value", Number(part.props.value ?? 0) - 1)} className="rounded-lg border border-border bg-secondary py-2 text-sm font-bold">−</button>
+                    <button onClick={() => onChangeProp(part.id, "value", 0)} className="rounded-lg border border-border bg-background py-2 text-[10px]">Reset</button>
+                    <button onClick={() => onChangeProp(part.id, "value", Number(part.props.value ?? 0) + 1)} className="rounded-lg border border-border bg-secondary py-2 text-sm font-bold">+</button>
+                  </div>
+                </Field>
+                <button
+                  onClick={() => onChangeProp(part.id, "pressed", part.props.pressed === "true" ? "false" : "true")}
+                  className={"w-full rounded-lg border px-3 py-2 text-xs font-bold " + (
+                    part.props.pressed === "true" ? "border-amber-400/50 bg-amber-500/15 text-amber-200" : "border-border bg-secondary text-muted-foreground"
+                  )}
+                >
+                  {part.props.pressed === "true" ? "🟡 Encoder switch pressed" : "○ Press encoder"}
+                </button>
+              </>
+            )}
+
+            {part.type === "soil-moisture" && (
+              <Field label={"Moisture: " + (part.props.moisture ?? 620) + " / 1023"}>
+                <input type="range" min={0} max={1023} value={Number(part.props.moisture ?? 620)}
+                  onChange={(e) => onChangeProp(part.id, "moisture", Number(e.target.value))}
+                  className="w-full accent-cyan-400" />
+                <div className="flex justify-between text-[10px] text-muted-foreground"><span>🏜️ Dry</span><span>💧 Wet</span></div>
+              </Field>
+            )}
+
+            {part.type === "keypad-4x4" && (
+              <Field label={"Key pressed: " + (part.props.lastKey || "none")}>
+                <div className="grid grid-cols-4 gap-1">
+                  {["1","2","3","A","4","5","6","B","7","8","9","C","*","0","#","D"].map((key) => (
+                    <button key={key}
+                      onClick={() => onChangeProp(part.id, "lastKey", key)}
+                      className={"rounded-lg border px-1 py-2 text-xs font-bold " + (
+                        String(part.props.lastKey ?? "") === key ? "border-primary bg-primary/15 text-primary" : "border-border bg-secondary text-foreground hover:bg-secondary/80"
+                      )}
+                    >
+                      {key}
+                    </button>
                   ))}
                 </div>
               </Field>

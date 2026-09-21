@@ -3,6 +3,7 @@
 import React, { useState, useMemo } from "react"
 import type { PartType } from "@/lib/circuit-types"
 import { CATALOG, PALETTE_ORDER } from "@/lib/components-catalog"
+import { COMPONENT_GROUPS, getComponentMeta } from "@/lib/component-registry"
 import { PartArt } from "./part-art"
 import { Search, X } from "lucide-react"
 
@@ -106,33 +107,14 @@ function OscilloscopeThumb() {
 
 const CATEGORIES = [
   { id: "all", label: "All" },
-  { id: "basic", label: "Basic" },
-  { id: "outputs", label: "Outputs" },
-  { id: "sensors", label: "Sensors" },
-  { id: "tools", label: "Tools" },
+  { id: "basic", label: "Build" },
+  { id: "input", label: "Input" },
+  { id: "sensor", label: "Sensors" },
+  { id: "output", label: "Output" },
+  { id: "display", label: "Displays" },
+  { id: "motor", label: "Motion" },
+  { id: "driver", label: "Drivers" },
 ] as const
-
-const PART_CATEGORIES: Record<string, string> = {
-  "arduino-uno": "basic",
-  "breadboard": "basic",
-  "resistor": "basic",
-  "pushbutton": "basic",
-  "potentiometer": "basic",
-  "battery": "basic",
-  "npn-transistor": "basic",
-  "led": "outputs",
-  "rgb-led": "outputs",
-  "seven-segment": "outputs",
-  "lcd-i2c": "outputs",
-  "buzzer": "outputs",
-  "servo": "outputs",
-  "dc-motor": "outputs",
-  "relay": "outputs",
-  "ultrasonic": "sensors",
-  "pir-sensor": "sensors",
-  "ldr": "sensors",
-  "tmp36": "sensors",
-}
 
 interface Props {
   onQuickAdd: (type: PartType) => void
@@ -166,19 +148,23 @@ export function Palette({
   }
 
   const filteredParts = useMemo(() => {
+    const query = search.trim().toLowerCase()
     return PALETTE_ORDER.filter((type) => {
       const def = CATALOG[type]
-      if (!def) return false
+      const meta = getComponentMeta(type)
+      if (!def || !meta) return false
       const matchesSearch =
-        def.name.toLowerCase().includes(search.toLowerCase()) ||
-        def.blurb.toLowerCase().includes(search.toLowerCase())
+        !query ||
+        def.name.toLowerCase().includes(query) ||
+        def.blurb.toLowerCase().includes(query) ||
+        meta.educational.concept.toLowerCase().includes(query)
       const matchesCategory =
-        activeCategory === "all" || PART_CATEGORIES[type] === activeCategory
+        activeCategory === "all" || meta.category === activeCategory
       return matchesSearch && matchesCategory
     })
   }, [search, activeCategory])
 
-  const showTools = activeCategory === "all" || activeCategory === "tools" || activeCategory === "basic"
+  const showTools = activeCategory === "all" || activeCategory === "basic"
 
   const matchesWireSearch =
     !search ||
@@ -370,39 +356,55 @@ export function Palette({
             </div>
           )}
 
-          {/* Standard Hardware Components */}
+          {/* Grouped hardware library */}
           {filteredParts.length === 0 && (!showTools || (!matchesWireSearch && !matchesDmmSearch)) ? (
             <div className="p-6 text-center text-xs text-muted-foreground">
               No components match "{search}"
             </div>
           ) : (
-            <ul className="flex flex-col gap-1.5">
-              {filteredParts.map((type) => {
-                const def = CATALOG[type]
+            <div className="space-y-2">
+              {COMPONENT_GROUPS.map((group) => {
+                const groupParts = filteredParts.filter((type) => getComponentMeta(type).category === group.id)
+                if (groupParts.length === 0) return null
                 return (
-                  <li key={type}>
-                    <button
-                      draggable
-                      onDragStart={(e) => onDragStart(e, type)}
-                      onClick={() => onQuickAdd(type)}
-                      className="group flex w-full items-center gap-3 rounded-xl border border-transparent p-2 text-left transition-all hover:border-border hover:bg-secondary/70 cursor-grab active:cursor-grabbing"
-                    >
-                      <span className="grid h-14 w-14 place-items-center rounded-lg bg-background/80 ring-1 ring-border shadow-xs shrink-0">
-                        <Thumb type={type} />
+                  <details key={group.id} open={Boolean(search) || activeCategory !== "all"} className="rounded-xl border border-border/70 bg-card/35 overflow-hidden">
+                    <summary className="flex cursor-pointer list-none items-center justify-between px-2.5 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:bg-secondary/50">
+                      <span className="flex items-center gap-1.5">
+                        <span className="text-primary">{group.icon}</span>
+                        {group.label}
                       </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate font-bold text-xs text-foreground group-hover:text-primary transition">
-                          {def.name}
-                        </span>
-                        <span className="block text-[10px] text-muted-foreground line-clamp-2 leading-tight mt-0.5">
-                          {def.blurb}
-                        </span>
-                      </span>
-                    </button>
-                  </li>
+                      <span className="rounded-full bg-background px-1.5 py-0.5 font-mono text-[9px]">{groupParts.length}</span>
+                    </summary>
+                    <div className="space-y-0.5 border-t border-border/60 p-1.5">
+                      {groupParts.map((type) => {
+                        const def = CATALOG[type]
+                        return (
+                          <button
+                            key={type}
+                            draggable
+                            onDragStart={(e) => onDragStart(e, type)}
+                            onClick={() => onQuickAdd(type)}
+                            className="group flex w-full items-center gap-2.5 rounded-lg border border-transparent p-1.5 text-left transition-all hover:border-border hover:bg-secondary/70 cursor-grab active:cursor-grabbing"
+                          >
+                            <span className="grid h-11 w-11 place-items-center rounded-lg bg-background/80 ring-1 ring-border shadow-xs shrink-0">
+                              <Thumb type={type} />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate font-bold text-[11px] text-foreground group-hover:text-primary transition">
+                                {def.name}
+                              </span>
+                              <span className="block text-[9px] text-muted-foreground line-clamp-2 leading-tight mt-0.5">
+                                {def.blurb}
+                              </span>
+                            </span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </details>
                 )
               })}
-            </ul>
+            </div>
           )}
         </div>
       </aside>
