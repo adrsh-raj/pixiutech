@@ -86,7 +86,12 @@ export const Oscilloscope = memo(function Oscilloscope({
       const currentState = snapshot.state
       const currentPinStates = snapshot.pinStates
 
-      if (cachedState !== currentState || cachedPinStates !== currentPinStates) {
+      const needsNodalSolve = [probeCH1, probeCH2].some((probe) => {
+        if (!probe) return false
+        return currentState.parts.find((part) => part.id === probe.partId)?.type !== "arduino-uno"
+      })
+
+      if (needsNodalSolve && (cachedState !== currentState || cachedPinStates !== currentPinStates)) {
         cachedState = currentState
         cachedPinStates = currentPinStates
         cachedNodalSolution = solveCircuitNodalPotentials(currentState, new Set(), currentPinStates, true)
