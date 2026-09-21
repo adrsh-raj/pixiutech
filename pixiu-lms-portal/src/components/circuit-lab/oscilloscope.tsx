@@ -1,20 +1,28 @@
 "use client"
 
-import { useState, useEffect, useMemo, useRef } from "react"
+import { memo, useState, useEffect, useMemo, useRef } from "react"
 import { Activity, X, Play, Pause, RotateCcw, Minimize2, Maximize2, GripHorizontal, Sparkles, Sliders } from "lucide-react"
 import type { CircuitState, PinRef } from "@/lib/circuit-types"
 import type { ArduinoPinState } from "@/lib/simulation"
-import type { PartRuntime } from "./part-art"
 import { CATALOG } from "@/lib/components-catalog"
 import { samplePinVoltage, computeChannelMetrics, type WaveformPoint } from "@/lib/waveform-sampler"
+import { solveCircuitNodalPotentials, type NodalSolution } from "@/lib/circuit-solver"
+
+interface SimulationSnapshot {
+  state: CircuitState
+  pinStates: Record<string, ArduinoPinState>
+  running: boolean
+}
+
+interface SimulationSnapshotRef {
+  current: SimulationSnapshot
+}
 
 interface Props {
   isOpen: boolean
   onClose: () => void
   state: CircuitState
-  runtime: Record<string, PartRuntime>
-  pinStates: Record<string, ArduinoPinState>
-  running: boolean
+  simulationRef: SimulationSnapshotRef
   probeCH1: PinRef | null
   probeCH2: PinRef | null
   onSetProbeCH1: (ref: PinRef | null) => void
@@ -31,13 +39,11 @@ const TIMEBASE_OPTIONS = [
   { label: "1s", windowMs: 10000 },
 ]
 
-export function Oscilloscope({
+export const Oscilloscope = memo(function Oscilloscope({
   isOpen,
   onClose,
   state,
-  runtime,
-  pinStates,
-  running,
+  simulationRef,
   probeCH1,
   probeCH2,
   onSetProbeCH1,
@@ -53,9 +59,6 @@ export function Oscilloscope({
 
   const historyRef = useRef<WaveformPoint[]>([])
   const hasCustomPositionRef = useRef(false)
-  const pinStatesRef = useRef(pinStates)
-  const runtimeRef = useRef(runtime)
-  const stateRef = useRef(state)
   const dragStartRef = useRef<{ mouseX: number; mouseY: number; startX: number; startY: number }>({
     mouseX: 0,
     mouseY: 0,
@@ -66,49 +69,50 @@ export function Oscilloscope({
 
   const activeWindowMs = TIMEBASE_OPTIONS[timebaseIndex].windowMs
 
-  // Keep rapidly-changing simulation inputs in refs so the sampling interval
-  // does not get torn down and recreated on every simulation tick.
+  // Simulation values change frequently. Read them through one stable ref and
+  // cache the expensive nodal solve until the circuit or pin-state object changes.
   useEffect(() => {
-    pinStatesRef.current = pinStates
-  }, [pinStates])
-
-  useEffect(() => {
-    runtimeRef.current = runtime
-  }, [runtime])
-
-  useEffect(() => {
-    stateRef.current = state
-  }, [state])
-
-  // Real-time sampling loop. Sample at 40Hz but repaint the React/SVG view at ~13-15fps.
-  useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen || isHold) return
 
     let frameCounter = 0
-    const interval = setInterval(() => {
-      if (isHold) return
+    let cachedState: CircuitState | null = null
+    let cachedPinStates: Record<string, ArduinoPinState> | null = null
+    let cachedNodalSolution: NodalSolution | null = null
+
+    const interval = window.setInterval(() => {
+      const snapshot = simulationRef.current
+      if (!snapshot.running) return
+
+      const currentState = snapshot.state
+      const currentPinStates = snapshot.pinStates
+
+      const needsNodalSolve = [probeCH1, probeCH2].some((probe) => {
+        if (!probe) return false
+        return currentState.parts.find((part) => part.id === probe.partId)?.type !== "arduino-uno"
+      })
+
+      if (needsNodalSolve && (cachedState !== currentState || cachedPinStates !== currentPinStates)) {
+        cachedState = currentState
+        cachedPinStates = currentPinStates
+        cachedNodalSolution = solveCircuitNodalPotentials(currentState, new Set(), currentPinStates, true)
+      }
 
       const now = performance.now()
-      const currentState = stateRef.current
-      const currentPinStates = pinStatesRef.current
-      const currentRuntime = runtimeRef.current
-      const v1 = running
-        ? samplePinVoltage(probeCH1, currentState, currentPinStates, currentRuntime, now)
-        : 0
-      const v2 = running
-        ? samplePinVoltage(probeCH2, currentState, currentPinStates, currentRuntime, now)
-        : 0
+      const v1 = samplePinVoltage(probeCH1, currentState, currentPinStates, now, cachedNodalSolution ?? undefined)
+      const v2 = samplePinVoltage(probeCH2, currentState, currentPinStates, now, cachedNodalSolution ?? undefined)
 
       const buf = historyRef.current
       buf.push({ t: now, v1, v2 })
 
       const cutoff = now - activeWindowMs * 1.2
-      while (buf.length > 0 && buf[0].t < cutoff) {
-        buf.shift()
+      if (buf.length > 0 && buf[0].t < cutoff) {
+        let firstVisible = 0
+        while (firstVisible < buf.length && buf[firstVisible].t < cutoff) firstVisible += 1
+        if (firstVisible > 0) historyRef.current = buf.slice(firstVisible)
       }
 
-      if (buf.length > 500) {
-        historyRef.current = buf.slice(-500)
+      if (historyRef.current.length > 600) {
+        historyRef.current = historyRef.current.slice(-500)
       }
 
       frameCounter += 1
@@ -117,8 +121,13 @@ export function Oscilloscope({
       }
     }, 25)
 
-    return () => clearInterval(interval)
-  }, [isOpen, running, isHold, probeCH1, probeCH2, activeWindowMs])
+    return () => window.clearInterval(interval)
+  }, [activeWindowMs, isHold, isOpen, probeCH1, probeCH2, simulationRef])
+
+  useEffect(() => {
+    historyRef.current = []
+    setRenderTick((prev) => prev + 1)
+  }, [probeCH1, probeCH2])
 
   // Compute metrics from the ref-backed waveform only when a render tick is requested.
   const metricsCH1 = useMemo(
@@ -207,39 +216,44 @@ export function Oscilloscope({
   const generatePath = (channel: "v1" | "v2") => {
     const history = historyRef.current
     if (history.length === 0) return ""
+
     const latestT = history[history.length - 1].t
     const startT = latestT - activeWindowMs
+    let firstVisible = 0
+    while (firstVisible < history.length && history[firstVisible].t < startT) firstVisible += 1
 
-    const visiblePoints = history.filter((p) => p.t >= startT)
-    if (visiblePoints.length === 0) {
-      const currentV = history[history.length - 1][channel]
-      const y = screenHeight - (Math.max(0, Math.min(vMaxScale, currentV)) / vMaxScale) * screenHeight
-      return `M 0 ${y.toFixed(1)} L ${screenWidth} ${y.toFixed(1)}`
-    }
+    if (firstVisible >= history.length) return ""
 
-    if (visiblePoints.length === 1) {
-      const y = screenHeight - (Math.max(0, Math.min(vMaxScale, visiblePoints[0][channel])) / vMaxScale) * screenHeight
-      return `M 0 ${y.toFixed(1)} L ${screenWidth} ${y.toFixed(1)}`
-    }
-
-    const points = visiblePoints.map((pt) => {
-      const x = ((pt.t - startT) / activeWindowMs) * screenWidth
-      const y = screenHeight - (Math.max(0, Math.min(vMaxScale, pt[channel])) / vMaxScale) * screenHeight
-      return { x, y }
-    })
-
+    const visibleCount = history.length - firstVisible
+    const stride = Math.max(1, Math.ceil(visibleCount / 400))
     let path = ""
-    if (points[0].x > 0.5) {
-      path = `M 0 ${points[0].y.toFixed(1)} L ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)} `
-    } else {
-      path = `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)} `
+    let pointsWritten = 0
+
+    for (let i = firstVisible; i < history.length; i += stride) {
+      const point = history[i]
+      const x = Math.max(0, Math.min(screenWidth, ((point.t - startT) / activeWindowMs) * screenWidth))
+      const voltage = Math.max(0, Math.min(vMaxScale, point[channel]))
+      const y = screenHeight - (voltage / vMaxScale) * screenHeight
+
+      if (pointsWritten === 0) {
+        path = x > 0.5
+          ? \`M 0 \${y.toFixed(1)} L \${x.toFixed(1)} \${y.toFixed(1)}\`
+          : \`M \${x.toFixed(1)} \${y.toFixed(1)}\`
+      } else {
+        path += \` L \${x.toFixed(1)} \${y.toFixed(1)}\`
+      }
+      pointsWritten += 1
     }
 
-    for (let i = 1; i < points.length; i++) {
-      path += `L ${points[i].x.toFixed(1)} ${points[i].y.toFixed(1)} `
+    const last = history[history.length - 1]
+    if (pointsWritten > 0 && (history.length - 1 - firstVisible) % stride !== 0) {
+      const x = Math.max(0, Math.min(screenWidth, ((last.t - startT) / activeWindowMs) * screenWidth))
+      const voltage = Math.max(0, Math.min(vMaxScale, last[channel]))
+      const y = screenHeight - (voltage / vMaxScale) * screenHeight
+      path += \` L \${x.toFixed(1)} \${y.toFixed(1)}\`
     }
 
-    return path.trim()
+    return path
   }
 
   const pathCH1 = generatePath("v1")
@@ -574,4 +588,10 @@ export function Oscilloscope({
       )}
     </div>
   )
-}
+}, (prevProps, nextProps) => (
+  prevProps.isOpen === nextProps.isOpen &&
+  prevProps.state === nextProps.state &&
+  prevProps.probeCH1 === nextProps.probeCH1 &&
+  prevProps.probeCH2 === nextProps.probeCH2 &&
+  prevProps.activeProbeToPlace === nextProps.activeProbeToPlace
+))

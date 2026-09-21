@@ -121,15 +121,25 @@ export function Multimeter({
     }
   }
 
-  // Dynamically solve exact nodal potentials across entire circuit network
-  const pinStatesJson = useMemo(() => JSON.stringify(pinStates), [pinStates])
-
+  // Solve only when a real measurement needs the circuit network.
+  // The solver result is memoized across render-only changes.
   const nodalSolution = useMemo(() => {
+    if (mode === "off" || !probeRed || !probeBlack) return null
     return solveCircuitNodalPotentials(state, new Set(), pinStates, running)
-  }, [state, pinStatesJson, running])
+  }, [mode, probeBlack, probeRed, pinStates, running, state])
 
-  const infoRed = useMemo(() => nodalSolution.getPinInfo(probeRed), [nodalSolution, probeRed])
-  const infoBlack = useMemo(() => nodalSolution.getPinInfo(probeBlack), [nodalSolution, probeBlack])
+  const emptyPinInfo = useMemo(
+    () => ({ voltage: 0, netId: -1, isDriven: false, isGnd: false }),
+    [],
+  )
+  const infoRed = useMemo(
+    () => (nodalSolution ? nodalSolution.getPinInfo(probeRed) : emptyPinInfo),
+    [emptyPinInfo, nodalSolution, probeRed],
+  )
+  const infoBlack = useMemo(
+    () => (nodalSolution ? nodalSolution.getPinInfo(probeBlack) : emptyPinInfo),
+    [emptyPinInfo, nodalSolution, probeBlack],
+  )
 
   // Helper to format pin label for display
   const formatPin = (ref: PinRef | null) => {
@@ -162,13 +172,14 @@ export function Multimeter({
       }
     }
 
-    // Check if probes are directly on a resistor
-    const sameResistor =
-      probeRed.partId === probeBlack.partId &&
-      state.parts.find((p) => p.id === probeRed.partId)?.type === "resistor"
-
-    const resistorPart = sameResistor ? state.parts.find((p) => p.id === probeRed.partId) : null
-    const resistorVal = resistorPart ? Number(resistorPart.props.resistance ?? 220) : null
+    if (!nodalSolution) {
+      return {
+        value: "O.L",
+        unit: "",
+        isContinuityBeep: false,
+        explanation: "Measurement solver is idle",
+      }
+    }
 
     switch (mode) {
       case "voltage": {
@@ -235,7 +246,7 @@ export function Multimeter({
         }
       }
     }
-  }, [mode, probeRed, probeBlack, state, nodalSolution, pinStates, infoRed, infoBlack, runtime])
+  }, [mode, probeRed, probeBlack, state, nodalSolution, pinStates, runtime])
 
   // Keep the continuity oscillator alive while the state remains continuous;
   // do not create/stop a new oscillator on every simulation tick.

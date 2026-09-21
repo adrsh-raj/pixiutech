@@ -1,6 +1,6 @@
 import type { CircuitState, PinRef } from "./circuit-types"
 import type { ArduinoPinState } from "./simulation"
-import type { PartRuntime } from "@/components/circuit-lab/part-art"
+import type { NodalSolution } from "./circuit-solver"
 import { solveCircuitNodalPotentials } from "./circuit-solver"
 
 export interface WaveformPoint {
@@ -23,8 +23,8 @@ export function samplePinVoltage(
   ref: PinRef | null,
   state: CircuitState,
   pinStates: Record<string, ArduinoPinState>,
-  runtime: Record<string, PartRuntime>,
-  simTimeMs: number
+  simTimeMs: number,
+  cachedNodalSolution?: NodalSolution
 ): number {
   if (!ref) return 0
 
@@ -54,7 +54,7 @@ export function samplePinVoltage(
   }
 
   // 2. Pure nodal potential solver for rest of circuit
-  const nodal = solveCircuitNodalPotentials(state, new Set(), pinStates, true)
+  const nodal = cachedNodalSolution ?? solveCircuitNodalPotentials(state, new Set(), pinStates, true)
   return Math.max(0, Math.min(5.0, nodal.getPinVoltage(ref)))
 }
 
@@ -63,7 +63,7 @@ export function computeChannelMetrics(
   channel: "v1" | "v2",
   isConnected: boolean
 ): ChannelMetrics {
-  if (!isConnected || history.length < 5) {
+  if (!isConnected || history.length < 2) {
     return {
       currentV: 0,
       vMax: 0,
@@ -71,56 +71,84 @@ export function computeChannelMetrics(
       vpp: 0,
       frequencyHz: 0,
       dutyCyclePct: 0,
-      isConnected: false,
+      isConnected,
     }
   }
 
-  const values = history.map((p) => p[channel])
-  const currentV = values[values.length - 1] ?? 0
-  const vMax = Math.max(...values)
-  const vMin = Math.min(...values)
-  const vpp = Number((vMax - vMin).toFixed(2))
+  const currentV = history[history.length - 1]?.[channel] ?? 0
+  let vMax = -Infinity
+  let vMin = Infinity
 
-  // Detect transitions (rising edge crossings around mid-voltage)
+  for (const point of history) {
+    const value = point[channel]
+    if (value > vMax) vMax = value
+    if (value < vMin) vMin = value
+  }
+
+  if (!Number.isFinite(vMax) || !Number.isFinite(vMin)) {
+    return {
+      currentV: 0,
+      vMax: 0,
+      vMin: 0,
+      vpp: 0,
+      frequencyHz: 0,
+      dutyCyclePct: 0,
+      isConnected,
+    }
+  }
+
+  const vpp = Number(Math.max(0, vMax - vMin).toFixed(2))
   const mid = (vMax + vMin) / 2
   const crossings: number[] = []
   let highDurationMs = 0
   let totalDurationMs = 0
 
-  if (vpp > 0.4 && history.length >= 10) {
-    for (let i = 1; i < history.length; i++) {
-      const dt = history[i].t - history[i - 1].t
+  for (let i = 1; i < history.length; i += 1) {
+    const previous = history[i - 1]
+    const point = history[i]
+    const dt = point.t - previous.t
+    if (Number.isFinite(dt) && dt > 0) {
       totalDurationMs += dt
-      if (history[i][channel] >= mid) {
-        highDurationMs += dt
-      }
-      // Rising edge
-      if (history[i - 1][channel] < mid && history[i][channel] >= mid) {
-        crossings.push(history[i].t)
-      }
+      if (point[channel] >= mid) highDurationMs += dt
+    }
+
+    if (
+      vpp > 0.4 &&
+      previous[channel] < mid &&
+      point[channel] >= mid &&
+      Number.isFinite(point.t)
+    ) {
+      crossings.push(point.t)
     }
   }
 
   let frequencyHz = 0
   if (crossings.length >= 2) {
-    const intervals: number[] = []
-    for (let i = 1; i < crossings.length; i++) {
+    let periodSum = 0
+    let periodCount = 0
+
+    for (let i = 1; i < crossings.length; i += 1) {
       const gap = crossings[i] - crossings[i - 1]
       if (Number.isFinite(gap) && gap > 0.5) {
-        intervals.push(gap)
+        periodSum += gap
+        periodCount += 1
       }
     }
 
-    if (intervals.length > 0) {
-      const avgPeriodMs = intervals.reduce((a, b) => a + b, 0) / intervals.length
-      if (Number.isFinite(avgPeriodMs) && avgPeriodMs > 0) {
-        frequencyHz = Math.round((1000 / avgPeriodMs) * 10) / 10
+    if (periodCount > 0) {
+      const averagePeriodMs = periodSum / periodCount
+      if (Number.isFinite(averagePeriodMs) && averagePeriodMs > 0) {
+        frequencyHz = Math.round((1000 / averagePeriodMs) * 10) / 10
       }
     }
   }
 
   const dutyCyclePct =
-    totalDurationMs > 0 ? Math.round((highDurationMs / totalDurationMs) * 100) : currentV > 2.5 ? 100 : 0
+    totalDurationMs > 0
+      ? Math.max(0, Math.min(100, Math.round((highDurationMs / totalDurationMs) * 100)))
+      : currentV > 2.5
+        ? 100
+        : 0
 
   return {
     currentV: Number(currentV.toFixed(2)),
@@ -129,6 +157,6 @@ export function computeChannelMetrics(
     vpp,
     frequencyHz,
     dutyCyclePct,
-    isConnected: true,
+    isConnected,
   }
 }

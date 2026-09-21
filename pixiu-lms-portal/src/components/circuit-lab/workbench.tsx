@@ -10,7 +10,7 @@ import { defineArduinoBlocks } from "@/lib/arduino-blocks"
 import { runBlocklyProgram, type ExecutionEnvironment, type BlockStepInfo } from "@/lib/blockly-runner"
 import { audioEngine } from "@/lib/audio-engine"
 import { createHistory, pushState, undo as historyUndo, redo as historyRedo, canUndo, canRedo, type HistoryState } from "@/lib/history"
-import { saveCircuit, loadCircuit, importFromJSON, exportAsJSON } from "@/lib/storage"
+import { saveCircuit, loadCurrentCircuit, saveCurrentCircuit, clearCurrentCircuit, importFromJSON, exportAsJSON, type SavedCircuit } from "@/lib/storage"
 import * as Blockly from "blockly"
 import { Boxes, Camera, Sparkles, Terminal, Trash2, Gauge, Sliders } from "lucide-react"
 import { computeWireCurrents } from "@/lib/current-flow"
@@ -27,6 +27,7 @@ import { TemplateBrowser } from "./template-browser"
 import { AiCameraPanel, type AiVisionState } from "./ai-camera-panel"
 import { ContextMenu, type ContextMenuTarget } from "./context-menu"
 import type { ProjectTemplate } from "@/lib/templates"
+import { ProjectManager } from "./project-manager"
 
 const DEFAULT_XML = `<xml xmlns="https://developers.google.com/blockly/xml">
   <block type="arduino_program" x="40" y="40">
@@ -56,6 +57,11 @@ export function Workbench() {
   const [isMuted, setIsMuted] = useState(false)
   const [runTime, setRunTime] = useState(0)
   const [lastSaved, setLastSaved] = useState<string | null>(null)
+  const [currentProjectName, setCurrentProjectName] = useState("Untitled Circuit")
+  const [isProjectManagerOpen, setIsProjectManagerOpen] = useState(false)
+  const [isDirty, setIsDirty] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [storageReady, setStorageReady] = useState(false)
   const [isTemplatesOpen, setIsTemplatesOpen] = useState(false)
   const [isAiCameraOpen, setIsAiCameraOpen] = useState(false)
   const [isInspectorOpen, setIsInspectorOpen] = useState(true)
@@ -85,19 +91,39 @@ export function Workbench() {
   const debugSpeedRef = useRef<"normal" | "slow" | "step">("normal")
   const stepResolverRef = useRef<(() => void) | null>(null)
   const visualWorkspaceRef = useRef<Blockly.WorkspaceSvg | null>(null)
-  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const saveNowRef = useRef<() => void>(() => {})
 
   useEffect(() => {
     isPausedRef.current = isPaused
   }, [isPaused])
 
   useEffect(() => {
-    const saved = loadCircuit("default")
-    if (!saved) return
+    let cancelled = false
 
-    setHistory(createHistory(saved.state))
-    setBlocklyXml(saved.blocklyXml || DEFAULT_XML)
-    setLastSaved(saved.savedAt)
+    const restoreCurrentProject = async () => {
+      try {
+        const saved = await loadCurrentCircuit()
+        if (cancelled) return
+
+        if (saved) {
+          setHistory(createHistory(saved.state))
+          setBlocklyXml(saved.blocklyXml || DEFAULT_XML)
+          setCurrentProjectName(saved.name === "default" ? "Untitled Circuit" : saved.name)
+          setLastSaved(saved.savedAt)
+        }
+
+        setIsDirty(false)
+      } catch (error) {
+        console.warn("Unable to restore the previous Pixiu circuit:", error)
+      } finally {
+        if (!cancelled) setStorageReady(true)
+      }
+    }
+
+    void restoreCurrentProject()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   useEffect(() => {
@@ -162,12 +188,13 @@ export function Workbench() {
   const selected = state.parts.find((p) => p.id === selectedId) ?? null
   const selectedWire = state.wires.find((w) => w.id === selectedWireId) ?? null
 
-  const pinStatesJsonForRuntime = useMemo(() => JSON.stringify(pinStates), [pinStates])
-
   const runtime = useMemo(
     () => (running ? computeRuntime(state, pressed, pinStates) : {}),
-    [running, state, pressed, pinStatesJsonForRuntime],
+    [running, state, pressed, pinStates],
   )
+
+  const oscilloscopeSimulationRef = useRef({ state, pinStates, running })
+  oscilloscopeSimulationRef.current = { state, pinStates, running }
 
   const wireCurrents = useMemo(
     () => (running ? computeWireCurrents(state, runtime, pinStates) : {}),
@@ -233,15 +260,18 @@ export function Workbench() {
       const next = updater(h.present)
       return pushState(h, next)
     })
-  }, [])
+    if (storageReady) setIsDirty(true)
+  }, [storageReady])
 
   const handleUndo = useCallback(() => {
     setHistory((h) => historyUndo(h))
-  }, [])
+    if (storageReady) setIsDirty(true)
+  }, [storageReady])
 
   const handleRedo = useCallback(() => {
     setHistory((h) => historyRedo(h))
-  }, [])
+    if (storageReady) setIsDirty(true)
+  }, [storageReady])
 
   const newId = () =>
     typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `id-${Math.random().toString(36).substring(2, 9)}`
@@ -599,14 +629,20 @@ export function Workbench() {
   // Keyboard shortcut listener and DevTools protection (placed after toggleRun and edit callbacks)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // 1. Block F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+Shift+C, Ctrl+U, Ctrl+S
+      // Keep inspection shortcuts intact, but Ctrl/Cmd+S belongs to Pixiu project save.
       if (
         e.key === "F12" ||
         (e.ctrlKey && e.shiftKey && ["I", "i", "J", "j", "C", "c"].includes(e.key)) ||
-        (e.ctrlKey && ["U", "u", "S", "s"].includes(e.key))
+        (e.ctrlKey && ["U", "u"].includes(e.key))
       ) {
         e.preventDefault()
         e.stopPropagation()
+        return
+      }
+
+      if ((e.ctrlKey || e.metaKey) && (e.key === "s" || e.key === "S")) {
+        e.preventDefault()
+        saveNowRef.current()
         return
       }
 
@@ -695,45 +731,94 @@ export function Workbench() {
     }
   }, [handleUndo, handleRedo, selectedWireId, selectedId, deleteWire, deletePart, rotatePart, duplicatePart, toggleRun, handleStepNext, handlePause, handleResume, isPaused, running])
 
-  const handleSave = useCallback(() => {
-    const savedAt = new Date().toISOString()
-    saveCircuit("default", state, blocklyXml)
-    setLastSaved(savedAt)
-  }, [state, blocklyXml])
+  const handleSave = useCallback(async (requestedName?: string): Promise<void> => {
+    const name = requestedName?.trim() || currentProjectName.trim() || "Untitled Circuit"
+    setIsSaving(true)
+    try {
+      const saved = await saveCircuit(name, state, blocklyXml)
+      setCurrentProjectName(saved.name)
+      setLastSaved(saved.savedAt)
+      setIsDirty(false)
+    } catch (error) {
+      setIsDirty(true)
+      throw error
+    } finally {
+      setIsSaving(false)
+    }
+  }, [blocklyXml, currentProjectName, state])
+
+  useEffect(() => {
+    saveNowRef.current = () => {
+      void handleSave().catch((error) => console.warn("Pixiu save failed:", error))
+    }
+  }, [handleSave])
+
+  // Debounced autosave keeps drag/edit interactions off the storage write path.
+  useEffect(() => {
+    if (!storageReady || !isDirty) return
+
+    const timer = window.setTimeout(() => {
+      void handleSave().catch((error) => console.warn("Pixiu autosave failed:", error))
+    }, 900)
+
+    return () => window.clearTimeout(timer)
+  }, [handleSave, isDirty, storageReady])
 
   const handleExport = useCallback(() => {
-    exportAsJSON("pixiu-circuit", state, blocklyXml)
-  }, [state, blocklyXml])
+    exportAsJSON(currentProjectName, state, blocklyXml)
+  }, [blocklyXml, currentProjectName, state])
 
-  const handleUploadClick = useCallback(() => {
-    fileInputRef.current?.click()
-  }, [])
+  const handleUploadFile = useCallback(async (file: File): Promise<void> => {
+    const imported = await importFromJSON(file)
+    stopProgram()
 
-  const handleUploadFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    e.target.value = ""
-    if (!file) return
+    const saved = await saveCircuit(imported.name, imported.state, imported.blocklyXml || DEFAULT_XML)
+    setHistory(createHistory(saved.state))
+    setBlocklyXml(saved.blocklyXml || DEFAULT_XML)
+    setCurrentProjectName(saved.name)
+    setSelectedId(null)
+    setSelectedWireId(null)
+    setWiring(null)
+    setSerialLines([])
+    setIsAiCameraOpen(false)
+    setIsDmmOpen(false)
+    setIsScopeOpen(false)
+    setLastSaved(saved.savedAt)
+    setIsDirty(false)
+  }, [stopProgram])
 
-    try {
-      const imported = await importFromJSON(file)
-      stopProgram()
-      setHistory(createHistory(imported.state))
-      setBlocklyXml(imported.blocklyXml || DEFAULT_XML)
-      setSelectedId(null)
-      setSelectedWireId(null)
-      setWiring(null)
-      setSerialLines([])
-      setIsAiCameraOpen(false)
-      setIsDmmOpen(false)
-      setIsScopeOpen(false)
-      setLastSaved(imported.savedAt || new Date().toISOString())
+  const handleLoadProject = useCallback(async (project: SavedCircuit): Promise<void> => {
+    stopProgram()
+    await saveCurrentCircuit(project)
+    setHistory(createHistory(project.state))
+    setBlocklyXml(project.blocklyXml || DEFAULT_XML)
+    setCurrentProjectName(project.name)
+    setSelectedId(null)
+    setSelectedWireId(null)
+    setWiring(null)
+    setSerialLines([])
+    setIsAiCameraOpen(false)
+    setIsDmmOpen(false)
+    setIsScopeOpen(false)
+    setLastSaved(project.savedAt)
+    setIsDirty(false)
+  }, [stopProgram])
 
-      // Also make the uploaded project the browser's current saved project.
-      saveCircuit("default", imported.state, imported.blocklyXml || DEFAULT_XML)
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to import this circuit file"
-      window.alert(message)
-    }
+  const handleNewProject = useCallback(async (): Promise<void> => {
+    stopProgram()
+    await clearCurrentCircuit()
+    setHistory(createHistory(INITIAL_STATE))
+    setBlocklyXml(DEFAULT_XML)
+    setCurrentProjectName("Untitled Circuit")
+    setLastSaved(null)
+    setIsDirty(false)
+    setSelectedId(null)
+    setSelectedWireId(null)
+    setWiring(null)
+    setSerialLines([])
+    setIsAiCameraOpen(false)
+    setIsDmmOpen(false)
+    setIsScopeOpen(false)
   }, [stopProgram])
 
   const handleSelectTemplate = useCallback(
@@ -741,6 +826,7 @@ export function Workbench() {
       stopProgram()
       updateState(() => tmpl.circuit)
       setBlocklyXml(tmpl.blocklyXml)
+      if (storageReady) setIsDirty(true)
       setSelectedId(null)
       setSelectedWireId(null)
       setWiring(null)
@@ -776,8 +862,8 @@ export function Workbench() {
         canRedo={canRedo(history)}
         onRedo={handleRedo}
         onSave={handleSave}
-        onUpload={handleUploadClick}
         onExport={handleExport}
+        onOpenProjects={() => setIsProjectManagerOpen(true)}
         isSerialOpen={isSerialOpen}
         onToggleSerial={() => setIsSerialOpen((prev) => !prev)}
         isAiCameraOpen={isAiCameraOpen}
@@ -798,14 +884,19 @@ export function Workbench() {
         activeStepLabel={activeStepBlock?.label ?? null}
       />
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".pixiu,.circuit.json,application/x-pixiu-circuit"
-        onChange={handleUploadFile}
-        className="hidden"
-        tabIndex={-1}
-        aria-hidden="true"
+      <ProjectManager
+        isOpen={isProjectManagerOpen}
+        currentProjectName={currentProjectName}
+        lastSaved={lastSaved}
+        dirty={isDirty}
+        storageReady={storageReady}
+        isSaving={isSaving}
+        onClose={() => setIsProjectManagerOpen(false)}
+        onSave={handleSave}
+        onNew={handleNewProject}
+        onImport={handleUploadFile}
+        onLoad={handleLoadProject}
+        onExportCurrent={handleExport}
       />
 
       <TemplateBrowser
@@ -829,7 +920,10 @@ export function Workbench() {
         <BlocklyEditor
           circuit={state}
           xml={blocklyXml}
-          onXmlChange={setBlocklyXml}
+          onXmlChange={(xml) => {
+            setBlocklyXml(xml)
+            if (storageReady) setIsDirty(true)
+          }}
           onWorkspaceReady={(ws) => {
             visualWorkspaceRef.current = ws
           }}
@@ -1096,9 +1190,7 @@ export function Workbench() {
         isOpen={isScopeOpen && view === "circuit"}
         onClose={() => setIsScopeOpen(false)}
         state={state}
-        runtime={runtime}
-        pinStates={pinStates}
-        running={running}
+        simulationRef={oscilloscopeSimulationRef}
         probeCH1={scopeProbeCH1}
         probeCH2={scopeProbeCH2}
         onSetProbeCH1={setScopeProbeCH1}
