@@ -146,6 +146,28 @@ export function LessonBrowser({
             </div>
           </div>
 
+          <div className="md:hidden border-b border-slate-800 bg-slate-950/35 p-3">
+            <div className="mb-2 flex items-center gap-2 text-[9px] font-mono uppercase tracking-[0.18em] text-slate-500"><BookOpen size={12} className="text-cyan-300" /> Missions</div>
+            <div className="grid grid-cols-1 gap-1.5">
+              {LESSONS.map((lesson) => {
+                const locked = !unlocked.has(lesson.id)
+                const percent = getLessonProgressPercent(lesson, progress[lesson.id])
+                return (
+                  <button
+                    key={lesson.id}
+                    disabled={locked}
+                    onClick={() => onSelectLesson(lesson)}
+                    className={`flex items-center gap-2 rounded-xl border px-2.5 py-2 text-left ${activeLesson?.id === lesson.id ? "border-cyan-400/30 bg-cyan-400/[0.06]" : "border-slate-800 bg-slate-900/40"} disabled:opacity-40`}
+                  >
+                    {locked ? <Lock size={12} className="text-slate-600" /> : percent === 100 ? <Check size={12} className="text-emerald-300" /> : <Circle size={12} className="text-cyan-300" />}
+                    <span className="min-w-0 flex-1 truncate text-[10px] font-semibold text-slate-200">{lesson.shortTitle}</span>
+                    <span className="font-mono text-[8px] text-slate-600">{percent}%</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
           {!activeLesson ? (
             <div className="flex flex-1 items-center justify-center p-8 text-center">
               <div className="max-w-md">
@@ -167,7 +189,7 @@ export function LessonBrowser({
                 </div>
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                   <p className="max-w-2xl text-[11px] leading-5 text-slate-400">{activeLesson.description}</p>
-                  <button onClick={() => onLoadLesson(activeLesson)} className="inline-flex items-center gap-1.5 rounded-xl bg-cyan-500 px-3 py-2 text-[10px] font-black text-slate-950 hover:bg-cyan-400">
+                  <button onClick={() => { onLoadLesson(activeLesson); setLastResults((current) => { const next = { ...current }; activeLesson.steps.forEach((step) => delete next[`${activeLesson.id}:${step.id}`]); return next }) }} className="inline-flex items-center gap-1.5 rounded-xl bg-cyan-500 px-3 py-2 text-[10px] font-black text-slate-950 hover:bg-cyan-400">
                     <Play size={12} fill="currentColor" /> Load starter
                   </button>
                 </div>
@@ -209,8 +231,8 @@ export function LessonBrowser({
                               <div className={`mt-3 rounded-xl border px-3 py-2 ${result.passed ? "border-emerald-500/20 bg-emerald-500/10" : "border-amber-500/20 bg-amber-500/10"}`}>
                                 <p className={`text-[10px] font-bold ${result.passed ? "text-emerald-300" : "text-amber-300"}`}>{result.summary}</p>
                                 <div className="mt-2 space-y-1">
-                                  {result.results.map((item) => (
-                                    <div key={item.label} className="flex items-center justify-between gap-3 text-[9px]">
+                                  {result.results.map((item, resultIndex) => (
+                                    <div key={`${item.label}-${resultIndex}`} className="flex items-center justify-between gap-3 text-[9px]">
                                       <span className="text-slate-400">{item.label}</span>
                                       <span className={item.passed ? "text-emerald-300" : "text-amber-300"}>{item.detail}</span>
                                     </div>

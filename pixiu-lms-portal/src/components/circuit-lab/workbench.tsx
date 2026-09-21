@@ -24,9 +24,11 @@ import { BlocklyEditor } from "./blockly-editor"
 import { SerialMonitor, type SerialLine } from "./serial-monitor"
 import { StatusBar } from "./status-bar"
 import { TemplateBrowser } from "./template-browser"
+import { LessonBrowser } from "./lesson-browser"
 import { AiCameraPanel, type AiVisionState } from "./ai-camera-panel"
 import { ContextMenu, type ContextMenuTarget } from "./context-menu"
 import type { ProjectTemplate } from "@/lib/templates"
+import { getLessonSeed, type Lesson } from "@/lib/lesson-engine"
 import { ProjectManager } from "./project-manager"
 import { WelcomeOverlay } from "./welcome-overlay"
 
@@ -64,6 +66,8 @@ export function Workbench() {
   const [isSaving, setIsSaving] = useState(false)
   const [storageReady, setStorageReady] = useState(false)
   const [isTemplatesOpen, setIsTemplatesOpen] = useState(false)
+  const [isLessonsOpen, setIsLessonsOpen] = useState(false)
+  const [activeLessonId, setActiveLessonId] = useState<string | null>(null)
   const [isAiCameraOpen, setIsAiCameraOpen] = useState(false)
   const [isInspectorOpen, setIsInspectorOpen] = useState(true)
   const [mobilePaletteOpen, setMobilePaletteOpen] = useState(false)
@@ -855,10 +859,37 @@ export function Workbench() {
     setIsScopeOpen(false)
   }, [stopProgram])
 
+  const handleSelectLesson = useCallback((lesson: Lesson) => {
+    setActiveLessonId(lesson.id)
+  }, [])
+
+  const handleLoadLesson = useCallback(
+    (lesson: Lesson) => {
+      const seed = getLessonSeed(lesson)
+      stopProgram()
+      updateState(() => seed.state)
+      setBlocklyXml(seed.blocklyXml)
+      setCurrentProjectName(`Mission · ${lesson.shortTitle}`)
+      setLastSaved(null)
+      setRunTime(0)
+      setSelectedId(null)
+      setSelectedWireId(null)
+      setWiring(null)
+      setSerialLines([])
+      setIsDmmOpen(false)
+      setIsScopeOpen(false)
+      setIsAiCameraOpen(false)
+      setActiveLessonId(lesson.id)
+      setView("circuit")
+    },
+    [stopProgram, updateState],
+  )
+
   const handleSelectTemplate = useCallback(
     (tmpl: ProjectTemplate) => {
       stopProgram()
       updateState(() => tmpl.circuit)
+      setActiveLessonId(null)
       setBlocklyXml(tmpl.blocklyXml)
       if (storageReady) setIsDirty(true)
       setSelectedId(null)
@@ -896,6 +927,7 @@ export function Workbench() {
         canRedo={canRedo(history)}
         onRedo={handleRedo}
          onOpenProjects={() => setIsProjectManagerOpen(true)}
+        onOpenLessons={() => setIsLessonsOpen(true)}
         onOpenGuide={() => window.dispatchEvent(new Event("pixiu-open-guide"))}
         isSerialOpen={isSerialOpen}
         onToggleSerial={() => setIsSerialOpen((prev) => !prev)}
@@ -932,6 +964,15 @@ export function Workbench() {
         onImport={handleUploadFile}
         onLoad={handleLoadProject}
         onExportCurrent={handleExport}
+      />
+
+      <LessonBrowser
+        isOpen={isLessonsOpen}
+        onClose={() => setIsLessonsOpen(false)}
+        activeLessonId={activeLessonId}
+        onSelectLesson={handleSelectLesson}
+        onLoadLesson={handleLoadLesson}
+        context={{ state, blocklyXml, running, runtime }}
       />
 
       <TemplateBrowser
