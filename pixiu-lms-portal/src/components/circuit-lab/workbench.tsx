@@ -184,38 +184,38 @@ export function Workbench() {
     return () => clearInterval(timer)
   }, [running, isPaused])
 
-  // Audio effect: keep one oscillator alive while a buzzer remains active.
+  // Audio effect: derive a cheap boolean from runtime, then react only when
+  // buzzer ON/OFF actually changes. Runtime itself updates many times per second.
+  const anyBuzzerActive = useMemo(
+    () => state.parts.some(
+      (p) => p.type === "buzzer" && (runtime[p.id]?.level ?? 0) > 0,
+    ),
+    [runtime, state.parts],
+  )
   const buzzerActiveRef = useRef(false)
 
   useEffect(() => {
-    if (!running || isMuted) {
-      if (buzzerActiveRef.current) {
-        audioEngine.stopTone()
-        buzzerActiveRef.current = false
-      }
-      return
-    }
+    const shouldBeep = running && !isMuted && anyBuzzerActive
 
-    const anyBuzzerActive = state.parts.some(
-      (p) => p.type === "buzzer" && (runtime[p.id]?.level ?? 0) > 0,
-    )
-
-    if (anyBuzzerActive && !buzzerActiveRef.current) {
+    if (shouldBeep && !buzzerActiveRef.current) {
       audioEngine.unlockAudio()
       audioEngine.playTone(850, 180)
       buzzerActiveRef.current = true
-    } else if (!anyBuzzerActive && buzzerActiveRef.current) {
+    } else if (!shouldBeep && buzzerActiveRef.current) {
       audioEngine.stopTone()
       buzzerActiveRef.current = false
     }
+  }, [running, isMuted, anyBuzzerActive])
 
+  // Hard cleanup only when Workbench unmounts.
+  useEffect(() => {
     return () => {
       if (buzzerActiveRef.current) {
         audioEngine.stopTone()
         buzzerActiveRef.current = false
       }
     }
-  }, [running, isMuted, runtime, state.parts])
+  }, [])
 
   // Helper to commit state changes to history
   const updateState = useCallback((updater: (prev: CircuitState) => CircuitState) => {
