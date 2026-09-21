@@ -29,6 +29,19 @@ export interface PartRuntime {
   sensorValue?: number
   /** Relay: coil energized */
   relayActive?: boolean
+  /** Hardware-expansion sensor/driver states */
+  dhtTemperature?: number
+  dhtHumidity?: number
+  joystickX?: number
+  joystickY?: number
+  joystickButton?: boolean
+  motorARpm?: number
+  motorBRpm?: number
+  motorADirection?: "cw" | "ccw" | "stopped"
+  motorBDirection?: "cw" | "ccw" | "stopped"
+  encoderValue?: number
+  encoderDirection?: "cw" | "ccw" | "idle"
+  keypadKey?: string
   /** Transistor: conducting */
   conducting?: boolean
 }
