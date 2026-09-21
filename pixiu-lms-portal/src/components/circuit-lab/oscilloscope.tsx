@@ -52,7 +52,6 @@ export function Oscilloscope({
   const [renderTick, setRenderTick] = useState(0)
 
   const historyRef = useRef<WaveformPoint[]>([])
-  const positionRef = useRef<{ x: number; y: number } | null>(null)
   const hasCustomPositionRef = useRef(false)
   const pinStatesRef = useRef(pinStates)
   const runtimeRef = useRef(runtime)
@@ -146,7 +145,6 @@ export function Oscilloscope({
       startY: rect.top,
     }
 
-    positionRef.current = { x: rect.left, y: rect.top }
     hasCustomPositionRef.current = true
     panel.style.left = `${rect.left}px`
     panel.style.top = `${rect.top}px`
@@ -167,7 +165,6 @@ export function Oscilloscope({
 
     const newX = Math.max(10, Math.min(window.innerWidth - panelWidth - 10, dragStartRef.current.startX + dx))
     const newY = Math.max(10, Math.min(window.innerHeight - panelHeight - 10, dragStartRef.current.startY + dy))
-    positionRef.current = { x: newX, y: newY }
 
     if (panel) {
       panel.style.left = `${newX}px`
