@@ -22,6 +22,7 @@ interface Props {
   isOpen: boolean
   onClose: () => void
   state: CircuitState
+  running: boolean
   simulationRef: SimulationSnapshotRef
   probeCH1: PinRef | null
   probeCH2: PinRef | null
@@ -43,6 +44,7 @@ export const Oscilloscope = memo(function Oscilloscope({
   isOpen,
   onClose,
   state,
+  running,
   simulationRef,
   probeCH1,
   probeCH2,
