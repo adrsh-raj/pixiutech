@@ -29,7 +29,7 @@ interface Props {
   onClose: () => void
   onSave: (name: string) => Promise<void>
   onNew: () => Promise<void>
-  onImport: (file: File) => Promise<void>
+  onImport: (file: File, password?: string) => Promise<void>
   onLoad: (project: SavedCircuit) => Promise<void>
   onExportCurrent: (password?: string) => Promise<void> | void
   isSaving: boolean
