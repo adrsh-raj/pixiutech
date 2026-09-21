@@ -1,6 +1,7 @@
 import * as Blockly from "blockly"
 import type { CircuitState } from "./circuit-types"
 import { getPinOptions } from "./pin-map"
+import { CATALOG } from "./components-catalog"
 
 /** Operator precedence buckets for the generated C++. */
 export const ORDER = {
