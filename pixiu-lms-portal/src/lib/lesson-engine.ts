@@ -13,6 +13,7 @@ export interface LessonPartRequirement {
 export interface LessonEndpoint {
   partType: PartType
   pinId: string
+  partId?: string
 }
 
 export interface LessonConnectionRequirement {
@@ -23,7 +24,7 @@ export interface LessonConnectionRequirement {
 export interface LessonBlockRequirement {
   type: string
   count: number
-  field?: { name: string; value: string }
+  fields?: Record<string, string>
 }
 
 export interface LessonRuntimeRequirement {
@@ -42,6 +43,7 @@ export type LessonCheck =
   | { kind: "blocks"; requirements: LessonBlockRequirement[] }
   | { kind: "running" }
   | { kind: "runtime"; requirements: LessonRuntimeRequirement[] }
+  | { kind: "runtime-any"; requirements: LessonRuntimeRequirement[] }
 
 export interface LessonStep {
   id: string
@@ -164,18 +166,20 @@ function countParts(state: CircuitState, type: PartType) {
 }
 
 function hasConnection(state: CircuitState, req: LessonConnectionRequirement) {
+  const endpointMatches = (endpoint: LessonEndpoint, partId: string, pinId: string) => {
+    const part = state.parts.find((item) => item.id === partId)
+    return Boolean(
+      part &&
+      part.type === endpoint.partType &&
+      (!endpoint.partId || endpoint.partId === partId) &&
+      endpoint.pinId === pinId,
+    )
+  }
   const matches = (a: LessonConnectionRequirement["from"], b: LessonConnectionRequirement["to"]) =>
-    state.wires.some((wire) => {
-      const fromPart = state.parts.find((part) => part.id === wire.from.partId)
-      const toPart = state.parts.find((part) => part.id === wire.to.partId)
-      if (!fromPart || !toPart) return false
-      return (
-        fromPart.type === a.partType &&
-        wire.from.pinId === a.pinId &&
-        toPart.type === b.partType &&
-        wire.to.pinId === b.pinId
-      )
-    })
+    state.wires.some((wire) =>
+      endpointMatches(a, wire.from.partId, wire.from.pinId) &&
+      endpointMatches(b, wire.to.partId, wire.to.pinId),
+    )
   return matches(req.from, req.to) || matches(req.to, req.from)
 }
 
@@ -254,7 +258,8 @@ export function evaluateLessonStep(lesson: Lesson, step: LessonStep, context: Le
       const blocks = extractBlocks(context.blocklyXml)
       for (const req of check.requirements) {
         const matching = blocks.filter((block) =>
-          block.type === req.type && (!req.field || block.fields[req.field.name] === req.field.value),
+          block.type === req.type &&
+          (!req.fields || Object.entries(req.fields).every(([name, value]) => block.fields[name] === value)),
         ).length
         results.push({
           passed: matching >= req.count,
@@ -287,6 +292,22 @@ export function evaluateLessonStep(lesson: Lesson, step: LessonStep, context: Le
           detail: passed ? "Condition met" : "Condition not met yet",
         })
       }
+    }
+
+    if (check.kind === "runtime-any") {
+      const passed = check.requirements.some((req) => {
+        const part = req.partId
+          ? context.state.parts.find((item) => item.id === req.partId)
+          : req.partType
+            ? context.state.parts.find((item) => item.type === req.partType)
+            : undefined
+        return matchesRuntimeValue(part ? context.runtime[part.id]?.[req.field] : undefined, req)
+      })
+      results.push({
+        passed,
+        label: "Live output",
+        detail: passed ? "Expected output is active" : "Expected output has not appeared yet",
+      })
     }
   }
 
@@ -376,9 +397,9 @@ export const LESSONS: Lesson[] = [
         instructions: "Use two digital-write blocks on pin 13: HIGH and LOW, with a delay between them.",
         kind: "code",
         checks: [{ kind: "blocks", requirements: [
-          { type: "io_digitalwrite", count: 1, field: { name: "PIN", value: "13" } },
-          { type: "io_digitalwrite", count: 1, field: { name: "STATE", value: "HIGH" } },
-          { type: "io_digitalwrite", count: 1, field: { name: "STATE", value: "LOW" } },
+          { type: "io_digitalwrite", count: 1, field: { PIN: "13" } },
+          { type: "io_digitalwrite", count: 1, field: { STATE: "HIGH" } },
+          { type: "io_digitalwrite", count: 1, field: { STATE: "LOW" } },
           { type: "time_delay", count: 2 },
         ] }],
         success: "The Blockly program contains the blink sequence.",
@@ -543,7 +564,7 @@ export const LESSONS: Lesson[] = [
         checks: [{ kind: "blocks", requirements: [
           { type: "ultrasonic_read", count: 2 },
           { type: "controls_if", count: 1 },
-          { type: "io_digitalwrite", count: 2, field: { name: "PIN", value: "8" } },
+          { type: "io_digitalwrite", count: 2, field: { PIN: "8" } },
         ] }],
         success: "The alarm logic is present.",
       },
