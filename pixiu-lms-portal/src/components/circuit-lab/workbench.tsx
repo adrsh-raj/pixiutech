@@ -152,9 +152,11 @@ export function Workbench() {
   const selected = state.parts.find((p) => p.id === selectedId) ?? null
   const selectedWire = state.wires.find((w) => w.id === selectedWireId) ?? null
 
+  const pinStatesJsonForRuntime = useMemo(() => JSON.stringify(pinStates), [pinStates])
+
   const runtime = useMemo(
     () => (running ? computeRuntime(state, pressed, pinStates) : {}),
-    [running, state, pressed, pinStates],
+    [running, state, pressed, pinStatesJsonForRuntime],
   )
 
   const wireCurrents = useMemo(
@@ -182,19 +184,36 @@ export function Workbench() {
     return () => clearInterval(timer)
   }, [running, isPaused])
 
-  // Audio effect: if any buzzer is powered in runtime and simulation is running, sound tone!
+  // Audio effect: keep one oscillator alive while a buzzer remains active.
+  const buzzerActiveRef = useRef(false)
+
   useEffect(() => {
     if (!running || isMuted) {
-      audioEngine.stopTone()
+      if (buzzerActiveRef.current) {
+        audioEngine.stopTone()
+        buzzerActiveRef.current = false
+      }
       return
     }
+
     const anyBuzzerActive = state.parts.some(
       (p) => p.type === "buzzer" && (runtime[p.id]?.level ?? 0) > 0,
     )
-    if (anyBuzzerActive) {
+
+    if (anyBuzzerActive && !buzzerActiveRef.current) {
+      audioEngine.unlockAudio()
       audioEngine.playTone(850, 180)
-    } else {
+      buzzerActiveRef.current = true
+    } else if (!anyBuzzerActive && buzzerActiveRef.current) {
       audioEngine.stopTone()
+      buzzerActiveRef.current = false
+    }
+
+    return () => {
+      if (buzzerActiveRef.current) {
+        audioEngine.stopTone()
+        buzzerActiveRef.current = false
+      }
     }
   }, [running, isMuted, runtime, state.parts])
 
