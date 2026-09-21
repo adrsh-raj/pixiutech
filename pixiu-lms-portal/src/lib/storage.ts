@@ -79,7 +79,7 @@ export function deleteSavedCircuit(name: string): void {
 }
 
 /**
- * Exports a circuit as a downloadable JSON file.
+ * Exports a circuit as a downloadable Pixiu circuit file.
  */
 export function exportAsJSON(name: string, state: CircuitState, blocklyXml: string): void {
   const saved: SavedCircuit = {
@@ -102,7 +102,7 @@ export function exportAsJSON(name: string, state: CircuitState, blocklyXml: stri
 }
 
 /**
- * Imports a circuit from a JSON file.
+ * Imports a circuit from a Pixiu circuit file.
  */
 export function importFromJSON(file: File): Promise<SavedCircuit> {
   return new Promise((resolve, reject) => {
