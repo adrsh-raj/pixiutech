@@ -19,11 +19,19 @@ function fromBase64(value: string): Uint8Array {
   return bytes
 }
 
-function assertCrypto(): Crypto {
-  if (typeof crypto === "undefined" || !crypto.subtle || !crypto.getRandomValues) {
-    throw new Error("Secure project protection requires a modern HTTPS browser.")
+function randomSource(): Crypto {
+  if (typeof crypto === "undefined" || !crypto.getRandomValues) {
+    throw new Error("This browser does not provide a secure random source.")
   }
   return crypto
+}
+
+function assertCrypto(): Crypto {
+  const webCrypto = randomSource()
+  if (!webCrypto.subtle) {
+    throw new Error("Password-protected .pixiu files require a modern HTTPS browser.")
+  }
+  return webCrypto
 }
 
 async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
@@ -45,7 +53,7 @@ async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey>
 }
 
 export async function encodePixiuProtocol(payload: unknown, password?: string): Promise<Blob> {
-  const webCrypto = assertCrypto()
+  const webCrypto = randomSource()
   const plaintext = enc.encode(JSON.stringify(payload))
   const salt = webCrypto.getRandomValues(new Uint8Array(16))
   const iv = webCrypto.getRandomValues(new Uint8Array(12))
