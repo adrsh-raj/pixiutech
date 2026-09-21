@@ -1225,6 +1225,7 @@ export function Workbench() {
         isOpen={isScopeOpen && view === "circuit"}
         onClose={() => setIsScopeOpen(false)}
         state={state}
+        running={running}
         simulationRef={oscilloscopeSimulationRef}
         probeCH1={scopeProbeCH1}
         probeCH2={scopeProbeCH2}
