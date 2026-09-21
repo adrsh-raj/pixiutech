@@ -336,9 +336,15 @@ async function executeSingleBlock(block: Blockly.Block, env: ExecutionEnvironmen
       const in1 = String(block.getFieldValue(in1Field) ?? (channel === "A" ? "7" : "9"))
       const in2 = String(block.getFieldValue(in2Field) ?? (channel === "A" ? "8" : "10"))
       const direction = block.getFieldValue("DIRECTION") ?? "CW"
-      env.setAnalogPin(enable, speed)
-      env.setDigitalPin(in1, direction === "CW" ? "HIGH" : "LOW")
-      env.setDigitalPin(in2, direction === "CW" ? "LOW" : "HIGH")
+      if (direction === "STOP") {
+        env.setAnalogPin(enable, 0)
+        env.setDigitalPin(in1, "LOW")
+        env.setDigitalPin(in2, "LOW")
+      } else {
+        env.setAnalogPin(enable, speed)
+        env.setDigitalPin(in1, direction === "CW" ? "HIGH" : "LOW")
+        env.setDigitalPin(in2, direction === "CW" ? "LOW" : "HIGH")
+      }
       break
     }
 
