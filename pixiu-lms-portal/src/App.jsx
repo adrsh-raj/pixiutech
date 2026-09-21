@@ -72,11 +72,46 @@ const StudentForgotPassword = lazyWithChunkRecovery(() => import('./pages/Studen
 const TrainerStudentPasswordReset = lazyWithChunkRecovery(() => import('./pages/TrainerStudentPasswordReset'));
 const StudentCredentialMigration = lazyWithChunkRecovery(() => import('./pages/StudentCredentialMigration'));
 
+const CHUNK_ERROR_RELOAD_KEY = 'pixiu_chunk_error_reload';
+
 class ChunkErrorBoundary extends Component {
-  constructor(props) { super(props); this.state = { hasError: false }; }
-  static getDerivedStateFromError() { return { hasError: true }; }
-  componentDidCatch(error) { console.error('Simulation chunk load error:', error); }
-  render() { if (this.state.hasError) return <div className="min-h-screen bg-[#070B14] flex items-center justify-center text-white p-6"><div className="bg-slate-900 border border-slate-800 p-8 rounded-2xl max-w-md w-full text-center"><h3 className="text-lg font-bold mb-2">Virtual Lab Update</h3><p className="text-sm text-slate-400 mb-5">The latest Virtual Lab build could not be loaded.</p><button type="button" onClick={() => this.setState({ hasError: false })} className="w-full px-5 py-3 bg-blue-600 rounded-xl font-bold">Try again</button></div></div>; return this.props.children; }
+  constructor(props) { super(props); this.state = { hasError: false, error: null }; }
+  static getDerivedStateFromError(error) { return { hasError: true, error }; }
+  componentDidCatch(error) {
+    console.error('Virtual Lab load error:', error);
+    try {
+      if (sessionStorage.getItem(CHUNK_ERROR_RELOAD_KEY) !== '1') {
+        sessionStorage.setItem(CHUNK_ERROR_RELOAD_KEY, '1');
+        const url = new URL(window.location.href);
+        url.searchParams.set('lab_reload', String(Date.now()));
+        window.location.replace(url.toString());
+        return;
+      }
+    } catch (e) {}
+  }
+  render() {
+    if (this.state.hasError) return (
+      <div className="min-h-screen bg-[#070B14] flex items-center justify-center text-white p-6">
+        <div className="bg-slate-900 border border-slate-800 p-8 rounded-2xl max-w-md w-full text-center">
+          <h3 className="text-lg font-bold mb-2">Virtual Lab Update</h3>
+          <p className="text-sm text-slate-400 mb-5">The latest Virtual Lab build could not be loaded.</p>
+          <button
+            type="button"
+            onClick={() => {
+              try { sessionStorage.removeItem(CHUNK_ERROR_RELOAD_KEY); } catch (e) {}
+              const url = new URL(window.location.href);
+              url.searchParams.set('lab_reload', String(Date.now()));
+              window.location.replace(url.toString());
+            }}
+            className="w-full px-5 py-3 bg-blue-600 rounded-xl font-bold"
+          >
+            Reload Virtual Lab
+          </button>
+        </div>
+      </div>
+    );
+    return this.props.children;
+  }
 }
 
 const LoadingScreen = ({ dark = true }) => <div className={`min-h-screen ${dark ? 'bg-slate-900' : 'bg-slate-50'} flex items-center justify-center`}><div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" /></div>;
