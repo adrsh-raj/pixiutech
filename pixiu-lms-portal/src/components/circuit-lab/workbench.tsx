@@ -496,16 +496,47 @@ export function Workbench() {
             lcd_line2: "" as any,
           }))
         },
+        setOledText: (line, text) => {
+          setPinStates((prev) => ({
+            ...prev,
+            [line === 1 ? "oled_line1" : line === 2 ? "oled_line2" : "oled_line3"]: text as any,
+          }))
+        },
+        clearOled: () => {
+          setPinStates((prev) => ({
+            ...prev,
+            oled_line1: "" as any,
+            oled_line2: "" as any,
+            oled_line3: "" as any,
+          }))
+        },
         getSensorValue: (type, pin) => {
-          const p = partsRef.current.find((pt) => pt.type === type)
+          const partId = pin && partsRef.current.some((pt) => pt.id === pin) ? pin : undefined
+          const p = partId
+            ? partsRef.current.find((pt) => pt.id === partId)
+            : partsRef.current.find((pt) => pt.type === type)
           if (type === "ultrasonic") return Number(p?.props?.distance ?? 100)
           if (type === "ldr") return Number(p?.props?.light ?? 512)
           if (type === "tmp36") return Number(p?.props?.temperature ?? 25)
+          if (type === "ir") return String(p?.props?.detected ?? "false") === "true" ? 1 : 0
+          if (type === "dht_temperature") return Number(p?.props?.temperature ?? 25)
+          if (type === "dht_humidity") return Number(p?.props?.humidity ?? 55)
+          if (type === "joystick_x") return Number(p?.props?.x ?? 512)
+          if (type === "joystick_y") return Number(p?.props?.y ?? 512)
+          if (type === "joystick_button") return String(p?.props?.pressed ?? "false") === "true" ? 1 : 0
+          if (type === "soil") return Number(p?.props?.moisture ?? 620)
+          if (type === "encoder") return Number(p?.props?.value ?? 0)
           if (type === "analog") {
             const pot = partsRef.current.find((pt) => pt.type === "potentiometer")
             return Number(pot?.props?.value ?? 512)
           }
           return 0
+        },
+        getSensorText: (type, id) => {
+          if (type !== "keypad") return ""
+          const keypad = partsRef.current.find((pt) => pt.id === id && pt.type === "keypad-4x4")
+            ?? partsRef.current.find((pt) => pt.type === "keypad-4x4")
+          return String(keypad?.props?.lastKey ?? "")
         },
         isAiDetected: (cls) => aiStateRef.current.detectedClass === cls,
         getAiDetectedClass: () => aiStateRef.current.detectedClass,
