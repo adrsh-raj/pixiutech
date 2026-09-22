@@ -6,7 +6,6 @@ import * as cocoSsd from "@tensorflow-models/coco-ssd"
 import "@tensorflow/tfjs"
 import {
   addAiSample,
-  canvasToDataUrl,
   clearAiStudioStore,
   getAiClasses,
   getModelWeightPreview,
@@ -18,8 +17,6 @@ import {
   removeAiSample,
   saveAiStudioStore,
   trainAiModel,
-  type AiModelSummary,
-  type AiSample,
   type AiStudioStore,
 } from "@/lib/ai-studio-engine"
 import type * as tf from "@tensorflow/tfjs"
