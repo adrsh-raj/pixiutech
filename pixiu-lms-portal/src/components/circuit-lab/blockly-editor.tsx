@@ -116,7 +116,7 @@ const TOOLBOX = {
     },
     {
       kind: 'category',
-      name: '🤖 AI Vision',
+      name: '🤖 AI Studio',
       colour: '#a855f7',
       contents: [
         { kind: 'block', type: 'ai_is_detected' },

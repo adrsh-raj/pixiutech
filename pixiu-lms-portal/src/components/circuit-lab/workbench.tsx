@@ -1,7 +1,7 @@
 "use client"
 import "./workbench.css"
 
-import { useCallback, useMemo, useRef, useState, useEffect } from "react"
+import { lazy, Suspense, useCallback, useMemo, useRef, useState, useEffect } from "react"
 import type { CircuitState, PartType, PinRef, PlacedPart } from "@/lib/circuit-types"
 import { CATALOG } from "@/lib/components-catalog"
 import { samePin } from "@/lib/geometry"
@@ -25,7 +25,8 @@ import { SerialMonitor, type SerialLine } from "./serial-monitor"
 import { StatusBar } from "./status-bar"
 import { TemplateBrowser } from "./template-browser"
 import { LessonBrowser } from "./lesson-browser"
-import { AiStudioPanel, type AiStudioVisionState } from "./ai-studio-panel"
+import type { AiStudioVisionState } from "./ai-studio-panel"
+const AiStudioPanel = lazy(() => import("./ai-studio-panel").then((module) => ({ default: module.AiStudioPanel })))
 import { ContextMenu, type ContextMenuTarget } from "./context-menu"
 import type { ProjectTemplate } from "@/lib/templates"
 import { getLessonSeed, type Lesson } from "@/lib/lesson-engine"
@@ -987,14 +988,16 @@ export function Workbench() {
       />
 
       {/* Pixiu AI Studio: simple by default, deep only when a student opens Understand. */}
-      <AiStudioPanel
-        isOpen={isAiCameraOpen}
-        onClose={() => setIsAiCameraOpen(false)}
-        aiState={aiState}
-        onAiStateChange={setAiState}
-        isSimRunning={running}
-        onStartSim={toggleRun}
-      />
+      <Suspense fallback={null}>
+        <AiStudioPanel
+          isOpen={isAiCameraOpen}
+          onClose={() => setIsAiCameraOpen(false)}
+          aiState={aiState}
+          onAiStateChange={setAiState}
+          isSimRunning={running}
+          onStartSim={toggleRun}
+        />
+      </Suspense>
 
       {/* Blockly Code View (Kept mounted to preserve workspace & block highlights) */}
       <div className={view === "code" ? "flex-1 min-h-0 w-full overflow-hidden" : "hidden"}>
