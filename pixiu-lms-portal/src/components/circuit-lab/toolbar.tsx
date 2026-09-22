@@ -105,7 +105,7 @@ export function Toolbar({
           </div>
           <div className="leading-tight">
             <div className="font-mono text-xs sm:text-sm font-bold tracking-tight text-foreground">
-              <span>CyberLab</span>
+              <span>PIXIU CYBERLAB</span>
             </div>
             <div className="hidden lg:block text-[9px] uppercase tracking-widest text-muted-foreground font-mono">
               Virtual Arduino & Circuit Studio
