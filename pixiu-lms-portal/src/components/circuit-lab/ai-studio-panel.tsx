@@ -51,6 +51,10 @@ const READY_MODES: Array<{ id: ReadyAiMode; title: string; subtitle: string; ico
   { id: "numbers", title: "Numbers", subtitle: "0–5 by fingers", icon: Zap },
 ]
 
+function modeLabel(mode: ReadyAiMode) {
+  return READY_MODES.find((item) => item.id === mode)?.title ?? "AI"
+}
+
 function fingerCount(landmarks: number[][]) {
   const wrist = landmarks[0]
   if (!wrist) return 0
@@ -481,7 +485,7 @@ export function AiStudioPanel({
                           ) : (
                             <div className="absolute inset-0 grid place-items-center p-6 text-center">
                               <div>
-                                <Camera size={28} className="mx-auto text-violet-300" />
+                                {readyMode === "sound" ? <Mic size={28} className="mx-auto text-violet-300" /> : <Camera size={28} className="mx-auto text-violet-300" />}
                                 <p className="mt-3 text-sm font-bold">{readyMode === "sound" ? "Microphone off" : "Camera off"}</p>
                                 <p className="mt-1 max-w-xs text-[11px] leading-5 text-slate-500">
                                   {readyMode === "sound" ? "Sound AI listens only after you start the microphone." : "Nothing loads until you press Start."}
@@ -497,7 +501,7 @@ export function AiStudioPanel({
                         </div>
                         <div className="flex items-center justify-between gap-2 border-t border-slate-800 px-3 py-2">
                           <div className="min-w-0">
-                            <p className="text-[9px] font-mono uppercase tracking-[0.16em] text-slate-600">{tryMode === "ready" ? "Perception" : "Learning"}</p>
+                            <p className="text-[9px] font-mono uppercase tracking-[0.16em] text-slate-600">{tryMode === "ready" ? modeLabel(readyMode) : "Learning"}</p>
                             <p className="truncate text-xs font-bold text-slate-200">{aiState.detectedClass === "none" ? "Looking..." : aiState.detectedClass}</p>
                           </div>
                           <span className="font-mono text-xs font-black text-violet-300">{aiState.confidence ? `${aiState.confidence}%` : "—"}</span>
@@ -522,6 +526,7 @@ export function AiStudioPanel({
                           )}
                         </div>
 
+                      {tryMode === "trained" && (
                         <label className="block rounded-2xl border border-dashed border-slate-700 bg-slate-950/35 p-4 cursor-pointer hover:border-violet-400/30">
                           <div className="flex items-center gap-2"><Upload size={14} className="text-violet-300" /><span className="text-xs font-black">Test an image</span></div>
                           <p className="mt-1 text-[10px] leading-5 text-slate-500">Use this to test a trained model without changing your dataset.</p>
@@ -536,7 +541,7 @@ export function AiStudioPanel({
                             }
                             reader.readAsDataURL(file)
                           }} />
-                          </label>
+                        </label>
                       )}
 
                         {testImage && testResult && (
