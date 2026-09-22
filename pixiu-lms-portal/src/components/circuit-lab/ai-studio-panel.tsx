@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Camera, CameraOff, Brain, ChevronRight, FlaskConical, Layers3, Play, Sparkles, Trash2, Upload, X, Zap } from "lucide-react"
+import { Camera, CameraOff, Brain, ChevronRight, Ear, FlaskConical, Hand, Layers3, Mic, MicOff, Play, ScanFace, Sparkles, Trash2, Upload, X, Zap } from "lucide-react"
 import * as cocoSsd from "@tensorflow-models/coco-ssd"
 import "@tensorflow/tfjs"
 import {
@@ -19,15 +19,49 @@ import {
   trainAiModel,
   type AiStudioStore,
 } from "@/lib/ai-studio-engine"
+import {
+  disposeAiResource,
+  loadFaceEmotion,
+  loadHandDetector,
+  loadPoseDetector,
+  loadSpeechRecognizer,
+  stopSpeechRecognizer,
+} from "@/lib/ai-ready-runtime"
 import type * as tf from "@tensorflow/tfjs"
+
+export type ReadyAiMode = "objects" | "pose" | "hands" | "emotion" | "sound" | "numbers"
 
 export interface AiStudioVisionState {
   enabled: boolean
+  mode?: ReadyAiMode | "trained"
   detectedClass: string
   confidence: number
   allDetections?: { class: string; score: number; bbox: [number, number, number, number] }[]
   modelClasses?: string[]
   modelSource?: "ready" | "trained"
+  detail?: string
+}
+
+const READY_MODES: Array<{ id: ReadyAiMode; title: string; subtitle: string; icon: typeof Sparkles }> = [
+  { id: "objects", title: "Objects", subtitle: "See objects", icon: Sparkles },
+  { id: "pose", title: "Pose", subtitle: "Track body", icon: Layers3 },
+  { id: "hands", title: "Fingers", subtitle: "Count fingers", icon: Hand },
+  { id: "emotion", title: "Emotion", subtitle: "Expression demo", icon: ScanFace },
+  { id: "sound", title: "Sound", subtitle: "Hear words", icon: Ear },
+  { id: "numbers", title: "Numbers", subtitle: "0–5 by fingers", icon: Zap },
+]
+
+function fingerCount(landmarks: number[][]) {
+  const wrist = landmarks[0]
+  if (!wrist) return 0
+  const tipIds = [4, 8, 12, 16, 20]
+  const foldIds = [2, 6, 10, 14, 18]
+  const distance = (a: number[], b: number[]) => Math.hypot((a?.[0] ?? 0) - (b?.[0] ?? 0), (a?.[1] ?? 0) - (b?.[1] ?? 0))
+  return tipIds.reduce((count, tipId, index) => {
+    const tip = landmarks[tipId]
+    const fold = landmarks[foldIds[index]]
+    return tip && fold && distance(tip, wrist) > distance(fold, wrist) * 1.12 ? count + 1 : count
+  }, 0)
 }
 
 interface Props {
@@ -55,9 +89,9 @@ export function AiStudioPanel({
   const [store, setStore] = useState<AiStudioStore>(() => ({ samples: [], model: null }))
   const [model, setModel] = useState<tf.LayersModel | null>(null)
   const [cameraActive, setCameraActive] = useState(false)
+  const [readyMode, setReadyMode] = useState<ReadyAiMode>("objects")
   const [cameraError, setCameraError] = useState<string | null>(null)
   const [readyLoading, setReadyLoading] = useState(false)
-  const [readyLoaded, setReadyLoaded] = useState(false)
   const [training, setTraining] = useState(false)
   const [trainingProgress, setTrainingProgress] = useState({ epoch: 0, total: 0, accuracy: 0, loss: 0 })
   const [label, setLabel] = useState("")
@@ -71,9 +105,12 @@ export function AiStudioPanel({
   const sampleCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const readyModelRef = useRef<cocoSsd.ObjectDetection | null>(null)
+  const resourceRef = useRef<any>(null)
+  const modeRunRef = useRef<ReadyAiMode | null>(null)
   const animationRef = useRef<number | null>(null)
   const inFlightRef = useRef(false)
-  const lastDetectRef = useRef(0)
+  const lastDetectRef = useRef(false)
+  const lastDetectAtRef = useRef(0)
 
   const counts = useMemo(() => getSampleCounts(store.samples), [store.samples])
   const classes = useMemo(() => getAiClasses(store.samples), [store.samples])
