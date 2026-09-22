@@ -6,7 +6,7 @@ import type { CircuitState, PartType, PinRef, PlacedPart } from "@/lib/circuit-t
 import { CATALOG } from "@/lib/components-catalog"
 import { samePin } from "@/lib/geometry"
 import { computeRuntime, type ArduinoPinState } from "@/lib/simulation"
-import { defineArduinoBlocks } from "@/lib/arduino-blocks"
+import { defineArduinoBlocks, setAiClassContext } from "@/lib/arduino-blocks"
 import { runBlocklyProgram, type ExecutionEnvironment, type BlockStepInfo } from "@/lib/blockly-runner"
 import { audioEngine } from "@/lib/audio-engine"
 import { createHistory, pushState, undo as historyUndo, redo as historyRedo, canUndo, canRedo, type HistoryState } from "@/lib/history"
@@ -25,7 +25,7 @@ import { SerialMonitor, type SerialLine } from "./serial-monitor"
 import { StatusBar } from "./status-bar"
 import { TemplateBrowser } from "./template-browser"
 import { LessonBrowser } from "./lesson-browser"
-import { AiCameraPanel, type AiVisionState } from "./ai-camera-panel"
+import { AiStudioPanel, type AiStudioVisionState } from "./ai-studio-panel"
 import { ContextMenu, type ContextMenuTarget } from "./context-menu"
 import type { ProjectTemplate } from "@/lib/templates"
 import { getLessonSeed, type Lesson } from "@/lib/lesson-engine"
@@ -171,7 +171,7 @@ export function Workbench() {
     e.preventDefault()
     setContextMenu({ x: e.clientX, y: e.clientY, target })
   }, [])
-  const [aiState, setAiState] = useState<AiVisionState>({
+  const [aiState, setAiState] = useState<AiStudioVisionState>({
     enabled: true,
     detectedClass: "none",
     confidence: 0,
@@ -180,6 +180,11 @@ export function Workbench() {
   useEffect(() => {
     aiStateRef.current = aiState
   }, [aiState])
+
+  // Keep Blockly AI dropdowns in sync with the student’s learned concepts.
+  useEffect(() => {
+    setAiClassContext(aiState.modelClasses ?? [])
+  }, [aiState.modelClasses])
 
   const runnerAbortRef = useRef<AbortController | null>(null)
   const runningRef = useRef(false)
@@ -981,8 +986,8 @@ export function Workbench() {
         onSelectTemplate={handleSelectTemplate}
       />
 
-      {/* PictoBlox AI Vision Floating Camera HUD */}
-      <AiCameraPanel
+      {/* Pixiu AI Studio: simple by default, deep only when a student opens Understand. */}
+      <AiStudioPanel
         isOpen={isAiCameraOpen}
         onClose={() => setIsAiCameraOpen(false)}
         aiState={aiState}
