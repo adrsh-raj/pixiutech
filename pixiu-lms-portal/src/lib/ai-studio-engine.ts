@@ -144,8 +144,10 @@ export async function trainAiModel(
       labels.push(classes.indexOf(sample.label))
     }
 
-    const xs = tf.stack(features)
-    const ys = tf.oneHot(tf.tensor1d(labels, "int32"), classes.length)
+    const xs = tf.concat(features, 0)
+    const labelTensor = tf.tensor1d(labels, "int32")
+    const ys = tf.oneHot(labelTensor, classes.length)
+    labelTensor.dispose()
 
     const model = tf.sequential({
       layers: [
