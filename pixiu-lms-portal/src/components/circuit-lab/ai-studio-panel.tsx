@@ -454,6 +454,22 @@ export function AiStudioPanel({
                       </div>
                     </div>
 
+                    {tryMode === "ready" && (
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+                        {READY_MODES.map(({ id, title, subtitle, icon: Icon }) => (
+                          <button
+                            key={id}
+                            onClick={() => { setCameraActive(false); setReadyMode(id); setStatus(null); setTestResult(null) }}
+                            className={`rounded-2xl border p-3 text-left transition ${readyMode === id ? "border-violet-400/35 bg-violet-500/[0.08]" : "border-slate-800 bg-slate-950/40 hover:border-slate-700"}`}
+                          >
+                            <Icon size={16} className="text-violet-300" />
+                            <p className="mt-2 text-[11px] font-black">{title}</p>
+                            <p className="mt-0.5 text-[9px] leading-4 text-slate-600">{subtitle}</p>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
                     <div className="grid gap-4 lg:grid-cols-[1.35fr_0.65fr]">
                       <div className="overflow-hidden rounded-2xl border border-slate-800 bg-black">
                         <div className="relative aspect-video">
@@ -466,14 +482,16 @@ export function AiStudioPanel({
                             <div className="absolute inset-0 grid place-items-center p-6 text-center">
                               <div>
                                 <Camera size={28} className="mx-auto text-violet-300" />
-                                <p className="mt-3 text-sm font-bold">Camera off</p>
-                                <p className="mt-1 max-w-xs text-[11px] leading-5 text-slate-500">Nothing starts until you press the camera button.</p>
+                                <p className="mt-3 text-sm font-bold">{readyMode === "sound" ? "Microphone off" : "Camera off"}</p>
+                                <p className="mt-1 max-w-xs text-[11px] leading-5 text-slate-500">
+                                  {readyMode === "sound" ? "Sound AI listens only after you start the microphone." : "Nothing loads until you press Start."}
+                                </p>
                               </div>
                             </div>
                           )}
                           <div className="absolute left-3 top-3 flex items-center gap-2 rounded-full border border-slate-700 bg-slate-950/80 px-2.5 py-1 text-[9px] font-mono">
-                            <span className={tryMode === "ready" && readyLoaded ? "text-emerald-300" : tryMode === "trained" && model ? "text-emerald-300" : "text-amber-300"}>
-                              {tryMode === "ready" ? (readyLoading ? "loading ready AI" : readyLoaded ? "ready AI" : "ready AI off") : model ? "my model ready" : "train a model"}
+                            <span className={readyLoading ? "text-amber-300" : cameraActive ? "text-emerald-300" : "text-slate-400"}>
+                              {readyLoading ? "loading model" : cameraActive ? (tryMode === "trained" ? "my AI live" : `${modeLabel(readyMode)} live`) : "ready"}
                             </span>
                           </div>
                         </div>
@@ -518,7 +536,8 @@ export function AiStudioPanel({
                             }
                             reader.readAsDataURL(file)
                           }} />
-                        </label>
+                          </label>
+                      )}
 
                         {testImage && testResult && (
                           <div className="rounded-2xl border border-violet-400/15 bg-violet-500/[0.04] p-3">
@@ -542,8 +561,8 @@ export function AiStudioPanel({
 
                     <div className="flex flex-wrap gap-2">
                       <button onClick={() => setCameraActive((value) => !value)} className="inline-flex items-center gap-1.5 rounded-xl bg-violet-500 px-3 py-2 text-[10px] font-black text-white hover:bg-violet-400">
-                        {cameraActive ? <CameraOff size={13} /> : <Camera size={13} />}
-                        {cameraActive ? "Stop camera" : "Start camera"}
+                        {cameraActive ? (readyMode === "sound" ? <MicOff size={13} /> : <CameraOff size={13} />) : (readyMode === "sound" ? <Mic size={13} /> : <Camera size={13} />)}
+                        {cameraActive ? "Stop" : readyMode === "sound" ? "Start microphone" : "Start camera"}
                       </button>
                       {store.model && (
                         <button onClick={() => setTryMode("trained")} className="inline-flex items-center gap-1.5 rounded-xl border border-violet-400/20 bg-violet-500/10 px-3 py-2 text-[10px] font-black text-violet-200">
