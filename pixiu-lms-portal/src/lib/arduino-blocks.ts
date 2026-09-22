@@ -43,6 +43,16 @@ function componentDropdown(types: string[], emptyLabel = "Add component first"):
 }
 
 let defined = false
+let aiClasses = ["car", "person", "phone", "hand"]
+
+export function setAiClassContext(classes: string[]) {
+  const normalized = classes.map((value) => value.trim()).filter(Boolean).slice(0, 8)
+  aiClasses = Array.from(new Set([...normalized, "car", "person", "phone", "hand"]))
+}
+
+function aiClassDropdown(): [string, string][] {
+  return aiClasses.map((value) => [value, value])
+}
 
 export function defineArduinoBlocks() {
   if (defined) return
@@ -416,12 +426,7 @@ export function defineArduinoBlocks() {
       this.appendDummyInput()
         .appendField('🤖 AI sees')
         .appendField(
-          new Blockly.FieldDropdown([
-            ['🚗 car', 'car'],
-            ['👤 person', 'person'],
-            ['📱 phone', 'phone'],
-            ['✋ hand', 'hand'],
-          ]),
+          new Blockly.FieldDropdown(aiClassDropdown),
           'CLASS',
         )
         .appendField('?')
