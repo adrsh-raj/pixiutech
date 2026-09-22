@@ -127,6 +127,8 @@ const TOOLBOX = {
 export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: Props) {
   const blocklyDiv = useRef<HTMLDivElement>(null)
   const workspaceRef = useRef<Blockly.WorkspaceSvg | null>(null)
+  const lastWorkspaceXmlRef = useRef<string | null>(null)
+  const pendingExternalXmlRef = useRef<string | null>(null)
   const [cppCode, setCppCode] = useState("")
   const [copied, setCopied] = useState(false)
   const [mobileTab, setMobileTab] = useState<"blocks" | "cpp">("blocks")
@@ -196,7 +198,7 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
       </block>
     </xml>`
 
-    const lastLoadedXml = { current: initialXml }
+    lastWorkspaceXmlRef.current = initialXml
 
     try {
       const dom = Blockly.utils.xml.textToDom(initialXml)
@@ -215,10 +217,16 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
       try {
         const code = arduino.workspaceToCode(workspace)
         setCppCode(code)
-        if (onXmlChange) {
-          const dom = Blockly.Xml.workspaceToDom(workspace)
-          const text = Blockly.utils.xml.domToText(dom)
-          lastLoadedXml.current = text
+
+        const dom = Blockly.Xml.workspaceToDom(workspace)
+        const text = Blockly.utils.xml.domToText(dom)
+        lastWorkspaceXmlRef.current = text
+
+        // This XML was authored by the live Blockly workspace. Do not let the
+        // parent prop immediately rehydrate the workspace while a drag/drop is
+        // in progress; that causes blocks to appear "stuck" to the cursor.
+        if (onXmlChange && pendingExternalXmlRef.current !== text) {
+          pendingExternalXmlRef.current = null
           onXmlChange(text)
         }
       } catch (err) {
@@ -240,19 +248,52 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
     }
   }, [])
 
-  // Sync workspace when external xml prop changes (e.g., when picking a template)
+  // Sync workspace only for genuinely external XML changes (starter/project loads).
+  // Never clear/recreate Blockly while the user is dragging a block.
   useEffect(() => {
-    if (!workspaceRef.current || !xml) return
-    try {
-      const currentDom = Blockly.Xml.workspaceToDom(workspaceRef.current)
+    const workspace = workspaceRef.current
+    if (!workspace || !xml) return
+
+    if (xml === lastWorkspaceXmlRef.current) {
+      pendingExternalXmlRef.current = null
+      return
+    }
+
+    pendingExternalXmlRef.current = xml
+
+    const applyExternalXml = () => {
+      const activeWorkspace = workspaceRef.current
+      if (!activeWorkspace) return
+
+      const isDragging = typeof (activeWorkspace as any).isDragging === "function"
+        ? Boolean((activeWorkspace as any).isDragging())
+        : false
+
+      if (isDragging) {
+        window.setTimeout(applyExternalXml, 80)
+        return
+      }
+
+      const currentDom = Blockly.Xml.workspaceToDom(activeWorkspace)
       const currentXml = Blockly.utils.xml.domToText(currentDom)
-      if (currentXml !== xml) {
-        workspaceRef.current.clear()
+
+      // If the workspace already reflects this change, just mark ownership.
+      if (currentXml === xml || lastWorkspaceXmlRef.current === xml) {
+        lastWorkspaceXmlRef.current = currentXml
+        pendingExternalXmlRef.current = null
+        return
+      }
+
+      try {
+        activeWorkspace.clear()
         const dom = Blockly.utils.xml.textToDom(xml)
-        Blockly.Xml.domToWorkspace(dom, workspaceRef.current)
-        const code = arduino.workspaceToCode(workspaceRef.current)
+        Blockly.Xml.domToWorkspace(dom, activeWorkspace)
+        lastWorkspaceXmlRef.current = xml
+        pendingExternalXmlRef.current = null
+        const code = arduino.workspaceToCode(activeWorkspace)
         setCppCode(code)
-        setTimeout(() => {
+
+        window.setTimeout(() => {
           if (workspaceRef.current) {
             Blockly.svgResize(workspaceRef.current)
             if (typeof (workspaceRef.current as any).scrollCenter === "function") {
@@ -260,10 +301,12 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
             }
           }
         }, 100)
+      } catch (err) {
+        console.error("Failed to sync XML to workspace:", err)
       }
-    } catch (err) {
-      console.error("Failed to sync XML to workspace:", err)
     }
+
+    applyExternalXml()
   }, [xml])
 
   useEffect(() => {
@@ -295,6 +338,17 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
         .blocklySvg svg,
         .blocklySvg g {
           max-width: none !important;
+        }
+
+        .pixiu-blockly-host,
+        .pixiu-blockly-host .blocklySvg {
+          touch-action: none;
+          user-select: none;
+          -webkit-user-select: none;
+        }
+
+        .pixiu-blockly-host .blocklyWorkspace {
+          touch-action: none;
         }
 
         /* Glowing amber highlight for actively executing / stepped block */
@@ -355,7 +409,7 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
           mobileTab === "blocks" ? "flex" : "hidden lg:flex"
         }`}
       >
-        <div ref={blocklyDiv} className="absolute inset-0 w-full h-full" />
+        <div ref={blocklyDiv} className="pixiu-blockly-host absolute inset-0 w-full h-full" />
       </div>
 
       {/* Generated Arduino C++ Sketch Panel */}
