@@ -110,7 +110,6 @@ export function AiStudioPanel({
   const animationRef = useRef<number | null>(null)
   const inFlightRef = useRef(false)
   const lastDetectAtRef = useRef(0)
-  const lastDetectAtRef = useRef(0)
 
   const counts = useMemo(() => getSampleCounts(store.samples), [store.samples])
   const classes = useMemo(() => getAiClasses(store.samples), [store.samples])
@@ -714,28 +713,194 @@ export function AiStudioPanel({
     return canvas.toDataURL("image/jpeg", 0.76)
   }
 
-  function drawDetections(detections: AiStudioVisionState["allDetections"]) {
+  function startVisualLoop() {
+    stopVisualLoop()
+    const tick = async (time: number) => {
+      if (!cameraActive || tab !== "try" || tryMode !== "ready") return
+      if (frameBusyRef.current || time - lastDetectAtRef.current < 220) {
+        animationRef.current = requestAnimationFrame(tick)
+        return
+      }
+      const video = videoRef.current
+      const detector = resourceRef.current
+      if (!video || video.readyState < 2 || !detector) {
+        animationRef.current = requestAnimationFrame(tick)
+        return
+      }
+
+      lastDetectAtRef.current = time
+      frameBusyRef.current = true
+      try {
+        if (modeRunRef.current === "objects") {
+          const predictions = await detector.detect(video)
+          const valid = predictions.filter((item: any) => item.score >= 0.45)
+          drawDetections(valid.map((item: any) => ({ class: item.class, score: item.score, bbox: item.bbox as [number, number, number, number] })))
+          const best = valid[0]
+          onAiStateChange({
+            enabled: true,
+            mode: "objects",
+            detectedClass: best?.class ?? "none",
+            confidence: Math.round((best?.score ?? 0) * 100),
+            allDetections: valid.map((item: any) => ({ class: item.class, score: item.score, bbox: item.bbox as [number, number, number, number] })),
+            modelClasses: [],
+            modelSource: "ready",
+            detail: best ? `${valid.length} object${valid.length === 1 ? "" : "s"}` : "Looking…",
+          })
+        } else if (modeRunRef.current === "pose") {
+          const poses = await detector.estimatePoses(video, { flipHorizontal: true })
+          drawPose(poses[0])
+          const keypoints = poses[0]?.keypoints ?? []
+          const confident = keypoints.filter((point: any) => (point.score ?? 0) >= 0.45)
+          const leftWrist = keypoints.find((point: any) => /left.*wrist/i.test(point.name ?? ""))
+          const rightWrist = keypoints.find((point: any) => /right.*wrist/i.test(point.name ?? ""))
+          const leftShoulder = keypoints.find((point: any) => /left.*shoulder/i.test(point.name ?? ""))
+          const rightShoulder = keypoints.find((point: any) => /right.*shoulder/i.test(point.name ?? ""))
+          const handsUp = Boolean(
+            (leftWrist && leftShoulder && leftWrist.y < leftShoulder.y) ||
+            (rightWrist && rightShoulder && rightWrist.y < rightShoulder.y),
+          )
+          onAiStateChange({
+            enabled: true,
+            mode: "pose",
+            detectedClass: poses[0] ? (handsUp ? "hands-up" : "person") : "none",
+            confidence: Math.round((confident[0]?.score ?? 0) * 100),
+            allDetections: [],
+            modelClasses: [],
+            modelSource: "ready",
+            detail: poses[0] ? `${confident.length} keypoints${handsUp ? " · hands up" : ""}` : "Show a person",
+          })
+        } else {
+          const hands = await detector.estimateHands(video, { flipHorizontal: true })
+          drawHands(hands[0])
+          const hand = hands[0]
+          const landmarks = hand?.landmarks ?? []
+          const fingers = hand ? fingerCount(landmarks) : 0
+          const mode = modeRunRef.current === "numbers" ? "numbers" : "hands"
+          onAiStateChange({
+            enabled: true,
+            mode,
+            detectedClass: hand ? (mode === "numbers" ? String(fingers) : "hand") : "none",
+            confidence: Math.round((hand?.handInViewConfidence ?? 0) * 100),
+            allDetections: [],
+            modelClasses: [],
+            modelSource: "ready",
+            detail: hand ? `${fingers} finger${fingers === 1 ? "" : "s"} extended` : "Show one hand",
+          })
+        }
+      } catch {
+        // A slow/failed frame must not kill the render loop.
+      } finally {
+        frameBusyRef.current = false
+        animationRef.current = requestAnimationFrame(tick)
+      }
+    }
+    animationRef.current = requestAnimationFrame(tick)
+  }
+
+  function stopVisualLoop() {
+    if (animationRef.current) cancelAnimationFrame(animationRef.current)
+    animationRef.current = null
+    frameBusyRef.current = false
+    modeRunRef.current = null
+    if (overlayRef.current) {
+      const ctx = overlayRef.current.getContext("2d")
+      ctx?.clearRect(0, 0, overlayRef.current.width, overlayRef.current.height)
+    }
+  }
+
+  function prepareOverlay() {
     const canvas = overlayRef.current
     const video = videoRef.current
-    if (!canvas || !video) return
-    canvas.width = video.videoWidth || 640
+    if (!canvas || !video) return null
+    canvas.width = video.videoWidth || 480
     canvas.height = video.videoHeight || 360
     const ctx = canvas.getContext("2d")
-    if (!ctx) return
+    if (!ctx) return null
     ctx.clearRect(0, 0, canvas.width, canvas.height)
+    ctx.lineCap = "round"
+    ctx.lineJoin = "round"
+    return ctx
+  }
+
+  function drawDetections(detections: AiStudioVisionState["allDetections"]) {
+    const ctx = prepareOverlay()
+    if (!ctx) return
     detections?.forEach((item) => {
       const [x, y, w, h] = item.bbox
       ctx.strokeStyle = "#a78bfa"
       ctx.lineWidth = 3
       ctx.strokeRect(x, y, w, h)
-      ctx.fillStyle = "rgba(167, 139, 250, 0.9)"
-      const text = `${item.class.toUpperCase()} ${Math.round(item.score * 100)}%`
+      const label = `${item.class} ${Math.round(item.score * 100)}%`
       ctx.font = "bold 12px monospace"
-      const width = ctx.measureText(text).width + 12
+      const width = ctx.measureText(label).width + 12
+      ctx.fillStyle = "rgba(167,139,250,0.9)"
       ctx.fillRect(x, Math.max(0, y - 21), width, 21)
       ctx.fillStyle = "#09090b"
-      ctx.fillText(text, x + 6, Math.max(15, y - 6))
+      ctx.fillText(label, x + 6, Math.max(15, y - 6))
     })
+  }
+
+  function drawPose(pose: any) {
+    const ctx = prepareOverlay()
+    if (!ctx || !pose) return
+    const keypoints = pose.keypoints || []
+    const byName = new Map(keypoints.map((point: any) => [point.name, point]))
+    const edges = [
+      ["left_shoulder", "right_shoulder"], ["left_shoulder", "left_elbow"], ["left_elbow", "left_wrist"],
+      ["right_shoulder", "right_elbow"], ["right_elbow", "right_wrist"], ["left_shoulder", "left_hip"],
+      ["right_shoulder", "right_hip"], ["left_hip", "right_hip"], ["left_hip", "left_knee"],
+      ["left_knee", "left_ankle"], ["right_hip", "right_knee"], ["right_knee", "right_ankle"],
+    ]
+    edges.forEach(([a, b]) => {
+      const p = byName.get(a) as any
+      const q = byName.get(b) as any
+      if ((p?.score ?? 0) < 0.4 || (q?.score ?? 0) < 0.4) return
+      ctx.beginPath()
+      ctx.moveTo(p.x, p.y)
+      ctx.lineTo(q.x, q.y)
+      ctx.stroke()
+    })
+    keypoints.forEach((point: any) => {
+      if ((point.score ?? 0) < 0.4) return
+      ctx.beginPath()
+      ctx.arc(point.x, point.y, 4, 0, Math.PI * 2)
+      ctx.fill()
+    })
+  }
+
+  function drawHands(hand: any) {
+    const ctx = prepareOverlay()
+    if (!ctx || !hand) return
+    const edges = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[0,9],[9,10],[10,11],[11,12],[0,13],[13,14],[14,15],[15,16],[0,17],[17,18],[18,19],[19,20],[5,9],[9,13],[13,17]]
+    edges.forEach(([a,b]) => {
+      const p = hand.landmarks?.[a]
+      const q = hand.landmarks?.[b]
+      if (!p || !q) return
+      ctx.beginPath()
+      ctx.moveTo(p[0], p[1])
+      ctx.lineTo(q[0], q[1])
+      ctx.stroke()
+    })
+    hand.landmarks?.forEach((point: number[]) => {
+      ctx.beginPath()
+      ctx.arc(point[0], point[1], 3, 0, Math.PI * 2)
+      ctx.fill()
+    })
+  }
+
+  function drawEmotion(expressions: Record<string, number>, box: { x: number; y: number; width: number; height: number }) {
+    const ctx = prepareOverlay()
+    if (!ctx) return
+    ctx.strokeRect(box.x, box.y, box.width, box.height)
+    const top = Object.entries(expressions).sort((a, b) => b[1] - a[1])[0]
+    if (!top) return
+    const label = `${top[0]} ${Math.round(top[1] * 100)}%`
+    ctx.font = "bold 12px monospace"
+    const width = ctx.measureText(label).width + 12
+    ctx.fillStyle = "rgba(167,139,250,0.9)"
+    ctx.fillRect(box.x, Math.max(0, box.y - 21), width, 21)
+    ctx.fillStyle = "#09090b"
+    ctx.fillText(label, box.x + 6, Math.max(15, box.y - 6))
   }
 
   function stopCameraTracks() {
@@ -744,4 +909,5 @@ export function AiStudioPanel({
       streamRef.current = null
     }
   }
+
 }
