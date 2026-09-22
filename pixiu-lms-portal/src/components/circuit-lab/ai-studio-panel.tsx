@@ -143,7 +143,7 @@ export function AiStudioPanel({
   }, [store.model])
 
   useEffect(() => {
-    if (!isOpen || !cameraActive || tab !== "try" || readyMode === "sound") {
+    if (!isOpen || !cameraActive || readyMode === "sound") {
       stopCameraTracks()
       return
     }
@@ -369,12 +369,21 @@ export function AiStudioPanel({
   }
 
   const resetStudio = () => {
+    stopCameraTracks()
+    stopVisualLoop()
+    stopSpeechRecognizer(resourceRef.current)
+    disposeAiResource(resourceRef.current)
+    resourceRef.current = null
+    disposeAiResource(readyModelRef.current)
+    readyModelRef.current = null
     clearAiStudioStore()
     setStore({ samples: [], model: null })
     setModel(null)
     setTryMode("ready")
+    setReadyMode("objects")
+    setCameraActive(false)
     setTestResult(null)
-    setStatus("AI Studio reset. Your saved examples and model were cleared.")
+    setStatus("AI Studio reset.")
   }
 
   const runFilePrediction = async (dataUrl: string) => {
@@ -396,6 +405,17 @@ export function AiStudioPanel({
       })
     }
   }
+
+  useEffect(() => {
+    if (isOpen) return
+    stopCameraTracks()
+    stopVisualLoop()
+    stopSpeechRecognizer(resourceRef.current)
+    disposeAiResource(resourceRef.current)
+    resourceRef.current = null
+    disposeAiResource(readyModelRef.current)
+    readyModelRef.current = null
+  }, [isOpen])
 
   if (!isOpen) return null
 
@@ -751,7 +771,7 @@ export function AiStudioPanel({
       }
       const video = videoRef.current
       const detector = resourceRef.current
-      if (!video || video.readyState < 2 || !detector) {
+      if (!video || video.readyState < 2 || (tryMode !== "trained" && !detector)) {
         animationRef.current = requestAnimationFrame(tick)
         return
       }
