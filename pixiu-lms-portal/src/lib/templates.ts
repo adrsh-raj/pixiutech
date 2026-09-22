@@ -146,6 +146,12 @@ export const TEMPLATES: ProjectTemplate[] = [
     },
     blocklyXml: `<xml xmlns="https://developers.google.com/blockly/xml">
   <block type="arduino_program" x="40" y="40">
+    <statement name="SETUP">
+      <block type="io_pinmode"><field name="PIN">12</field><field name="MODE">OUTPUT</field><next>
+      <block type="io_pinmode"><field name="PIN">11</field><field name="MODE">OUTPUT</field><next>
+      <block type="io_pinmode"><field name="PIN">10</field><field name="MODE">OUTPUT</field></block>
+      </next></block></next></block>
+    </statement>
     <statement name="LOOP">
       <block type="io_digitalwrite"><field name="PIN">12</field><field name="STATE">HIGH</field><next>
       <block type="io_digitalwrite"><field name="PIN">11</field><field name="STATE">LOW</field><next>
