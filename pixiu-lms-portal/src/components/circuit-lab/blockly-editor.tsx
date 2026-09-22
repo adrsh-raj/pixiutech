@@ -387,7 +387,7 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
             <Terminal size={13} className="text-cyan-400" />
             <span>Target: Arduino Uno (ATmega328P @ 16 MHz)</span>
           </div>
-          <span className="text-emerald-400 font-bold">100% Syntax Verified</span>
+          <span className="text-emerald-400 font-bold">Generated from Blockly</span>
         </div>
       </div>
     </div>

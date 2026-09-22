@@ -25,6 +25,10 @@ export interface LessonBlockRequirement {
   type: string
   count: number
   fields?: Record<string, string>
+  /** Optional values expected inside named value/statement inputs, e.g. ANGLE → 90. */
+  inputs?: Record<string, string | number>
+  /** Lesson code checks count only blocks attached to the Arduino program by default. */
+  connected?: boolean
 }
 
 export interface LessonRuntimeRequirement {
@@ -165,36 +169,200 @@ function countParts(state: CircuitState, type: PartType) {
   return state.parts.filter((part) => part.type === type).length
 }
 
-function hasConnection(state: CircuitState, req: LessonConnectionRequirement) {
-  const endpointMatches = (endpoint: LessonEndpoint, partId: string, pinId: string) => {
-    const part = state.parts.find((item) => item.id === partId)
-    return Boolean(
-      part &&
-      part.type === endpoint.partType &&
-      (!endpoint.partId || endpoint.partId === partId) &&
-      endpoint.pinId === pinId,
-    )
+function pinMatches(partType: PartType, expectedPinId: string, actualPinId: string) {
+  if (partType === "arduino-uno" && (expectedPinId === "gnd" || expectedPinId === "gnd_pwr")) {
+    return actualPinId === "gnd" || actualPinId === "gnd_pwr"
   }
-  const matches = (a: LessonConnectionRequirement["from"], b: LessonConnectionRequirement["to"]) =>
-    state.wires.some((wire) =>
-      endpointMatches(a, wire.from.partId, wire.from.pinId) &&
-      endpointMatches(b, wire.to.partId, wire.to.pinId),
-    )
-  return matches(req.from, req.to) || matches(req.to, req.from)
+  return expectedPinId === actualPinId
 }
 
-function extractBlocks(xml: string): Array<{ type: string; fields: Record<string, string> }> {
+function endpointMatches(state: CircuitState, endpoint: LessonEndpoint, actual: PinRef) {
+  const part = state.parts.find((item) => item.id === actual.partId)
+  if (!part || part.type !== endpoint.partType) return false
+  if (endpoint.partId) {
+    const namedPartExists = state.parts.some((item) => item.id === endpoint.partId && item.type === endpoint.partType)
+    if (namedPartExists && endpoint.partId !== actual.partId) return false
+  }
+  return pinMatches(part.type, endpoint.pinId, actual.pinId)
+}
+
+function addBreadboardEdges(
+  state: CircuitState,
+  graph: Map<string, Set<string>>,
+  breadboard: Extract<PartType, "breadboard">,
+) {
+  const part = state.parts.find((item) => item.type === breadboard)
+  if (!part) return
+  const link = (a: string, b: string) => {
+    const u = `${part.id}:${a}`
+    const v = `${part.id}:${b}`
+    if (!graph.has(u)) graph.set(u, new Set())
+    if (!graph.has(v)) graph.set(v, new Set())
+    graph.get(u)!.add(v)
+    graph.get(v)!.add(u)
+  }
+
+  for (let column = 1; column <= 20; column++) {
+    ;(["a", "b", "c", "d", "e"] as const).forEach((row, index, rows) => {
+      if (index < rows.length - 1) link(`${row}_${column}`, `${rows[index + 1]}_${column}`)
+    })
+    ;(["f", "g", "h", "i", "j"] as const).forEach((row, index, rows) => {
+      if (index < rows.length - 1) link(`${row}_${column}`, `${rows[index + 1]}_${column}`)
+    })
+    if (column < 20) {
+      link(`pos_t_${column}`, `pos_t_${column + 1}`)
+      link(`neg_t_${column}`, `neg_t_${column + 1}`)
+      link(`pos_b_${column}`, `pos_b_${column + 1}`)
+      link(`neg_b_${column}`, `neg_b_${column + 1}`)
+    }
+  }
+
+  link("pos_top", "pos_t_1")
+  link("neg_top", "neg_t_1")
+  link("pos_bot", "pos_b_1")
+  link("neg_bot", "neg_b_1")
+  link("a1", "a_3")
+  link("b1", "b_3")
+  link("c1", "c_3")
+  link("d1", "d_3")
+  link("e1", "e_3")
+  link("a2", "f_3")
+  link("b2", "g_3")
+  link("c2", "h_3")
+  link("d2", "i_3")
+  link("e2", "j_3")
+}
+
+function endpointKey(ref: PinRef) {
+  return `${ref.partId}:${ref.pinId}`
+}
+
+function areOnSameNet(state: CircuitState, a: LessonEndpoint, b: LessonEndpoint) {
+  const graph = new Map<string, Set<string>>()
+  const link = (u: string, v: string) => {
+    if (!graph.has(u)) graph.set(u, new Set())
+    if (!graph.has(v)) graph.set(v, new Set())
+    graph.get(u)!.add(v)
+    graph.get(v)!.add(u)
+  }
+
+  for (const wire of state.wires) {
+    link(endpointKey(wire.from), endpointKey(wire.to))
+  }
+
+  for (const part of state.parts) {
+    if (part.type === "breadboard") {
+      addBreadboardEdges(state, graph, "breadboard")
+      break
+    }
+  }
+
+  const aKeys = state.wires.flatMap((wire) => [wire.from, wire.to]).filter((ref) => endpointMatches(state, a, ref))
+  const bKeys = state.wires.flatMap((wire) => [wire.from, wire.to]).filter((ref) => endpointMatches(state, b, ref))
+  const queue = aKeys.map(endpointKey)
+  const visited = new Set(queue)
+  while (queue.length) {
+    const current = queue.shift()!
+    if (bKeys.some((ref) => endpointKey(ref) === current)) return true
+    for (const next of graph.get(current) ?? []) {
+      if (!visited.has(next)) {
+        visited.add(next)
+        queue.push(next)
+      }
+    }
+  }
+  return false
+}
+function hasConnection(state: CircuitState, req: LessonConnectionRequirement) {
+  const directMatches = (a: LessonConnectionRequirement["from"], b: LessonConnectionRequirement["to"]) =>
+    state.wires.some((wire) =>
+      endpointMatches(state, a, wire.from) &&
+      endpointMatches(state, b, wire.to),
+    )
+
+  return (
+    directMatches(req.from, req.to) ||
+    directMatches(req.to, req.from) ||
+    areOnSameNet(state, req.from, req.to)
+  )
+}
+
+function normalizeBlocklyValue(name: string, raw: string): string {
+  const value = raw.replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim()
+  if (["PIN", "TRIG", "ECHO", "ENA", "ENB", "IN1", "IN2", "IN3", "IN4"].includes(name)) {
+    const numeric = value.match(/^(A?\d+)/i)
+    if (numeric) return numeric[1].toUpperCase()
+  }
+  return value
+}
+
+function getNamedInputValue(node: Element, inputName: string): string | null {
+  const holder = Array.from(node.children).find((child) => {
+    const tag = child.tagName.toLowerCase()
+    return (tag === "value" || tag === "statement") && child.getAttribute("name") === inputName
+  })
+  if (!holder) return null
+  const nestedBlock = Array.from(holder.children).find((child) => child.tagName.toLowerCase() === "block")
+  if (!nestedBlock) return null
+
+  const numberField = Array.from(nestedBlock.getElementsByTagName("field")).find(
+    (field) => field.getAttribute("name") === "NUM",
+  )
+  if (numberField) return normalizeBlocklyValue("NUM", numberField.textContent || "")
+
+  const textField = Array.from(nestedBlock.getElementsByTagName("field")).find(
+    (field) => field.getAttribute("name") === "TEXT",
+  )
+  if (textField) return normalizeBlocklyValue("TEXT", textField.textContent || "")
+
+  return nestedBlock.getAttribute("type") || null
+}
+
+function extractBlocks(xml: string): Array<{
+  type: string
+  fields: Record<string, string>
+  inputs: Record<string, string>
+  connected: boolean
+}> {
   if (typeof DOMParser === "undefined") return []
   try {
     const doc = new DOMParser().parseFromString(xml, "text/xml")
     if (doc.querySelector("parsererror")) return []
+
     return Array.from(doc.getElementsByTagName("block")).map((node) => {
       const fields: Record<string, string> = {}
       Array.from(node.getElementsByTagName("field")).forEach((field) => {
         const name = field.getAttribute("name")
-        if (name) fields[name] = field.textContent || ""
+        if (name) fields[name] = normalizeBlocklyValue(name, field.textContent || "")
       })
-      return { type: node.getAttribute("type") || "", fields }
+
+      const inputs: Record<string, string> = {}
+      Array.from(node.children).forEach((child) => {
+        const name = child.getAttribute("name")
+        if (!name) return
+        const tag = child.tagName.toLowerCase()
+        if (tag === "value" || tag === "statement") {
+          const value = getNamedInputValue(node, name)
+          if (value !== null) inputs[name] = value
+        }
+      })
+
+      let connected = false
+      let parent: Element | null = node.parentElement
+      while (parent && parent.tagName.toLowerCase() !== "xml") {
+        if (parent.tagName.toLowerCase() === "block") {
+          connected = true
+          break
+        }
+        parent = parent.parentElement
+      }
+
+      return {
+        type: node.getAttribute("type") || "",
+        fields,
+        inputs,
+        connected,
+      }
     })
   } catch {
     return []
@@ -257,13 +425,25 @@ export function evaluateLessonStep(lesson: Lesson, step: LessonStep, context: Le
     if (check.kind === "blocks") {
       const blocks = extractBlocks(context.blocklyXml)
       for (const req of check.requirements) {
-        const matching = blocks.filter((block) =>
-          block.type === req.type &&
-          (!req.fields || Object.entries(req.fields).every(([name, value]) => block.fields[name] === value)),
-        ).length
+        const matchingBlocks = blocks.filter((block) => {
+          if (block.type !== req.type) return false
+          if (req.connected !== false && !block.connected) return false
+          if (req.fields && !Object.entries(req.fields).every(([name, value]) => normalizeBlocklyValue(name, block.fields[name] ?? "") === normalizeBlocklyValue(name, value))) {
+            return false
+          }
+          if (req.inputs && !Object.entries(req.inputs).every(([name, value]) => normalizeBlocklyValue(name, block.inputs[name] ?? "") === normalizeBlocklyValue(name, String(value)))) {
+            return false
+          }
+          return true
+        })
+        const matching = matchingBlocks.length
+        const requirementText = [
+          req.fields ? Object.entries(req.fields).map(([name, value]) => `${name}=${value}`) : [],
+          req.inputs ? Object.entries(req.inputs).map(([name, value]) => `${name}=${value}`) : [],
+        ].flat().join(", ")
         results.push({
           passed: matching >= req.count,
-          label: req.type,
+          label: requirementText ? `${req.type} · ${requirementText}` : req.type,
           detail: matching >= req.count ? `${matching} found` : `Need ${req.count}, found ${matching}`,
         })
       }
@@ -397,9 +577,8 @@ export const LESSONS: Lesson[] = [
         instructions: "Use two digital-write blocks on pin 13: HIGH and LOW, with a delay between them.",
         kind: "code",
         checks: [{ kind: "blocks", requirements: [
-          { type: "io_digitalwrite", count: 1, fields: { PIN: "13" } },
-          { type: "io_digitalwrite", count: 1, fields: { STATE: "HIGH" } },
-          { type: "io_digitalwrite", count: 1, fields: { STATE: "LOW" } },
+          { type: "io_digitalwrite", count: 1, fields: { PIN: "13", STATE: "HIGH" } },
+          { type: "io_digitalwrite", count: 1, fields: { PIN: "13", STATE: "LOW" } },
           { type: "time_delay", count: 2 },
         ] }],
         success: "The Blockly program contains the blink sequence.",
@@ -459,7 +638,15 @@ export const LESSONS: Lesson[] = [
         instructions: "Set up D12, D11 and D10 as digital outputs and use HIGH/LOW plus delays to cycle the lights.",
         kind: "code",
         checks: [{ kind: "blocks", requirements: [
-          { type: "io_digitalwrite", count: 6 },
+          { type: "io_pinmode", count: 1, fields: { PIN: "12", MODE: "OUTPUT" } },
+          { type: "io_pinmode", count: 1, fields: { PIN: "11", MODE: "OUTPUT" } },
+          { type: "io_pinmode", count: 1, fields: { PIN: "10", MODE: "OUTPUT" } },
+          { type: "io_digitalwrite", count: 1, fields: { PIN: "12", STATE: "HIGH" } },
+          { type: "io_digitalwrite", count: 1, fields: { PIN: "12", STATE: "LOW" } },
+          { type: "io_digitalwrite", count: 1, fields: { PIN: "11", STATE: "LOW" } },
+          { type: "io_digitalwrite", count: 1, fields: { PIN: "11", STATE: "HIGH" } },
+          { type: "io_digitalwrite", count: 1, fields: { PIN: "10", STATE: "LOW" } },
+          { type: "io_digitalwrite", count: 1, fields: { PIN: "10", STATE: "HIGH" } },
           { type: "time_delay", count: 3 },
         ] }],
         success: "The traffic sequence is represented in Blockly.",
@@ -515,9 +702,10 @@ export const LESSONS: Lesson[] = [
         instructions: "Add servo-write blocks for at least three target positions, including 0°, 90° and 180°.",
         kind: "code",
         checks: [{ kind: "blocks", requirements: [
-          { type: "servo_write", count: 3 },
-          { type: "servo_write", count: 1 },
-        ] }, { kind: "part-property", partType: "servo", property: "angle", min: 0, max: 180 }],
+          { type: "servo_write", count: 1, inputs: { ANGLE: 0 } },
+          { type: "servo_write", count: 1, inputs: { ANGLE: 90 } },
+          { type: "servo_write", count: 1, inputs: { ANGLE: 180 } },
+        ] }],
         success: "The program has multiple servo targets.",
       },
       {
@@ -570,9 +758,10 @@ export const LESSONS: Lesson[] = [
         instructions: "Read the ultrasonic sensor and use an IF block to make D8 HIGH below 30 cm, otherwise LOW.",
         kind: "code",
         checks: [{ kind: "blocks", requirements: [
-          { type: "ultrasonic_read", count: 2 },
+          { type: "ultrasonic_read", count: 2, fields: { TRIG: "9", ECHO: "10" } },
           { type: "controls_if", count: 1 },
-          { type: "io_digitalwrite", count: 2, fields: { PIN: "8" } },
+          { type: "io_digitalwrite", count: 1, fields: { PIN: "8", STATE: "HIGH" } },
+          { type: "io_digitalwrite", count: 1, fields: { PIN: "8", STATE: "LOW" } },
         ] }],
         success: "The alarm logic is present.",
       },
