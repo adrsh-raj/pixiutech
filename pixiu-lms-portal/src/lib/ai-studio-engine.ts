@@ -176,6 +176,7 @@ export async function trainAiModel(
 
     const epochs = Math.max(5, Math.min(30, options.epochs ?? 18))
     let latestAccuracy = 0
+    let latestValAccuracy = 0
     let latestLoss = 0
 
     await model.fit(xs, ys, {
@@ -187,6 +188,7 @@ export async function trainAiModel(
       callbacks: {
         onEpochEnd: async (epoch, logs) => {
           latestAccuracy = Number(logs?.acc ?? logs?.accuracy ?? 0)
+          latestValAccuracy = Number(logs?.val_acc ?? logs?.val_accuracy ?? latestAccuracy)
           latestLoss = Number(logs?.loss ?? 0)
           options.onEpoch?.(epoch + 1, epochs, latestAccuracy, latestLoss)
           await tf.nextFrame()
@@ -214,7 +216,7 @@ export async function trainAiModel(
       sampleCount: samples.length,
       epochs,
       trainAccuracy: Math.round(trainAccuracy * 100),
-      validationAccuracy: Math.round((samples.length >= 12 ? latestAccuracy : trainAccuracy) * 100),
+      validationAccuracy: Math.round((samples.length >= 12 ? latestValAccuracy : trainAccuracy) * 100),
       createdAt: Date.now(),
       inputShape: [INPUT_H, INPUT_W, INPUT_C],
       storageKey: MODEL_KEY,
