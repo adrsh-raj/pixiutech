@@ -672,6 +672,18 @@ export function AiStudioPanel({
                             className="pointer-events-none absolute inset-0 h-full w-full"
                           />
                         </>
+                      ) : showLiveInput && isSound ? (
+                        <div className="absolute inset-0 grid place-items-center p-6 text-center">
+                          <div>
+                            <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-violet-500/10 text-violet-300 ring-1 ring-violet-400/20">
+                              <Mic size={28} />
+                            </div>
+                            <p className="mt-3 text-sm font-bold">Listening…</p>
+                            <p className="mt-1 max-w-xs text-[11px] leading-5 text-slate-500">
+                              Speak a simple word or digit.
+                            </p>
+                          </div>
+                        </div>
                       ) : (
                         <div className="absolute inset-0 grid place-items-center p-6 text-center">
                           <div>
