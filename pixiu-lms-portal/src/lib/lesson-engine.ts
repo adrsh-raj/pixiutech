@@ -529,6 +529,11 @@ const DHT11_CIRCUIT: CircuitState = {
 
 const DHT11_XML = `<xml xmlns="https://developers.google.com/blockly/xml">
   <block type="arduino_program" x="40" y="40">
+    <statement name="SETUP">
+      <block type="serial_begin"><field name="BAUD">9600</field><next>
+      <block type="io_pinmode"><field name="PIN">4</field><field name="MODE">INPUT</field></block>
+      </next></block>
+    </statement>
     <statement name="LOOP">
       <block type="serial_print"><value name="TEXT"><block type="text_string"><field name="TEXT">Temperature: </field></block></value><next>
       <block type="serial_println"><value name="TEXT"><block type="dht_temperature"></block></value><next>
@@ -768,6 +773,8 @@ export const LESSONS: Lesson[] = [
         instructions: "Read the ultrasonic sensor and use an IF block to make D8 HIGH below 30 cm, otherwise LOW.",
         kind: "code",
         checks: [{ kind: "blocks", requirements: [
+          { type: "serial_begin", count: 1, fields: { BAUD: "9600" } },
+          { type: "io_pinmode", count: 1, fields: { PIN: "8", MODE: "OUTPUT" } },
           { type: "ultrasonic_read", count: 2, fields: { TRIG: "9", ECHO: "10" } },
           { type: "controls_if", count: 1 },
           { type: "io_digitalwrite", count: 1, fields: { PIN: "8", STATE: "HIGH" } },
@@ -819,6 +826,8 @@ export const LESSONS: Lesson[] = [
         instructions: "Use one temperature-read block and one humidity-read block, then send the values to Serial.",
         kind: "code",
         checks: [{ kind: "blocks", requirements: [
+          { type: "serial_begin", count: 1, fields: { BAUD: "9600" } },
+          { type: "io_pinmode", count: 1, fields: { PIN: "4", MODE: "INPUT" } },
           { type: "dht_temperature", count: 1 },
           { type: "dht_humidity", count: 1 },
           { type: "serial_print", count: 1 },
