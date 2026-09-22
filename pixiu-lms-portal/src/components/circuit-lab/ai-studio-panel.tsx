@@ -183,7 +183,6 @@ export function AiStudioPanel({
       return
     }
 
-    const session = ++sessionRef.current
     let cancelled = false
 
     const startInput = async () => {
@@ -195,7 +194,7 @@ export function AiStudioPanel({
         if (tryMode === "ready" && readyMode === "sound") {
           const recognizer = await loadSpeechRecognizer()
 
-          if (cancelled || session !== sessionRef.current) {
+          if (cancelled) {
             stopSpeechRecognizer(recognizer)
             return
           }
@@ -205,7 +204,7 @@ export function AiStudioPanel({
 
           recognizer.listen(
             (result: { scores: Float32Array | number[] }) => {
-              if (cancelled || session !== sessionRef.current) return
+              if (cancelled) return
 
               const scores = Array.from(result.scores ?? [])
               const labels = recognizer.wordLabels()
@@ -254,7 +253,7 @@ export function AiStudioPanel({
           throw new Error("This browser does not provide camera access.")
         }
 
-        if (cancelled || session !== sessionRef.current) {
+        if (cancelled) {
           stream.getTracks().forEach((track) => track.stop())
           return
         }
@@ -268,7 +267,7 @@ export function AiStudioPanel({
 
         setLoading(false)
       } catch (error) {
-        if (cancelled || session !== sessionRef.current) return
+        if (cancelled) return
         setLoading(false)
         setCameraError(
           error instanceof Error
