@@ -497,7 +497,7 @@ export function AiStudioPanel({
                     <div className="grid gap-4 lg:grid-cols-[1.35fr_0.65fr]">
                       <div className="overflow-hidden rounded-2xl border border-slate-800 bg-black">
                         <div className="relative aspect-video">
-                          {cameraActive ? (
+                          {cameraActive && readyMode !== "sound" ? (
                             <>
                               <video ref={videoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
                               <canvas ref={overlayRef} className="absolute inset-0 h-full w-full pointer-events-none" />
@@ -826,7 +826,7 @@ export function AiStudioPanel({
             enabled: true,
             mode: "pose",
             detectedClass: poses[0] ? (handsUp ? "hands-up" : "person") : "none",
-            confidence: Math.round((confident[0]?.score ?? 0) * 100),
+            confidence: Math.round((poses[0]?.score ?? confident[0]?.score ?? 0) * 100),
             allDetections: [],
             modelClasses: [],
             modelSource: "ready",
@@ -922,6 +922,8 @@ export function AiStudioPanel({
     ctx.clearRect(0, 0, canvas.width, canvas.height)
     ctx.lineCap = "round"
     ctx.lineJoin = "round"
+    ctx.strokeStyle = "#a78bfa"
+    ctx.fillStyle = "#a78bfa"
     return ctx
   }
 
