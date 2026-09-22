@@ -828,7 +828,7 @@ export function AiStudioPanel({
             detectedClass: poses[0] ? (handsUp ? "hands-up" : "person") : "none",
             confidence: Math.round((poses[0]?.score ?? confident[0]?.score ?? 0) * 100),
             allDetections: [],
-            modelClasses: [],
+            modelClasses: ["person", "hands-up"],
             modelSource: "ready",
             detail: poses[0] ? `${confident.length} keypoints${handsUp ? " · hands up" : ""}` : "Show a person",
           })
@@ -879,7 +879,7 @@ export function AiStudioPanel({
             detectedClass: hand ? (mode === "numbers" ? String(fingers) : "hand") : "none",
             confidence: Math.round((hand?.handInViewConfidence ?? 0) * 100),
             allDetections: [],
-            modelClasses: [],
+            modelClasses: mode === "numbers" ? ["0", "1", "2", "3", "4", "5"] : ["hand"],
             modelSource: "ready",
             detail: hand ? `${fingers} finger${fingers === 1 ? "" : "s"} extended` : "Show one hand",
           })
