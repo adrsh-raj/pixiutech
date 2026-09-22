@@ -287,8 +287,8 @@ export function Toolbar({
                   className="flex w-full items-center justify-between gap-2 rounded-xl px-2.5 py-2 text-left text-xs font-semibold text-slate-200 hover:bg-slate-800"
                   role="menuitem"
                 >
-                  <span className="flex items-center gap-2"><Camera size={14} className="text-purple-300" />AI Camera</span>
-                  <span className="text-[9px] text-slate-500">{isAiCameraOpen ? "ON" : "OFF"}</span>
+                  <span className="flex items-center gap-2"><Sparkles size={14} className="text-purple-300" />AI Studio</span>
+                  <span className="text-[9px] text-slate-500">{isAiCameraOpen ? "OPEN" : "CLOSED"}</span>
                 </button>
               )}
 
