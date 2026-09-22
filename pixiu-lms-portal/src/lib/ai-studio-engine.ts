@@ -231,7 +231,6 @@ export async function trainAiModel(
     features.forEach((tensor) => tensor.dispose())
     throw error
   } finally {
-    tf.engine().endScope()
   }
 }
 
