@@ -249,6 +249,8 @@ export function AiStudioPanel({
           readyModelRef.current = resourceRef.current
         } else if (readyMode === "pose") {
           resourceRef.current = await loadPoseDetector()
+        } else if (readyMode === "emotion") {
+          resourceRef.current = await loadFaceEmotion()
         } else {
           resourceRef.current = await loadHandDetector()
         }
@@ -769,6 +771,40 @@ export function AiStudioPanel({
             modelSource: "ready",
             detail: poses[0] ? `${confident.length} keypoints${handsUp ? " · hands up" : ""}` : "Show a person",
           })
+        } else if (modeRunRef.current === "emotion") {
+          const faceapi = detector
+          const detections = await faceapi
+            .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.5 }))
+            .withFaceExpressions()
+          const first = detections[0]
+          if (first) {
+            const expressions = first.expressions as Record<string, number>
+            const top = Object.entries(expressions).sort((a, b) => b[1] - a[1])[0]
+            const box = first.detection.box
+            drawEmotion(expressions, box)
+            onAiStateChange({
+              enabled: true,
+              mode: "emotion",
+              detectedClass: top?.[0] ?? "neutral",
+              confidence: Math.round((top?.[1] ?? 0) * 100),
+              allDetections: [],
+              modelClasses: Object.keys(expressions),
+              modelSource: "ready",
+              detail: "Expression estimate · keep still for a moment",
+            })
+          } else {
+            clearOverlay()
+            onAiStateChange({
+              enabled: true,
+              mode: "emotion",
+              detectedClass: "none",
+              confidence: 0,
+              allDetections: [],
+              modelClasses: [],
+              modelSource: "ready",
+              detail: "Show your face",
+            })
+          }
         } else {
           const hands = await detector.estimateHands(video, { flipHorizontal: true })
           drawHands(hands[0])
@@ -806,6 +842,12 @@ export function AiStudioPanel({
       const ctx = overlayRef.current.getContext("2d")
       ctx?.clearRect(0, 0, overlayRef.current.width, overlayRef.current.height)
     }
+  }
+
+  function clearOverlay() {
+    const canvas = overlayRef.current
+    if (!canvas) return
+    canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height)
   }
 
   function prepareOverlay() {
