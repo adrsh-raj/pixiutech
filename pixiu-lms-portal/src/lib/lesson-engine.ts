@@ -591,7 +591,6 @@ export const LESSONS: Lesson[] = [
         instructions: "Use two digital-write blocks on pin 13: HIGH and LOW, with a delay between them.",
         kind: "code",
         checks: [{ kind: "blocks", requirements: [
-          { type: "io_pinmode", count: 1, fields: { PIN: "13", MODE: "OUTPUT" } },
           { type: "io_digitalwrite", count: 1, fields: { PIN: "13", STATE: "HIGH" } },
           { type: "io_digitalwrite", count: 1, fields: { PIN: "13", STATE: "LOW" } },
           { type: "time_delay", count: 2 },
@@ -773,8 +772,6 @@ export const LESSONS: Lesson[] = [
         instructions: "Read the ultrasonic sensor and use an IF block to make D8 HIGH below 30 cm, otherwise LOW.",
         kind: "code",
         checks: [{ kind: "blocks", requirements: [
-          { type: "serial_begin", count: 1, fields: { BAUD: "9600" } },
-          { type: "io_pinmode", count: 1, fields: { PIN: "8", MODE: "OUTPUT" } },
           { type: "ultrasonic_read", count: 2, fields: { TRIG: "9", ECHO: "10" } },
           { type: "controls_if", count: 1 },
           { type: "io_digitalwrite", count: 1, fields: { PIN: "8", STATE: "HIGH" } },
@@ -826,8 +823,6 @@ export const LESSONS: Lesson[] = [
         instructions: "Use one temperature-read block and one humidity-read block, then send the values to Serial.",
         kind: "code",
         checks: [{ kind: "blocks", requirements: [
-          { type: "serial_begin", count: 1, fields: { BAUD: "9600" } },
-          { type: "io_pinmode", count: 1, fields: { PIN: "4", MODE: "INPUT" } },
           { type: "dht_temperature", count: 1 },
           { type: "dht_humidity", count: 1 },
           { type: "serial_print", count: 1 },
