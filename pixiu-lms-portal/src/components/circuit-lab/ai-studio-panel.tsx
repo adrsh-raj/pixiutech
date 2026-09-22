@@ -109,7 +109,7 @@ export function AiStudioPanel({
   const modeRunRef = useRef<ReadyAiMode | null>(null)
   const animationRef = useRef<number | null>(null)
   const inFlightRef = useRef(false)
-  const lastDetectRef = useRef(false)
+  const lastDetectAtRef = useRef(0)
   const lastDetectAtRef = useRef(0)
 
   const counts = useMemo(() => getSampleCounts(store.samples), [store.samples])
@@ -140,139 +140,148 @@ export function AiStudioPanel({
   }, [store.model])
 
   useEffect(() => {
-    if (!isOpen || !cameraActive) {
+    if (!isOpen || !cameraActive || tab !== "try" || readyMode === "sound") {
       stopCameraTracks()
       return
     }
 
     let active = true
-    navigator.mediaDevices
-      ?.getUserMedia({
-        video: { width: { ideal: 640 }, height: { ideal: 360 }, facingMode: "user" },
-      })
-      .then((stream) => {
-        if (!active) {
-          stream.getTracks().forEach((track) => track.stop())
-          return
-        }
-        streamRef.current = stream
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream
-          void videoRef.current.play().catch(() => {})
-        }
-        setCameraError(null)
-      })
-      .catch(() => {
-        if (!active) return
-        setCameraError("Camera permission is needed for live AI.")
-        setCameraActive(false)
-      })
+    setCameraError(null)
+    navigator.mediaDevices?.getUserMedia({
+      video: {
+        width: { ideal: 480, max: 640 },
+        height: { ideal: 360, max: 480 },
+        frameRate: { ideal: 12, max: 15 },
+        facingMode: "user",
+      },
+    }).then((stream) => {
+      if (!active) {
+        stream.getTracks().forEach((track) => track.stop())
+        return
+      }
+      streamRef.current = stream
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+        void videoRef.current.play().catch(() => {})
+      }
+      setCameraError(null)
+    }).catch(() => {
+      if (!active) return
+      setCameraError("Camera permission is needed for this AI mode.")
+      setCameraActive(false)
+    })
 
     return () => {
       active = false
       stopCameraTracks()
     }
-  }, [isOpen, tab, cameraActive])
+  }, [isOpen, tab, cameraActive, readyMode])
 
   useEffect(() => {
-    if (!cameraActive || tab !== "try") {
-      if (animationRef.current) cancelAnimationFrame(animationRef.current)
-      animationRef.current = null
+    if (!isOpen || !cameraActive || tab !== "try" || readyMode !== "sound") return
+
+    let cancelled = false
+    setReadyLoading(true)
+    setStatus(null)
+    void loadSpeechRecognizer().then((recognizer) => {
+      if (cancelled) {
+        stopSpeechRecognizer(recognizer)
+        return
+      }
+      resourceRef.current = recognizer
+      setReadyLoading(false)
+      recognizer.listen(
+        (result: { scores: Float32Array | number[] }) => {
+          if (cancelled) return
+          const scores = Array.from(result.scores || [])
+          const labels = recognizer.wordLabels()
+          let bestIndex = 0
+          for (let i = 1; i < scores.length; i += 1) {
+            if ((scores[i] ?? 0) > (scores[bestIndex] ?? 0)) bestIndex = i
+          }
+          const confidence = Math.round((scores[bestIndex] ?? 0) * 100)
+          const word = labels[bestIndex] ?? "unknown"
+          onAiStateChange({
+            enabled: true,
+            mode: "sound",
+            detectedClass: word,
+            confidence,
+            allDetections: [],
+            modelClasses: labels,
+            modelSource: "ready",
+            detail: confidence >= 70 ? `Heard “${word}”` : "Listening…",
+          })
+        },
+        {
+          probabilityThreshold: 0.65,
+          invokeCallbackOnNoiseAndUnknown: true,
+          includeSpectrogram: false,
+        },
+      )
+    }).catch((error) => {
+      if (cancelled) return
+      setReadyLoading(false)
+      setStatus(error instanceof Error ? error.message : "Sound AI could not start.")
+      setCameraActive(false)
+    })
+
+    return () => {
+      cancelled = true
+      stopSpeechRecognizer(resourceRef.current)
+      resourceRef.current = null
+    }
+  }, [isOpen, tab, cameraActive, readyMode, onAiStateChange])
+
+  useEffect(() => {
+    if (!isOpen || !cameraActive || tab !== "try" || readyMode === "sound" || tryMode !== "ready") {
+      stopVisualLoop()
       return
     }
 
-    const detect = async (time: number) => {
-      if (!videoRef.current || videoRef.current.readyState < 2) {
-        animationRef.current = requestAnimationFrame(detect)
-        return
-      }
-
-      if (time - lastDetectRef.current < 220 || inFlightRef.current) {
-        animationRef.current = requestAnimationFrame(detect)
-        return
-      }
-
-      lastDetectRef.current = time
-
-      if (tryMode === "ready") {
-        const detector = readyModelRef.current
-        if (detector && overlayRef.current) {
-          inFlightRef.current = true
-          try {
-            const predictions = await detector.detect(videoRef.current)
-            const valid = predictions.filter((item) => item.score >= 0.45)
-            drawDetections(valid.map((item) => ({ class: item.class, score: item.score, bbox: item.bbox as [number, number, number, number] })))
-            const primary = valid[0]
-            if (primary) {
-              onAiStateChange({
-                enabled: true,
-                detectedClass: primary.class,
-                confidence: Math.round(primary.score * 100),
-                allDetections: valid.map((item) => ({ class: item.class, score: item.score, bbox: item.bbox as [number, number, number, number] })),
-                modelClasses: [],
-                modelSource: "ready",
-              })
-            } else {
-              onAiStateChange({ enabled: true, detectedClass: "none", confidence: 0, allDetections: [], modelClasses: [], modelSource: "ready" })
-            }
-          } catch {
-            // Skip a frame if inference is busy.
-          } finally {
-            inFlightRef.current = false
-          }
-        }
-      } else if (model && store.model) {
-        const frame = captureVideoFrame()
-        if (frame) {
-          inFlightRef.current = true
-          try {
-            const prediction = await predictAiImage(frame, store.model)
-            if (prediction) {
-              setTestResult(prediction)
-              onAiStateChange({
-                enabled: true,
-                detectedClass: prediction.label,
-                confidence: prediction.confidence,
-                allDetections: [],
-                modelClasses: store.model.classes,
-                modelSource: "trained",
-              })
-            }
-          } finally {
-            inFlightRef.current = false
-          }
-        }
-      }
-
-      animationRef.current = requestAnimationFrame(detect)
-    }
-
-    animationRef.current = requestAnimationFrame(detect)
-    return () => {
-      if (animationRef.current) cancelAnimationFrame(animationRef.current)
-      animationRef.current = null
-    }
-  }, [cameraActive, tab, tryMode, model, store.model, onAiStateChange])
-
-  useEffect(() => {
-    if (!isOpen || tab !== "try" || tryMode !== "ready" || readyModelRef.current) return
     let cancelled = false
+    modeRunRef.current = readyMode
     setReadyLoading(true)
-    void cocoSsd
-      .load({ base: "lite_mobilenet_v2" })
-      .then((loaded) => {
-        if (cancelled) return
-        readyModelRef.current = loaded
-        setReadyLoaded(true)
+    setStatus(null)
+
+    const loadAndStart = async () => {
+      try {
+        if (readyMode === "objects") {
+          resourceRef.current = readyModelRef.current ?? await cocoSsd.load({ base: "lite_mobilenet_v2" })
+          readyModelRef.current = resourceRef.current
+        } else if (readyMode === "pose") {
+          resourceRef.current = await loadPoseDetector()
+        } else {
+          resourceRef.current = await loadHandDetector()
+        }
+
+        if (cancelled) {
+          disposeAiResource(resourceRef.current)
+          resourceRef.current = null
+          return
+        }
+
         setReadyLoading(false)
-      })
-      .catch(() => {
-        if (!cancelled) setReadyLoading(false)
-      })
+        startVisualLoop()
+      } catch (error) {
+        if (!cancelled) {
+          setReadyLoading(false)
+          setStatus(error instanceof Error ? error.message : `Could not start ${readyMode} AI.`)
+          setCameraActive(false)
+        }
+      }
+    }
+
+    void loadAndStart()
+
     return () => {
       cancelled = true
+      stopVisualLoop()
+      if (readyMode !== "objects") {
+        disposeAiResource(resourceRef.current)
+        resourceRef.current = null
+      }
     }
-  }, [isOpen, tab, tryMode])
+  }, [isOpen, tab, cameraActive, readyMode, tryMode])
 
   const train = async () => {
     if (!canTrain || training) return
