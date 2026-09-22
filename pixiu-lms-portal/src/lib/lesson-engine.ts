@@ -312,7 +312,10 @@ function readInputValue(node: Element, inputName: string): string | null {
     return (tag === "value" || tag === "statement") && child.getAttribute("name") === inputName
   })
   if (!holder) return null
-  const nestedBlock = Array.from(holder.children).find((child) => child.tagName.toLowerCase() === "block")
+  const nestedBlock = Array.from(holder.children).find((child) => {
+    const tag = child.tagName.toLowerCase()
+    return tag === "block" || tag === "shadow"
+  })
   if (!nestedBlock) return null
 
   const directFields = readOwnFields(nestedBlock)
