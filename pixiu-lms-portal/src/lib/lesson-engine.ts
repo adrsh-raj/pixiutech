@@ -287,6 +287,37 @@ function hasConnection(state: CircuitState, req: LessonConnectionRequirement) {
   )
 }
 
+function normalizeBlocklyValue(name: string, raw: string): string {
+  const value = raw.replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim()
+  if (["PIN", "TRIG", "ECHO", "ENA", "ENB", "IN1", "IN2", "IN3", "IN4"].includes(name)) {
+    const numeric = value.match(/^(A?\d+)/i)
+    if (numeric) return numeric[1].toUpperCase()
+  }
+  return value
+}
+
+function getNamedInputValue(node: Element, inputName: string): string | null {
+  const holder = Array.from(node.children).find((child) => {
+    const tag = child.tagName.toLowerCase()
+    return (tag === "value" || tag === "statement") && child.getAttribute("name") === inputName
+  })
+  if (!holder) return null
+  const nestedBlock = Array.from(holder.children).find((child) => child.tagName.toLowerCase() === "block")
+  if (!nestedBlock) return null
+
+  const numberField = Array.from(nestedBlock.getElementsByTagName("field")).find(
+    (field) => field.getAttribute("name") === "NUM",
+  )
+  if (numberField) return normalizeBlocklyValue("NUM", numberField.textContent || "")
+
+  const textField = Array.from(nestedBlock.getElementsByTagName("field")).find(
+    (field) => field.getAttribute("name") === "TEXT",
+  )
+  if (textField) return normalizeBlocklyValue("TEXT", textField.textContent || "")
+
+  return nestedBlock.getAttribute("type") || null
+}
+
 function extractBlocks(xml: string): Array<{
   type: string
   fields: Record<string, string>
