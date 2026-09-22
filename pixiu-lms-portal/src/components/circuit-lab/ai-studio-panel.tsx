@@ -130,7 +130,6 @@ export function AiStudioPanel({
   })
   const [label, setLabel] = useState("")
   const [testResult, setTestResult] = useState<Awaited<ReturnType<typeof predictAiImage>>>(null)
-  const [testImage, setTestImage] = useState<string | null>(null)
 
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const overlayRef = useRef<HTMLCanvasElement | null>(null)
@@ -154,7 +153,6 @@ export function AiStudioPanel({
     setStatus(null)
     setCameraError(null)
     setTestResult(null)
-    setTestImage(null)
     setTraining(false)
     setInputActive(false)
     setTab("try")
@@ -496,7 +494,6 @@ export function AiStudioPanel({
       return
     }
 
-    setTestImage(dataUrl)
     setLoading(true)
 
     try {
