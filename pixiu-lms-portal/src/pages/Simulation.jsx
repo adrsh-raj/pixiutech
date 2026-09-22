@@ -18,5 +18,7 @@ export default function Simulation() {
     return <Navigate to="/login" replace />;
   }
 
+  if (typeof document !== 'undefined') document.title = 'PIXIU CYBERLAB';
+
   return <Workbench />;
 }
