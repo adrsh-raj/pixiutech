@@ -106,7 +106,7 @@ export function AiStudioPanel({
   }, [store.model])
 
   useEffect(() => {
-    if (!isOpen || tab !== "try" || !cameraActive) {
+    if (!isOpen || !cameraActive) {
       stopCameraTracks()
       return
     }
