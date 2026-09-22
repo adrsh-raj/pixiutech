@@ -248,22 +248,27 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
     }
   }, [])
 
-  // Sync workspace only for genuinely external XML changes (starter/project loads).
-  // Never clear/recreate Blockly while the user is dragging a block.
+  // Sync the workspace for genuine external loads (starter/project changes), but
+  // debounce the prop before replacing blocks. During normal editing Blockly emits
+  // XML changes faster than React can echo them back; immediate rehydration makes a
+  // dragged block look glued to the pointer.
   useEffect(() => {
     const workspace = workspaceRef.current
     if (!workspace || !xml) return
+    if (xml === lastWorkspaceXmlRef.current) return
 
-    if (xml === lastWorkspaceXmlRef.current) {
-      pendingExternalXmlRef.current = null
-      return
-    }
-
-    pendingExternalXmlRef.current = xml
+    const expectedExternalXml = xml
+    let timer = 0
 
     const applyExternalXml = () => {
       const activeWorkspace = workspaceRef.current
       if (!activeWorkspace) return
+
+      // If Blockly has already emitted a newer workspace XML since this prop
+      // value arrived, this prop is a stale echo from our own edit. Ignore it.
+      if (lastWorkspaceXmlRef.current !== null && lastWorkspaceXmlRef.current !== expectedExternalXml) {
+        return
+      }
 
       const isDragging = typeof (activeWorkspace as any).isDragging === "function"
         ? Boolean((activeWorkspace as any).isDragging())
@@ -277,19 +282,18 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
       const currentDom = Blockly.Xml.workspaceToDom(activeWorkspace)
       const currentXml = Blockly.utils.xml.domToText(currentDom)
 
-      // If the workspace already reflects this change, just mark ownership.
-      if (currentXml === xml || lastWorkspaceXmlRef.current === xml) {
+      // The workspace may have caught up to the external value while React was
+      // waiting. In that case no DOM replacement is necessary.
+      if (currentXml === expectedExternalXml) {
         lastWorkspaceXmlRef.current = currentXml
-        pendingExternalXmlRef.current = null
         return
       }
 
       try {
         activeWorkspace.clear()
-        const dom = Blockly.utils.xml.textToDom(xml)
+        const dom = Blockly.utils.xml.textToDom(expectedExternalXml)
         Blockly.Xml.domToWorkspace(dom, activeWorkspace)
-        lastWorkspaceXmlRef.current = xml
-        pendingExternalXmlRef.current = null
+        lastWorkspaceXmlRef.current = expectedExternalXml
         const code = arduino.workspaceToCode(activeWorkspace)
         setCppCode(code)
 
@@ -300,13 +304,14 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
               (workspaceRef.current as any).scrollCenter()
             }
           }
-        }, 100)
+        }, 80)
       } catch (err) {
         console.error("Failed to sync XML to workspace:", err)
       }
     }
 
-    applyExternalXml()
+    timer = window.setTimeout(applyExternalXml, 120)
+    return () => window.clearTimeout(timer)
   }, [xml])
 
   useEffect(() => {
