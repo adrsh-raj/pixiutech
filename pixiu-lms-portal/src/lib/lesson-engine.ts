@@ -296,7 +296,17 @@ function normalizeBlocklyValue(name: string, raw: string): string {
   return value
 }
 
-function getNamedInputValue(node: Element, inputName: string): string | null {
+function readOwnFields(node: Element): Record<string, string> {
+  const fields: Record<string, string> = {}
+  Array.from(node.children).forEach((child) => {
+    if (child.tagName.toLowerCase() !== "field") return
+    const name = child.getAttribute("name")
+    if (name) fields[name] = normalizeBlocklyValue(name, child.textContent || "")
+  })
+  return fields
+}
+
+function readInputValue(node: Element, inputName: string): string | null {
   const holder = Array.from(node.children).find((child) => {
     const tag = child.tagName.toLowerCase()
     return (tag === "value" || tag === "statement") && child.getAttribute("name") === inputName
@@ -305,70 +315,66 @@ function getNamedInputValue(node: Element, inputName: string): string | null {
   const nestedBlock = Array.from(holder.children).find((child) => child.tagName.toLowerCase() === "block")
   if (!nestedBlock) return null
 
-  const numberField = Array.from(nestedBlock.getElementsByTagName("field")).find(
-    (field) => field.getAttribute("name") === "NUM",
-  )
-  if (numberField) return normalizeBlocklyValue("NUM", numberField.textContent || "")
-
-  const textField = Array.from(nestedBlock.getElementsByTagName("field")).find(
-    (field) => field.getAttribute("name") === "TEXT",
-  )
-  if (textField) return normalizeBlocklyValue("TEXT", textField.textContent || "")
-
+  const directFields = readOwnFields(nestedBlock)
+  if (directFields.NUM !== undefined) return directFields.NUM
+  if (directFields.TEXT !== undefined) return directFields.TEXT
   return nestedBlock.getAttribute("type") || null
 }
 
-function extractBlocks(xml: string): Array<{
+interface LessonXmlBlock {
   type: string
   fields: Record<string, string>
   inputs: Record<string, string>
-  connected: boolean
-}> {
+  attachedToProgram: boolean
+}
+
+function extractBlocks(xml: string): LessonXmlBlock[] {
   if (typeof DOMParser === "undefined") return []
   try {
     const doc = new DOMParser().parseFromString(xml, "text/xml")
     if (doc.querySelector("parsererror")) return []
 
-    return Array.from(doc.getElementsByTagName("block")).map((node) => {
-      const fields: Record<string, string> = {}
-      Array.from(node.getElementsByTagName("field")).forEach((field) => {
-        const name = field.getAttribute("name")
-        if (name) fields[name] = normalizeBlocklyValue(name, field.textContent || "")
-      })
+    const blocks: LessonXmlBlock[] = []
+    const visit = (node: Element, attachedToProgram: boolean) => {
+      if (node.tagName.toLowerCase() !== "block") return
 
       const inputs: Record<string, string> = {}
       Array.from(node.children).forEach((child) => {
-        const name = child.getAttribute("name")
-        if (!name) return
         const tag = child.tagName.toLowerCase()
-        if (tag === "value" || tag === "statement") {
-          const value = getNamedInputValue(node, name)
-          if (value !== null) inputs[name] = value
-        }
+        const name = child.getAttribute("name")
+        if (!name || (tag !== "value" && tag !== "statement")) return
+        const value = readInputValue(node, name)
+        if (value !== null) inputs[name] = value
       })
 
-      let connected = false
-      let parent: Element | null = node.parentElement
-      while (parent && parent.tagName.toLowerCase() !== "xml") {
-        if (parent.tagName.toLowerCase() === "block") {
-          connected = true
-          break
-        }
-        parent = parent.parentElement
-      }
-
-      return {
+      const current: LessonXmlBlock = {
         type: node.getAttribute("type") || "",
-        fields,
+        fields: readOwnFields(node),
         inputs,
-        connected,
+        attachedToProgram,
       }
-    })
+      blocks.push(current)
+
+      Array.from(node.children).forEach((child) => {
+        const tag = child.tagName.toLowerCase()
+        if (tag === "next" || tag === "statement" || tag === "value") {
+          Array.from(child.children)
+            .filter((element) => element.tagName.toLowerCase() === "block")
+            .forEach((childBlock) => visit(childBlock, attachedToProgram || current.type === "arduino_program"))
+        }
+      })
+    }
+
+    const topLevelBlocks = Array.from(doc.documentElement.children).filter(
+      (node) => node.tagName.toLowerCase() === "block",
+    )
+    topLevelBlocks.forEach((block) => visit(block, block.getAttribute("type") === "arduino_program"))
+
+    return blocks
   } catch {
     return []
   }
 }
-
 function matchesRuntimeValue(value: unknown, req: LessonRuntimeRequirement) {
   if (value === undefined || value === null) return false
   if (req.equals !== undefined) return value === req.equals
@@ -427,7 +433,7 @@ export function evaluateLessonStep(lesson: Lesson, step: LessonStep, context: Le
       for (const req of check.requirements) {
         const matchingBlocks = blocks.filter((block) => {
           if (block.type !== req.type) return false
-          if (req.connected !== false && !block.connected) return false
+          if (req.connected !== false && !block.attachedToProgram) return false
           if (req.fields && !Object.entries(req.fields).every(([name, value]) => normalizeBlocklyValue(name, block.fields[name] ?? "") === normalizeBlocklyValue(name, value))) {
             return false
           }
@@ -577,6 +583,7 @@ export const LESSONS: Lesson[] = [
         instructions: "Use two digital-write blocks on pin 13: HIGH and LOW, with a delay between them.",
         kind: "code",
         checks: [{ kind: "blocks", requirements: [
+          { type: "io_pinmode", count: 1, fields: { PIN: "13", MODE: "OUTPUT" } },
           { type: "io_digitalwrite", count: 1, fields: { PIN: "13", STATE: "HIGH" } },
           { type: "io_digitalwrite", count: 1, fields: { PIN: "13", STATE: "LOW" } },
           { type: "time_delay", count: 2 },
