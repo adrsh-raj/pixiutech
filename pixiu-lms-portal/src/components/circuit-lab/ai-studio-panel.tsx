@@ -555,8 +555,15 @@ export function AiStudioPanel({
                         </div>
 
                         <div className="mt-3 rounded-xl border border-violet-400/10 bg-violet-500/[0.04] p-3">
-                          <div className="flex items-center justify-between text-[10px] font-bold"><span>{canTrain ? "Ready to learn" : "Add more examples"}</span><span>{classes.length}/2+ concepts</span></div>
+                          <div className="flex items-center justify-between text-[10px] font-bold"><span>{canTrain ? "Ready to learn" : "Add more examples"}</span><span>{classes.length} concepts</span></div>
                           <p className="mt-1 text-[9px] leading-4 text-slate-500">Aim for 4–8 varied examples per concept. Front, side, near, far and different backgrounds help the model see more than one situation.</p>
+                          {store.model && !training && (
+                            <div className="mt-2 grid grid-cols-3 gap-1.5 text-center">
+                              <div className="rounded-lg bg-slate-900 px-2 py-1.5"><p className="text-[8px] text-slate-600">Train</p><p className="font-mono text-[10px] text-slate-300">{store.model.trainAccuracy}%</p></div>
+                              <div className="rounded-lg bg-slate-900 px-2 py-1.5"><p className="text-[8px] text-slate-600">Validate</p><p className="font-mono text-[10px] text-slate-300">{store.model.validationAccuracy}%</p></div>
+                              <div className="rounded-lg bg-slate-900 px-2 py-1.5"><p className="text-[8px] text-slate-600">Epochs</p><p className="font-mono text-[10px] text-slate-300">{store.model.epochs}</p></div>
+                            </div>
+                          )}
                           <button onClick={() => void train()} disabled={!canTrain || training} className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-violet-500 px-3 py-2.5 text-[10px] font-black text-white disabled:cursor-not-allowed disabled:opacity-30">
                             <Brain size={13} /> {training ? `Learning… ${trainingProgress.epoch}/${trainingProgress.total}` : store.model ? "Retrain my AI" : "Train my AI"}
                           </button>
