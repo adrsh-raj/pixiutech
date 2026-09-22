@@ -181,7 +181,7 @@ export function AiStudioPanel({
   }, [isOpen, tab, cameraActive, readyMode])
 
   useEffect(() => {
-    if (!isOpen || !cameraActive || tab !== "try" || readyMode !== "sound") return
+    if (!isOpen || !cameraActive || tab !== "try" || tryMode !== "ready" || readyMode !== "sound") return
 
     let cancelled = false
     setReadyLoading(true)
@@ -233,7 +233,7 @@ export function AiStudioPanel({
       stopSpeechRecognizer(resourceRef.current)
       resourceRef.current = null
     }
-  }, [isOpen, tab, cameraActive, readyMode, onAiStateChange])
+  }, [isOpen, tab, cameraActive, readyMode, tryMode, onAiStateChange])
 
   useEffect(() => {
     if (!isOpen || !cameraActive || tab !== "try" || readyMode === "sound") {
@@ -283,10 +283,10 @@ export function AiStudioPanel({
     return () => {
       cancelled = true
       stopVisualLoop()
-      if (tryMode !== "trained" && readyMode !== "objects") {
-        disposeAiResource(resourceRef.current)
-        resourceRef.current = null
-      }
+      const resource = resourceRef.current
+      if (resource) disposeAiResource(resource)
+      resourceRef.current = null
+      if (readyModelRef.current === resource) readyModelRef.current = null
     }
   }, [isOpen, tab, cameraActive, readyMode, tryMode, model, store.model])
 
