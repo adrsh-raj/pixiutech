@@ -787,7 +787,7 @@ export const LESSONS: Lesson[] = [
         checks: [
           { kind: "part-property", partType: "ultrasonic", property: "distance", max: 25 },
           { kind: "running" },
-          { kind: "runtime", requirements: [{ partId: "buzzer1", field: "level", min: 0.5 }] },
+          { kind: "runtime", requirements: [{ partType: "buzzer", field: "level", min: 0.5 }] },
         ],
         success: "Threshold reached: the virtual alarm is sounding.",
       },
