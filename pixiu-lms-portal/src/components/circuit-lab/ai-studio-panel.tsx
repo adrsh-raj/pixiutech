@@ -1,7 +1,7 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Camera, CameraOff, Brain, Check, ChevronRight, FlaskConical, Layers3, Play, Sparkles, Trash2, Upload, X, Zap } from "lucide-react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { Camera, CameraOff, Brain, ChevronRight, FlaskConical, Layers3, Play, Sparkles, Trash2, Upload, X, Zap } from "lucide-react"
 import * as cocoSsd from "@tensorflow-models/coco-ssd"
 import "@tensorflow/tfjs"
 import {
