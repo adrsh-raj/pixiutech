@@ -386,6 +386,29 @@ export function AiStudioPanel({
     setStatus("AI Studio reset.")
   }
 
+  const chooseTryMode = (nextMode: TryMode) => {
+    setCameraActive(false)
+    stopCameraTracks()
+    stopVisualLoop()
+    stopSpeechRecognizer(resourceRef.current)
+    if (resourceRef.current) disposeAiResource(resourceRef.current)
+    resourceRef.current = null
+
+    setTryMode(nextMode)
+    if (nextMode === "trained") setReadyMode("objects")
+    setStatus(null)
+    setTestResult(null)
+    onAiStateChange({
+      enabled: true,
+      mode: nextMode === "trained" ? "trained" : "objects",
+      detectedClass: "none",
+      confidence: 0,
+      allDetections: [],
+      modelClasses: nextMode === "trained" ? (store.model?.classes ?? []) : [],
+      modelSource: nextMode === "trained" ? "trained" : "ready",
+    })
+  }
+
   const runFilePrediction = async (dataUrl: string) => {
     if (!store.model) {
       setStatus("Train a model first.")
@@ -473,8 +496,8 @@ export function AiStudioPanel({
                         <p className="mt-1 text-xs leading-5 text-slate-500">Start simple. Use a ready-made AI now, or switch to your own trained model.</p>
                       </div>
                       <div className="flex rounded-xl border border-slate-800 bg-slate-950 p-1">
-                        <button onClick={() => setTryMode("ready")} className={`rounded-lg px-2.5 py-1.5 text-[10px] font-bold ${tryMode === "ready" ? "bg-slate-800 text-white" : "text-slate-500"}`}>Ready AI</button>
-                        <button disabled={!store.model} onClick={() => setTryMode("trained")} className={`rounded-lg px-2.5 py-1.5 text-[10px] font-bold ${tryMode === "trained" ? "bg-violet-600 text-white" : "text-slate-500"} disabled:opacity-30`}>My AI</button>
+                        <button onClick={() => chooseTryMode("ready")} className={`rounded-lg px-2.5 py-1.5 text-[10px] font-bold ${tryMode === "ready" ? "bg-slate-800 text-white" : "text-slate-500"}`}>Ready AI</button>
+                        <button disabled={!store.model} onClick={() => chooseTryMode("trained")} className={`rounded-lg px-2.5 py-1.5 text-[10px] font-bold ${tryMode === "trained" ? "bg-violet-600 text-white" : "text-slate-500"} disabled:opacity-30`}>My AI</button>
                       </div>
                     </div>
 
@@ -483,7 +506,7 @@ export function AiStudioPanel({
                         {READY_MODES.map(({ id, title, subtitle, icon: Icon }) => (
                           <button
                             key={id}
-                            onClick={() => { setCameraActive(false); setReadyMode(id); setStatus(null); setTestResult(null) }}
+                            onClick={() => { chooseTryMode("ready"); setReadyMode(id) }}
                             className={`rounded-2xl border p-3 text-left transition ${readyMode === id ? "border-violet-400/35 bg-violet-500/[0.08]" : "border-slate-800 bg-slate-950/40 hover:border-slate-700"}`}
                           >
                             <Icon size={16} className="text-violet-300" />
@@ -590,7 +613,7 @@ export function AiStudioPanel({
                         {cameraActive ? "Stop" : readyMode === "sound" ? "Start microphone" : "Start camera"}
                       </button>
                       {store.model && (
-                        <button onClick={() => setTryMode("trained")} className="inline-flex items-center gap-1.5 rounded-xl border border-violet-400/20 bg-violet-500/10 px-3 py-2 text-[10px] font-black text-violet-200">
+                        <button onClick={() => chooseTryMode("trained")} className="inline-flex items-center gap-1.5 rounded-xl border border-violet-400/20 bg-violet-500/10 px-3 py-2 text-[10px] font-black text-violet-200">
                           <Brain size={13} /> Use my model
                         </button>
                       )}
