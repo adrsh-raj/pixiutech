@@ -1143,10 +1143,10 @@ export function Workbench() {
               className={`flex flex-col items-center gap-0.5 p-1 transition active:scale-95 ${
                 isAiCameraOpen ? "text-purple-400 font-bold" : "text-muted-foreground hover:text-foreground"
               }`}
-              title="Toggle AI Camera"
+              title="Open AI Studio"
             >
               <Camera size={18} className={isAiCameraOpen ? "text-purple-400" : ""} />
-              <span className="text-[10px]">AI Cam</span>
+              <span className="text-[10px]">AI Studio</span>
             </button>
 
             <button

@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Camera, CameraOff, Brain, ChevronRight, FlaskConical, Layers3, Play, Sparkles, Trash2, Upload, X, Zap } from "lucide-react"
+import { Camera, CameraOff, Brain, ChevronRight, Ear, FlaskConical, Hand, Layers3, Mic, MicOff, Play, ScanFace, Sparkles, Trash2, Upload, X, Zap } from "lucide-react"
 import * as cocoSsd from "@tensorflow-models/coco-ssd"
 import "@tensorflow/tfjs"
 import {
@@ -19,15 +19,53 @@ import {
   trainAiModel,
   type AiStudioStore,
 } from "@/lib/ai-studio-engine"
+import {
+  disposeAiResource,
+  loadFaceEmotion,
+  loadHandDetector,
+  loadPoseDetector,
+  loadSpeechRecognizer,
+  stopSpeechRecognizer,
+} from "@/lib/ai-ready-runtime"
 import type * as tf from "@tensorflow/tfjs"
+
+export type ReadyAiMode = "objects" | "pose" | "hands" | "emotion" | "sound" | "numbers"
 
 export interface AiStudioVisionState {
   enabled: boolean
+  mode?: ReadyAiMode | "trained"
   detectedClass: string
   confidence: number
   allDetections?: { class: string; score: number; bbox: [number, number, number, number] }[]
   modelClasses?: string[]
   modelSource?: "ready" | "trained"
+  detail?: string
+}
+
+const READY_MODES: Array<{ id: ReadyAiMode; title: string; subtitle: string; icon: typeof Sparkles }> = [
+  { id: "objects", title: "Objects", subtitle: "See objects", icon: Sparkles },
+  { id: "pose", title: "Pose", subtitle: "Track body", icon: Layers3 },
+  { id: "hands", title: "Fingers", subtitle: "Count fingers", icon: Hand },
+  { id: "emotion", title: "Emotion", subtitle: "Expression demo", icon: ScanFace },
+  { id: "sound", title: "Sound", subtitle: "Hear words", icon: Ear },
+  { id: "numbers", title: "Numbers", subtitle: "0–5 by fingers", icon: Zap },
+]
+
+function modeLabel(mode: ReadyAiMode) {
+  return READY_MODES.find((item) => item.id === mode)?.title ?? "AI"
+}
+
+function fingerCount(landmarks: number[][]) {
+  const wrist = landmarks[0]
+  if (!wrist) return 0
+  const tipIds = [4, 8, 12, 16, 20]
+  const foldIds = [2, 6, 10, 14, 18]
+  const distance = (a: number[], b: number[]) => Math.hypot((a?.[0] ?? 0) - (b?.[0] ?? 0), (a?.[1] ?? 0) - (b?.[1] ?? 0))
+  return tipIds.reduce((count, tipId, index) => {
+    const tip = landmarks[tipId]
+    const fold = landmarks[foldIds[index]]
+    return tip && fold && distance(tip, wrist) > distance(fold, wrist) * 1.12 ? count + 1 : count
+  }, 0)
 }
 
 interface Props {
@@ -55,9 +93,9 @@ export function AiStudioPanel({
   const [store, setStore] = useState<AiStudioStore>(() => ({ samples: [], model: null }))
   const [model, setModel] = useState<tf.LayersModel | null>(null)
   const [cameraActive, setCameraActive] = useState(false)
+  const [readyMode, setReadyMode] = useState<ReadyAiMode>("objects")
   const [cameraError, setCameraError] = useState<string | null>(null)
   const [readyLoading, setReadyLoading] = useState(false)
-  const [readyLoaded, setReadyLoaded] = useState(false)
   const [training, setTraining] = useState(false)
   const [trainingProgress, setTrainingProgress] = useState({ epoch: 0, total: 0, accuracy: 0, loss: 0 })
   const [label, setLabel] = useState("")
@@ -71,9 +109,11 @@ export function AiStudioPanel({
   const sampleCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const readyModelRef = useRef<cocoSsd.ObjectDetection | null>(null)
+  const resourceRef = useRef<any>(null)
+  const modeRunRef = useRef<ReadyAiMode | null>(null)
   const animationRef = useRef<number | null>(null)
   const inFlightRef = useRef(false)
-  const lastDetectRef = useRef(0)
+  const lastDetectAtRef = useRef(0)
 
   const counts = useMemo(() => getSampleCounts(store.samples), [store.samples])
   const classes = useMemo(() => getAiClasses(store.samples), [store.samples])
@@ -103,139 +143,152 @@ export function AiStudioPanel({
   }, [store.model])
 
   useEffect(() => {
-    if (!isOpen || !cameraActive) {
+    if (!isOpen || !cameraActive || readyMode === "sound") {
       stopCameraTracks()
       return
     }
 
     let active = true
-    navigator.mediaDevices
-      ?.getUserMedia({
-        video: { width: { ideal: 640 }, height: { ideal: 360 }, facingMode: "user" },
-      })
-      .then((stream) => {
-        if (!active) {
-          stream.getTracks().forEach((track) => track.stop())
-          return
-        }
-        streamRef.current = stream
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream
-          void videoRef.current.play().catch(() => {})
-        }
-        setCameraError(null)
-      })
-      .catch(() => {
-        if (!active) return
-        setCameraError("Camera permission is needed for live AI.")
-        setCameraActive(false)
-      })
+    setCameraError(null)
+    navigator.mediaDevices?.getUserMedia({
+      video: {
+        width: { ideal: 480, max: 640 },
+        height: { ideal: 360, max: 480 },
+        frameRate: { ideal: 12, max: 15 },
+        facingMode: "user",
+      },
+    }).then((stream) => {
+      if (!active) {
+        stream.getTracks().forEach((track) => track.stop())
+        return
+      }
+      streamRef.current = stream
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+        void videoRef.current.play().catch(() => {})
+      }
+      setCameraError(null)
+    }).catch(() => {
+      if (!active) return
+      setCameraError("Camera permission is needed for this AI mode.")
+      setCameraActive(false)
+    })
 
     return () => {
       active = false
       stopCameraTracks()
     }
-  }, [isOpen, tab, cameraActive])
+  }, [isOpen, tab, cameraActive, readyMode])
 
   useEffect(() => {
-    if (!cameraActive || tab !== "try") {
-      if (animationRef.current) cancelAnimationFrame(animationRef.current)
-      animationRef.current = null
+    if (!isOpen || !cameraActive || tab !== "try" || readyMode !== "sound") return
+
+    let cancelled = false
+    setReadyLoading(true)
+    setStatus(null)
+    void loadSpeechRecognizer().then((recognizer) => {
+      if (cancelled) {
+        stopSpeechRecognizer(recognizer)
+        return
+      }
+      resourceRef.current = recognizer
+      setReadyLoading(false)
+      recognizer.listen(
+        (result: { scores: Float32Array | number[] }) => {
+          if (cancelled) return
+          const scores = Array.from(result.scores || [])
+          const labels = recognizer.wordLabels()
+          let bestIndex = 0
+          for (let i = 1; i < scores.length; i += 1) {
+            if ((scores[i] ?? 0) > (scores[bestIndex] ?? 0)) bestIndex = i
+          }
+          const confidence = Math.round((scores[bestIndex] ?? 0) * 100)
+          const word = labels[bestIndex] ?? "unknown"
+          onAiStateChange({
+            enabled: true,
+            mode: "sound",
+            detectedClass: word,
+            confidence,
+            allDetections: [],
+            modelClasses: labels,
+            modelSource: "ready",
+            detail: confidence >= 70 ? `Heard “${word}”` : "Listening…",
+          })
+        },
+        {
+          probabilityThreshold: 0.65,
+          invokeCallbackOnNoiseAndUnknown: true,
+          includeSpectrogram: false,
+        },
+      )
+    }).catch((error) => {
+      if (cancelled) return
+      setReadyLoading(false)
+      setStatus(error instanceof Error ? error.message : "Sound AI could not start.")
+      setCameraActive(false)
+    })
+
+    return () => {
+      cancelled = true
+      stopSpeechRecognizer(resourceRef.current)
+      resourceRef.current = null
+    }
+  }, [isOpen, tab, cameraActive, readyMode, onAiStateChange])
+
+  useEffect(() => {
+    if (!isOpen || !cameraActive || tab !== "try" || readyMode === "sound") {
+      stopVisualLoop()
       return
     }
 
-    const detect = async (time: number) => {
-      if (!videoRef.current || videoRef.current.readyState < 2) {
-        animationRef.current = requestAnimationFrame(detect)
-        return
-      }
-
-      if (time - lastDetectRef.current < 220 || inFlightRef.current) {
-        animationRef.current = requestAnimationFrame(detect)
-        return
-      }
-
-      lastDetectRef.current = time
-
-      if (tryMode === "ready") {
-        const detector = readyModelRef.current
-        if (detector && overlayRef.current) {
-          inFlightRef.current = true
-          try {
-            const predictions = await detector.detect(videoRef.current)
-            const valid = predictions.filter((item) => item.score >= 0.45)
-            drawDetections(valid.map((item) => ({ class: item.class, score: item.score, bbox: item.bbox as [number, number, number, number] })))
-            const primary = valid[0]
-            if (primary) {
-              onAiStateChange({
-                enabled: true,
-                detectedClass: primary.class,
-                confidence: Math.round(primary.score * 100),
-                allDetections: valid.map((item) => ({ class: item.class, score: item.score, bbox: item.bbox as [number, number, number, number] })),
-                modelClasses: [],
-                modelSource: "ready",
-              })
-            } else {
-              onAiStateChange({ enabled: true, detectedClass: "none", confidence: 0, allDetections: [], modelClasses: [], modelSource: "ready" })
-            }
-          } catch {
-            // Skip a frame if inference is busy.
-          } finally {
-            inFlightRef.current = false
-          }
-        }
-      } else if (model && store.model) {
-        const frame = captureVideoFrame()
-        if (frame) {
-          inFlightRef.current = true
-          try {
-            const prediction = await predictAiImage(frame, store.model)
-            if (prediction) {
-              setTestResult(prediction)
-              onAiStateChange({
-                enabled: true,
-                detectedClass: prediction.label,
-                confidence: prediction.confidence,
-                allDetections: [],
-                modelClasses: store.model.classes,
-                modelSource: "trained",
-              })
-            }
-          } finally {
-            inFlightRef.current = false
-          }
-        }
-      }
-
-      animationRef.current = requestAnimationFrame(detect)
-    }
-
-    animationRef.current = requestAnimationFrame(detect)
-    return () => {
-      if (animationRef.current) cancelAnimationFrame(animationRef.current)
-      animationRef.current = null
-    }
-  }, [cameraActive, tab, tryMode, model, store.model, onAiStateChange])
-
-  useEffect(() => {
-    if (!isOpen || tab !== "try" || tryMode !== "ready" || readyModelRef.current) return
     let cancelled = false
+    modeRunRef.current = readyMode
     setReadyLoading(true)
-    void cocoSsd
-      .load({ base: "lite_mobilenet_v2" })
-      .then((loaded) => {
-        if (cancelled) return
-        readyModelRef.current = loaded
-        setReadyLoaded(true)
+    setStatus(null)
+
+    const loadAndStart = async () => {
+      try {
+        if (tryMode === "trained") {
+          resourceRef.current = null
+        } else if (readyMode === "objects") {
+          resourceRef.current = readyModelRef.current ?? await cocoSsd.load({ base: "lite_mobilenet_v2" })
+          readyModelRef.current = resourceRef.current
+        } else if (readyMode === "pose") {
+          resourceRef.current = await loadPoseDetector()
+        } else if (readyMode === "emotion") {
+          resourceRef.current = await loadFaceEmotion()
+        } else {
+          resourceRef.current = await loadHandDetector()
+        }
+
+        if (cancelled) {
+          if (tryMode !== "trained" && readyMode !== "objects") disposeAiResource(resourceRef.current)
+          resourceRef.current = null
+          return
+        }
+
         setReadyLoading(false)
-      })
-      .catch(() => {
-        if (!cancelled) setReadyLoading(false)
-      })
+        startVisualLoop()
+      } catch (error) {
+        if (!cancelled) {
+          setReadyLoading(false)
+          setStatus(error instanceof Error ? error.message : `Could not start ${tryMode === "trained" ? "your model" : modeLabel(readyMode)}.`)
+          setCameraActive(false)
+        }
+      }
+    }
+
+    void loadAndStart()
+
     return () => {
       cancelled = true
+      stopVisualLoop()
+      if (tryMode !== "trained" && readyMode !== "objects") {
+        disposeAiResource(resourceRef.current)
+        resourceRef.current = null
+      }
     }
-  }, [isOpen, tab, tryMode])
+  }, [isOpen, tab, cameraActive, readyMode, tryMode, model, store.model])
 
   const train = async () => {
     if (!canTrain || training) return
@@ -316,12 +369,21 @@ export function AiStudioPanel({
   }
 
   const resetStudio = () => {
+    stopCameraTracks()
+    stopVisualLoop()
+    stopSpeechRecognizer(resourceRef.current)
+    disposeAiResource(resourceRef.current)
+    resourceRef.current = null
+    disposeAiResource(readyModelRef.current)
+    readyModelRef.current = null
     clearAiStudioStore()
     setStore({ samples: [], model: null })
     setModel(null)
     setTryMode("ready")
+    setReadyMode("objects")
+    setCameraActive(false)
     setTestResult(null)
-    setStatus("AI Studio reset. Your saved examples and model were cleared.")
+    setStatus("AI Studio reset.")
   }
 
   const runFilePrediction = async (dataUrl: string) => {
@@ -343,6 +405,17 @@ export function AiStudioPanel({
       })
     }
   }
+
+  useEffect(() => {
+    if (isOpen) return
+    stopCameraTracks()
+    stopVisualLoop()
+    stopSpeechRecognizer(resourceRef.current)
+    disposeAiResource(resourceRef.current)
+    resourceRef.current = null
+    disposeAiResource(readyModelRef.current)
+    readyModelRef.current = null
+  }, [isOpen])
 
   if (!isOpen) return null
 
@@ -405,10 +478,26 @@ export function AiStudioPanel({
                       </div>
                     </div>
 
+                    {tryMode === "ready" && (
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+                        {READY_MODES.map(({ id, title, subtitle, icon: Icon }) => (
+                          <button
+                            key={id}
+                            onClick={() => { setCameraActive(false); setReadyMode(id); setStatus(null); setTestResult(null) }}
+                            className={`rounded-2xl border p-3 text-left transition ${readyMode === id ? "border-violet-400/35 bg-violet-500/[0.08]" : "border-slate-800 bg-slate-950/40 hover:border-slate-700"}`}
+                          >
+                            <Icon size={16} className="text-violet-300" />
+                            <p className="mt-2 text-[11px] font-black">{title}</p>
+                            <p className="mt-0.5 text-[9px] leading-4 text-slate-600">{subtitle}</p>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
                     <div className="grid gap-4 lg:grid-cols-[1.35fr_0.65fr]">
                       <div className="overflow-hidden rounded-2xl border border-slate-800 bg-black">
                         <div className="relative aspect-video">
-                          {cameraActive ? (
+                          {cameraActive && readyMode !== "sound" ? (
                             <>
                               <video ref={videoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
                               <canvas ref={overlayRef} className="absolute inset-0 h-full w-full pointer-events-none" />
@@ -416,21 +505,23 @@ export function AiStudioPanel({
                           ) : (
                             <div className="absolute inset-0 grid place-items-center p-6 text-center">
                               <div>
-                                <Camera size={28} className="mx-auto text-violet-300" />
-                                <p className="mt-3 text-sm font-bold">Camera off</p>
-                                <p className="mt-1 max-w-xs text-[11px] leading-5 text-slate-500">Nothing starts until you press the camera button.</p>
+                                {readyMode === "sound" ? <Mic size={28} className="mx-auto text-violet-300" /> : <Camera size={28} className="mx-auto text-violet-300" />}
+                                <p className="mt-3 text-sm font-bold">{readyMode === "sound" ? "Microphone off" : "Camera off"}</p>
+                                <p className="mt-1 max-w-xs text-[11px] leading-5 text-slate-500">
+                                  {readyMode === "sound" ? "Sound AI listens only after you start the microphone." : "Nothing loads until you press Start."}
+                                </p>
                               </div>
                             </div>
                           )}
                           <div className="absolute left-3 top-3 flex items-center gap-2 rounded-full border border-slate-700 bg-slate-950/80 px-2.5 py-1 text-[9px] font-mono">
-                            <span className={tryMode === "ready" && readyLoaded ? "text-emerald-300" : tryMode === "trained" && model ? "text-emerald-300" : "text-amber-300"}>
-                              {tryMode === "ready" ? (readyLoading ? "loading ready AI" : readyLoaded ? "ready AI" : "ready AI off") : model ? "my model ready" : "train a model"}
+                            <span className={readyLoading ? "text-amber-300" : cameraActive ? "text-emerald-300" : "text-slate-400"}>
+                              {readyLoading ? "loading model" : cameraActive ? (tryMode === "trained" ? "my AI live" : `${modeLabel(readyMode)} live`) : "ready"}
                             </span>
                           </div>
                         </div>
                         <div className="flex items-center justify-between gap-2 border-t border-slate-800 px-3 py-2">
                           <div className="min-w-0">
-                            <p className="text-[9px] font-mono uppercase tracking-[0.16em] text-slate-600">{tryMode === "ready" ? "Perception" : "Learning"}</p>
+                            <p className="text-[9px] font-mono uppercase tracking-[0.16em] text-slate-600">{tryMode === "ready" ? modeLabel(readyMode) : "Learning"}</p>
                             <p className="truncate text-xs font-bold text-slate-200">{aiState.detectedClass === "none" ? "Looking..." : aiState.detectedClass}</p>
                           </div>
                           <span className="font-mono text-xs font-black text-violet-300">{aiState.confidence ? `${aiState.confidence}%` : "—"}</span>
@@ -455,6 +546,7 @@ export function AiStudioPanel({
                           )}
                         </div>
 
+                      {tryMode === "trained" && (
                         <label className="block rounded-2xl border border-dashed border-slate-700 bg-slate-950/35 p-4 cursor-pointer hover:border-violet-400/30">
                           <div className="flex items-center gap-2"><Upload size={14} className="text-violet-300" /><span className="text-xs font-black">Test an image</span></div>
                           <p className="mt-1 text-[10px] leading-5 text-slate-500">Use this to test a trained model without changing your dataset.</p>
@@ -470,6 +562,7 @@ export function AiStudioPanel({
                             reader.readAsDataURL(file)
                           }} />
                         </label>
+                      )}
 
                         {testImage && testResult && (
                           <div className="rounded-2xl border border-violet-400/15 bg-violet-500/[0.04] p-3">
@@ -493,8 +586,8 @@ export function AiStudioPanel({
 
                     <div className="flex flex-wrap gap-2">
                       <button onClick={() => setCameraActive((value) => !value)} className="inline-flex items-center gap-1.5 rounded-xl bg-violet-500 px-3 py-2 text-[10px] font-black text-white hover:bg-violet-400">
-                        {cameraActive ? <CameraOff size={13} /> : <Camera size={13} />}
-                        {cameraActive ? "Stop camera" : "Start camera"}
+                        {cameraActive ? (readyMode === "sound" ? <MicOff size={13} /> : <CameraOff size={13} />) : (readyMode === "sound" ? <Mic size={13} /> : <Camera size={13} />)}
+                        {cameraActive ? "Stop" : readyMode === "sound" ? "Start microphone" : "Start camera"}
                       </button>
                       {store.model && (
                         <button onClick={() => setTryMode("trained")} className="inline-flex items-center gap-1.5 rounded-xl border border-violet-400/20 bg-violet-500/10 px-3 py-2 text-[10px] font-black text-violet-200">
@@ -668,28 +761,251 @@ export function AiStudioPanel({
     return canvas.toDataURL("image/jpeg", 0.76)
   }
 
-  function drawDetections(detections: AiStudioVisionState["allDetections"]) {
+  function startVisualLoop() {
+    stopVisualLoop()
+    const tick = async (time: number) => {
+      if (!cameraActive || tab !== "try" || tryMode !== "ready") return
+      if (frameBusyRef.current || time - lastDetectAtRef.current < 220) {
+        animationRef.current = requestAnimationFrame(tick)
+        return
+      }
+      const video = videoRef.current
+      const detector = resourceRef.current
+      if (!video || video.readyState < 2 || (tryMode !== "trained" && !detector)) {
+        animationRef.current = requestAnimationFrame(tick)
+        return
+      }
+
+      lastDetectAtRef.current = time
+      frameBusyRef.current = true
+      try {
+        if (tryMode === "trained" && model && store.model) {
+          const frame = captureVideoFrame()
+          if (frame) {
+            const prediction = await predictAiImage(frame, store.model)
+            onAiStateChange({
+              enabled: true,
+              mode: "trained",
+              detectedClass: prediction?.label ?? "none",
+              confidence: prediction?.confidence ?? 0,
+              allDetections: [],
+              modelClasses: store.model.classes,
+              modelSource: "trained",
+              detail: prediction ? Object.entries(prediction.probabilities).map(([name, value]) => `${name} ${value}%`).join(" · ") : "Looking…",
+            })
+          }
+        } else if (modeRunRef.current === "objects") {
+          const predictions = await detector.detect(video)
+          const valid = predictions.filter((item: any) => item.score >= 0.45)
+          drawDetections(valid.map((item: any) => ({ class: item.class, score: item.score, bbox: item.bbox as [number, number, number, number] })))
+          const best = valid[0]
+          onAiStateChange({
+            enabled: true,
+            mode: "objects",
+            detectedClass: best?.class ?? "none",
+            confidence: Math.round((best?.score ?? 0) * 100),
+            allDetections: valid.map((item: any) => ({ class: item.class, score: item.score, bbox: item.bbox as [number, number, number, number] })),
+            modelClasses: [],
+            modelSource: "ready",
+            detail: best ? `${valid.length} object${valid.length === 1 ? "" : "s"}` : "Looking…",
+          })
+        } else if (modeRunRef.current === "pose") {
+          const poses = await detector.estimatePoses(video, { flipHorizontal: true })
+          drawPose(poses[0])
+          const keypoints = poses[0]?.keypoints ?? []
+          const confident = keypoints.filter((point: any) => (point.score ?? 0) >= 0.45)
+          const leftWrist = keypoints.find((point: any) => /left.*wrist/i.test(point.name ?? ""))
+          const rightWrist = keypoints.find((point: any) => /right.*wrist/i.test(point.name ?? ""))
+          const leftShoulder = keypoints.find((point: any) => /left.*shoulder/i.test(point.name ?? ""))
+          const rightShoulder = keypoints.find((point: any) => /right.*shoulder/i.test(point.name ?? ""))
+          const handsUp = Boolean(
+            (leftWrist && leftShoulder && leftWrist.y < leftShoulder.y) ||
+            (rightWrist && rightShoulder && rightWrist.y < rightShoulder.y),
+          )
+          onAiStateChange({
+            enabled: true,
+            mode: "pose",
+            detectedClass: poses[0] ? (handsUp ? "hands-up" : "person") : "none",
+            confidence: Math.round((poses[0]?.score ?? confident[0]?.score ?? 0) * 100),
+            allDetections: [],
+            modelClasses: ["person", "hands-up"],
+            modelSource: "ready",
+            detail: poses[0] ? `${confident.length} keypoints${handsUp ? " · hands up" : ""}` : "Show a person",
+          })
+        } else if (modeRunRef.current === "emotion") {
+          const faceapi = detector
+          const detections = await faceapi
+            .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.5 }))
+            .withFaceExpressions()
+          const first = detections[0]
+          if (first) {
+            const expressions = first.expressions as Record<string, number>
+            const top = Object.entries(expressions).sort((a, b) => b[1] - a[1])[0]
+            const box = first.detection.box
+            drawEmotion(expressions, box)
+            onAiStateChange({
+              enabled: true,
+              mode: "emotion",
+              detectedClass: top?.[0] ?? "neutral",
+              confidence: Math.round((top?.[1] ?? 0) * 100),
+              allDetections: [],
+              modelClasses: Object.keys(expressions),
+              modelSource: "ready",
+              detail: "Expression estimate · keep still for a moment",
+            })
+          } else {
+            clearOverlay()
+            onAiStateChange({
+              enabled: true,
+              mode: "emotion",
+              detectedClass: "none",
+              confidence: 0,
+              allDetections: [],
+              modelClasses: [],
+              modelSource: "ready",
+              detail: "Show your face",
+            })
+          }
+        } else {
+          const hands = await detector.estimateHands(video, { flipHorizontal: true })
+          drawHands(hands[0])
+          const hand = hands[0]
+          const landmarks = hand?.landmarks ?? []
+          const fingers = hand ? fingerCount(landmarks) : 0
+          const mode = modeRunRef.current === "numbers" ? "numbers" : "hands"
+          onAiStateChange({
+            enabled: true,
+            mode,
+            detectedClass: hand ? (mode === "numbers" ? String(fingers) : "hand") : "none",
+            confidence: Math.round((hand?.handInViewConfidence ?? 0) * 100),
+            allDetections: [],
+            modelClasses: mode === "numbers" ? ["0", "1", "2", "3", "4", "5"] : ["hand"],
+            modelSource: "ready",
+            detail: hand ? `${fingers} finger${fingers === 1 ? "" : "s"} extended` : "Show one hand",
+          })
+        }
+      } catch {
+        // A slow/failed frame must not kill the render loop.
+      } finally {
+        frameBusyRef.current = false
+        animationRef.current = requestAnimationFrame(tick)
+      }
+    }
+    animationRef.current = requestAnimationFrame(tick)
+  }
+
+  function stopVisualLoop() {
+    if (animationRef.current) cancelAnimationFrame(animationRef.current)
+    animationRef.current = null
+    frameBusyRef.current = false
+    modeRunRef.current = null
+    if (overlayRef.current) {
+      const ctx = overlayRef.current.getContext("2d")
+      ctx?.clearRect(0, 0, overlayRef.current.width, overlayRef.current.height)
+    }
+  }
+
+  function clearOverlay() {
+    const canvas = overlayRef.current
+    if (!canvas) return
+    canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height)
+  }
+
+  function prepareOverlay() {
     const canvas = overlayRef.current
     const video = videoRef.current
-    if (!canvas || !video) return
-    canvas.width = video.videoWidth || 640
+    if (!canvas || !video) return null
+    canvas.width = video.videoWidth || 480
     canvas.height = video.videoHeight || 360
     const ctx = canvas.getContext("2d")
-    if (!ctx) return
+    if (!ctx) return null
     ctx.clearRect(0, 0, canvas.width, canvas.height)
+    ctx.lineCap = "round"
+    ctx.lineJoin = "round"
+    ctx.strokeStyle = "#a78bfa"
+    ctx.fillStyle = "#a78bfa"
+    return ctx
+  }
+
+  function drawDetections(detections: AiStudioVisionState["allDetections"]) {
+    const ctx = prepareOverlay()
+    if (!ctx) return
     detections?.forEach((item) => {
       const [x, y, w, h] = item.bbox
       ctx.strokeStyle = "#a78bfa"
       ctx.lineWidth = 3
       ctx.strokeRect(x, y, w, h)
-      ctx.fillStyle = "rgba(167, 139, 250, 0.9)"
-      const text = `${item.class.toUpperCase()} ${Math.round(item.score * 100)}%`
+      const label = `${item.class} ${Math.round(item.score * 100)}%`
       ctx.font = "bold 12px monospace"
-      const width = ctx.measureText(text).width + 12
+      const width = ctx.measureText(label).width + 12
+      ctx.fillStyle = "rgba(167,139,250,0.9)"
       ctx.fillRect(x, Math.max(0, y - 21), width, 21)
       ctx.fillStyle = "#09090b"
-      ctx.fillText(text, x + 6, Math.max(15, y - 6))
+      ctx.fillText(label, x + 6, Math.max(15, y - 6))
     })
+  }
+
+  function drawPose(pose: any) {
+    const ctx = prepareOverlay()
+    if (!ctx || !pose) return
+    const keypoints = pose.keypoints || []
+    const byName = new Map(keypoints.map((point: any) => [point.name, point]))
+    const edges = [
+      ["left_shoulder", "right_shoulder"], ["left_shoulder", "left_elbow"], ["left_elbow", "left_wrist"],
+      ["right_shoulder", "right_elbow"], ["right_elbow", "right_wrist"], ["left_shoulder", "left_hip"],
+      ["right_shoulder", "right_hip"], ["left_hip", "right_hip"], ["left_hip", "left_knee"],
+      ["left_knee", "left_ankle"], ["right_hip", "right_knee"], ["right_knee", "right_ankle"],
+    ]
+    edges.forEach(([a, b]) => {
+      const p = byName.get(a) as any
+      const q = byName.get(b) as any
+      if ((p?.score ?? 0) < 0.4 || (q?.score ?? 0) < 0.4) return
+      ctx.beginPath()
+      ctx.moveTo(p.x, p.y)
+      ctx.lineTo(q.x, q.y)
+      ctx.stroke()
+    })
+    keypoints.forEach((point: any) => {
+      if ((point.score ?? 0) < 0.4) return
+      ctx.beginPath()
+      ctx.arc(point.x, point.y, 4, 0, Math.PI * 2)
+      ctx.fill()
+    })
+  }
+
+  function drawHands(hand: any) {
+    const ctx = prepareOverlay()
+    if (!ctx || !hand) return
+    const edges = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[0,9],[9,10],[10,11],[11,12],[0,13],[13,14],[14,15],[15,16],[0,17],[17,18],[18,19],[19,20],[5,9],[9,13],[13,17]]
+    edges.forEach(([a,b]) => {
+      const p = hand.landmarks?.[a]
+      const q = hand.landmarks?.[b]
+      if (!p || !q) return
+      ctx.beginPath()
+      ctx.moveTo(p[0], p[1])
+      ctx.lineTo(q[0], q[1])
+      ctx.stroke()
+    })
+    hand.landmarks?.forEach((point: number[]) => {
+      ctx.beginPath()
+      ctx.arc(point[0], point[1], 3, 0, Math.PI * 2)
+      ctx.fill()
+    })
+  }
+
+  function drawEmotion(expressions: Record<string, number>, box: { x: number; y: number; width: number; height: number }) {
+    const ctx = prepareOverlay()
+    if (!ctx) return
+    ctx.strokeRect(box.x, box.y, box.width, box.height)
+    const top = Object.entries(expressions).sort((a, b) => b[1] - a[1])[0]
+    if (!top) return
+    const label = `${top[0]} ${Math.round(top[1] * 100)}%`
+    ctx.font = "bold 12px monospace"
+    const width = ctx.measureText(label).width + 12
+    ctx.fillStyle = "rgba(167,139,250,0.9)"
+    ctx.fillRect(box.x, Math.max(0, box.y - 21), width, 21)
+    ctx.fillStyle = "#09090b"
+    ctx.fillText(label, box.x + 6, Math.max(15, box.y - 6))
   }
 
   function stopCameraTracks() {
@@ -698,4 +1014,5 @@ export function AiStudioPanel({
       streamRef.current = null
     }
   }
+
 }
