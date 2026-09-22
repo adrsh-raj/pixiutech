@@ -764,8 +764,8 @@ export function AiStudioPanel({
   function startVisualLoop() {
     stopVisualLoop()
     const tick = async (time: number) => {
-      if (!cameraActive || tab !== "try" || tryMode !== "ready") return
-      if (frameBusyRef.current || time - lastDetectAtRef.current < 220) {
+      if (!cameraActive || tab !== "try") return
+      if (inFlightRef.current || time - lastDetectAtRef.current < 220) {
         animationRef.current = requestAnimationFrame(tick)
         return
       }
@@ -777,7 +777,7 @@ export function AiStudioPanel({
       }
 
       lastDetectAtRef.current = time
-      frameBusyRef.current = true
+      inFlightRef.current = true
       try {
         if (tryMode === "trained" && model && store.model) {
           const frame = captureVideoFrame()
@@ -887,7 +887,7 @@ export function AiStudioPanel({
       } catch {
         // A slow/failed frame must not kill the render loop.
       } finally {
-        frameBusyRef.current = false
+        inFlightRef.current = false
         animationRef.current = requestAnimationFrame(tick)
       }
     }
@@ -897,7 +897,7 @@ export function AiStudioPanel({
   function stopVisualLoop() {
     if (animationRef.current) cancelAnimationFrame(animationRef.current)
     animationRef.current = null
-    frameBusyRef.current = false
+    inFlightRef.current = false
     modeRunRef.current = null
     if (overlayRef.current) {
       const ctx = overlayRef.current.getContext("2d")
