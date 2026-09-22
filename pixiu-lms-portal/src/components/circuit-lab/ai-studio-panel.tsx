@@ -232,7 +232,7 @@ export function AiStudioPanel({
   }, [isOpen, tab, cameraActive, readyMode, onAiStateChange])
 
   useEffect(() => {
-    if (!isOpen || !cameraActive || tab !== "try" || readyMode === "sound" || tryMode !== "ready") {
+    if (!isOpen || !cameraActive || tab !== "try" || readyMode === "sound") {
       stopVisualLoop()
       return
     }
@@ -244,7 +244,9 @@ export function AiStudioPanel({
 
     const loadAndStart = async () => {
       try {
-        if (readyMode === "objects") {
+        if (tryMode === "trained") {
+          resourceRef.current = null
+        } else if (readyMode === "objects") {
           resourceRef.current = readyModelRef.current ?? await cocoSsd.load({ base: "lite_mobilenet_v2" })
           readyModelRef.current = resourceRef.current
         } else if (readyMode === "pose") {
@@ -256,7 +258,7 @@ export function AiStudioPanel({
         }
 
         if (cancelled) {
-          disposeAiResource(resourceRef.current)
+          if (tryMode !== "trained" && readyMode !== "objects") disposeAiResource(resourceRef.current)
           resourceRef.current = null
           return
         }
@@ -266,7 +268,7 @@ export function AiStudioPanel({
       } catch (error) {
         if (!cancelled) {
           setReadyLoading(false)
-          setStatus(error instanceof Error ? error.message : `Could not start ${readyMode} AI.`)
+          setStatus(error instanceof Error ? error.message : `Could not start ${tryMode === "trained" ? "your model" : modeLabel(readyMode)}.`)
           setCameraActive(false)
         }
       }
@@ -277,12 +279,12 @@ export function AiStudioPanel({
     return () => {
       cancelled = true
       stopVisualLoop()
-      if (readyMode !== "objects") {
+      if (tryMode !== "trained" && readyMode !== "objects") {
         disposeAiResource(resourceRef.current)
         resourceRef.current = null
       }
     }
-  }, [isOpen, tab, cameraActive, readyMode, tryMode])
+  }, [isOpen, tab, cameraActive, readyMode, tryMode, model, store.model])
 
   const train = async () => {
     if (!canTrain || training) return
@@ -733,7 +735,22 @@ export function AiStudioPanel({
       lastDetectAtRef.current = time
       frameBusyRef.current = true
       try {
-        if (modeRunRef.current === "objects") {
+        if (tryMode === "trained" && model && store.model) {
+          const frame = captureVideoFrame()
+          if (frame) {
+            const prediction = await predictAiImage(frame, store.model)
+            onAiStateChange({
+              enabled: true,
+              mode: "trained",
+              detectedClass: prediction?.label ?? "none",
+              confidence: prediction?.confidence ?? 0,
+              allDetections: [],
+              modelClasses: store.model.classes,
+              modelSource: "trained",
+              detail: prediction ? Object.entries(prediction.probabilities).map(([name, value]) => `${name} ${value}%`).join(" · ") : "Looking…",
+            })
+          }
+        } else if (modeRunRef.current === "objects") {
           const predictions = await detector.detect(video)
           const valid = predictions.filter((item: any) => item.score >= 0.45)
           drawDetections(valid.map((item: any) => ({ class: item.class, score: item.score, bbox: item.bbox as [number, number, number, number] })))
