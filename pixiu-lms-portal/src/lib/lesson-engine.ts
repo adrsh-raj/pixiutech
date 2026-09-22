@@ -186,39 +186,105 @@ function endpointMatches(state: CircuitState, endpoint: LessonEndpoint, actual: 
   return pinMatches(part.type, endpoint.pinId, actual.pinId)
 }
 
+function addBreadboardEdges(
+  state: CircuitState,
+  graph: Map<string, Set<string>>,
+  breadboard: Extract<PartType, "breadboard">,
+) {
+  const part = state.parts.find((item) => item.type === breadboard)
+  if (!part) return
+  const link = (a: string, b: string) => {
+    const u = `${part.id}:${a}`
+    const v = `${part.id}:${b}`
+    if (!graph.has(u)) graph.set(u, new Set())
+    if (!graph.has(v)) graph.set(v, new Set())
+    graph.get(u)!.add(v)
+    graph.get(v)!.add(u)
+  }
+
+  for (let column = 1; column <= 20; column++) {
+    ;(["a", "b", "c", "d", "e"] as const).forEach((row, index, rows) => {
+      if (index < rows.length - 1) link(`${row}_${column}`, `${rows[index + 1]}_${column}`)
+    })
+    ;(["f", "g", "h", "i", "j"] as const).forEach((row, index, rows) => {
+      if (index < rows.length - 1) link(`${row}_${column}`, `${rows[index + 1]}_${column}`)
+    })
+    if (column < 20) {
+      link(`pos_t_${column}`, `pos_t_${column + 1}`)
+      link(`neg_t_${column}`, `neg_t_${column + 1}`)
+      link(`pos_b_${column}`, `pos_b_${column + 1}`)
+      link(`neg_b_${column}`, `neg_b_${column + 1}`)
+    }
+  }
+
+  link("pos_top", "pos_t_1")
+  link("neg_top", "neg_t_1")
+  link("pos_bot", "pos_b_1")
+  link("neg_bot", "neg_b_1")
+  link("a1", "a_3")
+  link("b1", "b_3")
+  link("c1", "c_3")
+  link("d1", "d_3")
+  link("e1", "e_3")
+  link("a2", "f_3")
+  link("b2", "g_3")
+  link("c2", "h_3")
+  link("d2", "i_3")
+  link("e2", "j_3")
+}
+
+function endpointKey(ref: PinRef) {
+  return `${ref.partId}:${ref.pinId}`
+}
+
+function areOnSameNet(state: CircuitState, a: LessonEndpoint, b: LessonEndpoint) {
+  const graph = new Map<string, Set<string>>()
+  const link = (u: string, v: string) => {
+    if (!graph.has(u)) graph.set(u, new Set())
+    if (!graph.has(v)) graph.set(v, new Set())
+    graph.get(u)!.add(v)
+    graph.get(v)!.add(u)
+  }
+
+  for (const wire of state.wires) {
+    link(endpointKey(wire.from), endpointKey(wire.to))
+  }
+
+  for (const part of state.parts) {
+    if (part.type === "breadboard") {
+      addBreadboardEdges(state, graph, "breadboard")
+      break
+    }
+  }
+
+  const aKeys = state.wires.flatMap((wire) => [wire.from, wire.to]).filter((ref) => endpointMatches(state, a, ref))
+  const bKeys = state.wires.flatMap((wire) => [wire.from, wire.to]).filter((ref) => endpointMatches(state, b, ref))
+  const queue = aKeys.map(endpointKey)
+  const visited = new Set(queue)
+  while (queue.length) {
+    const current = queue.shift()!
+    if (bKeys.some((ref) => endpointKey(ref) === current)) return true
+    for (const next of graph.get(current) ?? []) {
+      if (!visited.has(next)) {
+        visited.add(next)
+        queue.push(next)
+      }
+    }
+  }
+  return false
+}
 function hasConnection(state: CircuitState, req: LessonConnectionRequirement) {
-  const matches = (a: LessonConnectionRequirement["from"], b: LessonConnectionRequirement["to"]) =>
+  const directMatches = (a: LessonConnectionRequirement["from"], b: LessonConnectionRequirement["to"]) =>
     state.wires.some((wire) =>
       endpointMatches(state, a, wire.from) &&
       endpointMatches(state, b, wire.to),
     )
-  return matches(req.from, req.to) || matches(req.to, req.from)
-}
 
-function normalizeBlocklyValue(name: string, raw: string): string {
-  const value = raw.replace(/\\u00a0/g, " ").replace(/\\s+/g, " ").trim()
-  if (["PIN", "TRIG", "ECHO", "ENA", "ENB", "IN1", "IN2", "IN3", "IN4"].includes(name)) {
-    const numeric = value.match(/^(A?\\d+)/i)
-    if (numeric) return numeric[1].toUpperCase()
-  }
-  return value
-}
-
-function getNamedInputValue(node: Element, inputName: string): string | null {
-  const children = Array.from(node.children)
-  const holder = children.find((child) => {
-    const tag = child.tagName.toLowerCase()
-    return (tag === "value" || tag === "statement") && child.getAttribute("name") === inputName
-  })
-  if (!holder) return null
-  const nestedBlock = Array.from(holder.children).find((child) => child.tagName.toLowerCase() === "block")
-  if (!nestedBlock) return null
-  const nestedFields = Array.from(nestedBlock.getElementsByTagName("field"))
-  const numberField = nestedFields.find((field) => field.getAttribute("name") === "NUM")
-  if (numberField) return normalizeBlocklyValue("NUM", numberField.textContent || "")
-  const textField = nestedFields.find((field) => field.getAttribute("name") === "TEXT")
-  if (textField) return normalizeBlocklyValue("TEXT", textField.textContent || "")
-  return nestedBlock.getAttribute("type") || null
+  return (
+    directMatches(req.from, req.to) ||
+    directMatches(req.to, req.from) ||
+    areOnSameNet(state, req.from, req.to)
+  )
 }
 
 function extractBlocks(xml: string): Array<{
