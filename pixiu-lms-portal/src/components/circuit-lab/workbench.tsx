@@ -25,7 +25,8 @@ import { SerialMonitor, type SerialLine } from "./serial-monitor"
 import { StatusBar } from "./status-bar"
 import { TemplateBrowser } from "./template-browser"
 import { LessonBrowser } from "./lesson-browser"
-import type { AiStudioVisionState } from "./ai-studio-panel"
+import { AiCameraPanel } from "./ai-camera-panel"
+import type { AiVisionState } from "@/lib/ai/vision-types"
 const AiStudioPanel = lazy(() => import("./ai-studio-panel").then((module) => ({ default: module.AiStudioPanel })))
 import { ContextMenu, type ContextMenuTarget } from "./context-menu"
 import type { ProjectTemplate } from "@/lib/templates"
@@ -70,8 +71,8 @@ export function Workbench() {
   const [isLessonsOpen, setIsLessonsOpen] = useState(false)
   const [activeLessonId, setActiveLessonId] = useState<string | null>(null)
   const [isAiCameraOpen, setIsAiCameraOpen] = useState(false)
+  const [isAiStudioOpen, setIsAiStudioOpen] = useState(false)
   const [aiRuntimeEnabled, setAiRuntimeEnabled] = useState(false)
-  const [aiCameraCompact, setAiCameraCompact] = useState(false)
   const [isInspectorOpen, setIsInspectorOpen] = useState(true)
   const [mobilePaletteOpen, setMobilePaletteOpen] = useState(false)
   const [contextMenu, setContextMenu] = useState<{
@@ -174,10 +175,14 @@ export function Workbench() {
     e.preventDefault()
     setContextMenu({ x: e.clientX, y: e.clientY, target })
   }, [])
-  const [aiState, setAiState] = useState<AiStudioVisionState>({
-    enabled: true,
+  const [aiState, setAiState] = useState<AiVisionState>({
+    enabled: false,
+    mode: "objects",
     detectedClass: "none",
     confidence: 0,
+    allDetections: [],
+    modelSource: "ready",
+    detail: "AI idle",
   })
   const aiStateRef = useRef(aiState)
   useEffect(() => {
@@ -430,7 +435,6 @@ export function Workbench() {
   // restarting Arduino execution must not tear down the live camera PiP.
   const stopAiRuntime = useCallback(() => {
     setAiRuntimeEnabled(false)
-    setAiCameraCompact(false)
     setIsAiCameraOpen(false)
   }, [])
 
@@ -466,7 +470,6 @@ export function Workbench() {
     // floating mode. Preserve the student's current Circuit/Code view.
     if (usesAi && openAiHud) {
       setIsAiCameraOpen(true)
-      setAiCameraCompact(true)
       setAiRuntimeEnabled(true)
     } else {
       stopAiRuntime()
@@ -688,11 +691,9 @@ export function Workbench() {
   // AI Studio uses this entry point so "Run circuit" closes the AI overlay
   // and takes the student directly to the Circuit Simulator view.
   const handleRunFromAiStudio = useCallback(() => {
-    // "Run circuit" starts the Arduino program and keeps AI visible as the
-    // same small draggable floating window instead of covering the workspace.
-    setIsAiCameraOpen(true)
-    setAiCameraCompact(true)
-    setAiRuntimeEnabled(true)
+    // AI Studio is separate from the runtime camera. Running the circuit
+    // always uses the small legacy floating AI Vision HUD.
+    setIsAiStudioOpen(false)
     if (!runningRef.current) {
       setRunning(true)
       startProgram(false, true)
@@ -856,6 +857,7 @@ export function Workbench() {
     setWiring(null)
     setSerialLines([])
     stopAiRuntime()
+    setIsAiStudioOpen(false)
     setIsDmmOpen(false)
     setIsScopeOpen(false)
     setLastSaved(saved.savedAt)
@@ -873,6 +875,7 @@ export function Workbench() {
     setWiring(null)
     setSerialLines([])
     stopAiRuntime()
+    setIsAiStudioOpen(false)
     setIsDmmOpen(false)
     setIsScopeOpen(false)
     setLastSaved(project.savedAt)
@@ -892,6 +895,7 @@ export function Workbench() {
     setWiring(null)
     setSerialLines([])
     stopAiRuntime()
+    setIsAiStudioOpen(false)
     setIsDmmOpen(false)
     setIsScopeOpen(false)
   }, [stopProgram, stopAiRuntime])
@@ -936,30 +940,25 @@ export function Workbench() {
       // Selecting a template replaces the active program context, so stop the
       // current AI runtime before loading the new program.
       stopAiRuntime()
+      setIsAiStudioOpen(false)
     },
     [stopProgram, stopAiRuntime, updateState],
   )
 
-  const handleAiStudioClose = useCallback(() => {
-    // While an AI program is running, Studio close means minimize to PiP.
-    if (aiRuntimeEnabled) {
-      setIsAiCameraOpen(false)
-      setAiCameraCompact(true)
-      return
-    }
-    stopAiRuntime()
-  }, [aiRuntimeEnabled, stopAiRuntime])
-
-  const handleToggleAiStudio = useCallback(() => {
+  const handleToggleAiVision = useCallback(() => {
     if (isAiCameraOpen) {
-      handleAiStudioClose()
+      stopAiRuntime()
       return
     }
-
-    // Re-opening Studio changes presentation only; preserve the live runtime.
     setIsAiCameraOpen(true)
-    setAiCameraCompact(false)
-  }, [handleAiStudioClose, isAiCameraOpen])
+    if (runningRef.current && state.parts.some((p) => p.type === "arduino-uno")) {
+      setAiRuntimeEnabled(true)
+    }
+  }, [isAiCameraOpen, state.parts, stopAiRuntime])
+
+  const handleOpenAiStudio = useCallback(() => {
+    setIsAiStudioOpen(true)
+  }, [])
 
   const toggleMute = useCallback(() => {
     setIsMuted((prev) => {
@@ -987,7 +986,8 @@ export function Workbench() {
         isSerialOpen={isSerialOpen}
         onToggleSerial={() => setIsSerialOpen((prev) => !prev)}
         isAiCameraOpen={isAiCameraOpen}
-        onToggleAiCamera={handleToggleAiStudio}
+        onToggleAiCamera={handleToggleAiVision}
+        onOpenAiStudio={handleOpenAiStudio}
         isInspectorOpen={isInspectorOpen}
         onToggleInspector={() => setIsInspectorOpen((prev) => !prev)}
         isMuted={isMuted}
@@ -1036,16 +1036,31 @@ export function Workbench() {
         onSelectTemplate={handleSelectTemplate}
       />
 
-      {/* Pixiu AI Studio: simple by default, deep only when a student opens Understand. */}
+      {/* Legacy AI Vision HUD: stable floating multi-object detector tied to Arduino runtime. */}
+      <AiCameraPanel
+        isOpen={isAiCameraOpen}
+        onClose={stopAiRuntime}
+        aiState={aiState}
+        onAiStateChange={setAiState}
+        isSimRunning={running}
+        runtimeEnabled={aiRuntimeEnabled}
+        onStartSim={() => {
+          setIsAiStudioOpen(false)
+          if (!runningRef.current) {
+            setRunning(true)
+            startProgram(false, true)
+          }
+        }}
+      />
+
+      {/* AI Studio stays separate from the runtime HUD. */}
       <Suspense fallback={null}>
         <AiStudioPanel
-          isOpen={isAiCameraOpen}
-          onClose={handleAiStudioClose}
+          isOpen={isAiStudioOpen}
+          onClose={() => setIsAiStudioOpen(false)}
           aiState={aiState}
           onAiStateChange={setAiState}
           isSimRunning={running}
-          runtimeEnabled={aiRuntimeEnabled}
-          compact={aiCameraCompact}
           onStartSim={handleRunFromAiStudio}
         />
       </Suspense>
