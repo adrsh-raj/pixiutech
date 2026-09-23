@@ -65,6 +65,7 @@ const TOOLBOX = {
       contents: [
         { kind: "block", type: "math_number" },
         { kind: "block", type: "math_arithmetic" },
+        { kind: "block", type: "map_value" },
       ],
     },
     {
