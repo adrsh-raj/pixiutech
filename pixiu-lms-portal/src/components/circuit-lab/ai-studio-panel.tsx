@@ -57,6 +57,7 @@ interface Props {
   onAiStateChange: (state: AiVisionState) => void
   isSimRunning?: boolean
   runtimeEnabled?: boolean
+  compact?: boolean
   onStartSim?: () => void
 }
 
@@ -248,6 +249,7 @@ export function AiStudioPanel({
   onAiStateChange,
   isSimRunning = false,
   runtimeEnabled = false,
+  compact = false,
   onStartSim,
 }: Props) {
   const [tab, setTab] = useState<Tab>("try")
@@ -331,7 +333,7 @@ export function AiStudioPanel({
     } else if (!training) {
       stopInput()
     }
-  }, [runtimeEnabled, mode, isOpen])
+  }, [runtimeEnabled, mode, isOpen, compact])
 
   useEffect(() => {
     if (!store.model) {
@@ -348,11 +350,15 @@ export function AiStudioPanel({
   }, [store.model])
 
   function getActiveVideo() {
-    return (isOpen ? studioVideoRef.current : floatingVideoRef.current) ?? studioVideoRef.current ?? floatingVideoRef.current
+    return ((compact || !isOpen) ? floatingVideoRef.current : studioVideoRef.current)
+      ?? studioVideoRef.current
+      ?? floatingVideoRef.current
   }
 
   function getActiveOverlay() {
-    return (isOpen ? overlayRef.current : floatingOverlayRef.current) ?? overlayRef.current ?? floatingOverlayRef.current
+    return ((compact || !isOpen) ? floatingOverlayRef.current : overlayRef.current)
+      ?? overlayRef.current
+      ?? floatingOverlayRef.current
   }
 
   function attachStreamToVisibleVideos() {
@@ -862,7 +868,7 @@ export function AiStudioPanel({
       : MODES.find((item) => item.id === mode)?.title ?? "AI"
   const inputActive = isSound ? soundActive : cameraActive
 
-  if (!isOpen && runtimeEnabled) {
+  if (runtimeEnabled && (compact || !isOpen)) {
     const floatingStyle = floatingPosition
       ? { left: floatingPosition.left, top: floatingPosition.top }
       : { right: 16, bottom: 76 }
