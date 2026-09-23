@@ -223,6 +223,7 @@ export function AiStudioPanel({
   const [tab, setTab] = useState<Tab>("try")
   const [mode, setMode] = useState<ReadyAiMode | "trained">("objects")
   const [cameraActive, setCameraActive] = useState(false)
+  const [soundActive, setSoundActive] = useState(false)
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState("AI idle")
   const [error, setError] = useState<string | null>(null)
@@ -318,6 +319,7 @@ export function AiStudioPanel({
     stopCamera(videoRef.current, streamRef.current)
     streamRef.current = null
     setCameraActive(false)
+    setSoundActive(false)
     setLoading(false)
   }
 
@@ -427,7 +429,13 @@ export function AiStudioPanel({
       }
       resourceRef.current = recognizer
       setLoading(false)
-      setStatus("6A Sound listening")
+      setSoundActive(true)
+      onAiStateChange({
+        ...emptyState("sound"),
+        enabled: true,
+        detail: "Microphone listening",
+      })
+      setStatus("6F Sound listening")
 
       await recognizer.listen(
         (result: any) => {
@@ -473,7 +481,7 @@ export function AiStudioPanel({
   function startInferenceLoop(activeSession: number) {
     const tick = async () => {
       if (
-        !cameraActive ||
+        !streamRef.current ||
         !videoRef.current ||
         activeSession !== sessionRef.current ||
         !resourceRef.current ||
@@ -627,6 +635,7 @@ export function AiStudioPanel({
     stopCamera(videoRef.current, streamRef.current)
     streamRef.current = null
     setCameraActive(false)
+    setSoundActive(false)
     onAiStateChange(emptyState(mode))
     setStatus("AI stopped")
   }
@@ -811,9 +820,9 @@ export function AiStudioPanel({
                     <p className="mt-2 text-[10px] leading-5 text-slate-500">
                       Objects, Pose, Fingers, Emotion, Sound and Numbers share one camera lifecycle. Models are loaded only when selected.
                     </p>
-                    <button onClick={isSound ? (cameraActive ? stopInput : startSound) : (cameraActive ? stopInput : startCameraForMode)} className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-violet-500 px-3 py-2 text-[10px] font-black">
-                      {cameraActive ? <CameraOff size={13} /> : isSound ? <Mic size={13} /> : <Camera size={13} />}
-                      {cameraActive ? "Stop" : isSound ? "Start microphone" : "Start camera"}
+                    <button onClick={isSound ? (soundActive ? stopInput : startSound) : (cameraActive ? stopInput : startCameraForMode)} className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-violet-500 px-3 py-2 text-[10px] font-black">
+                      {(isSound ? soundActive : cameraActive) ? (isSound ? <Mic size={13} /> : <CameraOff size={13} />) : isSound ? <Mic size={13} /> : <Camera size={13} />}
+                      {(isSound ? soundActive : cameraActive) ? "Stop" : isSound ? "Start microphone" : "Start camera"}
                     </button>
                   </div>
 
