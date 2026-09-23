@@ -62,6 +62,13 @@ interface Props {
 type Tab = "try" | "teach" | "understand"
 type ReadyResource = any
 
+// Object detection tuning:
+// - MobileNetV2 is the higher-accuracy COCO-SSD backbone.
+// - A lower threshold makes smaller / harder COCO objects visible instead of
+//   effectively restricting the live demo to only the easiest detections.
+const OBJECT_MIN_SCORE = 0.30
+const OBJECT_MAX_BOXES = 20
+
 const MODES: Array<{ id: ReadyAiMode; title: string; subtitle: string }> = [
   { id: "objects", title: "Objects", subtitle: "COCO-SSD object boxes" },
   { id: "pose", title: "Pose", subtitle: "17 body keypoints" },
@@ -364,7 +371,7 @@ export function AiStudioPanel({
       let resource: ReadyResource = null
 
       if (mode === "objects") {
-        resource = await cocoSsd.load({ base: "lite_mobilenet_v2" })
+        resource = await cocoSsd.load({ base: "mobilenet_v2" })
       } else if (mode === "pose") {
         resource = await loadPoseDetector()
       } else if (mode === "hands" || mode === "numbers") {
@@ -487,9 +494,17 @@ export function AiStudioPanel({
 
       try {
         if (mode === "objects") {
-          const predictions = await resourceRef.current.detect(video, 20, 0.45)
+          const predictions = await resourceRef.current.detect(
+            video,
+            OBJECT_MAX_BOXES,
+            OBJECT_MIN_SCORE,
+          )
           if (activeSession !== sessionRef.current) return
-          const visible = predictions.filter((p: any) => p.score >= 0.45)
+          // Keep every detection returned by COCO-SSD at/above our live-demo
+          // threshold. Do not whitelist classes such as person/car/phone.
+          const visible = predictions.filter(
+            (p: any) => Number(p.score) >= OBJECT_MIN_SCORE,
+          )
           drawBoxes(overlayRef.current!, video, visible.map((p: any) => ({
             class: p.class,
             score: p.score,
