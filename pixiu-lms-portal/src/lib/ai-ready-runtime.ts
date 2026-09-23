@@ -86,7 +86,6 @@ async function ensureTfReady() {
 }
 
 export async function loadPoseDetector() {
-  ensureTfGlobal()
   await ensureTfReady()
   await loadScript(
     "https://unpkg.com/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.min.js",
@@ -106,7 +105,6 @@ export async function loadPoseDetector() {
 }
 
 export async function loadHandDetector() {
-  ensureTfGlobal()
   await ensureTfReady()
   await loadScript(
     "https://unpkg.com/@tensorflow-models/handpose@0.1.0/dist/handpose.min.js",
@@ -138,17 +136,26 @@ export async function loadFaceEmotion() {
 
     if (!window.faceapi) throw new Error("Expression AI is unavailable.")
 
-    const modelBase =
-      "https://justadudewhohacks.github.io/face-api.js/models"
+    const modelBases = [
+      "https://justadudewhohacks.github.io/face-api.js/models",
+      "https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights",
+    ]
 
-    try {
-      await window.faceapi.nets.tinyFaceDetector.loadFromUri(modelBase)
-      await window.faceapi.nets.faceExpressionNet.loadFromUri(modelBase)
-    } catch {
-      throw new Error("Expression AI model files could not be loaded. Check your internet connection and try again.")
+    let lastError: unknown = null
+
+    for (const modelBase of modelBases) {
+      try {
+        await window.faceapi.nets.tinyFaceDetector.loadFromUri(modelBase)
+        await window.faceapi.nets.faceExpressionNet.loadFromUri(modelBase)
+        return window.faceapi
+      } catch (error) {
+        lastError = error
+      }
     }
 
-    return window.faceapi
+    throw new Error(
+      `Expression AI model files could not be loaded. Check your internet connection and try again.${lastError instanceof Error ? ` (${lastError.message})` : ""}`,
+    )
   })()
 
   try {
