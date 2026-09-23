@@ -962,7 +962,7 @@ export function AiStudioPanel({
               <div className="grid gap-4 lg:grid-cols-[1.4fr_0.8fr]">
                 <div className="overflow-hidden rounded-3xl border border-slate-800 bg-black">
                   <div className="relative aspect-video">
-                    <video ref={videoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
+                    <video ref={studioVideoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
                     <canvas ref={overlayRef} className="pointer-events-none absolute inset-0 h-full w-full" />
                     {!inputActive && (
                       <div className="absolute inset-0 grid place-items-center bg-slate-950/95 p-6 text-center">
