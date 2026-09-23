@@ -173,9 +173,14 @@ export function Workbench() {
     setContextMenu({ x: e.clientX, y: e.clientY, target })
   }, [])
   const [aiState, setAiState] = useState<AiStudioVisionState>({
-    enabled: true,
+    enabled: false,
+    mode: "objects",
     detectedClass: "none",
     confidence: 0,
+    allDetections: [],
+    modelClasses: [],
+    modelSource: "ready",
+    detail: "AI Studio is idle",
   })
   const aiStateRef = useRef(aiState)
   useEffect(() => {
