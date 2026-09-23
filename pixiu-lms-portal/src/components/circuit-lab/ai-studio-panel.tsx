@@ -326,7 +326,7 @@ export function AiStudioPanel({
     } else if (!training) {
       stopInput()
     }
-  }, [runtimeEnabled])
+  }, [runtimeEnabled, mode])
 
   useEffect(() => {
     if (!store.model) {
