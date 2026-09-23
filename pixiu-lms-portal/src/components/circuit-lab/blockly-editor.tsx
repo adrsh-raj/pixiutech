@@ -252,6 +252,13 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
     }
   }, [])
 
+  // Keep the global Blockly pin context synchronized before applying any
+  // external XML. Template/project updates change circuit and XML together;
+  // the pin context must describe the new circuit when dropdown fields hydrate.
+  useEffect(() => {
+    setPinContext(circuit)
+  }, [circuit])
+
   // Sync the workspace for genuine external loads (templates, saved projects,
   // lessons, imports, and reset). Debounce before replacing blocks so normal
   // Blockly editing remains stable while external XML always reaches the workspace.
@@ -320,10 +327,6 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
     timer = window.setTimeout(applyExternalXml, 120)
     return () => window.clearTimeout(timer)
   }, [xml])
-
-  useEffect(() => {
-    setPinContext(circuit)
-  }, [circuit])
 
   const handleCopy = () => {
     navigator.clipboard.writeText(cppCode)
