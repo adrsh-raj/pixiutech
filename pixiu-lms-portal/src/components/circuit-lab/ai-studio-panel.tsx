@@ -138,8 +138,7 @@ export function AiStudioPanel({
   const resourceRef = useRef<any>(null)
   const animationRef = useRef<number | null>(null)
   const sessionRef = useRef(0)
-  const inFlightRef = useRef(false)
-  const lastInferenceRef = useRef(0)
+  const inferenceErrorRef = useRef<string | null>(null)
 
   const counts = useMemo(() => getSampleCounts(store.samples), [store.samples])
   const classes = useMemo(() => getAiClasses(store.samples), [store.samples])
@@ -161,15 +160,35 @@ export function AiStudioPanel({
   }, [isOpen])
 
   useEffect(() => {
+    let cancelled = false
+
+    setModel(null)
+
     if (!store.model) {
-      setModel(null)
-      return
+      return () => {
+        cancelled = true
+      }
     }
 
-    let cancelled = false
-    void loadStoredAiModel(store.model).then((loaded) => {
-      if (!cancelled) setModel(loaded)
-    })
+    void loadStoredAiModel(store.model)
+      .then((loaded) => {
+        if (cancelled) {
+          disposeAiResource(loaded)
+          return
+        }
+
+        if (!loaded) {
+          setStatus("Your saved AI model could not be loaded. Retrain it in Teach.")
+          return
+        }
+
+        setModel(loaded)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setStatus("Your saved AI model could not be loaded. Retrain it in Teach.")
+        }
+      })
 
     return () => {
       cancelled = true
@@ -178,10 +197,12 @@ export function AiStudioPanel({
 
   useEffect(() => {
     if (!isOpen || !inputActive || tab === "understand") {
+      stopCameraTracks()
       return
     }
 
     let cancelled = false
+    let speechRecognizer: any = null
 
     const startInput = async () => {
       setLoading(true)
@@ -190,22 +211,22 @@ export function AiStudioPanel({
 
       try {
         if (tryMode === "ready" && readyMode === "sound") {
-          const recognizer = await loadSpeechRecognizer()
+          speechRecognizer = await loadSpeechRecognizer()
 
           if (cancelled) {
-            stopSpeechRecognizer(recognizer)
+            stopSpeechRecognizer(speechRecognizer)
             return
           }
 
-          resourceRef.current = recognizer
+          resourceRef.current = speechRecognizer
           setLoading(false)
 
-          recognizer.listen(
+          await speechRecognizer.listen(
             (result: { scores: Float32Array | number[] }) => {
               if (cancelled) return
 
               const scores = Array.from(result.scores ?? [])
-              const labels = recognizer.wordLabels()
+              const labels = speechRecognizer?.wordLabels?.() ?? []
               let bestIndex = 0
 
               for (let index = 1; index < scores.length; index += 1) {
@@ -238,18 +259,23 @@ export function AiStudioPanel({
           return
         }
 
-        const stream = await navigator.mediaDevices?.getUserMedia({
+        if (!window.isSecureContext && window.location.hostname !== "localhost") {
+          throw new Error("Camera access requires HTTPS. Open PIXIU CYBERLAB over a secure connection.")
+        }
+
+        if (!navigator.mediaDevices?.getUserMedia) {
+          throw new Error("This browser cannot provide camera access.")
+        }
+
+        const stream = await navigator.mediaDevices.getUserMedia({
           video: {
             width: { ideal: 480, max: 640 },
             height: { ideal: 360, max: 480 },
             frameRate: { ideal: 12, max: 15 },
             facingMode: "user",
           },
+          audio: false,
         })
-
-        if (!stream) {
-          throw new Error("This browser does not provide camera access.")
-        }
 
         if (cancelled) {
           stream.getTracks().forEach((track) => track.stop())
@@ -258,14 +284,30 @@ export function AiStudioPanel({
 
         streamRef.current = stream
 
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream
-          await videoRef.current.play().catch(() => {})
+        const video = videoRef.current
+        if (!video) {
+          stream.getTracks().forEach((track) => track.stop())
+          throw new Error("The AI camera could not be attached to the page.")
         }
 
+        video.srcObject = stream
+        await video.play().catch(() => {})
+
+        if (video.readyState < 2) {
+          await new Promise<void>((resolve) => {
+            const onReady = () => {
+              video.removeEventListener("loadeddata", onReady)
+              resolve()
+            }
+            video.addEventListener("loadeddata", onReady, { once: true })
+          })
+        }
+
+        if (cancelled) return
         setLoading(false)
       } catch (error) {
         if (cancelled) return
+
         setLoading(false)
         setCameraError(
           error instanceof Error
@@ -280,6 +322,12 @@ export function AiStudioPanel({
 
     return () => {
       cancelled = true
+      stopCameraTracks()
+      stopSpeechRecognizer(speechRecognizer)
+
+      if (resourceRef.current === speechRecognizer) {
+        resourceRef.current = null
+      }
     }
   }, [isOpen, inputActive, tab, readyMode, tryMode, onAiStateChange])
 
@@ -289,15 +337,21 @@ export function AiStudioPanel({
       return
     }
 
+    if (tryMode === "trained" && (!store.model || !model)) {
+      stopInferenceLoop()
+      setLoading(Boolean(store.model))
+      return
+    }
+
     const session = ++sessionRef.current
     let cancelled = false
+    let resource: any = null
 
     const startInference = async () => {
       setLoading(true)
+      setStatus(null)
 
       try {
-        let resource: any = null
-
         if (tryMode === "trained") {
           resource = null
         } else if (readyMode === "objects") {
@@ -316,11 +370,26 @@ export function AiStudioPanel({
           return
         }
 
-        resourceRef.current = resource
+        if (tryMode !== "trained") {
+          resourceRef.current = resource
+        }
+
         setLoading(false)
+        inferenceErrorRef.current = null
+
+        if (tryMode === "trained" && (!model || !store.model)) {
+          throw new Error("Your trained AI is still loading. Try again in a moment.")
+        }
+
         startInferenceLoop(session)
       } catch (error) {
-        if (cancelled || session !== sessionRef.current) return
+        if (cancelled || session !== sessionRef.current) {
+          disposeAiResource(resource)
+          return
+        }
+
+        disposeAiResource(resource)
+        resourceRef.current = null
         setLoading(false)
         setStatus(
           error instanceof Error
@@ -337,8 +406,10 @@ export function AiStudioPanel({
       cancelled = true
       stopInferenceLoop()
 
-      const resource = resourceRef.current
-      resourceRef.current = null
+      if (resourceRef.current === resource) {
+        resourceRef.current = null
+      }
+
       disposeAiResource(resource)
     }
   }, [isOpen, inputActive, tab, readyMode, tryMode, model, store.model])
@@ -346,8 +417,18 @@ export function AiStudioPanel({
   useEffect(() => {
     if (!isOpen) {
       cleanupAll()
+      setLoading(false)
+      onAiStateChange({
+        enabled: false,
+        detectedClass: "none",
+        confidence: 0,
+        allDetections: [],
+        modelClasses: [],
+        modelSource: "ready",
+        detail: "AI Studio closed",
+      })
     }
-  }, [isOpen])
+  }, [isOpen, onAiStateChange])
 
   const stopInput = () => {
     setInputActive(false)
@@ -380,7 +461,6 @@ export function AiStudioPanel({
     stopInput()
     setTryMode(nextMode)
     setTestResult(null)
-    setTestImage(null)
     if (nextMode === "trained") setReadyMode("objects")
   }
 
@@ -390,7 +470,6 @@ export function AiStudioPanel({
     setReadyMode(nextMode)
     setStatus(null)
     setTestResult(null)
-    setTestImage(null)
   }
 
   const addCapturedSample = () => {
@@ -531,7 +610,6 @@ export function AiStudioPanel({
     setTab("try")
     setLabel("")
     setTestResult(null)
-    setTestImage(null)
     setStatus("AI Studio reset.")
   }
 
@@ -1240,7 +1318,31 @@ export function AiStudioPanel({
   )
 
   function startInferenceLoop(session: number) {
-    stopInferenceLoop()
+    if (animationRef.current !== null) {
+      window.clearTimeout(animationRef.current)
+      animationRef.current = null
+    }
+
+    let busy = false
+    let lastInferenceAt = 0
+
+    const schedule = (delay: number) => {
+      if (animationRef.current !== null) {
+        window.clearTimeout(animationRef.current)
+      }
+
+      if (
+        !isOpen ||
+        !inputActive ||
+        tab !== "try" ||
+        session !== sessionRef.current
+      ) {
+        animationRef.current = null
+        return
+      }
+
+      animationRef.current = window.setTimeout(tick, delay)
+    }
 
     const tick = async () => {
       if (
@@ -1254,49 +1356,55 @@ export function AiStudioPanel({
 
       const now = performance.now()
 
-      if (inFlightRef.current || now - lastInferenceRef.current < 250) {
-        animationRef.current = window.setTimeout(tick, 140)
+      if (busy || now - lastInferenceAt < 250) {
+        schedule(80)
         return
       }
 
       const video = videoRef.current
-      const detector = resourceRef.current
+      const detector = tryMode === "trained" ? null : resourceRef.current
 
-      if (
-        tryMode !== "trained" &&
-        (!video || video.readyState < 2 || !detector)
-      ) {
-        animationRef.current = window.setTimeout(tick, 140)
+      if (tryMode !== "trained" && (!video || video.readyState < 2 || !detector)) {
+        schedule(120)
         return
       }
 
-      inFlightRef.current = true
-      lastInferenceRef.current = now
+      if (tryMode === "trained" && (!model || !store.model)) {
+        schedule(120)
+        return
+      }
+
+      busy = true
+      lastInferenceAt = now
 
       try {
         if (tryMode === "trained" && model && store.model) {
           const frame = captureVideoFrame()
-          if (frame) {
-            const prediction = await predictAiImage(frame, store.model)
 
-            onAiStateChange({
-              enabled: true,
-              mode: "trained",
-              detectedClass: prediction?.label ?? "none",
-              confidence: prediction?.confidence ?? 0,
-              allDetections: [],
-              modelClasses: store.model.classes,
-              modelSource: "trained",
-              detail: prediction
-                ? Object.entries(prediction.probabilities)
-                    .map(([name, value]) => `${name} ${value}%`)
-                    .join(" · ")
-                : "Looking…",
-            })
+          if (!frame) {
+            throw new Error("The camera frame is not ready yet.")
           }
+
+          const prediction = await predictAiImage(frame, store.model)
+
+          onAiStateChange({
+            enabled: true,
+            mode: "trained",
+            detectedClass: prediction?.label ?? "none",
+            confidence: prediction?.confidence ?? 0,
+            allDetections: [],
+            modelClasses: store.model.classes,
+            modelSource: "trained",
+            detail: prediction
+              ? Object.entries(prediction.probabilities)
+                  .map(([name, value]) => `${name} ${value}%`)
+                  .join(" · ")
+              : "Looking…",
+          })
         } else if (readyMode === "objects") {
           const predictions = await detector.detect(video)
           const valid = predictions.filter((item: any) => item.score >= 0.45)
+
           drawObjectDetections(valid)
 
           const best = valid[0]
@@ -1317,8 +1425,8 @@ export function AiStudioPanel({
           const poses = await detector.estimatePoses(video, {
             flipHorizontal: true,
           })
-
           const pose = poses[0]
+
           drawPose(pose)
 
           const keypoints = pose?.keypoints ?? []
@@ -1351,7 +1459,11 @@ export function AiStudioPanel({
           onAiStateChange({
             enabled: true,
             mode: "pose",
-            detectedClass: pose ? (handsUp ? "hands-up" : "person") : "none",
+            detectedClass: pose
+              ? handsUp
+                ? "hands-up"
+                : "person"
+              : "none",
             confidence: Math.round(
               (pose?.score ?? confident[0]?.score ?? 0) * 100,
             ),
@@ -1413,7 +1525,6 @@ export function AiStudioPanel({
           const hands = await detector.estimateHands(video, {
             flipHorizontal: true,
           })
-
           const hand = hands[0]
           const landmarks = hand?.landmarks ?? []
           const fingers = hand ? fingerCount(landmarks) : 0
@@ -1443,10 +1554,18 @@ export function AiStudioPanel({
               : "Show one hand",
           })
         }
-      } catch {
-        // A slow/failed frame must never crash the lab.
+
+        inferenceErrorRef.current = null
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "AI inference failed."
+
+        if (session === sessionRef.current && message !== inferenceErrorRef.current) {
+          inferenceErrorRef.current = message
+          setStatus(`AI frame skipped: ${message}`)
+        }
       } finally {
-        inFlightRef.current = false
+        busy = false
 
         if (
           isOpen &&
@@ -1454,28 +1573,29 @@ export function AiStudioPanel({
           tab === "try" &&
           session === sessionRef.current
         ) {
-          animationRef.current = window.setTimeout(tick, 40)
+          schedule(40)
         }
       }
     }
 
-    animationRef.current = window.setTimeout(tick, 0)
+    schedule(0)
   }
 
   function stopInferenceLoop() {
+    sessionRef.current += 1
+
     if (animationRef.current !== null) {
       window.clearTimeout(animationRef.current)
       animationRef.current = null
     }
-
-    inFlightRef.current = false
-    lastInferenceRef.current = 0
 
     if (overlayRef.current) {
       overlayRef.current
         .getContext("2d")
         ?.clearRect(0, 0, overlayRef.current.width, overlayRef.current.height)
     }
+
+    inferenceErrorRef.current = null
   }
 
   function stopCameraTracks() {
@@ -1490,7 +1610,6 @@ export function AiStudioPanel({
   }
 
   function cleanupAll() {
-    sessionRef.current += 1
     stopInferenceLoop()
     stopCameraTracks()
     stopSpeechRecognizer(resourceRef.current)
@@ -1522,8 +1641,13 @@ export function AiStudioPanel({
 
     if (!canvas || !video) return null
 
-    canvas.width = video.videoWidth || 480
-    canvas.height = video.videoHeight || 360
+    const width = video.videoWidth || 480
+    const height = video.videoHeight || 360
+
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width
+      canvas.height = height
+    }
 
     const ctx = canvas.getContext("2d")
 
