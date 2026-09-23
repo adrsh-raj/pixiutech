@@ -664,7 +664,7 @@ export function Workbench() {
     setProbeBlack(null)
     setScopeProbeCH1(null)
     setScopeProbeCH2(null)
-  }, [stopProgram, updateState])
+  }, [stopProgram, stopAiRuntime, updateState])
 
   const toggleRun = useCallback(() => {
     // Do not perform start/stop side effects inside a React state updater.
