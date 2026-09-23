@@ -202,11 +202,21 @@ export async function loadHandDetector() {
       return {
         human: result,
         multiHandLandmarks: hands.map((hand: any) =>
-          (hand.keypoints ?? []).map((point: any) => ({
-            x: Number(point?.[0] ?? 0),
-            y: Number(point?.[1] ?? 0),
-            z: Number(point?.[2] ?? 0),
-          })),
+          (hand.keypoints ?? []).map((point: any) => {
+            const rawX = Number(point?.x ?? point?.[0] ?? 0)
+            const rawY = Number(point?.y ?? point?.[1] ?? 0)
+            const rawZ = Number(point?.z ?? point?.[2] ?? 0)
+            const width = video.videoWidth || 640
+            const height = video.videoHeight || 480
+            return {
+              // AI Studio drawing expects MediaPipe-style normalized 0..1
+              // coordinates. Human's Point values can be pixel-space, so
+              // normalize defensively while accepting either representation.
+              x: rawX > 1 ? rawX / width : rawX,
+              y: rawY > 1 ? rawY / height : rawY,
+              z: rawZ,
+            }
+          }),
         ),
       }
     },
@@ -242,7 +252,7 @@ export async function loadFaceEmotion() {
       mesh: { enabled: true },
       iris: { enabled: false },
       description: { enabled: false },
-      emotion: { enabled: true, minConfidence: 0.15 },
+      emotion: { enabled: true, minConfidence: 0.15, modelPath: "emotion.json" },
       antispoof: { enabled: false },
       liveness: { enabled: false },
     },
