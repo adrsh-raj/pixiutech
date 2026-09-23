@@ -1,5 +1,20 @@
 import * as Blockly from "blockly"
 
+const runtimeVariables = new Map<string, number | string | boolean>()
+
+function variableId(block: Blockly.Block): string {
+  return String(block.getFieldValue("VAR") ?? "")
+}
+
+function variableNumber(block: Blockly.Block): number {
+  const value = runtimeVariables.get(variableId(block))
+  return typeof value === "number" ? value : Number(value ?? 0) || 0
+}
+
+function setRuntimeVariable(block: Blockly.Block, value: number | string | boolean) {
+  runtimeVariables.set(variableId(block), value)
+}
+
 export interface BlockStepInfo {
   id: string
   type: string
@@ -64,6 +79,18 @@ export function evaluateNumber(target: Blockly.Block | null, env?: ExecutionEnvi
   if (target.type === "io_analogread") {
     const pin = target.getFieldValue("PIN") ?? "A0"
     return env?.getSensorValue ? env.getSensorValue("analog", pin) : 512
+  }
+  if (target.type === "variables_get") {
+    return variableNumber(target)
+  }
+  if (target.type === "map_value") {
+    const value = evaluateNumber(target.getInputTargetBlock("VALUE"), env, 0)
+    const inMin = evaluateNumber(target.getInputTargetBlock("IN_MIN"), env, 0)
+    const inMax = evaluateNumber(target.getInputTargetBlock("IN_MAX"), env, 1023)
+    const outMin = evaluateNumber(target.getInputTargetBlock("OUT_MIN"), env, 0)
+    const outMax = evaluateNumber(target.getInputTargetBlock("OUT_MAX"), env, 255)
+    if (inMax === inMin) return outMin
+    return ((value - inMin) * (outMax - outMin)) / (inMax - inMin) + outMin
   }
   if (target.type === "ai_confidence") {
     return env?.getAiConfidence ? env.getAiConfidence() : 0
@@ -166,6 +193,18 @@ function getBlockDescription(block: Blockly.Block, env: ExecutionEnvironment): s
       const pin = block.getFieldValue("PIN") ?? "13"
       const val = evaluateNumberInput(block, "VALUE", env, 255)
       return `analogWrite(Pin ${pin}, ${val})`
+    }
+    case "variables_set":
+      return `set ${variableId(block)}`
+    case "variables_get":
+      return `get ${variableId(block)}`
+    case "map_value": {
+      const value = evaluateNumberInput(block, "VALUE", env, 0)
+      const inMin = evaluateNumberInput(block, "IN_MIN", env, 0)
+      const inMax = evaluateNumberInput(block, "IN_MAX", env, 1023)
+      const outMin = evaluateNumberInput(block, "OUT_MIN", env, 0)
+      const outMax = evaluateNumberInput(block, "OUT_MAX", env, 255)
+      return `map(${value}, ${inMin}, ${inMax}, ${outMin}, ${outMax})`
     }
     case "servo_write": {
       const pin = block.getFieldValue("PIN") ?? "9"
@@ -273,6 +312,13 @@ async function executeSingleBlock(block: Blockly.Block, env: ExecutionEnvironmen
       const pin = String(block.getFieldValue("PIN") ?? "13")
       const state = (block.getFieldValue("STATE") ?? "HIGH") as "HIGH" | "LOW"
       env.setDigitalPin(pin, state)
+      break
+    }
+
+    case "variables_set": {
+      const valueTarget = block.getInputTargetBlock("VALUE")
+      const value = valueTarget ? evaluateNumber(valueTarget, env, 0) : 0
+      setRuntimeVariable(block, value)
       break
     }
 
@@ -442,6 +488,8 @@ export async function runBlocklyProgram(workspace: Blockly.Workspace, env: Execu
 
   lcdCursorCol = 0
   lcdCursorRow = 0
+
+  runtimeVariables.clear()
 
   try {
     // 1. Execute SETUP statement
