@@ -300,18 +300,24 @@ export function AiStudioPanel({
   }
 
   function stopAll() {
+    const resource = resourceRef.current
+    resourceRef.current = null
+
     stopInference()
-    disposeResource()
-    if (mode === "sound" && resourceRef.current) {
-      void stopSpeechRecognizer(resourceRef.current)
+
+    if (mode === "sound") {
+      void stopSpeechRecognizer(resource)
+    } else {
+      disposeAiResource(resource)
     }
+
     stopCamera(videoRef.current, streamRef.current)
     streamRef.current = null
     setCameraActive(false)
     setLoading(false)
   }
 
-  async function startCameraForMode() {
+  async function openCamera(withModel = true) {
     setError(null)
     setStatus("Starting camera...")
     stopInference()
@@ -323,11 +329,11 @@ export function AiStudioPanel({
       const stream = await startCamera(video)
       streamRef.current = stream
       setCameraActive(true)
-      setStatus(mode === "objects" ? "Camera live · loading object AI" : "Camera live")
+      setStatus(withModel ? "Camera live · loading AI" : "Camera live · ready to teach")
       onAiStateChange({
         ...emptyState(mode),
         enabled: true,
-        detail: "Camera live",
+        detail: withModel ? "Camera live" : "Teach camera live",
       })
     } catch (cameraError) {
       setError(
@@ -340,10 +346,16 @@ export function AiStudioPanel({
       return
     }
 
-    if (mode === "sound") return
-    if (mode === "objects" || mode === "pose" || mode === "hands" || mode === "emotion" || mode === "numbers" || mode === "trained") {
-      await startModeResource()
-    }
+    if (!withModel) return
+    if (mode !== "sound") await startModeResource()
+  }
+
+  async function startCameraForMode() {
+    await openCamera(true)
+  }
+
+  async function startTeachCamera() {
+    await openCamera(false)
   }
 
   async function startModeResource() {
@@ -821,7 +833,7 @@ export function AiStudioPanel({
                   <p className="mt-1 text-[10px] leading-5 text-slate-500">Create at least 3 examples for each concept. Examples stay in this browser.</p>
                   <div className="mt-3 flex gap-2">
                     <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. bottle" className="min-w-0 flex-1 rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-[10px] outline-none focus:border-violet-400" />
-                    <button onClick={cameraActive ? addSampleFromCamera : () => void startCameraForMode()} className="rounded-xl bg-violet-500 px-3 py-2 text-[10px] font-black">{cameraActive ? "Add example" : "Start camera"}</button>
+                    <button onClick={cameraActive ? addSampleFromCamera : () => void startTeachCamera()} className="rounded-xl bg-violet-500 px-3 py-2 text-[10px] font-black">{cameraActive ? "Add example" : "Start camera"}</button>
                     <label className="cursor-pointer rounded-xl border border-slate-700 px-3 py-2 text-[10px] font-black"><Upload size={13} className="inline mr-1" />Image<input hidden type="file" accept="image/*" onChange={importSample} /></label>
                   </div>
                 </div>
