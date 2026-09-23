@@ -327,7 +327,7 @@ async function imageToFeatureTensor(dataUrl: string): Promise<tf.Tensor2D> {
     values[i++] = pixels[p + 2] / 255
   }
 
-  return tf.tensor2d(values, [1, INPUT_W * INPUT_H * INPUT_C])
+  return tf.tensor4d(values, [1, INPUT_H, INPUT_W, INPUT_C])
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {
