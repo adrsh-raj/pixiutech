@@ -71,6 +71,7 @@ export function Workbench() {
   const [activeLessonId, setActiveLessonId] = useState<string | null>(null)
   const [isAiCameraOpen, setIsAiCameraOpen] = useState(false)
   const [aiRuntimeEnabled, setAiRuntimeEnabled] = useState(false)
+  const [aiCameraCompact, setAiCameraCompact] = useState(false)
   const [isInspectorOpen, setIsInspectorOpen] = useState(true)
   const [mobilePaletteOpen, setMobilePaletteOpen] = useState(false)
   const [contextMenu, setContextMenu] = useState<{
@@ -424,6 +425,8 @@ export function Workbench() {
     isPausedRef.current = false
     setActiveStepBlock(null)
     setAiRuntimeEnabled(false)
+    setAiCameraCompact(false)
+    setIsAiCameraOpen(false)
   }, [])
 
   const startProgram = useCallback((startPaused: boolean = false, openAiHud: boolean = true) => {
@@ -455,12 +458,17 @@ export function Workbench() {
       blocklyXml.includes("ai_confidence") ||
       blocklyXml.includes("ai_camera_enable")
     )
-    // AI runs should stay on the Circuit canvas while the camera becomes a
-    // small floating PiP. This also makes Run from Code view land on the
-    // simulator instead of leaving the student in generated code.
-    if (usesAi) setView("circuit")
-    setIsAiCameraOpen(false)
-    setAiRuntimeEnabled(openAiHud && usesAi)
+    // AI program execution automatically opens the AI camera in minimized
+    // floating mode. Preserve the student's current Circuit/Code view.
+    if (usesAi && openAiHud) {
+      setIsAiCameraOpen(true)
+      setAiCameraCompact(true)
+      setAiRuntimeEnabled(true)
+    } else {
+      setIsAiCameraOpen(false)
+      setAiCameraCompact(false)
+      setAiRuntimeEnabled(false)
+    }
 
     try {
       defineArduinoBlocks()
@@ -675,10 +683,11 @@ export function Workbench() {
   // AI Studio uses this entry point so "Run circuit" closes the AI overlay
   // and takes the student directly to the Circuit Simulator view.
   const handleRunFromAiStudio = useCallback(() => {
-    // This action is explicitly a navigation from AI Studio into the
-    // simulator. Do not let startProgram reopen the AI overlay.
-    setIsAiCameraOpen(false)
-    setView("circuit")
+    // "Run circuit" starts the Arduino program and keeps AI visible as the
+    // same small draggable floating window instead of covering the workspace.
+    setIsAiCameraOpen(true)
+    setAiCameraCompact(true)
+    setAiRuntimeEnabled(true)
     if (!runningRef.current) {
       setRunning(true)
       startProgram(false, true)
@@ -955,7 +964,14 @@ export function Workbench() {
         isSerialOpen={isSerialOpen}
         onToggleSerial={() => setIsSerialOpen((prev) => !prev)}
         isAiCameraOpen={isAiCameraOpen}
-        onToggleAiCamera={() => setIsAiCameraOpen((prev) => !prev)}
+        onToggleAiCamera={() => {
+          setIsAiCameraOpen((prev) => {
+            const next = !prev
+            setAiCameraCompact(false)
+            if (!next) setAiRuntimeEnabled(false)
+            return next
+          })
+        }}
         isInspectorOpen={isInspectorOpen}
         onToggleInspector={() => setIsInspectorOpen((prev) => !prev)}
         isMuted={isMuted}
@@ -1013,6 +1029,7 @@ export function Workbench() {
           onAiStateChange={setAiState}
           isSimRunning={running}
           runtimeEnabled={aiRuntimeEnabled}
+          compact={aiCameraCompact}
           onStartSim={handleRunFromAiStudio}
         />
       </Suspense>
