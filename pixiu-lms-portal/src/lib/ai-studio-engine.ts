@@ -308,7 +308,7 @@ export async function canvasToDataUrl(canvas: HTMLCanvasElement): Promise<string
   return canvas.toDataURL("image/jpeg", 0.72)
 }
 
-async function imageToFeatureTensor(dataUrl: string): Promise<tf.Tensor2D> {
+async function imageToFeatureTensor(dataUrl: string): Promise<tf.Tensor4D> {
   const image = await loadImage(dataUrl)
   const canvas = document.createElement("canvas")
   canvas.width = INPUT_W
