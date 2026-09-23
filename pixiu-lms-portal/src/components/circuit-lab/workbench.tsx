@@ -466,13 +466,15 @@ export function Workbench() {
       blocklyXml.includes("ai_confidence") ||
       blocklyXml.includes("ai_camera_enable")
     )
-    // AI program execution automatically opens the AI camera in minimized
-    // floating mode. Preserve the student's current Circuit/Code view.
+    // AI program execution automatically opens the proven floating AI Vision HUD.
+    // The separate AI Studio never covers the Circuit/Code workspace during Run.
     if (usesAi && openAiHud) {
+      setIsAiStudioOpen(false)
       setIsAiCameraOpen(true)
       setAiRuntimeEnabled(true)
     } else {
       stopAiRuntime()
+      setIsAiStudioOpen(false)
     }
 
     try {
@@ -678,6 +680,7 @@ export function Workbench() {
       setRunning(false)
       setPressed(new Set())
       stopProgram()
+      stopAiRuntime()
       return
     }
 
