@@ -1214,14 +1214,14 @@ export function Workbench() {
             </button>
 
             <button
-              onClick={handleToggleAiStudio}
+              onClick={handleToggleAiVision}
               className={`flex flex-col items-center gap-0.5 p-1 transition active:scale-95 ${
                 isAiCameraOpen ? "text-purple-400 font-bold" : "text-muted-foreground hover:text-foreground"
               }`}
-              title="Open AI Studio"
+              title="AI Vision multi-object camera"
             >
               <Camera size={18} className={isAiCameraOpen ? "text-purple-400" : ""} />
-              <span className="text-[10px]">AI Studio</span>
+              <span className="text-[10px]">AI Vision</span>
             </button>
 
             <button
@@ -1315,7 +1315,7 @@ export function Workbench() {
           onToggleDmm={() => setIsDmmOpen((prev) => !prev)}
           isScopeOpen={isScopeOpen}
           onToggleScope={() => setIsScopeOpen((prev) => !prev)}
-          onToggleAiCamera={handleToggleAiStudio}
+          onToggleAiCamera={handleToggleAiVision}
           onSwitchToCode={() => setView("code")}
           onToggleRun={toggleRun}
           onClearCanvas={clearAll}
