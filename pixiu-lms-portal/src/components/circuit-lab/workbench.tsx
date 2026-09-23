@@ -549,7 +549,7 @@ export function Workbench() {
             ?? partsRef.current.find((pt) => pt.type === "keypad-4x4")
           return String(keypad?.props?.lastKey ?? "")
         },
-        isAiDetected: (cls) => aiStateRef.current.detectedClass === cls,
+        isAiDetected: (cls) => aiStateRef.current.detectedClass.trim().toLowerCase() === String(cls).trim().toLowerCase(),
         getAiDetectedClass: () => aiStateRef.current.detectedClass,
         getAiConfidence: () => aiStateRef.current.confidence,
         setAiCamera: (enabled) => setIsAiCameraOpen(enabled),
