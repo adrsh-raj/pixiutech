@@ -294,7 +294,13 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
         activeWorkspace.clear()
         const dom = Blockly.utils.xml.textToDom(expectedExternalXml)
         Blockly.Xml.domToWorkspace(dom, activeWorkspace)
-        lastWorkspaceXmlRef.current = expectedExternalXml
+
+        // Blockly may normalize XML formatting while importing. Store the
+        // normalized workspace XML so the prop echo is recognized as current
+        // and the template is not re-applied unnecessarily.
+        const normalizedDom = Blockly.Xml.workspaceToDom(activeWorkspace)
+        lastWorkspaceXmlRef.current = Blockly.utils.xml.domToText(normalizedDom)
+
         const code = arduino.workspaceToCode(activeWorkspace)
         setCppCode(code)
 
