@@ -50,6 +50,17 @@ requireText(workbench, "isAiDetected:", "AI runtime bridge")
 requireText(workbench, "getAiDetectedClass:", "AI class bridge")
 requireText(workbench, "getAiConfidence:", "AI confidence bridge")
 requireText(workbench, "setAiCamera:", "AI camera bridge")
+const stopProgramSection = workbench.slice(
+  workbench.indexOf("const stopProgram"),
+  workbench.indexOf("const stopAiRuntime"),
+)
+if (/setAiRuntimeEnabled|setAiCameraCompact|setIsAiCameraOpen/.test(stopProgramSection)) {
+  failures.push("AI lifecycle: stopProgram still directly mutates AI runtime/presentation state")
+}
+requireText(workbench, "const stopAiRuntime = useCallback", "AI lifecycle decoupling")
+requireText(workbench, "setIsAiCameraOpen(true)\n      setAiCameraCompact(true)\n      setAiRuntimeEnabled(true)", "AI run opens compact runtime")
+requireText(workbench, "onClose={handleAiStudioClose}", "AI Studio close/minimize handler")
+requireText(workbench, "onToggleAiCamera={handleToggleAiStudio}", "AI Studio presentation handler")
 
 for (const needle of ["frameBusyRef", "setTestImage", "inFlightRef"]) {
   forbidText(panel, needle, "AI panel legacy reference")
@@ -81,6 +92,26 @@ for (const needle of ["face-api.min.js", "@mediapipe/hands/hands.js", "window.fa
 
 if (!panel.match(/function stopAll\(\)[\s\S]*?releaseCurrentResource\(\)/)) {
   failures.push("cleanup: stopAll does not release the current resource")
+}
+
+const panelStopSection = panel.slice(panel.indexOf("  function stopInput()"), panel.indexOf("  function selectMode("))
+if (!panelStopSection.includes("cameraRequestRef.current")) {
+  failures.push("camera lifecycle: stopInput does not invalidate pending camera requests")
+}
+if (!panel.includes("GripVertical,")) {
+  failures.push("floating runtime: GripVertical icon is not imported")
+}
+if (panel.includes("[runtimeEnabled, mode, isOpen, compact]")) {
+  failures.push("floating runtime: compact is still incorrectly driving runtime lifecycle effect")
+}
+if (!panel.includes("[runtimeEnabled, mode, isOpen]")) {
+  failures.push("floating runtime: runtime lifecycle effect dependency contract missing")
+}
+if (!panel.includes("const requestId = ++cameraRequestRef.current")) {
+  failures.push("camera lifecycle: request generation guard missing")
+}
+if (!panel.includes("useEffect(() => {\n    return () => {\n      sessionRef.current += 1\n      cameraRequestRef.current += 1")) {
+  failures.push("camera lifecycle: unmount cleanup missing")
 }
 
 if (failures.length) {
