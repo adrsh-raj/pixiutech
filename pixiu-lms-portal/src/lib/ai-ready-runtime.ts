@@ -190,7 +190,7 @@ export async function loadHandDetector() {
       detector: { modelPath: "handtrack.json" },
       skeleton: { modelPath: "handlandmark-lite.json" },
     },
-    gesture: { enabled: true },
+    gesture: { enabled: false },
   })
 
   return {
@@ -256,7 +256,7 @@ export async function loadFaceEmotion() {
       antispoof: { enabled: false },
       liveness: { enabled: false },
     },
-    gesture: { enabled: true },
+    gesture: { enabled: false },
   })
 
   return {
