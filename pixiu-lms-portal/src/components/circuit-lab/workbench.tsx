@@ -677,7 +677,7 @@ export function Workbench() {
     setView("circuit")
     if (!runningRef.current) {
       setRunning(true)
-      startProgram(false, false)
+      startProgram(false, true)
     }
   }, [startProgram])
 
