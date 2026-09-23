@@ -736,6 +736,7 @@ export function AiStudioPanel({
   const activeTitle =
     mode === "trained" ? "My AI"
       : MODES.find((item) => item.id === mode)?.title ?? "AI"
+  const inputActive = isSound ? soundActive : cameraActive
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/80 p-3 backdrop-blur-sm sm:p-5">
@@ -789,7 +790,7 @@ export function AiStudioPanel({
                   <div className="relative aspect-video">
                     <video ref={videoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
                     <canvas ref={overlayRef} className="pointer-events-none absolute inset-0 h-full w-full" />
-                    {!cameraActive && (
+                    {!inputActive && (
                       <div className="absolute inset-0 grid place-items-center bg-slate-950/95 p-6 text-center">
                         {isSound ? <Mic size={32} className="mx-auto text-violet-300" /> : <Camera size={32} className="mx-auto text-violet-300" />}
                         <p className="mt-3 text-sm font-black">{isSound ? "Microphone off" : "Camera off"}</p>
@@ -797,7 +798,7 @@ export function AiStudioPanel({
                       </div>
                     )}
                     <div className="absolute left-3 top-3 rounded-full border border-slate-700 bg-slate-950/85 px-2.5 py-1 font-mono text-[9px]">
-                      {loading ? "LOADING" : cameraActive || isSound ? (mode === "trained" ? "MY AI LIVE" : `${activeTitle.toUpperCase()} LIVE`) : "READY"}
+                      {loading ? "LOADING" : inputActive ? (mode === "trained" ? "MY AI LIVE" : `${activeTitle.toUpperCase()} LIVE`) : "READY"}
                     </div>
                   </div>
 
