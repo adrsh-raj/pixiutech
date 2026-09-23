@@ -121,6 +121,7 @@ jobs:
         run: |
           npm ci
           npm run lint
+          node ../scripts/ai-static-check.mjs
           ! grep -RInE 'Zenith Public School|Vikas Pandey|\bZPS\b|\bTR-01\b|\bTR-02\b' src --exclude-dir=node_modules
           ! grep -RInE 'SUPABASE_SERVICE_ROLE_KEY|SUPABASE_SECRET_KEY|sb_secret_|service_role' . --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=dist
           ! grep -RInE 'window\.location\.reload\s*\(' src --exclude-dir=node_modules
