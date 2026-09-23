@@ -265,8 +265,13 @@ export function AiStudioPanel({
   const [training, setTraining] = useState(false)
   const [progress, setProgress] = useState({ epoch: 0, total: 0, accuracy: 0, loss: 0 })
 
-  const videoRef = useRef<HTMLVideoElement | null>(null)
+  // Keep separate video/canvas refs for the full Studio and the compact
+  // floating runtime window. The same MediaStream can safely feed both, so
+  // switching UI state never turns the camera off or loses the overlay target.
+  const studioVideoRef = useRef<HTMLVideoElement | null>(null)
+  const floatingVideoRef = useRef<HTMLVideoElement | null>(null)
   const overlayRef = useRef<HTMLCanvasElement | null>(null)
+  const floatingOverlayRef = useRef<HTMLCanvasElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const resourceRef = useRef<ReadyResource>(null)
   const timerRef = useRef<number | null>(null)
@@ -274,6 +279,8 @@ export function AiStudioPanel({
   const busyRef = useRef(false)
   const fpsStartRef = useRef(0)
   const fpsFramesRef = useRef(0)
+  const dragRef = useRef<{ pointerId: number; offsetX: number; offsetY: number } | null>(null)
+  const [floatingPosition, setFloatingPosition] = useState<{ left: number; top: number } | null>(null)
 
   const classes = useMemo(() => getAiClasses(store.samples), [store.samples])
   const counts = useMemo(() => getSampleCounts(store.samples), [store.samples])
@@ -295,20 +302,9 @@ export function AiStudioPanel({
   }, [isOpen])
 
   function bindExistingCameraToVisibleVideo() {
-    const video = videoRef.current
-    const stream = streamRef.current
-    if (!video || !stream) return false
-
-    if (video.srcObject !== stream) {
-      video.srcObject = stream
-    }
-
-    void video.play().catch(() => {
-      // Autoplay may need a user gesture on some browsers; inference can still
-      // resume once the browser allows playback.
-    })
-
-    return true
+    if (!streamRef.current) return false
+    attachStreamToVisibleVideos()
+    return Boolean(getActiveVideo())
   }
 
   useEffect(() => {
@@ -351,10 +347,65 @@ export function AiStudioPanel({
     }
   }, [store.model])
 
+  function getActiveVideo() {
+    return (isOpen ? studioVideoRef.current : floatingVideoRef.current) ?? studioVideoRef.current ?? floatingVideoRef.current
+  }
+
+  function getActiveOverlay() {
+    return (isOpen ? overlayRef.current : floatingOverlayRef.current) ?? overlayRef.current ?? floatingOverlayRef.current
+  }
+
+  function attachStreamToVisibleVideos() {
+    const stream = streamRef.current
+    if (!stream) return
+
+    for (const video of [studioVideoRef.current, floatingVideoRef.current]) {
+      if (!video) continue
+      if (video.srcObject !== stream) video.srcObject = stream
+      void video.play().catch(() => {})
+    }
+  }
+
   function clearOverlay() {
-    const canvas = overlayRef.current
-    if (!canvas) return
-    canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height)
+    for (const canvas of [overlayRef.current, floatingOverlayRef.current]) {
+      if (!canvas) continue
+      canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height)
+    }
+  }
+
+  function resetFloatingPosition() {
+    setFloatingPosition(null)
+  }
+
+  function handleFloatingPointerDown(event: React.PointerEvent<HTMLDivElement>) {
+    if (event.button !== 0) return
+    const rect = event.currentTarget.getBoundingClientRect()
+    dragRef.current = {
+      pointerId: event.pointerId,
+      offsetX: event.clientX - rect.left,
+      offsetY: event.clientY - rect.top,
+    }
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+
+  function handleFloatingPointerMove(event: React.PointerEvent<HTMLDivElement>) {
+    const drag = dragRef.current
+    if (!drag || drag.pointerId !== event.pointerId) return
+
+    const width = event.currentTarget.offsetWidth || 280
+    const height = event.currentTarget.offsetHeight || 190
+    const margin = 8
+    const left = Math.max(margin, Math.min(window.innerWidth - width - margin, event.clientX - drag.offsetX))
+    const top = Math.max(56, Math.min(window.innerHeight - height - margin, event.clientY - drag.offsetY))
+    setFloatingPosition({ left, top })
+  }
+
+  function handleFloatingPointerUp(event: React.PointerEvent<HTMLDivElement>) {
+    if (dragRef.current?.pointerId !== event.pointerId) return
+    dragRef.current = null
+    try {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    } catch {}
   }
 
   function stopInference() {
@@ -387,7 +438,7 @@ export function AiStudioPanel({
   function stopAll() {
     releaseCurrentResource()
     stopInference()
-    stopCamera(videoRef.current, streamRef.current)
+    stopCamera(getActiveVideo(), streamRef.current)
     streamRef.current = null
     setCameraActive(false)
     setSoundActive(false)
@@ -401,10 +452,11 @@ export function AiStudioPanel({
     releaseCurrentResource()
 
     try {
-      const video = videoRef.current
-      if (!video) throw new Error("Camera preview is not ready.")
+      const video = getActiveVideo()
+      if (!video) throw new Error("Camera preview is not mounted.")
       const stream = await startCamera(video)
       streamRef.current = stream
+      attachStreamToVisibleVideos()
       setCameraActive(true)
       setStatus(withModel ? "Camera live · loading AI" : "Camera live · ready to teach")
       onAiStateChange({
@@ -553,7 +605,7 @@ export function AiStudioPanel({
     const tick = async () => {
       if (
         !streamRef.current ||
-        !videoRef.current ||
+        !getActiveVideo() ||
         activeSession !== sessionRef.current ||
         !resourceRef.current ||
         busyRef.current
@@ -562,7 +614,7 @@ export function AiStudioPanel({
         return
       }
 
-      const video = videoRef.current
+      const video = getActiveVideo()
       if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || !video.videoWidth) {
         timerRef.current = window.setTimeout(tick, 100)
         return
@@ -584,7 +636,7 @@ export function AiStudioPanel({
           const visible = predictions.filter(
             (p: any) => Number(p.score) >= OBJECT_MIN_SCORE,
           )
-          drawBoxes(overlayRef.current!, video, visible.map((p: any) => ({
+          drawBoxes(getActiveOverlay()!, video, visible.map((p: any) => ({
             class: p.class,
             score: p.score,
             bbox: p.bbox,
@@ -609,7 +661,7 @@ export function AiStudioPanel({
         } else if (mode === "pose") {
           const poses = await resourceRef.current.estimatePoses(video)
           if (activeSession !== sessionRef.current) return
-          drawPose(overlayRef.current!, video, poses)
+          drawPose(getActiveOverlay()!, video, poses)
           const pose = poses?.[0]
           const visible = pose?.keypoints?.filter((p: any) => (p.score ?? 0) >= 0.25).length ?? 0
           const score = pose && visible ? pose.keypoints.reduce((s: number, p: any) => s + Number(p.score ?? 0), 0) / pose.keypoints.length : 0
@@ -625,7 +677,7 @@ export function AiStudioPanel({
         } else if (mode === "hands" || mode === "numbers") {
           const result = await resourceRef.current.estimate(video)
           if (activeSession !== sessionRef.current) return
-          drawHands(overlayRef.current!, video, result)
+          drawHands(getActiveOverlay()!, video, result)
           const hand = result?.multiHandLandmarks?.[0]
           const score = hand ? 0.9 : 0
           const count = hand ? countFingers(hand) : 0
@@ -653,7 +705,7 @@ export function AiStudioPanel({
             modelSource: "ready",
             detail: result ? `${result.count} face${result.count === 1 ? "" : "s"} · ${result.expression}` : "Show your face",
           })
-          if (result) drawFace(overlayRef.current!, video, result)
+          if (result) drawFace(getActiveOverlay()!, video, result)
           else clearOverlay()
         } else if (mode === "trained") {
           const frame = captureVideoFrame(video, 640)
@@ -704,7 +756,7 @@ export function AiStudioPanel({
   function stopInput() {
     releaseCurrentResource()
     stopInference()
-    stopCamera(videoRef.current, streamRef.current)
+    stopCamera(getActiveVideo(), streamRef.current)
     streamRef.current = null
     setCameraActive(false)
     setSoundActive(false)
@@ -730,7 +782,7 @@ export function AiStudioPanel({
       setStatus("Enter a concept name first.")
       return
     }
-    const frame = captureVideoFrame(videoRef.current!, 640)
+    const frame = captureVideoFrame(getActiveVideo()!, 640)
     if (!frame) {
       setStatus("Start the camera first.")
       return
@@ -811,18 +863,46 @@ export function AiStudioPanel({
   const inputActive = isSound ? soundActive : cameraActive
 
   if (!isOpen && runtimeEnabled) {
+    const floatingStyle = floatingPosition
+      ? { left: floatingPosition.left, top: floatingPosition.top }
+      : { right: 16, bottom: 76 }
+
     return (
-      <div className="fixed bottom-20 right-4 z-[70] w-[min(280px,calc(100vw-24px))] overflow-hidden rounded-2xl border border-emerald-400/20 bg-slate-950/95 text-white shadow-2xl ring-1 ring-black/40">
-        <div className="flex items-center justify-between border-b border-slate-800 px-3 py-2">
-          <div className="min-w-0">
-            <p className="text-[8px] font-mono uppercase tracking-[0.18em] text-emerald-300">PIXIU AI RUNTIME</p>
-            <p className="truncate text-[10px] font-black">{activeTitle} · {mode === "sound" ? "MIC" : "CAMERA"}</p>
+      <div
+        className="fixed z-[70] w-[min(300px,calc(100vw-20px))] overflow-hidden rounded-2xl border border-emerald-400/25 bg-slate-950/96 text-white shadow-2xl ring-1 ring-black/50 select-none"
+        style={floatingStyle}
+        onPointerMove={handleFloatingPointerMove}
+        onPointerUp={handleFloatingPointerUp}
+        onPointerCancel={handleFloatingPointerUp}
+      >
+        <div
+          className="flex cursor-move touch-none items-center justify-between border-b border-slate-800 bg-slate-950/95 px-3 py-2"
+          onPointerDown={handleFloatingPointerDown}
+        >
+          <div className="flex min-w-0 items-center gap-2">
+            <GripVertical size={12} className="shrink-0 text-slate-500" />
+            <div className="min-w-0">
+              <p className="text-[8px] font-mono uppercase tracking-[0.18em] text-emerald-300">PIXIU AI RUNTIME</p>
+              <p className="truncate text-[10px] font-black">{activeTitle} · {mode === "sound" ? "MIC" : "CAMERA"}</p>
+            </div>
           </div>
-          <span className="ml-2 shrink-0 rounded-full border border-emerald-400/20 px-2 py-1 text-[8px] font-mono text-emerald-300">LIVE</span>
+          <div className="ml-2 flex shrink-0 items-center gap-1.5">
+            <button
+              type="button"
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={resetFloatingPosition}
+              className="rounded-md px-1.5 py-1 text-[8px] font-mono text-slate-500 hover:bg-slate-800 hover:text-white"
+              title="Reset camera position"
+            >
+              RESET
+            </button>
+            <span className="rounded-full border border-emerald-400/20 px-2 py-1 text-[8px] font-mono text-emerald-300">LIVE</span>
+          </div>
         </div>
+
         <div className="relative aspect-video bg-black">
-          <video ref={videoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
-          <canvas ref={overlayRef} className="pointer-events-none absolute inset-0 h-full w-full" />
+          <video ref={floatingVideoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
+          <canvas ref={floatingOverlayRef} className="pointer-events-none absolute inset-0 h-full w-full" />
           <div className="absolute bottom-2 left-2 max-w-[calc(100%-16px)] truncate rounded-md bg-slate-950/85 px-2 py-1 text-[9px] font-mono">
             {aiState.detectedClass === "none" ? status : aiState.detectedClass + " · " + aiState.confidence + "%"}
           </div>
@@ -830,6 +910,7 @@ export function AiStudioPanel({
       </div>
     )
   }
+
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/80 p-3 backdrop-blur-sm sm:p-5">
@@ -844,7 +925,7 @@ export function AiStudioPanel({
               <h2 className="text-sm font-black sm:text-base">Try AI · Teach AI · Connect AI</h2>
             </div>
           </div>
-          <button onClick={() => { stopInput(); onClose() }} className="rounded-xl p-2 text-slate-500 hover:bg-slate-800 hover:text-white" aria-label="Close AI Studio">
+          <button onClick={onClose} className="rounded-xl p-2 text-slate-500 hover:bg-slate-800 hover:text-white" aria-label="Minimize AI Studio">
             <X size={17} />
           </button>
         </header>
