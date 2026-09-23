@@ -25,7 +25,7 @@ import { SerialMonitor, type SerialLine } from "./serial-monitor"
 import { StatusBar } from "./status-bar"
 import { TemplateBrowser } from "./template-browser"
 import { LessonBrowser } from "./lesson-browser"
-import { AiCameraPanel, type AiVisionState } from "./ai-camera-panel"
+import { AiStudioPanel, type AiVisionState } from "./ai-studio-panel"
 import { ContextMenu, type ContextMenuTarget } from "./context-menu"
 import type { ProjectTemplate } from "@/lib/templates"
 import { getLessonSeed, type Lesson } from "@/lib/lesson-engine"
@@ -172,9 +172,12 @@ export function Workbench() {
     setContextMenu({ x: e.clientX, y: e.clientY, target })
   }, [])
   const [aiState, setAiState] = useState<AiVisionState>({
-    enabled: true,
+    enabled: false,
+    mode: "camera",
     detectedClass: "none",
     confidence: 0,
+    allDetections: [],
+    detail: "Camera idle",
   })
   const aiStateRef = useRef(aiState)
   useEffect(() => {
@@ -982,7 +985,7 @@ export function Workbench() {
       />
 
       {/* PictoBlox AI Vision Floating Camera HUD */}
-      <AiCameraPanel
+      <AiStudioPanel
         isOpen={isAiCameraOpen}
         onClose={() => setIsAiCameraOpen(false)}
         aiState={aiState}
