@@ -90,7 +90,8 @@ export function evaluateNumber(target: Blockly.Block | null, env?: ExecutionEnvi
     const outMin = evaluateNumber(target.getInputTargetBlock("OUT_MIN"), env, 0)
     const outMax = evaluateNumber(target.getInputTargetBlock("OUT_MAX"), env, 255)
     if (inMax === inMin) return outMin
-    return ((value - inMin) * (outMax - outMin)) / (inMax - inMin) + outMin
+    // Match Arduino map() semantics: linear scaling with integer output.
+    return Math.trunc(((value - inMin) * (outMax - outMin)) / (inMax - inMin) + outMin)
   }
   if (target.type === "ai_confidence") {
     return env?.getAiConfidence ? env.getAiConfidence() : 0
