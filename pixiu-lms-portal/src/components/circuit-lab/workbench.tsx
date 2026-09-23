@@ -665,19 +665,22 @@ export function Workbench() {
   }, [stopProgram, updateState])
 
   const toggleRun = useCallback(() => {
-    setRunning((r) => {
-      const next = !r
-      if (next) {
-        setWiring(null)
-        setSelectedId(null)
-        setSelectedWireId(null)
-        startProgram(false, true)
-      } else {
-        setPressed(new Set())
-        stopProgram()
-      }
-      return next
-    })
+    // Do not perform start/stop side effects inside a React state updater.
+    // The previous version did that, which could batch the AI-camera state
+    // updates with setRunning and leave the floating presentation out of sync.
+    if (runningRef.current) {
+      runningRef.current = false
+      setRunning(false)
+      setPressed(new Set())
+      stopProgram()
+      return
+    }
+
+    setWiring(null)
+    setSelectedId(null)
+    setSelectedWireId(null)
+    setRunning(true)
+    startProgram(false, true)
   }, [startProgram, stopProgram])
 
   // AI Studio uses this entry point so "Run circuit" closes the AI overlay
@@ -934,6 +937,7 @@ export function Workbench() {
       // actually starts running.
       setIsAiCameraOpen(false)
       setAiRuntimeEnabled(false)
+      setAiCameraCompact(false)
     },
     [stopProgram, updateState],
   )
