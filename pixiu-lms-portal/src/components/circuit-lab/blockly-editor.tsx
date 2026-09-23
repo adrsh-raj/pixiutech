@@ -167,6 +167,13 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
     workspaceRef.current = workspace
     onWorkspaceReady?.(workspace)
 
+    // Seed a couple of beginner-friendly variables so the Variables flyout
+    // immediately offers the familiar "set value to" pattern used in lessons.
+    if (workspace.getAllVariables().length === 0) {
+      workspace.createVariable("value")
+      workspace.createVariable("brightness")
+    }
+
     // Load initial Arduino Program block
     const initialXml = xml || `<xml xmlns="https://developers.google.com/blockly/xml">
       <block type="arduino_program" x="40" y="40">
