@@ -455,6 +455,10 @@ export function Workbench() {
       blocklyXml.includes("ai_confidence") ||
       blocklyXml.includes("ai_camera_enable")
     )
+    // AI runs should stay on the Circuit canvas while the camera becomes a
+    // small floating PiP. This also makes Run from Code view land on the
+    // simulator instead of leaving the student in generated code.
+    if (usesAi) setView("circuit")
     setIsAiCameraOpen(false)
     setAiRuntimeEnabled(openAiHud && usesAi)
 
@@ -916,11 +920,11 @@ export function Workbench() {
       setWiring(null)
       setSerialLines([])
       const tmplUsesAi = tmpl.tags.includes("AI Vision") || tmpl.id.includes("ai") || tmpl.blocklyXml.includes('type="ai_')
-      if (tmplUsesAi) {
-        setIsAiCameraOpen(true)
-      } else {
-        setIsAiCameraOpen(false)
-      }
+      // Selecting a template should not cover the simulator with the full
+      // AI Studio. The camera is enabled automatically when the AI program
+      // actually starts running.
+      setIsAiCameraOpen(false)
+      setAiRuntimeEnabled(false)
     },
     [stopProgram, updateState],
   )
