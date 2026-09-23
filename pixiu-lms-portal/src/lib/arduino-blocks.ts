@@ -415,19 +415,11 @@ export function defineArduinoBlocks() {
     init() {
       this.appendDummyInput()
         .appendField('🤖 AI sees')
-        .appendField(
-          new Blockly.FieldDropdown([
-            ['🚗 car', 'car'],
-            ['👤 person', 'person'],
-            ['📱 phone', 'phone'],
-            ['✋ hand', 'hand'],
-          ]),
-          'CLASS',
-        )
+        .appendField(new Blockly.FieldTextInput('car'), 'CLASS')
         .appendField('?')
       this.setOutput(true, 'Boolean')
       this.setColour(285)
-      this.setTooltip('Returns true if the AI vision camera sees the selected object.')
+      this.setTooltip('Returns true when the normalized AI class matches this label.')
     },
   }
 
