@@ -27,7 +27,13 @@ export function setPinContext(circuit: CircuitState) {
 function pinDropdown(): [string, string][] {
   const opts = getPinOptions(currentCircuit)
   if (opts.length === 0) return [["13", "13"]]
-  return opts.map((o) => [o.label, o.code])
+
+  // Put pins that are actually wired in the current circuit first. This makes
+  // newly added output/input blocks default to a meaningful connected pin
+  // instead of always starting at pin 0.
+  const connected = opts.filter((o) => o.connected)
+  const free = opts.filter((o) => !o.connected)
+  return [...connected, ...free].map((o) => [o.label, o.code])
 }
 
 function componentDropdown(types: string[], emptyLabel = "Add component first"): () => [string, string][] {
