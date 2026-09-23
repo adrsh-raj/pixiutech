@@ -4,33 +4,31 @@ declare global {
   interface Window {
     tf?: typeof tf
     poseDetection?: any
-    Hands?: any
-    faceapi?: any
+    Human?: any
     speechCommands?: any
   }
 }
 
 const scriptLoads = new Map<string, Promise<void>>()
-let emotionPromise: Promise<any> | null = null
 
 const CDN = {
   pose: [
     "https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.min.js",
     "https://unpkg.com/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.min.js",
   ],
-  hands: [
-    "https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js",
-    "https://unpkg.com/@mediapipe/hands/hands.js",
-  ],
-  face: [
-    "https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js",
-    "https://unpkg.com/face-api.js@0.22.2/dist/face-api.min.js",
+  human: [
+    "https://cdn.jsdelivr.net/npm/@vladmandic/human@3.3.6/dist/human.js",
+    "https://unpkg.com/@vladmandic/human@3.3.6/dist/human.js",
   ],
   speech: [
     "https://cdn.jsdelivr.net/npm/@tensorflow-models/speech-commands@0.5.4/dist/speech-commands.min.js",
     "https://unpkg.com/@tensorflow-models/speech-commands@0.5.4/dist/speech-commands.min.js",
   ],
 }
+
+const HUMAN_VERSION = "3.3.6"
+const HUMAN_MODEL_BASE =
+  "https://cdn.jsdelivr.net/npm/@vladmandic/human@3.3.6/models/"
 
 async function ensureTfReady() {
   if (typeof window !== "undefined") window.tf = tf
@@ -58,7 +56,9 @@ function loadScript(src: string, ready: () => boolean): Promise<void> {
   if (existing) return existing
 
   const promise = new Promise<void>((resolve, reject) => {
-    const current = document.querySelector<HTMLScriptElement>(`script[data-pixiu-ai-src="${src}"]`)
+    const current = document.querySelector<HTMLScriptElement>(
+      `script[data-pixiu-ai-src="${src}"]`,
+    )
 
     if (current && ready()) {
       resolve()
@@ -91,6 +91,7 @@ function loadScript(src: string, ready: () => boolean): Promise<void> {
 
     script.addEventListener("load", onLoad, { once: true })
     script.addEventListener("error", onError, { once: true })
+
     if (!current) {
       script.async = true
       script.src = src
@@ -127,6 +128,35 @@ async function loadAny(sources: string[], ready: () => boolean): Promise<string>
     : new Error("The AI module could not be loaded.")
 }
 
+async function loadHuman(config: Record<string, unknown>) {
+  await loadAny(CDN.human, () => Boolean(window.Human))
+
+  if (!window.Human?.Human) {
+    throw new Error(`Human AI ${HUMAN_VERSION} did not initialize.`)
+  }
+
+  const human = new window.Human.Human({
+    backend: "webgl",
+    debug: false,
+    cacheModels: true,
+    cacheSensitivity: 0,
+    modelBasePath: HUMAN_MODEL_BASE,
+    filter: { enabled: false },
+    face: { enabled: false },
+    body: { enabled: false },
+    hand: { enabled: false },
+    object: { enabled: false },
+    gesture: { enabled: false },
+    segmentation: { enabled: false },
+    ...config,
+  })
+
+  // Explicit preload turns model/network errors into the adapter's startup
+  // error instead of surfacing them later during the first camera frame.
+  await human.load()
+  return human
+}
+
 export async function loadPoseDetector() {
   await ensureTfReady()
   await loadAny(CDN.pose, () => Boolean(window.poseDetection))
@@ -140,92 +170,124 @@ export async function loadPoseDetector() {
   )
 }
 
+/**
+ * 6D Hand AI
+ *
+ * Uses the maintained Human browser library (v3.3.6) with hand tracking and
+ * hand-landmark models enabled only for this adapter. The adapter exposes the
+ * old normalized shape consumed by the AI Studio drawing/inference layer so
+ * the rest of the application stays model-agnostic.
+ */
 export async function loadHandDetector() {
-  const source = await loadAny(CDN.hands, () => Boolean(window.Hands))
-  const sourceBase = source.slice(0, source.lastIndexOf("/") + 1)
-
-  const hands = new window.Hands({
-    locateFile: (file: string) => `${sourceBase}${file}`,
-  })
-
-  hands.setOptions({
-    maxNumHands: 2,
-    modelComplexity: 1,
-    minDetectionConfidence: 0.55,
-    minTrackingConfidence: 0.55,
-  })
-
-  let pending: ((result: any) => void) | null = null
-  let rejected: ((error: unknown) => void) | null = null
-
-  hands.onResults((result: any) => {
-    const resolve = pending
-    pending = null
-    rejected = null
-    resolve?.(result)
+  const human = await loadHuman({
+    hand: {
+      enabled: true,
+      rotation: false,
+      maxDetected: 2,
+      minConfidence: 0.5,
+      iouThreshold: 0.2,
+      landmarks: true,
+      detector: { modelPath: "handtrack.json" },
+      skeleton: { modelPath: "handlandmark-lite.json" },
+    },
+    gesture: { enabled: true },
   })
 
   return {
+    version: HUMAN_VERSION,
     async estimate(video: HTMLVideoElement) {
-      if (pending) {
-        throw new Error("Hand AI is already processing a frame.")
+      const result = await human.detect(video)
+      const hands = Array.isArray(result?.hand) ? result.hand : []
+
+      return {
+        human: result,
+        multiHandLandmarks: hands.map((hand: any) =>
+          (hand.keypoints ?? []).map((point: any) => ({
+            x: Number(point?.[0] ?? 0),
+            y: Number(point?.[1] ?? 0),
+            z: Number(point?.[2] ?? 0),
+          })),
+        ),
       }
-
-      return new Promise<any>((resolve, reject) => {
-        pending = resolve
-        rejected = reject
-
-        Promise.resolve(hands.send({ image: video })).catch((error) => {
-          const rejectCurrent = rejected
-          pending = null
-          rejected = null
-          rejectCurrent?.(error)
-        })
-      })
     },
     async dispose() {
-      pending = null
-      rejected = null
-      await hands.close?.()
+      try {
+        human.reset?.()
+      } catch {
+        // Best effort. Human keeps model cache separate from app state.
+      }
     },
   }
 }
 
+/**
+ * 6E Face AI
+ *
+ * face-api.js 0.22.2 is no longer the maintained path for this project.
+ * Human 3.3.6 provides browser face detection, mesh/landmarks and emotion
+ * analysis on a maintained TensorFlow.js stack.
+ */
 export async function loadFaceEmotion() {
-  await ensureTfReady()
+  const human = await loadHuman({
+    face: {
+      enabled: true,
+      detector: {
+        rotation: false,
+        maxDetected: 2,
+        minConfidence: 0.45,
+        minSize: 80,
+        return: false,
+      },
+      mesh: { enabled: true },
+      iris: { enabled: false },
+      description: { enabled: false },
+      emotion: { enabled: true, minConfidence: 0.15 },
+      antispoof: { enabled: false },
+      liveness: { enabled: false },
+    },
+    gesture: { enabled: true },
+  })
 
-  if (emotionPromise) return emotionPromise
-
-  emotionPromise = (async () => {
-    await loadAny(CDN.face, () => Boolean(window.faceapi))
-
-    const bases = [
-      "https://justadudewhohacks.github.io/face-api.js/models",
-      "https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights",
-    ]
-
-    let lastError: unknown = null
-
-    for (const base of bases) {
+  return {
+    version: HUMAN_VERSION,
+    async detect(video: HTMLVideoElement) {
+      return human.detect(video)
+    },
+    async dispose() {
       try {
-        await window.faceapi.nets.tinyFaceDetector.loadFromUri(base)
-        await window.faceapi.nets.faceExpressionNet.loadFromUri(base)
-        return window.faceapi
-      } catch (error) {
-        lastError = error
+        human.reset?.()
+      } catch {
+        // Best effort cleanup.
       }
-    }
+    },
+  }
+}
 
-    throw lastError instanceof Error
-      ? lastError
-      : new Error("Emotion model weights could not be loaded.")
-  })()
+export async function estimateFaceEmotion(faceRuntime: any, video: HTMLVideoElement) {
+  const result = await faceRuntime.detect(video)
+  const faces = Array.isArray(result?.face) ? result.face : []
+  const primary = faces[0]
 
-  try {
-    return await emotionPromise
-  } catch (error) {
-    emotionPromise = null
-    throw error
+  if (!primary) return null
+
+  const emotions = Array.isArray(primary.emotion) ? primary.emotion : []
+  const [top] = [...emotions].sort(
+    (a: any, b: any) => Number(b?.score ?? 0) - Number(a?.score ?? 0),
+  )
+
+  return {
+    expression: String(top?.emotion ?? "neutral"),
+    score: Number(top?.score ?? 0),
+    count: faces.length,
+    box: Array.isArray(primary.box)
+      ? primary.box.map((value: unknown) => Number(value))
+      : null,
+    mesh: Array.isArray(primary.mesh)
+      ? primary.mesh.map((point: any) => ({
+          x: Number(point?.[0] ?? 0),
+          y: Number(point?.[1] ?? 0),
+        }))
+      : [],
   }
 }
 
@@ -238,34 +300,13 @@ export async function loadSpeechRecognizer() {
   return recognizer
 }
 
-export async function estimateFaceEmotion(faceapi: any, video: HTMLVideoElement) {
-  const options = new faceapi.TinyFaceDetectorOptions({
-    inputSize: 224,
-    scoreThreshold: 0.5,
-  })
-
-  const results = await faceapi
-    .detectAllFaces(video, options)
-    .withFaceExpressions()
-
-  const primary = results?.[0]
-  if (!primary?.expressions) return null
-
-  const entries = Object.entries(primary.expressions as Record<string, number>)
-    .sort((a, b) => b[1] - a[1])
-
-  const [expression, score] = entries[0] ?? ["unknown", 0]
-  return {
-    expression,
-    score: Number(score),
-    count: results.length,
-  }
-}
-
 export function disposeAiResource(resource: any) {
   try {
-    if (resource?.dispose) resource.dispose()
-    else if (resource?.close) void resource.close()
+    if (resource?.dispose) {
+      void resource.dispose()
+    } else if (resource?.close) {
+      void resource.close()
+    }
   } catch {
     // Best effort cleanup for browser-backed models.
   }
