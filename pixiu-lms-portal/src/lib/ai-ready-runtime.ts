@@ -12,8 +12,9 @@ declare global {
 
 const scriptLoads = new Map<string, Promise<void>>()
 let emotionModelsPromise: Promise<any> | null = null
+const SCRIPT_TIMEOUT_MS = 30_000
 
-function loadScript(src: string, ready: () => boolean): Promise<void> {
+function loadScript(src: string, ready: () => boolean, label: string): Promise<void> {
   if (typeof window === "undefined") {
     return Promise.reject(new Error("AI Studio needs a browser."))
   }
@@ -28,15 +29,24 @@ function loadScript(src: string, ready: () => boolean): Promise<void> {
       `script[data-pixiu-ai="${src}"]`,
     )
 
+    let timer: number | null = null
+    let settled = false
+    const finish = (error?: Error) => {
+      if (settled) return
+      settled = true
+      if (timer !== null) window.clearTimeout(timer)
+      if (error) reject(error)
+      else if (ready()) resolve()
+      else reject(new Error(`${label} loaded but did not initialize.`))
+    }
+
     if (current) {
-      const finish = () => (ready() ? resolve() : reject(new Error("AI module loaded but did not initialize.")))
       if (ready()) {
         finish()
       } else {
-        current.addEventListener("load", finish, { once: true })
-        current.addEventListener("error", () => reject(new Error("AI module could not be loaded.")), {
-          once: true,
-        })
+        current.addEventListener("load", () => finish(), { once: true })
+        current.addEventListener("error", () => finish(new Error(`${label} could not be loaded.`)), { once: true })
+        timer = window.setTimeout(() => finish(new Error(`${label} timed out while loading.`)), SCRIPT_TIMEOUT_MS)
       }
       return
     }
@@ -45,31 +55,43 @@ function loadScript(src: string, ready: () => boolean): Promise<void> {
     script.src = src
     script.async = true
     script.dataset.pixiuAi = src
-    script.onload = () => (ready() ? resolve() : reject(new Error("AI module loaded but did not initialize.")))
-    script.onerror = () => reject(new Error("AI module could not be loaded."))
+    script.onload = () => finish()
+    script.onerror = () => finish(new Error(`${label} could not be loaded.`))
     document.head.appendChild(script)
+    timer = window.setTimeout(() => finish(new Error(`${label} timed out while loading.`)), SCRIPT_TIMEOUT_MS)
   })
 
   scriptLoads.set(src, promise)
-
-  promise.catch(() => {
-    scriptLoads.delete(src)
-  })
-
+  promise.catch(() => scriptLoads.delete(src))
   return promise
 }
 
-function ensureTfGlobal() {
-  if (typeof window !== "undefined" && !window.tf) {
-    window.tf = tf
+async function ensureTfReady() {
+  if (typeof window === "undefined") {
+    throw new Error("AI Studio needs a browser.")
+  }
+
+  // All browser-loaded AI libraries must use the same TensorFlow.js instance.
+  window.tf = tf
+  await tf.ready()
+
+  if (!tf.getBackend()) {
+    try {
+      await tf.setBackend("webgl")
+    } catch {
+      await tf.setBackend("cpu")
+    }
+    await tf.ready()
   }
 }
 
 export async function loadPoseDetector() {
   ensureTfGlobal()
+  await ensureTfReady()
   await loadScript(
     "https://unpkg.com/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.min.js",
     () => Boolean(window.poseDetection),
+    "Pose AI",
   )
 
   if (!window.poseDetection) throw new Error("Pose AI is unavailable.")
@@ -85,9 +107,11 @@ export async function loadPoseDetector() {
 
 export async function loadHandDetector() {
   ensureTfGlobal()
+  await ensureTfReady()
   await loadScript(
     "https://unpkg.com/@tensorflow-models/handpose@0.1.0/dist/handpose.min.js",
     () => Boolean(window.handpose),
+    "Hand AI",
   )
 
   if (!window.handpose) throw new Error("Hand AI is unavailable.")
@@ -101,7 +125,7 @@ export async function loadHandDetector() {
 }
 
 export async function loadFaceEmotion() {
-  ensureTfGlobal()
+  await ensureTfReady()
 
   if (emotionModelsPromise) return emotionModelsPromise
 
@@ -109,6 +133,7 @@ export async function loadFaceEmotion() {
     await loadScript(
       "https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js",
       () => Boolean(window.faceapi),
+      "Expression AI",
     )
 
     if (!window.faceapi) throw new Error("Expression AI is unavailable.")
@@ -116,8 +141,12 @@ export async function loadFaceEmotion() {
     const modelBase =
       "https://justadudewhohacks.github.io/face-api.js/models"
 
-    await window.faceapi.nets.tinyFaceDetector.loadFromUri(modelBase)
-    await window.faceapi.nets.faceExpressionNet.loadFromUri(modelBase)
+    try {
+      await window.faceapi.nets.tinyFaceDetector.loadFromUri(modelBase)
+      await window.faceapi.nets.faceExpressionNet.loadFromUri(modelBase)
+    } catch {
+      throw new Error("Expression AI model files could not be loaded. Check your internet connection and try again.")
+    }
 
     return window.faceapi
   })()
@@ -131,11 +160,12 @@ export async function loadFaceEmotion() {
 }
 
 export async function loadSpeechRecognizer() {
-  ensureTfGlobal()
+  await ensureTfReady()
 
   await loadScript(
     "https://unpkg.com/@tensorflow-models/speech-commands@0.5.4/dist/speech-commands.min.js",
     () => Boolean(window.speechCommands),
+    "Sound AI",
   )
 
   if (!window.speechCommands) throw new Error("Sound AI is unavailable.")
