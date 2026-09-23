@@ -251,28 +251,6 @@ export function AiCameraPanel({
 
   if (!isOpen) return null
 
-  const handleManualTarget = (cls: "car" | "person" | "phone" | "none", conf = 94) => {
-    manualOverrideRef.current = cls !== "none"
-    onAiStateChange({
-      ...aiState,
-      enabled: true,
-      mode: "objects",
-      detectedClass: cls,
-      confidence: cls === "none" ? 0 : conf,
-      modelSource: "ready",
-      detail: cls === "none" ? "Looking..." : "Manual test · " + cls,
-    })
-  }
-
-  const resetToRealCamera = () => {
-    manualOverrideRef.current = false
-    onAiStateChange({
-      ...aiState,
-      detectedClass: "none",
-      confidence: 0,
-    })
-  }
-
   return (
     <div
       className={`fixed bottom-12 right-6 z-40 flex flex-col rounded-2xl border border-purple-500/40 bg-slate-950/95 shadow-2xl backdrop-blur-md text-white overflow-hidden transition-all duration-300 ${
@@ -343,14 +321,15 @@ export function AiCameraPanel({
                     ? "Loading AI Vision Model..."
                     : "Turn on your webcam to detect objects and open the barrier gate!"}
                 </p>
-                <button
-                  onClick={() => setCameraActive(true)}
-                  disabled={modelLoading}
-                  className="mt-1 flex items-center gap-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 disabled:opacity-50 px-3 py-1.5 text-xs font-semibold text-white transition shadow-md shadow-purple-500/20"
-                >
-                  <Camera size={13} />
-                  <span>Start Live Webcam AI</span>
-                </button>
+                {runtimeEnabled ? (
+                  <span className="mt-1 inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-[11px] font-semibold text-emerald-200">
+                    Arduino AI runtime starting…
+                  </span>
+                ) : (
+                  <span className="mt-1 inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-[11px] font-semibold text-slate-400">
+                    Run an AI Arduino program to start
+                  </span>
+                )}
               </div>
             )}
 
