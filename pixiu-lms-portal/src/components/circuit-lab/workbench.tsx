@@ -668,6 +668,16 @@ export function Workbench() {
     })
   }, [startProgram, stopProgram])
 
+  // AI Studio uses this entry point so "Run circuit" closes the AI overlay
+  // and takes the student directly to the Circuit Simulator view.
+  const handleRunFromAiStudio = useCallback(() => {
+    setIsAiCameraOpen(false)
+    setView("circuit")
+    if (!runningRef.current) {
+      toggleRun()
+    }
+  }, [toggleRun])
+
   // Keyboard shortcut listener and DevTools protection (placed after toggleRun and edit callbacks)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
