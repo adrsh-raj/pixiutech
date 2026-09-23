@@ -211,26 +211,6 @@ function drawHands(canvas: HTMLCanvasElement, video: HTMLVideoElement, results: 
       ctx.fill()
     }
   }
-}function drawHands(canvas: HTMLCanvasElement, video: HTMLVideoElement, results: any) {
-  const width = video.videoWidth || 640
-  const height = video.videoHeight || 480
-  if (canvas.width !== width || canvas.height !== height) {
-    canvas.width = width
-    canvas.height = height
-  }
-
-  const ctx = canvas.getContext("2d")
-  if (!ctx) return
-  ctx.clearRect(0, 0, canvas.width, canvas.height)
-  ctx.fillStyle = "#38bdf8"
-
-  for (const hand of results?.multiHandLandmarks ?? []) {
-    for (const point of hand) {
-      ctx.beginPath()
-      ctx.arc(point.x * width, point.y * height, 4, 0, Math.PI * 2)
-      ctx.fill()
-    }
-  }
 }
 
 function drawFace(canvas: HTMLCanvasElement, video: HTMLVideoElement, result: any) {
