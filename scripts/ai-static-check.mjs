@@ -54,9 +54,8 @@ requireText(workbench, "setAiCamera:", "AI camera bridge")
 for (const needle of ["frameBusyRef", "setTestImage", "inFlightRef"]) {
   forbidText(panel, needle, "AI panel legacy reference")
 }
-for (const needle of ["STORE_KEY = \"pixiu-ai-studio-v1\"", "MODEL_KEY = \"pixiu-ai-studio-model-v1\""]) {
-  forbidText(engine, needle, "AI storage legacy version")
-}
+requireText(engine, 'const LEGACY_STORE_KEY = "pixiu-ai-studio-v1"', "legacy cleanup key")
+requireText(engine, 'const LEGACY_MODEL_KEY = "pixiu-ai-studio-model-v1"', "legacy cleanup model key")
 requireText(engine, 'STORE_KEY = "pixiu-ai-studio-v2"', "AI store version")
 requireText(engine, 'MODEL_KEY = "pixiu-ai-studio-model-v2"', "AI model version")
 requireText(runtime, "loadAny", "AI CDN fallback")
