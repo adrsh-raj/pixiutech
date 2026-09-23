@@ -1005,7 +1005,7 @@ export function Workbench() {
           aiState={aiState}
           onAiStateChange={setAiState}
           isSimRunning={running}
-          onStartSim={toggleRun}
+          onStartSim={handleRunFromAiStudio}
         />
       </Suspense>
 
