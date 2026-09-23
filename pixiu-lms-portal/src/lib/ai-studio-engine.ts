@@ -28,7 +28,9 @@ export type AiStudioStore = {
 }
 
 const STORE_KEY = "pixiu-ai-studio-v2"
+const LEGACY_STORE_KEY = "pixiu-ai-studio-v1"
 const MODEL_KEY = "pixiu-ai-studio-model-v2"
+const LEGACY_MODEL_KEY = "pixiu-ai-studio-model-v1"
 const INPUT_W = 16
 const INPUT_H = 16
 const INPUT_C = 3
@@ -46,10 +48,16 @@ function safeParse<T>(value: string | null, fallback: T): T {
 
 export function loadAiStudioStore(): AiStudioStore {
   if (typeof window === "undefined") return { samples: [], model: null }
-  const store = safeParse<AiStudioStore>(window.localStorage.getItem(STORE_KEY), { samples: [], model: null })
+  const storedValue =
+    window.localStorage.getItem(STORE_KEY) ??
+    window.localStorage.getItem(LEGACY_STORE_KEY)
+  const store = safeParse<AiStudioStore>(storedValue, { samples: [], model: null })
+
   return {
     samples: Array.isArray(store.samples) ? store.samples : [],
-    model: store.model ?? null,
+    model: window.localStorage.getItem(STORE_KEY)
+      ? store.model ?? null
+      : null,
   }
 }
 
@@ -65,8 +73,10 @@ export function saveAiStudioStore(store: AiStudioStore) {
 export function clearAiStudioStore() {
   if (typeof window !== "undefined") {
     window.localStorage.removeItem(STORE_KEY)
+    window.localStorage.removeItem(LEGACY_STORE_KEY)
   }
   void deleteStoredModel()
+  void tf.io.removeModel(`indexeddb://${LEGACY_MODEL_KEY}`).catch(() => {})
 }
 
 export function addAiSample(store: AiStudioStore, label: string, dataUrl: string): AiStudioStore {
@@ -205,7 +215,7 @@ export async function trainAiModel(
       },
     })
 
-    const evaluation = model.evaluate(xs, ys) as tf.Scalar | tf.Scalar[]
+    const evaluation = model.evaluate(xs as tf.Tensor, ys as tf.Tensor) as tf.Scalar | tf.Scalar[]
     const evalItems = Array.isArray(evaluation) ? evaluation : [evaluation]
     const trainLoss = Number((await evalItems[0].data())[0])
     const trainAccuracy = evalItems[1] ? Number((await evalItems[1].data())[0]) : latestAccuracy
