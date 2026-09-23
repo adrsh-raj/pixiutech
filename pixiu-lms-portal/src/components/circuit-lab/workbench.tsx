@@ -424,6 +424,11 @@ export function Workbench() {
     setIsPaused(false)
     isPausedRef.current = false
     setActiveStepBlock(null)
+  }, [])
+
+  // AI runtime lifecycle is independent from the simulator runner. Stopping or
+  // restarting Arduino execution must not tear down the live camera PiP.
+  const stopAiRuntime = useCallback(() => {
     setAiRuntimeEnabled(false)
     setAiCameraCompact(false)
     setIsAiCameraOpen(false)
@@ -443,9 +448,8 @@ export function Workbench() {
     // Only run Arduino code and AI Vision if an Arduino board actually exists in the circuit
     const hasArduino = state.parts.some((p) => p.type === "arduino-uno")
     if (!hasArduino) {
-      // Pure DC circuit (battery, resistor, LED, etc.) - no Arduino code, no AI camera
-      setIsAiCameraOpen(false)
-      setAiRuntimeEnabled(false)
+      // Pure DC circuit (battery, resistor, LED, etc.) - no Arduino code, no AI camera.
+      stopAiRuntime()
       return
     }
 
@@ -465,9 +469,7 @@ export function Workbench() {
       setAiCameraCompact(true)
       setAiRuntimeEnabled(true)
     } else {
-      setIsAiCameraOpen(false)
-      setAiCameraCompact(false)
-      setAiRuntimeEnabled(false)
+      stopAiRuntime()
     }
 
     try {
@@ -601,7 +603,7 @@ export function Workbench() {
     } catch (err) {
       console.error("Failed to run Blockly program:", err)
     }
-  }, [blocklyXml, state.parts, stopProgram])
+  }, [blocklyXml, state.parts, stopProgram, stopAiRuntime])
 
   const handlePause = useCallback(() => {
     setIsPaused(true)
@@ -657,7 +659,7 @@ export function Workbench() {
     setPressed(new Set())
     setSerialLines([])
     setBlocklyXml(DEFAULT_XML)
-    setIsAiCameraOpen(false)
+    stopAiRuntime()
     setProbeRed(null)
     setProbeBlack(null)
     setScopeProbeCH1(null)
@@ -853,12 +855,12 @@ export function Workbench() {
     setSelectedWireId(null)
     setWiring(null)
     setSerialLines([])
-    setIsAiCameraOpen(false)
+    stopAiRuntime()
     setIsDmmOpen(false)
     setIsScopeOpen(false)
     setLastSaved(saved.savedAt)
     setIsDirty(false)
-  }, [stopProgram])
+  }, [stopProgram, stopAiRuntime])
 
   const handleLoadProject = useCallback(async (project: SavedCircuit): Promise<void> => {
     stopProgram()
@@ -870,12 +872,12 @@ export function Workbench() {
     setSelectedWireId(null)
     setWiring(null)
     setSerialLines([])
-    setIsAiCameraOpen(false)
+    stopAiRuntime()
     setIsDmmOpen(false)
     setIsScopeOpen(false)
     setLastSaved(project.savedAt)
     setIsDirty(false)
-  }, [stopProgram])
+  }, [stopProgram, stopAiRuntime])
 
   const handleNewProject = useCallback(async (): Promise<void> => {
     stopProgram()
@@ -889,10 +891,10 @@ export function Workbench() {
     setSelectedWireId(null)
     setWiring(null)
     setSerialLines([])
-    setIsAiCameraOpen(false)
+    stopAiRuntime()
     setIsDmmOpen(false)
     setIsScopeOpen(false)
-  }, [stopProgram])
+  }, [stopProgram, stopAiRuntime])
 
   const handleSelectLesson = useCallback((lesson: Lesson) => {
     setActiveLessonId(lesson.id)
@@ -913,11 +915,11 @@ export function Workbench() {
       setSerialLines([])
       setIsDmmOpen(false)
       setIsScopeOpen(false)
-      setIsAiCameraOpen(false)
+      stopAiRuntime()
       setActiveLessonId(lesson.id)
       setView("circuit")
     },
-    [stopProgram, updateState],
+    [stopProgram, stopAiRuntime, updateState],
   )
 
   const handleSelectTemplate = useCallback(
@@ -931,16 +933,33 @@ export function Workbench() {
       setSelectedWireId(null)
       setWiring(null)
       setSerialLines([])
-      const tmplUsesAi = tmpl.tags.includes("AI Vision") || tmpl.id.includes("ai") || tmpl.blocklyXml.includes('type="ai_')
-      // Selecting a template should not cover the simulator with the full
-      // AI Studio. The camera is enabled automatically when the AI program
-      // actually starts running.
-      setIsAiCameraOpen(false)
-      setAiRuntimeEnabled(false)
-      setAiCameraCompact(false)
+      // Selecting a template replaces the active program context, so stop the
+      // current AI runtime before loading the new program.
+      stopAiRuntime()
     },
-    [stopProgram, updateState],
+    [stopProgram, stopAiRuntime, updateState],
   )
+
+  const handleAiStudioClose = useCallback(() => {
+    // While an AI program is running, Studio close means minimize to PiP.
+    if (aiRuntimeEnabled) {
+      setIsAiCameraOpen(false)
+      setAiCameraCompact(true)
+      return
+    }
+    stopAiRuntime()
+  }, [aiRuntimeEnabled, stopAiRuntime])
+
+  const handleToggleAiStudio = useCallback(() => {
+    if (isAiCameraOpen) {
+      handleAiStudioClose()
+      return
+    }
+
+    // Re-opening Studio changes presentation only; preserve the live runtime.
+    setIsAiCameraOpen(true)
+    setAiCameraCompact(false)
+  }, [handleAiStudioClose, isAiCameraOpen])
 
   const toggleMute = useCallback(() => {
     setIsMuted((prev) => {
@@ -968,14 +987,7 @@ export function Workbench() {
         isSerialOpen={isSerialOpen}
         onToggleSerial={() => setIsSerialOpen((prev) => !prev)}
         isAiCameraOpen={isAiCameraOpen}
-        onToggleAiCamera={() => {
-          setIsAiCameraOpen((prev) => {
-            const next = !prev
-            setAiCameraCompact(false)
-            if (!next) setAiRuntimeEnabled(false)
-            return next
-          })
-        }}
+        onToggleAiCamera={handleToggleAiStudio}
         isInspectorOpen={isInspectorOpen}
         onToggleInspector={() => setIsInspectorOpen((prev) => !prev)}
         isMuted={isMuted}
@@ -1028,7 +1040,7 @@ export function Workbench() {
       <Suspense fallback={null}>
         <AiStudioPanel
           isOpen={isAiCameraOpen}
-          onClose={() => setIsAiCameraOpen(false)}
+          onClose={handleAiStudioClose}
           aiState={aiState}
           onAiStateChange={setAiState}
           isSimRunning={running}
@@ -1181,7 +1193,7 @@ export function Workbench() {
             </button>
 
             <button
-              onClick={() => setIsAiCameraOpen((prev) => !prev)}
+              onClick={handleToggleAiStudio}
               className={`flex flex-col items-center gap-0.5 p-1 transition active:scale-95 ${
                 isAiCameraOpen ? "text-purple-400 font-bold" : "text-muted-foreground hover:text-foreground"
               }`}
@@ -1282,7 +1294,7 @@ export function Workbench() {
           onToggleDmm={() => setIsDmmOpen((prev) => !prev)}
           isScopeOpen={isScopeOpen}
           onToggleScope={() => setIsScopeOpen((prev) => !prev)}
-          onToggleAiCamera={() => setIsAiCameraOpen((prev) => !prev)}
+          onToggleAiCamera={handleToggleAiStudio}
           onSwitchToCode={() => setView("code")}
           onToggleRun={toggleRun}
           onClearCanvas={clearAll}
