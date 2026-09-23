@@ -1,11 +1,12 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react"
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type PointerEvent } from "react"
 import {
   Brain,
   Camera,
   CameraOff,
   CheckCircle2,
+  GripVertical,
   Layers3,
   Mic,
   RefreshCcw,
@@ -282,7 +283,13 @@ export function AiStudioPanel({
   const fpsStartRef = useRef(0)
   const fpsFramesRef = useRef(0)
   const dragRef = useRef<{ pointerId: number; offsetX: number; offsetY: number } | null>(null)
+  const modeRef = useRef<ReadyAiMode | "trained">("objects")
+  const cameraRequestRef = useRef(0)
   const [floatingPosition, setFloatingPosition] = useState<{ left: number; top: number } | null>(null)
+
+  useEffect(() => {
+    modeRef.current = mode
+  }, [mode])
 
   const classes = useMemo(() => getAiClasses(store.samples), [store.samples])
   const counts = useMemo(() => getSampleCounts(store.samples), [store.samples])
@@ -303,37 +310,86 @@ export function AiStudioPanel({
     onAiStateChange(runtimeEnabled ? aiState : INITIAL)
   }, [isOpen])
 
+  // Safety net for route changes/unmounts: stop every browser-owned resource
+  // without relying on React state updates after the component is gone.
+  useEffect(() => {
+    return () => {
+      sessionRef.current += 1
+      cameraRequestRef.current += 1
+      if (timerRef.current !== null) {
+        window.clearTimeout(timerRef.current)
+        timerRef.current = null
+      }
+
+      const resource = resourceRef.current
+      resourceRef.current = null
+      if (modeRef.current === "sound") {
+        void stopSpeechRecognizer(resource)
+      } else if (modeRef.current === "trained") {
+        disposeActiveAiModel()
+      } else {
+        disposeAiResource(resource)
+      }
+
+      const stream = streamRef.current
+      streamRef.current = null
+      stream?.getTracks().forEach((track) => track.stop())
+    }
+  }, [])
+
   function bindExistingCameraToVisibleVideo() {
     if (!streamRef.current) return false
     attachStreamToVisibleVideos()
     return Boolean(getActiveVideo())
   }
 
+  // Runtime state controls the camera lifecycle. Presentation state must never
+  // stop the stream: compact/full/open/closed only changes where the same live
+  // stream is rendered.
   useEffect(() => {
-    if (runtimeEnabled) {
-      if (mode === "sound") {
-        if (!soundActive) void startSound()
-        return
-      }
-
-      // The full AI Studio and the compact PiP use the same camera stream but
-      // mount different <video> elements. When the UI switches between them,
-      // re-attach the existing stream instead of assuming cameraActive means
-      // that the newly mounted video already has srcObject.
-      if (!cameraActive || !streamRef.current) {
-        void openCamera(true)
-      } else {
-        const frame = window.requestAnimationFrame(() => {
-          bindExistingCameraToVisibleVideo()
-        })
-        return () => window.cancelAnimationFrame(frame)
-      }
-    } else if (!isOpen) {
-      stopAll()
-    } else if (!training) {
-      stopInput()
+    if (!runtimeEnabled) {
+      if (!isOpen) stopAll()
+      return
     }
-  }, [runtimeEnabled, mode, isOpen, compact])
+
+    if (mode === "sound") {
+      if (!soundActive) void startSound()
+      return
+    }
+
+    if (!cameraActive || !streamRef.current) {
+      // Give React one committed render to mount the floating/full video node.
+      const retry = window.setTimeout(() => {
+        if (runtimeEnabled && !streamRef.current) void openCamera(true)
+      }, 50)
+      return () => window.clearTimeout(retry)
+    }
+
+    bindExistingCameraToVisibleVideo()
+  }, [runtimeEnabled, mode, isOpen])
+
+  // When the visible presentation changes, rebind the existing MediaStream to
+  // the newly mounted video/canvas pair. This never requests a second stream.
+  useEffect(() => {
+    if (!streamRef.current) return
+
+    let attempts = 0
+    let retryTimer: number | null = null
+
+    const bind = () => {
+      attempts += 1
+      if (streamRef.current) attachStreamToVisibleVideos()
+      if (!getActiveVideo() && attempts < 6) {
+        retryTimer = window.setTimeout(bind, 50)
+      }
+    }
+
+    const frame = window.requestAnimationFrame(bind)
+    return () => {
+      window.cancelAnimationFrame(frame)
+      if (retryTimer !== null) window.clearTimeout(retryTimer)
+    }
+  }, [compact, isOpen])
 
   useEffect(() => {
     if (!store.model) {
@@ -383,7 +439,7 @@ export function AiStudioPanel({
     setFloatingPosition(null)
   }
 
-  function handleFloatingPointerDown(event: React.PointerEvent<HTMLDivElement>) {
+  function handleFloatingPointerDown(event: PointerEvent<HTMLDivElement>) {
     if (event.button !== 0) return
     const rect = event.currentTarget.getBoundingClientRect()
     dragRef.current = {
@@ -394,7 +450,7 @@ export function AiStudioPanel({
     event.currentTarget.setPointerCapture(event.pointerId)
   }
 
-  function handleFloatingPointerMove(event: React.PointerEvent<HTMLDivElement>) {
+  function handleFloatingPointerMove(event: PointerEvent<HTMLDivElement>) {
     const drag = dragRef.current
     if (!drag || drag.pointerId !== event.pointerId) return
 
@@ -406,7 +462,7 @@ export function AiStudioPanel({
     setFloatingPosition({ left, top })
   }
 
-  function handleFloatingPointerUp(event: React.PointerEvent<HTMLDivElement>) {
+  function handleFloatingPointerUp(event: PointerEvent<HTMLDivElement>) {
     if (dragRef.current?.pointerId !== event.pointerId) return
     dragRef.current = null
     try {
@@ -442,6 +498,7 @@ export function AiStudioPanel({
   }
 
   function stopAll() {
+    cameraRequestRef.current += 1
     releaseCurrentResource()
     stopInference()
     stopCamera(getActiveVideo(), streamRef.current)
@@ -454,6 +511,7 @@ export function AiStudioPanel({
   async function openCamera(withModel = true) {
     setError(null)
     setStatus("Starting camera...")
+    const requestId = ++cameraRequestRef.current
     stopInference()
     releaseCurrentResource()
 
@@ -461,6 +519,15 @@ export function AiStudioPanel({
       const video = getActiveVideo()
       if (!video) throw new Error("Camera preview is not mounted.")
       const stream = await startCamera(video)
+
+      // Ignore any stream belonging to an obsolete start request. This handles
+      // rapid mode changes, Stop clicks, navigation, or a second Start cleanly.
+      if (requestId !== cameraRequestRef.current) {
+        stream.getTracks().forEach((track) => track.stop())
+        return
+      }
+
+      streamRef.current?.getTracks().forEach((track) => track.stop())
       streamRef.current = stream
       attachStreamToVisibleVideos()
       setCameraActive(true)
@@ -471,6 +538,7 @@ export function AiStudioPanel({
         detail: withModel ? "Camera live" : "Teach camera live",
       })
     } catch (cameraError) {
+      if (requestId !== cameraRequestRef.current) return
       setError(
         cameraError instanceof Error
           ? cameraError.message
@@ -494,7 +562,7 @@ export function AiStudioPanel({
   }
 
   async function startModeResource() {
-    const activeSession = ++sessionRef.current
+    const activeSession = sessionRef.current
     setLoading(true)
     setError(null)
 
@@ -548,7 +616,7 @@ export function AiStudioPanel({
   async function startSound() {
     setError(null)
     stopInference()
-    const activeSession = ++sessionRef.current
+    const activeSession = sessionRef.current
     setLoading(true)
     try {
       const recognizer = await loadSpeechRecognizer()
@@ -760,6 +828,7 @@ export function AiStudioPanel({
   }
 
   function stopInput() {
+    cameraRequestRef.current += 1
     releaseCurrentResource()
     stopInference()
     stopCamera(getActiveVideo(), streamRef.current)
