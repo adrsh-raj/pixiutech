@@ -51,6 +51,11 @@ requireText(workbench, "isAiDetected:", "AI runtime bridge")
 requireText(workbench, "getAiDetectedClass:", "AI class bridge")
 requireText(workbench, "getAiConfidence:", "AI confidence bridge")
 requireText(workbench, "setAiCamera:", "AI camera bridge")
+requireText(panel, 'type: "io_analogread"', "analog read block")
+requireText(panel, "analogPinDropdown", "analog read A0-A5 dropdown")
+requireText(panel, 'type: "map_value"', "map value block")
+requireText(panel, 'arduino.forBlock["map_value"]', "map value generator")
+
 const stopProgramSection = workbench.slice(
   workbench.indexOf("const stopProgram"),
   workbench.indexOf("const stopAiRuntime"),
@@ -80,6 +85,13 @@ requireText(engine, 'STORE_KEY = "pixiu-ai-studio-v2"', "AI store version")
 requireText(engine, 'MODEL_KEY = "pixiu-ai-studio-model-v2"', "AI model version")
 requireText(runtime, "loadAny", "AI CDN fallback")
 requireText(runtime, "stopSpeechRecognizer", "AI audio cleanup")
+// Analog / variables / mapping runtime parity.
+requireText(workbench, "setIsAiCameraOpen(enabled)", "AI camera runtime bridge")
+requireText(read("pixiu-lms-portal/src/lib/blockly-runner.ts"), "runtimeVariables", "Blockly variable runtime")
+requireText(read("pixiu-lms-portal/src/lib/blockly-runner.ts"), 'target.type === "map_value"', "Blockly map runtime")
+requireText(read("pixiu-lms-portal/src/lib/blockly-runner.ts"), 'case "variables_set"', "Blockly set-variable runtime")
+requireText(read("pixiu-lms-portal/src/components/circuit-lab/blockly-editor.tsx"), 'type: "map_value"', "map value toolbox")
+
 
 // 6D / 6E / 6F dedicated runtime gates.
 requireText(runtime, '@vladmandic/human@3.3.6/dist/human.js', "6D/6E maintained Human runtime")
