@@ -56,6 +56,7 @@ interface Props {
   aiState: AiVisionState
   onAiStateChange: (state: AiVisionState) => void
   isSimRunning?: boolean
+  runtimeEnabled?: boolean
   onStartSim?: () => void
 }
 
@@ -210,6 +211,54 @@ function drawHands(canvas: HTMLCanvasElement, video: HTMLVideoElement, results: 
       ctx.fill()
     }
   }
+}function drawHands(canvas: HTMLCanvasElement, video: HTMLVideoElement, results: any) {
+  const width = video.videoWidth || 640
+  const height = video.videoHeight || 480
+  if (canvas.width !== width || canvas.height !== height) {
+    canvas.width = width
+    canvas.height = height
+  }
+
+  const ctx = canvas.getContext("2d")
+  if (!ctx) return
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+  ctx.fillStyle = "#38bdf8"
+
+  for (const hand of results?.multiHandLandmarks ?? []) {
+    for (const point of hand) {
+      ctx.beginPath()
+      ctx.arc(point.x * width, point.y * height, 4, 0, Math.PI * 2)
+      ctx.fill()
+    }
+  }
+}
+
+function drawFace(canvas: HTMLCanvasElement, video: HTMLVideoElement, result: any) {
+  const width = video.videoWidth || 640
+  const height = video.videoHeight || 480
+  if (canvas.width !== width || canvas.height !== height) {
+    canvas.width = width
+    canvas.height = height
+  }
+
+  const ctx = canvas.getContext("2d")
+  if (!ctx) return
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+  const box = result?.box
+  if (Array.isArray(box) && box.length >= 4) {
+    const [x, y, w, h] = box.map(Number)
+    ctx.strokeStyle = "#f472b6"
+    ctx.lineWidth = 3
+    ctx.strokeRect(x, y, w, h)
+    const label = String(result.expression ?? "face")
+    ctx.font = "700 13px system-ui"
+    const tw = ctx.measureText(label).width + 12
+    ctx.fillStyle = "#f472b6"
+    ctx.fillRect(x, Math.max(0, y - 22), tw, 22)
+    ctx.fillStyle = "#0f172a"
+    ctx.fillText(label, x + 6, Math.max(15, y - 7))
+  }
 }
 
 export function AiStudioPanel({
@@ -218,6 +267,7 @@ export function AiStudioPanel({
   aiState,
   onAiStateChange,
   isSimRunning = false,
+  runtimeEnabled = false,
   onStartSim,
 }: Props) {
   const [tab, setTab] = useState<Tab>("try")
@@ -252,19 +302,31 @@ export function AiStudioPanel({
 
   useEffect(() => {
     if (!isOpen) {
-      stopAll()
+      if (!runtimeEnabled) stopAll()
       return
     }
     setTab("try")
-    setMode("objects")
     setStore(loadAiStudioStore())
-    setModel(null)
     setLoading(false)
     setError(null)
-    setStatus("AI idle")
+    setStatus(runtimeEnabled ? "AI runtime active" : "AI idle")
     setCapture(null)
-    onAiStateChange(INITIAL)
+    onAiStateChange(runtimeEnabled ? aiState : INITIAL)
   }, [isOpen])
+
+  useEffect(() => {
+    if (runtimeEnabled) {
+      if (mode === "sound") {
+        if (!soundActive) void startSound()
+      } else if (!cameraActive) {
+        void openCamera(true)
+      }
+    } else if (!isOpen) {
+      stopAll()
+    } else if (!training) {
+      stopInput()
+    }
+  }, [runtimeEnabled])
 
   useEffect(() => {
     if (!store.model) {
@@ -582,7 +644,8 @@ export function AiStudioPanel({
             modelSource: "ready",
             detail: result ? `${result.count} face${result.count === 1 ? "" : "s"} · ${result.expression}` : "Show your face",
           })
-          clearOverlay()
+          if (result) drawFace(overlayRef.current!, video, result)
+          else clearOverlay()
         } else if (mode === "trained") {
           const frame = captureVideoFrame(video, 640)
           const result = frame ? await predictAiImage(frame, store.model) : null
@@ -730,13 +793,34 @@ export function AiStudioPanel({
     setStatus("AI Studio reset.")
   }
 
-  if (!isOpen) return null
+  if (!isOpen && !runtimeEnabled) return null
 
   const isSound = mode === "sound"
   const activeTitle =
     mode === "trained" ? "My AI"
       : MODES.find((item) => item.id === mode)?.title ?? "AI"
   const inputActive = isSound ? soundActive : cameraActive
+
+  if (!isOpen && runtimeEnabled) {
+    return (
+      <div className="fixed bottom-24 right-4 z-[70] w-[min(320px,calc(100vw-32px))] overflow-hidden rounded-2xl border border-emerald-400/20 bg-slate-950/95 text-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-800 px-3 py-2">
+          <div>
+            <p className="text-[8px] font-mono uppercase tracking-[0.18em] text-emerald-300">PIXIU AI RUNTIME</p>
+            <p className="text-[10px] font-black">{activeTitle} · {mode === "sound" ? "MIC" : "CAMERA"}</p>
+          </div>
+          <span className="rounded-full border border-emerald-400/20 px-2 py-1 text-[8px] font-mono text-emerald-300">LIVE</span>
+        </div>
+        <div className="relative aspect-video bg-black">
+          <video ref={videoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
+          <canvas ref={overlayRef} className="pointer-events-none absolute inset-0 h-full w-full" />
+          <div className="absolute bottom-2 left-2 rounded-md bg-slate-950/85 px-2 py-1 text-[9px] font-mono">
+            {aiState.detectedClass === "none" ? status : aiState.detectedClass + " · " + aiState.confidence + "%"}
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/80 p-3 backdrop-blur-sm sm:p-5">
