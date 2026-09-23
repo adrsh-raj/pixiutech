@@ -252,10 +252,9 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
     }
   }, [])
 
-  // Sync the workspace for genuine external loads (starter/project changes), but
-  // debounce the prop before replacing blocks. During normal editing Blockly emits
-  // XML changes faster than React can echo them back; immediate rehydration makes a
-  // dragged block look glued to the pointer.
+  // Sync the workspace for genuine external loads (templates, saved projects,
+  // lessons, imports, and reset). Debounce before replacing blocks so normal
+  // Blockly editing remains stable while external XML always reaches the workspace.
   useEffect(() => {
     const workspace = workspaceRef.current
     if (!workspace || !xml) return
@@ -268,12 +267,10 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
       const activeWorkspace = workspaceRef.current
       if (!activeWorkspace) return
 
-      // If Blockly has already emitted a newer workspace XML since this prop
-      // value arrived, this prop is a stale echo from our own edit. Ignore it.
-      if (lastWorkspaceXmlRef.current !== null && lastWorkspaceXmlRef.current !== expectedExternalXml) {
-        return
-      }
-
+      // Any prop XML that differs from the current workspace is a genuine
+      // external load (template, saved project, lesson, import, or reset).
+      // Blockly-originated edits already update lastWorkspaceXmlRef immediately,
+      // so they are filtered by the equality check above.
       const isDragging = typeof (activeWorkspace as any).isDragging === "function"
         ? Boolean((activeWorkspace as any).isDragging())
         : false
