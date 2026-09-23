@@ -61,6 +61,23 @@ requireText(engine, 'MODEL_KEY = "pixiu-ai-studio-model-v2"', "AI model version"
 requireText(runtime, "loadAny", "AI CDN fallback")
 requireText(runtime, "stopSpeechRecognizer", "AI audio cleanup")
 
+// 6D / 6E / 6F dedicated runtime gates.
+requireText(runtime, '@vladmandic/human@3.3.6/dist/human.js', "6D/6E maintained Human runtime")
+requireText(runtime, 'HUMAN_VERSION = "3.3.6"', "6D/6E pinned Human version")
+requireText(runtime, 'handlandmark-lite.json', "6D hand landmark model")
+requireText(runtime, 'handtrack.json', "6D hand detector model")
+requireText(runtime, 'emotion.json', "6E emotion model")
+requireText(runtime, 'mesh: { enabled: true }', "6E face mesh")
+requireText(runtime, '@tensorflow-models/speech-commands@0.5.4', "6F speech model version")
+requireText(panel, "soundActive", "6F microphone lifecycle")
+requireText(panel, "6F Sound listening", "6F UI runtime state")
+
+// The old unmaintained face-api / MediaPipe Hands CDN paths must not remain
+// active in the runtime adapter.
+for (const needle of ["face-api.min.js", "@mediapipe/hands/hands.js", "window.faceapi", "window.Hands"]) {
+  forbidText(runtime, needle, "legacy 6D/6E runtime")
+}
+
 if (!panel.match(/function stopAll\(\)[\s\S]*?releaseCurrentResource\(\)/)) {
   failures.push("cleanup: stopAll does not release the current resource")
 }
@@ -75,4 +92,7 @@ console.log("AI static contract check PASSED")
 console.log("6A Ready AI modes: 6")
 console.log("6B Teach/Understand: present")
 console.log("6C AI→Blockly bridge: present")
+console.log("6D Hand AI runtime: present")
+console.log("6E Face + emotion AI runtime: present")
+console.log("6F Speech Commands runtime: present")
 console.log("Legacy AI camera implementation: removed")
