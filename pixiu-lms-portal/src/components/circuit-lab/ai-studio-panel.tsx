@@ -294,19 +294,48 @@ export function AiStudioPanel({
     onAiStateChange(runtimeEnabled ? aiState : INITIAL)
   }, [isOpen])
 
+  function bindExistingCameraToVisibleVideo() {
+    const video = videoRef.current
+    const stream = streamRef.current
+    if (!video || !stream) return false
+
+    if (video.srcObject !== stream) {
+      video.srcObject = stream
+    }
+
+    void video.play().catch(() => {
+      // Autoplay may need a user gesture on some browsers; inference can still
+      // resume once the browser allows playback.
+    })
+
+    return true
+  }
+
   useEffect(() => {
     if (runtimeEnabled) {
       if (mode === "sound") {
         if (!soundActive) void startSound()
-      } else if (!cameraActive) {
+        return
+      }
+
+      // The full AI Studio and the compact PiP use the same camera stream but
+      // mount different <video> elements. When the UI switches between them,
+      // re-attach the existing stream instead of assuming cameraActive means
+      // that the newly mounted video already has srcObject.
+      if (!cameraActive || !streamRef.current) {
         void openCamera(true)
+      } else {
+        const frame = window.requestAnimationFrame(() => {
+          bindExistingCameraToVisibleVideo()
+        })
+        return () => window.cancelAnimationFrame(frame)
       }
     } else if (!isOpen) {
       stopAll()
     } else if (!training) {
       stopInput()
     }
-  }, [runtimeEnabled, mode])
+  }, [runtimeEnabled, mode, isOpen])
 
   useEffect(() => {
     if (!store.model) {
@@ -783,18 +812,18 @@ export function AiStudioPanel({
 
   if (!isOpen && runtimeEnabled) {
     return (
-      <div className="fixed bottom-24 right-4 z-[70] w-[min(320px,calc(100vw-32px))] overflow-hidden rounded-2xl border border-emerald-400/20 bg-slate-950/95 text-white shadow-2xl">
+      <div className="fixed bottom-20 right-4 z-[70] w-[min(280px,calc(100vw-24px))] overflow-hidden rounded-2xl border border-emerald-400/20 bg-slate-950/95 text-white shadow-2xl ring-1 ring-black/40">
         <div className="flex items-center justify-between border-b border-slate-800 px-3 py-2">
-          <div>
+          <div className="min-w-0">
             <p className="text-[8px] font-mono uppercase tracking-[0.18em] text-emerald-300">PIXIU AI RUNTIME</p>
-            <p className="text-[10px] font-black">{activeTitle} · {mode === "sound" ? "MIC" : "CAMERA"}</p>
+            <p className="truncate text-[10px] font-black">{activeTitle} · {mode === "sound" ? "MIC" : "CAMERA"}</p>
           </div>
-          <span className="rounded-full border border-emerald-400/20 px-2 py-1 text-[8px] font-mono text-emerald-300">LIVE</span>
+          <span className="ml-2 shrink-0 rounded-full border border-emerald-400/20 px-2 py-1 text-[8px] font-mono text-emerald-300">LIVE</span>
         </div>
         <div className="relative aspect-video bg-black">
           <video ref={videoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
           <canvas ref={overlayRef} className="pointer-events-none absolute inset-0 h-full w-full" />
-          <div className="absolute bottom-2 left-2 rounded-md bg-slate-950/85 px-2 py-1 text-[9px] font-mono">
+          <div className="absolute bottom-2 left-2 max-w-[calc(100%-16px)] truncate rounded-md bg-slate-950/85 px-2 py-1 text-[9px] font-mono">
             {aiState.detectedClass === "none" ? status : aiState.detectedClass + " · " + aiState.confidence + "%"}
           </div>
         </div>
