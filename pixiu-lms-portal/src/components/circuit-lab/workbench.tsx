@@ -571,7 +571,10 @@ export function Workbench() {
         isAiDetected: (cls) => aiStateRef.current.detectedClass.trim().toLowerCase() === String(cls).trim().toLowerCase(),
         getAiDetectedClass: () => aiStateRef.current.detectedClass,
         getAiConfidence: () => aiStateRef.current.confidence,
-        setAiCamera: (enabled) => setAiRuntimeEnabled(enabled),
+        setAiCamera: (enabled) => {
+          setAiRuntimeEnabled(enabled)
+          setIsAiCameraOpen(enabled)
+        },
         sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
         isRunning: () => runningRef.current,
 
