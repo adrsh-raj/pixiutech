@@ -188,7 +188,7 @@ export async function trainAiModel(
     let latestValAccuracy = 0
     let latestLoss = 0
 
-    await model.fit(xs, ys, {
+    await model.fit(xs as tf.Tensor, ys as tf.Tensor, {
       epochs,
       batchSize: Math.min(8, samples.length),
       shuffle: true,
