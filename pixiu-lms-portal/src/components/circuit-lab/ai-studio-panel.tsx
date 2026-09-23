@@ -291,12 +291,6 @@ export function AiStudioPanel({
     setFps(0)
   }
 
-  function disposeResource() {
-    const resource = resourceRef.current
-    resourceRef.current = null
-    if (resource) disposeAiResource(resource)
-  }
-
   function releaseCurrentResource() {
     const resource = resourceRef.current
     resourceRef.current = null
@@ -324,7 +318,7 @@ export function AiStudioPanel({
     setError(null)
     setStatus("Starting camera...")
     stopInference()
-    disposeResource()
+    releaseCurrentResource()
 
     try {
       const video = videoRef.current
