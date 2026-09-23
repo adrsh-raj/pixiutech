@@ -27,10 +27,10 @@ export type AiStudioStore = {
   model: AiModelSummary | null
 }
 
-const STORE_KEY = "pixiu-ai-studio-v1"
-const MODEL_KEY = "pixiu-ai-studio-model-v1"
-const INPUT_W = 8
-const INPUT_H = 8
+const STORE_KEY = "pixiu-ai-studio-v2"
+const MODEL_KEY = "pixiu-ai-studio-model-v2"
+const INPUT_W = 16
+const INPUT_H = 16
 const INPUT_C = 3
 
 let activeModel: tf.LayersModel | null = null
@@ -137,6 +137,8 @@ export async function trainAiModel(
   const shuffled = [...samples].sort(() => Math.random() - 0.5)
   const features: tf.Tensor[] = []
   const labels: number[] = []
+  let xs: tf.Tensor | null = null
+  let ys: tf.Tensor | null = null
 
   try {
     for (const sample of shuffled) {
@@ -144,29 +146,34 @@ export async function trainAiModel(
       labels.push(classes.indexOf(sample.label))
     }
 
-    const xs = tf.concat(features, 0)
+    xs = tf.concat(features, 0)
     const labelTensor = tf.tensor1d(labels, "int32")
-    const ys = tf.oneHot(labelTensor, classes.length)
+    ys = tf.oneHot(labelTensor, classes.length)
     labelTensor.dispose()
 
     const model = tf.sequential({
       layers: [
-        tf.layers.dense({
-          inputShape: [INPUT_W * INPUT_H * INPUT_C],
-          units: 32,
+        tf.layers.conv2d({
+          inputShape: [INPUT_H, INPUT_W, INPUT_C],
+          filters: 8,
+          kernelSize: 3,
           activation: "relu",
-          name: "pattern-detector",
+          padding: "same",
+          name: "vision-patterns-1",
         }),
-        tf.layers.dense({
-          units: 16,
+        tf.layers.maxPooling2d({ poolSize: 2, name: "vision-pool-1" }),
+        tf.layers.conv2d({
+          filters: 16,
+          kernelSize: 3,
           activation: "relu",
-          name: "feature-layer",
+          padding: "same",
+          name: "vision-patterns-2",
         }),
-        tf.layers.dense({
-          units: classes.length,
-          activation: "softmax",
-          name: "decision-layer",
-        }),
+        tf.layers.maxPooling2d({ poolSize: 2, name: "vision-pool-2" }),
+        tf.layers.flatten({ name: "vision-flatten" }),
+        tf.layers.dense({ units: 24, activation: "relu", name: "pattern-detector" }),
+        tf.layers.dropout({ rate: 0.15, name: "regularizer" }),
+        tf.layers.dense({ units: classes.length, activation: "softmax", name: "decision-layer" }),
       ],
     })
 
@@ -205,7 +212,9 @@ export async function trainAiModel(
     evalItems.forEach((item) => item.dispose())
 
     xs.dispose()
-    ys.dispose()
+    xs = null
+    ys?.dispose()
+    ys = null
     features.forEach((tensor) => tensor.dispose())
 
     activeModel?.dispose()
@@ -232,14 +241,18 @@ export async function trainAiModel(
 
     return { model, summary }
   } catch (error) {
+    xs?.dispose()
+    ys?.dispose()
     features.forEach((tensor) => tensor.dispose())
     throw error
-  } finally {
   }
 }
 
 export async function loadStoredAiModel(summary: AiModelSummary | null): Promise<tf.LayersModel | null> {
   if (!summary) return null
+  if (!Array.isArray(summary.inputShape) || summary.inputShape.join("x") !== `${INPUT_H}x${INPUT_W}x${INPUT_C}`) {
+    return null
+  }
   try {
     const model = await tf.loadLayersModel(`indexeddb://${MODEL_KEY}`)
     activeModel?.dispose()
