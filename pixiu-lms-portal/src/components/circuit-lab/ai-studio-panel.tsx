@@ -21,6 +21,7 @@ import * as cocoSsd from "@tensorflow-models/coco-ssd"
 import {
   addAiSample,
   clearAiStudioStore,
+  disposeActiveAiModel,
   canvasToDataUrl,
   getAiClasses,
   getModelWeightPreview,
@@ -299,18 +300,23 @@ export function AiStudioPanel({
     if (resource) disposeAiResource(resource)
   }
 
-  function stopAll() {
+  function releaseCurrentResource() {
     const resource = resourceRef.current
     resourceRef.current = null
 
-    stopInference()
-
     if (mode === "sound") {
       void stopSpeechRecognizer(resource)
+    } else if (mode === "trained") {
+      disposeActiveAiModel()
+      setModel(null)
     } else {
       disposeAiResource(resource)
     }
+  }
 
+  function stopAll() {
+    releaseCurrentResource()
+    stopInference()
     stopCamera(videoRef.current, streamRef.current)
     streamRef.current = null
     setCameraActive(false)
@@ -375,8 +381,10 @@ export function AiStudioPanel({
       } else if (mode === "emotion") {
         resource = await loadFaceEmotion()
       } else if (mode === "trained") {
-        if (!store.model || !model) throw new Error("Train My AI first, then start the live test.")
-        resource = model
+        if (!store.model) throw new Error("Train My AI first, then start the live test.")
+        resource = model ?? await loadStoredAiModel(store.model)
+        if (!resource) throw new Error("Saved My AI model could not be loaded. Retrain the model.")
+        if (!model) setModel(resource)
       }
 
       if (activeSession !== sessionRef.current) {
@@ -465,8 +473,6 @@ export function AiStudioPanel({
   }
 
   function startInferenceLoop(activeSession: number) {
-    stopInference()
-    sessionRef.current = activeSession
     const tick = async () => {
       if (
         !cameraActive ||
@@ -610,9 +616,8 @@ export function AiStudioPanel({
   }
 
   function stopInput() {
-    if (mode === "sound") void stopSpeechRecognizer(resourceRef.current)
+    releaseCurrentResource()
     stopInference()
-    disposeResource()
     stopCamera(videoRef.current, streamRef.current)
     streamRef.current = null
     setCameraActive(false)
