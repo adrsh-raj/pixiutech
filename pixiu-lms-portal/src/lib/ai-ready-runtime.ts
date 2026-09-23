@@ -110,13 +110,13 @@ function loadScript(src: string, ready: () => boolean): Promise<void> {
   return promise
 }
 
-async function loadAny(sources: string[], ready: () => boolean) {
+async function loadAny(sources: string[], ready: () => boolean): Promise<string> {
   let lastError: unknown = null
 
   for (const src of sources) {
     try {
       await loadScript(src, ready)
-      if (ready()) return
+      if (ready()) return src
     } catch (error) {
       lastError = error
     }
@@ -141,11 +141,11 @@ export async function loadPoseDetector() {
 }
 
 export async function loadHandDetector() {
-  await loadAny(CDN.hands, () => Boolean(window.Hands))
+  const source = await loadAny(CDN.hands, () => Boolean(window.Hands))
+  const sourceBase = source.slice(0, source.lastIndexOf("/") + 1)
 
   const hands = new window.Hands({
-    locateFile: (file: string) =>
-      `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
+    locateFile: (file: string) => `${sourceBase}${file}`,
   })
 
   hands.setOptions({
