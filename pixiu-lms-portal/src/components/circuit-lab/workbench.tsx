@@ -70,6 +70,7 @@ export function Workbench() {
   const [isLessonsOpen, setIsLessonsOpen] = useState(false)
   const [activeLessonId, setActiveLessonId] = useState<string | null>(null)
   const [isAiCameraOpen, setIsAiCameraOpen] = useState(false)
+  const [aiRuntimeEnabled, setAiRuntimeEnabled] = useState(false)
   const [isInspectorOpen, setIsInspectorOpen] = useState(true)
   const [mobilePaletteOpen, setMobilePaletteOpen] = useState(false)
   const [contextMenu, setContextMenu] = useState<{
@@ -422,6 +423,7 @@ export function Workbench() {
     setIsPaused(false)
     isPausedRef.current = false
     setActiveStepBlock(null)
+    setAiRuntimeEnabled(false)
   }, [])
 
   const startProgram = useCallback((startPaused: boolean = false, openAiHud: boolean = true) => {
@@ -440,6 +442,7 @@ export function Workbench() {
     if (!hasArduino) {
       // Pure DC circuit (battery, resistor, LED, etc.) - no Arduino code, no AI camera
       setIsAiCameraOpen(false)
+      setAiRuntimeEnabled(false)
       return
     }
 
@@ -452,11 +455,8 @@ export function Workbench() {
       blocklyXml.includes("ai_confidence") ||
       blocklyXml.includes("ai_camera_enable")
     )
-    if (openAiHud && usesAi) {
-      setIsAiCameraOpen(true)
-    } else {
-      setIsAiCameraOpen(false)
-    }
+    setIsAiCameraOpen(false)
+    setAiRuntimeEnabled(openAiHud && usesAi)
 
     try {
       defineArduinoBlocks()
@@ -552,7 +552,7 @@ export function Workbench() {
         isAiDetected: (cls) => aiStateRef.current.detectedClass.trim().toLowerCase() === String(cls).trim().toLowerCase(),
         getAiDetectedClass: () => aiStateRef.current.detectedClass,
         getAiConfidence: () => aiStateRef.current.confidence,
-        setAiCamera: (enabled) => setIsAiCameraOpen(enabled),
+        setAiCamera: (enabled) => setAiRuntimeEnabled(enabled),
         sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
         isRunning: () => runningRef.current,
 
@@ -1008,6 +1008,7 @@ export function Workbench() {
           aiState={aiState}
           onAiStateChange={setAiState}
           isSimRunning={running}
+          runtimeEnabled={aiRuntimeEnabled}
           onStartSim={handleRunFromAiStudio}
         />
       </Suspense>
