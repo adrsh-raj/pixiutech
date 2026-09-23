@@ -36,6 +36,23 @@ function pinDropdown(): [string, string][] {
   return [...connected, ...free].map((o) => [o.label, o.code])
 }
 
+function analogPinDropdown(): [string, string][] {
+  const opts = getPinOptions(currentCircuit).filter((o) => /^A[0-5]$/.test(o.code))
+  if (opts.length === 0) {
+    return [
+      ["A0", "A0"],
+      ["A1", "A1"],
+      ["A2", "A2"],
+      ["A3", "A3"],
+      ["A4", "A4"],
+      ["A5", "A5"],
+    ]
+  }
+  const connected = opts.filter((o) => o.connected)
+  const free = opts.filter((o) => !o.connected)
+  return [...connected, ...free].map((o) => [o.label, o.code])
+}
+
 function componentDropdown(types: string[], emptyLabel = "Add component first"): () => [string, string][] {
   return () => {
     const options = currentCircuit.parts
@@ -140,11 +157,11 @@ export function defineArduinoBlocks() {
     },
     {
       type: "io_analogread",
-      message0: "analog read pin %1",
-      args0: [{ type: "field_dropdown", name: "PIN", options: pinDropdown }],
+      message0: "read analog pin %1",
+      args0: [{ type: "field_dropdown", name: "PIN", options: analogPinDropdown }],
       output: "Number",
       colour: 260,
-      tooltip: "Read a 0-1023 value from an analog pin.",
+      tooltip: "Read a 0-1023 value from Arduino analog pins A0-A5.",
     },
     {
       type: "time_delay",
@@ -379,6 +396,29 @@ export function defineArduinoBlocks() {
       this.setNextStatement(true)
       this.setColour(120)
       this.setTooltip('Clear the virtual OLED display.')
+    }
+  }
+
+  Blockly.Blocks['map_value'] = {
+    init() {
+      this.appendValueInput('VALUE')
+        .setCheck('Number')
+        .appendField('map value')
+      this.appendValueInput('IN_MIN')
+        .setCheck('Number')
+        .appendField('from low')
+      this.appendValueInput('IN_MAX')
+        .setCheck('Number')
+        .appendField('high')
+      this.appendValueInput('OUT_MIN')
+        .setCheck('Number')
+        .appendField('to low')
+      this.appendValueInput('OUT_MAX')
+        .setCheck('Number')
+        .appendField('high')
+      this.setOutput(true, 'Number')
+      this.setColour(260)
+      this.setTooltip('Scale a value from one range to another, like Arduino map().')
     }
   }
 
@@ -646,6 +686,15 @@ arduino.forBlock["math_arithmetic"] = function (block, generator) {
   const a = generator.valueToCode(block, "A", order) || "0"
   const b = generator.valueToCode(block, "B", order) || "0"
   return [`${a} ${op} ${b}`, order]
+}
+
+arduino.forBlock["map_value"] = function (block, generator) {
+  const value = generator.valueToCode(block, "VALUE", ORDER.NONE) || "0"
+  const inMin = generator.valueToCode(block, "IN_MIN", ORDER.NONE) || "0"
+  const inMax = generator.valueToCode(block, "IN_MAX", ORDER.NONE) || "1023"
+  const outMin = generator.valueToCode(block, "OUT_MIN", ORDER.NONE) || "0"
+  const outMax = generator.valueToCode(block, "OUT_MAX", ORDER.NONE) || "255"
+  return [`map(${value}, ${inMin}, ${inMax}, ${outMin}, ${outMax})`, ORDER.ATOMIC]
 }
 
 arduino.forBlock["variables_get"] = function (block, generator) {
