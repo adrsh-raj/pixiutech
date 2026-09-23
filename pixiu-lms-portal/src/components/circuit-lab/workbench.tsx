@@ -424,7 +424,7 @@ export function Workbench() {
     setActiveStepBlock(null)
   }, [])
 
-  const startProgram = useCallback((startPaused: boolean = false) => {
+  const startProgram = useCallback((startPaused: boolean = false, openAiHud: boolean = true) => {
     stopProgram()
     runningRef.current = true
     const controller = new AbortController()
@@ -452,7 +452,7 @@ export function Workbench() {
       blocklyXml.includes("ai_confidence") ||
       blocklyXml.includes("ai_camera_enable")
     )
-    if (usesAi) {
+    if (openAiHud && usesAi) {
       setIsAiCameraOpen(true)
     } else {
       setIsAiCameraOpen(false)
@@ -659,7 +659,7 @@ export function Workbench() {
         setWiring(null)
         setSelectedId(null)
         setSelectedWireId(null)
-        startProgram(false)
+        startProgram(false, true)
       } else {
         setPressed(new Set())
         stopProgram()
@@ -671,12 +671,15 @@ export function Workbench() {
   // AI Studio uses this entry point so "Run circuit" closes the AI overlay
   // and takes the student directly to the Circuit Simulator view.
   const handleRunFromAiStudio = useCallback(() => {
+    // This action is explicitly a navigation from AI Studio into the
+    // simulator. Do not let startProgram reopen the AI overlay.
     setIsAiCameraOpen(false)
     setView("circuit")
     if (!runningRef.current) {
-      toggleRun()
+      setRunning(true)
+      startProgram(false, false)
     }
-  }, [toggleRun])
+  }, [startProgram])
 
   // Keyboard shortcut listener and DevTools protection (placed after toggleRun and edit callbacks)
   useEffect(() => {
