@@ -192,7 +192,7 @@ export function disposeAiResource(resource: any) {
 
 export function stopSpeechRecognizer(resource: any) {
   try {
-    resource?.stopListening?.()
+    void Promise.resolve(resource?.stopListening?.()).catch(() => {})
   } catch {
     // Best effort cleanup.
   }
