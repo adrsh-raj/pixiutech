@@ -66,6 +66,27 @@ function loadScript(src: string, ready: () => boolean, label: string): Promise<v
   return promise
 }
 
+async function loadScriptFromSources(
+  sources: string[],
+  ready: () => boolean,
+  label: string,
+): Promise<void> {
+  let lastError: unknown = null
+
+  for (const src of sources) {
+    try {
+      await loadScript(src, ready, label)
+      return
+    } catch (error) {
+      lastError = error
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error(`${label} could not be loaded.`)
+}
+
 async function ensureTfReady() {
   if (typeof window === "undefined") {
     throw new Error("AI Studio needs a browser.")
@@ -87,8 +108,11 @@ async function ensureTfReady() {
 
 export async function loadPoseDetector() {
   await ensureTfReady()
-  await loadScript(
-    "https://unpkg.com/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.min.js",
+  await loadScriptFromSources(
+    [
+      "https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.min.js",
+      "https://unpkg.com/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.min.js",
+    ],
     () => Boolean(window.poseDetection),
     "Pose AI",
   )
@@ -106,8 +130,11 @@ export async function loadPoseDetector() {
 
 export async function loadHandDetector() {
   await ensureTfReady()
-  await loadScript(
-    "https://unpkg.com/@tensorflow-models/handpose@0.1.0/dist/handpose.min.js",
+  await loadScriptFromSources(
+    [
+      "https://cdn.jsdelivr.net/npm/@tensorflow-models/handpose@0.1.0/dist/handpose.min.js",
+      "https://unpkg.com/@tensorflow-models/handpose@0.1.0/dist/handpose.min.js",
+    ],
     () => Boolean(window.handpose),
     "Hand AI",
   )
@@ -128,8 +155,11 @@ export async function loadFaceEmotion() {
   if (emotionModelsPromise) return emotionModelsPromise
 
   emotionModelsPromise = (async () => {
-    await loadScript(
-      "https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js",
+    await loadScriptFromSources(
+      [
+        "https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js",
+        "https://unpkg.com/face-api.js@0.22.2/dist/face-api.min.js",
+      ],
       () => Boolean(window.faceapi),
       "Expression AI",
     )
@@ -169,8 +199,11 @@ export async function loadFaceEmotion() {
 export async function loadSpeechRecognizer() {
   await ensureTfReady()
 
-  await loadScript(
-    "https://unpkg.com/@tensorflow-models/speech-commands@0.5.4/dist/speech-commands.min.js",
+  await loadScriptFromSources(
+    [
+      "https://cdn.jsdelivr.net/npm/@tensorflow-models/speech-commands@0.5.4/dist/speech-commands.min.js",
+      "https://unpkg.com/@tensorflow-models/speech-commands@0.5.4/dist/speech-commands.min.js",
+    ],
     () => Boolean(window.speechCommands),
     "Sound AI",
   )
