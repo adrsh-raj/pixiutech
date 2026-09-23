@@ -868,7 +868,9 @@ export function AiStudioPanel({
       : MODES.find((item) => item.id === mode)?.title ?? "AI"
   const inputActive = isSound ? soundActive : cameraActive
 
-  if (runtimeEnabled && (compact || !isOpen)) {
+  // Compact is an explicit presentation mode. It must win over isOpen so
+  // an automatically opened AI camera can never cover the workspace.
+  if (compact || (runtimeEnabled && !isOpen)) {
     const floatingStyle = floatingPosition
       ? { left: floatingPosition.left, top: floatingPosition.top }
       : { right: 16, bottom: 76 }
