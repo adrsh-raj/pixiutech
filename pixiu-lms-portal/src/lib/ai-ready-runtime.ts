@@ -212,9 +212,10 @@ export async function loadHandDetector() {
     },
     async dispose() {
       try {
+        human.models?.reset?.()
         human.reset?.()
       } catch {
-        // Best effort. Human keeps model cache separate from app state.
+        // Best effort. Explicitly unload Human model graphs on mode changes.
       }
     },
   }
@@ -255,6 +256,7 @@ export async function loadFaceEmotion() {
     },
     async dispose() {
       try {
+        human.models?.reset?.()
         human.reset?.()
       } catch {
         // Best effort cleanup.
