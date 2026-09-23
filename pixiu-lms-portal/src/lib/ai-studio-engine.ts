@@ -100,6 +100,8 @@ export function addAiSample(
   const cleanLabel = label.trim().slice(0, 32)
   if (!cleanLabel || !dataUrl) return store
 
+  if (store.model) void deleteStoredModel()
+
   return {
     ...store,
     samples: [
@@ -116,6 +118,8 @@ export function addAiSample(
 }
 
 export function removeAiSample(store: AiStudioStore, id: string): AiStudioStore {
+  if (store.model) void deleteStoredModel()
+
   return {
     ...store,
     samples: store.samples.filter((sample) => sample.id !== id),
@@ -288,6 +292,14 @@ export async function loadStoredAiModel(
 
   try {
     const model = await tf.loadLayersModel(`indexeddb://${MODEL_KEY}`)
+    const outputShape = model.outputs?.[0]?.shape
+    const outputClasses = Number(outputShape?.[outputShape.length - 1] ?? 0)
+
+    if (outputClasses !== summary.classes.length) {
+      model.dispose()
+      return null
+    }
+
     activeModel?.dispose()
     activeModel = model
     return model
@@ -298,6 +310,11 @@ export async function loadStoredAiModel(
 
 export function getActiveAiModel() {
   return activeModel
+}
+
+export function disposeActiveAiModel() {
+  activeModel?.dispose()
+  activeModel = null
 }
 
 export async function deleteStoredModel() {
