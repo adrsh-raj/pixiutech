@@ -21,6 +21,7 @@ interface Props {
   onToggleSerial?: () => void
   isAiCameraOpen?: boolean
   onToggleAiCamera?: () => void
+  onOpenAiStudio?: () => void
   isInspectorOpen?: boolean
   onToggleInspector?: () => void
   isMuted?: boolean
@@ -61,6 +62,7 @@ export function Toolbar({
   onToggleSerial,
   isAiCameraOpen = false,
   onToggleAiCamera,
+  onOpenAiStudio,
   isInspectorOpen = true,
   onToggleInspector,
   isMuted = false,
@@ -216,6 +218,20 @@ export function Toolbar({
 
       {/* RIGHT: compact grouped tools */}
       <div className="flex items-center gap-1.5 shrink-0" ref={toolsRef}>
+        {onToggleAiCamera && (
+          <button
+            onClick={onToggleAiCamera}
+            className={"flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold transition cursor-pointer " + (
+              isAiCameraOpen
+                ? "border-purple-400/50 bg-purple-500/15 text-purple-200"
+                : "border-purple-400/25 bg-purple-500/10 text-purple-200 hover:bg-purple-500/15"
+            )}
+            title="AI Vision multi-object camera"
+          >
+            <Camera size={14} />
+            <span className="hidden lg:inline">AI Vision</span>
+          </button>
+        )}
         {onOpenProjects && (
           <button
             onClick={onOpenProjects}
@@ -281,14 +297,14 @@ export function Toolbar({
                 </button>
               )}
 
-              {onToggleAiCamera && (
+              {onOpenAiStudio && (
                 <button
-                  onClick={() => { setToolsOpen(false); onToggleAiCamera() }}
+                  onClick={() => { setToolsOpen(false); onOpenAiStudio() }}
                   className="flex w-full items-center justify-between gap-2 rounded-xl px-2.5 py-2 text-left text-xs font-semibold text-slate-200 hover:bg-slate-800"
                   role="menuitem"
                 >
-                  <span className="flex items-center gap-2"><Sparkles size={14} className="text-purple-300" />AI Studio</span>
-                  <span className="text-[9px] text-slate-500">{isAiCameraOpen ? "OPEN" : "CLOSED"}</span>
+                  <span className="flex items-center gap-2"><Sparkles size={14} className="text-violet-300" />AI Studio</span>
+                  <span className="text-[9px] text-slate-500">SEPARATE</span>
                 </button>
               )}
 
