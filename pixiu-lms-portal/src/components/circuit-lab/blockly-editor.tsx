@@ -169,7 +169,10 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
 
     // Seed a couple of beginner-friendly variables so the Variables flyout
     // immediately offers the familiar "set value to" pattern used in lessons.
-    if (workspace.getAllVariables().length === 0) {
+    // Blockly 13 keeps variables on the workspace variable map; WorkspaceSvg
+    // itself does not expose getAllVariables().
+    const variableMap = workspace.getVariableMap()
+    if (variableMap.getAllVariables().length === 0) {
       workspace.createVariable("value")
       workspace.createVariable("brightness")
     }
