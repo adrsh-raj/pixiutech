@@ -55,6 +55,10 @@ requireText(panel, 'type: "io_analogread"', "analog read block")
 requireText(panel, "analogPinDropdown", "analog read A0-A5 dropdown")
 requireText(panel, 'type: "map_value"', "map value block")
 requireText(panel, 'arduino.forBlock["map_value"]', "map value generator")
+requireText(panel, "input.setShadowDom(shadow)", "map value default inputs")
+if ((panel.match(/const inputs = \[/g) || []).length < 1) {
+  failures.push("map value block: default range inputs missing")
+}
 
 const stopProgramSection = workbench.slice(
   workbench.indexOf("const stopProgram"),
