@@ -173,8 +173,10 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
     // itself does not expose getAllVariables().
     const variableMap = workspace.getVariableMap()
     if (variableMap.getAllVariables().length === 0) {
-      workspace.createVariable("value")
-      workspace.createVariable("brightness")
+      // In the current Blockly runtime, variable creation belongs to the
+      // variable map. Do not call createVariable() on WorkspaceSvg.
+      variableMap.createVariable("value")
+      variableMap.createVariable("brightness")
     }
 
     // Load initial Arduino Program block
