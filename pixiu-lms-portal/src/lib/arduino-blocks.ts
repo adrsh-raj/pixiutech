@@ -401,24 +401,30 @@ export function defineArduinoBlocks() {
 
   Blockly.Blocks['map_value'] = {
     init() {
-      this.appendValueInput('VALUE')
-        .setCheck('Number')
-        .appendField('map value')
-      this.appendValueInput('IN_MIN')
-        .setCheck('Number')
-        .appendField('from low')
-      this.appendValueInput('IN_MAX')
-        .setCheck('Number')
-        .appendField('high')
-      this.appendValueInput('OUT_MIN')
-        .setCheck('Number')
-        .appendField('to low')
-      this.appendValueInput('OUT_MAX')
-        .setCheck('Number')
-        .appendField('high')
+      const inputs = [
+        ['VALUE', 'map value', '0'],
+        ['IN_MIN', 'from low', '0'],
+        ['IN_MAX', 'high', '1023'],
+        ['OUT_MIN', 'to low', '0'],
+        ['OUT_MAX', 'high', '255'],
+      ] as const
+
+      for (const [name, label, defaultValue] of inputs) {
+        const input = this.appendValueInput(name)
+          .setCheck('Number')
+          .appendField(label)
+
+        // Give every socket a visible default number, while still allowing
+        // another number/expression block to be plugged into it.
+        const shadow = Blockly.utils.xml.textToDom(
+          `<shadow type="math_number"><field name="NUM">${defaultValue}</field></shadow>`,
+        )
+        input.setShadowDom(shadow)
+      }
+
       this.setOutput(true, 'Number')
       this.setColour(260)
-      this.setTooltip('Scale a value from one range to another, like Arduino map().')
+      this.setTooltip('Scale a value from one range to another, like Arduino map(). Example: 0-1023 to 0-255.')
     }
   }
 
