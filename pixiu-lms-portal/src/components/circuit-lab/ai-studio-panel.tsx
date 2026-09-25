@@ -840,11 +840,16 @@ export function AiStudioPanel({
           )
           drawFaces(getActiveOverlay()!, video, drawableFaces)
 
+          const stableEmotion = face?.emotions.find(
+            (emotion) => emotion.emotion === stableExpression,
+          )
+          const stableConfidence = stableEmotion?.score ?? face?.expressionScore ?? 0
+
           onAiStateChange({
             enabled: true,
             mode: "emotion",
             detectedClass: face ? stableExpression : "none",
-            confidence: face ? Math.round(face.expressionScore * 100) : 0,
+            confidence: face ? Math.round(stableConfidence * 100) : 0,
             allDetections: [],
             modelClasses: ["neutral", "happy", "sad", "angry", "surprise", "fear", "disgust"],
             modelSource: "ready",
