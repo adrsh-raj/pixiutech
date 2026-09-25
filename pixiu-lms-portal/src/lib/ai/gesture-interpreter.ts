@@ -11,7 +11,6 @@ export type HandGesture =
   | "open_palm"
   | "one"
   | "two"
-  | "five"
 
 export type HandGestureResult = {
   gesture: HandGesture
