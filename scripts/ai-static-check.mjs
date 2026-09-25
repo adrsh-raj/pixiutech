@@ -147,6 +147,7 @@ for (const marker of [
   "overlapFactor: 0.25",
   "isListening",
   "generation",
+  "window.tf = tf",
   "stopListening",
 ]) requireText(soundAdapter, marker, "6F sound adapter")
 
