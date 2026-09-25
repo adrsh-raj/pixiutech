@@ -20,8 +20,6 @@ const soundAdapter = read("pixiu-lms-portal/src/lib/ai/sound-detector.ts")
 const gestureAdapter = read("pixiu-lms-portal/src/lib/ai/gesture-interpreter.ts")
 const featureExtractor = read("pixiu-lms-portal/src/lib/ai/my-ai-feature-extractor.ts")
 const resultNormalizer = read("pixiu-lms-portal/src/lib/ai/ai-result-normalizer.ts")
-const gestureAdapter = read("pixiu-lms-portal/src/lib/ai/gesture-interpreter.ts")
-const featureExtractor = read("pixiu-lms-portal/src/lib/ai/my-ai-feature-extractor.ts")
 
 const failures = []
 const requireText = (text, needle, label) => {
@@ -276,7 +274,7 @@ for (const marker of ["6N · Why did AI produce this result?", "Class probabilit
 for (const marker of ["CAMERA ·", "MIC ·", "Erase local AI data", "Samples stay in this browser"]) {
   requireText(panel, marker, "6O privacy controls")
 }
-requireText(cameraAdapter, "getUserMedia", "6O media permissions")
+requireText(read("pixiu-lms-portal/src/lib/ai/camera-session.ts"), "getUserMedia", "6O media permissions")
 requireText(panel, "Permission blocked", "6O permission UI")
 requireText(workbench, "isAiGesture", "6G gesture predicate")
 
