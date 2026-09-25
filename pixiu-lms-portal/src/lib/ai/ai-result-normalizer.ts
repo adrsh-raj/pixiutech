@@ -124,7 +124,7 @@ export function normalizeAiVisionState(
       ? normalizeLabel(state.handedness)
       : state.handedness,
     unknown: decision.unknown,
-    lowConfidence: state.lowConfidence ?? decision.lowConfidence,
+    lowConfidence: decision.lowConfidence,
     confidenceThreshold: Math.max(
       0,
       Math.min(100, Math.round(threshold)),
