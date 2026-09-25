@@ -79,18 +79,41 @@ class CurriculumClassAssignmentSerializer(serializers.ModelSerializer):
         return attrs
     def create(self, validated_data): return CurriculumClassAssignment.objects.create(assigned_by=self.context["request"].user, **validated_data)
 
+class LearningContentFileField(serializers.FileField):
+    """Accept uploads but serialize only a boolean presence marker."""
+    def to_representation(self, value):
+        return bool(value)
+
+
 class LearningContentSerializer(serializers.ModelSerializer):
-    file = serializers.SerializerMethodField()
+    file = LearningContentFileField(required=False, allow_null=True)
+    file_available = serializers.SerializerMethodField()
+    video_processing_status = serializers.CharField(read_only=True)
+    video_processing_error = serializers.CharField(read_only=True)
+    video_duration_seconds = serializers.IntegerField(read_only=True)
+    video_size_bytes = serializers.IntegerField(read_only=True)
+    video_width = serializers.IntegerField(read_only=True)
+    video_height = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = LearningContent
-        fields = ["id", "title", "description", "content_type", "grade", "unit_code", "url", "file", "target_role", "status", "is_watermarked", "created_by", "created_at", "updated_at"]
+        fields = [
+            "id", "title", "description", "content_type", "grade", "unit_code", "url",
+            "file", "file_available", "target_role", "status", "is_watermarked",
+            "video_processing_status", "video_processing_error", "video_duration_seconds",
+            "video_size_bytes", "video_width", "video_height",
+            "created_by", "created_at", "updated_at",
+        ]
+        read_only_fields = [
+            "id", "file_available", "created_by", "created_at", "updated_at",
+            "video_processing_status", "video_processing_error", "video_duration_seconds",
+            "video_size_bytes", "video_width", "video_height",
+        ]
 
-    def get_file(self, obj):
-        # Never expose a direct/private-storage URL. Clients open content only
-        # through the authenticated/protected API endpoints.
-        return bool(obj.file)
-        read_only_fields = ["id", "created_by", "created_at", "updated_at"]
+    def get_file_available(self, obj):
+        return bool(obj.file) and (
+            obj.content_type != "video" or obj.video_processing_status == LearningContent.VIDEO_PROCESSING_READY
+        )
     def validate(self, attrs):
         title = attrs.get("title", getattr(self.instance, "title", "")); grade = attrs.get("grade", getattr(self.instance, "grade", "")); target_role = attrs.get("target_role", getattr(self.instance, "target_role", "student")); url = attrs.get("url", getattr(self.instance, "url", "")); file_value = attrs.get("file", getattr(self.instance, "file", None)); content_type = attrs.get("content_type", getattr(self.instance, "content_type", "")); content_status = attrs.get("status", getattr(self.instance, "status", "draft"))
         if not str(title).strip(): raise serializers.ValidationError({"title": "Title is required."})
