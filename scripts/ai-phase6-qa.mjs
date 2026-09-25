@@ -20,6 +20,10 @@ const blocks = read("pixiu-lms-portal/src/lib/arduino-blocks.ts")
 const toolbox = read("pixiu-lms-portal/src/components/circuit-lab/blockly-editor.tsx")
 const camera = read("pixiu-lms-portal/src/lib/ai/camera-session.ts")
 const hand = read("pixiu-lms-portal/src/lib/ai/hand-detector.ts")
+const face = read("pixiu-lms-portal/src/lib/ai/face-detector.ts")
+const sound = read("pixiu-lms-portal/src/lib/ai/sound-detector.ts")
+const object = read("pixiu-lms-portal/src/lib/ai/object-detector.ts")
+const pose = read("pixiu-lms-portal/src/lib/ai/pose-detector.ts")
 const gesture = read("pixiu-lms-portal/src/lib/ai/gesture-interpreter.ts")
 const extractor = read("pixiu-lms-portal/src/lib/ai/my-ai-feature-extractor.ts")
 const types = read("pixiu-lms-portal/src/lib/ai/vision-types.ts")
@@ -111,12 +115,12 @@ assert(low.confidenceThreshold === DEFAULT_AI_CONFIDENCE_THRESHOLD, "default thr
 
 const staticSourceChecks = [
   ["6A mode registry", /objects/.test(panel) && /pose/.test(panel) && /hands/.test(panel) && /emotion/.test(panel) && /sound/.test(panel) && /numbers/.test(panel)],
-  ["6A selected-resource loading", /mode === "objects"/.test(panel) && /mode === "pose"/.test(panel) && /mode === "hands" \\|\\| mode === "numbers"/.test(panel) && /mode === "emotion"/.test(panel) && /mode === "trained"/.test(panel)],
-  ["6B object adapter", engine.includes("MAX_CLASSES = 8") && panel.includes("loadObjectDetector")],
-  ["6C AI → Blockly bridge", workbench.includes("getAiDetectedClass") && workbench.includes("getAiConfidence") && runner.includes("ai_confidence")],
+  ["6A selected-resource loading", panel.includes('mode === "objects"') && panel.includes('mode === "pose"') && panel.includes('mode === "hands" || mode === "numbers"') && panel.includes('mode === "emotion"') && panel.includes('mode === "trained"')],
+  ["6B object adapter", object.includes("lite_mobilenet_v2") && object.includes("detectObjects") && panel.includes("loadObjectDetector")],
+  ["6C AI → Blockly bridge", pose.includes("singlepose/lightning/4") && workbench.includes("getAiDetectedClass") && workbench.includes("getAiConfidence") && runner.includes("ai_confidence")],
   ["6D hand adapter", hand.includes("MediaPipeHands") && hand.includes("maxHands: MAX_HANDS") && hand.includes("getExtendedFingerMask")],
-  ["6E face adapter", extractor.includes("MobileNetV2") && panel.includes("loadFaceDetector")],
-  ["6F sound adapter", panel.includes("loadSoundRecognizer") && runner.includes("ai_microphone_enable")],
+  ["6E face adapter", face.includes("MediaPipeFaceMesh") && face.includes("refineLandmarks: true") && panel.includes("loadFaceDetector")],
+  ["6F sound adapter", sound.includes("BROWSER_FFT") && sound.includes("generation") && panel.includes("loadSoundRecognizer") && runner.includes("ai_microphone_enable")],
   ["6G gesture interpreter", gesture.includes("interpretHandGesture") && workbench.includes("getAiGesture") && toolbox.includes("ai_get_gesture")],
   ["6H dataset workflow", engine.includes("addAiClass") && engine.includes("removeAiClass") && panel.includes("Import images") && panel.includes("Capture example")],
   ["6I transfer learning", extractor.includes("MY_AI_EMBEDDING_NODE") && engine.includes("Dense(96)") && !engine.includes("tf.layers.conv2d")],
@@ -132,7 +136,7 @@ const staticSourceChecks = [
   ["6P AI → virtual hardware isolation", !blocks.slice(blocks.indexOf("/* Browser AI generators")).match(/digitalWrite|analogWrite|setDigitalPin|motor_driver_write/)],
 ]
 
-for (const [name, passed] of requiredStaticChecks) {
+for (const [name, passed] of staticSourceChecks) {
   assert(passed, "static: " + name)
 }
 
