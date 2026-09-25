@@ -171,6 +171,10 @@ requireText(panel, "detectFaces", "panel E inference")
 requireText(panel, "loadSoundRecognizer", "panel F adapter")
 requireText(runner, 'case "ai_microphone_enable"', "Blockly Sound runtime execution")
 requireText(blocks, "setMicrophone", "Blockly Sound generator")
+requireText(blocks, "Browser AI generators", "compile-safe AI generator contract")
+for (const forbidden of ["aiVision.isDetected(", "aiVision.getDetectedClass(", "aiVision.getConfidence(", "aiVision.setCamera(", "aiVision.setMicrophone("]) {
+  forbidText(blocks, forbidden, "AI browser/Arduino generator mismatch")
+}
 requireText(read("pixiu-lms-portal/src/components/circuit-lab/blockly-editor.tsx"), 'type: "ai_microphone_enable"', "Blockly Sound toolbox")
 requireText(panel, "requestedMode", "panel requested-mode bridge")
 requireText(panel, "onRequestedModeHandled", "panel requested-mode acknowledgement")
