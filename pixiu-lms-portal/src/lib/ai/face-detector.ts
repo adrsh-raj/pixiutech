@@ -124,6 +124,10 @@ export async function loadFaceDetector(): Promise<FaceDetector> {
   }
 }
 
+export async function detectFaces(detector: FaceDetector, video: HTMLVideoElement): Promise<FaceDetection[]> {
+  return detector.detect(video)
+}
+
 export function disposeFaceDetector(detector: FaceDetector | null) {
   detector?.dispose()
 }
