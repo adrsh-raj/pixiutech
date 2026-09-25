@@ -252,6 +252,8 @@ function getBlockDescription(block: Blockly.Block, env: ExecutionEnvironment): s
       return "AI gesture → current hand gesture"
     case "ai_get_finger_count":
       return "AI fingers → current count"
+    case "ai_is_gesture":
+      return "AI gesture predicate"
     case "controls_if":
       return "if (condition)"
     case "controls_repeat_ext": {
