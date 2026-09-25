@@ -234,6 +234,11 @@ class SafeScopedContentViewSet(ScopedContractContentViewSet):
                 })
             content = serializer.save(**create_kwargs)
 
+        ContentClassAssignment.objects.bulk_create(
+            [ContentClassAssignment(content=content, school_class_id=class_id, assigned_by=user) for class_id in class_ids],
+            ignore_conflicts=True,
+        )
+
         if video_upload is not None:
             extension = Path(str(video_upload.name)).suffix.lower()
             temp_key, upload_size = upload_temp_video(video_upload, str(content.id), extension)
@@ -242,10 +247,6 @@ class SafeScopedContentViewSet(ScopedContractContentViewSet):
                 content.video_size_bytes = upload_size
             content.save(update_fields=["video_temp_key", "video_size_bytes", "updated_at"])
 
-        ContentClassAssignment.objects.bulk_create(
-            [ContentClassAssignment(content=content, school_class_id=class_id, assigned_by=user) for class_id in class_ids],
-            ignore_conflicts=True,
-        )
         return content
 
     def perform_create(self, serializer):
