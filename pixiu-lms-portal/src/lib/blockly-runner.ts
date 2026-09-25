@@ -20,6 +20,7 @@ export interface ExecutionEnvironment {
   getSensorValue?: (type: string, pin?: string) => number
   getSensorText?: (type: string, id?: string) => string
   isAiDetected?: (cls: string) => boolean
+  isAiUnknown?: () => boolean
   getAiDetectedClass?: () => string
   getAiConfidence?: () => number
   getAiGesture?: () => string
@@ -95,6 +96,9 @@ export function evaluateBoolean(target: Blockly.Block | null, env?: ExecutionEnv
   if (target.type === "ai_is_gesture") {
     const gesture = target.getFieldValue("GESTURE") ?? "fist"
     return env?.isAiGesture ? env.isAiGesture(gesture) : false
+  }
+  if (target.type === "ai_is_unknown") {
+    return env?.isAiUnknown ? env.isAiUnknown() : false
   }
   if (target.type === "logic_boolean") {
     return target.getFieldValue("BOOL") === "TRUE"
