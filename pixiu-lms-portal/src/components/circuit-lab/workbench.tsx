@@ -73,6 +73,7 @@ export function Workbench() {
   const [isAiCameraOpen, setIsAiCameraOpen] = useState(false)
   const [aiRuntimeEnabled, setAiRuntimeEnabled] = useState(false)
   const [aiCameraCompact, setAiCameraCompact] = useState(false)
+  const [aiRequestedMode, setAiRequestedMode] = useState<"objects" | "pose" | "hands" | "emotion" | "sound" | "numbers" | "trained" | null>(null)
   const [isInspectorOpen, setIsInspectorOpen] = useState(true)
   const [mobilePaletteOpen, setMobilePaletteOpen] = useState(false)
   const [contextMenu, setContextMenu] = useState<{
@@ -426,6 +427,7 @@ export function Workbench() {
   // AI runtime lifecycle is deliberately separate from the Arduino runner.
   // Stopping/restarting simulation must not silently destroy an active AI session.
   const stopAiRuntime = useCallback(() => {
+    setAiRequestedMode(null)
     setAiRuntimeEnabled(false)
     setAiCameraCompact(false)
     setIsAiCameraOpen(false)
@@ -478,7 +480,8 @@ export function Workbench() {
       blocklyXml.includes("ai_is_detected") ||
       blocklyXml.includes("ai_get_detected_class") ||
       blocklyXml.includes("ai_confidence") ||
-      blocklyXml.includes("ai_camera_enable")
+      blocklyXml.includes("ai_camera_enable") ||
+      blocklyXml.includes("ai_microphone_enable")
     )
     // AI program execution automatically opens the AI camera in minimized
     // floating mode. Preserve the student's current Circuit/Code view.
@@ -585,9 +588,21 @@ export function Workbench() {
         getAiDetectedClass: () => aiStateRef.current.detectedClass,
         getAiConfidence: () => aiStateRef.current.confidence,
         setAiCamera: (enabled) => {
+          setAiRequestedMode("objects")
           setAiRuntimeEnabled(enabled)
           setIsAiCameraOpen(enabled)
           setAiCameraCompact(enabled)
+        },
+        setAiMicrophone: (enabled) => {
+          if (enabled) {
+            setAiRequestedMode("sound")
+            setAiRuntimeEnabled(true)
+            setIsAiCameraOpen(true)
+            setAiCameraCompact(true)
+          } else {
+            setAiRequestedMode(null)
+            stopAiRuntime()
+          }
         },
         sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
         isRunning: () => runningRef.current,
@@ -1047,6 +1062,8 @@ export function Workbench() {
           isSimRunning={running}
           runtimeEnabled={aiRuntimeEnabled}
           compact={aiCameraCompact}
+          requestedMode={aiRequestedMode}
+          onRequestedModeHandled={() => setAiRequestedMode(null)}
           onStartSim={handleRunFromAiStudio}
         />
       </Suspense>
