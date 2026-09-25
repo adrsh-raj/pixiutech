@@ -1034,14 +1034,14 @@ export function AiStudioPanel({
       return
     }
 
-    const frame = captureVideoFrame(video, 512)
+    const frame = captureVideoFrame(video, 384)
     if (!frame) {
       setStatus("Start the camera first.")
       return
     }
 
     try {
-      const optimized = await optimizeAiImage(frame, 512, 0.7)
+      const optimized = await optimizeAiImage(frame, 384, 0.62)
       const before = store.samples.length
       const next = addAiSample(store, label, optimized)
       setStore(next)
@@ -1074,7 +1074,7 @@ export function AiStudioPanel({
 
       for (const file of files) {
         const dataUrl = await readFileAsDataUrl(file)
-        const optimized = await optimizeAiImage(dataUrl, 512, 0.68)
+        const optimized = await optimizeAiImage(dataUrl, 384, 0.62)
         const before = next.samples.length
         next = addAiSample(next, label, optimized)
         if (next.samples.length > before) added += 1
