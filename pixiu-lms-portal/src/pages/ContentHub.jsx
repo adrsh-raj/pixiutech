@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { BookOpen, Eye, FileText, Layers, Search, ShieldCheck, Trash2, Upload, X, Link2, Video } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { useToast } from '../context/ToastContext';
@@ -16,10 +16,10 @@ const isActive = v => clean(v?.status || 'active').toLowerCase() !== 'inactive';
 const asRows = payload => Array.isArray(payload) ? payload : Array.isArray(payload?.results) ? payload.results : [];
 
 export default function ContentHub(){
-  const { content=[], schools=[], classes=[], refreshAll, deleteContent } = useData();
+  const { content=[], schools=[], classes=[], refreshAll, refreshContent, deleteContent } = useData();
   const { role } = useAuth();
   const toast = useToast();
-  const [open,setOpen]=useState(false),[saving,setSaving]=useState(false),[query,setQuery]=useState(''),[targetFilter,setTargetFilter]=useState('all'),[gradeFilter,setGradeFilter]=useState('all'),[statusFilter,setStatusFilter]=useState('published');
+  const [open,setOpen]=useState(false),[saving,setSaving]=useState(false),[query,setQuery]=useState(''),[targetFilter,setTargetFilter]=useState('all'),[gradeFilter,setGradeFilter]=useState('all'),[statusFilter,setStatusFilter]=useState(role==='student'?'published':'all');
   const [schoolOptions,setSchoolOptions]=useState([]),[videoMaterial,setVideoMaterial]=useState(null);
   const [form,setForm]=useState({title:'',description:'',content_type:'pdf',school:'',grade:'',level:'',unit_code:'',url:'',target_role:role==='trainer'?'student':'student',status:'published',file:null,is_watermarked:true});
   const availableSchools = useMemo(()=>schools.filter(isActive),[schools]);
@@ -31,6 +31,14 @@ export default function ContentHub(){
     return [...new Set(activeClasses.filter(c=>!schoolCode || code(c)===schoolCode).map(c=>clean(c.grade)).filter(Boolean))].sort((a,b)=>Number(a)-Number(b));
   },[activeClasses,contentSchools,form.school]);
   const grades=[...new Set(content.map(x=>clean(x.grade)).filter(Boolean))].sort((a,b)=>Number(a)-Number(b));
+  useEffect(() => {
+    if (!['admin','trainer','superadmin'].includes(role)) return undefined;
+    const hasProcessingVideo = content.some(item => item.content_type === 'video' && ['queued','processing'].includes(String(item.video_processing_status || '').toLowerCase()));
+    if (!hasProcessingVideo) return undefined;
+    const timer = window.setInterval(() => { void refreshContent?.(); }, 8000);
+    return () => window.clearInterval(timer);
+  }, [role, content, refreshContent]);
+
   const filtered=useMemo(()=>content.filter(x=>{
     const hay=`${x.title||''} ${x.description||''} ${x.unit_code||''} ${x.level||''}`.toLowerCase();
     return (targetFilter==='all'||clean(x.target_role).toLowerCase()===targetFilter)&&(gradeFilter==='all'||clean(x.grade)===gradeFilter)&&(statusFilter==='all'||clean(x.status).toLowerCase()===statusFilter)&&hay.includes(query.trim().toLowerCase());
