@@ -35,10 +35,34 @@ export const MOVENET_KEYPOINT_NAMES = [
 const INPUT_SIZE = 192
 const KEYPOINT_SCORE_THRESHOLD = 0.25
 
+function firstGraphTensor(
+  output: tf.Tensor | tf.Tensor[] | tf.NamedTensorMap,
+): tf.Tensor {
+  if (Array.isArray(output)) return output[0]
+  if (output instanceof tf.Tensor) return output
+  const first = Object.values(output)[0]
+  if (!first) throw new Error("MoveNet returned no output tensor.")
+  return first
+}
+
+function disposeGraphOutput(
+  output: tf.Tensor | tf.Tensor[] | tf.NamedTensorMap,
+) {
+  if (Array.isArray(output)) {
+    output.forEach((tensor) => tensor.dispose())
+    return
+  }
+  if (output instanceof tf.Tensor) {
+    output.dispose()
+    return
+  }
+  Object.values(output).forEach((tensor) => tensor.dispose())
+}
+
 export async function loadMoveNet(): Promise<tf.GraphModel> {
   await tf.ready()
 
-  if (!tf.getBackend()) {
+  if (tf.getBackend() !== "webgl") {
     try {
       await tf.setBackend("webgl")
       await tf.ready()
@@ -52,12 +76,8 @@ export async function loadMoveNet(): Promise<tf.GraphModel> {
 
   // Warm the graph once so the first visible inference is not a cold-start spike.
   const warmup = tf.zeros([1, INPUT_SIZE, INPUT_SIZE, 3], "int32")
-  const output = model.execute(warmup)
-  if (Array.isArray(output)) {
-    output.forEach((tensor) => tensor.dispose())
-  } else {
-    output.dispose()
-  }
+  const rawOutput = model.execute(warmup)
+  disposeGraphOutput(rawOutput)
   warmup.dispose()
 
   return model
@@ -79,7 +99,7 @@ export async function estimateMoveNetPose(
       true,
     )
     const input = tf.cast(tf.expandDims(resized, 0), "int32")
-    return model.execute(input) as tf.Tensor
+    return firstGraphTensor(model.execute(input))
   })
 
   try {
