@@ -52,11 +52,6 @@ import {
   type SoundRecognizer,
 } from "@/lib/ai/sound-detector"
 import {
-  captureVideoFrame,
-  startCamera,
-  stopCamera,
-} from "@/lib/ai/camera-session"
-import {
   DEFAULT_OBJECT_MAX_BOXES,
   DEFAULT_OBJECT_MIN_SCORE,
   detectObjects,
