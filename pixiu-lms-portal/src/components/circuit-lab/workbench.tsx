@@ -27,6 +27,7 @@ import { TemplateBrowser } from "./template-browser"
 import { LessonBrowser } from "./lesson-browser"
 import type { AiVisionState } from "@/lib/ai/vision-types"
 import { createAiVisionState } from "@/lib/ai/vision-state"
+import { normalizeAiVisionState } from "@/lib/ai/ai-result-normalizer"
 const AiStudioPanel = lazy(() => import("./ai-studio-panel").then((module) => ({ default: module.AiStudioPanel })))
 import { ContextMenu, type ContextMenuTarget } from "./context-menu"
 import type { ProjectTemplate } from "@/lib/templates"
@@ -178,6 +179,12 @@ export function Workbench() {
   }, [])
   const [aiState, setAiState] = useState<AiVisionState>(() => createAiVisionState("objects"))
   const aiStateRef = useRef(aiState)
+  const handleAiStateChange = useCallback(
+    (nextState: AiVisionState) => {
+      setAiState(normalizeAiVisionState(nextState))
+    },
+    [],
+  )
   useEffect(() => {
     aiStateRef.current = aiState
   }, [aiState])
@@ -1081,7 +1088,7 @@ export function Workbench() {
           isOpen={isAiCameraOpen}
           onClose={handleAiStudioClose}
           aiState={aiState}
-          onAiStateChange={setAiState}
+          onAiStateChange={handleAiStateChange}
           isSimRunning={running}
           runtimeEnabled={aiRuntimeEnabled}
           compact={aiCameraCompact}
