@@ -91,6 +91,7 @@ export const Oscilloscope = memo(function Oscilloscope({
 
       const currentState = snapshot.state
       const currentPinStates = snapshot.pinStates
+      const currentPressed = snapshot.pressed
 
       const needsNodalSolve = [probeCH1, probeCH2].some((probe) => {
         if (!probe) return false
