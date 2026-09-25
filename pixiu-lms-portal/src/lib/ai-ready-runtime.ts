@@ -3,7 +3,6 @@ import * as tf from "@tensorflow/tfjs"
 declare global {
   interface Window {
     tf?: typeof tf
-    poseDetection?: any
     Human?: any
     speechCommands?: any
   }
@@ -12,10 +11,6 @@ declare global {
 const scriptLoads = new Map<string, Promise<void>>()
 
 const CDN = {
-  pose: [
-    "https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.min.js",
-    "https://unpkg.com/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.min.js",
-  ],
   human: [
     "https://cdn.jsdelivr.net/npm/@vladmandic/human@3.3.6/dist/human.js",
     "https://unpkg.com/@vladmandic/human@3.3.6/dist/human.js",
@@ -155,19 +150,6 @@ async function loadHuman(config: Record<string, unknown>) {
   // error instead of surfacing them later during the first camera frame.
   await human.load()
   return human
-}
-
-export async function loadPoseDetector() {
-  await ensureTfReady()
-  await loadAny(CDN.pose, () => Boolean(window.poseDetection))
-
-  return window.poseDetection.createDetector(
-    window.poseDetection.SupportedModels.MoveNet,
-    {
-      modelType: window.poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING,
-      enableSmoothing: true,
-    },
-  )
 }
 
 /**
