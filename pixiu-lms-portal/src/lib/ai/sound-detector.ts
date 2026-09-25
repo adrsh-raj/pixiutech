@@ -169,7 +169,16 @@ export async function loadSoundRecognizer(): Promise<SoundRecognizer> {
           (result: any) => {
             if (request !== generation || !listening) return
 
-            const scores = Array.from(result?.scores ?? []) as number[]
+            const rawScores = Array.from(result?.scores ?? []) as number[]
+            // Some mobile/audio stacks can surface NaN probabilities. Never
+            // leak NaN into the normalized AI state or UI percentages.
+            const scores = rawScores.map((value) => {
+              const numeric = Number(value)
+              return Number.isFinite(numeric)
+                ? Math.max(0, Math.min(1, numeric))
+                : 0
+            })
+
             let bestIndex = 0
             for (let index = 1; index < scores.length; index += 1) {
               if ((scores[index] ?? 0) > (scores[bestIndex] ?? 0)) {
@@ -178,8 +187,13 @@ export async function loadSoundRecognizer(): Promise<SoundRecognizer> {
             }
 
             const label = labels[bestIndex] ?? "unknown"
-            const confidence = Math.round(Number(scores[bestIndex] ?? 0) * 100)
-            const isNoise = label === "background_noise" || label === "unknown"
+            const bestScore = Number(scores[bestIndex] ?? 0)
+            const confidence = Math.round(bestScore * 100)
+            const hasUsableSignal = scores.some((score) => score > 0)
+            const isNoise =
+              !hasUsableSignal ||
+              label === "background_noise" ||
+              label === "unknown"
 
             onResult({
               label: isNoise ? "none" : label,
