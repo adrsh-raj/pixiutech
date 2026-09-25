@@ -19,6 +19,7 @@ const faceAdapter = read("pixiu-lms-portal/src/lib/ai/face-detector.ts")
 const soundAdapter = read("pixiu-lms-portal/src/lib/ai/sound-detector.ts")
 const gestureAdapter = read("pixiu-lms-portal/src/lib/ai/gesture-interpreter.ts")
 const featureExtractor = read("pixiu-lms-portal/src/lib/ai/my-ai-feature-extractor.ts")
+const resultNormalizer = read("pixiu-lms-portal/src/lib/ai/ai-result-normalizer.ts")
 const gestureAdapter = read("pixiu-lms-portal/src/lib/ai/gesture-interpreter.ts")
 const featureExtractor = read("pixiu-lms-portal/src/lib/ai/my-ai-feature-extractor.ts")
 
@@ -253,6 +254,30 @@ for (const marker of ["ai_get_gesture", "ai_get_finger_count", "ai_is_gesture"])
 }
 requireText(workbench, "getAiGesture", "6G gesture getter")
 requireText(workbench, "getAiFingerCount", "6G finger getter")
+requireText(resultNormalizer, "normalizeAiDecision", "6J/6K decision normalizer")
+requireText(resultNormalizer, "normalizeAiVisionState", "6K normalized state contract")
+requireText(resultNormalizer, "DEFAULT_AI_CONFIDENCE_THRESHOLD = 60", "6J confidence floor")
+requireText(engine, "lowMargin", "6J ambiguity fallback")
+requireText(engine, "lowConfidence", "6J low-confidence fallback")
+requireText(engine, "margin", "6J top-two margin")
+requireText(engine, "threshold", "6J decision threshold")
+requireText(workbench, "handleAiStateChange", "6K normalization boundary")
+requireText(workbench, "isAiUnknown:", "6K unknown bridge")
+requireText(blocks, "ai_is_unknown", "6K unknown Blockly block")
+requireText(runner, "ai_is_unknown", "6K unknown Blockly runtime")
+requireText(read("pixiu-lms-portal/src/components/circuit-lab/blockly-editor.tsx"), "ai_is_unknown", "6K unknown Blockly toolbox")
+requireText(runner, "AI blocks are data/control inputs only", "6L hardware boundary contract")
+for (const marker of ["6M · How My AI learns", "DATASET", "MODEL", "TRAIN", "INFERENCE"]) {
+  requireText(panel, marker, "6M Teach mode")
+}
+for (const marker of ["6N · Why did AI produce this result?", "Class probabilities", "explainCurrentAiResult"]) {
+  requireText(panel, marker, "6N Understand mode")
+}
+for (const marker of ["CAMERA ·", "MIC ·", "Erase local AI data", "Samples stay in this browser"]) {
+  requireText(panel, marker, "6O privacy controls")
+}
+requireText(cameraAdapter, "getUserMedia", "6O media permissions")
+requireText(panel, "Permission blocked", "6O permission UI")
 requireText(workbench, "isAiGesture", "6G gesture predicate")
 
 for (const marker of [
