@@ -243,6 +243,7 @@ export async function loadHandDetector(): Promise<HandDetector> {
                 toPoint(point, hand?.keypoints3D?.[index]),
               )
             : []
+          const extendedFingers = getExtendedFingerMask(keypoints)
           return {
             score: Number(hand?.score ?? 0),
             boxScore: Number(hand?.score ?? 0),
@@ -250,7 +251,8 @@ export async function loadHandDetector(): Promise<HandDetector> {
             handedness: String(hand?.handedness ?? "Hand"),
             box: toBox(hand?.box),
             keypoints,
-            fingerCount: countExtendedFingers(keypoints),
+            extendedFingers,
+            fingerCount: extendedFingers.filter(Boolean).length,
           }
         })
     },
