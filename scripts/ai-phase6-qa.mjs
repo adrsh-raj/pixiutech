@@ -3,6 +3,8 @@ import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import {
   DEFAULT_AI_CONFIDENCE_THRESHOLD,
+  SOUND_AI_CONFIDENCE_THRESHOLD,
+  TRAINED_AI_CONFIDENCE_THRESHOLD,
   normalizeAiDecision,
   normalizeAiVisionState,
 } from "../pixiu-lms-portal/src/lib/ai/ai-result-normalizer.ts"
@@ -139,6 +141,55 @@ const staleFlags = normalizeAiVisionState({
 assert(staleFlags.unknown === true, "normalizer must recompute stale unknown flag")
 assert(staleFlags.lowConfidence === true, "normalizer must recompute stale low-confidence flag")
 
+const soundState = normalizeAiVisionState({
+  ...createAiVisionState("sound"),
+  enabled: true,
+  detectedClass: "yes",
+  confidence: 65,
+  detail: "possible command",
+})
+assert(soundState.detectedClass === "unknown", "sound bridge must keep sub-72% commands unknown")
+assert(soundState.confidenceThreshold === SOUND_AI_CONFIDENCE_THRESHOLD, "sound threshold must match recognizer contract")
+
+const strongSoundState = normalizeAiVisionState({
+  ...createAiVisionState("sound"),
+  enabled: true,
+  detectedClass: "yes",
+  confidence: 72,
+  detail: "actionable command",
+})
+assert(strongSoundState.detectedClass === "yes", "72% sound command should be accepted")
+assert(strongSoundState.confidenceThreshold === SOUND_AI_CONFIDENCE_THRESHOLD, "sound accepted threshold mismatch")
+
+const trainedThresholdState = normalizeAiVisionState({
+  ...createAiVisionState("trained"),
+  enabled: true,
+  detectedClass: "bottle",
+  confidence: 61,
+  detail: "below trained threshold",
+})
+assert(trainedThresholdState.detectedClass === "unknown", "trained result below 62% must be unknown")
+assert(trainedThresholdState.confidenceThreshold === TRAINED_AI_CONFIDENCE_THRESHOLD, "trained threshold mismatch")
+
+const malformed = normalizeAiVisionState({
+  ...createAiVisionState("objects"),
+  enabled: true,
+  detectedClass: "Bottle",
+  confidence: 80,
+  probabilities: { Bottle: 105, Unknown: Number.NaN },
+  allDetections: [{
+    class: "Bottle",
+    score: Number.NaN,
+    bbox: [1, Number.NaN, -20, 4],
+  }],
+  detail: "malformed contract input",
+})
+assert(malformed.probabilities?.bottle === 100, "probabilities must be clamped to 0-100")
+assert(malformed.probabilities?.unknown === 0, "invalid probability must normalize to 0")
+assert(malformed.allDetections[0].score === 0, "invalid detection score must normalize to 0")
+assert(malformed.allDetections[0].bbox[1] === 0, "invalid bbox coordinate must normalize to 0")
+assert(malformed.allDetections[0].bbox[2] === 0, "negative bbox size must normalize to 0")
+
 const staticSourceChecks = [
   ["6A mode registry", /objects/.test(panel) && /pose/.test(panel) && /hands/.test(panel) && /emotion/.test(panel) && /sound/.test(panel) && /numbers/.test(panel)],
   ["6A selected-resource loading", panel.includes('mode === "objects"') && panel.includes('mode === "pose"') && panel.includes('mode === "hands" || mode === "numbers"') && panel.includes('mode === "emotion"') && panel.includes('mode === "trained"')],
@@ -156,8 +207,12 @@ const staticSourceChecks = [
   ["6M Teach concepts", panel.includes("6M · How My AI learns") && panel.includes("DATASET") && panel.includes("TRAIN") && panel.includes("INFERENCE")],
   ["6N Understand explanation", panel.includes("6N · Why did AI produce this result?") && panel.includes("Class probabilities") && panel.includes("explainCurrentAiResult")],
   ["6O privacy controls", panel.includes("CAMERA · ") && panel.includes("MIC · ") && panel.includes("Erase local AI data") && engine.includes("localStorage.removeItem")],
-  ["6P cleanup/restart", panel.includes("sessionRef") && panel.includes("cameraRequestRef") && panel.includes("releaseCurrentResource") && panel.includes("stopCameraStream")],
+  ["6P cleanup/restart", panel.includes("sessionRef") && panel.includes("cameraRequestRef") && panel.includes("releaseCurrentResource") && panel.includes("stopCameraStream") && !panel.includes("disposeAiResource")],
+
   ["6P permission handling", camera.includes("getUserMedia") && camera.includes("HTTPS") && panel.includes("Permission blocked")],
+  ["6P sound threshold alignment", sound.includes("probabilityThreshold: 0.72") && resultNormalizer.includes("SOUND_AI_CONFIDENCE_THRESHOLD = 72")],
+  ["6P training cancellation", engine.includes("shouldCancel") && panel.includes("trainingRunRef") && panel.includes("datasetVersionRef")],
+
   ["6P no-input path", createAiVisionState("objects").detectedClass === "none" && normalizeAiDecision("none", 0).reason === "no_input"],
   ["6P AI → virtual hardware isolation", !blocks.slice(blocks.indexOf("/* Browser AI generators")).match(/digitalWrite|analogWrite|setDigitalPin|motor_driver_write/)],
 ]
