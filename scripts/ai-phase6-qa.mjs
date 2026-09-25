@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
+import { fileURLToPath } from "node:url"
 import {
   DEFAULT_AI_CONFIDENCE_THRESHOLD,
   normalizeAiDecision,
@@ -7,7 +8,7 @@ import {
 } from "../pixiu-lms-portal/src/lib/ai/ai-result-normalizer.ts"
 import { createAiVisionState } from "../pixiu-lms-portal/src/lib/ai/vision-state.ts"
 
-const root = new URL("..", import.meta.url).pathname.replace(/\\/$/, "")
+const root = fileURLToPath(new URL("..", import.meta.url))
 const read = (relativePath) =>
   readFileSync(join(root, relativePath), "utf8")
 
@@ -114,7 +115,9 @@ const requiredStaticChecks = [
   ["6K normalized bridge", workbench.includes("normalizeAiVisionState") && workbench.includes("handleAiStateChange")],
   ["6K unknown Blockly block", blocks.includes("ai_is_unknown") && runner.includes("ai_is_unknown") && toolbox.includes("ai_is_unknown")],
   ["6K normalized getters", workbench.includes("getAiDetectedClass") && workbench.includes("getAiConfidence") && workbench.includes("getAiGesture")],
-  ["6L data-source-only design", runner.includes("setDigitalPin") && blocks.includes("browser-only") && !blocks.includes("aiVision.isDetected(")],
+  ["6L data-source-only design", runner.includes("AI blocks are data/control inputs only") && blocks.includes("browser-only") && !blocks.includes("aiVision.isDetected(")],
+  ["6L no AI generator hardware writes", !/arduino\.forBlock\['ai_[^']+'\][\\s\\S]*?(digitalWrite|analogWrite|setDigitalPin|motor_driver_write)/.test(blocks)],
+
   ["6L hardware remains simulator", runner.includes("case \"motor_driver_write\"") && runner.includes("env.setDigitalPin")],
   ["6M Teach dataset", panel.includes("6H · Build My AI dataset") && panel.includes("DATASET") && panel.includes("MODEL") && panel.includes("TRAIN") && panel.includes("INFERENCE")],
   ["6N explainability", panel.includes("6N · Why did AI produce this result?") && panel.includes("explainCurrentAiResult") && panel.includes("Class probabilities")],
