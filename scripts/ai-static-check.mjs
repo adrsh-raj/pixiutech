@@ -12,6 +12,9 @@ const types = read("pixiu-lms-portal/src/lib/ai/vision-types.ts")
 const workbench = read("pixiu-lms-portal/src/components/circuit-lab/workbench.tsx")
 const blocks = read("pixiu-lms-portal/src/lib/arduino-blocks.ts")
 const runner = read("pixiu-lms-portal/src/lib/blockly-runner.ts")
+const objectAdapter = read("pixiu-lms-portal/src/lib/ai/object-detector.ts")
+const poseAdapter = read("pixiu-lms-portal/src/lib/ai/pose-detector.ts")
+const visionState = read("pixiu-lms-portal/src/lib/ai/vision-state.ts")
 
 const failures = []
 const requireText = (text, needle, label) => {
@@ -31,7 +34,6 @@ for (const mode of ["objects", "pose", "hands", "emotion", "sound", "numbers"]) 
 }
 
 for (const marker of [
-  "loadPoseDetector",
   "loadHandDetector",
   "loadFaceEmotion",
   "loadSpeechRecognizer",
@@ -40,6 +42,50 @@ for (const marker of [
   "predictAiImage",
   "getModelWeightShapes",
 ]) requireText(panel, marker, "panel integration")
+
+for (const marker of [
+  "loadObjectDetector",
+  "detectObjects",
+  "disposeObjectDetector",
+  "loadMoveNet",
+  "estimateMoveNetPose",
+  "disposeMoveNet",
+]) requireText(panel, marker, "active AI adapter wiring")
+
+for (const marker of [
+  "lite_mobilenet_v2",
+  "DEFAULT_OBJECT_MIN_SCORE",
+  "DEFAULT_OBJECT_MAX_BOXES",
+]) requireText(objectAdapter, marker, "6B object adapter")
+
+for (const marker of [
+  "tf.loadGraphModel",
+  "SINGLEPOSE_LIGHTNING",
+  "MOVENET_KEYPOINT_NAMES",
+  "disposeMoveNet",
+]) requireText(poseAdapter, marker, "6C GraphModel adapter")
+
+requireText(visionState, "createAiVisionState", "6.0 normalized state factory")
+requireText(panel, "createAiVisionState", "6.0 state integration")
+
+for (const forbidden of [
+  'cocoSsd.load({ base: "mobilenet_v2" })',
+  "resourceRef.current.detect(",
+  "resourceRef.current.estimatePoses(",
+  "loadPoseDetector()",
+]) forbidText(panel, forbidden, "6A-6C old active path")
+
+const stopProgramSection = workbench.slice(
+  workbench.indexOf("const stopProgram"),
+  workbench.indexOf("const startProgram"),
+)
+if (/setAiRuntimeEnabled|setAiCameraCompact|setIsAiCameraOpen/.test(stopProgramSection)) {
+  failures.push("AI lifecycle: stopProgram still directly mutates AI runtime/presentation state")
+}
+requireText(workbench, "const stopAiRuntime = useCallback", "AI lifecycle decoupling")
+requireText(workbench, "stopAiRuntime()", "AI lifecycle shutdown")
+requireText(workbench, "setAiCamera: (enabled)", "AI camera bridge")
+requireText(workbench, "setAiCameraCompact(enabled)", "AI camera compact bridge")
 
 for (const marker of ["ai_is_detected", "ai_get_detected_class", "ai_confidence", "ai_camera_enable"]) {
   requireText(blocks, marker, "Blockly AI block")
@@ -59,6 +105,10 @@ requireText(engine, 'const LEGACY_MODEL_KEY = "pixiu-ai-studio-model-v1"', "lega
 requireText(engine, 'STORE_KEY = "pixiu-ai-studio-v2"', "AI store version")
 requireText(engine, 'MODEL_KEY = "pixiu-ai-studio-model-v2"', "AI model version")
 requireText(runtime, "loadAny", "AI CDN fallback")
+for (const forbidden of [
+  "@tensorflow-models/pose-detection",
+  "createDetector(",
+]) forbidText(runtime, forbidden, "6C generic runtime separation")
 requireText(runtime, "stopSpeechRecognizer", "AI audio cleanup")
 
 // 6D / 6E / 6F dedicated runtime gates.
@@ -78,6 +128,12 @@ requireText(panel, "6F Sound listening", "6F UI runtime state")
 for (const needle of ["face-api.min.js", "@mediapipe/hands/hands.js", "window.faceapi", "window.Hands"]) {
   forbidText(runtime, needle, "legacy 6D/6E runtime")
 }
+
+requireText(panel, "const requestId = ++cameraRequestRef.current", "camera request generation")
+requireText(panel, "if (requestId !== cameraRequestRef.current)", "camera stale-request guard")
+requireText(panel, "function stopCameraStream()", "camera stream shutdown boundary")
+requireText(panel, "stopCamera(studioVideoRef.current, stream)", "full-video cleanup")
+requireText(panel, "stopCamera(floatingVideoRef.current, stream)", "floating-video cleanup")
 
 if (!panel.match(/function stopAll\(\)[\s\S]*?releaseCurrentResource\(\)/)) {
   failures.push("cleanup: stopAll does not release the current resource")
