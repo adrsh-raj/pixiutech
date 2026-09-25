@@ -6,6 +6,7 @@ from django.db import DatabaseError, connection
 from django.http import FileResponse, HttpResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404
 from rest_framework.permissions import IsAuthenticated
+from accounts.permissions import IsActiveAccount
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
@@ -16,7 +17,7 @@ from learning.models import LearningContent
 from learning.services import accessible_content
 
 
-PLAYBACK_TOKEN_MAX_AGE = 10 * 60
+PLAYBACK_TOKEN_MAX_AGE = 60 * 60
 _playback_signer = TimestampSigner(salt="pixiu-learning-video-playback")
 
 
@@ -112,7 +113,7 @@ def _stream_storage_file(file_name, content_type, request):
 
 
 class LearningContentPlaybackTokenView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsActiveAccount]
 
     def get(self, request, pk):
         content = get_object_or_404(LearningContent, pk=pk, status="published", content_type="video")
