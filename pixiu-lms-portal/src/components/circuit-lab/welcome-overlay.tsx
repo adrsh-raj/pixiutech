@@ -171,7 +171,7 @@ export function WelcomeOverlay({ onOpenProjects }: { onOpenProjects: () => void 
                 </button>
               ) : (
                 <button
-                  onClick={() => setTourOpen(false)}
+                  onClick={() => dismiss()}
                   className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500 px-3 py-2 text-xs font-bold text-slate-950"
                 >
                   Start building <CheckCircle2 size={14} />
