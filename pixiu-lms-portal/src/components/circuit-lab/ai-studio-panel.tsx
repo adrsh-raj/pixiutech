@@ -1123,7 +1123,11 @@ export function AiStudioPanel({
                       <div className="absolute inset-0 grid place-items-center bg-slate-950/95 p-6 text-center">
                         {isSound ? <Mic size={32} className="mx-auto text-violet-300" /> : <Camera size={32} className="mx-auto text-violet-300" />}
                         <p className="mt-3 text-sm font-black">{isSound ? "Microphone off" : "Camera off"}</p>
-                        <p className="mt-1 max-w-sm text-[11px] leading-5 text-slate-500">6A loads only the selected Ready AI. 6B uses My AI. 6C is the live Blockly bridge.</p>
+                        <p className="mt-1 max-w-sm text-[11px] leading-5 text-slate-500">
+                          {isSound
+                            ? "Sound AI runs locally in your browser. Try words such as yes, no, go, stop, up, down, left or right."
+                            : "6A loads only the selected Ready AI. 6B uses My AI. 6C is the live Blockly bridge."}
+                        </p>
                       </div>
                     )}
                     <div className="absolute left-3 top-3 rounded-full border border-slate-700 bg-slate-950/85 px-2.5 py-1 font-mono text-[9px]">
@@ -1136,6 +1140,11 @@ export function AiStudioPanel({
                       <p className="text-[9px] font-mono uppercase tracking-[0.16em] text-slate-600">{activeTitle}</p>
                       <p className="mt-1 text-sm font-black">{aiState.detectedClass === "none" ? status : aiState.detectedClass}</p>
                       <p className="mt-0.5 text-[9px] text-slate-600">{aiState.detail}</p>
+                      {isSound && (
+                        <p className="mt-1 max-w-md text-[8px] leading-4 text-slate-700">
+                          Local vocabulary: yes · no · go · stop · up · down · left · right · zero–nine
+                        </p>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 font-mono text-violet-300">
                       <span className="text-[10px]">{fps ? `${fps} FPS` : "—"}</span>
@@ -1148,7 +1157,7 @@ export function AiStudioPanel({
                   <div className="rounded-2xl border border-slate-800 bg-slate-950/45 p-4">
                     <p className="text-xs font-black">6A · Ready AI</p>
                     <p className="mt-2 text-[10px] leading-5 text-slate-500">
-                      Objects, Pose, Fingers, Emotion, Sound and Numbers share one camera lifecycle. Models are loaded only when selected.
+                      Objects, Pose, Fingers, Emotion and Numbers use the Vision camera. Sound uses a separate microphone lifecycle. Only the selected AI model loads.
                     </p>
                     <button onClick={isSound ? (soundActive ? stopInput : startSound) : (cameraActive ? stopInput : startCameraForMode)} className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-violet-500 px-3 py-2 text-[10px] font-black">
                       {(isSound ? soundActive : cameraActive) ? (isSound ? <Mic size={13} /> : <CameraOff size={13} />) : isSound ? <Mic size={13} /> : <Camera size={13} />}
