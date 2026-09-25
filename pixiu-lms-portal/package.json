@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "oxlint",
+    "qa:ai": "node --experimental-strip-types ../scripts/ai-phase6-qa.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
