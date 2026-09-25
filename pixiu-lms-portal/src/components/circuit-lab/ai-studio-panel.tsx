@@ -520,7 +520,33 @@ export function AiStudioPanel({
   useEffect(() => {
     return () => {
       cameraRequestRef.current += 1
-      stopAll()
+      sessionRef.current += 1
+      if (timerRef.current !== null) {
+        window.clearTimeout(timerRef.current)
+        timerRef.current = null
+      }
+
+      const stream = streamRef.current
+      stopCamera(studioVideoRef.current, stream)
+      stopCamera(floatingVideoRef.current, stream)
+      streamRef.current = null
+
+      const resource = resourceRef.current
+      const resourceMode = resourceModeRef.current
+      resourceRef.current = null
+      resourceModeRef.current = null
+
+      if (resourceMode === "sound") {
+        void stopSpeechRecognizer(resource)
+      } else if (resourceMode === "trained") {
+        disposeActiveAiModel()
+      } else if (resourceMode === "objects") {
+        disposeObjectDetector(resource)
+      } else if (resourceMode === "pose") {
+        disposeMoveNet(resource)
+      } else {
+        disposeAiResource(resource)
+      }
     }
   }, [])
 
