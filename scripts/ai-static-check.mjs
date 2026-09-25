@@ -14,7 +14,6 @@ const runner = read("pixiu-lms-portal/src/lib/blockly-runner.ts")
 const objectAdapter = read("pixiu-lms-portal/src/lib/ai/object-detector.ts")
 const poseAdapter = read("pixiu-lms-portal/src/lib/ai/pose-detector.ts")
 const visionState = read("pixiu-lms-portal/src/lib/ai/vision-state.ts")
-const humanRuntime = read("pixiu-lms-portal/src/lib/ai/human-runtime.ts")
 const handAdapter = read("pixiu-lms-portal/src/lib/ai/hand-detector.ts")
 const faceAdapter = read("pixiu-lms-portal/src/lib/ai/face-detector.ts")
 const soundAdapter = read("pixiu-lms-portal/src/lib/ai/sound-detector.ts")
@@ -140,7 +139,10 @@ for (const marker of [
   'create("BROWSER_FFT", "18w")',
   "probabilityThreshold: 0.72",
   "overlapFactor: 0.25",
+  "suppressionTimeMillis: 650",
   "isListening",
+  "try {\n            await recognizer.stopListening()",
+  "generation",
   "generation",
   "window.tf = tf",
   "stopListening",
