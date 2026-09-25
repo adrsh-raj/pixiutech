@@ -66,6 +66,7 @@ export const MAX_SAMPLES_PER_CLASS = 20
 export const MAX_TOTAL_SAMPLES = 80
 export const MY_AI_SAMPLE_MAX_SIZE = 384
 export const MY_AI_SAMPLE_JPEG_QUALITY = 0.62
+export const MY_AI_LOW_MARGIN_THRESHOLD = 0.08
 
 let activeModel: tf.LayersModel | null = null
 let modelStorageQueue: Promise<void> = Promise.resolve()
@@ -460,10 +461,16 @@ type TrainOptions = {
     loss: number,
   ) => void
   onStage?: (stage: string) => void
+  shouldCancel?: () => boolean
 }
 
 function shuffle<T>(items: T[]) {
-  return [...items].sort(() => Math.random() - 0.5)
+  const output = [...items]
+  for (let index = output.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1))
+    ;[output[index], output[swapIndex]] = [output[swapIndex], output[index]]
+  }
+  return output
 }
 
 function buildValidationSplit(samples: AiSample[], classes: string[]) {
@@ -505,6 +512,10 @@ async function extractFeatures(
   let embeddingSize = 0
 
   for (let index = 0; index < samples.length; index += 1) {
+    if (options.shouldCancel?.()) {
+      throw new Error("Training cancelled.")
+    }
+
     const image = await loadImage(samples[index].dataUrl)
     const embedding = await extractMyAiEmbedding(image)
 
@@ -547,8 +558,20 @@ export async function trainAiModel(
     throw new Error("Teach at least 2 concepts before training.")
   }
 
+  if (classes.length > MAX_CLASSES) {
+    throw new Error("My AI supports at most 8 concepts.")
+  }
+
+  if (samples.length > MAX_TOTAL_SAMPLES) {
+    throw new Error("My AI supports at most 80 examples.")
+  }
+
   if (classes.some((name) => (counts[name] ?? 0) < MIN_SAMPLES_PER_CLASS)) {
     throw new Error("Give every concept at least 3 examples.")
+  }
+
+  if (classes.some((name) => (counts[name] ?? 0) > MAX_SAMPLES_PER_CLASS)) {
+    throw new Error("Keep each concept at or below 20 examples.")
   }
 
   const { train, validation } = buildValidationSplit(samples, classes)
@@ -612,6 +635,10 @@ export async function trainAiModel(
     })
 
     const epochs = Math.max(8, Math.min(30, options.epochs ?? 18))
+    if (options.shouldCancel?.()) {
+      throw new Error("Training cancelled.")
+    }
+
     let latestAccuracy = 0
     let latestValidation = 0
     let latestLoss = 0
@@ -628,6 +655,11 @@ export async function trainAiModel(
       verbose: 0,
       callbacks: {
         onEpochEnd: async (epoch, logs) => {
+          if (options.shouldCancel?.()) {
+            model!.stopTraining = true
+            return
+          }
+
           latestAccuracy = Number(logs?.accuracy ?? logs?.acc ?? 0)
           latestValidation = Number(
             logs?.val_accuracy ?? logs?.val_acc ?? latestAccuracy,
@@ -643,6 +675,10 @@ export async function trainAiModel(
         },
       },
     })
+
+    if (options.shouldCancel?.() || model.stopTraining) {
+      throw new Error("Training cancelled.")
+    }
 
     const trainEvaluation = model.evaluate(trainXs, trainYs) as tf.Scalar | tf.Scalar[]
     const trainValues = Array.isArray(trainEvaluation)
@@ -716,7 +752,11 @@ export async function loadStoredAiModel(
     !summary ||
     summary.storageKey !== MODEL_KEY ||
     summary.featureExtractor !== MY_AI_FEATURE_VERSION ||
-    !Number.isFinite(summary.embeddingSize)
+    !Number.isFinite(summary.embeddingSize) ||
+    !Array.isArray(summary.classes) ||
+    summary.classes.length < MIN_CLASSES ||
+    summary.classes.length > MAX_CLASSES ||
+    new Set(summary.classes.map((value) => String(value).trim().toLowerCase())).size !== summary.classes.length
   ) {
     return null
   }
@@ -822,10 +862,11 @@ export async function predictAiImage(
     const secondProbability = sortedProbabilities[1] ?? 0
     const margin = bestProbability - secondProbability
     const threshold = Number.isFinite(summary.predictionThreshold)
-      ? summary.predictionThreshold
+      ? Math.max(0, Math.min(1, summary.predictionThreshold))
       : MY_AI_PREDICTION_THRESHOLD
     const lowConfidence = bestProbability < threshold
-    const lowMargin = margin < 0.08
+    const lowMargin =
+      probabilities.length > 1 && margin < MY_AI_LOW_MARGIN_THRESHOLD
     const unknown = lowConfidence || lowMargin
     const reason = lowConfidence
       ? "low_confidence"
