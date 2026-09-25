@@ -14,6 +14,9 @@ export function createAiVisionState(mode: AiVisionMode): AiVisionState {
           ? []
           : undefined,
     modelSource: mode === "trained" ? "trained" : "ready",
+    detectedGesture: mode === "numbers" ? "none" : undefined,
+    fingerCount: mode === "numbers" ? 0 : undefined,
+    handedness: mode === "numbers" ? "none" : undefined,
     detail: mode === "trained" ? "My AI idle" : "AI idle",
   }
 }
