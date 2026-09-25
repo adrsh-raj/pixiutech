@@ -95,8 +95,17 @@ class LearningContentSerializer(serializers.ModelSerializer):
         title = attrs.get("title", getattr(self.instance, "title", "")); grade = attrs.get("grade", getattr(self.instance, "grade", "")); target_role = attrs.get("target_role", getattr(self.instance, "target_role", "student")); url = attrs.get("url", getattr(self.instance, "url", "")); file_value = attrs.get("file", getattr(self.instance, "file", None)); content_type = attrs.get("content_type", getattr(self.instance, "content_type", "")); content_status = attrs.get("status", getattr(self.instance, "status", "draft"))
         if not str(title).strip(): raise serializers.ValidationError({"title": "Title is required."})
         if grade and not str(grade).strip().isdigit(): raise serializers.ValidationError({"grade": "Grade must be numeric."})
-        if target_role not in {"student", "trainer", "school", "all"}: raise serializers.ValidationError({"target_role": "Unsupported target role."})
+        if target_role not in {"student", "trainer", "school", "student_trainer", "all"}: raise serializers.ValidationError({"target_role": "Unsupported target role."})
         if content_status == "published" and not url and not file_value: raise serializers.ValidationError("Published content must have a URL or file.")
+        if content_type == "video":
+            if not file_value:
+                raise serializers.ValidationError({"file": "Video content must use an uploaded MP4 or WebM file."})
+            filename = str(getattr(file_value, "name", "")).lower()
+            content_mime = str(getattr(file_value, "content_type", "")).lower()
+            if not (filename.endswith(".mp4") or filename.endswith(".webm")):
+                raise serializers.ValidationError({"file": "Only MP4 and WebM videos are supported."})
+            if content_mime and content_mime not in {"video/mp4", "video/webm"}:
+                raise serializers.ValidationError({"file": "Video MIME type must be video/mp4 or video/webm."})
         if content_type == "link" and not url: raise serializers.ValidationError({"url": "Link content requires a URL."})
         return attrs
 
