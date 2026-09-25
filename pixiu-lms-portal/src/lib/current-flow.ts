@@ -20,11 +20,12 @@ export function computeWireCurrents(
   state: CircuitState,
   runtime: Record<string, PartRuntime>,
   pinStates: Record<string, ArduinoPinState> = {},
+  pressed: Set<string> = new Set(),
 ): Record<string, WireCurrentState> {
   const result: Record<string, WireCurrentState> = {}
 
   // 1. Solve exact nodal potentials across circuit
-  const nodal = solveCircuitNodalPotentials(state, new Set(), pinStates, true)
+  const nodal = solveCircuitNodalPotentials(state, pressed, pinStates, true)
 
   // 2. Identify active power sources and ground sinks
   const powerPins = new Set<string>()
