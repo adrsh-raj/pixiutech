@@ -62,6 +62,8 @@ export const RECOMMENDED_SAMPLES_PER_CLASS = 8
 export const MAX_CLASSES = 8
 export const MAX_SAMPLES_PER_CLASS = 20
 export const MAX_TOTAL_SAMPLES = 80
+export const MY_AI_SAMPLE_MAX_SIZE = 384
+export const MY_AI_SAMPLE_JPEG_QUALITY = 0.62
 
 let activeModel: tf.LayersModel | null = null
 
@@ -390,8 +392,8 @@ export function removeAiSample(store: AiStudioStore, id: string): AiStudioStore 
 
 export async function optimizeAiImage(
   dataUrl: string,
-  maxSize = 512,
-  quality = 0.7,
+  maxSize = MY_AI_SAMPLE_MAX_SIZE,
+  quality = MY_AI_SAMPLE_JPEG_QUALITY,
 ): Promise<string> {
   const image = await loadImage(dataUrl)
   const longest = Math.max(image.naturalWidth || image.width, image.naturalHeight || image.height)
