@@ -7,7 +7,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from learning.models import LearningContent
-from learning.video_processing import delete_object, process_video_content, temp_bucket
+from learning.video_processing import delete_object, delete_final_object, process_video_content, temp_bucket
 
 
 logger = logging.getLogger(__name__)
@@ -92,8 +92,7 @@ class Command(BaseCommand):
 
             if old_key and old_key != result["file_key"]:
                 try:
-                    from learning.video_processing import final_bucket
-                    delete_object(final_bucket(), old_key)
+                    delete_final_object(old_key)
                 except Exception:
                     logger.exception("Could not delete previous final video object for %s", content_id)
 
