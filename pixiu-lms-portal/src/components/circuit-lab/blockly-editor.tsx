@@ -124,6 +124,7 @@ const TOOLBOX = {
         { kind: 'block', type: 'ai_confidence' },
         { kind: 'block', type: 'ai_get_gesture' },
         { kind: 'block', type: 'ai_get_finger_count' },
+        { kind: 'block', type: 'ai_is_gesture' },
         { kind: 'block', type: 'ai_camera_enable' },
         { kind: 'block', type: 'ai_microphone_enable' },
       ],
