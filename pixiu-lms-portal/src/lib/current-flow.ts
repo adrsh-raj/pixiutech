@@ -96,7 +96,9 @@ export function computeWireCurrents(
     } else if (part.type === "pushbutton") {
       linkInternal(k("p1a"), k("p1b"))
       linkInternal(k("p2a"), k("p2b"))
-      linkInternal(k("p1a"), k("p2a"))
+      if (pressed.has(part.id)) {
+        linkInternal(k("p1a"), k("p2a"))
+      }
     }
   }
 
