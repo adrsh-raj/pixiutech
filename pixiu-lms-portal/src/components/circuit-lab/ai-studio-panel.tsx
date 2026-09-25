@@ -433,7 +433,8 @@ export function AiStudioPanel({
 
   function commitStore(next: AiStudioStore) {
     datasetVersionRef.current += 1
-    commitStore(next)
+    setStore(next)
+    saveAiStudioStore(next)
   }
 
   useEffect(() => {
@@ -1219,7 +1220,12 @@ export function AiStudioPanel({
   }
 
   async function train() {
-    if (!canTrain || training) return
+    if (!canTrain || training || runtimeEnabled) {
+      if (runtimeEnabled && !training) {
+        setStatus("Stop the live AI runtime before training My AI.")
+      }
+      return
+    }
 
     const runId = ++trainingRunRef.current
     const datasetVersion = datasetVersionRef.current
@@ -1760,7 +1766,7 @@ export function AiStudioPanel({
                     </p>
                   </div>
                   <button
-                    disabled={!canTrain || training}
+                    disabled={!canTrain || training || runtimeEnabled}
                     onClick={() => void train()}
                     className="rounded-xl bg-violet-500 px-4 py-2 text-[10px] font-black disabled:opacity-30"
                   >
