@@ -837,6 +837,7 @@ export async function predictAiImage(
       unknown,
       lowConfidence,
       margin: Math.round(margin * 100),
+      threshold: Math.round(threshold * 100),
       reason,
     }
   } finally {
