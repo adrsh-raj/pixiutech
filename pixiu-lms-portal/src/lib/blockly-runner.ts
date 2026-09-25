@@ -247,6 +247,8 @@ function getBlockDescription(block: Blockly.Block, env: ExecutionEnvironment): s
     }
     case "lcd_clear":
       return "lcd.clear()"
+    case "ai_is_unknown":
+      return "AI unknown / low confidence"
     case "ai_camera_enable": {
       const state = block.getFieldValue("STATE") ?? "ON"
       return `AI Camera ${state}`
