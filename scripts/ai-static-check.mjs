@@ -108,30 +108,56 @@ requireText(engine, 'const LEGACY_STORE_KEY = "pixiu-ai-studio-v1"', "legacy cle
 requireText(engine, 'const LEGACY_MODEL_KEY = "pixiu-ai-studio-model-v1"', "legacy cleanup model key")
 requireText(engine, 'STORE_KEY = "pixiu-ai-studio-v2"', "AI store version")
 requireText(engine, 'MODEL_KEY = "pixiu-ai-studio-model-v2"', "AI model version")
-requireText(runtime, "loadAny", "AI CDN fallback")
-for (const forbidden of [
-  "@tensorflow-models/pose-detection",
-  "createDetector(",
-]) forbidText(runtime, forbidden, "6C generic runtime separation")
-requireText(runtime, "stopSpeechRecognizer", "AI audio cleanup")
 
-// 6D / 6E / 6F dedicated runtime gates.
-requireText(runtime, '@vladmandic/human@3.3.6/dist/human.js', "6D/6E maintained Human runtime")
-requireText(runtime, 'HUMAN_VERSION = "3.3.6"', "6D/6E pinned Human version")
-requireText(runtime, 'handlandmark-lite.json', "6D hand landmark model")
-requireText(runtime, 'handtrack.json', "6D hand detector model")
-requireText(runtime, 'emotion.json', "6E emotion model")
-requireText(runtime, 'mesh: { enabled: true', "6E face mesh")
-requireText(runtime, 'detector: {', "6E face detector")
-requireText(runtime, '@tensorflow-models/speech-commands@0.5.4', "6F speech model version")
-requireText(panel, "soundActive", "6F microphone lifecycle")
-requireText(panel, "6F Sound listening", "6F UI runtime state")
+// 6D/6E use a dedicated maintained Human runtime. Keep D/E model loading
+// behind adapters so the panel only consumes normalized results.
+requireText(humanRuntime, '@vladmandic/human@3.3.6/dist/human.js', "D/E Human runtime")
+requireText(humanRuntime, 'HUMAN_VERSION = "3.3.6"', "D/E Human version")
+requireText(humanRuntime, "cacheModels: true", "D/E model cache")
+requireText(humanRuntime, "modelBasePath", "D/E model base path")
 
-// The old unmaintained face-api / MediaPipe Hands CDN paths must not remain
-// active in the runtime adapter.
-for (const needle of ["face-api.min.js", "@mediapipe/hands/hands.js", "window.faceapi", "window.Hands"]) {
-  forbidText(runtime, needle, "legacy 6D/6E runtime")
-}
+for (const marker of [
+  "loadHandDetector",
+  "MAX_HANDS = 2",
+  "handtrack.json",
+  "handlandmark-lite.json",
+  "landmarks: true",
+  "countExtendedFingers",
+  "fingerCount",
+  "handedness",
+]) requireText(handAdapter, marker, "6D hand adapter")
+
+for (const marker of [
+  "loadFaceDetector",
+  "MAX_FACES = 3",
+  "minSize: 60",
+  "mesh:",
+  "emotion:",
+  'modelPath: "emotion.json"',
+  "getTopEmotion",
+]) requireText(faceAdapter, marker, "6E face adapter")
+
+for (const marker of [
+  'SPEECH_VERSION = "0.5.4"',
+  'create("BROWSER_FFT", "18w")',
+  "probabilityThreshold: 0.72",
+  "overlapFactor: 0.25",
+  "isListening",
+  "generation",
+  "stopListening",
+]) requireText(soundAdapter, marker, "6F sound adapter")
+
+for (const needle of [
+  "face-api.min.js",
+  "@mediapipe/hands/hands.js",
+  "window.faceapi",
+  "window.Hands",
+  "@tensorflow-models/speech-commands",
+]) forbidText(panel, needle, "legacy D-F runtime reference")
+
+requireText(panel, "loadHandDetector", "panel D adapter")
+requireText(panel, "loadFaceDetector", "panel E adapter")
+requireText(panel, "loadSoundRecognizer", "panel F adapter")
 
 requireText(panel, "const requestId = ++cameraRequestRef.current", "camera request generation")
 requireText(panel, "if (requestId !== cameraRequestRef.current)", "camera stale-request guard")
