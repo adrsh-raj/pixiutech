@@ -1,3 +1,5 @@
+import * as tf from "@tensorflow/tfjs"
+
 export const HUMAN_VERSION = "3.3.6"
 export const HUMAN_CDN_SOURCES = [
   "https://cdn.jsdelivr.net/npm/@vladmandic/human@3.3.6/dist/human.js",
@@ -6,6 +8,7 @@ export const HUMAN_CDN_SOURCES = [
 
 declare global {
   interface Window {
+    tf?: typeof tf
     Human?: {
       Human: new (config?: Record<string, unknown>) => any
     }
@@ -84,6 +87,9 @@ export async function ensureHumanRuntime(): Promise<void> {
   if (typeof window === "undefined") {
     throw new Error("PIXIU AI needs a browser.")
   }
+
+  window.tf = tf
+  await tf.ready()
 
   if (window.Human?.Human) return
 
