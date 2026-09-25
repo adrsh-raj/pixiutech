@@ -506,8 +506,8 @@ export function AiStudioPanel({
 
   function stopAll() {
     cameraRequestRef.current += 1
-    releaseCurrentResource()
     stopInference()
+    releaseCurrentResource()
     stopCameraStream()
     setCameraActive(false)
     setSoundActive(false)
@@ -899,8 +899,8 @@ export function AiStudioPanel({
 
   function stopInput() {
     cameraRequestRef.current += 1
-    releaseCurrentResource()
     stopInference()
+    releaseCurrentResource()
     stopCameraStream()
     setCameraActive(false)
     setSoundActive(false)
