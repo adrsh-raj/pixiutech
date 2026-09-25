@@ -588,7 +588,7 @@ export function Workbench() {
         getAiDetectedClass: () => aiStateRef.current.detectedClass,
         getAiConfidence: () => aiStateRef.current.confidence,
         setAiCamera: (enabled) => {
-          setAiRequestedMode("objects")
+          setAiRequestedMode(enabled ? "objects" : null)
           setAiRuntimeEnabled(enabled)
           setIsAiCameraOpen(enabled)
           setAiCameraCompact(enabled)
