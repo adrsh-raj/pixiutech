@@ -25,6 +25,7 @@ import {
   addAiSample,
   clearAiStudioStore,
   disposeActiveAiModel,
+  getActiveAiModel,
   getAiClasses,
   getAiDatasetStats,
   getModelWeightPreview,
@@ -420,6 +421,7 @@ export function AiStudioPanel({
   const fpsStartRef = useRef(0)
   const fpsFramesRef = useRef(0)
   const dragRef = useRef<{ pointerId: number; offsetX: number; offsetY: number } | null>(null)
+  const trainingRunRef = useRef(0)
   const [floatingPosition, setFloatingPosition] = useState<{ left: number; top: number } | null>(null)
 
   const classes = useMemo(() => getAiClasses(store), [store])
@@ -497,14 +499,26 @@ export function AiStudioPanel({
       setModel(null)
       return
     }
+
+    // Training already returns a live model. Do not immediately load the same
+    // IndexedDB model again: loadStoredAiModel() disposes the active model,
+    // which can turn the just-trained React state into a disposed tensor graph.
+    if (model) return
+
     let cancelled = false
     void loadStoredAiModel(store.model).then((loaded) => {
-      if (!cancelled) setModel(loaded)
+      if (cancelled) {
+        if (loaded && getActiveAiModel() === loaded) {
+          disposeActiveAiModel()
+        }
+        return
+      }
+      setModel(loaded)
     })
     return () => {
       cancelled = true
     }
-  }, [store.model])
+  }, [store.model, model])
 
   function getActiveVideo() {
     return ((compact || !isOpen) ? floatingVideoRef.current : studioVideoRef.current)
@@ -592,7 +606,7 @@ export function AiStudioPanel({
     if (resourceMode === "sound") {
       void stopSoundRecognizer(resource as SoundRecognizer)
     } else if (resourceMode === "trained") {
-      if (resource !== model) disposeAiResource(resource)
+      if (resource !== model) disposeActiveAiModel()
     } else if (resourceMode === "objects") {
       disposeObjectDetector(resource)
     } else if (resourceMode === "pose") {
@@ -693,6 +707,7 @@ export function AiStudioPanel({
     return () => {
       cameraRequestRef.current += 1
       sessionRef.current += 1
+      trainingRunRef.current += 1
       if (timerRef.current !== null) {
         window.clearTimeout(timerRef.current)
         timerRef.current = null
@@ -1101,6 +1116,7 @@ export function AiStudioPanel({
   }
 
   function selectMode(next: ReadyAiMode | "trained") {
+    if (training) return
     stopInput()
     setMode(next)
     setError(null)
@@ -1108,11 +1124,13 @@ export function AiStudioPanel({
   }
 
   function selectTab(next: Tab) {
+    if (training) return
     stopInput()
     setTab(next)
   }
 
   async function addSampleFromCamera() {
+    if (training) return
     if (!label.trim()) {
       setStatus("Enter a concept name first.")
       return
@@ -1160,6 +1178,11 @@ export function AiStudioPanel({
   }
 
   async function importSample(event: ChangeEvent<HTMLInputElement>) {
+    if (training) {
+      event.target.value = ""
+      return
+    }
+
     const files = Array.from(event.target.files ?? [])
       .filter((file) => file.type.startsWith("image/"))
       .slice(0, 10)
@@ -1193,13 +1216,17 @@ export function AiStudioPanel({
 
   async function train() {
     if (!canTrain || training) return
+
+    const runId = ++trainingRunRef.current
+    const trainingSamples = store.samples
     setTraining(true)
     setError(null)
     setProgress({ epoch: 0, total: 18, accuracy: 0, loss: 0, stage: "Preparing dataset" })
 
     try {
-      const result = await trainAiModel(store.samples, {
+      const result = await trainAiModel(trainingSamples, {
         epochs: 18,
+        shouldCancel: () => runId !== trainingRunRef.current,
         onStage: (stage) =>
           setProgress((current) => ({ ...current, stage })),
         onEpoch: (epoch, total, accuracy, loss) =>
@@ -1213,7 +1240,15 @@ export function AiStudioPanel({
           })),
       })
 
-      const next = { ...store, model: result.summary }
+      // Dataset/reset/unmount may have superseded this training run.
+      if (runId !== trainingRunRef.current) {
+        if (getActiveAiModel() === result.model) {
+          disposeActiveAiModel()
+        }
+        return
+      }
+
+      const next = { ...store, samples: trainingSamples, model: result.summary }
       setStore(next)
       saveAiStudioStore(next)
       setModel(result.model)
@@ -1221,13 +1256,17 @@ export function AiStudioPanel({
       setTab("try")
       setStatus("My AI learned " + result.summary.classes.length + " concepts with " + result.summary.featureExtractor + ".")
     } catch (trainError) {
+      if (runId !== trainingRunRef.current) return
       setError(trainError instanceof Error ? trainError.message : "Training failed.")
     } finally {
-      setTraining(false)
+      if (runId === trainingRunRef.current) {
+        setTraining(false)
+      }
     }
   }
 
   async function resetStudio() {
+    trainingRunRef.current += 1
     stopInput()
     await clearAiStudioStore()
     setStore({ classes: [], samples: [], model: null })
