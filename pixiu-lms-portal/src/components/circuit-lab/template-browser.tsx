@@ -1,6 +1,6 @@
-﻿import React from "react"
+﻿import React, { useMemo, useState } from "react"
 import { X, Sparkles, BookOpen, Layers, Check } from "lucide-react"
-import { TEMPLATES, type ProjectTemplate } from "@/lib/templates"
+import { TEMPLATES, type ProjectTemplate, type TemplateGrade } from "@/lib/templates"
 
 interface Props {
   isOpen: boolean
@@ -9,6 +9,8 @@ interface Props {
 }
 
 export const TemplateBrowser: React.FC<Props> = ({ isOpen, onClose, onSelectTemplate }) => {
+  const [gradeFilter, setGradeFilter] = useState<"all" | TemplateGrade>("all")
+  const filteredTemplates = useMemo(() => gradeFilter === "all" ? TEMPLATES : TEMPLATES.filter((template) => template.gradeBand === gradeFilter), [gradeFilter])
   if (!isOpen) return null
 
   return (
@@ -34,8 +36,8 @@ export const TemplateBrowser: React.FC<Props> = ({ isOpen, onClose, onSelectTemp
         </div>
 
         {/* Templates Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-6 overflow-y-auto">
-          {TEMPLATES.map((tmpl) => (
+        <div className="border-b border-slate-800 px-6 py-3 flex flex-wrap items-center gap-2">{["all", 6, 7, 8].map((grade) => <button key={String(grade)} onClick={() => setGradeFilter(grade as "all" | TemplateGrade)} className={`rounded-full px-3 py-1.5 text-[10px] font-bold transition ${gradeFilter === grade ? "bg-blue-500 text-white" : "bg-slate-800 text-slate-400 hover:text-white"}`}>{grade === "all" ? "All Grades" : `Grade ${grade}`}</button>)}<span className="ml-auto text-[10px] font-mono text-slate-500">{filteredTemplates.length} starter projects</span></div><div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-6 overflow-y-auto">
+          {filteredTemplates.map((tmpl) => (
             <div
               key={tmpl.id}
               onClick={() => {
@@ -66,9 +68,7 @@ export const TemplateBrowser: React.FC<Props> = ({ isOpen, onClose, onSelectTemp
                 <h3 className="text-sm font-bold text-white group-hover:text-blue-400 transition mb-1">
                   {tmpl.title}
                 </h3>
-                <p className="text-xs text-slate-400 line-clamp-2 mb-3 leading-relaxed">
-                  {tmpl.description}
-                </p>
+                <p className="text-xs text-slate-400 line-clamp-2 mb-3 leading-relaxed">{tmpl.description}</p><div className="mb-3 flex items-center gap-2 flex-wrap"><span className="rounded-full bg-blue-500/10 px-2 py-1 text-[9px] font-bold text-blue-300 border border-blue-500/20">Grade {tmpl.gradeBand ?? "6-8"}</span><span className="rounded-full bg-slate-800 px-2 py-1 text-[9px] font-semibold text-slate-400">{tmpl.unit ?? "Core Lab"}</span></div>{tmpl.tutorial?.length ? <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-2.5"><div className="mb-1.5 text-[9px] font-bold uppercase tracking-wider text-slate-500">Guided steps</div><ol className="space-y-1">{tmpl.tutorial.slice(0, 3).map((step, index) => <li key={step} className="flex gap-2 text-[9px] leading-4 text-slate-400"><span className="font-mono text-blue-400">{index + 1}.</span><span>{step}</span></li>)}</ol></div> : null}
               </div>
 
               <div className="flex items-center justify-between pt-3 border-t border-slate-800/80">
