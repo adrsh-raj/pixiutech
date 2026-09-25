@@ -309,6 +309,8 @@ export function AiStudioPanel({
   const resourceModeRef = useRef<AiVisionMode | null>(null)
   const busyRef = useRef(false)
   const busySessionRef = useRef<number | null>(null)
+  const handCountHistoryRef = useRef<number[]>([])
+  const emotionHistoryRef = useRef<string[]>([])
   const fpsStartRef = useRef(0)
   const fpsFramesRef = useRef(0)
   const dragRef = useRef<{ pointerId: number; offsetX: number; offsetY: number } | null>(null)
@@ -451,6 +453,8 @@ export function AiStudioPanel({
       timerRef.current = null
     }
     clearOverlay()
+    handCountHistoryRef.current = []
+    emotionHistoryRef.current = []
     fpsStartRef.current = 0
     fpsFramesRef.current = 0
     setFps(0)
