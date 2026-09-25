@@ -245,7 +245,7 @@ for (const forbidden of [
   "16×16 RGB → Conv2D",
 ]) forbidText(engine, forbidden, "6I old raw-pixel classifier")
 
-for (const marker of ["ai_get_gesture", "ai_get_finger_count"]) {
+for (const marker of ["ai_get_gesture", "ai_get_finger_count", "ai_is_gesture"]) {
   requireText(blocks, marker, "6G Blockly block")
   requireText(runner, marker, "6G Blockly runtime")
   requireText(read("pixiu-lms-portal/src/components/circuit-lab/blockly-editor.tsx"), marker, "6G Blockly toolbox")
@@ -253,6 +253,7 @@ for (const marker of ["ai_get_gesture", "ai_get_finger_count"]) {
 }
 requireText(workbench, "getAiGesture", "6G gesture getter")
 requireText(workbench, "getAiFingerCount", "6G finger getter")
+requireText(workbench, "isAiGesture", "6G gesture predicate")
 
 for (const marker of [
   "interpretHandGesture",
