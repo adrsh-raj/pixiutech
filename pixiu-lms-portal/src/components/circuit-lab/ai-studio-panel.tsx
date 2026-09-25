@@ -58,6 +58,7 @@ import {
   loadMoveNet,
 } from "@/lib/ai/pose-detector"
 import type { AiVisionMode, ReadyAiMode, AiVisionState } from "@/lib/ai/vision-types"
+import { createAiVisionState } from "@/lib/ai/vision-state"
 
 export type { AiVisionState, ReadyAiMode }
 
@@ -87,24 +88,6 @@ const MODES: Array<{ id: ReadyAiMode; title: string; subtitle: string }> = [
   { id: "numbers", title: "Numbers", subtitle: "0–5 fingers" },
 ]
 
-const INITIAL: AiVisionState = {
-  enabled: false,
-  mode: "objects",
-  detectedClass: "none",
-  confidence: 0,
-  allDetections: [],
-  modelSource: "ready",
-  detail: "AI idle",
-}
-
-function emptyState(mode: AiVisionMode): AiVisionState {
-  return {
-    ...INITIAL,
-    mode,
-    modelClasses: mode === "numbers" ? ["0", "1", "2", "3", "4", "5"] : undefined,
-    detail: mode === "trained" ? "My AI idle" : "AI idle",
-  }
-}
 
 function canonicalObjectClass(name: string) {
   const lower = name.toLowerCase()
@@ -309,7 +292,7 @@ export function AiStudioPanel({
     setError(null)
     setStatus(runtimeEnabled ? "AI runtime active" : "AI idle")
     setCapture(null)
-    onAiStateChange(runtimeEnabled ? aiState : INITIAL)
+    onAiStateChange(runtimeEnabled ? aiState : createAiVisionState("objects"))
   }, [isOpen])
 
   function bindExistingCameraToVisibleVideo() {
@@ -512,7 +495,7 @@ export function AiStudioPanel({
       setCameraActive(true)
       setStatus(withModel ? "Camera live · loading AI" : "Camera live · ready to teach")
       onAiStateChange({
-        ...emptyState(mode),
+        ...createAiVisionState(mode),
         enabled: true,
         detail: withModel ? "Camera live" : "Teach camera live",
       })
@@ -617,7 +600,7 @@ export function AiStudioPanel({
       setLoading(false)
       setSoundActive(true)
       onAiStateChange({
-        ...emptyState("sound"),
+        ...createAiVisionState("sound"),
         enabled: true,
         detail: "Microphone listening",
       })
@@ -823,7 +806,7 @@ export function AiStudioPanel({
     stopCameraStream()
     setCameraActive(false)
     setSoundActive(false)
-    onAiStateChange(emptyState(mode))
+    onAiStateChange(createAiVisionState(mode))
     setStatus("AI stopped")
   }
 
