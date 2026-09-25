@@ -109,8 +109,6 @@ requireText(engine, 'const LEGACY_MODEL_KEY = "pixiu-ai-studio-model-v1"', "lega
 requireText(engine, 'STORE_KEY = "pixiu-ai-studio-v2"', "AI store version")
 requireText(engine, 'MODEL_KEY = "pixiu-ai-studio-model-v2"', "AI model version")
 
-// 6D/6E use a dedicated maintained Human runtime. Keep D/E model loading
-// behind adapters so the panel only consumes normalized results.
 // 6D/6E share the application's existing TensorFlow.js runtime. Avoid a
 // second bundled TensorFlow.js instance from a separate vision framework.
 for (const marker of [
@@ -121,6 +119,7 @@ for (const marker of [
   "maxHands: MAX_HANDS",
   "countExtendedFingers",
   "detectHands",
+  "window.tf = tf",
 ]) requireText(handAdapter, marker, "6D TFJS hand adapter")
 
 for (const marker of [
@@ -133,6 +132,7 @@ for (const marker of [
   "classifyExpression",
   "detectFaces",
   "478",
+  "window.tf = tf",
 ]) requireText(faceAdapter, marker, "6E TFJS face/mesh adapter")
 
 for (const marker of [
