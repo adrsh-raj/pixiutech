@@ -174,6 +174,32 @@ class LearningContent(models.Model):
     target_role = models.CharField(max_length=20, default="student")
     status = models.CharField(max_length=20, choices=PublishStatus.choices, default=PublishStatus.DRAFT)
     is_watermarked = models.BooleanField(default=True)
+
+    # Video lifecycle: original uploads live only in a temporary private bucket
+    # while the worker transcodes them. Only the optimized final MP4 is retained
+    # in the permanent private learning bucket.
+    VIDEO_PROCESSING_QUEUED = "queued"
+    VIDEO_PROCESSING_PROCESSING = "processing"
+    VIDEO_PROCESSING_READY = "ready"
+    VIDEO_PROCESSING_FAILED = "failed"
+    VIDEO_PROCESSING_CHOICES = (
+        (VIDEO_PROCESSING_QUEUED, "Queued"),
+        (VIDEO_PROCESSING_PROCESSING, "Processing"),
+        (VIDEO_PROCESSING_READY, "Ready"),
+        (VIDEO_PROCESSING_FAILED, "Failed"),
+    )
+    video_processing_status = models.CharField(max_length=20, choices=VIDEO_PROCESSING_CHOICES, default=VIDEO_PROCESSING_READY)
+    video_processing_error = models.TextField(blank=True)
+    video_temp_key = models.CharField(max_length=500, blank=True)
+    video_requested_status = models.CharField(max_length=20, choices=PublishStatus.choices, blank=True)
+    video_original_name = models.CharField(max_length=255, blank=True)
+    video_duration_seconds = models.PositiveIntegerField(null=True, blank=True)
+    video_size_bytes = models.BigIntegerField(null=True, blank=True)
+    video_width = models.PositiveIntegerField(null=True, blank=True)
+    video_height = models.PositiveIntegerField(null=True, blank=True)
+    video_processing_started_at = models.DateTimeField(null=True, blank=True)
+    video_ready_at = models.DateTimeField(null=True, blank=True)
+
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_learning_content")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
