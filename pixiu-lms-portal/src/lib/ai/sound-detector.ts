@@ -160,6 +160,10 @@ export async function loadSoundRecognizer(): Promise<SoundRecognizer> {
 
       const request = ++generation
       starting = true
+      // Mark the session active before listen() so the very first recognition
+      // callback is not discarded while the underlying audio stream starts.
+      listening = true
+
       try {
         await recognizer.listen(
           (result: any) => {
@@ -187,19 +191,33 @@ export async function loadSoundRecognizer(): Promise<SoundRecognizer> {
           {
             probabilityThreshold: 0.72,
             overlapFactor: 0.25,
+            suppressionTimeMillis: 650,
             invokeCallbackOnNoiseAndUnknown: true,
             includeSpectrogram: false,
           },
         )
 
         if (request !== generation) {
+          if (recognizer.isListening?.()) {
+            try {
+              await recognizer.stopListening()
+            } catch {}
+          }
+          listening = false
+          return
+        }
+      } catch (error) {
+        // listen() can fail after the mic has already opened. Always tear down
+        // the native recognizer before returning the error to the UI.
+        if (recognizer.isListening?.()) {
           try {
             await recognizer.stopListening()
           } catch {}
-          return
         }
-
-        listening = true
+        if (request === generation) {
+          listening = false
+        }
+        throw error
       } finally {
         starting = false
       }
