@@ -280,6 +280,8 @@ export function AiStudioPanel({
   runtimeEnabled = false,
   compact = false,
   onStartSim,
+  requestedMode = null,
+  onRequestedModeHandled,
 }: Props) {
   const [tab, setTab] = useState<Tab>("try")
   const [mode, setMode] = useState<ReadyAiMode | "trained">("objects")
@@ -342,6 +344,26 @@ export function AiStudioPanel({
     attachStreamToVisibleVideos()
     return Boolean(getActiveVideo())
   }
+
+  useEffect(() => {
+    if (!requestedMode) return
+
+    if (mode !== requestedMode) {
+      stopInput()
+      setMode(requestedMode)
+      setError(null)
+      setCapture(null)
+      setStatus(
+        requestedMode === "sound"
+          ? "Sound selected by circuit"
+          : requestedMode === "trained"
+            ? "My AI selected by circuit"
+            : `${MODES.find((item) => item.id === requestedMode)?.title ?? "AI"} selected by circuit`,
+      )
+    }
+
+    onRequestedModeHandled?.()
+  }, [requestedMode])
 
   useEffect(() => {
     if (runtimeEnabled) {
