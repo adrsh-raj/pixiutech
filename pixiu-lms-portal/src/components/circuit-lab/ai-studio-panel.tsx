@@ -360,7 +360,6 @@ export function AiStudioPanel({
     setLoading(false)
     setError(null)
     setStatus(runtimeEnabled ? "AI runtime active" : "AI idle")
-    setCapture(null)
     onAiStateChange(runtimeEnabled ? aiState : createAiVisionState("objects"))
   }, [isOpen])
 
@@ -377,7 +376,6 @@ export function AiStudioPanel({
       stopInput()
       setMode(requestedMode)
       setError(null)
-      setCapture(null)
       setStatus(
         requestedMode === "sound"
           ? "Sound selected by circuit"
@@ -1004,7 +1002,6 @@ export function AiStudioPanel({
     stopInput()
     setMode(next)
     setError(null)
-    setCapture(null)
     setStatus(next === "trained" ? "My AI selected" : `${MODES.find((item) => item.id === next)?.title ?? "AI"} selected`)
   }
 
@@ -1131,10 +1128,9 @@ export function AiStudioPanel({
   async function resetStudio() {
     stopInput()
     await clearAiStudioStore()
-    setStore({ samples: [], model: null })
+    setStore({ classes: [], samples: [], model: null })
     setModel(null)
     setLabel("")
-    setCapture(null)
     setTab("try")
     setMode("objects")
     setStatus("AI Studio reset.")
