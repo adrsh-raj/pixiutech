@@ -203,6 +203,13 @@ export function DataProvider({ children }) {
     return refreshPromiseRef.current;
   }, [authLoading, isAuthenticated, loadEndpoints, endpoints]);
 
+  const refreshContent = useCallback(async () => {
+    if (authLoading || !isAuthenticated) return { success: false, error: 'Authentication required' };
+    const result = await loadEndpoints([['/content', rows => setContent(rows)]], { force: true });
+    const failed = result.find(item => item.status === 'rejected');
+    return failed ? { success: false, error: failed.reason?.message || 'Unable to refresh learning content.' } : { success: true };
+  }, [authLoading, isAuthenticated, loadEndpoints]);
+
   const bootstrap = useCallback(async () => {
     if (authLoading || !isAuthenticated) return;
     const all = endpoints();
@@ -312,7 +319,7 @@ export function DataProvider({ children }) {
     sessions, scheduleSession, completeSession, unlockSession, startNewSession,
     attendance, markAttendance, adminUpdateAttendance,
     leads, addLead, updateLeadStage, deleteLead, convertLeadToSchool,
-    content, uploadContent, deleteContent, curriculum, addCurriculumPlan, updateCurriculumStatus,
+    content, uploadContent, deleteContent, refreshContent, curriculum, addCurriculumPlan, updateCurriculumStatus,
     inventory, addInventoryKit, updateKitStatus, deleteKit, classKits, updateClassKitComponent, addComponentToClassKit,
     kits, loadKits, kitsLoading, kitsError,
     billing, createInvoice, updateInvoiceStatus, confirmPaymentReceipt, updateBillingInvoice, deleteBillingInvoice,
