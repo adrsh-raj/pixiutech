@@ -21,6 +21,9 @@ const featureExtractor = read("pixiu-lms-portal/src/lib/ai/my-ai-feature-extract
 const resultNormalizer = read("pixiu-lms-portal/src/lib/ai/ai-result-normalizer.ts")
 const cameraSession = read("pixiu-lms-portal/src/lib/ai/camera-session.ts")
 const visionState = read("pixiu-lms-portal/src/lib/ai/vision-state.ts")
+const currentFlow = read("pixiu-lms-portal/src/lib/current-flow.ts")
+const multimeter = read("pixiu-lms-portal/src/components/circuit-lab/multimeter.tsx")
+const oscilloscope = read("pixiu-lms-portal/src/components/circuit-lab/oscilloscope.tsx")
 
 const failures = []
 const requireText = (text, needle, label) => {
@@ -234,6 +237,28 @@ for (const marker of [
   "releaseCurrentResource",
   "stopCameraStream",
 ]) requireText(panel, marker, "6P restart/cleanup guard")
+
+for (const marker of [
+  "pressed.has(part.id)",
+  "computeWireCurrents(state, runtime, pinStates, pressed)",
+]) requireText(currentFlow + workbench, marker, "Phase 1/4 button-state propagation")
+
+for (const marker of [
+  "pressed: Set<string>",
+  "solveCircuitNodalPotentials(state, pressed, pinStates, running)",
+]) requireText(multimeter, marker, "Phase 4 DMM button-state propagation")
+
+for (const marker of [
+  "pressed: Set<string>",
+  "const currentPressed = snapshot.pressed",
+  "solveCircuitNodalPotentials(",
+  "pressed={pressed}",
+]) requireText(oscilloscope + workbench, marker, "Phase 4 scope button-state propagation")
+
+for (const marker of [
+  "runningRef.current = false",
+  "setRunning(false)",
+]) requireText(workbench, marker, "Phase 1 no-Arduino run-state safety")
 
 for (const marker of ["objects", "pose", "hands", "emotion", "sound", "numbers", "trained"]) {
   requireText(panel, marker, "6P cross-mode coverage")
