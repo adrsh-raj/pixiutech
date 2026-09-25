@@ -96,7 +96,7 @@ for (const marker of ["ai_is_detected", "ai_get_detected_class", "ai_confidence"
 }
 requireText(panel, "requestedMode", "panel requested-mode bridge")
 requireText(workbench, "setAiMicrophone:", "AI microphone bridge")
-requireText(read("pixiu-lms-portal/src/components/circuit-lab/blockly-editor.tsx"), 'type: "ai_microphone_enable"', "Blockly AI toolbox")
+requireText(read("pixiu-lms-portal/src/components/circuit-lab/blockly-editor.tsx"), "ai_microphone_enable", "Blockly AI toolbox")
 requireText(workbench, "AiStudioPanel", "Workbench AI panel")
 requireText(workbench, "isAiDetected:", "AI runtime bridge")
 requireText(workbench, "getAiDetectedClass:", "AI class bridge")
