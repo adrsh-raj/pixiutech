@@ -138,56 +138,72 @@ export async function loadSoundRecognizer(): Promise<SoundRecognizer> {
   await recognizer.ensureModelLoaded()
 
   let listening = false
-  const labels = recognizer.wordLabels()
-
+  let starting = false
+  let generation = 0
   return {
     version: SPEECH_VERSION,
     labels,
     isListening: () => listening || Boolean(recognizer.isListening?.()),
     async start(onResult) {
-      if (this.isListening()) return
+      if (listening || starting) return
 
-      await recognizer.listen(
-        (result: any) => {
-          const scores = Array.from(result?.scores ?? []) as number[]
-          let bestIndex = 0
-          for (let index = 1; index < scores.length; index += 1) {
-            if ((scores[index] ?? 0) > (scores[bestIndex] ?? 0)) {
-              bestIndex = index
+      const request = ++generation
+      starting = true
+      try {
+        await recognizer.listen(
+          (result: any) => {
+            if (request !== generation || !listening) return
+
+            const scores = Array.from(result?.scores ?? []) as number[]
+            let bestIndex = 0
+            for (let index = 1; index < scores.length; index += 1) {
+              if ((scores[index] ?? 0) > (scores[bestIndex] ?? 0)) {
+                bestIndex = index
+              }
             }
-          }
 
-          const label = labels[bestIndex] ?? "unknown"
-          const confidence = Math.round(Number(scores[bestIndex] ?? 0) * 100)
-          const isNoise = label === "background_noise" || label === "unknown"
+            const label = labels[bestIndex] ?? "unknown"
+            const confidence = Math.round(Number(scores[bestIndex] ?? 0) * 100)
+            const isNoise = label === "background_noise" || label === "unknown"
 
-          onResult({
-            label: isNoise ? "none" : label,
-            confidence: isNoise ? 0 : confidence,
-            scores: normalizeScores(labels, scores),
-            isActionable: !isNoise && confidence >= 72,
-          })
-        },
-        {
-          probabilityThreshold: 0.72,
-          overlapFactor: 0.25,
-          invokeCallbackOnNoiseAndUnknown: true,
-          includeSpectrogram: false,
-        },
-      )
+            onResult({
+              label: isNoise ? "none" : label,
+              confidence: isNoise ? 0 : confidence,
+              scores: normalizeScores(labels, scores),
+              isActionable: !isNoise && confidence >= 72,
+            })
+          },
+          {
+            probabilityThreshold: 0.72,
+            overlapFactor: 0.25,
+            invokeCallbackOnNoiseAndUnknown: true,
+            includeSpectrogram: false,
+          },
+        )
 
-      listening = true
+        if (request !== generation) {
+          try {
+            await recognizer.stopListening()
+          } catch {}
+          return
+        }
+
+        listening = true
+      } finally {
+        starting = false
+      }
     },
     async stop() {
-      if (!this.isListening()) {
-        listening = false
-        return
-      }
+      generation += 1
+      if (!listening && !starting) return
 
       try {
-        await recognizer.stopListening()
+        if (recognizer.isListening?.()) {
+          await recognizer.stopListening()
+        }
       } finally {
         listening = false
+        starting = false
       }
     },
   }
