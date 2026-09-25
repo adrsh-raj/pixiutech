@@ -92,8 +92,9 @@ else:
 }
 
 SECURE_UPLOAD_MAX_BYTES = int(os.environ.get("SECURE_UPLOAD_MAX_MB", "20")) * 1024 * 1024
+SECURE_VIDEO_MAX_BYTES = int(os.environ.get("SECURE_VIDEO_MAX_MB", "500")) * 1024 * 1024
 CAREER_CV_MAX_BYTES = int(os.environ.get("CAREER_CV_MAX_MB", "2")) * 1024 * 1024
-SECURE_UPLOAD_MAX_MULTIPART_BYTES = SECURE_UPLOAD_MAX_BYTES + 5 * 1024 * 1024
+SECURE_UPLOAD_MAX_MULTIPART_BYTES = max(SECURE_UPLOAD_MAX_BYTES, SECURE_VIDEO_MAX_BYTES) + 5 * 1024 * 1024
 FILE_UPLOAD_HANDLERS = ["core.upload_security.SecureUploadSizeHandler", "django.core.files.uploadhandler.MemoryFileUploadHandler", "django.core.files.uploadhandler.TemporaryFileUploadHandler"]
 FILE_UPLOAD_MAX_MEMORY_SIZE = int(os.environ.get("FILE_UPLOAD_MAX_MEMORY_MB", "5")) * 1024 * 1024
 DATA_UPLOAD_MAX_MEMORY_SIZE = SECURE_UPLOAD_MAX_MULTIPART_BYTES
@@ -153,10 +154,37 @@ WHITENOISE_INDEX_FILE = False
 FILE_UPLOAD_PERMISSIONS = 0o600
 FILE_UPLOAD_DIRECTORY_PERMISSIONS = 0o700
 STORAGES = {"default": {"BACKEND": "django.core.files.storage.FileSystemStorage"}, "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"}}
-AWS_BUCKET = os.environ.get("AWS_STORAGE_BUCKET_NAME", "").strip()
+
+# Supabase Storage is S3-compatible. Keep the bucket private and access it only
+# from the authenticated Django backend. Credentials must never be shipped to
+# the browser.
+SUPABASE_STORAGE_BUCKET = os.environ.get("SUPABASE_STORAGE_BUCKET", "").strip()
+SUPABASE_STORAGE_ENDPOINT = os.environ.get("SUPABASE_STORAGE_ENDPOINT", "").strip()
+SUPABASE_STORAGE_REGION = os.environ.get("SUPABASE_STORAGE_REGION", "ap-south-1").strip()
+SUPABASE_STORAGE_ACCESS_KEY = os.environ.get("SUPABASE_STORAGE_ACCESS_KEY", "").strip()
+SUPABASE_STORAGE_SECRET_KEY = os.environ.get("SUPABASE_STORAGE_SECRET_KEY", "").strip()
+
+AWS_BUCKET = os.environ.get("AWS_STORAGE_BUCKET_NAME", "").strip() or SUPABASE_STORAGE_BUCKET
+AWS_ENDPOINT = os.environ.get("AWS_S3_ENDPOINT_URL", "").strip() or SUPABASE_STORAGE_ENDPOINT
+AWS_REGION = os.environ.get("AWS_S3_REGION_NAME", "").strip() or SUPABASE_STORAGE_REGION
+AWS_ACCESS = os.environ.get("AWS_ACCESS_KEY_ID", "").strip() or SUPABASE_STORAGE_ACCESS_KEY
+AWS_SECRET = os.environ.get("AWS_SECRET_ACCESS_KEY", "").strip() or SUPABASE_STORAGE_SECRET_KEY
+
 if AWS_BUCKET:
+    if not AWS_ACCESS or not AWS_SECRET:
+        raise RuntimeError("Object storage is configured but storage access credentials are missing.")
     INSTALLED_APPS.append("storages")
-    STORAGES["default"] = {"BACKEND": "storages.backends.s3.S3Storage", "OPTIONS": {"bucket_name": AWS_BUCKET, "region_name": os.environ.get("AWS_S3_REGION_NAME") or None, "endpoint_url": os.environ.get("AWS_S3_ENDPOINT_URL") or None, "access_key_id": os.environ.get("AWS_ACCESS_KEY_ID") or None, "secret_access_key": os.environ.get("AWS_SECRET_ACCESS_KEY") or None, "location": os.environ.get("AWS_LOCATION", "pixiu-media").strip("/"), "file_overwrite": False, "querystring_auth": os.environ.get("AWS_QUERYSTRING_AUTH", "True").lower() == "true", "querystring_expire": int(os.environ.get("AWS_S3_QUERYSTRING_EXPIRE", "3600"))}}
+    STORAGES["default"] = {"BACKEND": "storages.backends.s3.S3Storage", "OPTIONS": {
+        "bucket_name": AWS_BUCKET,
+        "region_name": AWS_REGION or None,
+        "endpoint_url": AWS_ENDPOINT or None,
+        "access_key_id": AWS_ACCESS,
+        "secret_access_key": AWS_SECRET,
+        "location": os.environ.get("AWS_LOCATION", "pixiu-media").strip("/"),
+        "file_overwrite": False,
+        "querystring_auth": os.environ.get("AWS_QUERYSTRING_AUTH", "True").lower() == "true",
+        "querystring_expire": int(os.environ.get("AWS_S3_QUERYSTRING_EXPIRE", "600")),
+    }}
     MEDIA_URL = os.environ.get("AWS_CUSTOM_DOMAIN", "").strip()
     if MEDIA_URL and not MEDIA_URL.endswith("/"): MEDIA_URL += "/"
 
