@@ -37,11 +37,13 @@ import {
   stopCamera,
 } from "@/lib/ai/camera-session"
 import {
+  detectHands,
   disposeHandDetector,
   loadHandDetector,
   type HandDetection,
 } from "@/lib/ai/hand-detector"
 import {
+  detectFaces,
   disposeFaceDetector,
   loadFaceDetector,
   type FaceDetection,
@@ -778,7 +780,7 @@ export function AiStudioPanel({
             detail: pose ? `${visiblePoints.length}/17 keypoints tracked` : "No person detected",
           })
         } else if (mode === "hands" || mode === "numbers") {
-          const hands: HandDetection[] = await resourceRef.current.detect(video)
+          const hands: HandDetection[] = await detectHands(resourceRef.current, video)
           if (activeSession !== sessionRef.current) return
 
           drawHands(getActiveOverlay()!, video, hands)
@@ -814,7 +816,7 @@ export function AiStudioPanel({
               : "Show a hand",
           })
         } else if (mode === "emotion") {
-          const faces: FaceDetection[] = await resourceRef.current.detect(video)
+          const faces: FaceDetection[] = await detectFaces(resourceRef.current, video)
           if (activeSession !== sessionRef.current) return
 
           const face = faces[0]
