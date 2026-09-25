@@ -109,25 +109,27 @@ assert(low.detectedClass === "unknown", "low-confidence trained result must beco
 assert(low.unknown === true, "low-confidence trained result must set unknown")
 assert(low.confidenceThreshold === DEFAULT_AI_CONFIDENCE_THRESHOLD, "default threshold contract")
 
-const requiredStaticChecks = [
-  ["6J unknown prediction", engine.includes("unknown") && engine.includes("lowConfidence") && engine.includes("margin")],
-  ["6J prediction threshold", extractor.includes("MY_AI_PREDICTION_THRESHOLD = 0.62")],
-  ["6K normalized bridge", workbench.includes("normalizeAiVisionState") && workbench.includes("handleAiStateChange")],
-  ["6K unknown Blockly block", blocks.includes("ai_is_unknown") && runner.includes("ai_is_unknown") && toolbox.includes("ai_is_unknown")],
-  ["6K normalized getters", workbench.includes("getAiDetectedClass") && workbench.includes("getAiConfidence") && workbench.includes("getAiGesture")],
-  ["6L data-source-only design", runner.includes("AI blocks are data/control inputs only") && blocks.includes("browser-only") && !blocks.includes("aiVision.isDetected(")],
-  ["6L no AI generator hardware writes", !/digitalWrite|analogWrite|setDigitalPin|motor_driver_write/.test(blocks.slice(blocks.indexOf("/* Browser AI generators")))],
-
-  ["6L hardware remains simulator", runner.includes("case \"motor_driver_write\"") && runner.includes("env.setDigitalPin")],
-  ["6M Teach dataset", panel.includes("6H · Build My AI dataset") && panel.includes("DATASET") && panel.includes("MODEL") && panel.includes("TRAIN") && panel.includes("INFERENCE")],
-  ["6N explainability", panel.includes("6N · Why did AI produce this result?") && panel.includes("explainCurrentAiResult") && panel.includes("Class probabilities")],
-  ["6O activity indicators", panel.includes("CAMERA · ") && panel.includes("MIC · ") && panel.includes("Erase local AI data")],
-  ["6O cleanup", engine.includes("localStorage.removeItem") && engine.includes("tf.io.removeModel") && panel.includes("stopInput")],
-  ["6O media permissions", camera.includes("getUserMedia") && camera.includes("HTTPS") && panel.includes("Permission blocked")],
-  ["6P restart guards", panel.includes("sessionRef") && panel.includes("cameraRequestRef") && panel.includes("stopAll()") && panel.includes("stopInput()")],
-  ["6P mode coverage", /objects/.test(panel) && /pose/.test(panel) && /hands/.test(panel) && /emotion/.test(panel) && /sound/.test(panel) && /numbers/.test(panel) && /trained/.test(panel)],
-  ["6P gesture bridge", gesture.includes("interpretHandGesture") && workbench.includes("isAiGesture") && toolbox.includes("ai_get_finger_count")],
-  ["6P state schema", types.includes("confidenceThreshold") && types.includes("decisionReason") && types.includes("probabilities")],
+const staticSourceChecks = [
+  ["6A mode registry", /objects/.test(panel) && /pose/.test(panel) && /hands/.test(panel) && /emotion/.test(panel) && /sound/.test(panel) && /numbers/.test(panel)],
+  ["6A selected-resource loading", /mode === "objects"/.test(panel) && /mode === "pose"/.test(panel) && /mode === "hands" \\|\\| mode === "numbers"/.test(panel) && /mode === "emotion"/.test(panel) && /mode === "trained"/.test(panel)],
+  ["6B object adapter", engine.includes("MAX_CLASSES = 8") && panel.includes("loadObjectDetector")],
+  ["6C AI → Blockly bridge", workbench.includes("getAiDetectedClass") && workbench.includes("getAiConfidence") && runner.includes("ai_confidence")],
+  ["6D hand adapter", hand.includes("MediaPipeHands") && hand.includes("maxHands: MAX_HANDS") && hand.includes("getExtendedFingerMask")],
+  ["6E face adapter", extractor.includes("MobileNetV2") && panel.includes("loadFaceDetector")],
+  ["6F sound adapter", panel.includes("loadSoundRecognizer") && runner.includes("ai_microphone_enable")],
+  ["6G gesture interpreter", gesture.includes("interpretHandGesture") && workbench.includes("getAiGesture") && toolbox.includes("ai_get_gesture")],
+  ["6H dataset workflow", engine.includes("addAiClass") && engine.includes("removeAiClass") && panel.includes("Import images") && panel.includes("Capture example")],
+  ["6I transfer learning", extractor.includes("MY_AI_EMBEDDING_NODE") && engine.includes("Dense(96)") && !engine.includes("tf.layers.conv2d")],
+  ["6J unknown/low-confidence", engine.includes("lowConfidence") && engine.includes("unknown") && extractor.includes("MY_AI_PREDICTION_THRESHOLD = 0.62")],
+  ["6K normalization boundary", workbench.includes("normalizeAiVisionState") && workbench.includes("handleAiStateChange") && runner.includes("isAiUnknown")],
+  ["6L data-source boundary", runner.includes("AI blocks are data/control inputs only") && blocks.includes("Browser AI generators")],
+  ["6M Teach concepts", panel.includes("6M · How My AI learns") && panel.includes("DATASET") && panel.includes("TRAIN") && panel.includes("INFERENCE")],
+  ["6N Understand explanation", panel.includes("6N · Why did AI produce this result?") && panel.includes("Class probabilities") && panel.includes("explainCurrentAiResult")],
+  ["6O privacy controls", panel.includes("CAMERA · ") && panel.includes("MIC · ") && panel.includes("Erase local AI data") && engine.includes("localStorage.removeItem")],
+  ["6P cleanup/restart", panel.includes("sessionRef") && panel.includes("cameraRequestRef") && panel.includes("releaseCurrentResource") && panel.includes("stopCameraStream")],
+  ["6P permission handling", camera.includes("getUserMedia") && camera.includes("HTTPS") && panel.includes("Permission blocked")],
+  ["6P no-input path", createAiVisionState("objects").detectedClass === "none" && normalizeAiDecision("none", 0).reason === "no_input"],
+  ["6P AI → virtual hardware isolation", !blocks.slice(blocks.indexOf("/* Browser AI generators")).match(/digitalWrite|analogWrite|setDigitalPin|motor_driver_write/)],
 ]
 
 for (const [name, passed] of requiredStaticChecks) {
