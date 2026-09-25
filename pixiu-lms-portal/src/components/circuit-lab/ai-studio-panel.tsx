@@ -8,6 +8,8 @@ import {
   CheckCircle2,
   Layers3,
   Mic,
+  Pencil,
+  Plus,
   RefreshCcw,
   Sparkles,
   Trash2,
@@ -16,17 +18,23 @@ import {
   Zap,
 } from "lucide-react"
 import {
+  addAiClass,
   addAiSample,
   clearAiStudioStore,
   disposeActiveAiModel,
   getAiClasses,
+  getAiDatasetStats,
   getModelWeightPreview,
   getModelWeightShapes,
+  getSampleAddError,
   getSampleCounts,
   loadAiStudioStore,
   loadStoredAiModel,
+  optimizeAiImage,
   predictAiImage,
+  removeAiClass,
   removeAiSample,
+  renameAiClass,
   saveAiStudioStore,
   trainAiModel,
   type AiStudioStore,
@@ -42,6 +50,7 @@ import {
   loadHandDetector,
   type HandDetection,
 } from "@/lib/ai/hand-detector"
+import { interpretHandGesture } from "@/lib/ai/gesture-interpreter"
 import {
   detectFaces,
   disposeFaceDetector,
@@ -95,7 +104,7 @@ const MODES: Array<{ id: ReadyAiMode; title: string; subtitle: string }> = [
   { id: "hands", title: "Fingers", subtitle: "21 hand landmarks" },
   { id: "emotion", title: "Emotion", subtitle: "Expression demo" },
   { id: "sound", title: "Sound", subtitle: "Words + digits" },
-  { id: "numbers", title: "Numbers", subtitle: "0–5 fingers" },
+  { id: "numbers", title: "Numbers", subtitle: "0–5 + gestures" },
 ]
 
 
@@ -230,6 +239,18 @@ function drawHands(
   })
 }
 
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result === "string") resolve(reader.result)
+      else reject(new Error("Image could not be read."))
+    }
+    reader.onerror = () => reject(new Error("Image could not be read."))
+    reader.readAsDataURL(file)
+  })
+}
+
 function drawFaces(
   canvas: HTMLCanvasElement,
   video: HTMLVideoElement,
@@ -293,12 +314,13 @@ export function AiStudioPanel({
   const [status, setStatus] = useState("AI idle")
   const [error, setError] = useState<string | null>(null)
   const [fps, setFps] = useState(0)
-  const [capture, setCapture] = useState<string | null>(null)
-  const [store, setStore] = useState<AiStudioStore>(() => ({ samples: [], model: null }))
+  const [store, setStore] = useState<AiStudioStore>(() => ({ classes: [], samples: [], model: null }))
   const [model, setModel] = useState<any>(null)
   const [label, setLabel] = useState("")
+  const [renamingClass, setRenamingClass] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState("")
   const [training, setTraining] = useState(false)
-  const [progress, setProgress] = useState({ epoch: 0, total: 0, accuracy: 0, loss: 0 })
+  const [progress, setProgress] = useState({ epoch: 0, total: 0, accuracy: 0, loss: 0, stage: "" })
 
   // Keep separate video/canvas refs for the full Studio and the compact
   // floating runtime window. The same MediaStream can safely feed both, so
@@ -316,16 +338,17 @@ export function AiStudioPanel({
   const busyRef = useRef(false)
   const busySessionRef = useRef<number | null>(null)
   const handCountHistoryRef = useRef<number[]>([])
+  const handGestureHistoryRef = useRef<string[]>([])
   const emotionHistoryRef = useRef<string[]>([])
   const fpsStartRef = useRef(0)
   const fpsFramesRef = useRef(0)
   const dragRef = useRef<{ pointerId: number; offsetX: number; offsetY: number } | null>(null)
   const [floatingPosition, setFloatingPosition] = useState<{ left: number; top: number } | null>(null)
 
-  const classes = useMemo(() => getAiClasses(store.samples), [store.samples])
+  const classes = useMemo(() => getAiClasses(store), [store])
   const counts = useMemo(() => getSampleCounts(store.samples), [store.samples])
-  const canTrain =
-    classes.length >= 2 && classes.every((name) => (counts[name] ?? 0) >= 3)
+  const datasetStats = useMemo(() => getAiDatasetStats(store), [store])
+  const canTrain = datasetStats.ready
 
   useEffect(() => {
     if (!isOpen) {
@@ -480,6 +503,7 @@ export function AiStudioPanel({
     }
     clearOverlay()
     handCountHistoryRef.current = []
+    handGestureHistoryRef.current = []
     emotionHistoryRef.current = []
     fpsStartRef.current = 0
     fpsFramesRef.current = 0
@@ -809,11 +833,19 @@ export function AiStudioPanel({
 
           drawHands(getActiveOverlay()!, video, hands)
           const hand = hands[0]
+          const interpreted = hand ? interpretHandGesture(hand) : null
 
           if (hand) {
             handCountHistoryRef.current = [...handCountHistoryRef.current, hand.fingerCount].slice(-4)
+            if (interpreted) {
+              handGestureHistoryRef.current = [
+                ...handGestureHistoryRef.current,
+                interpreted.gesture,
+              ].slice(-4)
+            }
           } else {
             handCountHistoryRef.current = []
+            handGestureHistoryRef.current = []
           }
 
           const sortedCounts = [...handCountHistoryRef.current].sort((a, b) => a - b)
@@ -821,22 +853,47 @@ export function AiStudioPanel({
             ? sortedCounts[Math.floor(sortedCounts.length / 2)]
             : 0
 
+          const gestureHistogram = handGestureHistoryRef.current.reduce<Record<string, number>>(
+            (histogram, gesture) => {
+              histogram[gesture] = (histogram[gesture] ?? 0) + 1
+              return histogram
+            },
+            {},
+          )
+          const stableGesture =
+            Object.entries(gestureHistogram).sort((a, b) => b[1] - a[1])[0]?.[0] ??
+            "none"
+
           onAiStateChange({
             enabled: true,
             mode,
-            detectedClass: mode === "numbers"
-              ? hand ? String(stableCount) : "none"
-              : hand ? "hand" : "none",
-            confidence: hand ? Math.round(hand.score * 100) : 0,
+            detectedClass:
+              mode === "numbers"
+                ? hand
+                  ? String(stableCount)
+                  : "none"
+                : hand
+                  ? "hand"
+                  : "none",
+            confidence:
+              mode === "numbers"
+                ? interpreted?.confidence ?? (hand ? Math.round(hand.score * 100) : 0)
+                : hand
+                  ? Math.round(hand.score * 100)
+                  : 0,
             allDetections: [],
-            modelClasses: mode === "numbers"
-              ? ["0", "1", "2", "3", "4", "5"]
-              : ["hand"],
+            detectedGesture: hand ? stableGesture : "none",
+            fingerCount: hand ? stableCount : 0,
+            handedness: hand?.handedness ?? "none",
+            modelClasses:
+              mode === "numbers"
+                ? ["0", "1", "2", "3", "4", "5"]
+                : ["hand"],
             modelSource: "ready",
             detail: hand
               ? mode === "numbers"
-                ? String(stableCount) + " finger" + (stableCount === 1 ? "" : "s") + " · " + hand.handedness
-                : hand.handedness + " hand · " + hand.fingerCount + " fingers"
+                ? stableCount + " finger" + (stableCount === 1 ? "" : "s") + " · " + stableGesture.replace("_", " ") + " · " + hand.handedness
+                : hand.handedness + " hand · " + hand.fingerCount + " fingers · " + (interpreted?.gesture.replace("_", " ") ?? "hand")
               : "Show a hand",
           })
         } else if (mode === "emotion") {
@@ -956,64 +1013,114 @@ export function AiStudioPanel({
     setTab(next)
   }
 
-  function addSampleFromCamera() {
+  async function addSampleFromCamera() {
     if (!label.trim()) {
       setStatus("Enter a concept name first.")
       return
     }
-    const frame = captureVideoFrame(getActiveVideo()!, 640)
+
+    const addError = getSampleAddError(store, label)
+    if (addError) {
+      setStatus(addError)
+      return
+    }
+
+    if (!cameraActive) {
+      await startTeachCamera()
+      setStatus("Camera ready · click Capture example again.")
+      return
+    }
+
+    const video = getActiveVideo()
+    if (!video) {
+      setStatus("Camera preview is not ready.")
+      return
+    }
+
+    const frame = captureVideoFrame(video, 512)
     if (!frame) {
       setStatus("Start the camera first.")
       return
     }
-    const next = addAiSample(store, label, frame)
-    setStore(next)
-    saveAiStudioStore(next)
-    setLabel("")
-    setStatus(`Added sample to “${next.samples[next.samples.length - 1]?.label ?? "concept"}”.`)
-  }
 
-  function importSample(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0]
-    event.target.value = ""
-    if (!file || !label.trim()) {
-      setStatus("Enter a concept name and choose an image.")
-      return
-    }
-
-    const reader = new FileReader()
-    reader.onload = () => {
-      if (typeof reader.result !== "string") {
-        setStatus("Image could not be read.")
-        return
-      }
-      const next = addAiSample(store, label, reader.result)
+    try {
+      const optimized = await optimizeAiImage(frame, 512, 0.7)
+      const before = store.samples.length
+      const next = addAiSample(store, label, optimized)
       setStore(next)
       saveAiStudioStore(next)
       setLabel("")
-      setStatus("Image added.")
+      setStatus(
+        next.samples.length > before
+          ? "Example captured and added."
+          : "That example could not be added.",
+      )
+    } catch (sampleError) {
+      setError(sampleError instanceof Error ? sampleError.message : "Could not save the sample.")
     }
-    reader.readAsDataURL(file)
+  }
+
+  async function importSample(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? [])
+      .filter((file) => file.type.startsWith("image/"))
+      .slice(0, 10)
+    event.target.value = ""
+
+    if (!files.length || !label.trim()) {
+      setStatus("Enter a concept name and choose one or more images.")
+      return
+    }
+
+    try {
+      let next = addAiClass(store, label)
+      let added = 0
+
+      for (const file of files) {
+        const dataUrl = await readFileAsDataUrl(file)
+        const optimized = await optimizeAiImage(dataUrl, 512, 0.68)
+        const before = next.samples.length
+        next = addAiSample(next, label, optimized)
+        if (next.samples.length > before) added += 1
+      }
+
+      setStore(next)
+      saveAiStudioStore(next)
+      setLabel("")
+      setStatus("Imported " + added + " example" + (added === 1 ? "" : "s") + ".")
+    } catch (sampleError) {
+      setError(sampleError instanceof Error ? sampleError.message : "Could not import those images.")
+    }
   }
 
   async function train() {
     if (!canTrain || training) return
     setTraining(true)
     setError(null)
-    setProgress({ epoch: 0, total: 18, accuracy: 0, loss: 0 })
+    setProgress({ epoch: 0, total: 18, accuracy: 0, loss: 0, stage: "Preparing dataset" })
+
     try {
       const result = await trainAiModel(store.samples, {
         epochs: 18,
+        onStage: (stage) =>
+          setProgress((current) => ({ ...current, stage })),
         onEpoch: (epoch, total, accuracy, loss) =>
-          setProgress({ epoch, total, accuracy, loss }),
+          setProgress((current) => ({
+            ...current,
+            epoch,
+            total,
+            accuracy,
+            loss,
+            stage: "Training classifier " + epoch + "/" + total,
+          })),
       })
+
       const next = { ...store, model: result.summary }
       setStore(next)
       saveAiStudioStore(next)
       setModel(result.model)
       setMode("trained")
       setTab("try")
-      setStatus(`My AI learned ${result.summary.classes.length} concepts.`)
+      setStatus("My AI learned " + result.summary.classes.length + " concepts with " + result.summary.featureExtractor + ".")
     } catch (trainError) {
       setError(trainError instanceof Error ? trainError.message : "Training failed.")
     } finally {
@@ -1186,6 +1293,16 @@ export function AiStudioPanel({
                       <p className="text-[9px] font-mono uppercase tracking-[0.16em] text-slate-600">{activeTitle}</p>
                       <p className="mt-1 text-sm font-black">{aiState.detectedClass === "none" ? status : aiState.detectedClass}</p>
                       <p className="mt-0.5 text-[9px] text-slate-600">{aiState.detail}</p>
+                      {mode === "numbers" && (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <span className="rounded-lg border border-cyan-400/15 bg-cyan-400/5 px-2 py-1 text-[8px] font-mono text-cyan-200">
+                            Gesture · {aiState.detectedGesture ?? "none"}
+                          </span>
+                          <span className="rounded-lg border border-slate-800 bg-slate-950 px-2 py-1 text-[8px] font-mono text-slate-500">
+                            {aiState.fingerCount ?? 0} fingers
+                          </span>
+                        </div>
+                      )}
                       {isSound && (
                         <p className="mt-1 max-w-md text-[8px] leading-4 text-slate-700">
                           Local vocabulary: yes · no · go · stop · up · down · left · right · zero–nine
@@ -1231,60 +1348,271 @@ export function AiStudioPanel({
           )}
 
           {tab === "teach" && (
-            <div className="mx-auto max-w-5xl grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-              <div className="space-y-3">
-                <div className="rounded-2xl border border-slate-800 bg-slate-950/45 p-4">
-                  <p className="text-xs font-black">6B · Teach My AI</p>
-                  <p className="mt-1 text-[10px] leading-5 text-slate-500">Create at least 3 examples for each concept. Examples stay in this browser.</p>
-                  <div className="mt-3 flex gap-2">
-                    <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. bottle" className="min-w-0 flex-1 rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-[10px] outline-none focus:border-violet-400" />
-                    <button onClick={cameraActive ? addSampleFromCamera : () => void startTeachCamera()} className="rounded-xl bg-violet-500 px-3 py-2 text-[10px] font-black">{cameraActive ? "Add example" : "Start camera"}</button>
-                    <label className="cursor-pointer rounded-xl border border-slate-700 px-3 py-2 text-[10px] font-black"><Upload size={13} className="inline mr-1" />Image<input hidden type="file" accept="image/*" onChange={importSample} /></label>
-                  </div>
-                </div>
-
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {classes.map((name) => (
-                    <div key={name} className="rounded-2xl border border-slate-800 bg-slate-950/40 p-3">
-                      <div className="flex items-center justify-between"><span className="text-xs font-black">{name}</span><span className="font-mono text-[9px] text-slate-500">{counts[name] ?? 0} samples</span></div>
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {store.samples.filter((sample) => sample.label === name).map((sample) => (
-                          <div key={sample.id} className="relative">
-                            <img src={sample.dataUrl} alt={name} className="h-16 w-20 rounded-lg object-cover border border-slate-800" />
-                            <button onClick={() => { const next = removeAiSample(store, sample.id); setStore(next); saveAiStudioStore(next) }} className="absolute right-1 top-1 rounded-md bg-slate-950/80 p-1"><Trash2 size={10} /></button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
+            <div className="mx-auto max-w-5xl space-y-4">
+              <div className="grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
                 <div className="rounded-2xl border border-violet-400/15 bg-violet-500/[0.04] p-4">
-                  <div className="flex items-center justify-between">
-                    <div><p className="text-xs font-black">Train model</p><p className="mt-1 text-[10px] text-slate-500">{classes.length} classes · {store.samples.length} samples</p></div>
-                    <button disabled={!canTrain || training} onClick={() => void train()} className="rounded-xl bg-violet-500 px-4 py-2 text-[10px] font-black disabled:opacity-30">{training ? `Training ${progress.epoch}/${progress.total}` : "Train My AI"}</button>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-black">6H · Build My AI dataset</p>
+                      <p className="mt-1 max-w-xl text-[10px] leading-5 text-slate-500">
+                        Create concepts, capture or import examples, rename classes, remove mistakes, and balance the dataset before training.
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-slate-800 bg-slate-950/80 px-3 py-2 text-right">
+                      <p className="font-mono text-[8px] uppercase tracking-[0.16em] text-slate-600">Dataset</p>
+                      <p className="mt-1 text-sm font-black">{datasetStats.sampleCount} samples · {datasetStats.classCount} classes</p>
+                    </div>
                   </div>
-                  {training && <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-800"><div className="h-full bg-violet-400" style={{ width: `${Math.round((progress.epoch / Math.max(1, progress.total)) * 100)}%` }} /></div>}
+
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                    <input
+                      value={label}
+                      onChange={(event) => setLabel(event.target.value)}
+                      placeholder="Concept name · e.g. bottle"
+                      maxLength={32}
+                      className="min-w-0 flex-1 rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-[10px] outline-none focus:border-violet-400"
+                    />
+                    <button
+                      onClick={() => {
+                        const next = addAiClass(store, label)
+                        setStore(next)
+                        saveAiStudioStore(next)
+                        if (next.classes.length === store.classes.length) {
+                          setStatus("Concept already exists or the 8-concept limit is reached.")
+                        } else {
+                          const created = next.classes[next.classes.length - 1] ?? ""
+                          setLabel(created)
+                          setStatus("Concept created · capture examples for it.")
+                        }
+                      }}
+                      className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-violet-500 px-3 py-2.5 text-[10px] font-black"
+                    >
+                      <Plus size={13} /> Add concept
+                    </button>
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={() => void addSampleFromCamera()}
+                      disabled={!label.trim()}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-violet-400/25 bg-slate-950 px-3 py-2 text-[10px] font-black disabled:opacity-30"
+                    >
+                      <Camera size={13} /> {cameraActive ? "Capture example" : "Start capture"}
+                    </button>
+                    <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-[10px] font-black">
+                      <Upload size={13} /> Import images
+                      <input hidden multiple type="file" accept="image/*" onChange={importSample} />
+                    </label>
+                    <span className="text-[9px] text-slate-600">Recommended: 8+ / concept · minimum 3</span>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-800 bg-slate-950/45 p-4">
+                  <p className="text-xs font-black">Dataset health</p>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    {[
+                      ["Concepts", String(datasetStats.classCount)],
+                      ["Samples", String(datasetStats.sampleCount)],
+                      ["Min / class", String(datasetStats.minSamples)],
+                      ["Balance", datasetStats.balanced ? "Balanced" : "Needs balance"],
+                    ].map(([name, value]) => (
+                      <div key={name} className="rounded-xl border border-slate-800 bg-slate-950 p-3">
+                        <p className="text-[8px] font-mono uppercase tracking-[0.14em] text-slate-600">{name}</p>
+                        <p className="mt-1 text-xs font-black">{value}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-3 rounded-xl border border-emerald-400/10 bg-emerald-500/[0.03] p-3 text-[10px] leading-5 text-slate-500">
+                    {datasetStats.ready
+                      ? datasetStats.recommended
+                        ? "Ready · enough examples for a useful transfer-learning run."
+                        : "Ready to train · more varied examples can improve generalization."
+                      : "Training unlocks with 2 concepts and at least 3 examples per concept."}
+                  </div>
                 </div>
               </div>
 
-              <aside className="space-y-3">
-                <div className="rounded-2xl border border-slate-800 bg-slate-950/45 p-4">
-                  <p className="text-xs font-black">Teaching rules</p>
-                  {["Two or more concepts", "Three examples per concept", "Keep lighting/background varied", "Train after the examples are balanced"].map((rule) => (
-                    <div key={rule} className="mt-2 flex items-center gap-2 text-[10px] text-slate-500"><CheckCircle2 size={13} className="text-emerald-300" />{rule}</div>
-                  ))}
+              <div className="grid gap-3 sm:grid-cols-2">
+                {classes.map((name) => {
+                  const classSamples = store.samples.filter((sample) => sample.label === name)
+                  const isRenaming = renamingClass === name
+
+                  return (
+                    <div key={name} className="rounded-2xl border border-slate-800 bg-slate-950/40 p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          {isRenaming ? (
+                            <div className="flex gap-2">
+                              <input
+                                value={renameValue}
+                                onChange={(event) => setRenameValue(event.target.value)}
+                                className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-[10px] outline-none focus:border-violet-400"
+                                maxLength={32}
+                                autoFocus
+                              />
+                              <button
+                                onClick={() => {
+                                  const next = renameAiClass(store, name, renameValue)
+                                  setStore(next)
+                                  saveAiStudioStore(next)
+                                  setRenamingClass(null)
+                                  setRenameValue("")
+                                  setStatus(next === store ? "That concept name is already in use." : "Concept renamed.")
+                                }}
+                                className="rounded-lg bg-emerald-500/15 px-2 text-[9px] font-black text-emerald-300"
+                              >
+                                Save
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setLabel(name)}
+                              className="text-left"
+                              title="Use this concept for capture"
+                            >
+                              <p className="truncate text-xs font-black">{name}</p>
+                              <p className="mt-0.5 font-mono text-[8px] text-slate-600">{classSamples.length}/20 samples · click to select</p>
+                            </button>
+                          )}
+                        </div>
+
+                        {!isRenaming && (
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => {
+                                setRenamingClass(name)
+                                setRenameValue(name)
+                              }}
+                              className="rounded-lg border border-slate-800 p-1.5 text-slate-500 hover:text-white"
+                              title="Rename concept"
+                            >
+                              <Pencil size={11} />
+                            </button>
+                            <button
+                              onClick={() => {
+                                const next = removeAiClass(store, name)
+                                setStore(next)
+                                saveAiStudioStore(next)
+                                if (label === name) setLabel("")
+                                setRenamingClass(null)
+                                setStatus("Concept removed with its examples.")
+                              }}
+                              className="rounded-lg border border-slate-800 p-1.5 text-slate-500 hover:text-rose-300"
+                              title="Delete concept"
+                            >
+                              <Trash2 size={11} />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {classSamples.map((sample) => (
+                          <div key={sample.id} className="relative">
+                            <img
+                              src={sample.dataUrl}
+                              alt={name}
+                              loading="lazy"
+                              className="h-16 w-20 rounded-lg border border-slate-800 object-cover"
+                            />
+                            <button
+                              onClick={() => {
+                                const next = removeAiSample(store, sample.id)
+                                setStore(next)
+                                saveAiStudioStore(next)
+                              }}
+                              className="absolute right-1 top-1 rounded-md bg-slate-950/85 p-1 text-slate-300 hover:text-rose-300"
+                              title="Remove sample"
+                            >
+                              <Trash2 size={10} />
+                            </button>
+                          </div>
+                        ))}
+                        {!classSamples.length && (
+                          <div className="grid h-16 w-full place-items-center rounded-lg border border-dashed border-slate-800 text-[9px] text-slate-600">
+                            No examples yet
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+
+                {!classes.length && (
+                  <div className="sm:col-span-2 rounded-2xl border border-dashed border-slate-800 p-8 text-center">
+                    <Brain size={24} className="mx-auto text-violet-300" />
+                    <p className="mt-2 text-xs font-black">Start with your first concept</p>
+                    <p className="mt-1 text-[10px] text-slate-600">Create a concept such as “bottle”, “pen”, or “red block”, then add examples.</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-2xl border border-violet-400/15 bg-violet-500/[0.04] p-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <p className="text-xs font-black">6I · Train My AI</p>
+                    <p className="mt-1 text-[10px] leading-5 text-slate-500">
+                      Frozen MobileNetV2 features feed a small classifier head. The browser trains only the head, so the workflow stays lightweight and suited to student datasets.
+                    </p>
+                  </div>
+                  <button
+                    disabled={!canTrain || training}
+                    onClick={() => void train()}
+                    className="rounded-xl bg-violet-500 px-4 py-2 text-[10px] font-black disabled:opacity-30"
+                  >
+                    {training ? (progress.stage || "Training…") : "Train My AI"}
+                  </button>
                 </div>
-                <button onClick={() => void resetStudio()} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 px-3 py-2 text-[10px] font-black text-slate-300"><RefreshCcw size={13} /> Reset AI Studio</button>
-              </aside>
+
+                {training && (
+                  <div className="mt-3 space-y-2">
+                    <div className="flex items-center justify-between text-[9px] font-mono text-slate-600">
+                      <span>{progress.stage}</span>
+                      <span>{progress.epoch}/{progress.total}</span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-slate-800">
+                      <div
+                        className="h-full bg-violet-400 transition-all"
+                        style={{ width: (progress.stage.startsWith("Extracting") ? 18 : 18 + Math.round((progress.epoch / Math.max(1, progress.total)) * 82)) + "%" }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {error && (
+                <div className="rounded-xl border border-amber-500/30 bg-amber-950/30 px-3 py-2 text-[10px] text-amber-200">
+                  {error}
+                </div>
+              )}
+
+              <button
+                onClick={() => void resetStudio()}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 px-3 py-2 text-[10px] font-black text-slate-300"
+              >
+                <RefreshCcw size={13} /> Reset dataset + My AI
+              </button>
             </div>
-          )}
+          )
 
           {tab === "understand" && (
             <div className="mx-auto max-w-5xl grid gap-4 lg:grid-cols-2">
               <div className="rounded-2xl border border-slate-800 bg-slate-950/45 p-4">
                 <div className="flex items-center gap-2"><Layers3 size={15} className="text-violet-300" /><p className="text-xs font-black">6B · Understand My AI</p></div>
                 <p className="mt-2 text-[10px] leading-5 text-slate-500">See the learned model without exposing raw implementation complexity to the student.</p>
+                {store.model && (
+                  <div className="mb-3 grid grid-cols-2 gap-2">
+                    <div className="rounded-xl border border-slate-800 bg-slate-950 p-3">
+                      <p className="text-[8px] font-mono uppercase tracking-[0.14em] text-slate-600">Extractor</p>
+                      <p className="mt-1 text-[10px] font-black">{store.model.featureExtractor}</p>
+                    </div>
+                    <div className="rounded-xl border border-slate-800 bg-slate-950 p-3">
+                      <p className="text-[8px] font-mono uppercase tracking-[0.14em] text-slate-600">Validation</p>
+                      <p className="mt-1 text-[10px] font-black">{store.model.validationAccuracy}%</p>
+                    </div>
+                  </div>
+                )}
                 <div className="mt-3 rounded-xl bg-slate-950 p-3 font-mono text-[9px] text-slate-500">
                   {model ? getModelWeightShapes(model).map((shape) => <div key={shape} className="py-1">{shape}</div>) : <div>No trained model yet.</div>}
                 </div>
