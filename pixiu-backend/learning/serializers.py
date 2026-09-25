@@ -80,9 +80,16 @@ class CurriculumClassAssignmentSerializer(serializers.ModelSerializer):
     def create(self, validated_data): return CurriculumClassAssignment.objects.create(assigned_by=self.context["request"].user, **validated_data)
 
 class LearningContentSerializer(serializers.ModelSerializer):
+    file = serializers.SerializerMethodField()
+
     class Meta:
         model = LearningContent
         fields = ["id", "title", "description", "content_type", "grade", "unit_code", "url", "file", "target_role", "status", "is_watermarked", "created_by", "created_at", "updated_at"]
+
+    def get_file(self, obj):
+        # Never expose a direct/private-storage URL. Clients open content only
+        # through the authenticated/protected API endpoints.
+        return bool(obj.file)
         read_only_fields = ["id", "created_by", "created_at", "updated_at"]
     def validate(self, attrs):
         title = attrs.get("title", getattr(self.instance, "title", "")); grade = attrs.get("grade", getattr(self.instance, "grade", "")); target_role = attrs.get("target_role", getattr(self.instance, "target_role", "student")); url = attrs.get("url", getattr(self.instance, "url", "")); file_value = attrs.get("file", getattr(self.instance, "file", None)); content_type = attrs.get("content_type", getattr(self.instance, "content_type", "")); content_status = attrs.get("status", getattr(self.instance, "status", "draft"))
