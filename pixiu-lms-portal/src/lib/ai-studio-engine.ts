@@ -117,6 +117,7 @@ function validSamples(value: unknown): AiSample[] {
       typeof candidate.createdAt === "number"
     )
   })
+}
 
 export function loadAiStudioStore(): AiStudioStore {
   if (typeof window === "undefined") return emptyStore()
