@@ -127,7 +127,7 @@ const low = normalizeAiVisionState({
 })
 assert(low.detectedClass === "unknown", "low-confidence trained result must become unknown")
 assert(low.unknown === true, "low-confidence trained result must set unknown")
-assert(low.confidenceThreshold === DEFAULT_AI_CONFIDENCE_THRESHOLD, "default threshold contract")
+assert(low.confidenceThreshold === TRAINED_AI_CONFIDENCE_THRESHOLD, "trained threshold contract")
 
 const staleFlags = normalizeAiVisionState({
   ...createAiVisionState("trained"),
