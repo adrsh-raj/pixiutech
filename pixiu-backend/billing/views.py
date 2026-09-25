@@ -49,7 +49,7 @@ class InvoiceViewSet(BillingScopedMixin, viewsets.ModelViewSet):
         elif u.role == UserRole.SCHOOL:
             qs = qs.filter(school__account_id=u.id)
         elif u.role == UserRole.TRAINER:
-            qs = qs.filter(trainer__account_id=u.id)
+            return qs.none()
         else:
             return qs.none()
         return _school_filter(qs, self.request, "school")
