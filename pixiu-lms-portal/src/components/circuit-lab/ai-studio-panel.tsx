@@ -434,7 +434,10 @@ export function AiStudioPanel({
   function commitStore(next: AiStudioStore) {
     datasetVersionRef.current += 1
     setStore(next)
-    saveAiStudioStore(next)
+    const persisted = saveAiStudioStore(next)
+    if (!persisted) {
+      setStatus("Dataset updated for this session, but browser storage is full. Remove some samples and save again.")
+    }
   }
 
   useEffect(() => {
