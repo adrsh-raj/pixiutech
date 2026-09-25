@@ -1,9 +1,10 @@
-import { createHuman, disposeHuman, HUMAN_VERSION } from "./human-runtime"
+import * as tf from "@tensorflow/tfjs"
 
 export type FacePoint = {
   x: number
   y: number
-  z?: number
+  z: number
+  name?: string
 }
 
 export type FaceEmotion = {
@@ -26,105 +27,242 @@ export type FaceDetector = {
   dispose: () => void
 }
 
+const FACE_VERSION = "1.0.6"
 const MAX_FACES = 3
 const MIN_FACE_SCORE = 0.45
+const FACE_RUNTIME_SOURCES = {
+  detector: [
+    "https://cdn.jsdelivr.net/npm/@tensorflow-models/face-detection@1.0.3/dist/face-detection.min.js",
+    "https://unpkg.com/@tensorflow-models/face-detection@1.0.3/dist/face-detection.min.js",
+  ],
+  mesh: [
+    "https://cdn.jsdelivr.net/npm/@tensorflow-models/face-landmarks-detection@1.0.6/dist/face-landmarks-detection.min.js",
+    "https://unpkg.com/@tensorflow-models/face-landmarks-detection@1.0.6/dist/face-landmarks-detection.min.js",
+  ],
+}
+
+declare global {
+  interface Window {
+    tf?: typeof tf
+    faceDetection?: any
+    faceLandmarksDetection?: any
+  }
+}
+
+const scriptLoads = new Map<string, Promise<void>>()
+
+function loadScript(src: string, ready: () => boolean): Promise<void> {
+  if (typeof window === "undefined") return Promise.reject(new Error("Browser required."))
+  if (ready()) return Promise.resolve()
+
+  const existing = scriptLoads.get(src)
+  if (existing) return existing
+
+  const promise = new Promise<void>((resolve, reject) => {
+    const current = document.querySelector<HTMLScriptElement>(
+      `script[data-pixiu-face-src="${src}"]`,
+    )
+    if (current && ready()) {
+      resolve()
+      return
+    }
+
+    const script = current ?? document.createElement("script")
+    let settled = false
+    const cleanup = () => {
+      script.removeEventListener("load", onLoad)
+      script.removeEventListener("error", onError)
+    }
+    const onLoad = () => {
+      if (settled) return
+      settled = true
+      cleanup()
+      if (ready()) resolve()
+      else reject(new Error("Face AI runtime loaded without its API."))
+    }
+    const onError = () => {
+      if (settled) return
+      settled = true
+      cleanup()
+      script.remove()
+      reject(new Error("Face AI runtime could not be loaded."))
+    }
+
+    script.addEventListener("load", onLoad, { once: true })
+    script.addEventListener("error", onError, { once: true })
+    if (!current) {
+      script.async = true
+      script.src = src
+      script.dataset.pixiuFaceSrc = src
+      document.head.appendChild(script)
+    }
+
+    window.setTimeout(() => {
+      if (settled) return
+      if (ready()) onLoad()
+      else onError()
+    }, 30000)
+  })
+
+  scriptLoads.set(src, promise)
+  promise.catch(() => scriptLoads.delete(src))
+  return promise
+}
+
+async function ensureRuntime() {
+  if (typeof window === "undefined") throw new Error("PIXIU Face AI needs a browser.")
+  window.tf = tf
+  await tf.ready()
+
+  if (!tf.getBackend()) {
+    try {
+      await tf.setBackend("webgl")
+      await tf.ready()
+    } catch {
+      await tf.setBackend("cpu")
+      await tf.ready()
+    }
+  }
+
+  let lastError: unknown = null
+  for (const src of FACE_RUNTIME_SOURCES.detector) {
+    try {
+      await loadScript(src, () => Boolean(window.faceDetection))
+      if (window.faceDetection) break
+    } catch (error) {
+      lastError = error
+    }
+  }
+  if (!window.faceDetection) {
+    throw lastError instanceof Error ? lastError : new Error("Face detector runtime could not be loaded.")
+  }
+
+  lastError = null
+  for (const src of FACE_RUNTIME_SOURCES.mesh) {
+    try {
+      await loadScript(src, () => Boolean(window.faceLandmarksDetection))
+      if (window.faceLandmarksDetection) break
+    } catch (error) {
+      lastError = error
+    }
+  }
+  if (!window.faceLandmarksDetection) {
+    throw lastError instanceof Error ? lastError : new Error("Face mesh runtime could not be loaded.")
+  }
+}
 
 function toBox(box: any): [number, number, number, number] {
   return [
-    Number(box?.[0] ?? box?.x ?? 0),
-    Number(box?.[1] ?? box?.y ?? 0),
-    Number(box?.[2] ?? box?.width ?? 0),
-    Number(box?.[3] ?? box?.height ?? 0),
+    Number(box?.xMin ?? box?.x ?? 0),
+    Number(box?.yMin ?? box?.y ?? 0),
+    Number(box?.width ?? 0),
+    Number(box?.height ?? 0),
   ]
 }
 
-function toMeshPoint(point: any): FacePoint {
+function toPoint(point: any): FacePoint {
   return {
-    x: Number(point?.[0] ?? point?.x ?? 0),
-    y: Number(point?.[1] ?? point?.y ?? 0),
-    z: Number(point?.[2] ?? point?.z ?? 0),
+    x: Number(point?.x ?? 0),
+    y: Number(point?.y ?? 0),
+    z: Number(point?.z ?? 0),
+    name: typeof point?.name === "string" ? point.name : undefined,
   }
+}
+
+function dist(a: FacePoint, b: FacePoint) {
+  return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z)
+}
+
+function safeRatio(numerator: number, denominator: number) {
+  return denominator > 1e-6 ? numerator / denominator : 0
+}
+
+// This is intentionally called "expression demo", not medical or affective truth.
+// It is geometry derived from the 478-point mesh: smile / surprise / neutral.
+export function classifyExpression(points: FacePoint[], box: [number, number, number, number]): FaceEmotion {
+  if (points.length < 300) return { emotion: "neutral", score: 0 }
+
+  const width = Math.max(1, box[2])
+  const height = Math.max(1, box[3])
+  const p = (index: number) => points[index]
+
+  const mouthLeft = p(61), mouthRight = p(291), upperLip = p(13), lowerLip = p(14)
+  const leftEyeTop = p(159), leftEyeBottom = p(145)
+  const rightEyeTop = p(386), rightEyeBottom = p(374)
+
+  const mouthWidth = mouthLeft && mouthRight ? dist(mouthLeft, mouthRight) : 0
+  const mouthOpen = upperLip && lowerLip ? dist(upperLip, lowerLip) : 0
+  const leftEyeOpen = leftEyeTop && leftEyeBottom ? dist(leftEyeTop, leftEyeBottom) : 0
+  const rightEyeOpen = rightEyeTop && rightEyeBottom ? dist(rightEyeTop, rightEyeBottom) : 0
+
+  const smileScore = Math.min(1, Math.max(0, (mouthWidth / width - 0.28) / 0.16))
+  const surpriseScore = Math.min(1, Math.max(0,
+    ((mouthOpen / height - 0.08) / 0.16) * 0.6 +
+    (((leftEyeOpen + rightEyeOpen) / height - 0.045) / 0.12) * 0.4,
+  ))
+
+  if (surpriseScore >= 0.65) return { emotion: "surprised", score: surpriseScore }
+  if (smileScore >= 0.62) return { emotion: "happy", score: smileScore }
+  return { emotion: "neutral", score: Math.max(0.5, 1 - Math.max(smileScore, surpriseScore)) }
 }
 
 export function getTopEmotion(emotions: any[]): FaceEmotion | null {
   if (!Array.isArray(emotions) || emotions.length === 0) return null
-
-  const sorted = [...emotions]
+  return [...emotions]
     .map((entry) => ({
       emotion: String(entry?.emotion ?? "neutral"),
       score: Number(entry?.score ?? 0),
     }))
-    .sort((a, b) => b.score - a.score)
-
-  return sorted[0] ?? null
+    .sort((a, b) => b.score - a.score)[0] ?? null
 }
 
 export async function loadFaceDetector(): Promise<FaceDetector> {
-  const human = await createHuman({
-    face: {
-      enabled: true,
-      detector: {
-        enabled: true,
-        rotation: false,
-        maxDetected: MAX_FACES,
-        minConfidence: MIN_FACE_SCORE,
-        minSize: 60,
-        iouThreshold: 0.2,
-        skipFrames: 1,
-        skipTime: 180,
-        return: false,
-      },
-      mesh: {
-        enabled: true,
-        skipFrames: 1,
-        skipTime: 180,
-      },
-      iris: { enabled: false },
-      description: { enabled: false },
-      emotion: {
-        enabled: true,
-        minConfidence: 0.1,
-        skipFrames: 2,
-        skipTime: 450,
-        modelPath: "emotion.json",
-      },
-      antispoof: { enabled: false },
-      liveness: { enabled: false },
+  await ensureRuntime()
+
+  const detector = await window.faceLandmarksDetection.createDetector(
+    window.faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh,
+    {
+      runtime: "tfjs",
+      maxFaces: MAX_FACES,
+      refineLandmarks: false,
     },
-  })
+  )
 
   return {
-    version: HUMAN_VERSION,
+    version: FACE_VERSION,
     async detect(video) {
-      const result = await human.detect(video)
-      const rawFaces = Array.isArray(result?.face) ? result.face : []
+      const faces = await detector.estimateFaces(video, {
+        flipHorizontal: false,
+        staticImageMode: false,
+      })
 
-      return rawFaces.slice(0, MAX_FACES)
+      return faces
+        .slice(0, MAX_FACES)
         .map((face: any) => {
-          const emotion = getTopEmotion(face?.emotion)
+          const mesh = Array.isArray(face?.keypoints)
+            ? face.keypoints.map(toPoint)
+            : []
+          const box = toBox(face?.box)
+          const expression = classifyExpression(mesh, box)
+
           return {
-            score: Number(face?.score ?? face?.detector?.score ?? 0),
-            box: toBox(face?.box),
-            expression: emotion?.emotion ?? "neutral",
-            expressionScore: emotion?.score ?? 0,
-            emotions: Array.isArray(face?.emotion)
-              ? face.emotion.map((item: any) => ({
-                  emotion: String(item?.emotion ?? "neutral"),
-                  score: Number(item?.score ?? 0),
-                }))
-              : [],
-            mesh: Array.isArray(face?.mesh) ? face.mesh.map(toMeshPoint) : [],
+            score: Number(face?.score ?? 0),
+            box,
+            expression: expression.emotion,
+            expressionScore: expression.score,
+            emotions: [expression],
+            mesh,
           }
         })
-        .filter((face) => face.score >= MIN_FACE_SCORE)
+        .filter((face) => face.score === 0 || face.score >= MIN_FACE_SCORE)
     },
     dispose() {
-      disposeHuman(human)
+      detector.dispose?.()
     },
   }
 }
 
-export async function detectFaces(detector: FaceDetector, video: HTMLVideoElement): Promise<FaceDetection[]> {
+export async function detectFaces(detector: FaceDetector, video: HTMLVideoElement) {
   return detector.detect(video)
 }
 
