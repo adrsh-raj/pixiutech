@@ -102,6 +102,20 @@ assert(numbers.detectedGesture === "peace", "gesture must be normalized")
 assert(numbers.fingerCount === 3, "finger count must be clamped/rounded")
 assert(numbers.unknown === false, "strong numbers result must be accepted")
 
+const ambiguous = normalizeAiVisionState({
+  ...createAiVisionState("trained"),
+  enabled: true,
+  detectedClass: "Bottle",
+  confidence: 91,
+  lowConfidence: false,
+  unknown: true,
+  decisionReason: "ambiguous",
+  detail: "top two classes are close",
+})
+assert(ambiguous.detectedClass === "bottle", "ambiguous source label must stay normalized")
+assert(ambiguous.unknown === false, "source state must be recomputed by the boundary")
+
+
 const low = normalizeAiVisionState({
   ...createAiVisionState("trained"),
   enabled: true,
