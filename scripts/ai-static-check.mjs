@@ -61,7 +61,7 @@ for (const marker of [
 
 for (const marker of [
   "tf.loadGraphModel",
-  "SINGLEPOSE_LIGHTNING",
+  "singlepose/lightning/4",
   "MOVENET_KEYPOINT_NAMES",
   "disposeMoveNet",
 ]) requireText(poseAdapter, marker, "6C GraphModel adapter")
@@ -78,7 +78,7 @@ for (const forbidden of [
 
 const stopProgramSection = workbench.slice(
   workbench.indexOf("const stopProgram"),
-  workbench.indexOf("const startProgram"),
+  workbench.indexOf("const stopAiRuntime"),
 )
 if (/setAiRuntimeEnabled|setAiCameraCompact|setIsAiCameraOpen/.test(stopProgramSection)) {
   failures.push("AI lifecycle: stopProgram still directly mutates AI runtime/presentation state")
