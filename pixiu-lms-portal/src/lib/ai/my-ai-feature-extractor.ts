@@ -6,7 +6,7 @@ export const MY_AI_FEATURE_URL =
 export const MY_AI_EMBEDDING_NODE =
   "module_apply_default/MobilenetV2/Logits/AvgPool"
 export const MY_AI_INPUT_SIZE = 224
-export const MY_AI_PREDICTION_THRESHOLD = 0.55
+export const MY_AI_PREDICTION_THRESHOLD = 0.62
 
 let featureModel: tf.GraphModel | null = null
 let featureModelPromise: Promise<tf.GraphModel> | null = null
