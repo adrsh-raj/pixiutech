@@ -180,6 +180,7 @@ if AWS_BUCKET:
         "endpoint_url": AWS_ENDPOINT or None,
         "access_key_id": AWS_ACCESS,
         "secret_access_key": AWS_SECRET,
+        "addressing_style": os.environ.get("AWS_S3_ADDRESSING_STYLE", "path"),
         "location": os.environ.get("AWS_LOCATION", "pixiu-media").strip("/"),
         "file_overwrite": False,
         "querystring_auth": os.environ.get("AWS_QUERYSTRING_AUTH", "True").lower() == "true",
