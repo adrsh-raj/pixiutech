@@ -782,16 +782,38 @@ export async function predictAiImage(
     [1, summary.embeddingSize],
   )
 
+  let output: tf.Tensor | null = null
+
   try {
-    const output = model.predict(feature) as tf.Tensor
+    output = model.predict(feature) as tf.Tensor
     const probabilities = Array.from(await output.data())
-      .map((value) => Number.isFinite(Number(value)) ? Math.max(0, Math.min(1, Number(value))) : 0)
+      .map((value) =>
+        Number.isFinite(Number(value))
+          ? Math.max(0, Math.min(1, Number(value)))
+          : 0,
+      )
+
+    if (!probabilities.length) {
+      return {
+        label: "unknown",
+        confidence: 0,
+        probabilities: {},
+        unknown: true,
+        lowConfidence: true,
+        margin: 0,
+        reason: "low_confidence" as const,
+      }
+    }
+
     const bestIndex = probabilities.indexOf(Math.max(...probabilities))
     const sortedProbabilities = [...probabilities].sort((a, b) => b - a)
     const bestProbability = sortedProbabilities[0] ?? 0
     const secondProbability = sortedProbabilities[1] ?? 0
     const margin = bestProbability - secondProbability
-    const lowConfidence = bestProbability < MY_AI_PREDICTION_THRESHOLD
+    const threshold = Number.isFinite(summary.predictionThreshold)
+      ? summary.predictionThreshold
+      : MY_AI_PREDICTION_THRESHOLD
+    const lowConfidence = bestProbability < threshold
     const lowMargin = margin < 0.08
     const unknown = lowConfidence || lowMargin
     const reason = lowConfidence
@@ -799,8 +821,6 @@ export async function predictAiImage(
       : lowMargin
         ? "ambiguous"
         : "recognized"
-
-    output.dispose()
 
     return {
       label:
@@ -820,6 +840,7 @@ export async function predictAiImage(
       reason,
     }
   } finally {
+    output?.dispose()
     feature.dispose()
   }
 }
