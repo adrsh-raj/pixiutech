@@ -60,13 +60,15 @@ async function readJson(response) {
   return response.json().catch(() => ({}));
 }
 async function fetchOnce(url, options = {}, timeoutMs = 20000) {
+  const effectiveTimeoutMs = Number.isFinite(Number(options.timeoutMs)) ? Number(options.timeoutMs) : timeoutMs;
   const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  const timer = window.setTimeout(() => controller.abort(), effectiveTimeoutMs);
   const method = String(options.method || 'GET').toUpperCase();
   const started = typeof performance !== 'undefined' ? performance.now() : Date.now();
   try {
     const signal = options.signal || controller.signal;
-    const response = await fetch(url, { ...options, signal, credentials: options.credentials || 'include' });
+    const { timeoutMs: _timeoutMs, ...fetchOptions } = options;
+    const response = await fetch(url, { ...fetchOptions, signal, credentials: options.credentials || 'include' });
     const ended = typeof performance !== 'undefined' ? performance.now() : Date.now();
     const safePath = String(url).startsWith(API_BASE) ? String(url).slice(API_BASE.length) : '/external';
     recordApiPerformance(safePath, method, { durationMs: ended - started, status: response.status, cached: false });
@@ -80,6 +82,8 @@ async function fetchOnce(url, options = {}, timeoutMs = 20000) {
 }
 async function fetchWithRetry(url, options = {}) {
   const method = String(options.method || 'GET').toUpperCase();
+  const isVideoUpload = options.body instanceof FormData && String(options.body.get('content_type') || '').toLowerCase() === 'video';
+  const timeoutMs = Number.isFinite(Number(options.timeoutMs)) ? Number(options.timeoutMs) : (isVideoUpload ? 30 * 60 * 1000 : 20000);
   const retryable = method === 'GET' || method === 'HEAD';
   const delays = retryable ? [0, 1500, 4000] : [0];
   let lastResponse;
@@ -87,7 +91,7 @@ async function fetchWithRetry(url, options = {}) {
   for (let attempt = 0; attempt < delays.length; attempt += 1) {
     if (delays[attempt]) await new Promise(resolve => setTimeout(resolve, delays[attempt]));
     try {
-      const response = await fetchOnce(url, options, 20000);
+      const response = await fetchOnce(url, options, timeoutMs);
       lastResponse = response;
       if (response.ok || !retryable || ![502, 503, 504].includes(response.status) || attempt === delays.length - 1) return response;
     } catch (error) {
