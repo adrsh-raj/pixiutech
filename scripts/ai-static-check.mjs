@@ -188,6 +188,8 @@ for (const marker of [
   "isAiUnknown:",
   "getAiDetectedClass:",
   "getAiConfidence:",
+  "state.unknown",
+  "state.detectedClass === \"unknown\"",
 ]) requireText(workbench, marker, "6K normalized AI bridge")
 
 requireText(runner, "AI blocks are data/control inputs only", "6L AI data-source boundary")
@@ -214,7 +216,9 @@ for (const marker of ["getUserMedia", "isSecureContext", "HTTPS"]) {
 requireText(panel, "Permission blocked", "6O actionable permission error")
 requireText(engine, "tf.io.removeModel", "6O persisted model cleanup")
 requireText(engine, "localStorage.removeItem", "6O persisted dataset cleanup")
+requireText(engine, "AI_DATASET_STORAGE_SOFT_LIMIT_BYTES", "6O dataset persistence guard")
 requireText(panel, "stopInput", "6O runtime cleanup")
+requireText(panel, "Dataset updated for this session, but browser storage is full", "6O dataset persistence feedback")
 requireText(panel, "getActiveAiModel() === loaded", "6P stale model-load cleanup")
 requireText(panel, "if (model) return", "6P trained-model double-load guard")
 forbidText(panel, "disposeAiResource", "6P undefined trained-resource disposer")
