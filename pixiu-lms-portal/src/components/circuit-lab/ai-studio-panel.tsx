@@ -89,14 +89,7 @@ const MODES: Array<{ id: ReadyAiMode; title: string; subtitle: string }> = [
 ]
 
 
-function canonicalObjectClass(name: string) {
-  const lower = name.toLowerCase()
-  if (lower === "cell phone") return "phone"
-  if (["car", "truck", "bus", "motorcycle"].includes(lower)) return "car"
-  return lower
-}
-
-function countFingers(landmarks: Array<{ x: number; y: number }>) {
+undefinedfunction countFingers(landmarks: Array<{ x: number; y: number }>) {
   if (landmarks.length < 21) return 0
   const wrist = landmarks[0]
   const dist = (a: { x: number; y: number }, b: { x: number; y: number }) =>
@@ -704,28 +697,15 @@ export function AiStudioPanel({
           if (activeSession !== sessionRef.current) return
           // Keep every detection returned by COCO-SSD at/above our live-demo
           // threshold. Do not whitelist classes such as person/car/phone.
-          const visible = predictions.filter(
-            (p: any) => Number(p.score) >= OBJECT_MIN_SCORE,
-          )
-          drawBoxes(getActiveOverlay()!, video, visible.map((p: any) => ({
-            class: p.class,
-            score: p.score,
-            bbox: p.bbox,
-          })))
+          const visible = predictions
+          drawBoxes(getActiveOverlay()!, video, visible)
           const primary = visible[0]
           onAiStateChange({
             enabled: true,
             mode: "objects",
-            detectedClass: primary ? canonicalObjectClass(primary.class) : "none",
+            detectedClass: primary?.class ?? "none",
             confidence: primary ? Math.round(primary.score * 100) : 0,
-            allDetections: visible.map((p: any) => ({
-              class: p.class,
-              score: Number(p.score),
-              bbox: [
-                Number(p.bbox[0]), Number(p.bbox[1]),
-                Number(p.bbox[2]), Number(p.bbox[3]),
-              ],
-            })),
+            allDetections: visible,
             modelSource: "ready",
             detail: primary ? `${visible.length} object${visible.length === 1 ? "" : "s"} detected` : "Looking...",
           })
