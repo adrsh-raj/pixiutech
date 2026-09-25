@@ -41,6 +41,9 @@ export interface ExecutionEnvironment {
 let lcdCursorCol = 0
 let lcdCursorRow = 0
 
+// AI blocks are data/control inputs only. They do not mutate virtual hardware;
+// actuator effects remain in the simulator's Arduino execution cases below.
+
 export function evaluateNumber(target: Blockly.Block | null, env?: ExecutionEnvironment, defaultValue: number = 0): number {
   if (!target) return defaultValue
   if (target.type === "math_number") {
