@@ -41,7 +41,9 @@ for (const mode of ["objects", "pose", "hands", "emotion", "sound", "numbers"]) 
 
 for (const marker of [
   "loadHandDetector",
+  "detectHands",
   "loadFaceDetector",
+  "detectFaces",
   "loadSoundRecognizer",
   "trainAiModel",
   "predictAiImage",
