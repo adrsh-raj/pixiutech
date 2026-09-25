@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, Loader2, ShieldCheck, X } from 'lucide-react';
+import { AlertTriangle, Loader2, X } from 'lucide-react';
 import { API_BASE } from '../config/api';
 import { apiFetch } from '../context/AuthContext';
 
@@ -46,6 +46,14 @@ export default function LearningVideoPlayer({ material, onClose }) {
   }, [material?.id]);
 
   useEffect(() => {
+    const closeOnEscape = event => {
+      if (event.key === 'Escape') onClose?.();
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [onClose]);
+
+  useEffect(() => {
     const preventSave = event => {
       if ((event.ctrlKey || event.metaKey) && String(event.key).toLowerCase() === 's') {
         event.preventDefault();
@@ -62,15 +70,14 @@ export default function LearningVideoPlayer({ material, onClose }) {
       aria-modal="true"
       aria-label={material?.title || 'Learning video'}
       onContextMenu={event => event.preventDefault()}
+      onMouseDown={event => {
+        if (event.target === event.currentTarget) onClose?.();
+      }}
     >
-      <div className="w-full max-w-6xl rounded-2xl overflow-hidden border border-slate-700 bg-slate-950 shadow-2xl">
-        <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-slate-800">
+      <div className="w-full max-w-6xl max-h-[95dvh] rounded-2xl overflow-hidden border border-slate-700 bg-slate-950 shadow-2xl">
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-3 px-4 py-3 border-b border-slate-800 bg-slate-950">
           <div className="min-w-0">
             <h2 className="text-sm sm:text-base font-black text-white truncate">{material?.title || 'Learning video'}</h2>
-            <div className="mt-1 flex items-center gap-2 text-[10px] text-emerald-300">
-              <ShieldCheck size={13} />
-              <span>Authenticated view-only playback · download controls disabled</span>
-            </div>
           </div>
           <button type="button" onClick={onClose} className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800" aria-label="Close video">
             <X size={18} />
@@ -109,9 +116,6 @@ export default function LearningVideoPlayer({ material, onClose }) {
           )}
         </div>
 
-        <div className="px-4 py-3 border-t border-slate-800 text-[10px] text-slate-400">
-          Content is served from a private storage bucket through a short-lived authorized playback session.
-        </div>
       </div>
     </div>
   );
