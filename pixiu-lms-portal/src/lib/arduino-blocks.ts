@@ -429,7 +429,7 @@ export function defineArduinoBlocks() {
         .appendField('?')
       this.setOutput(true, 'Boolean')
       this.setColour(285)
-      this.setTooltip('Returns true when the normalized AI class matches this label.')
+      this.setTooltip('Browser AI Studio block: checks the live AI result in the simulator.')
     },
   }
 
@@ -438,7 +438,7 @@ export function defineArduinoBlocks() {
       this.appendDummyInput().appendField('🤖 AI detected object')
       this.setOutput(true, 'String')
       this.setColour(285)
-      this.setTooltip('Returns the name of the currently detected object.')
+      this.setTooltip('Browser AI Studio block: returns the current AI label in the simulator.')
     },
   }
 
@@ -447,7 +447,7 @@ export function defineArduinoBlocks() {
       this.appendDummyInput().appendField('🤖 AI confidence (%)')
       this.setOutput(true, 'Number')
       this.setColour(285)
-      this.setTooltip('Returns the AI detection confidence score (0 to 100%).')
+      this.setTooltip('Browser AI Studio block: returns AI confidence (0 to 100%) in the simulator.')
     },
   }
 
@@ -465,7 +465,7 @@ export function defineArduinoBlocks() {
       this.setPreviousStatement(true)
       this.setNextStatement(true)
       this.setColour(285)
-      this.setTooltip('Enable or disable the AI vision camera.')
+      this.setTooltip('Browser AI Studio block: enable or disable the camera runtime in the simulator.')
     },
   }
 
@@ -483,7 +483,7 @@ export function defineArduinoBlocks() {
       this.setPreviousStatement(true)
       this.setNextStatement(true)
       this.setColour(285)
-      this.setTooltip('Enable or disable the AI microphone and Sound AI input.')
+      this.setTooltip('Browser AI Studio block: enable or disable the microphone and Sound AI input.')
     },
   }
 }
@@ -736,24 +736,42 @@ arduino.forBlock['ultrasonic_read'] = (block) => {
   return ['readUltrasonic(' + trig + ', ' + echo + ')', ORDER.ATOMIC]
 }
 
-/* AI Vision C++ Generators */
+/* Browser AI generators -------------------------------------------------
+ * PIXIU AI inference lives in the browser runtime. Arduino C++ generation is
+ * intentionally compile-safe and documents that the AI action is simulator
+ * runtime behavior rather than an Arduino-side aiVision library call.
+ */
 arduino.forBlock['ai_is_detected'] = (block) => {
   const cls = block.getFieldValue('CLASS') ?? 'car'
-  return ['aiVision.isDetected("' + cls + '")', ORDER.ATOMIC]
+  const safeClass = String(cls).replace(/[^a-zA-Z0-9 _-]/g, '').trim() || 'car'
+  return [
+    'false /* PIXIU AI Studio: browser-only AI sees "' + safeClass + '". */',
+    ORDER.ATOMIC,
+  ]
 }
 
-arduino.forBlock['ai_get_detected_class'] = () => ['aiVision.getDetectedClass()', ORDER.ATOMIC]
+arduino.forBlock['ai_get_detected_class'] = () => [
+  '"none" /* PIXIU AI Studio: browser-only AI detected class. */',
+  ORDER.ATOMIC,
+]
 
-arduino.forBlock['ai_confidence'] = () => ['aiVision.getConfidence()', ORDER.ATOMIC]
+arduino.forBlock['ai_confidence'] = () => [
+  '0 /* PIXIU AI Studio: browser-only AI confidence (0-100). */',
+  ORDER.ATOMIC,
+]
 
 arduino.forBlock['ai_camera_enable'] = (block) => {
   const state = block.getFieldValue('STATE') ?? 'ON'
-  return 'aiVision.setCamera(' + (state === 'ON' ? 'true' : 'false') + ');\n'
+  return '/* PIXIU AI Studio browser runtime: AI camera ' +
+    state.toLowerCase() +
+    '. This is not an Arduino camera API. */\n'
 }
 
 arduino.forBlock['ai_microphone_enable'] = (block) => {
   const state = block.getFieldValue('STATE') ?? 'ON'
-  return 'aiVision.setMicrophone(' + (state === 'ON' ? 'true' : 'false') + ');\n'
+  return '/* PIXIU AI Studio browser runtime: AI microphone ' +
+    state.toLowerCase() +
+    '. This is not an Arduino microphone API. */\n'
 }
 
 // keep indent helper referenced (used by callers that post-process)
