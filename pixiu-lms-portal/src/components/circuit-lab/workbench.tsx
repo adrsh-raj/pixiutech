@@ -25,7 +25,8 @@ import { SerialMonitor, type SerialLine } from "./serial-monitor"
 import { StatusBar } from "./status-bar"
 import { TemplateBrowser } from "./template-browser"
 import { LessonBrowser } from "./lesson-browser"
-import type { AiStudioVisionState } from "./ai-studio-panel"
+import type { AiVisionState } from "@/lib/ai/vision-types"
+import { createAiVisionState } from "@/lib/ai/vision-state"
 const AiStudioPanel = lazy(() => import("./ai-studio-panel").then((module) => ({ default: module.AiStudioPanel })))
 import { ContextMenu, type ContextMenuTarget } from "./context-menu"
 import type { ProjectTemplate } from "@/lib/templates"
@@ -174,11 +175,7 @@ export function Workbench() {
     e.preventDefault()
     setContextMenu({ x: e.clientX, y: e.clientY, target })
   }, [])
-  const [aiState, setAiState] = useState<AiStudioVisionState>({
-    enabled: true,
-    detectedClass: "none",
-    confidence: 0,
-  })
+  const [aiState, setAiState] = useState<AiVisionState>(() => createAiVisionState("objects"))
   const aiStateRef = useRef(aiState)
   useEffect(() => {
     aiStateRef.current = aiState
