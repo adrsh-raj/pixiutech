@@ -89,7 +89,7 @@ class LearningContentSerializer(serializers.ModelSerializer):
     file = LearningContentFileField(required=False, allow_null=True)
     file_available = serializers.SerializerMethodField()
     video_processing_status = serializers.CharField(read_only=True)
-    video_processing_error = serializers.CharField(read_only=True)
+    video_processing_error = serializers.SerializerMethodField()
     video_duration_seconds = serializers.IntegerField(read_only=True)
     video_size_bytes = serializers.IntegerField(read_only=True)
     video_width = serializers.IntegerField(read_only=True)
@@ -114,6 +114,13 @@ class LearningContentSerializer(serializers.ModelSerializer):
         return bool(obj.file) and (
             obj.content_type != "video" or obj.video_processing_status == LearningContent.VIDEO_PROCESSING_READY
         )
+
+    def get_video_processing_error(self, obj):
+        role = getattr(self.context.get("request"), "user", None)
+        if getattr(role, "role", None) in {UserRole.ADMIN, UserRole.TRAINER}:
+            return str(obj.video_processing_error or "")
+        return "" if obj.video_processing_status != LearningContent.VIDEO_PROCESSING_FAILED else "Video processing failed. Please contact your trainer."
+
     def validate(self, attrs):
         title = attrs.get("title", getattr(self.instance, "title", "")); grade = attrs.get("grade", getattr(self.instance, "grade", "")); target_role = attrs.get("target_role", getattr(self.instance, "target_role", "student")); url = attrs.get("url", getattr(self.instance, "url", "")); file_value = attrs.get("file", getattr(self.instance, "file", None)); content_type = attrs.get("content_type", getattr(self.instance, "content_type", "")); content_status = attrs.get("status", getattr(self.instance, "status", "draft"))
         if not str(title).strip(): raise serializers.ValidationError({"title": "Title is required."})
