@@ -55,6 +55,8 @@ for (const marker of [
   "lite_mobilenet_v2",
   "DEFAULT_OBJECT_MIN_SCORE",
   "DEFAULT_OBJECT_MAX_BOXES",
+  "NormalizedObjectDetection",
+  "normalizeObjectClass",
 ]) requireText(objectAdapter, marker, "6B object adapter")
 
 for (const marker of [
