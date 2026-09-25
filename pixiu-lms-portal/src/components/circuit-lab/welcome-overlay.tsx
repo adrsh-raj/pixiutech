@@ -49,6 +49,7 @@ export function WelcomeOverlay({ onOpenProjects }: { onOpenProjects: () => void 
 
   const dismiss = (remember = true) => {
     setShow(false)
+    setTourOpen(false)
     if (remember) {
       try {
         localStorage.setItem(STORAGE_KEY, "seen")
