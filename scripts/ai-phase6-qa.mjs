@@ -127,6 +127,18 @@ assert(low.detectedClass === "unknown", "low-confidence trained result must beco
 assert(low.unknown === true, "low-confidence trained result must set unknown")
 assert(low.confidenceThreshold === DEFAULT_AI_CONFIDENCE_THRESHOLD, "default threshold contract")
 
+const staleFlags = normalizeAiVisionState({
+  ...createAiVisionState("trained"),
+  enabled: true,
+  detectedClass: "Bottle",
+  confidence: 41,
+  lowConfidence: false,
+  unknown: false,
+  detail: "stale flags",
+})
+assert(staleFlags.unknown === true, "normalizer must recompute stale unknown flag")
+assert(staleFlags.lowConfidence === true, "normalizer must recompute stale low-confidence flag")
+
 const staticSourceChecks = [
   ["6A mode registry", /objects/.test(panel) && /pose/.test(panel) && /hands/.test(panel) && /emotion/.test(panel) && /sound/.test(panel) && /numbers/.test(panel)],
   ["6A selected-resource loading", panel.includes('mode === "objects"') && panel.includes('mode === "pose"') && panel.includes('mode === "hands" || mode === "numbers"') && panel.includes('mode === "emotion"') && panel.includes('mode === "trained"')],
