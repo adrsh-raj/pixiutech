@@ -6,7 +6,6 @@ const portal = join(root, "pixiu-lms-portal", "src")
 const read = (path) => readFileSync(join(root, path), "utf8")
 
 const panel = read("pixiu-lms-portal/src/components/circuit-lab/ai-studio-panel.tsx")
-const runtime = read("pixiu-lms-portal/src/lib/ai-ready-runtime.ts")
 const engine = read("pixiu-lms-portal/src/lib/ai-studio-engine.ts")
 const types = read("pixiu-lms-portal/src/lib/ai/vision-types.ts")
 const workbench = read("pixiu-lms-portal/src/components/circuit-lab/workbench.tsx")
@@ -15,6 +14,10 @@ const runner = read("pixiu-lms-portal/src/lib/blockly-runner.ts")
 const objectAdapter = read("pixiu-lms-portal/src/lib/ai/object-detector.ts")
 const poseAdapter = read("pixiu-lms-portal/src/lib/ai/pose-detector.ts")
 const visionState = read("pixiu-lms-portal/src/lib/ai/vision-state.ts")
+const humanRuntime = read("pixiu-lms-portal/src/lib/ai/human-runtime.ts")
+const handAdapter = read("pixiu-lms-portal/src/lib/ai/hand-detector.ts")
+const faceAdapter = read("pixiu-lms-portal/src/lib/ai/face-detector.ts")
+const soundAdapter = read("pixiu-lms-portal/src/lib/ai/sound-detector.ts")
 
 const failures = []
 const requireText = (text, needle, label) => {
