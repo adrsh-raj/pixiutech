@@ -37,7 +37,6 @@ for (const marker of [
   "loadHandDetector",
   "loadFaceEmotion",
   "loadSpeechRecognizer",
-  "cocoSsd.load",
   "trainAiModel",
   "predictAiImage",
   "getModelWeightShapes",
