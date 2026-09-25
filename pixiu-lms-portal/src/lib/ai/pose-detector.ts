@@ -38,7 +38,11 @@ const KEYPOINT_SCORE_THRESHOLD = 0.25
 function firstGraphTensor(
   output: tf.Tensor | tf.Tensor[] | tf.NamedTensorMap,
 ): tf.Tensor {
-  if (Array.isArray(output)) return output[0]
+  if (Array.isArray(output)) {
+    const first = output[0]
+    if (!first) throw new Error("MoveNet returned no output tensor.")
+    return first
+  }
   if (output instanceof tf.Tensor) return output
   const first = Object.values(output)[0]
   if (!first) throw new Error("MoveNet returned no output tensor.")
