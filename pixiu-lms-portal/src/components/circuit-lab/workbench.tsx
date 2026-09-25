@@ -477,7 +477,10 @@ export function Workbench() {
     // Only run Arduino code and AI Vision if an Arduino board actually exists in the circuit
     const hasArduino = state.parts.some((p) => p.type === "arduino-uno")
     if (!hasArduino) {
-      // Pure DC circuit (battery, resistor, LED, etc.) - no Arduino code, no AI camera
+      // Pure DC circuit (battery, resistor, LED, etc.) - no Arduino code, no AI camera.
+      // Keep the Workbench run-state consistent with the early return.
+      runningRef.current = false
+      setRunning(false)
       stopAiRuntime()
       return
     }
