@@ -842,7 +842,7 @@ export function AiStudioPanel({
             detectedClass: face ? stableExpression : "none",
             confidence: face ? Math.round(face.expressionScore * 100) : 0,
             allDetections: [],
-            modelClasses: ["neutral", "happy", "sad", "angry", "surprised", "fearful", "disgusted"],
+            modelClasses: ["neutral", "happy", "sad", "angry", "surprise", "fear", "disgust"],
             modelSource: "ready",
             detail: face
               ? String(faces.length) + " face" + (faces.length === 1 ? "" : "s") + " · " + stableExpression
