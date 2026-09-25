@@ -1414,6 +1414,16 @@ export function AiStudioPanel({
                       <p className="text-[9px] font-mono uppercase tracking-[0.16em] text-slate-600">{activeTitle}</p>
                       <p className="mt-1 text-sm font-black">{aiState.detectedClass === "none" ? status : aiState.detectedClass}</p>
                       <p className="mt-0.5 text-[9px] text-slate-600">{aiState.detail}</p>
+                      {mode === "trained" && (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <span className={"rounded-lg border px-2 py-1 text-[8px] font-mono " + (aiState.unknown ? "border-amber-400/20 bg-amber-400/5 text-amber-300" : "border-emerald-400/20 bg-emerald-400/5 text-emerald-300")}>
+                            {aiState.unknown ? "UNKNOWN · safe fallback" : "ACCEPTED · My AI"}
+                          </span>
+                          <span className="rounded-lg border border-slate-800 bg-slate-950 px-2 py-1 text-[8px] font-mono text-slate-500">
+                            threshold {aiState.confidenceThreshold ?? 62}%
+                          </span>
+                        </div>
+                      )}
                       {mode === "numbers" && (
                         <div className="mt-2 flex flex-wrap gap-2">
                           <span className="rounded-lg border border-cyan-400/15 bg-cyan-400/5 px-2 py-1 text-[8px] font-mono text-cyan-200">
@@ -1830,16 +1840,25 @@ export function AiStudioPanel({
                       </div>
                     </div>
                     <div className="mt-3 rounded-xl border border-slate-800 bg-slate-950 p-3 text-[9px] leading-5 text-slate-600">
-                      Samples are stored in browser storage. “Reset dataset + My AI” removes the dataset and saved model from this browser.
+                      Samples stay in this browser's storage. “Reset dataset + My AI” removes the dataset and saved model from this browser. The browser controls site permission; stopping PIXIU ends active tracks but does not revoke a site's saved permission.
                     </div>
-                    <button
-                      type="button"
-                      onClick={stopInput}
-                      disabled={!cameraActive && !soundActive && !loading}
-                      className="mt-3 rounded-xl border border-rose-400/20 px-3 py-2 text-[9px] font-black text-rose-300 disabled:opacity-30"
-                    >
-                      Stop camera / microphone + clear runtime
-                    </button>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={stopInput}
+                        disabled={!cameraActive && !soundActive && !loading}
+                        className="rounded-xl border border-rose-400/20 px-3 py-2 text-[9px] font-black text-rose-300 disabled:opacity-30"
+                      >
+                        Stop camera / microphone + clear runtime
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void resetStudio()}
+                        className="rounded-xl border border-rose-400/20 px-3 py-2 text-[9px] font-black text-rose-300 hover:bg-rose-500/5"
+                      >
+                        Erase local AI data
+                      </button>
+                    </div>
                   </div>
 
                   <div className="rounded-2xl border border-slate-800 bg-slate-950/45 p-4">
