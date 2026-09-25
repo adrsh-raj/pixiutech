@@ -1,0 +1,104 @@
+name: PIXIU Learning Video Processor
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pixiu-learning-video-processor
+  cancel-in-progress: false
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+
+    services:
+      clamav:
+        image: clamav/clamav:1.5.4-debian13-slim
+        ports:
+          - 3310:3310
+        env:
+          CLAMD_CONF_StreamMaxLength: 600M
+          CLAMD_CONF_MaxFileSize: 600M
+          CLAMD_CONF_MaxScanSize: 600M
+          CLAMD_CONF_MaxScanTime: 3600000
+          CLAMD_CONF_ConcurrentDatabaseReload: "no"
+          CLAMD_CONF_MaxThreads: "4"
+          FRESHCLAM_CHECKS: "24"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pixiu-backend/requirements.txt
+
+      - name: Install backend dependencies
+        working-directory: pixiu-backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Wait for ClamAV
+        run: |
+          python - <<'PY'
+          import socket
+          import time
+
+          deadline = time.time() + 240
+          while time.time() < deadline:
+              try:
+                  with socket.create_connection(("127.0.0.1", 3310), timeout=3) as sock:
+                      sock.settimeout(3)
+                      sock.sendall(b"zPING\\0")
+                      reply = sock.recv(128).replace(b"\\0", b"\\n").decode("utf-8", "replace").strip()
+                      if reply == "PONG":
+                          print("ClamAV is ready")
+                          raise SystemExit(0)
+              except (OSError, TimeoutError):
+                  pass
+              time.sleep(3)
+
+          raise SystemExit("ClamAV did not become ready within 240 seconds")
+          PY
+
+      - name: Process one queued learning video
+        working-directory: pixiu-backend
+        env:
+          DJANGO_SECRET_KEY: ${{ secrets.PIXIU_DJANGO_SECRET_KEY }}
+          DJANGO_DEBUG: "False"
+          DJANGO_SECURE_SSL_REDIRECT: "False"
+          DATABASE_URL: ${{ secrets.PIXIU_DATABASE_URL }}
+          DJANGO_EXPECTED_DATABASE_NAME: ${{ secrets.PIXIU_EXPECTED_DATABASE_NAME }}
+          DJANGO_DB_SSLMODE: "require"
+          DJANGO_DB_CONN_MAX_AGE: "0"
+
+          SUPABASE_STORAGE_BUCKET: "pixiu-learning"
+          SUPABASE_STORAGE_ENDPOINT: "https://fainrogbfuxyvfpujmze.storage.supabase.co/storage/v1/s3"
+          SUPABASE_STORAGE_REGION: "ap-south-1"
+          SUPABASE_STORAGE_ACCESS_KEY: ${{ secrets.PIXIU_SUPABASE_STORAGE_ACCESS_KEY }}
+          SUPABASE_STORAGE_SECRET_KEY: ${{ secrets.PIXIU_SUPABASE_STORAGE_SECRET_KEY }}
+          SUPABASE_VIDEO_TEMP_BUCKET: "pixiu-video-temp"
+          AWS_S3_ADDRESSING_STYLE: "path"
+          AWS_LOCATION: "pixiu-media"
+          SECURE_VIDEO_MAX_MB: "500"
+
+          CLAMAV_ENABLED: "True"
+          CLAMAV_REQUIRED: "True"
+          CLAMAV_HOST: "127.0.0.1"
+          CLAMAV_PORT: "3310"
+          CLAMAV_TIMEOUT_SECONDS: "60"
+          CLAMAV_RETRY_ATTEMPTS: "3"
+          CLAMAV_RETRY_BACKOFF_SECONDS: "1"
+          CLAMAV_CHUNK_SIZE: "1048576"
+
+        run: python manage.py process_learning_videos --once
