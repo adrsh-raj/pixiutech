@@ -175,9 +175,9 @@ class LearningContent(models.Model):
     status = models.CharField(max_length=20, choices=PublishStatus.choices, default=PublishStatus.DRAFT)
     is_watermarked = models.BooleanField(default=True)
 
-    # Video lifecycle: original uploads live only in a temporary private bucket
-    # while the worker transcodes them. Only the optimized final MP4 is retained
-    # in the permanent private learning bucket.
+    # Video lifecycle metadata. Videos are stored in the permanent private
+    # learning bucket and served through the protected Django playback endpoint.
+    # Processing fields remain for backwards compatibility with older uploads.
     VIDEO_PROCESSING_QUEUED = "queued"
     VIDEO_PROCESSING_PROCESSING = "processing"
     VIDEO_PROCESSING_READY = "ready"
