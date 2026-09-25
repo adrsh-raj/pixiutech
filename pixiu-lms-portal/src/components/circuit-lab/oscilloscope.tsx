@@ -11,6 +11,7 @@ import { solveCircuitNodalPotentials, type NodalSolution } from "@/lib/circuit-s
 interface SimulationSnapshot {
   state: CircuitState
   pinStates: Record<string, ArduinoPinState>
+  pressed: Set<string>
   running: boolean
 }
 
@@ -24,6 +25,7 @@ interface Props {
   state: CircuitState
   running: boolean
   simulationRef: SimulationSnapshotRef
+  pressed: Set<string>
   probeCH1: PinRef | null
   probeCH2: PinRef | null
   onSetProbeCH1: (ref: PinRef | null) => void
@@ -46,6 +48,7 @@ export const Oscilloscope = memo(function Oscilloscope({
   state,
   running,
   simulationRef,
+  pressed,
   probeCH1,
   probeCH2,
   onSetProbeCH1,
@@ -79,6 +82,7 @@ export const Oscilloscope = memo(function Oscilloscope({
     let frameCounter = 0
     let cachedState: CircuitState | null = null
     let cachedPinStates: Record<string, ArduinoPinState> | null = null
+    let cachedPressed: Set<string> | null = null
     let cachedNodalSolution: NodalSolution | null = null
 
     const interval = window.setInterval(() => {
@@ -93,10 +97,23 @@ export const Oscilloscope = memo(function Oscilloscope({
         return currentState.parts.find((part) => part.id === probe.partId)?.type !== "arduino-uno"
       })
 
-      if (needsNodalSolve && (cachedState !== currentState || cachedPinStates !== currentPinStates)) {
+      if (
+        needsNodalSolve &&
+        (
+          cachedState !== currentState ||
+          cachedPinStates !== currentPinStates ||
+          cachedPressed !== currentPressed
+        )
+      ) {
         cachedState = currentState
         cachedPinStates = currentPinStates
-        cachedNodalSolution = solveCircuitNodalPotentials(currentState, new Set(), currentPinStates, true)
+        cachedPressed = currentPressed
+        cachedNodalSolution = solveCircuitNodalPotentials(
+          currentState,
+          currentPressed,
+          currentPinStates,
+          true,
+        )
       }
 
       const now = performance.now()
@@ -124,7 +141,7 @@ export const Oscilloscope = memo(function Oscilloscope({
     }, 25)
 
     return () => window.clearInterval(interval)
-  }, [activeWindowMs, isHold, isOpen, probeCH1, probeCH2, simulationRef])
+  }, [activeWindowMs, isHold, isOpen, probeCH1, probeCH2, simulationRef, pressed])
 
   useEffect(() => {
     historyRef.current = []
