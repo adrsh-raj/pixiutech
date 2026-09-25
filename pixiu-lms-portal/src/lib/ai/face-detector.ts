@@ -225,7 +225,9 @@ export async function loadFaceDetector(): Promise<FaceDetector> {
     {
       runtime: "tfjs",
       maxFaces: MAX_FACES,
-      refineLandmarks: false,
+      // Keep iris/lip refinement enabled so the adapter's 478-point contract
+      // matches the MediaPipe FaceMesh refined output used by this UI.
+      refineLandmarks: true,
     },
   )
 
