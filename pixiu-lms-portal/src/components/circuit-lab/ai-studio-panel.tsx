@@ -794,7 +794,7 @@ export function AiStudioPanel({
           : mode === "hands" ? "6D Fingers ready"
           : mode === "numbers" ? "6G Numbers ready"
           : mode === "emotion" ? "6E Emotion ready"
-          : "6B My AI ready",
+          : "6I My AI ready",
       )
 
       if (mode !== "sound") startInferenceLoop(activeSession)
@@ -1464,7 +1464,7 @@ export function AiStudioPanel({
                         <p className="mt-1 max-w-sm text-[11px] leading-5 text-slate-500">
                           {isSound
                             ? "Sound AI runs locally in your browser. Try words such as yes, no, go, stop, up, down, left or right."
-                            : "6A loads only the selected Ready AI. 6B uses My AI. 6C is the live Blockly bridge."}
+                            : "6A loads only the selected Ready AI. 6I uses My AI. 6K is the normalized Blockly bridge."}
                         </p>
                       </div>
                     )}
@@ -1524,7 +1524,7 @@ export function AiStudioPanel({
                   </div>
 
                   <div className="rounded-2xl border border-emerald-400/10 bg-emerald-500/[0.03] p-4">
-                    <div className="flex items-center gap-2"><Zap size={14} className="text-emerald-300" /><p className="text-xs font-black">6C · AI → Circuit</p></div>
+                    <div className="flex items-center gap-2"><Zap size={14} className="text-emerald-300" /><p className="text-xs font-black">6K · AI → Circuit</p></div>
                     <p className="mt-2 text-[10px] leading-5 text-slate-500">The Workbench receives detected class, confidence and detections. Blockly can use AI sees, AI class, AI confidence and AI camera ON/OFF.</p>
                     <div className="mt-3 grid grid-cols-2 gap-1.5">
                       {["car", "person", "phone", "hand", "0", "3", "happy", "yes"].map((signal) => (
