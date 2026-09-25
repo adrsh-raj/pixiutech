@@ -17,6 +17,8 @@ const visionState = read("pixiu-lms-portal/src/lib/ai/vision-state.ts")
 const handAdapter = read("pixiu-lms-portal/src/lib/ai/hand-detector.ts")
 const faceAdapter = read("pixiu-lms-portal/src/lib/ai/face-detector.ts")
 const soundAdapter = read("pixiu-lms-portal/src/lib/ai/sound-detector.ts")
+const gestureAdapter = read("pixiu-lms-portal/src/lib/ai/gesture-interpreter.ts")
+const featureExtractor = read("pixiu-lms-portal/src/lib/ai/my-ai-feature-extractor.ts")
 
 const failures = []
 const requireText = (text, needle, label) => {
@@ -110,8 +112,10 @@ for (const needle of ["frameBusyRef", "setTestImage", "inFlightRef"]) {
 }
 requireText(engine, 'const LEGACY_STORE_KEY = "pixiu-ai-studio-v1"', "legacy cleanup key")
 requireText(engine, 'const LEGACY_MODEL_KEY = "pixiu-ai-studio-model-v1"', "legacy cleanup model key")
-requireText(engine, 'STORE_KEY = "pixiu-ai-studio-v2"', "AI store version")
-requireText(engine, 'MODEL_KEY = "pixiu-ai-studio-model-v2"', "AI model version")
+requireText(engine, 'STORE_KEY = "pixiu-ai-studio-v3"', "AI store version")
+requireText(engine, 'MODEL_KEY = "pixiu-ai-studio-model-v3"', "AI model version")
+requireText(engine, '"pixiu-ai-studio-v2"', "legacy store migration")
+requireText(engine, '"pixiu-ai-studio-model-v2"', "legacy model migration")
 
 // 6D/6E share the application's existing TensorFlow.js runtime. Avoid a
 // second bundled TensorFlow.js instance from a separate vision framework.
@@ -181,6 +185,73 @@ requireText(panel, "requestedMode", "panel requested-mode bridge")
 requireText(panel, "onRequestedModeHandled", "panel requested-mode acknowledgement")
 requireText(panel, 'modelClasses: ["neutral", "happy", "surprised"]', "6E expression label contract")
 
+for (const marker of [
+  "interpretHandGesture",
+  "detectedGesture",
+  "fingerCount",
+  "handGestureHistoryRef",
+  '["0", "1", "2", "3", "4", "5"]',
+]) requireText(panel, marker, "6G gesture/number integration")
+
+for (const marker of ["FingerMask", "getExtendedFingerMask", "extendedFingers"]) {
+  requireText(handAdapter, marker, "6G hand-layer contract")
+}
+
+for (const marker of [
+  "HandGesture",
+  "interpretHandGesture",
+  "thumbs_up",
+  "thumbs_down",
+  "peace",
+  "open_palm",
+]) requireText(gestureAdapter, marker, "6G gesture interpreter")
+
+for (const marker of [
+  "classes: string[]",
+  "addAiClass",
+  "renameAiClass",
+  "removeAiClass",
+  "getAiDatasetStats",
+  "getSampleAddError",
+  "MAX_CLASSES = 8",
+  "MAX_SAMPLES_PER_CLASS = 20",
+  "MAX_TOTAL_SAMPLES = 80",
+  'STORE_KEY = "pixiu-ai-studio-v3"',
+  'MODEL_KEY = "pixiu-ai-studio-model-v3"',
+]) requireText(engine, marker, "6H dataset contract")
+
+for (const marker of [
+  "MobileNetV2-0.5",
+  "MY_AI_EMBEDDING_NODE",
+  "tf.loadGraphModel",
+  "model.execute(batched, MY_AI_EMBEDDING_NODE)",
+  "extractMyAiEmbedding",
+]) requireText(featureExtractor, marker, "6I transfer feature extractor")
+
+for (const marker of [
+  "extractFeatures",
+  "Frozen MobileNetV2",
+  "featureExtractor: MY_AI_FEATURE_VERSION",
+  "Dense(96)",
+  "validationData",
+]) requireText(engine, marker, "6I transfer-learning training engine")
+
+for (const forbidden of [
+  "INPUT_W = 16",
+  "INPUT_H = 16",
+  "tf.layers.conv2d",
+  "16×16 RGB → Conv2D",
+]) forbidText(engine, forbidden, "6I old raw-pixel classifier")
+
+for (const marker of ["ai_get_gesture", "ai_get_finger_count"]) {
+  requireText(blocks, marker, "6G Blockly block")
+  requireText(runner, marker, "6G Blockly runtime")
+  requireText(read("pixiu-lms-portal/src/components/circuit-lab/blockly-editor.tsx"), marker, "6G Blockly toolbox")
+  requireText(workbench, marker, "6G Workbench bridge")
+}
+requireText(workbench, "getAiGesture", "6G gesture getter")
+requireText(workbench, "getAiFingerCount", "6G finger getter")
+
 requireText(panel, "const requestId = ++cameraRequestRef.current", "camera request generation")
 requireText(panel, "if (requestId !== cameraRequestRef.current)", "camera stale-request guard")
 requireText(panel, "function stopCameraStream()", "camera stream shutdown boundary")
@@ -205,4 +276,7 @@ console.log("6C AI→Blockly bridge: present")
 console.log("6D Hand AI runtime: present")
 console.log("6E Face + emotion AI runtime: present")
 console.log("6F Speech Commands runtime: present")
+console.log("6G Numbers + Gesture runtime: present")
+console.log("6H My AI dataset workflow: present")
+console.log("6I Transfer-learning training engine: present")
 console.log("Legacy AI camera implementation: removed")
