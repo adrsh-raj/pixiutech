@@ -67,6 +67,9 @@ export const MAX_TOTAL_SAMPLES = 80
 export const MY_AI_SAMPLE_MAX_SIZE = 384
 export const MY_AI_SAMPLE_JPEG_QUALITY = 0.62
 export const MY_AI_LOW_MARGIN_THRESHOLD = 0.08
+// Conservative soft ceiling for localStorage JSON. This prevents a browser
+// quota failure from silently turning a large dataset into an ephemeral state.
+export const AI_DATASET_STORAGE_SOFT_LIMIT_BYTES = 4_000_000
 
 let activeModel: tf.LayersModel | null = null
 let modelStorageQueue: Promise<void> = Promise.resolve()
@@ -176,22 +179,30 @@ export function loadAiStudioStore(): AiStudioStore {
 }
 
 export function saveAiStudioStore(store: AiStudioStore) {
-  if (typeof window === "undefined") return
+  if (typeof window === "undefined") return false
 
   try {
-    window.localStorage.setItem(
-      STORE_KEY,
-      JSON.stringify({
-        classes: uniqueClasses(store.classes),
-        samples: store.samples.slice(-MAX_TOTAL_SAMPLES),
-        model: store.model,
-      }),
-    )
+    const serialized = JSON.stringify({
+      classes: uniqueClasses(store.classes),
+      samples: store.samples.slice(-MAX_TOTAL_SAMPLES),
+      model: store.model,
+    })
+
+    if (serialized.length > AI_DATASET_STORAGE_SOFT_LIMIT_BYTES) {
+      console.warn(
+        "PIXIU My AI dataset is too large for the localStorage safety ceiling.",
+      )
+      return false
+    }
+
+    window.localStorage.setItem(STORE_KEY, serialized)
     for (const key of LEGACY_STORE_KEYS) {
       window.localStorage.removeItem(key)
     }
+    return true
   } catch {
     // Dataset persistence is best-effort. The active React state remains usable.
+    return false
   }
 }
 
