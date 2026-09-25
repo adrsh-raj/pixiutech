@@ -79,6 +79,8 @@ interface Props {
   runtimeEnabled?: boolean
   compact?: boolean
   onStartSim?: () => void
+  requestedMode?: ReadyAiMode | "trained" | null
+  onRequestedModeHandled?: () => void
 }
 
 type Tab = "try" | "teach" | "understand"
