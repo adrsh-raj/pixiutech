@@ -482,6 +482,7 @@ export function Workbench() {
       blocklyXml.includes("ai_confidence") ||
       blocklyXml.includes("ai_get_gesture") ||
       blocklyXml.includes("ai_get_finger_count") ||
+      blocklyXml.includes("ai_is_gesture") ||
       blocklyXml.includes("ai_camera_enable") ||
       blocklyXml.includes("ai_microphone_enable")
     )
@@ -591,6 +592,9 @@ export function Workbench() {
         getAiConfidence: () => aiStateRef.current.confidence,
         getAiGesture: () => aiStateRef.current.detectedGesture ?? "none",
         getAiFingerCount: () => aiStateRef.current.fingerCount ?? 0,
+        isAiGesture: (gesture) =>
+          (aiStateRef.current.detectedGesture ?? "none").trim().toLowerCase() ===
+          String(gesture).trim().toLowerCase(),
         setAiCamera: (enabled) => {
           setAiRequestedMode(enabled ? "objects" : null)
           setAiRuntimeEnabled(enabled)
