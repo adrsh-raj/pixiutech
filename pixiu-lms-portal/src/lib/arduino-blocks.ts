@@ -468,6 +468,24 @@ export function defineArduinoBlocks() {
       this.setTooltip('Enable or disable the AI vision camera.')
     },
   }
+
+  Blockly.Blocks['ai_microphone_enable'] = {
+    init() {
+      this.appendDummyInput()
+        .appendField('🤖 turn AI microphone')
+        .appendField(
+          new Blockly.FieldDropdown([
+            ['ON', 'ON'],
+            ['OFF', 'OFF'],
+          ]),
+          'STATE',
+        )
+      this.setPreviousStatement(true)
+      this.setNextStatement(true)
+      this.setColour(285)
+      this.setTooltip('Enable or disable the AI microphone and Sound AI input.')
+    },
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -731,6 +749,11 @@ arduino.forBlock['ai_confidence'] = () => ['aiVision.getConfidence()', ORDER.ATO
 arduino.forBlock['ai_camera_enable'] = (block) => {
   const state = block.getFieldValue('STATE') ?? 'ON'
   return 'aiVision.setCamera(' + (state === 'ON' ? 'true' : 'false') + ');\n'
+}
+
+arduino.forBlock['ai_microphone_enable'] = (block) => {
+  const state = block.getFieldValue('STATE') ?? 'ON'
+  return 'aiVision.setMicrophone(' + (state === 'ON' ? 'true' : 'false') + ');\n'
 }
 
 // keep indent helper referenced (used by callers that post-process)
