@@ -32,6 +32,8 @@ ALLOWED_UPLOADS = {
     ".jpg": ("image/jpeg", "image/jpg"),
     ".jpeg": ("image/jpeg", "image/jpg"),
     ".webp": ("image/webp",),
+    ".mp4": ("video/mp4",),
+    ".webm": ("video/webm",),
 }
 
 MAGIC_BYTES = {
@@ -40,6 +42,8 @@ MAGIC_BYTES = {
     ".jpg": ((b"\xff\xd8\xff", 0),),
     ".jpeg": ((b"\xff\xd8\xff", 0),),
     ".webp": ((b"RIFF", 0), (b"WEBP", 8)),
+    ".mp4": ((b"ftyp", 4),),
+    ".webm": ((b"\x1a\x45\xdf\xa3", 0),),
 }
 
 
@@ -47,7 +51,10 @@ class SecureUploadError(DjangoValidationError):
     """Validation error raised for unsafe uploads."""
 
 
-def max_upload_bytes() -> int:
+def max_upload_bytes(extension: str | None = None) -> int:
+    normalized = str(extension or "").lower()
+    if normalized in {".mp4", ".webm"}:
+        return int(getattr(settings, "SECURE_VIDEO_MAX_BYTES", 500 * 1024 * 1024))
     return int(getattr(settings, "SECURE_UPLOAD_MAX_BYTES", 20 * 1024 * 1024))
 
 
@@ -56,7 +63,7 @@ def max_multipart_bytes() -> int:
         getattr(
             settings,
             "SECURE_UPLOAD_MAX_MULTIPART_BYTES",
-            max_upload_bytes() + 5 * 1024 * 1024,
+            max(int(getattr(settings, "SECURE_UPLOAD_MAX_BYTES", 20 * 1024 * 1024)), int(getattr(settings, "SECURE_VIDEO_MAX_BYTES", 500 * 1024 * 1024))) + 5 * 1024 * 1024,
         )
     )
 
@@ -128,15 +135,17 @@ def validate_uploaded_file(uploaded: UploadedFile | None) -> UploadedFile:
     extension = Path(original_name).suffix.lower()
     if extension not in ALLOWED_UPLOADS:
         raise SecureUploadError(
-            "Only PDF, PNG, JPG/JPEG, and WEBP files are allowed."
+            "Only PDF, PNG, JPG/JPEG, WEBP, MP4, and WEBM files are allowed."
         )
 
     size = getattr(uploaded, "size", None)
     if size is None or int(size) <= 0:
         raise SecureUploadError("Uploaded file is empty.")
-    if int(size) > max_upload_bytes():
+    upload_limit = max_upload_bytes(extension)
+    if int(size) > upload_limit:
         raise SecureUploadError(
-            f"File must be {max_upload_bytes() // (1024 * 1024)} MB or smaller."
+            f"Video files must be {upload_limit // (1024 * 1024)} MB or smaller." if extension in {".mp4", ".webm"} else
+            f"File must be {upload_limit // (1024 * 1024)} MB or smaller."
         )
 
     declared_type = str(getattr(uploaded, "content_type", "") or "").split(";", 1)[0].strip().lower()
@@ -196,15 +205,17 @@ class SecureUploadSizeHandler(FileUploadHandler):
         super().__init__(request)
         self._received = 0
 
-    def new_file(self, *args, **kwargs):
+    def new_file(self, field_name, file_name, *args, **kwargs):
         self._received = 0
-        return super().new_file(*args, **kwargs)
+        self._extension = Path(str(file_name or "")).suffix.lower()
+        return super().new_file(field_name, file_name, *args, **kwargs)
 
     def receive_data_chunk(self, raw_data, start):
         self._received += len(raw_data)
-        if self._received > max_upload_bytes():
+        limit = max_upload_bytes(getattr(self, "_extension", ""))
+        if self._received > limit:
             raise ParseError(
-                f"File exceeds the {max_upload_bytes() // (1024 * 1024)} MB upload limit."
+                f"File exceeds the {limit // (1024 * 1024)} MB upload limit."
             )
         return raw_data
 
