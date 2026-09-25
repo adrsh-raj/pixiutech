@@ -1553,6 +1553,33 @@ export function AiStudioPanel({
                 </div>
               </div>
 
+              <div className="rounded-2xl border border-slate-800 bg-slate-950/35 p-4">
+                <div className="flex items-center gap-2">
+                  <BookOpen size={15} className="text-violet-300" />
+                  <p className="text-xs font-black">6M · How My AI learns</p>
+                </div>
+                <div className="mt-3 grid gap-2 md:grid-cols-4">
+                  {[
+                    ["DATASET", "Examples + labels", "You teach what each concept looks like."],
+                    ["MODEL", "Features + classifier", "A pretrained vision encoder turns images into useful features."],
+                    ["TRAIN", "Learn patterns", "Only the small classifier head is updated from your examples."],
+                    ["INFERENCE", "Predict + confidence", "A new image is compared with learned class patterns and scored."],
+                  ].map(([title, value, note]) => (
+                    <div key={title} className="rounded-xl border border-slate-800 bg-slate-950 p-3">
+                      <p className="text-[8px] font-mono tracking-[0.15em] text-violet-300">{title}</p>
+                      <p className="mt-1 text-[10px] font-black">{value}</p>
+                      <p className="mt-1 text-[9px] leading-4 text-slate-600">{note}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 flex items-start gap-2 rounded-xl border border-slate-800 bg-slate-950 p-3">
+                  <Info size={13} className="mt-0.5 shrink-0 text-slate-500" />
+                  <p className="text-[9px] leading-4 text-slate-600">
+                    Confidence is not a guarantee of truth. PIXIU treats a weak or ambiguous result as UNKNOWN instead of pretending it knows.
+                  </p>
+                </div>
+              </div>
+
               <div className="grid gap-3 sm:grid-cols-2">
                 {classes.map((name) => {
                   const classSamples = store.samples.filter((sample) => sample.label === name)
