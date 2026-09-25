@@ -615,7 +615,21 @@ export function Workbench() {
             ?? partsRef.current.find((pt) => pt.type === "keypad-4x4")
           return String(keypad?.props?.lastKey ?? "")
         },
-        isAiDetected: (cls) => aiStateRef.current.detectedClass.trim().toLowerCase() === String(cls).trim().toLowerCase(),
+        isAiDetected: (cls) => {
+          const state = aiStateRef.current
+          if (
+            !state.enabled ||
+            state.unknown ||
+            state.detectedClass === "none" ||
+            state.detectedClass === "unknown"
+          ) {
+            return false
+          }
+          return (
+            state.detectedClass.trim().toLowerCase() ===
+            String(cls).trim().toLowerCase()
+          )
+        },
         isAiUnknown: () => aiStateRef.current.unknown === true,
         getAiDetectedClass: () => aiStateRef.current.detectedClass,
         getAiConfidence: () => aiStateRef.current.confidence,
