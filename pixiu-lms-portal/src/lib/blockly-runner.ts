@@ -231,6 +231,10 @@ function getBlockDescription(block: Blockly.Block, env: ExecutionEnvironment): s
       const state = block.getFieldValue("STATE") ?? "ON"
       return `AI Camera ${state}`
     }
+    case "ai_microphone_enable": {
+      const state = block.getFieldValue("STATE") ?? "ON"
+      return `AI Microphone ${state}`
+    }
     case "controls_if":
       return "if (condition)"
     case "controls_repeat_ext": {
