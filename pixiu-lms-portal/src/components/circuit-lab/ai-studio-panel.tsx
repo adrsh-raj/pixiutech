@@ -464,15 +464,17 @@ export function AiStudioPanel({
     if (!resource) return
 
     if (resourceMode === "sound") {
-      void stopSpeechRecognizer(resource)
+      void stopSoundRecognizer(resource as SoundRecognizer)
     } else if (resourceMode === "trained") {
       if (resource !== model) disposeAiResource(resource)
     } else if (resourceMode === "objects") {
       disposeObjectDetector(resource)
     } else if (resourceMode === "pose") {
       disposeMoveNet(resource)
-    } else {
-      disposeAiResource(resource)
+    } else if (resourceMode === "hands" || resourceMode === "numbers") {
+      disposeHandDetector(resource)
+    } else if (resourceMode === "emotion") {
+      disposeFaceDetector(resource)
     }
   }
 
@@ -578,15 +580,17 @@ export function AiStudioPanel({
       resourceModeRef.current = null
 
       if (resourceMode === "sound") {
-        void stopSpeechRecognizer(resource)
+        void stopSoundRecognizer(resource as SoundRecognizer)
       } else if (resourceMode === "trained") {
         disposeActiveAiModel()
       } else if (resourceMode === "objects") {
         disposeObjectDetector(resource)
       } else if (resourceMode === "pose") {
         disposeMoveNet(resource)
-      } else {
-        disposeAiResource(resource)
+      } else if (resourceMode === "hands" || resourceMode === "numbers") {
+        disposeHandDetector(resource)
+      } else if (resourceMode === "emotion") {
+        disposeFaceDetector(resource)
       }
     }
   }, [])
@@ -614,7 +618,7 @@ export function AiStudioPanel({
       } else if (mode === "hands" || mode === "numbers") {
         resource = await loadHandDetector()
       } else if (mode === "emotion") {
-        resource = await loadFaceEmotion()
+        resource = await loadFaceDetector()
       } else if (mode === "trained") {
         if (!store.model) throw new Error("Train My AI first, then start the live test.")
         resource = model ?? await loadStoredAiModel(store.model)
