@@ -1058,8 +1058,18 @@ export function AiStudioPanel({
         </div>
 
         <div className="relative aspect-video bg-black">
-          <video ref={floatingVideoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
-          <canvas ref={floatingOverlayRef} className="pointer-events-none absolute inset-0 h-full w-full" />
+          {mode === "sound" ? (
+            <div className="flex h-full flex-col items-center justify-center gap-2 p-5 text-center">
+              <Mic size={28} className={soundActive ? "text-violet-300 animate-pulse" : "text-slate-500"} />
+              <p className="text-[10px] font-black">{aiState.detectedClass === "none" ? "Listening…" : aiState.detectedClass}</p>
+              <p className="text-[8px] text-slate-600">{aiState.detail}</p>
+            </div>
+          ) : (
+            <>
+              <video ref={floatingVideoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
+              <canvas ref={floatingOverlayRef} className="pointer-events-none absolute inset-0 h-full w-full" />
+            </>
+          )}
           <div className="absolute bottom-2 left-2 max-w-[calc(100%-16px)] truncate rounded-md bg-slate-950/85 px-2 py-1 text-[9px] font-mono">
             {aiState.detectedClass === "none" ? status : aiState.detectedClass + " · " + aiState.confidence + "%"}
           </div>
@@ -1119,9 +1129,19 @@ export function AiStudioPanel({
               <div className="grid gap-4 lg:grid-cols-[1.4fr_0.8fr]">
                 <div className="overflow-hidden rounded-3xl border border-slate-800 bg-black">
                   <div className="relative aspect-video">
-                    <video ref={studioVideoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
-                    <canvas ref={overlayRef} className="pointer-events-none absolute inset-0 h-full w-full" />
-                    {!inputActive && (
+                    {isSound ? (
+                      <div className="flex h-full flex-col items-center justify-center bg-slate-950/90 p-6 text-center">
+                        <Mic size={42} className={soundActive ? "text-violet-300 animate-pulse" : "text-slate-600"} />
+                        <p className="mt-3 text-sm font-black">{aiState.detectedClass === "none" ? "Ready for a voice command" : aiState.detectedClass}</p>
+                        <p className="mt-1 max-w-sm text-[10px] leading-5 text-slate-600">{aiState.detail}</p>
+                      </div>
+                    ) : (
+                      <>
+                        <video ref={studioVideoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
+                        <canvas ref={overlayRef} className="pointer-events-none absolute inset-0 h-full w-full" />
+                      </>
+                    )}
+                    {!inputActive && !isSound && (
                       <div className="absolute inset-0 grid place-items-center bg-slate-950/95 p-6 text-center">
                         {isSound ? <Mic size={32} className="mx-auto text-violet-300" /> : <Camera size={32} className="mx-auto text-violet-300" />}
                         <p className="mt-3 text-sm font-black">{isSound ? "Microphone off" : "Camera off"}</p>
