@@ -46,7 +46,7 @@ export async function detectObjects(
         Number(prediction.bbox[1]),
         Number(prediction.bbox[2]),
         Number(prediction.bbox[3]),
-      ],
+      ] as [number, number, number, number],
     }))
 }
 
