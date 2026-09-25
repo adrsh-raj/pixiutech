@@ -1155,7 +1155,7 @@ export function AiStudioPanel({
 
                 <aside className="space-y-3">
                   <div className="rounded-2xl border border-slate-800 bg-slate-950/45 p-4">
-                    <p className="text-xs font-black">6A · Ready AI</p>
+                    <p className="text-xs font-black">6B–6G · Ready AI</p>
                     <p className="mt-2 text-[10px] leading-5 text-slate-500">
                       Objects, Pose, Fingers, Emotion and Numbers use the Vision camera. Sound uses a separate microphone lifecycle. Only the selected AI model loads.
                     </p>
