@@ -159,7 +159,7 @@ function drawBoxes(
   })
 }
 
-function drawPose(canvas: HTMLCanvasElement, video: HTMLVideoElement, poses: any[]) {
+function drawPose(canvas: HTMLCanvasElement, video: HTMLVideoElement, poseResult: { keypoints?: any[] } | null) {
   const width = video.videoWidth || 640
   const height = video.videoHeight || 480
   if (canvas.width !== width || canvas.height !== height) {
@@ -176,7 +176,7 @@ function drawPose(canvas: HTMLCanvasElement, video: HTMLVideoElement, poses: any
     [6, 12], [11, 12], [11, 13], [13, 15], [12, 14], [14, 16],
   ]
 
-  const pose = poses[0]
+  const pose = poseResult
   if (!pose) return
   ctx.lineWidth = 3
   ctx.strokeStyle = "#22c55e"
@@ -688,11 +688,10 @@ export function AiStudioPanel({
 
       try {
         if (mode === "objects") {
-          const predictions = await resourceRef.current.detect(
-            video,
-            OBJECT_MAX_BOXES,
-            OBJECT_MIN_SCORE,
-          )
+          const predictions = await detectObjects(resourceRef.current, video, {
+            maxNumBoxes: OBJECT_MAX_BOXES,
+            minScore: OBJECT_MIN_SCORE,
+          })
           if (activeSession !== sessionRef.current) return
           // Keep every detection returned by COCO-SSD at/above our live-demo
           // threshold. Do not whitelist classes such as person/car/phone.
@@ -722,12 +721,13 @@ export function AiStudioPanel({
             detail: primary ? `${visible.length} object${visible.length === 1 ? "" : "s"} detected` : "Looking...",
           })
         } else if (mode === "pose") {
-          const poses = await resourceRef.current.estimatePoses(video)
+          const pose = await estimateMoveNetPose(resourceRef.current, video)
           if (activeSession !== sessionRef.current) return
-          drawPose(getActiveOverlay()!, video, poses)
-          const pose = poses?.[0]
-          const visible = pose?.keypoints?.filter((p: any) => (p.score ?? 0) >= 0.25).length ?? 0
-          const score = pose && visible ? pose.keypoints.reduce((s: number, p: any) => s + Number(p.score ?? 0), 0) / pose.keypoints.length : 0
+          drawPose(getActiveOverlay()!, video, pose)
+          const visiblePoints = pose?.keypoints?.filter((point: any) => (point.score ?? 0) >= 0.25) ?? []
+          const score = visiblePoints.length
+            ? visiblePoints.reduce((sum: number, point: any) => sum + Number(point.score ?? 0), 0) / visiblePoints.length
+            : 0
           onAiStateChange({
             enabled: true,
             mode: "pose",
@@ -735,7 +735,7 @@ export function AiStudioPanel({
             confidence: Math.round(score * 100),
             allDetections: [],
             modelSource: "ready",
-            detail: pose ? `${visible}/17 keypoints tracked` : "No person detected",
+            detail: pose ? `${visiblePoints.length}/17 keypoints tracked` : "No person detected",
           })
         } else if (mode === "hands" || mode === "numbers") {
           const result = await resourceRef.current.estimate(video)
