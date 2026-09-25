@@ -141,3 +141,68 @@ services:
         value: "1"
       - key: CLAMAV_CHUNK_SIZE
         value: "1048576"
+
+  - type: worker
+    name: pixiu-learning-video-worker
+    runtime: python
+    rootDir: pixiu-backend
+    plan: 1c-2g
+    buildCommand: pip install -r requirements.txt
+    startCommand: python manage.py process_learning_videos --poll 5
+    autoDeploy: true
+    maxShutdownDelaySeconds: 300
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.0
+      - key: DJANGO_SECRET_KEY
+        sync: false
+      - key: DJANGO_DEBUG
+        value: "False"
+      - key: DATABASE_URL
+        sync: false
+      - key: DJANGO_DB_SSLMODE
+        value: require
+      - key: DJANGO_DB_CONN_MAX_AGE
+        value: "60"
+      - key: DJANGO_EXPECTED_DATABASE_NAME
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: "pixiu-learning"
+      - key: SUPABASE_STORAGE_ENDPOINT
+        value: "https://fainrogbfuxyvfpujmze.storage.supabase.co/storage/v1/s3"
+      - key: SUPABASE_STORAGE_REGION
+        value: "ap-south-1"
+      - key: SUPABASE_STORAGE_ACCESS_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_SECRET_KEY
+        sync: false
+      - key: SUPABASE_VIDEO_TEMP_BUCKET
+        value: "pixiu-video-temp"
+      - key: AWS_S3_ADDRESSING_STYLE
+        value: "path"
+      - key: SECURE_VIDEO_MAX_MB
+        value: "500"
+      - key: CLAMAV_ENABLED
+        value: "True"
+      - key: CLAMAV_REQUIRED
+        value: "True"
+      - key: CLAMAV_HOSTPORT
+        fromService:
+          type: pserv
+          name: pixiu-clamav
+          property: hostport
+      - key: CLAMAV_HOST
+        fromService:
+          type: pserv
+          name: pixiu-clamav
+          property: host
+      - key: CLAMAV_PORT
+        value: "3310"
+      - key: CLAMAV_TIMEOUT_SECONDS
+        value: "60"
+      - key: CLAMAV_RETRY_ATTEMPTS
+        value: "3"
+      - key: CLAMAV_RETRY_BACKOFF_SECONDS
+        value: "1"
+      - key: CLAMAV_CHUNK_SIZE
+        value: "1048576"
