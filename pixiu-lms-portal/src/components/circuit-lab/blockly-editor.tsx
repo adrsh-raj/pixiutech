@@ -123,6 +123,7 @@ const TOOLBOX = {
         { kind: 'block', type: 'ai_get_detected_class' },
         { kind: 'block', type: 'ai_confidence' },
         { kind: 'block', type: 'ai_camera_enable' },
+        { kind: 'block', type: 'ai_microphone_enable' },
       ],
     },
   ],
