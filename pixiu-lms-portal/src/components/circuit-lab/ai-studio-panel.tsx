@@ -637,11 +637,11 @@ export function AiStudioPanel({
       resourceModeRef.current = mode
       setLoading(false)
       setStatus(
-        mode === "objects" ? "6A Objects ready"
-          : mode === "pose" ? "6A Pose ready"
-          : mode === "hands" ? "6A Fingers ready"
-          : mode === "numbers" ? "6A Numbers ready"
-          : mode === "emotion" ? "6A Emotion ready"
+        mode === "objects" ? "6B Objects ready"
+          : mode === "pose" ? "6C Pose ready"
+          : mode === "hands" ? "6D Fingers ready"
+          : mode === "numbers" ? "6G Numbers ready"
+          : mode === "emotion" ? "6E Emotion ready"
           : "6B My AI ready",
       )
 
