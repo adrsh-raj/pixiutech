@@ -58,7 +58,7 @@ export function WelcomeOverlay({ onOpenProjects }: { onOpenProjects: () => void 
     }
   }
 
-  if (!show) return null
+  if (!show && !tourOpen) return null
 
   const current = TOUR[tourIndex]
   const Icon = current.icon
@@ -88,7 +88,7 @@ export function WelcomeOverlay({ onOpenProjects }: { onOpenProjects: () => void 
             <div className="mt-6 grid gap-2 sm:grid-cols-2">
               <button
                 onClick={() => {
-                  dismiss()
+                  setShow(true)
                   setTourIndex(0)
                   setTourOpen(true)
                 }}
