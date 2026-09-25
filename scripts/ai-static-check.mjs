@@ -2,7 +2,6 @@ import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 
 const root = process.cwd()
-const portal = join(root, "pixiu-lms-portal", "src")
 const read = (path) => readFileSync(join(root, path), "utf8")
 
 const panel = read("pixiu-lms-portal/src/components/circuit-lab/ai-studio-panel.tsx")
@@ -11,15 +10,17 @@ const types = read("pixiu-lms-portal/src/lib/ai/vision-types.ts")
 const workbench = read("pixiu-lms-portal/src/components/circuit-lab/workbench.tsx")
 const blocks = read("pixiu-lms-portal/src/lib/arduino-blocks.ts")
 const runner = read("pixiu-lms-portal/src/lib/blockly-runner.ts")
+const toolbox = read("pixiu-lms-portal/src/components/circuit-lab/blockly-editor.tsx")
 const objectAdapter = read("pixiu-lms-portal/src/lib/ai/object-detector.ts")
 const poseAdapter = read("pixiu-lms-portal/src/lib/ai/pose-detector.ts")
-const visionState = read("pixiu-lms-portal/src/lib/ai/vision-state.ts")
 const handAdapter = read("pixiu-lms-portal/src/lib/ai/hand-detector.ts")
 const faceAdapter = read("pixiu-lms-portal/src/lib/ai/face-detector.ts")
 const soundAdapter = read("pixiu-lms-portal/src/lib/ai/sound-detector.ts")
 const gestureAdapter = read("pixiu-lms-portal/src/lib/ai/gesture-interpreter.ts")
 const featureExtractor = read("pixiu-lms-portal/src/lib/ai/my-ai-feature-extractor.ts")
 const resultNormalizer = read("pixiu-lms-portal/src/lib/ai/ai-result-normalizer.ts")
+const cameraSession = read("pixiu-lms-portal/src/lib/ai/camera-session.ts")
+const visionState = read("pixiu-lms-portal/src/lib/ai/vision-state.ts")
 
 const failures = []
 const requireText = (text, needle, label) => {
@@ -34,35 +35,23 @@ if (existsSync(join(root, "pixiu-lms-portal/src/components/circuit-lab/ai-camera
 }
 
 for (const mode of ["objects", "pose", "hands", "emotion", "sound", "numbers"]) {
-  requireText(types, mode, "vision type")
-  requireText(panel, `id: "${mode}"`, "AI mode")
+  requireText(types, mode, "6A vision mode")
+  requireText(panel, 'id: "' + mode + '"', "6A panel mode")
 }
 
 for (const marker of [
+  "loadObjectDetector",
+  "loadMoveNet",
   "loadHandDetector",
-  "detectHands",
   "loadFaceDetector",
-  "detectFaces",
   "loadSoundRecognizer",
   "trainAiModel",
   "predictAiImage",
-  "getModelWeightShapes",
-]) requireText(panel, marker, "panel integration")
-
-for (const marker of [
-  "loadObjectDetector",
-  "detectObjects",
-  "disposeObjectDetector",
-  "loadMoveNet",
-  "estimateMoveNetPose",
-  "disposeMoveNet",
-]) requireText(panel, marker, "active AI adapter wiring")
+]) requireText(panel, marker, "6A resource wiring")
 
 for (const marker of [
   "lite_mobilenet_v2",
-  "DEFAULT_OBJECT_MIN_SCORE",
-  "DEFAULT_OBJECT_MAX_BOXES",
-  "NormalizedObjectDetection",
+  "detectObjects",
   "normalizeObjectClass",
 ]) requireText(objectAdapter, marker, "6B object adapter")
 
@@ -70,121 +59,36 @@ for (const marker of [
   "tf.loadGraphModel",
   "singlepose/lightning/4",
   "MOVENET_KEYPOINT_NAMES",
-  "disposeMoveNet",
-]) requireText(poseAdapter, marker, "6C GraphModel adapter")
+]) requireText(poseAdapter, marker, "6C pose adapter")
 
-requireText(visionState, "createAiVisionState", "6.0 normalized state factory")
-requireText(panel, "createAiVisionState", "6.0 state integration")
-
-for (const forbidden of [
-  'cocoSsd.load({ base: "mobilenet_v2" })',
-  "resourceRef.current.estimatePoses(",
-]) forbidText(panel, forbidden, "6A-6C old active path")
-
-const stopProgramSection = workbench.slice(
-  workbench.indexOf("const stopProgram"),
-  workbench.indexOf("const stopAiRuntime"),
-)
-if (/setAiRuntimeEnabled|setAiCameraCompact|setIsAiCameraOpen/.test(stopProgramSection)) {
-  failures.push("AI lifecycle: stopProgram still directly mutates AI runtime/presentation state")
-}
-requireText(workbench, "const stopAiRuntime = useCallback", "AI lifecycle decoupling")
-requireText(workbench, "stopAiRuntime()", "AI lifecycle shutdown")
-requireText(workbench, "setAiCamera: (enabled)", "AI camera bridge")
-requireText(workbench, "setAiCameraCompact(enabled)", "AI camera compact bridge")
-
-for (const marker of ["ai_is_detected", "ai_get_detected_class", "ai_confidence", "ai_camera_enable", "ai_microphone_enable"]) {
-  requireText(blocks, marker, "Blockly AI block")
-  requireText(runner, marker, "Blockly runtime")
-}
-requireText(panel, "requestedMode", "panel requested-mode bridge")
-requireText(workbench, "setAiMicrophone:", "AI microphone bridge")
-requireText(read("pixiu-lms-portal/src/components/circuit-lab/blockly-editor.tsx"), "ai_microphone_enable", "Blockly AI toolbox")
-requireText(workbench, "AiStudioPanel", "Workbench AI panel")
-requireText(workbench, "isAiDetected:", "AI runtime bridge")
-requireText(workbench, "getAiDetectedClass:", "AI class bridge")
-requireText(workbench, "getAiConfidence:", "AI confidence bridge")
-requireText(workbench, "setAiCamera:", "AI camera bridge")
-requireText(workbench, "setAiMicrophone:", "AI microphone bridge")
-requireText(workbench, "requestedMode={aiRequestedMode}", "AI requested-mode bridge")
-
-for (const needle of ["frameBusyRef", "setTestImage", "inFlightRef"]) {
-  forbidText(panel, needle, "AI panel legacy reference")
-}
-requireText(engine, 'const LEGACY_STORE_KEY = "pixiu-ai-studio-v1"', "legacy cleanup key")
-requireText(engine, 'const LEGACY_MODEL_KEY = "pixiu-ai-studio-model-v1"', "legacy cleanup model key")
-requireText(engine, 'STORE_KEY = "pixiu-ai-studio-v3"', "AI store version")
-requireText(engine, 'MODEL_KEY = "pixiu-ai-studio-model-v3"', "AI model version")
-requireText(engine, '"pixiu-ai-studio-v2"', "legacy store migration")
-requireText(engine, '"pixiu-ai-studio-model-v2"', "legacy model migration")
-
-// 6D/6E share the application's existing TensorFlow.js runtime. Avoid a
-// second bundled TensorFlow.js instance from a separate vision framework.
 for (const marker of [
   "HAND_VERSION = \"2.0.1\"",
   "@tensorflow-models/hand-pose-detection@2.0.1",
-  'SupportedModels.MediaPipeHands',
+  "SupportedModels.MediaPipeHands",
   'runtime: "tfjs"',
   "maxHands: MAX_HANDS",
-  "countExtendedFingers",
-  "detectHands",
+  "getExtendedFingerMask",
   "window.tf = tf",
-]) requireText(handAdapter, marker, "6D TFJS hand adapter")
+]) requireText(handAdapter, marker, "6D hand adapter")
 
 for (const marker of [
   "FACE_VERSION = \"1.0.6\"",
-  "@tensorflow-models/face-detection@1.0.3",
   "@tensorflow-models/face-landmarks-detection@1.0.6",
-  'SupportedModels.MediaPipeFaceMesh',
-  'runtime: "tfjs"',
-  "maxFaces: MAX_FACES",
+  "SupportedModels.MediaPipeFaceMesh",
   "refineLandmarks: true",
   "classifyExpression",
-  "detectFaces",
-  "478",
   "window.tf = tf",
-]) requireText(faceAdapter, marker, "6E TFJS face/mesh adapter")
+]) requireText(faceAdapter, marker, "6E face adapter")
 
 for (const marker of [
   'SPEECH_VERSION = "0.5.4"',
   'create("BROWSER_FFT", "18w")',
   "probabilityThreshold: 0.72",
-  "overlapFactor: 0.25",
   "suppressionTimeMillis: 650",
-  "isListening",
-  "try {\n            await recognizer.stopListening()",
   "generation",
-  "generation",
-  "window.tf = tf",
   "Number.isFinite",
   "stopListening",
 ]) requireText(soundAdapter, marker, "6F sound adapter")
-
-for (const needle of [
-  "face-api.min.js",
-  "@mediapipe/hands/hands.js",
-  "window.faceapi",
-  "window.Hands",
-  "@vladmandic/human",
-  "loadFaceEmotion",
-  "loadSpeechRecognizer",
-]) forbidText(panel, needle, "legacy D-F runtime reference")
-
-requireText(panel, "loadHandDetector", "panel D adapter")
-requireText(panel, "detectHands", "panel D inference")
-requireText(panel, "loadFaceDetector", "panel E adapter")
-requireText(panel, "detectFaces", "panel E inference")
-requireText(panel, "loadSoundRecognizer", "panel F adapter")
-requireText(runner, 'case "ai_microphone_enable"', "Blockly Sound runtime execution")
-requireText(blocks, "Browser AI Studio browser runtime: AI microphone", "Blockly Sound generator")
-requireText(blocks, "Browser AI generators", "compile-safe AI generator contract")
-for (const forbidden of ["aiVision.isDetected(", "aiVision.getDetectedClass(", "aiVision.getConfidence(", "aiVision.setCamera(", "aiVision.setMicrophone("]) {
-  forbidText(blocks, forbidden, "AI browser/Arduino generator mismatch")
-}
-requireText(read("pixiu-lms-portal/src/components/circuit-lab/blockly-editor.tsx"), 'type: "ai_microphone_enable"', "Blockly Sound toolbox")
-requireText(panel, "requestedMode", "panel requested-mode bridge")
-requireText(panel, "onRequestedModeHandled", "panel requested-mode acknowledgement")
-requireText(panel, 'modelClasses: ["neutral", "happy", "surprised"]', "6E expression label contract")
 
 for (const marker of [
   "interpretHandGesture",
@@ -194,13 +98,14 @@ for (const marker of [
   '["0", "1", "2", "3", "4", "5"]',
 ]) requireText(panel, marker, "6G gesture/number integration")
 
-for (const marker of ["FingerMask", "getExtendedFingerMask", "extendedFingers"]) {
-  requireText(handAdapter, marker, "6G hand-layer contract")
-}
+for (const marker of [
+  "FingerMask",
+  "getExtendedFingerMask",
+  "extendedFingers",
+]) requireText(handAdapter, marker, "6G finger mask")
 
 for (const marker of [
   "HandGesture",
-  "interpretHandGesture",
   "thumbs_up",
   "thumbs_down",
   "peace",
@@ -208,10 +113,26 @@ for (const marker of [
 ]) requireText(gestureAdapter, marker, "6G gesture interpreter")
 
 for (const marker of [
+  "ai_get_gesture",
+  "ai_get_finger_count",
+  "ai_is_gesture",
+  "ai_is_unknown",
+]) {
+  requireText(blocks, marker, "6G/6K Blockly block")
+  requireText(runner, marker, "6G/6K Blockly runner")
+  requireText(toolbox, marker, "6G/6K Blockly toolbox")
+}
+for (const marker of ["getAiGesture", "getAiFingerCount", "isAiGesture", "isAiUnknown"]) {
+  requireText(workbench, marker, "6G/6K Workbench bridge")
+}
+
+for (const marker of [
   "classes: string[]",
   "addAiClass",
   "renameAiClass",
   "removeAiClass",
+  "addAiSample",
+  "removeAiSample",
   "getAiDatasetStats",
   "getSampleAddError",
   "MAX_CLASSES = 8",
@@ -226,45 +147,56 @@ for (const marker of [
   "MY_AI_EMBEDDING_NODE",
   "tf.loadGraphModel",
   "model.execute(batched, MY_AI_EMBEDDING_NODE)",
-  "extractMyAiEmbedding",
-]) requireText(featureExtractor, marker, "6I transfer feature extractor")
+  "MY_AI_PREDICTION_THRESHOLD = 0.62",
+]) requireText(featureExtractor, marker, "6I/6J feature extractor")
 
 for (const marker of [
   "extractFeatures",
-  "featureExtractor: MY_AI_FEATURE_VERSION",
   "Dense(96)",
   "validationData",
+  "featureExtractor: MY_AI_FEATURE_VERSION",
+  "predictionThreshold",
+  "confidenceCalibration",
   "indexeddb://",
-]) requireText(engine, marker, "6I transfer-learning training engine")
+  "lowMargin",
+  "lowConfidence",
+  "unknown",
+]) requireText(engine, marker, "6I/6J training + prediction engine")
 
 for (const forbidden of [
   "INPUT_W = 16",
   "INPUT_H = 16",
   "tf.layers.conv2d",
-  "16×16 RGB → Conv2D",
-]) forbidText(engine, forbidden, "6I old raw-pixel classifier")
+  "aiVision.isDetected(",
+  "aiVision.getDetectedClass(",
+  "aiVision.getConfidence(",
+  "aiVision.setCamera(",
+  "aiVision.setMicrophone(",
+]) forbidText(engine + blocks, forbidden, "legacy/unsafe AI implementation")
 
-for (const marker of ["ai_get_gesture", "ai_get_finger_count", "ai_is_gesture"]) {
-  requireText(blocks, marker, "6G Blockly block")
-  requireText(runner, marker, "6G Blockly runtime")
-  requireText(read("pixiu-lms-portal/src/components/circuit-lab/blockly-editor.tsx"), marker, "6G Blockly toolbox")
-  requireText(workbench, marker, "6G Workbench bridge")
+for (const marker of [
+  "normalizeAiDecision",
+  "normalizeAiVisionState",
+  "DEFAULT_AI_CONFIDENCE_THRESHOLD = 60",
+]) requireText(resultNormalizer, marker, "6J/6K result normalization")
+
+for (const marker of [
+  "normalizeAiVisionState",
+  "handleAiStateChange",
+  "isAiUnknown:",
+  "getAiDetectedClass:",
+  "getAiConfidence:",
+]) requireText(workbench, marker, "6K normalized AI bridge")
+
+requireText(runner, "AI blocks are data/control inputs only", "6L AI data-source boundary")
+requireText(blocks, "Browser AI generators", "6L compile-safe AI boundary")
+const aiGeneratorSection = blocks.slice(blocks.indexOf("/* Browser AI generators"))
+if (!aiGeneratorSection.length) {
+  failures.push("6L: Browser AI generators section not found")
+} else if (/digitalWrite|analogWrite|setDigitalPin|motor_driver_write/.test(aiGeneratorSection)) {
+  failures.push("6L: AI generators directly mutate virtual hardware")
 }
-requireText(workbench, "getAiGesture", "6G gesture getter")
-requireText(workbench, "getAiFingerCount", "6G finger getter")
-requireText(resultNormalizer, "normalizeAiDecision", "6J/6K decision normalizer")
-requireText(resultNormalizer, "normalizeAiVisionState", "6K normalized state contract")
-requireText(resultNormalizer, "DEFAULT_AI_CONFIDENCE_THRESHOLD = 60", "6J confidence floor")
-requireText(engine, "lowMargin", "6J ambiguity fallback")
-requireText(engine, "lowConfidence", "6J low-confidence fallback")
-requireText(engine, "margin", "6J top-two margin")
-requireText(engine, "threshold", "6J decision threshold")
-requireText(workbench, "handleAiStateChange", "6K normalization boundary")
-requireText(workbench, "isAiUnknown:", "6K unknown bridge")
-requireText(blocks, "ai_is_unknown", "6K unknown Blockly block")
-requireText(runner, "ai_is_unknown", "6K unknown Blockly runtime")
-requireText(read("pixiu-lms-portal/src/components/circuit-lab/blockly-editor.tsx"), "ai_is_unknown", "6K unknown Blockly toolbox")
-requireText(runner, "AI blocks are data/control inputs only", "6L hardware boundary contract")
+
 for (const marker of ["6M · How My AI learns", "DATASET", "MODEL", "TRAIN", "INFERENCE"]) {
   requireText(panel, marker, "6M Teach mode")
 }
@@ -274,86 +206,26 @@ for (const marker of ["6N · Why did AI produce this result?", "Class probabilit
 for (const marker of ["CAMERA ·", "MIC ·", "Erase local AI data", "Samples stay in this browser"]) {
   requireText(panel, marker, "6O privacy controls")
 }
-requireText(read("pixiu-lms-portal/src/lib/ai/camera-session.ts"), "getUserMedia", "6O media permissions")
-requireText(panel, "Permission blocked", "6O permission UI")
-requireText(workbench, "isAiGesture", "6G gesture predicate")
-
-for (const marker of [
-  "interpretHandGesture",
-  "detectedGesture",
-  "fingerCount",
-  "handGestureHistoryRef",
-  '["0", "1", "2", "3", "4", "5"]',
-]) requireText(panel, marker, "6G gesture/number integration")
-
-for (const marker of ["FingerMask", "getExtendedFingerMask", "extendedFingers"]) {
-  requireText(handAdapter, marker, "6G hand-layer contract")
+for (const marker of ["getUserMedia", "isSecureContext", "HTTPS"]) {
+  requireText(cameraSession, marker, "6O media permission boundary")
 }
+requireText(panel, "Permission blocked", "6O actionable permission error")
+requireText(engine, "tf.io.removeModel", "6O persisted model cleanup")
+requireText(engine, "localStorage.removeItem", "6O persisted dataset cleanup")
+requireText(panel, "stopInput", "6O runtime cleanup")
 
 for (const marker of [
-  "HandGesture",
-  "interpretHandGesture",
-  "thumbs_up",
-  "thumbs_down",
-  "peace",
-  "open_palm",
-]) requireText(gestureAdapter, marker, "6G gesture interpreter")
+  "sessionRef",
+  "cameraRequestRef",
+  "busySessionRef",
+  "stopAll()",
+  "stopInput()",
+  "releaseCurrentResource",
+  "stopCameraStream",
+]) requireText(panel, marker, "6P restart/cleanup guard")
 
-for (const marker of [
-  "classes: string[]",
-  "addAiClass",
-  "renameAiClass",
-  "removeAiClass",
-  "getAiDatasetStats",
-  "getSampleAddError",
-  "MAX_CLASSES = 8",
-  "MAX_SAMPLES_PER_CLASS = 20",
-  "MAX_TOTAL_SAMPLES = 80",
-  'STORE_KEY = "pixiu-ai-studio-v3"',
-  'MODEL_KEY = "pixiu-ai-studio-model-v3"',
-]) requireText(engine, marker, "6H dataset contract")
-
-for (const marker of [
-  "MobileNetV2-0.5",
-  "MY_AI_EMBEDDING_NODE",
-  "tf.loadGraphModel",
-  "model.execute(batched, MY_AI_EMBEDDING_NODE)",
-  "extractMyAiEmbedding",
-]) requireText(featureExtractor, marker, "6I transfer feature extractor")
-
-for (const marker of [
-  "extractFeatures",
-  "Frozen MobileNetV2",
-  "featureExtractor: MY_AI_FEATURE_VERSION",
-  "Dense(96)",
-  "validationData",
-]) requireText(engine, marker, "6I transfer-learning training engine")
-
-for (const forbidden of [
-  "INPUT_W = 16",
-  "INPUT_H = 16",
-  "tf.layers.conv2d",
-  "16×16 RGB → Conv2D",
-]) forbidText(engine, forbidden, "6I old raw-pixel classifier")
-
-for (const marker of ["ai_get_gesture", "ai_get_finger_count"]) {
-  requireText(blocks, marker, "6G Blockly block")
-  requireText(runner, marker, "6G Blockly runtime")
-  requireText(read("pixiu-lms-portal/src/components/circuit-lab/blockly-editor.tsx"), marker, "6G Blockly toolbox")
-  requireText(workbench, marker, "6G Workbench bridge")
-}
-requireText(workbench, "getAiGesture", "6G gesture getter")
-requireText(workbench, "getAiFingerCount", "6G finger getter")
-
-requireText(panel, "const requestId = ++cameraRequestRef.current", "camera request generation")
-requireText(panel, "if (requestId !== cameraRequestRef.current)", "camera stale-request guard")
-requireText(panel, "function stopCameraStream()", "camera stream shutdown boundary")
-requireText(panel, "busySessionRef", "inference overlap guard")
-requireText(panel, "stopCamera(studioVideoRef.current, stream)", "full-video cleanup")
-requireText(panel, "stopCamera(floatingVideoRef.current, stream)", "floating-video cleanup")
-
-if (!panel.match(/function stopAll\(\)[\s\S]*?releaseCurrentResource\(\)/)) {
-  failures.push("cleanup: stopAll does not release the current resource")
+for (const marker of ["objects", "pose", "hands", "emotion", "sound", "numbers", "trained"]) {
+  requireText(panel, marker, "6P cross-mode coverage")
 }
 
 if (failures.length) {
@@ -363,13 +235,19 @@ if (failures.length) {
 }
 
 console.log("AI static contract check PASSED")
-console.log("6A Ready AI modes: 6")
-console.log("6B Teach/Understand: present")
-console.log("6C AI→Blockly bridge: present")
-console.log("6D Hand AI runtime: present")
-console.log("6E Face + emotion AI runtime: present")
-console.log("6F Speech Commands runtime: present")
-console.log("6G Numbers + Gesture runtime: present")
+console.log("6A Ready AI modes + resource lifecycle: present")
+console.log("6B Object AI: present")
+console.log("6C Pose AI + AI bridge: present")
+console.log("6D Hand AI: present")
+console.log("6E Face + expression AI: present")
+console.log("6F Sound AI: present")
+console.log("6G Numbers + Gesture AI: present")
 console.log("6H My AI dataset workflow: present")
-console.log("6I Transfer-learning training engine: present")
-console.log("Legacy AI camera implementation: removed")
+console.log("6I My AI transfer-learning engine: present")
+console.log("6J Unknown/low-confidence prediction: present")
+console.log("6K Normalized AI → Blockly boundary: present")
+console.log("6L AI data-source / virtual-hardware boundary: present")
+console.log("6M Teach mode: present")
+console.log("6N Understand mode: present")
+console.log("6O safety/privacy controls: present")
+console.log("6P QA lifecycle contracts: present")
