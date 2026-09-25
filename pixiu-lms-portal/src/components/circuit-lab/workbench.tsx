@@ -181,7 +181,9 @@ export function Workbench() {
   const aiStateRef = useRef(aiState)
   const handleAiStateChange = useCallback(
     (nextState: AiVisionState) => {
-      setAiState(normalizeAiVisionState(nextState))
+      const normalized = normalizeAiVisionState(nextState)
+      aiStateRef.current = normalized
+      setAiState(normalized)
     },
     [],
   )
