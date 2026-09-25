@@ -80,6 +80,7 @@ import {
 } from "@/lib/ai/pose-detector"
 import type { AiVisionMode, ReadyAiMode, AiVisionState } from "@/lib/ai/vision-types"
 import { createAiVisionState } from "@/lib/ai/vision-state"
+import "./pixiu-brand.css"
 
 export type { AiVisionState, ReadyAiMode }
 
@@ -1319,20 +1320,20 @@ export function AiStudioPanel({
 
     return (
       <div
-        className="fixed z-[70] w-[min(300px,calc(100vw-20px))] overflow-hidden rounded-2xl border border-emerald-400/25 bg-slate-950/96 text-white shadow-2xl ring-1 ring-black/50 select-none"
+        className="pixiu-ai-floating fixed z-[70] w-[min(300px,calc(100vw-20px))] overflow-hidden rounded-2xl border bg-slate-950/96 text-white shadow-2xl ring-1 ring-black/50 select-none"
         style={floatingStyle}
         onPointerMove={handleFloatingPointerMove}
         onPointerUp={handleFloatingPointerUp}
         onPointerCancel={handleFloatingPointerUp}
       >
         <div
-          className="flex cursor-move touch-none items-center justify-between border-b border-slate-800 bg-slate-950/95 px-3 py-2"
+          className="pixiu-ai-floating-header flex cursor-move touch-none items-center justify-between border-b bg-slate-950/95 px-3 py-2"
           onPointerDown={handleFloatingPointerDown}
         >
           <div className="flex min-w-0 items-center gap-2">
             <GripVertical size={12} className="shrink-0 text-slate-500" />
             <div className="min-w-0">
-              <p className="text-[8px] font-mono uppercase tracking-[0.18em] text-emerald-300">PIXIU AI RUNTIME</p>
+              <p className="text-[8px] font-mono uppercase tracking-[0.18em] text-cyan-200">PIXIU VISION CORE</p>
               <p className="truncate text-[10px] font-black">{activeTitle} · {mode === "sound" ? "MIC" : "CAMERA"}</p>
             </div>
           </div>
@@ -1346,7 +1347,7 @@ export function AiStudioPanel({
             >
               RESET
             </button>
-            <span className="rounded-full border border-emerald-400/20 px-2 py-1 text-[8px] font-mono text-emerald-300">LIVE</span>
+            <span className="pixiu-ai-live-chip rounded-full border px-2 py-1 text-[8px] font-mono">LIVE FEED</span>
           </div>
         </div>
 
@@ -1373,16 +1374,16 @@ export function AiStudioPanel({
 
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/80 p-3 backdrop-blur-sm sm:p-5">
-      <div className="flex h-[min(92vh,900px)] w-full max-w-6xl flex-col overflow-hidden rounded-3xl border border-violet-400/20 bg-[#07111f] text-white shadow-2xl shadow-black/60">
-        <header className="flex shrink-0 items-center justify-between border-b border-slate-800 bg-slate-950/70 px-4 py-3 sm:px-6">
+    <div className="pixiu-ai-shell fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/80 p-3 backdrop-blur-sm sm:p-5">
+      <div className="pixiu-ai-window flex h-[min(92vh,900px)] w-full max-w-6xl flex-col overflow-hidden rounded-3xl border bg-[#07111f] text-white shadow-2xl shadow-black/60">
+        <header className="pixiu-ai-header flex shrink-0 items-center justify-between border-b bg-slate-950/70 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-3">
-            <div className="grid h-9 w-9 place-items-center rounded-xl bg-violet-500/10 text-violet-300 ring-1 ring-violet-400/20">
+            <div className="pixiu-ai-mark grid h-9 w-9 place-items-center rounded-xl text-violet-300">
               <Sparkles size={18} />
             </div>
             <div>
               <p className="font-mono text-[9px] font-bold uppercase tracking-[0.22em] text-violet-300">PIXIU AI STUDIO</p>
-              <h2 className="text-sm font-black sm:text-base">Try AI · Teach AI · Connect AI</h2>
+              <h2 className="text-sm font-black sm:text-base">EXPLORE AI · BUILD AI · UNDERSTAND AI</h2>
             </div>
           </div>
           <button onClick={onClose} className="rounded-xl p-2 text-slate-500 hover:bg-slate-800 hover:text-white" aria-label="Minimize AI Studio">
@@ -1390,20 +1391,20 @@ export function AiStudioPanel({
           </button>
         </header>
 
-        <nav className="flex items-center gap-1 border-b border-slate-800 bg-slate-950/25 p-2">
+        <nav className="pixiu-ai-nav flex items-center gap-1 border-b p-2">
           {([
             ["try", "Try", Sparkles],
             ["teach", "Teach", Brain],
             ["understand", "Understand", Layers3],
           ] as const).map(([value, title, Icon]) => (
-            <button key={value} onClick={() => selectTab(value)} className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-[10px] font-black ${tab === value ? "bg-violet-500/15 text-violet-200 ring-1 ring-violet-400/20" : "text-slate-500 hover:bg-slate-900 hover:text-slate-200"}`}>
+            <button key={value} onClick={() => selectTab(value)} className={`pixiu-ai-tab flex items-center gap-1.5 rounded-xl px-3 py-2 text-[10px] font-black ${tab === value ? "pixiu-ai-tab-active" : "text-slate-500 hover:bg-slate-900 hover:text-slate-200"}`}>
               <Icon size={13} />{title}
             </button>
           ))}
           <span className="ml-auto hidden text-[9px] font-mono text-slate-600 sm:block">{store.samples.length} examples</span>
         </nav>
 
-        <div className="border-b border-slate-800 bg-slate-950/40 px-4 py-2 sm:px-6">
+        <div className="pixiu-ai-privacy border-b bg-slate-950/40 px-4 py-2 sm:px-6">
           <div className="flex flex-wrap items-center gap-2 text-[9px] font-mono">
             <span className="mr-1 uppercase tracking-[0.16em] text-slate-600">Privacy</span>
             <span className={"rounded-full border px-2 py-1 " + (cameraActive ? "border-emerald-400/30 bg-emerald-400/5 text-emerald-300" : "border-slate-800 text-slate-600")}>
@@ -1431,19 +1432,19 @@ export function AiStudioPanel({
             <div className="mx-auto max-w-5xl space-y-4">
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-7">
                 {MODES.map((item) => (
-                  <button key={item.id} onClick={() => selectMode(item.id)} className={`rounded-2xl border p-3 text-left ${mode === item.id ? "border-violet-400/35 bg-violet-500/[0.08]" : "border-slate-800 bg-slate-950/40 hover:border-slate-700"}`}>
-                    <p className="text-[10px] font-black">{item.title}</p>
+                  <button key={item.id} onClick={() => selectMode(item.id)} className={`pixiu-ai-mode-card rounded-2xl border p-3 text-left ${mode === item.id ? "pixiu-ai-mode-selected" : "border-slate-800 bg-slate-950/40"}`}>
+                    <p className="pixiu-ai-mode-kicker text-[10px] font-black">{item.title}</p>
                     <p className="mt-1 text-[9px] leading-4 text-slate-600">{item.subtitle}</p>
                   </button>
                 ))}
-                <button disabled={!store.model} onClick={() => selectMode("trained")} className={`rounded-2xl border p-3 text-left ${mode === "trained" ? "border-emerald-400/35 bg-emerald-500/[0.05]" : "border-slate-800 bg-slate-950/40"} disabled:opacity-35`}>
+                <button disabled={!store.model} onClick={() => selectMode("trained")} className={`pixiu-ai-mode-card rounded-2xl border p-3 text-left ${mode === "trained" ? "pixiu-ai-mode-selected" : "border-slate-800 bg-slate-950/40"} disabled:opacity-35`}>
                   <p className="text-[10px] font-black">My AI</p>
                   <p className="mt-1 text-[9px] leading-4 text-slate-600">Your trained model</p>
                 </button>
               </div>
 
               <div className="grid gap-4 lg:grid-cols-[1.4fr_0.8fr]">
-                <div className="overflow-hidden rounded-3xl border border-slate-800 bg-black">
+                <div className="pixiu-ai-preview overflow-hidden rounded-3xl border bg-black">
                   <div className="relative aspect-video">
                     {isSound ? (
                       <div className="flex h-full flex-col items-center justify-center bg-slate-950/90 p-6 text-center">
@@ -1468,7 +1469,7 @@ export function AiStudioPanel({
                         </p>
                       </div>
                     )}
-                    <div className="absolute left-3 top-3 rounded-full border border-slate-700 bg-slate-950/85 px-2.5 py-1 font-mono text-[9px]">
+                    <div className="pixiu-ai-preview-chip absolute left-3 top-3 rounded-full border px-2.5 py-1 font-mono text-[9px]">
                       {loading ? "LOADING" : inputActive ? (mode === "trained" ? "MY AI LIVE" : `${activeTitle.toUpperCase()} LIVE`) : "READY"}
                     </div>
                   </div>
@@ -1517,18 +1518,18 @@ export function AiStudioPanel({
                     <p className="mt-2 text-[10px] leading-5 text-slate-500">
                       Objects, Pose, Fingers, Emotion and Numbers use the Vision camera. Sound uses a separate microphone lifecycle. Only the selected AI model loads.
                     </p>
-                    <button onClick={isSound ? (soundActive ? stopInput : startSound) : (cameraActive ? stopInput : startCameraForMode)} className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-violet-500 px-3 py-2 text-[10px] font-black">
+                    <button onClick={isSound ? (soundActive ? stopInput : startSound) : (cameraActive ? stopInput : startCameraForMode)} className="pixiu-ai-command mt-3 inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[10px] font-black">
                       {(isSound ? soundActive : cameraActive) ? (isSound ? <Mic size={13} /> : <CameraOff size={13} />) : isSound ? <Mic size={13} /> : <Camera size={13} />}
                       {(isSound ? soundActive : cameraActive) ? "Stop" : isSound ? "Start microphone" : "Start camera"}
                     </button>
                   </div>
 
-                  <div className="rounded-2xl border border-emerald-400/10 bg-emerald-500/[0.03] p-4">
-                    <div className="flex items-center gap-2"><Zap size={14} className="text-emerald-300" /><p className="text-xs font-black">6K · AI → Circuit</p></div>
+                  <div className="pixiu-ai-signal-card rounded-2xl border p-4">
+                    <div className="flex items-center gap-2"><Zap size={14} className="text-cyan-300" /><p className="pixiu-ai-signal-title text-xs font-mono font-black">6K · AI → CIRCUIT SIGNAL</p></div>
                     <p className="mt-2 text-[10px] leading-5 text-slate-500">The Workbench receives detected class, confidence and detections. Blockly can use AI sees, AI class, AI confidence and AI camera ON/OFF.</p>
                     <div className="mt-3 grid grid-cols-2 gap-1.5">
                       {["car", "person", "phone", "hand", "0", "3", "happy", "yes"].map((signal) => (
-                        <button key={signal} onClick={() => onAiStateChange({ ...aiState, enabled: true, detectedClass: signal, confidence: 95, detail: `Test signal · ${signal}` })} className="rounded-lg border border-slate-800 bg-slate-950/80 px-2 py-1.5 text-[9px] font-mono text-slate-300 hover:border-emerald-400/30">
+                        <button key={signal} onClick={() => onAiStateChange({ ...aiState, enabled: true, detectedClass: signal, confidence: 95, detail: `Test signal · ${signal}` })} className="pixiu-ai-signal-button rounded-lg border px-2 py-1.5 text-[9px] font-mono text-slate-300">
                           Test {signal}
                         </button>
                       ))}
