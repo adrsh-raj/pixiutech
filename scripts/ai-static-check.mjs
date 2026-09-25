@@ -178,6 +178,8 @@ for (const marker of [
   "normalizeAiDecision",
   "normalizeAiVisionState",
   "DEFAULT_AI_CONFIDENCE_THRESHOLD = 60",
+  "SOUND_AI_CONFIDENCE_THRESHOLD = 72",
+  "TRAINED_AI_CONFIDENCE_THRESHOLD = 62",
 ]) requireText(resultNormalizer, marker, "6J/6K result normalization")
 
 for (const marker of [
@@ -213,11 +215,16 @@ requireText(panel, "Permission blocked", "6O actionable permission error")
 requireText(engine, "tf.io.removeModel", "6O persisted model cleanup")
 requireText(engine, "localStorage.removeItem", "6O persisted dataset cleanup")
 requireText(panel, "stopInput", "6O runtime cleanup")
+requireText(panel, "getActiveAiModel() === loaded", "6P stale model-load cleanup")
+requireText(panel, "if (model) return", "6P trained-model double-load guard")
+forbidText(panel, "disposeAiResource", "6P undefined trained-resource disposer")
 
 for (const marker of [
   "sessionRef",
   "cameraRequestRef",
   "busySessionRef",
+  "trainingRunRef",
+  "datasetVersionRef",
   "stopAll()",
   "stopInput()",
   "releaseCurrentResource",
