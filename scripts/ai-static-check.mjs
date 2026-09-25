@@ -19,6 +19,8 @@ const faceAdapter = read("pixiu-lms-portal/src/lib/ai/face-detector.ts")
 const soundAdapter = read("pixiu-lms-portal/src/lib/ai/sound-detector.ts")
 const gestureAdapter = read("pixiu-lms-portal/src/lib/ai/gesture-interpreter.ts")
 const featureExtractor = read("pixiu-lms-portal/src/lib/ai/my-ai-feature-extractor.ts")
+const gestureAdapter = read("pixiu-lms-portal/src/lib/ai/gesture-interpreter.ts")
+const featureExtractor = read("pixiu-lms-portal/src/lib/ai/my-ai-feature-extractor.ts")
 
 const failures = []
 const requireText = (text, needle, label) => {
@@ -184,6 +186,73 @@ requireText(read("pixiu-lms-portal/src/components/circuit-lab/blockly-editor.tsx
 requireText(panel, "requestedMode", "panel requested-mode bridge")
 requireText(panel, "onRequestedModeHandled", "panel requested-mode acknowledgement")
 requireText(panel, 'modelClasses: ["neutral", "happy", "surprised"]', "6E expression label contract")
+
+for (const marker of [
+  "interpretHandGesture",
+  "detectedGesture",
+  "fingerCount",
+  "handGestureHistoryRef",
+  '["0", "1", "2", "3", "4", "5"]',
+]) requireText(panel, marker, "6G gesture/number integration")
+
+for (const marker of ["FingerMask", "getExtendedFingerMask", "extendedFingers"]) {
+  requireText(handAdapter, marker, "6G hand-layer contract")
+}
+
+for (const marker of [
+  "HandGesture",
+  "interpretHandGesture",
+  "thumbs_up",
+  "thumbs_down",
+  "peace",
+  "open_palm",
+]) requireText(gestureAdapter, marker, "6G gesture interpreter")
+
+for (const marker of [
+  "classes: string[]",
+  "addAiClass",
+  "renameAiClass",
+  "removeAiClass",
+  "getAiDatasetStats",
+  "getSampleAddError",
+  "MAX_CLASSES = 8",
+  "MAX_SAMPLES_PER_CLASS = 20",
+  "MAX_TOTAL_SAMPLES = 80",
+  'STORE_KEY = "pixiu-ai-studio-v3"',
+  'MODEL_KEY = "pixiu-ai-studio-model-v3"',
+]) requireText(engine, marker, "6H dataset contract")
+
+for (const marker of [
+  "MobileNetV2-0.5",
+  "MY_AI_EMBEDDING_NODE",
+  "tf.loadGraphModel",
+  "model.execute(batched, MY_AI_EMBEDDING_NODE)",
+  "extractMyAiEmbedding",
+]) requireText(featureExtractor, marker, "6I transfer feature extractor")
+
+for (const marker of [
+  "extractFeatures",
+  "featureExtractor: MY_AI_FEATURE_VERSION",
+  "Dense(96)",
+  "validationData",
+  "indexeddb://",
+]) requireText(engine, marker, "6I transfer-learning training engine")
+
+for (const forbidden of [
+  "INPUT_W = 16",
+  "INPUT_H = 16",
+  "tf.layers.conv2d",
+  "16×16 RGB → Conv2D",
+]) forbidText(engine, forbidden, "6I old raw-pixel classifier")
+
+for (const marker of ["ai_get_gesture", "ai_get_finger_count"]) {
+  requireText(blocks, marker, "6G Blockly block")
+  requireText(runner, marker, "6G Blockly runtime")
+  requireText(read("pixiu-lms-portal/src/components/circuit-lab/blockly-editor.tsx"), marker, "6G Blockly toolbox")
+  requireText(workbench, marker, "6G Workbench bridge")
+}
+requireText(workbench, "getAiGesture", "6G gesture getter")
+requireText(workbench, "getAiFingerCount", "6G finger getter")
 
 for (const marker of [
   "interpretHandGesture",
