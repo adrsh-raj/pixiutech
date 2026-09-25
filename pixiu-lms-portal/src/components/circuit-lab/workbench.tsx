@@ -486,13 +486,21 @@ export function Workbench() {
       blocklyXml.includes("ai_camera_enable") ||
       blocklyXml.includes("ai_microphone_enable")
     )
-    // AI program execution automatically opens the AI camera in minimized
-    // floating mode. Preserve the student's current Circuit/Code view.
+    const usesNumberGestureAi = Boolean(
+      blocklyXml.includes("ai_get_gesture") ||
+      blocklyXml.includes("ai_get_finger_count") ||
+      blocklyXml.includes("ai_is_gesture")
+    )
+    // AI program execution automatically opens the selected AI runtime in
+    // minimized floating mode. The 6G blocks explicitly request the Numbers
+    // / hand layer so their getters are live instead of falling back to 0/none.
     if (usesAi && openAiHud) {
+      setAiRequestedMode(usesNumberGestureAi ? "numbers" : null)
       setIsAiCameraOpen(true)
       setAiCameraCompact(true)
       setAiRuntimeEnabled(true)
     } else {
+      setAiRequestedMode(null)
       stopAiRuntime()
     }
 
