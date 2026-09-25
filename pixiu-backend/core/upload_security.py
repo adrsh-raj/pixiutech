@@ -124,7 +124,7 @@ def secure_storage_name(original_name: str | None, *, extension: str | None = No
     return f"{uuid4().hex}{suffix}"
 
 
-def validate_uploaded_file(uploaded: UploadedFile | None) -> UploadedFile:
+def validate_uploaded_file(uploaded: UploadedFile | None, *, scan: bool = True) -> UploadedFile:
     """Validate, malware-scan, and rename an upload before storage."""
     if uploaded is None:
         raise SecureUploadError("A file is required.")
@@ -158,12 +158,13 @@ def validate_uploaded_file(uploaded: UploadedFile | None) -> UploadedFile:
     _assert_signature(uploaded, extension)
     _assert_valid_image(uploaded, extension)
 
-    try:
-        ensure_clean_upload(uploaded)
-    except ClamAVMalwareDetectedError as exc:
-        raise SecureUploadError("Uploaded file failed malware scanning.") from exc
-    except ClamAVUnavailableError as exc:
-        raise SecureUploadError("Malware scanning is currently unavailable.") from exc
+    if scan:
+        try:
+            ensure_clean_upload(uploaded)
+        except ClamAVMalwareDetectedError as exc:
+            raise SecureUploadError("Uploaded file failed malware scanning.") from exc
+        except ClamAVUnavailableError as exc:
+            raise SecureUploadError("Malware scanning is currently unavailable.") from exc
 
     uploaded.name = secure_storage_name(original_name, extension=extension)
     setattr(uploaded, "_pixiu_secure_upload", True)
