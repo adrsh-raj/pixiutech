@@ -100,6 +100,12 @@ def delete_object(bucket: str, key: str) -> None:
     _s3_config().delete_object(Bucket=bucket, Key=key)
 
 
+def delete_final_object(relative_key: str) -> None:
+    if not relative_key:
+        return
+    delete_object(final_bucket(), final_physical_key(relative_key))
+
+
 def object_exists(bucket: str, key: str) -> bool:
     try:
         _s3_config().head_object(Bucket=bucket, Key=key)
