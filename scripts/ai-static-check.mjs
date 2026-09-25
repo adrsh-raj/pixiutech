@@ -22,6 +22,7 @@ const resultNormalizer = read("pixiu-lms-portal/src/lib/ai/ai-result-normalizer.
 const cameraSession = read("pixiu-lms-portal/src/lib/ai/camera-session.ts")
 const visionState = read("pixiu-lms-portal/src/lib/ai/vision-state.ts")
 const currentFlow = read("pixiu-lms-portal/src/lib/current-flow.ts")
+const lessonEngine = read("pixiu-lms-portal/src/lib/lesson-engine.ts")
 const multimeter = read("pixiu-lms-portal/src/components/circuit-lab/multimeter.tsx")
 const oscilloscope = read("pixiu-lms-portal/src/components/circuit-lab/oscilloscope.tsx")
 
@@ -222,6 +223,12 @@ requireText(engine, "localStorage.removeItem", "6O persisted dataset cleanup")
 requireText(engine, "AI_DATASET_STORAGE_SOFT_LIMIT_BYTES", "6O dataset persistence guard")
 requireText(panel, "stopInput", "6O runtime cleanup")
 requireText(panel, "Dataset updated for this session, but browser storage is full", "6O dataset persistence feedback")
+
+for (const marker of [
+  "completedStepIds = Array.isArray(candidate.completedStepIds)",
+  "Array.from(new Set(completedStepIds))",
+  "Array.isArray(progress.completedStepIds)",
+]) requireText(lessonEngine, marker, "Phase 5 progress-storage safety")
 requireText(panel, "getActiveAiModel() === loaded", "6P stale model-load cleanup")
 requireText(panel, "if (model) return", "6P trained-model double-load guard")
 forbidText(panel, "disposeAiResource", "6P undefined trained-resource disposer")
