@@ -142,7 +142,7 @@ class LearningContentVideoView(APIView):
             raise PermissionDenied("A playback token is required.")
         try:
             payload = _playback_signer.unsign(token, max_age=PLAYBACK_TOKEN_MAX_AGE)
-            user_id, content_id = str(payload).split(":", 1)
+            content_id, user_id = str(payload).split(":", 1)
         except (BadSignature, SignatureExpired, ValueError):
             raise PermissionDenied("This playback session has expired.")
 
