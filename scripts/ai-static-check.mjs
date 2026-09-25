@@ -133,6 +133,7 @@ for (const needle of ["face-api.min.js", "@mediapipe/hands/hands.js", "window.fa
 requireText(panel, "const requestId = ++cameraRequestRef.current", "camera request generation")
 requireText(panel, "if (requestId !== cameraRequestRef.current)", "camera stale-request guard")
 requireText(panel, "function stopCameraStream()", "camera stream shutdown boundary")
+requireText(panel, "busySessionRef", "inference overlap guard")
 requireText(panel, "stopCamera(studioVideoRef.current, stream)", "full-video cleanup")
 requireText(panel, "stopCamera(floatingVideoRef.current, stream)", "floating-video cleanup")
 
