@@ -29,7 +29,7 @@ export type FaceDetector = {
 
 const FACE_VERSION = "1.0.6"
 const MAX_FACES = 3
-const EXPECTED_MESH_POINTS = 478
+// MediaPipe FaceMesh returns 478 keypoints in the TFJS adapter.
 const MIN_FACE_SCORE = 0.45
 const FACE_RUNTIME_SOURCES = {
   detector: [
