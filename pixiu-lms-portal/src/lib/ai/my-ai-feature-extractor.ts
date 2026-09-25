@@ -49,7 +49,9 @@ export async function loadMyAiFeatureExtractor() {
     const model = await tf.loadGraphModel(MY_AI_FEATURE_URL, { fromTFHub: true })
 
     const warmup = tf.zeros([1, MY_AI_INPUT_SIZE, MY_AI_INPUT_SIZE, 3])
-    const output = firstTensor(model.execute(warmup))
+    const output = firstTensor(
+      model.execute(warmup, MY_AI_EMBEDDING_NODE) as tf.Tensor,
+    )
     await output.data()
     output.dispose()
     warmup.dispose()
@@ -79,7 +81,7 @@ export async function extractMyAiEmbedding(
       true,
     )
     const batched = tf.expandDims(resized, 0)
-    const raw = firstTensor(model.execute(batched))
+    const raw = model.execute(batched, MY_AI_EMBEDDING_NODE) as tf.Tensor4D
     return tf.reshape(raw, [1, -1])
   })
 
@@ -89,12 +91,6 @@ export async function extractMyAiEmbedding(
   } finally {
     embedding.dispose()
   }
-}
-
-export function getMyAiFeatureEmbeddingSize() {
-  return featureModel?.outputs?.[0]?.shape?.[1]
-    ? Number(featureModel.outputs[0].shape[1])
-    : null
 }
 
 export function disposeMyAiFeatureExtractor() {
