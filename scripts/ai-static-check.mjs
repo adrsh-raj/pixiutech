@@ -90,7 +90,7 @@ requireText(workbench, "stopAiRuntime()", "AI lifecycle shutdown")
 requireText(workbench, "setAiCamera: (enabled)", "AI camera bridge")
 requireText(workbench, "setAiCameraCompact(enabled)", "AI camera compact bridge")
 
-for (const marker of ["ai_is_detected", "ai_get_detected_class", "ai_confidence", "ai_camera_enable"]) {
+for (const marker of ["ai_is_detected", "ai_get_detected_class", "ai_confidence", "ai_camera_enable", "ai_microphone_enable"]) {
   requireText(blocks, marker, "Blockly AI block")
   requireText(runner, marker, "Blockly runtime")
 }
@@ -99,6 +99,8 @@ requireText(workbench, "isAiDetected:", "AI runtime bridge")
 requireText(workbench, "getAiDetectedClass:", "AI class bridge")
 requireText(workbench, "getAiConfidence:", "AI confidence bridge")
 requireText(workbench, "setAiCamera:", "AI camera bridge")
+requireText(workbench, "setAiMicrophone:", "AI microphone bridge")
+requireText(workbench, "requestedMode={aiRequestedMode}", "AI requested-mode bridge")
 
 for (const needle of ["frameBusyRef", "setTestImage", "inFlightRef"]) {
   forbidText(panel, needle, "AI panel legacy reference")
@@ -163,6 +165,8 @@ requireText(panel, "detectHands", "panel D inference")
 requireText(panel, "loadFaceDetector", "panel E adapter")
 requireText(panel, "detectFaces", "panel E inference")
 requireText(panel, "loadSoundRecognizer", "panel F adapter")
+requireText(panel, "requestedMode", "panel requested-mode bridge")
+requireText(panel, "onRequestedModeHandled", "panel requested-mode acknowledgement")
 
 requireText(panel, "const requestId = ++cameraRequestRef.current", "camera request generation")
 requireText(panel, "if (requestId !== cameraRequestRef.current)", "camera stale-request guard")
