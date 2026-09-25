@@ -68,6 +68,7 @@ export const MY_AI_SAMPLE_MAX_SIZE = 384
 export const MY_AI_SAMPLE_JPEG_QUALITY = 0.62
 
 let activeModel: tf.LayersModel | null = null
+let modelStorageQueue: Promise<void> = Promise.resolve()
 
 function emptyStore(): AiStudioStore {
   return { classes: [], samples: [], model: null }
@@ -201,11 +202,18 @@ export async function clearAiStudioStore() {
     }
   }
 
-  await deleteStoredModel()
+  await queueModelOperation(() => deleteStoredModel())
+}
+
+function queueModelOperation(operation: () => Promise<void>) {
+  modelStorageQueue = modelStorageQueue
+    .catch(() => undefined)
+    .then(operation)
+  return modelStorageQueue
 }
 
 function invalidateStoredModel() {
-  void deleteStoredModel()
+  void queueModelOperation(() => deleteStoredModel())
 }
 
 export function addAiClass(store: AiStudioStore, label: string): AiStudioStore {
@@ -680,7 +688,7 @@ export async function trainAiModel(
     }
 
     options.onStage?.("Saving model locally")
-    await model.save(`indexeddb://${MODEL_KEY}`)
+    await queueModelOperation(() => model!.save(`indexeddb://${MODEL_KEY}`))
 
     activeModel = model
     model = null
@@ -712,6 +720,7 @@ export async function loadStoredAiModel(
   }
 
   try {
+    await modelStorageQueue
     const model = await tf.loadLayersModel(`indexeddb://${MODEL_KEY}`)
     const inputShape = model.inputs?.[0]?.shape
     const inputSize = Number(inputShape?.[inputShape.length - 1] ?? 0)
