@@ -66,9 +66,9 @@ def accessible_content(user):
     if user.role == UserRole.ADMIN:
         return qs
     if user.role == UserRole.STUDENT:
-        return qs.filter(status="published", target_role__in=["student", "all"], class_assignments__school_class_id__in=assigned_class_ids(user)).distinct()
+        return qs.filter(status="published", target_role__in=["student", "student_trainer", "all"], class_assignments__school_class_id__in=assigned_class_ids(user)).distinct()
     if user.role == UserRole.TRAINER:
-        return qs.filter(target_role__in=["trainer", "all"], class_assignments__school_class_id__in=assigned_class_ids(user)).distinct()
+        return qs.filter(target_role__in=["trainer", "student_trainer", "all"], class_assignments__school_class_id__in=assigned_class_ids(user)).distinct()
     if user.role == UserRole.SCHOOL:
         return qs.filter(target_role__in=["school", "all"], class_assignments__school_class_id__in=assigned_class_ids(user)).distinct()
     return qs.none()
