@@ -56,6 +56,16 @@ def final_bucket() -> str:
     return bucket
 
 
+def final_storage_location() -> str:
+    return str(getattr(settings, "AWS_LOCATION", os.environ.get("AWS_LOCATION", "pixiu-media"))).strip("/")
+
+
+def final_physical_key(relative_key: str) -> str:
+    relative_key = str(relative_key or "").lstrip("/")
+    location = final_storage_location()
+    return f"{location}/{relative_key}" if location else relative_key
+
+
 def temp_bucket() -> str:
     bucket = os.environ.get(VIDEO_TEMP_BUCKET_ENV, "pixiu-video-temp").strip()
     if not bucket:
@@ -109,7 +119,7 @@ def _upload_final(source: Path, key: str) -> None:
     client.upload_file(
         str(source),
         final_bucket(),
-        key,
+        final_physical_key(key),
         ExtraArgs={"ContentType": "video/mp4", "CacheControl": "private, no-store, max-age=0"},
     )
 
