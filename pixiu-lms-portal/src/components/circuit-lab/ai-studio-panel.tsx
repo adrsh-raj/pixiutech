@@ -1135,7 +1135,9 @@ export function AiStudioPanel({
 
   function selectTab(next: Tab) {
     if (training) return
-    stopInput()
+    // A live Blockly AI runtime must keep its active camera/mic session while
+    // the Studio is switched between Try/Teach/Understand.
+    if (!runtimeEnabled) stopInput()
     setTab(next)
   }
 
@@ -1284,6 +1286,10 @@ export function AiStudioPanel({
   }
 
   async function resetStudio() {
+    if (runtimeEnabled) {
+      setStatus("Stop the live AI runtime before resetting My AI.")
+      return
+    }
     trainingRunRef.current += 1
     datasetVersionRef.current += 1
     stopInput()
@@ -1562,8 +1568,9 @@ export function AiStudioPanel({
                       className="min-w-0 flex-1 rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-[10px] outline-none focus:border-violet-400"
                     />
                     <button
-                      onClick={() => {
-                        const next = addAiClass(store, label)
+                       disabled={runtimeEnabled || training}
+                       onClick={() => {
+                         const next = addAiClass(store, label)
                         commitStore(next)
                         if (next.classes.length === store.classes.length) {
                           setStatus("Concept already exists or the 8-concept limit is reached.")
@@ -1582,14 +1589,14 @@ export function AiStudioPanel({
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <button
                       onClick={() => void addSampleFromCamera()}
-                      disabled={!label.trim()}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-violet-400/25 bg-slate-950 px-3 py-2 text-[10px] font-black disabled:opacity-30"
+                      disabled={!label.trim() || runtimeEnabled || training}
+                       className="inline-flex items-center gap-1.5 rounded-xl border border-violet-400/25 bg-slate-950 px-3 py-2 text-[10px] font-black disabled:opacity-30"
                     >
                       <Camera size={13} /> {cameraActive ? "Capture example" : "Start capture"}
                     </button>
-                    <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-[10px] font-black">
+                    <label className={"inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-[10px] font-black " + (runtimeEnabled || training ? "cursor-not-allowed opacity-30" : "cursor-pointer")}>
                       <Upload size={13} /> Import images
-                      <input hidden multiple type="file" accept="image/*" onChange={importSample} />
+                      <input hidden multiple type="file" accept="image/*" onChange={importSample} disabled={runtimeEnabled || training} />
                     </label>
                     <span className="text-[9px] text-slate-600">Recommended: 8+ / concept · minimum 3</span>
                   </div>
@@ -1666,8 +1673,9 @@ export function AiStudioPanel({
                                 autoFocus
                               />
                               <button
-                                onClick={() => {
-                                  const next = renameAiClass(store, name, renameValue)
+                                 disabled={runtimeEnabled || training}
+                                 onClick={() => {
+                                   const next = renameAiClass(store, name, renameValue)
                                   commitStore(next)
                                   setRenamingClass(null)
                                   setRenameValue("")
@@ -1694,6 +1702,7 @@ export function AiStudioPanel({
                         {!isRenaming && (
                           <div className="flex items-center gap-1">
                             <button
+                              disabled={runtimeEnabled || training}
                               onClick={() => {
                                 setRenamingClass(name)
                                 setRenameValue(name)
@@ -1704,6 +1713,7 @@ export function AiStudioPanel({
                               <Pencil size={11} />
                             </button>
                             <button
+                              disabled={runtimeEnabled || training}
                               onClick={() => {
                                 const next = removeAiClass(store, name)
                                 commitStore(next)
@@ -1730,8 +1740,9 @@ export function AiStudioPanel({
                               className="h-16 w-20 rounded-lg border border-slate-800 object-cover"
                             />
                             <button
-                              onClick={() => {
-                                const next = removeAiSample(store, sample.id)
+                               disabled={runtimeEnabled || training}
+                               onClick={() => {
+                                 const next = removeAiSample(store, sample.id)
                                 commitStore(next)
                               }}
                               className="absolute right-1 top-1 rounded-md bg-slate-950/85 p-1 text-slate-300 hover:text-rose-300"
