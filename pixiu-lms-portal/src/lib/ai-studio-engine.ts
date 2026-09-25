@@ -104,15 +104,17 @@ function uniqueClasses(values: unknown) {
 function validSamples(value: unknown): AiSample[] {
   if (!Array.isArray(value)) return []
 
-  return value.filter(
-    (sample): sample is AiSample =>
-      typeof sample?.id === "string" &&
-      typeof sample?.label === "string" &&
-      typeof sample?.dataUrl === "string" &&
-      sample.dataUrl.startsWith("data:image/") &&
-      typeof sample?.createdAt === "number",
-  )
-}
+  return value.filter((sample): sample is AiSample => {
+    if (!sample || typeof sample !== "object") return false
+    const candidate = sample as Partial<AiSample>
+    return (
+      typeof candidate.id === "string" &&
+      typeof candidate.label === "string" &&
+      typeof candidate.dataUrl === "string" &&
+      candidate.dataUrl.startsWith("data:image/") &&
+      typeof candidate.createdAt === "number"
+    )
+  })
 
 export function loadAiStudioStore(): AiStudioStore {
   if (typeof window === "undefined") return emptyStore()
