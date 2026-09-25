@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { BookOpen, Eye, FileText, Layers, Search, ShieldCheck, Trash2, Upload, X, Link2, Video } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { useToast } from '../context/ToastContext';
@@ -31,13 +31,6 @@ export default function ContentHub(){
     return [...new Set(activeClasses.filter(c=>!schoolCode || code(c)===schoolCode).map(c=>clean(c.grade)).filter(Boolean))].sort((a,b)=>Number(a)-Number(b));
   },[activeClasses,contentSchools,form.school]);
   const grades=[...new Set(content.map(x=>clean(x.grade)).filter(Boolean))].sort((a,b)=>Number(a)-Number(b));
-  useEffect(()=>{
-    const pending=content.some(x=>x.content_type==='video'&&['queued','processing'].includes(x.video_processing_status));
-    if(!pending) return undefined;
-    const timer=window.setInterval(()=>{void refreshAll?.();},5000);
-    return ()=>window.clearInterval(timer);
-  },[content,refreshAll]);
-
   const filtered=useMemo(()=>content.filter(x=>{
     const hay=`${x.title||''} ${x.description||''} ${x.unit_code||''} ${x.level||''}`.toLowerCase();
     return (targetFilter==='all'||clean(x.target_role).toLowerCase()===targetFilter)&&(gradeFilter==='all'||clean(x.grade)===gradeFilter)&&(statusFilter==='all'||clean(x.status).toLowerCase()===statusFilter)&&hay.includes(query.trim().toLowerCase());
@@ -92,7 +85,7 @@ export default function ContentHub(){
     try{
       if(item.content_type==='video'){
         if(item.video_processing_status!=='ready') {
-          toast.error(item.video_processing_status==='failed' ? (item.video_processing_error || 'Video processing failed.') : 'Video is still being optimized. Please wait.');
+          toast.error(item.video_processing_status==='failed' ? (item.video_processing_error || 'Video processing failed.') : 'Video is not ready. Re-upload this video after the storage update.');
           return;
         }
         setVideoMaterial(item);
@@ -113,8 +106,8 @@ export default function ContentHub(){
   item.video_processing_status==='ready'
     ? <span className="px-2 py-1 rounded-lg bg-violet-50 text-violet-700 text-[10px] font-black inline-flex items-center gap-1"><Video size={11}/> View only</span>
     : item.video_processing_status==='failed'
-      ? <span className="px-2 py-1 rounded-lg bg-rose-50 text-rose-700 text-[10px] font-black">Processing failed</span>
-      : <span className="px-2 py-1 rounded-lg bg-amber-50 text-amber-700 text-[10px] font-black">Optimizing video…</span>
+      ? <span className="px-2 py-1 rounded-lg bg-rose-50 text-rose-700 text-[10px] font-black">Video unavailable</span>
+      : <span className="px-2 py-1 rounded-lg bg-amber-50 text-amber-700 text-[10px] font-black">Pending legacy upload</span>
 )}{item.content_type!=='video'&&item.file&&<span className="px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-[10px] font-black">{item.is_watermarked?'Pixiu Watermarked':'Original Copy'}</span>}</div><h2 className="font-black text-slate-900 mt-3">{item.title}</h2><p className="text-xs text-slate-500 mt-2 line-clamp-3">{item.description||'No description stored.'}</p><p className="text-[10px] text-slate-400 mt-3">{item.unit_code||'No unit code'} · {item.level||'No level'}</p><div className="flex items-center justify-between border-t border-slate-100 mt-5 pt-4"><button type="button" disabled={item.content_type==='video'&&item.video_processing_status!=='ready'} onClick={()=>openMaterial(item)} className="px-3 py-2 rounded-lg bg-blue-600 disabled:bg-slate-200 disabled:text-slate-400 text-white text-[11px] font-black inline-flex items-center gap-1.5"><Eye size={13}/> {item.content_type==='video' ? (item.video_processing_status==='ready' ? 'Watch' : 'Processing…') : 'Open'}</button>{role==='admin'&&<button type="button" onClick={async()=>{if(!window.confirm(`Archive “${item.title}”?`))return;const r=await deleteContent(item.id);r?.success?toast.success('Content archived.'):toast.error(r?.error||'Unable to archive content.');}} className="p-2 rounded-lg text-slate-400 hover:text-rose-600"><Trash2 size={15}/></button>}</div></article>)}{!filtered.length&&<div className="col-span-full p-10 text-center border border-dashed border-slate-200 rounded-2xl text-sm text-slate-400">No learning content matches the current filters.</div>}</section>
     {open&&<div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-3"><div className="bg-white rounded-2xl w-full max-w-2xl max-h-[calc(100dvh-1.5rem)] overflow-y-auto shadow-2xl"><div className="sticky top-0 bg-white p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between"><div><h2 className="font-black text-slate-900">Add Learning Content</h2><p className="text-xs text-slate-500 mt-1">Choose the audience and exact school + grade before publishing.</p></div><button type="button" onClick={()=>setOpen(false)} className="p-2 text-slate-400"><X size={18}/></button></div><form onSubmit={submit} className="p-4 sm:p-5 space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><Field label="Title"><input className="field" value={form.title} onChange={e=>setForm(v=>({...v,title:e.target.value}))} required/></Field><Field label="Content type"><select className="field" value={form.content_type} onChange={e=>setForm(v=>({...v,content_type:e.target.value,file:null,url:'',is_watermarked:e.target.value==='pdf'||e.target.value==='image'}))}>{TYPES.map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></Field></div>
@@ -123,7 +116,7 @@ export default function ContentHub(){
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><Field label="Share with"><select className="field" value={form.target_role} onChange={e=>setForm(v=>({...v,target_role:e.target.value,is_watermarked:e.target.value==='student'&&v.content_type!=='video'}))} disabled={role==='trainer'}>{(role==='trainer'?[['student','Student']]:TARGETS).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></Field><Field label="Status"><select className="field" value={form.status} onChange={e=>setForm(v=>({...v,status:e.target.value}))}><option value="draft">Draft</option><option value="published">Published</option></select></Field></div>
       <div className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-[10px] text-blue-800">{form.school&&form.grade?`Only active classes in ${schoolName}, Grade ${form.grade}, will receive this content.`:'Select a school and grade to define the delivery scope.'}</div>
       {canWatermark&&<label className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3"><input type="checkbox" checked={form.is_watermarked} onChange={e=>setForm(v=>({...v,is_watermarked:e.target.checked}))}/><span><b className="block text-xs text-emerald-800">Apply Pixiu Tech watermark</b><span className="text-[10px] text-emerald-700">Student-facing PDF/image copies can be permanently watermarked.</span></span></label>}
-      {form.content_type!=='link'&&<Field label={form.content_type==='video'?'Upload video':'Upload file'}><input className="field" type="file" accept={form.content_type==='video'?'.mp4,.webm,video/mp4,video/webm':form.content_type==='image'?'image/*':form.content_type==='pdf'?'application/pdf,.pdf':undefined} onChange={e=>setForm(v=>({...v,file:e.target.files?.[0]||null}))}/>{form.content_type==='video'&&<p className="mt-1 text-[10px] text-slate-400">MP4 or WebM only · maximum 500 MB · stored in private Supabase Storage.</p>}</Field>}
+      {form.content_type!=='link'&&<Field label={form.content_type==='video'?'Upload video':'Upload file'}><input className="field" type="file" accept={form.content_type==='video'?'.mp4,.webm,video/mp4,video/webm':form.content_type==='image'?'image/*':form.content_type==='pdf'?'application/pdf,.pdf':undefined} onChange={e=>setForm(v=>({...v,file:e.target.files?.[0]||null}))}/>{form.content_type==='video'&&<p className="mt-1 text-[10px] text-slate-400">MP4 or WebM only · maximum 500 MB · stored directly in private Supabase Storage and streamed securely.</p>}</Field>}
       {form.content_type==='link'&&<Field label="External resource URL"><div className="relative"><Link2 size={14} className="absolute left-3 top-3 text-slate-400"/><input className="field pl-9" type="url" value={form.url} onChange={e=>setForm(v=>({...v,url:e.target.value}))} placeholder="https://…" required/></div></Field>}
       <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-[10px] text-slate-600">One upload creates exactly one Learning Content record / ID. Choosing <b>Student + Trainer</b> assigns that same content ID to both audiences.</div>
       <Field label="Description"><textarea className="field min-h-24" value={form.description} onChange={e=>setForm(v=>({...v,description:e.target.value}))}/></Field>
