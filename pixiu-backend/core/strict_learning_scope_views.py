@@ -40,7 +40,10 @@ from .scoped_contract_views import (
 from .quiz_contract_view import ScopedContractQuizViewSetStrict
 from .strict_session_views import StrictScopedSessionViewSet
 from learning.watermarking import prepare_uploaded_file
-from django.db import transaction
+from pathlib import Path
+
+from core.upload_security import validate_uploaded_file
+from learning.video_processing import upload_temp_video
 
 
 def _accessible_quiz_queryset(user):
@@ -154,13 +157,16 @@ class SafeScopedContentViewSet(ScopedContractContentViewSet):
     def _prepare_content_file(self, serializer):
         upload = serializer.validated_data.get("file")
         if upload is None:
-            return
+            return None
         content_type = serializer.validated_data.get("content_type", "pdf")
         if content_type == "video":
-            # Videos stay byte-for-byte unchanged; they are protected by the
-            # private bucket + authenticated playback endpoint instead.
+            # Keep the original out of the permanent bucket. Validate filename,
+            # MIME, signature and size here, then let the worker scan the
+            # compressed derivative before final storage.
+            validate_uploaded_file(upload, scan=False)
+            serializer.validated_data.pop("file", None)
             serializer.validated_data["is_watermarked"] = False
-            return
+            return upload
 
         enabled_raw = self.request.data.get("is_watermarked", "true")
         enabled = str(enabled_raw).strip().lower() not in {"false", "0", "no", "off"}
@@ -168,6 +174,7 @@ class SafeScopedContentViewSet(ScopedContractContentViewSet):
         processed, watermarked = prepare_uploaded_file(upload, target_role, enabled)
         serializer.validated_data["file"] = processed
         serializer.validated_data["is_watermarked"] = watermarked
+        return None
 
     @transaction.atomic
     def _save_scoped_content(self, serializer, *, update=False):
@@ -189,12 +196,51 @@ class SafeScopedContentViewSet(ScopedContractContentViewSet):
         if not class_ids:
             raise ValidationError({"grade": f"School {school.school_code} has no active class in Grade {grade}."})
 
-        self._prepare_content_file(serializer)
+        video_upload = self._prepare_content_file(serializer)
+        content_type = str(serializer.validated_data.get("content_type", getattr(serializer.instance, "content_type", ""))).lower()
+        requested_status = str(serializer.validated_data.get("status", getattr(serializer.instance, "status", "draft")) or "draft").lower()
+
         if update:
-            content = serializer.save(created_by=user if user.role == UserRole.TRAINER else serializer.instance.created_by)
+            save_kwargs = {
+                "created_by": user if user.role == UserRole.TRAINER else serializer.instance.created_by,
+            }
+            if video_upload is not None:
+                # Keep any currently published MP4 until the replacement has
+                # completed. The requested publish state is restored after
+                # successful transcoding.
+                save_kwargs.update({
+                    "status": "draft",
+                    "video_processing_status": LearningContent.VIDEO_PROCESSING_QUEUED,
+                    "video_processing_error": "",
+                    "video_requested_status": requested_status,
+                    "video_original_name": Path(str(video_upload.name)).name,
+                    "video_size_bytes": int(getattr(video_upload, "size", 0) or 0),
+                    "video_processing_started_at": None,
+                    "video_ready_at": None,
+                })
+            content = serializer.save(**save_kwargs)
             ContentClassAssignment.objects.filter(content=content).delete()
         else:
-            content = serializer.save(created_by=user)
+            create_kwargs = {
+                "created_by": user,
+            }
+            if content_type == "video":
+                create_kwargs.update({
+                    "status": "draft",
+                    "video_processing_status": LearningContent.VIDEO_PROCESSING_QUEUED,
+                    "video_requested_status": requested_status,
+                    "video_original_name": Path(str(video_upload.name)).name if video_upload is not None else "",
+                    "video_size_bytes": int(getattr(video_upload, "size", 0) or 0) if video_upload is not None else None,
+                })
+            content = serializer.save(**create_kwargs)
+
+        if video_upload is not None:
+            extension = Path(str(video_upload.name)).suffix.lower()
+            temp_key, upload_size = upload_temp_video(video_upload, str(content.id), extension)
+            content.video_temp_key = temp_key
+            if not content.video_size_bytes:
+                content.video_size_bytes = upload_size
+            content.save(update_fields=["video_temp_key", "video_size_bytes", "updated_at"])
 
         ContentClassAssignment.objects.bulk_create(
             [ContentClassAssignment(content=content, school_class_id=class_id, assigned_by=user) for class_id in class_ids],
