@@ -30,6 +30,9 @@ const forbidText = (text, needle, label) => {
 if (existsSync(join(root, "pixiu-lms-portal/src/components/circuit-lab/ai-camera-panel.tsx"))) {
   failures.push("legacy ai-camera-panel.tsx still exists")
 }
+if (existsSync(join(root, "pixiu-lms-portal/src/lib/ai-ready-runtime.ts"))) {
+  failures.push("legacy ai-ready-runtime.ts still exists")
+}
 
 for (const mode of ["objects", "pose", "hands", "emotion", "sound", "numbers"]) {
   requireText(types, mode, "vision type")
