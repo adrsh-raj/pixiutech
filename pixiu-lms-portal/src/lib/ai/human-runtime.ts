@@ -110,6 +110,7 @@ export async function createHuman(config: Record<string, unknown>): Promise<any>
     debug: false,
     cacheModels: true,
     cacheSensitivity: 0.01,
+    modelBasePath: "https://cdn.jsdelivr.net/npm/@vladmandic/human@3.3.6/models/",
     filter: { enabled: false },
     face: { enabled: false },
     body: { enabled: false },
