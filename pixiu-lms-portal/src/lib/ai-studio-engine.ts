@@ -29,6 +29,8 @@ export type AiModelSummary = {
   featureExtractor: string
   storageKey: string
   architecture: string
+  predictionThreshold: number
+  confidenceCalibration: string
 }
 
 export type AiStudioStore = {
@@ -673,6 +675,8 @@ export async function trainAiModel(
       storageKey: MODEL_KEY,
       architecture:
         `Frozen ${MY_AI_FEATURE_VERSION} embeddings → Dense(96) → Dropout(20%) → Softmax`,
+      predictionThreshold: MY_AI_PREDICTION_THRESHOLD,
+      confidenceCalibration: "Thresholded top-class confidence; low-margin predictions are returned as unknown.",
     }
 
     options.onStage?.("Saving model locally")
@@ -783,14 +787,25 @@ export async function predictAiImage(
     const probabilities = Array.from(await output.data())
       .map((value) => Number.isFinite(Number(value)) ? Math.max(0, Math.min(1, Number(value))) : 0)
     const bestIndex = probabilities.indexOf(Math.max(...probabilities))
-    const bestProbability = probabilities[bestIndex] ?? 0
+    const sortedProbabilities = [...probabilities].sort((a, b) => b - a)
+    const bestProbability = sortedProbabilities[0] ?? 0
+    const secondProbability = sortedProbabilities[1] ?? 0
+    const margin = bestProbability - secondProbability
+    const lowConfidence = bestProbability < MY_AI_PREDICTION_THRESHOLD
+    const lowMargin = margin < 0.08
+    const unknown = lowConfidence || lowMargin
+    const reason = lowConfidence
+      ? "low_confidence"
+      : lowMargin
+        ? "ambiguous"
+        : "recognized"
 
     output.dispose()
 
     return {
       label:
-        bestProbability >= MY_AI_PREDICTION_THRESHOLD
-          ? summary.classes[bestIndex] ?? "unknown"
+        !unknown && summary.classes[bestIndex]
+          ? summary.classes[bestIndex]
           : "unknown",
       confidence: Math.round(bestProbability * 100),
       probabilities: Object.fromEntries(
@@ -799,6 +814,10 @@ export async function predictAiImage(
           Math.round((probabilities[index] ?? 0) * 100),
         ]),
       ),
+      unknown,
+      lowConfidence,
+      margin: Math.round(margin * 100),
+      reason,
     }
   } finally {
     feature.dispose()
