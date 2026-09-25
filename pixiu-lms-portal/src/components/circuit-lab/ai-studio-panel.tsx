@@ -1142,7 +1142,7 @@ export function AiStudioPanel({
   }
 
   async function addSampleFromCamera() {
-    if (training) return
+    if (training || runtimeEnabled) return
     if (!label.trim()) {
       setStatus("Enter a concept name first.")
       return
@@ -1189,7 +1189,7 @@ export function AiStudioPanel({
   }
 
   async function importSample(event: ChangeEvent<HTMLInputElement>) {
-    if (training) {
+    if (training || runtimeEnabled) {
       event.target.value = ""
       return
     }
