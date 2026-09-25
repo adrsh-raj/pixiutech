@@ -62,7 +62,10 @@ class Command(BaseCommand):
         if not content_id:
             return False
 
+        temp_key = ""
         try:
+            content_before = LearningContent.objects.get(pk=content_id)
+            temp_key = str(content_before.video_temp_key or "").strip()
             result = process_video_content(content_id)
             with transaction.atomic():
                 content = LearningContent.objects.select_for_update().get(pk=content_id)
@@ -89,17 +92,17 @@ class Command(BaseCommand):
 
             if old_key and old_key != result["file_key"]:
                 try:
-                    delete_object(str(getattr(__import__("django.conf", fromlist=["settings"]), "settings").SUPABASE_STORAGE_BUCKET), old_key)
+                    from learning.video_processing import final_bucket
+                    delete_object(final_bucket(), old_key)
                 except Exception:
                     logger.exception("Could not delete previous final video object for %s", content_id)
 
-            # Original is no longer needed after final upload.
-            temp_key = str(getattr(content, "video_temp_key", "") or "")
-            # content was refreshed above with an empty temp key; use the job's
-            # original temp key captured before processing.
-            # process_video_content has already consumed it, so recover it from
-            # a local attribute is not possible after refresh; use the DB history
-            # captured below in the failure-safe branch.
+            if temp_key:
+                try:
+                    delete_object(temp_bucket(), temp_key)
+                except Exception:
+                    logger.exception("Could not delete temporary source video %s", temp_key)
+
             return True
         except Exception as exc:
             logger.exception("Learning video processing failed: %s", content_id)
