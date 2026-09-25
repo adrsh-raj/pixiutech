@@ -26,7 +26,7 @@ export interface AiVisionState {
   unknown?: boolean
   lowConfidence?: boolean
   confidenceThreshold?: number
-  decisionReason?: "recognized" | "no_input" | "low_confidence"
+  decisionReason?: "recognized" | "no_input" | "low_confidence" | "ambiguous"
   probabilities?: Record<string, number>
   modelClasses?: string[]
   modelSource?: "ready" | "trained"
