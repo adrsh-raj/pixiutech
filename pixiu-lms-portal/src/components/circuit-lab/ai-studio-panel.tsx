@@ -1825,7 +1825,7 @@ export function AiStudioPanel({
                 </div>
               </div>
             </div>
-          )}}
+          )}
         </div>
       </div>
     </div>
