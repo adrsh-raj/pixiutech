@@ -480,6 +480,8 @@ export function Workbench() {
       blocklyXml.includes("ai_is_detected") ||
       blocklyXml.includes("ai_get_detected_class") ||
       blocklyXml.includes("ai_confidence") ||
+      blocklyXml.includes("ai_get_gesture") ||
+      blocklyXml.includes("ai_get_finger_count") ||
       blocklyXml.includes("ai_camera_enable") ||
       blocklyXml.includes("ai_microphone_enable")
     )
@@ -587,6 +589,8 @@ export function Workbench() {
         isAiDetected: (cls) => aiStateRef.current.detectedClass.trim().toLowerCase() === String(cls).trim().toLowerCase(),
         getAiDetectedClass: () => aiStateRef.current.detectedClass,
         getAiConfidence: () => aiStateRef.current.confidence,
+        getAiGesture: () => aiStateRef.current.detectedGesture ?? "none",
+        getAiFingerCount: () => aiStateRef.current.fingerCount ?? 0,
         setAiCamera: (enabled) => {
           setAiRequestedMode(enabled ? "objects" : null)
           setAiRuntimeEnabled(enabled)
