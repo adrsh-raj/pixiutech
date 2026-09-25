@@ -22,6 +22,8 @@ export interface ExecutionEnvironment {
   isAiDetected?: (cls: string) => boolean
   getAiDetectedClass?: () => string
   getAiConfidence?: () => number
+  getAiGesture?: () => string
+  getAiFingerCount?: () => number
   setAiCamera?: (enabled: boolean) => void
   setAiMicrophone?: (enabled: boolean) => void
   sleep: (ms: number) => Promise<void>
@@ -68,6 +70,9 @@ export function evaluateNumber(target: Blockly.Block | null, env?: ExecutionEnvi
   }
   if (target.type === "ai_confidence") {
     return env?.getAiConfidence ? env.getAiConfidence() : 0
+  }
+  if (target.type === "ai_get_finger_count") {
+    return env?.getAiFingerCount ? env.getAiFingerCount() : 0
   }
   return defaultValue
 }
@@ -148,6 +153,9 @@ function evaluateValueInput(block: Blockly.Block, inputName: string, env?: Execu
   }
   if (target.type === "ai_get_detected_class") {
     return env?.getAiDetectedClass ? env.getAiDetectedClass() : "none"
+  }
+  if (target.type === "ai_get_gesture") {
+    return env?.getAiGesture ? env.getAiGesture() : "none"
   }
   return defaultValue
 }
@@ -235,6 +243,10 @@ function getBlockDescription(block: Blockly.Block, env: ExecutionEnvironment): s
       const state = block.getFieldValue("STATE") ?? "ON"
       return `AI Microphone ${state}`
     }
+    case "ai_get_gesture":
+      return "AI gesture → current hand gesture"
+    case "ai_get_finger_count":
+      return "AI fingers → current count"
     case "controls_if":
       return "if (condition)"
     case "controls_repeat_ext": {
@@ -402,6 +414,11 @@ async function executeSingleBlock(block: Blockly.Block, env: ExecutionEnvironmen
       env.setAiMicrophone?.(state === "ON")
       break
     }
+
+    case "ai_get_gesture":
+    case "ai_get_finger_count":
+      // Value blocks are evaluated by evaluateValueInput/evaluateNumber.
+      break
 
     case "controls_if": {
       let branchExecuted = false
