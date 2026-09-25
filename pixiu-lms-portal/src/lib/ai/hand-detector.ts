@@ -7,6 +7,8 @@ export type HandPoint = {
   name?: string
 }
 
+export type FingerMask = [boolean, boolean, boolean, boolean, boolean]
+
 export type HandDetection = {
   score: number
   boxScore: number
@@ -14,6 +16,7 @@ export type HandDetection = {
   handedness: string
   box: [number, number, number, number]
   keypoints: HandPoint[]
+  extendedFingers: FingerMask
   fingerCount: number
 }
 
@@ -181,14 +184,20 @@ function thumbExtended(points: HandPoint[]) {
     distance(tip, indexMcp) > distance(ip, indexMcp) * 1.05
 }
 
+export function getExtendedFingerMask(points: HandPoint[]): FingerMask {
+  if (points.length < 21) return [false, false, false, false, false]
+
+  return [
+    thumbExtended(points),
+    fingerExtended(points, 5, 6, 7, 8),
+    fingerExtended(points, 9, 10, 11, 12),
+    fingerExtended(points, 13, 14, 15, 16),
+    fingerExtended(points, 17, 18, 19, 20),
+  ]
+}
+
 export function countExtendedFingers(points: HandPoint[]) {
-  if (points.length < 21) return 0
-  let count = thumbExtended(points) ? 1 : 0
-  count += fingerExtended(points, 5, 6, 7, 8) ? 1 : 0
-  count += fingerExtended(points, 9, 10, 11, 12) ? 1 : 0
-  count += fingerExtended(points, 13, 14, 15, 16) ? 1 : 0
-  count += fingerExtended(points, 17, 18, 19, 20) ? 1 : 0
-  return count
+  return getExtendedFingerMask(points).filter(Boolean).length
 }
 
 function toPoint(point: any, point3d?: any): HandPoint {
