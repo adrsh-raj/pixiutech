@@ -137,6 +137,11 @@ export async function loadSoundRecognizer(): Promise<SoundRecognizer> {
   const recognizer = window.speechCommands!.create("BROWSER_FFT", "18w")
   await recognizer.ensureModelLoaded()
 
+  const labels = recognizer.wordLabels()
+  if (!Array.isArray(labels) || labels.length === 0) {
+    throw new Error("Speech Commands model returned no vocabulary.")
+  }
+
   let listening = false
   let starting = false
   let generation = 0
