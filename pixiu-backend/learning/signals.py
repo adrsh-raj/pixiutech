@@ -14,6 +14,12 @@ from .watermarking import prepare_stored_file
 
 @receiver(pre_save, sender=LearningContent)
 def enforce_learning_content_watermark(sender, instance, **kwargs):
+    # Videos are transcoded and secured by the dedicated video pipeline; the
+    # PDF/image watermarker intentionally does not modify video streams.
+    if str(instance.content_type or "").strip().lower() == "video":
+        instance.is_watermarked = False
+        return
+
     role = str(instance.target_role or "student").strip().lower()
     if role == "trainer":
         instance.is_watermarked = False
