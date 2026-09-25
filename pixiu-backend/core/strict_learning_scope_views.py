@@ -155,6 +155,13 @@ class SafeScopedContentViewSet(ScopedContractContentViewSet):
         upload = serializer.validated_data.get("file")
         if upload is None:
             return
+        content_type = serializer.validated_data.get("content_type", "pdf")
+        if content_type == "video":
+            # Videos stay byte-for-byte unchanged; they are protected by the
+            # private bucket + authenticated playback endpoint instead.
+            serializer.validated_data["is_watermarked"] = False
+            return
+
         enabled_raw = self.request.data.get("is_watermarked", "true")
         enabled = str(enabled_raw).strip().lower() not in {"false", "0", "no", "off"}
         target_role = serializer.validated_data.get("target_role", "student")
