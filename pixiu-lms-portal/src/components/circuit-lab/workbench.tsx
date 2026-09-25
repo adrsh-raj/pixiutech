@@ -213,12 +213,12 @@ export function Workbench() {
     [running, state, pressed, pinStates],
   )
 
-  const oscilloscopeSimulationRef = useRef({ state, pinStates, running })
-  oscilloscopeSimulationRef.current = { state, pinStates, running }
+  const oscilloscopeSimulationRef = useRef({ state, pinStates, running, pressed })
+  oscilloscopeSimulationRef.current = { state, pinStates, running, pressed }
 
   const wireCurrents = useMemo(
-    () => (running ? computeWireCurrents(state, runtime, pinStates) : {}),
-    [running, state, runtime, pinStates],
+    () => (running ? computeWireCurrents(state, runtime, pinStates, pressed) : {}),
+    [running, state, runtime, pinStates, pressed],
   )
 
   // Calculate total mA consumption across components
@@ -1379,6 +1379,7 @@ export function Workbench() {
         state={state}
         runtime={runtime}
         pinStates={pinStates}
+        pressed={pressed}
         running={running}
         probeRed={probeRed}
         probeBlack={probeBlack}
