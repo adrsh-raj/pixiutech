@@ -62,10 +62,15 @@ class Command(BaseCommand):
         if not content_id:
             return False
 
+        self.stdout.write(f"Picked queued video: {content_id}")
+        self.stdout.flush()
+
         temp_key = ""
         try:
             content_before = LearningContent.objects.get(pk=content_id)
             temp_key = str(content_before.video_temp_key or "").strip()
+            self.stdout.write(f"Processing video: {content_id}")
+            self.stdout.flush()
             result = process_video_content(content_id)
             with transaction.atomic():
                 content = LearningContent.objects.select_for_update().get(pk=content_id)
@@ -102,6 +107,8 @@ class Command(BaseCommand):
                 except Exception:
                     logger.exception("Could not delete temporary source video %s", temp_key)
 
+            self.stdout.write(self.style.SUCCESS(f"Video ready: {content_id}"))
+            self.stdout.flush()
             return True
         except Exception as exc:
             logger.exception("Learning video processing failed: %s", content_id)
