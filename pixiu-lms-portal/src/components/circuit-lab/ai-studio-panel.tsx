@@ -1033,8 +1033,26 @@ export function AiStudioPanel({
             allDetections: [],
             modelClasses: store.model?.classes ?? [],
             modelSource: "trained",
-            detail: result ? Object.entries(result.probabilities).map(([k, v]) => `${k} ${v}%`).join(" · ") : "Show an example",
-          })
+            unknown: result?.unknown ?? true,
+            lowConfidence: result?.lowConfidence ?? true,
+            confidenceThreshold: result?.threshold ?? store.model?.predictionThreshold ?? 62,
+            decisionReason:
+              result?.reason === "ambiguous"
+                ? "ambiguous"
+                : result?.reason === "low_confidence"
+                  ? "low_confidence"
+                  : result
+                    ? "recognized"
+                    : "no_input",
+            probabilities: result?.probabilities,
+            detail: result
+              ? result.unknown
+                ? "UNKNOWN · " + formatDecisionReason(result.reason)
+                : Object.entries(result.probabilities)
+                    .map(([key, value]) => key + " " + value + "%")
+                    .join(" · ")
+              : "Show an example",
+          }))
           clearOverlay()
         }
 
