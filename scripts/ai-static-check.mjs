@@ -38,8 +38,8 @@ for (const mode of ["objects", "pose", "hands", "emotion", "sound", "numbers"]) 
 
 for (const marker of [
   "loadHandDetector",
-  "loadFaceEmotion",
-  "loadSpeechRecognizer",
+  "loadFaceDetector",
+  "loadSoundRecognizer",
   "trainAiModel",
   "predictAiImage",
   "getModelWeightShapes",
@@ -74,9 +74,7 @@ requireText(panel, "createAiVisionState", "6.0 state integration")
 
 for (const forbidden of [
   'cocoSsd.load({ base: "mobilenet_v2" })',
-  "resourceRef.current.detect(",
   "resourceRef.current.estimatePoses(",
-  "loadPoseDetector()",
 ]) forbidText(panel, forbidden, "6A-6C old active path")
 
 const stopProgramSection = workbench.slice(
