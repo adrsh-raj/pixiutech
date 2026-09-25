@@ -422,6 +422,7 @@ export function AiStudioPanel({
   const fpsFramesRef = useRef(0)
   const dragRef = useRef<{ pointerId: number; offsetX: number; offsetY: number } | null>(null)
   const trainingRunRef = useRef(0)
+  const datasetVersionRef = useRef(0)
   const [floatingPosition, setFloatingPosition] = useState<{ left: number; top: number } | null>(null)
 
   const classes = useMemo(() => getAiClasses(store), [store])
@@ -429,6 +430,11 @@ export function AiStudioPanel({
   const datasetStats = useMemo(() => getAiDatasetStats(store), [store])
   const currentExplanation = explainCurrentAiResult(aiState, store.model)
   const canTrain = datasetStats.ready
+
+  function commitStore(next: AiStudioStore) {
+    datasetVersionRef.current += 1
+    commitStore(next)
+  }
 
   useEffect(() => {
     if (!isOpen) {
@@ -1164,8 +1170,7 @@ export function AiStudioPanel({
       const optimized = await optimizeAiImage(frame, 384, 0.62)
       const before = store.samples.length
       const next = addAiSample(store, label, optimized)
-      setStore(next)
-      saveAiStudioStore(next)
+      commitStore(next)
       setLabel("")
       setStatus(
         next.samples.length > before
@@ -1205,8 +1210,7 @@ export function AiStudioPanel({
         if (next.samples.length > before) added += 1
       }
 
-      setStore(next)
-      saveAiStudioStore(next)
+      commitStore(next)
       setLabel("")
       setStatus("Imported " + added + " example" + (added === 1 ? "" : "s") + ".")
     } catch (sampleError) {
@@ -1218,6 +1222,7 @@ export function AiStudioPanel({
     if (!canTrain || training) return
 
     const runId = ++trainingRunRef.current
+    const datasetVersion = datasetVersionRef.current
     const trainingSamples = store.samples
     setTraining(true)
     setError(null)
@@ -1226,7 +1231,9 @@ export function AiStudioPanel({
     try {
       const result = await trainAiModel(trainingSamples, {
         epochs: 18,
-        shouldCancel: () => runId !== trainingRunRef.current,
+        shouldCancel: () =>
+          runId !== trainingRunRef.current ||
+          datasetVersion !== datasetVersionRef.current,
         onStage: (stage) =>
           setProgress((current) => ({ ...current, stage })),
         onEpoch: (epoch, total, accuracy, loss) =>
@@ -1241,7 +1248,10 @@ export function AiStudioPanel({
       })
 
       // Dataset/reset/unmount may have superseded this training run.
-      if (runId !== trainingRunRef.current) {
+      if (
+        runId !== trainingRunRef.current ||
+        datasetVersion !== datasetVersionRef.current
+      ) {
         if (getActiveAiModel() === result.model) {
           disposeActiveAiModel()
         }
@@ -1249,8 +1259,7 @@ export function AiStudioPanel({
       }
 
       const next = { ...store, samples: trainingSamples, model: result.summary }
-      setStore(next)
-      saveAiStudioStore(next)
+      commitStore(next)
       setModel(result.model)
       setMode("trained")
       setTab("try")
@@ -1267,6 +1276,7 @@ export function AiStudioPanel({
 
   async function resetStudio() {
     trainingRunRef.current += 1
+    datasetVersionRef.current += 1
     stopInput()
     await clearAiStudioStore()
     setStore({ classes: [], samples: [], model: null })
@@ -1545,8 +1555,7 @@ export function AiStudioPanel({
                     <button
                       onClick={() => {
                         const next = addAiClass(store, label)
-                        setStore(next)
-                        saveAiStudioStore(next)
+                        commitStore(next)
                         if (next.classes.length === store.classes.length) {
                           setStatus("Concept already exists or the 8-concept limit is reached.")
                         } else {
@@ -1650,8 +1659,7 @@ export function AiStudioPanel({
                               <button
                                 onClick={() => {
                                   const next = renameAiClass(store, name, renameValue)
-                                  setStore(next)
-                                  saveAiStudioStore(next)
+                                  commitStore(next)
                                   setRenamingClass(null)
                                   setRenameValue("")
                                   setStatus(next === store ? "That concept name is already in use." : "Concept renamed.")
@@ -1689,8 +1697,7 @@ export function AiStudioPanel({
                             <button
                               onClick={() => {
                                 const next = removeAiClass(store, name)
-                                setStore(next)
-                                saveAiStudioStore(next)
+                                commitStore(next)
                                 if (label === name) setLabel("")
                                 setRenamingClass(null)
                                 setStatus("Concept removed with its examples.")
@@ -1716,8 +1723,7 @@ export function AiStudioPanel({
                             <button
                               onClick={() => {
                                 const next = removeAiSample(store, sample.id)
-                                setStore(next)
-                                saveAiStudioStore(next)
+                                commitStore(next)
                               }}
                               className="absolute right-1 top-1 rounded-md bg-slate-950/85 p-1 text-slate-300 hover:text-rose-300"
                               title="Remove sample"
