@@ -670,9 +670,12 @@ export function AiStudioPanel({
     } catch (cameraError) {
       if (requestId !== cameraRequestRef.current) return
       setError(
-        cameraError instanceof Error
-          ? cameraError.message
-          : "Camera permission was denied or unavailable.",
+        mediaPermissionMessage(
+          cameraError,
+          cameraError instanceof Error
+            ? cameraError.message
+            : "Camera permission was denied or unavailable.",
+        ),
       )
       setStatus("Camera unavailable")
       setCameraActive(false)
@@ -833,9 +836,12 @@ export function AiStudioPanel({
       setLoading(false)
       setSoundActive(false)
       setError(
-        soundError instanceof Error
-          ? soundError.message
-          : "Microphone recognition could not start.",
+        mediaPermissionMessage(
+          soundError,
+          soundError instanceof Error
+            ? soundError.message
+            : "Microphone recognition could not start.",
+        ),
       )
       setStatus("Sound AI unavailable")
     }
