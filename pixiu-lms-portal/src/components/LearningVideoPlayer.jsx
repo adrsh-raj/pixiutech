@@ -1,15 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AlertTriangle, Loader2, ShieldCheck, X } from 'lucide-react';
 import { API_BASE } from '../config/api';
 import { apiFetch } from '../context/AuthContext';
-
-const PLAYBACK_REFRESH_MS = 20 * 60 * 1000;
 
 export default function LearningVideoPlayer({ material, onClose }) {
   const [videoUrl, setVideoUrl] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const refreshTimer = useRef(null);
 
   const getPlaybackUrl = async () => {
     const id = encodeURIComponent(String(material?.id || ''));
@@ -31,12 +28,6 @@ export default function LearningVideoPlayer({ material, onClose }) {
         const url = await getPlaybackUrl();
         if (!active) return;
         setVideoUrl(url);
-        refreshTimer.current = window.setTimeout(async () => {
-          try {
-            const refreshed = await getPlaybackUrl();
-            if (active) setVideoUrl(refreshed);
-          } catch {}
-        }, PLAYBACK_REFRESH_MS);
       } catch (err) {
         if (active) setError(err?.message || 'Unable to play this video.');
       } finally {
@@ -46,7 +37,6 @@ export default function LearningVideoPlayer({ material, onClose }) {
     void load();
     return () => {
       active = false;
-      if (refreshTimer.current) window.clearTimeout(refreshTimer.current);
     };
   }, [material?.id]);
 
