@@ -176,6 +176,13 @@ export async function loadHandDetector(): Promise<HandDetector> {
   }
 }
 
+export async function detectHands(
+  detector: HandDetector,
+  video: HTMLVideoElement,
+): Promise<HandDetection[]> {
+  return detector.detect(video)
+}
+
 export function disposeHandDetector(detector: HandDetector | null) {
   detector?.dispose()
 }
