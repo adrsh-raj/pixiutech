@@ -897,12 +897,12 @@ export function Workbench() {
     setSelectedWireId(null)
     setWiring(null)
     setSerialLines([])
-    setIsAiCameraOpen(false)
+    stopAiRuntime()
     setIsDmmOpen(false)
     setIsScopeOpen(false)
     setLastSaved(project.savedAt)
     setIsDirty(false)
-  }, [stopProgram])
+  }, [stopProgram, stopAiRuntime])
 
   const handleNewProject = useCallback(async (): Promise<void> => {
     stopProgram()
@@ -916,10 +916,10 @@ export function Workbench() {
     setSelectedWireId(null)
     setWiring(null)
     setSerialLines([])
-    setIsAiCameraOpen(false)
+    stopAiRuntime()
     setIsDmmOpen(false)
     setIsScopeOpen(false)
-  }, [stopProgram])
+  }, [stopProgram, stopAiRuntime])
 
   const handleSelectLesson = useCallback((lesson: Lesson) => {
     setActiveLessonId(lesson.id)
