@@ -661,54 +661,52 @@ export function AiStudioPanel({
     stopInference()
     const activeSession = ++sessionRef.current
     setLoading(true)
+
     try {
-      const recognizer = await loadSpeechRecognizer()
+      const recognizer = await loadSoundRecognizer()
       if (activeSession !== sessionRef.current) {
-        await stopSpeechRecognizer(recognizer)
+        await stopSoundRecognizer(recognizer)
         return
       }
+
       resourceRef.current = recognizer
+      resourceModeRef.current = "sound"
       setLoading(false)
       setSoundActive(true)
       onAiStateChange({
         ...createAiVisionState("sound"),
         enabled: true,
-        detail: "Microphone listening",
+        modelClasses: recognizer.labels,
+        detail: "Microphone ready",
       })
-      setStatus("6F Sound listening")
+      setStatus("6F Sound ready")
 
-      await recognizer.listen(
-        (result: any) => {
-          if (activeSession !== sessionRef.current) return
-          const scores = Array.from(result?.scores ?? []) as number[]
-          const labels = recognizer.wordLabels()
-          let best = 0
-          for (let i = 1; i < scores.length; i += 1) {
-            if ((scores[i] ?? 0) > (scores[best] ?? 0)) best = i
-          }
+      await recognizer.start((result) => {
+        if (activeSession !== sessionRef.current) return
 
-          const confidence = Math.round((scores[best] ?? 0) * 100)
-          const word = labels[best] ?? "unknown"
-          onAiStateChange({
-            enabled: true,
-            mode: "sound",
-            detectedClass: word,
-            confidence,
-            allDetections: [],
-            modelClasses: labels,
-            modelSource: "ready",
-            detail: confidence >= 65 ? `Heard “${word}”` : "Listening...",
-          })
-        },
-        {
-          probabilityThreshold: 0.65,
-          invokeCallbackOnNoiseAndUnknown: true,
-          includeSpectrogram: false,
-        },
-      )
+        onAiStateChange({
+          enabled: true,
+          mode: "sound",
+          detectedClass: result.label,
+          confidence: result.confidence,
+          allDetections: [],
+          modelClasses: recognizer.labels,
+          modelSource: "ready",
+          detail: result.isActionable
+            ? `Heard “${result.label}” · ${result.confidence}%`
+            : result.label === "none"
+              ? "Listening…"
+              : `Possible “${result.label}” · speak clearly`,
+        })
+      })
+
+      if (activeSession === sessionRef.current) {
+        setStatus("6F Sound listening")
+      }
     } catch (soundError) {
       if (activeSession !== sessionRef.current) return
       setLoading(false)
+      setSoundActive(false)
       setError(
         soundError instanceof Error
           ? soundError.message
