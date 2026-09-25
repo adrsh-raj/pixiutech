@@ -1397,6 +1397,7 @@ export function Workbench() {
         state={state}
         running={running}
         simulationRef={oscilloscopeSimulationRef}
+        pressed={pressed}
         probeCH1={scopeProbeCH1}
         probeCH2={scopeProbeCH2}
         onSetProbeCH1={setScopeProbeCH1}
