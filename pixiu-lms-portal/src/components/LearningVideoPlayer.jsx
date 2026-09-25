@@ -16,7 +16,12 @@ export default function LearningVideoPlayer({ material, onClose }) {
     if (!response.ok || !payload.video_url) {
       throw new Error(payload?.detail || payload?.error || 'Unable to start secure video playback.');
     }
-    return API_BASE + String(payload.video_url);
+    const playbackPath = String(payload.video_url || '').trim();
+    try {
+      return new URL(playbackPath, `${API_BASE}/`).toString();
+    } catch {
+      throw new Error('Invalid secure video playback URL.');
+    }
   };
 
   useEffect(() => {
