@@ -2,6 +2,12 @@ import * as cocoSsd from "@tensorflow-models/coco-ssd"
 
 export type ObjectDetector = cocoSsd.ObjectDetection
 
+export type NormalizedObjectDetection = {
+  class: string
+  score: number
+  bbox: [number, number, number, number]
+}
+
 export const DEFAULT_OBJECT_MAX_BOXES = 20
 export const DEFAULT_OBJECT_MIN_SCORE = 0.3
 
