@@ -469,6 +469,29 @@ export function defineArduinoBlocks() {
     },
   }
 
+  Blockly.Blocks['ai_is_gesture'] = {
+    init() {
+      const gestures = [
+        ['Fist', 'fist'],
+        ['Thumbs Up', 'thumbs_up'],
+        ['Thumbs Down', 'thumbs_down'],
+        ['Point', 'point'],
+        ['Peace', 'peace'],
+        ['One', 'one'],
+        ['Two', 'two'],
+        ['Three', 'three'],
+        ['Four', 'four'],
+        ['Open Palm', 'open_palm'],
+      ]
+      this.appendDummyInput()
+        .appendField('🤖 AI gesture is')
+        .appendField(new Blockly.FieldDropdown(gestures), 'GESTURE')
+      this.setOutput(true, 'Boolean')
+      this.setColour(285)
+      this.setTooltip('Browser AI Studio block: checks the interpreted hand gesture.')
+    },
+  }
+
   Blockly.Blocks['ai_camera_enable'] = {
     init() {
       this.appendDummyInput()
@@ -785,6 +808,11 @@ arduino.forBlock['ai_get_gesture'] = () => [
 
 arduino.forBlock['ai_get_finger_count'] = () => [
   '0 /* PIXIU AI Studio: browser-only finger count. */',
+  ORDER.ATOMIC,
+]
+
+arduino.forBlock['ai_is_gesture'] = () => [
+  'false /* PIXIU AI Studio: browser-only gesture predicate. */',
   ORDER.ATOMIC,
 ]
 
