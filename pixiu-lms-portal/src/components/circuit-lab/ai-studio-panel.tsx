@@ -2,15 +2,18 @@
 
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react"
 import {
+  BookOpen,
   Brain,
   Camera,
   CameraOff,
   CheckCircle2,
+  Info,
   Layers3,
   Mic,
   Pencil,
   Plus,
   RefreshCcw,
+  ShieldCheck,
   Sparkles,
   Trash2,
   Upload,
@@ -97,6 +100,80 @@ type ReadyResource = any
 
 const OBJECT_MIN_SCORE = DEFAULT_OBJECT_MIN_SCORE
 const OBJECT_MAX_BOXES = DEFAULT_OBJECT_MAX_BOXES
+
+function formatDecisionReason(reason: AiVisionState["decisionReason"]) {
+  if (reason === "no_input") return "No usable input"
+  if (reason === "low_confidence") return "Below confidence threshold"
+  if (reason === "ambiguous") return "Top classes are too close"
+  return "Accepted"
+}
+
+function explainCurrentAiResult(
+  state: AiVisionState,
+  modelSummary: AiStudioStore["model"],
+) {
+  const threshold = state.confidenceThreshold ?? 60
+  if (!state.enabled || state.detectedClass === "none") {
+    return "No input is being accepted right now. Start the required camera or microphone and provide a clear example."
+  }
+
+  if (state.unknown) {
+    const reason = state.decisionReason === "ambiguous"
+      ? "the top candidates are too close to one another"
+      : "the confidence is below the acceptance threshold"
+    return "AI returned UNKNOWN because " + reason + ". The normalized bridge does not present this result as a detected class."
+  }
+
+  if (state.mode === "trained" && state.probabilities && modelSummary) {
+    const ranked = Object.entries(state.probabilities).sort((a, b) => b[1] - a[1]).slice(0, 3)
+    const top = ranked.map(([name, value]) => name + " " + value + "%").join(" · ")
+    return "My AI used the frozen feature extractor plus its trained classifier head. Top scores: " + top + ". The result is accepted at " + state.confidence + "% because it clears the " + threshold + "% threshold."
+  }
+
+  if (state.mode === "numbers") {
+    return "6G first reads the 21 hand landmarks, converts them to extended-finger geometry, then uses short temporal smoothing. Current gesture: " + (state.detectedGesture ?? "none") + "."
+  }
+
+  if (state.mode === "hands") {
+    return "6D uses the detected hand landmarks and handedness. Finger counts are derived from landmark geometry rather than a separate image classifier."
+  }
+
+  if (state.mode === "objects") {
+    return "6B ranks the visible object candidates produced by COCO-SSD. The normalized bridge exposes the top accepted label and confidence to Blockly."
+  }
+
+  if (state.mode === "pose") {
+    return "6C uses MoveNet Lightning keypoint scores. The displayed confidence is based on the visible keypoints that pass the runtime visibility threshold."
+  }
+
+  if (state.mode === "emotion") {
+    return "6E uses the FaceMesh landmark geometry and the project's expression heuristic. This is an expression demo, not a definitive measurement of a person's internal emotional state."
+  }
+
+  if (state.mode === "sound") {
+    return "6F compares microphone audio against the browser speech-command vocabulary. Only sufficiently confident actionable words are exposed as recognized commands."
+  }
+
+  return "The current AI result is accepted by the active model contract."
+}
+
+function mediaPermissionMessage(error: unknown, fallback: string) {
+  const name =
+    error && typeof error === "object" && "name" in error
+      ? String((error as { name?: unknown }).name ?? "")
+      : ""
+
+  if (name === "NotAllowedError" || name === "SecurityError") {
+    return "Permission blocked. Allow camera/microphone access for this site, then start AI again."
+  }
+  if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+    return "No compatible camera or microphone was found."
+  }
+  if (name === "NotReadableError") {
+    return "The camera or microphone is busy in another app or browser tab."
+  }
+  return fallback
+}
 
 const MODES: Array<{ id: ReadyAiMode; title: string; subtitle: string }> = [
   { id: "objects", title: "Objects", subtitle: "COCO-SSD object boxes" },
