@@ -170,7 +170,7 @@ requireText(panel, "loadFaceDetector", "panel E adapter")
 requireText(panel, "detectFaces", "panel E inference")
 requireText(panel, "loadSoundRecognizer", "panel F adapter")
 requireText(runner, 'case "ai_microphone_enable"', "Blockly Sound runtime execution")
-requireText(blocks, "setMicrophone", "Blockly Sound generator")
+requireText(blocks, "Browser AI Studio browser runtime: AI microphone", "Blockly Sound generator")
 requireText(blocks, "Browser AI generators", "compile-safe AI generator contract")
 for (const forbidden of ["aiVision.isDetected(", "aiVision.getDetectedClass(", "aiVision.getConfidence(", "aiVision.setCamera(", "aiVision.setMicrophone("]) {
   forbidText(blocks, forbidden, "AI browser/Arduino generator mismatch")
