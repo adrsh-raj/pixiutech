@@ -120,6 +120,7 @@ const TOOLBOX = {
       colour: '#a855f7',
       contents: [
         { kind: 'block', type: 'ai_is_detected' },
+        { kind: 'block', type: 'ai_is_unknown' },
         { kind: 'block', type: 'ai_get_detected_class' },
         { kind: 'block', type: 'ai_confidence' },
         { kind: 'block', type: 'ai_get_gesture' },
