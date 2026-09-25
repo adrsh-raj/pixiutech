@@ -23,6 +23,7 @@ export interface ExecutionEnvironment {
   getAiDetectedClass?: () => string
   getAiConfidence?: () => number
   setAiCamera?: (enabled: boolean) => void
+  setAiMicrophone?: (enabled: boolean) => void
   sleep: (ms: number) => Promise<void>
   isRunning: () => boolean
   // Stepping & Debugging methods
@@ -389,6 +390,12 @@ async function executeSingleBlock(block: Blockly.Block, env: ExecutionEnvironmen
     case "ai_camera_enable": {
       const state = block.getFieldValue("STATE") ?? "ON"
       env.setAiCamera?.(state === "ON")
+      break
+    }
+
+    case "ai_microphone_enable": {
+      const state = block.getFieldValue("STATE") ?? "ON"
+      env.setAiMicrophone?.(state === "ON")
       break
     }
 
