@@ -688,7 +688,9 @@ export async function trainAiModel(
     }
 
     options.onStage?.("Saving model locally")
-    await queueModelOperation(() => model!.save(`indexeddb://${MODEL_KEY}`))
+    await queueModelOperation(async () => {
+      await model!.save(`indexeddb://${MODEL_KEY}`)
+    })
 
     activeModel = model
     model = null
