@@ -485,6 +485,7 @@ export function Workbench() {
       blocklyXml.includes('type="ai_') ||
       blocklyXml.includes("ai_detect_objects") ||
       blocklyXml.includes("ai_is_detected") ||
+      blocklyXml.includes("ai_is_unknown") ||
       blocklyXml.includes("ai_get_detected_class") ||
       blocklyXml.includes("ai_confidence") ||
       blocklyXml.includes("ai_get_gesture") ||
@@ -610,6 +611,7 @@ export function Workbench() {
           return String(keypad?.props?.lastKey ?? "")
         },
         isAiDetected: (cls) => aiStateRef.current.detectedClass.trim().toLowerCase() === String(cls).trim().toLowerCase(),
+        isAiUnknown: () => aiStateRef.current.unknown === true,
         getAiDetectedClass: () => aiStateRef.current.detectedClass,
         getAiConfidence: () => aiStateRef.current.confidence,
         getAiGesture: () => aiStateRef.current.detectedGesture ?? "none",
