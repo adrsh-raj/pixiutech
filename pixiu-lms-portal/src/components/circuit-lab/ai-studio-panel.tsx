@@ -817,7 +817,6 @@ export function AiStudioPanel({
           const faces: FaceDetection[] = await resourceRef.current.detect(video)
           if (activeSession !== sessionRef.current) return
 
-          drawFaces(getActiveOverlay()!, video, faces)
           const face = faces[0]
 
           if (face) {
@@ -836,6 +835,11 @@ export function AiStudioPanel({
           const stableExpression =
             Object.entries(histogram).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "none"
 
+          const drawableFaces = faces.map((current, index) =>
+            index === 0 ? { ...current, expression: stableExpression } : current,
+          )
+          drawFaces(getActiveOverlay()!, video, drawableFaces)
+
           onAiStateChange({
             enabled: true,
             mode: "emotion",
@@ -848,7 +852,7 @@ export function AiStudioPanel({
               ? String(faces.length) + " face" + (faces.length === 1 ? "" : "s") + " · " + stableExpression
               : "Show your face",
           })
-                  } else if (mode === "trained") {
+        } else if (mode === "trained") {
           const frame = captureVideoFrame(video, 640)
           const result = frame ? await predictAiImage(frame, store.model) : null
           if (activeSession !== sessionRef.current) return
