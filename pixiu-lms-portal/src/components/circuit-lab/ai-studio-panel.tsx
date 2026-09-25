@@ -15,7 +15,6 @@ import {
   X,
   Zap,
 } from "lucide-react"
-import * as cocoSsd from "@tensorflow-models/coco-ssd"
 import {
   addAiSample,
   clearAiStudioStore,
@@ -46,6 +45,18 @@ import {
   startCamera,
   stopCamera,
 } from "@/lib/ai/camera-session"
+import {
+  DEFAULT_OBJECT_MAX_BOXES,
+  DEFAULT_OBJECT_MIN_SCORE,
+  detectObjects,
+  disposeObjectDetector,
+  loadObjectDetector,
+} from "@/lib/ai/object-detector"
+import {
+  disposeMoveNet,
+  estimateMoveNetPose,
+  loadMoveNet,
+} from "@/lib/ai/pose-detector"
 import type { AiVisionMode, ReadyAiMode, AiVisionState } from "@/lib/ai/vision-types"
 
 export type { AiVisionState, ReadyAiMode }
@@ -64,12 +75,8 @@ interface Props {
 type Tab = "try" | "teach" | "understand"
 type ReadyResource = any
 
-// Object detection tuning:
-// - MobileNetV2 is the higher-accuracy COCO-SSD backbone.
-// - A lower threshold makes smaller / harder COCO objects visible instead of
-//   effectively restricting the live demo to only the easiest detections.
-const OBJECT_MIN_SCORE = 0.30
-const OBJECT_MAX_BOXES = 20
+const OBJECT_MIN_SCORE = DEFAULT_OBJECT_MIN_SCORE
+const OBJECT_MAX_BOXES = DEFAULT_OBJECT_MAX_BOXES
 
 const MODES: Array<{ id: ReadyAiMode; title: string; subtitle: string }> = [
   { id: "objects", title: "Objects", subtitle: "COCO-SSD object boxes" },
@@ -278,6 +285,8 @@ export function AiStudioPanel({
   const resourceRef = useRef<ReadyResource>(null)
   const timerRef = useRef<number | null>(null)
   const sessionRef = useRef(0)
+  const cameraRequestRef = useRef(0)
+  const resourceModeRef = useRef<AiVisionMode | null>(null)
   const busyRef = useRef(false)
   const fpsStartRef = useRef(0)
   const fpsFramesRef = useRef(0)
@@ -427,40 +436,77 @@ export function AiStudioPanel({
     setFps(0)
   }
 
-  function releaseCurrentResource() {
-    const resource = resourceRef.current
-    resourceRef.current = null
+  function releaseLoadedResource(resourceMode: AiVisionMode | null, resource: ReadyResource) {
+    if (!resource) return
 
-    if (mode === "sound") {
+    if (resourceMode === "sound") {
       void stopSpeechRecognizer(resource)
-    } else if (mode === "trained") {
-      disposeActiveAiModel()
-      setModel(null)
+    } else if (resourceMode === "trained") {
+      if (resource !== model) disposeAiResource(resource)
+    } else if (resourceMode === "objects") {
+      disposeObjectDetector(resource)
+    } else if (resourceMode === "pose") {
+      disposeMoveNet(resource)
     } else {
       disposeAiResource(resource)
     }
   }
 
+  function releaseCurrentResource() {
+    const resource = resourceRef.current
+    const resourceMode = resourceModeRef.current
+    resourceRef.current = null
+    resourceModeRef.current = null
+
+    if (!resource) return
+
+    if (resourceMode === "trained") {
+      disposeActiveAiModel()
+      setModel(null)
+      return
+    }
+
+    releaseLoadedResource(resourceMode, resource)
+  }
+
+  function stopCameraStream() {
+    const stream = streamRef.current
+    if (!stream) return
+
+    stopCamera(studioVideoRef.current, stream)
+    stopCamera(floatingVideoRef.current, stream)
+    streamRef.current = null
+  }
+
   function stopAll() {
+    cameraRequestRef.current += 1
     releaseCurrentResource()
     stopInference()
-    stopCamera(getActiveVideo(), streamRef.current)
-    streamRef.current = null
+    stopCameraStream()
     setCameraActive(false)
     setSoundActive(false)
     setLoading(false)
   }
 
   async function openCamera(withModel = true) {
+    const requestId = ++cameraRequestRef.current
     setError(null)
     setStatus("Starting camera...")
     stopInference()
     releaseCurrentResource()
+    stopCameraStream()
+    setCameraActive(false)
 
     try {
       const video = getActiveVideo()
       if (!video) throw new Error("Camera preview is not mounted.")
       const stream = await startCamera(video)
+
+      if (requestId !== cameraRequestRef.current) {
+        stopCamera(video, stream)
+        return
+      }
+
       streamRef.current = stream
       attachStreamToVisibleVideos()
       setCameraActive(true)
@@ -471,6 +517,7 @@ export function AiStudioPanel({
         detail: withModel ? "Camera live" : "Teach camera live",
       })
     } catch (cameraError) {
+      if (requestId !== cameraRequestRef.current) return
       setError(
         cameraError instanceof Error
           ? cameraError.message
@@ -482,8 +529,17 @@ export function AiStudioPanel({
     }
 
     if (!withModel) return
-    if (mode !== "sound") await startModeResource()
+    if (mode !== "sound" && requestId === cameraRequestRef.current) {
+      await startModeResource()
+    }
   }
+
+  useEffect(() => {
+    return () => {
+      cameraRequestRef.current += 1
+      stopAll()
+    }
+  }, [])
 
   async function startCameraForMode() {
     await openCamera(true)
@@ -502,9 +558,9 @@ export function AiStudioPanel({
       let resource: ReadyResource = null
 
       if (mode === "objects") {
-        resource = await cocoSsd.load({ base: "mobilenet_v2" })
+        resource = await loadObjectDetector()
       } else if (mode === "pose") {
-        resource = await loadPoseDetector()
+        resource = await loadMoveNet()
       } else if (mode === "hands" || mode === "numbers") {
         resource = await loadHandDetector()
       } else if (mode === "emotion") {
@@ -517,11 +573,12 @@ export function AiStudioPanel({
       }
 
       if (activeSession !== sessionRef.current) {
-        if (resource && resource !== model) disposeAiResource(resource)
+        releaseLoadedResource(mode, resource)
         return
       }
 
       resourceRef.current = resource
+      resourceModeRef.current = mode
       setLoading(false)
       setStatus(
         mode === "objects" ? "6A Objects ready"
@@ -760,10 +817,10 @@ export function AiStudioPanel({
   }
 
   function stopInput() {
+    cameraRequestRef.current += 1
     releaseCurrentResource()
     stopInference()
-    stopCamera(getActiveVideo(), streamRef.current)
-    streamRef.current = null
+    stopCameraStream()
     setCameraActive(false)
     setSoundActive(false)
     onAiStateChange(emptyState(mode))
