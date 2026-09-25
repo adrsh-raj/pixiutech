@@ -1,6 +1,4 @@
-from django.core.files.storage import default_storage
 from django.db import transaction
-from django.utils import timezone
 
 from rest_framework.exceptions import ValidationError
 
@@ -47,6 +45,7 @@ from learning.watermarking import prepare_uploaded_file
 from pathlib import Path
 
 from core.upload_security import validate_uploaded_file
+from learning.video_processing import upload_temp_video
 
 
 def _accessible_quiz_queryset(user):
@@ -163,12 +162,11 @@ class SafeScopedContentViewSet(ScopedContractContentViewSet):
             return None
         content_type = serializer.validated_data.get("content_type", "pdf")
         if content_type == "video":
-            # Store videos directly in the permanent private bucket. Validate
-            # extension, MIME, signature and size before Django/S3 storage.
-            # Server-side transcoding is intentionally disabled because the
-            # production API does not require a background worker for uploads.
+            # Keep the original out of the permanent bucket. Validate filename,
+            # MIME, signature and size here, then let the worker scan the
+            # compressed derivative before final storage.
             validate_uploaded_file(upload, scan=False)
-            serializer.validated_data["file"] = upload
+            serializer.validated_data.pop("file", None)
             serializer.validated_data["is_watermarked"] = False
             return upload
 
@@ -204,25 +202,23 @@ class SafeScopedContentViewSet(ScopedContractContentViewSet):
         content_type = str(serializer.validated_data.get("content_type", getattr(serializer.instance, "content_type", ""))).lower()
         requested_status = str(serializer.validated_data.get("status", getattr(serializer.instance, "status", "draft")) or "draft").lower()
 
-        old_file_name = ""
         if update:
             save_kwargs = {
                 "created_by": user if user.role == UserRole.TRAINER else serializer.instance.created_by,
             }
             if video_upload is not None:
-                old_file_name = str(getattr(serializer.instance.file, "name", "") or "").strip()
-                # Direct-upload videos are immediately ready and published/drafted
-                # according to the user's requested status. No worker is required.
+                # Keep any currently published MP4 until the replacement has
+                # completed. The requested publish state is restored after
+                # successful transcoding.
                 save_kwargs.update({
-                    "status": requested_status,
-                    "video_processing_status": LearningContent.VIDEO_PROCESSING_READY,
+                    "status": "draft",
+                    "video_processing_status": LearningContent.VIDEO_PROCESSING_QUEUED,
                     "video_processing_error": "",
-                    "video_requested_status": "",
-                    "video_temp_key": "",
+                    "video_requested_status": requested_status,
                     "video_original_name": Path(str(video_upload.name)).name,
                     "video_size_bytes": int(getattr(video_upload, "size", 0) or 0),
                     "video_processing_started_at": None,
-                    "video_ready_at": timezone.now(),
+                    "video_ready_at": None,
                 })
             content = serializer.save(**save_kwargs)
             ContentClassAssignment.objects.filter(content=content).delete()
@@ -232,15 +228,11 @@ class SafeScopedContentViewSet(ScopedContractContentViewSet):
             }
             if content_type == "video":
                 create_kwargs.update({
-                    "status": requested_status,
-                    "video_processing_status": LearningContent.VIDEO_PROCESSING_READY,
-                    "video_processing_error": "",
-                    "video_requested_status": "",
-                    "video_temp_key": "",
+                    "status": "draft",
+                    "video_processing_status": LearningContent.VIDEO_PROCESSING_QUEUED,
+                    "video_requested_status": requested_status,
                     "video_original_name": Path(str(video_upload.name)).name if video_upload is not None else "",
                     "video_size_bytes": int(getattr(video_upload, "size", 0) or 0) if video_upload is not None else None,
-                    "video_processing_started_at": None,
-                    "video_ready_at": timezone.now(),
                 })
             content = serializer.save(**create_kwargs)
 
@@ -250,25 +242,12 @@ class SafeScopedContentViewSet(ScopedContractContentViewSet):
         )
 
         if video_upload is not None:
-            content.video_processing_status = LearningContent.VIDEO_PROCESSING_READY
-            content.video_temp_key = ""
-            content.video_ready_at = content.video_ready_at or timezone.now()
-            content.video_processing_started_at = None
-            content.video_requested_status = ""
+            extension = Path(str(video_upload.name)).suffix.lower()
+            temp_key, upload_size = upload_temp_video(video_upload, str(content.id), extension)
+            content.video_temp_key = temp_key
             if not content.video_size_bytes:
-                content.video_size_bytes = int(getattr(video_upload, "size", 0) or 0)
-            content.save(update_fields=[
-                "video_processing_status", "video_temp_key", "video_ready_at",
-                "video_processing_started_at", "video_requested_status",
-                "video_size_bytes", "updated_at",
-            ])
-            if old_file_name and old_file_name != str(content.file.name or "").strip():
-                try:
-                    default_storage.delete(old_file_name)
-                except Exception:
-                    # The new video is already committed; a stale old object is
-                    # safe to clean up separately and must not break the request.
-                    pass
+                content.video_size_bytes = upload_size
+            content.save(update_fields=["video_temp_key", "video_size_bytes", "updated_at"])
 
         return content
 
