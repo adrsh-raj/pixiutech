@@ -32,14 +32,25 @@ import {
   type AiStudioStore,
 } from "@/lib/ai-studio-engine"
 import {
-  disposeAiResource,
-  estimateFaceEmotion,
-  loadFaceEmotion,
+  captureVideoFrame,
+  startCamera,
+  stopCamera,
+} from "@/lib/ai/camera-session"
+import {
+  disposeHandDetector,
   loadHandDetector,
-  loadPoseDetector,
-  loadSpeechRecognizer,
-  stopSpeechRecognizer,
-} from "@/lib/ai-ready-runtime"
+  type HandDetection,
+} from "@/lib/ai/hand-detector"
+import {
+  disposeFaceDetector,
+  loadFaceDetector,
+  type FaceDetection,
+} from "@/lib/ai/face-detector"
+import {
+  loadSoundRecognizer,
+  stopSoundRecognizer,
+  type SoundRecognizer,
+} from "@/lib/ai/sound-detector"
 import {
   captureVideoFrame,
   startCamera,
@@ -88,21 +99,6 @@ const MODES: Array<{ id: ReadyAiMode; title: string; subtitle: string }> = [
   { id: "numbers", title: "Numbers", subtitle: "0–5 fingers" },
 ]
 
-
-undefinedfunction countFingers(landmarks: Array<{ x: number; y: number }>) {
-  if (landmarks.length < 21) return 0
-  const wrist = landmarks[0]
-  const dist = (a: { x: number; y: number }, b: { x: number; y: number }) =>
-    Math.hypot(a.x - b.x, a.y - b.y)
-
-  const tips = [4, 8, 12, 16, 20]
-  const folds = [2, 6, 10, 14, 18]
-  return tips.reduce((count, tipIndex, i) => {
-    const tip = landmarks[tipIndex]
-    const fold = landmarks[folds[i]]
-    return dist(tip, wrist) > dist(fold, wrist) * 1.1 ? count + 1 : count
-  }, 0)
-}
 
 function drawBoxes(
   canvas: HTMLCanvasElement,
@@ -175,7 +171,11 @@ function drawPose(canvas: HTMLCanvasElement, video: HTMLVideoElement, poseResult
   }
 }
 
-function drawHands(canvas: HTMLCanvasElement, video: HTMLVideoElement, results: any) {
+function drawHands(
+  canvas: HTMLCanvasElement,
+  video: HTMLVideoElement,
+  hands: HandDetection[],
+) {
   const width = video.videoWidth || 640
   const height = video.videoHeight || 480
   if (canvas.width !== width || canvas.height !== height) {
@@ -186,18 +186,56 @@ function drawHands(canvas: HTMLCanvasElement, video: HTMLVideoElement, results: 
   const ctx = canvas.getContext("2d")
   if (!ctx) return
   ctx.clearRect(0, 0, canvas.width, canvas.height)
-  ctx.fillStyle = "#38bdf8"
+  ctx.lineWidth = 3
+  ctx.strokeStyle = "#38bdf8"
+  ctx.fillStyle = "#e0f2fe"
+  ctx.font = "700 12px system-ui"
 
-  for (const hand of results?.multiHandLandmarks ?? []) {
-    for (const point of hand) {
+  const edges = [
+    [0, 1], [1, 2], [2, 3], [3, 4],
+    [0, 5], [5, 6], [6, 7], [7, 8],
+    [5, 9], [9, 10], [10, 11], [11, 12],
+    [9, 13], [13, 14], [14, 15], [15, 16],
+    [13, 17], [17, 18], [18, 19], [19, 20],
+    [0, 17],
+  ]
+
+  hands.forEach((hand) => {
+    edges.forEach(([a, b]) => {
+      const p1 = hand.keypoints[a]
+      const p2 = hand.keypoints[b]
+      if (!p1 || !p2) return
       ctx.beginPath()
-      ctx.arc(point.x * width, point.y * height, 4, 0, Math.PI * 2)
+      ctx.moveTo(p1.x, p1.y)
+      ctx.lineTo(p2.x, p2.y)
+      ctx.stroke()
+    })
+
+    for (const point of hand.keypoints) {
+      ctx.beginPath()
+      ctx.arc(point.x, point.y, 4, 0, Math.PI * 2)
       ctx.fill()
     }
-  }
+
+    const [x, y, w, h] = hand.box
+    if (w > 0 && h > 0) {
+      ctx.strokeRect(x, y, w, h)
+      const label = `${hand.handedness} · ${hand.fingerCount} fingers · ${Math.round(hand.score * 100)}%`
+      const tw = ctx.measureText(label).width + 12
+      ctx.fillStyle = "#38bdf8"
+      ctx.fillRect(x, Math.max(0, y - 22), tw, 22)
+      ctx.fillStyle = "#0f172a"
+      ctx.fillText(label, x + 6, Math.max(15, y - 7))
+      ctx.fillStyle = "#e0f2fe"
+    }
+  })
 }
 
-function drawFace(canvas: HTMLCanvasElement, video: HTMLVideoElement, result: any) {
+function drawFaces(
+  canvas: HTMLCanvasElement,
+  video: HTMLVideoElement,
+  faces: FaceDetection[],
+) {
   const width = video.videoWidth || 640
   const height = video.videoHeight || 480
   if (canvas.width !== width || canvas.height !== height) {
@@ -208,15 +246,26 @@ function drawFace(canvas: HTMLCanvasElement, video: HTMLVideoElement, result: an
   const ctx = canvas.getContext("2d")
   if (!ctx) return
   ctx.clearRect(0, 0, canvas.width, canvas.height)
+  ctx.lineWidth = 2
+  ctx.font = "700 12px system-ui"
 
-  const box = result?.box
-  if (Array.isArray(box) && box.length >= 4) {
-    const [x, y, w, h] = box.map(Number)
+  for (const face of faces) {
+    const [x, y, w, h] = face.box
+    if (w <= 0 || h <= 0) continue
+
     ctx.strokeStyle = "#f472b6"
-    ctx.lineWidth = 3
     ctx.strokeRect(x, y, w, h)
-    const label = String(result.expression ?? "face")
-    ctx.font = "700 13px system-ui"
+
+    if (face.mesh.length) {
+      ctx.fillStyle = "rgba(244, 114, 182, 0.75)"
+      for (const point of face.mesh) {
+        ctx.beginPath()
+        ctx.arc(point.x, point.y, 1.5, 0, Math.PI * 2)
+        ctx.fill()
+      }
+    }
+
+    const label = `${face.expression} · ${Math.round(face.expressionScore * 100)}%`
     const tw = ctx.measureText(label).width + 12
     ctx.fillStyle = "#f472b6"
     ctx.fillRect(x, Math.max(0, y - 22), tw, 22)
