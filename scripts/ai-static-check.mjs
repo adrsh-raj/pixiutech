@@ -150,6 +150,7 @@ for (const marker of [
   "generation",
   "generation",
   "window.tf = tf",
+  "Number.isFinite",
   "stopListening",
 ]) requireText(soundAdapter, marker, "6F sound adapter")
 
