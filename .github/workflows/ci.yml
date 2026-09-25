@@ -32,7 +32,10 @@ jobs:
         ports:
           - 3310:3310
         env:
-          CLAMD_CONF_StreamMaxLength: 30M
+          CLAMD_CONF_StreamMaxLength: 600M
+          CLAMD_CONF_MaxFileSize: 600M
+          CLAMD_CONF_MaxScanSize: 600M
+          CLAMD_CONF_MaxScanTime: 3600000
           CLAMD_CONF_ConcurrentDatabaseReload: "no"
           CLAMD_CONF_MaxThreads: "4"
           FRESHCLAM_CHECKS: "24"
