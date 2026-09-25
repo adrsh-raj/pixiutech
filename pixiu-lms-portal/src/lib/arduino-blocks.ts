@@ -433,6 +433,15 @@ export function defineArduinoBlocks() {
     },
   }
 
+  Blockly.Blocks['ai_is_unknown'] = {
+    init() {
+      this.appendDummyInput().appendField('🤖 AI result is unknown?')
+      this.setOutput(true, 'Boolean')
+      this.setColour(285)
+      this.setTooltip('Returns true when AI has no accepted result or confidence is below the AI threshold.')
+    },
+  }
+
   Blockly.Blocks['ai_get_detected_class'] = {
     init() {
       this.appendDummyInput().appendField('🤖 AI detected object')
@@ -790,6 +799,11 @@ arduino.forBlock['ai_is_detected'] = (block) => {
     ORDER.ATOMIC,
   ]
 }
+
+arduino.forBlock['ai_is_unknown'] = () => [
+  'false /* PIXIU AI Studio browser-only: normalized unknown/low-confidence result. */',
+  ORDER.ATOMIC,
+]
 
 arduino.forBlock['ai_get_detected_class'] = () => [
   '"none" /* PIXIU AI Studio: browser-only AI detected class. */',
