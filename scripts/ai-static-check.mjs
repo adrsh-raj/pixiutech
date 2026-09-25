@@ -133,6 +133,7 @@ for (const marker of [
   'SupportedModels.MediaPipeFaceMesh',
   'runtime: "tfjs"',
   "maxFaces: MAX_FACES",
+  "refineLandmarks: true",
   "classifyExpression",
   "detectFaces",
   "478",
@@ -178,6 +179,7 @@ for (const forbidden of ["aiVision.isDetected(", "aiVision.getDetectedClass(", "
 requireText(read("pixiu-lms-portal/src/components/circuit-lab/blockly-editor.tsx"), 'type: "ai_microphone_enable"', "Blockly Sound toolbox")
 requireText(panel, "requestedMode", "panel requested-mode bridge")
 requireText(panel, "onRequestedModeHandled", "panel requested-mode acknowledgement")
+requireText(panel, 'modelClasses: ["neutral", "happy", "surprised"]', "6E expression label contract")
 
 requireText(panel, "const requestId = ++cameraRequestRef.current", "camera request generation")
 requireText(panel, "if (requestId !== cameraRequestRef.current)", "camera stale-request guard")
