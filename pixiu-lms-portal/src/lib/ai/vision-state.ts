@@ -1,7 +1,5 @@
 import type { AiVisionMode, AiVisionState } from "./vision-types"
 
-export const READY_AI_DEFAULT_CLASSES = ["car", "person", "phone", "hand"] as const
-
 export function createAiVisionState(mode: AiVisionMode): AiVisionState {
   return {
     enabled: false,
