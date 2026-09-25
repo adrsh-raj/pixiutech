@@ -9,7 +9,8 @@ export function createAiVisionState(mode: AiVisionMode): AiVisionState {
     allDetections: [],
     unknown: false,
     lowConfidence: false,
-    confidenceThreshold: mode === "trained" ? 62 : 60,
+    confidenceThreshold:
+      mode === "trained" ? 62 : mode === "sound" ? 72 : 60,
     decisionReason: "no_input",
     modelClasses:
       mode === "numbers"
