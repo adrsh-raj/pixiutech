@@ -30,9 +30,6 @@ const forbidText = (text, needle, label) => {
 if (existsSync(join(root, "pixiu-lms-portal/src/components/circuit-lab/ai-camera-panel.tsx"))) {
   failures.push("legacy ai-camera-panel.tsx still exists")
 }
-if (existsSync(join(root, "pixiu-lms-portal/src/lib/ai-ready-runtime.ts"))) {
-  failures.push("legacy ai-ready-runtime.ts still exists")
-}
 
 for (const mode of ["objects", "pose", "hands", "emotion", "sound", "numbers"]) {
   requireText(types, mode, "vision type")
@@ -114,31 +111,29 @@ requireText(engine, 'MODEL_KEY = "pixiu-ai-studio-model-v2"', "AI model version"
 
 // 6D/6E use a dedicated maintained Human runtime. Keep D/E model loading
 // behind adapters so the panel only consumes normalized results.
-requireText(humanRuntime, '@vladmandic/human@3.3.6/dist/human.js', "D/E Human runtime")
-requireText(humanRuntime, 'HUMAN_VERSION = "3.3.6"', "D/E Human version")
-requireText(humanRuntime, "cacheModels: true", "D/E model cache")
-requireText(humanRuntime, "modelBasePath", "D/E model base path")
-
+// 6D/6E share the application's existing TensorFlow.js runtime. Avoid a
+// second bundled TensorFlow.js instance from a separate vision framework.
 for (const marker of [
-  "loadHandDetector",
-  "MAX_HANDS = 2",
-  "handtrack.json",
-  "handlandmark-lite.json",
-  "landmarks: true",
+  "HAND_VERSION = \"2.0.1\"",
+  "@tensorflow-models/hand-pose-detection@2.0.1",
+  'SupportedModels.MediaPipeHands',
+  'runtime: "tfjs"',
+  "maxHands: MAX_HANDS",
   "countExtendedFingers",
-  "fingerCount",
-  "handedness",
-]) requireText(handAdapter, marker, "6D hand adapter")
+  "detectHands",
+]) requireText(handAdapter, marker, "6D TFJS hand adapter")
 
 for (const marker of [
-  "loadFaceDetector",
-  "MAX_FACES = 3",
-  "minSize: 60",
-  "mesh:",
-  "emotion:",
-  'modelPath: "emotion.json"',
-  "getTopEmotion",
-]) requireText(faceAdapter, marker, "6E face adapter")
+  "FACE_VERSION = \"1.0.6\"",
+  "@tensorflow-models/face-detection@1.0.3",
+  "@tensorflow-models/face-landmarks-detection@1.0.6",
+  'SupportedModels.MediaPipeFaceMesh',
+  'runtime: "tfjs"',
+  "maxFaces: MAX_FACES",
+  "classifyExpression",
+  "detectFaces",
+  "478",
+]) requireText(faceAdapter, marker, "6E TFJS face/mesh adapter")
 
 for (const marker of [
   'SPEECH_VERSION = "0.5.4"',
@@ -156,11 +151,15 @@ for (const needle of [
   "@mediapipe/hands/hands.js",
   "window.faceapi",
   "window.Hands",
-  "@tensorflow-models/speech-commands",
+  "@vladmandic/human",
+  "loadFaceEmotion",
+  "loadSpeechRecognizer",
 ]) forbidText(panel, needle, "legacy D-F runtime reference")
 
 requireText(panel, "loadHandDetector", "panel D adapter")
+requireText(panel, "detectHands", "panel D inference")
 requireText(panel, "loadFaceDetector", "panel E adapter")
+requireText(panel, "detectFaces", "panel E inference")
 requireText(panel, "loadSoundRecognizer", "panel F adapter")
 
 requireText(panel, "const requestId = ++cameraRequestRef.current", "camera request generation")
