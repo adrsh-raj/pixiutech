@@ -778,39 +778,77 @@ export function AiStudioPanel({
             detail: pose ? `${visiblePoints.length}/17 keypoints tracked` : "No person detected",
           })
         } else if (mode === "hands" || mode === "numbers") {
-          const result = await resourceRef.current.estimate(video)
+          const hands: HandDetection[] = await resourceRef.current.detect(video)
           if (activeSession !== sessionRef.current) return
-          drawHands(getActiveOverlay()!, video, result)
-          const hand = result?.multiHandLandmarks?.[0]
-          const score = hand ? 0.9 : 0
-          const count = hand ? countFingers(hand) : 0
+
+          drawHands(getActiveOverlay()!, video, hands)
+          const hand = hands[0]
+
+          if (hand) {
+            handCountHistoryRef.current = [...handCountHistoryRef.current, hand.fingerCount].slice(-4)
+          } else {
+            handCountHistoryRef.current = []
+          }
+
+          const sortedCounts = [...handCountHistoryRef.current].sort((a, b) => a - b)
+          const stableCount = sortedCounts.length
+            ? sortedCounts[Math.floor(sortedCounts.length / 2)]
+            : 0
+
           onAiStateChange({
             enabled: true,
             mode,
-            detectedClass: mode === "numbers" ? String(count) : hand ? "hand" : "none",
-            confidence: hand ? Math.round(score * 100) : 0,
+            detectedClass: mode === "numbers"
+              ? hand ? String(stableCount) : "none"
+              : hand ? "hand" : "none",
+            confidence: hand ? Math.round(hand.score * 100) : 0,
             allDetections: [],
-            modelClasses: mode === "numbers" ? ["0", "1", "2", "3", "4", "5"] : ["hand"],
+            modelClasses: mode === "numbers"
+              ? ["0", "1", "2", "3", "4", "5"]
+              : ["hand"],
             modelSource: "ready",
             detail: hand
-              ? mode === "numbers" ? `${count} finger${count === 1 ? "" : "s"} extended` : "Hand tracked"
+              ? mode === "numbers"
+                ? String(stableCount) + " finger" + (stableCount === 1 ? "" : "s") + " · " + hand.handedness
+                : hand.handedness + " hand · " + hand.fingerCount + " fingers"
               : "Show a hand",
           })
         } else if (mode === "emotion") {
-          const result = await estimateFaceEmotion(resourceRef.current, video)
+          const faces: FaceDetection[] = await resourceRef.current.detect(video)
           if (activeSession !== sessionRef.current) return
+
+          drawFaces(getActiveOverlay()!, video, faces)
+          const face = faces[0]
+
+          if (face) {
+            emotionHistoryRef.current = [...emotionHistoryRef.current, face.expression].slice(-3)
+          } else {
+            emotionHistoryRef.current = []
+          }
+
+          const histogram = emotionHistoryRef.current.reduce<Record<string, number>>(
+            (counts, expression) => {
+              counts[expression] = (counts[expression] ?? 0) + 1
+              return counts
+            },
+            {},
+          )
+          const stableExpression =
+            Object.entries(histogram).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "none"
+
           onAiStateChange({
             enabled: true,
             mode: "emotion",
-            detectedClass: result?.expression ?? "none",
-            confidence: result ? Math.round(result.score * 100) : 0,
+            detectedClass: face ? stableExpression : "none",
+            confidence: face ? Math.round(face.expressionScore * 100) : 0,
             allDetections: [],
+            modelClasses: ["neutral", "happy", "sad", "angry", "surprised", "fearful", "disgusted"],
             modelSource: "ready",
-            detail: result ? `${result.count} face${result.count === 1 ? "" : "s"} · ${result.expression}` : "Show your face",
+            detail: face
+              ? String(faces.length) + " face" + (faces.length === 1 ? "" : "s") + " · " + stableExpression
+              : "Show your face",
           })
-          if (result) drawFace(getActiveOverlay()!, video, result)
-          else clearOverlay()
-        } else if (mode === "trained") {
+                  } else if (mode === "trained") {
           const frame = captureVideoFrame(video, 640)
           const result = frame ? await predictAiImage(frame, store.model) : null
           if (activeSession !== sessionRef.current) return
