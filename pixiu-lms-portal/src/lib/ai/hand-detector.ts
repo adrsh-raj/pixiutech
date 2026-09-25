@@ -1,4 +1,4 @@
-import { createHuman, disposeHuman, HUMAN_VERSION } from "./human-runtime"
+import * as tf from "@tensorflow/tfjs"
 
 export type HandPoint = {
   x: number
@@ -23,8 +23,113 @@ export type HandDetector = {
   dispose: () => void
 }
 
-const MIN_HAND_SCORE = 0.5
+const HAND_VERSION = "2.0.1"
 const MAX_HANDS = 2
+const MIN_HAND_SCORE = 0.5
+const HAND_RUNTIME_SOURCES = [
+  "https://cdn.jsdelivr.net/npm/@tensorflow-models/hand-pose-detection@2.0.1/dist/hand-pose-detection.min.js",
+  "https://unpkg.com/@tensorflow-models/hand-pose-detection@2.0.1/dist/hand-pose-detection.min.js",
+]
+
+declare global {
+  interface Window {
+    tf?: typeof tf
+    handPoseDetection?: any
+  }
+}
+
+const scriptLoads = new Map<string, Promise<void>>()
+
+function loadScript(src: string): Promise<void> {
+  if (typeof window === "undefined") {
+    return Promise.reject(new Error("PIXIU Hand AI needs a browser."))
+  }
+  if (window.handPoseDetection) return Promise.resolve()
+
+  const existing = scriptLoads.get(src)
+  if (existing) return existing
+
+  const promise = new Promise<void>((resolve, reject) => {
+    const current = document.querySelector<HTMLScriptElement>(
+      `script[data-pixiu-hand-src="${src}"]`,
+    )
+    if (current && window.handPoseDetection) {
+      resolve()
+      return
+    }
+
+    const script = current ?? document.createElement("script")
+    let settled = false
+    const cleanup = () => {
+      script.removeEventListener("load", onLoad)
+      script.removeEventListener("error", onError)
+    }
+    const onLoad = () => {
+      if (settled) return
+      settled = true
+      cleanup()
+      if (window.handPoseDetection) resolve()
+      else reject(new Error("Hand pose runtime loaded without its API."))
+    }
+    const onError = () => {
+      if (settled) return
+      settled = true
+      cleanup()
+      script.remove()
+      reject(new Error("Hand pose runtime could not be loaded."))
+    }
+
+    script.addEventListener("load", onLoad, { once: true })
+    script.addEventListener("error", onError, { once: true })
+
+    if (!current) {
+      script.async = true
+      script.src = src
+      script.dataset.pixiuHandSrc = src
+      document.head.appendChild(script)
+    }
+
+    window.setTimeout(() => {
+      if (settled) return
+      if (window.handPoseDetection) onLoad()
+      else onError()
+    }, 30000)
+  })
+
+  scriptLoads.set(src, promise)
+  promise.catch(() => scriptLoads.delete(src))
+  return promise
+}
+
+async function ensureRuntime() {
+  if (typeof window === "undefined") throw new Error("Browser required.")
+  window.tf = tf
+  await tf.ready()
+
+  if (!tf.getBackend()) {
+    try {
+      await tf.setBackend("webgl")
+      await tf.ready()
+    } catch {
+      await tf.setBackend("cpu")
+      await tf.ready()
+    }
+  }
+
+  let lastError: unknown = null
+  for (const src of HAND_RUNTIME_SOURCES) {
+    try {
+      await loadScript(src)
+      if (window.handPoseDetection) return
+    } catch (error) {
+      lastError = error
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("Hand pose runtime could not be loaded.")
+}
 
 const LANDMARK_INDEX = {
   wrist: 0,
@@ -50,136 +155,103 @@ const LANDMARK_INDEX = {
   pinkyTip: 20,
 } as const
 
-function pointDistance(a: HandPoint, b: HandPoint) {
-  return Math.hypot(a.x - b.x, a.y - b.y, (a.z ?? 0) - (b.z ?? 0))
+function distance(a: HandPoint, b: HandPoint) {
+  return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z)
 }
 
-function jointAngle(a: HandPoint, b: HandPoint, c: HandPoint) {
+function angle(a: HandPoint, b: HandPoint, c: HandPoint) {
   const ab = { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z }
   const cb = { x: c.x - b.x, y: c.y - b.y, z: c.z - b.z }
-  const dot = ab.x * cb.x + ab.y * cb.y + ab.z * cb.z
-  const mag = Math.hypot(ab.x, ab.y, ab.z) * Math.hypot(cb.x, cb.y, cb.z)
-  if (!mag) return 0
-  return Math.acos(Math.max(-1, Math.min(1, dot / mag))) * (180 / Math.PI)
+  const magnitude = Math.hypot(ab.x, ab.y, ab.z) * Math.hypot(cb.x, cb.y, cb.z)
+  if (!magnitude) return 0
+  const cosine = (ab.x * cb.x + ab.y * cb.y + ab.z * cb.z) / magnitude
+  return Math.acos(Math.max(-1, Math.min(1, cosine))) * 180 / Math.PI
 }
 
-function isFingerExtended(
-  points: HandPoint[],
-  mcp: number,
-  pip: number,
-  dip: number,
-  tip: number,
-) {
-  const pMcp = points[mcp]
-  const pPip = points[pip]
-  const pDip = points[dip]
-  const pTip = points[tip]
-  const pWrist = points[LANDMARK_INDEX.wrist]
-  if (!pMcp || !pPip || !pDip || !pTip || !pWrist) return false
-
-  const pipAngle = jointAngle(pMcp, pPip, pDip)
-  const dipAngle = jointAngle(pPip, pDip, pTip)
-  const radial = pointDistance(pTip, pWrist)
-  const base = pointDistance(pMcp, pWrist)
-
-  return pipAngle > 145 && dipAngle > 145 && radial > base * 1.25
+function fingerExtended(points: HandPoint[], mcp: number, pip: number, dip: number, tip: number) {
+  const a = points[mcp], b = points[pip], c = points[dip], d = points[tip], wrist = points[0]
+  if (!a || !b || !c || !d || !wrist) return false
+  return angle(a, b, c) > 145 && angle(b, c, d) > 145 && distance(d, wrist) > distance(a, wrist) * 1.22
 }
 
-function isThumbExtended(points: HandPoint[]) {
-  const cmc = points[LANDMARK_INDEX.thumbCmc]
-  const mcp = points[LANDMARK_INDEX.thumbMcp]
-  const ip = points[LANDMARK_INDEX.thumbIp]
-  const tip = points[LANDMARK_INDEX.thumbTip]
-  const indexMcp = points[LANDMARK_INDEX.indexMcp]
+function thumbExtended(points: HandPoint[]) {
+  const cmc = points[1], mcp = points[2], ip = points[3], tip = points[4], indexMcp = points[5]
   if (!cmc || !mcp || !ip || !tip || !indexMcp) return false
-
-  const mcpAngle = jointAngle(cmc, mcp, ip)
-  const ipAngle = jointAngle(mcp, ip, tip)
-  return (
-    mcpAngle > 135 &&
-    ipAngle > 135 &&
-    pointDistance(tip, indexMcp) > pointDistance(ip, indexMcp) * 1.12
-  )
+  return angle(cmc, mcp, ip) > 130 && angle(mcp, ip, tip) > 130 &&
+    distance(tip, indexMcp) > distance(ip, indexMcp) * 1.05
 }
 
 export function countExtendedFingers(points: HandPoint[]) {
   if (points.length < 21) return 0
-
-  let count = 0
-  if (isThumbExtended(points)) count += 1
-  if (isFingerExtended(points, LANDMARK_INDEX.indexMcp, LANDMARK_INDEX.indexPip, LANDMARK_INDEX.indexDip, LANDMARK_INDEX.indexTip)) count += 1
-  if (isFingerExtended(points, LANDMARK_INDEX.middleMcp, LANDMARK_INDEX.middlePip, LANDMARK_INDEX.middleDip, LANDMARK_INDEX.middleTip)) count += 1
-  if (isFingerExtended(points, LANDMARK_INDEX.ringMcp, LANDMARK_INDEX.ringPip, LANDMARK_INDEX.ringDip, LANDMARK_INDEX.ringTip)) count += 1
-  if (isFingerExtended(points, LANDMARK_INDEX.pinkyMcp, LANDMARK_INDEX.pinkyPip, LANDMARK_INDEX.pinkyDip, LANDMARK_INDEX.pinkyTip)) count += 1
+  let count = thumbExtended(points) ? 1 : 0
+  count += fingerExtended(points, 5, 6, 7, 8) ? 1 : 0
+  count += fingerExtended(points, 9, 10, 11, 12) ? 1 : 0
+  count += fingerExtended(points, 13, 14, 15, 16) ? 1 : 0
+  count += fingerExtended(points, 17, 18, 19, 20) ? 1 : 0
   return count
 }
 
-function toPoint(point: any): HandPoint {
+function toPoint(point: any, point3d?: any): HandPoint {
   return {
-    x: Number(point?.x ?? point?.[0] ?? 0),
-    y: Number(point?.y ?? point?.[1] ?? 0),
-    z: Number(point?.z ?? point?.[2] ?? 0),
+    x: Number(point?.x ?? 0),
+    y: Number(point?.y ?? 0),
+    z: Number(point3d?.z ?? point?.z ?? 0),
     name: typeof point?.name === "string" ? point.name : undefined,
   }
 }
 
 function toBox(box: any): [number, number, number, number] {
   return [
-    Number(box?.[0] ?? box?.x ?? 0),
-    Number(box?.[1] ?? box?.y ?? 0),
-    Number(box?.[2] ?? box?.width ?? 0),
-    Number(box?.[3] ?? box?.height ?? 0),
+    Number(box?.xMin ?? box?.x ?? 0),
+    Number(box?.yMin ?? box?.y ?? 0),
+    Number(box?.width ?? 0),
+    Number(box?.height ?? 0),
   ]
 }
 
 export async function loadHandDetector(): Promise<HandDetector> {
-  const human = await createHuman({
-    hand: {
-      enabled: true,
-      rotation: false,
-      maxDetected: MAX_HANDS,
-      minConfidence: MIN_HAND_SCORE,
-      iouThreshold: 0.2,
-      landmarks: true,
-      skipFrames: 1,
-      skipTime: 120,
-      detector: { modelPath: "handtrack.json" },
-      skeleton: { modelPath: "handlandmark-lite.json" },
+  await ensureRuntime()
+
+  const detector = await window.handPoseDetection.createDetector(
+    window.handPoseDetection.SupportedModels.MediaPipeHands,
+    {
+      runtime: "tfjs",
+      modelType: "full",
+      maxHands: MAX_HANDS,
     },
-  })
+  )
 
   return {
-    version: HUMAN_VERSION,
+    version: HAND_VERSION,
     async detect(video) {
-      const result = await human.detect(video)
-      const rawHands = Array.isArray(result?.hand) ? result.hand : []
-
-      return rawHands.slice(0, MAX_HANDS).map((hand: any) => {
-        const keypoints = Array.isArray(hand?.keypoints)
-          ? hand.keypoints.map(toPoint)
-          : []
-
-        return {
-          score: Number(hand?.score ?? 0),
-          boxScore: Number(hand?.boxScore ?? hand?.score ?? 0),
-          fingerScore: Number(hand?.fingerScore ?? hand?.score ?? 0),
-          handedness: String(hand?.label ?? hand?.handedness ?? "hand"),
-          box: toBox(hand?.box),
-          keypoints,
-          fingerCount: countExtendedFingers(keypoints),
-        }
-      })
+      const hands = await detector.estimateHands(video, { flipHorizontal: false })
+      return hands
+        .filter((hand: any) => Number(hand?.score ?? 0) >= MIN_HAND_SCORE)
+        .slice(0, MAX_HANDS)
+        .map((hand: any) => {
+          const keypoints = Array.isArray(hand?.keypoints)
+            ? hand.keypoints.map((point: any, index: number) =>
+                toPoint(point, hand?.keypoints3D?.[index]),
+              )
+            : []
+          return {
+            score: Number(hand?.score ?? 0),
+            boxScore: Number(hand?.score ?? 0),
+            fingerScore: Number(hand?.score ?? 0),
+            handedness: String(hand?.handedness ?? "Hand"),
+            box: toBox(hand?.box),
+            keypoints,
+            fingerCount: countExtendedFingers(keypoints),
+          }
+        })
     },
     dispose() {
-      disposeHuman(human)
+      detector.dispose?.()
     },
   }
 }
 
-export async function detectHands(
-  detector: HandDetector,
-  video: HTMLVideoElement,
-): Promise<HandDetection[]> {
+export async function detectHands(detector: HandDetector, video: HTMLVideoElement) {
   return detector.detect(video)
 }
 
