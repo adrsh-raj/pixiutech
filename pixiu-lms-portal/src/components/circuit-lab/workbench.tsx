@@ -491,11 +491,18 @@ export function Workbench() {
       blocklyXml.includes("ai_get_finger_count") ||
       blocklyXml.includes("ai_is_gesture")
     )
+    const programAiMode = usesNumberGestureAi
+      ? "numbers"
+      : blocklyXml.includes("ai_microphone_enable")
+        ? "sound"
+        : usesAi
+          ? "objects"
+          : null
     // AI program execution automatically opens the selected AI runtime in
-    // minimized floating mode. The 6G blocks explicitly request the Numbers
-    // / hand layer so their getters are live instead of falling back to 0/none.
+    // minimized floating mode. 6G explicitly requests the Numbers/hand layer;
+    // ordinary camera AI blocks request Objects and microphone blocks request Sound.
     if (usesAi && openAiHud) {
-      setAiRequestedMode(usesNumberGestureAi ? "numbers" : null)
+      setAiRequestedMode(programAiMode)
       setIsAiCameraOpen(true)
       setAiCameraCompact(true)
       setAiRuntimeEnabled(true)
