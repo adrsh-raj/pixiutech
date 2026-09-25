@@ -1590,7 +1590,7 @@ export function AiStudioPanel({
                 <RefreshCcw size={13} /> Reset dataset + My AI
               </button>
             </div>
-          )
+          )}
 
           {tab === "understand" && (
             <div className="mx-auto max-w-5xl grid gap-4 lg:grid-cols-2">
