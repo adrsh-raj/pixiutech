@@ -1,3 +1,5 @@
+import * as tf from "@tensorflow/tfjs"
+
 export type SoundDetection = {
   label: string
   confidence: number
@@ -23,6 +25,7 @@ const SPEECH_SOURCES = [
 
 declare global {
   interface Window {
+    tf?: typeof tf
     speechCommands?: {
       create: (inputType: string, vocabulary?: string) => any
     }
@@ -132,6 +135,9 @@ function normalizeScores(labels: string[], scores: ArrayLike<number>) {
 }
 
 export async function loadSoundRecognizer(): Promise<SoundRecognizer> {
+  // Speech Commands uses TensorFlow.js through the browser global in its CDN build.
+  if (typeof window !== "undefined") window.tf = tf
+  await tf.ready()
   await ensureSpeechRuntime()
 
   const recognizer = window.speechCommands!.create("BROWSER_FFT", "18w")
