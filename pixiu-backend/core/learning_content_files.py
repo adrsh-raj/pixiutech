@@ -60,6 +60,7 @@ def _stream_storage_file(file_name, content_type, request):
         response["Pragma"] = "no-cache"
         response["X-Content-Type-Options"] = "nosniff"
         response["X-Frame-Options"] = "DENY"
+        response["Referrer-Policy"] = "no-referrer"
         return response
 
     if not range_header.startswith("bytes=") or "," in range_header:
@@ -109,6 +110,7 @@ def _stream_storage_file(file_name, content_type, request):
     response["Pragma"] = "no-cache"
     response["X-Content-Type-Options"] = "nosniff"
     response["X-Frame-Options"] = "DENY"
+    response["Referrer-Policy"] = "no-referrer"
     return response
 
 
