@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom"
 import { useEffect, useRef, useState } from "react"
 import { CircuitBoard, Play, Square, Trash2, ArrowLeft, Undo2, Redo2, FolderOpen, BookOpen, Terminal, Volume2, VolumeX, Sparkles, Camera, Sliders, Pause, StepForward, FastForward, MoreHorizontal, HelpCircle } from "lucide-react"
+import "./pixiu-brand.css"
 
 export type WorkbenchView = "circuit" | "code" | "3d"
 
@@ -88,7 +89,7 @@ export function Toolbar({
   }, [])
 
   return (
-    <header className="flex h-12 md:h-14 shrink-0 items-center justify-between border-b border-border bg-card px-2.5 sm:px-4 gap-1.5 sm:gap-2">
+    <header className="pixiu-toolbar flex h-12 md:h-14 shrink-0 items-center justify-between border-b border-border bg-card px-2.5 sm:px-4 gap-1.5 sm:gap-2">
       {/* LEFT: Back + CyberLab Logo */}
       <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
         <Link
@@ -117,12 +118,12 @@ export function Toolbar({
       {/* CENTER: View Switcher & Primary Execution/Stepping Controller */}
       <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
         {/* Mode Toggle: Circuit / Code */}
-        <div className="flex items-center gap-1 rounded-lg border border-border bg-background p-0.5 sm:p-1 shrink-0 shadow-xs">
+        <div className="pixiu-toolbar-views flex items-center gap-1 rounded-lg border border-border bg-background p-0.5 sm:p-1 shrink-0 shadow-xs">
           <button
             onClick={() => onViewChange("circuit")}
             className={`rounded-md px-2.5 sm:px-3 py-1 text-xs sm:text-sm font-semibold transition cursor-pointer ${
               view === "circuit"
-                ? "bg-primary text-primary-foreground shadow-xs"
+                ? "pixiu-toolbar-view-active"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
@@ -132,7 +133,7 @@ export function Toolbar({
             onClick={() => onViewChange("code")}
             className={`rounded-md px-2.5 sm:px-3 py-1 text-xs sm:text-sm font-semibold transition cursor-pointer ${
               view === "code"
-                ? "bg-primary text-primary-foreground shadow-xs"
+                ? "pixiu-toolbar-view-active"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
@@ -147,16 +148,12 @@ export function Toolbar({
         </div>
 
         {/* PRIMARY EXECUTION & STEPPING CONTROLLER (Always Front & Center, Never Cut Off) */}
-        <div className="flex items-center gap-1 bg-background p-0.5 sm:p-1 rounded-lg border border-border shadow-xs shrink-0">
+        <div className="pixiu-toolbar-execution flex items-center gap-1 bg-background p-0.5 sm:p-1 rounded-lg border border-border shadow-xs shrink-0">
           {/* Main Run / Stop Simulation Button */}
           <button
             onClick={onToggleRun}
-            className={`flex items-center gap-1.5 rounded-md px-2.5 sm:px-3.5 py-1 text-xs font-bold transition shadow-sm cursor-pointer active:scale-95 ${
-              running
-                ? "bg-destructive text-white hover:opacity-90 animate-pulse"
-                : "bg-emerald-600 text-white hover:bg-emerald-500 shadow-emerald-600/25"
-            }`}
-            title={running ? "Stop Simulation (Space)" : "Run Simulation Continuously (Space)"}
+            className={`pixiu-toolbar-run ${running ? "pixiu-toolbar-run-running" : ""} flex items-center gap-1.5 rounded-md px-2.5 sm:px-3.5 py-1 text-xs font-bold transition shadow-sm cursor-pointer active:scale-95`}
+            title={running ? "Stop Pixiu runtime (Space)" : "Launch Pixiu runtime (Space)"}
           >
             {running ? <Square className="h-3.5 w-3.5 fill-current" /> : <Play className="h-3.5 w-3.5 fill-current" />}
             <span>{running ? "Stop" : "Run"}</span>
@@ -232,10 +229,8 @@ export function Toolbar({
             onClick={() => setToolsOpen((value) => !value)}
             aria-expanded={toolsOpen}
             aria-haspopup="menu"
-            className={"flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold transition cursor-pointer " + (
-              toolsOpen ? "border-primary/50 bg-primary/10 text-primary" : "border-border bg-background text-muted-foreground hover:bg-secondary hover:text-foreground"
-            )}
-            title="Open lab tools"
+            className={"pixiu-toolbar-tool flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold transition cursor-pointer " + (toolsOpen ? "border-violet-400/40 bg-violet-500/10 text-violet-100" : "")}
+            title="Open Pixiu lab tools"
           >
             <MoreHorizontal size={15} />
             <span className="hidden lg:inline">Tools</span>
