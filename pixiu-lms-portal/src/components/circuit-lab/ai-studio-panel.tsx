@@ -264,6 +264,7 @@ export function AiStudioPanel({
   const cameraRequestRef = useRef(0)
   const resourceModeRef = useRef<AiVisionMode | null>(null)
   const busyRef = useRef(false)
+  const busySessionRef = useRef<number | null>(null)
   const fpsStartRef = useRef(0)
   const fpsFramesRef = useRef(0)
   const dragRef = useRef<{ pointerId: number; offsetX: number; offsetY: number } | null>(null)
@@ -405,7 +406,6 @@ export function AiStudioPanel({
       window.clearTimeout(timerRef.current)
       timerRef.current = null
     }
-    busyRef.current = false
     clearOverlay()
     fpsStartRef.current = 0
     fpsFramesRef.current = 0
@@ -686,6 +686,7 @@ export function AiStudioPanel({
       }
 
       busyRef.current = true
+      busySessionRef.current = activeSession
       const started = performance.now()
 
       try {
@@ -798,7 +799,10 @@ export function AiStudioPanel({
           timerRef.current = window.setTimeout(tick, 600)
         }
       } finally {
-        busyRef.current = false
+        if (busySessionRef.current === activeSession) {
+          busyRef.current = false
+          busySessionRef.current = null
+        }
       }
     }
 
