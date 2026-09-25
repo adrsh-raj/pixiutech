@@ -24,6 +24,7 @@ export interface ExecutionEnvironment {
   getAiConfidence?: () => number
   getAiGesture?: () => string
   getAiFingerCount?: () => number
+  isAiGesture?: (gesture: string) => boolean
   setAiCamera?: (enabled: boolean) => void
   setAiMicrophone?: (enabled: boolean) => void
   sleep: (ms: number) => Promise<void>
@@ -90,6 +91,10 @@ export function evaluateBoolean(target: Blockly.Block | null, env?: ExecutionEnv
   if (target.type === "ai_is_detected") {
     const cls = target.getFieldValue("CLASS") ?? "car"
     return env?.isAiDetected ? env.isAiDetected(cls) : false
+  }
+  if (target.type === "ai_is_gesture") {
+    const gesture = target.getFieldValue("GESTURE") ?? "fist"
+    return env?.isAiGesture ? env.isAiGesture(gesture) : false
   }
   if (target.type === "logic_boolean") {
     return target.getFieldValue("BOOL") === "TRUE"
