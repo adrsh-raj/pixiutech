@@ -1,27 +1,16 @@
 import * as tf from "@tensorflow/tfjs"
 
-export const MY_AI_FEATURE_VERSION = "vision-features-v2"
-// Use the underlying TensorFlow.js-hosted artifact directly instead of the
-// tfhub.dev landing URL. tfhub.dev currently redirects this model family to
-// Kaggle, while the browser loader expects the TFJS model.json + shard layout.
-export const MY_AI_FEATURE_URL =
-  "https://storage.googleapis.com/tfhub-tfjs-modules/google/imagenet/mobilenet_v2_100_224/feature_vector/4/model.json"
+export const MY_AI_FEATURE_VERSION = "vision-features-v3-native"
 export const MY_AI_INPUT_SIZE = 224
 export const MY_AI_PREDICTION_THRESHOLD = 0.62
 
-let featureModel: tf.GraphModel | null = null
-let featureModelPromise: Promise<tf.GraphModel> | null = null
+// My AI intentionally does not depend on a remote pretrained model.
+// The feature vector is computed locally in the browser from the user's image.
+// This avoids model-download failures, external storage/CSP problems, and keeps
+// training self-contained and predictable for classroom use.
 
-function firstTensor(output: tf.Tensor | tf.Tensor[] | tf.NamedTensorMap) {
-  if (output instanceof tf.Tensor) return output
-  if (Array.isArray(output)) {
-    if (!output[0]) throw new Error("My AI feature extractor returned no tensor.")
-    return output[0]
-  }
-  const tensor = Object.values(output)[0]
-  if (!tensor) throw new Error("My AI feature extractor returned no tensor.")
-  return tensor
-}
+let featureExtractorReady = false
+let featureExtractorPromise: Promise<void> | null = null
 
 async function ensureBackend() {
   await tf.ready()
@@ -38,75 +27,75 @@ async function ensureBackend() {
 }
 
 export async function loadMyAiFeatureExtractor() {
-  if (featureModel) return featureModel
-  if (featureModelPromise) return featureModelPromise
+  if (featureExtractorReady) return
+  if (featureExtractorPromise) return featureExtractorPromise
 
-  featureModelPromise = (async () => {
+  featureExtractorPromise = (async () => {
     if (typeof window === "undefined") {
       throw new Error("My AI needs a browser runtime.")
     }
 
     await ensureBackend()
-    let model: tf.GraphModel
-    try {
-      model = await tf.loadGraphModel(MY_AI_FEATURE_URL)
-    } catch (directError) {
-      // Backward-compatible fallback for environments where the direct
-      // storage endpoint is blocked by a network policy.
-      try {
-        model = await tf.loadGraphModel(
-          "https://tfhub.dev/google/imagenet/mobilenet_v2_100_224/feature_vector/4",
-          { fromTFHub: true },
-        )
-      } catch (fallbackError) {
-        const directMessage =
-          directError instanceof Error ? directError.message : String(directError)
-        const fallbackMessage =
-          fallbackError instanceof Error ? fallbackError.message : String(fallbackError)
-        throw new Error(
-          "My AI model could not be downloaded. Direct TFJS model fetch failed (" +
-            directMessage +
-            "); TF Hub fallback failed (" +
-            fallbackMessage +
-            "). Check the browser network/CSP and allow storage.googleapis.com.",
-        )
-      }
-    }
 
+    // Warm up TensorFlow.js without downloading any external model.
     const warmup = tf.zeros([1, MY_AI_INPUT_SIZE, MY_AI_INPUT_SIZE, 3])
-    const output = firstTensor(model.execute(warmup) as tf.Tensor)
-    await output.data()
-    output.dispose()
+    await warmup.mean().data()
     warmup.dispose()
 
-    featureModel = model
-    return model
+    featureExtractorReady = true
   })()
 
   try {
-    return await featureModelPromise
+    await featureExtractorPromise
   } finally {
-    featureModelPromise = null
+    featureExtractorPromise = null
   }
 }
 
 export async function extractMyAiEmbedding(
   image: HTMLImageElement | HTMLCanvasElement | HTMLVideoElement | ImageData,
 ) {
-  const model = await loadMyAiFeatureExtractor()
+  await loadMyAiFeatureExtractor()
 
   const embedding = tf.tidy(() => {
     const pixels = tf.browser.fromPixels(image)
-    const normalized = tf.mul(tf.cast(pixels, "float32"), 1 / 255)
+    const normalized = tf.div(tf.cast(pixels, "float32"), 255)
     const resized = tf.image.resizeWithPad(
       normalized,
       MY_AI_INPUT_SIZE,
       MY_AI_INPUT_SIZE,
     )
-    const batched = tf.expandDims(resized, 0)
-    const raw = firstTensor(model.execute(batched) as tf.Tensor)
-    const flat = tf.reshape(raw, [1, -1])
-    return tf.linalg.l2Normalize(flat, 1)
+
+    // 256 dims: coarse luminance layout (16 × 16).
+    const grayscale = resized.mean(2, true)
+    const graySmall = tf.image.resizeBilinear(grayscale, [16, 16], true)
+    const grayFeatures = tf.reshape(graySmall, [1, 256])
+
+    // 192 dims: coarse RGB layout (8 × 8 × 3).
+    const rgbSmall = tf.image.resizeBilinear(resized, [8, 8], true)
+    const rgbFeatures = tf.reshape(rgbSmall, [1, 192])
+
+    // 64 dims: edge/texture response at 8 × 8.
+    const dx = tf.abs(
+      tf.sub(
+        grayscale.slice([0, 0, 1, 0], [1, MY_AI_INPUT_SIZE, MY_AI_INPUT_SIZE - 1, 1]),
+        grayscale.slice([0, 0, 0, 0], [1, MY_AI_INPUT_SIZE, MY_AI_INPUT_SIZE - 1, 1]),
+      ),
+    )
+    const dy = tf.abs(
+      tf.sub(
+        grayscale.slice([0, 1, 0, 0], [1, MY_AI_INPUT_SIZE - 1, MY_AI_INPUT_SIZE, 1]),
+        grayscale.slice([0, 0, 0, 0], [1, MY_AI_INPUT_SIZE - 1, MY_AI_INPUT_SIZE, 1]),
+      ),
+    )
+    const dxSmall = tf.image.resizeBilinear(dx, [8, 8], true)
+    const dySmall = tf.image.resizeBilinear(dy, [8, 8], true)
+    const edgeFeatures = tf.reshape(tf.add(dxSmall, dySmall), [1, 64])
+
+    return tf.linalg.l2Normalize(
+      tf.concat([grayFeatures, rgbFeatures, edgeFeatures], 1),
+      1,
+    )
   })
 
   try {
@@ -118,7 +107,6 @@ export async function extractMyAiEmbedding(
 }
 
 export function disposeMyAiFeatureExtractor() {
-  featureModel?.dispose()
-  featureModel = null
-  featureModelPromise = null
+  featureExtractorReady = false
+  featureExtractorPromise = null
 }
