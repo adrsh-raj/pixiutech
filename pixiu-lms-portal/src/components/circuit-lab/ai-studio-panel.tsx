@@ -1,53 +1,86 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type PointerEvent } from "react"
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react"
 import {
+  BookOpen,
   Brain,
   Camera,
   CameraOff,
   CheckCircle2,
-  GripVertical,
+  Info,
   Layers3,
   Mic,
+  Pencil,
+  Plus,
   RefreshCcw,
+  ShieldCheck,
   Sparkles,
   Trash2,
   Upload,
   X,
   Zap,
 } from "lucide-react"
-import * as cocoSsd from "@tensorflow-models/coco-ssd"
 import {
+  addAiClass,
   addAiSample,
   clearAiStudioStore,
   disposeActiveAiModel,
+  getActiveAiModel,
   getAiClasses,
+  getAiDatasetStats,
   getModelWeightPreview,
   getModelWeightShapes,
+  getSampleAddError,
   getSampleCounts,
   loadAiStudioStore,
   loadStoredAiModel,
+  optimizeAiImage,
   predictAiImage,
+  removeAiClass,
   removeAiSample,
+  renameAiClass,
   saveAiStudioStore,
   trainAiModel,
   type AiStudioStore,
 } from "@/lib/ai-studio-engine"
 import {
-  disposeAiResource,
-  estimateFaceEmotion,
-  loadFaceEmotion,
-  loadHandDetector,
-  loadPoseDetector,
-  loadSpeechRecognizer,
-  stopSpeechRecognizer,
-} from "@/lib/ai-ready-runtime"
-import {
   captureVideoFrame,
   startCamera,
   stopCamera,
 } from "@/lib/ai/camera-session"
+import {
+  detectHands,
+  disposeHandDetector,
+  loadHandDetector,
+  type HandDetection,
+} from "@/lib/ai/hand-detector"
+import { interpretHandGesture } from "@/lib/ai/gesture-interpreter"
+import {
+  detectFaces,
+  disposeFaceDetector,
+  loadFaceDetector,
+  type FaceDetection,
+} from "@/lib/ai/face-detector"
+import {
+  loadSoundRecognizer,
+  stopSoundRecognizer,
+  type SoundRecognizer,
+} from "@/lib/ai/sound-detector"
+import {
+  DEFAULT_OBJECT_MAX_BOXES,
+  DEFAULT_OBJECT_MIN_SCORE,
+  detectObjects,
+  disposeObjectDetector,
+  loadObjectDetector,
+} from "@/lib/ai/object-detector"
+import {
+  disposeMoveNet,
+  estimateMoveNetPose,
+  loadMoveNet,
+} from "@/lib/ai/pose-detector"
 import type { AiVisionMode, ReadyAiMode, AiVisionState } from "@/lib/ai/vision-types"
+import { createAiVisionState } from "@/lib/ai/vision-state"
+import "./pixiu-brand.css"
 
 export type { AiVisionState, ReadyAiMode }
 
@@ -60,17 +93,89 @@ interface Props {
   runtimeEnabled?: boolean
   compact?: boolean
   onStartSim?: () => void
+  requestedMode?: ReadyAiMode | "trained" | null
+  onRequestedModeHandled?: () => void
 }
 
 type Tab = "try" | "teach" | "understand"
 type ReadyResource = any
 
-// Object detection tuning:
-// - MobileNetV2 is the higher-accuracy COCO-SSD backbone.
-// - A lower threshold makes smaller / harder COCO objects visible instead of
-//   effectively restricting the live demo to only the easiest detections.
-const OBJECT_MIN_SCORE = 0.30
-const OBJECT_MAX_BOXES = 20
+const OBJECT_MIN_SCORE = DEFAULT_OBJECT_MIN_SCORE
+const OBJECT_MAX_BOXES = DEFAULT_OBJECT_MAX_BOXES
+
+function formatDecisionReason(reason: AiVisionState["decisionReason"]) {
+  if (reason === "no_input") return "No usable input"
+  if (reason === "low_confidence") return "Below confidence threshold"
+  if (reason === "ambiguous") return "Top classes are too close"
+  return "Accepted"
+}
+
+function explainCurrentAiResult(
+  state: AiVisionState,
+  modelSummary: AiStudioStore["model"],
+) {
+  const threshold = state.confidenceThreshold ?? 60
+  if (!state.enabled || state.detectedClass === "none") {
+    return "No input is being accepted right now. Start the required camera or microphone and provide a clear example."
+  }
+
+  if (state.unknown) {
+    const reason = state.decisionReason === "ambiguous"
+      ? "the top candidates are too close to one another"
+      : "the confidence is below the acceptance threshold"
+    return "AI returned UNKNOWN because " + reason + ". The normalized bridge does not present this result as a detected class."
+  }
+
+  if (state.mode === "trained" && state.probabilities && modelSummary) {
+    const ranked = Object.entries(state.probabilities).sort((a, b) => b[1] - a[1]).slice(0, 3)
+    const top = ranked.map(([name, value]) => name + " " + value + "%").join(" · ")
+    return "My AI used the frozen feature extractor plus its trained classifier head. Top scores: " + top + ". The result is accepted at " + state.confidence + "% because it clears the " + threshold + "% threshold."
+  }
+
+  if (state.mode === "numbers") {
+    return "6G first reads the 21 hand landmarks, converts them to extended-finger geometry, then uses short temporal smoothing. Current gesture: " + (state.detectedGesture ?? "none") + "."
+  }
+
+  if (state.mode === "hands") {
+    return "6D uses the detected hand landmarks and handedness. Finger counts are derived from landmark geometry rather than a separate image classifier."
+  }
+
+  if (state.mode === "objects") {
+    return "6B ranks the visible object candidates produced by COCO-SSD. The normalized bridge exposes the top accepted label and confidence to Blockly."
+  }
+
+  if (state.mode === "pose") {
+    return "6C uses MoveNet Lightning keypoint scores. The displayed confidence is based on the visible keypoints that pass the runtime visibility threshold."
+  }
+
+  if (state.mode === "emotion") {
+    return "6E uses the FaceMesh landmark geometry and the project's expression heuristic. This is an expression demo, not a definitive measurement of a person's internal emotional state."
+  }
+
+  if (state.mode === "sound") {
+    return "6F compares microphone audio against the browser speech-command vocabulary. Only sufficiently confident actionable words are exposed as recognized commands."
+  }
+
+  return "The current AI result is accepted by the active model contract."
+}
+
+function mediaPermissionMessage(error: unknown, fallback: string) {
+  const name =
+    error && typeof error === "object" && "name" in error
+      ? String((error as { name?: unknown }).name ?? "")
+      : ""
+
+  if (name === "NotAllowedError" || name === "SecurityError") {
+    return "Permission blocked. Allow camera/microphone access for this site, then start AI again."
+  }
+  if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+    return "No compatible camera or microphone was found."
+  }
+  if (name === "NotReadableError") {
+    return "The camera or microphone is busy in another app or browser tab."
+  }
+  return fallback
+}
 
 const MODES: Array<{ id: ReadyAiMode; title: string; subtitle: string }> = [
   { id: "objects", title: "Objects", subtitle: "COCO-SSD object boxes" },
@@ -78,49 +183,9 @@ const MODES: Array<{ id: ReadyAiMode; title: string; subtitle: string }> = [
   { id: "hands", title: "Fingers", subtitle: "21 hand landmarks" },
   { id: "emotion", title: "Emotion", subtitle: "Expression demo" },
   { id: "sound", title: "Sound", subtitle: "Words + digits" },
-  { id: "numbers", title: "Numbers", subtitle: "0–5 fingers" },
+  { id: "numbers", title: "Numbers", subtitle: "0–5 + gestures" },
 ]
 
-const INITIAL: AiVisionState = {
-  enabled: false,
-  mode: "objects",
-  detectedClass: "none",
-  confidence: 0,
-  allDetections: [],
-  modelSource: "ready",
-  detail: "AI idle",
-}
-
-function emptyState(mode: AiVisionMode): AiVisionState {
-  return {
-    ...INITIAL,
-    mode,
-    modelClasses: mode === "numbers" ? ["0", "1", "2", "3", "4", "5"] : undefined,
-    detail: mode === "trained" ? "My AI idle" : "AI idle",
-  }
-}
-
-function canonicalObjectClass(name: string) {
-  const lower = name.toLowerCase()
-  if (lower === "cell phone") return "phone"
-  if (["car", "truck", "bus", "motorcycle"].includes(lower)) return "car"
-  return lower
-}
-
-function countFingers(landmarks: Array<{ x: number; y: number }>) {
-  if (landmarks.length < 21) return 0
-  const wrist = landmarks[0]
-  const dist = (a: { x: number; y: number }, b: { x: number; y: number }) =>
-    Math.hypot(a.x - b.x, a.y - b.y)
-
-  const tips = [4, 8, 12, 16, 20]
-  const folds = [2, 6, 10, 14, 18]
-  return tips.reduce((count, tipIndex, i) => {
-    const tip = landmarks[tipIndex]
-    const fold = landmarks[folds[i]]
-    return dist(tip, wrist) > dist(fold, wrist) * 1.1 ? count + 1 : count
-  }, 0)
-}
 
 function drawBoxes(
   canvas: HTMLCanvasElement,
@@ -153,7 +218,7 @@ function drawBoxes(
   })
 }
 
-function drawPose(canvas: HTMLCanvasElement, video: HTMLVideoElement, poses: any[]) {
+function drawPose(canvas: HTMLCanvasElement, video: HTMLVideoElement, poseResult: { keypoints?: any[] } | null) {
   const width = video.videoWidth || 640
   const height = video.videoHeight || 480
   if (canvas.width !== width || canvas.height !== height) {
@@ -170,7 +235,7 @@ function drawPose(canvas: HTMLCanvasElement, video: HTMLVideoElement, poses: any
     [6, 12], [11, 12], [11, 13], [13, 15], [12, 14], [14, 16],
   ]
 
-  const pose = poses[0]
+  const pose = poseResult
   if (!pose) return
   ctx.lineWidth = 3
   ctx.strokeStyle = "#22c55e"
@@ -193,7 +258,11 @@ function drawPose(canvas: HTMLCanvasElement, video: HTMLVideoElement, poses: any
   }
 }
 
-function drawHands(canvas: HTMLCanvasElement, video: HTMLVideoElement, results: any) {
+function drawHands(
+  canvas: HTMLCanvasElement,
+  video: HTMLVideoElement,
+  hands: HandDetection[],
+) {
   const width = video.videoWidth || 640
   const height = video.videoHeight || 480
   if (canvas.width !== width || canvas.height !== height) {
@@ -204,18 +273,68 @@ function drawHands(canvas: HTMLCanvasElement, video: HTMLVideoElement, results: 
   const ctx = canvas.getContext("2d")
   if (!ctx) return
   ctx.clearRect(0, 0, canvas.width, canvas.height)
-  ctx.fillStyle = "#38bdf8"
+  ctx.lineWidth = 3
+  ctx.strokeStyle = "#38bdf8"
+  ctx.fillStyle = "#e0f2fe"
+  ctx.font = "700 12px system-ui"
 
-  for (const hand of results?.multiHandLandmarks ?? []) {
-    for (const point of hand) {
+  const edges = [
+    [0, 1], [1, 2], [2, 3], [3, 4],
+    [0, 5], [5, 6], [6, 7], [7, 8],
+    [5, 9], [9, 10], [10, 11], [11, 12],
+    [9, 13], [13, 14], [14, 15], [15, 16],
+    [13, 17], [17, 18], [18, 19], [19, 20],
+    [0, 17],
+  ]
+
+  hands.forEach((hand) => {
+    edges.forEach(([a, b]) => {
+      const p1 = hand.keypoints[a]
+      const p2 = hand.keypoints[b]
+      if (!p1 || !p2) return
       ctx.beginPath()
-      ctx.arc(point.x * width, point.y * height, 4, 0, Math.PI * 2)
+      ctx.moveTo(p1.x, p1.y)
+      ctx.lineTo(p2.x, p2.y)
+      ctx.stroke()
+    })
+
+    for (const point of hand.keypoints) {
+      ctx.beginPath()
+      ctx.arc(point.x, point.y, 4, 0, Math.PI * 2)
       ctx.fill()
     }
-  }
+
+    const [x, y, w, h] = hand.box
+    if (w > 0 && h > 0) {
+      ctx.strokeRect(x, y, w, h)
+      const label = `${hand.handedness} · ${hand.fingerCount} fingers · ${Math.round(hand.score * 100)}%`
+      const tw = ctx.measureText(label).width + 12
+      ctx.fillStyle = "#38bdf8"
+      ctx.fillRect(x, Math.max(0, y - 22), tw, 22)
+      ctx.fillStyle = "#0f172a"
+      ctx.fillText(label, x + 6, Math.max(15, y - 7))
+      ctx.fillStyle = "#e0f2fe"
+    }
+  })
 }
 
-function drawFace(canvas: HTMLCanvasElement, video: HTMLVideoElement, result: any) {
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result === "string") resolve(reader.result)
+      else reject(new Error("Image could not be read."))
+    }
+    reader.onerror = () => reject(new Error("Image could not be read."))
+    reader.readAsDataURL(file)
+  })
+}
+
+function drawFaces(
+  canvas: HTMLCanvasElement,
+  video: HTMLVideoElement,
+  faces: FaceDetection[],
+) {
   const width = video.videoWidth || 640
   const height = video.videoHeight || 480
   if (canvas.width !== width || canvas.height !== height) {
@@ -226,15 +345,26 @@ function drawFace(canvas: HTMLCanvasElement, video: HTMLVideoElement, result: an
   const ctx = canvas.getContext("2d")
   if (!ctx) return
   ctx.clearRect(0, 0, canvas.width, canvas.height)
+  ctx.lineWidth = 2
+  ctx.font = "700 12px system-ui"
 
-  const box = result?.box
-  if (Array.isArray(box) && box.length >= 4) {
-    const [x, y, w, h] = box.map(Number)
+  for (const face of faces) {
+    const [x, y, w, h] = face.box
+    if (w <= 0 || h <= 0) continue
+
     ctx.strokeStyle = "#f472b6"
-    ctx.lineWidth = 3
     ctx.strokeRect(x, y, w, h)
-    const label = String(result.expression ?? "face")
-    ctx.font = "700 13px system-ui"
+
+    if (face.mesh.length) {
+      ctx.fillStyle = "rgba(244, 114, 182, 0.75)"
+      for (const point of face.mesh) {
+        ctx.beginPath()
+        ctx.arc(point.x, point.y, 1.5, 0, Math.PI * 2)
+        ctx.fill()
+      }
+    }
+
+    const label = `${face.expression} · ${Math.round(face.expressionScore * 100)}%`
     const tw = ctx.measureText(label).width + 12
     ctx.fillStyle = "#f472b6"
     ctx.fillRect(x, Math.max(0, y - 22), tw, 22)
@@ -252,6 +382,8 @@ export function AiStudioPanel({
   runtimeEnabled = false,
   compact = false,
   onStartSim,
+  requestedMode = null,
+  onRequestedModeHandled,
 }: Props) {
   const [tab, setTab] = useState<Tab>("try")
   const [mode, setMode] = useState<ReadyAiMode | "trained">("objects")
@@ -261,12 +393,13 @@ export function AiStudioPanel({
   const [status, setStatus] = useState("AI idle")
   const [error, setError] = useState<string | null>(null)
   const [fps, setFps] = useState(0)
-  const [capture, setCapture] = useState<string | null>(null)
-  const [store, setStore] = useState<AiStudioStore>(() => ({ samples: [], model: null }))
+  const [store, setStore] = useState<AiStudioStore>(() => ({ classes: [], samples: [], model: null }))
   const [model, setModel] = useState<any>(null)
   const [label, setLabel] = useState("")
+  const [renamingClass, setRenamingClass] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState("")
   const [training, setTraining] = useState(false)
-  const [progress, setProgress] = useState({ epoch: 0, total: 0, accuracy: 0, loss: 0 })
+  const [progress, setProgress] = useState({ epoch: 0, total: 0, accuracy: 0, loss: 0, stage: "" })
 
   // Keep separate video/canvas refs for the full Studio and the compact
   // floating runtime window. The same MediaStream can safely feed both, so
@@ -279,22 +412,34 @@ export function AiStudioPanel({
   const resourceRef = useRef<ReadyResource>(null)
   const timerRef = useRef<number | null>(null)
   const sessionRef = useRef(0)
+  const cameraRequestRef = useRef(0)
+  const resourceModeRef = useRef<AiVisionMode | null>(null)
   const busyRef = useRef(false)
+  const busySessionRef = useRef<number | null>(null)
+  const handCountHistoryRef = useRef<number[]>([])
+  const handGestureHistoryRef = useRef<string[]>([])
+  const emotionHistoryRef = useRef<string[]>([])
   const fpsStartRef = useRef(0)
   const fpsFramesRef = useRef(0)
   const dragRef = useRef<{ pointerId: number; offsetX: number; offsetY: number } | null>(null)
-  const modeRef = useRef<ReadyAiMode | "trained">("objects")
-  const cameraRequestRef = useRef(0)
+  const trainingRunRef = useRef(0)
+  const datasetVersionRef = useRef(0)
   const [floatingPosition, setFloatingPosition] = useState<{ left: number; top: number } | null>(null)
 
-  useEffect(() => {
-    modeRef.current = mode
-  }, [mode])
-
-  const classes = useMemo(() => getAiClasses(store.samples), [store.samples])
+  const classes = useMemo(() => getAiClasses(store), [store])
   const counts = useMemo(() => getSampleCounts(store.samples), [store.samples])
-  const canTrain =
-    classes.length >= 2 && classes.every((name) => (counts[name] ?? 0) >= 3)
+  const datasetStats = useMemo(() => getAiDatasetStats(store), [store])
+  const currentExplanation = explainCurrentAiResult(aiState, store.model)
+  const canTrain = datasetStats.ready
+
+  function commitStore(next: AiStudioStore) {
+    datasetVersionRef.current += 1
+    setStore(next)
+    const persisted = saveAiStudioStore(next)
+    if (!persisted) {
+      setStatus("Dataset updated for this session, but browser storage is full. Remove some samples and save again.")
+    }
+  }
 
   useEffect(() => {
     if (!isOpen) {
@@ -306,36 +451,8 @@ export function AiStudioPanel({
     setLoading(false)
     setError(null)
     setStatus(runtimeEnabled ? "AI runtime active" : "AI idle")
-    setCapture(null)
-    onAiStateChange(runtimeEnabled ? aiState : INITIAL)
+    onAiStateChange(runtimeEnabled ? aiState : createAiVisionState("objects"))
   }, [isOpen])
-
-  // Safety net for route changes/unmounts: stop every browser-owned resource
-  // without relying on React state updates after the component is gone.
-  useEffect(() => {
-    return () => {
-      sessionRef.current += 1
-      cameraRequestRef.current += 1
-      if (timerRef.current !== null) {
-        window.clearTimeout(timerRef.current)
-        timerRef.current = null
-      }
-
-      const resource = resourceRef.current
-      resourceRef.current = null
-      if (modeRef.current === "sound") {
-        void stopSpeechRecognizer(resource)
-      } else if (modeRef.current === "trained") {
-        disposeActiveAiModel()
-      } else {
-        disposeAiResource(resource)
-      }
-
-      const stream = streamRef.current
-      streamRef.current = null
-      stream?.getTracks().forEach((track) => track.stop())
-    }
-  }, [])
 
   function bindExistingCameraToVisibleVideo() {
     if (!streamRef.current) return false
@@ -343,67 +460,76 @@ export function AiStudioPanel({
     return Boolean(getActiveVideo())
   }
 
-  // Runtime state controls the camera lifecycle. Presentation state must never
-  // stop the stream: compact/full/open/closed only changes where the same live
-  // stream is rendered.
   useEffect(() => {
-    if (!runtimeEnabled) {
-      if (!isOpen) stopAll()
-      return
+    if (!requestedMode) return
+
+    if (mode !== requestedMode) {
+      stopInput()
+      setMode(requestedMode)
+      setError(null)
+      setStatus(
+        requestedMode === "sound"
+          ? "Sound selected by circuit"
+          : requestedMode === "trained"
+            ? "My AI selected by circuit"
+            : `${MODES.find((item) => item.id === requestedMode)?.title ?? "AI"} selected by circuit`,
+      )
     }
 
-    if (mode === "sound") {
-      if (!soundActive) void startSound()
-      return
-    }
+    onRequestedModeHandled?.()
+  }, [requestedMode])
 
-    if (!cameraActive || !streamRef.current) {
-      // Give React one committed render to mount the floating/full video node.
-      const retry = window.setTimeout(() => {
-        if (runtimeEnabled && !streamRef.current) void openCamera(true)
-      }, 50)
-      return () => window.clearTimeout(retry)
-    }
-
-    bindExistingCameraToVisibleVideo()
-  }, [runtimeEnabled, mode, isOpen])
-
-  // When the visible presentation changes, rebind the existing MediaStream to
-  // the newly mounted video/canvas pair. This never requests a second stream.
   useEffect(() => {
-    if (!streamRef.current) return
-
-    let attempts = 0
-    let retryTimer: number | null = null
-
-    const bind = () => {
-      attempts += 1
-      if (streamRef.current) attachStreamToVisibleVideos()
-      if (!getActiveVideo() && attempts < 6) {
-        retryTimer = window.setTimeout(bind, 50)
+    if (runtimeEnabled) {
+      if (mode === "sound") {
+        if (!soundActive) void startSound()
+        return
       }
-    }
 
-    const frame = window.requestAnimationFrame(bind)
-    return () => {
-      window.cancelAnimationFrame(frame)
-      if (retryTimer !== null) window.clearTimeout(retryTimer)
+      // The full AI Studio and the compact PiP use the same camera stream but
+      // mount different <video> elements. When the UI switches between them,
+      // re-attach the existing stream instead of assuming cameraActive means
+      // that the newly mounted video already has srcObject.
+      if (!cameraActive || !streamRef.current) {
+        void openCamera(true)
+      } else {
+        const frame = window.requestAnimationFrame(() => {
+          bindExistingCameraToVisibleVideo()
+        })
+        return () => window.cancelAnimationFrame(frame)
+      }
+    } else if (!isOpen) {
+      stopAll()
+    } else if (!training) {
+      stopInput()
     }
-  }, [compact, isOpen])
+  }, [runtimeEnabled, mode, isOpen, compact])
 
   useEffect(() => {
     if (!store.model) {
       setModel(null)
       return
     }
+
+    // Training already returns a live model. Do not immediately load the same
+    // IndexedDB model again: loadStoredAiModel() disposes the active model,
+    // which can turn the just-trained React state into a disposed tensor graph.
+    if (model) return
+
     let cancelled = false
     void loadStoredAiModel(store.model).then((loaded) => {
-      if (!cancelled) setModel(loaded)
+      if (cancelled) {
+        if (loaded && getActiveAiModel() === loaded) {
+          disposeActiveAiModel()
+        }
+        return
+      }
+      setModel(loaded)
     })
     return () => {
       cancelled = true
     }
-  }, [store.model])
+  }, [store.model, model])
 
   function getActiveVideo() {
     return ((compact || !isOpen) ? floatingVideoRef.current : studioVideoRef.current)
@@ -439,7 +565,7 @@ export function AiStudioPanel({
     setFloatingPosition(null)
   }
 
-  function handleFloatingPointerDown(event: PointerEvent<HTMLDivElement>) {
+  function handleFloatingPointerDown(event: React.PointerEvent<HTMLDivElement>) {
     if (event.button !== 0) return
     const rect = event.currentTarget.getBoundingClientRect()
     dragRef.current = {
@@ -450,7 +576,7 @@ export function AiStudioPanel({
     event.currentTarget.setPointerCapture(event.pointerId)
   }
 
-  function handleFloatingPointerMove(event: PointerEvent<HTMLDivElement>) {
+  function handleFloatingPointerMove(event: React.PointerEvent<HTMLDivElement>) {
     const drag = dragRef.current
     if (!drag || drag.pointerId !== event.pointerId) return
 
@@ -462,7 +588,7 @@ export function AiStudioPanel({
     setFloatingPosition({ left, top })
   }
 
-  function handleFloatingPointerUp(event: PointerEvent<HTMLDivElement>) {
+  function handleFloatingPointerUp(event: React.PointerEvent<HTMLDivElement>) {
     if (dragRef.current?.pointerId !== event.pointerId) return
     dragRef.current = null
     try {
@@ -476,73 +602,106 @@ export function AiStudioPanel({
       window.clearTimeout(timerRef.current)
       timerRef.current = null
     }
-    busyRef.current = false
     clearOverlay()
+    handCountHistoryRef.current = []
+    handGestureHistoryRef.current = []
+    emotionHistoryRef.current = []
     fpsStartRef.current = 0
     fpsFramesRef.current = 0
     setFps(0)
   }
 
+  function releaseLoadedResource(resourceMode: AiVisionMode | null, resource: ReadyResource) {
+    if (!resource) return
+
+    if (resourceMode === "sound") {
+      void stopSoundRecognizer(resource as SoundRecognizer)
+    } else if (resourceMode === "trained") {
+      if (resource !== model) disposeActiveAiModel()
+    } else if (resourceMode === "objects") {
+      disposeObjectDetector(resource)
+    } else if (resourceMode === "pose") {
+      disposeMoveNet(resource)
+    } else if (resourceMode === "hands" || resourceMode === "numbers") {
+      disposeHandDetector(resource)
+    } else if (resourceMode === "emotion") {
+      disposeFaceDetector(resource)
+    }
+  }
+
   function releaseCurrentResource() {
     const resource = resourceRef.current
+    const resourceMode = resourceModeRef.current
     resourceRef.current = null
+    resourceModeRef.current = null
 
-    if (mode === "sound") {
-      void stopSpeechRecognizer(resource)
-    } else if (mode === "trained") {
+    if (!resource) return
+
+    if (resourceMode === "trained") {
       disposeActiveAiModel()
       setModel(null)
-    } else {
-      disposeAiResource(resource)
+      return
     }
+
+    releaseLoadedResource(resourceMode, resource)
+  }
+
+  function stopCameraStream() {
+    const stream = streamRef.current
+    if (!stream) return
+
+    stopCamera(studioVideoRef.current, stream)
+    stopCamera(floatingVideoRef.current, stream)
+    streamRef.current = null
   }
 
   function stopAll() {
     cameraRequestRef.current += 1
-    releaseCurrentResource()
     stopInference()
-    stopCamera(getActiveVideo(), streamRef.current)
-    streamRef.current = null
+    releaseCurrentResource()
+    stopCameraStream()
     setCameraActive(false)
     setSoundActive(false)
     setLoading(false)
   }
 
   async function openCamera(withModel = true) {
+    const requestId = ++cameraRequestRef.current
     setError(null)
     setStatus("Starting camera...")
-    const requestId = ++cameraRequestRef.current
     stopInference()
     releaseCurrentResource()
+    stopCameraStream()
+    setCameraActive(false)
 
     try {
       const video = getActiveVideo()
       if (!video) throw new Error("Camera preview is not mounted.")
       const stream = await startCamera(video)
 
-      // Ignore any stream belonging to an obsolete start request. This handles
-      // rapid mode changes, Stop clicks, navigation, or a second Start cleanly.
       if (requestId !== cameraRequestRef.current) {
-        stream.getTracks().forEach((track) => track.stop())
+        stopCamera(video, stream)
         return
       }
 
-      streamRef.current?.getTracks().forEach((track) => track.stop())
       streamRef.current = stream
       attachStreamToVisibleVideos()
       setCameraActive(true)
       setStatus(withModel ? "Camera live · loading AI" : "Camera live · ready to teach")
       onAiStateChange({
-        ...emptyState(mode),
+        ...createAiVisionState(mode),
         enabled: true,
         detail: withModel ? "Camera live" : "Teach camera live",
       })
     } catch (cameraError) {
       if (requestId !== cameraRequestRef.current) return
       setError(
-        cameraError instanceof Error
-          ? cameraError.message
-          : "Camera permission was denied or unavailable.",
+        mediaPermissionMessage(
+          cameraError,
+          cameraError instanceof Error
+            ? cameraError.message
+            : "Camera permission was denied or unavailable.",
+        ),
       )
       setStatus("Camera unavailable")
       setCameraActive(false)
@@ -550,8 +709,46 @@ export function AiStudioPanel({
     }
 
     if (!withModel) return
-    if (mode !== "sound") await startModeResource()
+    if (mode !== "sound" && requestId === cameraRequestRef.current) {
+      await startModeResource()
+    }
   }
+
+  useEffect(() => {
+    return () => {
+      cameraRequestRef.current += 1
+      sessionRef.current += 1
+      trainingRunRef.current += 1
+      if (timerRef.current !== null) {
+        window.clearTimeout(timerRef.current)
+        timerRef.current = null
+      }
+
+      const stream = streamRef.current
+      stopCamera(studioVideoRef.current, stream)
+      stopCamera(floatingVideoRef.current, stream)
+      streamRef.current = null
+
+      const resource = resourceRef.current
+      const resourceMode = resourceModeRef.current
+      resourceRef.current = null
+      resourceModeRef.current = null
+
+      if (resourceMode === "sound") {
+        void stopSoundRecognizer(resource as SoundRecognizer)
+      } else if (resourceMode === "trained") {
+        disposeActiveAiModel()
+      } else if (resourceMode === "objects") {
+        disposeObjectDetector(resource)
+      } else if (resourceMode === "pose") {
+        disposeMoveNet(resource)
+      } else if (resourceMode === "hands" || resourceMode === "numbers") {
+        disposeHandDetector(resource)
+      } else if (resourceMode === "emotion") {
+        disposeFaceDetector(resource)
+      }
+    }
+  }, [])
 
   async function startCameraForMode() {
     await openCamera(true)
@@ -562,7 +759,7 @@ export function AiStudioPanel({
   }
 
   async function startModeResource() {
-    const activeSession = sessionRef.current
+    const activeSession = ++sessionRef.current
     setLoading(true)
     setError(null)
 
@@ -570,13 +767,13 @@ export function AiStudioPanel({
       let resource: ReadyResource = null
 
       if (mode === "objects") {
-        resource = await cocoSsd.load({ base: "mobilenet_v2" })
+        resource = await loadObjectDetector()
       } else if (mode === "pose") {
-        resource = await loadPoseDetector()
+        resource = await loadMoveNet()
       } else if (mode === "hands" || mode === "numbers") {
         resource = await loadHandDetector()
       } else if (mode === "emotion") {
-        resource = await loadFaceEmotion()
+        resource = await loadFaceDetector()
       } else if (mode === "trained") {
         if (!store.model) throw new Error("Train My AI first, then start the live test.")
         resource = model ?? await loadStoredAiModel(store.model)
@@ -585,19 +782,20 @@ export function AiStudioPanel({
       }
 
       if (activeSession !== sessionRef.current) {
-        if (resource && resource !== model) disposeAiResource(resource)
+        releaseLoadedResource(mode, resource)
         return
       }
 
       resourceRef.current = resource
+      resourceModeRef.current = mode
       setLoading(false)
       setStatus(
-        mode === "objects" ? "6A Objects ready"
-          : mode === "pose" ? "6A Pose ready"
-          : mode === "hands" ? "6A Fingers ready"
-          : mode === "numbers" ? "6A Numbers ready"
-          : mode === "emotion" ? "6A Emotion ready"
-          : "6B My AI ready",
+        mode === "objects" ? "6B Objects ready"
+          : mode === "pose" ? "6C Pose ready"
+          : mode === "hands" ? "6D Fingers ready"
+          : mode === "numbers" ? "6G Numbers ready"
+          : mode === "emotion" ? "6E Emotion ready"
+          : "6I My AI ready",
       )
 
       if (mode !== "sound") startInferenceLoop(activeSession)
@@ -616,60 +814,61 @@ export function AiStudioPanel({
   async function startSound() {
     setError(null)
     stopInference()
-    const activeSession = sessionRef.current
+    const activeSession = ++sessionRef.current
     setLoading(true)
+
     try {
-      const recognizer = await loadSpeechRecognizer()
+      const recognizer = await loadSoundRecognizer()
       if (activeSession !== sessionRef.current) {
-        await stopSpeechRecognizer(recognizer)
+        await stopSoundRecognizer(recognizer)
         return
       }
+
       resourceRef.current = recognizer
+      resourceModeRef.current = "sound"
       setLoading(false)
       setSoundActive(true)
       onAiStateChange({
-        ...emptyState("sound"),
+        ...createAiVisionState("sound"),
         enabled: true,
-        detail: "Microphone listening",
+        modelClasses: recognizer.labels,
+        detail: "Microphone ready",
       })
-      setStatus("6F Sound listening")
+      setStatus("6F Sound ready")
 
-      await recognizer.listen(
-        (result: any) => {
-          if (activeSession !== sessionRef.current) return
-          const scores = Array.from(result?.scores ?? []) as number[]
-          const labels = recognizer.wordLabels()
-          let best = 0
-          for (let i = 1; i < scores.length; i += 1) {
-            if ((scores[i] ?? 0) > (scores[best] ?? 0)) best = i
-          }
+      await recognizer.start((result) => {
+        if (activeSession !== sessionRef.current) return
 
-          const confidence = Math.round((scores[best] ?? 0) * 100)
-          const word = labels[best] ?? "unknown"
-          onAiStateChange({
-            enabled: true,
-            mode: "sound",
-            detectedClass: word,
-            confidence,
-            allDetections: [],
-            modelClasses: labels,
-            modelSource: "ready",
-            detail: confidence >= 65 ? `Heard “${word}”` : "Listening...",
-          })
-        },
-        {
-          probabilityThreshold: 0.65,
-          invokeCallbackOnNoiseAndUnknown: true,
-          includeSpectrogram: false,
-        },
-      )
+        onAiStateChange({
+          enabled: true,
+          mode: "sound",
+          detectedClass: result.label,
+          confidence: result.confidence,
+          allDetections: [],
+          modelClasses: recognizer.labels,
+          modelSource: "ready",
+          detail: result.isActionable
+            ? `Heard “${result.label}” · ${result.confidence}%`
+            : result.label === "none"
+              ? "Listening…"
+              : `Possible “${result.label}” · speak clearly`,
+        })
+      })
+
+      if (activeSession === sessionRef.current) {
+        setStatus("6F Sound listening")
+      }
     } catch (soundError) {
       if (activeSession !== sessionRef.current) return
       setLoading(false)
+      setSoundActive(false)
       setError(
-        soundError instanceof Error
-          ? soundError.message
-          : "Microphone recognition could not start.",
+        mediaPermissionMessage(
+          soundError,
+          soundError instanceof Error
+            ? soundError.message
+            : "Microphone recognition could not start.",
+        ),
       )
       setStatus("Sound AI unavailable")
     }
@@ -695,50 +894,38 @@ export function AiStudioPanel({
       }
 
       busyRef.current = true
+      busySessionRef.current = activeSession
       const started = performance.now()
 
       try {
         if (mode === "objects") {
-          const predictions = await resourceRef.current.detect(
-            video,
-            OBJECT_MAX_BOXES,
-            OBJECT_MIN_SCORE,
-          )
+          const predictions = await detectObjects(resourceRef.current, video, {
+            maxNumBoxes: OBJECT_MAX_BOXES,
+            minScore: OBJECT_MIN_SCORE,
+          })
           if (activeSession !== sessionRef.current) return
           // Keep every detection returned by COCO-SSD at/above our live-demo
           // threshold. Do not whitelist classes such as person/car/phone.
-          const visible = predictions.filter(
-            (p: any) => Number(p.score) >= OBJECT_MIN_SCORE,
-          )
-          drawBoxes(getActiveOverlay()!, video, visible.map((p: any) => ({
-            class: p.class,
-            score: p.score,
-            bbox: p.bbox,
-          })))
+          const visible = predictions
+          drawBoxes(getActiveOverlay()!, video, visible)
           const primary = visible[0]
           onAiStateChange({
             enabled: true,
             mode: "objects",
-            detectedClass: primary ? canonicalObjectClass(primary.class) : "none",
+            detectedClass: primary?.class ?? "none",
             confidence: primary ? Math.round(primary.score * 100) : 0,
-            allDetections: visible.map((p: any) => ({
-              class: p.class,
-              score: Number(p.score),
-              bbox: [
-                Number(p.bbox[0]), Number(p.bbox[1]),
-                Number(p.bbox[2]), Number(p.bbox[3]),
-              ],
-            })),
+            allDetections: visible,
             modelSource: "ready",
             detail: primary ? `${visible.length} object${visible.length === 1 ? "" : "s"} detected` : "Looking...",
           })
         } else if (mode === "pose") {
-          const poses = await resourceRef.current.estimatePoses(video)
+          const pose = await estimateMoveNetPose(resourceRef.current, video)
           if (activeSession !== sessionRef.current) return
-          drawPose(getActiveOverlay()!, video, poses)
-          const pose = poses?.[0]
-          const visible = pose?.keypoints?.filter((p: any) => (p.score ?? 0) >= 0.25).length ?? 0
-          const score = pose && visible ? pose.keypoints.reduce((s: number, p: any) => s + Number(p.score ?? 0), 0) / pose.keypoints.length : 0
+          drawPose(getActiveOverlay()!, video, pose)
+          const visiblePoints = pose?.keypoints?.filter((point: any) => (point.score ?? 0) >= 0.25) ?? []
+          const score = visiblePoints.length
+            ? visiblePoints.reduce((sum: number, point: any) => sum + Number(point.score ?? 0), 0) / visiblePoints.length
+            : 0
           onAiStateChange({
             enabled: true,
             mode: "pose",
@@ -746,41 +933,121 @@ export function AiStudioPanel({
             confidence: Math.round(score * 100),
             allDetections: [],
             modelSource: "ready",
-            detail: pose ? `${visible}/17 keypoints tracked` : "No person detected",
+            detail: pose ? `${visiblePoints.length}/17 keypoints tracked` : "No person detected",
           })
         } else if (mode === "hands" || mode === "numbers") {
-          const result = await resourceRef.current.estimate(video)
+          const hands: HandDetection[] = await detectHands(resourceRef.current, video)
           if (activeSession !== sessionRef.current) return
-          drawHands(getActiveOverlay()!, video, result)
-          const hand = result?.multiHandLandmarks?.[0]
-          const score = hand ? 0.9 : 0
-          const count = hand ? countFingers(hand) : 0
+
+          drawHands(getActiveOverlay()!, video, hands)
+          const hand = hands[0]
+          const interpreted = hand ? interpretHandGesture(hand) : null
+
+          if (hand) {
+            handCountHistoryRef.current = [...handCountHistoryRef.current, hand.fingerCount].slice(-4)
+            if (interpreted) {
+              handGestureHistoryRef.current = [
+                ...handGestureHistoryRef.current,
+                interpreted.gesture,
+              ].slice(-4)
+            }
+          } else {
+            handCountHistoryRef.current = []
+            handGestureHistoryRef.current = []
+          }
+
+          const sortedCounts = [...handCountHistoryRef.current].sort((a, b) => a - b)
+          const stableCount = sortedCounts.length
+            ? sortedCounts[Math.floor(sortedCounts.length / 2)]
+            : 0
+
+          const gestureHistogram = handGestureHistoryRef.current.reduce<Record<string, number>>(
+            (histogram, gesture) => {
+              histogram[gesture] = (histogram[gesture] ?? 0) + 1
+              return histogram
+            },
+            {},
+          )
+          const stableGesture =
+            Object.entries(gestureHistogram).sort((a, b) => b[1] - a[1])[0]?.[0] ??
+            "none"
+
           onAiStateChange({
             enabled: true,
             mode,
-            detectedClass: mode === "numbers" ? String(count) : hand ? "hand" : "none",
-            confidence: hand ? Math.round(score * 100) : 0,
+            detectedClass:
+              mode === "numbers"
+                ? hand
+                  ? String(stableCount)
+                  : "none"
+                : hand
+                  ? "hand"
+                  : "none",
+            confidence:
+              mode === "numbers"
+                ? interpreted?.confidence ?? (hand ? Math.round(hand.score * 100) : 0)
+                : hand
+                  ? Math.round(hand.score * 100)
+                  : 0,
             allDetections: [],
-            modelClasses: mode === "numbers" ? ["0", "1", "2", "3", "4", "5"] : ["hand"],
+            detectedGesture: hand ? stableGesture : "none",
+            fingerCount: hand ? stableCount : 0,
+            handedness: hand?.handedness ?? "none",
+            modelClasses:
+              mode === "numbers"
+                ? ["0", "1", "2", "3", "4", "5"]
+                : ["hand"],
             modelSource: "ready",
             detail: hand
-              ? mode === "numbers" ? `${count} finger${count === 1 ? "" : "s"} extended` : "Hand tracked"
+              ? mode === "numbers"
+                ? stableCount + " finger" + (stableCount === 1 ? "" : "s") + " · " + stableGesture.replace("_", " ") + " · " + hand.handedness
+                : hand.handedness + " hand · " + hand.fingerCount + " fingers · " + (interpreted?.gesture.replace("_", " ") ?? "hand")
               : "Show a hand",
           })
         } else if (mode === "emotion") {
-          const result = await estimateFaceEmotion(resourceRef.current, video)
+          const faces: FaceDetection[] = await detectFaces(resourceRef.current, video)
           if (activeSession !== sessionRef.current) return
+
+          const face = faces[0]
+
+          if (face) {
+            emotionHistoryRef.current = [...emotionHistoryRef.current, face.expression].slice(-3)
+          } else {
+            emotionHistoryRef.current = []
+          }
+
+          const histogram = emotionHistoryRef.current.reduce<Record<string, number>>(
+            (counts, expression) => {
+              counts[expression] = (counts[expression] ?? 0) + 1
+              return counts
+            },
+            {},
+          )
+          const stableExpression =
+            Object.entries(histogram).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "none"
+
+          const drawableFaces = faces.map((current, index) =>
+            index === 0 ? { ...current, expression: stableExpression } : current,
+          )
+          drawFaces(getActiveOverlay()!, video, drawableFaces)
+
+          const stableEmotion = face?.emotions.find(
+            (emotion) => emotion.emotion === stableExpression,
+          )
+          const stableConfidence = stableEmotion?.score ?? face?.expressionScore ?? 0
+
           onAiStateChange({
             enabled: true,
             mode: "emotion",
-            detectedClass: result?.expression ?? "none",
-            confidence: result ? Math.round(result.score * 100) : 0,
+            detectedClass: face ? stableExpression : "none",
+            confidence: face ? Math.round(stableConfidence * 100) : 0,
             allDetections: [],
+            modelClasses: ["neutral", "happy", "surprised"],
             modelSource: "ready",
-            detail: result ? `${result.count} face${result.count === 1 ? "" : "s"} · ${result.expression}` : "Show your face",
+            detail: face
+              ? String(faces.length) + " face" + (faces.length === 1 ? "" : "s") + " · " + stableExpression
+              : "Show your face",
           })
-          if (result) drawFace(getActiveOverlay()!, video, result)
-          else clearOverlay()
         } else if (mode === "trained") {
           const frame = captureVideoFrame(video, 640)
           const result = frame ? await predictAiImage(frame, store.model) : null
@@ -793,7 +1060,25 @@ export function AiStudioPanel({
             allDetections: [],
             modelClasses: store.model?.classes ?? [],
             modelSource: "trained",
-            detail: result ? Object.entries(result.probabilities).map(([k, v]) => `${k} ${v}%`).join(" · ") : "Show an example",
+            unknown: result?.unknown ?? true,
+            lowConfidence: result?.lowConfidence ?? true,
+            confidenceThreshold: result?.threshold ?? store.model?.predictionThreshold ?? 62,
+            decisionReason:
+              result?.reason === "ambiguous"
+                ? "ambiguous"
+                : result?.reason === "low_confidence"
+                  ? "low_confidence"
+                  : result
+                    ? "recognized"
+                    : "no_input",
+            probabilities: result?.probabilities,
+            detail: result
+              ? result.unknown
+                ? "UNKNOWN · " + formatDecisionReason(result.reason)
+                : Object.entries(result.probabilities)
+                    .map(([key, value]) => key + " " + value + "%")
+                    .join(" · ")
+              : "Show an example",
           })
           clearOverlay()
         }
@@ -820,7 +1105,10 @@ export function AiStudioPanel({
           timerRef.current = window.setTimeout(tick, 600)
         }
       } finally {
-        busyRef.current = false
+        if (busySessionRef.current === activeSession) {
+          busyRef.current = false
+          busySessionRef.current = null
+        }
       }
     }
 
@@ -829,101 +1117,187 @@ export function AiStudioPanel({
 
   function stopInput() {
     cameraRequestRef.current += 1
-    releaseCurrentResource()
     stopInference()
-    stopCamera(getActiveVideo(), streamRef.current)
-    streamRef.current = null
+    releaseCurrentResource()
+    stopCameraStream()
     setCameraActive(false)
     setSoundActive(false)
-    onAiStateChange(emptyState(mode))
+    onAiStateChange(createAiVisionState(mode))
     setStatus("AI stopped")
   }
 
   function selectMode(next: ReadyAiMode | "trained") {
+    if (training) return
     stopInput()
     setMode(next)
     setError(null)
-    setCapture(null)
     setStatus(next === "trained" ? "My AI selected" : `${MODES.find((item) => item.id === next)?.title ?? "AI"} selected`)
   }
 
   function selectTab(next: Tab) {
-    stopInput()
+    if (training) return
+    // A live Blockly AI runtime must keep its active camera/mic session while
+    // the Studio is switched between Try/Teach/Understand.
+    if (!runtimeEnabled) stopInput()
     setTab(next)
   }
 
-  function addSampleFromCamera() {
+  async function addSampleFromCamera() {
+    if (training || runtimeEnabled) return
     if (!label.trim()) {
       setStatus("Enter a concept name first.")
       return
     }
-    const frame = captureVideoFrame(getActiveVideo()!, 640)
+
+    const addError = getSampleAddError(store, label)
+    if (addError) {
+      setStatus(addError)
+      return
+    }
+
+    if (!cameraActive) {
+      await startTeachCamera()
+      setStatus("Camera ready · click Capture example again.")
+      return
+    }
+
+    const video = getActiveVideo()
+    if (!video) {
+      setStatus("Camera preview is not ready.")
+      return
+    }
+
+    const frame = captureVideoFrame(video, 384)
     if (!frame) {
       setStatus("Start the camera first.")
       return
     }
-    const next = addAiSample(store, label, frame)
-    setStore(next)
-    saveAiStudioStore(next)
-    setLabel("")
-    setStatus(`Added sample to “${next.samples[next.samples.length - 1]?.label ?? "concept"}”.`)
+
+    try {
+      const optimized = await optimizeAiImage(frame, 384, 0.62)
+      const before = store.samples.length
+      const next = addAiSample(store, label, optimized)
+      commitStore(next)
+      setLabel("")
+      setStatus(
+        next.samples.length > before
+          ? "Example captured and added."
+          : "That example could not be added.",
+      )
+    } catch (sampleError) {
+      setError(sampleError instanceof Error ? sampleError.message : "Could not save the sample.")
+    }
   }
 
-  function importSample(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0]
-    event.target.value = ""
-    if (!file || !label.trim()) {
-      setStatus("Enter a concept name and choose an image.")
+  async function importSample(event: ChangeEvent<HTMLInputElement>) {
+    if (training || runtimeEnabled) {
+      event.target.value = ""
       return
     }
 
-    const reader = new FileReader()
-    reader.onload = () => {
-      if (typeof reader.result !== "string") {
-        setStatus("Image could not be read.")
-        return
-      }
-      const next = addAiSample(store, label, reader.result)
-      setStore(next)
-      saveAiStudioStore(next)
-      setLabel("")
-      setStatus("Image added.")
+    const files = Array.from(event.target.files ?? [])
+      .filter((file) => file.type.startsWith("image/"))
+      .slice(0, 10)
+    event.target.value = ""
+
+    if (!files.length || !label.trim()) {
+      setStatus("Enter a concept name and choose one or more images.")
+      return
     }
-    reader.readAsDataURL(file)
+
+    try {
+      let next = addAiClass(store, label)
+      let added = 0
+
+      for (const file of files) {
+        const dataUrl = await readFileAsDataUrl(file)
+        const optimized = await optimizeAiImage(dataUrl, 384, 0.62)
+        const before = next.samples.length
+        next = addAiSample(next, label, optimized)
+        if (next.samples.length > before) added += 1
+      }
+
+      commitStore(next)
+      setLabel("")
+      setStatus("Imported " + added + " example" + (added === 1 ? "" : "s") + ".")
+    } catch (sampleError) {
+      setError(sampleError instanceof Error ? sampleError.message : "Could not import those images.")
+    }
   }
 
   async function train() {
-    if (!canTrain || training) return
+    if (!canTrain || training || runtimeEnabled) {
+      if (runtimeEnabled && !training) {
+        setStatus("Stop the live AI runtime before training My AI.")
+      }
+      return
+    }
+
+    const runId = ++trainingRunRef.current
+    const datasetVersion = datasetVersionRef.current
+    const trainingSamples = store.samples
     setTraining(true)
     setError(null)
-    setProgress({ epoch: 0, total: 18, accuracy: 0, loss: 0 })
+    setProgress({ epoch: 0, total: 18, accuracy: 0, loss: 0, stage: "Preparing dataset" })
+
     try {
-      const result = await trainAiModel(store.samples, {
+      const result = await trainAiModel(trainingSamples, {
         epochs: 18,
+        shouldCancel: () =>
+          runId !== trainingRunRef.current ||
+          datasetVersion !== datasetVersionRef.current,
+        onStage: (stage) =>
+          setProgress((current) => ({ ...current, stage })),
         onEpoch: (epoch, total, accuracy, loss) =>
-          setProgress({ epoch, total, accuracy, loss }),
+          setProgress((current) => ({
+            ...current,
+            epoch,
+            total,
+            accuracy,
+            loss,
+            stage: "Training classifier " + epoch + "/" + total,
+          })),
       })
-      const next = { ...store, model: result.summary }
-      setStore(next)
-      saveAiStudioStore(next)
+
+      // Dataset/reset/unmount may have superseded this training run.
+      if (
+        runId !== trainingRunRef.current ||
+        datasetVersion !== datasetVersionRef.current
+      ) {
+        if (getActiveAiModel() === result.model) {
+          disposeActiveAiModel()
+        }
+        return
+      }
+
+      const next = { ...store, samples: trainingSamples, model: result.summary }
+      commitStore(next)
       setModel(result.model)
       setMode("trained")
       setTab("try")
-      setStatus(`My AI learned ${result.summary.classes.length} concepts.`)
+      setStatus("My AI learned " + result.summary.classes.length + " concepts with " + result.summary.featureExtractor + ".")
     } catch (trainError) {
+      if (runId !== trainingRunRef.current) return
       setError(trainError instanceof Error ? trainError.message : "Training failed.")
     } finally {
-      setTraining(false)
+      if (runId === trainingRunRef.current) {
+        setTraining(false)
+      }
     }
   }
 
   async function resetStudio() {
+    if (runtimeEnabled) {
+      setStatus("Stop the live AI runtime before resetting My AI.")
+      return
+    }
+    trainingRunRef.current += 1
+    datasetVersionRef.current += 1
     stopInput()
     await clearAiStudioStore()
-    setStore({ samples: [], model: null })
+    setStore({ classes: [], samples: [], model: null })
     setModel(null)
     setLabel("")
-    setCapture(null)
     setTab("try")
     setMode("objects")
     setStatus("AI Studio reset.")
@@ -946,20 +1320,20 @@ export function AiStudioPanel({
 
     return (
       <div
-        className="fixed z-[70] w-[min(300px,calc(100vw-20px))] overflow-hidden rounded-2xl border border-emerald-400/25 bg-slate-950/96 text-white shadow-2xl ring-1 ring-black/50 select-none"
+        className="pixiu-ai-floating fixed z-[70] w-[min(300px,calc(100vw-20px))] overflow-hidden rounded-2xl border bg-slate-950/96 text-white shadow-2xl ring-1 ring-black/50 select-none"
         style={floatingStyle}
         onPointerMove={handleFloatingPointerMove}
         onPointerUp={handleFloatingPointerUp}
         onPointerCancel={handleFloatingPointerUp}
       >
         <div
-          className="flex cursor-move touch-none items-center justify-between border-b border-slate-800 bg-slate-950/95 px-3 py-2"
+          className="pixiu-ai-floating-header flex cursor-move touch-none items-center justify-between border-b bg-slate-950/95 px-3 py-2"
           onPointerDown={handleFloatingPointerDown}
         >
           <div className="flex min-w-0 items-center gap-2">
             <GripVertical size={12} className="shrink-0 text-slate-500" />
             <div className="min-w-0">
-              <p className="text-[8px] font-mono uppercase tracking-[0.18em] text-emerald-300">PIXIU AI RUNTIME</p>
+              <p className="text-[8px] font-mono uppercase tracking-[0.18em] text-cyan-200">PIXIU VISION CORE</p>
               <p className="truncate text-[10px] font-black">{activeTitle} · {mode === "sound" ? "MIC" : "CAMERA"}</p>
             </div>
           </div>
@@ -973,13 +1347,23 @@ export function AiStudioPanel({
             >
               RESET
             </button>
-            <span className="rounded-full border border-emerald-400/20 px-2 py-1 text-[8px] font-mono text-emerald-300">LIVE</span>
+            <span className="pixiu-ai-live-chip rounded-full border px-2 py-1 text-[8px] font-mono">LIVE FEED</span>
           </div>
         </div>
 
         <div className="relative aspect-video bg-black">
-          <video ref={floatingVideoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
-          <canvas ref={floatingOverlayRef} className="pointer-events-none absolute inset-0 h-full w-full" />
+          {mode === "sound" ? (
+            <div className="flex h-full flex-col items-center justify-center gap-2 p-5 text-center">
+              <Mic size={28} className={soundActive ? "text-violet-300 animate-pulse" : "text-slate-500"} />
+              <p className="text-[10px] font-black">{aiState.detectedClass === "none" ? "Listening…" : aiState.detectedClass}</p>
+              <p className="text-[8px] text-slate-600">{aiState.detail}</p>
+            </div>
+          ) : (
+            <>
+              <video ref={floatingVideoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
+              <canvas ref={floatingOverlayRef} className="pointer-events-none absolute inset-0 h-full w-full" />
+            </>
+          )}
           <div className="absolute bottom-2 left-2 max-w-[calc(100%-16px)] truncate rounded-md bg-slate-950/85 px-2 py-1 text-[9px] font-mono">
             {aiState.detectedClass === "none" ? status : aiState.detectedClass + " · " + aiState.confidence + "%"}
           </div>
@@ -990,16 +1374,16 @@ export function AiStudioPanel({
 
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/80 p-3 backdrop-blur-sm sm:p-5">
-      <div className="flex h-[min(92vh,900px)] w-full max-w-6xl flex-col overflow-hidden rounded-3xl border border-violet-400/20 bg-[#07111f] text-white shadow-2xl shadow-black/60">
-        <header className="flex shrink-0 items-center justify-between border-b border-slate-800 bg-slate-950/70 px-4 py-3 sm:px-6">
+    <div className="pixiu-ai-shell fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/80 p-3 backdrop-blur-sm sm:p-5">
+      <div className="pixiu-ai-window flex h-[min(92vh,900px)] w-full max-w-6xl flex-col overflow-hidden rounded-3xl border bg-[#07111f] text-white shadow-2xl shadow-black/60">
+        <header className="pixiu-ai-header flex shrink-0 items-center justify-between border-b bg-slate-950/70 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-3">
-            <div className="grid h-9 w-9 place-items-center rounded-xl bg-violet-500/10 text-violet-300 ring-1 ring-violet-400/20">
+            <div className="pixiu-ai-mark grid h-9 w-9 place-items-center rounded-xl text-violet-300">
               <Sparkles size={18} />
             </div>
             <div>
               <p className="font-mono text-[9px] font-bold uppercase tracking-[0.22em] text-violet-300">PIXIU AI STUDIO</p>
-              <h2 className="text-sm font-black sm:text-base">Try AI · Teach AI · Connect AI</h2>
+              <h2 className="text-sm font-black sm:text-base">EXPLORE AI · BUILD AI · UNDERSTAND AI</h2>
             </div>
           </div>
           <button onClick={onClose} className="rounded-xl p-2 text-slate-500 hover:bg-slate-800 hover:text-white" aria-label="Minimize AI Studio">
@@ -1007,48 +1391,85 @@ export function AiStudioPanel({
           </button>
         </header>
 
-        <nav className="flex items-center gap-1 border-b border-slate-800 bg-slate-950/25 p-2">
+        <nav className="pixiu-ai-nav flex items-center gap-1 border-b p-2">
           {([
             ["try", "Try", Sparkles],
             ["teach", "Teach", Brain],
             ["understand", "Understand", Layers3],
           ] as const).map(([value, title, Icon]) => (
-            <button key={value} onClick={() => selectTab(value)} className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-[10px] font-black ${tab === value ? "bg-violet-500/15 text-violet-200 ring-1 ring-violet-400/20" : "text-slate-500 hover:bg-slate-900 hover:text-slate-200"}`}>
+            <button key={value} onClick={() => selectTab(value)} className={`pixiu-ai-tab flex items-center gap-1.5 rounded-xl px-3 py-2 text-[10px] font-black ${tab === value ? "pixiu-ai-tab-active" : "text-slate-500 hover:bg-slate-900 hover:text-slate-200"}`}>
               <Icon size={13} />{title}
             </button>
           ))}
           <span className="ml-auto hidden text-[9px] font-mono text-slate-600 sm:block">{store.samples.length} examples</span>
         </nav>
 
+        <div className="pixiu-ai-privacy border-b bg-slate-950/40 px-4 py-2 sm:px-6">
+          <div className="flex flex-wrap items-center gap-2 text-[9px] font-mono">
+            <span className="mr-1 uppercase tracking-[0.16em] text-slate-600">Privacy</span>
+            <span className={"rounded-full border px-2 py-1 " + (cameraActive ? "border-emerald-400/30 bg-emerald-400/5 text-emerald-300" : "border-slate-800 text-slate-600")}>
+              CAMERA · {cameraActive ? "ACTIVE" : "OFF"}
+            </span>
+            <span className={"rounded-full border px-2 py-1 " + (soundActive ? "border-violet-400/30 bg-violet-400/5 text-violet-300" : "border-slate-800 text-slate-600")}>
+              MIC · {soundActive ? "ACTIVE" : "OFF"}
+            </span>
+            <span className="rounded-full border border-slate-800 px-2 py-1 text-slate-600">DATA · THIS BROWSER</span>
+            {(cameraActive || soundActive) && (
+              <button
+                type="button"
+                onClick={stopInput}
+                className="ml-auto rounded-full border border-rose-400/20 px-2 py-1 text-rose-300 hover:bg-rose-500/5"
+              >
+                Stop inputs
+              </button>
+            )}
+            <span className="text-slate-700">No camera/mic stream is sent to the AI backend by this studio.</span>
+          </div>
+        </div>
+
         <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
           {tab === "try" && (
             <div className="mx-auto max-w-5xl space-y-4">
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-7">
                 {MODES.map((item) => (
-                  <button key={item.id} onClick={() => selectMode(item.id)} className={`rounded-2xl border p-3 text-left ${mode === item.id ? "border-violet-400/35 bg-violet-500/[0.08]" : "border-slate-800 bg-slate-950/40 hover:border-slate-700"}`}>
-                    <p className="text-[10px] font-black">{item.title}</p>
+                  <button key={item.id} onClick={() => selectMode(item.id)} className={`pixiu-ai-mode-card rounded-2xl border p-3 text-left ${mode === item.id ? "pixiu-ai-mode-selected" : "border-slate-800 bg-slate-950/40"}`}>
+                    <p className="pixiu-ai-mode-kicker text-[10px] font-black">{item.title}</p>
                     <p className="mt-1 text-[9px] leading-4 text-slate-600">{item.subtitle}</p>
                   </button>
                 ))}
-                <button disabled={!store.model} onClick={() => selectMode("trained")} className={`rounded-2xl border p-3 text-left ${mode === "trained" ? "border-emerald-400/35 bg-emerald-500/[0.05]" : "border-slate-800 bg-slate-950/40"} disabled:opacity-35`}>
+                <button disabled={!store.model} onClick={() => selectMode("trained")} className={`pixiu-ai-mode-card rounded-2xl border p-3 text-left ${mode === "trained" ? "pixiu-ai-mode-selected" : "border-slate-800 bg-slate-950/40"} disabled:opacity-35`}>
                   <p className="text-[10px] font-black">My AI</p>
                   <p className="mt-1 text-[9px] leading-4 text-slate-600">Your trained model</p>
                 </button>
               </div>
 
               <div className="grid gap-4 lg:grid-cols-[1.4fr_0.8fr]">
-                <div className="overflow-hidden rounded-3xl border border-slate-800 bg-black">
+                <div className="pixiu-ai-preview overflow-hidden rounded-3xl border bg-black">
                   <div className="relative aspect-video">
-                    <video ref={studioVideoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
-                    <canvas ref={overlayRef} className="pointer-events-none absolute inset-0 h-full w-full" />
-                    {!inputActive && (
+                    {isSound ? (
+                      <div className="flex h-full flex-col items-center justify-center bg-slate-950/90 p-6 text-center">
+                        <Mic size={42} className={soundActive ? "text-violet-300 animate-pulse" : "text-slate-600"} />
+                        <p className="mt-3 text-sm font-black">{aiState.detectedClass === "none" ? "Ready for a voice command" : aiState.detectedClass}</p>
+                        <p className="mt-1 max-w-sm text-[10px] leading-5 text-slate-600">{aiState.detail}</p>
+                      </div>
+                    ) : (
+                      <>
+                        <video ref={studioVideoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
+                        <canvas ref={overlayRef} className="pointer-events-none absolute inset-0 h-full w-full" />
+                      </>
+                    )}
+                    {!inputActive && !isSound && (
                       <div className="absolute inset-0 grid place-items-center bg-slate-950/95 p-6 text-center">
                         {isSound ? <Mic size={32} className="mx-auto text-violet-300" /> : <Camera size={32} className="mx-auto text-violet-300" />}
                         <p className="mt-3 text-sm font-black">{isSound ? "Microphone off" : "Camera off"}</p>
-                        <p className="mt-1 max-w-sm text-[11px] leading-5 text-slate-500">6A loads only the selected Ready AI. 6B uses My AI. 6C is the live Blockly bridge.</p>
+                        <p className="mt-1 max-w-sm text-[11px] leading-5 text-slate-500">
+                          {isSound
+                            ? "Sound AI runs locally in your browser. Try words such as yes, no, go, stop, up, down, left or right."
+                            : "6A loads only the selected Ready AI. 6I uses My AI. 6K is the normalized Blockly bridge."}
+                        </p>
                       </div>
                     )}
-                    <div className="absolute left-3 top-3 rounded-full border border-slate-700 bg-slate-950/85 px-2.5 py-1 font-mono text-[9px]">
+                    <div className="pixiu-ai-preview-chip absolute left-3 top-3 rounded-full border px-2.5 py-1 font-mono text-[9px]">
                       {loading ? "LOADING" : inputActive ? (mode === "trained" ? "MY AI LIVE" : `${activeTitle.toUpperCase()} LIVE`) : "READY"}
                     </div>
                   </div>
@@ -1058,6 +1479,31 @@ export function AiStudioPanel({
                       <p className="text-[9px] font-mono uppercase tracking-[0.16em] text-slate-600">{activeTitle}</p>
                       <p className="mt-1 text-sm font-black">{aiState.detectedClass === "none" ? status : aiState.detectedClass}</p>
                       <p className="mt-0.5 text-[9px] text-slate-600">{aiState.detail}</p>
+                      {mode === "trained" && (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <span className={"rounded-lg border px-2 py-1 text-[8px] font-mono " + (aiState.unknown ? "border-amber-400/20 bg-amber-400/5 text-amber-300" : "border-emerald-400/20 bg-emerald-400/5 text-emerald-300")}>
+                            {aiState.unknown ? "UNKNOWN · safe fallback" : "ACCEPTED · My AI"}
+                          </span>
+                          <span className="rounded-lg border border-slate-800 bg-slate-950 px-2 py-1 text-[8px] font-mono text-slate-500">
+                            threshold {aiState.confidenceThreshold ?? 62}%
+                          </span>
+                        </div>
+                      )}
+                      {mode === "numbers" && (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <span className="rounded-lg border border-cyan-400/15 bg-cyan-400/5 px-2 py-1 text-[8px] font-mono text-cyan-200">
+                            Gesture · {aiState.detectedGesture ?? "none"}
+                          </span>
+                          <span className="rounded-lg border border-slate-800 bg-slate-950 px-2 py-1 text-[8px] font-mono text-slate-500">
+                            {aiState.fingerCount ?? 0} fingers
+                          </span>
+                        </div>
+                      )}
+                      {isSound && (
+                        <p className="mt-1 max-w-md text-[8px] leading-4 text-slate-700">
+                          Local vocabulary: yes · no · go · stop · up · down · left · right · zero–nine
+                        </p>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 font-mono text-violet-300">
                       <span className="text-[10px]">{fps ? `${fps} FPS` : "—"}</span>
@@ -1068,22 +1514,22 @@ export function AiStudioPanel({
 
                 <aside className="space-y-3">
                   <div className="rounded-2xl border border-slate-800 bg-slate-950/45 p-4">
-                    <p className="text-xs font-black">6A · Ready AI</p>
+                    <p className="text-xs font-black">6B–6G · Ready AI</p>
                     <p className="mt-2 text-[10px] leading-5 text-slate-500">
-                      Objects, Pose, Fingers, Emotion, Sound and Numbers share one camera lifecycle. Models are loaded only when selected.
+                      Objects, Pose, Fingers, Emotion and Numbers use the Vision camera. Sound uses a separate microphone lifecycle. Only the selected AI model loads.
                     </p>
-                    <button onClick={isSound ? (soundActive ? stopInput : startSound) : (cameraActive ? stopInput : startCameraForMode)} className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-violet-500 px-3 py-2 text-[10px] font-black">
+                    <button onClick={isSound ? (soundActive ? stopInput : startSound) : (cameraActive ? stopInput : startCameraForMode)} className="pixiu-ai-command mt-3 inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[10px] font-black">
                       {(isSound ? soundActive : cameraActive) ? (isSound ? <Mic size={13} /> : <CameraOff size={13} />) : isSound ? <Mic size={13} /> : <Camera size={13} />}
                       {(isSound ? soundActive : cameraActive) ? "Stop" : isSound ? "Start microphone" : "Start camera"}
                     </button>
                   </div>
 
-                  <div className="rounded-2xl border border-emerald-400/10 bg-emerald-500/[0.03] p-4">
-                    <div className="flex items-center gap-2"><Zap size={14} className="text-emerald-300" /><p className="text-xs font-black">6C · AI → Circuit</p></div>
+                  <div className="pixiu-ai-signal-card rounded-2xl border p-4">
+                    <div className="flex items-center gap-2"><Zap size={14} className="text-cyan-300" /><p className="pixiu-ai-signal-title text-xs font-mono font-black">6K · AI → CIRCUIT SIGNAL</p></div>
                     <p className="mt-2 text-[10px] leading-5 text-slate-500">The Workbench receives detected class, confidence and detections. Blockly can use AI sees, AI class, AI confidence and AI camera ON/OFF.</p>
                     <div className="mt-3 grid grid-cols-2 gap-1.5">
                       {["car", "person", "phone", "hand", "0", "3", "happy", "yes"].map((signal) => (
-                        <button key={signal} onClick={() => onAiStateChange({ ...aiState, enabled: true, detectedClass: signal, confidence: 95, detail: `Test signal · ${signal}` })} className="rounded-lg border border-slate-800 bg-slate-950/80 px-2 py-1.5 text-[9px] font-mono text-slate-300 hover:border-emerald-400/30">
+                        <button key={signal} onClick={() => onAiStateChange({ ...aiState, enabled: true, detectedClass: signal, confidence: 95, detail: `Test signal · ${signal}` })} className="pixiu-ai-signal-button rounded-lg border px-2 py-1.5 text-[9px] font-mono text-slate-300">
                           Test {signal}
                         </button>
                       ))}
@@ -1098,70 +1544,397 @@ export function AiStudioPanel({
           )}
 
           {tab === "teach" && (
-            <div className="mx-auto max-w-5xl grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-              <div className="space-y-3">
-                <div className="rounded-2xl border border-slate-800 bg-slate-950/45 p-4">
-                  <p className="text-xs font-black">6B · Teach My AI</p>
-                  <p className="mt-1 text-[10px] leading-5 text-slate-500">Create at least 3 examples for each concept. Examples stay in this browser.</p>
-                  <div className="mt-3 flex gap-2">
-                    <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. bottle" className="min-w-0 flex-1 rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-[10px] outline-none focus:border-violet-400" />
-                    <button onClick={cameraActive ? addSampleFromCamera : () => void startTeachCamera()} className="rounded-xl bg-violet-500 px-3 py-2 text-[10px] font-black">{cameraActive ? "Add example" : "Start camera"}</button>
-                    <label className="cursor-pointer rounded-xl border border-slate-700 px-3 py-2 text-[10px] font-black"><Upload size={13} className="inline mr-1" />Image<input hidden type="file" accept="image/*" onChange={importSample} /></label>
-                  </div>
-                </div>
-
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {classes.map((name) => (
-                    <div key={name} className="rounded-2xl border border-slate-800 bg-slate-950/40 p-3">
-                      <div className="flex items-center justify-between"><span className="text-xs font-black">{name}</span><span className="font-mono text-[9px] text-slate-500">{counts[name] ?? 0} samples</span></div>
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {store.samples.filter((sample) => sample.label === name).map((sample) => (
-                          <div key={sample.id} className="relative">
-                            <img src={sample.dataUrl} alt={name} className="h-16 w-20 rounded-lg object-cover border border-slate-800" />
-                            <button onClick={() => { const next = removeAiSample(store, sample.id); setStore(next); saveAiStudioStore(next) }} className="absolute right-1 top-1 rounded-md bg-slate-950/80 p-1"><Trash2 size={10} /></button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
+            <div className="mx-auto max-w-5xl space-y-4">
+              <div className="grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
                 <div className="rounded-2xl border border-violet-400/15 bg-violet-500/[0.04] p-4">
-                  <div className="flex items-center justify-between">
-                    <div><p className="text-xs font-black">Train model</p><p className="mt-1 text-[10px] text-slate-500">{classes.length} classes · {store.samples.length} samples</p></div>
-                    <button disabled={!canTrain || training} onClick={() => void train()} className="rounded-xl bg-violet-500 px-4 py-2 text-[10px] font-black disabled:opacity-30">{training ? `Training ${progress.epoch}/${progress.total}` : "Train My AI"}</button>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-black">6H · Build My AI dataset</p>
+                      <p className="mt-1 max-w-xl text-[10px] leading-5 text-slate-500">
+                        Create concepts, capture or import examples, rename classes, remove mistakes, and balance the dataset before training.
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-slate-800 bg-slate-950/80 px-3 py-2 text-right">
+                      <p className="font-mono text-[8px] uppercase tracking-[0.16em] text-slate-600">Dataset</p>
+                      <p className="mt-1 text-sm font-black">{datasetStats.sampleCount} samples · {datasetStats.classCount} classes</p>
+                    </div>
                   </div>
-                  {training && <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-800"><div className="h-full bg-violet-400" style={{ width: `${Math.round((progress.epoch / Math.max(1, progress.total)) * 100)}%` }} /></div>}
+
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                    <input
+                      value={label}
+                      onChange={(event) => setLabel(event.target.value)}
+                      placeholder="Concept name · e.g. bottle"
+                      maxLength={32}
+                      className="min-w-0 flex-1 rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-[10px] outline-none focus:border-violet-400"
+                    />
+                    <button
+                       disabled={runtimeEnabled || training}
+                       onClick={() => {
+                         const next = addAiClass(store, label)
+                        commitStore(next)
+                        if (next.classes.length === store.classes.length) {
+                          setStatus("Concept already exists or the 8-concept limit is reached.")
+                        } else {
+                          const created = next.classes[next.classes.length - 1] ?? ""
+                          setLabel(created)
+                          setStatus("Concept created · capture examples for it.")
+                        }
+                      }}
+                      className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-violet-500 px-3 py-2.5 text-[10px] font-black"
+                    >
+                      <Plus size={13} /> Add concept
+                    </button>
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={() => void addSampleFromCamera()}
+                      disabled={!label.trim() || runtimeEnabled || training}
+                       className="inline-flex items-center gap-1.5 rounded-xl border border-violet-400/25 bg-slate-950 px-3 py-2 text-[10px] font-black disabled:opacity-30"
+                    >
+                      <Camera size={13} /> {cameraActive ? "Capture example" : "Start capture"}
+                    </button>
+                    <label className={"inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-[10px] font-black " + (runtimeEnabled || training ? "cursor-not-allowed opacity-30" : "cursor-pointer")}>
+                      <Upload size={13} /> Import images
+                      <input hidden multiple type="file" accept="image/*" onChange={importSample} disabled={runtimeEnabled || training} />
+                    </label>
+                    <span className="text-[9px] text-slate-600">Recommended: 8+ / concept · minimum 3</span>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-800 bg-slate-950/45 p-4">
+                  <p className="text-xs font-black">Dataset health</p>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    {[
+                      ["Concepts", String(datasetStats.classCount)],
+                      ["Samples", String(datasetStats.sampleCount)],
+                      ["Min / class", String(datasetStats.minSamples)],
+                      ["Balance", datasetStats.balanced ? "Balanced" : "Needs balance"],
+                    ].map(([name, value]) => (
+                      <div key={name} className="rounded-xl border border-slate-800 bg-slate-950 p-3">
+                        <p className="text-[8px] font-mono uppercase tracking-[0.14em] text-slate-600">{name}</p>
+                        <p className="mt-1 text-xs font-black">{value}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-3 rounded-xl border border-emerald-400/10 bg-emerald-500/[0.03] p-3 text-[10px] leading-5 text-slate-500">
+                    {datasetStats.ready
+                      ? datasetStats.recommended
+                        ? "Ready · enough examples for a useful transfer-learning run."
+                        : "Ready to train · more varied examples can improve generalization."
+                      : "Training unlocks with 2 concepts and at least 3 examples per concept."}
+                  </div>
                 </div>
               </div>
 
-              <aside className="space-y-3">
-                <div className="rounded-2xl border border-slate-800 bg-slate-950/45 p-4">
-                  <p className="text-xs font-black">Teaching rules</p>
-                  {["Two or more concepts", "Three examples per concept", "Keep lighting/background varied", "Train after the examples are balanced"].map((rule) => (
-                    <div key={rule} className="mt-2 flex items-center gap-2 text-[10px] text-slate-500"><CheckCircle2 size={13} className="text-emerald-300" />{rule}</div>
+              <div className="rounded-2xl border border-slate-800 bg-slate-950/35 p-4">
+                <div className="flex items-center gap-2">
+                  <BookOpen size={15} className="text-violet-300" />
+                  <p className="text-xs font-black">6M · How My AI learns</p>
+                </div>
+                <div className="mt-3 grid gap-2 md:grid-cols-4">
+                  {[
+                    ["DATASET", "Examples + labels", "You teach what each concept looks like."],
+                    ["MODEL", "Features + classifier", "A pretrained vision encoder turns images into useful features."],
+                    ["TRAIN", "Learn patterns", "Only the small classifier head is updated from your examples."],
+                    ["INFERENCE", "Predict + confidence", "A new image is compared with learned class patterns and scored."],
+                  ].map(([title, value, note]) => (
+                    <div key={title} className="rounded-xl border border-slate-800 bg-slate-950 p-3">
+                      <p className="text-[8px] font-mono tracking-[0.15em] text-violet-300">{title}</p>
+                      <p className="mt-1 text-[10px] font-black">{value}</p>
+                      <p className="mt-1 text-[9px] leading-4 text-slate-600">{note}</p>
+                    </div>
                   ))}
                 </div>
-                <button onClick={() => void resetStudio()} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 px-3 py-2 text-[10px] font-black text-slate-300"><RefreshCcw size={13} /> Reset AI Studio</button>
-              </aside>
+                <div className="mt-3 flex items-start gap-2 rounded-xl border border-slate-800 bg-slate-950 p-3">
+                  <Info size={13} className="mt-0.5 shrink-0 text-slate-500" />
+                  <p className="text-[9px] leading-4 text-slate-600">
+                    Confidence is not a guarantee of truth. PIXIU treats a weak or ambiguous result as UNKNOWN instead of pretending it knows.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                {classes.map((name) => {
+                  const classSamples = store.samples.filter((sample) => sample.label === name)
+                  const isRenaming = renamingClass === name
+
+                  return (
+                    <div key={name} className="rounded-2xl border border-slate-800 bg-slate-950/40 p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          {isRenaming ? (
+                            <div className="flex gap-2">
+                              <input
+                                value={renameValue}
+                                onChange={(event) => setRenameValue(event.target.value)}
+                                className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-[10px] outline-none focus:border-violet-400"
+                                maxLength={32}
+                                autoFocus
+                              />
+                              <button
+                                 disabled={runtimeEnabled || training}
+                                 onClick={() => {
+                                   const next = renameAiClass(store, name, renameValue)
+                                  commitStore(next)
+                                  setRenamingClass(null)
+                                  setRenameValue("")
+                                  setStatus(next === store ? "That concept name is already in use." : "Concept renamed.")
+                                }}
+                                className="rounded-lg bg-emerald-500/15 px-2 text-[9px] font-black text-emerald-300"
+                              >
+                                Save
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setLabel(name)}
+                              className="text-left"
+                              title="Use this concept for capture"
+                            >
+                              <p className="truncate text-xs font-black">{name}</p>
+                              <p className="mt-0.5 font-mono text-[8px] text-slate-600">{classSamples.length}/20 samples · click to select</p>
+                            </button>
+                          )}
+                        </div>
+
+                        {!isRenaming && (
+                          <div className="flex items-center gap-1">
+                            <button
+                              disabled={runtimeEnabled || training}
+                              onClick={() => {
+                                setRenamingClass(name)
+                                setRenameValue(name)
+                              }}
+                              className="rounded-lg border border-slate-800 p-1.5 text-slate-500 hover:text-white"
+                              title="Rename concept"
+                            >
+                              <Pencil size={11} />
+                            </button>
+                            <button
+                              disabled={runtimeEnabled || training}
+                              onClick={() => {
+                                const next = removeAiClass(store, name)
+                                commitStore(next)
+                                if (label === name) setLabel("")
+                                setRenamingClass(null)
+                                setStatus("Concept removed with its examples.")
+                              }}
+                              className="rounded-lg border border-slate-800 p-1.5 text-slate-500 hover:text-rose-300"
+                              title="Delete concept"
+                            >
+                              <Trash2 size={11} />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {classSamples.map((sample) => (
+                          <div key={sample.id} className="relative">
+                            <img
+                              src={sample.dataUrl}
+                              alt={name}
+                              loading="lazy"
+                              className="h-16 w-20 rounded-lg border border-slate-800 object-cover"
+                            />
+                            <button
+                               disabled={runtimeEnabled || training}
+                               onClick={() => {
+                                 const next = removeAiSample(store, sample.id)
+                                commitStore(next)
+                              }}
+                              className="absolute right-1 top-1 rounded-md bg-slate-950/85 p-1 text-slate-300 hover:text-rose-300"
+                              title="Remove sample"
+                            >
+                              <Trash2 size={10} />
+                            </button>
+                          </div>
+                        ))}
+                        {!classSamples.length && (
+                          <div className="grid h-16 w-full place-items-center rounded-lg border border-dashed border-slate-800 text-[9px] text-slate-600">
+                            No examples yet
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+
+                {!classes.length && (
+                  <div className="sm:col-span-2 rounded-2xl border border-dashed border-slate-800 p-8 text-center">
+                    <Brain size={24} className="mx-auto text-violet-300" />
+                    <p className="mt-2 text-xs font-black">Start with your first concept</p>
+                    <p className="mt-1 text-[10px] text-slate-600">Create a concept such as “bottle”, “pen”, or “red block”, then add examples.</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-2xl border border-violet-400/15 bg-violet-500/[0.04] p-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <p className="text-xs font-black">6I · Train My AI</p>
+                    <p className="mt-1 text-[10px] leading-5 text-slate-500">
+                      Frozen MobileNetV2 features feed a small classifier head. The browser trains only the head, so the workflow stays lightweight and suited to student datasets.
+                    </p>
+                  </div>
+                  <button
+                    disabled={!canTrain || training || runtimeEnabled}
+                    onClick={() => void train()}
+                    className="rounded-xl bg-violet-500 px-4 py-2 text-[10px] font-black disabled:opacity-30"
+                  >
+                    {training ? (progress.stage || "Training…") : "Train My AI"}
+                  </button>
+                </div>
+
+                {training && (
+                  <div className="mt-3 space-y-2">
+                    <div className="flex items-center justify-between text-[9px] font-mono text-slate-600">
+                      <span>{progress.stage}</span>
+                      <span>{progress.epoch}/{progress.total}</span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-slate-800">
+                      <div
+                        className="h-full bg-violet-400 transition-all"
+                        style={{ width: (progress.stage.startsWith("Extracting") ? 18 : 18 + Math.round((progress.epoch / Math.max(1, progress.total)) * 82)) + "%" }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {error && (
+                <div className="rounded-xl border border-amber-500/30 bg-amber-950/30 px-3 py-2 text-[10px] text-amber-200">
+                  {error}
+                </div>
+              )}
+
+              <button
+                onClick={() => void resetStudio()}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 px-3 py-2 text-[10px] font-black text-slate-300"
+              >
+                <RefreshCcw size={13} /> Reset dataset + My AI
+              </button>
             </div>
           )}
 
           {tab === "understand" && (
-            <div className="mx-auto max-w-5xl grid gap-4 lg:grid-cols-2">
-              <div className="rounded-2xl border border-slate-800 bg-slate-950/45 p-4">
-                <div className="flex items-center gap-2"><Layers3 size={15} className="text-violet-300" /><p className="text-xs font-black">6B · Understand My AI</p></div>
-                <p className="mt-2 text-[10px] leading-5 text-slate-500">See the learned model without exposing raw implementation complexity to the student.</p>
-                <div className="mt-3 rounded-xl bg-slate-950 p-3 font-mono text-[9px] text-slate-500">
-                  {model ? getModelWeightShapes(model).map((shape) => <div key={shape} className="py-1">{shape}</div>) : <div>No trained model yet.</div>}
+            <div className="mx-auto max-w-5xl space-y-4">
+              <div className="rounded-2xl border border-violet-400/15 bg-violet-500/[0.04] p-4">
+                <div className="flex items-start gap-3">
+                  <Info size={16} className="mt-0.5 text-violet-300" />
+                  <div className="min-w-0">
+                    <p className="text-xs font-black">6N · Why did AI produce this result?</p>
+                    <p className="mt-2 text-[10px] leading-5 text-slate-400">{currentExplanation}</p>
+                    <div className="mt-3 flex flex-wrap gap-2 font-mono text-[8px]">
+                      <span className="rounded-lg border border-slate-800 bg-slate-950 px-2 py-1 text-slate-500">
+                        RESULT · {aiState.detectedClass}
+                      </span>
+                      <span className="rounded-lg border border-slate-800 bg-slate-950 px-2 py-1 text-slate-500">
+                        CONFIDENCE · {aiState.confidence}%
+                      </span>
+                      <span className="rounded-lg border border-slate-800 bg-slate-950 px-2 py-1 text-slate-500">
+                        THRESHOLD · {aiState.confidenceThreshold ?? 60}%
+                      </span>
+                      <span className={"rounded-lg border px-2 py-1 " + (aiState.unknown ? "border-amber-400/20 bg-amber-400/5 text-amber-300" : "border-emerald-400/20 bg-emerald-400/5 text-emerald-300")}>
+                        {aiState.unknown ? "UNKNOWN / NOT ACCEPTED" : formatDecisionReason(aiState.decisionReason)}
+                      </span>
+                    </div>
+                  </div>
                 </div>
+
+                {aiState.probabilities && (
+                  <div className="mt-4">
+                    <div className="mb-2 flex items-center justify-between">
+                      <p className="text-[9px] font-mono uppercase tracking-[0.16em] text-slate-600">Class probabilities</p>
+                      <span className="text-[8px] text-slate-700">top candidates</span>
+                    </div>
+                    <div className="space-y-1.5">
+                      {Object.entries(aiState.probabilities).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, value]) => (
+                        <div key={name} className="flex items-center gap-2">
+                          <span className="w-24 truncate text-[9px] text-slate-500">{name}</span>
+                          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-900">
+                            <div className="h-full rounded-full bg-violet-400" style={{ width: value + "%" }} />
+                          </div>
+                          <span className="w-10 text-right font-mono text-[8px] text-slate-600">{value}%</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-              <div className="rounded-2xl border border-slate-800 bg-slate-950/45 p-4">
-                <p className="text-xs font-black">Model weights preview</p>
-                <div className="mt-3 grid gap-2">
-                  {(model ? getModelWeightPreview(model) : []).slice(0, 8).map((row, index) => <div key={index} className="rounded-lg border border-slate-800 bg-slate-950 p-2 font-mono text-[8px] text-slate-500">{row.join(" · ")}</div>)}
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div className="rounded-2xl border border-slate-800 bg-slate-950/45 p-4">
+                  <div className="flex items-center gap-2"><BookOpen size={15} className="text-violet-300" /><p className="text-xs font-black">Model structure</p></div>
+                  <p className="mt-2 text-[10px] leading-5 text-slate-500">
+                    {store.model?.architecture ?? "Train My AI to create a local classifier head."}
+                  </p>
+                  {store.model && (
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <div className="rounded-xl border border-slate-800 bg-slate-950 p-3">
+                        <p className="text-[8px] font-mono uppercase tracking-[0.14em] text-slate-600">Extractor</p>
+                        <p className="mt-1 text-[10px] font-black">{store.model.featureExtractor}</p>
+                      </div>
+                      <div className="rounded-xl border border-slate-800 bg-slate-950 p-3">
+                        <p className="text-[8px] font-mono uppercase tracking-[0.14em] text-slate-600">Validation</p>
+                        <p className="mt-1 text-[10px] font-black">{store.model.validationAccuracy}%</p>
+                      </div>
+                    </div>
+                  )}
+                  <div className="mt-3 rounded-xl bg-slate-950 p-3 font-mono text-[9px] text-slate-500">
+                    {model ? getModelWeightShapes(model).map((shape) => <div key={shape} className="py-1">{shape}</div>) : <div>No trained model loaded.</div>}
+                  </div>
                 </div>
-                {!model && <p className="mt-3 text-[10px] text-slate-600">Train My AI in the Teach tab to inspect its layers and weights.</p>}
+
+                <div className="space-y-4">
+                  <div className="rounded-2xl border border-slate-800 bg-slate-950/45 p-4">
+                    <div className="flex items-center gap-2"><ShieldCheck size={15} className="text-emerald-300" /><p className="text-xs font-black">6O · AI safety & privacy</p></div>
+                    <p className="mt-2 text-[10px] leading-5 text-slate-500">
+                      Camera and microphone start only when the selected AI runtime is started. Browser permission is required for media input; stopping AI ends the active media tracks.
+                    </p>
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-[9px] font-mono">
+                      <div className="rounded-xl border border-slate-800 bg-slate-950 p-3">
+                        <p className="text-slate-600">Camera</p>
+                        <p className={"mt-1 " + (cameraActive ? "text-emerald-300" : "text-slate-500")}>{cameraActive ? "ACTIVE" : "OFF"}</p>
+                      </div>
+                      <div className="rounded-xl border border-slate-800 bg-slate-950 p-3">
+                        <p className="text-slate-600">Microphone</p>
+                        <p className={"mt-1 " + (soundActive ? "text-violet-300" : "text-slate-500")}>{soundActive ? "ACTIVE" : "OFF"}</p>
+                      </div>
+                    </div>
+                    <div className="mt-3 rounded-xl border border-slate-800 bg-slate-950 p-3 text-[9px] leading-5 text-slate-600">
+                      Samples stay in this browser's storage. “Reset dataset + My AI” removes the dataset and saved model from this browser. The browser controls site permission; stopping PIXIU ends active tracks but does not revoke a site's saved permission.
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={stopInput}
+                        disabled={!cameraActive && !soundActive && !loading}
+                        className="rounded-xl border border-rose-400/20 px-3 py-2 text-[9px] font-black text-rose-300 disabled:opacity-30"
+                      >
+                        Stop camera / microphone + clear runtime
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void resetStudio()}
+                        className="rounded-xl border border-rose-400/20 px-3 py-2 text-[9px] font-black text-rose-300 hover:bg-rose-500/5"
+                      >
+                        Erase local AI data
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-800 bg-slate-950/45 p-4">
+                    <p className="text-xs font-black">Model weights preview</p>
+                    <div className="mt-3 grid gap-2">
+                      {(model ? getModelWeightPreview(model) : []).slice(0, 8).map((row, index) => <div key={index} className="rounded-lg border border-slate-800 bg-slate-950 p-2 font-mono text-[8px] text-slate-500">{row.join(" · ")}</div>)}
+                    </div>
+                    {!model && <p className="mt-3 text-[10px] text-slate-600">Train My AI in Teach to inspect its learned head.</p>}
+                  </div>
+                </div>
               </div>
             </div>
           )}

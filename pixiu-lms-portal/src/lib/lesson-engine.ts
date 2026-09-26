@@ -102,9 +102,29 @@ const PROGRESS_KEY = "pixiu-lesson-progress-v1"
 
 export function loadLessonProgress(): Record<string, LessonProgress> {
   if (typeof window === "undefined") return {}
+
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(PROGRESS_KEY) || "{}")
-    return parsed && typeof parsed === "object" ? parsed : {}
+    const parsed: unknown = JSON.parse(window.localStorage.getItem(PROGRESS_KEY) || "{}")
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {}
+
+    const normalized: Record<string, LessonProgress> = {}
+    for (const [lessonId, raw] of Object.entries(parsed)) {
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue
+      const candidate = raw as Partial<LessonProgress>
+      const completedStepIds = Array.isArray(candidate.completedStepIds)
+        ? candidate.completedStepIds.filter(
+            (id): id is string => typeof id === "string" && id.length <= 120,
+          )
+        : []
+
+      normalized[lessonId] = {
+        completedStepIds: Array.from(new Set(completedStepIds)).slice(0, 100),
+        ...(typeof candidate.startedAt === "string" ? { startedAt: candidate.startedAt } : {}),
+        ...(typeof candidate.completedAt === "string" ? { completedAt: candidate.completedAt } : {}),
+      }
+    }
+
+    return normalized
   } catch {
     return {}
   }
@@ -153,8 +173,15 @@ export function getLessonById(id: string) {
 }
 
 export function getLessonProgressPercent(lesson: Lesson, progress?: LessonProgress) {
-  if (!progress || lesson.steps.length === 0) return 0
-  return Math.round((progress.completedStepIds.filter((id) => lesson.steps.some((step) => step.id === id)).length / lesson.steps.length) * 100)
+  if (!progress || lesson.steps.length === 0 || !Array.isArray(progress.completedStepIds)) return 0
+  return Math.round(
+    (
+      progress.completedStepIds.filter((id) =>
+        lesson.steps.some((step) => step.id === id),
+      ).length /
+      lesson.steps.length
+    ) * 100,
+  )
 }
 
 export function getUnlockedLessonIds(progress: Record<string, LessonProgress>) {

@@ -1,20 +1,5 @@
 import * as Blockly from "blockly"
 
-const runtimeVariables = new Map<string, number | string | boolean>()
-
-function variableId(block: Blockly.Block): string {
-  return String(block.getFieldValue("VAR") ?? "")
-}
-
-function variableNumber(block: Blockly.Block): number {
-  const value = runtimeVariables.get(variableId(block))
-  return typeof value === "number" ? value : Number(value ?? 0) || 0
-}
-
-function setRuntimeVariable(block: Blockly.Block, value: number | string | boolean) {
-  runtimeVariables.set(variableId(block), value)
-}
-
 export interface BlockStepInfo {
   id: string
   type: string
@@ -35,9 +20,14 @@ export interface ExecutionEnvironment {
   getSensorValue?: (type: string, pin?: string) => number
   getSensorText?: (type: string, id?: string) => string
   isAiDetected?: (cls: string) => boolean
+  isAiUnknown?: () => boolean
   getAiDetectedClass?: () => string
   getAiConfidence?: () => number
+  getAiGesture?: () => string
+  getAiFingerCount?: () => number
+  isAiGesture?: (gesture: string) => boolean
   setAiCamera?: (enabled: boolean) => void
+  setAiMicrophone?: (enabled: boolean) => void
   sleep: (ms: number) => Promise<void>
   isRunning: () => boolean
   // Stepping & Debugging methods
@@ -50,6 +40,9 @@ export interface ExecutionEnvironment {
 
 let lcdCursorCol = 0
 let lcdCursorRow = 0
+
+// AI blocks are data/control inputs only. They do not mutate virtual hardware;
+// actuator effects remain in the simulator's Arduino execution cases below.
 
 export function evaluateNumber(target: Blockly.Block | null, env?: ExecutionEnvironment, defaultValue: number = 0): number {
   if (!target) return defaultValue
@@ -80,21 +73,11 @@ export function evaluateNumber(target: Blockly.Block | null, env?: ExecutionEnvi
     const pin = target.getFieldValue("PIN") ?? "A0"
     return env?.getSensorValue ? env.getSensorValue("analog", pin) : 512
   }
-  if (target.type === "variables_get") {
-    return variableNumber(target)
-  }
-  if (target.type === "map_value") {
-    const value = evaluateNumber(target.getInputTargetBlock("VALUE"), env, 0)
-    const inMin = evaluateNumber(target.getInputTargetBlock("IN_MIN"), env, 0)
-    const inMax = evaluateNumber(target.getInputTargetBlock("IN_MAX"), env, 1023)
-    const outMin = evaluateNumber(target.getInputTargetBlock("OUT_MIN"), env, 0)
-    const outMax = evaluateNumber(target.getInputTargetBlock("OUT_MAX"), env, 255)
-    if (inMax === inMin) return outMin
-    // Match Arduino map() semantics: linear scaling with integer output.
-    return Math.trunc(((value - inMin) * (outMax - outMin)) / (inMax - inMin) + outMin)
-  }
   if (target.type === "ai_confidence") {
     return env?.getAiConfidence ? env.getAiConfidence() : 0
+  }
+  if (target.type === "ai_get_finger_count") {
+    return env?.getAiFingerCount ? env.getAiFingerCount() : 0
   }
   return defaultValue
 }
@@ -112,6 +95,13 @@ export function evaluateBoolean(target: Blockly.Block | null, env?: ExecutionEnv
   if (target.type === "ai_is_detected") {
     const cls = target.getFieldValue("CLASS") ?? "car"
     return env?.isAiDetected ? env.isAiDetected(cls) : false
+  }
+  if (target.type === "ai_is_gesture") {
+    const gesture = target.getFieldValue("GESTURE") ?? "fist"
+    return env?.isAiGesture ? env.isAiGesture(gesture) : false
+  }
+  if (target.type === "ai_is_unknown") {
+    return env?.isAiUnknown ? env.isAiUnknown() : false
   }
   if (target.type === "logic_boolean") {
     return target.getFieldValue("BOOL") === "TRUE"
@@ -176,6 +166,9 @@ function evaluateValueInput(block: Blockly.Block, inputName: string, env?: Execu
   if (target.type === "ai_get_detected_class") {
     return env?.getAiDetectedClass ? env.getAiDetectedClass() : "none"
   }
+  if (target.type === "ai_get_gesture") {
+    return env?.getAiGesture ? env.getAiGesture() : "none"
+  }
   return defaultValue
 }
 
@@ -194,18 +187,6 @@ function getBlockDescription(block: Blockly.Block, env: ExecutionEnvironment): s
       const pin = block.getFieldValue("PIN") ?? "13"
       const val = evaluateNumberInput(block, "VALUE", env, 255)
       return `analogWrite(Pin ${pin}, ${val})`
-    }
-    case "variables_set":
-      return `set ${variableId(block)}`
-    case "variables_get":
-      return `get ${variableId(block)}`
-    case "map_value": {
-      const value = evaluateNumberInput(block, "VALUE", env, 0)
-      const inMin = evaluateNumberInput(block, "IN_MIN", env, 0)
-      const inMax = evaluateNumberInput(block, "IN_MAX", env, 1023)
-      const outMin = evaluateNumberInput(block, "OUT_MIN", env, 0)
-      const outMax = evaluateNumberInput(block, "OUT_MAX", env, 255)
-      return `map(${value}, ${inMin}, ${inMax}, ${outMin}, ${outMax})`
     }
     case "servo_write": {
       const pin = block.getFieldValue("PIN") ?? "9"
@@ -266,10 +247,22 @@ function getBlockDescription(block: Blockly.Block, env: ExecutionEnvironment): s
     }
     case "lcd_clear":
       return "lcd.clear()"
+    case "ai_is_unknown":
+      return "AI unknown / low confidence"
     case "ai_camera_enable": {
       const state = block.getFieldValue("STATE") ?? "ON"
       return `AI Camera ${state}`
     }
+    case "ai_microphone_enable": {
+      const state = block.getFieldValue("STATE") ?? "ON"
+      return `AI Microphone ${state}`
+    }
+    case "ai_get_gesture":
+      return "AI gesture → current hand gesture"
+    case "ai_get_finger_count":
+      return "AI fingers → current count"
+    case "ai_is_gesture":
+      return "AI gesture predicate"
     case "controls_if":
       return "if (condition)"
     case "controls_repeat_ext": {
@@ -313,13 +306,6 @@ async function executeSingleBlock(block: Blockly.Block, env: ExecutionEnvironmen
       const pin = String(block.getFieldValue("PIN") ?? "13")
       const state = (block.getFieldValue("STATE") ?? "HIGH") as "HIGH" | "LOW"
       env.setDigitalPin(pin, state)
-      break
-    }
-
-    case "variables_set": {
-      const valueTarget = block.getInputTargetBlock("VALUE")
-      const value = valueTarget ? evaluateNumber(valueTarget, env, 0) : 0
-      setRuntimeVariable(block, value)
       break
     }
 
@@ -439,6 +425,17 @@ async function executeSingleBlock(block: Blockly.Block, env: ExecutionEnvironmen
       break
     }
 
+    case "ai_microphone_enable": {
+      const state = block.getFieldValue("STATE") ?? "ON"
+      env.setAiMicrophone?.(state === "ON")
+      break
+    }
+
+    case "ai_get_gesture":
+    case "ai_get_finger_count":
+      // Value blocks are evaluated by evaluateValueInput/evaluateNumber.
+      break
+
     case "controls_if": {
       let branchExecuted = false
       let i = 0
@@ -489,8 +486,6 @@ export async function runBlocklyProgram(workspace: Blockly.Workspace, env: Execu
 
   lcdCursorCol = 0
   lcdCursorRow = 0
-
-  runtimeVariables.clear()
 
   try {
     // 1. Execute SETUP statement

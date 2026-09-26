@@ -65,7 +65,6 @@ const TOOLBOX = {
       contents: [
         { kind: "block", type: "math_number" },
         { kind: "block", type: "math_arithmetic" },
-        { kind: "block", type: "map_value" },
       ],
     },
     {
@@ -121,9 +120,14 @@ const TOOLBOX = {
       colour: '#a855f7',
       contents: [
         { kind: 'block', type: 'ai_is_detected' },
+        { kind: 'block', type: 'ai_is_unknown' },
         { kind: 'block', type: 'ai_get_detected_class' },
         { kind: 'block', type: 'ai_confidence' },
+        { kind: 'block', type: 'ai_get_gesture' },
+        { kind: 'block', type: 'ai_get_finger_count' },
+        { kind: 'block', type: 'ai_is_gesture' },
         { kind: 'block', type: 'ai_camera_enable' },
+        { kind: 'block', type: 'ai_microphone_enable' },
       ],
     },
   ],
@@ -166,18 +170,6 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
 
     workspaceRef.current = workspace
     onWorkspaceReady?.(workspace)
-
-    // Seed a couple of beginner-friendly variables so the Variables flyout
-    // immediately offers the familiar "set value to" pattern used in lessons.
-    // Blockly 13 keeps variables on the workspace variable map; WorkspaceSvg
-    // itself does not expose getAllVariables().
-    const variableMap = workspace.getVariableMap()
-    if (variableMap.getAllVariables().length === 0) {
-      // In the current Blockly runtime, variable creation belongs to the
-      // variable map. Do not call createVariable() on WorkspaceSvg.
-      variableMap.createVariable("value")
-      variableMap.createVariable("brightness")
-    }
 
     // Load initial Arduino Program block
     const initialXml = xml || `<xml xmlns="https://developers.google.com/blockly/xml">
@@ -265,16 +257,10 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
     }
   }, [])
 
-  // Keep the global Blockly pin context synchronized before applying any
-  // external XML. Template/project updates change circuit and XML together;
-  // the pin context must describe the new circuit when dropdown fields hydrate.
-  useEffect(() => {
-    setPinContext(circuit)
-  }, [circuit])
-
-  // Sync the workspace for genuine external loads (templates, saved projects,
-  // lessons, imports, and reset). Debounce before replacing blocks so normal
-  // Blockly editing remains stable while external XML always reaches the workspace.
+  // Sync the workspace for genuine external loads (starter/project changes), but
+  // debounce the prop before replacing blocks. During normal editing Blockly emits
+  // XML changes faster than React can echo them back; immediate rehydration makes a
+  // dragged block look glued to the pointer.
   useEffect(() => {
     const workspace = workspaceRef.current
     if (!workspace || !xml) return
@@ -287,10 +273,12 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
       const activeWorkspace = workspaceRef.current
       if (!activeWorkspace) return
 
-      // Any prop XML that differs from the current workspace is a genuine
-      // external load (template, saved project, lesson, import, or reset).
-      // Blockly-originated edits already update lastWorkspaceXmlRef immediately,
-      // so they are filtered by the equality check above.
+      // If Blockly has already emitted a newer workspace XML since this prop
+      // value arrived, this prop is a stale echo from our own edit. Ignore it.
+      if (lastWorkspaceXmlRef.current !== null && lastWorkspaceXmlRef.current !== expectedExternalXml) {
+        return
+      }
+
       const isDragging = typeof (activeWorkspace as any).isDragging === "function"
         ? Boolean((activeWorkspace as any).isDragging())
         : false
@@ -314,13 +302,7 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
         activeWorkspace.clear()
         const dom = Blockly.utils.xml.textToDom(expectedExternalXml)
         Blockly.Xml.domToWorkspace(dom, activeWorkspace)
-
-        // Blockly may normalize XML formatting while importing. Store the
-        // normalized workspace XML so the prop echo is recognized as current
-        // and the template is not re-applied unnecessarily.
-        const normalizedDom = Blockly.Xml.workspaceToDom(activeWorkspace)
-        lastWorkspaceXmlRef.current = Blockly.utils.xml.domToText(normalizedDom)
-
+        lastWorkspaceXmlRef.current = expectedExternalXml
         const code = arduino.workspaceToCode(activeWorkspace)
         setCppCode(code)
 
@@ -340,6 +322,10 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
     timer = window.setTimeout(applyExternalXml, 120)
     return () => window.clearTimeout(timer)
   }, [xml])
+
+  useEffect(() => {
+    setPinContext(circuit)
+  }, [circuit])
 
   const handleCopy = () => {
     navigator.clipboard.writeText(cppCode)

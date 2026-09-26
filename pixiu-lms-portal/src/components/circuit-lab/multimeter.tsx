@@ -21,6 +21,7 @@ interface Props {
   state: CircuitState
   runtime: Record<string, PartRuntime>
   pinStates: Record<string, ArduinoPinState>
+  pressed: Set<string>
   running: boolean
   probeRed: PinRef | null
   probeBlack: PinRef | null
@@ -37,6 +38,7 @@ export function Multimeter({
   state,
   runtime,
   pinStates,
+  pressed,
   running,
   probeRed,
   probeBlack,
@@ -125,8 +127,8 @@ export function Multimeter({
   // The solver result is memoized across render-only changes.
   const nodalSolution = useMemo(() => {
     if (mode === "off" || !probeRed || !probeBlack) return null
-    return solveCircuitNodalPotentials(state, new Set(), pinStates, running)
-  }, [mode, probeBlack, probeRed, pinStates, running, state])
+    return solveCircuitNodalPotentials(state, pressed, pinStates, running)
+  }, [mode, probeBlack, probeRed, pinStates, pressed, running, state])
 
   const emptyPinInfo = useMemo(
     () => ({ voltage: 0, netId: -1, isDriven: false, isGnd: false }),
