@@ -31,6 +31,12 @@ export type AiModelSummary = {
   architecture: string
   predictionThreshold: number
   confidenceCalibration: string
+  trainingProfile?: AiTrainingProfile
+  hiddenLayers?: 1 | 2
+  hiddenUnits?: number
+  dropoutRate?: number
+  learningRate?: number
+  batchSize?: number
 }
 
 export type AiStudioStore = {
@@ -70,6 +76,34 @@ export const MY_AI_LOW_MARGIN_THRESHOLD = 0.08
 // Conservative soft ceiling for localStorage JSON. This prevents a browser
 // quota failure from silently turning a large dataset into an ephemeral state.
 export const AI_DATASET_STORAGE_SOFT_LIMIT_BYTES = 4_000_000
+
+export type AiTrainingProfile = "grade6" | "grade7" | "grade8" | "custom"
+
+export type AiTrainingConfig = {
+  epochs: number
+  hiddenLayers: 1 | 2
+  hiddenUnits: number
+  dropoutRate: number
+  learningRate: number
+  batchSize: number
+}
+
+export const AI_TRAINING_PROFILES: Record<Exclude<AiTrainingProfile, "custom">, AiTrainingConfig> = {
+  grade6: { epochs: 12, hiddenLayers: 1, hiddenUnits: 64, dropoutRate: 0.15, learningRate: 0.001, batchSize: 8 },
+  grade7: { epochs: 18, hiddenLayers: 1, hiddenUnits: 96, dropoutRate: 0.2, learningRate: 0.001, batchSize: 8 },
+  grade8: { epochs: 22, hiddenLayers: 2, hiddenUnits: 128, dropoutRate: 0.2, learningRate: 0.0008, batchSize: 8 },
+}
+
+function clampTrainingConfig(options: TrainOptions = {}): AiTrainingConfig {
+  return {
+    epochs: Math.max(8, Math.min(30, Math.round(options.epochs ?? 18))),
+    hiddenLayers: options.hiddenLayers === 2 ? 2 : 1,
+    hiddenUnits: Math.max(32, Math.min(160, Math.round(options.hiddenUnits ?? 96))),
+    dropoutRate: Math.max(0, Math.min(0.4, Number(options.dropoutRate ?? 0.2))),
+    learningRate: Math.max(0.0003, Math.min(0.003, Number(options.learningRate ?? 0.001))),
+    batchSize: Math.max(4, Math.min(16, Math.round(options.batchSize ?? 8))),
+  }
+}
 
 let activeModel: tf.LayersModel | null = null
 let modelStorageQueue: Promise<void> = Promise.resolve()
@@ -623,15 +657,30 @@ export async function trainAiModel(
       validationYs = validationTensors.ys
     }
 
-    model = tf.sequential({
-      layers: [
+    const config = clampTrainingConfig(options)
+    const hiddenLayers: any[] = [
+      tf.layers.dense({
+        inputShape: [extracted.size],
+        units: config.hiddenUnits,
+        activation: "relu",
+        kernelRegularizer: tf.regularizers.l2({ l2: 0.0001 }),
+      }),
+      tf.layers.dropout({ rate: config.dropoutRate }),
+    ]
+    if (config.hiddenLayers === 2) {
+      hiddenLayers.push(
         tf.layers.dense({
-          inputShape: [extracted.size],
-          units: 96,
+          units: Math.max(32, Math.round(config.hiddenUnits / 2)),
           activation: "relu",
           kernelRegularizer: tf.regularizers.l2({ l2: 0.0001 }),
         }),
-        tf.layers.dropout({ rate: 0.2 }),
+        tf.layers.dropout({ rate: config.dropoutRate }),
+      )
+    }
+
+    model = tf.sequential({
+      layers: [
+        ...hiddenLayers,
         tf.layers.dense({
           units: classes.length,
           activation: "softmax",
@@ -640,12 +689,12 @@ export async function trainAiModel(
     })
 
     model.compile({
-      optimizer: tf.train.adam(0.001),
+      optimizer: tf.train.adam(config.learningRate),
       loss: "categoricalCrossentropy",
       metrics: ["accuracy"],
     })
 
-    const epochs = Math.max(8, Math.min(30, options.epochs ?? 18))
+    const epochs = config.epochs
     if (options.shouldCancel?.()) {
       throw new Error("Training cancelled.")
     }
@@ -657,7 +706,7 @@ export async function trainAiModel(
     options.onStage?.("Training classifier head")
     await model.fit(trainXs, trainYs, {
       epochs,
-      batchSize: Math.min(16, train.length),
+      batchSize: Math.min(config.batchSize, train.length),
       shuffle: true,
       validationData:
         validationXs && validationYs
@@ -729,8 +778,16 @@ export async function trainAiModel(
       featureExtractor: MY_AI_FEATURE_VERSION,
       storageKey: MODEL_KEY,
       architecture:
-        `Frozen ${MY_AI_FEATURE_VERSION} embeddings → Dense(96) → Dropout(20%) → Softmax`,
+        config.hiddenLayers === 2
+          ? `Frozen ${MY_AI_FEATURE_VERSION} embeddings → Dense(${config.hiddenUnits}) → Dropout(${Math.round(config.dropoutRate * 100)}%) → Dense(${Math.max(32, Math.round(config.hiddenUnits / 2))}) → Dropout(${Math.round(config.dropoutRate * 100)}%) → Softmax`
+          : `Frozen ${MY_AI_FEATURE_VERSION} embeddings → Dense(${config.hiddenUnits}) → Dropout(${Math.round(config.dropoutRate * 100)}%) → Softmax`,
       predictionThreshold: MY_AI_PREDICTION_THRESHOLD,
+      trainingProfile: options.profile ?? "custom",
+      hiddenLayers: config.hiddenLayers,
+      hiddenUnits: config.hiddenUnits,
+      dropoutRate: config.dropoutRate,
+      learningRate: config.learningRate,
+      batchSize: config.batchSize,
       confidenceCalibration: "Thresholded top-class confidence; low-margin predictions are returned as unknown.",
     }
 

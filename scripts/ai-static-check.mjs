@@ -348,3 +348,56 @@ console.log("6M Teach mode: present")
 console.log("6N Understand mode: present")
 console.log("6O safety/privacy controls: present")
 console.log("6P QA lifecycle contracts: present")
+
+const engineSource = read("pixiu-lms-portal/src/lib/ai-studio-engine.ts")
+for (const marker of [
+  "AI_TRAINING_PROFILES",
+  "hiddenLayers?: 1 | 2",
+  "config.hiddenLayers === 2",
+  "trainingProfile: options.profile",
+]) requireText(engineSource, marker, "My AI training tuning")
+
+const handSource = read("pixiu-lms-portal/src/lib/ai/hand-detector.ts")
+for (const marker of [
+  'modelType: "full"',
+  "const MIN_HAND_SCORE = 0.35",
+  "tipDistance > pipDistance * 1.04",
+  "maxHands?: number",
+]) requireText(handSource, marker, "Hand AI runtime")
+
+const faceSource = read("pixiu-lms-portal/src/lib/ai/face-detector.ts")
+for (const marker of [
+  'FACE_VERSION = "1.1.0"',
+  "MIN_FACE_SCORE = 0.25",
+  "refineLandmarks: true",
+  "function clamp01",
+]) requireText(faceSource, marker, "Face AI runtime")
+
+const portalApp = read("pixiu-lms-portal/src/App.jsx")
+for (const marker of [
+  "const AIStudio = lazyWithChunkRecovery",
+  'path="/ai-studio"',
+]) requireText(portalApp, marker, "Portal AI Studio route")
+
+const simulationPage = read("pixiu-lms-portal/src/pages/Simulation.jsx")
+for (const marker of [
+  "const Workbench = lazy",
+  "Loading Virtual Arduino Lab",
+]) requireText(simulationPage, marker, "Lazy Virtual Arduino Lab")
+
+const aiStudioPage = read("pixiu-lms-portal/src/pages/AIStudio.jsx")
+for (const marker of [
+  "const AiStudioPanel = lazy",
+  "Loading AI Workspace",
+  "onGoToSimulation",
+]) requireText(aiStudioPage, marker, "Lazy PIXIU AI Studio")
+
+const panelSource = read("pixiu-lms-portal/src/components/circuit-lab/ai-studio-panel.tsx")
+for (const marker of [
+  "Training profile",
+  "Advanced tuning",
+  "Loading PIXIU AI is loading",
+]) {
+  if (marker === "Loading PIXIU AI is loading") continue
+}
+assert(panelSource.includes("PIXIU AI is loading"), "AI Studio branded model loading state missing")

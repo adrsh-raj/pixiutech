@@ -27,10 +27,10 @@ export type FaceDetector = {
   dispose: () => void
 }
 
-const FACE_VERSION = "1.0.6"
-const MAX_FACES = 3
+const FACE_VERSION = "1.1.0"
+const MAX_FACES = 1
 // MediaPipe FaceMesh returns 478 keypoints in the TFJS adapter.
-const MIN_FACE_SCORE = 0.45
+const MIN_FACE_SCORE = 0.25
 const FACE_RUNTIME_SOURCES = {
   detector: [
     "https://cdn.jsdelivr.net/npm/@tensorflow-models/face-detection@1.0.3/dist/face-detection.min.js",
@@ -181,30 +181,57 @@ function safeRatio(numerator: number, denominator: number) {
 // This is intentionally called "expression demo", not medical or affective truth.
 // It is geometry derived from the 478-point mesh: smile / surprise / neutral.
 export function classifyExpression(points: FacePoint[], box: [number, number, number, number]): FaceEmotion {
-  if (points.length < 300) return { emotion: "neutral", score: 0 }
+  if (points.length < 200) return { emotion: "neutral", score: 0.35 }
 
   const width = Math.max(1, box[2])
   const height = Math.max(1, box[3])
   const p = (index: number) => points[index]
 
-  const mouthLeft = p(61), mouthRight = p(291), upperLip = p(13), lowerLip = p(14)
-  const leftEyeTop = p(159), leftEyeBottom = p(145)
-  const rightEyeTop = p(386), rightEyeBottom = p(374)
+  const mouthLeft = p(61)
+  const mouthRight = p(291)
+  const upperLip = p(13)
+  const lowerLip = p(14)
+  const leftEyeTop = p(159)
+  const leftEyeBottom = p(145)
+  const rightEyeTop = p(386)
+  const rightEyeBottom = p(374)
 
-  const mouthWidth = mouthLeft && mouthRight ? dist(mouthLeft, mouthRight) : 0
-  const mouthOpen = upperLip && lowerLip ? dist(upperLip, lowerLip) : 0
+  if (!mouthLeft || !mouthRight || !upperLip || !lowerLip) {
+    return { emotion: "neutral", score: 0.4 }
+  }
+
+  const mouthWidth = dist(mouthLeft, mouthRight)
+  const mouthOpen = dist(upperLip, lowerLip)
   const leftEyeOpen = leftEyeTop && leftEyeBottom ? dist(leftEyeTop, leftEyeBottom) : 0
   const rightEyeOpen = rightEyeTop && rightEyeBottom ? dist(rightEyeTop, rightEyeBottom) : 0
 
-  const smileScore = Math.min(1, Math.max(0, (mouthWidth / width - 0.28) / 0.16))
-  const surpriseScore = Math.min(1, Math.max(0,
-    ((mouthOpen / height - 0.08) / 0.16) * 0.6 +
-    (((leftEyeOpen + rightEyeOpen) / height - 0.045) / 0.12) * 0.4,
-  ))
+  // Normalize by face size so the same expression works at different camera distances.
+  const widthRatio = safeRatio(mouthWidth, width)
+  const openRatio = safeRatio(mouthOpen, height)
+  const eyeRatio = safeRatio(leftEyeOpen + rightEyeOpen, height)
 
-  if (surpriseScore >= 0.65) return { emotion: "surprised", score: surpriseScore }
-  if (smileScore >= 0.62) return { emotion: "happy", score: smileScore }
-  return { emotion: "neutral", score: Math.max(0.5, 1 - Math.max(smileScore, surpriseScore)) }
+  const cornerLift = safeRatio(
+    ((mouthLeft.y + mouthRight.y) / 2) - ((upperLip.y + lowerLip.y) / 2),
+    height,
+  )
+
+  const smileScore = clamp01(
+    ((widthRatio - 0.30) / 0.15) * 0.7 +
+    ((cornerLift + 0.005) / 0.055) * 0.3,
+  )
+
+  const surpriseScore = clamp01(
+    ((openRatio - 0.055) / 0.12) * 0.6 +
+    ((eyeRatio - 0.07) / 0.10) * 0.4,
+  )
+
+  if (surpriseScore >= 0.58) return { emotion: "surprised", score: surpriseScore }
+  if (smileScore >= 0.50) return { emotion: "happy", score: smileScore }
+  return { emotion: "neutral", score: Math.max(0.45, 1 - Math.max(smileScore, surpriseScore)) }
+}
+
+function clamp01(value: number) {
+  return Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0))
 }
 
 export function getTopEmotion(emotions: any[]): FaceEmotion | null {

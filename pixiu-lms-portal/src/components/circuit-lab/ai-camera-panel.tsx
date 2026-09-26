@@ -308,6 +308,17 @@ export function AiCameraPanel({
         <>
           {/* Video Feed & Real-time Canvas Stage */}
           <div className="relative aspect-video w-full bg-slate-900 overflow-hidden flex items-center justify-center">
+             {modelLoading && (
+               <div className="absolute inset-0 z-30 flex items-center justify-center bg-slate-950/90 backdrop-blur-sm">
+                 <div className="px-5 text-center">
+                   <div className="mx-auto h-12 w-12 rounded-2xl border border-violet-400/30 bg-violet-500/10 flex items-center justify-center">
+                     <Sparkles size={22} className="text-violet-300 animate-pulse" />
+                   </div>
+                   <p className="mt-3 text-xs font-black text-white">Loading PIXIU Vision Model</p>
+                   <p className="mt-1 text-[10px] text-slate-500">Camera is ready. Preparing object recognition…</p>
+                 </div>
+               </div>
+             )}
             {cameraActive ? (
               <>
                 <video

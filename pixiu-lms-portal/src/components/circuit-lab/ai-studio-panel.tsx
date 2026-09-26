@@ -41,8 +41,9 @@ import {
   removeAiSample,
   renameAiClass,
   saveAiStudioStore,
+  AI_TRAINING_PROFILES,
   trainAiModel,
-  type AiStudioStore,
+  type AiStudioStore, type AiTrainingProfile,
 } from "@/lib/ai-studio-engine"
 import {
   captureVideoFrame,
@@ -95,6 +96,7 @@ interface Props {
   runtimeEnabled?: boolean
   compact?: boolean
   onStartSim?: () => void
+  onGoToSimulation?: () => void
   requestedMode?: ReadyAiMode | "trained" | null
   onRequestedModeHandled?: () => void
 }
@@ -384,6 +386,7 @@ export function AiStudioPanel({
   runtimeEnabled = false,
   compact = false,
   onStartSim,
+  onGoToSimulation,
   requestedMode = null,
   onRequestedModeHandled,
 }: Props) {
@@ -402,6 +405,13 @@ export function AiStudioPanel({
   const [renameValue, setRenameValue] = useState("")
   const [training, setTraining] = useState(false)
   const [progress, setProgress] = useState({ epoch: 0, total: 0, accuracy: 0, loss: 0, stage: "" })
+  const [trainingProfile, setTrainingProfile] = useState<AiTrainingProfile>("grade6")
+  const [advancedTuning, setAdvancedTuning] = useState(false)
+  const [customEpochs, setCustomEpochs] = useState(18)
+  const [customDepth, setCustomDepth] = useState<1 | 2>(1)
+  const [customUnits, setCustomUnits] = useState(96)
+  const [customDropout, setCustomDropout] = useState(20)
+  const [customLearningRate, setCustomLearningRate] = useState(0.001)
 
   // Keep separate video/canvas refs for the full Studio and the compact
   // floating runtime window. The same MediaStream can safely feed both, so
@@ -433,6 +443,9 @@ export function AiStudioPanel({
   const datasetStats = useMemo(() => getAiDatasetStats(store), [store])
   const currentExplanation = explainCurrentAiResult(aiState, store.model)
   const canTrain = datasetStats.ready
+  const selectedTrainingConfig = advancedTuning
+    ? { epochs: customEpochs, hiddenLayers: customDepth, hiddenUnits: customUnits, dropoutRate: customDropout / 100, learningRate: customLearningRate, batchSize: 8 }
+    : AI_TRAINING_PROFILES[trainingProfile === "custom" ? "grade7" : trainingProfile]
 
   function commitStore(next: AiStudioStore) {
     datasetVersionRef.current += 1
@@ -763,7 +776,6 @@ export function AiStudioPanel({
   async function startModeResource() {
     const activeSession = ++sessionRef.current
     setLoading(true)
-    setError(null)
 
     try {
       let resource: ReadyResource = null
@@ -773,7 +785,7 @@ export function AiStudioPanel({
       } else if (mode === "pose") {
         resource = await loadMoveNet()
       } else if (mode === "hands" || mode === "numbers") {
-        resource = await loadHandDetector()
+        resource = await loadHandDetector({ maxHands: mode === "numbers" ? 1 : 2 })
       } else if (mode === "emotion") {
         resource = await loadFaceDetector()
       } else if (mode === "trained") {
@@ -1240,11 +1252,17 @@ export function AiStudioPanel({
     const trainingSamples = store.samples
     setTraining(true)
     setError(null)
-    setProgress({ epoch: 0, total: 18, accuracy: 0, loss: 0, stage: "Preparing dataset" })
+    setProgress({ epoch: 0, total: selectedTrainingConfig.epochs, accuracy: 0, loss: 0, stage: "Preparing dataset" })
 
     try {
       const result = await trainAiModel(trainingSamples, {
-        epochs: 18,
+        profile: advancedTuning ? "custom" : trainingProfile,
+        epochs: selectedTrainingConfig.epochs,
+        hiddenLayers: selectedTrainingConfig.hiddenLayers,
+        hiddenUnits: selectedTrainingConfig.hiddenUnits,
+        dropoutRate: selectedTrainingConfig.dropoutRate,
+        learningRate: selectedTrainingConfig.learningRate,
+        batchSize: selectedTrainingConfig.batchSize,
         shouldCancel: () =>
           runId !== trainingRunRef.current ||
           datasetVersion !== datasetVersionRef.current,
@@ -1377,7 +1395,7 @@ export function AiStudioPanel({
 
   return (
     <div className="pixiu-ai-shell fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/80 p-3 backdrop-blur-sm sm:p-5">
-      <div className="pixiu-ai-window flex h-[min(92vh,900px)] w-full max-w-6xl flex-col overflow-hidden rounded-3xl border bg-[#07111f] text-white shadow-2xl shadow-black/60">
+      <div className="pixiu-ai-window flex h-[min(96vh,980px)] w-[calc(100vw-24px)] max-w-[1580px] flex-col overflow-hidden rounded-3xl border bg-[#07111f] text-white shadow-2xl shadow-black/60">
         <header className="pixiu-ai-header flex shrink-0 items-center justify-between border-b bg-slate-950/70 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-3">
             <div className="pixiu-ai-mark grid h-9 w-9 place-items-center rounded-xl text-violet-300">
@@ -1426,6 +1444,7 @@ export function AiStudioPanel({
               </button>
             )}
             <span className="text-slate-700">No camera/mic stream is sent to the AI backend by this studio.</span>
+            {onGoToSimulation && <button type="button" onClick={onGoToSimulation} className="ml-auto rounded-full border border-violet-400/30 bg-violet-500/10 px-3 py-1 text-[9px] font-black text-violet-200 hover:bg-violet-500/20">Go to Simulation</button>}
           </div>
         </div>
 
@@ -1447,7 +1466,23 @@ export function AiStudioPanel({
 
               <div className="grid gap-4 lg:grid-cols-[1.4fr_0.8fr]">
                 <div className="pixiu-ai-preview overflow-hidden rounded-3xl border bg-black">
-                  <div className="relative aspect-video">
+                  <div className="relative aspect-video min-h-[52vh] lg:min-h-[62vh]">
+                {loading && (
+                  <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/92 backdrop-blur-sm">
+                    <div className="max-w-md px-6 text-center">
+                      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-400/30 bg-violet-500/10 text-violet-300 shadow-lg">
+                        <Sparkles size={24} className="animate-pulse" />
+                      </div>
+                      <p className="mt-4 text-sm font-black">PIXIU AI is loading…</p>
+                      <p className="mt-1 text-[10px] leading-4 text-slate-500">
+                        {mode === "numbers" ? "Preparing hand landmarks and finger geometry." : mode === "hands" ? "Preparing hand landmark tracking." : mode === "emotion" ? "Preparing face landmarks and expression analysis." : mode === "pose" ? "Preparing body-pose keypoints." : "Preparing the selected AI model."}
+                      </p>
+                      <div className="mx-auto mt-4 h-1.5 w-48 overflow-hidden rounded-full bg-slate-800">
+                        <div className="h-full w-1/2 animate-pulse rounded-full bg-violet-400" />
+                      </div>
+                    </div>
+                  </div>
+                )}
                     {isSound ? (
                       <div className="flex h-full flex-col items-center justify-center bg-slate-950/90 p-6 text-center">
                         <Mic size={42} className={soundActive ? "text-violet-300 animate-pulse" : "text-slate-600"} />
@@ -1775,36 +1810,74 @@ export function AiStudioPanel({
               </div>
 
               <div className="rounded-2xl border border-violet-400/15 bg-violet-500/[0.04] p-4">
-                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                  <div>
-                    <p className="text-xs font-black">6I · Train My AI</p>
-                    <p className="mt-1 text-[10px] leading-5 text-slate-500">
-                      Frozen MobileNetV2 features feed a small classifier head. The browser trains only the head, so the workflow stays lightweight and suited to student datasets.
-                    </p>
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div className="min-w-0">
+                      <p className="text-xs font-black">6I · Train My AI</p>
+                      <p className="mt-1 text-[10px] leading-5 text-slate-500">
+                        Frozen MobileNetV2 features feed a small classifier head. Grade-based profiles keep training light; advanced tuning is optional.
+                      </p>
+                    </div>
+                    <button disabled={!canTrain || training || runtimeEnabled} onClick={() => void train()} className="shrink-0 rounded-xl bg-violet-500 px-4 py-2 text-[10px] font-black disabled:opacity-30">
+                      {training ? (progress.stage || "Training…") : "Train My AI"}
+                    </button>
                   </div>
-                  <button
-                    disabled={!canTrain || training || runtimeEnabled}
-                    onClick={() => void train()}
-                    className="rounded-xl bg-violet-500 px-4 py-2 text-[10px] font-black disabled:opacity-30"
-                  >
-                    {training ? (progress.stage || "Training…") : "Train My AI"}
-                  </button>
-                </div>
 
-                {training && (
-                  <div className="mt-3 space-y-2">
-                    <div className="flex items-center justify-between text-[9px] font-mono text-slate-600">
-                      <span>{progress.stage}</span>
-                      <span>{progress.epoch}/{progress.total}</span>
+                  <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-violet-300">Training profile</p>
+                        <p className="mt-1 text-[9px] leading-4 text-slate-600">Optimized defaults for Grade 6–8 classroom datasets.</p>
+                      </div>
+                      <select value={trainingProfile} onChange={(event) => setTrainingProfile(event.target.value as AiTrainingProfile)} disabled={training || runtimeEnabled} className="w-full max-w-md rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-[10px] font-black text-white outline-none">
+                        <option value="grade6">Grade 6 · Fast · 12 epochs · 1 × 64</option>
+                        <option value="grade7">Grade 7 · Balanced · 18 epochs · 1 × 96</option>
+                        <option value="grade8">Grade 8 · Extended · 22 epochs · 2 × 128</option>
+                      </select>
                     </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-slate-800">
-                      <div
-                        className="h-full bg-violet-400 transition-all"
-                        style={{ width: (progress.stage.startsWith("Extracting") ? 18 : 18 + Math.round((progress.epoch / Math.max(1, progress.total)) * 82)) + "%" }}
-                      />
-                    </div>
+
+                    <label className="mt-3 inline-flex items-center gap-2 text-[10px] font-bold text-slate-400">
+                      <input type="checkbox" checked={advancedTuning} onChange={(event) => setAdvancedTuning(event.target.checked)} disabled={training || runtimeEnabled} />
+                      Advanced tuning
+                    </label>
+
+                    {advancedTuning ? (
+                      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                        <label className="text-[9px] font-mono text-slate-500">Epochs
+                          <input type="number" min="8" max="30" step="1" value={customEpochs} onChange={(event) => setCustomEpochs(Math.max(8, Math.min(30, Number(event.target.value) || 18)))} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-2 text-[10px] text-white" />
+                        </label>
+                        <label className="text-[9px] font-mono text-slate-500">Depth
+                          <select value={customDepth} onChange={(event) => setCustomDepth(Number(event.target.value) === 2 ? 2 : 1)} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-2 text-[10px] text-white"><option value="1">1 layer</option><option value="2">2 layers</option></select>
+                        </label>
+                        <label className="text-[9px] font-mono text-slate-500">Neurons
+                          <input type="number" min="32" max="160" step="8" value={customUnits} onChange={(event) => setCustomUnits(Math.max(32, Math.min(160, Number(event.target.value) || 96)))} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-2 text-[10px] text-white" />
+                        </label>
+                        <label className="text-[9px] font-mono text-slate-500">Dropout %
+                          <input type="number" min="0" max="40" step="5" value={customDropout} onChange={(event) => setCustomDropout(Math.max(0, Math.min(40, Number(event.target.value) || 20)))} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-2 text-[10px] text-white" />
+                        </label>
+                        <label className="text-[9px] font-mono text-slate-500">Learning rate
+                          <input type="number" min="0.0003" max="0.003" step="0.0001" value={customLearningRate} onChange={(event) => setCustomLearningRate(Math.max(0.0003, Math.min(0.003, Number(event.target.value) || 0.001)))} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-2 text-[10px] text-white" />
+                        </label>
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-[9px] text-slate-600">
+                        {trainingProfile === "grade6" ? "Optimized for first-time learners and small datasets." : trainingProfile === "grade7" ? "Balanced default for classroom experiments." : "More capacity for Grade 8 datasets with enough examples."}
+                      </p>
+                    )}
                   </div>
-                )}
+
+                  {training && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-[9px] font-mono text-slate-600">
+                        <span>{progress.stage}</span>
+                        <span>{progress.epoch}/{progress.total}</span>
+                      </div>
+                      <div className="h-2 overflow-hidden rounded-full bg-slate-800">
+                        <div className="h-full bg-violet-400 transition-all" style={{ width: (progress.stage.startsWith("Extracting") ? 18 : 18 + Math.round((progress.epoch / Math.max(1, progress.total)) * 82)) + "%" }} />
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {error && (

@@ -26,9 +26,9 @@ export type HandDetector = {
   dispose: () => void
 }
 
-const HAND_VERSION = "2.0.1"
+const HAND_VERSION = "2.1.1"
 const MAX_HANDS = 2
-const MIN_HAND_SCORE = 0.5
+const MIN_HAND_SCORE = 0.35
 const HAND_RUNTIME_SOURCES = [
   "https://cdn.jsdelivr.net/npm/@tensorflow-models/hand-pose-detection@2.0.1/dist/hand-pose-detection.min.js",
   "https://unpkg.com/@tensorflow-models/hand-pose-detection@2.0.1/dist/hand-pose-detection.min.js",
@@ -174,14 +174,31 @@ function angle(a: HandPoint, b: HandPoint, c: HandPoint) {
 function fingerExtended(points: HandPoint[], mcp: number, pip: number, dip: number, tip: number) {
   const a = points[mcp], b = points[pip], c = points[dip], d = points[tip], wrist = points[0]
   if (!a || !b || !c || !d || !wrist) return false
-  return angle(a, b, c) > 145 && angle(b, c, d) > 145 && distance(d, wrist) > distance(a, wrist) * 1.22
+
+  const tipDistance = distance(d, wrist)
+  const pipDistance = distance(b, wrist)
+  const mcpDistance = distance(a, wrist)
+  const pipAngle = angle(a, b, c)
+
+  // MediaPipe landmarks move significantly with camera distance and hand pose.
+  // Use ratios/angles instead of the previous hard absolute extension threshold.
+  return pipAngle > 145 &&
+    tipDistance > pipDistance * 1.04 &&
+    tipDistance > mcpDistance * 1.12
 }
 
 function thumbExtended(points: HandPoint[]) {
-  const cmc = points[1], mcp = points[2], ip = points[3], tip = points[4], indexMcp = points[5]
-  if (!cmc || !mcp || !ip || !tip || !indexMcp) return false
-  return angle(cmc, mcp, ip) > 130 && angle(mcp, ip, tip) > 130 &&
-    distance(tip, indexMcp) > distance(ip, indexMcp) * 1.05
+  const cmc = points[1], mcp = points[2], ip = points[3], tip = points[4], indexMcp = points[5], wrist = points[0]
+  if (!cmc || !mcp || !ip || !tip || !indexMcp || !wrist) return false
+
+  const ipAngle = angle(mcp, ip, tip)
+  const tipDistance = distance(tip, wrist)
+  const ipDistance = distance(ip, wrist)
+  const lateralDistance = distance(tip, indexMcp)
+
+  return ipAngle > 135 &&
+    tipDistance > ipDistance * 1.04 &&
+    lateralDistance > distance(ip, indexMcp) * 1.02
 }
 
 export function getExtendedFingerMask(points: HandPoint[]): FingerMask {
@@ -218,7 +235,7 @@ function toBox(box: any): [number, number, number, number] {
   ]
 }
 
-export async function loadHandDetector(): Promise<HandDetector> {
+export async function loadHandDetector(options: { maxHands?: number } = {}): Promise<HandDetector> {
   await ensureRuntime()
 
   const detector = await window.handPoseDetection.createDetector(
@@ -226,7 +243,7 @@ export async function loadHandDetector(): Promise<HandDetector> {
     {
       runtime: "tfjs",
       modelType: "full",
-      maxHands: MAX_HANDS,
+      maxHands: Math.max(1, Math.min(MAX_HANDS, Math.round(options.maxHands ?? MAX_HANDS))),
     },
   )
 
@@ -236,12 +253,10 @@ export async function loadHandDetector(): Promise<HandDetector> {
       const hands = await detector.estimateHands(video, { flipHorizontal: false })
       return hands
         .filter((hand: any) => Number(hand?.score ?? 0) >= MIN_HAND_SCORE)
-        .slice(0, MAX_HANDS)
+        .slice(0, Math.max(1, Math.min(MAX_HANDS, Math.round(options.maxHands ?? MAX_HANDS))))
         .map((hand: any) => {
           const keypoints = Array.isArray(hand?.keypoints)
-            ? hand.keypoints.map((point: any, index: number) =>
-                toPoint(point, hand?.keypoints3D?.[index]),
-              )
+            ? hand.keypoints.map((point: any, index: number) => toPoint(point, hand?.keypoints3D?.[index]))
             : []
           const extendedFingers = getExtendedFingerMask(keypoints)
           return {

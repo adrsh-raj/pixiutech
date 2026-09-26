@@ -57,6 +57,11 @@ try {
   await page.getByRole("button", { name: "Start camera" }).click()
   await page.getByText("6C Pose ready", { exact: true }).waitFor()
 
+  // Separate portal AI Studio route.
+  await page.goto(baseUrl + "/ai-studio", { waitUntil: "networkidle" })
+  if (!(await page.title()).includes("PIXIU AI STUDIO")) throw new Error("Standalone AI Studio route did not load")
+  await page.getByText("PIXIU AI STUDIO", { exact: true }).first().waitFor()
+
   if (pageErrors.length) throw new Error("Browser page errors: " + pageErrors.join(" | "))
   console.log("PIXIU CyberLab browser gate PASSED")
  } finally {
