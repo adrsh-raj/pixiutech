@@ -428,6 +428,16 @@ export function AiStudioPanel({
   const resourceModeRef = useRef<AiVisionMode | null>(null)
   const busyRef = useRef(false)
   const busySessionRef = useRef<number | null>(null)
+  useEffect(() => {
+    if (!isOpen || typeof document === "undefined") return
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [isOpen])
   const handCountHistoryRef = useRef<number[]>([])
   const handGestureHistoryRef = useRef<string[]>([])
   const emotionHistoryRef = useRef<string[]>([])
@@ -601,7 +611,7 @@ export function AiStudioPanel({
 
     const width = event.currentTarget.offsetWidth || 280
     const height = event.currentTarget.offsetHeight || 190
-    const margin = 8
+    const margin = 12
     const left = Math.max(margin, Math.min(window.innerWidth - width - margin, event.clientX - drag.offsetX))
     const top = Math.max(56, Math.min(window.innerHeight - height - margin, event.clientY - drag.offsetY))
     setFloatingPosition({ left, top })
@@ -1416,8 +1426,8 @@ export function AiStudioPanel({
 
 
   return (
-    <div className="pixiu-ai-shell fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/80 p-3 backdrop-blur-sm sm:p-5">
-      <div className="pixiu-ai-window flex h-[min(98vh,1080px)] w-[calc(100vw-8px)] max-w-[1800px] flex-col overflow-hidden rounded-3xl border bg-[#07111f] text-white shadow-2xl shadow-black/60">
+    <div className="pixiu-ai-shell fixed inset-0 z-[80] flex h-[100dvh] w-screen items-stretch justify-stretch overflow-hidden bg-slate-950/90">
+      <div className="pixiu-ai-window flex h-[100dvh] w-screen max-w-none flex-col overflow-hidden rounded-none border-0 bg-[#07111f] text-white shadow-2xl shadow-black/60">
         <header className="pixiu-ai-header flex shrink-0 items-center justify-between border-b bg-slate-950/70 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-3">
             <div className="pixiu-ai-mark grid h-9 w-9 place-items-center rounded-xl text-violet-300">
@@ -1470,7 +1480,7 @@ export function AiStudioPanel({
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-5 lg:p-6">
           {tab === "try" && (
             <div className="mx-auto max-w-none space-y-4">
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-7">
