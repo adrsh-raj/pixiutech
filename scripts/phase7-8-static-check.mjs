@@ -35,6 +35,13 @@ for (const type of ["ai_get_object_count","pir_motion","ldr_read","tmp36_tempera
 const toolbox = read("pixiu-lms-portal/src/components/circuit-lab/blockly-editor.tsx")
 for (const type of ["math_modulo","math_single","arduino_map","pir_motion","ldr_read","tmp36_temperature","potentiometer_read","ai_get_object_count"]) assert(toolbox.includes('type: "' + type + '"' ) || toolbox.includes("type: '" + type + "'"), "Blockly toolbox missing " + type)
 
+
+const workbench = read("pixiu-lms-portal/src/components/circuit-lab/workbench.tsx")
+assert(workbench.includes("const liveWorkspace = visualWorkspaceRef.current"), "Workbench runner is not using the mounted Blockly workspace")
+assert(workbench.includes("const currentBlocklyXml = liveWorkspaceXml || blocklyXml"), "Workbench has no synchronized Blockly XML fallback")
+assert(workbench.includes("No Arduino Program block found"), "Workbench silently permits a run with no Arduino Program block")
+assert(workbench.includes("Pixiu Blockly runtime failed"), "Workbench runtime errors do not fail closed")
+
 const runner = read("pixiu-lms-portal/src/lib/blockly-runner.ts")
 assert(runner.includes('case "controls_whileUntil"'), "Blockly while/until block has no simulator execution path")
 assert(runner.includes("getAiObjectCount"), "Blockly runner lacks AI object count bridge")

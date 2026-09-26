@@ -501,28 +501,36 @@ export function Workbench() {
       return
     }
 
+    // Serialize the currently mounted Blockly editor before Run. The visible workspace
+    // is the source of truth; blocklyXml is the fallback during editor hydration.
+    const liveWorkspaceForRun = visualWorkspaceRef.current
+    const liveWorkspaceXml = liveWorkspaceForRun
+      ? Blockly.utils.xml.domToText(Blockly.Xml.workspaceToDom(liveWorkspaceForRun))
+      : null
+    const currentBlocklyXml = liveWorkspaceXml || blocklyXml
+
     // Auto-open AI Vision HUD ONLY if current program uses AI Vision blocks
     const usesAi = Boolean(
-      blocklyXml.includes('type="ai_') ||
-      blocklyXml.includes("ai_detect_objects") ||
-      blocklyXml.includes("ai_is_detected") ||
-      blocklyXml.includes("ai_is_unknown") ||
-      blocklyXml.includes("ai_get_detected_class") ||
-      blocklyXml.includes("ai_confidence") ||
-      blocklyXml.includes("ai_get_gesture") ||
-      blocklyXml.includes("ai_get_finger_count") ||
-      blocklyXml.includes("ai_is_gesture") ||
-      blocklyXml.includes("ai_camera_enable") ||
-      blocklyXml.includes("ai_microphone_enable")
+      currentBlocklyXml.includes('type="ai_') ||
+      currentBlocklyXml.includes("ai_detect_objects") ||
+      currentBlocklyXml.includes("ai_is_detected") ||
+      currentBlocklyXml.includes("ai_is_unknown") ||
+      currentBlocklyXml.includes("ai_get_detected_class") ||
+      currentBlocklyXml.includes("ai_confidence") ||
+      currentBlocklyXml.includes("ai_get_gesture") ||
+      currentBlocklyXml.includes("ai_get_finger_count") ||
+      currentBlocklyXml.includes("ai_is_gesture") ||
+      currentBlocklyXml.includes("ai_camera_enable") ||
+      currentBlocklyXml.includes("ai_microphone_enable")
     )
     const usesNumberGestureAi = Boolean(
-      blocklyXml.includes("ai_get_gesture") ||
-      blocklyXml.includes("ai_get_finger_count") ||
-      blocklyXml.includes("ai_is_gesture")
+      currentBlocklyXml.includes("ai_get_gesture") ||
+      currentBlocklyXml.includes("ai_get_finger_count") ||
+      currentBlocklyXml.includes("ai_is_gesture")
     )
     const programAiMode = usesNumberGestureAi
       ? "numbers"
-      : blocklyXml.includes("ai_microphone_enable")
+      : currentBlocklyXml.includes("ai_microphone_enable")
         ? "sound"
         : usesAi
           ? "objects"
@@ -544,9 +552,29 @@ export function Workbench() {
 
     try {
       defineArduinoBlocks()
-      const workspace = new Blockly.Workspace()
-      const dom = Blockly.utils.xml.textToDom(blocklyXml)
-      Blockly.Xml.domToWorkspace(dom, workspace)
+      const liveWorkspace = visualWorkspaceRef.current
+      const liveXml = liveWorkspace
+        ? Blockly.utils.xml.domToText(Blockly.Xml.workspaceToDom(liveWorkspace))
+        : null
+      let workspace: Blockly.Workspace = liveWorkspace ?? new Blockly.Workspace()
+      let ownsWorkspace = !liveWorkspace
+
+      // Use the visible Blockly workspace whenever it is already synchronized.
+      // During template/project hydration, fall back to current React XML instead
+      // of executing a stale or empty hidden workspace.
+      if (!liveWorkspace || liveXml !== blocklyXml) {
+        if (liveWorkspace && liveXml !== blocklyXml) {
+          workspace = new Blockly.Workspace()
+          ownsWorkspace = true
+        }
+        const dom = Blockly.utils.xml.textToDom(blocklyXml)
+        Blockly.Xml.domToWorkspace(dom, workspace)
+      }
+
+      const runnableRoot = workspace.getTopBlocks(true).find((b) => b.type === "arduino_program")
+      if (!runnableRoot) {
+        throw new Error("No Arduino Program block found. Open Code and add an Arduino program before running.")
+      }
 
       const env: ExecutionEnvironment = {
         setDigitalPin: (pin, state) => {
@@ -704,17 +732,43 @@ export function Workbench() {
         },
       }
 
-      runBlocklyProgram(workspace, env, controller.signal).finally(() => {
-        workspace.dispose()
-        if (visualWorkspaceRef.current) {
-          try {
-            visualWorkspaceRef.current.highlightBlock(null)
-          } catch (e) {}
-        }
-        setActiveStepBlock(null)
-      })
+      void runBlocklyProgram(workspace, env, controller.signal)
+        .catch((err) => {
+          console.error("Pixiu Blockly runtime failed:", err)
+          if (runnerAbortRef.current === controller) {
+            runningRef.current = false
+            setRunning(false)
+            setSerialLines((prev) => [...prev, {
+              text: "[Runtime error] " + (err instanceof Error ? err.message : String(err)),
+              timestamp: Date.now(),
+              type: "error",
+            }])
+          }
+        })
+        .finally(() => {
+          if (ownsWorkspace) workspace.dispose()
+          if (visualWorkspaceRef.current) {
+            try {
+              visualWorkspaceRef.current.highlightBlock(null)
+            } catch (e) {}
+          }
+          if (runnerAbortRef.current === controller) {
+            runnerAbortRef.current = null
+          }
+          setActiveStepBlock(null)
+        })
     } catch (err) {
-      console.error("Failed to run Blockly program:", err)
+      console.error("Failed to start Pixiu Blockly runtime:", err)
+      if (runnerAbortRef.current === controller) {
+        runnerAbortRef.current = null
+        runningRef.current = false
+        setRunning(false)
+        setSerialLines((prev) => [...prev, {
+          text: "[Runtime error] " + (err instanceof Error ? err.message : String(err)),
+          timestamp: Date.now(),
+          type: "error",
+        }])
+      }
     }
   }, [blocklyXml, state.parts, stopProgram, stopAiRuntime])
 
