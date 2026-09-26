@@ -789,11 +789,12 @@ export function Workbench() {
     startProgram(false, true)
   }, [startProgram, stopProgram])
 
-  // AI Studio "Run circuit" hands control to the integrated Vision Canvas
-  // for Arduino object-detection programs.
+  // AI Studio "Run circuit" hands control to the compact right-side
+  // Pixiu Vision Runtime HUD. It must never open the separate full
+  // AI Vision Canvas, otherwise two camera owners can compete for getUserMedia.
   const handleRunFromAiStudio = useCallback(() => {
     setIsAiStudioOpen(false)
-    setIsAiCameraOpen(true)
+    setIsAiCameraOpen(false)
     setAiCameraCompact(true)
     setAiRuntimeEnabled(true)
     if (!runningRef.current) {
