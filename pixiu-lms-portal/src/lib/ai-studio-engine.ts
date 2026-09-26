@@ -931,14 +931,72 @@ export async function trainAiModel(
       : latestAccuracy
     trainValues.forEach((value) => value.dispose())
 
+
     let validationAccuracy = 0
     let validationConfusionMatrix: number[][] | undefined
 
     if (validationXs && validationYs && validation.length) {
-      const validationEvaluation = model.evaluate(validationXs, validationYs) as tf.Scalar | tf.Scalar[]
-      const validationValues = Array.isArray(validationEvaluation) ? validationEvaluation : [validationEvaluation]
-      validationAccuracy = validationValues[1] ? Number((await validationValues[1].data())[0]) : latestValidation
-      validationValues.forEach((value) => value.dispose())    const summary: AiModelSummary = {
+      const validationEvaluation = model.evaluate(
+        validationXs,
+        validationYs,
+      ) as tf.Scalar | tf.Scalar[]
+
+      const validationValues = Array.isArray(validationEvaluation)
+        ? validationEvaluation
+        : [validationEvaluation]
+
+      validationAccuracy = validationValues[1]
+        ? Number((await validationValues[1].data())[0])
+        : latestValidation
+
+      validationValues.forEach((value) => value.dispose())
+
+      const predictionTensor = model.predict(validationXs) as tf.Tensor
+      const predictionValues = Array.from(await predictionTensor.data())
+      predictionTensor.dispose()
+
+      validationConfusionMatrix = classes.map(() => classes.map(() => 0))
+
+      for (let row = 0; row < validationLabels.length; row += 1) {
+        const actual = validationLabels[row]
+        const offset = row * classes.length
+        let predicted = 0
+
+        for (let column = 1; column < classes.length; column += 1) {
+          if (
+            (predictionValues[offset + column] ?? 0) >
+            (predictionValues[offset + predicted] ?? 0)
+          ) {
+            predicted = column
+          }
+        }
+
+        if (validationConfusionMatrix[actual]) {
+          validationConfusionMatrix[actual][predicted] += 1
+        }
+      }
+    }
+
+    const trainEvaluation = model.evaluate(
+      trainXs,
+      trainYs,
+    ) as tf.Scalar | tf.Scalar[]
+
+    const trainValues = Array.isArray(trainEvaluation)
+      ? trainEvaluation
+      : [trainEvaluation]
+
+    const trainAccuracy = trainValues[1]
+      ? Number((await trainValues[1].data())[0])
+      : latestAccuracy
+
+    trainValues.forEach((value) => value.dispose())
+
+    const generalizationGap = validation.length
+      ? Math.round(Math.max(0, trainAccuracy - validationAccuracy) * 100)
+      : 0
+
+    const summary: AiModelSummary = {
       id: createId(),
       name: classes.join(" vs ") + " · Pixiu My AI",
       classes,
@@ -951,27 +1009,40 @@ export async function trainAiModel(
       embeddingSize: extracted.size,
       featureExtractor: MY_AI_FEATURE_VERSION,
       storageKey: MODEL_KEY,
-      classPrototypes: buildClassPrototypes(trainFeatureMatrix, trainLabels, classes),
+      classPrototypes: buildClassPrototypes(
+        trainFeatureMatrix,
+        trainLabels,
+        classes,
+      ),
       architecture: describeArchitecture(config.layers, classes.length),
       predictionThreshold: MY_AI_PREDICTION_THRESHOLD,
       trainingProfile: options.profile ?? "custom",
       hiddenLayers: config.layers.filter((layer) => layer.type === "dense").length,
-      hiddenUnits: Math.max(0, ...config.layers.filter((layer) => layer.type === "dense").map((layer) => layer.units ?? 0)),
-      dropoutRate: config.layers.find((layer) => layer.type === "dropout")?.rate ?? 0,
+      hiddenUnits: Math.max(
+        0,
+        ...config.layers
+          .filter((layer) => layer.type === "dense")
+          .map((layer) => layer.units ?? 0),
+      ),
+      dropoutRate:
+        config.layers.find((layer) => layer.type === "dropout")?.rate ?? 0,
       learningRate: config.learningRate,
       batchSize: config.batchSize,
       earlyStoppingPatience: config.earlyStoppingPatience,
       earlyStoppingMinDelta: config.earlyStoppingMinDelta,
       earlyStopped,
-      bestEpoch: bestEpoch || history[history.length - 1]?.epoch || history.length,
+      bestEpoch:
+        bestEpoch || history[history.length - 1]?.epoch || history.length,
       parameterCount: model.countParams(),
       layerSpecs: config.layers,
       trainingHistory: history,
       validationAvailable: validation.length > 0,
       generalizationGap,
       validationConfusionMatrix,
-      confidenceCalibration: "Classifier confidence is combined with learned class-pattern similarity; weak matches return as unknown.",
+      confidenceCalibration:
+        "Classifier confidence is combined with learned class-pattern similarity; weak matches return as unknown.",
     }
+
 
     options.onStage?.("Saving model locally")
     await queueModelOperation(async () => {
