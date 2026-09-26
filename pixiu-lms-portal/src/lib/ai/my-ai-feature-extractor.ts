@@ -60,10 +60,12 @@ export async function extractMyAiEmbedding(
   const embedding = tf.tidy(() => {
     const pixels = tf.browser.fromPixels(image)
     const normalized = tf.div(tf.cast(pixels, "float32"), 255)
-    const resized = tf.image.resizeWithPad(
+    // Use resizeBilinear directly. resizeWithPad is not available in every
+    // TensorFlow.js browser bundle and can fail at runtime after minification.
+    const resized = tf.image.resizeBilinear(
       normalized,
-      MY_AI_INPUT_SIZE,
-      MY_AI_INPUT_SIZE,
+      [MY_AI_INPUT_SIZE, MY_AI_INPUT_SIZE],
+      true,
     )
 
     // 256 dims: coarse luminance layout (16 × 16).
