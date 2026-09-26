@@ -1,16 +1,37 @@
 import * as tf from "@tensorflow/tfjs"
 
-export const MY_AI_FEATURE_VERSION = "vision-features-v3-native"
+export const MY_AI_FEATURE_VERSION = "vision-features-v4-local"
 export const MY_AI_INPUT_SIZE = 224
+export const MY_AI_FEATURE_SIZE = 512
 export const MY_AI_PREDICTION_THRESHOLD = 0.62
 
-// My AI intentionally does not depend on a remote pretrained model.
-// The feature vector is computed locally in the browser from the user's image.
-// This avoids model-download failures, external storage/CSP problems, and keeps
-// training self-contained and predictable for classroom use.
+const L2_EPSILON = 1e-12
 
+// Shape contract:
+// source pixels     [H, W, 3]
+// batched image     [1, 224, 224, 3]
+// feature vector    [1, 512]
+// classifier input  [batch, 512]
 let featureExtractorReady = false
 let featureExtractorPromise: Promise<void> | null = null
+
+function assertShape(tensor: tf.Tensor, expected: number[], label: string) {
+  const actual = tensor.shape
+  const matches =
+    actual.length === expected.length &&
+    expected.every((value, index) => value === -1 || actual[index] === value)
+
+  if (!matches) {
+    throw new Error(
+      label +
+        " shape mismatch. Expected [" +
+        expected.join(", ") +
+        "], got [" +
+        actual.join(", ") +
+        "].",
+    )
+  }
+}
 
 async function ensureBackend() {
   await tf.ready()
@@ -37,10 +58,22 @@ export async function loadMyAiFeatureExtractor() {
 
     await ensureBackend()
 
-    // Warm up TensorFlow.js without downloading any external model.
-    const warmup = tf.zeros([1, MY_AI_INPUT_SIZE, MY_AI_INPUT_SIZE, 3])
-    await warmup.mean().data()
-    warmup.dispose()
+    const warmup = tf.zeros([
+      1,
+      MY_AI_INPUT_SIZE,
+      MY_AI_INPUT_SIZE,
+      3,
+    ])
+    try {
+      assertShape(
+        warmup,
+        [1, MY_AI_INPUT_SIZE, MY_AI_INPUT_SIZE, 3],
+        "My AI warmup tensor",
+      )
+      await tf.mean(warmup).data()
+    } finally {
+      warmup.dispose()
+    }
 
     featureExtractorReady = true
   })()
@@ -59,63 +92,113 @@ export async function extractMyAiEmbedding(
 
   const embedding = tf.tidy(() => {
     const pixels = tf.browser.fromPixels(image)
-    const normalized = tf.div(tf.cast(pixels, "float32"), 255)
-    // Use resizeBilinear directly. resizeWithPad is not available in every
-    // TensorFlow.js browser bundle and can fail at runtime after minification.
+    assertShape(pixels, [-1, -1, 3], "Source image tensor")
+
+    const batchedPixels = tf.expandDims(pixels, 0)
+    assertShape(
+      batchedPixels,
+      [1, -1, -1, 3],
+      "Batched source image tensor",
+    )
+
+    const normalized = tf.div(tf.cast(batchedPixels, "float32"), 255)
     const resized = tf.image.resizeBilinear(
       normalized,
       [MY_AI_INPUT_SIZE, MY_AI_INPUT_SIZE],
       true,
     )
+    assertShape(
+      resized,
+      [1, MY_AI_INPUT_SIZE, MY_AI_INPUT_SIZE, 3],
+      "Resized image tensor",
+    )
 
-    // 256 dims: coarse luminance layout (16 × 16).
-    const grayscale = resized.mean(2, true)
+    const grayscale = tf.mean(resized, 3, true)
+    assertShape(
+      grayscale,
+      [1, MY_AI_INPUT_SIZE, MY_AI_INPUT_SIZE, 1],
+      "Grayscale tensor",
+    )
+
     const graySmall = tf.image.resizeBilinear(grayscale, [16, 16], true)
     const grayFeatures = tf.reshape(graySmall, [1, 256])
+    assertShape(grayFeatures, [1, 256], "Grayscale feature vector")
 
-    // 192 dims: coarse RGB layout (8 × 8 × 3).
     const rgbSmall = tf.image.resizeBilinear(resized, [8, 8], true)
     const rgbFeatures = tf.reshape(rgbSmall, [1, 192])
+    assertShape(rgbFeatures, [1, 192], "RGB feature vector")
 
-    // 64 dims: edge/texture response at 8 × 8.
-    // `resizeBilinear` returns a rank-3 H×W×C tensor here, so slice
-    // coordinates must also be rank-3 (H, W, C), not rank-4.
     const dx = tf.abs(
       tf.sub(
         grayscale.slice(
-          [0, 1, 0],
-          [MY_AI_INPUT_SIZE, MY_AI_INPUT_SIZE - 1, 1],
+          [0, 0, 1, 0],
+          [1, MY_AI_INPUT_SIZE, MY_AI_INPUT_SIZE - 1, 1],
         ),
         grayscale.slice(
-          [0, 0, 0],
-          [MY_AI_INPUT_SIZE, MY_AI_INPUT_SIZE - 1, 1],
+          [0, 0, 0, 0],
+          [1, MY_AI_INPUT_SIZE, MY_AI_INPUT_SIZE - 1, 1],
         ),
       ),
     )
     const dy = tf.abs(
       tf.sub(
         grayscale.slice(
-          [1, 0, 0],
-          [MY_AI_INPUT_SIZE - 1, MY_AI_INPUT_SIZE, 1],
+          [0, 1, 0, 0],
+          [1, MY_AI_INPUT_SIZE - 1, MY_AI_INPUT_SIZE, 1],
         ),
         grayscale.slice(
-          [0, 0, 0],
-          [MY_AI_INPUT_SIZE - 1, MY_AI_INPUT_SIZE, 1],
+          [0, 0, 0, 0],
+          [1, MY_AI_INPUT_SIZE - 1, MY_AI_INPUT_SIZE, 1],
         ),
       ),
     )
+    assertShape(
+      dx,
+      [1, MY_AI_INPUT_SIZE, MY_AI_INPUT_SIZE - 1, 1],
+      "Horizontal edge tensor",
+    )
+    assertShape(
+      dy,
+      [1, MY_AI_INPUT_SIZE - 1, MY_AI_INPUT_SIZE, 1],
+      "Vertical edge tensor",
+    )
+
     const dxSmall = tf.image.resizeBilinear(dx, [8, 8], true)
     const dySmall = tf.image.resizeBilinear(dy, [8, 8], true)
     const edgeFeatures = tf.reshape(tf.add(dxSmall, dySmall), [1, 64])
+    assertShape(edgeFeatures, [1, 64], "Edge feature vector")
 
-    return tf.linalg.l2Normalize(
-      tf.concat([grayFeatures, rgbFeatures, edgeFeatures], 1),
+    const combined = tf.concat(
+      [grayFeatures, rgbFeatures, edgeFeatures],
       1,
     )
+    assertShape(combined, [1, MY_AI_FEATURE_SIZE], "Combined feature vector")
+
+    const sumSquares = tf.sum(tf.square(combined), 1, true)
+    const norm = tf.sqrt(
+      tf.maximum(sumSquares, tf.scalar(L2_EPSILON)),
+    )
+    const normalizedFeatures = tf.div(combined, norm)
+    assertShape(
+      normalizedFeatures,
+      [1, MY_AI_FEATURE_SIZE],
+      "Normalized feature vector",
+    )
+
+    return normalizedFeatures
   })
 
   try {
     const values = await embedding.data()
+    if (values.length !== MY_AI_FEATURE_SIZE) {
+      throw new Error(
+        "My AI feature-size mismatch. Expected " +
+          MY_AI_FEATURE_SIZE +
+          ", got " +
+          values.length +
+          ".",
+      )
+    }
     return Array.from(values)
   } finally {
     embedding.dispose()

@@ -151,19 +151,28 @@ for (const marker of [
 ]) requireText(engine, marker, "6H dataset contract")
 
 for (const marker of [
-  'MY_AI_FEATURE_VERSION = "vision-features-v2"',
-  "feature_vector/4",
-  "tf.loadGraphModel",
-  "model.execute(batched)",
-  "resizeWithPad",
+  'MY_AI_FEATURE_VERSION = "vision-features-v4-local"',
+  "MY_AI_INPUT_SIZE = 224",
+  "MY_AI_FEATURE_SIZE = 512",
+  "tf.browser.fromPixels",
+  "tf.expandDims",
+  "tf.image.resizeBilinear",
+  "tf.mean",
+  "tf.sum",
+  "tf.sqrt",
+  "tf.maximum",
+  "tf.div",
   "MY_AI_PREDICTION_THRESHOLD = 0.62",
-]) requireText(featureExtractor, marker, "6I/6J feature extractor")
+]) requireText(featureExtractor, marker, "6I/6J local feature extractor")
 
 for (const marker of [
   "extractFeatures",
   "augmentImageForTraining",
   "classPrototypes",
-  "Dense(${config.hiddenUnits})",
+  "buildTrainableLayers",
+  "validateClassifierModelShape",
+  "modelInputShape",
+  "outputShape",
   "validationData",
   "trainingProfile: options.profile",
   "featureExtractor: MY_AI_FEATURE_VERSION",
@@ -347,7 +356,7 @@ console.log("6E Face + expression AI: present")
 console.log("6F Sound AI: present")
 console.log("6G Numbers + Gesture AI: present")
 console.log("6H My AI dataset workflow: present")
-console.log("6I My AI transfer-learning engine: present")
+console.log("6I My AI local feature + configurable training engine: present")
 console.log("6J Unknown/low-confidence prediction: present")
 console.log("6K Normalized AI → Blockly boundary: present")
 console.log("6L AI data-source / virtual-hardware boundary: present")
@@ -359,8 +368,12 @@ console.log("6P QA lifecycle contracts: present")
 const engineSource = read("pixiu-lms-portal/src/lib/ai-studio-engine.ts")
 for (const marker of [
   "AI_TRAINING_PROFILES",
-  "hiddenLayers?: 1 | 2",
-  "config.hiddenLayers === 2",
+  "MAX_CONFIGURABLE_LAYERS = 8",
+  "MY_AI_FEATURE_SIZE",
+  "estimateTrainingLoad",
+  "modelInputShape",
+  "outputShape",
+  "validateClassifierModelShape",
   "trainingProfile: options.profile",
 ]) requireText(engineSource, marker, "My AI training tuning")
 

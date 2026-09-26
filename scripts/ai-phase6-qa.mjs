@@ -234,7 +234,7 @@ const staticSourceChecks = [
   ["6F sound adapter", sound.includes("BROWSER_FFT") && sound.includes("generation") && panel.includes("loadSoundRecognizer") && runner.includes("ai_microphone_enable")],
   ["6G gesture interpreter", gesture.includes("interpretHandGesture") && workbench.includes("getAiGesture") && toolbox.includes("ai_get_gesture")],
   ["6H dataset workflow", engine.includes("addAiClass") && engine.includes("removeAiClass") && panel.includes("Import images") && panel.includes("Capture example")],
-  ["6I configurable My AI training head", extractor.includes("MY_AI_EMBEDDING_NODE") && engine.includes("AiLayerType") && engine.includes("buildTrainableLayers") && !engine.includes("tf.layers.conv2d")],
+  ["6I configurable My AI training head", extractor.includes("MY_AI_FEATURE_SIZE") && extractor.includes("tf.image.resizeBilinear") && engine.includes("AiLayerType") && engine.includes("buildTrainableLayers") && engine.includes("validateClassifierModelShape") && !engine.includes("tf.layers.conv2d")],
   ["6J unknown/low-confidence", engine.includes("lowConfidence") && engine.includes("unknown") && extractor.includes("MY_AI_PREDICTION_THRESHOLD = 0.62")],
   ["6K normalization boundary", workbench.includes("normalizeAiVisionState") && workbench.includes("handleAiStateChange") && runner.includes("isAiUnknown")],
   ["6L data-source boundary", runner.includes("AI blocks are data/control inputs only") && blocks.includes("Browser AI generators")],

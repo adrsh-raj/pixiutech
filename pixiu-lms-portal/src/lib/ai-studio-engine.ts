@@ -5,6 +5,7 @@ import {
   loadMyAiFeatureExtractor,
   MY_AI_FEATURE_VERSION,
   MY_AI_INPUT_SIZE,
+  MY_AI_FEATURE_SIZE,
   MY_AI_PREDICTION_THRESHOLD,
 } from "@/lib/ai/my-ai-feature-extractor"
 
@@ -24,8 +25,12 @@ export type AiModelSummary = {
   trainAccuracy: number
   validationAccuracy: number
   createdAt: number
-  inputShape: [number, number, number]
+  imageInputShape: [number, number, number]
+  featureShape: [number]
+  modelInputShape: [number]
+  outputShape: [number]
   embeddingSize: number
+  classCount: number
   featureExtractor: string
   storageKey: string
   classPrototypes?: Record<string, number[]>
@@ -88,6 +93,7 @@ export const MY_AI_LOW_MARGIN_THRESHOLD = 0.08
 // Conservative soft ceiling for localStorage JSON. This prevents a browser
 // quota failure from silently turning a large dataset into an ephemeral state.
 export const AI_DATASET_STORAGE_SOFT_LIMIT_BYTES = 4_000_000
+export const MAX_CONFIGURABLE_LAYERS = 8
 
 export type AiLayerType = "dense" | "batchNormalization" | "dropout" | "activation"
 
@@ -125,7 +131,7 @@ export const AI_TRAINING_PROFILES: Record<Exclude<AiTrainingProfile, "custom">, 
 }
 
 function sanitizeLayerSpecs(specs: AiLayerSpec[] | undefined): AiLayerSpec[] {
-  return (Array.isArray(specs) ? specs : []).slice(0, 8).map((spec) => {
+  return (Array.isArray(specs) ? specs : []).slice(0, MAX_CONFIGURABLE_LAYERS).map((spec) => {
     if (spec.type === "dense") return { type: "dense", units: Math.max(16, Math.min(256, Math.round(spec.units ?? 64))), activation: spec.activation ?? "relu" }
     if (spec.type === "dropout") return { type: "dropout", rate: Math.max(0, Math.min(0.5, Number(spec.rate ?? 0.2))) }
     if (spec.type === "activation") return { type: "activation", activation: spec.activation ?? "relu" }
@@ -133,23 +139,55 @@ function sanitizeLayerSpecs(specs: AiLayerSpec[] | undefined): AiLayerSpec[] {
   })
 }
 
-export function estimateTrainingLoad(specs: AiLayerSpec[], classCount: number, inputSize = 1280, epochs = 20) {
-  let previousUnits = inputSize
+export function estimateTrainingLoad(
+  specs: AiLayerSpec[],
+  classCount: number,
+  inputSize = MY_AI_FEATURE_SIZE,
+  epochs = 20,
+  sampleCount = 1,
+  batchSize = 8,
+) {
+  let previousUnits = Math.max(1, Math.round(inputSize))
   let parameters = 0
+
   for (const spec of sanitizeLayerSpecs(specs)) {
     if (spec.type === "dense") {
       const units = spec.units ?? 64
       parameters += previousUnits * units + units
       previousUnits = units
     } else if (spec.type === "batchNormalization") {
-      parameters += previousUnits * 2
+      parameters += previousUnits * 4
     }
   }
+
   const outputs = Math.max(2, classCount)
   parameters += previousUnits * outputs + outputs
-  const operations = parameters * Math.max(1, epochs)
-  const label = parameters > 450_000 || operations > 12_000_000 ? "High" : parameters > 150_000 || operations > 5_000_000 ? "Medium" : "Light"
-  return { parameters: Math.round(parameters), operations: Math.round(operations), label, warning: label === "High" ? "This setup may feel slow on lower-end devices. Reduce units/layers or epochs if needed." : label === "Medium" ? "Training stays browser-local; longer runs may use more CPU/GPU time." : null }
+
+  const safeSamples = Math.max(1, Math.round(sampleCount))
+  const safeBatchSize = Math.max(1, Math.round(batchSize))
+  const stepsPerEpoch = Math.max(1, Math.ceil(safeSamples / safeBatchSize))
+  const workUnits =
+    parameters * Math.max(1, Math.round(epochs)) * stepsPerEpoch
+
+  const label =
+    parameters > 750_000 || workUnits > 60_000_000
+      ? "High"
+      : parameters > 250_000 || workUnits > 20_000_000
+        ? "Medium"
+        : "Light"
+
+  return {
+    parameters: Math.round(parameters),
+    stepsPerEpoch,
+    workUnits: Math.round(workUnits),
+    label,
+    warning:
+      label === "High"
+        ? "This setup may feel slow on lower-end devices. Reduce units, layers, epochs, or batch size if needed."
+        : label === "Medium"
+          ? "Training stays browser-local; longer runs may use more CPU/GPU time."
+          : null,
+  }
 }
 
 function clampTrainingConfig(options: TrainOptions = {}): AiTrainingConfig {
@@ -724,28 +762,83 @@ function buildTrainableLayers(
   classCount: number,
   specs: AiLayerSpec[],
 ) {
-  const layers: tf.layers.Layer[] = []
-  let hasInputShape = false
+  const layers: tf.layers.Layer[] = [
+    tf.layers.inputLayer({
+      inputShape: [inputSize],
+      name: "my-ai-input",
+    }),
+  ]
+
   for (const spec of sanitizeLayerSpecs(specs)) {
     if (spec.type === "dense") {
-      layers.push(tf.layers.dense({
-        ...(hasInputShape ? {} : { inputShape: [inputSize] }),
-        units: spec.units ?? 64,
-        activation: spec.activation ?? "relu",
-        kernelRegularizer: tf.regularizers.l2({ l2: 0.0001 }),
-      }))
-      hasInputShape = true
+      layers.push(
+        tf.layers.dense({
+          units: spec.units ?? 64,
+          activation: spec.activation ?? "relu",
+          kernelRegularizer: tf.regularizers.l2({ l2: 0.0001 }),
+        }),
+      )
     } else if (spec.type === "batchNormalization") {
       layers.push(tf.layers.batchNormalization())
     } else if (spec.type === "dropout") {
       layers.push(tf.layers.dropout({ rate: spec.rate ?? 0.2 }))
     } else {
-      layers.push(tf.layers.activation({ activation: spec.activation ?? "relu" }))
+      layers.push(
+        tf.layers.activation({
+          activation: spec.activation ?? "relu",
+        }),
+      )
     }
   }
-  if (!hasInputShape) layers.unshift(tf.layers.dense({ inputShape: [inputSize], units: 64, activation: "relu" }))
-  layers.push(tf.layers.dense({ units: classCount, activation: "softmax" }))
+
+  layers.push(
+    tf.layers.dense({
+      units: classCount,
+      activation: "softmax",
+      name: "my-ai-output",
+    }),
+  )
+
   return layers
+}
+
+function validateClassifierModelShape(
+  model: tf.LayersModel,
+  inputSize: number,
+  classCount: number,
+) {
+  const inputShape = model.inputs?.[0]?.shape
+  const outputShape = model.outputs?.[0]?.shape
+
+  if (
+    !Array.isArray(inputShape) ||
+    inputShape.length !== 2 ||
+    inputShape[0] !== null ||
+    Number(inputShape[1]) !== inputSize
+  ) {
+    throw new Error(
+      "My AI model input shape mismatch. Expected [batch, " +
+        inputSize +
+        "], got " +
+        JSON.stringify(inputShape) +
+        ".",
+    )
+  }
+
+  if (
+    !Array.isArray(outputShape) ||
+    outputShape.length !== 2 ||
+    outputShape[0] !== null ||
+    Number(outputShape[1]) !== classCount
+  ) {
+    throw new Error(
+      "My AI model output shape mismatch. Expected [batch, " +
+        classCount +
+        "], got " +
+        JSON.stringify(outputShape) +
+        ".",
+    )
+  }
 }
 
 function describeArchitecture(specs: AiLayerSpec[], classCount: number) {
@@ -762,19 +855,75 @@ function makeTensorPair(
   labels: number[],
   classCount: number,
 ) {
-  const xs = tf.tensor2d(features)
+  if (!features.length) {
+    throw new Error("My AI cannot train with an empty feature matrix.")
+  }
+  if (features.length !== labels.length) {
+    throw new Error(
+      "My AI dataset shape mismatch: " +
+        features.length +
+        " feature rows for " +
+        labels.length +
+        " labels.",
+    )
+  }
+
+  const featureSize = features[0]?.length ?? 0
+  if (!featureSize) {
+    throw new Error("My AI received an empty feature vector.")
+  }
+
+  for (const row of features) {
+    if (
+      row.length !== featureSize ||
+      row.some((value) => !Number.isFinite(value))
+    ) {
+      throw new Error("My AI received an invalid or inconsistent feature matrix.")
+    }
+  }
+
+  if (
+    labels.some(
+      (label) =>
+        !Number.isInteger(label) || label < 0 || label >= classCount,
+    )
+  ) {
+    throw new Error("My AI received an invalid class index.")
+  }
+
+  const xs = tf.tensor2d(
+    features,
+    [features.length, featureSize],
+    "float32",
+  )
   const labelTensor = tf.tensor1d(labels, "int32")
   const ys = tf.oneHot(labelTensor, classCount)
   labelTensor.dispose()
-  return { xs, ys }
+
+  return { xs, ys, featureSize }
 }
 
 export async function trainAiModel(
   samples: AiSample[],
   options: TrainOptions = {},
 ): Promise<{ model: tf.LayersModel; summary: AiModelSummary }> {
-  const classes = uniqueClasses(samples.map((sample) => sample.label))
-  const counts = getSampleCounts(samples)
+  const normalizedSamples = samples
+    .map((sample) => ({
+      ...sample,
+      label: normalizeLabel(sample.label),
+    }))
+    .filter((sample) => sample.label.length > 0)
+
+  const classes = uniqueClasses(
+    normalizedSamples.map((sample) => sample.label),
+  )
+  const classIndexByKey = new Map(
+    classes.map((className, index) => [className.toLowerCase(), index]),
+  )
+  const classIndexForLabel = (label: string) =>
+    classIndexByKey.get(normalizeLabel(label).toLowerCase()) ?? -1
+  const counts = getSampleCounts(normalizedSamples)
+
 
   if (classes.length < MIN_CLASSES) {
     throw new Error("Teach at least 2 concepts before training.")
@@ -784,7 +933,7 @@ export async function trainAiModel(
     throw new Error("My AI supports at most 8 concepts.")
   }
 
-  if (samples.length > MAX_TOTAL_SAMPLES) {
+  if (normalizedSamples.length > MAX_TOTAL_SAMPLES) {
     throw new Error("My AI supports at most 80 examples.")
   }
 
@@ -796,7 +945,7 @@ export async function trainAiModel(
     throw new Error("Keep each concept at or below 20 examples.")
   }
 
-  const { train, validation } = buildValidationSplit(samples, classes)
+  const { train, validation } = buildValidationSplit(normalizedSamples, classes)
   const minClassSamples = Math.min(...classes.map((name) => counts[name] ?? 0))
   let trainXs: tf.Tensor2D | null = null
   let trainYs: tf.Tensor2D | null = null
@@ -818,10 +967,20 @@ export async function trainAiModel(
     const trainFeatureMatrix = extractedTrain.features
     const validationFeatureMatrix = extractedValidation.features
     const copiesPerSample = augmentTraining && train.length <= 32 ? 2 : 1
-    const trainLabels = train.flatMap((sample) =>
-      Array.from({ length: copiesPerSample }, () => classes.indexOf(sample.label)),
-    )
-    const validationLabels = validation.map((sample) => classes.indexOf(sample.label))
+    const trainLabels = train.flatMap((sample) => {
+      const classIndex = classIndexForLabel(sample.label)
+      if (classIndex < 0 || classIndex >= classes.length) {
+        throw new Error("My AI found a training label that is not in the concept list.")
+      }
+      return Array.from({ length: copiesPerSample }, () => classIndex)
+    })
+    const validationLabels = validation.map((sample) => {
+      const classIndex = classIndexForLabel(sample.label)
+      if (classIndex < 0 || classIndex >= classes.length) {
+        throw new Error("My AI found a validation label that is not in the concept list.")
+      }
+      return classIndex
+    })
     const extracted = {
       features: trainFeatureMatrix,
       size: extractedTrain.size,
@@ -846,10 +1005,28 @@ export async function trainAiModel(
     }
 
     const config = clampTrainingConfig(options)
-    const load = estimateTrainingLoad(config.layers, classes.length, extracted.size, config.epochs)
-    if (load.parameters > 750_000) throw new Error("This architecture is too heavy for a browser. Reduce layer count or layer size before training.")
+    const load = estimateTrainingLoad(
+      config.layers,
+      classes.length,
+      extracted.size,
+      config.epochs,
+      trainFeatureMatrix.length,
+      config.batchSize,
+    )
+    if (load.parameters > 750_000 || load.label === "High") {
+      throw new Error(
+        "This architecture is too heavy for a browser. Reduce layer count, layer size, epochs, or batch size before training.",
+      )
+    }
 
-    model = tf.sequential({ layers: buildTrainableLayers(extracted.size, classes.length, config.layers) })
+    model = tf.sequential({
+      layers: buildTrainableLayers(
+        extracted.size,
+        classes.length,
+        config.layers,
+      ),
+    })
+    validateClassifierModelShape(model, extracted.size, classes.length)
     model.compile({ optimizer: tf.train.adam(config.learningRate), loss: "categoricalCrossentropy", metrics: ["accuracy"] })
 
     const epochs = config.epochs
@@ -990,13 +1167,17 @@ export async function trainAiModel(
       id: createId(),
       name: classes.join(" vs ") + " · Pixiu My AI",
       classes,
-      sampleCount: samples.length,
+      sampleCount: normalizedSamples.length,
       epochs: history.length,
       trainAccuracy: Math.round(trainAccuracy * 100),
       validationAccuracy: Math.round(validationAccuracy * 100),
       createdAt: Date.now(),
-      inputShape: [MY_AI_INPUT_SIZE, MY_AI_INPUT_SIZE, 3],
+      imageInputShape: [MY_AI_INPUT_SIZE, MY_AI_INPUT_SIZE, 3],
+      featureShape: [extracted.size],
+      modelInputShape: [extracted.size],
+      outputShape: [classes.length],
       embeddingSize: extracted.size,
+      classCount: classes.length,
       featureExtractor: MY_AI_FEATURE_VERSION,
       storageKey: MODEL_KEY,
       classPrototypes: buildClassPrototypes(
@@ -1064,6 +1245,16 @@ export async function loadStoredAiModel(
     summary.storageKey !== MODEL_KEY ||
     summary.featureExtractor !== MY_AI_FEATURE_VERSION ||
     !Number.isFinite(summary.embeddingSize) ||
+    !Array.isArray(summary.featureShape) ||
+    summary.featureShape.length !== 1 ||
+    summary.featureShape[0] !== summary.embeddingSize ||
+    !Array.isArray(summary.modelInputShape) ||
+    summary.modelInputShape.length !== 1 ||
+    summary.modelInputShape[0] !== summary.embeddingSize ||
+    !Array.isArray(summary.outputShape) ||
+    summary.outputShape.length !== 1 ||
+    summary.outputShape[0] !== summary.classes.length ||
+    summary.classCount !== summary.classes.length ||
     !Array.isArray(summary.classes) ||
     summary.classes.length < MIN_CLASSES ||
     summary.classes.length > MAX_CLASSES ||
@@ -1083,7 +1274,9 @@ export async function loadStoredAiModel(
     )
 
     if (
+      inputShape?.length !== 2 ||
       inputSize !== summary.embeddingSize ||
+      outputShape?.length !== 2 ||
       outputClasses !== summary.classes.length
     ) {
       model.dispose()
@@ -1135,6 +1328,16 @@ export async function predictAiImage(
   const model = activeModel ?? (await loadStoredAiModel(summary))
   if (!model) return null
 
+  try {
+    validateClassifierModelShape(
+      model,
+      summary.embeddingSize,
+      summary.classes.length,
+    )
+  } catch {
+    return null
+  }
+
   const image = await loadImage(dataUrl)
   const embeddingValues = await extractMyAiEmbedding(image)
   if (embeddingValues.length !== summary.embeddingSize) return null
@@ -1142,6 +1345,7 @@ export async function predictAiImage(
   const feature = tf.tensor2d(
     embeddingValues,
     [1, summary.embeddingSize],
+    "float32",
   )
 
   let output: tf.Tensor | null = null

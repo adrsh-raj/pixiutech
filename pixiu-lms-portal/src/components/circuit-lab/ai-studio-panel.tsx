@@ -45,6 +45,7 @@ import {
   saveAiStudioStore,
   estimateTrainingLoad,
   AI_TRAINING_PROFILES,
+  MY_AI_FEATURE_SIZE,
   trainAiModel,
   type AiLayerSpec,
   type AiTrainingHistoryPoint,
@@ -578,7 +579,14 @@ export function AiStudioPanel({
     ? { epochs: customEpochs, layers: customLayers, learningRate: customLearningRate, batchSize: customBatchSize, earlyStoppingPatience: customPatience, earlyStoppingMinDelta: customMinDelta }
     : AI_TRAINING_PROFILES[trainingProfile === "custom" ? "grade7" : trainingProfile]
 
-  const estimatedTrainingLoad = estimateTrainingLoad(selectedTrainingConfig.layers, Math.max(2, classes.length), store.model?.embeddingSize ?? 1280, selectedTrainingConfig.epochs)
+  const estimatedTrainingLoad = estimateTrainingLoad(
+    selectedTrainingConfig.layers,
+    Math.max(2, classes.length),
+    store.model?.embeddingSize ?? MY_AI_FEATURE_SIZE,
+    selectedTrainingConfig.epochs,
+    Math.max(1, store.samples.length),
+    selectedTrainingConfig.batchSize,
+  )
 
   useEffect(() => {
     const preset = AI_TRAINING_PROFILES[trainingProfile === "custom" ? "grade7" : trainingProfile]
@@ -1909,7 +1917,7 @@ export function AiStudioPanel({
                 <div className="mt-3 grid gap-2 md:grid-cols-4">
                   {[
                     ["DATASET", "Examples + labels", "You teach what each concept looks like."],
-                    ["MODEL", "Features + classifier", "A pretrained vision encoder turns images into useful features."],
+                    ["MODEL", "Features + classifier", "A local vision feature extractor converts each image into a fixed-size visual feature vector."],
                     ["TRAIN", "Learn patterns", "Only the small classifier head is updated from your examples."],
                     ["INFERENCE", "Predict + confidence", "A new image is compared with learned class patterns and scored."],
                   ].map(([title, value, note]) => (
@@ -2051,7 +2059,7 @@ export function AiStudioPanel({
                     <div className="min-w-0">
                       <p className="text-xs font-black">6I · Train My AI</p>
                       <p className="mt-1 text-[10px] leading-5 text-slate-500">
-                        Learned visual features feed a small classifier head. Grade-based profiles keep training light; advanced tuning is optional.
+                        Local visual features feed a small classifier head. Grade-based profiles keep training light; advanced tuning is optional.
                       </p>
                     </div>
                     <button disabled={!canTrain || training || runtimeEnabled} onClick={() => void train()} className="shrink-0 rounded-xl bg-violet-500 px-4 py-2 text-[10px] font-black disabled:opacity-30">
