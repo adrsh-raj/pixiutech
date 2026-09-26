@@ -1153,7 +1153,7 @@ export function Workbench() {
           aiState={aiState}
           onAiStateChange={handleAiStateChange}
           isSimRunning={running}
-          runtimeEnabled={aiRuntimeEnabled}
+          runtimeEnabled={aiRuntimeEnabled && !isAiCameraOpen}
           compact={aiCameraCompact}
           requestedMode={aiRequestedMode}
           onRequestedModeHandled={() => setAiRequestedMode(null)}
