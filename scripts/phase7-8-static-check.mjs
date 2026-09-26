@@ -42,6 +42,11 @@ assert(workbench.includes("const currentBlocklyXml = liveWorkspaceXml || blockly
 assert(workbench.includes("No Arduino Program block found"), "Workbench silently permits a run with no Arduino Program block")
 assert(workbench.includes("Pixiu Blockly runtime failed"), "Workbench runtime errors do not fail closed")
 
+const blocklyEditor = read("pixiu-lms-portal/src/components/circuit-lab/blockly-editor.tsx")
+assert(blocklyEditor.includes("externalLoadVersionRef"), "Blockly editor external-load versioning is missing")
+assert(blocklyEditor.includes('timer = window.setTimeout(applyExternalXml, 0)'), "Blockly editor external template/project load is not scheduled")
+assert(blocklyEditor.includes("lastParentXmlRef.current = expectedExternalXml"), "Blockly editor does not lock the completed external XML after hydration")
+
 const runner = read("pixiu-lms-portal/src/lib/blockly-runner.ts")
 assert(runner.includes('case "controls_whileUntil"'), "Blockly while/until block has no simulator execution path")
 assert(runner.includes("getAiObjectCount"), "Blockly runner lacks AI object count bridge")

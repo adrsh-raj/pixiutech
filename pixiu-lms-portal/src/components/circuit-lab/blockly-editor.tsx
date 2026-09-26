@@ -150,6 +150,7 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
   // (starter template / project / lesson) and must rehydrate the workspace.
   const lastParentXmlRef = useRef<string | null>(null)
   const pendingExternalXmlRef = useRef<string | null>(null)
+  const externalLoadVersionRef = useRef(0)
   const [cppCode, setCppCode] = useState("")
   const [copied, setCopied] = useState(false)
   const [mobileTab, setMobileTab] = useState<"blocks" | "cpp">("blocks")
@@ -271,25 +272,20 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
     }
   }, [])
 
-  // Sync genuine external loads (starter/project/lesson changes).
-  // Parent echoes caused by normal Blockly editing are identified by
-  // lastParentXmlRef, so they are never mistaken for external project loads.
+  // Sync genuine external loads (starter/project/lesson/template changes).
+  // Internal Blockly edits are echoed through onXmlChange and match
+  // lastParentXmlRef, so they do not trigger a workspace reset.
   useEffect(() => {
     const workspace = workspaceRef.current
-    if (!workspace || !xml) return
-    if (xml === lastParentXmlRef.current) return
+    if (!workspace || !xml || xml === lastParentXmlRef.current) return
 
     const expectedExternalXml = xml
+    const version = ++externalLoadVersionRef.current
     let timer = 0
 
     const applyExternalXml = () => {
       const activeWorkspace = workspaceRef.current
-      if (!activeWorkspace) return
-
-      // A newer parent value may have arrived while this debounced load waited.
-      if (lastParentXmlRef.current !== null && lastParentXmlRef.current !== expectedExternalXml) {
-        return
-      }
+      if (!activeWorkspace || externalLoadVersionRef.current !== version) return
 
       const isDragging = typeof (activeWorkspace as any).isDragging === "function"
         ? Boolean((activeWorkspace as any).isDragging())
@@ -303,10 +299,10 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
       const currentDom = Blockly.Xml.workspaceToDom(activeWorkspace)
       const currentXml = Blockly.utils.xml.domToText(currentDom)
 
-      // The workspace may have caught up to the external value while React was
-      // waiting. In that case no DOM replacement is necessary.
+      // The workspace already contains the requested external document.
       if (currentXml === expectedExternalXml) {
         lastWorkspaceXmlRef.current = currentXml
+        lastParentXmlRef.current = currentXml
         return
       }
 
@@ -314,13 +310,17 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
         activeWorkspace.clear()
         const dom = Blockly.utils.xml.textToDom(expectedExternalXml)
         Blockly.Xml.domToWorkspace(dom, activeWorkspace)
+
+        // Blockly can emit change events while domToWorkspace hydrates.
+        // Force the refs to the complete external document after hydration
+        // so the parent echo is treated as the same document, not a new load.
         lastWorkspaceXmlRef.current = expectedExternalXml
         lastParentXmlRef.current = expectedExternalXml
         const code = arduino.workspaceToCode(activeWorkspace)
         setCppCode(code)
 
         window.setTimeout(() => {
-          if (workspaceRef.current) {
+          if (workspaceRef.current && externalLoadVersionRef.current === version) {
             Blockly.svgResize(workspaceRef.current)
             if (typeof (workspaceRef.current as any).scrollCenter === "function") {
               (workspaceRef.current as any).scrollCenter()
@@ -328,12 +328,15 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
           }
         }, 80)
       } catch (err) {
-        console.error("Failed to sync XML to workspace:", err)
+        console.error("Failed to sync external Blockly XML:", err)
       }
     }
 
-    timer = window.setTimeout(applyExternalXml, 120)
-    return () => window.clearTimeout(timer)
+    timer = window.setTimeout(applyExternalXml, 0)
+    return () => {
+      window.clearTimeout(timer)
+      externalLoadVersionRef.current += 1
+    }
   }, [xml])
 
   useEffect(() => {
