@@ -1538,12 +1538,41 @@ export function AiStudioPanel({
                         </p>
                       </div>
                     )}
+                    <div className="absolute bottom-3 left-3 right-3 z-30 max-w-2xl rounded-2xl border border-cyan-300/20 bg-slate-950/90 px-4 py-3 shadow-xl backdrop-blur-md">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-[8px] font-mono uppercase tracking-[0.18em] text-cyan-200">LIVE RESULT</p>
+                          <p className="mt-1 truncate text-base font-black text-white sm:text-lg">
+                            {aiState.detectedClass === "none"
+                              ? isSound
+                                ? "Listening…"
+                                : mode === "emotion"
+                                  ? "No face detected"
+                                  : mode === "numbers" || mode === "hands"
+                                    ? "No hand detected"
+                                    : "No object detected"
+                              : mode === "emotion"
+                                ? "Person detected · " + String(aiState.detectedClass).replace(/_/g, " ") + " expression"
+                                : mode === "numbers" || mode === "hands"
+                                  ? String(aiState.fingerCount ?? 0) + " fingers · " + String(aiState.detectedGesture ?? "hand").replace(/_/g, " ")
+                                  : String(aiState.detectedClass).replace(/_/g, " ")}
+                          </p>
+                          <p className="mt-1 text-[9px] leading-4 text-slate-400">
+                            {aiState.detail}
+                          </p>
+                        </div>
+                        <div className="shrink-0 rounded-xl border border-violet-300/20 bg-slate-950 px-3 py-2 text-right">
+                          <p className="text-[8px] font-mono uppercase tracking-[0.14em] text-slate-600">Confidence</p>
+                          <p className="mt-1 text-lg font-black text-violet-200">{aiState.confidence}%</p>
+                        </div>
+                      </div>
+                    </div>
                     <div className="pixiu-ai-preview-chip absolute left-3 top-3 rounded-full border px-2.5 py-1 font-mono text-[9px]">
                       {loading ? "LOADING" : inputActive ? (mode === "trained" ? "MY AI LIVE" : `${activeTitle.toUpperCase()} LIVE`) : "READY"}
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-800 px-3 py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-800 bg-slate-950/60 px-3 py-3">
                     <div>
                       <p className="text-[9px] font-mono uppercase tracking-[0.16em] text-slate-600">{activeTitle}</p>
                       <p className="mt-1 text-sm font-black">{aiState.detectedClass === "none" ? status : aiState.detectedClass}</p>
@@ -1582,6 +1611,25 @@ export function AiStudioPanel({
                 </div>
 
                 <aside className="space-y-3">
+                  <div className="rounded-2xl border border-cyan-300/15 bg-slate-950/55 p-4 shadow-lg">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[8px] font-mono uppercase tracking-[0.18em] text-cyan-200">LIVE RESULT</p>
+                        <p className="mt-1 truncate text-sm font-black text-white">
+                          {aiState.detectedClass === "none"
+                            ? "Waiting for detection"
+                            : mode === "emotion"
+                              ? "Person · " + String(aiState.detectedClass).replace(/_/g, " ") + " expression"
+                              : mode === "numbers" || mode === "hands"
+                                ? String(aiState.fingerCount ?? 0) + " fingers · " + String(aiState.detectedGesture ?? "hand").replace(/_/g, " ")
+                                : String(aiState.detectedClass).replace(/_/g, " ")}
+                        </p>
+                      </div>
+                      <span className="shrink-0 rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 font-mono text-[8px] text-violet-200">{aiState.confidence}%</span>
+                    </div>
+                    <p className="mt-1 text-[9px] leading-4 text-slate-500">{aiState.detail}</p>
+                  </div>
+
                   <div className="rounded-2xl border border-slate-800 bg-slate-950/45 p-4">
                     <p className="text-xs font-black">6B–6G · Ready AI</p>
                     <p className="mt-2 text-[10px] leading-5 text-slate-500">
