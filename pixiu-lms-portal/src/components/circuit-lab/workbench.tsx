@@ -38,8 +38,8 @@ import { WelcomeOverlay } from "./welcome-overlay"
 
 function PixiuModuleLoading({ title, subtitle }: { title: string; subtitle: string }) {
   return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/96 p-6 text-white">
-      <div className="w-full max-w-md rounded-3xl border border-violet-400/20 bg-slate-900/90 p-8 text-center shadow-2xl shadow-violet-950/30">
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/96 p-2 text-white sm:p-3">
+      <div className="flex h-[min(98vh,1080px)] w-[calc(100vw-8px)] max-w-[1800px] items-center justify-center rounded-3xl border border-violet-400/20 bg-slate-900/95 p-8 text-center shadow-2xl shadow-violet-950/30">
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-400/30 bg-violet-500/10 text-violet-300">
           <Sparkles size={24} className="animate-pulse" />
         </div>
@@ -580,16 +580,11 @@ export function Workbench() {
         ? Blockly.utils.xml.domToText(Blockly.Xml.workspaceToDom(liveWorkspace))
         : null
       let workspace: Blockly.Workspace = liveWorkspace ?? new Blockly.Workspace()
-      let ownsWorkspace = !liveWorkspace
+      const ownsWorkspace = !liveWorkspace
 
-      // Use the visible Blockly workspace whenever it is already synchronized.
-      // During template/project hydration, fall back to current React XML instead
-      // of executing a stale or empty hidden workspace.
-      if (!liveWorkspace || liveXml !== blocklyXml) {
-        if (liveWorkspace && liveXml !== blocklyXml) {
-          workspace = new Blockly.Workspace()
-          ownsWorkspace = true
-        }
+      // The mounted Blockly editor is the execution source of truth. React XML
+      // is only the hydration fallback when the editor is not mounted yet.
+      if (!liveWorkspace) {
         const dom = Blockly.utils.xml.textToDom(blocklyXml)
         Blockly.Xml.domToWorkspace(dom, workspace)
       }
@@ -1002,7 +997,11 @@ export function Workbench() {
     const name = requestedName?.trim() || currentProjectName.trim() || "Untitled Circuit"
     setIsSaving(true)
     try {
-      const saved = await saveCircuit(name, state, blocklyXml)
+      const liveWorkspace = visualWorkspaceRef.current
+      const xmlToSave = liveWorkspace
+        ? Blockly.utils.xml.domToText(Blockly.Xml.workspaceToDom(liveWorkspace))
+        : blocklyXml
+      const saved = await saveCircuit(name, state, xmlToSave)
       setCurrentProjectName(saved.name)
       setLastSaved(saved.savedAt)
       setIsDirty(false)
@@ -1032,7 +1031,11 @@ export function Workbench() {
   }, [handleSave, isDirty, storageReady])
 
   const handleExport = useCallback((password?: string) => {
-    void exportAsJSON(currentProjectName, state, blocklyXml, password).catch((error) => {
+    const liveWorkspace = visualWorkspaceRef.current
+    const xmlToExport = liveWorkspace
+      ? Blockly.utils.xml.domToText(Blockly.Xml.workspaceToDom(liveWorkspace))
+      : blocklyXml
+    void exportAsJSON(currentProjectName, state, xmlToExport, password).catch((error) => {
       window.alert(error instanceof Error ? error.message : "Could not export this .pixiu file.")
     })
   }, [blocklyXml, currentProjectName, state])
@@ -1132,18 +1135,8 @@ export function Workbench() {
       setSelectedWireId(null)
       setWiring(null)
       setSerialLines([])
-      // Selecting a template replaces the active program context. Keep the
-      // dedicated Vision Canvas visible for AI templates, but do not request
-      // camera access until the student actually runs the program.
-      const templateUsesAi = Boolean(
-        tmpl.blocklyXml.includes('type="ai_') ||
-        tmpl.blocklyXml.includes("ai_detect_objects") ||
-        tmpl.blocklyXml.includes("ai_is_detected") ||
-        tmpl.blocklyXml.includes("ai_confidence") ||
-        tmpl.blocklyXml.includes("ai_camera_enable") ||
-        tmpl.blocklyXml.includes("ai_microphone_enable"),
-      )
-
+      // Selecting a template replaces the active program context. AI templates
+      // never request camera/microphone access until the student runs the program.
       setIsAiStudioOpen(false)
       setAiRequestedMode(null)
       setAiRuntimeEnabled(false)

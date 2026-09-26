@@ -9,6 +9,8 @@ import {
   normalizeAiVisionState,
 } from "../pixiu-lms-portal/src/lib/ai/ai-result-normalizer.ts"
 import { createAiVisionState } from "../pixiu-lms-portal/src/lib/ai/vision-state.ts"
+import { countExtendedFingers } from "../pixiu-lms-portal/src/lib/ai/hand-detector.ts"
+import { classifyExpression } from "../pixiu-lms-portal/src/lib/ai/face-detector.ts
 
 const root = fileURLToPath(new URL("..", import.meta.url))
 const read = (relativePath) =>
@@ -44,6 +46,38 @@ function expectDecision(candidate, confidence, expected) {
   assert(actual.lowConfidence === expected.lowConfidence, "normalize low confidence: " + candidate)
   assert(actual.reason === expected.reason, "normalize reason: " + candidate)
 }
+
+// 6D/6G executable hand regression.
+const handPoints = Array.from({ length: 21 }, () => ({ x: 0, y: 0, z: 0 }))
+handPoints[0] = { x: 0, y: 0, z: 0 }
+handPoints[1] = { x: 8, y: -4, z: 0 }
+handPoints[2] = { x: 15, y: -8, z: 0 }
+handPoints[3] = { x: 30, y: -10, z: 0 }
+handPoints[4] = { x: 45, y: -12, z: 0 }
+for (const [mcp, pip, dip, tip, x] of [
+  [5, 6, 7, 8, 20],
+  [9, 10, 11, 12, 30],
+  [13, 14, 15, 16, 40],
+  [17, 18, 19, 20, 50],
+]) {
+  handPoints[mcp] = { x, y: 0, z: 0 }
+  handPoints[pip] = { x, y: -20, z: 0 }
+  handPoints[dip] = { x, y: -40, z: 0 }
+  handPoints[tip] = { x, y: -60, z: 0 }
+}
+assert(countExtendedFingers(handPoints) === 5, "extended five-finger pose must count as 5")
+
+// 6E executable expression regression.
+const happyFace = Array.from({ length: 478 }, () => ({ x: 0, y: 0, z: 0 }))
+happyFace[61] = { x: 20, y: 50, z: 0 }
+happyFace[291] = { x: 80, y: 50, z: 0 }
+happyFace[13] = { x: 50, y: 47, z: 0 }
+happyFace[14] = { x: 50, y: 53, z: 0 }
+happyFace[159] = { x: 45, y: 40, z: 0 }
+happyFace[145] = { x: 45, y: 45, z: 0 }
+happyFace[386] = { x: 55, y: 40, z: 0 }
+happyFace[374] = { x: 55, y: 45, z: 0 }
+assert(classifyExpression(happyFace, [0, 0, 100, 100]).emotion === "happy", "happy facial geometry regression")
 
 // 6J/6K executable normalization checks.
 expectDecision("none", 0, {

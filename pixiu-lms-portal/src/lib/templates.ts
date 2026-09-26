@@ -358,7 +358,14 @@ const EXTRA_TEMPLATES: ProjectTemplate[] = [
     ["Place Arduino and the RGB LED.","Connect the three colour channels to PWM pins.","Change the three output values to create new colours."]),
   starter("g6-buzzer-doorbell", "Smart Doorbell", "Use a pushbutton input and buzzer output for a simple doorbell.", 6, "Digital Inputs + Outputs", "Beginner", ["Pushbutton", "Buzzer", "Digital I/O"],
     { parts: [part("uno","arduino-uno",60,110),part("btn","pushbutton",340,90),part("bz","buzzer",520,160)], wires: [wire("a","uno","d2","btn","p1a"),wire("b","btn","p2a","uno","5v","#ef4444"),wire("c","uno","d8","bz","pos","#facc15"),wire("d","bz","neg","uno","gnd","#1e293b")] },
-    program([pinMode("2","INPUT"),pinMode("8","OUTPUT")],[digitalWrite("8","HIGH"),delay(250),digitalWrite("8","LOW"),delay(750)]),
+    program([pinMode("2","INPUT"),pinMode("8","OUTPUT")],[
+      ifElseBlock(
+        sensorBlock("pushbutton_read", "btn"),
+        [digitalWrite("8","HIGH"), delay(250), digitalWrite("8","LOW")],
+        [digitalWrite("8","LOW")],
+      ),
+      delay(50),
+    ]),
     ["Place the button, buzzer and Arduino.","Wire the button as the input and buzzer to D8.","Run the circuit and experiment with the timing."]),
   starter("g6-seven-segment", "7-Segment Number Display", "Light a seven-segment display using Arduino digital outputs.", 6, "Displays", "Intermediate", ["7-Segment", "GPIO", "Numbers"],
     { parts: [part("uno","arduino-uno",60,110),part("seg","seven-segment",400,90)], wires: [wire("a","uno","d3","seg","a","#ef4444"),wire("b","uno","d4","seg","b","#f97316"),wire("c","uno","d5","seg","c","#eab308"),wire("d","uno","d6","seg","d","#22c55e"),wire("e","uno","gnd","seg","com","#1e293b")] },

@@ -27,7 +27,7 @@ export type FaceDetector = {
   dispose: () => void
 }
 
-const FACE_VERSION = "1.1.0"
+const FACE_VERSION = "1.1.1"
 const MAX_FACES = 1
 // MediaPipe FaceMesh returns 478 keypoints in the TFJS adapter.
 const MIN_FACE_SCORE = 0.25
@@ -275,8 +275,12 @@ export async function loadFaceDetector(): Promise<FaceDetector> {
           const box = toBox(face?.box)
           const expression = classifyExpression(mesh, box)
 
+          const faceScore = Number.isFinite(Number(face?.score))
+            ? Number(face.score)
+            : 1
+
           return {
-            score: Number(face?.score ?? 0),
+            score: faceScore,
             box,
             expression: expression.emotion,
             expressionScore: expression.score,

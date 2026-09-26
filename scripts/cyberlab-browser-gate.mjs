@@ -57,6 +57,14 @@ try {
   await page.getByRole("button", { name: "Start camera" }).click()
   await page.getByText("6C Pose ready", { exact: true }).waitFor()
 
+  await page.getByText("Fingers", { exact: true }).click()
+  await page.getByRole("button", { name: "Start camera" }).click()
+  await page.getByText("6D Fingers ready", { exact: true }).waitFor()
+
+  await page.getByText("Emotion", { exact: true }).click()
+  await page.getByRole("button", { name: "Start camera" }).click()
+  await page.getByText("6E Emotion ready", { exact: true }).waitFor()
+
   // Separate portal AI Studio route.
   await page.goto(baseUrl + "/ai-studio", { waitUntil: "networkidle" })
   if (!(await page.title()).includes("PIXIU AI STUDIO")) throw new Error("Standalone AI Studio route did not load")

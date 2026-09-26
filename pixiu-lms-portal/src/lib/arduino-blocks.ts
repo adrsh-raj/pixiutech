@@ -834,38 +834,46 @@ arduino.forBlock['serial_println'] = (block, gen) => {
   return 'Serial.println(' + text + ');\n'
 }
 
-arduino.forBlock['text_string'] = (block) => ['"' + block.getFieldValue('TEXT') + '"', ORDER.ATOMIC]
+arduino.forBlock['text_string'] = (block) => [
+  JSON.stringify(String(block.getFieldValue('TEXT') ?? '')),
+  ORDER.ATOMIC,
+]
 
-arduino.forBlock['lcd_print'] = (block, gen) => {
-  const text = gen.valueToCode(block, 'TEXT', ORDER.NONE) || '""'
-  return 'lcd.print(' + text + ');\n'
-}
+arduino.forBlock['lcd_print'] = () =>
+  '/* PIXIU simulated LCD print: runtime-only in CyberLab. */\\n'
 
-arduino.forBlock['lcd_set_cursor'] = (block) => {
-  return 'lcd.setCursor(' + block.getFieldValue('COL') + ', ' + block.getFieldValue('ROW') + ');\n'
-}
+arduino.forBlock['lcd_set_cursor'] = () =>
+  '/* PIXIU simulated LCD cursor: runtime-only in CyberLab. */\\n'
 
-arduino.forBlock['lcd_clear'] = () => 'lcd.clear();\n'
+arduino.forBlock['lcd_clear'] = () =>
+  '/* PIXIU simulated LCD clear: runtime-only in CyberLab. */\\n'
 
-arduino.forBlock['ir_read'] = (block) => ['digitalRead(' + block.getFieldValue('SENSOR') + ')', ORDER.ATOMIC]
-arduino.forBlock['dht_temperature'] = (block, generator) => {
-  const sensor = block.getFieldValue('SENSOR') || 'dht'
-  ;(generator as ArduinoGen).definitions_[`dht_${sensor}`] = `// Add DHT11 setup for ${sensor} before uploading.\\n`
-  return [`dht_${sensor}.readTemperature()`, ORDER.ATOMIC]
-}
-arduino.forBlock['dht_humidity'] = (block) => [`dht_${block.getFieldValue('SENSOR') || 'dht'}.readHumidity()`, ORDER.ATOMIC]
+arduino.forBlock['ir_read' = (block) => ['digitalRead(' + block.getFieldValue('SENSOR') + ')', ORDER.ATOMIC]
+arduino.forBlock['dht_temperature'] = (block) => [
+  '0 /* PIXIU simulated DHT11 temperature: ' + String(block.getFieldValue('SENSOR') || 'dht') + ' */',
+  ORDER.ATOMIC,
+]
+arduino.forBlock['dht_humidity'] = (block) => [
+  '0 /* PIXIU simulated DHT11 humidity: ' + String(block.getFieldValue('SENSOR') || 'dht') + ' */',
+  ORDER.ATOMIC,
+]
 arduino.forBlock['joystick_x'] = (block) => [`analogRead(${block.getFieldValue('SENSOR') || 'A0'})`, ORDER.ATOMIC]
 arduino.forBlock['joystick_y'] = (block) => [`analogRead(${block.getFieldValue('SENSOR') || 'A1'})`, ORDER.ATOMIC]
 arduino.forBlock['joystick_button'] = (block) => [`digitalRead(${block.getFieldValue('SENSOR') || '2'})`, ORDER.ATOMIC]
 arduino.forBlock['soil_moisture_read'] = (block) => [`analogRead(${block.getFieldValue('SENSOR') || 'A0'})`, ORDER.ATOMIC]
-arduino.forBlock['encoder_read'] = (block) => [`readEncoder("${block.getFieldValue('SENSOR') || ''}")`, ORDER.ATOMIC]
-arduino.forBlock['keypad_read'] = (block) => [`readKeypad("${block.getFieldValue('SENSOR') || ''}")`, ORDER.ATOMIC]
-arduino.forBlock['oled_print'] = (block, generator) => {
-  const text = generator.valueToCode(block, 'TEXT', ORDER.NONE) || '""'
-  return 'oled.print(' + text + ');\\n'
-}
-arduino.forBlock['oled_clear'] = () => 'oled.clearDisplay(); oled.display();\\n'
-arduino.forBlock['motor_driver_write'] = (block, generator) => {
+arduino.forBlock['encoder_read'] = (block) => [
+  '0 /* PIXIU simulated rotary encoder: ' + String(block.getFieldValue('SENSOR') || '') + ' */',
+  ORDER.ATOMIC,
+]
+arduino.forBlock['keypad_read'] = (block) => [
+  '"" /* PIXIU simulated keypad: ' + String(block.getFieldValue('SENSOR') || '') + ' */',
+  ORDER.ATOMIC,
+]
+arduino.forBlock['oled_print'] = () =>
+  '/* PIXIU simulated OLED print: runtime-only in CyberLab. */\\n'
+arduino.forBlock['oled_clear'] = () =>
+  '/* PIXIU simulated OLED clear: runtime-only in CyberLab. */\\n'
+arduino.forBlock['motor_driver_write' = (block, generator) => {
   const channel = block.getFieldValue('CHANNEL') || 'A'
   const speed = generator.valueToCode(block, 'SPEED', ORDER.NONE) || '0'
   const direction = block.getFieldValue('DIRECTION') || 'STOP'
@@ -892,11 +900,14 @@ arduino.forBlock['arduino_map'] = (block, generator) => {
   return ['map(' + value + ', ' + fromLow + ', ' + fromHigh + ', ' + toLow + ', ' + toHigh + ')', ORDER.ATOMIC]
 }
 
-arduino.forBlock['ultrasonic_read'] = (block) => {
-  const trig = block.getFieldValue('TRIG')
-  const echo = block.getFieldValue('ECHO')
-  return ['readUltrasonic(' + trig + ', ' + echo + ')', ORDER.ATOMIC]
-}
+arduino.forBlock['ultrasonic_read'] = (block) => [
+  '0 /* PIXIU simulated ultrasonic distance: D' +
+    String(block.getFieldValue('TRIG') || '?') +
+    '/D' +
+    String(block.getFieldValue('ECHO') || '?') +
+    ' */',
+  ORDER.ATOMIC,
+]
 
 /* Browser AI generators -------------------------------------------------
  * PIXIU AI inference lives in the browser runtime. Arduino C++ generation is

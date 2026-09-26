@@ -60,6 +60,11 @@ export function AiCameraPanel({
   const modelRef = useRef<cocoSsd.ObjectDetection | null>(null)
   const animFrameRef = useRef<number | null>(null)
   const manualOverrideRef = useRef<boolean>(false)
+  const aiStateRef = useRef(aiState)
+
+  useEffect(() => {
+    aiStateRef.current = aiState
+  }, [aiState])
 
   // 1. Load COCO-SSD Neural Network Model
   useEffect(() => {
@@ -79,11 +84,20 @@ export function AiCameraPanel({
       })
       .catch((err) => {
         console.warn("Failed to load COCO-SSD model:", err)
-        if (isMounted) setModelLoading(false)
+        if (isMounted) {
+          setCameraError("PIXIU Vision model could not be loaded. Stop and start AI Vision again.")
+          setModelLoading(false)
+        }
       })
 
     return () => {
       isMounted = false
+      if (modelRef.current) {
+        modelRef.current.dispose()
+        modelRef.current = null
+      }
+      setModelLoaded(false)
+      setModelLoading(false)
     }
   }, [isOpen])
 
@@ -103,7 +117,10 @@ export function AiCameraPanel({
     }
 
     const ctx = canvas.getContext("2d")
-    if (!ctx) return
+    if (!ctx) {
+      animFrameRef.current = requestAnimationFrame(detectFrame)
+      return
+    }
 
     // Ensure canvas dimensions match video
     if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
@@ -156,7 +173,7 @@ export function AiCameraPanel({
           const mappedClass = String(primary.class).trim().toLowerCase()
 
           onAiStateChange({
-            ...aiState,
+            ...aiStateRef.current,
             enabled: true,
             mode: "objects",
             detectedClass: mappedClass,
@@ -180,7 +197,7 @@ export function AiCameraPanel({
         // No objects detected
         if (!manualOverrideRef.current) {
           onAiStateChange({
-            ...aiState,
+            ...aiStateRef.current,
             enabled: true,
             mode: "objects",
             detectedClass: "none",

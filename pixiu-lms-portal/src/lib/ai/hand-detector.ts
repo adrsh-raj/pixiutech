@@ -26,7 +26,7 @@ export type HandDetector = {
   dispose: () => void
 }
 
-const HAND_VERSION = "2.1.1"
+const HAND_VERSION = "2.1.2"
 const MAX_HANDS = 2
 const MIN_HAND_SCORE = 0.35
 const HAND_RUNTIME_SOURCES = [
@@ -109,7 +109,7 @@ async function ensureRuntime() {
   window.tf = tf
   await tf.ready()
 
-  if (!tf.getBackend()) {
+  if (tf.getBackend() !== "webgl") {
     try {
       await tf.setBackend("webgl")
       await tf.ready()
@@ -182,9 +182,9 @@ function fingerExtended(points: HandPoint[], mcp: number, pip: number, dip: numb
 
   // MediaPipe landmarks move significantly with camera distance and hand pose.
   // Use ratios/angles instead of the previous hard absolute extension threshold.
-  return pipAngle > 145 &&
-    tipDistance > pipDistance * 1.04 &&
-    tipDistance > mcpDistance * 1.12
+  return pipAngle > 140 &&
+    tipDistance > pipDistance * 1.01 &&
+    tipDistance > mcpDistance * 1.04
 }
 
 function thumbExtended(points: HandPoint[]) {
@@ -197,8 +197,8 @@ function thumbExtended(points: HandPoint[]) {
   const lateralDistance = distance(tip, indexMcp)
 
   return ipAngle > 135 &&
-    tipDistance > ipDistance * 1.04 &&
-    lateralDistance > distance(ip, indexMcp) * 1.02
+    tipDistance > ipDistance * 1.02 &&
+    lateralDistance >= distance(ip, indexMcp)
 }
 
 export function getExtendedFingerMask(points: HandPoint[]): FingerMask {

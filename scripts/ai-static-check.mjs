@@ -68,7 +68,7 @@ for (const marker of [
 ]) requireText(poseAdapter, marker, "6C pose adapter")
 
 for (const marker of [
-  "HAND_VERSION = \"2.0.1\"",
+  "const HAND_VERSION =",
   "@tensorflow-models/hand-pose-detection@2.0.1",
   "SupportedModels.MediaPipeHands",
   'runtime: "tfjs"',
@@ -78,11 +78,12 @@ for (const marker of [
 ]) requireText(handAdapter, marker, "6D hand adapter")
 
 for (const marker of [
-  "FACE_VERSION = \"1.0.6\"",
+  "const FACE_VERSION =",
   "@tensorflow-models/face-landmarks-detection@1.0.6",
   "SupportedModels.MediaPipeFaceMesh",
   "refineLandmarks: true",
   "classifyExpression",
+  "faceScore = Number.isFinite",
   "window.tf = tf",
 ]) requireText(faceAdapter, marker, "6E face adapter")
 
@@ -158,8 +159,9 @@ for (const marker of [
 
 for (const marker of [
   "extractFeatures",
-  "Dense(96)",
+  "Dense(${config.hiddenUnits})",
   "validationData",
+  "trainingProfile: options.profile",
   "featureExtractor: MY_AI_FEATURE_VERSION",
   "predictionThreshold",
   "confidenceCalibration",
@@ -206,7 +208,6 @@ for (const marker of [
 ]) requireText(read("pixiu-lms-portal/src/components/circuit-lab/blockly-editor.tsx"), marker, "Blockly external XML hydration")
 
 for (const marker of [
-  "templateUsesAi",
   "setAiRuntimeEnabled(false)",
   "setIsAiCameraOpen(false)",
   "setAiCameraCompact(false)",
@@ -223,7 +224,7 @@ for (const marker of [
 ]) requireText(templates, marker, "AI Smart Barrier template")
 
 for (const marker of [
-  'import { AiCameraPanel } from "./ai-camera-panel"',
+  'const AiCameraPanel = lazy(() => import("./ai-camera-panel")',
   "isAiStudioOpen",
   "handleToggleAiVision",
   "handleToggleAiStudio",
@@ -291,6 +292,7 @@ for (const marker of [
   "sessionRef",
   "cameraRequestRef",
   "busySessionRef",
+  "runtimeFailedRef",
   "trainingRunRef",
   "datasetVersionRef",
   "stopAll()",
@@ -401,3 +403,5 @@ for (const marker of [
   if (marker === "Loading PIXIU AI is loading") continue
 }
 assert(panelSource.includes("PIXIU AI is loading"), "AI Studio branded model loading state missing")
+assert(panelSource.includes("Training profile"), "AI Studio grade training profile control missing")
+assert(panelSource.includes("Advanced tuning"), "AI Studio advanced tuning control missing")

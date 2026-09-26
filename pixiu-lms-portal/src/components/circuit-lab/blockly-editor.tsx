@@ -470,7 +470,7 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
         <div className="border-t border-slate-800 p-3 bg-slate-900/50 flex items-center justify-between text-[11px] text-slate-400">
           <div className="flex items-center gap-1.5">
             <Terminal size={13} className="text-cyan-400" />
-            <span>Target: Arduino Uno (ATmega328P @ 16 MHz)</span>
+            <span>Target: Arduino UNO R4 Minima · RA4M1 · 48 MHz</span>
           </div>
           <span className="text-emerald-400 font-bold">Generated from Blockly</span>
         </div>

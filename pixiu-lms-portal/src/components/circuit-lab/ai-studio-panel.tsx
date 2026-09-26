@@ -436,6 +436,7 @@ export function AiStudioPanel({
   const dragRef = useRef<{ pointerId: number; offsetX: number; offsetY: number } | null>(null)
   const trainingRunRef = useRef(0)
   const datasetVersionRef = useRef(0)
+  const runtimeFailedRef = useRef(false)
   const [floatingPosition, setFloatingPosition] = useState<{ left: number; top: number } | null>(null)
 
   const classes = useMemo(() => getAiClasses(store), [store])
@@ -462,6 +463,7 @@ export function AiStudioPanel({
       return
     }
     setTab("try")
+    runtimeFailedRef.current = false
     setStore(loadAiStudioStore())
     setLoading(false)
     setError(null)
@@ -496,6 +498,7 @@ export function AiStudioPanel({
 
   useEffect(() => {
     if (runtimeEnabled) {
+      if (runtimeFailedRef.current) return
       if (mode === "sound") {
         if (!soundActive) void startSound()
         return
@@ -522,6 +525,7 @@ export function AiStudioPanel({
 
   useEffect(() => {
     if (!store.model) {
+      disposeActiveAiModel()
       setModel(null)
       return
     }
@@ -671,6 +675,7 @@ export function AiStudioPanel({
   }
 
   function stopAll() {
+    runtimeFailedRef.current = false
     cameraRequestRef.current += 1
     stopInference()
     releaseCurrentResource()
@@ -815,6 +820,12 @@ export function AiStudioPanel({
       if (mode !== "sound") startInferenceLoop(activeSession)
     } catch (resourceError) {
       if (activeSession !== sessionRef.current) return
+      runtimeFailedRef.current = true
+      if (mode !== "sound") {
+        stopCameraStream()
+        setCameraActive(false)
+      }
+      releaseCurrentResource()
       setLoading(false)
       setError(
         resourceError instanceof Error
@@ -874,6 +885,14 @@ export function AiStudioPanel({
       }
     } catch (soundError) {
       if (activeSession !== sessionRef.current) return
+      runtimeFailedRef.current = true
+      const failedResource = resourceRef.current
+      const failedResourceMode = resourceModeRef.current
+      resourceRef.current = null
+      resourceModeRef.current = null
+      if (failedResource && failedResourceMode === "sound") {
+        await stopSoundRecognizer(failedResource as SoundRecognizer)
+      }
       setLoading(false)
       setSoundActive(false)
       setError(
@@ -890,10 +909,11 @@ export function AiStudioPanel({
 
   function startInferenceLoop(activeSession: number) {
     const tick = async () => {
+      if (activeSession !== sessionRef.current) return
+
       if (
         !streamRef.current ||
         !getActiveVideo() ||
-        activeSession !== sessionRef.current ||
         !resourceRef.current ||
         busyRef.current
       ) {
@@ -1130,12 +1150,14 @@ export function AiStudioPanel({
   }
 
   function stopInput() {
+    runtimeFailedRef.current = false
     cameraRequestRef.current += 1
     stopInference()
     releaseCurrentResource()
     stopCameraStream()
     setCameraActive(false)
     setSoundActive(false)
+    setLoading(false)
     onAiStateChange(createAiVisionState(mode))
     setStatus("AI stopped")
   }
@@ -1395,7 +1417,7 @@ export function AiStudioPanel({
 
   return (
     <div className="pixiu-ai-shell fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/80 p-3 backdrop-blur-sm sm:p-5">
-      <div className="pixiu-ai-window flex h-[min(96vh,980px)] w-[calc(100vw-24px)] max-w-[1580px] flex-col overflow-hidden rounded-3xl border bg-[#07111f] text-white shadow-2xl shadow-black/60">
+      <div className="pixiu-ai-window flex h-[min(98vh,1080px)] w-[calc(100vw-8px)] max-w-[1800px] flex-col overflow-hidden rounded-3xl border bg-[#07111f] text-white shadow-2xl shadow-black/60">
         <header className="pixiu-ai-header flex shrink-0 items-center justify-between border-b bg-slate-950/70 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-3">
             <div className="pixiu-ai-mark grid h-9 w-9 place-items-center rounded-xl text-violet-300">
@@ -1450,7 +1472,7 @@ export function AiStudioPanel({
 
         <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
           {tab === "try" && (
-            <div className="mx-auto max-w-5xl space-y-4">
+            <div className="mx-auto max-w-none space-y-4">
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-7">
                 {MODES.map((item) => (
                   <button key={item.id} onClick={() => selectMode(item.id)} className={`pixiu-ai-mode-card rounded-2xl border p-3 text-left ${mode === item.id ? "pixiu-ai-mode-selected" : "border-slate-800 bg-slate-950/40"}`}>
@@ -1464,9 +1486,9 @@ export function AiStudioPanel({
                 </button>
               </div>
 
-              <div className="grid gap-4 lg:grid-cols-[1.4fr_0.8fr]">
+              <div className="grid gap-4 lg:grid-cols-[1.55fr_0.85fr] xl:grid-cols-[1.6fr_0.8fr]">
                 <div className="pixiu-ai-preview overflow-hidden rounded-3xl border bg-black">
-                  <div className="relative aspect-video min-h-[52vh] lg:min-h-[62vh]">
+                  <div className="relative aspect-video min-h-[56vh] lg:min-h-[66vh] xl:min-h-[68vh]">
                 {loading && (
                   <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/92 backdrop-blur-sm">
                     <div className="max-w-md px-6 text-center">
@@ -1948,7 +1970,7 @@ export function AiStudioPanel({
                     {store.model?.architecture ?? "Train My AI to create a local classifier head."}
                   </p>
                   {store.model && (
-                    <div className="mt-3 grid grid-cols-2 gap-2">
+                    <div className="mt-3 grid gap-2 sm:grid-cols-3">
                       <div className="rounded-xl border border-slate-800 bg-slate-950 p-3">
                         <p className="text-[8px] font-mono uppercase tracking-[0.14em] text-slate-600">Extractor</p>
                         <p className="mt-1 text-[10px] font-black">{store.model.featureExtractor}</p>
@@ -1956,6 +1978,14 @@ export function AiStudioPanel({
                       <div className="rounded-xl border border-slate-800 bg-slate-950 p-3">
                         <p className="text-[8px] font-mono uppercase tracking-[0.14em] text-slate-600">Validation</p>
                         <p className="mt-1 text-[10px] font-black">{store.model.validationAccuracy}%</p>
+                      </div>
+                      <div className="rounded-xl border border-slate-800 bg-slate-950 p-3">
+                        <p className="text-[8px] font-mono uppercase tracking-[0.14em] text-slate-600">Training profile</p>
+                        <p className="mt-1 text-[10px] font-black">
+                          {store.model.trainingProfile === "custom"
+                            ? "Custom tuning"
+                            : String(store.model.trainingProfile ?? "grade6").replace("grade", "Grade ")}
+                        </p>
                       </div>
                     </div>
                   )}

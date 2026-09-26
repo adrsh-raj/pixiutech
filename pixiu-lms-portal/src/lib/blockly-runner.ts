@@ -534,13 +534,13 @@ async function executeSingleBlock(block: Blockly.Block, env: ExecutionEnvironmen
       const condition = block.getInputTargetBlock("BOOL")
       const branch = block.getInputTargetBlock("DO")
       let guard = 0
+
       while (!signal.aborted && env.isRunning() && guard++ < 10000) {
         const value = evaluateBoolean(condition, env)
-        if (until ? value : !value) {
-          await executeStatement(branch, env, signal)
-        } else {
-          break
-        }
+        const shouldContinue = until ? !value : value
+        if (!shouldContinue) break
+        await executeStatement(branch, env, signal)
+        if (guard % 50 === 0) await env.sleep(0)
       }
       break
     }

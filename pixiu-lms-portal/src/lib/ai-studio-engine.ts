@@ -499,6 +499,12 @@ export function getModelWeightPreview(model: tf.LayersModel | null): number[][] 
 
 type TrainOptions = {
   epochs?: number
+  hiddenLayers?: 1 | 2
+  hiddenUnits?: number
+  dropoutRate?: number
+  learningRate?: number
+  batchSize?: number
+  profile?: AiTrainingProfile
   onEpoch?: (
     epoch: number,
     total: number,
