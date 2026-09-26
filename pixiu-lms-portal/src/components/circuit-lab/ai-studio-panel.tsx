@@ -384,15 +384,6 @@ function drawFaces(
 
 
 function metricValues(points: AiTrainingHistoryPoint[], key: "loss"|"valLoss"|"accuracy"|"valAccuracy") {
-  return points.map(point=>point[key]).filter((value): value is number => typeof value==="number"&&Number.isFinite(value))
-}
-function metricPath(points: AiTrainingHistoryPoint[], key: "loss"|"valLoss"|"accuracy"|"valAccuracy") {
-  const values=metricValues(points,key); if(!values.length)return ""
-  const min=Math.min(...values),max=Math.max(...values),range=Math.max(0.0001,max-min),px=30,py=18,width=520,height=180
-  const plotted=points.map((point,index)=>{const value=point[key];if(typeof value!=="number"||!Number.isFinite(value))return null;const x=px+index/Math.max(1,points.length-1)*(width-px*2);const y=height-py-((value-min)/range)*(height-py*2);return x.toFixed(1)+","+y.toFixed(1)}).filter((value): value is string=>Boolean(value))
-  return plotted.length>1?"M "+plotted.join(" L "):plotted.length===1?"M "+plotted[0]:""
-}
-function metricValues(points: AiTrainingHistoryPoint[], key: "loss"|"valLoss"|"accuracy"|"valAccuracy") {
   return points.map((point) => point[key]).filter((value): value is number => typeof value === "number" && Number.isFinite(value))
 }
 function metricPath(points: AiTrainingHistoryPoint[], key: "loss"|"valLoss"|"accuracy"|"valAccuracy") {
@@ -2259,3 +2250,4 @@ export function AiStudioPanel({
     </div>
   )
 }
+
