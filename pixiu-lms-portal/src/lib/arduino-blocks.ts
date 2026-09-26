@@ -848,7 +848,7 @@ arduino.forBlock['lcd_set_cursor'] = () =>
 arduino.forBlock['lcd_clear'] = () =>
   '/* PIXIU simulated LCD clear: runtime-only in CyberLab. */\\n'
 
-arduino.forBlock['ir_read' = (block) => ['digitalRead(' + block.getFieldValue('SENSOR') + ')', ORDER.ATOMIC]
+arduino.forBlock['ir_read'] = (block) => ['digitalRead(' + block.getFieldValue('SENSOR') + ')', ORDER.ATOMIC]
 arduino.forBlock['dht_temperature'] = (block) => [
   '0 /* PIXIU simulated DHT11 temperature: ' + String(block.getFieldValue('SENSOR') || 'dht') + ' */',
   ORDER.ATOMIC,
@@ -873,7 +873,7 @@ arduino.forBlock['oled_print'] = () =>
   '/* PIXIU simulated OLED print: runtime-only in CyberLab. */\\n'
 arduino.forBlock['oled_clear'] = () =>
   '/* PIXIU simulated OLED clear: runtime-only in CyberLab. */\\n'
-arduino.forBlock['motor_driver_write' = (block, generator) => {
+arduino.forBlock['motor_driver_write'] = (block, generator) => {
   const channel = block.getFieldValue('CHANNEL') || 'A'
   const speed = generator.valueToCode(block, 'SPEED', ORDER.NONE) || '0'
   const direction = block.getFieldValue('DIRECTION') || 'STOP'
