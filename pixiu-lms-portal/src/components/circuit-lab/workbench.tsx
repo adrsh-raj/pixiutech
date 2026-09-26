@@ -63,6 +63,7 @@ export function Workbench() {
     pinStatesRef.current = pinStates
   }, [pinStates])
   const [blocklyXml, setBlocklyXml] = useState<string>(DEFAULT_XML)
+  const [blocklyDocumentVersion, setBlocklyDocumentVersion] = useState(0)
   const [serialLines, setSerialLines] = useState<SerialLine[]>([])
   const [isSerialOpen, setIsSerialOpen] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
@@ -125,6 +126,7 @@ export function Workbench() {
         if (saved) {
           setHistory(createHistory(saved.state))
           setBlocklyXml(saved.blocklyXml || DEFAULT_XML)
+          setBlocklyDocumentVersion((value) => value + 1)
           setCurrentProjectName(saved.name === "default" ? "Untitled Circuit" : saved.name)
           setLastSaved(saved.savedAt)
         }
@@ -826,6 +828,7 @@ export function Workbench() {
     setPressed(new Set())
     setSerialLines([])
     setBlocklyXml(DEFAULT_XML)
+    setBlocklyDocumentVersion((value) => value + 1)
     stopAiRuntime()
     setProbeRed(null)
     setProbeBlack(null)
@@ -1017,6 +1020,7 @@ export function Workbench() {
     const saved = await saveCircuit(imported.name, imported.state, imported.blocklyXml || DEFAULT_XML)
     setHistory(createHistory(saved.state))
     setBlocklyXml(saved.blocklyXml || DEFAULT_XML)
+    setBlocklyDocumentVersion((value) => value + 1)
     setCurrentProjectName(saved.name)
     setSelectedId(null)
     setSelectedWireId(null)
@@ -1034,6 +1038,7 @@ export function Workbench() {
     await saveCurrentCircuit(project)
     setHistory(createHistory(project.state))
     setBlocklyXml(project.blocklyXml || DEFAULT_XML)
+    setBlocklyDocumentVersion((value) => value + 1)
     setCurrentProjectName(project.name)
     setSelectedId(null)
     setSelectedWireId(null)
@@ -1051,6 +1056,7 @@ export function Workbench() {
     await clearCurrentCircuit()
     setHistory(createHistory(INITIAL_STATE))
     setBlocklyXml(DEFAULT_XML)
+    setBlocklyDocumentVersion((value) => value + 1)
     setCurrentProjectName("Untitled Circuit")
     setLastSaved(null)
     setIsDirty(false)
@@ -1073,6 +1079,7 @@ export function Workbench() {
       stopProgram()
       updateState(() => seed.state)
       setBlocklyXml(seed.blocklyXml)
+      setBlocklyDocumentVersion((value) => value + 1)
       setCurrentProjectName(`Mission · ${lesson.shortTitle}`)
       setLastSaved(null)
       setRunTime(0)
@@ -1095,6 +1102,7 @@ export function Workbench() {
       updateState(() => tmpl.circuit)
       setActiveLessonId(null)
       setBlocklyXml(tmpl.blocklyXml)
+      setBlocklyDocumentVersion((value) => value + 1)
       if (storageReady) setIsDirty(true)
       setSelectedId(null)
       setSelectedWireId(null)
@@ -1228,6 +1236,7 @@ export function Workbench() {
       {/* Blockly Code View (Kept mounted to preserve workspace & block highlights) */}
       <div className={view === "code" ? "flex-1 min-h-0 w-full overflow-hidden" : "hidden"}>
         <BlocklyEditor
+          key={blocklyDocumentVersion}
           circuit={state}
           xml={blocklyXml}
           onXmlChange={(xml) => {

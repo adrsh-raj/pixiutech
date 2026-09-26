@@ -249,8 +249,7 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
         // This XML was authored by the live Blockly workspace. Do not let the
         // parent prop immediately rehydrate the workspace while a drag/drop is
         // in progress; that causes blocks to appear "stuck" to the cursor.
-        if (onXmlChange && pendingExternalXmlRef.current !== text) {
-          pendingExternalXmlRef.current = null
+        if (onXmlChange && !pendingExternalXmlRef.current) {
           onXmlChange(text)
         }
       } catch (err) {
@@ -273,15 +272,15 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
   }, [])
 
   // Sync genuine external loads (starter/project/lesson/template changes).
-  // Internal Blockly edits are echoed through onXmlChange and match
-  // lastParentXmlRef, so they do not trigger a workspace reset.
+  // Internal Blockly edits are echoed through onXmlChange and are never
+  // mistaken for external loads.
   useEffect(() => {
     const workspace = workspaceRef.current
     if (!workspace || !xml || xml === lastParentXmlRef.current) return
 
     const expectedExternalXml = xml
     const version = ++externalLoadVersionRef.current
-    let timer = 0
+    pendingExternalXmlRef.current = expectedExternalXml
 
     const applyExternalXml = () => {
       const activeWorkspace = workspaceRef.current
@@ -296,13 +295,11 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
         return
       }
 
-      const currentDom = Blockly.Xml.workspaceToDom(activeWorkspace)
-      const currentXml = Blockly.utils.xml.domToText(currentDom)
-
-      // The workspace already contains the requested external document.
+      const currentXml = Blockly.utils.xml.domToText(Blockly.Xml.workspaceToDom(activeWorkspace))
       if (currentXml === expectedExternalXml) {
         lastWorkspaceXmlRef.current = currentXml
         lastParentXmlRef.current = currentXml
+        pendingExternalXmlRef.current = null
         return
       }
 
@@ -311,13 +308,12 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
         const dom = Blockly.utils.xml.textToDom(expectedExternalXml)
         Blockly.Xml.domToWorkspace(dom, activeWorkspace)
 
-        // Blockly can emit change events while domToWorkspace hydrates.
-        // Force the refs to the complete external document after hydration
-        // so the parent echo is treated as the same document, not a new load.
         lastWorkspaceXmlRef.current = expectedExternalXml
         lastParentXmlRef.current = expectedExternalXml
-        const code = arduino.workspaceToCode(activeWorkspace)
-        setCppCode(code)
+        pendingExternalXmlRef.current = null
+
+        setCppCode(arduino.workspaceToCode(activeWorkspace))
+        onXmlChange?.(expectedExternalXml)
 
         window.setTimeout(() => {
           if (workspaceRef.current && externalLoadVersionRef.current === version) {
@@ -328,13 +324,17 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
           }
         }, 80)
       } catch (err) {
+        pendingExternalXmlRef.current = null
         console.error("Failed to sync external Blockly XML:", err)
       }
     }
 
-    timer = window.setTimeout(applyExternalXml, 0)
+    const timer = window.setTimeout(applyExternalXml, 0)
     return () => {
       window.clearTimeout(timer)
+      if (pendingExternalXmlRef.current === expectedExternalXml) {
+        pendingExternalXmlRef.current = null
+      }
       externalLoadVersionRef.current += 1
     }
   }, [xml])

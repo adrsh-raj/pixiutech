@@ -205,9 +205,11 @@ for (const marker of [
 
 for (const marker of [
   "templateUsesAi",
-  "setIsAiCameraOpen(templateUsesAi)",
   "setAiRuntimeEnabled(false)",
-  "programAiMode === "objects"",
+  "setIsAiCameraOpen(false)",
+  "setAiCameraCompact(false)",
+  "setAiRequestedMode(null)",
+  "if (usesAi && openAiHud)",
 ]) requireText(workbench, marker, "AI template → Vision Canvas lifecycle")
 
 for (const marker of [
