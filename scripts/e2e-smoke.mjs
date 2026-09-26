@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 const baseUrl = process.env.E2E_BASE_URL || process.env.PLAYWRIGHT_TEST_BASE_URL;
+const portalUrl = process.env.E2E_PORTAL_URL;
 const apiUrl = process.env.E2E_API_URL;
 
 if (!baseUrl && !apiUrl) {
@@ -39,7 +40,7 @@ async function checkPublicRoutes(baseUrl) {
 }
 
 async function checkPublicFormValidation(baseUrl, apiBaseUrl) {
-  const enquiry = await fetch(joinUrl(baseUrl, '/api/enquiry'), {
+  const enquiry = await fetch(joinUrl(apiBaseUrl, '/public/enquiries'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify({ school: '', person: '', phone: '', email: '', website: '' }),
@@ -91,6 +92,12 @@ try {
   if (baseUrl) {
     await checkFrontendOrApiTarget(baseUrl);
     await checkPublicRoutes(baseUrl);
+  }
+
+  if (portalUrl) {
+    await checkFrontendOrApiTarget(portalUrl);
+    await assertOk(joinUrl(portalUrl, '/simulation'), 'Portal Virtual Lab route');
+    console.log('Portal Virtual Lab smoke check passed');
   }
 
   if (baseUrl && apiUrl && process.env.E2E_TEST_FORMS === '1') {

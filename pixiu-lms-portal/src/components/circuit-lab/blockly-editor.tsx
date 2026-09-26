@@ -65,6 +65,9 @@ const TOOLBOX = {
       contents: [
         { kind: "block", type: "math_number" },
         { kind: "block", type: "math_arithmetic" },
+        { kind: "block", type: "math_modulo" },
+        { kind: "block", type: "math_single" },
+        { kind: "block", type: "arduino_map" },
       ],
     },
     {
@@ -112,17 +115,22 @@ const TOOLBOX = {
         { kind: 'block', type: 'soil_moisture_read' },
         { kind: 'block', type: 'encoder_read' },
         { kind: 'block', type: 'keypad_read' },
+        { kind: 'block', type: 'pir_motion' },
+        { kind: 'block', type: 'ldr_read' },
+        { kind: 'block', type: 'tmp36_temperature' },
+        { kind: 'block', type: 'potentiometer_read' },
       ],
     },
     {
       kind: 'category',
-      name: '🤖 AI Studio',
+      name: '🤖 Pixiu AI',
       colour: '#a855f7',
       contents: [
         { kind: 'block', type: 'ai_is_detected' },
         { kind: 'block', type: 'ai_is_unknown' },
         { kind: 'block', type: 'ai_get_detected_class' },
         { kind: 'block', type: 'ai_confidence' },
+        { kind: 'block', type: 'ai_get_object_count' },
         { kind: 'block', type: 'ai_get_gesture' },
         { kind: 'block', type: 'ai_get_finger_count' },
         { kind: 'block', type: 'ai_is_gesture' },

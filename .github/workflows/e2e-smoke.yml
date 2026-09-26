@@ -28,6 +28,7 @@ jobs:
       - name: Run deployment smoke checks
         env:
           E2E_BASE_URL: ${{ github.event_name == 'workflow_dispatch' && inputs.frontend_url || github.event.deployment_status.target_url }}
+          E2E_PORTAL_URL: https://portal.pixiutech.com
           E2E_API_URL: ${{ github.event_name == 'workflow_dispatch' && inputs.api_url || secrets.E2E_API_URL }}
           E2E_USERNAME: ${{ secrets.E2E_USERNAME }}
           E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}

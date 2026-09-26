@@ -62,3 +62,8 @@ The old Node database compatibility layer is deliberately not reused by Django. 
 6. Only then remove the legacy Node server from deployment and repository.
 
 A live production database was not accessed during this implementation, so production row-level migration/cutover is intentionally a deployment verification step rather than a claim of completed data migration.
+
+
+## Public enquiry cutover
+
+The public website enquiry form now targets Django `/api/v1/public/enquiries` directly. The legacy Vercel/Node `api/enquiry.js` function is removed from the repository. Deployment-side verification remains required before treating 7.5 as fully closed.

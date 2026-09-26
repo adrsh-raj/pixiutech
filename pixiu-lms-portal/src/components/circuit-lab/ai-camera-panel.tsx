@@ -132,17 +132,8 @@ export function AiCameraPanel({
 
         // If not manually overridden, update live AI state
         if (!manualOverrideRef.current && primary) {
-          const mappedClass =
-            primary.class === "car" ||
-            primary.class === "truck" ||
-            primary.class === "bus" ||
-            primary.class === "motorcycle"
-              ? "car"
-              : primary.class === "person"
-              ? "person"
-              : primary.class === "cell phone"
-              ? "phone"
-              : primary.class.toLowerCase()
+          // Preserve the actual COCO-SSD class for Blockly and AI state.
+          const mappedClass = String(primary.class).trim().toLowerCase()
 
           onAiStateChange({
             ...aiState,

@@ -68,6 +68,7 @@ import {
   type SoundRecognizer,
 } from "@/lib/ai/sound-detector"
 import {
+  COCO_SSD_CLASSES,
   DEFAULT_OBJECT_MAX_BOXES,
   DEFAULT_OBJECT_MIN_SCORE,
   detectObjects,

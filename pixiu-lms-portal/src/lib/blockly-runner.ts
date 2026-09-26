@@ -23,6 +23,8 @@ export interface ExecutionEnvironment {
   isAiUnknown?: () => boolean
   getAiDetectedClass?: () => string
   getAiConfidence?: () => number
+  getAiObjectCount?: () => number
+  getDigitalPin?: (pin: string) => boolean
   getAiGesture?: () => string
   getAiFingerCount?: () => number
   isAiGesture?: (gesture: string) => boolean
@@ -73,6 +75,49 @@ export function evaluateNumber(target: Blockly.Block | null, env?: ExecutionEnvi
     const pin = target.getFieldValue("PIN") ?? "A0"
     return env?.getSensorValue ? env.getSensorValue("analog", pin) : 512
   }
+  if (target.type === "math_arithmetic") {
+    const op = target.getFieldValue("OP") ?? "ADD"
+    const a = evaluateNumber(target.getInputTargetBlock("A"), env, 0)
+    const b = evaluateNumber(target.getInputTargetBlock("B"), env, 0)
+    if (op === "ADD") return a + b
+    if (op === "MINUS") return a - b
+    if (op === "MULTIPLY") return a * b
+    return b === 0 ? 0 : a / b
+  }
+  if (target.type === "math_modulo") {
+    const a = evaluateNumber(target.getInputTargetBlock("DIVIDEND"), env, 0)
+    const b = evaluateNumber(target.getInputTargetBlock("DIVISOR"), env, 1)
+    return b === 0 ? 0 : a % b
+  }
+  if (target.type === "math_single") {
+    const value = evaluateNumber(target.getInputTargetBlock("NUM"), env, 0)
+    switch (target.getFieldValue("OP")) {
+      case "ROOT": return Math.sqrt(Math.max(0, value))
+      case "ABS": return Math.abs(value)
+      case "NEG": return -value
+      case "SIN": return Math.sin(value * Math.PI / 180)
+      case "COS": return Math.cos(value * Math.PI / 180)
+      case "TAN": return Math.tan(value * Math.PI / 180)
+      default: return value
+    }
+  }
+  if (target.type === "arduino_map") {
+    const value = evaluateNumber(target.getInputTargetBlock("VALUE"), env, 0)
+    const fromLow = evaluateNumber(target.getInputTargetBlock("FROM_LOW"), env, 0)
+    const fromHigh = evaluateNumber(target.getInputTargetBlock("FROM_HIGH"), env, 1023)
+    const toLow = evaluateNumber(target.getInputTargetBlock("TO_LOW"), env, 0)
+    const toHigh = evaluateNumber(target.getInputTargetBlock("TO_HIGH"), env, 255)
+    if (fromHigh === fromLow) return toLow
+    return ((value - fromLow) * (toHigh - toLow)) / (fromHigh - fromLow) + toLow
+  }
+  if (target.type === "ai_get_object_count") {
+    return env?.getAiObjectCount ? env.getAiObjectCount() : 0
+  }
+  if (target.type === "ldr_read" || target.type === "tmp36_temperature" || target.type === "potentiometer_read") {
+    const id = target.getFieldValue("SENSOR") ?? ""
+    const type = target.type === "ldr_read" ? "ldr" : target.type === "tmp36_temperature" ? "tmp36" : "potentiometer"
+    return env?.getSensorValue ? env.getSensorValue(type, id) : 0
+  }
   if (target.type === "ai_confidence") {
     return env?.getAiConfidence ? env.getAiConfidence() : 0
   }
@@ -87,6 +132,14 @@ export function evaluateBoolean(target: Blockly.Block | null, env?: ExecutionEnv
   if (target.type === "ir_read") {
     const id = target.getFieldValue("SENSOR") ?? ""
     return (env?.getSensorValue ? env.getSensorValue("ir", id) : 0) > 0
+  }
+  if (target.type === "pir_motion") {
+    const id = target.getFieldValue("SENSOR") ?? ""
+    return (env?.getSensorValue ? env.getSensorValue("pir", id) : 0) > 0
+  }
+  if (target.type === "io_digitalread") {
+    const pin = String(target.getFieldValue("PIN") ?? "13")
+    return env?.getDigitalPin ? env.getDigitalPin(pin) : false
   }
   if (target.type === "joystick_button") {
     const id = target.getFieldValue("SENSOR") ?? ""
@@ -154,6 +207,12 @@ function evaluateValueInput(block: Blockly.Block, inputName: string, env?: Execu
   }
   if (target.type === "math_number") {
     return String(target.getFieldValue("NUM") ?? defaultValue)
+  }
+  if ([
+    "math_arithmetic","math_modulo","math_single","arduino_map","ai_confidence",
+    "ai_get_finger_count","ai_get_object_count","ldr_read","tmp36_temperature","potentiometer_read"
+  ].includes(target.type)) {
+    return String(evaluateNumber(target, env, Number(defaultValue) || 0))
   }
   if (target.type === "ultrasonic_read") {
     const val = env?.getSensorValue ? env.getSensorValue("ultrasonic") : 100
@@ -466,6 +525,22 @@ async function executeSingleBlock(block: Blockly.Block, env: ExecutionEnvironmen
       }
       break
     }
+    case "controls_whileUntil": {
+      const until = block.getFieldValue("MODE") === "UNTIL"
+      const condition = block.getInputTargetBlock("BOOL")
+      const branch = block.getInputTargetBlock("DO")
+      let guard = 0
+      while (!signal.aborted && env.isRunning() && guard++ < 10000) {
+        const value = evaluateBoolean(condition, env)
+        if (until ? value : !value) {
+          await executeStatement(branch, env, signal)
+        } else {
+          break
+        }
+      }
+      break
+    }
+
 
     default:
       break

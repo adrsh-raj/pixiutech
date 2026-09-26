@@ -7,6 +7,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from academics.models import School, SchoolClass, Student, Trainer
 from billing.models import Invoice
+from crm.models import Lead
 
 User = get_user_model()
 
@@ -23,6 +24,24 @@ class Phase7APITests(APITestCase):
         refresh["username"] = user.username
         self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
 
+    def test_v1_public_enquiry_uses_canonical_django_endpoint(self):
+        response = self.client.post(
+            "/api/v1/public/enquiries",
+            {
+                "school": "Phase Seven Enquiry",
+                "person": "Public Contact",
+                "phone": "9876543210",
+                "email": "public@example.com",
+                "city": "Lucknow",
+                "strength": "120",
+                "message": "Canonical API smoke test",
+                "website": "",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(response.data["success"])
+        self.assertTrue(Lead.objects.filter(organization_name="Phase Seven Enquiry").exists())
     def test_v1_login_contract_returns_access_refresh_and_user(self):
         response = self.client.post("/api/v1/auth/login/", {"username": "phase7-admin", "password": "StrongAdminPass!123", "role": "admin"}, format="json")
         self.assertEqual(response.status_code, 200)

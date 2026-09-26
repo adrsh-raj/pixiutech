@@ -2,6 +2,7 @@ import * as Blockly from "blockly"
 import type { CircuitState } from "./circuit-types"
 import { getPinOptions } from "./pin-map"
 import { CATALOG } from "./components-catalog"
+import { COCO_SSD_CLASSES } from "./ai/object-detector"
 
 /** Operator precedence buckets for the generated C++. */
 export const ORDER = {
@@ -43,15 +44,15 @@ function componentDropdown(types: string[], emptyLabel = "Add component first"):
 }
 
 let defined = false
-let aiClasses = ["car", "person", "phone", "hand"]
+let aiClasses: string[] = [...COCO_SSD_CLASSES, "phone", "hand"]
 
 export function setAiClassContext(classes: string[]) {
-  const normalized = classes.map((value) => value.trim()).filter(Boolean).slice(0, 8)
-  aiClasses = Array.from(new Set([...normalized, "car", "person", "phone", "hand"]))
+  const normalized = classes.map((value) => value.trim().toLowerCase()).filter(Boolean).slice(0, 32)
+  aiClasses = Array.from(new Set([...COCO_SSD_CLASSES, ...normalized, "phone", "hand"]))
 }
 
 function aiClassDropdown(): [string, string][] {
-  return aiClasses.map((value) => [value, value])
+  return aiClasses.map((value) => [value === "phone" ? "phone (legacy alias)" : value, value])
 }
 
 export function defineArduinoBlocks() {
@@ -407,6 +408,63 @@ export function defineArduinoBlocks() {
     }
   }
 
+  Blockly.Blocks['pir_motion'] = {
+    init() {
+      this.appendDummyInput()
+        .appendField('PIR motion?')
+        .appendField(new Blockly.FieldDropdown(componentDropdown(['pir-sensor'])), 'SENSOR')
+      this.setOutput(true, 'Boolean')
+      this.setColour(230)
+      this.setTooltip('Read whether the virtual PIR sensor detects motion.')
+    }
+  }
+
+  Blockly.Blocks['ldr_read'] = {
+    init() {
+      this.appendDummyInput()
+        .appendField('LDR light')
+        .appendField(new Blockly.FieldDropdown(componentDropdown(['ldr'])), 'SENSOR')
+      this.setOutput(true, 'Number')
+      this.setColour(230)
+      this.setTooltip('Read the simulated LDR light level.')
+    }
+  }
+
+  Blockly.Blocks['tmp36_temperature'] = {
+    init() {
+      this.appendDummyInput()
+        .appendField('TMP36 temperature')
+        .appendField(new Blockly.FieldDropdown(componentDropdown(['tmp36'])), 'SENSOR')
+      this.setOutput(true, 'Number')
+      this.setColour(230)
+      this.setTooltip('Read the simulated TMP36 temperature.')
+    }
+  }
+
+  Blockly.Blocks['potentiometer_read'] = {
+    init() {
+      this.appendDummyInput()
+        .appendField('Potentiometer')
+        .appendField(new Blockly.FieldDropdown(componentDropdown(['potentiometer'])), 'SENSOR')
+      this.setOutput(true, 'Number')
+      this.setColour(210)
+      this.setTooltip('Read the potentiometer wiper value.')
+    }
+  }
+
+  Blockly.Blocks['arduino_map'] = {
+    init() {
+      this.appendValueInput('VALUE').setCheck('Number').appendField('map')
+      this.appendValueInput('FROM_LOW').setCheck('Number').appendField('from')
+      this.appendValueInput('FROM_HIGH').setCheck('Number').appendField('to')
+      this.appendValueInput('TO_LOW').setCheck('Number').appendField('→')
+      this.appendValueInput('TO_HIGH').setCheck('Number')
+      this.setOutput(true, 'Number')
+      this.setColour(260)
+      this.setTooltip('Map one numeric range to another.')
+    }
+  }
+
   Blockly.Blocks['ultrasonic_read'] = {
     init() {
       this.appendDummyInput()
@@ -420,12 +478,12 @@ export function defineArduinoBlocks() {
     }
   }
 
-  /* --- PictoBlox AI Vision Blocks --- */
+  /* --- PIXIU AI Runtime Blocks --- */
   Blockly.Blocks['ai_is_detected'] = {
     init() {
       this.appendDummyInput()
         .appendField('🤖 AI sees')
-        .appendField(new Blockly.FieldTextInput('car'), 'CLASS')
+        .appendField(new Blockly.FieldDropdown(aiClassDropdown), 'CLASS')
         .appendField('?')
       this.setOutput(true, 'Boolean')
       this.setColour(285)
@@ -458,6 +516,15 @@ export function defineArduinoBlocks() {
       this.setColour(285)
       this.setTooltip('Browser AI Studio block: returns AI confidence (0 to 100%) in the simulator.')
     },
+  }
+
+  Blockly.Blocks['ai_get_object_count'] = {
+    init() {
+      this.appendDummyInput().appendField('🤖 AI objects in view')
+      this.setOutput(true, 'Number')
+      this.setColour(285)
+      this.setTooltip('Returns the number of accepted object detections in the current AI frame.')
+    }
   }
 
   Blockly.Blocks['ai_get_gesture'] = {
@@ -710,6 +777,26 @@ arduino.forBlock["math_arithmetic"] = function (block, generator) {
   return [`${a} ${op} ${b}`, order]
 }
 
+arduino.forBlock["math_modulo"] = function (block, generator) {
+  const a = generator.valueToCode(block, "DIVIDEND", ORDER.NONE) || "0"
+  const b = generator.valueToCode(block, "DIVISOR", ORDER.NONE) || "1"
+  return [`((${a}) % (${b}))`, ORDER.MUL]
+}
+
+arduino.forBlock["math_single"] = function (block, generator) {
+  const op = block.getFieldValue("OP") || "ABS"
+  const value = generator.valueToCode(block, "NUM", ORDER.NONE) || "0"
+  const expressions: Record<string, string> = {
+    ROOT: `sqrt(${value})`,
+    ABS: `abs(${value})`,
+    NEG: `-(${value})`,
+    SIN: `sin((${value}) * PI / 180.0)`,
+    COS: `cos((${value}) * PI / 180.0)`,
+    TAN: `tan((${value}) * PI / 180.0)`,
+  }
+  return [expressions[op] || value, ORDER.ATOMIC]
+}
+
 arduino.forBlock["variables_get"] = function (block, generator) {
   const gg = generator as ArduinoGen
   const name = gg.nameDB_!.getName(block.getFieldValue("VAR"), Blockly.Names.NameType.VARIABLE)
@@ -780,6 +867,19 @@ arduino.forBlock['motor_driver_write'] = (block, generator) => {
   return `analogWrite(${ena}, ${speed}); digitalWrite(${highPin}, HIGH); digitalWrite(${lowPin}, LOW);\\n`
 }
 
+arduino.forBlock['pir_motion'] = (block) => ['false /* PIXIU simulated PIR: ' + String(block.getFieldValue('SENSOR') || '') + ' */', ORDER.ATOMIC]
+arduino.forBlock['ldr_read'] = () => ['analogRead(A0) /* PIXIU simulated LDR */', ORDER.ATOMIC]
+arduino.forBlock['tmp36_temperature'] = () => ['analogRead(A0) /* PIXIU simulated TMP36 */', ORDER.ATOMIC]
+arduino.forBlock['potentiometer_read'] = () => ['analogRead(A0) /* PIXIU simulated potentiometer */', ORDER.ATOMIC]
+arduino.forBlock['arduino_map'] = (block, generator) => {
+  const value = generator.valueToCode(block, 'VALUE', ORDER.NONE) || '0'
+  const fromLow = generator.valueToCode(block, 'FROM_LOW', ORDER.NONE) || '0'
+  const fromHigh = generator.valueToCode(block, 'FROM_HIGH', ORDER.NONE) || '1023'
+  const toLow = generator.valueToCode(block, 'TO_LOW', ORDER.NONE) || '0'
+  const toHigh = generator.valueToCode(block, 'TO_HIGH', ORDER.NONE) || '255'
+  return ['map(' + value + ', ' + fromLow + ', ' + fromHigh + ', ' + toLow + ', ' + toHigh + ')', ORDER.ATOMIC]
+}
+
 arduino.forBlock['ultrasonic_read'] = (block) => {
   const trig = block.getFieldValue('TRIG')
   const echo = block.getFieldValue('ECHO')
@@ -807,6 +907,11 @@ arduino.forBlock['ai_is_unknown'] = () => [
 
 arduino.forBlock['ai_get_detected_class'] = () => [
   '"none" /* PIXIU AI Studio: browser-only AI detected class. */',
+  ORDER.ATOMIC,
+]
+
+arduino.forBlock['ai_get_object_count'] = () => [
+  '0 /* PIXIU AI Studio: browser-only object count. */',
   ORDER.ATOMIC,
 ]
 

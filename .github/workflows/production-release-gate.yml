@@ -1,0 +1,38 @@
+name: PIXIU Production Release Gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      frontend_url:
+        description: "Public website URL"
+        required: true
+        default: "https://www.pixiutech.com"
+        type: string
+      portal_url:
+        description: "Portal / Virtual Lab URL"
+        required: true
+        default: "https://portal.pixiutech.com"
+        type: string
+      api_url:
+        description: "Django API base including /api/v1"
+        required: true
+        default: "https://pixiu-django-api.onrender.com/api/v1"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  release_gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Phase 8 production release gate
+        env:
+          E2E_BASE_URL: ${{ inputs.frontend_url }}
+          E2E_PORTAL_URL: ${{ inputs.portal_url }}
+          E2E_API_URL: ${{ inputs.api_url }}
+          E2E_USERNAME: ${{ secrets.E2E_USERNAME }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+          E2E_ROLE: ${{ secrets.E2E_ROLE || 'admin' }}
+        run: node scripts/phase8-release-gate.mjs

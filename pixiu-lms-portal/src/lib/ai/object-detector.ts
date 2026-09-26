@@ -8,6 +8,18 @@ export type NormalizedObjectDetection = {
   bbox: [number, number, number, number]
 }
 
+export const COCO_SSD_CLASSES = [
+  "person","bicycle","car","motorcycle","airplane","bus","train","truck","boat","traffic light",
+  "fire hydrant","stop sign","parking meter","bench","bird","cat","dog","horse","sheep","cow",
+  "elephant","bear","zebra","giraffe","backpack","umbrella","handbag","tie","suitcase","frisbee",
+  "skis","snowboard","sports ball","kite","baseball bat","baseball glove","skateboard","surfboard",
+  "tennis racket","bottle","wine glass","cup","fork","knife","spoon","bowl","banana","apple",
+  "sandwich","orange","broccoli","carrot","hot dog","pizza","donut","cake","chair","couch",
+  "potted plant","bed","dining table","toilet","tv","laptop","mouse","remote","keyboard",
+  "cell phone","microwave","oven","toaster","sink","refrigerator","book","clock","vase",
+  "scissors","teddy bear","hair drier","toothbrush",
+] as const
+
 export const DEFAULT_OBJECT_MAX_BOXES = 20
 export const DEFAULT_OBJECT_MIN_SCORE = 0.3
 
@@ -52,8 +64,6 @@ export async function detectObjects(
 
 function normalizeObjectClass(name: string) {
   const lower = String(name).trim().toLowerCase()
-  if (lower === "cell phone") return "phone"
-  if (["car", "truck", "bus", "motorcycle"].includes(lower)) return "car"
   return lower
 }
 

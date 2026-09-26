@@ -11,6 +11,10 @@ const FIELDS = [
 
 const EMPTY = { school: '', person: '', phone: '', email: '', city: '', strength: '', message: '', website: '' }
 
+const API_BASE = String(
+  import.meta.env.VITE_API_URL || 'https://pixiu-django-api.onrender.com/api/v1',
+).replace(/\/+$/, '')
+
 export default function EnquiryForm({ intent }) {
   const [values, setValues] = useState({
     ...EMPTY,
@@ -48,7 +52,7 @@ export default function EnquiryForm({ intent }) {
     setSending(true)
 
     try {
-      const response = await fetch('/api/enquiry', {
+      const response = await fetch(`${API_BASE}/public/enquiries`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify(values),

@@ -58,6 +58,10 @@ export function Workbench() {
   const [pressed, setPressed] = useState<Set<string>>(new Set())
   const [view, setView] = useState<WorkbenchView>("circuit")
   const [pinStates, setPinStates] = useState<Record<string, ArduinoPinState>>({})
+  const pinStatesRef = useRef<Record<string, ArduinoPinState>>({})
+  useEffect(() => {
+    pinStatesRef.current = pinStates
+  }, [pinStates])
   const [blocklyXml, setBlocklyXml] = useState<string>(DEFAULT_XML)
   const [serialLines, setSerialLines] = useState<SerialLine[]>([])
   const [isSerialOpen, setIsSerialOpen] = useState(false)
@@ -609,6 +613,8 @@ export function Workbench() {
           if (type === "ultrasonic") return Number(p?.props?.distance ?? 100)
           if (type === "ldr") return Number(p?.props?.light ?? 512)
           if (type === "tmp36") return Number(p?.props?.temperature ?? 25)
+           if (type === "pir") return String(p?.props?.motion ?? "false") === "true" ? 1 : 0
+           if (type === "potentiometer") return Number(p?.props?.value ?? 512)
           if (type === "ir") return String(p?.props?.detected ?? "false") === "true" ? 1 : 0
           if (type === "dht_temperature") return Number(p?.props?.temperature ?? 25)
           if (type === "dht_humidity") return Number(p?.props?.humidity ?? 55)
@@ -623,6 +629,8 @@ export function Workbench() {
           }
           return 0
         },
+         getAiObjectCount: () => aiStateRef.current.allDetections?.length ?? 0,
+         getDigitalPin: (pin) => (pinStatesRef.current[pin]?.state ?? "LOW") === "HIGH",
         getSensorText: (type, id) => {
           if (type !== "keypad") return ""
           const keypad = partsRef.current.find((pt) => pt.id === id && pt.type === "keypad-4x4")
@@ -639,10 +647,11 @@ export function Workbench() {
           ) {
             return false
           }
-          return (
-            state.detectedClass.trim().toLowerCase() ===
-            String(cls).trim().toLowerCase()
-          )
+           const normalizeClass = (value: string) => {
+             const normalized = String(value).trim().toLowerCase()
+             return normalized === "phone" ? "cell phone" : normalized
+           }
+           return normalizeClass(state.detectedClass) === normalizeClass(String(cls))
         },
         isAiUnknown: () => aiStateRef.current.unknown === true,
         getAiDetectedClass: () => aiStateRef.current.detectedClass,

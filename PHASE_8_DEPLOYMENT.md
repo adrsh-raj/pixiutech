@@ -64,3 +64,10 @@ node scripts/e2e-smoke.mjs
 ## What still requires deployment-side action
 
 The repository can define and validate the deployment, but it cannot create services inside a Render or Vercel account from GitHub source alone. After connecting the repository in Render and Vercel, configure the environment variables above and trigger the first production deploy. The deployment smoke script should then be run against the resulting URLs.
+
+
+## Release-gate hardening
+
+Phase 8 now includes repository-level release-gate checks for the public website, the `/simulation` Virtual Lab route, Django `/api/v1/health/`, public-enquiry validation, and the absence of the legacy JSON `/api/enquiry` function. A manual GitHub Actions release gate is provided for real deployed URLs.
+
+Repository checks do not by themselves mark production closed. Render health, Vercel project root/environment configuration, deployment quota availability, and final browser smoke results remain deployment-side evidence requirements.
