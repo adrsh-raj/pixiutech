@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   Info,
   Layers3,
+  GripVertical,
   Mic,
   Pencil,
   Plus,
