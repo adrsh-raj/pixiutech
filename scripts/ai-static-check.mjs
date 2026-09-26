@@ -71,20 +71,23 @@ for (const marker of [
   "const HAND_VERSION =",
   "@tensorflow-models/hand-pose-detection@2.0.1",
   "SupportedModels.MediaPipeHands",
-  'runtime: "tfjs"',
+  'runtime: "mediapipe"',
+  "solutionPath",
+  'modelType: "full"',
   "maxHands: MAX_HANDS",
   "getExtendedFingerMask",
-  "window.tf = tf",
+  "window.Hands",
 ]) requireText(handAdapter, marker, "6D hand adapter")
 
 for (const marker of [
   "const FACE_VERSION =",
   "@tensorflow-models/face-landmarks-detection@1.0.6",
   "SupportedModels.MediaPipeFaceMesh",
+  'runtime: "mediapipe"',
+  "solutionPath",
   "refineLandmarks: true",
   "classifyExpression",
-  "faceScore = Number.isFinite",
-  "window.tf = tf",
+  "window.FaceMesh",
 ]) requireText(faceAdapter, marker, "6E face adapter")
 
 for (const marker of [
@@ -362,17 +365,20 @@ for (const marker of [
 const handSource = read("pixiu-lms-portal/src/lib/ai/hand-detector.ts")
 for (const marker of [
   'modelType: "full"',
-  "const MIN_HAND_SCORE = 0.35",
-  "tipDistance > pipDistance * 1.04",
+  "const MIN_HAND_SCORE = 0.15",
+  "solutionPath",
+  "dipAngle >= 135",
   "maxHands?: number",
 ]) requireText(handSource, marker, "Hand AI runtime")
 
 const faceSource = read("pixiu-lms-portal/src/lib/ai/face-detector.ts")
 for (const marker of [
-  'FACE_VERSION = "1.1.0"',
-  "MIN_FACE_SCORE = 0.25",
+  'const FACE_VERSION = "2.0.0"',
+  'runtime: "mediapipe"',
+  "solutionPath",
   "refineLandmarks: true",
-  "function clamp01",
+  "function classifyExpression",
+  "cornerLift",
 ]) requireText(faceSource, marker, "Face AI runtime")
 
 const portalApp = read("pixiu-lms-portal/src/App.jsx")

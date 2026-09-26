@@ -441,6 +441,8 @@ export function AiStudioPanel({
   const handCountHistoryRef = useRef<number[]>([])
   const handGestureHistoryRef = useRef<string[]>([])
   const emotionHistoryRef = useRef<string[]>([])
+  const emptyHandFramesRef = useRef(0)
+  const emptyFaceFramesRef = useRef(0)
   const fpsStartRef = useRef(0)
   const fpsFramesRef = useRef(0)
   const dragRef = useRef<{ pointerId: number; offsetX: number; offsetY: number } | null>(null)
@@ -635,6 +637,8 @@ export function AiStudioPanel({
     handCountHistoryRef.current = []
     handGestureHistoryRef.current = []
     emotionHistoryRef.current = []
+    emptyHandFramesRef.current = 0
+    emptyFaceFramesRef.current = 0
     fpsStartRef.current = 0
     fpsFramesRef.current = 0
     setFps(0)
@@ -983,6 +987,16 @@ export function AiStudioPanel({
           const hands: HandDetection[] = await detectHands(resourceRef.current, video)
           if (activeSession !== sessionRef.current) return
 
+          if (hands.length === 0) {
+            emptyHandFramesRef.current += 1
+            if (emptyHandFramesRef.current >= 4) {
+              resourceRef.current?.reset?.()
+              emptyHandFramesRef.current = 0
+            }
+          } else {
+            emptyHandFramesRef.current = 0
+          }
+
           drawHands(getActiveOverlay()!, video, hands)
           const hand = hands[0]
           const interpreted = hand ? interpretHandGesture(hand) : null
@@ -1051,6 +1065,16 @@ export function AiStudioPanel({
         } else if (mode === "emotion") {
           const faces: FaceDetection[] = await detectFaces(resourceRef.current, video)
           if (activeSession !== sessionRef.current) return
+
+          if (faces.length === 0) {
+            emptyFaceFramesRef.current += 1
+            if (emptyFaceFramesRef.current >= 4) {
+              resourceRef.current?.reset?.()
+              emptyFaceFramesRef.current = 0
+            }
+          } else {
+            emptyFaceFramesRef.current = 0
+          }
 
           const face = faces[0]
 

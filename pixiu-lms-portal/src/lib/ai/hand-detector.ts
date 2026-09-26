@@ -1,5 +1,3 @@
-import * as tf from "@tensorflow/tfjs"
-
 export type HandPoint = {
   x: number
   y: number
@@ -24,39 +22,47 @@ export type HandDetector = {
   version: string
   detect: (video: HTMLVideoElement) => Promise<HandDetection[]>
   dispose: () => void
+  reset?: () => void
 }
 
-const HAND_VERSION = "2.1.2"
+const HAND_VERSION = "3.0.0"
 const MAX_HANDS = 2
-const MIN_HAND_SCORE = 0.35
+const MIN_HAND_SCORE = 0.15
+const MEDIAPIPE_HANDS_VERSION = "0.4.1675469240"
 const HAND_RUNTIME_SOURCES = [
   "https://cdn.jsdelivr.net/npm/@tensorflow-models/hand-pose-detection@2.0.1/dist/hand-pose-detection.min.js",
   "https://unpkg.com/@tensorflow-models/hand-pose-detection@2.0.1/dist/hand-pose-detection.min.js",
 ]
 
+const HAND_SOLUTION_SOURCES = [
+  `https://cdn.jsdelivr.net/npm/@mediapipe/hands@${MEDIAPIPE_HANDS_VERSION}/hands.js`,
+  `https://unpkg.com/@mediapipe/hands@${MEDIAPIPE_HANDS_VERSION}/hands.js`,
+]
+
 declare global {
   interface Window {
-    tf?: typeof tf
     handPoseDetection?: any
+    Hands?: any
   }
 }
 
 const scriptLoads = new Map<string, Promise<void>>()
 
-function loadScript(src: string): Promise<void> {
+function loadScript(src: string, ready: () => boolean, marker: string): Promise<void> {
   if (typeof window === "undefined") {
     return Promise.reject(new Error("PIXIU Hand AI needs a browser."))
   }
-  if (window.handPoseDetection) return Promise.resolve()
+  if (ready()) return Promise.resolve()
 
-  const existing = scriptLoads.get(src)
+  const key = marker + "::" + src
+  const existing = scriptLoads.get(key)
   if (existing) return existing
 
   const promise = new Promise<void>((resolve, reject) => {
     const current = document.querySelector<HTMLScriptElement>(
       `script[data-pixiu-hand-src="${src}"]`,
     )
-    if (current && window.handPoseDetection) {
+    if (current && ready()) {
       resolve()
       return
     }
@@ -71,15 +77,15 @@ function loadScript(src: string): Promise<void> {
       if (settled) return
       settled = true
       cleanup()
-      if (window.handPoseDetection) resolve()
-      else reject(new Error("Hand pose runtime loaded without its API."))
+      if (ready()) resolve()
+      else reject(new Error(`Hand AI ${marker} loaded without its runtime API.`))
     }
     const onError = () => {
       if (settled) return
       settled = true
       cleanup()
-      script.remove()
-      reject(new Error("Hand pose runtime could not be loaded."))
+      if (!current) script.remove()
+      reject(new Error(`Hand AI ${marker} could not be loaded.`))
     }
 
     script.addEventListener("load", onLoad, { once: true })
@@ -87,6 +93,7 @@ function loadScript(src: string): Promise<void> {
 
     if (!current) {
       script.async = true
+      script.crossOrigin = "anonymous"
       script.src = src
       script.dataset.pixiuHandSrc = src
       document.head.appendChild(script)
@@ -94,44 +101,50 @@ function loadScript(src: string): Promise<void> {
 
     window.setTimeout(() => {
       if (settled) return
-      if (window.handPoseDetection) onLoad()
+      if (ready()) onLoad()
       else onError()
     }, 30000)
   })
 
-  scriptLoads.set(src, promise)
-  promise.catch(() => scriptLoads.delete(src))
+  scriptLoads.set(key, promise)
+  promise.catch(() => scriptLoads.delete(key))
   return promise
 }
 
 async function ensureRuntime() {
   if (typeof window === "undefined") throw new Error("Browser required.")
-  window.tf = tf
-  await tf.ready()
-
-  if (tf.getBackend() !== "webgl") {
-    try {
-      await tf.setBackend("webgl")
-      await tf.ready()
-    } catch {
-      await tf.setBackend("cpu")
-      await tf.ready()
-    }
-  }
 
   let lastError: unknown = null
   for (const src of HAND_RUNTIME_SOURCES) {
     try {
-      await loadScript(src)
-      if (window.handPoseDetection) return
+      await loadScript(src, () => Boolean(window.handPoseDetection), "detector")
+      break
     } catch (error) {
       lastError = error
     }
   }
 
-  throw lastError instanceof Error
-    ? lastError
-    : new Error("Hand pose runtime could not be loaded.")
+  if (!window.handPoseDetection) {
+    throw lastError instanceof Error
+      ? lastError
+      : new Error("Hand pose detection runtime could not be loaded.")
+  }
+
+  let solutionError: unknown = null
+  for (const src of HAND_SOLUTION_SOURCES) {
+    try {
+      await loadScript(src, () => Boolean(window.Hands), "mediapipe")
+      break
+    } catch (error) {
+      solutionError = error
+    }
+  }
+
+  if (!window.Hands) {
+    throw solutionError instanceof Error
+      ? solutionError
+      : new Error("MediaPipe Hands runtime could not be loaded.")
+  }
 }
 
 const LANDMARK_INDEX = {
@@ -182,9 +195,14 @@ function fingerExtended(points: HandPoint[], mcp: number, pip: number, dip: numb
 
   // MediaPipe landmarks move significantly with camera distance and hand pose.
   // Use ratios/angles instead of the previous hard absolute extension threshold.
-  return pipAngle > 140 &&
-    tipDistance > pipDistance * 1.01 &&
-    tipDistance > mcpDistance * 1.04
+  const dipAngle = angle(b, c, d)
+  const fingerLength = distance(a, b) + distance(b, c) + distance(c, d)
+  const directRatio = fingerLength > 1e-6 ? distance(a, d) / fingerLength : 0
+
+  return pipAngle >= 142 &&
+    dipAngle >= 135 &&
+    tipDistance >= pipDistance * 1.02 &&
+    directRatio >= 0.72
 }
 
 function thumbExtended(points: HandPoint[]) {
@@ -196,9 +214,9 @@ function thumbExtended(points: HandPoint[]) {
   const ipDistance = distance(ip, wrist)
   const lateralDistance = distance(tip, indexMcp)
 
-  return ipAngle > 135 &&
-    tipDistance > ipDistance * 1.02 &&
-    lateralDistance >= distance(ip, indexMcp)
+  return ipAngle >= 130 &&
+    tipDistance >= ipDistance * 1.01 &&
+    lateralDistance >= distance(ip, indexMcp) * 0.95
 }
 
 export function getExtendedFingerMask(points: HandPoint[]): FingerMask {
@@ -241,9 +259,10 @@ export async function loadHandDetector(options: { maxHands?: number } = {}): Pro
   const detector = await window.handPoseDetection.createDetector(
     window.handPoseDetection.SupportedModels.MediaPipeHands,
     {
-      runtime: "tfjs",
+      runtime: "mediapipe",
       modelType: "full",
       maxHands: Math.max(1, Math.min(MAX_HANDS, Math.round(options.maxHands ?? MAX_HANDS))),
+      solutionPath: `https://cdn.jsdelivr.net/npm/@mediapipe/hands@${MEDIAPIPE_HANDS_VERSION}`,
     },
   )
 
@@ -258,9 +277,11 @@ export async function loadHandDetector(options: { maxHands?: number } = {}): Pro
           const keypoints = Array.isArray(hand?.keypoints)
             ? hand.keypoints.map((point: any, index: number) => toPoint(point, hand?.keypoints3D?.[index]))
             : []
+          const scoreValue = Number(hand?.score)
+          const score = Number.isFinite(scoreValue) && scoreValue > 0 ? scoreValue : 1
           const extendedFingers = getExtendedFingerMask(keypoints)
           return {
-            score: Number(hand?.score ?? 0),
+            score,
             boxScore: Number(hand?.score ?? 0),
             fingerScore: Number(hand?.score ?? 0),
             handedness: String(hand?.handedness ?? "Hand"),
@@ -273,6 +294,9 @@ export async function loadHandDetector(options: { maxHands?: number } = {}): Pro
     },
     dispose() {
       detector.dispose?.()
+    },
+    reset() {
+      detector.reset?.()
     },
   }
 }

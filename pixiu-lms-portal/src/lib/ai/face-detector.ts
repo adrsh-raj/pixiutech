@@ -1,5 +1,3 @@
-import * as tf from "@tensorflow/tfjs"
-
 export type FacePoint = {
   x: number
   y: number
@@ -27,36 +25,34 @@ export type FaceDetector = {
   dispose: () => void
 }
 
-const FACE_VERSION = "1.1.1"
+const FACE_VERSION = "2.0.0"
 const MAX_FACES = 1
-// MediaPipe FaceMesh returns 478 keypoints in the TFJS adapter.
-const MIN_FACE_SCORE = 0.25
-const FACE_RUNTIME_SOURCES = {
-  detector: [
-    "https://cdn.jsdelivr.net/npm/@tensorflow-models/face-detection@1.0.3/dist/face-detection.min.js",
-    "https://unpkg.com/@tensorflow-models/face-detection@1.0.3/dist/face-detection.min.js",
-  ],
-  mesh: [
-    "https://cdn.jsdelivr.net/npm/@tensorflow-models/face-landmarks-detection@1.0.6/dist/face-landmarks-detection.min.js",
-    "https://unpkg.com/@tensorflow-models/face-landmarks-detection@1.0.6/dist/face-landmarks-detection.min.js",
-  ],
-}
+const MEDIAPIPE_FACE_VERSION = "0.4.1633559619"
 
+const FACE_RUNTIME_SOURCES = [
+  "https://cdn.jsdelivr.net/npm/@tensorflow-models/face-landmarks-detection@1.0.6/dist/face-landmarks-detection.min.js",
+  "https://unpkg.com/@tensorflow-models/face-landmarks-detection@1.0.6/dist/face-landmarks-detection.min.js",
+]
+
+const FACE_SOLUTION_SOURCES = [
+  `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@${MEDIAPIPE_FACE_VERSION}/face_mesh.js`,
+  `https://unpkg.com/@mediapipe/face_mesh@${MEDIAPIPE_FACE_VERSION}/face_mesh.js`,
+]
 declare global {
   interface Window {
-    tf?: typeof tf
-    faceDetection?: any
     faceLandmarksDetection?: any
+    FaceMesh?: any
   }
 }
 
 const scriptLoads = new Map<string, Promise<void>>()
 
-function loadScript(src: string, ready: () => boolean): Promise<void> {
+function loadScript(src: string, ready: () => boolean, marker: string): Promise<void> {
   if (typeof window === "undefined") return Promise.reject(new Error("Browser required."))
   if (ready()) return Promise.resolve()
 
-  const existing = scriptLoads.get(src)
+  const key = marker + "::" + src
+  const existing = scriptLoads.get(key)
   if (existing) return existing
 
   const promise = new Promise<void>((resolve, reject) => {
@@ -79,20 +75,21 @@ function loadScript(src: string, ready: () => boolean): Promise<void> {
       settled = true
       cleanup()
       if (ready()) resolve()
-      else reject(new Error("Face AI runtime loaded without its API."))
+      else reject(new Error(`Face AI ${marker} loaded without its runtime API.`))
     }
     const onError = () => {
       if (settled) return
       settled = true
       cleanup()
-      script.remove()
-      reject(new Error("Face AI runtime could not be loaded."))
+      if (!current) script.remove()
+      reject(new Error(`Face AI ${marker} could not be loaded.`))
     }
 
     script.addEventListener("load", onLoad, { once: true })
     script.addEventListener("error", onError, { once: true })
     if (!current) {
       script.async = true
+      script.crossOrigin = "anonymous"
       script.src = src
       script.dataset.pixiuFaceSrc = src
       document.head.appendChild(script)
@@ -105,50 +102,44 @@ function loadScript(src: string, ready: () => boolean): Promise<void> {
     }, 30000)
   })
 
-  scriptLoads.set(src, promise)
-  promise.catch(() => scriptLoads.delete(src))
+  scriptLoads.set(key, promise)
+  promise.catch(() => scriptLoads.delete(key))
   return promise
 }
 
 async function ensureRuntime() {
   if (typeof window === "undefined") throw new Error("PIXIU Face AI needs a browser.")
-  window.tf = tf
-  await tf.ready()
-
-  if (!tf.getBackend()) {
-    try {
-      await tf.setBackend("webgl")
-      await tf.ready()
-    } catch {
-      await tf.setBackend("cpu")
-      await tf.ready()
-    }
-  }
 
   let lastError: unknown = null
-  for (const src of FACE_RUNTIME_SOURCES.detector) {
+  for (const src of FACE_RUNTIME_SOURCES) {
     try {
-      await loadScript(src, () => Boolean(window.faceDetection))
-      if (window.faceDetection) break
+      await loadScript(src, () => Boolean(window.faceLandmarksDetection), "detector")
+      break
     } catch (error) {
       lastError = error
     }
-  }
-  if (!window.faceDetection) {
-    throw lastError instanceof Error ? lastError : new Error("Face detector runtime could not be loaded.")
   }
 
-  lastError = null
-  for (const src of FACE_RUNTIME_SOURCES.mesh) {
+  if (!window.faceLandmarksDetection) {
+    throw lastError instanceof Error
+      ? lastError
+      : new Error("Face landmarks runtime could not be loaded.")
+  }
+
+  let solutionError: unknown = null
+  for (const src of FACE_SOLUTION_SOURCES) {
     try {
-      await loadScript(src, () => Boolean(window.faceLandmarksDetection))
-      if (window.faceLandmarksDetection) break
+      await loadScript(src, () => Boolean(window.FaceMesh), "mediapipe")
+      break
     } catch (error) {
-      lastError = error
+      solutionError = error
     }
   }
-  if (!window.faceLandmarksDetection) {
-    throw lastError instanceof Error ? lastError : new Error("Face mesh runtime could not be loaded.")
+
+  if (!window.FaceMesh) {
+    throw solutionError instanceof Error
+      ? solutionError
+      : new Error("MediaPipe Face Mesh runtime could not be loaded.")
   }
 }
 
@@ -210,23 +201,22 @@ export function classifyExpression(points: FacePoint[], box: [number, number, nu
   const openRatio = safeRatio(mouthOpen, height)
   const eyeRatio = safeRatio(leftEyeOpen + rightEyeOpen, height)
 
-  const cornerLift = safeRatio(
-    ((mouthLeft.y + mouthRight.y) / 2) - ((upperLip.y + lowerLip.y) / 2),
-    height,
-  )
+  // In image coordinates y grows downward: lifted smile corners have a
+  // smaller y than the lip center.
+  const lipCenterY = (upperLip.y + lowerLip.y) / 2
+  const cornerCenterY = (mouthLeft.y + mouthRight.y) / 2
+  const cornerLift = safeRatio(lipCenterY - cornerCenterY, height)
 
-  const smileScore = clamp01(
-    ((widthRatio - 0.30) / 0.15) * 0.7 +
-    ((cornerLift + 0.005) / 0.055) * 0.3,
-  )
+  const smileBreadth = clamp01((widthRatio - 0.24) / 0.20)
+  const smileLift = clamp01((cornerLift + 0.002) / 0.035)
+  const smileScore = clamp01(smileBreadth * 0.45 + smileLift * 0.55)
 
-  const surpriseScore = clamp01(
-    ((openRatio - 0.055) / 0.12) * 0.6 +
-    ((eyeRatio - 0.07) / 0.10) * 0.4,
-  )
+  const mouthSurprise = clamp01((openRatio - 0.035) / 0.10)
+  const eyeSurprise = clamp01((eyeRatio - 0.06) / 0.10)
+  const surpriseScore = clamp01(mouthSurprise * 0.62 + eyeSurprise * 0.38)
 
-  if (surpriseScore >= 0.58) return { emotion: "surprised", score: surpriseScore }
-  if (smileScore >= 0.50) return { emotion: "happy", score: smileScore }
+  if (surpriseScore >= 0.64 && openRatio > 0.055) return { emotion: "surprised", score: surpriseScore }
+  if (smileScore >= 0.48) return { emotion: "happy", score: smileScore }
   return { emotion: "neutral", score: Math.max(0.45, 1 - Math.max(smileScore, surpriseScore)) }
 }
 
@@ -250,11 +240,10 @@ export async function loadFaceDetector(): Promise<FaceDetector> {
   const detector = await window.faceLandmarksDetection.createDetector(
     window.faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh,
     {
-      runtime: "tfjs",
+      runtime: "mediapipe",
       maxFaces: MAX_FACES,
-      // Keep iris/lip refinement enabled so the adapter's 478-point contract
-      // matches the MediaPipe FaceMesh refined output used by this UI.
       refineLandmarks: true,
+      solutionPath: `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@${MEDIAPIPE_FACE_VERSION}`,
     },
   )
 
@@ -275,12 +264,8 @@ export async function loadFaceDetector(): Promise<FaceDetector> {
           const box = toBox(face?.box)
           const expression = classifyExpression(mesh, box)
 
-          const faceScore = Number.isFinite(Number(face?.score))
-            ? Number(face.score)
-            : 1
-
           return {
-            score: faceScore,
+            score: 1,
             box,
             expression: expression.emotion,
             expressionScore: expression.score,
@@ -288,7 +273,7 @@ export async function loadFaceDetector(): Promise<FaceDetector> {
             mesh,
           }
         })
-        .filter((face) => face.score === 0 || face.score >= MIN_FACE_SCORE)
+        .filter((face) => face.mesh.length >= 200)
     },
     dispose() {
       detector.dispose?.()
