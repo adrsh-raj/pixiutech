@@ -33,11 +33,21 @@ export type AiModelSummary = {
   predictionThreshold: number
   confidenceCalibration: string
   trainingProfile?: AiTrainingProfile
-  hiddenLayers?: 1 | 2
+  hiddenLayers?: number
   hiddenUnits?: number
   dropoutRate?: number
   learningRate?: number
   batchSize?: number
+  earlyStoppingPatience?: number
+  earlyStoppingMinDelta?: number
+  earlyStopped?: boolean
+  bestEpoch?: number
+  parameterCount?: number
+  layerSpecs?: AiLayerSpec[]
+  trainingHistory?: AiTrainingHistoryPoint[]
+  validationAvailable?: boolean
+  generalizationGap?: number
+  validationConfusionMatrix?: number[][]
 }
 
 export type AiStudioStore = {
@@ -79,31 +89,78 @@ export const MY_AI_LOW_MARGIN_THRESHOLD = 0.08
 // quota failure from silently turning a large dataset into an ephemeral state.
 export const AI_DATASET_STORAGE_SOFT_LIMIT_BYTES = 4_000_000
 
+export type AiLayerType = "dense" | "batchNormalization" | "dropout" | "activation"
+
+export type AiLayerSpec = {
+  type: AiLayerType
+  units?: number
+  activation?: "relu" | "linear" | "tanh" | "sigmoid"
+  rate?: number
+}
+
+export type AiTrainingHistoryPoint = {
+  epoch: number
+  loss: number
+  accuracy: number
+  valLoss: number | null
+  valAccuracy: number | null
+  elapsedMs: number
+}
+
 export type AiTrainingProfile = "grade6" | "grade7" | "grade8" | "custom"
 
 export type AiTrainingConfig = {
   epochs: number
-  hiddenLayers: 1 | 2
-  hiddenUnits: number
-  dropoutRate: number
+  layers: AiLayerSpec[]
   learningRate: number
   batchSize: number
+  earlyStoppingPatience: number
+  earlyStoppingMinDelta: number
 }
 
 export const AI_TRAINING_PROFILES: Record<Exclude<AiTrainingProfile, "custom">, AiTrainingConfig> = {
-  grade6: { epochs: 12, hiddenLayers: 1, hiddenUnits: 64, dropoutRate: 0.15, learningRate: 0.001, batchSize: 8 },
-  grade7: { epochs: 18, hiddenLayers: 1, hiddenUnits: 96, dropoutRate: 0.2, learningRate: 0.001, batchSize: 8 },
-  grade8: { epochs: 22, hiddenLayers: 2, hiddenUnits: 128, dropoutRate: 0.2, learningRate: 0.0008, batchSize: 8 },
+  grade6: { epochs: 20, layers: [{ type: "dense", units: 64, activation: "relu" }, { type: "dropout", rate: 0.15 }], learningRate: 0.001, batchSize: 8, earlyStoppingPatience: 6, earlyStoppingMinDelta: 0.001 },
+  grade7: { epochs: 35, layers: [{ type: "dense", units: 96, activation: "relu" }, { type: "batchNormalization" }, { type: "dropout", rate: 0.2 }, { type: "dense", units: 64, activation: "relu" }, { type: "dropout", rate: 0.2 }], learningRate: 0.001, batchSize: 8, earlyStoppingPatience: 8, earlyStoppingMinDelta: 0.001 },
+  grade8: { epochs: 50, layers: [{ type: "dense", units: 128, activation: "relu" }, { type: "batchNormalization" }, { type: "dropout", rate: 0.2 }, { type: "dense", units: 96, activation: "relu" }, { type: "dropout", rate: 0.2 }], learningRate: 0.0008, batchSize: 8, earlyStoppingPatience: 10, earlyStoppingMinDelta: 0.001 },
+}
+
+function sanitizeLayerSpecs(specs: AiLayerSpec[] | undefined): AiLayerSpec[] {
+  return (Array.isArray(specs) ? specs : []).slice(0, 8).map((spec) => {
+    if (spec.type === "dense") return { type: "dense", units: Math.max(16, Math.min(256, Math.round(spec.units ?? 64))), activation: spec.activation ?? "relu" }
+    if (spec.type === "dropout") return { type: "dropout", rate: Math.max(0, Math.min(0.5, Number(spec.rate ?? 0.2))) }
+    if (spec.type === "activation") return { type: "activation", activation: spec.activation ?? "relu" }
+    return { type: "batchNormalization" }
+  })
+}
+
+export function estimateTrainingLoad(specs: AiLayerSpec[], classCount: number, inputSize = 1280, epochs = 20) {
+  let previousUnits = inputSize
+  let parameters = 0
+  for (const spec of sanitizeLayerSpecs(specs)) {
+    if (spec.type === "dense") {
+      const units = spec.units ?? 64
+      parameters += previousUnits * units + units
+      previousUnits = units
+    } else if (spec.type === "batchNormalization") {
+      parameters += previousUnits * 2
+    }
+  }
+  const outputs = Math.max(2, classCount)
+  parameters += previousUnits * outputs + outputs
+  const operations = parameters * Math.max(1, epochs)
+  const label = parameters > 450_000 || operations > 12_000_000 ? "High" : parameters > 150_000 || operations > 5_000_000 ? "Medium" : "Light"
+  return { parameters: Math.round(parameters), operations: Math.round(operations), label, warning: label === "High" ? "This setup may feel slow on lower-end devices. Reduce units/layers or epochs if needed." : label === "Medium" ? "Training stays browser-local; longer runs may use more CPU/GPU time." : null }
 }
 
 function clampTrainingConfig(options: TrainOptions = {}): AiTrainingConfig {
+  const fallback = AI_TRAINING_PROFILES.grade7
   return {
-    epochs: Math.max(8, Math.min(30, Math.round(options.epochs ?? 18))),
-    hiddenLayers: options.hiddenLayers === 2 ? 2 : 1,
-    hiddenUnits: Math.max(32, Math.min(160, Math.round(options.hiddenUnits ?? 96))),
-    dropoutRate: Math.max(0, Math.min(0.4, Number(options.dropoutRate ?? 0.2))),
-    learningRate: Math.max(0.0003, Math.min(0.003, Number(options.learningRate ?? 0.001))),
-    batchSize: Math.max(4, Math.min(16, Math.round(options.batchSize ?? 8))),
+    epochs: Math.max(8, Math.min(150, Math.round(options.epochs ?? fallback.epochs))),
+    layers: sanitizeLayerSpecs(options.layers ?? fallback.layers),
+    learningRate: Math.max(0.0001, Math.min(0.01, Number(options.learningRate ?? fallback.learningRate))),
+    batchSize: Math.max(2, Math.min(32, Math.round(options.batchSize ?? fallback.batchSize))),
+    earlyStoppingPatience: Math.max(2, Math.min(20, Math.round(options.earlyStoppingPatience ?? fallback.earlyStoppingPatience))),
+    earlyStoppingMinDelta: Math.max(0.0001, Math.min(0.05, Number(options.earlyStoppingMinDelta ?? fallback.earlyStoppingMinDelta))),
   }
 }
 
@@ -504,18 +561,13 @@ export function getModelWeightPreview(model: tf.LayersModel | null): number[][] 
 
 type TrainOptions = {
   epochs?: number
-  hiddenLayers?: 1 | 2
-  hiddenUnits?: number
-  dropoutRate?: number
+  layers?: AiLayerSpec[]
   learningRate?: number
   batchSize?: number
+  earlyStoppingPatience?: number
+  earlyStoppingMinDelta?: number
   profile?: AiTrainingProfile
-  onEpoch?: (
-    epoch: number,
-    total: number,
-    accuracy: number,
-    loss: number,
-  ) => void
+  onEpoch?: (point: AiTrainingHistoryPoint) => void
   onStage?: (stage: string) => void
   shouldCancel?: () => boolean
 }
@@ -631,6 +683,7 @@ function softmaxScores(scores: number[], temperature = 0.12) {
 async function extractFeatures(
   samples: AiSample[],
   options: TrainOptions,
+  augment = false,
 ): Promise<{ features: number[][]; size: number }> {
   await loadMyAiFeatureExtractor()
   const features: number[][] = []
@@ -664,6 +717,44 @@ async function extractFeatures(
   }
 
   return { features, size: embeddingSize }
+}
+
+function buildTrainableLayers(
+  inputSize: number,
+  classCount: number,
+  specs: AiLayerSpec[],
+) {
+  const layers: tf.layers.Layer[] = []
+  let hasInputShape = false
+  for (const spec of sanitizeLayerSpecs(specs)) {
+    if (spec.type === "dense") {
+      layers.push(tf.layers.dense({
+        ...(hasInputShape ? {} : { inputShape: [inputSize] }),
+        units: spec.units ?? 64,
+        activation: spec.activation ?? "relu",
+        kernelRegularizer: tf.regularizers.l2({ l2: 0.0001 }),
+      }))
+      hasInputShape = true
+    } else if (spec.type === "batchNormalization") {
+      layers.push(tf.layers.batchNormalization())
+    } else if (spec.type === "dropout") {
+      layers.push(tf.layers.dropout({ rate: spec.rate ?? 0.2 }))
+    } else {
+      layers.push(tf.layers.activation({ activation: spec.activation ?? "relu" }))
+    }
+  }
+  if (!hasInputShape) layers.unshift(tf.layers.dense({ inputShape: [inputSize], units: 64, activation: "relu" }))
+  layers.push(tf.layers.dense({ units: classCount, activation: "softmax" }))
+  return layers
+}
+
+function describeArchitecture(specs: AiLayerSpec[], classCount: number) {
+  return `Visual features → ${sanitizeLayerSpecs(specs).map((spec,index) => {
+    if (spec.type === "dense") return `${index+1}. Dense(${spec.units})`
+    if (spec.type === "dropout") return `${index+1}. Dropout(${Math.round((spec.rate??0.2)*100)}%)`
+    if (spec.type === "batchNormalization") return `${index+1}. Normalization`
+    return `${index+1}. Activation(${spec.activation??"relu"})`
+  }).join(" → ")} → Classifier(${classCount} classes)`
 }
 
 function makeTensorPair(
@@ -754,72 +845,32 @@ export async function trainAiModel(
       validationYs = validationTensors.ys
     }
 
-    const baseConfig = clampTrainingConfig(options)
-    const config =
-      minClassSamples < 5
-        ? {
-            ...baseConfig,
-            epochs: Math.max(baseConfig.epochs, 18),
-            hiddenLayers: 1 as const,
-            hiddenUnits: Math.min(baseConfig.hiddenUnits, 64),
-            dropoutRate: 0,
-            batchSize: Math.min(baseConfig.batchSize, 4),
-          }
-        : baseConfig
-    const hiddenLayers: any[] = [
-      tf.layers.dense({
-        inputShape: [extracted.size],
-        units: config.hiddenUnits,
-        activation: "relu",
-        kernelRegularizer: tf.regularizers.l2({ l2: 0.0001 }),
-      }),
-      tf.layers.dropout({ rate: config.dropoutRate }),
-    ]
-    if (config.hiddenLayers === 2) {
-      hiddenLayers.push(
-        tf.layers.dense({
-          units: Math.max(32, Math.round(config.hiddenUnits / 2)),
-          activation: "relu",
-          kernelRegularizer: tf.regularizers.l2({ l2: 0.0001 }),
-        }),
-        tf.layers.dropout({ rate: config.dropoutRate }),
-      )
-    }
+    const config = clampTrainingConfig(options)
+    const load = estimateTrainingLoad(config.layers, classes.length, extracted.size, config.epochs)
+    if (load.parameters > 750_000) throw new Error("This architecture is too heavy for a browser. Reduce layer count or layer size before training.")
 
-    model = tf.sequential({
-      layers: [
-        ...hiddenLayers,
-        tf.layers.dense({
-          units: classes.length,
-          activation: "softmax",
-        }),
-      ],
-    })
-
-    model.compile({
-      optimizer: tf.train.adam(config.learningRate),
-      loss: "categoricalCrossentropy",
-      metrics: ["accuracy"],
-    })
+    model = tf.sequential({ layers: buildTrainableLayers(extracted.size, classes.length, config.layers) })
+    model.compile({ optimizer: tf.train.adam(config.learningRate), loss: "categoricalCrossentropy", metrics: ["accuracy"] })
 
     const epochs = config.epochs
-    if (options.shouldCancel?.()) {
-      throw new Error("Training cancelled.")
-    }
+    if (options.shouldCancel?.()) throw new Error("Training cancelled.")
 
+    const history: AiTrainingHistoryPoint[] = []
     let latestAccuracy = 0
     let latestValidation = 0
-    let latestLoss = 0
+    let bestEpoch = 0
+    let bestMonitor = Number.POSITIVE_INFINITY
+    let wait = 0
+    let earlyStopped = false
+    let bestWeights: tf.Tensor[] | null = null
+    const startedAt = performance.now()
 
-    options.onStage?.("Training classifier head")
+    options.onStage?.("Training classifier")
     await model.fit(trainXs, trainYs, {
       epochs,
-      batchSize: Math.min(config.batchSize, train.length),
+      batchSize: Math.min(config.batchSize, trainFeatureMatrix.length),
       shuffle: true,
-      validationData:
-        validationXs && validationYs
-          ? [validationXs, validationYs]
-          : undefined,
+      validationData: validationXs && validationYs ? [validationXs, validationYs] : undefined,
       verbose: 0,
       callbacks: {
         onEpochEnd: async (epoch, logs) => {
@@ -827,26 +878,49 @@ export async function trainAiModel(
             model!.stopTraining = true
             return
           }
-
           latestAccuracy = Number(logs?.accuracy ?? logs?.acc ?? 0)
-          latestValidation = Number(
-            logs?.val_accuracy ?? logs?.val_acc ?? latestAccuracy,
-          )
-          latestLoss = Number(logs?.loss ?? 0)
-          options.onEpoch?.(
-            epoch + 1,
-            epochs,
-            latestAccuracy,
-            latestLoss,
-          )
+          latestValidation = Number(logs?.val_accuracy ?? logs?.val_acc ?? 0)
+          const point: AiTrainingHistoryPoint = {
+            epoch: epoch + 1,
+            loss: Number(logs?.loss ?? 0),
+            accuracy: latestAccuracy,
+            valLoss: validationXs && validationYs && Number.isFinite(Number(logs?.val_loss)) ? Number(logs?.val_loss) : null,
+            valAccuracy: validationXs && validationYs ? latestValidation : null,
+            elapsedMs: Math.round(performance.now() - startedAt),
+          }
+          history.push(point)
+          options.onEpoch?.(point)
+
+          const monitor = point.valLoss ?? point.loss
+          if (monitor + config.earlyStoppingMinDelta < bestMonitor) {
+            bestMonitor = monitor
+            bestEpoch = point.epoch
+            wait = 0
+            bestWeights?.forEach((weight) => weight.dispose())
+            bestWeights = model!.getWeights().map((weight) => weight.clone())
+          } else {
+            wait += 1
+            if (wait >= config.earlyStoppingPatience && point.epoch >= 8) {
+              earlyStopped = true
+              model!.stopTraining = true
+            }
+          }
           await tf.nextFrame()
         },
       },
     })
 
-    if (options.shouldCancel?.() || model.stopTraining) {
+    if (options.shouldCancel?.()) {
+      bestWeights?.forEach((weight) => weight.dispose())
+      bestWeights = null
       throw new Error("Training cancelled.")
     }
+    if (bestWeights) {
+      model.setWeights(bestWeights)
+      bestWeights.forEach((weight) => weight.dispose())
+      bestWeights = null
+    }
+    model.stopTraining = false
 
     const trainEvaluation = model.evaluate(trainXs, trainYs) as tf.Scalar | tf.Scalar[]
     const trainValues = Array.isArray(trainEvaluation)
@@ -857,27 +931,19 @@ export async function trainAiModel(
       : latestAccuracy
     trainValues.forEach((value) => value.dispose())
 
-    let validationAccuracy = latestValidation
-    if (validationXs && validationYs) {
-      const validationEvaluation = model.evaluate(
-        validationXs,
-        validationYs,
-      ) as tf.Scalar | tf.Scalar[]
-      const validationValues = Array.isArray(validationEvaluation)
-        ? validationEvaluation
-        : [validationEvaluation]
-      validationAccuracy = validationValues[1]
-        ? Number((await validationValues[1].data())[0])
-        : latestValidation
-      validationValues.forEach((value) => value.dispose())
-    }
+    let validationAccuracy = 0
+    let validationConfusionMatrix: number[][] | undefined
 
-    const summary: AiModelSummary = {
+    if (validationXs && validationYs && validation.length) {
+      const validationEvaluation = model.evaluate(validationXs, validationYs) as tf.Scalar | tf.Scalar[]
+      const validationValues = Array.isArray(validationEvaluation) ? validationEvaluation : [validationEvaluation]
+      validationAccuracy = validationValues[1] ? Number((await validationValues[1].data())[0]) : latestValidation
+      validationValues.forEach((value) => value.dispose())    const summary: AiModelSummary = {
       id: createId(),
-      name: `${classes.join(" vs ")} · Pixiu Transfer AI`,
+      name: classes.join(" vs ") + " · Pixiu My AI",
       classes,
       sampleCount: samples.length,
-      epochs,
+      epochs: history.length,
       trainAccuracy: Math.round(trainAccuracy * 100),
       validationAccuracy: Math.round(validationAccuracy * 100),
       createdAt: Date.now(),
@@ -885,22 +951,25 @@ export async function trainAiModel(
       embeddingSize: extracted.size,
       featureExtractor: MY_AI_FEATURE_VERSION,
       storageKey: MODEL_KEY,
-      classPrototypes: buildClassPrototypes(
-        trainFeatureMatrix,
-        trainLabels,
-        classes,
-      ),
-      architecture:
-        config.hiddenLayers === 2
-          ? `Visual features → Dense(${config.hiddenUnits}) → Dropout(${Math.round(config.dropoutRate * 100)}%) → Dense(${Math.max(32, Math.round(config.hiddenUnits / 2))}) → Dropout(${Math.round(config.dropoutRate * 100)}%) → Classifier`
-          : `Visual features → Dense(${config.hiddenUnits}) → Dropout(${Math.round(config.dropoutRate * 100)}%) → Classifier`,
+      classPrototypes: buildClassPrototypes(trainFeatureMatrix, trainLabels, classes),
+      architecture: describeArchitecture(config.layers, classes.length),
       predictionThreshold: MY_AI_PREDICTION_THRESHOLD,
       trainingProfile: options.profile ?? "custom",
-      hiddenLayers: config.hiddenLayers,
-      hiddenUnits: config.hiddenUnits,
-      dropoutRate: config.dropoutRate,
+      hiddenLayers: config.layers.filter((layer) => layer.type === "dense").length,
+      hiddenUnits: Math.max(0, ...config.layers.filter((layer) => layer.type === "dense").map((layer) => layer.units ?? 0)),
+      dropoutRate: config.layers.find((layer) => layer.type === "dropout")?.rate ?? 0,
       learningRate: config.learningRate,
       batchSize: config.batchSize,
+      earlyStoppingPatience: config.earlyStoppingPatience,
+      earlyStoppingMinDelta: config.earlyStoppingMinDelta,
+      earlyStopped,
+      bestEpoch: bestEpoch || history[history.length - 1]?.epoch || history.length,
+      parameterCount: model.countParams(),
+      layerSpecs: config.layers,
+      trainingHistory: history,
+      validationAvailable: validation.length > 0,
+      generalizationGap,
+      validationConfusionMatrix,
       confidenceCalibration: "Classifier confidence is combined with learned class-pattern similarity; weak matches return as unknown.",
     }
 

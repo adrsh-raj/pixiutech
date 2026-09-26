@@ -10,6 +10,8 @@ import {
   Info,
   Layers3,
   GripVertical,
+  ChevronDown,
+  ChevronUp,
   Mic,
   Pencil,
   Plus,
@@ -41,8 +43,11 @@ import {
   removeAiSample,
   renameAiClass,
   saveAiStudioStore,
+  estimateTrainingLoad,
   AI_TRAINING_PROFILES,
   trainAiModel,
+  type AiLayerSpec,
+  type AiTrainingHistoryPoint,
   type AiStudioStore, type AiTrainingProfile,
 } from "@/lib/ai-studio-engine"
 import {
@@ -377,6 +382,25 @@ function drawFaces(
   }
 }
 
+
+function metricValues(points: AiTrainingHistoryPoint[], key: "loss"|"valLoss"|"accuracy"|"valAccuracy") {
+  return points.map(point=>point[key]).filter((value): value is number => typeof value==="number"&&Number.isFinite(value))
+}
+function metricPath(points: AiTrainingHistoryPoint[], key: "loss"|"valLoss"|"accuracy"|"valAccuracy") {
+  const values=metricValues(points,key); if(!values.length)return ""
+  const min=Math.min(...values),max=Math.max(...values),range=Math.max(0.0001,max-min),px=30,py=18,width=520,height=180
+  const plotted=points.map((point,index)=>{const value=point[key];if(typeof value!=="number"||!Number.isFinite(value))return null;const x=px+index/Math.max(1,points.length-1)*(width-px*2);const y=height-py-((value-min)/range)*(height-py*2);return x.toFixed(1)+","+y.toFixed(1)}).filter((value): value is string=>Boolean(value))
+  return plotted.length>1?"M "+plotted.join(" L "):plotted.length===1?"M "+plotted[0]:""
+}
+function MetricChart({title,points,primary,secondary,primaryLabel,secondaryLabel}:{title:string;points:AiTrainingHistoryPoint[];primary:"loss"|"accuracy";secondary:"valLoss"|"valAccuracy";primaryLabel:string;secondaryLabel:string}) {
+  if(!points.length)return null
+  const latest=points[points.length-1],hasSecondary=metricValues(points,secondary).length>0
+  return <div className="rounded-2xl border border-slate-800 bg-slate-950/55 p-3"><div className="flex justify-between"><p className="text-[10px] font-black">{title}</p><div className="flex gap-3 text-[8px] font-mono"><span className="text-violet-300">● {primaryLabel}</span>{hasSecondary&&<span className="text-cyan-300">● {secondaryLabel}</span>}</div></div><svg viewBox="0 0 520 180" className="mt-2 h-44 w-full"><path d={metricPath(points,primary)} fill="none" stroke="#a78bfa" strokeWidth="3"/>{hasSecondary&&<path d={metricPath(points,secondary)} fill="none" stroke="#22d3ee" strokeWidth="2.5" strokeDasharray="6 5"/></svg><div className="flex justify-between text-[8px] font-mono text-slate-600"><span>Epoch 1</span><span>Epoch {latest.epoch}</span></div><div className="mt-2 grid grid-cols-2 gap-2"><div className="rounded-lg border border-slate-800 p-2"><p className="text-[8px] text-slate-600">{primaryLabel} · latest</p><p className="mt-1 text-xs font-black">{primary==="accuracy"?Math.round(latest.accuracy*100)+"%":latest.loss.toFixed(4)}</p></div><div className="rounded-lg border border-slate-800 p-2"><p className="text-[8px] text-slate-600">{secondaryLabel} · latest</p><p className="mt-1 text-xs font-black">{secondary==="valAccuracy"?(latest.valAccuracy==null?"Not available":Math.round(latest.valAccuracy*100)+"%"):(latest.valLoss==null?"Not available":latest.valLoss.toFixed(4))}</p></div></div></div>
+}
+function ConfusionMatrix({classes,matrix}:{classes:string[];matrix?:number[][]}) {
+  if(!matrix?.length)return null
+  return <div className="rounded-2xl border border-slate-800 bg-slate-950/55 p-3"><p className="text-[10px] font-black">Validation confusion matrix</p><div className="mt-2 overflow-x-auto"><table className="min-w-full border-collapse text-[8px] font-mono"><thead><tr><th>A/P</th>{classes.map(name=><th key={name}>{name}</th>)}</tr></thead><tbody>{matrix.map((row,i)=><tr key={classes[i]}><th className="text-left">{classes[i]}</th>{row.map((v,j)=><td key={j} className={i===j?"text-emerald-300":"text-slate-500"}>{v}</td>)}</tr>)}</tbody></table></div></div>
+}
 export function AiStudioPanel({
   isOpen,
   onClose,
@@ -404,14 +428,24 @@ export function AiStudioPanel({
   const [renamingClass, setRenamingClass] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState("")
   const [training, setTraining] = useState(false)
-  const [progress, setProgress] = useState({ epoch: 0, total: 0, accuracy: 0, loss: 0, stage: "" })
+  const [progress, setProgress] = useState({
+    epoch: 0,
+    total: 0,
+    accuracy: 0,
+    loss: 0,
+    valAccuracy: null as number | null,
+    valLoss: null as number | null,
+    stage: "",
+  })
+  const [trainingHistory, setTrainingHistory] = useState<AiTrainingHistoryPoint[]>([])
   const [trainingProfile, setTrainingProfile] = useState<AiTrainingProfile>("grade6")
   const [advancedTuning, setAdvancedTuning] = useState(false)
-  const [customEpochs, setCustomEpochs] = useState(18)
-  const [customDepth, setCustomDepth] = useState<1 | 2>(1)
-  const [customUnits, setCustomUnits] = useState(96)
-  const [customDropout, setCustomDropout] = useState(20)
+  const [customEpochs, setCustomEpochs] = useState(40)
+  const [customLayers, setCustomLayers] = useState<AiLayerSpec[]>(() => AI_TRAINING_PROFILES.grade6.layers.map((layer) => ({ ...layer })))
   const [customLearningRate, setCustomLearningRate] = useState(0.001)
+  const [customBatchSize, setCustomBatchSize] = useState(8)
+  const [customPatience, setCustomPatience] = useState(8)
+  const [customMinDelta, setCustomMinDelta] = useState(0.001)
 
   // Keep separate video/canvas refs for the full Studio and the compact
   // floating runtime window. The same MediaStream can safely feed both, so
@@ -457,8 +491,40 @@ export function AiStudioPanel({
   const currentExplanation = explainCurrentAiResult(aiState, store.model)
   const canTrain = datasetStats.ready
   const selectedTrainingConfig = advancedTuning
-    ? { epochs: customEpochs, hiddenLayers: customDepth, hiddenUnits: customUnits, dropoutRate: customDropout / 100, learningRate: customLearningRate, batchSize: 8 }
+    ? { epochs: customEpochs, layers: customLayers, learningRate: customLearningRate, batchSize: customBatchSize, earlyStoppingPatience: customPatience, earlyStoppingMinDelta: customMinDelta }
     : AI_TRAINING_PROFILES[trainingProfile === "custom" ? "grade7" : trainingProfile]
+
+  const estimatedTrainingLoad = estimateTrainingLoad(selectedTrainingConfig.layers, Math.max(2, classes.length), store.model?.embeddingSize ?? 1280, selectedTrainingConfig.epochs)
+
+  useEffect(() => {
+    const preset = AI_TRAINING_PROFILES[trainingProfile === "custom" ? "grade7" : trainingProfile]
+    setCustomLayers(preset.layers.map((layer) => ({ ...layer })))
+    setCustomEpochs(preset.epochs)
+    setCustomLearningRate(preset.learningRate)
+    setCustomBatchSize(preset.batchSize)
+    setCustomPatience(preset.earlyStoppingPatience)
+    setCustomMinDelta(preset.earlyStoppingMinDelta)
+  }, [trainingProfile])
+
+  function updateCustomLayer(index: number, patch: Partial<AiLayerSpec>) {
+    setCustomLayers((current) => current.map((layer, i) => i === index ? { ...layer, ...patch } : layer))
+  }
+  function addCustomLayer() {
+    if (customLayers.length >= 8) return
+    setCustomLayers((current) => [...current, { type: "dense", units: 64, activation: "relu" }])
+  }
+  function removeCustomLayer(index: number) {
+    setCustomLayers((current) => current.length <= 1 ? current : current.filter((_, i) => i !== index))
+  }
+  function moveCustomLayer(index: number, direction: -1 | 1) {
+    setCustomLayers((current) => {
+      const target = index + direction
+      if (target < 0 || target >= current.length) return current
+      const next = [...current]
+      ;[next[index], next[target]] = [next[target], next[index]]
+      return next
+    })
+  }
 
   function commitStore(next: AiStudioStore) {
     datasetVersionRef.current += 1
@@ -1297,52 +1363,36 @@ export function AiStudioPanel({
 
   async function train() {
     if (!canTrain || training || runtimeEnabled) {
-      if (runtimeEnabled && !training) {
-        setStatus("Stop the live AI runtime before training My AI.")
-      }
+      if (runtimeEnabled && !training) setStatus("Stop the live AI runtime before training My AI.")
       return
     }
-
     const runId = ++trainingRunRef.current
     const datasetVersion = datasetVersionRef.current
     const trainingSamples = store.samples
     setTraining(true)
     setError(null)
-    setProgress({ epoch: 0, total: selectedTrainingConfig.epochs, accuracy: 0, loss: 0, stage: "Preparing dataset" })
+    setTrainingHistory([])
+    setProgress({ epoch: 0, total: selectedTrainingConfig.epochs, accuracy: 0, loss: 0, valAccuracy: null, valLoss: null, stage: "Preparing dataset" })
 
     try {
       const result = await trainAiModel(trainingSamples, {
         profile: advancedTuning ? "custom" : trainingProfile,
         epochs: selectedTrainingConfig.epochs,
-        hiddenLayers: selectedTrainingConfig.hiddenLayers,
-        hiddenUnits: selectedTrainingConfig.hiddenUnits,
-        dropoutRate: selectedTrainingConfig.dropoutRate,
+        layers: selectedTrainingConfig.layers,
         learningRate: selectedTrainingConfig.learningRate,
         batchSize: selectedTrainingConfig.batchSize,
-        shouldCancel: () =>
-          runId !== trainingRunRef.current ||
-          datasetVersion !== datasetVersionRef.current,
-        onStage: (stage) =>
-          setProgress((current) => ({ ...current, stage })),
-        onEpoch: (epoch, total, accuracy, loss) =>
-          setProgress((current) => ({
-            ...current,
-            epoch,
-            total,
-            accuracy,
-            loss,
-            stage: "Training classifier " + epoch + "/" + total,
-          })),
+        earlyStoppingPatience: selectedTrainingConfig.earlyStoppingPatience,
+        earlyStoppingMinDelta: selectedTrainingConfig.earlyStoppingMinDelta,
+        shouldCancel: () => runId !== trainingRunRef.current || datasetVersion !== datasetVersionRef.current,
+        onStage: (stage) => setProgress((current) => ({ ...current, stage })),
+        onEpoch: (point) => {
+          setTrainingHistory((current) => [...current, point])
+          setProgress((current) => ({ ...current, epoch: point.epoch, total: selectedTrainingConfig.epochs, accuracy: point.accuracy, loss: point.loss, valAccuracy: point.valAccuracy, valLoss: point.valLoss, stage: "Training classifier " + point.epoch + "/" + selectedTrainingConfig.epochs }))
+        },
       })
 
-      // Dataset/reset/unmount may have superseded this training run.
-      if (
-        runId !== trainingRunRef.current ||
-        datasetVersion !== datasetVersionRef.current
-      ) {
-        if (getActiveAiModel() === result.model) {
-          disposeActiveAiModel()
-        }
+      if (runId !== trainingRunRef.current || datasetVersion !== datasetVersionRef.current) {
+        if (getActiveAiModel() === result.model) disposeActiveAiModel()
         return
       }
 
@@ -1356,9 +1406,7 @@ export function AiStudioPanel({
       if (runId !== trainingRunRef.current) return
       setError(trainError instanceof Error ? trainError.message : "Training failed.")
     } finally {
-      if (runId === trainingRunRef.current) {
-        setTraining(false)
-      }
+      if (runId === trainingRunRef.current) setTraining(false)
     }
   }
 
@@ -1928,48 +1976,28 @@ export function AiStudioPanel({
                   </div>
 
                   <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-                      <div className="min-w-0">
-                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-violet-300">Training profile</p>
-                        <p className="mt-1 text-[9px] leading-4 text-slate-600">Optimized defaults for Grade 6–8 classroom datasets.</p>
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between"><div><p className="text-[10px] font-black uppercase tracking-[0.14em] text-violet-300">Training profile</p><p className="mt-1 text-[9px] text-slate-600">Grade 6–8 presets plus Advanced tuning.</p></div>
+                    <select value={trainingProfile} onChange={(event)=>setTrainingProfile(event.target.value as AiTrainingProfile)} disabled={training||runtimeEnabled||advancedTuning} className="w-full max-w-md rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-[10px] font-black text-white"><option value="grade6">Grade 6 · 20 max epochs</option><option value="grade7">Grade 7 · 35 max epochs</option><option value="grade8">Grade 8 · 50 max epochs</option></select></div>
+                    <label className="mt-3 inline-flex items-center gap-2 text-[10px] font-bold text-slate-400"><input type="checkbox" checked={advancedTuning} onChange={(event)=>setAdvancedTuning(event.target.checked)} disabled={training||runtimeEnabled}/>Advanced tuning</label>
+                    {advancedTuning&&<div className="mt-3 space-y-3">
+                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                        <label className="text-[9px] font-mono text-slate-500">Max epochs<input type="number" min="8" max="150" value={customEpochs} onChange={(event)=>setCustomEpochs(Math.max(8,Math.min(150,Number(event.target.value)||40)))} disabled={training||runtimeEnabled} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-2 text-[10px] text-white"/></label>
+                        <label className="text-[9px] font-mono text-slate-500">Learning rate<input type="number" min="0.0001" max="0.01" step="0.0001" value={customLearningRate} onChange={(event)=>setCustomLearningRate(Math.max(0.0001,Math.min(0.01,Number(event.target.value)||0.001)))} disabled={training||runtimeEnabled} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-2 text-[10px] text-white"/></label>
+                        <label className="text-[9px] font-mono text-slate-500">Batch size<input type="number" min="2" max="32" value={customBatchSize} onChange={(event)=>setCustomBatchSize(Math.max(2,Math.min(32,Number(event.target.value)||8)))} disabled={training||runtimeEnabled} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-2 text-[10px] text-white"/></label>
+                        <label className="text-[9px] font-mono text-slate-500">Patience<input type="number" min="2" max="20" value={customPatience} onChange={(event)=>setCustomPatience(Math.max(2,Math.min(20,Number(event.target.value)||8)))} disabled={training||runtimeEnabled} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-2 text-[10px] text-white"/></label>
+                        <label className="text-[9px] font-mono text-slate-500">Min improvement<input type="number" min="0.0001" max="0.05" step="0.0001" value={customMinDelta} onChange={(event)=>setCustomMinDelta(Math.max(0.0001,Math.min(0.05,Number(event.target.value)||0.001)))} disabled={training||runtimeEnabled} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-2 text-[10px] text-white"/></label>
                       </div>
-                      <select value={trainingProfile} onChange={(event) => setTrainingProfile(event.target.value as AiTrainingProfile)} disabled={training || runtimeEnabled} className="w-full max-w-md rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-[10px] font-black text-white outline-none">
-                        <option value="grade6">Grade 6 · Fast · 12 epochs · 1 × 64</option>
-                        <option value="grade7">Grade 7 · Balanced · 18 epochs · 1 × 96</option>
-                        <option value="grade8">Grade 8 · Extended · 22 epochs · 2 × 128</option>
-                      </select>
-                    </div>
-
-                    <label className="mt-3 inline-flex items-center gap-2 text-[10px] font-bold text-slate-400">
-                      <input type="checkbox" checked={advancedTuning} onChange={(event) => setAdvancedTuning(event.target.checked)} disabled={training || runtimeEnabled} />
-                      Advanced tuning
-                    </label>
-
-                    {advancedTuning ? (
-                      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                        <label className="text-[9px] font-mono text-slate-500">Epochs
-                          <input type="number" min="8" max="30" step="1" value={customEpochs} onChange={(event) => setCustomEpochs(Math.max(8, Math.min(30, Number(event.target.value) || 18)))} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-2 text-[10px] text-white" />
-                        </label>
-                        <label className="text-[9px] font-mono text-slate-500">Depth
-                          <select value={customDepth} onChange={(event) => setCustomDepth(Number(event.target.value) === 2 ? 2 : 1)} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-2 text-[10px] text-white"><option value="1">1 layer</option><option value="2">2 layers</option></select>
-                        </label>
-                        <label className="text-[9px] font-mono text-slate-500">Neurons
-                          <input type="number" min="32" max="160" step="8" value={customUnits} onChange={(event) => setCustomUnits(Math.max(32, Math.min(160, Number(event.target.value) || 96)))} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-2 text-[10px] text-white" />
-                        </label>
-                        <label className="text-[9px] font-mono text-slate-500">Dropout %
-                          <input type="number" min="0" max="40" step="5" value={customDropout} onChange={(event) => setCustomDropout(Math.max(0, Math.min(40, Number(event.target.value) || 20)))} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-2 text-[10px] text-white" />
-                        </label>
-                        <label className="text-[9px] font-mono text-slate-500">Learning rate
-                          <input type="number" min="0.0003" max="0.003" step="0.0001" value={customLearningRate} onChange={(event) => setCustomLearningRate(Math.max(0.0003, Math.min(0.003, Number(event.target.value) || 0.001)))} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-2 text-[10px] text-white" />
-                        </label>
+                      <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-[9px] font-black text-cyan-200">Layer stack</p><p className="mt-1 text-[8px] text-slate-600">Dense / Linear, Normalization, Dropout and Activation. Conv2D is intentionally excluded.</p></div><button type="button" onClick={addCustomLayer} disabled={training||runtimeEnabled||customLayers.length>=8} className="rounded-lg bg-violet-500/15 px-2 py-1.5 text-[9px] font-black text-violet-200 disabled:opacity-30"><Plus size={11}/> Add layer</button></div>
+                        <div className="mt-3 space-y-2">{customLayers.map((layer,index)=><div key={index} className="grid gap-2 rounded-xl border border-slate-800 bg-slate-950 p-2 lg:grid-cols-[28px_150px_1fr_auto] lg:items-center"><span className="text-center font-mono text-[9px] text-slate-700">{index+1}</span>
+                          <select value={layer.type} onChange={(event)=>{const type=event.target.value as AiLayerSpec["type"];updateCustomLayer(index,type==="dense"?{type,units:layer.units??64,activation:layer.activation??"relu"}:type==="dropout"?{type,rate:layer.rate??0.2}:type==="activation"?{type,activation:layer.activation??"relu"}:{type})}} disabled={training||runtimeEnabled} className="rounded-lg border border-slate-700 bg-slate-950 px-2 py-2 text-[9px] font-black text-white"><option value="dense">Dense / Linear</option><option value="batchNormalization">Normalization</option><option value="dropout">Dropout</option><option value="activation">Activation</option></select>
+                          <div className="flex flex-wrap items-center gap-2">{layer.type==="dense"&&<><label className="text-[8px] font-mono text-slate-600">Units<input type="number" min="16" max="256" step="8" value={layer.units??64} onChange={(event)=>updateCustomLayer(index,{units:Math.max(16,Math.min(256,Number(event.target.value)||64))})} disabled={training||runtimeEnabled} className="ml-1 w-24 rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-[9px] text-white"/></label><label className="text-[8px] font-mono text-slate-600">Activation<select value={layer.activation??"relu"} onChange={(event)=>updateCustomLayer(index,{activation:event.target.value as AiLayerSpec["activation"]})} disabled={training||runtimeEnabled} className="ml-1 rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-[9px] text-white"><option value="relu">ReLU</option><option value="linear">Linear</option><option value="tanh">Tanh</option><option value="sigmoid">Sigmoid</option></select></label></>}</div>
+                          <div className="flex items-center justify-end gap-1"><button type="button" onClick={()=>moveCustomLayer(index,-1)} disabled={training||runtimeEnabled||index===0} title="Move up" className="rounded-lg border border-slate-800 p-1.5 disabled:opacity-25"><ChevronUp size={12}/></button><button type="button" onClick={()=>moveCustomLayer(index,1)} disabled={training||runtimeEnabled||index===customLayers.length-1} title="Move down" className="rounded-lg border border-slate-800 p-1.5 disabled:opacity-25"><ChevronDown size={12}/></button><button type="button" onClick={()=>removeCustomLayer(index)} disabled={training||runtimeEnabled||customLayers.length<=1} title="Remove layer" className="rounded-lg border border-rose-400/10 p-1.5 text-slate-500 hover:text-rose-300 disabled:opacity-25"><Trash2 size={12}/></button></div>
+                        </div>)}</div>
                       </div>
-                    ) : (
-                      <p className="mt-2 text-[9px] text-slate-600">
-                        {trainingProfile === "grade6" ? "Optimized for first-time learners and small datasets." : trainingProfile === "grade7" ? "Balanced default for classroom experiments." : "More capacity for Grade 8 datasets with enough examples."}
-                      </p>
-                    )}
+                    </div>}
+                    <div className="mt-3 flex flex-wrap gap-2 text-[8px] font-mono"><span className="rounded-lg border border-slate-800 px-2 py-1">Epochs · {selectedTrainingConfig.epochs}</span><span className="rounded-lg border border-slate-800 px-2 py-1">Layers · {selectedTrainingConfig.layers.length}</span><span className="rounded-lg border border-slate-800 px-2 py-1">Patience · {selectedTrainingConfig.earlyStoppingPatience}</span><span className="rounded-lg border border-slate-800 px-2 py-1">Load · {estimatedTrainingLoad.label}</span><span className="rounded-lg border border-slate-800 px-2 py-1">Params · {estimatedTrainingLoad.parameters.toLocaleString()}</span></div>
+                    {estimatedTrainingLoad.warning&&<p className="mt-2 text-[8px] text-amber-300/80">{estimatedTrainingLoad.warning}</p>}
                   </div>
-
                   {training && (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-[9px] font-mono text-slate-600">
@@ -1984,7 +2012,15 @@ export function AiStudioPanel({
                 </div>
               </div>
 
-              {error && (
+              {(training || store.model?.trainingHistory?.length) && (
+  <div className="space-y-3 rounded-2xl border border-cyan-300/10 bg-cyan-500/[0.02] p-4">
+    <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-black">6I · Training diagnostics</p><span className="text-[8px] font-mono text-slate-600">Epoch {training?progress.epoch+"/"+progress.total:store.model?.epochs??0} · Train {training?Math.round(progress.accuracy*100):store.model?.trainAccuracy??0}% · Val {training?(progress.valAccuracy==null?"—":Math.round(progress.valAccuracy*100)+"%"):store.model?.validationAvailable?(store.model.validationAccuracy??0)+"%":"—"}</span></div>
+    <div className="grid gap-3 lg:grid-cols-2"><MetricChart title="Loss · lower is better" points={training?trainingHistory:store.model?.trainingHistory??[]} primary="loss" secondary="valLoss" primaryLabel="Training loss" secondaryLabel="Validation loss"/><MetricChart title="Accuracy · higher is better" points={training?trainingHistory:store.model?.trainingHistory??[]} primary="accuracy" secondary="valAccuracy" primaryLabel="Training accuracy" secondaryLabel="Validation accuracy"/></div>
+    {!training&&store.model&&<><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5"><div className="rounded-xl border border-slate-800 p-3"><p className="text-[8px] text-slate-600">Best epoch</p><p className="text-sm font-black">{store.model.bestEpoch??"—"}</p></div><div className="rounded-xl border border-slate-800 p-3"><p className="text-[8px] text-slate-600">Parameters</p><p className="text-sm font-black">{(store.model.parameterCount??0).toLocaleString()}</p></div><div className="rounded-xl border border-slate-800 p-3"><p className="text-[8px] text-slate-600">Validation</p><p className="text-sm font-black">{store.model.validationAvailable?"Available":"Not available"}</p></div><div className="rounded-xl border border-slate-800 p-3"><p className="text-[8px] text-slate-600">Gap</p><p className="text-sm font-black">{store.model.validationAvailable?(store.model.generalizationGap??0)+"%":"—"}</p></div><div className="rounded-xl border border-slate-800 p-3"><p className="text-[8px] text-slate-600">Stopping</p><p className="text-sm font-black">{store.model.earlyStopped?"Early":"Max epochs"}</p></div></div><ConfusionMatrix classes={store.model.classes} matrix={store.model.validationConfusionMatrix}/></>}
+  </div>
+)}
+
+{error && (
                 <div className="rounded-xl border border-amber-500/30 bg-amber-950/30 px-3 py-2 text-[10px] text-amber-200">
                   {error}
                 </div>

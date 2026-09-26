@@ -10,7 +10,7 @@ import {
 } from "../pixiu-lms-portal/src/lib/ai/ai-result-normalizer.ts"
 import { createAiVisionState } from "../pixiu-lms-portal/src/lib/ai/vision-state.ts"
 import { countExtendedFingers } from "../pixiu-lms-portal/src/lib/ai/hand-detector.ts"
-import { classifyExpression } from "../pixiu-lms-portal/src/lib/ai/face-detector.ts
+import { classifyExpression } from "../pixiu-lms-portal/src/lib/ai/face-detector.ts"
 
 const root = fileURLToPath(new URL("..", import.meta.url))
 const read = (relativePath) =>
@@ -234,7 +234,7 @@ const staticSourceChecks = [
   ["6F sound adapter", sound.includes("BROWSER_FFT") && sound.includes("generation") && panel.includes("loadSoundRecognizer") && runner.includes("ai_microphone_enable")],
   ["6G gesture interpreter", gesture.includes("interpretHandGesture") && workbench.includes("getAiGesture") && toolbox.includes("ai_get_gesture")],
   ["6H dataset workflow", engine.includes("addAiClass") && engine.includes("removeAiClass") && panel.includes("Import images") && panel.includes("Capture example")],
-  ["6I transfer learning", extractor.includes("MY_AI_EMBEDDING_NODE") && engine.includes("Dense(96)") && !engine.includes("tf.layers.conv2d")],
+  ["6I configurable My AI training head", extractor.includes("MY_AI_EMBEDDING_NODE") && engine.includes("AiLayerType") && engine.includes("buildTrainableLayers") && !engine.includes("tf.layers.conv2d")],
   ["6J unknown/low-confidence", engine.includes("lowConfidence") && engine.includes("unknown") && extractor.includes("MY_AI_PREDICTION_THRESHOLD = 0.62")],
   ["6K normalization boundary", workbench.includes("normalizeAiVisionState") && workbench.includes("handleAiStateChange") && runner.includes("isAiUnknown")],
   ["6L data-source boundary", runner.includes("AI blocks are data/control inputs only") && blocks.includes("Browser AI generators")],
@@ -269,3 +269,13 @@ console.log("6M · Teach mode concepts: PASS")
 console.log("6N · Explain current result: PASS")
 console.log("6O · camera/mic activity + local cleanup controls: PASS")
 console.log("6P · cross-mode/restart/permission/no-input/integration matrix: PASS")
+
+assert(engine.includes("trainingHistory: history"), "training history persistence missing")
+assert(engine.includes("validationConfusionMatrix"), "validation confusion matrix missing")
+assert(engine.includes("estimateTrainingLoad"), "training load guard missing")
+assert(panel.includes("MetricChart"), "training graph UI missing")
+assert(panel.includes("Add layer"), "layer editor missing")
+assert(panel.includes("Max epochs"), "extended epoch control missing")
+assert(!panel.includes("customDepth"), "obsolete depth control remains")
+assert(!panel.includes("customUnits"), "obsolete unit control remains")
+assert(!panel.includes("customDropout"), "obsolete dropout control remains")
