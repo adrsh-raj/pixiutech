@@ -78,16 +78,30 @@ export async function extractMyAiEmbedding(
     const rgbFeatures = tf.reshape(rgbSmall, [1, 192])
 
     // 64 dims: edge/texture response at 8 × 8.
+    // `resizeBilinear` returns a rank-3 H×W×C tensor here, so slice
+    // coordinates must also be rank-3 (H, W, C), not rank-4.
     const dx = tf.abs(
       tf.sub(
-        grayscale.slice([0, 0, 1, 0], [1, MY_AI_INPUT_SIZE, MY_AI_INPUT_SIZE - 1, 1]),
-        grayscale.slice([0, 0, 0, 0], [1, MY_AI_INPUT_SIZE, MY_AI_INPUT_SIZE - 1, 1]),
+        grayscale.slice(
+          [0, 1, 0],
+          [MY_AI_INPUT_SIZE, MY_AI_INPUT_SIZE - 1, 1],
+        ),
+        grayscale.slice(
+          [0, 0, 0],
+          [MY_AI_INPUT_SIZE, MY_AI_INPUT_SIZE - 1, 1],
+        ),
       ),
     )
     const dy = tf.abs(
       tf.sub(
-        grayscale.slice([0, 1, 0, 0], [1, MY_AI_INPUT_SIZE - 1, MY_AI_INPUT_SIZE, 1]),
-        grayscale.slice([0, 0, 0, 0], [1, MY_AI_INPUT_SIZE - 1, MY_AI_INPUT_SIZE, 1]),
+        grayscale.slice(
+          [1, 0, 0],
+          [MY_AI_INPUT_SIZE - 1, MY_AI_INPUT_SIZE, 1],
+        ),
+        grayscale.slice(
+          [0, 0, 0],
+          [MY_AI_INPUT_SIZE - 1, MY_AI_INPUT_SIZE, 1],
+        ),
       ),
     )
     const dxSmall = tf.image.resizeBilinear(dx, [8, 8], true)
