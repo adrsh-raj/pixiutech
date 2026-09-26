@@ -33,7 +33,7 @@ assert(blocks.includes("new Blockly.FieldDropdown(aiClassDropdown)"), "AI detect
 for (const type of ["ai_get_object_count","pir_motion","ldr_read","tmp36_temperature","potentiometer_read","arduino_map"]) assert(blocks.includes("'" + type + "'"), "Block implementation missing " + type)
 
 const toolbox = read("pixiu-lms-portal/src/components/circuit-lab/blockly-editor.tsx")
-for (const type of ["math_modulo","math_single","arduino_map","pir_motion","ldr_read","tmp36_temperature","potentiometer_read","ai_get_object_count"]) assert(toolbox.includes('type: "' + type + '"' ) || toolbox.includes("type: '" + type + "'"), "Blockly toolbox missing " + type)
+for (const type of ["math_modulo","math_single","arduino_map","pushbutton_read","pir_motion","ldr_read","tmp36_temperature","potentiometer_read","ai_get_object_count"]) assert(toolbox.includes('type: "' + type + '"' ) || toolbox.includes("type: '" + type + "'"), "Blockly toolbox missing " + type)
 
 
 const workbench = read("pixiu-lms-portal/src/components/circuit-lab/workbench.tsx")
@@ -57,3 +57,13 @@ if (failures.length) {
   process.exit(1)
 }
 console.log("PIXIU Phase 7-8 static contract check PASSED")
+const templatesSource = read("pixiu-lms-portal/src/lib/templates.ts")
+for (const marker of [
+  'sensorBlock("pushbutton_read", "btn")',
+  'sensorBlock("potentiometer_read", "pot")',
+  'sensorBlock("ldr_read", "ldr")',
+  'sensorBlock("pir_motion", "pir")',
+  'sensorBlock("tmp36_temperature", "tmp")',
+  'sensorBlock("ir_read", "ir")',
+  'sensorBlock("soil_moisture_read", "soil")',
+]) assert(templatesSource.includes(marker), "Template behavioral starter contract missing: " + marker)

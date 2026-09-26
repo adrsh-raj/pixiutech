@@ -640,6 +640,7 @@ export function Workbench() {
           const p = partId
             ? partsRef.current.find((pt) => pt.id === partId)
             : partsRef.current.find((pt) => pt.type === type)
+          if (type === "pushbutton") return String(p?.props?.pressed ?? "false") === "true" ? 1 : 0
           if (type === "ultrasonic") return Number(p?.props?.distance ?? 100)
           if (type === "ldr") return Number(p?.props?.light ?? 512)
           if (type === "tmp36") return Number(p?.props?.temperature ?? 25)

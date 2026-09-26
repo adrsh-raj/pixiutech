@@ -105,6 +105,7 @@ const TOOLBOX = {
       name: 'Sensors & Inputs',
       colour: '230',
       contents: [
+        { kind: 'block', type: 'pushbutton_read' },
         { kind: 'block', type: 'ultrasonic_read' },
         { kind: 'block', type: 'ir_read' },
         { kind: 'block', type: 'dht_temperature' },

@@ -304,6 +304,16 @@ function chain(blocks: string[]) {
 }
 
 function numberBlock(value: number) { return block("math_number", { NUM: String(value) }) }
+function compareBlock(op: string, left: string, right: string) {
+  return "<block type=\"logic_compare\"><field name=\"OP\">" + op + "</field><value name=\"A\">" + left + "</value><value name=\"B\">" + right + "</value></block>"
+}
+function ifElseBlock(condition: string, whenTrue: string[], whenFalse: string[]) {
+  return "<block type=\"controls_if\"><mutation else=\"1\"></mutation><value name=\"IF0\">" + condition + "</value><statement name=\"DO0\">" + chain(whenTrue) + "</statement><statement name=\"ELSE\">" + chain(whenFalse) + "</statement></block>"
+}
+function sensorBlock(type: string, sensor: string) {
+  return block(type, { SENSOR: sensor })
+}
+
 function textBlock(value: string) { return block("text_string", { TEXT: value }) }
 function pinMode(pin: string, mode: string) { return block("io_pinmode", { PIN: pin, MODE: mode }) }
 function digitalWrite(pin: string, state: "HIGH" | "LOW") { return block("io_digitalwrite", { PIN: pin, STATE: state }) }
@@ -324,11 +334,23 @@ function starter(id: string, title: string, description: string, gradeBand: Temp
 const EXTRA_TEMPLATES: ProjectTemplate[] = [
   starter("g6-pushbutton-led", "Pushbutton Lamp", "Use a tactile pushbutton as a digital input to control an LED.", 6, "Digital Inputs", "Beginner", ["Pushbutton", "Digital Input", "LED"],
     { parts: [part("uno","arduino-uno",60,110),part("btn","pushbutton",360,100),part("led1","led",540,90,{color:"green"}),part("r1","resistor",540,200,{resistance:220})], wires: [wire("p1","uno","d2","btn","p1a"),wire("p2","btn","p2a","uno","5v","#ef4444"),wire("p3","uno","d13","r1","a","#22c55e"),wire("p4","r1","b","led1","anode","#22c55e"),wire("p5","led1","cathode","uno","gnd","#1e293b")] },
-    program([pinMode("2","INPUT"),pinMode("13","OUTPUT")],[digitalWrite("13","HIGH"),delay(400),digitalWrite("13","LOW"),delay(400)]),
+    program([pinMode("2","INPUT"),pinMode("13","OUTPUT")],[
+      ifElseBlock(
+        sensorBlock("pushbutton_read", "btn"),
+        [digitalWrite("13","HIGH")],
+        [digitalWrite("13","LOW")],
+      ),
+      delay(50),
+    ]),
     ["Place Arduino, pushbutton, LED and resistor.","Connect the button to a digital input and the LED to D13 through its resistor.","Run the circuit and experiment with the button."]),
   starter("g6-pot-brightness", "Potentiometer LED Dimmer", "Turn a virtual knob and explore analog input mapped to LED brightness.", 6, "Analog Input", "Beginner", ["Potentiometer", "Analog", "PWM"],
     { parts: [part("uno","arduino-uno",60,110),part("pot","potentiometer",330,110,{value:512}),part("led1","led",540,90,{color:"blue"}),part("r1","resistor",540,190,{resistance:220})], wires: [wire("a","uno","5v","pot","t1","#ef4444"),wire("b","uno","gnd","pot","t2","#1e293b"),wire("c","pot","wiper","uno","a0","#eab308"),wire("d","uno","d9","r1","a","#3b82f6"),wire("e","r1","b","led1","anode","#3b82f6"),wire("f","led1","cathode","uno","gnd","#1e293b")] },
-    program([pinMode("9","OUTPUT")],[analogWrite("9",128),delay(250)]),
+    program([pinMode("9","OUTPUT")],[
+      block("io_analogwrite", { PIN: "9" }, {
+        VALUE: "<block type=\"arduino_map\"><value name=\"VALUE\">" + sensorBlock("potentiometer_read", "pot") + "</value><value name=\"FROM_LOW\">" + numberBlock(0) + "</value><value name=\"FROM_HIGH\">" + numberBlock(1023) + "</value><value name=\"TO_LOW\">" + numberBlock(0) + "</value><value name=\"TO_HIGH\">" + numberBlock(255) + "</value></block>",
+      }),
+      delay(80),
+    ]),
     ["Place the potentiometer and LED circuit.","Connect the wiper to A0 and the LED to PWM pin D9.","Move the knob and observe the simulated brightness response."]),
   starter("g6-rgb-mood-lamp", "RGB Mood Lamp", "Drive three colour channels to create a simple RGB mood lamp.", 6, "Multi-Output", "Beginner", ["RGB LED", "Colour", "GPIO"],
     { parts: [part("uno","arduino-uno",60,110),part("rgb","rgb-led",430,100,{})], wires: [wire("r","uno","d9","rgb","red","#ef4444"),wire("g","uno","d10","rgb","green","#22c55e"),wire("b","uno","d11","rgb","blue","#3b82f6"),wire("gnd","uno","gnd","rgb","gnd","#1e293b")] },
@@ -344,15 +366,37 @@ const EXTRA_TEMPLATES: ProjectTemplate[] = [
     ["Place the 7-segment display.","Connect several segments to Arduino outputs and the common pin to GND.","Run the display, then change which segments are HIGH."]),
   starter("g6-ldr-night-lamp", "Automatic Night Lamp", "Use an LDR concept circuit to introduce light sensing and automatic output.", 6, "Sensors", "Intermediate", ["LDR", "Analog", "Automation"],
     { parts: [part("uno","arduino-uno",60,110),part("ldr","ldr",330,100),part("led1","led",540,90,{color:"yellow"}),part("r1","resistor",540,190,{resistance:220})], wires: [wire("a","uno","5v","ldr","t1","#ef4444"),wire("b","ldr","t2","uno","a0","#eab308"),wire("c","uno","d13","r1","a","#facc15"),wire("d","r1","b","led1","anode","#facc15"),wire("e","led1","cathode","uno","gnd","#1e293b")] },
-    program([pinMode("13","OUTPUT")],[digitalWrite("13","HIGH"),delay(700),digitalWrite("13","LOW"),delay(300)]),
+    program([pinMode("13","OUTPUT")],[
+      ifElseBlock(
+        compareBlock("LT", sensorBlock("ldr_read", "ldr"), numberBlock(400)),
+        [digitalWrite("13","HIGH")],
+        [digitalWrite("13","LOW")],
+      ),
+      delay(100),
+    ]),
     ["Build the LDR sensing path and LED output.","Use A0 as the sensor input.","Experiment with the LDR value and decide when the lamp should turn on."]),
   starter("g7-pir-security", "PIR Security Light", "Turn an LED on when a PIR motion sensor reports movement.", 7, "Sensors + Automation", "Intermediate", ["PIR", "Motion", "Security"],
     { parts: [part("uno","arduino-uno",60,110),part("pir","pir-sensor",360,90,{motion:false}),part("led1","led",560,90,{color:"red"}),part("r1","resistor",560,190,{resistance:220})], wires: [wire("a","uno","5v","pir","vcc","#ef4444"),wire("b","uno","gnd","pir","gnd","#1e293b"),wire("c","uno","d7","pir","out","#60a5fa"),wire("d","uno","d13","r1","a","#ef4444"),wire("e","r1","b","led1","anode","#ef4444"),wire("f","led1","cathode","uno","gnd","#1e293b")] },
-    program([pinMode("7","INPUT"),pinMode("13","OUTPUT")],[digitalWrite("13","HIGH"),delay(500),digitalWrite("13","LOW"),delay(500)]),
+    program([pinMode("7","INPUT"),pinMode("13","OUTPUT")],[
+      ifElseBlock(
+        sensorBlock("pir_motion", "pir"),
+        [digitalWrite("13","HIGH")],
+        [digitalWrite("13","LOW")],
+      ),
+      delay(80),
+    ]),
     ["Power the PIR sensor and connect OUT to D7.","Connect the LED to D13 through a resistor.","Trigger motion in the Inspector and observe the light."]),
   starter("g7-tmp36-alert", "TMP36 Temperature Alert", "Read an analog temperature sensor and build a high-temperature alarm concept.", 7, "Analog Sensors", "Intermediate", ["TMP36", "Temperature", "Alarm"],
     { parts: [part("uno","arduino-uno",60,110),part("tmp","tmp36",350,95,{temperature:28}),part("bz","buzzer",560,170)], wires: [wire("a","uno","5v","tmp","vcc","#ef4444"),wire("b","tmp","out","uno","a0","#eab308"),wire("c","tmp","gnd","uno","gnd","#1e293b"),wire("d","uno","d8","bz","pos","#facc15"),wire("e","bz","neg","uno","gnd","#1e293b")] },
-    program([serialBegin(),pinMode("8","OUTPUT")],[serialPrint("Temperature check"),digitalWrite("8","HIGH"),delay(200),digitalWrite("8","LOW"),delay(800)]),
+    program([serialBegin(),pinMode("8","OUTPUT")],[
+      serialPrintValue("tmp36_temperature", { SENSOR: "tmp" }),
+      ifElseBlock(
+        compareBlock("GT", sensorBlock("tmp36_temperature", "tmp"), numberBlock(30)),
+        [digitalWrite("8","HIGH")],
+        [digitalWrite("8","LOW")],
+      ),
+      delay(500),
+    ]),
     ["Wire TMP36 power, ground and Vout to A0.","Place the buzzer on D8.","Adjust temperature in the Inspector and build your own threshold logic."]),
   starter("g7-dht-weather", "DHT11 Weather Station", "Display live temperature and humidity readings from a DHT11 sensor.", 7, "Environmental Sensors", "Intermediate", ["DHT11", "Temperature", "Humidity"],
     { parts: [part("uno","arduino-uno",60,120),part("dht","dht11",420,100,{temperature:25,humidity:55})], wires: [wire("a","uno","5v","dht","vcc","#ef4444"),wire("b","uno","gnd","dht","gnd","#1e293b"),wire("c","uno","d4","dht","data","#60a5fa")] },
@@ -360,15 +404,32 @@ const EXTRA_TEMPLATES: ProjectTemplate[] = [
     ["Connect DHT11 VCC, GND and DATA.","Keep temperature and humidity reads in the loop.","Move the DHT11 controls and watch the live values."]),
   starter("g7-soil-smart-farm", "Smart Farm Soil Monitor", "Read soil moisture and use it to drive a farm indicator.", 7, "Smart Farming", "Intermediate", ["Soil Moisture", "Analog", "IoT"],
     { parts: [part("uno","arduino-uno",60,110),part("soil","soil-moisture",350,95,{moisture:620}),part("led1","led",560,90,{color:"green"}),part("r1","resistor",560,190,{resistance:220})], wires: [wire("a","uno","5v","soil","vcc","#ef4444"),wire("b","soil","ao","uno","a0","#eab308"),wire("c","soil","gnd","uno","gnd","#1e293b"),wire("d","uno","d13","r1","a","#22c55e"),wire("e","r1","b","led1","anode","#22c55e"),wire("f","led1","cathode","uno","gnd","#1e293b")] },
-    program([pinMode("13","OUTPUT")],[digitalWrite("13","HIGH"),delay(500),digitalWrite("13","LOW"),delay(500)]),
+    program([pinMode("13","OUTPUT")],[
+      ifElseBlock(
+        compareBlock("GT", sensorBlock("soil_moisture_read", "soil"), numberBlock(600)),
+        [digitalWrite("13","HIGH")],
+        [digitalWrite("13","LOW")],
+      ),
+      delay(100),
+    ]),
     ["Connect the soil sensor AO line to A0.","Connect an indicator LED to D13.","Change moisture and design a dry-soil alert."]),
   starter("g7-ir-obstacle", "IR Obstacle Indicator", "Use an infrared obstacle sensor to control an indicator LED.", 7, "Digital Sensors", "Intermediate", ["IR Sensor", "Obstacle", "Robotics"],
     { parts: [part("uno","arduino-uno",60,110),part("ir","ir-sensor",350,95,{detected:"false"}),part("led1","led",560,90,{color:"red"}),part("r1","resistor",560,190,{resistance:220})], wires: [wire("a","uno","5v","ir","vcc","#ef4444"),wire("b","uno","gnd","ir","gnd","#1e293b"),wire("c","uno","d7","ir","out","#60a5fa"),wire("d","uno","d13","r1","a","#ef4444"),wire("e","r1","b","led1","anode","#ef4444"),wire("f","led1","cathode","uno","gnd","#1e293b")] },
-    program([pinMode("7","INPUT"),pinMode("13","OUTPUT")],[digitalWrite("13","HIGH"),delay(300),digitalWrite("13","LOW"),delay(700)]),
+    program([pinMode("7","INPUT"),pinMode("13","OUTPUT")],[
+      ifElseBlock(
+        sensorBlock("ir_read", "ir"),
+        [digitalWrite("13","HIGH")],
+        [digitalWrite("13","LOW")],
+      ),
+      delay(80),
+    ]),
     ["Connect IR VCC, GND and OUT.","Use D7 as the digital input.","Toggle obstacle detection and observe the LED."]),
   starter("g7-encoder-menu", "Rotary Encoder Counter", "Use a rotary encoder to explore incremental user input.", 7, "Human Interface", "Intermediate", ["Rotary Encoder", "Input", "Counter"],
     { parts: [part("uno","arduino-uno",60,110),part("enc","rotary-encoder",380,100,{value:0,pressed:"false"})], wires: [wire("a","uno","5v","enc","vcc","#ef4444"),wire("b","uno","gnd","enc","gnd","#1e293b"),wire("c","uno","d2","enc","clk","#60a5fa"),wire("d","uno","d3","enc","dt","#3b82f6"),wire("e","uno","d4","enc","sw","#a855f7")] },
-    program([serialBegin(),pinMode("2","INPUT"),pinMode("3","INPUT"),pinMode("4","INPUT")],[serialPrintValue("encoder_read",{SENSOR:"A0"}),delay(300)]),
+    program([serialBegin(),pinMode("2","INPUT"),pinMode("3","INPUT"),pinMode("4","INPUT")],[
+      serialPrintValue("encoder_read", { SENSOR: "enc" }),
+      delay(300),
+    ]),
     ["Connect VCC/GND and CLK, DT, SW.","Rotate the virtual encoder in the Inspector.","Use its count for a menu or counter."]),
   starter("g7-servo-door", "Automatic Servo Door", "Use a servo as a miniature automatic door mechanism.", 7, "Robotics", "Intermediate", ["Servo", "Automation", "PWM"],
     { parts: [part("uno","arduino-uno",60,110),part("servo","servo",420,110,{angle:0})], wires: [wire("a","uno","5v","servo","vcc","#ef4444"),wire("b","uno","gnd","servo","gnd","#1e293b"),wire("c","uno","d9","servo","sig","#fb923c")] },

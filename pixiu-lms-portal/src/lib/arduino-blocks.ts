@@ -408,6 +408,17 @@ export function defineArduinoBlocks() {
     }
   }
 
+  Blockly.Blocks['pushbutton_read'] = {
+    init() {
+      this.appendDummyInput()
+        .appendField('Pushbutton pressed?')
+        .appendField(new Blockly.FieldDropdown(componentDropdown(['pushbutton'])), 'SENSOR')
+      this.setOutput(true, 'Boolean')
+      this.setColour(210)
+      this.setTooltip('Read the live pressed state of a virtual pushbutton.')
+    }
+  }
+
   Blockly.Blocks['pir_motion'] = {
     init() {
       this.appendDummyInput()
@@ -867,6 +878,7 @@ arduino.forBlock['motor_driver_write'] = (block, generator) => {
   return `analogWrite(${ena}, ${speed}); digitalWrite(${highPin}, HIGH); digitalWrite(${lowPin}, LOW);\\n`
 }
 
+arduino.forBlock['pushbutton_read'] = (block) => ['false /* PIXIU simulated pushbutton: ' + String(block.getFieldValue('SENSOR') || '') + ' */', ORDER.ATOMIC]
 arduino.forBlock['pir_motion'] = (block) => ['false /* PIXIU simulated PIR: ' + String(block.getFieldValue('SENSOR') || '') + ' */', ORDER.ATOMIC]
 arduino.forBlock['ldr_read'] = () => ['analogRead(A0) /* PIXIU simulated LDR */', ORDER.ATOMIC]
 arduino.forBlock['tmp36_temperature'] = () => ['analogRead(A0) /* PIXIU simulated TMP36 */', ORDER.ATOMIC]

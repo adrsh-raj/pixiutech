@@ -1,0 +1,61 @@
+name: PIXIU Phase 0 Performance Baseline
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pixiu-backend/requirements.txt
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Build portal + bundle report
+        working-directory: pixiu-lms-portal
+        run: |
+          npm ci
+          npm run build
+          mkdir -p ../artifacts
+          node ../tools/frontend_bundle_report.mjs dist/assets | tee ../artifacts/frontend-bundle-report.txt
+
+      - name: Install backend dependencies
+        working-directory: pixiu-backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Authenticated API matrix
+        env:
+          PIXIU_PERF_TOKEN: \${{ secrets.PIXIU_PERF_TOKEN }}
+        run: |
+          test -n "$PIXIU_PERF_TOKEN" || { echo "PIXIU_PERF_TOKEN secret is required."; exit 2; }
+          python tools/perf_baseline.py \
+            --base-url https://pixiu-django-api.onrender.com/api/v1 \
+            --all-endpoints \
+            --requests 100 \
+            --concurrencies 1,10,25,50,100 \
+            --auth-env PIXIU_PERF_TOKEN \
+            --csv artifacts/phase0-api.csv
+
+      - name: Upload Phase 0 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: pixiu-phase0-baseline
+          path: artifacts/
+          if-no-files-found: error

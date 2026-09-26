@@ -1,0 +1,49 @@
+name: PIXIU CyberLab Browser Gate
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  browser_gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Build Virtual Lab
+        working-directory: pixiu-lms-portal
+        run: |
+          npm ci
+          npm run build
+
+      - name: Install browser runner
+        run: |
+          npm install --no-save --package-lock=false playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Start preview
+        working-directory: pixiu-lms-portal
+        run: |
+          nohup npm run preview -- --host 127.0.0.1 --port 4173 >/tmp/pixiu-cyberlab.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:4173/simulation >/dev/null && exit 0
+            sleep 2
+          done
+          cat /tmp/pixiu-cyberlab.log
+          exit 1
+
+      - name: Run browser gate
+        env:
+          CYBERLAB_BASE_URL: "http://127.0.0.1:4173"
+        run: node scripts/cyberlab-browser-gate.mjs

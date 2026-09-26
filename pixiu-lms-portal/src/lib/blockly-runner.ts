@@ -129,6 +129,10 @@ export function evaluateNumber(target: Blockly.Block | null, env?: ExecutionEnvi
 
 export function evaluateBoolean(target: Blockly.Block | null, env?: ExecutionEnvironment): boolean {
   if (!target) return false
+  if (target.type === "pushbutton_read") {
+    const id = target.getFieldValue("SENSOR") ?? ""
+    return (env?.getSensorValue ? env.getSensorValue("pushbutton", id) : 0) > 0
+  }
   if (target.type === "ir_read") {
     const id = target.getFieldValue("SENSOR") ?? ""
     return (env?.getSensorValue ? env.getSensorValue("ir", id) : 0) > 0

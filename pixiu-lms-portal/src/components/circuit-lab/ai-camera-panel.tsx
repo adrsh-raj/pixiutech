@@ -9,6 +9,26 @@ import "./pixiu-brand.css"
 
 export type { AiVisionState }
 
+function formatAiObjectLabel(value: string) {
+  const normalized = String(value || "unknown").trim().toLowerCase()
+  if (!normalized || normalized === "none" || normalized === "unknown") return "Unknown"
+  return normalized
+    .split(/\s+/)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ")
+}
+
+function aiObjectIcon(value: string) {
+  const normalized = String(value || "").trim().toLowerCase()
+  if (normalized === "person") return "👤"
+  if (normalized === "car") return "🚗"
+  if (normalized === "dog") return "🐕"
+  if (normalized === "cat") return "🐈"
+  if (normalized === "bird") return "🐦"
+  if (normalized === "cell phone" || normalized === "phone") return "📱"
+  return "◉"
+}
+
 interface Props {
   isOpen: boolean
   onClose: () => void
@@ -354,19 +374,9 @@ export function AiCameraPanel({
           <div className="pixiu-ai-signal-card flex items-center justify-between px-3 py-2 border-b text-xs">
             <div className="flex items-center gap-2">
               <span className="text-[11px] text-slate-400">Vision Signal:</span>
-              <span
-                className={`font-mono text-[11px] font-bold px-2 py-0.5 rounded-full border ${
-                  aiState.detectedClass === "car"
-                    ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-300"
-                    : aiState.detectedClass === "person"
-                    ? "bg-blue-500/15 border-blue-500/40 text-blue-300"
-                    : aiState.detectedClass === "phone"
-                    ? "bg-purple-500/15 border-purple-500/40 text-purple-300"
-                    : "bg-slate-800 border-slate-700 text-slate-400"
-                }`}
-              >
-                {aiState.detectedClass !== "none"
-                  ? `${aiState.detectedClass === "car" ? "🚗 CAR" : aiState.detectedClass === "person" ? "👤 PERSON" : "📱 PHONE"}`
+              <span className="font-mono text-[11px] font-bold px-2 py-0.5 rounded-full border bg-slate-800 border-slate-700 text-slate-200">
+                {aiState.detectedClass !== "none" && !aiState.unknown
+                  ? `${aiObjectIcon(aiState.detectedClass)} ${formatAiObjectLabel(aiState.detectedClass)}`
                   : "LOOKING AT VIDEO..."}
               </span>
             </div>
@@ -398,7 +408,7 @@ export function AiCameraPanel({
           {/* Instructions */}
           <div className="px-3.5 py-2.5 bg-slate-950 border-t border-slate-900">
             <p className="text-[11px] text-slate-400 text-center leading-relaxed">
-              Show a <strong className="text-cyan-300">Car / Vehicle</strong> to trigger the AI-connected barrier automation.
+              Show a supported object from the AI program (for example <strong className="text-cyan-300">car, dog or cat</strong>) to trigger the connected automation.
             </p>
           </div>
         </>
