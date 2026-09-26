@@ -67,3 +67,8 @@ for (const marker of [
   'sensorBlock("ir_read", "ir")',
   'sensorBlock("soil_moisture_read", "soil")',
 ]) assert(templatesSource.includes(marker), "Template behavioral starter contract missing: " + marker)
+
+const workbenchLiveInput = read("pixiu-lms-portal/src/components/circuit-lab/workbench.tsx")
+for (const marker of ["const pressedRef = useRef<Set<string>>", "pressedRef.current = next", "pressedRef.current.has(p.id)"]) {
+  assert(workbenchLiveInput.includes(marker), "Pushbutton live Blockly bridge missing: " + marker)
+}

@@ -56,6 +56,7 @@ export function Workbench() {
   const [wiring, setWiring] = useState<PinRef | null>(null)
   const [running, setRunning] = useState(false)
   const [pressed, setPressed] = useState<Set<string>>(new Set())
+  const pressedRef = useRef<Set<string>>(new Set())
   const [view, setView] = useState<WorkbenchView>("circuit")
   const [pinStates, setPinStates] = useState<Record<string, ArduinoPinState>>({})
   const pinStatesRef = useRef<Record<string, ArduinoPinState>>({})
@@ -416,6 +417,7 @@ export function Workbench() {
       const next = new Set(prev)
       if (mode === "down") next.add(id)
       else next.delete(id)
+      pressedRef.current = next
       return next
     })
   }, [])
@@ -640,7 +642,7 @@ export function Workbench() {
           const p = partId
             ? partsRef.current.find((pt) => pt.id === partId)
             : partsRef.current.find((pt) => pt.type === type)
-          if (type === "pushbutton") return String(p?.props?.pressed ?? "false") === "true" ? 1 : 0
+          if (type === "pushbutton") return p ? (pressedRef.current.has(p.id) ? 1 : 0) : 0
           if (type === "ultrasonic") return Number(p?.props?.distance ?? 100)
           if (type === "ldr") return Number(p?.props?.light ?? 512)
           if (type === "tmp36") return Number(p?.props?.temperature ?? 25)
@@ -827,6 +829,7 @@ export function Workbench() {
     isPausedRef.current = false
     setActiveStepBlock(null)
     setPressed(new Set())
+    pressedRef.current = new Set()
     setSerialLines([])
     setBlocklyXml(DEFAULT_XML)
     setBlocklyDocumentVersion((value) => value + 1)
@@ -845,6 +848,7 @@ export function Workbench() {
       runningRef.current = false
       setRunning(false)
       setPressed(new Set())
+      pressedRef.current = new Set()
       stopProgram()
       return
     }

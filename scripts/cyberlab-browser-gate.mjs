@@ -24,8 +24,8 @@ try {
 
   // Template → Blockly
   await page.getByRole("button", { name: "Tools" }).click()
-  await page.getByText("Templates", { exact: true }).click()
-  await page.getByText("Arduino Blink with 220Ω Resistor", { exact: true }).click()
+  await page.getByRole("button", { name: /Templates/ }).click()
+  await page.locator("h3").filter({ hasText: "Arduino Blink with 220Ω Resistor" }).click()
   await page.getByRole("button", { name: "Code" }).click()
   const blink = await page.locator("body").innerText()
   if (!/void setup\(\)/.test(blink) || !/digitalWrite|HIGH|LOW/.test(blink)) {
@@ -35,8 +35,8 @@ try {
   // AI template → AI Blockly → automatic Pixiu runtime HUD
   await page.getByRole("button", { name: "Circuit" }).click()
   await page.getByRole("button", { name: "Tools" }).click()
-  await page.getByText("Templates", { exact: true }).click()
-  await page.getByText("AI Vision Smart Boom Barrier Gate (Pixiu AI)", { exact: false }).click()
+  await page.getByRole("button", { name: /Templates/ }).click()
+  await page.locator("h3").filter({ hasText: "AI Vision Smart Boom Barrier Gate" }).click()
   await page.getByRole("button", { name: "Code" }).click()
   const aiCodeView = await page.locator("body").innerText()
   if (!/AI sees/.test(aiCodeView) || !/car/i.test(aiCodeView)) {
@@ -59,6 +59,6 @@ try {
 
   if (pageErrors.length) throw new Error("Browser page errors: " + pageErrors.join(" | "))
   console.log("PIXIU CyberLab browser gate PASSED")
-} finally {
+ } finally {
   await browser.close()
 }
