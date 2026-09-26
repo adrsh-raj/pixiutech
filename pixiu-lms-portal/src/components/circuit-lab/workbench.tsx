@@ -655,14 +655,16 @@ export function Workbench() {
         setAiCamera: (enabled) => {
           setAiRequestedMode(enabled ? "objects" : null)
           setAiRuntimeEnabled(enabled)
-          setIsAiCameraOpen(enabled)
+          setIsAiCameraOpen(false)
+          setIsAiStudioOpen(false)
           setAiCameraCompact(enabled)
         },
         setAiMicrophone: (enabled) => {
           if (enabled) {
             setAiRequestedMode("sound")
             setAiRuntimeEnabled(true)
-            setIsAiCameraOpen(true)
+            setIsAiCameraOpen(false)
+            setIsAiStudioOpen(false)
             setAiCameraCompact(true)
           } else {
             setAiRequestedMode(null)
@@ -1049,8 +1051,8 @@ export function Workbench() {
       setIsAiStudioOpen(false)
       setAiRequestedMode(null)
       setAiRuntimeEnabled(false)
-      setAiCameraCompact(templateUsesAi)
-      setIsAiCameraOpen(templateUsesAi)
+      setAiCameraCompact(false)
+      setIsAiCameraOpen(false)
     },
     [stopProgram, stopAiRuntime, updateState],
   )
@@ -1151,7 +1153,7 @@ export function Workbench() {
           aiState={aiState}
           onAiStateChange={handleAiStateChange}
           isSimRunning={running}
-          runtimeEnabled={aiRuntimeEnabled}
+          runtimeEnabled={aiRuntimeEnabled && !isAiCameraOpen}
           compact={aiCameraCompact}
           requestedMode={aiRequestedMode}
           onRequestedModeHandled={() => setAiRequestedMode(null)}
