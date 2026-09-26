@@ -922,16 +922,6 @@ export async function trainAiModel(
     }
     model.stopTraining = false
 
-    const trainEvaluation = model.evaluate(trainXs, trainYs) as tf.Scalar | tf.Scalar[]
-    const trainValues = Array.isArray(trainEvaluation)
-      ? trainEvaluation
-      : [trainEvaluation]
-    const trainAccuracy = trainValues[1]
-      ? Number((await trainValues[1].data())[0])
-      : latestAccuracy
-    trainValues.forEach((value) => value.dispose())
-
-
     let validationAccuracy = 0
     let validationConfusionMatrix: number[][] | undefined
 
