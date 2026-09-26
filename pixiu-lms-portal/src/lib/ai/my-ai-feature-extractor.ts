@@ -1,10 +1,8 @@
 import * as tf from "@tensorflow/tfjs"
 
-export const MY_AI_FEATURE_VERSION = "MobileNetV2-0.5"
+export const MY_AI_FEATURE_VERSION = "vision-features-v2"
 export const MY_AI_FEATURE_URL =
-  "https://tfhub.dev/google/imagenet/mobilenet_v2_050_224/classification/2"
-export const MY_AI_EMBEDDING_NODE =
-  "module_apply_default/MobilenetV2/Logits/AvgPool"
+  "https://tfhub.dev/google/imagenet/mobilenet_v2_100_224/feature_vector/4"
 export const MY_AI_INPUT_SIZE = 224
 export const MY_AI_PREDICTION_THRESHOLD = 0.62
 
@@ -49,9 +47,7 @@ export async function loadMyAiFeatureExtractor() {
     const model = await tf.loadGraphModel(MY_AI_FEATURE_URL, { fromTFHub: true })
 
     const warmup = tf.zeros([1, MY_AI_INPUT_SIZE, MY_AI_INPUT_SIZE, 3])
-    const output = firstTensor(
-      model.execute(warmup, MY_AI_EMBEDDING_NODE) as tf.Tensor,
-    )
+    const output = firstTensor(model.execute(warmup) as tf.Tensor)
     await output.data()
     output.dispose()
     warmup.dispose()
@@ -75,14 +71,15 @@ export async function extractMyAiEmbedding(
   const embedding = tf.tidy(() => {
     const pixels = tf.browser.fromPixels(image)
     const normalized = tf.mul(tf.cast(pixels, "float32"), 1 / 255)
-    const resized = tf.image.resizeBilinear(
+    const resized = tf.image.resizeWithPad(
       normalized,
-      [MY_AI_INPUT_SIZE, MY_AI_INPUT_SIZE],
-      true,
+      MY_AI_INPUT_SIZE,
+      MY_AI_INPUT_SIZE,
     )
     const batched = tf.expandDims(resized, 0)
-    const raw = model.execute(batched, MY_AI_EMBEDDING_NODE) as tf.Tensor4D
-    return tf.reshape(raw, [1, -1])
+    const raw = firstTensor(model.execute(batched) as tf.Tensor)
+    const flat = tf.reshape(raw, [1, -1])
+    return tf.linalg.l2Normalize(flat, 1)
   })
 
   try {

@@ -28,6 +28,7 @@ export type AiModelSummary = {
   embeddingSize: number
   featureExtractor: string
   storageKey: string
+  classPrototypes?: Record<string, number[]>
   architecture: string
   predictionThreshold: number
   confidenceCalibration: string
@@ -56,10 +57,11 @@ export type AiDatasetStats = {
   recommended: boolean
 }
 
-const STORE_KEY = "pixiu-ai-studio-v3"
-const MODEL_KEY = "pixiu-ai-studio-model-v3"
-const LEGACY_STORE_KEYS = ["pixiu-ai-studio-v2", "pixiu-ai-studio-v1"]
+const STORE_KEY = "pixiu-ai-studio-v4"
+const MODEL_KEY = "pixiu-ai-studio-model-v4"
+const LEGACY_STORE_KEYS = ["pixiu-ai-studio-v3", "pixiu-ai-studio-v2", "pixiu-ai-studio-v1"]
 const LEGACY_MODEL_KEYS = [
+  "pixiu-ai-studio-model-v3",
   "pixiu-ai-studio-model-v2",
   "pixiu-ai-studio-model-v1",
 ]
@@ -205,8 +207,11 @@ export function loadAiStudioStore(): AiStudioStore {
     ),
     model:
       source.model?.storageKey === MODEL_KEY &&
+      source.model.featureExtractor === MY_AI_FEATURE_VERSION &&
       Array.isArray(source.model.classes) &&
-      typeof source.model.embeddingSize === "number"
+      typeof source.model.embeddingSize === "number" &&
+      source.model.classPrototypes &&
+      typeof source.model.classPrototypes === "object"
         ? source.model
         : null,
   }
@@ -554,6 +559,75 @@ function buildValidationSplit(samples: AiSample[], classes: string[]) {
   return { train: shuffle(train), validation: shuffle(validation) }
 }
 
+function augmentImageForTraining(
+  image: HTMLImageElement,
+  variant: number,
+): HTMLCanvasElement {
+  const width = image.naturalWidth || image.width
+  const height = image.naturalHeight || image.height
+  const canvas = document.createElement("canvas")
+  canvas.width = width
+  canvas.height = height
+  const context = canvas.getContext("2d")
+  if (!context) throw new Error("Canvas is not available in this browser.")
+
+  const zoom = variant === 0 ? 1.06 : 0.95
+  const offsetX = variant === 0 ? width * 0.02 : -width * 0.015
+  const offsetY = variant === 0 ? -height * 0.015 : height * 0.015
+  context.filter = variant === 0
+    ? "brightness(1.06) contrast(1.03)"
+    : "brightness(0.94) contrast(1.03)"
+  context.translate(width / 2 + offsetX, height / 2 + offsetY)
+  context.scale(zoom, zoom)
+  context.drawImage(image, -width / 2, -height / 2, width, height)
+  return canvas
+}
+
+function normalizeVector(values: number[]) {
+  let sumSquares = 0
+  for (const value of values) {
+    const safe = Number.isFinite(value) ? value : 0
+    sumSquares += safe * safe
+  }
+  const norm = Math.sqrt(sumSquares) || 1
+  return values.map((value) => (Number.isFinite(value) ? value : 0) / norm)
+}
+
+function buildClassPrototypes(
+  features: number[][],
+  labels: number[],
+  classes: string[],
+) {
+  const prototypes: Record<string, number[]> = {}
+  for (let classIndex = 0; classIndex < classes.length; classIndex += 1) {
+    const classFeatures = features.filter((_, index) => labels[index] === classIndex)
+    if (!classFeatures.length) continue
+    const mean = new Array(classFeatures[0].length).fill(0)
+    for (const vector of classFeatures) {
+      for (let i = 0; i < vector.length; i += 1) mean[i] += vector[i]
+    }
+    for (let i = 0; i < mean.length; i += 1) mean[i] /= classFeatures.length
+    prototypes[classes[classIndex]] = normalizeVector(mean)
+  }
+  return prototypes
+}
+
+function cosineSimilarity(a: number[], b: number[]) {
+  const size = Math.min(a.length, b.length)
+  let score = 0
+  for (let i = 0; i < size; i += 1) score += a[i] * b[i]
+  return Math.max(-1, Math.min(1, Number.isFinite(score) ? score : 0))
+}
+
+function softmaxScores(scores: number[], temperature = 0.12) {
+  if (!scores.length) return []
+  const logits = scores.map((score) => score / temperature)
+  const maxLogit = Math.max(...logits)
+  const exps = logits.map((value) => Math.exp(value - maxLogit))
+  const total = exps.reduce((sum, value) => sum + value, 0) || 1
+  return exps.map((value) => value / total)
+}
+
 async function extractFeatures(
   samples: AiSample[],
   options: TrainOptions,
@@ -568,18 +642,24 @@ async function extractFeatures(
     }
 
     const image = await loadImage(samples[index].dataUrl)
-    const embedding = await extractMyAiEmbedding(image)
+    const sources: Array<HTMLImageElement | HTMLCanvasElement> =
+      augment && samples.length <= 32
+        ? [image, augmentImageForTraining(image, index % 2)]
+        : [image]
 
-    if (!embedding.length) {
-      throw new Error("My AI feature extractor returned an empty embedding.")
-    }
-    if (!embeddingSize) embeddingSize = embedding.length
-    if (embedding.length !== embeddingSize) {
-      throw new Error("My AI returned inconsistent feature sizes.")
+    for (const source of sources) {
+      const embedding = await extractMyAiEmbedding(source)
+      if (!embedding.length) {
+        throw new Error("My AI feature extractor returned an empty embedding.")
+      }
+      if (!embeddingSize) embeddingSize = embedding.length
+      if (embedding.length !== embeddingSize) {
+        throw new Error("My AI returned inconsistent feature sizes.")
+      }
+      features.push(embedding)
     }
 
-    features.push(embedding)
-    options.onStage?.(`Extracting vision features · ${index + 1}/${samples.length}`)
+    options.onStage?.(`Learning visual patterns · ${index + 1}/${samples.length}`)
     await tf.nextFrame()
   }
 
@@ -626,8 +706,7 @@ export async function trainAiModel(
   }
 
   const { train, validation } = buildValidationSplit(samples, classes)
-  const allForFeatures = [...train, ...validation]
-  const allLabels = allForFeatures.map((sample) => classes.indexOf(sample.label))
+  const minClassSamples = Math.min(...classes.map((name) => counts[name] ?? 0))
   let trainXs: tf.Tensor2D | null = null
   let trainYs: tf.Tensor2D | null = null
   let validationXs: tf.Tensor2D | null = null
@@ -638,12 +717,24 @@ export async function trainAiModel(
   activeModel = null
 
   try {
-    options.onStage?.("Loading frozen vision encoder · MobileNetV2")
-    const extracted = await extractFeatures(allForFeatures, options)
-    const trainFeatureMatrix = extracted.features.slice(0, train.length)
-    const validationFeatureMatrix = extracted.features.slice(train.length)
-    const trainLabels = allLabels.slice(0, train.length)
-    const validationLabels = allLabels.slice(train.length)
+    options.onStage?.("Preparing visual learning features")
+    const augmentTraining = minClassSamples < RECOMMENDED_SAMPLES_PER_CLASS
+    const extractedTrain = await extractFeatures(train, options, augmentTraining)
+    const extractedValidation = validation.length
+      ? await extractFeatures(validation, options, false)
+      : { features: [], size: extractedTrain.size }
+
+    const trainFeatureMatrix = extractedTrain.features
+    const validationFeatureMatrix = extractedValidation.features
+    const copiesPerSample = augmentTraining && train.length <= 32 ? 2 : 1
+    const trainLabels = train.flatMap((sample) =>
+      Array.from({ length: copiesPerSample }, () => classes.indexOf(sample.label)),
+    )
+    const validationLabels = validation.map((sample) => classes.indexOf(sample.label))
+    const extracted = {
+      features: trainFeatureMatrix,
+      size: extractedTrain.size,
+    }
 
     const trainTensors = makeTensorPair(
       trainFeatureMatrix,
@@ -663,7 +754,18 @@ export async function trainAiModel(
       validationYs = validationTensors.ys
     }
 
-    const config = clampTrainingConfig(options)
+    const baseConfig = clampTrainingConfig(options)
+    const config =
+      minClassSamples < 5
+        ? {
+            ...baseConfig,
+            epochs: Math.max(baseConfig.epochs, 18),
+            hiddenLayers: 1 as const,
+            hiddenUnits: Math.min(baseConfig.hiddenUnits, 64),
+            dropoutRate: 0,
+            batchSize: Math.min(baseConfig.batchSize, 4),
+          }
+        : baseConfig
     const hiddenLayers: any[] = [
       tf.layers.dense({
         inputShape: [extracted.size],
@@ -783,10 +885,15 @@ export async function trainAiModel(
       embeddingSize: extracted.size,
       featureExtractor: MY_AI_FEATURE_VERSION,
       storageKey: MODEL_KEY,
+      classPrototypes: buildClassPrototypes(
+        trainFeatureMatrix,
+        trainLabels,
+        classes,
+      ),
       architecture:
         config.hiddenLayers === 2
-          ? `Frozen ${MY_AI_FEATURE_VERSION} embeddings → Dense(${config.hiddenUnits}) → Dropout(${Math.round(config.dropoutRate * 100)}%) → Dense(${Math.max(32, Math.round(config.hiddenUnits / 2))}) → Dropout(${Math.round(config.dropoutRate * 100)}%) → Softmax`
-          : `Frozen ${MY_AI_FEATURE_VERSION} embeddings → Dense(${config.hiddenUnits}) → Dropout(${Math.round(config.dropoutRate * 100)}%) → Softmax`,
+          ? `Visual features → Dense(${config.hiddenUnits}) → Dropout(${Math.round(config.dropoutRate * 100)}%) → Dense(${Math.max(32, Math.round(config.hiddenUnits / 2))}) → Dropout(${Math.round(config.dropoutRate * 100)}%) → Classifier`
+          : `Visual features → Dense(${config.hiddenUnits}) → Dropout(${Math.round(config.dropoutRate * 100)}%) → Classifier`,
       predictionThreshold: MY_AI_PREDICTION_THRESHOLD,
       trainingProfile: options.profile ?? "custom",
       hiddenLayers: config.hiddenLayers,
@@ -794,7 +901,7 @@ export async function trainAiModel(
       dropoutRate: config.dropoutRate,
       learningRate: config.learningRate,
       batchSize: config.batchSize,
-      confidenceCalibration: "Thresholded top-class confidence; low-margin predictions are returned as unknown.",
+      confidenceCalibration: "Classifier confidence is combined with learned class-pattern similarity; weak matches return as unknown.",
     }
 
     options.onStage?.("Saving model locally")
@@ -930,18 +1037,44 @@ export async function predictAiImage(
       }
     }
 
-    const bestIndex = probabilities.indexOf(Math.max(...probabilities))
-    const sortedProbabilities = [...probabilities].sort((a, b) => b - a)
+    const normalizedEmbedding = normalizeVector(embeddingValues)
+    const prototypeSimilarities = summary.classPrototypes
+      ? summary.classes.map((className) =>
+          cosineSimilarity(
+            normalizedEmbedding,
+            normalizeVector(summary.classPrototypes?.[className] ?? []),
+          ),
+        )
+      : []
+    const prototypeProbabilities = softmaxScores(prototypeSimilarities)
+
+    const perClassSamples =
+      summary.sampleCount / Math.max(1, summary.classes.length)
+    const prototypeWeight =
+      perClassSamples < RECOMMENDED_SAMPLES_PER_CLASS ? 0.68 : 0.42
+
+    const blendedProbabilities = probabilities.map((value, index) =>
+      prototypeProbabilities.length
+        ? value * (1 - prototypeWeight) +
+          (prototypeProbabilities[index] ?? 0) * prototypeWeight
+        : value,
+    )
+
+    const bestIndex = blendedProbabilities.indexOf(Math.max(...blendedProbabilities))
+    const sortedProbabilities = [...blendedProbabilities].sort((a, b) => b - a)
     const bestProbability = sortedProbabilities[0] ?? 0
     const secondProbability = sortedProbabilities[1] ?? 0
     const margin = bestProbability - secondProbability
     const threshold = Number.isFinite(summary.predictionThreshold)
       ? Math.max(0, Math.min(1, summary.predictionThreshold))
       : MY_AI_PREDICTION_THRESHOLD
+    const prototypeBest = prototypeSimilarities[bestIndex] ?? -1
     const lowConfidence = bestProbability < threshold
+    const lowPrototype =
+      prototypeSimilarities.length > 0 && prototypeBest < 0.35
     const lowMargin =
-      probabilities.length > 1 && margin < MY_AI_LOW_MARGIN_THRESHOLD
-    const unknown = lowConfidence || lowMargin
+      blendedProbabilities.length > 1 && margin < MY_AI_LOW_MARGIN_THRESHOLD
+    const unknown = lowConfidence || lowMargin || lowPrototype
     const reason = lowConfidence
       ? "low_confidence"
       : lowMargin
@@ -957,7 +1090,7 @@ export async function predictAiImage(
       probabilities: Object.fromEntries(
         summary.classes.map((name, index) => [
           name,
-          Math.round((probabilities[index] ?? 0) * 100),
+          Math.round((blendedProbabilities[index] ?? 0) * 100),
         ]),
       ),
       unknown,

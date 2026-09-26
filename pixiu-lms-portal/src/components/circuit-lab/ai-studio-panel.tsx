@@ -1351,7 +1351,7 @@ export function AiStudioPanel({
       setModel(result.model)
       setMode("trained")
       setTab("try")
-      setStatus("My AI learned " + result.summary.classes.length + " concepts with " + result.summary.featureExtractor + ".")
+      setStatus("My AI learned " + result.summary.classes.length + " concepts.")
     } catch (trainError) {
       if (runId !== trainingRunRef.current) return
       setError(trainError instanceof Error ? trainError.message : "Training failed.")
@@ -1919,7 +1919,7 @@ export function AiStudioPanel({
                     <div className="min-w-0">
                       <p className="text-xs font-black">6I · Train My AI</p>
                       <p className="mt-1 text-[10px] leading-5 text-slate-500">
-                        Frozen MobileNetV2 features feed a small classifier head. Grade-based profiles keep training light; advanced tuning is optional.
+                        Learned visual features feed a small classifier head. Grade-based profiles keep training light; advanced tuning is optional.
                       </p>
                     </div>
                     <button disabled={!canTrain || training || runtimeEnabled} onClick={() => void train()} className="shrink-0 rounded-xl bg-violet-500 px-4 py-2 text-[10px] font-black disabled:opacity-30">
@@ -2055,7 +2055,7 @@ export function AiStudioPanel({
                     <div className="mt-3 grid gap-2 sm:grid-cols-3">
                       <div className="rounded-xl border border-slate-800 bg-slate-950 p-3">
                         <p className="text-[8px] font-mono uppercase tracking-[0.14em] text-slate-600">Extractor</p>
-                        <p className="mt-1 text-[10px] font-black">{store.model.featureExtractor}</p>
+                        <p className="mt-1 text-[10px] font-black">Local vision features</p>
                       </div>
                       <div className="rounded-xl border border-slate-800 bg-slate-950 p-3">
                         <p className="text-[8px] font-mono uppercase tracking-[0.14em] text-slate-600">Validation</p>

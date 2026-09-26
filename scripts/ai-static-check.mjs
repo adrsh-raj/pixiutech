@@ -146,20 +146,23 @@ for (const marker of [
   "MAX_CLASSES = 8",
   "MAX_SAMPLES_PER_CLASS = 20",
   "MAX_TOTAL_SAMPLES = 80",
-  'STORE_KEY = "pixiu-ai-studio-v3"',
-  'MODEL_KEY = "pixiu-ai-studio-model-v3"',
+  'STORE_KEY = "pixiu-ai-studio-v4"',
+  'MODEL_KEY = "pixiu-ai-studio-model-v4"',
 ]) requireText(engine, marker, "6H dataset contract")
 
 for (const marker of [
-  "MobileNetV2-0.5",
-  "MY_AI_EMBEDDING_NODE",
+  'MY_AI_FEATURE_VERSION = "vision-features-v2"',
+  "feature_vector/4",
   "tf.loadGraphModel",
-  "model.execute(batched, MY_AI_EMBEDDING_NODE)",
+  "model.execute(batched)",
+  "resizeWithPad",
   "MY_AI_PREDICTION_THRESHOLD = 0.62",
 ]) requireText(featureExtractor, marker, "6I/6J feature extractor")
 
 for (const marker of [
   "extractFeatures",
+  "augmentImageForTraining",
+  "classPrototypes",
   "Dense(${config.hiddenUnits})",
   "validationData",
   "trainingProfile: options.profile",
@@ -167,6 +170,7 @@ for (const marker of [
   "predictionThreshold",
   "confidenceCalibration",
   "indexeddb://",
+  "prototypeWeight",
   "lowMargin",
   "lowConfidence",
   "unknown",
