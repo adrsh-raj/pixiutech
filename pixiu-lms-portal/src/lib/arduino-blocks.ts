@@ -27,30 +27,7 @@ export function setPinContext(circuit: CircuitState) {
 function pinDropdown(): [string, string][] {
   const opts = getPinOptions(currentCircuit)
   if (opts.length === 0) return [["13", "13"]]
-
-  // Put pins that are actually wired in the current circuit first. This makes
-  // newly added output/input blocks default to a meaningful connected pin
-  // instead of always starting at pin 0.
-  const connected = opts.filter((o) => o.connected)
-  const free = opts.filter((o) => !o.connected)
-  return [...connected, ...free].map((o) => [o.label, o.code])
-}
-
-function analogPinDropdown(): [string, string][] {
-  const opts = getPinOptions(currentCircuit).filter((o) => /^A[0-5]$/.test(o.code))
-  if (opts.length === 0) {
-    return [
-      ["A0", "A0"],
-      ["A1", "A1"],
-      ["A2", "A2"],
-      ["A3", "A3"],
-      ["A4", "A4"],
-      ["A5", "A5"],
-    ]
-  }
-  const connected = opts.filter((o) => o.connected)
-  const free = opts.filter((o) => !o.connected)
-  return [...connected, ...free].map((o) => [o.label, o.code])
+  return opts.map((o) => [o.label, o.code])
 }
 
 function componentDropdown(types: string[], emptyLabel = "Add component first"): () => [string, string][] {
@@ -157,11 +134,11 @@ export function defineArduinoBlocks() {
     },
     {
       type: "io_analogread",
-      message0: "read analog pin %1",
-      args0: [{ type: "field_dropdown", name: "PIN", options: analogPinDropdown }],
+      message0: "analog read pin %1",
+      args0: [{ type: "field_dropdown", name: "PIN", options: pinDropdown }],
       output: "Number",
       colour: 260,
-      tooltip: "Read a 0-1023 value from Arduino analog pins A0-A5.",
+      tooltip: "Read a 0-1023 value from an analog pin.",
     },
     {
       type: "time_delay",
@@ -399,35 +376,6 @@ export function defineArduinoBlocks() {
     }
   }
 
-  Blockly.Blocks['map_value'] = {
-    init() {
-      const inputs = [
-        ['VALUE', 'map value', '0'],
-        ['IN_MIN', 'from low', '0'],
-        ['IN_MAX', 'high', '1023'],
-        ['OUT_MIN', 'to low', '0'],
-        ['OUT_MAX', 'high', '255'],
-      ] as const
-
-      for (const [name, label, defaultValue] of inputs) {
-        const input = this.appendValueInput(name)
-          .setCheck('Number')
-          .appendField(label)
-
-        // Give every socket a visible default number, while still allowing
-        // another number/expression block to be plugged into it.
-        const shadow = Blockly.utils.xml.textToDom(
-          `<shadow type="math_number"><field name="NUM">${defaultValue}</field></shadow>`,
-        )
-        input.setShadowDom(shadow)
-      }
-
-      this.setOutput(true, 'Number')
-      this.setColour(260)
-      this.setTooltip('Scale a value from one range to another, like Arduino map(). Example: 0-1023 to 0-255.')
-    }
-  }
-
   Blockly.Blocks['motor_driver_write'] = {
     init() {
       this.appendDummyInput()
@@ -481,7 +429,16 @@ export function defineArduinoBlocks() {
         .appendField('?')
       this.setOutput(true, 'Boolean')
       this.setColour(285)
-      this.setTooltip('Returns true when the normalized AI class matches this label.')
+      this.setTooltip('Browser AI Studio block: checks the live AI result in the simulator.')
+    },
+  }
+
+  Blockly.Blocks['ai_is_unknown'] = {
+    init() {
+      this.appendDummyInput().appendField('🤖 AI result is unknown?')
+      this.setOutput(true, 'Boolean')
+      this.setColour(285)
+      this.setTooltip('Returns true when AI has no accepted result or confidence is below the AI threshold.')
     },
   }
 
@@ -490,7 +447,7 @@ export function defineArduinoBlocks() {
       this.appendDummyInput().appendField('🤖 AI detected object')
       this.setOutput(true, 'String')
       this.setColour(285)
-      this.setTooltip('Returns the name of the currently detected object.')
+      this.setTooltip('Browser AI Studio block: returns the current AI label in the simulator.')
     },
   }
 
@@ -499,7 +456,48 @@ export function defineArduinoBlocks() {
       this.appendDummyInput().appendField('🤖 AI confidence (%)')
       this.setOutput(true, 'Number')
       this.setColour(285)
-      this.setTooltip('Returns the AI detection confidence score (0 to 100%).')
+      this.setTooltip('Browser AI Studio block: returns AI confidence (0 to 100%) in the simulator.')
+    },
+  }
+
+  Blockly.Blocks['ai_get_gesture'] = {
+    init() {
+      this.appendDummyInput().appendField('🤖 AI gesture')
+      this.setOutput(true, 'String')
+      this.setColour(285)
+      this.setTooltip('Browser AI Studio block: returns the interpreted hand gesture in the simulator.')
+    },
+  }
+
+  Blockly.Blocks['ai_get_finger_count'] = {
+    init() {
+      this.appendDummyInput().appendField('🤖 AI finger count')
+      this.setOutput(true, 'Number')
+      this.setColour(285)
+      this.setTooltip('Browser AI Studio block: returns the stable 0–5 finger count in the simulator.')
+    },
+  }
+
+  Blockly.Blocks['ai_is_gesture'] = {
+    init() {
+      const gestures = [
+        ['Fist', 'fist'],
+        ['Thumbs Up', 'thumbs_up'],
+        ['Thumbs Down', 'thumbs_down'],
+        ['Point', 'point'],
+        ['Peace', 'peace'],
+        ['One', 'one'],
+        ['Two', 'two'],
+        ['Three', 'three'],
+        ['Four', 'four'],
+        ['Open Palm', 'open_palm'],
+      ]
+      this.appendDummyInput()
+        .appendField('🤖 AI gesture is')
+        .appendField(new Blockly.FieldDropdown(gestures), 'GESTURE')
+      this.setOutput(true, 'Boolean')
+      this.setColour(285)
+      this.setTooltip('Browser AI Studio block: checks the interpreted hand gesture.')
     },
   }
 
@@ -517,7 +515,25 @@ export function defineArduinoBlocks() {
       this.setPreviousStatement(true)
       this.setNextStatement(true)
       this.setColour(285)
-      this.setTooltip('Enable or disable the AI vision camera.')
+      this.setTooltip('Browser AI Studio block: enable or disable the camera runtime in the simulator.')
+    },
+  }
+
+  Blockly.Blocks['ai_microphone_enable'] = {
+    init() {
+      this.appendDummyInput()
+        .appendField('🤖 turn AI microphone')
+        .appendField(
+          new Blockly.FieldDropdown([
+            ['ON', 'ON'],
+            ['OFF', 'OFF'],
+          ]),
+          'STATE',
+        )
+      this.setPreviousStatement(true)
+      this.setNextStatement(true)
+      this.setColour(285)
+      this.setTooltip('Browser AI Studio block: enable or disable the microphone and Sound AI input.')
     },
   }
 }
@@ -694,15 +710,6 @@ arduino.forBlock["math_arithmetic"] = function (block, generator) {
   return [`${a} ${op} ${b}`, order]
 }
 
-arduino.forBlock["map_value"] = function (block, generator) {
-  const value = generator.valueToCode(block, "VALUE", ORDER.NONE) || "0"
-  const inMin = generator.valueToCode(block, "IN_MIN", ORDER.NONE) || "0"
-  const inMax = generator.valueToCode(block, "IN_MAX", ORDER.NONE) || "1023"
-  const outMin = generator.valueToCode(block, "OUT_MIN", ORDER.NONE) || "0"
-  const outMax = generator.valueToCode(block, "OUT_MAX", ORDER.NONE) || "255"
-  return [`map(${value}, ${inMin}, ${inMax}, ${outMin}, ${outMax})`, ORDER.ATOMIC]
-}
-
 arduino.forBlock["variables_get"] = function (block, generator) {
   const gg = generator as ArduinoGen
   const name = gg.nameDB_!.getName(block.getFieldValue("VAR"), Blockly.Names.NameType.VARIABLE)
@@ -779,19 +786,62 @@ arduino.forBlock['ultrasonic_read'] = (block) => {
   return ['readUltrasonic(' + trig + ', ' + echo + ')', ORDER.ATOMIC]
 }
 
-/* AI Vision C++ Generators */
+/* Browser AI generators -------------------------------------------------
+ * PIXIU AI inference lives in the browser runtime. Arduino C++ generation is
+ * intentionally compile-safe and documents that the AI action is simulator
+ * runtime behavior rather than an Arduino-side aiVision library call.
+ */
 arduino.forBlock['ai_is_detected'] = (block) => {
   const cls = block.getFieldValue('CLASS') ?? 'car'
-  return ['aiVision.isDetected("' + cls + '")', ORDER.ATOMIC]
+  const safeClass = String(cls).replace(/[^a-zA-Z0-9 _-]/g, '').trim() || 'car'
+  return [
+    'false /* PIXIU AI Studio: browser-only AI sees "' + safeClass + '". */',
+    ORDER.ATOMIC,
+  ]
 }
 
-arduino.forBlock['ai_get_detected_class'] = () => ['aiVision.getDetectedClass()', ORDER.ATOMIC]
+arduino.forBlock['ai_is_unknown'] = () => [
+  'false /* PIXIU AI Studio browser-only: normalized unknown/low-confidence result. */',
+  ORDER.ATOMIC,
+]
 
-arduino.forBlock['ai_confidence'] = () => ['aiVision.getConfidence()', ORDER.ATOMIC]
+arduino.forBlock['ai_get_detected_class'] = () => [
+  '"none" /* PIXIU AI Studio: browser-only AI detected class. */',
+  ORDER.ATOMIC,
+]
+
+arduino.forBlock['ai_confidence'] = () => [
+  '0 /* PIXIU AI Studio: browser-only AI confidence (0-100). */',
+  ORDER.ATOMIC,
+]
+
+arduino.forBlock['ai_get_gesture'] = () => [
+  '"none" /* PIXIU AI Studio: browser-only hand gesture. */',
+  ORDER.ATOMIC,
+]
+
+arduino.forBlock['ai_get_finger_count'] = () => [
+  '0 /* PIXIU AI Studio: browser-only finger count. */',
+  ORDER.ATOMIC,
+]
+
+arduino.forBlock['ai_is_gesture'] = () => [
+  'false /* PIXIU AI Studio: browser-only gesture predicate. */',
+  ORDER.ATOMIC,
+]
 
 arduino.forBlock['ai_camera_enable'] = (block) => {
   const state = block.getFieldValue('STATE') ?? 'ON'
-  return 'aiVision.setCamera(' + (state === 'ON' ? 'true' : 'false') + ');\n'
+  return '/* PIXIU AI Studio browser runtime: AI camera ' +
+    state.toLowerCase() +
+    '. This is not an Arduino camera API. */\n'
+}
+
+arduino.forBlock['ai_microphone_enable'] = (block) => {
+  const state = block.getFieldValue('STATE') ?? 'ON'
+  return '/* PIXIU AI Studio browser runtime: AI microphone ' +
+    state.toLowerCase() +
+    '. This is not an Arduino microphone API. */\n'
 }
 
 // keep indent helper referenced (used by callers that post-process)

@@ -25,8 +25,9 @@ import { SerialMonitor, type SerialLine } from "./serial-monitor"
 import { StatusBar } from "./status-bar"
 import { TemplateBrowser } from "./template-browser"
 import { LessonBrowser } from "./lesson-browser"
-import { AiCameraPanel } from "./ai-camera-panel"
 import type { AiVisionState } from "@/lib/ai/vision-types"
+import { createAiVisionState } from "@/lib/ai/vision-state"
+import { normalizeAiVisionState } from "@/lib/ai/ai-result-normalizer"
 const AiStudioPanel = lazy(() => import("./ai-studio-panel").then((module) => ({ default: module.AiStudioPanel })))
 import { ContextMenu, type ContextMenuTarget } from "./context-menu"
 import type { ProjectTemplate } from "@/lib/templates"
@@ -71,8 +72,9 @@ export function Workbench() {
   const [isLessonsOpen, setIsLessonsOpen] = useState(false)
   const [activeLessonId, setActiveLessonId] = useState<string | null>(null)
   const [isAiCameraOpen, setIsAiCameraOpen] = useState(false)
-  const [isAiStudioOpen, setIsAiStudioOpen] = useState(false)
   const [aiRuntimeEnabled, setAiRuntimeEnabled] = useState(false)
+  const [aiCameraCompact, setAiCameraCompact] = useState(false)
+  const [aiRequestedMode, setAiRequestedMode] = useState<"objects" | "pose" | "hands" | "emotion" | "sound" | "numbers" | "trained" | null>(null)
   const [isInspectorOpen, setIsInspectorOpen] = useState(true)
   const [mobilePaletteOpen, setMobilePaletteOpen] = useState(false)
   const [contextMenu, setContextMenu] = useState<{
@@ -175,16 +177,16 @@ export function Workbench() {
     e.preventDefault()
     setContextMenu({ x: e.clientX, y: e.clientY, target })
   }, [])
-  const [aiState, setAiState] = useState<AiVisionState>({
-    enabled: false,
-    mode: "objects",
-    detectedClass: "none",
-    confidence: 0,
-    allDetections: [],
-    modelSource: "ready",
-    detail: "AI idle",
-  })
+  const [aiState, setAiState] = useState<AiVisionState>(() => createAiVisionState("objects"))
   const aiStateRef = useRef(aiState)
+  const handleAiStateChange = useCallback(
+    (nextState: AiVisionState) => {
+      const normalized = normalizeAiVisionState(nextState)
+      aiStateRef.current = normalized
+      setAiState(normalized)
+    },
+    [],
+  )
   useEffect(() => {
     aiStateRef.current = aiState
   }, [aiState])
@@ -211,12 +213,12 @@ export function Workbench() {
     [running, state, pressed, pinStates],
   )
 
-  const oscilloscopeSimulationRef = useRef({ state, pinStates, running })
-  oscilloscopeSimulationRef.current = { state, pinStates, running }
+  const oscilloscopeSimulationRef = useRef({ state, pinStates, running, pressed })
+  oscilloscopeSimulationRef.current = { state, pinStates, running, pressed }
 
   const wireCurrents = useMemo(
-    () => (running ? computeWireCurrents(state, runtime, pinStates) : {}),
-    [running, state, runtime, pinStates],
+    () => (running ? computeWireCurrents(state, runtime, pinStates, pressed) : {}),
+    [running, state, runtime, pinStates, pressed],
   )
 
   // Calculate total mA consumption across components
@@ -431,12 +433,35 @@ export function Workbench() {
     setActiveStepBlock(null)
   }, [])
 
-  // AI runtime lifecycle is independent from the simulator runner. Stopping or
-  // restarting Arduino execution must not tear down the live camera PiP.
+  // AI runtime lifecycle is deliberately separate from the Arduino runner.
+  // Stopping/restarting simulation must not silently destroy an active AI session.
   const stopAiRuntime = useCallback(() => {
+    setAiRequestedMode(null)
     setAiRuntimeEnabled(false)
+    setAiCameraCompact(false)
     setIsAiCameraOpen(false)
   }, [])
+
+  const handleAiStudioClose = useCallback(() => {
+    // While an AI program is running, closing Studio means minimize to PiP.
+    if (aiRuntimeEnabled) {
+      setIsAiCameraOpen(false)
+      setAiCameraCompact(true)
+      return
+    }
+    stopAiRuntime()
+  }, [aiRuntimeEnabled, stopAiRuntime])
+
+  const handleToggleAiStudio = useCallback(() => {
+    if (isAiCameraOpen) {
+      handleAiStudioClose()
+      return
+    }
+
+    // Opening Studio is presentation-only. A live AI runtime keeps running.
+    setIsAiCameraOpen(true)
+    setAiCameraCompact(false)
+  }, [handleAiStudioClose, isAiCameraOpen])
 
   const startProgram = useCallback((startPaused: boolean = false, openAiHud: boolean = true) => {
     stopProgram()
@@ -453,6 +478,9 @@ export function Workbench() {
     const hasArduino = state.parts.some((p) => p.type === "arduino-uno")
     if (!hasArduino) {
       // Pure DC circuit (battery, resistor, LED, etc.) - no Arduino code, no AI camera.
+      // Keep the Workbench run-state consistent with the early return.
+      runningRef.current = false
+      setRunning(false)
       stopAiRuntime()
       return
     }
@@ -462,19 +490,38 @@ export function Workbench() {
       blocklyXml.includes('type="ai_') ||
       blocklyXml.includes("ai_detect_objects") ||
       blocklyXml.includes("ai_is_detected") ||
+      blocklyXml.includes("ai_is_unknown") ||
       blocklyXml.includes("ai_get_detected_class") ||
       blocklyXml.includes("ai_confidence") ||
-      blocklyXml.includes("ai_camera_enable")
+      blocklyXml.includes("ai_get_gesture") ||
+      blocklyXml.includes("ai_get_finger_count") ||
+      blocklyXml.includes("ai_is_gesture") ||
+      blocklyXml.includes("ai_camera_enable") ||
+      blocklyXml.includes("ai_microphone_enable")
     )
-    // AI program execution automatically opens the proven floating AI Vision HUD.
-    // The separate AI Studio never covers the Circuit/Code workspace during Run.
+    const usesNumberGestureAi = Boolean(
+      blocklyXml.includes("ai_get_gesture") ||
+      blocklyXml.includes("ai_get_finger_count") ||
+      blocklyXml.includes("ai_is_gesture")
+    )
+    const programAiMode = usesNumberGestureAi
+      ? "numbers"
+      : blocklyXml.includes("ai_microphone_enable")
+        ? "sound"
+        : usesAi
+          ? "objects"
+          : null
+    // AI program execution automatically opens the selected AI runtime in
+    // minimized floating mode. 6G explicitly requests the Numbers/hand layer;
+    // ordinary camera AI blocks request Objects and microphone blocks request Sound.
     if (usesAi && openAiHud) {
-      setIsAiStudioOpen(false)
+      setAiRequestedMode(programAiMode)
       setIsAiCameraOpen(true)
+      setAiCameraCompact(true)
       setAiRuntimeEnabled(true)
     } else {
+      setAiRequestedMode(null)
       stopAiRuntime()
-      setIsAiStudioOpen(false)
     }
 
     try {
@@ -568,12 +615,45 @@ export function Workbench() {
             ?? partsRef.current.find((pt) => pt.type === "keypad-4x4")
           return String(keypad?.props?.lastKey ?? "")
         },
-        isAiDetected: (cls) => aiStateRef.current.detectedClass.trim().toLowerCase() === String(cls).trim().toLowerCase(),
+        isAiDetected: (cls) => {
+          const state = aiStateRef.current
+          if (
+            !state.enabled ||
+            state.unknown ||
+            state.detectedClass === "none" ||
+            state.detectedClass === "unknown"
+          ) {
+            return false
+          }
+          return (
+            state.detectedClass.trim().toLowerCase() ===
+            String(cls).trim().toLowerCase()
+          )
+        },
+        isAiUnknown: () => aiStateRef.current.unknown === true,
         getAiDetectedClass: () => aiStateRef.current.detectedClass,
         getAiConfidence: () => aiStateRef.current.confidence,
+        getAiGesture: () => aiStateRef.current.detectedGesture ?? "none",
+        getAiFingerCount: () => aiStateRef.current.fingerCount ?? 0,
+        isAiGesture: (gesture) =>
+          (aiStateRef.current.detectedGesture ?? "none").trim().toLowerCase() ===
+          String(gesture).trim().toLowerCase(),
         setAiCamera: (enabled) => {
+          setAiRequestedMode(enabled ? "objects" : null)
           setAiRuntimeEnabled(enabled)
           setIsAiCameraOpen(enabled)
+          setAiCameraCompact(enabled)
+        },
+        setAiMicrophone: (enabled) => {
+          if (enabled) {
+            setAiRequestedMode("sound")
+            setAiRuntimeEnabled(true)
+            setIsAiCameraOpen(true)
+            setAiCameraCompact(true)
+          } else {
+            setAiRequestedMode(null)
+            stopAiRuntime()
+          }
         },
         sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
         isRunning: () => runningRef.current,
@@ -683,7 +763,6 @@ export function Workbench() {
       setRunning(false)
       setPressed(new Set())
       stopProgram()
-      stopAiRuntime()
       return
     }
 
@@ -697,9 +776,11 @@ export function Workbench() {
   // AI Studio uses this entry point so "Run circuit" closes the AI overlay
   // and takes the student directly to the Circuit Simulator view.
   const handleRunFromAiStudio = useCallback(() => {
-    // AI Studio is separate from the runtime camera. Running the circuit
-    // always uses the small legacy floating AI Vision HUD.
-    setIsAiStudioOpen(false)
+    // "Run circuit" starts the Arduino program and keeps AI visible as the
+    // same small draggable floating window instead of covering the workspace.
+    setIsAiCameraOpen(true)
+    setAiCameraCompact(true)
+    setAiRuntimeEnabled(true)
     if (!runningRef.current) {
       setRunning(true)
       startProgram(false, true)
@@ -863,7 +944,6 @@ export function Workbench() {
     setWiring(null)
     setSerialLines([])
     stopAiRuntime()
-    setIsAiStudioOpen(false)
     setIsDmmOpen(false)
     setIsScopeOpen(false)
     setLastSaved(saved.savedAt)
@@ -881,7 +961,6 @@ export function Workbench() {
     setWiring(null)
     setSerialLines([])
     stopAiRuntime()
-    setIsAiStudioOpen(false)
     setIsDmmOpen(false)
     setIsScopeOpen(false)
     setLastSaved(project.savedAt)
@@ -901,7 +980,6 @@ export function Workbench() {
     setWiring(null)
     setSerialLines([])
     stopAiRuntime()
-    setIsAiStudioOpen(false)
     setIsDmmOpen(false)
     setIsScopeOpen(false)
   }, [stopProgram, stopAiRuntime])
@@ -943,28 +1021,12 @@ export function Workbench() {
       setSelectedWireId(null)
       setWiring(null)
       setSerialLines([])
-      // Selecting a template replaces the active program context, so stop the
-      // current AI runtime before loading the new program.
+      // Selecting a template replaces the active program context, so stop
+      // the current AI runtime before loading the new program.
       stopAiRuntime()
-      setIsAiStudioOpen(false)
     },
     [stopProgram, stopAiRuntime, updateState],
   )
-
-  const handleToggleAiVision = useCallback(() => {
-    if (isAiCameraOpen) {
-      stopAiRuntime()
-      return
-    }
-    setIsAiCameraOpen(true)
-    if (runningRef.current && state.parts.some((p) => p.type === "arduino-uno")) {
-      setAiRuntimeEnabled(true)
-    }
-  }, [isAiCameraOpen, state.parts, stopAiRuntime])
-
-  const handleOpenAiStudio = useCallback(() => {
-    setIsAiStudioOpen(true)
-  }, [])
 
   const toggleMute = useCallback(() => {
     setIsMuted((prev) => {
@@ -992,8 +1054,7 @@ export function Workbench() {
         isSerialOpen={isSerialOpen}
         onToggleSerial={() => setIsSerialOpen((prev) => !prev)}
         isAiCameraOpen={isAiCameraOpen}
-        onToggleAiCamera={handleToggleAiVision}
-        onOpenAiStudio={handleOpenAiStudio}
+        onToggleAiCamera={handleToggleAiStudio}
         isInspectorOpen={isInspectorOpen}
         onToggleInspector={() => setIsInspectorOpen((prev) => !prev)}
         isMuted={isMuted}
@@ -1042,31 +1103,18 @@ export function Workbench() {
         onSelectTemplate={handleSelectTemplate}
       />
 
-      {/* Legacy AI Vision HUD: stable floating multi-object detector tied to Arduino runtime. */}
-      <AiCameraPanel
-        isOpen={isAiCameraOpen}
-        onClose={stopAiRuntime}
-        aiState={aiState}
-        onAiStateChange={setAiState}
-        isSimRunning={running}
-        runtimeEnabled={aiRuntimeEnabled}
-        onStartSim={() => {
-          setIsAiStudioOpen(false)
-          if (!runningRef.current) {
-            setRunning(true)
-            startProgram(false, true)
-          }
-        }}
-      />
-
-      {/* AI Studio stays separate from the runtime HUD. */}
+      {/* Pixiu AI Studio: simple by default, deep only when a student opens Understand. */}
       <Suspense fallback={null}>
         <AiStudioPanel
-          isOpen={isAiStudioOpen}
-          onClose={() => setIsAiStudioOpen(false)}
+          isOpen={isAiCameraOpen}
+          onClose={handleAiStudioClose}
           aiState={aiState}
-          onAiStateChange={setAiState}
+          onAiStateChange={handleAiStateChange}
           isSimRunning={running}
+          runtimeEnabled={aiRuntimeEnabled}
+          compact={aiCameraCompact}
+          requestedMode={aiRequestedMode}
+          onRequestedModeHandled={() => setAiRequestedMode(null)}
           onStartSim={handleRunFromAiStudio}
         />
       </Suspense>
@@ -1214,14 +1262,14 @@ export function Workbench() {
             </button>
 
             <button
-              onClick={handleToggleAiVision}
+              onClick={handleToggleAiStudio}
               className={`flex flex-col items-center gap-0.5 p-1 transition active:scale-95 ${
                 isAiCameraOpen ? "text-purple-400 font-bold" : "text-muted-foreground hover:text-foreground"
               }`}
-              title="AI Vision multi-object camera"
+              title="AI Studio"
             >
               <Camera size={18} className={isAiCameraOpen ? "text-purple-400" : ""} />
-              <span className="text-[10px]">AI Vision</span>
+              <span className="text-[10px]">AI Studio</span>
             </button>
 
             <button
@@ -1315,7 +1363,7 @@ export function Workbench() {
           onToggleDmm={() => setIsDmmOpen((prev) => !prev)}
           isScopeOpen={isScopeOpen}
           onToggleScope={() => setIsScopeOpen((prev) => !prev)}
-          onToggleAiCamera={handleToggleAiVision}
+          onToggleAiCamera={handleToggleAiStudio}
           onSwitchToCode={() => setView("code")}
           onToggleRun={toggleRun}
           onClearCanvas={clearAll}
@@ -1331,6 +1379,7 @@ export function Workbench() {
         state={state}
         runtime={runtime}
         pinStates={pinStates}
+        pressed={pressed}
         running={running}
         probeRed={probeRed}
         probeBlack={probeBlack}
@@ -1348,6 +1397,7 @@ export function Workbench() {
         state={state}
         running={running}
         simulationRef={oscilloscopeSimulationRef}
+        pressed={pressed}
         probeCH1={scopeProbeCH1}
         probeCH2={scopeProbeCH2}
         onSetProbeCH1={setScopeProbeCH1}

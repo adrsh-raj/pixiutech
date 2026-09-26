@@ -20,6 +20,14 @@ export interface AiVisionState {
   detectedClass: string
   confidence: number
   allDetections: AiDetection[]
+  detectedGesture?: string
+  fingerCount?: number
+  handedness?: string
+  unknown?: boolean
+  lowConfidence?: boolean
+  confidenceThreshold?: number
+  decisionReason?: "recognized" | "no_input" | "low_confidence" | "ambiguous"
+  probabilities?: Record<string, number>
   modelClasses?: string[]
   modelSource?: "ready" | "trained"
   detail: string
