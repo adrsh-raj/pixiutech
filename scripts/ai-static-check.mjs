@@ -5,6 +5,8 @@ const root = process.cwd()
 const read = (path) => readFileSync(join(root, path), "utf8")
 
 const panel = read("pixiu-lms-portal/src/components/circuit-lab/ai-studio-panel.tsx")
+const canvasPanel = read("pixiu-lms-portal/src/components/circuit-lab/ai-camera-panel.tsx")
+const templates = read("pixiu-lms-portal/src/lib/templates.ts")
 const engine = read("pixiu-lms-portal/src/lib/ai-studio-engine.ts")
 const types = read("pixiu-lms-portal/src/lib/ai/vision-types.ts")
 const workbench = read("pixiu-lms-portal/src/components/circuit-lab/workbench.tsx")
@@ -34,8 +36,8 @@ const forbidText = (text, needle, label) => {
   if (text.includes(needle)) failures.push(label + ": forbidden " + needle)
 }
 
-if (existsSync(join(root, "pixiu-lms-portal/src/components/circuit-lab/ai-camera-panel.tsx"))) {
-  failures.push("legacy ai-camera-panel.tsx still exists")
+if (!existsSync(join(root, "pixiu-lms-portal/src/components/circuit-lab/ai-camera-panel.tsx"))) {
+  failures.push("integrated AI Vision Canvas panel is missing")
 }
 
 for (const mode of ["objects", "pose", "hands", "emotion", "sound", "numbers"]) {
@@ -185,6 +187,40 @@ for (const marker of [
   "SOUND_AI_CONFIDENCE_THRESHOLD = 72",
   "TRAINED_AI_CONFIDENCE_THRESHOLD = 62",
 ]) requireText(resultNormalizer, marker, "6J/6K result normalization")
+
+for (const marker of [
+  "cocoSsd.load",
+  'base: "lite_mobilenet_v2"',
+  "modelRef.current.detect(video)",
+  "runtimeEnabled",
+  "Vision Signal:",
+  "PIXIU VISION CORE",
+]) requireText(canvasPanel, marker, "Integrated AI Vision Canvas runtime")
+
+for (const marker of [
+  'id: "ai-smart-barrier"',
+  "ai_is_detected",
+  '<field name="CLASS">car</field>',
+  '<field name="PIN">6</field>',
+  '<field name="NUM">90</field>',
+]) requireText(templates, marker, "AI Smart Barrier template")
+
+for (const marker of [
+  'import { AiCameraPanel } from "./ai-camera-panel"',
+  "isAiStudioOpen",
+  "handleToggleAiVision",
+  "handleToggleAiStudio",
+  "<AiCameraPanel",
+  "<AiStudioPanel",
+  'programAiMode === "objects"',
+]) requireText(workbench, marker, "separate AI Canvas + AI Studio runtime")
+
+for (const marker of [
+  "isAiStudioOpen?: boolean",
+  "onOpenAiStudio?: () => void",
+  "AI Vision Canvas",
+  "PIXIU AI Studio",
+]) requireText(read("pixiu-lms-portal/src/components/circuit-lab/toolbar.tsx"), marker, "separate AI toolbar controls")
 
 for (const marker of [
   "normalizeAiVisionState",

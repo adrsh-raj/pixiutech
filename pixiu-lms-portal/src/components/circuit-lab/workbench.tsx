@@ -24,6 +24,7 @@ import { BlocklyEditor } from "./blockly-editor"
 import { SerialMonitor, type SerialLine } from "./serial-monitor"
 import { StatusBar } from "./status-bar"
 import { TemplateBrowser } from "./template-browser"
+import { AiCameraPanel } from "./ai-camera-panel"
 import { LessonBrowser } from "./lesson-browser"
 import type { AiVisionState } from "@/lib/ai/vision-types"
 import { createAiVisionState } from "@/lib/ai/vision-state"
@@ -72,6 +73,7 @@ export function Workbench() {
   const [isLessonsOpen, setIsLessonsOpen] = useState(false)
   const [activeLessonId, setActiveLessonId] = useState<string | null>(null)
   const [isAiCameraOpen, setIsAiCameraOpen] = useState(false)
+  const [isAiStudioOpen, setIsAiStudioOpen] = useState(false)
   const [aiRuntimeEnabled, setAiRuntimeEnabled] = useState(false)
   const [aiCameraCompact, setAiCameraCompact] = useState(false)
   const [aiRequestedMode, setAiRequestedMode] = useState<"objects" | "pose" | "hands" | "emotion" | "sound" | "numbers" | "trained" | null>(null)
@@ -434,7 +436,7 @@ export function Workbench() {
   }, [])
 
   // AI runtime lifecycle is deliberately separate from the Arduino runner.
-  // Stopping/restarting simulation must not silently destroy an active AI session.
+  // AI Vision Canvas and PIXIU AI Studio are separate interfaces.
   const stopAiRuntime = useCallback(() => {
     setAiRequestedMode(null)
     setAiRuntimeEnabled(false)
@@ -442,26 +444,36 @@ export function Workbench() {
     setIsAiCameraOpen(false)
   }, [])
 
-  const handleAiStudioClose = useCallback(() => {
-    // While an AI program is running, closing Studio means minimize to PiP.
-    if (aiRuntimeEnabled) {
-      setIsAiCameraOpen(false)
-      setAiCameraCompact(true)
+  const handleToggleAiVision = useCallback(() => {
+    if (isAiCameraOpen) {
+      stopAiRuntime()
       return
     }
-    stopAiRuntime()
-  }, [aiRuntimeEnabled, stopAiRuntime])
+
+    // The integrated Vision Canvas is the runtime surface for Arduino AI
+    // programs/templates such as the Smart Boom Barrier.
+    setIsAiStudioOpen(false)
+    setAiRequestedMode(null)
+    setIsAiCameraOpen(true)
+    setAiCameraCompact(true)
+    setAiRuntimeEnabled(true)
+  }, [isAiCameraOpen, stopAiRuntime])
+
+  const handleAiStudioClose = useCallback(() => {
+    setIsAiStudioOpen(false)
+  }, [])
 
   const handleToggleAiStudio = useCallback(() => {
-    if (isAiCameraOpen) {
+    if (isAiStudioOpen) {
       handleAiStudioClose()
       return
     }
 
-    // Opening Studio is presentation-only. A live AI runtime keeps running.
-    setIsAiCameraOpen(true)
-    setAiCameraCompact(false)
-  }, [handleAiStudioClose, isAiCameraOpen])
+    // Studio is an authoring/learning surface. It is intentionally separate
+    // from the integrated runtime canvas.
+    stopAiRuntime()
+    setIsAiStudioOpen(true)
+  }, [handleAiStudioClose, isAiStudioOpen, stopAiRuntime])
 
   const startProgram = useCallback((startPaused: boolean = false, openAiHud: boolean = true) => {
     stopProgram()
@@ -515,10 +527,22 @@ export function Workbench() {
     // minimized floating mode. 6G explicitly requests the Numbers/hand layer;
     // ordinary camera AI blocks request Objects and microphone blocks request Sound.
     if (usesAi && openAiHud) {
-      setAiRequestedMode(programAiMode)
-      setIsAiCameraOpen(true)
-      setAiCameraCompact(true)
-      setAiRuntimeEnabled(true)
+      if (programAiMode === "objects") {
+        // Object-detection Arduino programs use the dedicated integrated
+        // Vision Canvas so the camera and the circuit remain visible together.
+        setIsAiStudioOpen(false)
+        setAiRequestedMode(null)
+        setIsAiCameraOpen(true)
+        setAiCameraCompact(true)
+        setAiRuntimeEnabled(true)
+      } else {
+        // Sound/gesture/hand/My AI programs use the richer AI Studio runtime.
+        setIsAiCameraOpen(false)
+        setAiCameraCompact(false)
+        setAiRequestedMode(programAiMode)
+        setIsAiStudioOpen(true)
+        setAiRuntimeEnabled(true)
+      }
     } else {
       setAiRequestedMode(null)
       stopAiRuntime()
@@ -773,11 +797,10 @@ export function Workbench() {
     startProgram(false, true)
   }, [startProgram, stopProgram])
 
-  // AI Studio uses this entry point so "Run circuit" closes the AI overlay
-  // and takes the student directly to the Circuit Simulator view.
+  // AI Studio "Run circuit" hands control to the integrated Vision Canvas
+  // for Arduino object-detection programs.
   const handleRunFromAiStudio = useCallback(() => {
-    // "Run circuit" starts the Arduino program and keeps AI visible as the
-    // same small draggable floating window instead of covering the workspace.
+    setIsAiStudioOpen(false)
     setIsAiCameraOpen(true)
     setAiCameraCompact(true)
     setAiRuntimeEnabled(true)
@@ -1054,7 +1077,9 @@ export function Workbench() {
         isSerialOpen={isSerialOpen}
         onToggleSerial={() => setIsSerialOpen((prev) => !prev)}
         isAiCameraOpen={isAiCameraOpen}
-        onToggleAiCamera={handleToggleAiStudio}
+        onToggleAiCamera={handleToggleAiVision}
+        isAiStudioOpen={isAiStudioOpen}
+        onOpenAiStudio={handleToggleAiStudio}
         isInspectorOpen={isInspectorOpen}
         onToggleInspector={() => setIsInspectorOpen((prev) => !prev)}
         isMuted={isMuted}
@@ -1103,10 +1128,21 @@ export function Workbench() {
         onSelectTemplate={handleSelectTemplate}
       />
 
+      {/* Integrated AI Vision Canvas — runtime surface for AI Arduino templates/programs. */}
+      <AiCameraPanel
+        isOpen={isAiCameraOpen}
+        onClose={stopAiRuntime}
+        aiState={aiState}
+        onAiStateChange={handleAiStateChange}
+        isSimRunning={running}
+        runtimeEnabled={aiRuntimeEnabled}
+        onStartSim={handleRunFromAiStudio}
+      />
+
       {/* Pixiu AI Studio: simple by default, deep only when a student opens Understand. */}
       <Suspense fallback={null}>
         <AiStudioPanel
-          isOpen={isAiCameraOpen}
+          isOpen={isAiStudioOpen}
           onClose={handleAiStudioClose}
           aiState={aiState}
           onAiStateChange={handleAiStateChange}
@@ -1262,13 +1298,24 @@ export function Workbench() {
             </button>
 
             <button
+              onClick={handleToggleAiVision}
+              className={`flex flex-col items-center gap-0.5 p-1 transition active:scale-95 ${
+                isAiCameraOpen ? "text-cyan-300 font-bold" : "text-muted-foreground hover:text-foreground"
+              }`}
+              title="AI Vision Canvas"
+            >
+              <Camera size={18} className={isAiCameraOpen ? "text-cyan-300" : ""} />
+              <span className="text-[10px]">AI Vision</span>
+            </button>
+
+            <button
               onClick={handleToggleAiStudio}
               className={`flex flex-col items-center gap-0.5 p-1 transition active:scale-95 ${
-                isAiCameraOpen ? "text-purple-400 font-bold" : "text-muted-foreground hover:text-foreground"
+                isAiStudioOpen ? "text-violet-300 font-bold" : "text-muted-foreground hover:text-foreground"
               }`}
-              title="AI Studio"
+              title="PIXIU AI Studio"
             >
-              <Camera size={18} className={isAiCameraOpen ? "text-purple-400" : ""} />
+              <Sparkles size={18} className={isAiStudioOpen ? "text-violet-300" : ""} />
               <span className="text-[10px]">AI Studio</span>
             </button>
 
@@ -1303,14 +1350,6 @@ export function Workbench() {
               <span className="text-[10px]">Serial</span>
             </button>
 
-            <button
-              onClick={clearAll}
-              className="flex flex-col items-center gap-0.5 p-1 text-muted-foreground hover:text-destructive transition active:scale-95"
-              title="Clear Canvas"
-            >
-              <Trash2 size={18} />
-              <span className="text-[10px]">Clear</span>
-            </button>
           </div>
         </main>
         {isInspectorOpen && (
@@ -1363,7 +1402,7 @@ export function Workbench() {
           onToggleDmm={() => setIsDmmOpen((prev) => !prev)}
           isScopeOpen={isScopeOpen}
           onToggleScope={() => setIsScopeOpen((prev) => !prev)}
-          onToggleAiCamera={handleToggleAiStudio}
+          onToggleAiCamera={handleToggleAiVision}
           onSwitchToCode={() => setView("code")}
           onToggleRun={toggleRun}
           onClearCanvas={clearAll}

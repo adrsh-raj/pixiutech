@@ -22,6 +22,8 @@ interface Props {
   onToggleSerial?: () => void
   isAiCameraOpen?: boolean
   onToggleAiCamera?: () => void
+  isAiStudioOpen?: boolean
+  onOpenAiStudio?: () => void
   isInspectorOpen?: boolean
   onToggleInspector?: () => void
   isMuted?: boolean
@@ -62,6 +64,8 @@ export function Toolbar({
   onToggleSerial,
   isAiCameraOpen = false,
   onToggleAiCamera,
+  isAiStudioOpen = false,
+  onOpenAiStudio,
   isInspectorOpen = true,
   onToggleInspector,
   isMuted = false,
@@ -282,8 +286,19 @@ export function Toolbar({
                   className="flex w-full items-center justify-between gap-2 rounded-xl px-2.5 py-2 text-left text-xs font-semibold text-slate-200 hover:bg-slate-800"
                   role="menuitem"
                 >
-                  <span className="flex items-center gap-2"><Sparkles size={14} className="text-purple-300" />AI Studio</span>
-                  <span className="text-[9px] text-slate-500">{isAiCameraOpen ? "OPEN" : "CLOSED"}</span>
+                  <span className="flex items-center gap-2"><Camera size={14} className="text-cyan-300" />AI Vision Canvas</span>
+                  <span className="text-[9px] text-slate-500">{isAiCameraOpen ? "LIVE" : "READY"}</span>
+                </button>
+              )}
+
+              {onOpenAiStudio && (
+                <button
+                  onClick={() => { setToolsOpen(false); onOpenAiStudio() }}
+                  className="pixiu-toolbar-tool flex w-full items-center justify-between gap-2 rounded-xl border px-2.5 py-2 text-left text-xs font-semibold text-slate-200 hover:bg-slate-800"
+                  role="menuitem"
+                >
+                  <span className="flex items-center gap-2"><Sparkles size={14} className="text-violet-300" />PIXIU AI Studio</span>
+                  <span className="text-[9px] text-slate-500">{isAiStudioOpen ? "OPEN" : "BUILD"}</span>
                 </button>
               )}
 

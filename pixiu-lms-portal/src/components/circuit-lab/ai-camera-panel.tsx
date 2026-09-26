@@ -5,6 +5,7 @@ import { Camera, CameraOff, Sparkles, X, Minimize2, Maximize2 } from "lucide-rea
 import * as cocoSsd from "@tensorflow-models/coco-ssd"
 import "@tensorflow/tfjs"
 import type { AiVisionState } from "@/lib/ai/vision-types"
+import "./pixiu-brand.css"
 
 export type { AiVisionState }
 
@@ -253,22 +254,22 @@ export function AiCameraPanel({
 
   return (
     <div
-      className={`fixed bottom-12 right-6 z-40 flex flex-col rounded-2xl border border-purple-500/40 bg-slate-950/95 shadow-2xl backdrop-blur-md text-white overflow-hidden transition-all duration-300 ${
+      className={`pixiu-ai-floating fixed bottom-12 right-6 z-40 flex flex-col rounded-2xl border bg-slate-950/95 shadow-2xl backdrop-blur-md text-white overflow-hidden transition-all duration-300 ${
         minimized ? "w-64" : "w-80 sm:w-96"
       }`}
       style={{ boxShadow: "0 10px 35px -5px rgba(168, 85, 247, 0.35)" }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-3.5 py-2.5 bg-gradient-to-r from-purple-950/90 to-slate-900 border-b border-purple-500/30">
+      <div className="pixiu-ai-floating-header flex items-center justify-between px-3.5 py-2.5 bg-slate-950 border-b">
         <div className="flex items-center gap-2">
-          <div className="h-6 w-6 rounded-lg bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-300">
+          <div className="pixiu-ai-mark h-6 w-6 rounded-lg flex items-center justify-center">
             <Sparkles size={13} className={modelLoading ? "animate-spin" : ""} />
           </div>
           <div>
             <h3 className="text-xs font-bold text-white flex items-center gap-1.5">
-              <span>AI Vision Camera</span>
-              <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-purple-500/25 text-purple-300 border border-purple-500/40">
-                PICTOBLOX AI
+              <span>PIXIU AI VISION</span>
+              <span className="pixiu-ai-live-chip text-[9px] font-mono px-1.5 py-0.2 rounded-full border">
+                PIXIU VISION CORE
               </span>
             </h3>
           </div>
@@ -285,7 +286,7 @@ export function AiCameraPanel({
           <button
             onClick={onClose}
             className="p-1 hover:text-white rounded hover:bg-red-500/20 hover:text-red-300 transition"
-            title="Close AI Camera"
+            title="Close Pixiu AI Vision"
           >
             <X size={14} />
           </button>
@@ -319,15 +320,15 @@ export function AiCameraPanel({
                 <p className="text-[11px] text-slate-500 max-w-[220px]">
                   {modelLoading
                     ? "Loading AI Vision Model..."
-                    : "Turn on your webcam to detect objects and open the barrier gate!"}
+                    : "Start the vision feed to detect objects and drive the connected automation."}
                 </p>
                 {runtimeEnabled ? (
                   <span className="mt-1 inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-[11px] font-semibold text-emerald-200">
-                    Arduino AI runtime starting…
+                    PIXIU AI runtime starting…
                   </span>
                 ) : (
                   <span className="mt-1 inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-[11px] font-semibold text-slate-400">
-                    Run an AI Arduino program to start
+                    Run an AI program to activate the vision runtime
                   </span>
                 )}
               </div>
@@ -347,7 +348,7 @@ export function AiCameraPanel({
             {/* Model status indicator */}
             <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-950/80 border border-slate-800 text-[10px] font-mono text-slate-300">
               <span className={`h-1.5 w-1.5 rounded-full ${modelLoaded ? "bg-emerald-400" : "bg-amber-400 animate-pulse"}`} />
-              <span>{modelLoading ? "Loading..." : modelLoaded ? "AI Active" : "Initializing"}</span>
+              <span>{modelLoading ? "Loading..." : modelLoaded ? "PIXIU AI ACTIVE" : "Initializing"}</span>
             </div>
           </div>
 
@@ -359,9 +360,9 @@ export function AiCameraPanel({
           )}
 
           {/* Live AI Status Pill */}
-          <div className="flex items-center justify-between px-3 py-2 bg-slate-900/60 border-b border-slate-800 text-xs">
+          <div className="pixiu-ai-signal-card flex items-center justify-between px-3 py-2 border-b text-xs">
             <div className="flex items-center gap-2">
-              <span className="text-[11px] text-slate-400">Live Detection:</span>
+              <span className="text-[11px] text-slate-400">Vision Signal:</span>
               <span
                 className={`font-mono text-[11px] font-bold px-2 py-0.5 rounded-full border ${
                   aiState.detectedClass === "car"
@@ -390,15 +391,15 @@ export function AiCameraPanel({
             <div className="flex items-center gap-2">
               <span className={`h-2 w-2 rounded-full ${isSimRunning ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`} />
               <span className="text-[11px] text-slate-300">
-                {isSimRunning ? "Circuit Running · Live" : "Circuit Simulation Stopped"}
+                {isSimRunning ? "Circuit Runtime · Live" : "Circuit Runtime Stopped"}
               </span>
             </div>
             {!isSimRunning && onStartSim && (
               <button
                 onClick={onStartSim}
-                className="flex items-center gap-1 rounded-md bg-emerald-600 hover:bg-emerald-500 px-2.5 py-1 text-[11px] font-bold text-white transition shadow-sm cursor-pointer"
+                className="pixiu-ai-command flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-bold text-white transition shadow-sm cursor-pointer"
               >
-                <span>▶️ Start Simulation</span>
+                <span>Launch Runtime</span>
               </button>
             )}
           </div>
@@ -406,7 +407,7 @@ export function AiCameraPanel({
           {/* Instructions */}
           <div className="px-3.5 py-2.5 bg-slate-950 border-t border-slate-900">
             <p className="text-[11px] text-slate-400 text-center leading-relaxed">
-              Show a <strong className="text-emerald-400">Car / Vehicle</strong> (toy car or car photo on phone) to open the barrier gate!
+              Show a <strong className="text-cyan-300">Car / Vehicle</strong> to trigger the AI-connected barrier automation.
             </p>
           </div>
         </>
