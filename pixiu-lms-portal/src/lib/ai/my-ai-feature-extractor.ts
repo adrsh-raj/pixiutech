@@ -1,8 +1,11 @@
 import * as tf from "@tensorflow/tfjs"
 
 export const MY_AI_FEATURE_VERSION = "vision-features-v2"
+// Use the underlying TensorFlow.js-hosted artifact directly instead of the
+// tfhub.dev landing URL. tfhub.dev currently redirects this model family to
+// Kaggle, while the browser loader expects the TFJS model.json + shard layout.
 export const MY_AI_FEATURE_URL =
-  "https://tfhub.dev/google/imagenet/mobilenet_v2_100_224/feature_vector/4"
+  "https://storage.googleapis.com/tfhub-tfjs-modules/google/imagenet/mobilenet_v2_100_224/feature_vector/4/model.json"
 export const MY_AI_INPUT_SIZE = 224
 export const MY_AI_PREDICTION_THRESHOLD = 0.62
 
@@ -44,7 +47,31 @@ export async function loadMyAiFeatureExtractor() {
     }
 
     await ensureBackend()
-    const model = await tf.loadGraphModel(MY_AI_FEATURE_URL, { fromTFHub: true })
+    let model: tf.GraphModel
+    try {
+      model = await tf.loadGraphModel(MY_AI_FEATURE_URL)
+    } catch (directError) {
+      // Backward-compatible fallback for environments where the direct
+      // storage endpoint is blocked by a network policy.
+      try {
+        model = await tf.loadGraphModel(
+          "https://tfhub.dev/google/imagenet/mobilenet_v2_100_224/feature_vector/4",
+          { fromTFHub: true },
+        )
+      } catch (fallbackError) {
+        const directMessage =
+          directError instanceof Error ? directError.message : String(directError)
+        const fallbackMessage =
+          fallbackError instanceof Error ? fallbackError.message : String(fallbackError)
+        throw new Error(
+          "My AI model could not be downloaded. Direct TFJS model fetch failed (" +
+            directMessage +
+            "); TF Hub fallback failed (" +
+            fallbackMessage +
+            "). Check the browser network/CSP and allow storage.googleapis.com.",
+        )
+      }
+    }
 
     const warmup = tf.zeros([1, MY_AI_INPUT_SIZE, MY_AI_INPUT_SIZE, 3])
     const output = firstTensor(model.execute(warmup) as tf.Tensor)
