@@ -450,12 +450,12 @@ export function Workbench() {
       return
     }
 
-    // The integrated Vision Canvas is the runtime surface for Arduino AI
-    // programs/templates such as the Smart Boom Barrier.
+    // Manual full Vision Canvas. Automatic program execution uses the
+    // compact right-side Runtime HUD instead.
     setIsAiStudioOpen(false)
     setAiRequestedMode(null)
     setIsAiCameraOpen(true)
-    setAiCameraCompact(true)
+    setAiCameraCompact(false)
     setAiRuntimeEnabled(true)
   }, [isAiCameraOpen, stopAiRuntime])
 
@@ -523,28 +523,18 @@ export function Workbench() {
         : usesAi
           ? "objects"
           : null
-    // AI program execution automatically opens the selected AI runtime in
-    // minimized floating mode. 6G explicitly requests the Numbers/hand layer;
-    // ordinary camera AI blocks request Objects and microphone blocks request Sound.
+    // Any Arduino program containing AI blocks automatically gets the
+    // compact Pixiu Vision Runtime HUD on the right side. This is the
+    // execution surface; the full AI Studio remains a separate authoring UI.
     if (usesAi && openAiHud) {
-      if (programAiMode === "objects") {
-        // Object-detection Arduino programs use the dedicated integrated
-        // Vision Canvas so the camera and the circuit remain visible together.
-        setIsAiStudioOpen(false)
-        setAiRequestedMode(null)
-        setIsAiCameraOpen(true)
-        setAiCameraCompact(true)
-        setAiRuntimeEnabled(true)
-      } else {
-        // Sound/gesture/hand/My AI programs use the richer AI Studio runtime.
-        setIsAiCameraOpen(false)
-        setAiCameraCompact(false)
-        setAiRequestedMode(programAiMode)
-        setIsAiStudioOpen(true)
-        setAiRuntimeEnabled(true)
-      }
+      setIsAiCameraOpen(false)
+      setIsAiStudioOpen(false)
+      setAiCameraCompact(true)
+      setAiRequestedMode(programAiMode)
+      setAiRuntimeEnabled(true)
     } else {
       setAiRequestedMode(null)
+      setAiCameraCompact(false)
       stopAiRuntime()
     }
 
