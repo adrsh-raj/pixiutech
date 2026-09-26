@@ -198,9 +198,11 @@ for (const marker of [
 ]) requireText(canvasPanel, marker, "Integrated AI Vision Canvas runtime")
 for (const marker of [
   "lastParentXmlRef",
-  "xml === lastParentXmlRef.current",
+  "pendingExternalXmlRef",
+  "externalLoadVersionRef",
   "genuine external loads",
   "lastParentXmlRef.current = expectedExternalXml",
+  "onXmlChange?.(expectedExternalXml)",
 ]) requireText(read("pixiu-lms-portal/src/components/circuit-lab/blockly-editor.tsx"), marker, "Blockly external XML hydration")
 
 for (const marker of [
@@ -227,7 +229,8 @@ for (const marker of [
   "handleToggleAiStudio",
   "<AiCameraPanel",
   "<AiStudioPanel",
-  'programAiMode === "objects"',
+  "programAiMode",
+  "if (usesAi && openAiHud)",
 ]) requireText(workbench, marker, "separate AI Canvas + AI Studio runtime")
 
 for (const marker of [
