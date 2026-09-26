@@ -1044,9 +1044,23 @@ export function Workbench() {
       setSelectedWireId(null)
       setWiring(null)
       setSerialLines([])
-      // Selecting a template replaces the active program context, so stop
-      // the current AI runtime before loading the new program.
-      stopAiRuntime()
+      // Selecting a template replaces the active program context. Keep the
+      // dedicated Vision Canvas visible for AI templates, but do not request
+      // camera access until the student actually runs the program.
+      const templateUsesAi = Boolean(
+        tmpl.blocklyXml.includes('type="ai_') ||
+        tmpl.blocklyXml.includes("ai_detect_objects") ||
+        tmpl.blocklyXml.includes("ai_is_detected") ||
+        tmpl.blocklyXml.includes("ai_confidence") ||
+        tmpl.blocklyXml.includes("ai_camera_enable") ||
+        tmpl.blocklyXml.includes("ai_microphone_enable"),
+      )
+
+      setIsAiStudioOpen(false)
+      setAiRequestedMode(null)
+      setAiRuntimeEnabled(false)
+      setAiCameraCompact(templateUsesAi)
+      setIsAiCameraOpen(templateUsesAi)
     },
     [stopProgram, stopAiRuntime, updateState],
   )
