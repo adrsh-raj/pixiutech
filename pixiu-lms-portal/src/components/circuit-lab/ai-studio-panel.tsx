@@ -1079,7 +1079,7 @@ export function AiStudioPanel({
                     .map(([key, value]) => key + " " + value + "%")
                     .join(" · ")
               : "Show an example",
-          }))
+          })
           clearOverlay()
         }
 
