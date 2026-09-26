@@ -25,151 +25,84 @@ export type HandDetector = {
   reset?: () => void
 }
 
-const HAND_VERSION = "3.0.0"
+const HAND_VERSION = "4.0.0"
 const MAX_HANDS = 2
-const MIN_HAND_SCORE = 0.15
-const MEDIAPIPE_HANDS_VERSION = "0.4.1675469240"
-const HAND_RUNTIME_SOURCES = [
-  "https://cdn.jsdelivr.net/npm/@tensorflow-models/hand-pose-detection@2.0.1/dist/hand-pose-detection.min.js",
-  "https://unpkg.com/@tensorflow-models/hand-pose-detection@2.0.1/dist/hand-pose-detection.min.js",
-]
-
-const HAND_SOLUTION_SOURCES = [
-  `https://cdn.jsdelivr.net/npm/@mediapipe/hands@${MEDIAPIPE_HANDS_VERSION}/hands.js`,
-  `https://unpkg.com/@mediapipe/hands@${MEDIAPIPE_HANDS_VERSION}/hands.js`,
-]
+const MIN_HAND_SCORE = 0.05
+const HANDS_SCRIPT =
+  "https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"
+const HANDS_ASSET_BASE =
+  "https://cdn.jsdelivr.net/npm/@mediapipe/hands/"
 
 declare global {
   interface Window {
-    handPoseDetection?: any
     Hands?: any
   }
 }
 
-const scriptLoads = new Map<string, Promise<void>>()
+let handsScriptPromise: Promise<void> | null = null
 
-function loadScript(src: string, ready: () => boolean, marker: string): Promise<void> {
+function loadHandsScript() {
   if (typeof window === "undefined") {
     return Promise.reject(new Error("PIXIU Hand AI needs a browser."))
   }
-  if (ready()) return Promise.resolve()
+  if (typeof window.Hands === "function") return Promise.resolve()
 
-  const key = marker + "::" + src
-  const existing = scriptLoads.get(key)
-  if (existing) return existing
+  if (handsScriptPromise) return handsScriptPromise
 
-  const promise = new Promise<void>((resolve, reject) => {
-    const current = document.querySelector<HTMLScriptElement>(
-      `script[data-pixiu-hand-src="${src}"]`,
+  handsScriptPromise = new Promise<void>((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>(
+      'script[data-pixiu-hands-solution="1"]',
     )
-    if (current && ready()) {
-      resolve()
-      return
-    }
 
-    const script = current ?? document.createElement("script")
-    let settled = false
-    const cleanup = () => {
+    const cleanup = (script: HTMLScriptElement) => {
       script.removeEventListener("load", onLoad)
       script.removeEventListener("error", onError)
     }
-    const onLoad = () => {
-      if (settled) return
-      settled = true
-      cleanup()
-      if (ready()) resolve()
-      else reject(new Error(`Hand AI ${marker} loaded without its runtime API.`))
-    }
-    const onError = () => {
-      if (settled) return
-      settled = true
-      cleanup()
-      if (!current) script.remove()
-      reject(new Error(`Hand AI ${marker} could not be loaded.`))
+
+    const onLoad = (event?: Event) => {
+      const script = (event?.currentTarget as HTMLScriptElement | null) ?? existing
+      if (script) cleanup(script)
+      if (typeof window.Hands === "function") {
+        resolve()
+      } else {
+        handsScriptPromise = null
+        reject(new Error("MediaPipe Hands loaded, but the Hands constructor is unavailable."))
+      }
     }
 
+    const onError = (event?: Event) => {
+      const script = (event?.currentTarget as HTMLScriptElement | null) ?? existing
+      if (script) cleanup(script)
+      handsScriptPromise = null
+      reject(new Error("MediaPipe Hands script could not be loaded."))
+    }
+
+    if (existing) {
+      existing.addEventListener("load", onLoad, { once: true })
+      existing.addEventListener("error", onError, { once: true })
+      if (typeof window.Hands === "function") {
+        onLoad()
+      }
+      return
+    }
+
+    const script = document.createElement("script")
+    script.async = true
+    script.crossOrigin = "anonymous"
+    script.src = HANDS_SCRIPT
+    script.dataset.pixiuHandsSolution = "1"
     script.addEventListener("load", onLoad, { once: true })
     script.addEventListener("error", onError, { once: true })
-
-    if (!current) {
-      script.async = true
-      script.crossOrigin = "anonymous"
-      script.src = src
-      script.dataset.pixiuHandSrc = src
-      document.head.appendChild(script)
-    }
+    document.head.appendChild(script)
 
     window.setTimeout(() => {
-      if (settled) return
-      if (ready()) onLoad()
-      else onError()
+      if (typeof window.Hands === "function") return
+      onError()
     }, 30000)
   })
 
-  scriptLoads.set(key, promise)
-  promise.catch(() => scriptLoads.delete(key))
-  return promise
+  return handsScriptPromise
 }
-
-async function ensureRuntime() {
-  if (typeof window === "undefined") throw new Error("Browser required.")
-
-  let lastError: unknown = null
-  for (const src of HAND_RUNTIME_SOURCES) {
-    try {
-      await loadScript(src, () => Boolean(window.handPoseDetection), "detector")
-      break
-    } catch (error) {
-      lastError = error
-    }
-  }
-
-  if (!window.handPoseDetection) {
-    throw lastError instanceof Error
-      ? lastError
-      : new Error("Hand pose detection runtime could not be loaded.")
-  }
-
-  let solutionError: unknown = null
-  for (const src of HAND_SOLUTION_SOURCES) {
-    try {
-      await loadScript(src, () => Boolean(window.Hands), "mediapipe")
-      break
-    } catch (error) {
-      solutionError = error
-    }
-  }
-
-  if (!window.Hands) {
-    throw solutionError instanceof Error
-      ? solutionError
-      : new Error("MediaPipe Hands runtime could not be loaded.")
-  }
-}
-
-const LANDMARK_INDEX = {
-  wrist: 0,
-  thumbCmc: 1,
-  thumbMcp: 2,
-  thumbIp: 3,
-  thumbTip: 4,
-  indexMcp: 5,
-  indexPip: 6,
-  indexDip: 7,
-  indexTip: 8,
-  middleMcp: 9,
-  middlePip: 10,
-  middleDip: 11,
-  middleTip: 12,
-  ringMcp: 13,
-  ringPip: 14,
-  ringDip: 15,
-  ringTip: 16,
-  pinkyMcp: 17,
-  pinkyPip: 18,
-  pinkyDip: 19,
-  pinkyTip: 20,
-} as const
 
 function distance(a: HandPoint, b: HandPoint) {
   return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z)
@@ -178,50 +111,68 @@ function distance(a: HandPoint, b: HandPoint) {
 function angle(a: HandPoint, b: HandPoint, c: HandPoint) {
   const ab = { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z }
   const cb = { x: c.x - b.x, y: c.y - b.y, z: c.z - b.z }
-  const magnitude = Math.hypot(ab.x, ab.y, ab.z) * Math.hypot(cb.x, cb.y, cb.z)
+  const magnitude =
+    Math.hypot(ab.x, ab.y, ab.z) * Math.hypot(cb.x, cb.y, cb.z)
   if (!magnitude) return 0
-  const cosine = (ab.x * cb.x + ab.y * cb.y + ab.z * cb.z) / magnitude
+  const cosine =
+    (ab.x * cb.x + ab.y * cb.y + ab.z * cb.z) / magnitude
   return Math.acos(Math.max(-1, Math.min(1, cosine))) * 180 / Math.PI
 }
 
-function fingerExtended(points: HandPoint[], mcp: number, pip: number, dip: number, tip: number) {
-  const a = points[mcp], b = points[pip], c = points[dip], d = points[tip], wrist = points[0]
-  if (!a || !b || !c || !d || !wrist) return false
+function fingerExtended(
+  points: HandPoint[],
+  mcpIndex: number,
+  pipIndex: number,
+  dipIndex: number,
+  tipIndex: number,
+) {
+  const wrist = points[0]
+  const mcp = points[mcpIndex]
+  const pip = points[pipIndex]
+  const dip = points[dipIndex]
+  const tip = points[tipIndex]
+  if (!wrist || !mcp || !pip || !dip || !tip) return false
 
-  const tipDistance = distance(d, wrist)
-  const pipDistance = distance(b, wrist)
-  const mcpDistance = distance(a, wrist)
-  const pipAngle = angle(a, b, c)
+  const pipAngle = angle(mcp, pip, dip)
+  const dipAngle = angle(pip, dip, tip)
+  const tipDistance = distance(tip, wrist)
+  const pipDistance = distance(pip, wrist)
+  const pathLength =
+    distance(mcp, pip) + distance(pip, dip) + distance(dip, tip)
+  const straightness = pathLength > 1e-6 ? distance(mcp, tip) / pathLength : 0
 
-  // MediaPipe landmarks move significantly with camera distance and hand pose.
-  // Use ratios/angles instead of the previous hard absolute extension threshold.
-  const dipAngle = angle(b, c, d)
-  const fingerLength = distance(a, b) + distance(b, c) + distance(c, d)
-  const directRatio = fingerLength > 1e-6 ? distance(a, d) / fingerLength : 0
-
-  return pipAngle >= 142 &&
-    dipAngle >= 135 &&
-    tipDistance >= pipDistance * 1.02 &&
-    directRatio >= 0.72
+  return (
+    pipAngle >= 135 &&
+    dipAngle >= 130 &&
+    tipDistance >= pipDistance * 1.01 &&
+    straightness >= 0.68
+  )
 }
 
 function thumbExtended(points: HandPoint[]) {
-  const cmc = points[1], mcp = points[2], ip = points[3], tip = points[4], indexMcp = points[5], wrist = points[0]
-  if (!cmc || !mcp || !ip || !tip || !indexMcp || !wrist) return false
+  const wrist = points[0]
+  const cmc = points[1]
+  const mcp = points[2]
+  const ip = points[3]
+  const tip = points[4]
+  const indexMcp = points[5]
+  if (!wrist || !cmc || !mcp || !ip || !tip || !indexMcp) return false
 
   const ipAngle = angle(mcp, ip, tip)
   const tipDistance = distance(tip, wrist)
   const ipDistance = distance(ip, wrist)
-  const lateralDistance = distance(tip, indexMcp)
+  const lateral = distance(tip, indexMcp)
+  const ipLateral = distance(ip, indexMcp)
 
-  return ipAngle >= 130 &&
-    tipDistance >= ipDistance * 1.01 &&
-    lateralDistance >= distance(ip, indexMcp) * 0.95
+  return (
+    ipAngle >= 125 &&
+    tipDistance >= ipDistance * 1.005 &&
+    lateral >= ipLateral * 0.9
+  )
 }
 
 export function getExtendedFingerMask(points: HandPoint[]): FingerMask {
   if (points.length < 21) return [false, false, false, false, false]
-
   return [
     thumbExtended(points),
     fingerExtended(points, 5, 6, 7, 8),
@@ -244,64 +195,151 @@ function toPoint(point: any, point3d?: any): HandPoint {
   }
 }
 
-function toBox(box: any): [number, number, number, number] {
-  return [
-    Number(box?.xMin ?? box?.x ?? 0),
-    Number(box?.yMin ?? box?.y ?? 0),
-    Number(box?.width ?? 0),
-    Number(box?.height ?? 0),
-  ]
+function toBoxFromPoints(
+  points: HandPoint[],
+): [number, number, number, number] {
+  if (!points.length) return [0, 0, 0, 0]
+  const xs = points.map((point) => point.x)
+  const ys = points.map((point) => point.y)
+  const minX = Math.min(...xs)
+  const minY = Math.min(...ys)
+  const maxX = Math.max(...xs)
+  const maxY = Math.max(...ys)
+  return [minX, minY, Math.max(0, maxX - minX), Math.max(0, maxY - minY)]
 }
 
-export async function loadHandDetector(options: { maxHands?: number } = {}): Promise<HandDetector> {
-  await ensureRuntime()
+function normalizeHandResult(hand: any): HandDetection {
+  const keypoints = Array.isArray(hand?.keypoints)
+    ? hand.keypoints.map((point: any, index: number) =>
+        toPoint(point, hand?.keypoints3D?.[index]),
+      )
+    : []
 
-  const detector = await window.handPoseDetection.createDetector(
-    window.handPoseDetection.SupportedModels.MediaPipeHands,
-    {
-      runtime: "mediapipe",
-      modelType: "full",
-      maxHands: Math.max(1, Math.min(MAX_HANDS, Math.round(options.maxHands ?? MAX_HANDS))),
-      solutionPath: `https://cdn.jsdelivr.net/npm/@mediapipe/hands@${MEDIAPIPE_HANDS_VERSION}`,
-    },
+  const scoreValue = Number(hand?.score)
+  const score =
+    Number.isFinite(scoreValue) && scoreValue > 0 ? scoreValue : 1
+  const extendedFingers = getExtendedFingerMask(keypoints)
+  const handedness =
+    String(
+      hand?.handedness ??
+        hand?.handednesses?.[0]?.displayName ??
+        hand?.handednesses?.[0]?.categoryName ??
+        "Hand",
+    ) || "Hand"
+
+  return {
+    score,
+    boxScore: score,
+    fingerScore: score,
+    handedness,
+    box: toBoxFromPoints(keypoints),
+    keypoints,
+    extendedFingers,
+    fingerCount: extendedFingers.filter(Boolean).length,
+  }
+}
+
+export async function loadHandDetector(
+  options: { maxHands?: number } = {},
+): Promise<HandDetector> {
+  await loadHandsScript()
+
+  const maxHands = Math.max(
+    1,
+    Math.min(MAX_HANDS, Math.round(options.maxHands ?? MAX_HANDS)),
   )
+
+  const hands = new window.Hands({
+    locateFile: (file: string) => `${HANDS_ASSET_BASE}${file}`,
+  })
+
+  hands.setOptions({
+    maxNumHands: maxHands,
+    modelComplexity: 1,
+    minDetectionConfidence: 0.35,
+    minTrackingConfidence: 0.35,
+  })
+
+  let disposed = false
+  let processing = false
+  let pending:
+    | {
+        resolve: (value: HandDetection[]) => void
+        reject: (reason: unknown) => void
+      }
+    | null = null
+
+  hands.onResults((results: any) => {
+    if (!pending) return
+
+    const normalized = Array.isArray(results?.multiHandLandmarks)
+      ? results.multiHandLandmarks
+          .slice(0, maxHands)
+          .map((landmarks: any[], index: number) =>
+            normalizeHandResult({
+              keypoints: landmarks,
+              keypoints3D: results?.multiHandWorldLandmarks?.[index],
+              score: Number(
+                results?.multiHandedness?.[index]?.score ??
+                  results?.multiHandedness?.[index]?.[0]?.score ??
+                  1,
+              ),
+              handedness:
+                results?.multiHandedness?.[index]?.displayName ??
+                results?.multiHandedness?.[index]?.[0]?.displayName ??
+                results?.multiHandedness?.[index]?.categoryName ??
+                results?.multiHandedness?.[index]?.[0]?.categoryName ??
+                "Hand",
+            }),
+          )
+          .filter((hand: HandDetection) => hand.keypoints.length >= 21 && hand.score >= MIN_HAND_SCORE)
+      : []
+
+    const current = pending
+    pending = null
+    processing = false
+    current.resolve(normalized)
+  })
+
+  const detect = async (video: HTMLVideoElement) => {
+    if (disposed) throw new Error("Hand detector has been disposed.")
+    if (processing) return []
+    processing = true
+
+    return await new Promise<HandDetection[]>((resolve, reject) => {
+      pending = { resolve, reject }
+      hands.send({ image: video }).catch((error: unknown) => {
+        if (!pending) return
+        const current = pending
+        pending = null
+        processing = false
+        current.reject(error)
+      })
+    })
+  }
 
   return {
     version: HAND_VERSION,
-    async detect(video) {
-      const hands = await detector.estimateHands(video, { flipHorizontal: false })
-      return hands
-        .filter((hand: any) => Number(hand?.score ?? 0) >= MIN_HAND_SCORE)
-        .slice(0, Math.max(1, Math.min(MAX_HANDS, Math.round(options.maxHands ?? MAX_HANDS))))
-        .map((hand: any) => {
-          const keypoints = Array.isArray(hand?.keypoints)
-            ? hand.keypoints.map((point: any, index: number) => toPoint(point, hand?.keypoints3D?.[index]))
-            : []
-          const scoreValue = Number(hand?.score)
-          const score = Number.isFinite(scoreValue) && scoreValue > 0 ? scoreValue : 1
-          const extendedFingers = getExtendedFingerMask(keypoints)
-          return {
-            score,
-            boxScore: Number(hand?.score ?? 0),
-            fingerScore: Number(hand?.score ?? 0),
-            handedness: String(hand?.handedness ?? "Hand"),
-            box: toBox(hand?.box),
-            keypoints,
-            extendedFingers,
-            fingerCount: extendedFingers.filter(Boolean).length,
-          }
-        })
-    },
+    detect,
     dispose() {
-      detector.dispose?.()
+      disposed = true
+      pending?.resolve([])
+      pending = null
+      processing = false
+      hands.close?.()
     },
     reset() {
-      detector.reset?.()
+      hands.reset?.()
+      processing = false
+      pending = null
     },
   }
 }
 
-export async function detectHands(detector: HandDetector, video: HTMLVideoElement) {
+export async function detectHands(
+  detector: HandDetector,
+  video: HTMLVideoElement,
+) {
   return detector.detect(video)
 }
 

@@ -69,22 +69,20 @@ for (const marker of [
 
 for (const marker of [
   "const HAND_VERSION =",
-  "@tensorflow-models/hand-pose-detection@2.0.1",
-  "SupportedModels.MediaPipeHands",
-  'runtime: "mediapipe"',
-  "solutionPath",
-  'modelType: "full"',
-  "maxHands: MAX_HANDS",
+  "https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js",
+  "const HANDS_ASSET_BASE",
+  "new window.Hands",
+  "maxNumHands: maxHands",
   "getExtendedFingerMask",
   "window.Hands",
 ]) requireText(handAdapter, marker, "6D hand adapter")
 
 for (const marker of [
   "const FACE_VERSION =",
-  "@tensorflow-models/face-landmarks-detection@1.0.6",
-  "SupportedModels.MediaPipeFaceMesh",
-  'runtime: "mediapipe"',
-  "solutionPath",
+  "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js",
+  "const FACE_MESH_ASSET_BASE",
+  "new window.FaceMesh",
+  "minDetectionConfidence: 0.35",
   "refineLandmarks: true",
   "classifyExpression",
   "window.FaceMesh",

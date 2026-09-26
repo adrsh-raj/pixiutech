@@ -23,133 +23,263 @@ export type FaceDetector = {
   version: string
   detect: (video: HTMLVideoElement) => Promise<FaceDetection[]>
   dispose: () => void
+  reset?: () => void
 }
 
-const FACE_VERSION = "2.0.0"
+const FACE_VERSION = "3.0.0"
 const MAX_FACES = 1
-const MEDIAPIPE_FACE_VERSION = "0.4.1633559619"
+const FACE_MESH_SCRIPT =
+  "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"
+const FACE_MESH_ASSET_BASE =
+  "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/"
 
-const FACE_RUNTIME_SOURCES = [
-  "https://cdn.jsdelivr.net/npm/@tensorflow-models/face-landmarks-detection@1.0.6/dist/face-landmarks-detection.min.js",
-  "https://unpkg.com/@tensorflow-models/face-landmarks-detection@1.0.6/dist/face-landmarks-detection.min.js",
-]
-
-const FACE_SOLUTION_SOURCES = [
-  `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@${MEDIAPIPE_FACE_VERSION}/face_mesh.js`,
-  `https://unpkg.com/@mediapipe/face_mesh@${MEDIAPIPE_FACE_VERSION}/face_mesh.js`,
-]
 declare global {
   interface Window {
-    faceLandmarksDetection?: any
     FaceMesh?: any
   }
 }
 
-const scriptLoads = new Map<string, Promise<void>>()
+let faceScriptPromise: Promise<void> | null = null
 
-function loadScript(src: string, ready: () => boolean, marker: string): Promise<void> {
-  if (typeof window === "undefined") return Promise.reject(new Error("Browser required."))
-  if (ready()) return Promise.resolve()
+function loadFaceMeshScript() {
+  if (typeof window === "undefined") {
+    return Promise.reject(new Error("PIXIU Face AI needs a browser."))
+  }
+  if (typeof window.FaceMesh === "function") return Promise.resolve()
+  if (faceScriptPromise) return faceScriptPromise
 
-  const key = marker + "::" + src
-  const existing = scriptLoads.get(key)
-  if (existing) return existing
-
-  const promise = new Promise<void>((resolve, reject) => {
-    const current = document.querySelector<HTMLScriptElement>(
-      `script[data-pixiu-face-src="${src}"]`,
+  faceScriptPromise = new Promise<void>((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>(
+      'script[data-pixiu-face-mesh-solution="1"]',
     )
-    if (current && ready()) {
-      resolve()
-      return
-    }
 
-    const script = current ?? document.createElement("script")
-    let settled = false
-    const cleanup = () => {
+    const cleanup = (script: HTMLScriptElement) => {
       script.removeEventListener("load", onLoad)
       script.removeEventListener("error", onError)
     }
-    const onLoad = () => {
-      if (settled) return
-      settled = true
-      cleanup()
-      if (ready()) resolve()
-      else reject(new Error(`Face AI ${marker} loaded without its runtime API.`))
-    }
-    const onError = () => {
-      if (settled) return
-      settled = true
-      cleanup()
-      if (!current) script.remove()
-      reject(new Error(`Face AI ${marker} could not be loaded.`))
+
+    const onLoad = (event?: Event) => {
+      const script = (event?.currentTarget as HTMLScriptElement | null) ?? existing
+      if (script) cleanup(script)
+      if (typeof window.FaceMesh === "function") {
+        resolve()
+      } else {
+        faceScriptPromise = null
+        reject(new Error("MediaPipe Face Mesh loaded, but the FaceMesh constructor is unavailable."))
+      }
     }
 
+    const onError = (event?: Event) => {
+      const script = (event?.currentTarget as HTMLScriptElement | null) ?? existing
+      if (script) cleanup(script)
+      faceScriptPromise = null
+      reject(new Error("MediaPipe Face Mesh script could not be loaded."))
+    }
+
+    if (existing) {
+      existing.addEventListener("load", onLoad, { once: true })
+      existing.addEventListener("error", onError, { once: true })
+      if (typeof window.FaceMesh === "function") onLoad()
+      return
+    }
+
+    const script = document.createElement("script")
+    script.async = true
+    script.crossOrigin = "anonymous"
+    script.src = FACE_MESH_SCRIPT
+    script.dataset.pixiuFaceMeshSolution = "1"
     script.addEventListener("load", onLoad, { once: true })
     script.addEventListener("error", onError, { once: true })
-    if (!current) {
-      script.async = true
-      script.crossOrigin = "anonymous"
-      script.src = src
-      script.dataset.pixiuFaceSrc = src
-      document.head.appendChild(script)
-    }
+    document.head.appendChild(script)
 
     window.setTimeout(() => {
-      if (settled) return
-      if (ready()) onLoad()
-      else onError()
+      if (typeof window.FaceMesh === "function") return
+      onError()
     }, 30000)
   })
 
-  scriptLoads.set(key, promise)
-  promise.catch(() => scriptLoads.delete(key))
-  return promise
+  return faceScriptPromise
 }
 
-async function ensureRuntime() {
-  if (typeof window === "undefined") throw new Error("PIXIU Face AI needs a browser.")
-
-  let lastError: unknown = null
-  for (const src of FACE_RUNTIME_SOURCES) {
-    try {
-      await loadScript(src, () => Boolean(window.faceLandmarksDetection), "detector")
-      break
-    } catch (error) {
-      lastError = error
-    }
-  }
-
-  if (!window.faceLandmarksDetection) {
-    throw lastError instanceof Error
-      ? lastError
-      : new Error("Face landmarks runtime could not be loaded.")
-  }
-
-  let solutionError: unknown = null
-  for (const src of FACE_SOLUTION_SOURCES) {
-    try {
-      await loadScript(src, () => Boolean(window.FaceMesh), "mediapipe")
-      break
-    } catch (error) {
-      solutionError = error
-    }
-  }
-
-  if (!window.FaceMesh) {
-    throw solutionError instanceof Error
-      ? solutionError
-      : new Error("MediaPipe Face Mesh runtime could not be loaded.")
-  }
+function safeRatio(numerator: number, denominator: number) {
+  return denominator > 1e-6 ? numerator / denominator : 0
 }
 
-function toBox(box: any): [number, number, number, number] {
-  return [
-    Number(box?.xMin ?? box?.x ?? 0),
-    Number(box?.yMin ?? box?.y ?? 0),
-    Number(box?.width ?? 0),
-    Number(box?.height ?? 0),
-  ]
+function clamp01(value: number) {
+  return Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0))
+}
+
+function distance(a: FacePoint, b: FacePoint) {
+  return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z)
+}
+
+export function classifyExpression(
+  points: FacePoint[],
+  box: [number, number, number, number],
+): FaceEmotion {
+  if (points.length < 200) return { emotion: "neutral", score: 0.35 }
+
+  const width = Math.max(
+    1,
+    box[2] || Math.max(...points.map((point) => point.x)) -
+      Math.min(...points.map((point) => point.x)),
+  )
+  const height = Math.max(
+    1,
+    box[3] || Math.max(...points.map((point) => point.y)) -
+      Math.min(...points.map((point) => point.y)),
+  )
+  const p = (index: number) => points[index]
+
+  const leftCorner = p(61)
+  const rightCorner = p(291)
+  const upperLip = p(13)
+  const lowerLip = p(14)
+  const leftEyeTop = p(159)
+  const leftEyeBottom = p(145)
+  const rightEyeTop = p(386)
+  const rightEyeBottom = p(374)
+
+  if (!leftCorner || !rightCorner || !upperLip || !lowerLip) {
+    return { emotion: "neutral", score: 0.4 }
+  }
+
+  const mouthWidth = Math.abs(rightCorner.x - leftCorner.x)
+  const mouthOpen = Math.abs(lowerLip.y - upperLip.y)
+  const leftEyeOpen =
+    leftEyeTop && leftEyeBottom
+      ? Math.abs(leftEyeBottom.y - leftEyeTop.y)
+      : 0
+  const rightEyeOpen =
+    rightEyeTop && rightEyeBottom
+      ? Math.abs(rightEyeBottom.y - rightEyeTop.y)
+      : 0
+
+  const widthRatio = safeRatio(mouthWidth, width)
+  const openRatio = safeRatio(mouthOpen, height)
+  const eyeRatio = safeRatio((leftEyeOpen + rightEyeOpen) / 2, height)
+
+  const lipCenterY = (upperLip.y + lowerLip.y) / 2
+  const cornerCenterY = (leftCorner.y + rightCorner.y) / 2
+  const cornerLiftRatio = safeRatio(lipCenterY - cornerCenterY, height)
+
+  const smileBreadth = clamp01((widthRatio - 0.22) / 0.18)
+  const smileLift = clamp01((cornerLiftRatio + 0.001) / 0.028)
+  const smileScore = clamp01(smileBreadth * 0.42 + smileLift * 0.58)
+
+  const mouthOpenScore = clamp01((openRatio - 0.045) / 0.10)
+  const eyeOpenScore = clamp01((eyeRatio - 0.055) / 0.09)
+  const surpriseScore = clamp01(mouthOpenScore * 0.65 + eyeOpenScore * 0.35)
+
+  if (surpriseScore >= 0.68 && openRatio >= 0.06) {
+    return { emotion: "surprised", score: surpriseScore }
+  }
+  if (smileScore >= 0.45) {
+    return { emotion: "happy", score: smileScore }
+  }
+
+  const neutralScore = Math.max(0.45, 1 - Math.max(smileScore, surpriseScore))
+  return { emotion: "neutral", score: neutralScore }
+}
+
+function boundsFromMesh(mesh: FacePoint[]): [number, number, number, number] {
+  if (!mesh.length) return [0, 0, 0, 0]
+  const xs = mesh.map((point) => point.x)
+  const ys = mesh.map((point) => point.y)
+  const minX = Math.min(...xs)
+  const minY = Math.min(...ys)
+  const maxX = Math.max(...xs)
+  const maxY = Math.max(...ys)
+  return [minX, minY, Math.max(0, maxX - minX), Math.max(0, maxY - minY)]
+}
+
+export async function loadFaceDetector(): Promise<FaceDetector> {
+  await loadFaceMeshScript()
+
+  const faceMesh = new window.FaceMesh({
+    locateFile: (file: string) => `${FACE_MESH_ASSET_BASE}${file}`,
+  })
+
+  faceMesh.setOptions({
+    maxNumFaces: MAX_FACES,
+    refineLandmarks: true,
+    minDetectionConfidence: 0.35,
+    minTrackingConfidence: 0.35,
+  })
+
+  let disposed = false
+  let processing = false
+  let pending:
+    | {
+        resolve: (value: FaceDetection[]) => void
+        reject: (reason: unknown) => void
+      }
+    | null = null
+
+  faceMesh.onResults((results: any) => {
+    if (!pending) return
+
+    const detections: FaceDetection[] = (
+      Array.isArray(results?.multiFaceLandmarks)
+        ? results.multiFaceLandmarks
+        : []
+    )
+      .slice(0, MAX_FACES)
+      .map((landmarks: any[]) => {
+        const mesh = landmarks.map(toPoint)
+        const box = boundsFromMesh(mesh)
+        const expression = classifyExpression(mesh, box)
+
+        return {
+          score: 1,
+          box,
+          expression: expression.emotion,
+          expressionScore: expression.score,
+          emotions: [expression],
+          mesh,
+        }
+      })
+      .filter((face: FaceDetection) => face.mesh.length >= 200)
+
+    const current = pending
+    pending = null
+    processing = false
+    current.resolve(detections)
+  })
+
+  const detect = async (video: HTMLVideoElement) => {
+    if (disposed) throw new Error("Face detector has been disposed.")
+    if (processing) return []
+    processing = true
+
+    return await new Promise<FaceDetection[]>((resolve, reject) => {
+      pending = { resolve, reject }
+      faceMesh.send({ image: video }).catch((error: unknown) => {
+        if (!pending) return
+        const current = pending
+        pending = null
+        processing = false
+        current.reject(error)
+      })
+    })
+  }
+
+  return {
+    version: FACE_VERSION,
+    detect,
+    dispose() {
+      disposed = true
+      pending?.resolve([])
+      pending = null
+      processing = false
+      faceMesh.close?.()
+    },
+    reset() {
+      faceMesh.reset?.()
+      processing = false
+      pending = null
+    },
+  }
 }
 
 function toPoint(point: any): FacePoint {
@@ -161,127 +291,10 @@ function toPoint(point: any): FacePoint {
   }
 }
 
-function dist(a: FacePoint, b: FacePoint) {
-  return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z)
-}
-
-function safeRatio(numerator: number, denominator: number) {
-  return denominator > 1e-6 ? numerator / denominator : 0
-}
-
-// This is intentionally called "expression demo", not medical or affective truth.
-// It is geometry derived from the 478-point mesh: smile / surprise / neutral.
-export function classifyExpression(points: FacePoint[], box: [number, number, number, number]): FaceEmotion {
-  if (points.length < 200) return { emotion: "neutral", score: 0.35 }
-
-  const width = Math.max(1, box[2])
-  const height = Math.max(1, box[3])
-  const p = (index: number) => points[index]
-
-  const mouthLeft = p(61)
-  const mouthRight = p(291)
-  const upperLip = p(13)
-  const lowerLip = p(14)
-  const leftEyeTop = p(159)
-  const leftEyeBottom = p(145)
-  const rightEyeTop = p(386)
-  const rightEyeBottom = p(374)
-
-  if (!mouthLeft || !mouthRight || !upperLip || !lowerLip) {
-    return { emotion: "neutral", score: 0.4 }
-  }
-
-  const mouthWidth = dist(mouthLeft, mouthRight)
-  const mouthOpen = dist(upperLip, lowerLip)
-  const leftEyeOpen = leftEyeTop && leftEyeBottom ? dist(leftEyeTop, leftEyeBottom) : 0
-  const rightEyeOpen = rightEyeTop && rightEyeBottom ? dist(rightEyeTop, rightEyeBottom) : 0
-
-  // Normalize by face size so the same expression works at different camera distances.
-  const widthRatio = safeRatio(mouthWidth, width)
-  const openRatio = safeRatio(mouthOpen, height)
-  const eyeRatio = safeRatio(leftEyeOpen + rightEyeOpen, height)
-
-  // In image coordinates y grows downward: lifted smile corners have a
-  // smaller y than the lip center.
-  const lipCenterY = (upperLip.y + lowerLip.y) / 2
-  const cornerCenterY = (mouthLeft.y + mouthRight.y) / 2
-  const cornerLift = safeRatio(lipCenterY - cornerCenterY, height)
-
-  const smileBreadth = clamp01((widthRatio - 0.24) / 0.20)
-  const smileLift = clamp01((cornerLift + 0.002) / 0.035)
-  const smileScore = clamp01(smileBreadth * 0.45 + smileLift * 0.55)
-
-  const mouthSurprise = clamp01((openRatio - 0.035) / 0.10)
-  const eyeSurprise = clamp01((eyeRatio - 0.06) / 0.10)
-  const surpriseScore = clamp01(mouthSurprise * 0.62 + eyeSurprise * 0.38)
-
-  if (surpriseScore >= 0.64 && openRatio > 0.055) return { emotion: "surprised", score: surpriseScore }
-  if (smileScore >= 0.48) return { emotion: "happy", score: smileScore }
-  return { emotion: "neutral", score: Math.max(0.45, 1 - Math.max(smileScore, surpriseScore)) }
-}
-
-function clamp01(value: number) {
-  return Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0))
-}
-
-export function getTopEmotion(emotions: any[]): FaceEmotion | null {
-  if (!Array.isArray(emotions) || emotions.length === 0) return null
-  return [...emotions]
-    .map((entry) => ({
-      emotion: String(entry?.emotion ?? "neutral"),
-      score: Number(entry?.score ?? 0),
-    }))
-    .sort((a, b) => b.score - a.score)[0] ?? null
-}
-
-export async function loadFaceDetector(): Promise<FaceDetector> {
-  await ensureRuntime()
-
-  const detector = await window.faceLandmarksDetection.createDetector(
-    window.faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh,
-    {
-      runtime: "mediapipe",
-      maxFaces: MAX_FACES,
-      refineLandmarks: true,
-      solutionPath: `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@${MEDIAPIPE_FACE_VERSION}`,
-    },
-  )
-
-  return {
-    version: FACE_VERSION,
-    async detect(video) {
-      const faces = await detector.estimateFaces(video, {
-        flipHorizontal: false,
-        staticImageMode: false,
-      })
-
-      return faces
-        .slice(0, MAX_FACES)
-        .map((face: any) => {
-          const mesh = Array.isArray(face?.keypoints)
-            ? face.keypoints.map(toPoint)
-            : []
-          const box = toBox(face?.box)
-          const expression = classifyExpression(mesh, box)
-
-          return {
-            score: 1,
-            box,
-            expression: expression.emotion,
-            expressionScore: expression.score,
-            emotions: [expression],
-            mesh,
-          }
-        })
-        .filter((face) => face.mesh.length >= 200)
-    },
-    dispose() {
-      detector.dispose?.()
-    },
-  }
-}
-
-export async function detectFaces(detector: FaceDetector, video: HTMLVideoElement) {
+export async function detectFaces(
+  detector: FaceDetector,
+  video: HTMLVideoElement,
+) {
   return detector.detect(video)
 }
 
