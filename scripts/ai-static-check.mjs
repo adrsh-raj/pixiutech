@@ -196,6 +196,19 @@ for (const marker of [
   "Vision Signal:",
   "PIXIU VISION CORE",
 ]) requireText(canvasPanel, marker, "Integrated AI Vision Canvas runtime")
+for (const marker of [
+  "lastParentXmlRef",
+  "xml === lastParentXmlRef.current",
+  "genuine external loads",
+  "lastParentXmlRef.current = expectedExternalXml",
+]) requireText(read("pixiu-lms-portal/src/components/circuit-lab/blockly-editor.tsx"), marker, "Blockly external XML hydration")
+
+for (const marker of [
+  "templateUsesAi",
+  "setIsAiCameraOpen(templateUsesAi)",
+  "setAiRuntimeEnabled(false)",
+  "programAiMode === "objects"",
+]) requireText(workbench, marker, "AI template → Vision Canvas lifecycle")
 
 for (const marker of [
   'id: "ai-smart-barrier"',

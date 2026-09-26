@@ -137,6 +137,10 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
   const blocklyDiv = useRef<HTMLDivElement>(null)
   const workspaceRef = useRef<Blockly.WorkspaceSvg | null>(null)
   const lastWorkspaceXmlRef = useRef<string | null>(null)
+  // Tracks the latest XML echoed back from the parent after a live Blockly edit.
+  // A prop change that differs from this value is a genuine external load
+  // (starter template / project / lesson) and must rehydrate the workspace.
+  const lastParentXmlRef = useRef<string | null>(null)
   const pendingExternalXmlRef = useRef<string | null>(null)
   const [cppCode, setCppCode] = useState("")
   const [copied, setCopied] = useState(false)
@@ -208,6 +212,7 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
     </xml>`
 
     lastWorkspaceXmlRef.current = initialXml
+    lastParentXmlRef.current = initialXml
 
     try {
       const dom = Blockly.utils.xml.textToDom(initialXml)
@@ -230,6 +235,7 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
         const dom = Blockly.Xml.workspaceToDom(workspace)
         const text = Blockly.utils.xml.domToText(dom)
         lastWorkspaceXmlRef.current = text
+        lastParentXmlRef.current = text
 
         // This XML was authored by the live Blockly workspace. Do not let the
         // parent prop immediately rehydrate the workspace while a drag/drop is
@@ -257,14 +263,13 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
     }
   }, [])
 
-  // Sync the workspace for genuine external loads (starter/project changes), but
-  // debounce the prop before replacing blocks. During normal editing Blockly emits
-  // XML changes faster than React can echo them back; immediate rehydration makes a
-  // dragged block look glued to the pointer.
+  // Sync genuine external loads (starter/project/lesson changes).
+  // Parent echoes caused by normal Blockly editing are identified by
+  // lastParentXmlRef, so they are never mistaken for external project loads.
   useEffect(() => {
     const workspace = workspaceRef.current
     if (!workspace || !xml) return
-    if (xml === lastWorkspaceXmlRef.current) return
+    if (xml === lastParentXmlRef.current) return
 
     const expectedExternalXml = xml
     let timer = 0
@@ -273,9 +278,8 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
       const activeWorkspace = workspaceRef.current
       if (!activeWorkspace) return
 
-      // If Blockly has already emitted a newer workspace XML since this prop
-      // value arrived, this prop is a stale echo from our own edit. Ignore it.
-      if (lastWorkspaceXmlRef.current !== null && lastWorkspaceXmlRef.current !== expectedExternalXml) {
+      // A newer parent value may have arrived while this debounced load waited.
+      if (lastParentXmlRef.current !== null && lastParentXmlRef.current !== expectedExternalXml) {
         return
       }
 
@@ -303,6 +307,7 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
         const dom = Blockly.utils.xml.textToDom(expectedExternalXml)
         Blockly.Xml.domToWorkspace(dom, activeWorkspace)
         lastWorkspaceXmlRef.current = expectedExternalXml
+        lastParentXmlRef.current = expectedExternalXml
         const code = arduino.workspaceToCode(activeWorkspace)
         setCppCode(code)
 
