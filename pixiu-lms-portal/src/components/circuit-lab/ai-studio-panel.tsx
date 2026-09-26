@@ -392,15 +392,108 @@ function metricPath(points: AiTrainingHistoryPoint[], key: "loss"|"valLoss"|"acc
   const plotted=points.map((point,index)=>{const value=point[key];if(typeof value!=="number"||!Number.isFinite(value))return null;const x=px+index/Math.max(1,points.length-1)*(width-px*2);const y=height-py-((value-min)/range)*(height-py*2);return x.toFixed(1)+","+y.toFixed(1)}).filter((value): value is string=>Boolean(value))
   return plotted.length>1?"M "+plotted.join(" L "):plotted.length===1?"M "+plotted[0]:""
 }
-function MetricChart({title,points,primary,secondary,primaryLabel,secondaryLabel}:{title:string;points:AiTrainingHistoryPoint[];primary:"loss"|"accuracy";secondary:"valLoss"|"valAccuracy";primaryLabel:string;secondaryLabel:string}) {
-  if(!points.length)return null
-  const latest=points[points.length-1],hasSecondary=metricValues(points,secondary).length>0
-  return <div className="rounded-2xl border border-slate-800 bg-slate-950/55 p-3"><div className="flex justify-between"><p className="text-[10px] font-black">{title}</p><div className="flex gap-3 text-[8px] font-mono"><span className="text-violet-300">● {primaryLabel}</span>{hasSecondary&&<span className="text-cyan-300">● {secondaryLabel}</span>}</div></div><svg viewBox="0 0 520 180" className="mt-2 h-44 w-full"><path d={metricPath(points,primary)} fill="none" stroke="#a78bfa" strokeWidth="3"/>{hasSecondary&&<path d={metricPath(points,secondary)} fill="none" stroke="#22d3ee" strokeWidth="2.5" strokeDasharray="6 5"/></svg><div className="flex justify-between text-[8px] font-mono text-slate-600"><span>Epoch 1</span><span>Epoch {latest.epoch}</span></div><div className="mt-2 grid grid-cols-2 gap-2"><div className="rounded-lg border border-slate-800 p-2"><p className="text-[8px] text-slate-600">{primaryLabel} · latest</p><p className="mt-1 text-xs font-black">{primary==="accuracy"?Math.round(latest.accuracy*100)+"%":latest.loss.toFixed(4)}</p></div><div className="rounded-lg border border-slate-800 p-2"><p className="text-[8px] text-slate-600">{secondaryLabel} · latest</p><p className="mt-1 text-xs font-black">{secondary==="valAccuracy"?(latest.valAccuracy==null?"Not available":Math.round(latest.valAccuracy*100)+"%"):(latest.valLoss==null?"Not available":latest.valLoss.toFixed(4))}</p></div></div></div>
+function metricValues(points: AiTrainingHistoryPoint[], key: "loss"|"valLoss"|"accuracy"|"valAccuracy") {
+  return points.map((point) => point[key]).filter((value): value is number => typeof value === "number" && Number.isFinite(value))
 }
-function ConfusionMatrix({classes,matrix}:{classes:string[];matrix?:number[][]}) {
-  if(!matrix?.length)return null
-  return <div className="rounded-2xl border border-slate-800 bg-slate-950/55 p-3"><p className="text-[10px] font-black">Validation confusion matrix</p><div className="mt-2 overflow-x-auto"><table className="min-w-full border-collapse text-[8px] font-mono"><thead><tr><th>A/P</th>{classes.map(name=><th key={name}>{name}</th>)}</tr></thead><tbody>{matrix.map((row,i)=><tr key={classes[i]}><th className="text-left">{classes[i]}</th>{row.map((v,j)=><td key={j} className={i===j?"text-emerald-300":"text-slate-500"}>{v}</td>)}</tr>)}</tbody></table></div></div>
+function metricPath(points: AiTrainingHistoryPoint[], key: "loss"|"valLoss"|"accuracy"|"valAccuracy") {
+  const values = metricValues(points, key)
+  if (!values.length) return ""
+  const min = Math.min(...values), max = Math.max(...values), range = Math.max(0.0001, max - min)
+  const width = 520, height = 180, padX = 30, padY = 18
+  const plotted = points.map((point,index) => {
+    const value = point[key]
+    if (typeof value !== "number" || !Number.isFinite(value)) return null
+    const x = padX + (index / Math.max(1, points.length - 1)) * (width - padX * 2)
+    const y = height - padY - ((value - min) / range) * (height - padY * 2)
+    return `${x.toFixed(1)},${y.toFixed(1)}`
+  }).filter((value): value is string => Boolean(value))
+  if (plotted.length > 1) return `M ${plotted.join(" L ")}`
+  if (plotted.length === 1) return `M ${plotted[0]}`
+  return ""
 }
+
+function MetricChart({ title, points, primary, secondary, primaryLabel, secondaryLabel }: {
+  title: string
+  points: AiTrainingHistoryPoint[]
+  primary: "loss" | "accuracy"
+  secondary: "valLoss" | "valAccuracy"
+  primaryLabel: string
+  secondaryLabel: string
+}) {
+  if (!points.length) return null
+  const latest = points[points.length - 1]
+  const hasSecondary = metricValues(points, secondary).length > 0
+
+  return (
+    <div className="rounded-2xl border border-slate-800 bg-slate-950/55 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[10px] font-black">{title}</p>
+        <div className="flex gap-3 text-[8px] font-mono">
+          <span className="text-violet-300">● {primaryLabel}</span>
+          {hasSecondary ? <span className="text-cyan-300">● {secondaryLabel}</span> : null}
+        </div>
+      </div>
+      <svg viewBox="0 0 520 180" className="mt-2 h-44 w-full" role="img" aria-label={title}>
+        <path d={metricPath(points, primary)} fill="none" stroke="#a78bfa" strokeWidth="3" strokeLinecap="round" />
+        {hasSecondary ? <path d={metricPath(points, secondary)} fill="none" stroke="#22d3ee" strokeWidth="2.5" strokeDasharray="6 5" strokeLinecap="round" /> : null}
+      </svg>
+      <div className="flex justify-between text-[8px] font-mono text-slate-600"><span>Epoch 1</span><span>Epoch {latest.epoch}</span></div>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <div className="rounded-lg border border-slate-800 p-2">
+          <p className="text-[8px] text-slate-600">{primaryLabel} · latest</p>
+          <p className="mt-1 text-xs font-black">{primary === "accuracy" ? Math.round(latest.accuracy * 100) + "%" : latest.loss.toFixed(4)}</p>
+        </div>
+        <div className="rounded-lg border border-slate-800 p-2">
+          <p className="text-[8px] text-slate-600">{secondaryLabel} · latest</p>
+          <p className="mt-1 text-xs font-black">
+            {secondary === "valAccuracy"
+              ? latest.valAccuracy == null
+                ? "Not available"
+                : Math.round(latest.valAccuracy * 100) + "%"
+              : latest.valLoss == null
+                ? "Not available"
+                : latest.valLoss.toFixed(4)}
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ConfusionMatrix({ classes, matrix }: { classes: string[]; matrix?: number[][] }) {
+  if (!matrix?.length) return null
+  return (
+    <div className="rounded-2xl border border-slate-800 bg-slate-950/55 p-3">
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] font-black">Validation confusion matrix</p>
+        <span className="text-[8px] font-mono text-slate-600">actual → predicted</span>
+      </div>
+      <div className="mt-3 overflow-x-auto">
+        <table className="min-w-full border-collapse text-[8px] font-mono">
+          <thead>
+            <tr>
+              <th className="border border-slate-800 px-2 py-1">A/P</th>
+              {classes.map((name) => <th key={name} className="border border-slate-800 px-2 py-1">{name}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {matrix.map((row, rowIndex) => (
+              <tr key={classes[rowIndex]}>
+                <th className="border border-slate-800 px-2 py-1 text-left">{classes[rowIndex]}</th>
+                {row.map((value, columnIndex) => (
+                  <td key={columnIndex} className={"border border-slate-800 px-2 py-1 text-center " + (rowIndex === columnIndex ? "text-emerald-300" : "text-slate-500")}>
+                    {value}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 export function AiStudioPanel({
   isOpen,
   onClose,
