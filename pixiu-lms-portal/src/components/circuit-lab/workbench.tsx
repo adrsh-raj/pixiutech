@@ -1309,6 +1309,17 @@ export function Workbench() {
             </button>
 
             <button
+              onClick={handleToggleAiStudio}
+              className={`flex flex-col items-center gap-0.5 p-1 transition active:scale-95 ${
+                isAiStudioOpen ? "text-violet-300 font-bold" : "text-muted-foreground hover:text-foreground"
+              }`}
+              title="PIXIU AI Studio"
+            >
+              <Sparkles size={18} className={isAiStudioOpen ? "text-violet-300" : ""} />
+              <span className="text-[10px]">AI Studio</span>
+            </button>
+
+            <button
               onClick={() => setIsDmmOpen((prev) => !prev)}
               className={`flex flex-col items-center gap-0.5 p-1 transition active:scale-95 ${
                 isDmmOpen ? "text-amber-400 font-bold" : "text-muted-foreground hover:text-foreground"
@@ -1339,14 +1350,6 @@ export function Workbench() {
               <span className="text-[10px]">Serial</span>
             </button>
 
-            <button
-              onClick={clearAll}
-              className="flex flex-col items-center gap-0.5 p-1 text-muted-foreground hover:text-destructive transition active:scale-95"
-              title="Clear Canvas"
-            >
-              <Trash2 size={18} />
-              <span className="text-[10px]">Clear</span>
-            </button>
           </div>
         </main>
         {isInspectorOpen && (
