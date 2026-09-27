@@ -95,6 +95,9 @@ try {
   await page.getByRole("button", { name: "Start camera" }).click()
   await page.getByText("6C Pose ready", { exact: true }).waitFor()
   await page.getByRole("button", { name: "Stop" }).click()
+  await page.getByRole("button", { name: "Start camera" }).click()
+  await page.getByText("6C Pose ready", { exact: true }).waitFor()
+  await page.getByRole("button", { name: "Stop" }).click()
 
   await page.getByText("Fingers", { exact: true }).click()
   await page.getByRole("button", { name: "Start camera" }).click()
@@ -104,6 +107,11 @@ try {
   await page.getByText("Emotion", { exact: true }).click()
   await page.getByRole("button", { name: "Start camera" }).click()
   await page.getByText("6E Emotion ready", { exact: true }).waitFor()
+  await page.getByRole("button", { name: "Stop" }).click()
+
+  await page.getByText("Sound", { exact: true }).click()
+  await page.getByRole("button", { name: "Start microphone" }).click()
+  await page.getByText("6F Sound ready", { exact: true }).waitFor()
   await page.getByRole("button", { name: "Stop" }).click()
 
   // Separate portal AI Studio route.
