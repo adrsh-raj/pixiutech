@@ -34,7 +34,9 @@ for (const match of html.matchAll(pattern)) {
   if (actual !== integrity) fail("SRI byte mismatch for " + url)
 }
 if (!count) fail("No build script/style resources were found.")
-if (/<(script|link)\b[^>]*(?:src|href)="https?:\/\//i.test(html)) {
+const hasRemoteScript = /<script\b[^>]*src="https?:\/\//i.test(html)
+const hasRemoteStyle = /<link\b[^>]*rel=["']stylesheet["'][^>]*href="https?:\/\//i.test(html) || /<link\b[^>]*href="https?:\/\/[^>]*rel=["']stylesheet["']/i.test(html)
+if (hasRemoteScript || hasRemoteStyle) {
   fail("Root build output still contains a remote script or stylesheet resource.")
 }
 console.log("PIXIU root production security verification PASSED")

@@ -16,7 +16,6 @@ import {
 import type { AiRuntimeErrorKind } from "@/lib/ai/ai-runtime-state"
 import { toAiRuntimeError } from "@/lib/ai/ai-errors"
 import type { AiVisionState } from "@/lib/ai/vision-types"
-import { toAiRuntimeError } from "@/lib/ai/ai-errors"
 import { createAiVisionState } from "@/lib/ai/vision-state"
 import "./pixiu-brand.css"
 

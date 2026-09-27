@@ -9,6 +9,7 @@ function sriAttributePlugin() {
   return {
     name: 'pixiu-sri-attributes',
     apply: 'build',
+    enforce: 'post',
     async closeBundle() {
       const distDir = path.resolve(import.meta.dirname, 'dist')
       const indexPath = path.join(distDir, 'index.html')

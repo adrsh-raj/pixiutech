@@ -165,8 +165,7 @@ export function AiTryPanel({ viewModel }: { viewModel: AiStudioViewModel }) {
                       </div>
                       <span className="shrink-0 rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 font-mono text-[8px] text-violet-200">{aiState.confidence}%</span>
                     </div>
-                    <p className="mt-1 text-[9px] leading-4 text-slate-500">{aiStat<AiRuntimeControls viewModel={viewModel} />a"}
-                    </button>
+                    <p className="mt-1 text-[9px] leading-4 text-slate-500">{aiState.detail}</p>
                   </div>
 
                   <div className="pixiu-ai-signal-card rounded-2xl border p-4">
