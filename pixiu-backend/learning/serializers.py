@@ -165,6 +165,8 @@ class QuizQuestionWriteSerializer(serializers.ModelSerializer):
         quiz = attrs.get("quiz", getattr(self.instance, "quiz", None))
         if quiz is None: raise serializers.ValidationError({"quiz": "Quiz is required."})
         if quiz.status == "closed": raise serializers.ValidationError("Closed quizzes cannot be edited.")
+        if not accessible_quizzes(request.user).filter(pk=quiz.pk).exists():
+            raise serializers.ValidationError({"quiz": "You cannot manage questions for this quiz."})
         if self.instance and quiz != self.instance.quiz: raise serializers.ValidationError("Question quiz cannot be changed after creation.")
         if int(attrs.get("points", getattr(self.instance, "points", 1))) <= 0: raise serializers.ValidationError({"points": "Points must be positive."})
         return attrs
