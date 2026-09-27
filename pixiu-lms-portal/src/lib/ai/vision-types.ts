@@ -8,6 +8,23 @@ export type ReadyAiMode =
 
 export type AiVisionMode = ReadyAiMode | "trained"
 
+export type AiRuntimeStatus =
+  | "idle"
+  | "loading"
+  | "ready"
+  | "running"
+  | "error"
+  | "stopped"
+
+export type AiRuntimeErrorKind =
+  | "permission"
+  | "unsupported"
+  | "model"
+  | "inference"
+  | "storage"
+  | "cancelled"
+  | "unknown"
+
 export type AiDetection = {
   class: string
   score: number
@@ -30,6 +47,9 @@ export interface AiVisionState {
   probabilities?: Record<string, number>
   modelClasses?: string[]
   modelSource?: "ready" | "trained"
+  runtimeStatus?: AiRuntimeStatus
+  runtimeErrorKind?: AiRuntimeErrorKind
+  runtimeError?: string
   detail: string
 }
 
