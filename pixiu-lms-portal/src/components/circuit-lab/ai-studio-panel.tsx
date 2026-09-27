@@ -90,6 +90,17 @@ import {
 } from "@/lib/ai/pose-detector"
 import type { AiVisionMode, ReadyAiMode, AiVisionState } from "@/lib/ai/vision-types"
 import { createAiVisionState } from "@/lib/ai/vision-state"
+import {
+  classifyAiRuntimeError,
+  runtimeDetail,
+  type AiRuntimeStatus,
+} from "@/lib/ai/ai-runtime-state"
+import {
+  AI_PERFORMANCE_BUDGETS,
+  createAiRuntimeMetrics,
+  isBudgetExceeded,
+  type AiRuntimeMetrics,
+} from "@/lib/ai/ai-performance"
 import "./pixiu-brand.css"
 
 export type { AiVisionState, ReadyAiMode }
@@ -569,7 +580,27 @@ export function AiStudioPanel({
   const trainingRunRef = useRef(0)
   const datasetVersionRef = useRef(0)
   const runtimeFailedRef = useRef(false)
+  const runtimeStatusRef = useRef<AiRuntimeStatus>("idle")
+  const runtimeMetricsRef = useRef<ReturnType<typeof createAiRuntimeMetrics> | null>(null)
+  const lastRuntimeMetricsRef = useRef<AiRuntimeMetrics | null>(null)
   const [floatingPosition, setFloatingPosition] = useState<{ left: number; top: number } | null>(null)
+
+  function publishRuntimeState(
+    status: AiRuntimeStatus,
+    detail = runtimeDetail(mode, status),
+    extras: Partial<AiVisionState> = {},
+  ) {
+    runtimeStatusRef.current = status
+    onAiStateChange({
+      ...aiState,
+      mode,
+      runtimeStatus: status,
+      runtimeError: status === "error" ? extras.runtimeError : undefined,
+      runtimeErrorKind: status === "error" ? extras.runtimeErrorKind : undefined,
+      detail,
+      ...extras,
+    })
+  }
 
   const classes = useMemo(() => getAiClasses(store), [store])
   const counts = useMemo(() => getSampleCounts(store.samples), [store.samples])
