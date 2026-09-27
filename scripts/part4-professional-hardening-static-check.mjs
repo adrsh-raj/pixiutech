@@ -10,6 +10,10 @@ const assert = (condition, message) => { if (!condition) failures.push(message) 
 
 const objectDetector = read("pixiu-lms-portal/src/lib/ai/object-detector.ts")
 const soundDetector = read("pixiu-lms-portal/src/lib/ai/sound-detector.ts")
+const handDetector = read("pixiu-lms-portal/src/lib/ai/hand-detector.ts")
+const faceDetector = read("pixiu-lms-portal/src/lib/ai/face-detector.ts")
+const poseDetector = read("pixiu-lms-portal/src/lib/ai/pose-detector.ts")
+const cameraSession = read("pixiu-lms-portal/src/lib/ai/camera-session.ts")
 const syncAssets = read("scripts/sync-ai-runtime-assets.mjs")
 const vite = read("pixiu-lms-portal/vite.config.js")
 const rootVite = read("vite.config.js")
@@ -69,6 +73,9 @@ assert(unitFiles.length >= 5, "Expected at least five AI module unit-test files"
 assert(controller.includes('type ReadyResource ='), "Typed AI resource union is missing")
 assert(!controller.match(/\bany\b/), "AI Studio controller still contains broad any")
 assert(!soundDetector.match(/\bany\b/), "Sound detector still contains broad any")
+for (const [name, source] of [["Hand detector", handDetector], ["Face detector", faceDetector], ["Pose detector", poseDetector], ["Camera session", cameraSession]]) {
+  assert(!source.match(/\bany\b/), name + " still contains broad any")
+}
 assert(productionSmoke.split("\n").length < 180, "Production security smoke workflow is unexpectedly large/corrupted")
 assert(productionSmoke.includes("name: PIXIU Production Security Smoke") && productionSmoke.includes("jobs:") && productionSmoke.includes("Django health"), "Production security smoke workflow is incomplete")
 
