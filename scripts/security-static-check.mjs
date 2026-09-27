@@ -42,6 +42,7 @@ assert(learningServices.includes('trainer = getattr(user, "trainer_profile", Non
 assert(learningViews.includes("self.role_only(UserRole.ADMIN, UserRole.STUDENT)"), "Quiz attempt submission is not restricted to learner/admin roles")
 assert(playback.includes('status=UserStatus.ACTIVE'), "Signed video playback does not reject suspended accounts")
 assert(portalVercel.includes('"Content-Security-Policy"'), "Portal CSP header is missing")
+assert(rootVercel.includes('"Content-Security-Policy"'), "Root CSP header is missing")
 assert(portalVercel.includes("object-src 'none'"), "Portal CSP does not block plugin objects")
 assert(portalVercel.includes("frame-ancestors 'none'"), "Portal CSP does not lock down framing")
 assert(portalVercel.includes("script-src 'self'"), "Portal CSP does not require same-origin scripts")
