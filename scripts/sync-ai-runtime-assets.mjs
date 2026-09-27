@@ -35,7 +35,7 @@ const FACE_SOURCE = join(
 
 const MOVENET_SOURCE_URL =
   process.env.PIXIU_MOVENET_SOURCE_URL ??
-  "https://tfhub.dev/google/tfjs-model/movenet/singlepose/lightning/4/model.json"
+  "https://storage.googleapis.com/tfhub-tfjs-modules/google/tfjs-model/movenet/singlepose/lightning/4/model.json"
 const COCO_SSD_SOURCE_URL =
   process.env.PIXIU_COCO_SSD_SOURCE_URL ??
   "https://storage.googleapis.com/tfjs-models/savedmodel/ssdlite_mobilenet_v2/model.json"
@@ -86,14 +86,37 @@ async function fetchBytes(url, attempts = 3) {
       const response = await fetch(url, {
         signal: controller.signal,
         redirect: "follow",
+        headers: {
+          accept: "application/json, text/plain, */*",
+        },
       })
+
+      const contentType = response.headers.get("content-type") ?? ""
+      const finalUrl = response.url || url
+
       if (!response.ok) {
-        throw new Error("HTTP " + response.status + " for " + url)
+        throw new Error(
+          "HTTP " +
+            response.status +
+            " (" +
+            response.statusText +
+            ") for " +
+            url +
+            " [final: " +
+            finalUrl +
+            "]",
+        )
+      }
+
+      const bytes = Buffer.from(await response.arrayBuffer())
+      if (!bytes.length) {
+        throw new Error("Downloaded empty response from " + finalUrl)
       }
 
       return {
-        bytes: Buffer.from(await response.arrayBuffer()),
-        finalUrl: response.url || url,
+        bytes,
+        finalUrl,
+        contentType,
       }
     } catch (error) {
       lastError = error
@@ -361,28 +384,50 @@ function validateModelManifest(model, label, expectedFormat) {
 async function ensureGraphModel(modelSourceUrl, destinationDir, label, expectedFormat) {
   const modelPath = join(destinationDir, "model.json")
   const sourcePath = join(destinationDir, ".source-url")
-  let modelSource = modelSourceUrl
+  // The canonical source passed by the caller is authoritative. A cached
+  // .source-url must never redirect future builds to an obsolete provider.
+  const modelSource = modelSourceUrl
   let model = null
-
-  if (await exists(sourcePath)) {
-    const stored = (await readFile(sourcePath, "utf8")).trim()
-    if (stored) modelSource = stored
-  }
 
   if (await exists(modelPath)) {
     try {
       model = await readModelJson(modelPath, label)
       validateModelManifest(model, label, expectedFormat)
     } catch {
-      // Deployment caches may contain an older model format or an interrupted
-      // artifact. Force a fresh download and validate the replacement.
+      // Deployment caches may contain an older model format, HTML from a
+      // redirect, or an interrupted artifact. Re-fetch from the canonical
+      // model source and validate the replacement.
       model = null
     }
   }
 
   if (!model) {
-    const finalUrl = await ensureRemoteFile(modelSource, modelPath, { force: true })
-    modelSource = finalUrl || modelSource
+    const result = await fetchBytes(modelSource)
+    const contentType = result.contentType.toLowerCase()
+    if (
+      label === "MoveNet" &&
+      contentType &&
+      !contentType.includes("application/json") &&
+      !contentType.includes("text/json")
+    ) {
+      throw new Error(
+        label +
+          " model endpoint returned non-JSON content-type " +
+          JSON.stringify(result.contentType) +
+          " from " +
+          result.finalUrl,
+      )
+    }
+
+    const temporary = modelPath + ".tmp-" + process.pid + "-" + Date.now()
+    try {
+      await mkdir(dirname(modelPath), { recursive: true })
+      await writeFile(temporary, result.bytes)
+      await rename(temporary, modelPath)
+    } finally {
+      await rm(temporary, { force: true })
+    }
+
     await writeFile(sourcePath, modelSource + "\n")
     model = await readModelJson(modelPath, label)
   }
