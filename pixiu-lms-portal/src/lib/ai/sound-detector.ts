@@ -18,10 +18,7 @@ export type SoundRecognizer = {
 }
 
 const SPEECH_VERSION = "0.5.4"
-const SPEECH_SOURCES = [
-  "https://cdn.jsdelivr.net/npm/@tensorflow-models/speech-commands@0.5.4/dist/speech-commands.min.js",
-  "https://unpkg.com/@tensorflow-models/speech-commands@0.5.4/dist/speech-commands.min.js",
-]
+const SPEECH_SCRIPT = "/vendor/tfjs/speech-commands/speech-commands.min.js"
 
 declare global {
   interface Window {
@@ -111,19 +108,10 @@ async function ensureSpeechRuntime() {
 
   if (window.speechCommands) return
 
-  let lastError: unknown = null
-  for (const src of SPEECH_SOURCES) {
-    try {
-      await loadScript(src)
-      if (window.speechCommands) return
-    } catch (error) {
-      lastError = error
-    }
+  await loadScript(SPEECH_SCRIPT)
+  if (!window.speechCommands) {
+    throw new Error("Local Speech Commands runtime loaded without its API.")
   }
-
-  throw lastError instanceof Error
-    ? lastError
-    : new Error("Speech Commands runtime could not be loaded.")
 }
 
 function normalizeScores(labels: string[], scores: ArrayLike<number>) {

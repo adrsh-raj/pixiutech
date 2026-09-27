@@ -1380,8 +1380,8 @@ export async function deleteStoredModel() {
   disposeActiveAiModel()
 }
 
-export async function predictAiImage(
-  dataUrl: string,
+async function predictAiEmbedding(
+  embeddingValues: number[],
   summary: AiModelSummary | null,
 ) {
   if (
@@ -1405,9 +1405,12 @@ export async function predictAiImage(
     return null
   }
 
-  const image = await loadImage(dataUrl)
-  const embeddingValues = await extractMyAiEmbedding(image)
-  if (embeddingValues.length !== summary.embeddingSize) return null
+  if (
+    embeddingValues.length !== summary.embeddingSize ||
+    embeddingValues.some((value) => !Number.isFinite(value))
+  ) {
+    return null
+  }
 
   const feature = tf.tensor2d(
     embeddingValues,
@@ -1426,19 +1429,7 @@ export async function predictAiImage(
           : 0,
       )
 
-    if (probabilities.length !== summary.classes.length) {
-      return {
-        label: "unknown",
-        confidence: 0,
-        probabilities: {},
-        unknown: true,
-        lowConfidence: true,
-        margin: 0,
-        reason: "low_confidence" as const,
-      }
-    }
-
-    if (!probabilities.length) {
+    if (probabilities.length !== summary.classes.length || !probabilities.length) {
       return {
         label: "unknown",
         confidence: 0,
@@ -1473,7 +1464,9 @@ export async function predictAiImage(
         : value,
     )
 
-    const bestIndex = blendedProbabilities.indexOf(Math.max(...blendedProbabilities))
+    const bestIndex = blendedProbabilities.indexOf(
+      Math.max(...blendedProbabilities),
+    )
     const sortedProbabilities = [...blendedProbabilities].sort((a, b) => b - a)
     const bestProbability = sortedProbabilities[0] ?? 0
     const secondProbability = sortedProbabilities[1] ?? 0
@@ -1486,7 +1479,8 @@ export async function predictAiImage(
     const lowPrototype =
       prototypeSimilarities.length > 0 && prototypeBest < 0.35
     const lowMargin =
-      blendedProbabilities.length > 1 && margin < MY_AI_LOW_MARGIN_THRESHOLD
+      blendedProbabilities.length > 1 &&
+      margin < MY_AI_LOW_MARGIN_THRESHOLD
     const unknown = lowConfidence || lowMargin || lowPrototype
     const reason = lowConfidence
       ? "low_confidence"
@@ -1516,6 +1510,32 @@ export async function predictAiImage(
     output?.dispose()
     feature.dispose()
   }
+}
+
+export async function predictAiImage(
+  dataUrl: string,
+  summary: AiModelSummary | null,
+) {
+  if (!summary) return null
+  const image = await loadImage(dataUrl)
+  const embeddingValues = await extractMyAiEmbedding(image)
+  return predictAiEmbedding(embeddingValues, summary)
+}
+
+export async function predictAiVideo(
+  video: HTMLVideoElement,
+  summary: AiModelSummary | null,
+) {
+  if (
+    video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA ||
+    !video.videoWidth ||
+    !video.videoHeight
+  ) {
+    return null
+  }
+
+  const embeddingValues = await extractMyAiEmbedding(video)
+  return predictAiEmbedding(embeddingValues, summary)
 }
 
 export function canvasToDataUrl(canvas: HTMLCanvasElement) {

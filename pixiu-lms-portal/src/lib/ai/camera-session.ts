@@ -65,6 +65,7 @@ export function stopCamera(video: HTMLVideoElement | null, stream: MediaStream |
     video.pause()
     video.srcObject = null
   }
+  disposeCaptureFrameResource()
 }
 
 export function waitForVideoReady(video: HTMLVideoElement): Promise<void> {
@@ -103,22 +104,76 @@ export function waitForVideoReady(video: HTMLVideoElement): Promise<void> {
   })
 }
 
+type CaptureResource = {
+  canvas: HTMLCanvasElement
+  context: CanvasRenderingContext2D
+  width: number
+  height: number
+}
+
+let captureResource: CaptureResource | null = null
+
+function getCaptureResource(width: number, height: number): CaptureResource | null {
+  if (typeof document === "undefined") return null
+
+  if (
+    !captureResource ||
+    captureResource.width !== width ||
+    captureResource.height !== height
+  ) {
+    const canvas = captureResource?.canvas ?? document.createElement("canvas")
+    canvas.width = width
+    canvas.height = height
+
+    const context = canvas.getContext("2d")
+    if (!context) {
+      captureResource = null
+      return null
+    }
+
+    captureResource = {
+      canvas,
+      context,
+      width,
+      height,
+    }
+  }
+
+  return captureResource
+}
+
 export function captureVideoFrame(
   video: HTMLVideoElement,
   maxDimension = 640,
 ): string | null {
-  if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || !video.videoWidth) {
+  if (
+    video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA ||
+    !video.videoWidth ||
+    !video.videoHeight
+  ) {
     return null
   }
 
-  const scale = Math.min(1, maxDimension / Math.max(video.videoWidth, video.videoHeight))
-  const canvas = document.createElement("canvas")
-  canvas.width = Math.max(1, Math.round(video.videoWidth * scale))
-  canvas.height = Math.max(1, Math.round(video.videoHeight * scale))
+  const requestedDimension = Number(maxDimension)
+  const safeMaxDimension = Number.isFinite(requestedDimension)
+    ? Math.max(1, Math.floor(requestedDimension))
+    : 640
+  const scale = Math.min(
+    1,
+    safeMaxDimension / Math.max(video.videoWidth, video.videoHeight),
+  )
+  const width = Math.max(1, Math.round(video.videoWidth * scale))
+  const height = Math.max(1, Math.round(video.videoHeight * scale))
+  const resource = getCaptureResource(width, height)
+  if (!resource) return null
 
-  const context = canvas.getContext("2d")
-  if (!context) return null
+  resource.context.drawImage(video, 0, 0, width, height)
+  return resource.canvas.toDataURL("image/jpeg", 0.82)
+}
 
-  context.drawImage(video, 0, 0, canvas.width, canvas.height)
-  return canvas.toDataURL("image/jpeg", 0.82)
+export function disposeCaptureFrameResource() {
+  if (!captureResource) return
+  captureResource.canvas.width = 1
+  captureResource.canvas.height = 1
+  captureResource = null
 }

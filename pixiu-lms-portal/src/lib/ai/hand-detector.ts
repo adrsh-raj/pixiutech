@@ -28,10 +28,8 @@ export type HandDetector = {
 const HAND_VERSION = "4.0.0"
 const MAX_HANDS = 2
 const MIN_HAND_SCORE = 0.05
-const HANDS_SCRIPT =
-  "https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js"
-const HANDS_ASSET_BASE =
-  "https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/"
+const HANDS_SCRIPT = "/vendor/mediapipe/hands/hands.js"
+const HANDS_ASSET_BASE = "/vendor/mediapipe/hands/"
 
 declare global {
   interface Window {

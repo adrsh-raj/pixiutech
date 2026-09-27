@@ -40,7 +40,7 @@ assert(
   "My AI embedding inference must use tf.tidy and explicitly dispose the returned tensor",
 )
 assert(
-  !/tf\.tidy\(\s*async\\b/.test(extractor),
+  !/tf\.tidy\(\s*async\b/.test(extractor),
   "tf.tidy callback must not be async",
 )
 assert(
@@ -62,7 +62,7 @@ assert(
   "MoveNet inference output must be returned from tidy and explicitly disposed after data()",
 )
 assert(
-  !/tf\.tidy\(\s*async\\b/.test(pose),
+  !/tf\.tidy\(\s*async\b/.test(pose),
   "MoveNet tf.tidy callback must not be async",
 )
 
@@ -114,7 +114,7 @@ for (const [name, source] of [
   ["ai-studio-engine.ts", engine],
 ]) {
   assert(
-    !/tf\.tidy\(\s*async\\b/.test(source),
+    !/tf\.tidy\(\s*async\b/.test(source),
     name + ": async callbacks inside tf.tidy are forbidden",
   )
 }

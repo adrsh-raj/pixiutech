@@ -11,7 +11,11 @@
     "qa:phase4-6": "node ../scripts/phase4-6-static-check.mjs",
     "preview": "vite preview",
     "qa:brand": "node --experimental-strip-types ../scripts/pixiu-brand-qa.mjs",
-    "qa:phase-a1": "node ../scripts/phase-a1-foundation-static-check.mjs"
+    "qa:phase-a1": "node ../scripts/phase-a1-foundation-static-check.mjs",
+    "sync:ai-runtime-assets": "node ../scripts/sync-ai-runtime-assets.mjs",
+    "prebuild": "npm run sync:ai-runtime-assets",
+    "qa:phase2-3": "node ../scripts/phase2-3-inference-runtime-static-check.mjs",
+    "predev": "npm run sync:ai-runtime-assets"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
@@ -22,7 +26,9 @@
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router-dom": "^7.18.3",
-    "recharts": "^3.10.1"
+    "recharts": "^3.10.1",
+    "@mediapipe/face_mesh": "0.4.1633559619",
+    "@mediapipe/hands": "0.4.1675469240"
   },
   "devDependencies": {
     "@types/react": "^19.2.18",
