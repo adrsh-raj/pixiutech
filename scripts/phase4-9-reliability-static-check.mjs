@@ -13,7 +13,13 @@ const assert = (condition, message) => {
 const vision = read("pixiu-lms-portal/src/lib/ai/vision-types.ts")
 const runtimeState = read("pixiu-lms-portal/src/lib/ai/ai-runtime-state.ts")
 const performance = read("pixiu-lms-portal/src/lib/ai/ai-performance.ts")
-const panel = read("pixiu-lms-portal/src/components/circuit-lab/ai-studio-panel.tsx")
+const panel = [
+  read("pixiu-lms-portal/src/components/circuit-lab/ai-studio-panel.tsx"),
+  read("pixiu-lms-portal/src/components/circuit-lab/use-ai-studio-controller.ts"),
+  read("pixiu-lms-portal/src/components/circuit-lab/ai-try-panel.tsx"),
+  read("pixiu-lms-portal/src/components/circuit-lab/ai-teach-panel.tsx"),
+  read("pixiu-lms-portal/src/components/circuit-lab/ai-understand-panel.tsx"),
+].join("\n")
 const visionCore = read("pixiu-lms-portal/src/components/circuit-lab/ai-camera-panel.tsx")
 const camera = read("pixiu-lms-portal/src/lib/ai/camera-session.ts")
 const sound = read("pixiu-lms-portal/src/lib/ai/sound-detector.ts")
