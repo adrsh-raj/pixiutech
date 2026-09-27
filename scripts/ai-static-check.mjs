@@ -57,6 +57,9 @@ assert(
 requireText(types, "export type PoseKeypoint", "Phase 0 pose typing")
 requireText(types, "export type PoseResult", "Phase 0 pose result typing")
 
+assert(engine.includes("function finiteNumber(value: unknown, fallback: number)"), "My AI training config does not sanitize non-finite numeric inputs")
+assert(engine.includes("function safeActivation(value: unknown)"), "My AI layer activation is not allowlisted")
+
 for (const name of ["trainEvaluation", "trainValues", "trainAccuracy"]) {
   const declarations =
     engine.match(new RegExp("\\b(?:const|let|var)\\s+" + name + "\\b", "g")) ?? []
