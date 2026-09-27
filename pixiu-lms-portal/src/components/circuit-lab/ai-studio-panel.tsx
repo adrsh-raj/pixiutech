@@ -924,24 +924,35 @@ export function AiStudioPanel({
       streamRef.current = stream
       attachStreamToVisibleVideos()
       setCameraActive(true)
+      runtimeStatusRef.current = withModel ? "loading" : "ready"
       setStatus(withModel ? "Camera live · loading AI" : "Camera live · ready to teach")
       onAiStateChange({
         ...createAiVisionState(mode),
         enabled: true,
+        runtimeStatus: withModel ? "loading" : "ready",
         detail: withModel ? "Camera live" : "Teach camera live",
       })
     } catch (cameraError) {
       if (requestId !== cameraRequestRef.current) return
-      setError(
-        mediaPermissionMessage(
-          cameraError,
-          cameraError instanceof Error
-            ? cameraError.message
-            : "Camera permission was denied or unavailable.",
-        ),
+      const message = mediaPermissionMessage(
+        cameraError,
+        cameraError instanceof Error
+          ? cameraError.message
+          : "Camera permission was denied or unavailable.",
       )
+      const errorKind = classifyAiRuntimeError(cameraError)
+      runtimeStatusRef.current = "error"
+      setError(message)
       setStatus("Camera unavailable")
       setCameraActive(false)
+      onAiStateChange({
+        ...createAiVisionState(mode),
+        enabled: false,
+        runtimeStatus: "error",
+        runtimeErrorKind: errorKind,
+        runtimeError: message,
+        detail: message,
+      })
       return
     }
 
