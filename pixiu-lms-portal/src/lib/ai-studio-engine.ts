@@ -7,7 +7,7 @@ import {
   MY_AI_INPUT_SIZE,
   MY_AI_FEATURE_SIZE,
   MY_AI_PREDICTION_THRESHOLD,
-} from "@/lib/ai/my-ai-feature-extractor"
+} from "./ai/my-ai-feature-extractor"
 
 export type AiSample = {
   id: string
