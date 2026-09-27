@@ -3,7 +3,6 @@ import type { LayersModel } from "@tensorflow/tfjs"
 import type {
   AiDatasetStats,
   AiLayerSpec,
-  AiModelSummary,
   AiStudioStore,
   AiTrainingConfig,
   AiTrainingHistoryPoint,
@@ -95,7 +94,4 @@ export type AiStudioViewModel = {
   trainingHistory: AiTrainingHistoryPoint[]
   train: () => Promise<void>
   resetStudio: () => Promise<void>
-  getModelWeightPreview: (model: LayersModel) => string[][]
-  getModelWeightShapes: (model: LayersModel) => string[]
-  modelSummary?: AiModelSummary | null
 }
