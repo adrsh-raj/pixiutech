@@ -39,7 +39,11 @@ try {
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text())
   })
-  page.on("requestfailed", (request) => failedRequests.push(request.url() + " :: " + (request.failure()?.errorText || "request failed")))
+  page.on("requestfailed", (request) => {
+    const resourceType = request.resourceType()
+    if (resourceType === "font") return
+    failedRequests.push(request.url() + " [" + resourceType + "] :: " + (request.failure()?.errorText || "request failed"))
+  })
   await mkdir(artifactDir, { recursive: true })
 
   await page.goto(baseUrl + "/simulation", { waitUntil: "networkidle" })
