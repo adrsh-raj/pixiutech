@@ -1,0 +1,51 @@
+name: PIXIU AI Lab Phase 2-3 Inference Runtime Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+      - fix/ai-lab-phase-4-6-end-to-end
+      - ai-runtime/phase-a1-foundation
+    paths:
+      - "pixiu-lms-portal/src/components/circuit-lab/ai-studio-panel.tsx"
+      - "pixiu-lms-portal/src/lib/ai/**"
+      - "pixiu-lms-portal/src/lib/ai-studio-engine.ts"
+      - "pixiu-lms-portal/package.json"
+      - "pixiu-lms-portal/package-lock.json"
+      - "scripts/sync-ai-runtime-assets.mjs"
+      - "scripts/phase2-3-inference-runtime-static-check.mjs"
+      - ".github/workflows/ai-phase-2-3-inference-runtime-gate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ai_phase_2_3:
+    name: AI/CyberLab Phase 2-3 verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: pixiu-lms-portal/.node-version
+          cache: npm
+          cache-dependency-path: pixiu-lms-portal/package-lock.json
+      - name: Install portal dependencies
+        working-directory: pixiu-lms-portal
+        run: npm ci
+      - name: Phase 2-3 static runtime gate
+        working-directory: pixiu-lms-portal
+        run: npm run qa:phase2-3
+      - name: Portal lint
+        working-directory: pixiu-lms-portal
+        run: npm run lint
+      - name: Provision and validate local AI runtime assets
+        working-directory: pixiu-lms-portal
+        run: npm run sync:ai-runtime-assets
+      - name: Production build
+        working-directory: pixiu-lms-portal
+        run: npm run build
