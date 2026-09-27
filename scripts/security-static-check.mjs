@@ -16,6 +16,7 @@ const rootVercel = read("vercel.json")
 const portalVercel = read("pixiu-lms-portal/vercel.json")
 
 assert(settings.includes('SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")'), "Render TLS proxy header is not explicitly configured")
+assert(settings.includes('if not DEBUG and CLOUDFLARE_TURNSTILE_ENABLED and not CLOUDFLARE_TURNSTILE_SECRET_KEY:'), "Production Turnstile is not fail-closed when its secret is missing")
 assert(settings.includes('os.environ.get("PIXIU_BILLING_ACCOUNT_NUMBER", os.environ.get("PIXIU_BANK_ACCOUNT_NUMBER", ""))'), "Billing account fallback is not secret-free")
 assert(!/PIXIU_BILLING_ACCOUNT_NUMBER[^\n]*[0-9]{6,}/.test(settings), "Billing account number has a source-code numeric fallback")
 assert(!/PIXIU_BILLING_IFSC[^\n]*[A-Z0-9]{8,}/.test(settings), "Billing IFSC has a source-code value")
@@ -24,6 +25,10 @@ assert(hand.includes("@mediapipe/hands@0.4.1675469240/"), "MediaPipe Hands asset
 assert(face.includes("@mediapipe/face_mesh@0.4.1633559619/face_mesh.js"), "MediaPipe FaceMesh script is not version pinned")
 assert(face.includes("@mediapipe/face_mesh@0.4.1633559619/"), "MediaPipe FaceMesh assets are not version pinned")
 assert(quizSerializers.includes('if not accessible_quizzes(request.user).filter(pk=quiz.pk).exists()'), "Quiz question writes are missing accessible-quiz scope validation")
+assert(quizSerializers.includes('accessible_curriculum"]).accessible_curriculum(user).filter(pk=unit.pk)'), "Curriculum assignment writes are missing source scope validation")
+assert(quizSerializers.includes('accessible_content"]).accessible_content(user).filter(pk=content.pk)'), "Content assignment writes are missing source scope validation")
+assert(quizSerializers.includes('if not accessible_projects(request.user).filter(pk=project.pk).exists()'), "Project evidence writes are missing project scope validation")
+assert(quizSerializers.includes('Session cannot be changed after activity creation.'), "Session activity moves are not locked to the original scoped session")
 for (const file of [rootVercel, portalVercel]) {
   for (const header of [
     '"Strict-Transport-Security"',
