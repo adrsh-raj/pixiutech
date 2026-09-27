@@ -896,7 +896,16 @@ export function AiStudioPanel({
   async function openCamera(withModel = true) {
     const requestId = ++cameraRequestRef.current
     setError(null)
+    runtimeStatusRef.current = "loading"
     setStatus("Starting camera...")
+    onAiStateChange({
+      ...aiStateRef.current,
+      mode,
+      runtimeStatus: "loading",
+      runtimeError: undefined,
+      runtimeErrorKind: undefined,
+      detail: "Starting camera…",
+    })
     stopInference()
     releaseCurrentResource()
     stopCameraStream()
