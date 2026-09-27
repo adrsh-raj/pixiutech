@@ -7,6 +7,30 @@ export const MY_AI_PREDICTION_THRESHOLD = 0.62
 
 const L2_EPSILON = 1e-12
 
+export function normalizeAiEmbeddingValues(values: ArrayLike<number>): number[] {
+  if (values.length !== MY_AI_FEATURE_SIZE) {
+    throw new Error(
+      "My AI feature-size mismatch. Expected " +
+        MY_AI_FEATURE_SIZE +
+        ", got " +
+        values.length +
+        ".",
+    )
+  }
+
+  const output = Array.from(values, (value) => Number(value))
+  if (!output.every((value) => Number.isFinite(value))) {
+    throw new Error("My AI feature vector contains NaN or Infinity.")
+  }
+
+  const norm = Math.sqrt(output.reduce((sum, value) => sum + value * value, 0))
+  if (!Number.isFinite(norm) || norm < Math.sqrt(L2_EPSILON)) {
+    throw new Error("My AI feature vector cannot be normalized safely.")
+  }
+
+  return output.map((value) => value / norm)
+}
+
 // Shape contract:
 // source pixels     [H, W, 3]
 // batched image     [1, 224, 224, 3]
@@ -194,16 +218,7 @@ export async function extractMyAiEmbedding(
 
   try {
     const values = await embedding.data()
-    if (values.length !== MY_AI_FEATURE_SIZE) {
-      throw new Error(
-        "My AI feature-size mismatch. Expected " +
-          MY_AI_FEATURE_SIZE +
-          ", got " +
-          values.length +
-          ".",
-      )
-    }
-    return Array.from(values)
+    return normalizeAiEmbeddingValues(values)
   } finally {
     embedding.dispose()
   }
