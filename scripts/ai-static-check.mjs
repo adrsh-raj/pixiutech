@@ -35,9 +35,34 @@ const requireText = (text, needle, label) => {
 const forbidText = (text, needle, label) => {
   if (text.includes(needle)) failures.push(label + ": forbidden " + needle)
 }
+const assert = (condition, message) => {
+  if (!condition) failures.push(message)
+}
 
 if (!existsSync(join(root, "pixiu-lms-portal/src/components/circuit-lab/ai-camera-panel.tsx"))) {
   failures.push("integrated AI Vision Canvas panel is missing")
+}
+
+const engineImportBlock =
+  panel.match(/import\s*\{([\s\S]*?)\}\s*from\s*["']@\/lib\/ai-studio-engine["']/)?.[1] ?? ""
+assert(
+  !engineImportBlock.includes("MY_AI_FEATURE_SIZE"),
+  "Phase 0: MY_AI_FEATURE_SIZE must not be imported from ai-studio-engine",
+)
+assert(
+  /import\s*\{\s*MY_AI_FEATURE_SIZE\s*\}\s*from\s*["']@\/lib\/ai\/my-ai-feature-extractor["']/.test(panel),
+  "Phase 0: MY_AI_FEATURE_SIZE direct extractor import is missing",
+)
+requireText(types, "export type PoseKeypoint", "Phase 0 pose typing")
+requireText(types, "export type PoseResult", "Phase 0 pose result typing")
+
+for (const name of ["trainEvaluation", "trainValues", "trainAccuracy"]) {
+  const declarations =
+    engine.match(new RegExp("\\b(?:const|let|var)\\s+" + name + "\\b", "g")) ?? []
+  assert(
+    declarations.length === 1,
+    "Phase 1: expected exactly one " + name + " declaration, found " + declarations.length,
+  )
 }
 
 for (const mode of ["objects", "pose", "hands", "emotion", "sound", "numbers"]) {
@@ -376,6 +401,9 @@ for (const marker of [
   "validateClassifierModelShape",
   "trainingProfile: options.profile",
 ]) requireText(engineSource, marker, "My AI training tuning")
+requireText(engineSource, "embedding.length !== MY_AI_FEATURE_SIZE", "Phase 3 feature-size enforcement")
+requireText(engineSource, "featureSize !== MY_AI_FEATURE_SIZE", "Phase 3 tensor-pair feature-size enforcement")
+requireText(featureExtractor, "warmupMean.dispose()", "Phase 2 warmup tensor cleanup")
 
 const handSource = read("pixiu-lms-portal/src/lib/ai/hand-detector.ts")
 for (const marker of [

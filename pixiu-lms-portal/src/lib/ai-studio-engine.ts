@@ -740,8 +740,17 @@ async function extractFeatures(
 
     for (const source of sources) {
       const embedding = await extractMyAiEmbedding(source)
-      if (!embedding.length) {
-        throw new Error("My AI feature extractor returned an empty embedding.")
+      if (embedding.length !== MY_AI_FEATURE_SIZE) {
+        throw new Error(
+          "My AI feature-size contract mismatch. Expected " +
+            MY_AI_FEATURE_SIZE +
+            ", got " +
+            embedding.length +
+            ".",
+        )
+      }
+      if (embedding.some((value) => !Number.isFinite(value))) {
+        throw new Error("My AI feature extractor returned a non-finite embedding.")
       }
       if (!embeddingSize) embeddingSize = embedding.length
       if (embedding.length !== embeddingSize) {
@@ -871,6 +880,15 @@ function makeTensorPair(
   const featureSize = features[0]?.length ?? 0
   if (!featureSize) {
     throw new Error("My AI received an empty feature vector.")
+  }
+  if (featureSize !== MY_AI_FEATURE_SIZE) {
+    throw new Error(
+      "My AI feature matrix size mismatch. Expected " +
+        MY_AI_FEATURE_SIZE +
+        ", got " +
+        featureSize +
+        ".",
+    )
   }
 
   for (const row of features) {

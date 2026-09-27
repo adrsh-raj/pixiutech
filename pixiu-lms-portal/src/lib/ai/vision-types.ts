@@ -32,3 +32,15 @@ export interface AiVisionState {
   modelSource?: "ready" | "trained"
   detail: string
 }
+
+export type PoseKeypoint = {
+  name: string
+  x: number
+  y: number
+  score: number
+}
+
+export type PoseResult = {
+  score: number
+  keypoints: PoseKeypoint[]
+}
