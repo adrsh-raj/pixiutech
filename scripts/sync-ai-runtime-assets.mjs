@@ -225,7 +225,7 @@ async function ensureMoveNet() {
   )
 }
 
-async function ensureGraphModel(modelSourceUrl, destinationDir, label) {
+async function ensureGraphModel(modelSourceUrl, destinationDir, label, expectedFormat) {
   const modelPath = join(destinationDir, "model.json")
   const sourcePath = join(destinationDir, ".source-url")
   let modelSource = modelSourceUrl
@@ -240,6 +240,9 @@ async function ensureGraphModel(modelSourceUrl, destinationDir, label) {
   }
 
   const model = JSON.parse(await readFile(modelPath, "utf8"))
+  if (expectedFormat && model.format !== expectedFormat) {
+    throw new Error(label + " model format mismatch: expected " + expectedFormat + ", got " + String(model.format))
+  }
   if (!Array.isArray(model.weightsManifest) || !model.weightsManifest.length) {
     throw new Error(label + " model.json has no weightsManifest.")
   }
@@ -269,6 +272,7 @@ async function ensureSpeechCommands() {
     SPEECH_SOURCE_URL,
     SPEECH_MODEL_DIR,
     "Speech Commands",
+    "layers-model",
   )
   const metadataPath = join(SPEECH_MODEL_DIR, "metadata.json")
   await ensureRemoteFile(SPEECH_METADATA_SOURCE_URL, metadataPath)
@@ -283,7 +287,10 @@ async function ensureSpeechCommands() {
     )
   }
 
-  JSON.parse(await readFile(metadataPath, "utf8"))
+  const metadata = JSON.parse(await readFile(metadataPath, "utf8"))
+  if (!Array.isArray(metadata.wordLabels) || metadata.wordLabels.length < 18) {
+    throw new Error("Speech Commands metadata has an invalid wordLabels list.")
+  }
   console.log("Speech Commands local assets ready:", join("public", "models", "speech-commands", "18w"))
   console.log("Speech Commands runtime ready:", join("public", "vendor", "tfjs", "speech-commands", "speech-commands.min.js"))
 }
@@ -292,7 +299,7 @@ async function main() {
   await Promise.all([
     copyDirectoryAssets(HANDS_SOURCE, HANDS_DIR),
     copyDirectoryAssets(FACE_SOURCE, FACE_DIR),
-    ensureGraphModel(COCO_SSD_SOURCE_URL, COCO_SSD_DIR, "COCO-SSD"),
+    ensureGraphModel(COCO_SSD_SOURCE_URL, COCO_SSD_DIR, "COCO-SSD", "graph-model"),
     ensureMoveNet(),
     ensureSpeechCommands(),
   ])
