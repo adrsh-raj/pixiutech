@@ -12,6 +12,7 @@ from .services import (
     accessible_projects,
     accessible_quizzes,
     accessible_sessions,
+    trainer_currently_assigned_to_school,
     create_attendance,
     grade_attempt,
 )
@@ -42,11 +43,12 @@ class SessionSerializer(serializers.ModelSerializer):
             if not CurriculumClassAssignment.objects.filter(curriculum_unit=curriculum, school_class=school_class).exists():
                 raise serializers.ValidationError({"curriculum_unit": "This curriculum unit is not assigned to the selected class."})
         if trainer.status != "active": raise serializers.ValidationError({"trainer": "Only active trainers can be scheduled."})
-        if request.user.role != UserRole.ADMIN and not trainer.school_assignments.filter(
-            school_id=school_class.school_id,
-            status="active",
-            assigned_from__lte=timezone.localdate(),
-        ).filter(Q(assigned_to__isnull=True) | Q(assigned_to__gte=timezone.localdate())).exists():
+        if request.user.role != UserRole.ADMIN and (
+            not trainer.school_assignments.filter(school_id=school_class.school_id).filter(
+                status="active",
+                assigned_from__lte=timezone.localdate(),
+            ).filter(Q(assigned_to__isnull=True) | Q(assigned_to__gte=timezone.localdate())).exists()
+        ):
             raise serializers.ValidationError("Trainer is not currently assigned to this school.")
         if request.user.role == UserRole.TRAINER and trainer.account_id != request.user.id: raise serializers.ValidationError("A trainer can only schedule their own sessions.")
         if instance and instance.is_locked and request.user.role != UserRole.ADMIN: raise serializers.ValidationError("Locked sessions cannot be edited.")
@@ -68,6 +70,8 @@ class SessionActivitySerializer(serializers.ModelSerializer):
         if not session: raise serializers.ValidationError({"session": "Session is required."})
         if not accessible_sessions(request.user).filter(pk=session.pk).exists():
             raise serializers.ValidationError({"session": "You cannot manage activities for this session."})
+        if request.user.role == UserRole.TRAINER and not trainer_currently_assigned_to_school(request.user, session.school_class.school_id):
+            raise serializers.ValidationError({"session": "Trainer is not currently assigned to this school."})
         if self.instance and session != self.instance.session:
             raise serializers.ValidationError({"session": "Session cannot be changed after activity creation."})
         return attrs
