@@ -2,7 +2,9 @@ name: PIXIU AI Lab Phase 0-3 Gate
 
 on:
   pull_request:
-    branches: [main]
+    branches:
+      - main
+      - fix/ai-lab-phase-0-3-end-to-end
     paths:
       - "pixiu-lms-portal/**"
       - "scripts/ai-static-check.mjs"
