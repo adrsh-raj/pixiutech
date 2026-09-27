@@ -23,7 +23,7 @@ const workflowDir = join(repoRoot, ".github/workflows")
 for (const name of readdirSync(workflowDir)) {
   if (!/\.(yml|yaml)$/.test(name)) continue
   const source = readFileSync(join(workflowDir, name), "utf8")
-  if (/git\s+push(?:\s+[^\n]*)?(?:--force|-f)?\s+(?:origin\s+)?main/i.test(source) || /git\s+push\s+--force/i.test(source)) {
+  if (/\bgit\s+push\b/i.test(source) || /\bgh\s+pr\s+merge\b/i.test(source)) {
     throw new Error("Controlled-push invariant violated by " + name)
   }
 }
