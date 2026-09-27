@@ -1091,7 +1091,17 @@ export function AiStudioPanel({
     setError(null)
     stopInference()
     const activeSession = ++sessionRef.current
+    runtimeStatusRef.current = "loading"
+    runtimeMetricsRef.current = createAiRuntimeMetrics("sound")
     setLoading(true)
+    onAiStateChange({
+      ...aiStateRef.current,
+      mode: "sound",
+      runtimeStatus: "loading",
+      runtimeError: undefined,
+      runtimeErrorKind: undefined,
+      detail: "Starting microphone…",
+    })
 
     try {
       const recognizer = await loadSoundRecognizer()
@@ -1102,6 +1112,9 @@ export function AiStudioPanel({
 
       resourceRef.current = recognizer
       resourceModeRef.current = "sound"
+      runtimeMetricsRef.current?.markReady()
+      lastRuntimeMetricsRef.current = runtimeMetricsRef.current?.snapshot() ?? null
+      runtimeStatusRef.current = "ready"
       setLoading(false)
       setSoundActive(true)
       onAiStateChange({
@@ -1118,6 +1131,7 @@ export function AiStudioPanel({
         onAiStateChange({
           enabled: true,
           mode: "sound",
+          runtimeStatus: "running",
           detectedClass: result.label,
           confidence: result.confidence,
           allDetections: [],
@@ -1144,17 +1158,26 @@ export function AiStudioPanel({
       if (failedResource && failedResourceMode === "sound") {
         await stopSoundRecognizer(failedResource as SoundRecognizer)
       }
+      const message = mediaPermissionMessage(
+        soundError,
+        soundError instanceof Error
+          ? soundError.message
+          : "Microphone recognition could not start.",
+      )
+      const errorKind = classifyAiRuntimeError(soundError)
+      runtimeStatusRef.current = "error"
       setLoading(false)
       setSoundActive(false)
-      setError(
-        mediaPermissionMessage(
-          soundError,
-          soundError instanceof Error
-            ? soundError.message
-            : "Microphone recognition could not start.",
-        ),
-      )
+      setError(message)
       setStatus("Sound AI unavailable")
+      onAiStateChange({
+        ...createAiVisionState("sound"),
+        enabled: false,
+        runtimeStatus: "error",
+        runtimeErrorKind: errorKind,
+        runtimeError: message,
+        detail: message,
+      })
     }
   }
 
