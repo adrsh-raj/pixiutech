@@ -20,11 +20,20 @@ export type HandDetection = {
 
 
 export type MediaPipeHandLandmark = { x?: number; y?: number; z?: number; name?: string }
+export type MediaPipeHandednessCategory = {
+  score?: number
+  label?: string
+  displayName?: string
+  categoryName?: string
+}
+export type MediaPipeHandednessEntry =
+  | MediaPipeHandednessCategory
+  | { classification?: MediaPipeHandednessCategory[] }
+  | MediaPipeHandednessCategory[]
 export type MediaPipeHandsResults = {
   multiHandLandmarks?: MediaPipeHandLandmark[][]
-  multiHandedness?: Array<{
-    classification?: Array<{ displayName?: string; categoryName?: string }>
-  }>
+  multiHandWorldLandmarks?: MediaPipeHandLandmark[][]
+  multiHandedness?: MediaPipeHandednessEntry[]
 }
 export type MediaPipeHandsInstance = {
   setOptions: (options: {
@@ -306,23 +315,25 @@ export async function loadHandDetector(
     const normalized = Array.isArray(results?.multiHandLandmarks)
       ? results.multiHandLandmarks
           .slice(0, maxHands)
-          .map((landmarks: MediaPipeHandLandmark[], index: number) =>
-            normalizeHandResult({
+          .map((landmarks: MediaPipeHandLandmark[], index: number) => {
+            const handednessEntry = results?.multiHandedness?.[index]
+            const category =
+              Array.isArray(handednessEntry)
+                ? handednessEntry[0]
+                : "classification" in (handednessEntry ?? {})
+                  ? handednessEntry?.classification?.[0]
+                  : handednessEntry
+            return normalizeHandResult({
               keypoints: landmarks,
               keypoints3D: results?.multiHandWorldLandmarks?.[index],
-              score: Number(
-                results?.multiHandedness?.[index]?.score ??
-                  results?.multiHandedness?.[index]?.[0]?.score ??
-                  1,
-              ),
+              score: Number(category?.score ?? 1),
               handedness:
-                results?.multiHandedness?.[index]?.displayName ??
-                results?.multiHandedness?.[index]?.[0]?.displayName ??
-                results?.multiHandedness?.[index]?.categoryName ??
-                results?.multiHandedness?.[index]?.[0]?.categoryName ??
+                category?.displayName ??
+                category?.categoryName ??
+                category?.label ??
                 "Hand",
-            }),
-          )
+            })
+          })
           .filter((hand: HandDetection) => hand.keypoints.length >= 21 && hand.score >= MIN_HAND_SCORE)
       : []
 
