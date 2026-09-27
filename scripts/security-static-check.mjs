@@ -6,7 +6,6 @@ import { dirname, join, resolve } from "node:path"
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 const read = (p) => readFileSync(join(root, p), "utf8")
 const failures = []
-void runtimeManifestPath
 const assert = (condition, message) => { if (!condition) failures.push(message) }
 
 const settings = read("pixiu-backend/config/settings.py")
