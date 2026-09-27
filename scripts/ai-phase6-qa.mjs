@@ -16,7 +16,14 @@ const root = fileURLToPath(new URL("..", import.meta.url))
 const read = (relativePath) =>
   readFileSync(join(root, relativePath), "utf8")
 
-const panel = read("pixiu-lms-portal/src/components/circuit-lab/ai-studio-panel.tsx")
+const panel = [
+  read("pixiu-lms-portal/src/components/circuit-lab/ai-studio-panel.tsx"),
+  read("pixiu-lms-portal/src/components/circuit-lab/use-ai-studio-controller.ts"),
+  read("pixiu-lms-portal/src/components/circuit-lab/ai-try-panel.tsx"),
+  read("pixiu-lms-portal/src/components/circuit-lab/ai-teach-panel.tsx"),
+  read("pixiu-lms-portal/src/components/circuit-lab/ai-understand-panel.tsx"),
+  read("pixiu-lms-portal/src/components/circuit-lab/ai-training-diagnostics.tsx"),
+].join("\n")
 const engine = read("pixiu-lms-portal/src/lib/ai-studio-engine.ts")
 const workbench = read("pixiu-lms-portal/src/components/circuit-lab/workbench.tsx")
 const runner = read("pixiu-lms-portal/src/lib/blockly-runner.ts")
@@ -259,12 +266,12 @@ for (const [name, passed] of staticSourceChecks) {
 assert(engine.includes("trainingHistory: history"), "training history persistence missing")
 assert(engine.includes("validationConfusionMatrix"), "validation confusion matrix missing")
 assert(engine.includes("estimateTrainingLoad"), "training load guard missing")
-assert(panel.includes("MetricChart"), "training graph UI missing")
-assert(panel.includes("Add layer"), "layer editor missing")
-assert(panel.includes("Max epochs"), "extended epoch control missing")
-assert(!panel.includes("customDepth"), "obsolete depth control remains")
-assert(!panel.includes("customUnits"), "obsolete unit control remains")
-assert(!panel.includes("customDropout"), "obsolete dropout control remains")
+assert(read("pixiu-lms-portal/src/components/circuit-lab/ai-training-diagnostics.tsx").includes("MetricChart"), "training graph UI missing")
+assert(read("pixiu-lms-portal/src/components/circuit-lab/ai-teach-panel.tsx").includes("Add layer"), "layer editor missing")
+assert(read("pixiu-lms-portal/src/components/circuit-lab/ai-teach-panel.tsx").includes("Max epochs"), "extended epoch control missing")
+assert(!read("pixiu-lms-portal/src/components/circuit-lab/ai-teach-panel.tsx").includes("customDepth"), "obsolete depth control remains")
+assert(!read("pixiu-lms-portal/src/components/circuit-lab/ai-teach-panel.tsx").includes("customUnits"), "obsolete unit control remains")
+assert(!read("pixiu-lms-portal/src/components/circuit-lab/ai-teach-panel.tsx").includes("customDropout"), "obsolete dropout control remains")
 
 if (failures.length) {
   console.error("PIXIU Phase 6 QA matrix FAILED")
