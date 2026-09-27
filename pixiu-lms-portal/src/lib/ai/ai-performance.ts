@@ -11,7 +11,9 @@ export type AiRuntimeMetrics = {
   fps: number
   tensorCount: number | null
   tensorBytes: number | null
+  tensorGrowthBytes: number | null
   jsHeapBytes: number | null
+  jsHeapGrowthBytes: number | null
   hardwareConcurrency: number | null
 }
 
@@ -111,7 +113,12 @@ export function createAiRuntimeMetrics(mode: string) {
         fps,
         tensorCount: memory.tensorCount,
         tensorBytes: memory.tensorBytes,
+        tensorGrowthBytes: Math.max(0, memory.tensorBytes - before.tensorBytes),
         jsHeapBytes: memory.jsHeapBytes,
+        jsHeapGrowthBytes:
+          memory.jsHeapBytes != null && before.jsHeapBytes != null
+            ? Math.max(0, memory.jsHeapBytes - before.jsHeapBytes)
+            : null,
         hardwareConcurrency:
           typeof navigator !== "undefined" &&
           Number.isFinite(Number(navigator.hardwareConcurrency))
@@ -148,7 +155,7 @@ export function isBudgetExceeded(metrics: AiRuntimeMetrics) {
       metrics.fps > 0 &&
       metrics.fps < AI_PERFORMANCE_BUDGETS.minimumLiveFps,
     tensorGrowth:
-      getTensorMemoryGrowthBytes(metrics ? { tensorBytes: 0 } : null) >
+      (metrics.tensorGrowthBytes ?? 0) >
       AI_PERFORMANCE_BUDGETS.maxTensorGrowthBytes,
   }
 }
