@@ -1,12 +1,14 @@
 import { BookOpen, Info, ShieldCheck } from "lucide-react"
 import type { AiStudioViewModel } from "./ai-studio-view-model"
 import { getModelWeightPreview, getModelWeightShapes } from "@/lib/ai-studio-engine"
+import { formatDecisionReason } from "./ai-studio-presenters"
 
 export function AiUnderstandPanel({ viewModel }: { viewModel: AiStudioViewModel }) {
   const {
     currentExplanation, aiState, store, model, cameraActive, soundActive,
     stopInput, resetStudio, loading,
   } = viewModel
+  return (
 <div className="mx-auto max-w-5xl space-y-4">
               <div className="rounded-2xl border border-violet-400/15 bg-violet-500/[0.04] p-4">
                 <div className="flex items-start gap-3">
@@ -131,4 +133,5 @@ export function AiUnderstandPanel({ viewModel }: { viewModel: AiStudioViewModel 
                 </div>
               </div>
             </div>
+  )
 }
