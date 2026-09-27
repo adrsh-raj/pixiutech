@@ -7,6 +7,8 @@ import type {
 export type { AiRuntimeErrorKind, AiRuntimeStatus }
 
 export function classifyAiRuntimeError(error: unknown): AiRuntimeErrorKind {
+  if (error instanceof AiRuntimeError) return error.kind
+
   const name =
     error && typeof error === "object" && "name" in error
       ? String((error as { name?: unknown }).name ?? "")
