@@ -281,7 +281,7 @@ export function AiCameraPanel({
               enabled: false,
               mode: "objects",
               runtimeStatus: "error",
-              runtimeErrorKind: "inference",
+              runtimeErrorKind: errorKind,
               runtimeError: message,
               detail: "Vision inference unavailable · retrying",
             })
