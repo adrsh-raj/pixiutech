@@ -1,6 +1,5 @@
 import {
   BookOpen,
-  Camera,
   ChevronDown,
   ChevronUp,
   Info,
@@ -8,7 +7,6 @@ import {
   Plus,
   RefreshCcw,
   Trash2,
-  Upload,
 } from "lucide-react"
 import type { AiStudioViewModel } from "./ai-studio-view-model"
 import { AiDatasetPanel } from "./ai-dataset-panel"
