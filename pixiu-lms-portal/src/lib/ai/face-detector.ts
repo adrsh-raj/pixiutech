@@ -285,6 +285,7 @@ export async function loadFaceDetector(): Promise<FaceDetector> {
     detect,
     dispose() {
       disposed = true
+      clearPendingTimeout()
       pending?.resolve([])
       pending = null
       processing = false
@@ -292,6 +293,7 @@ export async function loadFaceDetector(): Promise<FaceDetector> {
     },
     reset() {
       faceMesh.reset?.()
+      clearPendingTimeout()
       pending?.resolve([])
       processing = false
       pending = null
