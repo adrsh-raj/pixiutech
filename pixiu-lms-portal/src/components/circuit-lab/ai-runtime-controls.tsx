@@ -2,7 +2,7 @@ import { Camera, CameraOff, Mic } from "lucide-react"
 import type { AiStudioViewModel } from "./ai-studio-view-model"
 
 export function AiRuntimeControls({ viewModel }: { viewModel: AiStudioViewModel }) {
-  const { mode, isSound, cameraActive, soundActive, startSound, startCameraForMode, stopInput } = viewModel
+  const { isSound, cameraActive, soundActive, startSound, startCameraForMode, stopInput } = viewModel
 
   return (
 <div className="rounded-2xl border border-slate-800 bg-slate-950/45 p-4">
