@@ -36,9 +36,16 @@ class SessionActivitySerializer(serializers.ModelSerializer):
         fields = ["id", "session", "title", "activity_type", "notes", "completed_at", "created_by", "created_at", "updated_at"]
         read_only_fields = ["id", "created_by", "created_at", "updated_at"]
     def validate(self, attrs):
-        title = attrs.get("title", ""); session = self.instance.session if self.instance else attrs.get("session")
+        from .services import accessible_sessions
+        request = self.context["request"]
+        title = attrs.get("title", "")
+        session = self.instance.session if self.instance else attrs.get("session")
         if not str(title).strip(): raise serializers.ValidationError({"title": "Activity title is required."})
         if not session: raise serializers.ValidationError({"session": "Session is required."})
+        if not accessible_sessions(request.user).filter(pk=session.pk).exists():
+            raise serializers.ValidationError({"session": "You cannot manage activities for this session."})
+        if self.instance and session != self.instance.session:
+            raise serializers.ValidationError({"session": "Session cannot be changed after activity creation."})
         return attrs
 
 class AttendanceRecordSerializer(serializers.ModelSerializer):
@@ -271,33 +278,6 @@ class StudentAssessmentSerializer(serializers.ModelSerializer):
 
 class ProjectEvidenceSerializer(serializers.ModelSerializer):
     uploaded_by_username = serializers.CharField(source="uploaded_by.username", read_only=True)
-    class Meta:
-        model = ProjectEvidence
-        fields = ["id", "project", "title", "note", "file", "external_url", "uploaded_by", "uploaded_by_username", "created_at"]
-        read_only_fields = ["id", "uploaded_by", "uploaded_by_username", "created_at"]
-    def validate(self, attrs):
-        file_value = attrs.get("file", getattr(self.instance, "file", None)); external_url = attrs.get("external_url", getattr(self.instance, "external_url", ""))
-        if not file_value and not str(external_url or "").strip(): raise serializers.ValidationError("Evidence must include a file or an external URL.")
-        return attrs
-
-class ProjectSerializer(serializers.ModelSerializer):
-    student_id = serializers.CharField(source="student.student_id", read_only=True); student_name = serializers.CharField(source="student.name", read_only=True); evidence = ProjectEvidenceSerializer(many=True, read_only=True)
-    class Meta:
-        model = Project
-        fields = ["id", "student", "student_id", "student_name", "title", "description", "status", "score", "trainer_feedback", "submitted_at", "completed_at", "created_at", "updated_at", "evidence"]
-        read_only_fields = ["id", "student_id", "student_name", "submitted_at", "completed_at", "created_at", "updated_at", "evidence"]
-    def validate(self, attrs):
-        from academics.services import accessible_student_queryset
-        request = self.context["request"]; student = attrs.get("student", getattr(self.instance, "student", None))
-        if student is None: raise serializers.ValidationError({"student": "Student is required."})
-        if not accessible_student_queryset(request.user).filter(pk=student.pk).exists(): raise serializers.ValidationError({"student": "You cannot manage a project for this student."})
-        title = attrs.get("title", getattr(self.instance, "title", ""))
-        if not str(title).strip(): raise serializers.ValidationError({"title": "Project title is required."})
-        return attrs
-
-
-class ProjectEvidenceSerializer(serializers.ModelSerializer):
-    uploaded_by_username = serializers.CharField(source="uploaded_by.username", read_only=True)
 
     class Meta:
         model = ProjectEvidence
@@ -305,12 +285,20 @@ class ProjectEvidenceSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "uploaded_by", "uploaded_by_username", "created_at"]
 
     def validate(self, attrs):
+        from .services import accessible_projects
+        request = self.context["request"]
         file_value = attrs.get("file", getattr(self.instance, "file", None))
         external_url = attrs.get("external_url", getattr(self.instance, "external_url", ""))
+        project = attrs.get("project", getattr(self.instance, "project", None))
+        if project is None:
+            raise serializers.ValidationError({"project": "Project is required."})
+        if not accessible_projects(request.user).filter(pk=project.pk).exists():
+            raise serializers.ValidationError({"project": "You cannot add evidence to this project."})
+        if self.instance and project != self.instance.project:
+            raise serializers.ValidationError({"project": "Evidence cannot be moved between projects."})
         if not file_value and not str(external_url or "").strip():
             raise serializers.ValidationError("Evidence must include a file or an external URL.")
         return attrs
-
 
 class ProjectSerializer(serializers.ModelSerializer):
     student_id = serializers.CharField(source="student.student_id", read_only=True)
