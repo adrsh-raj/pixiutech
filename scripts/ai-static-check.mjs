@@ -6,6 +6,12 @@ const root = fileURLToPath(new URL("..", import.meta.url))
 const read = (path) => readFileSync(join(root, path), "utf8")
 
 const panel = read("pixiu-lms-portal/src/components/circuit-lab/ai-studio-panel.tsx")
+const controller = read("pixiu-lms-portal/src/components/circuit-lab/use-ai-studio-controller.ts")
+const tryPanel = read("pixiu-lms-portal/src/components/circuit-lab/ai-try-panel.tsx")
+const teachPanel = read("pixiu-lms-portal/src/components/circuit-lab/ai-teach-panel.tsx")
+const understandPanel = read("pixiu-lms-portal/src/components/circuit-lab/ai-understand-panel.tsx")
+const diagnostics = read("pixiu-lms-portal/src/components/circuit-lab/ai-training-diagnostics.tsx")
+const studioSource = [panel, controller, tryPanel, teachPanel, understandPanel, diagnostics].join("\n")
 const canvasPanel = read("pixiu-lms-portal/src/components/circuit-lab/ai-camera-panel.tsx")
 const templates = read("pixiu-lms-portal/src/lib/templates.ts")
 const engine = read("pixiu-lms-portal/src/lib/ai-studio-engine.ts")
@@ -45,13 +51,13 @@ if (!existsSync(join(root, "pixiu-lms-portal/src/components/circuit-lab/ai-camer
 }
 
 const engineImportBlock =
-  panel.match(/import\s*\{([\s\S]*?)\}\s*from\s*["']@\/lib\/ai-studio-engine["']/)?.[1] ?? ""
+  studioSource.match(/import\s*\{([\s\S]*?)\}\s*from\s*["']@\/lib\/ai-studio-engine["']/)?.[1] ?? ""
 assert(
   !engineImportBlock.includes("MY_AI_FEATURE_SIZE"),
   "Phase 0: MY_AI_FEATURE_SIZE must not be imported from ai-studio-engine",
 )
 assert(
-  /import\s*\{\s*MY_AI_FEATURE_SIZE\s*\}\s*from\s*["']@\/lib\/ai\/my-ai-feature-extractor["']/.test(panel),
+  /import\s*\{\s*MY_AI_FEATURE_SIZE\s*\}\s*from\s*["']@\/lib\/ai\/my-ai-feature-extractor["']/.test(controller),
   "Phase 0: MY_AI_FEATURE_SIZE direct extractor import is missing",
 )
 requireText(types, "export type PoseKeypoint", "Phase 0 pose typing")
@@ -71,7 +77,7 @@ for (const name of ["trainEvaluation", "trainValues", "trainAccuracy"]) {
 
 for (const mode of ["objects", "pose", "hands", "emotion", "sound", "numbers"]) {
   requireText(types, mode, "6A vision mode")
-  requireText(panel, 'id: "' + mode + '"', "6A panel mode")
+  requireText(studioSource, 'id: "' + mode + '"', "6A panel mode")
 }
 
 for (const marker of [
@@ -82,7 +88,7 @@ for (const marker of [
   "loadSoundRecognizer",
   "trainAiModel",
   "predictAiImage",
-]) requireText(panel, marker, "6A resource wiring")
+]) requireText(studioSource, marker, "6A resource wiring")
 
 for (const marker of [
   "lite_mobilenet_v2",
@@ -98,7 +104,7 @@ for (const marker of [
 
 for (const marker of [
   "const HAND_VERSION =",
-  "https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js",
+  "/vendor/mediapipe/hands/hands.js",
   "const HANDS_ASSET_BASE",
   "new window.Hands",
   "maxNumHands: maxHands",
@@ -108,7 +114,7 @@ for (const marker of [
 
 for (const marker of [
   "const FACE_VERSION =",
-  "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js",
+  "/vendor/mediapipe/face_mesh/face_mesh.js",
   "const FACE_MESH_ASSET_BASE",
   "new window.FaceMesh",
   "minDetectionConfidence: 0.35",
@@ -119,7 +125,7 @@ for (const marker of [
 
 for (const marker of [
   'SPEECH_VERSION = "0.5.4"',
-  'create("BROWSER_FFT", "18w")',
+  'create(\n    "BROWSER_FFT",\n    null,\n    SPEECH_MODEL_URL,\n    SPEECH_METADATA_URL,\n  )',
   "probabilityThreshold: 0.72",
   "suppressionTimeMillis: 650",
   "generation",
@@ -133,7 +139,7 @@ for (const marker of [
   "fingerCount",
   "handGestureHistoryRef",
   '["0", "1", "2", "3", "4", "5"]',
-]) requireText(panel, marker, "6G gesture/number integration")
+]) requireText(studioSource, marker, "6G gesture/number integration")
 
 for (const marker of [
   "FingerMask",
@@ -304,31 +310,31 @@ if (!aiGeneratorSection.length) {
 }
 
 for (const marker of ["6M · How My AI learns", "DATASET", "MODEL", "TRAIN", "INFERENCE"]) {
-  requireText(panel, marker, "6M Teach mode")
+  requireText(studioSource, marker, "6M Teach mode")
 }
 for (const marker of ["6N · Why did AI produce this result?", "Class probabilities", "explainCurrentAiResult"]) {
-  requireText(panel, marker, "6N Understand mode")
+  requireText(studioSource, marker, "6N Understand mode")
 }
 for (const marker of ["CAMERA ·", "MIC ·", "Erase local AI data", "Samples stay in this browser"]) {
-  requireText(panel, marker, "6O privacy controls")
+  requireText(studioSource, marker, "6O privacy controls")
 }
 for (const marker of ["getUserMedia", "isSecureContext", "HTTPS"]) {
   requireText(cameraSession, marker, "6O media permission boundary")
 }
-requireText(panel, "Permission blocked", "6O actionable permission error")
+requireText(studioSource, "Permission blocked", "6O actionable permission error")
 requireText(engine, "tf.io.removeModel", "6O persisted model cleanup")
 requireText(engine, "localStorage.removeItem", "6O persisted dataset cleanup")
 requireText(engine, "AI_DATASET_STORAGE_SOFT_LIMIT_BYTES", "6O dataset persistence guard")
-requireText(panel, "stopInput", "6O runtime cleanup")
-requireText(panel, "Dataset updated for this session, but browser storage is full", "6O dataset persistence feedback")
+requireText(studioSource, "stopInput", "6O runtime cleanup")
+requireText(studioSource, "Dataset updated for this session, but browser storage is full", "6O dataset persistence feedback")
 
 for (const marker of [
   "completedStepIds = Array.isArray(candidate.completedStepIds)",
   "Array.from(new Set(completedStepIds))",
   "Array.isArray(progress.completedStepIds)",
 ]) requireText(lessonEngine, marker, "Phase 5 progress-storage safety")
-requireText(panel, "getActiveAiModel() === loaded", "6P stale model-load cleanup")
-requireText(panel, "if (model) return", "6P trained-model double-load guard")
+requireText(studioSource, "getActiveAiModel() === loaded", "6P stale model-load cleanup")
+requireText(studioSource, "if (model) return", "6P trained-model double-load guard")
 forbidText(panel, "disposeAiResource", "6P undefined trained-resource disposer")
 
 for (const marker of [
@@ -342,7 +348,7 @@ for (const marker of [
   "stopInput()",
   "releaseCurrentResource",
   "stopCameraStream",
-]) requireText(panel, marker, "6P restart/cleanup guard")
+]) requireText(studioSource, marker, "6P restart/cleanup guard")
 
 for (const marker of [
   "pressed.has(part.id)",
@@ -367,7 +373,7 @@ for (const marker of [
 ]) requireText(workbench, marker, "Phase 1 no-Arduino run-state safety")
 
 for (const marker of ["objects", "pose", "hands", "emotion", "sound", "numbers", "trained"]) {
-  requireText(panel, marker, "6P cross-mode coverage")
+  requireText(studioSource, marker, "6P cross-mode coverage")
 }
 
 if (failures.length) {
@@ -447,17 +453,10 @@ for (const marker of [
   "onGoToSimulation",
 ]) requireText(aiStudioPage, marker, "Lazy PIXIU AI Studio")
 
-const panelSource = read("pixiu-lms-portal/src/components/circuit-lab/ai-studio-panel.tsx")
-for (const marker of [
-  "Training profile",
-  "Advanced tuning",
-  "Loading PIXIU AI is loading",
-]) {
-  if (marker === "Loading PIXIU AI is loading") continue
-}
-assert(panelSource.includes("PIXIU AI is loading"), "AI Studio branded model loading state missing")
-assert(panelSource.includes("Training profile"), "AI Studio grade training profile control missing")
-assert(panelSource.includes("Advanced tuning"), "AI Studio advanced tuning control missing")
+const panelSource = studioSource
+assert(tryPanel.includes("PIXIU AI is loading"), "AI Studio branded model loading state missing")
+assert(teachPanel.includes("Training profile"), "AI Studio grade training profile control missing")
+assert(teachPanel.includes("Advanced tuning"), "AI Studio advanced tuning control missing")
 
 if (failures.length) {
   console.error("AI static contract check FAILED")
