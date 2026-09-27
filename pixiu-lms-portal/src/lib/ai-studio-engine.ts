@@ -250,6 +250,41 @@ function normalizeLabel(label: string) {
     .slice(0, 32)
 }
 
+function isCompatibleModelSummary(summary: unknown): summary is AiModelSummary {
+  if (!summary || typeof summary !== "object") return false
+  const candidate = summary as Partial<AiModelSummary>
+  if (
+    candidate.storageKey !== MODEL_KEY ||
+    candidate.featureExtractor !== MY_AI_FEATURE_VERSION ||
+    candidate.embeddingSize !== MY_AI_FEATURE_SIZE ||
+    !Array.isArray(candidate.classes) ||
+    candidate.classes.length < MIN_CLASSES ||
+    candidate.classes.length > MAX_CLASSES ||
+    !Array.isArray(candidate.featureShape) ||
+    candidate.featureShape.length !== 1 ||
+    candidate.featureShape[0] !== MY_AI_FEATURE_SIZE ||
+    !Array.isArray(candidate.modelInputShape) ||
+    candidate.modelInputShape.length !== 1 ||
+    candidate.modelInputShape[0] !== MY_AI_FEATURE_SIZE ||
+    !Array.isArray(candidate.outputShape) ||
+    candidate.outputShape.length !== 1 ||
+    candidate.outputShape[0] !== candidate.classes.length ||
+    candidate.classCount !== candidate.classes.length ||
+    new Set(candidate.classes.map((value) => String(value).trim().toLowerCase())).size !== candidate.classes.length ||
+    !candidate.classPrototypes ||
+    typeof candidate.classPrototypes !== "object"
+  ) return false
+
+  return candidate.classes.every((className) => {
+    const prototype = candidate.classPrototypes?.[className]
+    return (
+      Array.isArray(prototype) &&
+      prototype.length === MY_AI_FEATURE_SIZE &&
+      prototype.every((value) => Number.isFinite(Number(value)))
+    )
+  })
+}
+
 function uniqueClasses(values: unknown) {
   const output: string[] = []
   const seen = new Set<string>()
@@ -325,15 +360,7 @@ export function loadAiStudioStore(): AiStudioStore {
     samples: samples.filter((sample) =>
       classes.some((name) => name.toLowerCase() === normalizeLabel(sample.label).toLowerCase()),
     ),
-    model:
-      source.model?.storageKey === MODEL_KEY &&
-      source.model.featureExtractor === MY_AI_FEATURE_VERSION &&
-      Array.isArray(source.model.classes) &&
-      typeof source.model.embeddingSize === "number" &&
-      source.model.classPrototypes &&
-      typeof source.model.classPrototypes === "object"
-        ? source.model
-        : null,
+    model: isCompatibleModelSummary(source.model) ? source.model : null,
   }
 }
 
@@ -999,7 +1026,7 @@ export async function trainAiModel(
   let validationYs: tf.Tensor2D | null = null
   let model: tf.LayersModel | null = null
 
-  activeModel?.dispose()
+  const previousActiveModel = activeModel
   activeModel = null
 
   try {
@@ -1270,6 +1297,9 @@ export async function trainAiModel(
       await model!.save(`indexeddb://${MODEL_KEY}`)
     })
 
+    if (previousActiveModel && previousActiveModel !== model) {
+      previousActiveModel.dispose()
+    }
     activeModel = model
     model = null
     return {
@@ -1277,6 +1307,7 @@ export async function trainAiModel(
       summary,
     }
   } catch (error) {
+    activeModel = previousActiveModel
     if (model) model.dispose()
     throw error instanceof Error ? error : new Error("Training failed.")
   } finally {
@@ -1293,37 +1324,7 @@ export async function loadStoredAiModel(
   summary: AiModelSummary | null,
 ): Promise<tf.LayersModel | null> {
   if (!summary || typeof summary !== "object") return null
-  if (
-    summary.storageKey !== MODEL_KEY ||
-    summary.featureExtractor !== MY_AI_FEATURE_VERSION ||
-    summary.embeddingSize !== MY_AI_FEATURE_SIZE ||
-    !Array.isArray(summary.classes) ||
-    summary.classes.length < MIN_CLASSES ||
-    summary.classes.length > MAX_CLASSES ||
-    !Array.isArray(summary.featureShape) ||
-    summary.featureShape.length !== 1 ||
-    summary.featureShape[0] !== MY_AI_FEATURE_SIZE ||
-    !Array.isArray(summary.modelInputShape) ||
-    summary.modelInputShape.length !== 1 ||
-    summary.modelInputShape[0] !== MY_AI_FEATURE_SIZE ||
-    !Array.isArray(summary.outputShape) ||
-    summary.outputShape.length !== 1 ||
-    summary.outputShape[0] !== summary.classes.length ||
-    summary.classCount !== summary.classes.length ||
-    new Set(summary.classes.map((value) => String(value).trim().toLowerCase())).size !== summary.classes.length ||
-    !summary.classPrototypes ||
-    typeof summary.classPrototypes !== "object" ||
-    !summary.classes.every((className) => {
-      const prototype = summary.classPrototypes?.[className]
-      return (
-        Array.isArray(prototype) &&
-        prototype.length === MY_AI_FEATURE_SIZE &&
-        prototype.every((value) => Number.isFinite(Number(value)))
-      )
-    })
-  ) {
-    return null
-  }
+  if (!isCompatibleModelSummary(summary)) return null
 
   try {
     await modelStorageQueue
