@@ -430,12 +430,13 @@ for (const marker of [
 
 const faceSource = read("pixiu-lms-portal/src/lib/ai/face-detector.ts")
 for (const marker of [
-  'const FACE_VERSION = "3.0.0"','
-  'runtime: "mediapipe"',
-  "solutionPath",
+  'const FACE_VERSION = "3.0.0"',
+  'const FACE_MESH_SCRIPT = "/vendor/mediapipe/face_mesh/face_mesh.js"',
+  "const FACE_MESH_ASSET_BASE",
   "refineLandmarks: true",
   "function classifyExpression",
   "cornerLift",
+  "new window.FaceMesh",
 ]) requireText(faceSource, marker, "Face AI runtime")
 
 const portalApp = read("pixiu-lms-portal/src/App.jsx")
