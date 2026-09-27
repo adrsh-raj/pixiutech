@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
+import { fileURLToPath } from "node:url"
 
-const root = process.cwd()
+const root = fileURLToPath(new URL("..", import.meta.url))
 const read = (path) => readFileSync(join(root, path), "utf8")
 const failures = []
 const requireText = (source, needle, label) => {
