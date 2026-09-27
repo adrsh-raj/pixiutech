@@ -17,6 +17,7 @@ const rootVercel = read("vercel.json")
 const index = read("pixiu-lms-portal/index.html")
 const vercel = read("pixiu-lms-portal/vercel.json")
 const packageJson = JSON.parse(read("pixiu-lms-portal/package.json"))
+const errorTaxonomy = read("pixiu-lms-portal/src/lib/ai/ai-errors.ts")
 const studio = read("pixiu-lms-portal/src/components/circuit-lab/ai-studio-panel.tsx")
 const controller = read("pixiu-lms-portal/src/components/circuit-lab/use-ai-studio-controller.ts")
 
@@ -45,6 +46,9 @@ for (const directive of ["default-src 'self'", "object-src 'none'", "frame-ances
 }
 assert(packageJson.scripts?.["test:ai"], "AI unit-test script is missing")
 assert(packageJson.scripts?.["qa:part4"], "Part 4 static gate script is missing")
+for (const name of ["AiRuntimeError","AIModelLoadError","AIModelShapeError","AITensorShapeError","AIDatasetError","AIPermissionError","AICameraError","AIMicrophoneError","AIInferenceError","AIStorageError","AIUnsupportedBrowserError"]) {
+  assert(errorTaxonomy.includes("class " + name), "Structured AI error class missing: " + name)
+}
 for (const file of [
   "pixiu-lms-portal/src/components/circuit-lab/ai-studio-view-model.ts",
   "pixiu-lms-portal/src/components/circuit-lab/ai-try-panel.tsx",
