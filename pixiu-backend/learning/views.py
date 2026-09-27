@@ -182,7 +182,18 @@ class QuizViewSet(LearningViewSet):
     def perform_destroy(self, instance): self.role_only(UserRole.ADMIN); instance.status = "closed"; instance.save(update_fields=["status", "updated_at"])
     @action(detail=True, methods=["post"])
     def submit(self, request, pk=None):
-        self.required_action = "CREATE"; quiz = self.get_object(); serializer = QuizAttemptCreateSerializer(data={**request.data, "quiz": quiz.pk}, context={"request": request}); serializer.is_valid(raise_exception=True); return Response(QuizAttemptReadSerializer(serializer.save(), context={"request": request}).data, status=status.HTTP_201_CREATED)
+        self.required_action = "CREATE"
+        self.role_only(UserRole.ADMIN, UserRole.STUDENT)
+        quiz = self.get_object()
+        serializer = QuizAttemptCreateSerializer(
+            data={**request.data, "quiz": quiz.pk},
+            context={"request": request},
+        )
+        serializer.is_valid(raise_exception=True)
+        return Response(
+            QuizAttemptReadSerializer(serializer.save(), context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
+        )
 
 class QuizQuestionViewSet(LearningViewSet):
     queryset = QuizQuestion.objects.select_related("quiz")
@@ -205,7 +216,14 @@ class QuizAttemptViewSet(LearningViewSet):
     queryset = QuizAttempt.objects.select_related("quiz", "student"); serializer_class = QuizAttemptReadSerializer
     def scoped_queryset(self): return accessible_attempts(self.request.user)
     def create(self, request, *args, **kwargs):
-        self.required_action = "CREATE"; serializer = QuizAttemptCreateSerializer(data=request.data, context={"request": request}); serializer.is_valid(raise_exception=True); return Response(QuizAttemptReadSerializer(serializer.save(), context={"request": request}).data, status=status.HTTP_201_CREATED)
+        self.required_action = "CREATE"
+        self.role_only(UserRole.ADMIN, UserRole.STUDENT)
+        serializer = QuizAttemptCreateSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        return Response(
+            QuizAttemptReadSerializer(serializer.save(), context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
+        )
     def perform_destroy(self, instance): self.role_only(UserRole.ADMIN); instance.status = "invalidated"; instance.save(update_fields=["status"])
 
 class AssessmentViewSet(LearningViewSet):
