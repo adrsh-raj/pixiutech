@@ -27,7 +27,6 @@ export type FaceDetector = {
 }
 
 const FACE_VERSION = "3.0.0"
-const FACE_MESH_PACKAGE_VERSION = "0.4.1633559619"
 const MAX_FACES = 1
 const FACE_MESH_SCRIPT = "/vendor/mediapipe/face_mesh/face_mesh.js"
 const FACE_MESH_ASSET_BASE = "/vendor/mediapipe/face_mesh/"
