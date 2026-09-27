@@ -18,6 +18,7 @@ export function AiTryPanel({ viewModel }: { viewModel: AiStudioViewModel }) {
     stopInput, startSound, startCameraForMode, selectMode,
   } = viewModel
 
+  return (
 <div className="mx-auto max-w-none space-y-4">
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-7">
                 {MODES.map((item) => (
@@ -194,4 +195,5 @@ export function AiTryPanel({ viewModel }: { viewModel: AiStudioViewModel }) {
                 </aside>
               </div>
             </div>
+  )
 }
