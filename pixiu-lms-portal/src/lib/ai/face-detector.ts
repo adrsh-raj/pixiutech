@@ -274,6 +274,7 @@ export async function loadFaceDetector(): Promise<FaceDetector> {
     },
     reset() {
       faceMesh.reset?.()
+      pending?.resolve([])
       processing = false
       pending = null
     },

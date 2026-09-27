@@ -328,6 +328,7 @@ export async function loadHandDetector(
     },
     reset() {
       hands.reset?.()
+      pending?.resolve([])
       processing = false
       pending = null
     },

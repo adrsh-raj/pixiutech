@@ -31,10 +31,39 @@ declare global {
 
 const scriptLoads = new Map<string, Promise<void>>()
 
+export type MicrophonePermissionState = "granted" | "denied" | "prompt" | "unsupported" | "unknown"
+
+export async function getMicrophonePermissionState(): Promise<MicrophonePermissionState> {
+  if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+    return "unsupported"
+  }
+
+  try {
+    const permissions = navigator.permissions
+    if (!permissions?.query) return "unknown"
+    const result = await permissions.query({
+      name: "microphone" as PermissionName,
+    })
+    return result.state
+  } catch {
+    return "unknown"
+  }
+}
+
 function ensureBrowserAudio() {
   if (typeof window === "undefined") {
     throw new Error("PIXIU Sound AI needs a browser.")
   }
+
+  const secure =
+    window.isSecureContext ||
+    window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1"
+
+  if (!secure) {
+    throw new Error("Microphone access requires HTTPS (or localhost).")
+  }
+
   if (!navigator.mediaDevices?.getUserMedia) {
     throw new Error("This browser does not support microphone input.")
   }

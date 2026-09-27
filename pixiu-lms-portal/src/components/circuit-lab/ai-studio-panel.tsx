@@ -55,6 +55,7 @@ import { MY_AI_FEATURE_SIZE } from "@/lib/ai/my-ai-feature-extractor"
 import {
   captureVideoFrame,
   startCamera,
+  getCameraPermissionState,
   stopCamera,
 } from "@/lib/ai/camera-session"
 import {
@@ -71,6 +72,7 @@ import {
   type FaceDetection,
 } from "@/lib/ai/face-detector"
 import {
+  getMicrophonePermissionState,
   loadSoundRecognizer,
   stopSoundRecognizer,
   type SoundRecognizer,
@@ -90,6 +92,16 @@ import {
 } from "@/lib/ai/pose-detector"
 import type { AiVisionMode, ReadyAiMode, AiVisionState } from "@/lib/ai/vision-types"
 import { createAiVisionState } from "@/lib/ai/vision-state"
+import {
+  classifyAiRuntimeError,
+  runtimeDetail,
+  type AiRuntimeStatus,
+} from "@/lib/ai/ai-runtime-state"
+import {
+  createAiRuntimeMetrics,
+  isBudgetExceeded,
+  type AiRuntimeMetrics,
+} from "@/lib/ai/ai-performance"
 import "./pixiu-brand.css"
 
 export type { AiVisionState, ReadyAiMode }
@@ -548,6 +560,10 @@ export function AiStudioPanel({
   const resourceModeRef = useRef<AiVisionMode | null>(null)
   const busyRef = useRef(false)
   const busySessionRef = useRef<number | null>(null)
+  const aiStateRef = useRef(aiState)
+  useEffect(() => {
+    aiStateRef.current = aiState
+  }, [aiState])
   useEffect(() => {
     if (!isOpen || typeof document === "undefined") return
 
@@ -569,7 +585,28 @@ export function AiStudioPanel({
   const trainingRunRef = useRef(0)
   const datasetVersionRef = useRef(0)
   const runtimeFailedRef = useRef(false)
+  const runtimeStatusRef = useRef<AiRuntimeStatus>("idle")
+  const runtimeMetricsRef = useRef<ReturnType<typeof createAiRuntimeMetrics> | null>(null)
+  const lastRuntimeMetricsRef = useRef<AiRuntimeMetrics | null>(null)
+  const runtimeBudgetWarnedRef = useRef(false)
   const [floatingPosition, setFloatingPosition] = useState<{ left: number; top: number } | null>(null)
+
+  function publishRuntimeState(
+    status: AiRuntimeStatus,
+    detail = runtimeDetail(mode, status),
+    extras: Partial<AiVisionState> = {},
+  ) {
+    runtimeStatusRef.current = status
+    onAiStateChange({
+      ...aiStateRef.current,
+      mode,
+      runtimeStatus: status,
+      runtimeError: status === "error" ? extras.runtimeError : undefined,
+      runtimeErrorKind: status === "error" ? extras.runtimeErrorKind : undefined,
+      detail,
+      ...extras,
+    })
+  }
 
   const classes = useMemo(() => getAiClasses(store), [store])
   const counts = useMemo(() => getSampleCounts(store.samples), [store.samples])
@@ -861,13 +898,30 @@ export function AiStudioPanel({
   async function openCamera(withModel = true) {
     const requestId = ++cameraRequestRef.current
     setError(null)
+    runtimeStatusRef.current = "loading"
     setStatus("Starting camera...")
+    onAiStateChange({
+      ...aiStateRef.current,
+      mode,
+      runtimeStatus: "loading",
+      runtimeError: undefined,
+      runtimeErrorKind: undefined,
+      detail: "Starting camera…",
+    })
     stopInference()
     releaseCurrentResource()
     stopCameraStream()
     setCameraActive(false)
 
     try {
+      const permission = await getCameraPermissionState()
+      if (permission === "denied") {
+        throw Object.assign(
+          new Error("Camera permission is blocked for this site. Allow camera access and try again."),
+          { name: "NotAllowedError" },
+        )
+      }
+
       const video = getActiveVideo()
       if (!video) throw new Error("Camera preview is not mounted.")
       const stream = await startCamera(video)
@@ -880,24 +934,35 @@ export function AiStudioPanel({
       streamRef.current = stream
       attachStreamToVisibleVideos()
       setCameraActive(true)
+      runtimeStatusRef.current = withModel ? "loading" : "ready"
       setStatus(withModel ? "Camera live · loading AI" : "Camera live · ready to teach")
       onAiStateChange({
         ...createAiVisionState(mode),
         enabled: true,
+        runtimeStatus: withModel ? "loading" : "ready",
         detail: withModel ? "Camera live" : "Teach camera live",
       })
     } catch (cameraError) {
       if (requestId !== cameraRequestRef.current) return
-      setError(
-        mediaPermissionMessage(
-          cameraError,
-          cameraError instanceof Error
-            ? cameraError.message
-            : "Camera permission was denied or unavailable.",
-        ),
+      const message = mediaPermissionMessage(
+        cameraError,
+        cameraError instanceof Error
+          ? cameraError.message
+          : "Camera permission was denied or unavailable.",
       )
+      const errorKind = classifyAiRuntimeError(cameraError)
+      runtimeStatusRef.current = "error"
+      setError(message)
       setStatus("Camera unavailable")
       setCameraActive(false)
+      onAiStateChange({
+        ...createAiVisionState(mode),
+        enabled: false,
+        runtimeStatus: "error",
+        runtimeErrorKind: errorKind,
+        runtimeError: message,
+        detail: message,
+      })
       return
     }
 
@@ -953,7 +1018,18 @@ export function AiStudioPanel({
 
   async function startModeResource() {
     const activeSession = ++sessionRef.current
+    runtimeStatusRef.current = "loading"
+    runtimeBudgetWarnedRef.current = false
+    runtimeMetricsRef.current = createAiRuntimeMetrics(String(mode))
     setLoading(true)
+    onAiStateChange({
+      ...aiStateRef.current,
+      mode,
+      runtimeStatus: "loading",
+      runtimeError: undefined,
+      runtimeErrorKind: undefined,
+      detail: runtimeDetail(mode, "loading"),
+    })
 
     try {
       let resource: ReadyResource = null
@@ -980,16 +1056,36 @@ export function AiStudioPanel({
 
       resourceRef.current = resource
       resourceModeRef.current = mode
+      runtimeMetricsRef.current?.markReady()
+      lastRuntimeMetricsRef.current = runtimeMetricsRef.current?.snapshot() ?? null
+      runtimeStatusRef.current = "ready"
       setLoading(false)
+      onAiStateChange({
+        ...aiStateRef.current,
+        mode,
+        runtimeStatus: "ready",
+        runtimeError: undefined,
+        runtimeErrorKind: undefined,
+        detail: "AI ready",
+      })
+      const loadBudget = lastRuntimeMetricsRef.current
+        ? isBudgetExceeded(lastRuntimeMetricsRef.current)
+        : null
       setStatus(
-        mode === "objects" ? "6B Objects ready"
-          : mode === "pose" ? "6C Pose ready"
-          : mode === "hands" ? "6D Fingers ready"
-          : mode === "numbers" ? "6G Numbers ready"
-          : mode === "emotion" ? "6E Emotion ready"
-          : "6I My AI ready",
+        loadBudget?.load
+          ? "AI ready · model load was slow"
+          : mode === "objects"
+            ? "6B Objects ready"
+            : mode === "pose"
+              ? "6C Pose ready"
+              : mode === "hands"
+                ? "6D Fingers ready"
+                : mode === "numbers"
+                  ? "6G Numbers ready"
+                  : mode === "emotion"
+                    ? "6E Emotion ready"
+                    : "6I My AI ready",
       )
-
       if (mode !== "sound") startInferenceLoop(activeSession)
     } catch (resourceError) {
       if (activeSession !== sessionRef.current) return
@@ -1000,12 +1096,22 @@ export function AiStudioPanel({
       }
       releaseCurrentResource()
       setLoading(false)
-      setError(
+      const message =
         resourceError instanceof Error
           ? resourceError.message
-          : "The selected AI could not start.",
-      )
+          : "The selected AI could not start."
+      const errorKind = classifyAiRuntimeError(resourceError)
+      runtimeStatusRef.current = "error"
+      setError(message)
       setStatus("AI unavailable")
+      onAiStateChange({
+        ...createAiVisionState(mode),
+        enabled: false,
+        runtimeStatus: "error",
+        runtimeErrorKind: errorKind,
+        runtimeError: message,
+        detail: message,
+      })
     }
   }
 
@@ -1013,9 +1119,27 @@ export function AiStudioPanel({
     setError(null)
     stopInference()
     const activeSession = ++sessionRef.current
+    runtimeStatusRef.current = "loading"
+    runtimeMetricsRef.current = createAiRuntimeMetrics("sound")
     setLoading(true)
+    onAiStateChange({
+      ...aiStateRef.current,
+      mode: "sound",
+      runtimeStatus: "loading",
+      runtimeError: undefined,
+      runtimeErrorKind: undefined,
+      detail: "Starting microphone…",
+    })
 
     try {
+      const permission = await getMicrophonePermissionState()
+      if (permission === "denied") {
+        throw Object.assign(
+          new Error("Microphone permission is blocked for this site. Allow microphone access and try again."),
+          { name: "NotAllowedError" },
+        )
+      }
+
       const recognizer = await loadSoundRecognizer()
       if (activeSession !== sessionRef.current) {
         await stopSoundRecognizer(recognizer)
@@ -1024,6 +1148,9 @@ export function AiStudioPanel({
 
       resourceRef.current = recognizer
       resourceModeRef.current = "sound"
+      runtimeMetricsRef.current?.markReady()
+      lastRuntimeMetricsRef.current = runtimeMetricsRef.current?.snapshot() ?? null
+      runtimeStatusRef.current = "ready"
       setLoading(false)
       setSoundActive(true)
       onAiStateChange({
@@ -1040,6 +1167,7 @@ export function AiStudioPanel({
         onAiStateChange({
           enabled: true,
           mode: "sound",
+          runtimeStatus: "running",
           detectedClass: result.label,
           confidence: result.confidence,
           allDetections: [],
@@ -1066,17 +1194,26 @@ export function AiStudioPanel({
       if (failedResource && failedResourceMode === "sound") {
         await stopSoundRecognizer(failedResource as SoundRecognizer)
       }
+      const message = mediaPermissionMessage(
+        soundError,
+        soundError instanceof Error
+          ? soundError.message
+          : "Microphone recognition could not start.",
+      )
+      const errorKind = classifyAiRuntimeError(soundError)
+      runtimeStatusRef.current = "error"
       setLoading(false)
       setSoundActive(false)
-      setError(
-        mediaPermissionMessage(
-          soundError,
-          soundError instanceof Error
-            ? soundError.message
-            : "Microphone recognition could not start.",
-        ),
-      )
+      setError(message)
       setStatus("Sound AI unavailable")
+      onAiStateChange({
+        ...createAiVisionState("sound"),
+        enabled: false,
+        runtimeStatus: "error",
+        runtimeErrorKind: errorKind,
+        runtimeError: message,
+        detail: message,
+      })
     }
   }
 
@@ -1119,6 +1256,7 @@ export function AiStudioPanel({
           onAiStateChange({
             enabled: true,
             mode: "objects",
+            runtimeStatus: "running",
             detectedClass: primary?.class ?? "none",
             confidence: primary ? Math.round(primary.score * 100) : 0,
             allDetections: visible,
@@ -1136,6 +1274,7 @@ export function AiStudioPanel({
           onAiStateChange({
             enabled: true,
             mode: "pose",
+            runtimeStatus: "running",
             detectedClass: pose ? "person" : "none",
             confidence: Math.round(score * 100),
             allDetections: [],
@@ -1192,6 +1331,7 @@ export function AiStudioPanel({
           onAiStateChange({
             enabled: true,
             mode,
+            runtimeStatus: "running",
             detectedClass:
               mode === "numbers"
                 ? hand
@@ -1266,6 +1406,7 @@ export function AiStudioPanel({
           onAiStateChange({
             enabled: true,
             mode: "emotion",
+            runtimeStatus: "running",
             detectedClass: face ? stableExpression : "none",
             confidence: face ? Math.round(stableConfidence * 100) : 0,
             allDetections: [],
@@ -1283,6 +1424,7 @@ export function AiStudioPanel({
           onAiStateChange({
             enabled: true,
             mode: "trained",
+            runtimeStatus: "running",
             detectedClass: result?.label ?? "none",
             confidence: result?.confidence ?? 0,
             allDetections: [],
@@ -1321,6 +1463,11 @@ export function AiStudioPanel({
         }
 
         const elapsed = performance.now() - started
+        if (runtimeStatusRef.current === "ready") {
+          runtimeStatusRef.current = "running"
+          setStatus("AI running")
+        }
+
         timerRef.current = window.setTimeout(tick, Math.max(180, 280 - elapsed))
       } catch (inferenceError) {
         if (activeSession === sessionRef.current) {
@@ -1333,6 +1480,23 @@ export function AiStudioPanel({
           timerRef.current = window.setTimeout(tick, 600)
         }
       } finally {
+        runtimeMetricsRef.current?.recordInference(performance.now() - started)
+        lastRuntimeMetricsRef.current = runtimeMetricsRef.current?.snapshot() ?? null
+        if (
+          activeSession === sessionRef.current &&
+          !runtimeBudgetWarnedRef.current &&
+          lastRuntimeMetricsRef.current
+        ) {
+          const budget = isBudgetExceeded(lastRuntimeMetricsRef.current)
+          if (budget.steadyInference || budget.tensorGrowth) {
+            runtimeBudgetWarnedRef.current = true
+            setStatus(
+              budget.tensorGrowth
+                ? "AI running · memory growth warning"
+                : "AI running · performance warning",
+            )
+          }
+        }
         if (busySessionRef.current === activeSession) {
           busyRef.current = false
           busySessionRef.current = null
@@ -1352,7 +1516,11 @@ export function AiStudioPanel({
     setCameraActive(false)
     setSoundActive(false)
     setLoading(false)
-    onAiStateChange(createAiVisionState(mode))
+    onAiStateChange({
+      ...createAiVisionState(mode),
+      runtimeStatus: "stopped",
+      detail: "AI stopped",
+    })
     setStatus("AI stopped")
   }
 
@@ -1360,7 +1528,13 @@ export function AiStudioPanel({
     if (training) return
     stopInput()
     setMode(next)
+    runtimeStatusRef.current = "idle"
     setError(null)
+    onAiStateChange({
+      ...createAiVisionState(next),
+      runtimeStatus: "idle",
+      detail: next === "trained" ? "My AI selected" : "AI selected",
+    })
     setStatus(next === "trained" ? "My AI selected" : `${MODES.find((item) => item.id === next)?.title ?? "AI"} selected`)
   }
 

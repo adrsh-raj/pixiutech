@@ -80,32 +80,49 @@ function assertMoveNetOutputShape(output: tf.Tensor | tf.Tensor[] | tf.NamedTens
   }
 }
 
+let moveNetLoadPromise: Promise<tf.GraphModel> | null = null
+
 export async function loadMoveNet(): Promise<tf.GraphModel> {
-  await tf.ready()
+  if (moveNetLoadPromise) return moveNetLoadPromise
 
-  if (tf.getBackend() !== "webgl") {
-    try {
-      await tf.setBackend("webgl")
-      await tf.ready()
-    } catch {
-      await tf.setBackend("cpu")
-      await tf.ready()
+  moveNetLoadPromise = (async () => {
+    await tf.ready()
+
+    if (tf.getBackend() !== "webgl") {
+      try {
+        const switched = await tf.setBackend("webgl")
+        if (!switched) throw new Error("WebGL backend is unavailable.")
+        await tf.ready()
+      } catch {
+        const switched = await tf.setBackend("cpu")
+        if (!switched) throw new Error("CPU backend is unavailable.")
+        await tf.ready()
+      }
     }
-  }
 
-  const model = await tf.loadGraphModel(MOVENET_URL)
+    const model = await tf.loadGraphModel(MOVENET_URL)
 
-  // Warm the graph once so the first visible inference is not a cold-start spike.
-  const warmup = tf.zeros([1, INPUT_SIZE, INPUT_SIZE, 3], "int32")
-  const rawOutput = model.execute(warmup)
-  try {
-    assertMoveNetOutputShape(rawOutput)
-  } finally {
-    disposeGraphOutput(rawOutput)
-    warmup.dispose()
-  }
+    try {
+      // Warm the graph once so the first visible inference is not a cold-start spike.
+      const warmup = tf.zeros([1, INPUT_SIZE, INPUT_SIZE, 3], "int32")
+      const rawOutput = model.execute(warmup)
+      try {
+        assertMoveNetOutputShape(rawOutput)
+      } finally {
+        disposeGraphOutput(rawOutput)
+        warmup.dispose()
+      }
 
-  return model
+      return model
+    } catch (error) {
+      model.dispose()
+      throw error
+    }
+  })().finally(() => {
+    moveNetLoadPromise = null
+  })
+
+  return moveNetLoadPromise
 }
 
 export async function estimateMoveNetPose(

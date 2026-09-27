@@ -23,10 +23,20 @@ export const COCO_SSD_CLASSES = [
 export const DEFAULT_OBJECT_MAX_BOXES = 20
 export const DEFAULT_OBJECT_MIN_SCORE = 0.3
 
+let objectDetectorLoadPromise: Promise<ObjectDetector> | null = null
+
 export async function loadObjectDetector(): Promise<ObjectDetector> {
-  return cocoSsd.load({
-    base: "lite_mobilenet_v2",
-  })
+  if (objectDetectorLoadPromise) return objectDetectorLoadPromise
+
+  objectDetectorLoadPromise = cocoSsd
+    .load({
+      base: "lite_mobilenet_v2",
+    })
+    .finally(() => {
+      objectDetectorLoadPromise = null
+    })
+
+  return objectDetectorLoadPromise
 }
 
 export async function detectObjects(

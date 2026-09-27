@@ -68,7 +68,7 @@ assert(
 
 // Phase A(1) — Classifier tensor ownership.
 assert(
-  engine.includes("const labelTensor = tf.tensor1d(labels, \"int32\")") &&
+  engine.includes("labelTensor = tf.tensor1d(labels, \"int32\")") &&
     engine.includes("labelTensor?.dispose()") &&
     engine.includes("ys?.dispose()") &&
     engine.includes("xs.dispose()"),

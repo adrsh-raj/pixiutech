@@ -39,10 +39,12 @@ async function ensureBackend() {
   if (tf.getBackend() === "webgl") return
 
   try {
-    await tf.setBackend("webgl")
+    const switched = await tf.setBackend("webgl")
+    if (!switched) throw new Error("WebGL backend is unavailable.")
     await tf.ready()
   } catch {
-    await tf.setBackend("cpu")
+    const switched = await tf.setBackend("cpu")
+    if (!switched) throw new Error("CPU backend is unavailable.")
     await tf.ready()
   }
 }
