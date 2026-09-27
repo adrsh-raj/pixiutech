@@ -12,7 +12,7 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.exceptions import PermissionDenied
 
-from accounts.models import User
+from accounts.models import User, UserStatus
 from learning.models import LearningContent
 from learning.services import accessible_content
 
@@ -149,7 +149,7 @@ class LearningContentVideoView(APIView):
         if content_id != str(pk):
             raise PermissionDenied("This playback token is not valid for this video.")
 
-        user = get_object_or_404(User, pk=user_id, is_active=True)
+        user = get_object_or_404(User, pk=user_id, is_active=True, status=UserStatus.ACTIVE)
         content = get_object_or_404(LearningContent, pk=pk, status="published", content_type="video")
         if not accessible_content(user).filter(pk=content.pk).exists():
             raise PermissionDenied("You are not allowed to open this learning video.")
