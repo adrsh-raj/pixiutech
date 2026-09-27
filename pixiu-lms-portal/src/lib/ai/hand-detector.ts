@@ -26,7 +26,6 @@ export type HandDetector = {
 }
 
 const HAND_VERSION = "4.0.0"
-const HANDS_PACKAGE_VERSION = "0.4.1675469240"
 const MAX_HANDS = 2
 const MIN_HAND_SCORE = 0.05
 const HANDS_SCRIPT = "/vendor/mediapipe/hands/hands.js"
