@@ -10,6 +10,7 @@ const assert = (condition, message) => { if (!condition) failures.push(message) 
 
 const settings = read("pixiu-backend/config/settings.py")
 const quizSerializers = read("pixiu-backend/learning/serializers.py")
+const playback = read("pixiu-backend/core/learning_content_files.py")
 const hand = read("pixiu-lms-portal/src/lib/ai/hand-detector.ts")
 const face = read("pixiu-lms-portal/src/lib/ai/face-detector.ts")
 const rootVercel = read("vercel.json")
@@ -29,6 +30,7 @@ assert(quizSerializers.includes('accessible_curriculum"]).accessible_curriculum(
 assert(quizSerializers.includes('accessible_content"]).accessible_content(user).filter(pk=content.pk)'), "Content assignment writes are missing source scope validation")
 assert(quizSerializers.includes('if not accessible_projects(request.user).filter(pk=project.pk).exists()'), "Project evidence writes are missing project scope validation")
 assert(quizSerializers.includes('Session cannot be changed after activity creation.'), "Session activity moves are not locked to the original scoped session")
+assert(playback.includes('status=UserStatus.ACTIVE'), "Signed video playback does not reject suspended accounts")
 for (const file of [rootVercel, portalVercel]) {
   for (const header of [
     '"Strict-Transport-Security"',
