@@ -162,6 +162,7 @@ class QuizQuestionWriteSerializer(serializers.ModelSerializer):
         fields = ["id", "quiz", "question_order", "question_text", "option_a", "option_b", "option_c", "option_d", "correct_option", "explanation", "points"]
         read_only_fields = ["id"]
     def validate(self, attrs):
+        request = self.context["request"]
         quiz = attrs.get("quiz", getattr(self.instance, "quiz", None))
         if quiz is None: raise serializers.ValidationError({"quiz": "Quiz is required."})
         if quiz.status == "closed": raise serializers.ValidationError("Closed quizzes cannot be edited.")
