@@ -62,7 +62,7 @@ assert(
   "MoveNet inference output must be returned from tidy and explicitly disposed after data()",
 )
 assert(
-  !/tf\.tidy\(\s*async\\b/.test(pose),
+  !/tf\.tidy\(\s*async\b/.test(pose),
   "MoveNet tf.tidy callback must not be async",
 )
 
