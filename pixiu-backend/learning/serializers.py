@@ -74,6 +74,8 @@ class CurriculumClassAssignmentSerializer(serializers.ModelSerializer):
         user = self.context["request"].user; school_class = attrs.get("school_class", getattr(self.instance, "school_class", None)); unit = attrs.get("curriculum_unit", getattr(self.instance, "curriculum_unit", None))
         if not school_class or not unit: raise serializers.ValidationError("Both curriculum unit and class are required.")
         if not accessible_class_queryset(user).filter(pk=school_class.pk).exists(): raise serializers.ValidationError("You cannot assign curriculum to this class.")
+        if not __import__("learning.services", fromlist=["accessible_curriculum"]).accessible_curriculum(user).filter(pk=unit.pk).exists():
+            raise serializers.ValidationError({"curriculum_unit": "You cannot assign this curriculum unit."})
         if str(unit.grade).upper() != str(school_class.grade).upper(): raise serializers.ValidationError("Curriculum grade must match the class grade.")
         if self.instance and unit != self.instance.curriculum_unit: raise serializers.ValidationError("Curriculum unit cannot be changed after assignment.")
         return attrs
@@ -150,6 +152,8 @@ class ContentClassAssignmentSerializer(serializers.ModelSerializer):
         user = self.context["request"].user; school_class = attrs.get("school_class", getattr(self.instance, "school_class", None)); content = attrs.get("content", getattr(self.instance, "content", None))
         if not school_class or not content: raise serializers.ValidationError("Both content and class are required.")
         if not accessible_class_queryset(user).filter(pk=school_class.pk).exists(): raise serializers.ValidationError("You cannot assign content to this class.")
+        if not __import__("learning.services", fromlist=["accessible_content"]).accessible_content(user).filter(pk=content.pk).exists():
+            raise serializers.ValidationError({"content": "You cannot assign this learning content."})
         if content.grade and str(content.grade).upper() != str(school_class.grade).upper(): raise serializers.ValidationError("Content grade must match class grade.")
         if content.status == "archived": raise serializers.ValidationError("Archived content cannot be assigned.")
         if self.instance and content != self.instance.content: raise serializers.ValidationError("Content cannot be changed after assignment.")
@@ -206,6 +210,8 @@ class QuizClassAssignmentSerializer(serializers.ModelSerializer):
         user = self.context["request"].user; school_class = attrs.get("school_class", getattr(self.instance, "school_class", None)); quiz = attrs.get("quiz", getattr(self.instance, "quiz", None))
         if not school_class or not quiz: raise serializers.ValidationError("Both quiz and class are required.")
         if not accessible_class_queryset(user).filter(pk=school_class.pk).exists(): raise serializers.ValidationError("You cannot assign this quiz to the selected class.")
+        if not accessible_quizzes(user).filter(pk=quiz.pk).exists():
+            raise serializers.ValidationError({"quiz": "You cannot assign this quiz."})
         if str(quiz.grade).upper() != str(school_class.grade).upper(): raise serializers.ValidationError("Quiz grade must match class grade.")
         if quiz.status == "closed": raise serializers.ValidationError("Closed quizzes cannot be assigned.")
         if self.instance and quiz != self.instance.quiz: raise serializers.ValidationError("Quiz cannot be changed after assignment.")
