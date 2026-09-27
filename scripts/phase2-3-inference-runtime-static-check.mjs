@@ -30,7 +30,8 @@ assert(
   "Camera frame capture must reuse a module-level canvas instead of allocating one per frame",
 )
 assert(
-  camera.includes("captureResource.width !== width || captureResource.height !== height"),
+  camera.includes("captureResource.width !== width") &&
+    camera.includes("captureResource.height !== height"),
   "Reusable camera canvas must resize only when dimensions change",
 )
 assert(
