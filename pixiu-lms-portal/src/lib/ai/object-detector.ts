@@ -22,6 +22,7 @@ export const COCO_SSD_CLASSES = [
 
 export const DEFAULT_OBJECT_MAX_BOXES = 20
 export const DEFAULT_OBJECT_MIN_SCORE = 0.3
+export const COCO_SSD_MODEL_URL = "/models/coco-ssd-lite-mobilenet-v2/model.json"
 
 let objectDetectorLoadPromise: Promise<ObjectDetector> | null = null
 
@@ -31,6 +32,7 @@ export async function loadObjectDetector(): Promise<ObjectDetector> {
   objectDetectorLoadPromise = cocoSsd
     .load({
       base: "lite_mobilenet_v2",
+      modelUrl: COCO_SSD_MODEL_URL,
     })
     .finally(() => {
       objectDetectorLoadPromise = null
