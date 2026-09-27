@@ -31,6 +31,25 @@ declare global {
 
 const scriptLoads = new Map<string, Promise<void>>()
 
+export type MicrophonePermissionState = "granted" | "denied" | "prompt" | "unsupported" | "unknown"
+
+export async function getMicrophonePermissionState(): Promise<MicrophonePermissionState> {
+  if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+    return "unsupported"
+  }
+
+  try {
+    const permissions = navigator.permissions
+    if (!permissions?.query) return "unknown"
+    const result = await permissions.query({
+      name: "microphone" as PermissionName,
+    })
+    return result.state
+  } catch {
+    return "unknown"
+  }
+}
+
 function ensureBrowserAudio() {
   if (typeof window === "undefined") {
     throw new Error("PIXIU Sound AI needs a browser.")
