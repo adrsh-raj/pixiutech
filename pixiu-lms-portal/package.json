@@ -10,7 +10,8 @@
     "qa:ai": "node --experimental-strip-types ../scripts/ai-phase6-qa.mjs",
     "qa:phase4-6": "node ../scripts/phase4-6-static-check.mjs",
     "preview": "vite preview",
-    "qa:brand": "node --experimental-strip-types ../scripts/pixiu-brand-qa.mjs"
+    "qa:brand": "node --experimental-strip-types ../scripts/pixiu-brand-qa.mjs",
+    "qa:phase-a1": "node ../scripts/phase-a1-foundation-static-check.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
