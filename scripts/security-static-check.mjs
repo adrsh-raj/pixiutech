@@ -39,6 +39,7 @@ for (const file of [rootVercel, portalVercel]) {
     '"X-Content-Type-Options"',
     '"X-Frame-Options"',
     '"Referrer-Policy"',
+    '"Permissions-Policy"',
   ]) assert(file.includes(header), "Vercel security header missing: " + header)
 }
 
