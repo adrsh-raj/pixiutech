@@ -2,15 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react"
 import {
-  Brain,
-  Camera,
-  Layers3,
-  GripVertical,
-  Mic,
-  Sparkles,
-  X,
-} from "lucide-react"
-import {
   addAiClass,
   addAiSample,
   clearAiStudioStore,
