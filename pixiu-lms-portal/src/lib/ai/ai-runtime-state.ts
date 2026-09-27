@@ -1,21 +1,10 @@
-import type { AiVisionMode } from "./vision-types"
+import type {
+  AiRuntimeErrorKind,
+  AiRuntimeStatus,
+  AiVisionMode,
+} from "./vision-types"
 
-export type AiRuntimeStatus =
-  | "idle"
-  | "loading"
-  | "ready"
-  | "running"
-  | "error"
-  | "stopped"
-
-export type AiRuntimeErrorKind =
-  | "permission"
-  | "unsupported"
-  | "model"
-  | "inference"
-  | "storage"
-  | "cancelled"
-  | "unknown"
+export type { AiRuntimeErrorKind, AiRuntimeStatus }
 
 export function classifyAiRuntimeError(error: unknown): AiRuntimeErrorKind {
   const name =
