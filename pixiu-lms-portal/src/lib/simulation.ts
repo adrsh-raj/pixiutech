@@ -195,10 +195,13 @@ export function computeRuntime(
       }
       const readDrive = (pin: string) => {
         const stateForPin = findArduinoPinState(k(pin))
-        const pwm = stateForPin
-          ? clampPwm(stateForPin.value ?? (stateForPin.state === "HIGH" ? 255 : 0))
-          : 0
-        return { enabled: pwm > 0, pwm }
+        if (!stateForPin) {
+          return { connected: false, enabled: false, pwm: 0 }
+        }
+        const pwm = clampPwm(
+          stateForPin.value ?? (stateForPin.state === "HIGH" ? 255 : 0),
+        )
+        return { connected: true, enabled: pwm > 0, pwm }
       }
       const readDirection = (highPin: string, lowPin: string) => {
         const highState = findArduinoPinState(k(highPin))
@@ -210,8 +213,12 @@ export function computeRuntime(
       }
       const enaDrive = readDrive("ena")
       const enbDrive = readDrive("enb")
-      const speedA = enaDrive.pwm || clampPwm(part.props.speedA ?? 0)
-      const speedB = enbDrive.pwm || clampPwm(part.props.speedB ?? 0)
+      const speedA = enaDrive.connected
+        ? enaDrive.pwm
+        : clampPwm(part.props.speedA ?? 0)
+      const speedB = enbDrive.connected
+        ? enbDrive.pwm
+        : clampPwm(part.props.speedB ?? 0)
       const directionA = !powered || speedA <= 0 ? "stopped" : readDirection("in1", "in2")
       const directionB = !powered || speedB <= 0 ? "stopped" : readDirection("in3", "in4")
       const rpmA = directionA === "stopped" ? 0 : Math.round((speedA / 255) * 1000)
