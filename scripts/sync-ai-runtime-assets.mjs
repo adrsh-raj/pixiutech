@@ -32,7 +32,7 @@ const FACE_SOURCE = join(
 
 const MOVENET_SOURCE_URL =
   process.env.PIXIU_MOVENET_SOURCE_URL ??
-  "https://storage.googleapis.com/tfhub-tfjs-modules/google/tfjs-model/movenet/singlepose/lightning/4/model.json"
+  "https://tfhub.dev/google/tfjs-model/movenet/singlepose/lightning/4/model.json"
 const SPEECH_SOURCE_URL =
   process.env.PIXIU_SPEECH_COMMANDS_SOURCE_URL ??
   "https://cdn.jsdelivr.net/npm/@tensorflow-models/speech-commands@0.5.4/dist/speech-commands.min.js"
@@ -76,7 +76,11 @@ async function fetchBytes(url, attempts = 3) {
       if (!response.ok) {
         throw new Error("HTTP " + response.status + " for " + url)
       }
-      return Buffer.from(await response.arrayBuffer())
+
+      return {
+        bytes: Buffer.from(await response.arrayBuffer()),
+        finalUrl: response.url || url,
+      }
     } catch (error) {
       lastError = error
       if (attempt < attempts) {
@@ -97,13 +101,14 @@ async function fetchBytes(url, attempts = 3) {
 async function ensureRemoteFile(url, destination) {
   if (await exists(destination)) {
     const info = await stat(destination)
-    if (info.size > 0) return
+    if (info.size > 0) return null
   }
 
   await mkdir(dirname(destination), { recursive: true })
-  const bytes = await fetchBytes(url)
-  if (!bytes.length) throw new Error("Downloaded empty asset: " + url)
-  await writeFile(destination, bytes)
+  const result = await fetchBytes(url)
+  if (!result.bytes.length) throw new Error("Downloaded empty asset: " + url)
+  await writeFile(destination, result.bytes)
+  return result.finalUrl
 }
 
 async function copyDirectoryAssets(sourceDir, destinationDir) {
@@ -146,9 +151,16 @@ async function copyDirectoryAssets(sourceDir, destinationDir) {
 
 async function ensureMoveNet() {
   const modelPath = join(MOVENET_DIR, "model.json")
+  const sourcePath = join(MOVENET_DIR, ".source-url")
+  let modelSourceUrl = MOVENET_SOURCE_URL
 
   if (!(await exists(modelPath)) || (await stat(modelPath)).size === 0) {
-    await ensureRemoteFile(MOVENET_SOURCE_URL, modelPath)
+    const finalUrl = await ensureRemoteFile(MOVENET_SOURCE_URL, modelPath)
+    modelSourceUrl = finalUrl || MOVENET_SOURCE_URL
+    await writeFile(sourcePath, modelSourceUrl + "\n")
+  } else if (await exists(sourcePath)) {
+    const storedSource = (await readFile(sourcePath, "utf8")).trim()
+    if (storedSource) modelSourceUrl = storedSource
   }
 
   const model = JSON.parse(await readFile(modelPath, "utf8"))
@@ -174,7 +186,7 @@ async function ensureMoveNet() {
 
   for (const assetPath of paths) {
     const destination = join(MOVENET_DIR, assetPath)
-    const url = new URL(assetPath, MOVENET_SOURCE_URL).toString()
+    const url = new URL(assetPath, modelSourceUrl).toString()
     await ensureRemoteFile(url, destination)
   }
 
