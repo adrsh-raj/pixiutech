@@ -7,6 +7,23 @@ export type SoundDetection = {
   isActionable: boolean
 }
 
+export type SpeechRecognizerRuntime = {
+  ensureModelLoaded: () => Promise<void>
+  wordLabels: () => string[]
+  listen: (
+    callback: (result: { scores?: ArrayLike<number> }) => void,
+    config: {
+      probabilityThreshold: number
+      overlapFactor: number
+      suppressionTimeMillis: number
+      invokeCallbackOnNoiseAndUnknown: boolean
+      includeSpectrogram: boolean
+    },
+  ) => Promise<void>
+  stopListening?: () => Promise<void>
+  isListening?: () => boolean
+}
+
 export type SoundRecognizer = {
   version: string
   labels: string[]
@@ -26,7 +43,12 @@ declare global {
   interface Window {
     tf?: typeof tf
     speechCommands?: {
-      create: (inputType: string, vocabulary?: string) => any
+      create: (
+        inputType: string,
+        vocabulary?: string | null,
+        modelArtifactsOrURL?: string,
+        metadataOrURL?: string,
+      ) => SpeechRecognizerRuntime
     }
   }
 }
@@ -159,23 +181,14 @@ export async function loadSoundRecognizer(): Promise<SoundRecognizer> {
   await tf.ready()
   await ensureSpeechRuntime()
 
-  const recognizer = window.speechCommands!.create("BROWSER_FFT", "18w") as any
-  const runtime = recognizer as {
-    modelArtifactsOrURL?: string
-    metadataOrURL?: string
-  }
-
-  // speech-commands@0.5.4's public factory selects the hosted model when a
-  // vocabulary name is supplied. The library's documented recognizer class
-  // accepts custom model/metadata URLs; keep the factory for compatibility,
-  // then bind its private loader inputs to our same-origin assets before the
-  // first load. The build gate verifies these internal field names against the
-  // pinned runtime version.
-  if (!("modelArtifactsOrURL" in runtime) || !("metadataOrURL" in runtime)) {
-    throw new Error("Unsupported Speech Commands runtime: local model binding is unavailable.")
-  }
-  runtime.modelArtifactsOrURL = SPEECH_MODEL_URL
-  runtime.metadataOrURL = SPEECH_METADATA_URL
+  // Passing explicit model + metadata URLs is the supported custom-model
+  // path; vocabulary is intentionally null for a custom model.
+  const recognizer = window.speechCommands!.create(
+    "BROWSER_FFT",
+    null,
+    SPEECH_MODEL_URL,
+    SPEECH_METADATA_URL,
+  )
 
   await recognizer.ensureModelLoaded()
 
