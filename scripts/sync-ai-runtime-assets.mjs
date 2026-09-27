@@ -133,9 +133,21 @@ async function copyDirectoryAssets(sourceDir, destinationDir) {
     await copyFile(join(sourceDir, entry.name), join(destinationDir, entry.name))
   }
 
-  const required = ["hands.js", "hands.binarypb"]
+  const required = [
+    "hands.js",
+    "hands.binarypb",
+    "hands_solution_packed_assets.data",
+    "hands_solution_packed_assets_loader.js",
+  ]
   if (sourceDir.endsWith("@mediapipe" + sep + "face_mesh")) {
-    required.splice(0, required.length, "face_mesh.js", "face_mesh.binarypb")
+    required.splice(
+      0,
+      required.length,
+      "face_mesh.js",
+      "face_mesh.binarypb",
+      "face_mesh_solution_packed_assets.data",
+      "face_mesh_solution_packed_assets_loader.js",
+    )
   }
 
   for (const file of required) {
@@ -146,6 +158,12 @@ async function copyDirectoryAssets(sourceDir, destinationDir) {
     if ((await stat(target)).size <= 0) {
       throw new Error("Local MediaPipe asset is empty: " + target)
     }
+  }
+
+  const wasmFiles = (await readdir(destinationDir))
+    .filter((file) => file.endsWith(".wasm"))
+  if (!wasmFiles.length) {
+    throw new Error("Local MediaPipe runtime is missing its WASM binary: " + destinationDir)
   }
 }
 
