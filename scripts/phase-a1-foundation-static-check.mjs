@@ -35,7 +35,7 @@ assert(
   "My AI warmup tensors must dispose both the derived mean tensor and warmup tensor",
 )
 assert(
-  /const embedding = tf\.tidy\\(\\(\\) =>/.test(extractor) &&
+  /const embedding = tf\.tidy\(\(\) =>/.test(extractor) &&
     extractor.includes("embedding.dispose()"),
   "My AI embedding inference must use tf.tidy and explicitly dispose the returned tensor",
 )
@@ -57,7 +57,7 @@ assert(
   "MoveNet warmup graph outputs and input tensor must be disposed",
 )
 assert(
-  /const output = tf\.tidy\\(\\(\\) =>/.test(pose) &&
+  /const output = tf\.tidy\(\(\) =>/.test(pose) &&
     pose.includes("output.dispose()"),
   "MoveNet inference output must be returned from tidy and explicitly disposed after data()",
 )
@@ -69,8 +69,10 @@ assert(
 // Phase A(1) — Classifier tensor ownership.
 assert(
   engine.includes("const labelTensor = tf.tensor1d(labels, \"int32\")") &&
-    engine.includes("labelTensor.dispose()"),
-  "Training label helper must dispose the one-hot source label tensor",
+    engine.includes("labelTensor?.dispose()") &&
+    engine.includes("ys?.dispose()") &&
+    engine.includes("xs.dispose()"),
+  "Training tensor-pair helper must clean up partial allocations on failure",
 )
 assert(
   engine.includes("trainXs?.dispose()") &&
@@ -80,9 +82,10 @@ assert(
   "Training tensors must be disposed in the outer finally block",
 )
 assert(
-  engine.includes("bestWeights?.forEach((weight) => weight.dispose())") &&
-    engine.includes("const weightsToRestore = bestWeights") &&
-    engine.includes("weightsToRestore.forEach((weight) => weight.dispose())"),
+  engine.includes("const weightsToRestore = bestWeights") &&
+    engine.includes("weightsToRestore.forEach((weight) => weight.dispose())") &&
+    engine.includes("bestWeights?.forEach((weight) => weight.dispose())") &&
+    engine.includes("bestWeights = null"),
   "Best-weight snapshots must be disposed on cancellation/error and after restore",
 )
 assert(
