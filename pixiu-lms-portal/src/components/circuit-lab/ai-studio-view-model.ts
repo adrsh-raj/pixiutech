@@ -30,12 +30,14 @@ export type AiStudioViewModel = {
 
   mode: ReadyAiMode | "trained"
   isSound: boolean
+  runtimeEnabled: boolean
   activeTitle: string
   loading: boolean
   cameraActive: boolean
   soundActive: boolean
   inputActive: boolean
   status: string
+  setStatus: Dispatch<SetStateAction<string>>
   error: string | null
   fps: number
   store: AiStudioStore
