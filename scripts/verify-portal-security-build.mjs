@@ -16,11 +16,26 @@ function fail(message) {
 
 const html = await read("index.html")
 const manifestText = await read("security/sri-manifest.json")
+const runtimeManifestText = await read("vendor/PIXIU-AI-RUNTIME-MANIFEST.json")
 const manifest = JSON.parse(manifestText)
+const runtimeManifest = JSON.parse(runtimeManifestText)
 if (manifest.algorithm !== "sha384" || !manifest.resources || typeof manifest.resources !== "object") {
   fail("Invalid SRI manifest.")
 }
 
+
+if (runtimeManifest.algorithm !== "sha256" || !runtimeManifest.files || typeof runtimeManifest.files !== "object") {
+  fail("Invalid PIXIU AI runtime integrity manifest.")
+}
+
+for (const [path, metadata] of Object.entries(runtimeManifest.files)) {
+  const safePath = path.replace(/\\/g, "/")
+  if (!/^(models|vendor)\//.test(safePath)) fail("Runtime manifest path escapes allowed asset roots: " + safePath)
+  const body = await readFile(join(dist, safePath))
+  const actualHash = createHash("sha256").update(body).digest("hex")
+  if (actualHash !== metadata.sha256) fail("AI runtime asset hash mismatch: " + safePath)
+  if (body.length !== metadata.size) fail("AI runtime asset size mismatch: " + safePath)
+}
 const resourcePattern = /<(script|link)[^>]*?(?:src|href)="(/[^"]+.(?:js|css))"[^>]*>/gi
 let resourceCount = 0
 
