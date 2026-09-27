@@ -24,7 +24,7 @@ export function AiTeachPanel({ viewModel }: { viewModel: AiStudioViewModel }) {
     setCustomBatchSize, customPatience, setCustomPatience, customMinDelta, setCustomMinDelta,
     customLayers, addCustomLayer, updateCustomLayer, removeCustomLayer, moveCustomLayer,
     selectedTrainingConfig, estimatedTrainingLoad, progress, canTrain, train, resetStudio,
-    model, trainingHistory, setStatus,
+    model, trainingHistory, setStatus, error,
   } = viewModel
   return (
 <div className="mx-auto max-w-5xl space-y-4">
