@@ -1008,7 +1008,17 @@ export function AiStudioPanel({
 
   async function startModeResource() {
     const activeSession = ++sessionRef.current
+    runtimeStatusRef.current = "loading"
+    runtimeMetricsRef.current = createAiRuntimeMetrics(String(mode))
     setLoading(true)
+    onAiStateChange({
+      ...aiStateRef.current,
+      mode,
+      runtimeStatus: "loading",
+      runtimeError: undefined,
+      runtimeErrorKind: undefined,
+      detail: runtimeDetail(mode, "loading"),
+    })
 
     try {
       let resource: ReadyResource = null
@@ -1035,6 +1045,9 @@ export function AiStudioPanel({
 
       resourceRef.current = resource
       resourceModeRef.current = mode
+      runtimeMetricsRef.current?.markReady()
+      lastRuntimeMetricsRef.current = runtimeMetricsRef.current?.snapshot() ?? null
+      runtimeStatusRef.current = "ready"
       setLoading(false)
       setStatus(
         mode === "objects" ? "6B Objects ready"
@@ -1055,12 +1068,22 @@ export function AiStudioPanel({
       }
       releaseCurrentResource()
       setLoading(false)
-      setError(
+      const message =
         resourceError instanceof Error
           ? resourceError.message
-          : "The selected AI could not start.",
-      )
+          : "The selected AI could not start."
+      const errorKind = classifyAiRuntimeError(resourceError)
+      runtimeStatusRef.current = "error"
+      setError(message)
       setStatus("AI unavailable")
+      onAiStateChange({
+        ...createAiVisionState(mode),
+        enabled: false,
+        runtimeStatus: "error",
+        runtimeErrorKind: errorKind,
+        runtimeError: message,
+        detail: message,
+      })
     }
   }
 
