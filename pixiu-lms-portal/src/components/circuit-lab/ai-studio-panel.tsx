@@ -2,26 +2,15 @@
 
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react"
 import {
-  BookOpen,
   Brain,
   Camera,
   CameraOff,
-  CheckCircle2,
-  Info,
   Layers3,
   GripVertical,
-  ChevronDown,
-  ChevronUp,
   Mic,
-  Pencil,
-  Plus,
   RefreshCcw,
-  ShieldCheck,
   Sparkles,
-  Trash2,
-  Upload,
   X,
-  Zap,
 } from "lucide-react"
 import {
   addAiClass,
@@ -103,6 +92,10 @@ import {
   type AiRuntimeMetrics,
 } from "@/lib/ai/ai-performance"
 import "./pixiu-brand.css"
+import { AiTryPanel } from "./ai-try-panel"
+import { AiTeachPanel } from "./ai-teach-panel"
+import { AiUnderstandPanel } from "./ai-understand-panel"
+import type { AiStudioViewModel } from "./ai-studio-view-model"
 
 export type { AiVisionState, ReadyAiMode }
 
@@ -125,13 +118,6 @@ type ReadyResource = any
 
 const OBJECT_MIN_SCORE = DEFAULT_OBJECT_MIN_SCORE
 const OBJECT_MAX_BOXES = DEFAULT_OBJECT_MAX_BOXES
-
-function formatDecisionReason(reason: AiVisionState["decisionReason"]) {
-  if (reason === "no_input") return "No usable input"
-  if (reason === "low_confidence") return "Below confidence threshold"
-  if (reason === "ambiguous") return "Top classes are too close"
-  return "Accepted"
-}
 
 function explainCurrentAiResult(
   state: AiVisionState,
@@ -396,108 +382,6 @@ function drawFaces(
   }
 }
 
-
-function metricValues(points: AiTrainingHistoryPoint[], key: "loss"|"valLoss"|"accuracy"|"valAccuracy") {
-  return points.map((point) => point[key]).filter((value): value is number => typeof value === "number" && Number.isFinite(value))
-}
-function metricPath(points: AiTrainingHistoryPoint[], key: "loss"|"valLoss"|"accuracy"|"valAccuracy") {
-  const values = metricValues(points, key)
-  if (!values.length) return ""
-  const min = Math.min(...values), max = Math.max(...values), range = Math.max(0.0001, max - min)
-  const width = 520, height = 180, padX = 30, padY = 18
-  const plotted = points.map((point,index) => {
-    const value = point[key]
-    if (typeof value !== "number" || !Number.isFinite(value)) return null
-    const x = padX + (index / Math.max(1, points.length - 1)) * (width - padX * 2)
-    const y = height - padY - ((value - min) / range) * (height - padY * 2)
-    return `${x.toFixed(1)},${y.toFixed(1)}`
-  }).filter((value): value is string => Boolean(value))
-  if (plotted.length > 1) return `M ${plotted.join(" L ")}`
-  if (plotted.length === 1) return `M ${plotted[0]}`
-  return ""
-}
-
-function MetricChart({ title, points, primary, secondary, primaryLabel, secondaryLabel }: {
-  title: string
-  points: AiTrainingHistoryPoint[]
-  primary: "loss" | "accuracy"
-  secondary: "valLoss" | "valAccuracy"
-  primaryLabel: string
-  secondaryLabel: string
-}) {
-  if (!points.length) return null
-  const latest = points[points.length - 1]
-  const hasSecondary = metricValues(points, secondary).length > 0
-
-  return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-950/55 p-3">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-[10px] font-black">{title}</p>
-        <div className="flex gap-3 text-[8px] font-mono">
-          <span className="text-violet-300">● {primaryLabel}</span>
-          {hasSecondary ? <span className="text-cyan-300">● {secondaryLabel}</span> : null}
-        </div>
-      </div>
-      <svg viewBox="0 0 520 180" className="mt-2 h-44 w-full" role="img" aria-label={title}>
-        <path d={metricPath(points, primary)} fill="none" stroke="#a78bfa" strokeWidth="3" strokeLinecap="round" />
-        {hasSecondary ? <path d={metricPath(points, secondary)} fill="none" stroke="#22d3ee" strokeWidth="2.5" strokeDasharray="6 5" strokeLinecap="round" /> : null}
-      </svg>
-      <div className="flex justify-between text-[8px] font-mono text-slate-600"><span>Epoch 1</span><span>Epoch {latest.epoch}</span></div>
-      <div className="mt-2 grid grid-cols-2 gap-2">
-        <div className="rounded-lg border border-slate-800 p-2">
-          <p className="text-[8px] text-slate-600">{primaryLabel} · latest</p>
-          <p className="mt-1 text-xs font-black">{primary === "accuracy" ? Math.round(latest.accuracy * 100) + "%" : latest.loss.toFixed(4)}</p>
-        </div>
-        <div className="rounded-lg border border-slate-800 p-2">
-          <p className="text-[8px] text-slate-600">{secondaryLabel} · latest</p>
-          <p className="mt-1 text-xs font-black">
-            {secondary === "valAccuracy"
-              ? latest.valAccuracy == null
-                ? "Not available"
-                : Math.round(latest.valAccuracy * 100) + "%"
-              : latest.valLoss == null
-                ? "Not available"
-                : latest.valLoss.toFixed(4)}
-          </p>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function ConfusionMatrix({ classes, matrix }: { classes: string[]; matrix?: number[][] }) {
-  if (!matrix?.length) return null
-  return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-950/55 p-3">
-      <div className="flex items-center justify-between">
-        <p className="text-[10px] font-black">Validation confusion matrix</p>
-        <span className="text-[8px] font-mono text-slate-600">actual → predicted</span>
-      </div>
-      <div className="mt-3 overflow-x-auto">
-        <table className="min-w-full border-collapse text-[8px] font-mono">
-          <thead>
-            <tr>
-              <th className="border border-slate-800 px-2 py-1">A/P</th>
-              {classes.map((name) => <th key={name} className="border border-slate-800 px-2 py-1">{name}</th>)}
-            </tr>
-          </thead>
-          <tbody>
-            {matrix.map((row, rowIndex) => (
-              <tr key={classes[rowIndex]}>
-                <th className="border border-slate-800 px-2 py-1 text-left">{classes[rowIndex]}</th>
-                {row.map((value, columnIndex) => (
-                  <td key={columnIndex} className={"border border-slate-800 px-2 py-1 text-center " + (rowIndex === columnIndex ? "text-emerald-300" : "text-slate-500")}>
-                    {value}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
-}
 
 export function AiStudioPanel({
   isOpen,
@@ -1703,6 +1587,76 @@ export function AiStudioPanel({
       : MODES.find((item) => item.id === mode)?.title ?? "AI"
   const inputActive = isSound ? soundActive : cameraActive
 
+  const viewModel: AiStudioViewModel = {
+    aiState,
+    onAiStateChange,
+    isSimRunning,
+    onStartSim,
+    onGoToSimulation,
+    mode,
+    isSound,
+    runtimeEnabled,
+    activeTitle,
+    loading,
+    cameraActive,
+    soundActive,
+    inputActive,
+    status,
+    setStatus,
+    error,
+    fps,
+    store,
+    model,
+    classes,
+    datasetStats,
+    canTrain,
+    currentExplanation,
+    studioVideoRef,
+    overlayRef,
+    stopInput,
+    startSound,
+    startCameraForMode,
+    selectMode,
+    label,
+    setLabel,
+    addSampleFromCamera,
+    importSample,
+    commitStore,
+    renamingClass,
+    renameValue,
+    setRenamingClass,
+    setRenameValue,
+    training,
+    removeAiClass,
+    renameAiClass,
+    removeAiSample,
+    trainingProfile,
+    setTrainingProfile,
+    advancedTuning,
+    setAdvancedTuning,
+    customEpochs,
+    setCustomEpochs,
+    customLearningRate,
+    setCustomLearningRate,
+    customBatchSize,
+    setCustomBatchSize,
+    customPatience,
+    setCustomPatience,
+    customMinDelta,
+    setCustomMinDelta,
+    customLayers,
+    addCustomLayer,
+    updateCustomLayer,
+    removeCustomLayer,
+    moveCustomLayer,
+    selectedTrainingConfig,
+    estimatedTrainingLoad,
+    progress,
+    trainingHistory,
+    train,
+    resetStudio,
+  }
+
   // Compact is an explicit presentation mode. It must win over isOpen so
   // an automatically opened AI camera can never cover the workspace.
   if (compact || (runtimeEnabled && !isOpen)) {
@@ -1821,614 +1775,11 @@ export function AiStudioPanel({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-5 lg:p-6">
-          {tab === "try" && (
-            <div className="mx-auto max-w-none space-y-4">
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-7">
-                {MODES.map((item) => (
-                  <button key={item.id} onClick={() => selectMode(item.id)} className={`pixiu-ai-mode-card rounded-2xl border p-3 text-left ${mode === item.id ? "pixiu-ai-mode-selected" : "border-slate-800 bg-slate-950/40"}`}>
-                    <p className="pixiu-ai-mode-kicker text-[10px] font-black">{item.title}</p>
-                    <p className="mt-1 text-[9px] leading-4 text-slate-600">{item.subtitle}</p>
-                  </button>
-                ))}
-                <button disabled={!store.model} onClick={() => selectMode("trained")} className={`pixiu-ai-mode-card rounded-2xl border p-3 text-left ${mode === "trained" ? "pixiu-ai-mode-selected" : "border-slate-800 bg-slate-950/40"} disabled:opacity-35`}>
-                  <p className="text-[10px] font-black">My AI</p>
-                  <p className="mt-1 text-[9px] leading-4 text-slate-600">Your trained model</p>
-                </button>
-              </div>
+          {tab === "try" && <AiTryPanel viewModel={viewModel} />}
 
-              <div className="grid gap-4 lg:grid-cols-[1.55fr_0.85fr] xl:grid-cols-[1.6fr_0.8fr]">
-                <div className="pixiu-ai-preview overflow-hidden rounded-3xl border bg-black">
-                  <div className="relative aspect-video min-h-[56vh] lg:min-h-[66vh] xl:min-h-[68vh]">
-                {loading && (
-                  <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/92 backdrop-blur-sm">
-                    <div className="max-w-md px-6 text-center">
-                      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-400/30 bg-violet-500/10 text-violet-300 shadow-lg">
-                        <Sparkles size={24} className="animate-pulse" />
-                      </div>
-                      <p className="mt-4 text-sm font-black">PIXIU AI is loading…</p>
-                      <p className="mt-1 text-[10px] leading-4 text-slate-500">
-                        {mode === "numbers" ? "Preparing hand landmarks and finger geometry." : mode === "hands" ? "Preparing hand landmark tracking." : mode === "emotion" ? "Preparing face landmarks and expression analysis." : mode === "pose" ? "Preparing body-pose keypoints." : "Preparing the selected AI model."}
-                      </p>
-                      <div className="mx-auto mt-4 h-1.5 w-48 overflow-hidden rounded-full bg-slate-800">
-                        <div className="h-full w-1/2 animate-pulse rounded-full bg-violet-400" />
-                      </div>
-                    </div>
-                  </div>
-                )}
-                    {isSound ? (
-                      <div className="flex h-full flex-col items-center justify-center bg-slate-950/90 p-6 text-center">
-                        <Mic size={42} className={soundActive ? "text-violet-300 animate-pulse" : "text-slate-600"} />
-                        <p className="mt-3 text-sm font-black">{aiState.detectedClass === "none" ? "Ready for a voice command" : aiState.detectedClass}</p>
-                        <p className="mt-1 max-w-sm text-[10px] leading-5 text-slate-600">{aiState.detail}</p>
-                      </div>
-                    ) : (
-                      <>
-                        <video ref={studioVideoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
-                        <canvas ref={overlayRef} className="pointer-events-none absolute inset-0 h-full w-full" />
-                      </>
-                    )}
-                    {!inputActive && !isSound && (
-                      <div className="absolute inset-0 grid place-items-center bg-slate-950/95 p-6 text-center">
-                        {isSound ? <Mic size={32} className="mx-auto text-violet-300" /> : <Camera size={32} className="mx-auto text-violet-300" />}
-                        <p className="mt-3 text-sm font-black">{isSound ? "Microphone off" : "Camera off"}</p>
-                        <p className="mt-1 max-w-sm text-[11px] leading-5 text-slate-500">
-                          {isSound
-                            ? "Sound AI runs locally in your browser. Try words such as yes, no, go, stop, up, down, left or right."
-                            : "6A loads only the selected Ready AI. 6I uses My AI. 6K is the normalized Blockly bridge."}
-                        </p>
-                      </div>
-                    )}
-                    <div className="absolute bottom-3 left-3 right-3 z-30 max-w-2xl rounded-2xl border border-cyan-300/20 bg-slate-950/90 px-4 py-3 shadow-xl backdrop-blur-md">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-[8px] font-mono uppercase tracking-[0.18em] text-cyan-200">LIVE RESULT</p>
-                          <p className="mt-1 truncate text-base font-black text-white sm:text-lg">
-                            {aiState.detectedClass === "none"
-                              ? isSound
-                                ? "Listening…"
-                                : mode === "emotion"
-                                  ? "No face detected"
-                                  : mode === "numbers" || mode === "hands"
-                                    ? "No hand detected"
-                                    : "No object detected"
-                              : mode === "emotion"
-                                ? "Person detected · " + String(aiState.detectedClass).replace(/_/g, " ") + " expression"
-                                : mode === "numbers" || mode === "hands"
-                                  ? String(aiState.fingerCount ?? 0) + " fingers · " + String(aiState.detectedGesture ?? "hand").replace(/_/g, " ")
-                                  : String(aiState.detectedClass).replace(/_/g, " ")}
-                          </p>
-                          <p className="mt-1 text-[9px] leading-4 text-slate-400">
-                            {aiState.detail}
-                          </p>
-                        </div>
-                        <div className="shrink-0 rounded-xl border border-violet-300/20 bg-slate-950 px-3 py-2 text-right">
-                          <p className="text-[8px] font-mono uppercase tracking-[0.14em] text-slate-600">Confidence</p>
-                          <p className="mt-1 text-lg font-black text-violet-200">{aiState.confidence}%</p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="pixiu-ai-preview-chip absolute left-3 top-3 rounded-full border px-2.5 py-1 font-mono text-[9px]">
-                      {loading ? "LOADING" : inputActive ? (mode === "trained" ? "MY AI LIVE" : `${activeTitle.toUpperCase()} LIVE`) : "READY"}
-                    </div>
-                  </div>
+          {tab === "teach" && <AiTeachPanel viewModel={viewModel} />}
 
-                  <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-800 bg-slate-950/60 px-3 py-3">
-                    <div>
-                      <p className="text-[9px] font-mono uppercase tracking-[0.16em] text-slate-600">{activeTitle}</p>
-                      <p className="mt-1 text-sm font-black">{aiState.detectedClass === "none" ? status : aiState.detectedClass}</p>
-                      <p className="mt-0.5 text-[9px] text-slate-600">{aiState.detail}</p>
-                      {mode === "trained" && (
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          <span className={"rounded-lg border px-2 py-1 text-[8px] font-mono " + (aiState.unknown ? "border-amber-400/20 bg-amber-400/5 text-amber-300" : "border-emerald-400/20 bg-emerald-400/5 text-emerald-300")}>
-                            {aiState.unknown ? "UNKNOWN · safe fallback" : "ACCEPTED · My AI"}
-                          </span>
-                          <span className="rounded-lg border border-slate-800 bg-slate-950 px-2 py-1 text-[8px] font-mono text-slate-500">
-                            threshold {aiState.confidenceThreshold ?? 62}%
-                          </span>
-                        </div>
-                      )}
-                      {mode === "numbers" && (
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          <span className="rounded-lg border border-cyan-400/15 bg-cyan-400/5 px-2 py-1 text-[8px] font-mono text-cyan-200">
-                            Gesture · {aiState.detectedGesture ?? "none"}
-                          </span>
-                          <span className="rounded-lg border border-slate-800 bg-slate-950 px-2 py-1 text-[8px] font-mono text-slate-500">
-                            {aiState.fingerCount ?? 0} fingers
-                          </span>
-                        </div>
-                      )}
-                      {isSound && (
-                        <p className="mt-1 max-w-md text-[8px] leading-4 text-slate-700">
-                          Local vocabulary: yes · no · go · stop · up · down · left · right · zero–nine
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 font-mono text-violet-300">
-                      <span className="text-[10px]">{fps ? `${fps} FPS` : "—"}</span>
-                      <span className="text-sm font-black">{aiState.confidence ? `${aiState.confidence}%` : "—"}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <aside className="space-y-3">
-                  <div className="rounded-2xl border border-cyan-300/15 bg-slate-950/55 p-4 shadow-lg">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-[8px] font-mono uppercase tracking-[0.18em] text-cyan-200">LIVE RESULT</p>
-                        <p className="mt-1 truncate text-sm font-black text-white">
-                          {aiState.detectedClass === "none"
-                            ? "Waiting for detection"
-                            : mode === "emotion"
-                              ? "Person · " + String(aiState.detectedClass).replace(/_/g, " ") + " expression"
-                              : mode === "numbers" || mode === "hands"
-                                ? String(aiState.fingerCount ?? 0) + " fingers · " + String(aiState.detectedGesture ?? "hand").replace(/_/g, " ")
-                                : String(aiState.detectedClass).replace(/_/g, " ")}
-                        </p>
-                      </div>
-                      <span className="shrink-0 rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 font-mono text-[8px] text-violet-200">{aiState.confidence}%</span>
-                    </div>
-                    <p className="mt-1 text-[9px] leading-4 text-slate-500">{aiState.detail}</p>
-                  </div>
-
-                  <div className="rounded-2xl border border-slate-800 bg-slate-950/45 p-4">
-                    <p className="text-xs font-black">6B–6G · Ready AI</p>
-                    <p className="mt-2 text-[10px] leading-5 text-slate-500">
-                      Objects, Pose, Fingers, Emotion and Numbers use the Vision camera. Sound uses a separate microphone lifecycle. Only the selected AI model loads.
-                    </p>
-                    <button onClick={isSound ? (soundActive ? stopInput : startSound) : (cameraActive ? stopInput : startCameraForMode)} className="pixiu-ai-command mt-3 inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[10px] font-black">
-                      {(isSound ? soundActive : cameraActive) ? (isSound ? <Mic size={13} /> : <CameraOff size={13} />) : isSound ? <Mic size={13} /> : <Camera size={13} />}
-                      {(isSound ? soundActive : cameraActive) ? "Stop" : isSound ? "Start microphone" : "Start camera"}
-                    </button>
-                  </div>
-
-                  <div className="pixiu-ai-signal-card rounded-2xl border p-4">
-                    <div className="flex items-center gap-2"><Zap size={14} className="text-cyan-300" /><p className="pixiu-ai-signal-title text-xs font-mono font-black">6K · AI → CIRCUIT SIGNAL</p></div>
-                    <p className="mt-2 text-[10px] leading-5 text-slate-500">The Workbench receives detected class, confidence and detections. Blockly can use AI sees, AI class, AI confidence and AI camera ON/OFF.</p>
-                    <div className="mt-3 grid grid-cols-2 gap-1.5">
-                      {["car", "person", "phone", "hand", "0", "3", "happy", "yes"].map((signal) => (
-                        <button key={signal} onClick={() => onAiStateChange({ ...aiState, enabled: true, detectedClass: signal, confidence: 95, detail: `Test signal · ${signal}` })} className="pixiu-ai-signal-button rounded-lg border px-2 py-1.5 text-[9px] font-mono text-slate-300">
-                          Test {signal}
-                        </button>
-                      ))}
-                    </div>
-                    {onStartSim && !isSimRunning && <button onClick={onStartSim} className="mt-3 rounded-xl bg-emerald-400 px-3 py-2 text-[10px] font-black text-slate-950">Run circuit</button>}
-                  </div>
-
-                  {error && <div className="rounded-2xl border border-amber-500/30 bg-amber-950/30 p-3 text-[10px] leading-5 text-amber-200">{error}</div>}
-                </aside>
-              </div>
-            </div>
-          )}
-
-          {tab === "teach" && (
-            <div className="mx-auto max-w-5xl space-y-4">
-              <div className="grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
-                <div className="rounded-2xl border border-violet-400/15 bg-violet-500/[0.04] p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-black">6H · Build My AI dataset</p>
-                      <p className="mt-1 max-w-xl text-[10px] leading-5 text-slate-500">
-                        Create concepts, capture or import examples, rename classes, remove mistakes, and balance the dataset before training.
-                      </p>
-                    </div>
-                    <div className="rounded-xl border border-slate-800 bg-slate-950/80 px-3 py-2 text-right">
-                      <p className="font-mono text-[8px] uppercase tracking-[0.16em] text-slate-600">Dataset</p>
-                      <p className="mt-1 text-sm font-black">{datasetStats.sampleCount} samples · {datasetStats.classCount} classes</p>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-                    <input
-                      value={label}
-                      onChange={(event) => setLabel(event.target.value)}
-                      placeholder="Concept name · e.g. bottle"
-                      maxLength={32}
-                      className="min-w-0 flex-1 rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-[10px] outline-none focus:border-violet-400"
-                    />
-                    <button
-                       disabled={runtimeEnabled || training}
-                       onClick={() => {
-                         const next = addAiClass(store, label)
-                        commitStore(next)
-                        if (next.classes.length === store.classes.length) {
-                          setStatus("Concept already exists or the 8-concept limit is reached.")
-                        } else {
-                          const created = next.classes[next.classes.length - 1] ?? ""
-                          setLabel(created)
-                          setStatus("Concept created · capture examples for it.")
-                        }
-                      }}
-                      className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-violet-500 px-3 py-2.5 text-[10px] font-black"
-                    >
-                      <Plus size={13} /> Add concept
-                    </button>
-                  </div>
-
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <button
-                      onClick={() => void addSampleFromCamera()}
-                      disabled={!label.trim() || runtimeEnabled || training}
-                       className="inline-flex items-center gap-1.5 rounded-xl border border-violet-400/25 bg-slate-950 px-3 py-2 text-[10px] font-black disabled:opacity-30"
-                    >
-                      <Camera size={13} /> {cameraActive ? "Capture example" : "Start capture"}
-                    </button>
-                    <label className={"inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-[10px] font-black " + (runtimeEnabled || training ? "cursor-not-allowed opacity-30" : "cursor-pointer")}>
-                      <Upload size={13} /> Import images
-                      <input hidden multiple type="file" accept="image/*" onChange={importSample} disabled={runtimeEnabled || training} />
-                    </label>
-                    <span className="text-[9px] text-slate-600">Recommended: 8+ / concept · minimum 3</span>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-slate-800 bg-slate-950/45 p-4">
-                  <p className="text-xs font-black">Dataset health</p>
-                  <div className="mt-3 grid grid-cols-2 gap-2">
-                    {[
-                      ["Concepts", String(datasetStats.classCount)],
-                      ["Samples", String(datasetStats.sampleCount)],
-                      ["Min / class", String(datasetStats.minSamples)],
-                      ["Balance", datasetStats.balanced ? "Balanced" : "Needs balance"],
-                    ].map(([name, value]) => (
-                      <div key={name} className="rounded-xl border border-slate-800 bg-slate-950 p-3">
-                        <p className="text-[8px] font-mono uppercase tracking-[0.14em] text-slate-600">{name}</p>
-                        <p className="mt-1 text-xs font-black">{value}</p>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-3 rounded-xl border border-emerald-400/10 bg-emerald-500/[0.03] p-3 text-[10px] leading-5 text-slate-500">
-                    {datasetStats.ready
-                      ? datasetStats.recommended
-                        ? "Ready · enough examples for a useful transfer-learning run."
-                        : "Ready to train · more varied examples can improve generalization."
-                      : "Training unlocks with 2 concepts and at least 3 examples per concept."}
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-slate-800 bg-slate-950/35 p-4">
-                <div className="flex items-center gap-2">
-                  <BookOpen size={15} className="text-violet-300" />
-                  <p className="text-xs font-black">6M · How My AI learns</p>
-                </div>
-                <div className="mt-3 grid gap-2 md:grid-cols-4">
-                  {[
-                    ["DATASET", "Examples + labels", "You teach what each concept looks like."],
-                    ["MODEL", "Features + classifier", "A local vision feature extractor converts each image into a fixed-size visual feature vector."],
-                    ["TRAIN", "Learn patterns", "Only the small classifier head is updated from your examples."],
-                    ["INFERENCE", "Predict + confidence", "A new image is compared with learned class patterns and scored."],
-                  ].map(([title, value, note]) => (
-                    <div key={title} className="rounded-xl border border-slate-800 bg-slate-950 p-3">
-                      <p className="text-[8px] font-mono tracking-[0.15em] text-violet-300">{title}</p>
-                      <p className="mt-1 text-[10px] font-black">{value}</p>
-                      <p className="mt-1 text-[9px] leading-4 text-slate-600">{note}</p>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-3 flex items-start gap-2 rounded-xl border border-slate-800 bg-slate-950 p-3">
-                  <Info size={13} className="mt-0.5 shrink-0 text-slate-500" />
-                  <p className="text-[9px] leading-4 text-slate-600">
-                    Confidence is not a guarantee of truth. PIXIU treats a weak or ambiguous result as UNKNOWN instead of pretending it knows.
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                {classes.map((name) => {
-                  const classSamples = store.samples.filter((sample) => sample.label === name)
-                  const isRenaming = renamingClass === name
-
-                  return (
-                    <div key={name} className="rounded-2xl border border-slate-800 bg-slate-950/40 p-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                          {isRenaming ? (
-                            <div className="flex gap-2">
-                              <input
-                                value={renameValue}
-                                onChange={(event) => setRenameValue(event.target.value)}
-                                className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-[10px] outline-none focus:border-violet-400"
-                                maxLength={32}
-                                autoFocus
-                              />
-                              <button
-                                 disabled={runtimeEnabled || training}
-                                 onClick={() => {
-                                   const next = renameAiClass(store, name, renameValue)
-                                  commitStore(next)
-                                  setRenamingClass(null)
-                                  setRenameValue("")
-                                  setStatus(next === store ? "That concept name is already in use." : "Concept renamed.")
-                                }}
-                                className="rounded-lg bg-emerald-500/15 px-2 text-[9px] font-black text-emerald-300"
-                              >
-                                Save
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => setLabel(name)}
-                              className="text-left"
-                              title="Use this concept for capture"
-                            >
-                              <p className="truncate text-xs font-black">{name}</p>
-                              <p className="mt-0.5 font-mono text-[8px] text-slate-600">{classSamples.length}/20 samples · click to select</p>
-                            </button>
-                          )}
-                        </div>
-
-                        {!isRenaming && (
-                          <div className="flex items-center gap-1">
-                            <button
-                              disabled={runtimeEnabled || training}
-                              onClick={() => {
-                                setRenamingClass(name)
-                                setRenameValue(name)
-                              }}
-                              className="rounded-lg border border-slate-800 p-1.5 text-slate-500 hover:text-white"
-                              title="Rename concept"
-                            >
-                              <Pencil size={11} />
-                            </button>
-                            <button
-                              disabled={runtimeEnabled || training}
-                              onClick={() => {
-                                const next = removeAiClass(store, name)
-                                commitStore(next)
-                                if (label === name) setLabel("")
-                                setRenamingClass(null)
-                                setStatus("Concept removed with its examples.")
-                              }}
-                              className="rounded-lg border border-slate-800 p-1.5 text-slate-500 hover:text-rose-300"
-                              title="Delete concept"
-                            >
-                              <Trash2 size={11} />
-                            </button>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {classSamples.map((sample) => (
-                          <div key={sample.id} className="relative">
-                            <img
-                              src={sample.dataUrl}
-                              alt={name}
-                              loading="lazy"
-                              className="h-16 w-20 rounded-lg border border-slate-800 object-cover"
-                            />
-                            <button
-                               disabled={runtimeEnabled || training}
-                               onClick={() => {
-                                 const next = removeAiSample(store, sample.id)
-                                commitStore(next)
-                              }}
-                              className="absolute right-1 top-1 rounded-md bg-slate-950/85 p-1 text-slate-300 hover:text-rose-300"
-                              title="Remove sample"
-                            >
-                              <Trash2 size={10} />
-                            </button>
-                          </div>
-                        ))}
-                        {!classSamples.length && (
-                          <div className="grid h-16 w-full place-items-center rounded-lg border border-dashed border-slate-800 text-[9px] text-slate-600">
-                            No examples yet
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
-
-                {!classes.length && (
-                  <div className="sm:col-span-2 rounded-2xl border border-dashed border-slate-800 p-8 text-center">
-                    <Brain size={24} className="mx-auto text-violet-300" />
-                    <p className="mt-2 text-xs font-black">Start with your first concept</p>
-                    <p className="mt-1 text-[10px] text-slate-600">Create a concept such as “bottle”, “pen”, or “red block”, then add examples.</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="rounded-2xl border border-violet-400/15 bg-violet-500/[0.04] p-4">
-                <div className="flex flex-col gap-4">
-                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                    <div className="min-w-0">
-                      <p className="text-xs font-black">6I · Train My AI</p>
-                      <p className="mt-1 text-[10px] leading-5 text-slate-500">
-                        Local visual features feed a small classifier head. Grade-based profiles keep training light; advanced tuning is optional.
-                      </p>
-                    </div>
-                    <button disabled={!canTrain || training || runtimeEnabled} onClick={() => void train()} className="shrink-0 rounded-xl bg-violet-500 px-4 py-2 text-[10px] font-black disabled:opacity-30">
-                      {training ? (progress.stage || "Training…") : "Train My AI"}
-                    </button>
-                  </div>
-
-                  <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between"><div><p className="text-[10px] font-black uppercase tracking-[0.14em] text-violet-300">Training profile</p><p className="mt-1 text-[9px] text-slate-600">Grade 6–8 presets plus Advanced tuning.</p></div>
-                    <select value={trainingProfile} onChange={(event)=>setTrainingProfile(event.target.value as AiTrainingProfile)} disabled={training||runtimeEnabled||advancedTuning} className="w-full max-w-md rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-[10px] font-black text-white"><option value="grade6">Grade 6 · 20 max epochs</option><option value="grade7">Grade 7 · 35 max epochs</option><option value="grade8">Grade 8 · 50 max epochs</option></select></div>
-                    <label className="mt-3 inline-flex items-center gap-2 text-[10px] font-bold text-slate-400"><input type="checkbox" checked={advancedTuning} onChange={(event)=>setAdvancedTuning(event.target.checked)} disabled={training||runtimeEnabled}/>Advanced tuning</label>
-                    {advancedTuning&&<div className="mt-3 space-y-3">
-                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                        <label className="text-[9px] font-mono text-slate-500">Max epochs<input type="number" min="8" max="150" value={customEpochs} onChange={(event)=>setCustomEpochs(Math.max(8,Math.min(150,Number(event.target.value)||40)))} disabled={training||runtimeEnabled} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-2 text-[10px] text-white"/></label>
-                        <label className="text-[9px] font-mono text-slate-500">Learning rate<input type="number" min="0.0001" max="0.01" step="0.0001" value={customLearningRate} onChange={(event)=>setCustomLearningRate(Math.max(0.0001,Math.min(0.01,Number(event.target.value)||0.001)))} disabled={training||runtimeEnabled} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-2 text-[10px] text-white"/></label>
-                        <label className="text-[9px] font-mono text-slate-500">Batch size<input type="number" min="2" max="32" value={customBatchSize} onChange={(event)=>setCustomBatchSize(Math.max(2,Math.min(32,Number(event.target.value)||8)))} disabled={training||runtimeEnabled} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-2 text-[10px] text-white"/></label>
-                        <label className="text-[9px] font-mono text-slate-500">Patience<input type="number" min="2" max="20" value={customPatience} onChange={(event)=>setCustomPatience(Math.max(2,Math.min(20,Number(event.target.value)||8)))} disabled={training||runtimeEnabled} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-2 text-[10px] text-white"/></label>
-                        <label className="text-[9px] font-mono text-slate-500">Min improvement<input type="number" min="0.0001" max="0.05" step="0.0001" value={customMinDelta} onChange={(event)=>setCustomMinDelta(Math.max(0.0001,Math.min(0.05,Number(event.target.value)||0.001)))} disabled={training||runtimeEnabled} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-2 text-[10px] text-white"/></label>
-                      </div>
-                      <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-[9px] font-black text-cyan-200">Layer stack</p><p className="mt-1 text-[8px] text-slate-600">Dense / Linear, Normalization, Dropout and Activation. Conv2D is intentionally excluded.</p></div><button type="button" onClick={addCustomLayer} disabled={training||runtimeEnabled||customLayers.length>=8} className="rounded-lg bg-violet-500/15 px-2 py-1.5 text-[9px] font-black text-violet-200 disabled:opacity-30"><Plus size={11}/> Add layer</button></div>
-                        <div className="mt-3 space-y-2">{customLayers.map((layer,index)=><div key={index} className="grid gap-2 rounded-xl border border-slate-800 bg-slate-950 p-2 lg:grid-cols-[28px_150px_1fr_auto] lg:items-center"><span className="text-center font-mono text-[9px] text-slate-700">{index+1}</span>
-                          <select value={layer.type} onChange={(event)=>{const type=event.target.value as AiLayerSpec["type"];updateCustomLayer(index,type==="dense"?{type,units:layer.units??64,activation:layer.activation??"relu"}:type==="dropout"?{type,rate:layer.rate??0.2}:type==="activation"?{type,activation:layer.activation??"relu"}:{type})}} disabled={training||runtimeEnabled} className="rounded-lg border border-slate-700 bg-slate-950 px-2 py-2 text-[9px] font-black text-white"><option value="dense">Dense / Linear</option><option value="batchNormalization">Normalization</option><option value="dropout">Dropout</option><option value="activation">Activation</option></select>
-                          <div className="flex flex-wrap items-center gap-2">{layer.type==="dense"&&<><label className="text-[8px] font-mono text-slate-600">Units<input type="number" min="16" max="256" step="8" value={layer.units??64} onChange={(event)=>updateCustomLayer(index,{units:Math.max(16,Math.min(256,Number(event.target.value)||64))})} disabled={training||runtimeEnabled} className="ml-1 w-24 rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-[9px] text-white"/></label><label className="text-[8px] font-mono text-slate-600">Activation<select value={layer.activation??"relu"} onChange={(event)=>updateCustomLayer(index,{activation:event.target.value as AiLayerSpec["activation"]})} disabled={training||runtimeEnabled} className="ml-1 rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-[9px] text-white"><option value="relu">ReLU</option><option value="linear">Linear</option><option value="tanh">Tanh</option><option value="sigmoid">Sigmoid</option></select></label></>}</div>
-                          <div className="flex items-center justify-end gap-1"><button type="button" onClick={()=>moveCustomLayer(index,-1)} disabled={training||runtimeEnabled||index===0} title="Move up" className="rounded-lg border border-slate-800 p-1.5 disabled:opacity-25"><ChevronUp size={12}/></button><button type="button" onClick={()=>moveCustomLayer(index,1)} disabled={training||runtimeEnabled||index===customLayers.length-1} title="Move down" className="rounded-lg border border-slate-800 p-1.5 disabled:opacity-25"><ChevronDown size={12}/></button><button type="button" onClick={()=>removeCustomLayer(index)} disabled={training||runtimeEnabled||customLayers.length<=1} title="Remove layer" className="rounded-lg border border-rose-400/10 p-1.5 text-slate-500 hover:text-rose-300 disabled:opacity-25"><Trash2 size={12}/></button></div>
-                        </div>)}</div>
-                      </div>
-                    </div>}
-                    <div className="mt-3 flex flex-wrap gap-2 text-[8px] font-mono"><span className="rounded-lg border border-slate-800 px-2 py-1">Epochs · {selectedTrainingConfig.epochs}</span><span className="rounded-lg border border-slate-800 px-2 py-1">Layers · {selectedTrainingConfig.layers.length}</span><span className="rounded-lg border border-slate-800 px-2 py-1">Patience · {selectedTrainingConfig.earlyStoppingPatience}</span><span className="rounded-lg border border-slate-800 px-2 py-1">Load · {estimatedTrainingLoad.label}</span><span className="rounded-lg border border-slate-800 px-2 py-1">Params · {estimatedTrainingLoad.parameters.toLocaleString()}</span></div>
-                    {estimatedTrainingLoad.warning&&<p className="mt-2 text-[8px] text-amber-300/80">{estimatedTrainingLoad.warning}</p>}
-                  </div>
-                  {training && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-[9px] font-mono text-slate-600">
-                        <span>{progress.stage}</span>
-                        <span>{progress.epoch}/{progress.total}</span>
-                      </div>
-                      <div className="h-2 overflow-hidden rounded-full bg-slate-800">
-                        <div className="h-full bg-violet-400 transition-all" style={{ width: (progress.stage.startsWith("Extracting") ? 18 : 18 + Math.round((progress.epoch / Math.max(1, progress.total)) * 82)) + "%" }} />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {(training || store.model?.trainingHistory?.length) && (
-  <div className="space-y-3 rounded-2xl border border-cyan-300/10 bg-cyan-500/[0.02] p-4">
-    <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-black">6I · Training diagnostics</p><span className="text-[8px] font-mono text-slate-600">Epoch {training?progress.epoch+"/"+progress.total:store.model?.epochs??0} · Train {training?Math.round(progress.accuracy*100):store.model?.trainAccuracy??0}% · Val {training?(progress.valAccuracy==null?"—":Math.round(progress.valAccuracy*100)+"%"):store.model?.validationAvailable?(store.model.validationAccuracy??0)+"%":"—"}</span></div>
-    <div className="grid gap-3 lg:grid-cols-2"><MetricChart title="Loss · lower is better" points={training?trainingHistory:store.model?.trainingHistory??[]} primary="loss" secondary="valLoss" primaryLabel="Training loss" secondaryLabel="Validation loss"/><MetricChart title="Accuracy · higher is better" points={training?trainingHistory:store.model?.trainingHistory??[]} primary="accuracy" secondary="valAccuracy" primaryLabel="Training accuracy" secondaryLabel="Validation accuracy"/></div>
-    {!training&&store.model&&<><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5"><div className="rounded-xl border border-slate-800 p-3"><p className="text-[8px] text-slate-600">Best epoch</p><p className="text-sm font-black">{store.model.bestEpoch??"—"}</p></div><div className="rounded-xl border border-slate-800 p-3"><p className="text-[8px] text-slate-600">Parameters</p><p className="text-sm font-black">{(store.model.parameterCount??0).toLocaleString()}</p></div><div className="rounded-xl border border-slate-800 p-3"><p className="text-[8px] text-slate-600">Validation</p><p className="text-sm font-black">{store.model.validationAvailable?"Available":"Not available"}</p></div><div className="rounded-xl border border-slate-800 p-3"><p className="text-[8px] text-slate-600">Gap</p><p className="text-sm font-black">{store.model.validationAvailable?(store.model.generalizationGap??0)+"%":"—"}</p></div><div className="rounded-xl border border-slate-800 p-3"><p className="text-[8px] text-slate-600">Stopping</p><p className="text-sm font-black">{store.model.earlyStopped?"Early":"Max epochs"}</p></div></div><ConfusionMatrix classes={store.model.classes} matrix={store.model.validationConfusionMatrix}/></>}
-  </div>
-)}
-
-{error && (
-                <div className="rounded-xl border border-amber-500/30 bg-amber-950/30 px-3 py-2 text-[10px] text-amber-200">
-                  {error}
-                </div>
-              )}
-
-              <button
-                onClick={() => void resetStudio()}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 px-3 py-2 text-[10px] font-black text-slate-300"
-              >
-                <RefreshCcw size={13} /> Reset dataset + My AI
-              </button>
-            </div>
-          )}
-
-          {tab === "understand" && (
-            <div className="mx-auto max-w-5xl space-y-4">
-              <div className="rounded-2xl border border-violet-400/15 bg-violet-500/[0.04] p-4">
-                <div className="flex items-start gap-3">
-                  <Info size={16} className="mt-0.5 text-violet-300" />
-                  <div className="min-w-0">
-                    <p className="text-xs font-black">6N · Why did AI produce this result?</p>
-                    <p className="mt-2 text-[10px] leading-5 text-slate-400">{currentExplanation}</p>
-                    <div className="mt-3 flex flex-wrap gap-2 font-mono text-[8px]">
-                      <span className="rounded-lg border border-slate-800 bg-slate-950 px-2 py-1 text-slate-500">
-                        RESULT · {aiState.detectedClass}
-                      </span>
-                      <span className="rounded-lg border border-slate-800 bg-slate-950 px-2 py-1 text-slate-500">
-                        CONFIDENCE · {aiState.confidence}%
-                      </span>
-                      <span className="rounded-lg border border-slate-800 bg-slate-950 px-2 py-1 text-slate-500">
-                        THRESHOLD · {aiState.confidenceThreshold ?? 60}%
-                      </span>
-                      <span className={"rounded-lg border px-2 py-1 " + (aiState.unknown ? "border-amber-400/20 bg-amber-400/5 text-amber-300" : "border-emerald-400/20 bg-emerald-400/5 text-emerald-300")}>
-                        {aiState.unknown ? "UNKNOWN / NOT ACCEPTED" : formatDecisionReason(aiState.decisionReason)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {aiState.probabilities && (
-                  <div className="mt-4">
-                    <div className="mb-2 flex items-center justify-between">
-                      <p className="text-[9px] font-mono uppercase tracking-[0.16em] text-slate-600">Class probabilities</p>
-                      <span className="text-[8px] text-slate-700">top candidates</span>
-                    </div>
-                    <div className="space-y-1.5">
-                      {Object.entries(aiState.probabilities).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, value]) => (
-                        <div key={name} className="flex items-center gap-2">
-                          <span className="w-24 truncate text-[9px] text-slate-500">{name}</span>
-                          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-900">
-                            <div className="h-full rounded-full bg-violet-400" style={{ width: value + "%" }} />
-                          </div>
-                          <span className="w-10 text-right font-mono text-[8px] text-slate-600">{value}%</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="grid gap-4 lg:grid-cols-2">
-                <div className="rounded-2xl border border-slate-800 bg-slate-950/45 p-4">
-                  <div className="flex items-center gap-2"><BookOpen size={15} className="text-violet-300" /><p className="text-xs font-black">Model structure</p></div>
-                  <p className="mt-2 text-[10px] leading-5 text-slate-500">
-                    {store.model?.architecture ?? "Train My AI to create a local classifier head."}
-                  </p>
-                  {store.model && (
-                    <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                      <div className="rounded-xl border border-slate-800 bg-slate-950 p-3">
-                        <p className="text-[8px] font-mono uppercase tracking-[0.14em] text-slate-600">Extractor</p>
-                        <p className="mt-1 text-[10px] font-black">Local vision features</p>
-                      </div>
-                      <div className="rounded-xl border border-slate-800 bg-slate-950 p-3">
-                        <p className="text-[8px] font-mono uppercase tracking-[0.14em] text-slate-600">Validation</p>
-                        <p className="mt-1 text-[10px] font-black">{store.model.validationAccuracy}%</p>
-                      </div>
-                      <div className="rounded-xl border border-slate-800 bg-slate-950 p-3">
-                        <p className="text-[8px] font-mono uppercase tracking-[0.14em] text-slate-600">Training profile</p>
-                        <p className="mt-1 text-[10px] font-black">
-                          {store.model.trainingProfile === "custom"
-                            ? "Custom tuning"
-                            : String(store.model.trainingProfile ?? "grade6").replace("grade", "Grade ")}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                  <div className="mt-3 rounded-xl bg-slate-950 p-3 font-mono text-[9px] text-slate-500">
-                    {model ? getModelWeightShapes(model).map((shape) => <div key={shape} className="py-1">{shape}</div>) : <div>No trained model loaded.</div>}
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="rounded-2xl border border-slate-800 bg-slate-950/45 p-4">
-                    <div className="flex items-center gap-2"><ShieldCheck size={15} className="text-emerald-300" /><p className="text-xs font-black">6O · AI safety & privacy</p></div>
-                    <p className="mt-2 text-[10px] leading-5 text-slate-500">
-                      Camera and microphone start only when the selected AI runtime is started. Browser permission is required for media input; stopping AI ends the active media tracks.
-                    </p>
-                    <div className="mt-3 grid grid-cols-2 gap-2 text-[9px] font-mono">
-                      <div className="rounded-xl border border-slate-800 bg-slate-950 p-3">
-                        <p className="text-slate-600">Camera</p>
-                        <p className={"mt-1 " + (cameraActive ? "text-emerald-300" : "text-slate-500")}>{cameraActive ? "ACTIVE" : "OFF"}</p>
-                      </div>
-                      <div className="rounded-xl border border-slate-800 bg-slate-950 p-3">
-                        <p className="text-slate-600">Microphone</p>
-                        <p className={"mt-1 " + (soundActive ? "text-violet-300" : "text-slate-500")}>{soundActive ? "ACTIVE" : "OFF"}</p>
-                      </div>
-                    </div>
-                    <div className="mt-3 rounded-xl border border-slate-800 bg-slate-950 p-3 text-[9px] leading-5 text-slate-600">
-                      Samples stay in this browser's storage. “Reset dataset + My AI” removes the dataset and saved model from this browser. The browser controls site permission; stopping PIXIU ends active tracks but does not revoke a site's saved permission.
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={stopInput}
-                        disabled={!cameraActive && !soundActive && !loading}
-                        className="rounded-xl border border-rose-400/20 px-3 py-2 text-[9px] font-black text-rose-300 disabled:opacity-30"
-                      >
-                        Stop camera / microphone + clear runtime
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void resetStudio()}
-                        className="rounded-xl border border-rose-400/20 px-3 py-2 text-[9px] font-black text-rose-300 hover:bg-rose-500/5"
-                      >
-                        Erase local AI data
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-slate-800 bg-slate-950/45 p-4">
-                    <p className="text-xs font-black">Model weights preview</p>
-                    <div className="mt-3 grid gap-2">
-                      {(model ? getModelWeightPreview(model) : []).slice(0, 8).map((row, index) => <div key={index} className="rounded-lg border border-slate-800 bg-slate-950 p-2 font-mono text-[8px] text-slate-500">{row.join(" · ")}</div>)}
-                    </div>
-                    {!model && <p className="mt-3 text-[10px] text-slate-600">Train My AI in Teach to inspect its learned head.</p>}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+          {tab === "understand" && <AiUnderstandPanel viewModel={viewModel} />}
         </div>
       </div>
     </div>
