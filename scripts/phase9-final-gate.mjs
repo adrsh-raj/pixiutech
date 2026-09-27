@@ -29,7 +29,10 @@ for (const name of readdirSync(workflowDir)) {
 }
 
 const requiredScripts = [
+  "scripts/phase-a1-foundation-static-check.mjs",
+  "scripts/phase2-3-inference-runtime-static-check.mjs",
   "scripts/phase4-6-static-check.mjs",
+  "scripts/phase4-9-reliability-static-check.mjs",
   "scripts/ai-static-check.mjs",
   "scripts/ai-phase6-qa.mjs",
   "scripts/phase7-8-static-check.mjs",
@@ -42,7 +45,10 @@ for (const relative of requiredScripts) {
 }
 
 run("npm", ["run", "lint"], portalRoot, "Portal lint")
+run("npm", ["run", "qa:phase-a1"], portalRoot, "Phase A(1) foundation gate")
+run("npm", ["run", "qa:phase2-3"], portalRoot, "Phase 2-3 inference/runtime gate")
 run("npm", ["run", "qa:phase4-6"], portalRoot, "Phase 4-6 static gate")
+run("npm", ["run", "qa:phase4-9"], portalRoot, "Phase 4-9 reliability gate")
 run(process.execPath, ["scripts/ai-static-check.mjs"], repoRoot, "AI static contract gate")
 run(process.execPath, ["--experimental-strip-types", "scripts/ai-phase6-qa.mjs"], repoRoot, "AI executable regression matrix")
 run(process.execPath, ["scripts/phase7-8-static-check.mjs"], repoRoot, "Phase 7-8 static regression gate")

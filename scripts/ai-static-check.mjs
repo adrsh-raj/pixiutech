@@ -16,6 +16,7 @@ const runner = read("pixiu-lms-portal/src/lib/blockly-runner.ts")
 const toolbox = read("pixiu-lms-portal/src/components/circuit-lab/blockly-editor.tsx")
 const objectAdapter = read("pixiu-lms-portal/src/lib/ai/object-detector.ts")
 const poseAdapter = read("pixiu-lms-portal/src/lib/ai/pose-detector.ts")
+const runtimeSync = read("scripts/sync-ai-runtime-assets.mjs")
 const handAdapter = read("pixiu-lms-portal/src/lib/ai/hand-detector.ts")
 const faceAdapter = read("pixiu-lms-portal/src/lib/ai/face-detector.ts")
 const soundAdapter = read("pixiu-lms-portal/src/lib/ai/sound-detector.ts")
@@ -92,13 +93,14 @@ for (const marker of [
 
 for (const marker of [
   "tf.loadGraphModel",
-  "singlepose/lightning/4",
+  'const MOVENET_URL = "/models/movenet/model.json"',
   "MOVENET_KEYPOINT_NAMES",
 ]) requireText(poseAdapter, marker, "6C pose adapter")
+requireText(runtimeSync, "singlepose/lightning/4/model.json", "6C local MoveNet asset source")
 
 for (const marker of [
   "const HAND_VERSION =",
-  "https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js",
+  'const HANDS_SCRIPT = "/vendor/mediapipe/hands/hands.js"',
   "const HANDS_ASSET_BASE",
   "new window.Hands",
   "maxNumHands: maxHands",
@@ -108,7 +110,7 @@ for (const marker of [
 
 for (const marker of [
   "const FACE_VERSION =",
-  "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js",
+  'const FACE_MESH_SCRIPT = "/vendor/mediapipe/face_mesh/face_mesh.js"',
   "const FACE_MESH_ASSET_BASE",
   "new window.FaceMesh",
   "minDetectionConfidence: 0.35",
