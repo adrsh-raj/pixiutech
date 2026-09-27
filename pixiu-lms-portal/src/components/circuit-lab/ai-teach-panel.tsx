@@ -10,7 +10,6 @@ import {
   Trash2,
   Upload,
 } from "lucide-react"
-import { addAiClass } from "@/lib/ai-studio-engine"
 import type { AiStudioViewModel } from "./ai-studio-view-model"
 import { AiDatasetPanel } from "./ai-dataset-panel"
 import { AiTrainingDiagnostics } from "./ai-training-diagnostics"
