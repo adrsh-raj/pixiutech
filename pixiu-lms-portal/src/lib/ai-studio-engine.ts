@@ -1262,13 +1262,13 @@ export async function loadStoredAiModel(
     !summary ||
     summary.storageKey !== MODEL_KEY ||
     summary.featureExtractor !== MY_AI_FEATURE_VERSION ||
-    !Number.isFinite(summary.embeddingSize) ||
+    summary.embeddingSize !== MY_AI_FEATURE_SIZE ||
     !Array.isArray(summary.featureShape) ||
     summary.featureShape.length !== 1 ||
-    summary.featureShape[0] !== summary.embeddingSize ||
+    summary.featureShape[0] !== MY_AI_FEATURE_SIZE ||
     !Array.isArray(summary.modelInputShape) ||
     summary.modelInputShape.length !== 1 ||
-    summary.modelInputShape[0] !== summary.embeddingSize ||
+    summary.modelInputShape[0] !== MY_AI_FEATURE_SIZE ||
     !Array.isArray(summary.outputShape) ||
     summary.outputShape.length !== 1 ||
     summary.outputShape[0] !== summary.classes.length ||
@@ -1276,7 +1276,17 @@ export async function loadStoredAiModel(
     !Array.isArray(summary.classes) ||
     summary.classes.length < MIN_CLASSES ||
     summary.classes.length > MAX_CLASSES ||
-    new Set(summary.classes.map((value) => String(value).trim().toLowerCase())).size !== summary.classes.length
+    new Set(summary.classes.map((value) => String(value).trim().toLowerCase())).size !== summary.classes.length ||
+    !summary.classPrototypes ||
+    typeof summary.classPrototypes !== "object" ||
+    !summary.classes.every((className) => {
+      const prototype = summary.classPrototypes?.[className]
+      return (
+        Array.isArray(prototype) &&
+        prototype.length === MY_AI_FEATURE_SIZE &&
+        prototype.every((value) => Number.isFinite(Number(value)))
+      )
+    })
   ) {
     return null
   }
@@ -1376,6 +1386,18 @@ export async function predictAiImage(
           ? Math.max(0, Math.min(1, Number(value)))
           : 0,
       )
+
+    if (probabilities.length !== summary.classes.length) {
+      return {
+        label: "unknown",
+        confidence: 0,
+        probabilities: {},
+        unknown: true,
+        lowConfidence: true,
+        margin: 0,
+        reason: "low_confidence" as const,
+      }
+    }
 
     if (!probabilities.length) {
       return {
