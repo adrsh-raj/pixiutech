@@ -24,6 +24,7 @@ const packageJson = JSON.parse(read("pixiu-lms-portal/package.json"))
 const errorTaxonomy = read("pixiu-lms-portal/src/lib/ai/ai-errors.ts")
 const studio = read("pixiu-lms-portal/src/components/circuit-lab/ai-studio-panel.tsx")
 const controller = read("pixiu-lms-portal/src/components/circuit-lab/use-ai-studio-controller.ts")
+const engine = read("pixiu-lms-portal/src/lib/ai-studio-engine.ts")
 const productionSmoke = read(".github/workflows/production-security-smoke.yml")
 
 assert(objectDetector.includes('modelUrl: COCO_SSD_MODEL_URL'), "COCO-SSD is not explicitly bound to a same-origin model URL")
@@ -72,6 +73,9 @@ const unitFiles = readdirSync(unitDir).filter((name) => name.endsWith(".test.ts"
 assert(unitFiles.length >= 5, "Expected at least five AI module unit-test files")
 assert(controller.includes('type ReadyResource ='), "Typed AI resource union is missing")
 assert(!controller.match(/\bany\b/), "AI Studio controller still contains broad any")
+assert(engine.includes("isCompatibleModelSummary"), "Central stored-model compatibility contract is missing")
+assert(objectDetector.includes("objectDetectorReferences") && objectDetector.includes("objectDetectorInstance"), "Object detector shared-load ownership guard is missing")
+assert(poseDetector.includes("moveNetReferences") && poseDetector.includes("moveNetInstance"), "MoveNet shared-load ownership guard is missing")
 assert(!soundDetector.match(/\bany\b/), "Sound detector still contains broad any")
 for (const [name, source] of [["Hand detector", handDetector], ["Face detector", faceDetector], ["Pose detector", poseDetector], ["Camera session", cameraSession]]) {
   assert(!source.match(/\bany\b/), name + " still contains broad any")
