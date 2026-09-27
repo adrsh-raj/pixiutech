@@ -1,4 +1,5 @@
 import * as tf from "@tensorflow/tfjs"
+import { AIDatasetError, AIModelShapeError } from "@/lib/ai/ai-errors"
 import {
   disposeMyAiFeatureExtractor,
   extractMyAiEmbedding,
@@ -849,12 +850,10 @@ function validateClassifierModelShape(
     inputShape[0] !== null ||
     Number(inputShape[1]) !== inputSize
   ) {
-    throw new Error(
+    throw new AIModelShapeError(
       "My AI model input shape mismatch. Expected [batch, " +
         inputSize +
-        "], got " +
-        JSON.stringify(inputShape) +
-        ".",
+        "]. Retrain My AI with the current feature version.",
     )
   }
 
@@ -864,12 +863,8 @@ function validateClassifierModelShape(
     outputShape[0] !== null ||
     Number(outputShape[1]) !== classCount
   ) {
-    throw new Error(
-      "My AI model output shape mismatch. Expected [batch, " +
-        classCount +
-        "], got " +
-        JSON.stringify(outputShape) +
-        ".",
+    throw new AIModelShapeError(
+      "My AI model output shape mismatch. Retrain My AI with the current class set.",
     )
   }
 }
@@ -977,23 +972,23 @@ export async function trainAiModel(
 
 
   if (classes.length < MIN_CLASSES) {
-    throw new Error("Teach at least 2 concepts before training.")
+    throw new AIDatasetError("Teach at least 2 concepts before training.")
   }
 
   if (classes.length > MAX_CLASSES) {
-    throw new Error("My AI supports at most 8 concepts.")
+    throw new AIDatasetError("My AI supports at most 8 concepts.")
   }
 
   if (normalizedSamples.length > MAX_TOTAL_SAMPLES) {
-    throw new Error("My AI supports at most 80 examples.")
+    throw new AIDatasetError("My AI supports at most 80 examples.")
   }
 
   if (classes.some((name) => (counts[name] ?? 0) < MIN_SAMPLES_PER_CLASS)) {
-    throw new Error("Give every concept at least 3 examples.")
+    throw new AIDatasetError("Give every concept at least 3 examples.")
   }
 
   if (classes.some((name) => (counts[name] ?? 0) > MAX_SAMPLES_PER_CLASS)) {
-    throw new Error("Keep each concept at or below 20 examples.")
+    throw new AIDatasetError("Keep each concept at or below 20 examples.")
   }
 
   const { train, validation } = buildValidationSplit(normalizedSamples, classes)
