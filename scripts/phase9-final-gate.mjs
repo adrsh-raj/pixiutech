@@ -33,6 +33,7 @@ const requiredScripts = [
   "scripts/ai-static-check.mjs",
   "scripts/ai-phase6-qa.mjs",
   "scripts/phase7-8-static-check.mjs",
+  "scripts/security-static-check.mjs",
   "scripts/phase8-release-gate.mjs",
   "scripts/cyberlab-browser-gate.mjs",
 ]
@@ -45,6 +46,7 @@ run("npm", ["run", "qa:phase4-6"], portalRoot, "Phase 4-6 static gate")
 run(process.execPath, ["scripts/ai-static-check.mjs"], repoRoot, "AI static contract gate")
 run(process.execPath, ["--experimental-strip-types", "scripts/ai-phase6-qa.mjs"], repoRoot, "AI executable regression matrix")
 run(process.execPath, ["scripts/phase7-8-static-check.mjs"], repoRoot, "Phase 7-8 static regression gate")
+run(process.execPath, ["scripts/security-static-check.mjs"], repoRoot, "Cross-phase security static gate")
 run("npm", ["run", "build"], portalRoot, "Portal production build")
 
 process.stdout.write("\nPIXIU Phase 9 final green gate source/build portion PASSED\n")
