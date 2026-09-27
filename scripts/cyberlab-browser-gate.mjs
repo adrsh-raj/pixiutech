@@ -80,7 +80,7 @@ try {
   // Pose browser lifecycle
   await page.getByRole("button", { name: "Stop" }).click()
   await page.getByRole("button", { name: "Tools" }).click()
-  await page.getByText("AI Studio", { exact: true }).click()
+  await page.getByText("PIXIU AI Studio", { exact: true }).click()
   await page.getByText("Pose", { exact: true }).click()
   await page.getByRole("button", { name: "Start camera" }).click()
   await page.getByText("6C Pose ready", { exact: true }).waitFor()
