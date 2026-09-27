@@ -22,7 +22,14 @@ const workbench = read("pixiu-lms-portal/src/components/circuit-lab/workbench.ts
 const partArt = read("pixiu-lms-portal/src/components/circuit-lab/part-art.tsx")
 const currentFlow = read("pixiu-lms-portal/src/lib/current-flow.ts")
 const camera = read("pixiu-lms-portal/src/components/circuit-lab/ai-camera-panel.tsx")
-const aiPanel = read("pixiu-lms-portal/src/components/circuit-lab/ai-studio-panel.tsx")
+const aiPanel = [
+  read("pixiu-lms-portal/src/components/circuit-lab/ai-studio-panel.tsx"),
+  read("pixiu-lms-portal/src/components/circuit-lab/use-ai-studio-controller.ts"),
+  read("pixiu-lms-portal/src/components/circuit-lab/ai-try-panel.tsx"),
+  read("pixiu-lms-portal/src/components/circuit-lab/ai-teach-panel.tsx"),
+  read("pixiu-lms-portal/src/components/circuit-lab/ai-understand-panel.tsx"),
+  read("pixiu-lms-portal/src/components/circuit-lab/ai-training-diagnostics.tsx"),
+].join("\n")
 const aiEngine = read("pixiu-lms-portal/src/lib/ai-studio-engine.ts")
 const aiTypes = read("pixiu-lms-portal/src/lib/ai/vision-types.ts")
 const normalizer = read("pixiu-lms-portal/src/lib/ai/ai-result-normalizer.ts")
