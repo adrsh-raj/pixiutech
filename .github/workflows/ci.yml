@@ -117,6 +117,7 @@ jobs:
           npm ci
           npm run build
           npm run audit:site
+          node scripts/verify-root-security-build.mjs
 
       - name: Verify LMS lint, safety scans, and production build
         working-directory: pixiu-lms-portal
