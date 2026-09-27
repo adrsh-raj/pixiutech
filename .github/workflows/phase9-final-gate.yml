@@ -45,6 +45,9 @@ jobs:
       - name: Run cross-phase security static gate
         run: node scripts/security-static-check.mjs
 
+      - name: Run Part 4 professional AI gate
+        run: node scripts/part4-professional-hardening-static-check.mjs
+
       - name: Run source/build final gate
         run: node scripts/phase9-final-gate.mjs
 
@@ -52,6 +55,10 @@ jobs:
         run: |
           npm run build
           npm run audit:site
+
+      - name: Verify portal AI unit tests
+        working-directory: pixiu-lms-portal
+        run: npm run test:ai
 
       - name: Install browser runner
         run: |
