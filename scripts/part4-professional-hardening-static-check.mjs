@@ -16,6 +16,7 @@ const index = read("pixiu-lms-portal/index.html")
 const vercel = read("pixiu-lms-portal/vercel.json")
 const packageJson = JSON.parse(read("pixiu-lms-portal/package.json"))
 const studio = read("pixiu-lms-portal/src/components/circuit-lab/ai-studio-panel.tsx")
+const controller = read("pixiu-lms-portal/src/components/circuit-lab/use-ai-studio-controller.ts")
 
 assert(objectDetector.includes('modelUrl: COCO_SSD_MODEL_URL'), "COCO-SSD is not explicitly bound to a same-origin model URL")
 assert(objectDetector.includes('"/models/coco-ssd-lite-mobilenet-v2/model.json"'), "COCO-SSD local model path is missing")
@@ -47,7 +48,8 @@ for (const file of [
   "pixiu-lms-portal/src/components/circuit-lab/ai-training-diagnostics.tsx",
   "pixiu-lms-portal/src/components/circuit-lab/ai-studio-presenters.ts",
 ]) assert(existsSync(join(root, file)), "Split AI Studio module missing: " + file)
-assert(studio.split("\n").length <= 1800, "AI Studio controller file is still over the Part 4 size budget")
+assert(studio.split("\n").length <= 400, "AI Studio view shell is too large")
+assert(controller.split("\n").length <= 2000, "AI Studio controller exceeded the approved controller budget")
 const unitDir = join(root, "pixiu-lms-portal/test/ai")
 const unitFiles = readdirSync(unitDir).filter((name) => name.endsWith(".test.ts"))
 assert(unitFiles.length >= 5, "Expected at least five AI module unit-test files")
