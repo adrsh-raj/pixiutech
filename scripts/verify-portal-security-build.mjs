@@ -36,16 +36,16 @@ for (const [path, metadata] of Object.entries(runtimeManifest.files)) {
   if (actualHash !== metadata.sha256) fail("AI runtime asset hash mismatch: " + safePath)
   if (body.length !== metadata.size) fail("AI runtime asset size mismatch: " + safePath)
 }
-const resourcePattern = /<(script|link)[^>]*?(?:src|href)="(/[^"]+.(?:js|css))"[^>]*>/gi
+const resourcePattern = /<(script|link)\b[^>]*?(?:src|href)="(/[^"]+.(?:js|css))"[^>]*>/gi
 let resourceCount = 0
 
 for (const match of html.matchAll(resourcePattern)) {
   resourceCount += 1
   const tag = match[0]
   const url = match[2]
-  const integrity = tag.match(/integrity="([^"]+)"/i)?.[1]
+  const integrity = tag.match(/\bintegrity="([^"]+)"/i)?.[1]
   if (!integrity) fail("Missing SRI integrity on " + url)
-  if (!/crossorigin="anonymous"/i.test(tag)) fail("Missing crossorigin=anonymous on " + url)
+  if (!/\bcrossorigin="anonymous"/i.test(tag)) fail("Missing crossorigin=anonymous on " + url)
 
   const expected = manifest.resources[url]
   if (expected !== integrity) fail("SRI manifest mismatch for " + url)
@@ -56,7 +56,7 @@ for (const match of html.matchAll(resourcePattern)) {
 }
 
 if (!resourceCount) fail("No build script/style resources were found for SRI verification.")
-if (/<(script|link)[^>]*(?:src|href)="https?:///i.test(html)) {
+if (/<(script|link)\b[^>]*(?:src|href)="https?:///i.test(html)) {
   fail("Build output still contains a remote script or stylesheet resource.")
 }
 
