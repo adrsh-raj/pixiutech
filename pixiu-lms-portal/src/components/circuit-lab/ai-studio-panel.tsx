@@ -1060,6 +1060,14 @@ export function AiStudioPanel({
       lastRuntimeMetricsRef.current = runtimeMetricsRef.current?.snapshot() ?? null
       runtimeStatusRef.current = "ready"
       setLoading(false)
+      onAiStateChange({
+        ...aiStateRef.current,
+        mode,
+        runtimeStatus: "ready",
+        runtimeError: undefined,
+        runtimeErrorKind: undefined,
+        detail: "AI ready",
+      })
       const loadBudget = lastRuntimeMetricsRef.current
         ? isBudgetExceeded(lastRuntimeMetricsRef.current)
         : null
@@ -1520,7 +1528,13 @@ export function AiStudioPanel({
     if (training) return
     stopInput()
     setMode(next)
+    runtimeStatusRef.current = "idle"
     setError(null)
+    onAiStateChange({
+      ...createAiVisionState(next),
+      runtimeStatus: "idle",
+      detail: next === "trained" ? "My AI selected" : "AI selected",
+    })
     setStatus(next === "trained" ? "My AI selected" : `${MODES.find((item) => item.id === next)?.title ?? "AI"} selected`)
   }
 
