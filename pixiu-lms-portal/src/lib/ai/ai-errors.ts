@@ -51,14 +51,14 @@ export class AIPermissionError extends AiRuntimeError {
 
 export class AICameraError extends AiRuntimeError {
   constructor(userMessage = "The camera could not be started.", cause?: unknown) {
-    super("permission", userMessage, cause)
+    super("unsupported", userMessage, cause)
     this.name = "AICameraError"
   }
 }
 
 export class AIMicrophoneError extends AiRuntimeError {
   constructor(userMessage = "The microphone could not be started.", cause?: unknown) {
-    super("permission", userMessage, cause)
+    super("unsupported", userMessage, cause)
     this.name = "AIMicrophoneError"
   }
 }
@@ -89,25 +89,30 @@ export function toAiRuntimeError(error: unknown, context = "AI"): AiRuntimeError
 
   const message = error instanceof Error ? error.message : String(error ?? "")
   const lower = message.toLowerCase()
-  if (lower.includes("camera")) {
-    if (lower.includes("permission") || lower.includes("notallowed") || lower.includes("secure context")) {
-      return new AIPermissionError("Camera permission is required. Allow camera access and try again.", error)
-    }
-    return new AICameraError("The camera could not be started. Check the camera and browser permission.", error)
-  }
-  if (lower.includes("microphone")) {
-    if (lower.includes("permission") || lower.includes("notallowed") || lower.includes("secure context")) {
-      return new AIPermissionError("Microphone permission is required. Allow microphone access and try again.", error)
-    }
-    return new AIMicrophoneError("The microphone could not be started. Check the microphone and browser permission.", error)
-  }
+
   if (lower.includes("permission") || lower.includes("notallowed") || lower.includes("secure context")) {
     return new AIPermissionError(context + " needs browser permission. Allow access and try again.", error)
   }
-  if (lower.includes("not support") || lower.includes("unsupported")) return new AIUnsupportedBrowserError(undefined, error)
-  if (lower.includes("shape") || lower.includes("tensor") || lower.includes("rank")) return new AITensorShapeError(undefined, error)
-  if (lower.includes("model") || lower.includes("movenet") || lower.includes("mediapipe") || lower.includes("coco-ssd") || lower.includes("speech commands")) return new AIModelLoadError(undefined, error)
-  if (lower.includes("storage") || lower.includes("indexeddb") || lower.includes("localstorage")) return new AIStorageError(undefined, error)
-  if (lower.includes("cancel")) return new AiRuntimeError("cancelled", context + " was cancelled.", error)
+  if (lower.includes("not support") || lower.includes("unsupported")) {
+    return new AIUnsupportedBrowserError(undefined, error)
+  }
+  if (lower.includes("model") || lower.includes("movenet") || lower.includes("mediapipe") || lower.includes("coco-ssd") || lower.includes("speech commands")) {
+    return new AIModelLoadError(undefined, error)
+  }
+  if (lower.includes("camera")) {
+    return new AICameraError("The camera could not be started. Check the camera and browser permission.", error)
+  }
+  if (lower.includes("microphone")) {
+    return new AIMicrophoneError("The microphone could not be started. Check the microphone and browser permission.", error)
+  }
+  if (lower.includes("shape") || lower.includes("tensor") || lower.includes("rank")) {
+    return new AITensorShapeError(undefined, error)
+  }
+  if (lower.includes("storage") || lower.includes("indexeddb") || lower.includes("localstorage")) {
+    return new AIStorageError(undefined, error)
+  }
+  if (lower.includes("cancel")) {
+    return new AiRuntimeError("cancelled", context + " was cancelled.", error)
+  }
   return new AIInferenceError(undefined, error)
 }
