@@ -735,20 +735,20 @@ const [tab, setTab] = useState<Tab>("try")
   }
 
   function releaseLoadedResource(resourceMode: AiVisionMode | null, resource: ReadyResource) {
-    if (!resource) return
+    if (!resource || !resourceMode) return
 
     if (resourceMode === "sound") {
       void stopSoundRecognizer(resource as SoundRecognizer)
     } else if (resourceMode === "trained") {
-      if (resource !== model) disposeActiveAiModel()
+      disposeActiveAiModel()
     } else if (resourceMode === "objects") {
-      disposeObjectDetector(resource)
+      disposeObjectDetector(resource as ObjectDetector)
     } else if (resourceMode === "pose") {
-      disposeMoveNet(resource)
+      disposeMoveNet(resource as GraphModel)
     } else if (resourceMode === "hands" || resourceMode === "numbers") {
-      disposeHandDetector(resource)
+      disposeHandDetector(resource as HandDetector)
     } else if (resourceMode === "emotion") {
-      disposeFaceDetector(resource)
+      disposeFaceDetector(resource as FaceDetector)
     }
   }
 
@@ -838,13 +838,9 @@ const [tab, setTab] = useState<Tab>("try")
       })
     } catch (cameraError) {
       if (requestId !== cameraRequestRef.current) return
-      const message = mediaPermissionMessage(
-        cameraError,
-        cameraError instanceof Error
-          ? cameraError.message
-          : "Camera permission was denied or unavailable.",
-      )
-      const errorKind = classifyAiRuntimeError(cameraError)
+      const structuredError = toAiRuntimeError(cameraError, "Camera")
+      const message = structuredError.userMessage
+      const errorKind = structuredError.kind
       runtimeStatusRef.current = "error"
       setError(message)
       setStatus("Camera unavailable")
@@ -938,7 +934,7 @@ const [tab, setTab] = useState<Tab>("try")
         resource = await loadFaceDetector()
       } else if (mode === "trained") {
         if (!store.model) throw new Error("Train My AI first, then start the live test.")
-        resource = model ?? await loadStoredAiModel(store.model)
+        resource = (model ?? await loadStoredAiModel(store.model)) as LayersModel | null
         if (!resource) throw new Error("Saved My AI model could not be loaded. Retrain the model.")
         if (!model) setModel(resource)
       }
@@ -990,10 +986,8 @@ const [tab, setTab] = useState<Tab>("try")
       }
       releaseCurrentResource()
       setLoading(false)
-      const message =
-        resourceError instanceof Error
-          ? resourceError.message
-          : "The selected AI could not start."
+      const structuredError = toAiRuntimeError(resourceError, "Selected AI")
+      const message = structuredError.userMessage
       const errorKind = structuredError.kind
       runtimeStatusRef.current = "error"
       setError(message)
@@ -1088,12 +1082,8 @@ const [tab, setTab] = useState<Tab>("try")
       if (failedResource && failedResourceMode === "sound") {
         await stopSoundRecognizer(failedResource as SoundRecognizer)
       }
-      const message = mediaPermissionMessage(
-        soundError,
-        soundError instanceof Error
-          ? soundError.message
-          : "Microphone recognition could not start.",
-      )
+      const structuredError = toAiRuntimeError(soundError, "Microphone")
+      const message = structuredError.userMessage
       const errorKind = structuredError.kind
       runtimeStatusRef.current = "error"
       setLoading(false)
@@ -1137,7 +1127,7 @@ const [tab, setTab] = useState<Tab>("try")
 
       try {
         if (mode === "objects") {
-          const predictions = await detectObjects(resourceRef.current, video, {
+          const predictions = await detectObjects(resourceRef.current as ObjectDetector, video, {
             maxNumBoxes: OBJECT_MAX_BOXES,
             minScore: OBJECT_MIN_SCORE,
           })
@@ -1158,7 +1148,7 @@ const [tab, setTab] = useState<Tab>("try")
             detail: primary ? `${visible.length} object${visible.length === 1 ? "" : "s"} detected` : "Looking...",
           })
         } else if (mode === "pose") {
-          const pose = await estimateMoveNetPose(resourceRef.current, video)
+          const pose = await estimateMoveNetPose(resourceRef.current as GraphModel, video)
           if (activeSession !== sessionRef.current) return
           drawPose(getActiveOverlay()!, video, pose)
           const visiblePoints = pose?.keypoints?.filter((point) => (point.score ?? 0) >= 0.25) ?? []
@@ -1176,13 +1166,13 @@ const [tab, setTab] = useState<Tab>("try")
             detail: pose ? `${visiblePoints.length}/17 keypoints tracked` : "No person detected",
           })
         } else if (mode === "hands" || mode === "numbers") {
-          const hands: HandDetection[] = await detectHands(resourceRef.current, video)
+          const hands: HandDetection[] = await detectHands(resourceRef.current as HandDetector, video)
           if (activeSession !== sessionRef.current) return
 
           if (hands.length === 0) {
             emptyHandFramesRef.current += 1
             if (emptyHandFramesRef.current >= 4) {
-              resourceRef.current?.reset?.()
+              (resourceRef.current as HandDetector | FaceDetector | null)?.reset?.()
               emptyHandFramesRef.current = 0
             }
           } else {
@@ -1256,7 +1246,7 @@ const [tab, setTab] = useState<Tab>("try")
               : "Show a hand",
           })
         } else if (mode === "emotion") {
-          const faces: FaceDetection[] = await detectFaces(resourceRef.current, video)
+          const faces: FaceDetection[] = await detectFaces(resourceRef.current as FaceDetector, video)
           if (activeSession !== sessionRef.current) return
 
           if (faces.length === 0) {
