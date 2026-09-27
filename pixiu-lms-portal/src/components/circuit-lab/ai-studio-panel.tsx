@@ -39,6 +39,7 @@ import {
   loadStoredAiModel,
   optimizeAiImage,
   predictAiImage,
+  predictAiVideo,
   removeAiClass,
   removeAiSample,
   renameAiClass,
@@ -1275,8 +1276,9 @@ export function AiStudioPanel({
               : "Show your face",
           })
         } else if (mode === "trained") {
-          const frame = captureVideoFrame(video, 640)
-          const result = frame ? await predictAiImage(frame, store.model) : null
+          // Continuous My AI inference stays on the live video path. JPEG/base64
+          // capture is reserved for dataset examples and explicit image flows.
+          const result = await predictAiVideo(video, store.model)
           if (activeSession !== sessionRef.current) return
           onAiStateChange({
             enabled: true,
