@@ -2,7 +2,16 @@ from accounts.models import UserRole
 from academics.models import Student, Trainer
 from rest_framework import serializers
 from .models import (AttendanceRecord, ContentClassAssignment, CurriculumClassAssignment, CurriculumUnit, LearningContent, Project, ProjectEvidence, Quiz, QuizAttempt, QuizClassAssignment, QuizQuestion, Session, SessionActivity, StudentAssessment)
-from .services import accessible_quizzes, create_attendance, grade_attempt
+from .services import (
+    accessible_content,
+    accessible_curriculum,
+    accessible_evidence,
+    accessible_projects,
+    accessible_quizzes,
+    accessible_sessions,
+    create_attendance,
+    grade_attempt,
+)
 
 class SessionSerializer(serializers.ModelSerializer):
     school_id = serializers.CharField(source="school_class.school.school_code", read_only=True)
@@ -23,7 +32,7 @@ class SessionSerializer(serializers.ModelSerializer):
         if not __import__("academics.services", fromlist=["accessible_class_queryset"]).accessible_class_queryset(request.user).filter(pk=school_class.pk).exists(): raise serializers.ValidationError("You cannot manage a session for this class.")
         curriculum = attrs.get("curriculum_unit", getattr(instance, "curriculum_unit", None))
         if curriculum is not None:
-            if not __import__("learning.services", fromlist=["accessible_curriculum"]).accessible_curriculum(request.user).filter(pk=curriculum.pk).exists():
+            if not accessible_curriculum(request.user).filter(pk=curriculum.pk).exists():
                 raise serializers.ValidationError({"curriculum_unit": "You cannot use this curriculum unit."})
             if str(curriculum.grade).strip().upper() != str(school_class.grade).strip().upper():
                 raise serializers.ValidationError({"curriculum_unit": "Curriculum grade must match the selected class."})
@@ -44,7 +53,6 @@ class SessionActivitySerializer(serializers.ModelSerializer):
         fields = ["id", "session", "title", "activity_type", "notes", "completed_at", "created_by", "created_at", "updated_at"]
         read_only_fields = ["id", "created_by", "created_at", "updated_at"]
     def validate(self, attrs):
-        from .services import accessible_sessions
         request = self.context["request"]
         title = attrs.get("title", getattr(self.instance, "title", ""))
         session = self.instance.session if self.instance else attrs.get("session")
@@ -167,7 +175,7 @@ class ContentClassAssignmentSerializer(serializers.ModelSerializer):
         user = self.context["request"].user; school_class = attrs.get("school_class", getattr(self.instance, "school_class", None)); content = attrs.get("content", getattr(self.instance, "content", None))
         if not school_class or not content: raise serializers.ValidationError("Both content and class are required.")
         if not accessible_class_queryset(user).filter(pk=school_class.pk).exists(): raise serializers.ValidationError("You cannot assign content to this class.")
-        if not __import__("learning.services", fromlist=["accessible_content"]).accessible_content(user).filter(pk=content.pk).exists():
+        if not accessible_content(user).filter(pk=content.pk).exists():
             raise serializers.ValidationError({"content": "You cannot assign this learning content."})
         if content.grade and str(content.grade).upper() != str(school_class.grade).upper(): raise serializers.ValidationError("Content grade must match class grade.")
         if content.status == "archived": raise serializers.ValidationError("Archived content cannot be assigned.")
