@@ -1,0 +1,20 @@
+name: PIXIU Runner Probe
+
+on:
+  push:
+    branches:
+      - fix/part-4-professional-ai-hardening
+
+permissions: {}
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Runtime probe
+        run: |
+          set -e
+          node --version
+          npm --version
+          echo "runner-ok"
