@@ -18,8 +18,8 @@ const packageJson = read("pixiu-lms-portal/package.json")
 
 // Phase A(1) — Pose type contract.
 assert(
-  /export type PoseKeypoint\\s*=/.test(vision) &&
-    /export type PoseResult\\s*=/.test(vision),
+  /export type PoseKeypoint\s*=/.test(vision) &&
+    /export type PoseResult\s*=/.test(vision),
   "PoseKeypoint/PoseResult must remain exported by vision-types.ts",
 )
 assert(
@@ -35,12 +35,12 @@ assert(
   "My AI warmup tensors must dispose both the derived mean tensor and warmup tensor",
 )
 assert(
-  /const embedding = tf\\.tidy\\(\\(\\) =>/.test(extractor) &&
+  /const embedding = tf\.tidy\\(\\(\\) =>/.test(extractor) &&
     extractor.includes("embedding.dispose()"),
   "My AI embedding inference must use tf.tidy and explicitly dispose the returned tensor",
 )
 assert(
-  !/tf\\.tidy\\(\\s*async\\b/.test(extractor),
+  !/tf\.tidy\\(\s*async\\b/.test(extractor),
   "tf.tidy callback must not be async",
 )
 assert(
@@ -57,12 +57,12 @@ assert(
   "MoveNet warmup graph outputs and input tensor must be disposed",
 )
 assert(
-  /const output = tf\\.tidy\\(\\(\\) =>/.test(pose) &&
+  /const output = tf\.tidy\\(\\(\\) =>/.test(pose) &&
     pose.includes("output.dispose()"),
   "MoveNet inference output must be returned from tidy and explicitly disposed after data()",
 )
 assert(
-  !/tf\\.tidy\\(\\s*async\\b/.test(pose),
+  !/tf\.tidy\\(\s*async\\b/.test(pose),
   "MoveNet tf.tidy callback must not be async",
 )
 
@@ -111,7 +111,7 @@ for (const [name, source] of [
   ["ai-studio-engine.ts", engine],
 ]) {
   assert(
-    !/tf\\.tidy\\(\\s*async\\b/.test(source),
+    !/tf\.tidy\\(\s*async\\b/.test(source),
     name + ": async callbacks inside tf.tidy are forbidden",
   )
 }
