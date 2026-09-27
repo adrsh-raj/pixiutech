@@ -42,6 +42,7 @@ export interface ExecutionEnvironment {
 
 let lcdCursorCol = 0
 let lcdCursorRow = 0
+const MAX_BLOCK_LOOP_ITERATIONS = 10_000
 
 // AI blocks are data/control inputs only. They do not mutate virtual hardware;
 // actuator effects remain in the simulator's Arduino execution cases below.
@@ -522,7 +523,10 @@ async function executeSingleBlock(block: Blockly.Block, env: ExecutionEnvironmen
     }
 
     case "controls_repeat_ext": {
-      const times = evaluateNumberInput(block, "TIMES", env, 1)
+      const requestedTimes = evaluateNumberInput(block, "TIMES", env, 1)
+      const times = Number.isFinite(requestedTimes)
+        ? Math.max(0, Math.min(MAX_BLOCK_LOOP_ITERATIONS, Math.floor(requestedTimes)))
+        : 0
       const branch = block.getInputTargetBlock("DO")
       for (let i = 0; i < times && !signal.aborted && env.isRunning(); i++) {
         await executeStatement(branch, env, signal)
@@ -535,7 +539,7 @@ async function executeSingleBlock(block: Blockly.Block, env: ExecutionEnvironmen
       const branch = block.getInputTargetBlock("DO")
       let guard = 0
 
-      while (!signal.aborted && env.isRunning() && guard++ < 10000) {
+      while (!signal.aborted && env.isRunning() && guard++ < MAX_BLOCK_LOOP_ITERATIONS) {
         const value = evaluateBoolean(condition, env)
         const shouldContinue = until ? !value : value
         if (!shouldContinue) break
