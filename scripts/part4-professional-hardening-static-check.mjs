@@ -32,6 +32,7 @@ assert(syncAssets.includes("SPEECH_SOURCE_URL"), "Speech model provisioning is m
 assert(vite.includes("sriAttributePlugin"), "Vite production SRI plugin is missing")
 assert(vite.includes("sha384-"), "Vite SRI plugin does not generate SHA-384 integrity")
 assert(vite.includes("sri-manifest.json"), "Build does not emit an SRI manifest")
+assert(syncAssets.includes("PIXIU-AI-RUNTIME-MANIFEST.json"), "Build does not generate AI runtime integrity manifest")
 assert(!index.includes("fonts.googleapis.com"), "External Google Fonts stylesheet remains in portal HTML")
 assert(!index.includes("fonts.gstatic.com"), "External Google Fonts preconnect remains in portal HTML")
 assert(vercel.includes('"Content-Security-Policy"'), "Portal CSP header is missing")
