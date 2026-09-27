@@ -36,6 +36,8 @@ assert(!soundDetector.includes("modelArtifactsOrURL = SPEECH_MODEL_URL"), "Speec
 assert(!soundDetector.includes("https://storage.googleapis.com/tfjs-models/tfjs/speech-commands"), "Runtime speech detector still hardcodes a remote model URL")
 assert(syncAssets.includes("COCO_SSD_SOURCE_URL"), "COCO-SSD asset provisioning is missing")
 assert(syncAssets.includes("ensureGraphModel(COCO_SSD_SOURCE_URL"), "COCO-SSD weights are not provisioned from model.json manifest")
+assert(syncAssets.includes('expectedFormat === "graph-model"') && syncAssets.includes('legacy-model-without-format'), "Graph-model validator must support legacy TF.js model.json files without a top-level format")
+assert(syncAssets.includes('force: true'), "Invalid cached AI model.json files must be force-refetched")
 assert(syncAssets.includes("SPEECH_METADATA_SOURCE_URL"), "Speech metadata provisioning is missing")
 assert(syncAssets.includes("SPEECH_SOURCE_URL"), "Speech model provisioning is missing")
 assert(vite.includes("sriAttributePlugin"), "Portal Vite production SRI plugin is missing")
