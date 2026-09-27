@@ -36,7 +36,7 @@ for (const [path, metadata] of Object.entries(runtimeManifest.files)) {
   if (actualHash !== metadata.sha256) fail("AI runtime asset hash mismatch: " + safePath)
   if (body.length !== metadata.size) fail("AI runtime asset size mismatch: " + safePath)
 }
-const resourcePattern = /<(script|link)\b[^>]*?(?:src|href)="(/[^"]+.(?:js|css))"[^>]*>/gi
+const resourcePattern = /<(script|link)\b[^>]*?(?:src|href)="(\/[^"]+\.(?:js|css))"[^>]*>/gi
 let resourceCount = 0
 
 for (const match of html.matchAll(resourcePattern)) {
