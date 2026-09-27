@@ -13,10 +13,8 @@ import {
   startCamera,
   stopCamera,
 } from "@/lib/ai/camera-session"
-import {
-  classifyAiRuntimeError,
-  type AiRuntimeErrorKind,
-} from "@/lib/ai/ai-runtime-state"
+import type { AiRuntimeErrorKind } from "@/lib/ai/ai-runtime-state"
+import { toAiRuntimeError } from "@/lib/ai/ai-errors"
 import type { AiVisionState } from "@/lib/ai/vision-types"
 import { toAiRuntimeError } from "@/lib/ai/ai-errors"
 import { createAiVisionState } from "@/lib/ai/vision-state"
@@ -302,9 +300,9 @@ export function AiCameraPanel({
       } catch (error) {
         if (disposed || activeSession !== sessionRef.current) return
 
-        const errorKind = classifyAiRuntimeError(error)
-        const message =
-          error instanceof Error ? error.message : mediaErrorDetail(errorKind)
+        const structuredError = toAiRuntimeError(error, "Camera")
+        const errorKind = structuredError.kind
+        const message = structuredError.userMessage
 
         releaseResources()
         setCameraActive(false)
