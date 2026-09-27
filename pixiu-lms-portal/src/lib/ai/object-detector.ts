@@ -25,20 +25,42 @@ export const DEFAULT_OBJECT_MIN_SCORE = 0.3
 export const COCO_SSD_MODEL_URL = "/models/coco-ssd-lite-mobilenet-v2/model.json"
 
 let objectDetectorLoadPromise: Promise<ObjectDetector> | null = null
+let objectDetectorInstance: ObjectDetector | null = null
+let objectDetectorReferences = 0
 
 export async function loadObjectDetector(): Promise<ObjectDetector> {
-  if (objectDetectorLoadPromise) return objectDetectorLoadPromise
+  objectDetectorReferences += 1
+
+  if (objectDetectorInstance) return objectDetectorInstance
+  if (objectDetectorLoadPromise) {
+    try {
+      const model = await objectDetectorLoadPromise
+      return model
+    } catch (error) {
+      objectDetectorReferences = Math.max(0, objectDetectorReferences - 1)
+      throw error
+    }
+  }
 
   objectDetectorLoadPromise = cocoSsd
     .load({
       base: "lite_mobilenet_v2",
       modelUrl: COCO_SSD_MODEL_URL,
     })
+    .then((model) => {
+      objectDetectorInstance = model
+      return model
+    })
     .finally(() => {
       objectDetectorLoadPromise = null
     })
 
-  return objectDetectorLoadPromise
+  try {
+    return await objectDetectorLoadPromise
+  } catch (error) {
+    objectDetectorReferences = Math.max(0, objectDetectorReferences - 1)
+    throw error
+  }
 }
 
 export async function detectObjects(
@@ -80,5 +102,12 @@ function normalizeObjectClass(name: string) {
 }
 
 export function disposeObjectDetector(detector: ObjectDetector | null) {
-  detector?.dispose()
+  if (!detector) return
+  objectDetectorReferences = Math.max(0, objectDetectorReferences - 1)
+  if (objectDetectorReferences > 0) return
+
+  if (detector === objectDetectorInstance) {
+    objectDetectorInstance = null
+  }
+  detector.dispose()
 }
