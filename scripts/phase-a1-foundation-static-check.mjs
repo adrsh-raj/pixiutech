@@ -40,7 +40,7 @@ assert(
   "My AI embedding inference must use tf.tidy and explicitly dispose the returned tensor",
 )
 assert(
-  !/tf\.tidy\(\s*async\\b/.test(extractor),
+  !/tf\.tidy\(\s*async\b/.test(extractor),
   "tf.tidy callback must not be async",
 )
 assert(
