@@ -1,6 +1,9 @@
 from accounts.models import UserRole
 from academics.models import Student, Trainer
+from academics.services import accessible_class_queryset
 from rest_framework import serializers
+from django.db.models import Q
+from django.utils import timezone
 from .models import (AttendanceRecord, ContentClassAssignment, CurriculumClassAssignment, CurriculumUnit, LearningContent, Project, ProjectEvidence, Quiz, QuizAttempt, QuizClassAssignment, QuizQuestion, Session, SessionActivity, StudentAssessment)
 from .services import (
     accessible_content,
@@ -29,7 +32,7 @@ class SessionSerializer(serializers.ModelSerializer):
         school_class = attrs.get("school_class", getattr(instance, "school_class", None)); trainer = attrs.get("trainer", getattr(instance, "trainer", None))
         if not school_class: raise serializers.ValidationError({"school_class": "Class is required."})
         if not trainer: raise serializers.ValidationError({"trainer": "Trainer is required."})
-        if not __import__("academics.services", fromlist=["accessible_class_queryset"]).accessible_class_queryset(request.user).filter(pk=school_class.pk).exists(): raise serializers.ValidationError("You cannot manage a session for this class.")
+        if not accessible_class_queryset(request.user).filter(pk=school_class.pk).exists(): raise serializers.ValidationError("You cannot manage a session for this class.")
         curriculum = attrs.get("curriculum_unit", getattr(self.instance, "curriculum_unit", None))
         if curriculum is not None:
             if not accessible_curriculum(request.user).filter(pk=curriculum.pk).exists():
@@ -39,7 +42,12 @@ class SessionSerializer(serializers.ModelSerializer):
             if not CurriculumClassAssignment.objects.filter(curriculum_unit=curriculum, school_class=school_class).exists():
                 raise serializers.ValidationError({"curriculum_unit": "This curriculum unit is not assigned to the selected class."})
         if trainer.status != "active": raise serializers.ValidationError({"trainer": "Only active trainers can be scheduled."})
-        if request.user.role != UserRole.ADMIN and not trainer.school_assignments.filter(school_id=school_class.school_id, status="active").exists(): raise serializers.ValidationError("Trainer is not assigned to this school.")
+        if request.user.role != UserRole.ADMIN and not trainer.school_assignments.filter(
+            school_id=school_class.school_id,
+            status="active",
+            assigned_from__lte=timezone.localdate(),
+        ).filter(Q(assigned_to__isnull=True) | Q(assigned_to__gte=timezone.localdate())).exists():
+            raise serializers.ValidationError("Trainer is not currently assigned to this school.")
         if request.user.role == UserRole.TRAINER and trainer.account_id != request.user.id: raise serializers.ValidationError("A trainer can only schedule their own sessions.")
         if instance and instance.is_locked and request.user.role != UserRole.ADMIN: raise serializers.ValidationError("Locked sessions cannot be edited.")
         if instance and instance.status in {"completed", "cancelled"} and request.user.role != UserRole.ADMIN: raise serializers.ValidationError("Completed or cancelled sessions cannot be edited.")
