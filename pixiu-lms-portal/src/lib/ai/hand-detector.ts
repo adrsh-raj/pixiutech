@@ -266,9 +266,17 @@ export async function loadHandDetector(
         reject: (reason: unknown) => void
       }
     | null = null
+  let pendingTimeout: number | null = null
+  const clearPendingTimeout = () => {
+    if (pendingTimeout !== null) {
+      window.clearTimeout(pendingTimeout)
+      pendingTimeout = null
+    }
+  }
 
   hands.onResults((results: any) => {
     if (!pending) return
+    clearPendingTimeout()
 
     const normalized = Array.isArray(results?.multiHandLandmarks)
       ? results.multiHandLandmarks
