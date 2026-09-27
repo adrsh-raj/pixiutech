@@ -37,6 +37,7 @@ const requiredScripts = [
   "scripts/phase8-release-gate.mjs",
   "scripts/cyberlab-browser-gate.mjs",
   "scripts/part4-professional-hardening-static-check.mjs",
+  "scripts/verify-portal-security-build.mjs",
 ]
 for (const relative of requiredScripts) {
   if (!existsSync(join(repoRoot, relative))) throw new Error("Required release gate missing: " + relative)
@@ -51,6 +52,7 @@ run(process.execPath, ["--experimental-strip-types", "scripts/ai-phase6-qa.mjs"]
 run(process.execPath, ["scripts/phase7-8-static-check.mjs"], repoRoot, "Phase 7-8 static regression gate")
 run(process.execPath, ["scripts/security-static-check.mjs"], repoRoot, "Cross-phase security static gate")
 run("npm", ["run", "build"], portalRoot, "Portal production build")
+run(process.execPath, ["scripts/verify-portal-security-build.mjs"], repoRoot, "Built SRI + local AI runtime verification")
 
 process.stdout.write("\nPIXIU Phase 9 final green gate source/build portion PASSED\n")
 process.stdout.write("Controlled push invariant: PASS (no workflow performs an automatic main/force push)\n")
