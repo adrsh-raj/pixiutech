@@ -1,8 +1,7 @@
 import * as tf from "@tensorflow/tfjs"
 import type { PoseKeypoint, PoseResult } from "./vision-types"
 
-const MOVENET_URL =
-  "https://tfhub.dev/google/tfjs-model/movenet/singlepose/lightning/4"
+const MOVENET_URL = "/models/movenet/model.json"
 
 export const MOVENET_EDGES: Array<[number, number]> = [
   [0, 1], [0, 2], [1, 3], [2, 4],
@@ -76,7 +75,7 @@ export async function loadMoveNet(): Promise<tf.GraphModel> {
     }
   }
 
-  const model = await tf.loadGraphModel(MOVENET_URL, { fromTFHub: true })
+  const model = await tf.loadGraphModel(MOVENET_URL)
 
   // Warm the graph once so the first visible inference is not a cold-start spike.
   const warmup = tf.zeros([1, INPUT_SIZE, INPUT_SIZE, 3], "int32")
