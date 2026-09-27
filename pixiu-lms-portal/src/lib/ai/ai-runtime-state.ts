@@ -1,0 +1,105 @@
+import type { AiVisionMode } from "./vision-types"
+
+export type AiRuntimeStatus =
+  | "idle"
+  | "loading"
+  | "ready"
+  | "running"
+  | "error"
+  | "stopped"
+
+export type AiRuntimeErrorKind =
+  | "permission"
+  | "unsupported"
+  | "model"
+  | "inference"
+  | "storage"
+  | "cancelled"
+  | "unknown"
+
+export function classifyAiRuntimeError(error: unknown): AiRuntimeErrorKind {
+  const name =
+    error && typeof error === "object" && "name" in error
+      ? String((error as { name?: unknown }).name ?? "")
+      : ""
+
+  if (
+    name === "NotAllowedError" ||
+    name === "SecurityError" ||
+    name === "PermissionDeniedError"
+  ) {
+    return "permission"
+  }
+
+  if (
+    name === "NotFoundError" ||
+    name === "DevicesNotFoundError"
+  ) {
+    return "unsupported"
+  }
+
+  if (name === "NotReadableError" || name === "TrackStartError") {
+    return "permission"
+  }
+
+  const message =
+    error instanceof Error ? error.message.toLowerCase() : String(error ?? "").toLowerCase()
+
+  if (
+    message.includes("permission") ||
+    message.includes("denied") ||
+    message.includes("secure context") ||
+    message.includes("microphone") ||
+    message.includes("camera")
+  ) {
+    return "permission"
+  }
+
+  if (
+    message.includes("not support") ||
+    message.includes("unsupported") ||
+    message.includes("browser")
+  ) {
+    return "unsupported"
+  }
+
+  if (
+    message.includes("model") ||
+    message.includes("mediapipe") ||
+    message.includes("movenet") ||
+    message.includes("speech commands") ||
+    message.includes("coco-ssd")
+  ) {
+    return "model"
+  }
+
+  if (message.includes("storage") || message.includes("indexeddb")) {
+    return "storage"
+  }
+
+  if (message.includes("cancel")) {
+    return "cancelled"
+  }
+
+  if (
+    message.includes("inference") ||
+    message.includes("predict") ||
+    message.includes("detection")
+  ) {
+    return "inference"
+  }
+
+  return "unknown"
+}
+
+export function runtimeDetail(
+  mode: AiVisionMode,
+  status: AiRuntimeStatus,
+): string {
+  if (status === "idle") return mode === "sound" ? "Microphone idle" : "Camera idle"
+  if (status === "loading") return mode === "sound" ? "Starting microphone…" : "Loading AI…"
+  if (status === "ready") return "AI ready"
+  if (status === "running") return "AI running"
+  if (status === "stopped") return "AI stopped"
+  return "AI unavailable"
+}
