@@ -215,7 +215,7 @@ export async function loadSoundRecognizer(): Promise<SoundRecognizer> {
 
       try {
         await recognizer.listen(
-          (result: any) => {
+          (result: { scores?: ArrayLike<number> }) => {
             if (request !== generation || !listening) return
 
             const rawScores = Array.from(result?.scores ?? []) as number[]
