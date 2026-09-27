@@ -8,6 +8,7 @@ import {
   readFile,
   readdir,
   rename,
+  rm,
   stat,
   writeFile,
 } from "node:fs/promises"
@@ -128,13 +129,8 @@ async function ensureRemoteFile(url, destination, options = {}) {
   try {
     await writeFile(temporary, result.bytes)
     await rename(temporary, destination)
-  } catch (error) {
-    try {
-      await rename(temporary, destination)
-    } catch {
-      // Preserve the original error with no partial final file left behind.
-    }
-    throw error
+  } finally {
+    await rm(temporary, { force: true })
   }
 
   return result.finalUrl
