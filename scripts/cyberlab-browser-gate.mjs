@@ -119,10 +119,59 @@ try {
   await page.getByText("6F Sound ready", { exact: true }).waitFor()
   await page.getByRole("button", { name: "Stop" }).click()
 
-  // Separate portal AI Studio route.
+  // Standalone portal AI Studio route + real My AI train/persist/predict flow.
   await page.goto(baseUrl + "/ai-studio", { waitUntil: "networkidle" })
   if (!(await page.title()).includes("PIXIU AI STUDIO")) throw new Error("Standalone AI Studio route did not load")
   await page.getByText("PIXIU AI STUDIO", { exact: true }).first().waitFor()
+
+  const seededDataset = await page.evaluate(() => {
+    const makeImage = (color) => {
+      const canvas = document.createElement("canvas")
+      canvas.width = 24
+      canvas.height = 24
+      const context = canvas.getContext("2d")
+      if (!context) throw new Error("Canvas is unavailable in browser gate.")
+      context.fillStyle = color
+      context.fillRect(0, 0, 24, 24)
+      return canvas.toDataURL("image/png")
+    }
+    const classes = ["red", "blue"]
+    const samples = classes.flatMap((label, classIndex) =>
+      Array.from({ length: 3 }, (_, index) => ({
+        id: label + "-" + index,
+        label,
+        dataUrl: makeImage(classIndex === 0 ? "#ef4444" : "#3b82f6"),
+        createdAt: Date.now() + index,
+      })),
+    )
+    localStorage.setItem("pixiu-ai-studio-v4", JSON.stringify({
+      classes,
+      samples,
+      model: null,
+    }))
+    return samples.length
+  })
+  if (seededDataset !== 6) throw new Error("My AI browser dataset seed failed.")
+  await page.reload({ waitUntil: "networkidle" })
+
+  await page.getByText("Teach", { exact: true }).click()
+  await page.getByRole("button", { name: "Train My AI", exact: true }).click()
+  await page.getByText(/My AI learned 2 concepts/i).waitFor({ timeout: 90_000 })
+
+  await page.getByText("Try", { exact: true }).click()
+  const myAiButton = page.getByRole("button").filter({ hasText: /^My AI/i }).last()
+  await myAiButton.click()
+  await page.getByRole("button", { name: "Start camera", exact: true }).click()
+  await page.getByText("6I My AI ready", { exact: true }).waitFor({ timeout: 60_000 })
+  await page.getByRole("button", { name: "Stop", exact: true }).click()
+
+  await page.reload({ waitUntil: "networkidle" })
+  await page.getByText("Try", { exact: true }).click()
+  await page.getByRole("button").filter({ hasText: /^My AI/i }).last().click()
+  await page.getByRole("button", { name: "Start camera", exact: true }).click()
+  await page.getByText("6I My AI ready", { exact: true }).waitFor({ timeout: 60_000 })
+  await page.getByRole("button", { name: "Stop", exact: true }).click()
+
   await page.screenshot({ path: artifactDir + "/ai-studio.png", fullPage: true })
 
   if (aiRemoteRequests.length) throw new Error("AI runtime attempted a remote dependency: " + aiRemoteRequests.join(" | "))
