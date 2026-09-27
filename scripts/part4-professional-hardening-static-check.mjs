@@ -20,6 +20,7 @@ const packageJson = JSON.parse(read("pixiu-lms-portal/package.json"))
 const errorTaxonomy = read("pixiu-lms-portal/src/lib/ai/ai-errors.ts")
 const studio = read("pixiu-lms-portal/src/components/circuit-lab/ai-studio-panel.tsx")
 const controller = read("pixiu-lms-portal/src/components/circuit-lab/use-ai-studio-controller.ts")
+const productionSmoke = read(".github/workflows/production-security-smoke.yml")
 
 assert(objectDetector.includes('modelUrl: COCO_SSD_MODEL_URL'), "COCO-SSD is not explicitly bound to a same-origin model URL")
 assert(objectDetector.includes('"/models/coco-ssd-lite-mobilenet-v2/model.json"'), "COCO-SSD local model path is missing")
@@ -68,6 +69,8 @@ assert(unitFiles.length >= 5, "Expected at least five AI module unit-test files"
 assert(controller.includes('type ReadyResource ='), "Typed AI resource union is missing")
 assert(!controller.match(/\bany\b/), "AI Studio controller still contains broad any")
 assert(!soundDetector.match(/\bany\b/), "Sound detector still contains broad any")
+assert(productionSmoke.split("\n").length < 180, "Production security smoke workflow is unexpectedly large/corrupted")
+assert(productionSmoke.includes("name: PIXIU Production Security Smoke") && productionSmoke.includes("jobs:") && productionSmoke.includes("Django health"), "Production security smoke workflow is incomplete")
 
 if (failures.length) {
   console.error("PIXIU Part 4 professional hardening gate FAILED")
