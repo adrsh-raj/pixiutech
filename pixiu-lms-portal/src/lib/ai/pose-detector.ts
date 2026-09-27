@@ -62,6 +62,24 @@ function disposeGraphOutput(
   Object.values(output).forEach((tensor) => tensor.dispose())
 }
 
+function assertMoveNetOutputShape(output: tf.Tensor | tf.Tensor[] | tf.NamedTensorMap) {
+  const tensor = firstGraphTensor(output)
+  const shape = tensor.shape
+  if (
+    shape.length !== 4 ||
+    shape[0] !== 1 ||
+    shape[1] !== 1 ||
+    shape[2] !== MOVENET_KEYPOINT_NAMES.length ||
+    shape[3] !== 3
+  ) {
+    throw new Error(
+      "MoveNet output shape mismatch. Expected [1,1,17,3], got " +
+        JSON.stringify(shape) +
+        ".",
+    )
+  }
+}
+
 export async function loadMoveNet(): Promise<tf.GraphModel> {
   await tf.ready()
 
@@ -80,8 +98,12 @@ export async function loadMoveNet(): Promise<tf.GraphModel> {
   // Warm the graph once so the first visible inference is not a cold-start spike.
   const warmup = tf.zeros([1, INPUT_SIZE, INPUT_SIZE, 3], "int32")
   const rawOutput = model.execute(warmup)
-  disposeGraphOutput(rawOutput)
-  warmup.dispose()
+  try {
+    assertMoveNetOutputShape(rawOutput)
+  } finally {
+    disposeGraphOutput(rawOutput)
+    warmup.dispose()
+  }
 
   return model
 }
@@ -106,6 +128,17 @@ export async function estimateMoveNetPose(
   })
 
   try {
+    const shape = output.shape
+    if (
+      shape.length !== 4 ||
+      shape[0] !== 1 ||
+      shape[1] !== 1 ||
+      shape[2] !== MOVENET_KEYPOINT_NAMES.length ||
+      shape[3] !== 3
+    ) {
+      return null
+    }
+
     const values = await output.data()
     if (values.length < MOVENET_KEYPOINT_NAMES.length * 3) {
       return null
@@ -113,9 +146,12 @@ export async function estimateMoveNetPose(
 
     const keypoints: PoseKeypoint[] = MOVENET_KEYPOINT_NAMES.map((name, index) => {
       const offset = index * 3
-      const y = Number(values[offset] ?? 0)
-      const x = Number(values[offset + 1] ?? 0)
-      const score = Number(values[offset + 2] ?? 0)
+      const rawY = Number(values[offset] ?? 0)
+      const rawX = Number(values[offset + 1] ?? 0)
+      const rawScore = Number(values[offset + 2] ?? 0)
+      const y = Number.isFinite(rawY) ? rawY : 0
+      const x = Number.isFinite(rawX) ? rawX : 0
+      const score = Number.isFinite(rawScore) ? rawScore : 0
 
       return {
         name,
