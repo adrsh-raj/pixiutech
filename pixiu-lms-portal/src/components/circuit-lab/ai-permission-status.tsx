@@ -1,14 +1,10 @@
-import type { AiVisionState } from "@/lib/ai/vision-types"
-import type { Dispatch } from "react"
 
 export function AiPermissionStatus({
-  aiState,
   cameraActive,
   soundActive,
   stopInput,
   onGoToSimulation,
 }: {
-  aiState: AiVisionState
   cameraActive: boolean
   soundActive: boolean
   stopInput: () => void
