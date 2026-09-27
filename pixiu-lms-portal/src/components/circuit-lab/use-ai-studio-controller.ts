@@ -1472,7 +1472,7 @@ const [tab, setTab] = useState<Tab>("try")
           : "That example could not be added.",
       )
     } catch (sampleError) {
-      setError(sampleError instanceof Error ? sampleError.message : "Could not save the sample.")
+      setError(toAiRuntimeError(sampleError, "Dataset").userMessage)
     }
   }
 
@@ -1508,7 +1508,7 @@ const [tab, setTab] = useState<Tab>("try")
       setLabel("")
       setStatus("Imported " + added + " example" + (added === 1 ? "" : "s") + ".")
     } catch (sampleError) {
-      setError(sampleError instanceof Error ? sampleError.message : "Could not import those images.")
+      setError(toAiRuntimeError(sampleError, "Dataset").userMessage)
     }
   }
 
@@ -1555,7 +1555,7 @@ const [tab, setTab] = useState<Tab>("try")
       setStatus("My AI learned " + result.summary.classes.length + " concepts.")
     } catch (trainError) {
       if (runId !== trainingRunRef.current) return
-      setError(trainError instanceof Error ? trainError.message : "Training failed.")
+      setError(toAiRuntimeError(trainError, "My AI training").userMessage)
     } finally {
       if (runId === trainingRunRef.current) setTraining(false)
     }
