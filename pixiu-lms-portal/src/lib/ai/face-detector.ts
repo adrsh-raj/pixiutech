@@ -19,6 +19,24 @@ export type FaceDetection = {
   mesh: FacePoint[]
 }
 
+
+export type MediaPipeFaceLandmark = { x?: number; y?: number; z?: number; name?: string }
+export type MediaPipeFaceResults = {
+  multiFaceLandmarks?: MediaPipeFaceLandmark[][]
+}
+export type MediaPipeFaceMeshInstance = {
+  setOptions: (options: {
+    maxNumFaces: number
+    refineLandmarks: boolean
+    minDetectionConfidence: number
+    minTrackingConfidence: number
+  }) => void
+  onResults: (callback: (results: MediaPipeFaceResults) => void) => void
+  send: (input: { image: HTMLVideoElement }) => Promise<void>
+  close: () => void
+  reset?: () => void
+}
+
 export type FaceDetector = {
   version: string
   detect: (video: HTMLVideoElement) => Promise<FaceDetection[]>
@@ -33,7 +51,7 @@ const FACE_MESH_ASSET_BASE = "/vendor/mediapipe/face_mesh/"
 
 declare global {
   interface Window {
-    FaceMesh?: any
+    FaceMesh?: new (options: { locateFile: (file: string) => string }) => MediaPipeFaceMeshInstance
   }
 }
 
@@ -194,8 +212,8 @@ function boundsFromMesh(mesh: FacePoint[]): [number, number, number, number] {
 export async function loadFaceDetector(): Promise<FaceDetector> {
   await loadFaceMeshScript()
 
-  const faceMesh = new window.FaceMesh({
-    locateFile: (file: string) => `${FACE_MESH_ASSET_BASE}${file}`,
+  const faceMesh = new window.FaceMesh!({
+    locateFile: (file) => `${FACE_MESH_ASSET_BASE}${file}`,
   })
 
   faceMesh.setOptions({
@@ -221,7 +239,7 @@ export async function loadFaceDetector(): Promise<FaceDetector> {
     }
   }
 
-  faceMesh.onResults((results: any) => {
+  faceMesh.onResults((results: MediaPipeFaceResults) => {
     if (!pending) return
     clearPendingTimeout()
 
@@ -231,7 +249,7 @@ export async function loadFaceDetector(): Promise<FaceDetector> {
         : []
     )
       .slice(0, MAX_FACES)
-      .map((landmarks: any[]) => {
+      .map((landmarks: MediaPipeFaceLandmark[]) => {
         const mesh = landmarks.map(toPoint)
         const box = boundsFromMesh(mesh)
         const expression = classifyExpression(mesh, box)
@@ -301,7 +319,7 @@ export async function loadFaceDetector(): Promise<FaceDetector> {
   }
 }
 
-function toPoint(point: any): FacePoint {
+function toPoint(point: MediaPipeFaceLandmark): FacePoint {
   return {
     x: Number(point?.x ?? 0),
     y: Number(point?.y ?? 0),
