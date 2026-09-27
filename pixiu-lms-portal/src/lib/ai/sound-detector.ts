@@ -108,19 +108,10 @@ async function ensureSpeechRuntime() {
 
   if (window.speechCommands) return
 
-  let lastError: unknown = null
-  for (const src of SPEECH_SOURCES) {
-    try {
-      await loadScript(src)
-      if (window.speechCommands) return
-    } catch (error) {
-      lastError = error
-    }
+  await loadScript(SPEECH_SCRIPT)
+  if (!window.speechCommands) {
+    throw new Error("Local Speech Commands runtime loaded without its API.")
   }
-
-  throw lastError instanceof Error
-    ? lastError
-    : new Error("Speech Commands runtime could not be loaded.")
 }
 
 function normalizeScores(labels: string[], scores: ArrayLike<number>) {
