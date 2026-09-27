@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - fix/ai-lab-phase-0-3-end-to-end
+      - fix/ai-lab-phase-4-6-end-to-end
     paths:
       - "pixiu-lms-portal/src/lib/ai/**"
       - "pixiu-lms-portal/src/lib/ai-studio-engine.ts"
