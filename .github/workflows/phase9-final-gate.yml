@@ -1,0 +1,89 @@
+name: PIXIU Phase 9 Final Green Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+      - fix/ai-lab-phase-0-3-end-to-end
+    paths:
+      - "pixiu-lms-portal/**"
+      - "scripts/**"
+      - ".github/workflows/**"
+      - "package.json"
+      - "package-lock.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  final_green_gate:
+    name: Phase 9 final green gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: pixiu-lms-portal/.node-version
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            pixiu-lms-portal/package-lock.json
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install portal dependencies
+        working-directory: pixiu-lms-portal
+        run: npm ci
+
+      - name: Run source/build final gate
+        run: node scripts/phase9-final-gate.mjs
+
+      - name: Verify public website build and audit
+        run: |
+          npm run build
+          npm run audit:site
+
+      - name: Install browser runner
+        run: |
+          npm install --no-save --package-lock=false playwright@1.63.0
+          npx playwright install --with-deps chromium
+
+      - name: Start production preview
+        working-directory: pixiu-lms-portal
+        run: |
+          nohup npm run preview -- --host 127.0.0.1 --port 4173 >/tmp/pixiu-phase9-preview.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4173/simulation >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/pixiu-phase9-preview.log
+          exit 1
+
+      - name: Run browser verification and regression gate
+        env:
+          CYBERLAB_BASE_URL: "http://127.0.0.1:4173"
+          CYBERLAB_ARTIFACT_DIR: "artifacts/phase9-browser"
+        run: node scripts/cyberlab-browser-gate.mjs
+
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pixiu-phase9-browser-evidence
+          path: artifacts/phase9-browser
+          if-no-files-found: ignore
+
+      - name: Controlled push checkpoint
+        run: |
+          echo "FINAL GREEN GATE CHECKPOINT"
+          echo "Commit: $GITHUB_SHA"
+          echo "No automatic push or force-push is performed by this workflow."
