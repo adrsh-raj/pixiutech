@@ -161,6 +161,32 @@ export function solveCircuitNodalPotentials(
         allPins.add(pinKey(part.id, "gnd"))
         allPins.add(pinKey(part.id, "sig"))
         break
+      case "ir-sensor":
+        for (const pin of ["vcc", "out", "gnd"]) allPins.add(pinKey(part.id, pin))
+        break
+      case "dht11":
+        for (const pin of ["vcc", "data", "gnd"]) allPins.add(pinKey(part.id, pin))
+        break
+      case "oled-i2c":
+        for (const pin of ["gnd", "vcc", "scl", "sda"]) allPins.add(pinKey(part.id, pin))
+        break
+      case "joystick":
+        for (const pin of ["gnd", "vcc", "vrx", "vry", "sw"]) allPins.add(pinKey(part.id, pin))
+        break
+      case "l298n":
+        for (const pin of ["vs", "gnd", "5v", "ena", "in1", "in2", "out1", "out2", "enb", "in3", "in4", "out3", "out4"]) {
+          allPins.add(pinKey(part.id, pin))
+        }
+        break
+      case "rotary-encoder":
+        for (const pin of ["gnd", "vcc", "clk", "dt", "sw"]) allPins.add(pinKey(part.id, pin))
+        break
+      case "soil-moisture":
+        for (const pin of ["vcc", "ao", "gnd"]) allPins.add(pinKey(part.id, pin))
+        break
+      case "keypad-4x4":
+        for (const pin of ["r1", "r2", "r3", "r4", "c1", "c2", "c3", "c4"]) allPins.add(pinKey(part.id, pin))
+        break
       case "breadboard": {
         for (let c = 1; c <= 20; c++) {
           for (const r of ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"]) {
@@ -299,6 +325,36 @@ export function solveCircuitNodalPotentials(
       fixedNets.set(netPos, { voltage: 9.0, label: "9V Battery (+)" })
       const netNeg = pinToNetId(part.id, "neg")
       fixedNets.set(netNeg, { voltage: 0.0, label: "Battery Ground (0V)" })
+    }
+  }
+
+  // 5. Expose deterministic module outputs only when their power and ground
+  // nets are actually connected to a fixed source/sink.
+  for (const part of state.parts) {
+    const poweredTypes = ["ir-sensor", "dht11", "oled-i2c", "joystick", "soil-moisture"]
+    if (!poweredTypes.includes(part.type)) continue
+    const vccPin = pinToNetId(part.id, "vcc")
+    const gndPin = pinToNetId(part.id, "gnd")
+    if (!fixedNets.has(vccPin) || !fixedNets.has(gndPin)) continue
+
+    const setOutputIfFree = (pinId: string, voltage: number, label: string) => {
+      const net = pinToNetId(part.id, pinId)
+      if (!fixedNets.has(net)) fixedNets.set(net, { voltage, label })
+    }
+
+    if (part.type === "ir-sensor") {
+      setOutputIfFree("out", String(part.props.detected ?? "false") === "true" ? 5 : 0, "IR sensor " + part.id + " OUT")
+    } else if (part.type === "dht11") {
+      setOutputIfFree("data", 3.3, "DHT11 " + part.id + " DATA")
+    } else if (part.type === "oled-i2c") {
+      setOutputIfFree("sda", 3.3, "OLED " + part.id + " SDA")
+      setOutputIfFree("scl", 3.3, "OLED " + part.id + " SCL")
+    } else if (part.type === "joystick") {
+      setOutputIfFree("vrx", Math.max(0, Math.min(5, Number(part.props.x ?? 512) / 1023 * 5)), "Joystick " + part.id + " VRx")
+      setOutputIfFree("vry", Math.max(0, Math.min(5, Number(part.props.y ?? 512) / 1023 * 5)), "Joystick " + part.id + " VRy")
+      setOutputIfFree("sw", String(part.props.pressed ?? "false") === "true" ? 5 : 0, "Joystick " + part.id + " SW")
+    } else if (part.type === "soil-moisture") {
+      setOutputIfFree("ao", Math.max(0, Math.min(5, Number(part.props.moisture ?? 620) / 1023 * 5)), "Soil moisture " + part.id + " AO")
     }
   }
 

@@ -1,6 +1,6 @@
 import type { CircuitState } from "./circuit-types"
 import { CATALOG } from "./components-catalog"
-import type { PartRuntime } from "@/components/part-art"
+import type { PartRuntime } from "@/components/circuit-lab/part-art"
 
 export interface ArduinoPinState {
   state: "HIGH" | "LOW"
@@ -147,304 +147,12 @@ export function computeRuntime(
       activeSources.push({ key: k("pos"), voltage: 9.0 })
       groundSinks.push(k("neg"))
     } else if (part.type === "ir-sensor") {
-      activeSources.push({ key: k("vcc"), voltage: 5.0 })
-      groundSinks.push(k("gnd"))
-      activeSources.push({ key: k("out"), voltage: String(part.props.detected ?? "false") === "true" ? 5.0 : 0.0 })
-      if (String(part.props.detected ?? "false") !== "true") groundSinks.push(k("out"))
-    } else if (part.type === "joystick") {
-      activeSources.push({ key: k("vcc"), voltage: 5.0 })
-      groundSinks.push(k("gnd"))
-      activeSources.push({ key: k("vrx"), voltage: Math.max(0, Math.min(5, Number(part.props.x ?? 512) / 1023 * 5)) })
-      activeSources.push({ key: k("vry"), voltage: Math.max(0, Math.min(5, Number(part.props.y ?? 512) / 1023 * 5)) })
-      if (String(part.props.pressed ?? "false") === "true") activeSources.push({ key: k("sw"), voltage: 5.0 })
-      else groundSinks.push(k("sw"))
-    } else if (part.type === "soil-moisture") {
-      activeSources.push({ key: k("vcc"), voltage: 5.0 })
-      groundSinks.push(k("gnd"))
-      activeSources.push({ key: k("ao"), voltage: Math.max(0, Math.min(5, Number(part.props.moisture ?? 620) / 1023 * 5)) })
-    } else if (part.type === "rotary-encoder") {
-      const value = Number(part.props.value ?? 0)
-      activeSources.push({ key: k("vcc"), voltage: 5.0 })
-      groundSinks.push(k("gnd"))
-      activeSources.push({ key: k("clk"), voltage: value % 2 ? 5.0 : 0.0 })
-      activeSources.push({ key: k("dt"), voltage: Math.floor(value / 2) % 2 ? 5.0 : 0.0 })
-      if (String(part.props.pressed ?? "false") === "true") activeSources.push({ key: k("sw"), voltage: 5.0 })
-      else groundSinks.push(k("sw"))
-    } else if (part.type === "dht11") {
-      activeSources.push({ key: k("vcc"), voltage: 5.0 })
-      groundSinks.push(k("gnd"))
-      activeSources.push({ key: k("data"), voltage: 3.3 })
-    } else if (part.type === "oled-i2c") {
-      activeSources.push({ key: k("vcc"), voltage: 5.0 })
-      groundSinks.push(k("gnd"))
-      activeSources.push({ key: k("sda"), voltage: 3.3 })
-      activeSources.push({ key: k("scl"), voltage: 3.3 })
-    } else if (part.type === "l298n") {
-      activeSources.push({ key: k("vs"), voltage: 9.0 })
-      activeSources.push({ key: k("5v"), voltage: 5.0 })
-      groundSinks.push(k("gnd"))
-    }
-  }
-
-  // Helper: Dijkstra shortest resistance path from a list of start nodes to a target
-  function shortestResistance(
-    starts: { key: string; voltage?: number }[],
-    target: string,
-  ): { resistance: number; voltage: number } | null {
-    const dist = new Map<string, number>()
-    const voltageMap = new Map<string, number>()
-    const visited = new Set<string>()
-
-    const pq: { node: string; d: number }[] = []
-
-    for (const s of starts) {
-      dist.set(s.key, 0)
-      if (s.voltage !== undefined) voltageMap.set(s.key, s.voltage)
-      pq.push({ node: s.key, d: 0 })
-    }
-
-    while (pq.length > 0) {
-      pq.sort((a, b) => a.d - b.d)
-      const { node, d } = pq.shift()!
-
-      if (node === target) {
-        return { resistance: d, voltage: voltageMap.get(node) ?? 5.0 }
-      }
-
-      if (visited.has(node)) continue
-      visited.add(node)
-
-      const edges = graph.get(node) || []
-      for (const e of edges) {
-        const newD = d + e.resistance
-        if (newD < (dist.get(e.to) ?? Infinity)) {
-          dist.set(e.to, newD)
-          if (voltageMap.has(node)) {
-            voltageMap.set(e.to, voltageMap.get(node)!)
-          }
-          pq.push({ node: e.to, d: newD })
-        }
-      }
-    }
-
-    return null
-  }
-
-  const runtime: Record<string, PartRuntime> = {}
-
-  // 4. Solve for each component
-  for (const part of state.parts) {
-    if (part.type === "arduino-uno") {
-      runtime[part.id] = {
-        pin13High: pinStates["13"]?.state === "HIGH",
-      }
-    } else if (part.type === "led") {
-      const anodeKey = key(part.id, "anode")
-      const cathodeKey = key(part.id, "cathode")
-
-      // Forward polarity path check
-      const pathSourceToAnode = shortestResistance(activeSources, anodeKey)
-      const pathCathodeToGround = shortestResistance(
-        groundSinks.map((g) => ({ key: g })),
-        cathodeKey,
-      )
-
-      if (pathSourceToAnode && pathCathodeToGround) {
-        const totalResistance = pathSourceToAnode.resistance + pathCathodeToGround.resistance
-        const vSupply = pathSourceToAnode.voltage
-        const vForward = 2.0 // Typical 5mm red/green/yellow LED forward voltage
-        const vResistor = Math.max(0, vSupply - vForward)
-        const currentAmps = vResistor / (totalResistance + 0.1)
-        const currentMa = currentAmps * 1000
-
-        // ================= ELECTRICAL SAFETY CHECK =================
-        // Safe LED current: 10 mA - 25 mA (ideal 220 - 330 ohm resistor)
-        // Overcurrent: Without a resistor, resistance is near 0 ohms (< 60 ohms),
-        // causing massive current (> 50 mA up to 1000 mA) which instantly burns the diode!
-        if (totalResistance < 60) {
-          runtime[part.id] = {
-            burnt: true,
-            level: 0,
-            currentMa: Math.round(currentMa),
-            resistorOhms: Math.round(totalResistance),
-            warning: `💥 OVERCURRENT BURNOUT! Current was ${Math.round(currentMa)} mA (Max safe: 20 mA). Connect a 220Ω resistor in series!`,
-          }
-        } else if (totalResistance > 4700) {
-          // Starved of current (e.g. 10k resistor): too dim to glow
-          runtime[part.id] = {
-            burnt: false,
-            level: 0,
-            currentMa: Number(currentMa.toFixed(2)),
-            resistorOhms: Math.round(totalResistance),
-            warning: `Current is too weak (${currentMa.toFixed(2)} mA) to illuminate LED.`,
-          }
-        } else {
-          // Perfectly protected by current-limiting resistor!
-          const brightness = Math.min(1.0, Math.max(0.3, currentMa / 15.0))
-          runtime[part.id] = {
-            burnt: false,
-            level: brightness,
-            currentMa: Number(currentMa.toFixed(1)),
-            resistorOhms: Math.round(totalResistance),
-          }
-        }
-      } else {
-        // Check reverse polarity (Cathode to Source, Anode to Ground)
-        const reverseSource = shortestResistance(activeSources, cathodeKey)
-        const reverseGround = shortestResistance(
-          groundSinks.map((g) => ({ key: g })),
-          anodeKey,
-        )
-        if (reverseSource && reverseGround) {
-          runtime[part.id] = {
-            burnt: false,
-            level: 0,
-            warning: "Reverse Polarity: Anode (+) is wired to GND. Diodes block reverse current.",
-          }
-        } else {
-          // Open circuit (not connected)
-          runtime[part.id] = { burnt: false, level: 0 }
-        }
-      }
-    } else if (part.type === "buzzer") {
-      const posKey = key(part.id, "pos")
-      const negKey = key(part.id, "neg")
-      const toPos = shortestResistance(activeSources, posKey)
-      const toNeg = shortestResistance(
-        groundSinks.map((g) => ({ key: g })),
-        negKey,
-      )
-      const active = Boolean(toPos && toNeg)
-      runtime[part.id] = { level: active ? 1 : 0 }
-    } else if (part.type === "servo") {
-      const sigKey = key(part.id, "sig")
-      let drivenAngle: number | undefined
-      const unoPart = state.parts.find((pt) => pt.type === "arduino-uno")
-      if (unoPart) {
-        for (const [pinNum, p] of Object.entries(pinStates)) {
-          if (p.angle !== undefined) {
-            const cleanPin = pinNum.toLowerCase().replace(/^d/, "")
-            const unoPinKey1 = key(unoPart.id, `d${cleanPin}`)
-            const unoPinKey2 = key(unoPart.id, cleanPin)
-            const path = shortestResistance([{ key: unoPinKey1 }, { key: unoPinKey2 }], sigKey)
-            if (path) {
-              drivenAngle = p.angle
-              break
-            }
-          }
-        }
-      }
-      runtime[part.id] = { angle: drivenAngle ?? Number(part.props.angle ?? 0) }
-    } else if (part.type === "rgb-led") {
-      // RGB LED: common-cathode, each color pin driven independently by PWM
-      const gndKey = key(part.id, "gnd")
-      const toGnd = shortestResistance(groundSinks.map((g) => ({ key: g })), gndKey)
-      if (toGnd) {
-        const getLevel = (pinId: string) => {
-          const pk = key(part.id, pinId)
-          const path = shortestResistance(activeSources, pk)
-          if (!path) return 0
-          const totalR = path.resistance + toGnd.resistance
-          if (totalR < 60) return 0 // burnt without resistor
-          const current = Math.max(0, path.voltage - 2.0) / (totalR + 0.1) * 1000
-          return Math.min(1.0, Math.max(0, current / 15.0))
-        }
-        runtime[part.id] = {
-          redLevel: getLevel("red"),
-          greenLevel: getLevel("green"),
-          blueLevel: getLevel("blue"),
-        }
-      } else {
-        runtime[part.id] = { redLevel: 0, greenLevel: 0, blueLevel: 0 }
-      }
-    } else if (part.type === "seven-segment") {
-      // 7-Segment: each segment pin checked for power
-      const comKey = key(part.id, "com")
-      const toComGnd = shortestResistance(groundSinks.map((g) => ({ key: g })), comKey)
-      const segments: Record<string, boolean> = {}
-      if (toComGnd) {
-        for (const segId of ["a", "b", "c", "d", "e", "f", "g", "dp"]) {
-          const segKey = key(part.id, segId)
-          const path = shortestResistance(activeSources, segKey)
-          segments[segId] = Boolean(path)
-        }
-      }
-      runtime[part.id] = { segments }
-    } else if (part.type === "lcd-i2c") {
-      // LCD: check power connectivity, text comes from pinStates
-      const vccKey = key(part.id, "vcc")
-      const gndKey = key(part.id, "gnd")
-      const hasPower = shortestResistance(activeSources, vccKey)
-      const hasGnd = shortestResistance(groundSinks.map((g) => ({ key: g })), gndKey)
-      const powered = Boolean(hasPower && hasGnd)
-      runtime[part.id] = {
-        lcdBacklight: powered,
-        lcdLine1: powered ? (pinStates["lcd_line1"] as unknown as string || "") : "",
-        lcdLine2: powered ? (pinStates["lcd_line2"] as unknown as string || "") : "",
-      }
-    } else if (part.type === "ultrasonic") {
-      // Ultrasonic sensor: powered = shows distance from inspector slider
-      const vccKey = key(part.id, "vcc")
-      const gndKey = key(part.id, "gnd")
-      const hasPower = shortestResistance(activeSources, vccKey)
-      const hasGnd = shortestResistance(groundSinks.map((g) => ({ key: g })), gndKey)
-      const powered = Boolean(hasPower && hasGnd)
-      const dist = powered ? Number(part.props.distance ?? 100) : undefined
-      runtime[part.id] = { sensorValue: dist }
-    } else if (part.type === "pir-sensor") {
-      // PIR: shows HIGH when motion triggered via inspector
-      const vccKey = key(part.id, "vcc")
-      const gndKey = key(part.id, "gnd")
-      const hasPower = shortestResistance(activeSources, vccKey)
-      const hasGnd = shortestResistance(groundSinks.map((g) => ({ key: g })), gndKey)
-      const powered = Boolean(hasPower && hasGnd)
-      const triggered = powered && part.props.motion === "true"
-      runtime[part.id] = { level: triggered ? 1 : 0 }
-    } else if (part.type === "ldr") {
-      // LDR: resistance varies with light (inspector slider)
-      const lightValue = Number(part.props.light ?? 512)
-      runtime[part.id] = { sensorValue: lightValue }
-    } else if (part.type === "tmp36") {
-      // TMP36: temperature from inspector slider
-      const vccKey = key(part.id, "vcc")
-      const gndKey = key(part.id, "gnd")
-      const hasPower = shortestResistance(activeSources, vccKey)
-      const hasGnd = shortestResistance(groundSinks.map((g) => ({ key: g })), gndKey)
-      const powered = Boolean(hasPower && hasGnd)
-      const temp = powered ? Number(part.props.temperature ?? 25) : undefined
-      runtime[part.id] = { sensorValue: temp }
-    } else if (part.type === "dc-motor") {
-      // DC Motor: check power path
-      const posKey = key(part.id, "pos")
-      const negKey = key(part.id, "neg")
-      const toPos = shortestResistance(activeSources, posKey)
-      const toNeg = shortestResistance(groundSinks.map((g) => ({ key: g })), negKey)
-      if (toPos && toNeg) {
-        const voltage = toPos.voltage
-        const rpm = Math.round(voltage * 200) // ~1000 RPM at 5V
-        runtime[part.id] = { rpm, motorDirection: "cw" }
-      } else {
-        runtime[part.id] = { rpm: 0, motorDirection: "stopped" }
-      }
-    } else if (part.type === "npn-transistor") {
-      // NPN: base receives signal → collector-emitter conducts
-      const baseKey = key(part.id, "base")
-      const toBase = shortestResistance(activeSources, baseKey)
-      const conducting = Boolean(toBase)
-      runtime[part.id] = { conducting }
-      // When conducting, connect collector to emitter internally
-      if (conducting) {
-        addEdge(key(part.id, "collector"), key(part.id, "emitter"), 0.2)
-      }
-    } else if (part.type === "ir-sensor") {
-      const vccKey = k("vcc")
-      const gndKey = k("gnd")
-      const powered = Boolean(shortestResistance(activeSources, vccKey) && shortestResistance(groundSinks.map((g) => ({ key: g })), gndKey))
+      const powered = hasExternalPower(part.id, "vcc", "gnd")
       const detected = powered && String(part.props.detected ?? "false") === "true"
       runtime[part.id] = { sensorValue: detected ? 1 : 0, level: detected ? 1 : 0 }
 
     } else if (part.type === "dht11") {
-      const powered = Boolean(shortestResistance(activeSources, k("vcc")) && shortestResistance(groundSinks.map((g) => ({ key: g })), k("gnd")))
+      const powered = hasExternalPower(part.id, "vcc", "gnd")
       runtime[part.id] = {
         sensorValue: powered ? Number(part.props.temperature ?? 25) : undefined,
         dhtTemperature: powered ? Number(part.props.temperature ?? 25) : undefined,
@@ -452,7 +160,7 @@ export function computeRuntime(
       }
 
     } else if (part.type === "oled-i2c") {
-      const powered = Boolean(shortestResistance(activeSources, k("vcc")) && shortestResistance(groundSinks.map((g) => ({ key: g })), k("gnd")))
+      const powered = hasExternalPower(part.id, "vcc", "gnd")
       runtime[part.id] = {
         lcdBacklight: powered,
         lcdLine1: powered ? String(pinStates["oled_line1"] ?? part.props.line1 ?? "") : "",
@@ -460,7 +168,7 @@ export function computeRuntime(
       }
 
     } else if (part.type === "joystick") {
-      const powered = Boolean(shortestResistance(activeSources, k("vcc")) && shortestResistance(groundSinks.map((g) => ({ key: g })), k("gnd")))
+      const powered = hasExternalPower(part.id, "vcc", "gnd")
       runtime[part.id] = {
         joystickX: powered ? Number(part.props.x ?? 512) : undefined,
         joystickY: powered ? Number(part.props.y ?? 512) : undefined,
@@ -469,32 +177,59 @@ export function computeRuntime(
       }
 
     } else if (part.type === "l298n") {
-      const speedA = Math.max(0, Math.min(255, Number(part.props.speedA ?? 0)))
-      const speedB = Math.max(0, Math.min(255, Number(part.props.speedB ?? 0)))
-      const readControl = (pin: string) => Boolean(shortestResistance(activeSources, k(pin)))
-      const in1 = readControl("in1")
-      const in2 = readControl("in2")
-      const in3 = readControl("in3")
-      const in4 = readControl("in4")
-      const ena = readControl("ena")
-      const enb = readControl("enb")
-      const directionA = !ena || speedA <= 0 ? "stopped" : in1 !== in2 ? (in1 ? "cw" : "ccw") : "stopped"
-      const directionB = !enb || speedB <= 0 ? "stopped" : in3 !== in4 ? (in3 ? "cw" : "ccw") : "stopped"
+      const powered = hasExternalPower(part.id, "vs", "gnd")
+      const clampPwm = (value: unknown) =>
+        Math.max(0, Math.min(255, Number.isFinite(Number(value)) ? Number(value) : 0))
+      const findArduinoPinState = (targetKey: string) => {
+        for (const uno of state.parts.filter((candidate) => candidate.type === "arduino-uno")) {
+          for (let pin = 0; pin <= 13; pin += 1) {
+            const candidates = [key(uno.id, "d" + pin), key(uno.id, String(pin))]
+            for (const candidate of candidates) {
+              if (shortestResistance([{ key: candidate }], targetKey)) {
+                return pinStates[String(pin)] ?? pinStates["d" + pin] ?? null
+              }
+            }
+          }
+        }
+        return null
+      }
+      const readDrive = (pin: string) => {
+        const stateForPin = findArduinoPinState(k(pin))
+        const pwm = stateForPin
+          ? clampPwm(stateForPin.value ?? (stateForPin.state === "HIGH" ? 255 : 0))
+          : 0
+        return { enabled: pwm > 0, pwm }
+      }
+      const readDirection = (highPin: string, lowPin: string) => {
+        const highState = findArduinoPinState(k(highPin))
+        const lowState = findArduinoPinState(k(lowPin))
+        const highOn = highState ? highState.state === "HIGH" || Number(highState.value ?? 0) > 0 : false
+        const lowOn = lowState ? lowState.state === "HIGH" || Number(lowState.value ?? 0) > 0 : false
+        if (highOn === lowOn) return "stopped" as const
+        return highOn ? "cw" as const : "ccw" as const
+      }
+      const enaDrive = readDrive("ena")
+      const enbDrive = readDrive("enb")
+      const speedA = enaDrive.pwm || clampPwm(part.props.speedA ?? 0)
+      const speedB = enbDrive.pwm || clampPwm(part.props.speedB ?? 0)
+      const directionA = !powered || speedA <= 0 ? "stopped" : readDirection("in1", "in2")
+      const directionB = !powered || speedB <= 0 ? "stopped" : readDirection("in3", "in4")
       const rpmA = directionA === "stopped" ? 0 : Math.round((speedA / 255) * 1000)
       const rpmB = directionB === "stopped" ? 0 : Math.round((speedB / 255) * 1000)
-      runtime[part.id] = { motorARpm: rpmA, motorBRpm: rpmB, motorADirection: directionA, motorBDirection: directionB }
-
-      if (directionA !== "stopped") {
-        addEdge(k("out1"), k("out2"), 2)
+      runtime[part.id] = {
+        motorARpm: rpmA,
+        motorBRpm: rpmB,
+        motorADirection: directionA,
+        motorBDirection: directionB,
+        currentMa: rpmA + rpmB > 0 ? Math.round(120 + ((rpmA + rpmB) / 2000) * 180) : 0,
       }
-      if (directionB !== "stopped") {
-        addEdge(k("out1"), k("out2"), 2)
-      }
+      if (directionA !== "stopped") addEdge(k("out1"), k("out2"), 2)
+      if (directionB !== "stopped") addEdge(k("out3"), k("out4"), 2)
 
     } else if (part.type === "rotary-encoder") {
       const value = Number(part.props.value ?? 0)
-      const prev = Number(part.props.previousValue ?? value)
-      const direction = value > prev ? "cw" : value < prev ? "ccw" : "idle"
+      const previousValue = Number(part.props.previousValue ?? value)
+      const direction = value > previousValue ? "cw" : value < previousValue ? "ccw" : "idle"
       runtime[part.id] = {
         encoderValue: value,
         encoderDirection: direction,
@@ -502,21 +237,22 @@ export function computeRuntime(
       }
 
     } else if (part.type === "soil-moisture") {
-      const powered = Boolean(shortestResistance(activeSources, k("vcc")) && shortestResistance(groundSinks.map((g) => ({ key: g })), k("gnd")))
+      const powered = hasExternalPower(part.id, "vcc", "gnd")
       const moisture = powered ? Number(part.props.moisture ?? 620) : undefined
       runtime[part.id] = { sensorValue: moisture }
 
     } else if (part.type === "keypad-4x4") {
-      runtime[part.id] = { keypadKey: String(part.props.lastKey ?? "") }
+      const wired = state.wires.some((wire) => wire.from.partId === part.id || wire.to.partId === part.id)
+      runtime[part.id] = { keypadKey: wired ? String(part.props.lastKey ?? "") : "" }
     } else if (part.type === "relay") {
       // Relay: IN pin receives signal → COM connects to NO (normally open)
       const inKey = key(part.id, "in")
       const vccKey = key(part.id, "vcc")
       const gndKey = key(part.id, "gnd")
       const hasSignal = shortestResistance(activeSources, inKey)
-      const hasPower = shortestResistance(activeSources, vccKey)
-      const hasGnd = shortestResistance(groundSinks.map((g) => ({ key: g })), gndKey)
-      const energized = Boolean(hasSignal && hasPower && hasGnd)
+      const energized = Boolean(
+        hasSignal && hasExternalPower(part.id, "vcc", "gnd"),
+      )
       runtime[part.id] = { relayActive: energized }
       // When energized: COM ↔ NO; When not: COM ↔ NC
       if (energized) {

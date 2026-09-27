@@ -702,17 +702,41 @@ export function PartArt({ part, runtime }: { part: PlacedPart; runtime?: PartRun
     }
 
     case "l298n": {
-      const speedA = Math.max(0, Math.min(255, Number(part.props.speedA ?? 0)))
-      const speedB = Math.max(0, Math.min(255, Number(part.props.speedB ?? 0)))
+      const speedA = Math.max(
+        0,
+        Math.min(
+          255,
+          Number(
+            runtime?.motorARpm !== undefined
+              ? Math.round((runtime.motorARpm / 1000) * 255)
+              : part.props.speedA ?? 0,
+          ),
+        ),
+      )
+      const speedB = Math.max(
+        0,
+        Math.min(
+          255,
+          Number(
+            runtime?.motorBRpm !== undefined
+              ? Math.round((runtime.motorBRpm / 1000) * 255)
+              : part.props.speedB ?? 0,
+          ),
+        ),
+      )
+      const directionA = runtime?.motorADirection ?? "stopped"
+      const directionB = runtime?.motorBDirection ?? "stopped"
       return (
         <g>
           <rect x="2" y="4" width="116" height="88" rx="7" fill="#153e75" stroke="#1d4ed8" strokeWidth="2" />
           <rect x="46" y="16" width="28" height="36" rx="2" fill="#0f172a" stroke="#334155" />
           <text x="60" y="37" textAnchor="middle" fontSize="8" fill="#cbd5e1" fontFamily="monospace" fontWeight="700">L298N</text>
-          <text x="12" y="68" fontSize="8" fill="#93c5fd" fontFamily="monospace">A:{speedA}</text>
-          <text x="65" y="68" fontSize="8" fill="#93c5fd" fontFamily="monospace">B:{speedB}</text>
-          <rect x="10" y="74" width="100" height="7" rx="3" fill="#0f172a" />
-          <rect x="11" y="75" width={98 * (speedA / 255)} height="5" rx="2" fill="#22c55e" />
+          <text x="10" y="66" fontSize="7" fill="#93c5fd" fontFamily="monospace">A:{speedA} {directionA.toUpperCase()}</text>
+          <text x="64" y="66" fontSize="7" fill="#93c5fd" fontFamily="monospace">B:{speedB} {directionB.toUpperCase()}</text>
+          <rect x="10" y="74" width="100" height="6" rx="3" fill="#0f172a" />
+          <rect x="11" y="75" width={98 * (speedA / 255)} height="4" rx="2" fill="#22c55e" />
+          <rect x="10" y="84" width="100" height="4" rx="2" fill="#0f172a" />
+          <rect x="11" y="84.5" width={98 * (speedB / 255)} height="3" rx="1.5" fill="#38bdf8" />
         </g>
       )
     }
