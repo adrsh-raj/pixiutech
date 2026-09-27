@@ -212,7 +212,11 @@ function boundsFromMesh(mesh: FacePoint[]): [number, number, number, number] {
 export async function loadFaceDetector(): Promise<FaceDetector> {
   await loadFaceMeshScript()
 
-  const faceMesh = new window.FaceMesh!({
+  const FaceMeshConstructor = window.FaceMesh
+  if (!FaceMeshConstructor) {
+    throw new Error("MediaPipe Face Mesh constructor is unavailable.")
+  }
+  const faceMesh = new FaceMeshConstructor({
     locateFile: (file) => `${FACE_MESH_ASSET_BASE}${file}`,
   })
 
