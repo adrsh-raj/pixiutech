@@ -19,41 +19,27 @@ export function classifyAiRuntimeError(error: unknown): AiRuntimeErrorKind {
     name === "NotAllowedError" ||
     name === "SecurityError" ||
     name === "PermissionDeniedError"
-  ) {
-    return "permission"
-  }
+  ) return "permission"
 
-  if (
-    name === "NotFoundError" ||
-    name === "DevicesNotFoundError"
-  ) {
-    return "unsupported"
-  }
-
-  if (name === "NotReadableError" || name === "TrackStartError") {
-    return "permission"
-  }
+  if (name === "NotFoundError" || name === "DevicesNotFoundError") return "unsupported"
+  if (name === "NotReadableError" || name === "TrackStartError") return "unsupported"
 
   const message =
-    error instanceof Error ? error.message.toLowerCase() : String(error ?? "").toLowerCase()
+    error instanceof Error
+      ? error.message.toLowerCase()
+      : String(error ?? "").toLowerCase()
 
   if (
     message.includes("permission") ||
     message.includes("denied") ||
-    message.includes("secure context") ||
-    message.includes("microphone") ||
-    message.includes("camera")
-  ) {
-    return "permission"
-  }
+    message.includes("secure context")
+  ) return "permission"
 
   if (
     message.includes("not support") ||
     message.includes("unsupported") ||
     message.includes("browser")
-  ) {
-    return "unsupported"
-  }
+  ) return "unsupported"
 
   if (
     message.includes("model") ||
@@ -61,25 +47,17 @@ export function classifyAiRuntimeError(error: unknown): AiRuntimeErrorKind {
     message.includes("movenet") ||
     message.includes("speech commands") ||
     message.includes("coco-ssd")
-  ) {
-    return "model"
-  }
+  ) return "model"
 
-  if (message.includes("storage") || message.includes("indexeddb")) {
-    return "storage"
-  }
-
-  if (message.includes("cancel")) {
-    return "cancelled"
-  }
+  if (message.includes("camera") || message.includes("microphone")) return "unsupported"
+  if (message.includes("storage") || message.includes("indexeddb")) return "storage"
+  if (message.includes("cancel")) return "cancelled"
 
   if (
     message.includes("inference") ||
     message.includes("predict") ||
     message.includes("detection")
-  ) {
-    return "inference"
-  }
+  ) return "inference"
 
   return "unknown"
 }
