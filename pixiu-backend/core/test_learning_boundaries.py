@@ -233,6 +233,27 @@ class LearningBoundaryTests(APITestCase):
         self.assertFalse(serializer.is_valid())
         self.assertIn("project", serializer.errors)
 
+    def test_trainer_cannot_create_session_with_unassigned_curriculum(self):
+        from rest_framework.test import APIRequestFactory, force_authenticate
+        from learning.serializers import SessionSerializer
+
+        factory = APIRequestFactory()
+        payload = {
+            "school_class": str(self.class_a.id),
+            "trainer": str(self.trainer.id),
+            "curriculum_unit": str(self.unit_b.id),
+            "date": date.today().isoformat(),
+            "start_time": "14:00",
+            "end_time": "15:00",
+            "topic": "Blocked cross-school curriculum",
+            "notes": "",
+        }
+        request = factory.post("/api/learning/sessions/", payload, format="json")
+        force_authenticate(request, user=self.trainer_user)
+        serializer = SessionSerializer(data=payload, context={"request": request})
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("curriculum_unit", serializer.errors)
+
     def test_direct_session_creation_persists_real_curriculum_fk(self):
         self.client.force_authenticate(self.trainer_user)
         response = self.client.post(
