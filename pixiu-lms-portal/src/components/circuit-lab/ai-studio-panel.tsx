@@ -1508,7 +1508,11 @@ export function AiStudioPanel({
     setCameraActive(false)
     setSoundActive(false)
     setLoading(false)
-    onAiStateChange(createAiVisionState(mode))
+    onAiStateChange({
+      ...createAiVisionState(mode),
+      runtimeStatus: "stopped",
+      detail: "AI stopped",
+    })
     setStatus("AI stopped")
   }
 
