@@ -130,11 +130,35 @@ export const AI_TRAINING_PROFILES: Record<Exclude<AiTrainingProfile, "custom">, 
   grade8: { epochs: 50, layers: [{ type: "dense", units: 128, activation: "relu" }, { type: "batchNormalization" }, { type: "dropout", rate: 0.2 }, { type: "dense", units: 96, activation: "relu" }, { type: "dropout", rate: 0.2 }], learningRate: 0.0008, batchSize: 8, earlyStoppingPatience: 10, earlyStoppingMinDelta: 0.001 },
 }
 
+function finiteNumber(value: unknown, fallback: number) {
+  const numeric = Number(value)
+  return Number.isFinite(numeric) ? numeric : fallback
+}
+
+function safeActivation(value: unknown): AiLayerSpec["activation"] {
+  return value === "relu" || value === "linear" || value === "tanh" || value === "sigmoid"
+    ? value
+    : "relu"
+}
+
 function sanitizeLayerSpecs(specs: AiLayerSpec[] | undefined): AiLayerSpec[] {
   return (Array.isArray(specs) ? specs : []).slice(0, MAX_CONFIGURABLE_LAYERS).map((spec) => {
-    if (spec.type === "dense") return { type: "dense", units: Math.max(16, Math.min(256, Math.round(spec.units ?? 64))), activation: spec.activation ?? "relu" }
-    if (spec.type === "dropout") return { type: "dropout", rate: Math.max(0, Math.min(0.5, Number(spec.rate ?? 0.2))) }
-    if (spec.type === "activation") return { type: "activation", activation: spec.activation ?? "relu" }
+    if (spec.type === "dense") {
+      return {
+        type: "dense",
+        units: Math.max(16, Math.min(256, Math.round(finiteNumber(spec.units, 64)))),
+        activation: safeActivation(spec.activation),
+      }
+    }
+    if (spec.type === "dropout") {
+      return {
+        type: "dropout",
+        rate: Math.max(0, Math.min(0.5, finiteNumber(spec.rate, 0.2))),
+      }
+    }
+    if (spec.type === "activation") {
+      return { type: "activation", activation: safeActivation(spec.activation) }
+    }
     return { type: "batchNormalization" }
   })
 }
@@ -193,12 +217,12 @@ export function estimateTrainingLoad(
 function clampTrainingConfig(options: TrainOptions = {}): AiTrainingConfig {
   const fallback = AI_TRAINING_PROFILES.grade7
   return {
-    epochs: Math.max(8, Math.min(150, Math.round(options.epochs ?? fallback.epochs))),
+    epochs: Math.max(8, Math.min(150, Math.round(finiteNumber(options.epochs, fallback.epochs)))),
     layers: sanitizeLayerSpecs(options.layers ?? fallback.layers),
-    learningRate: Math.max(0.0001, Math.min(0.01, Number(options.learningRate ?? fallback.learningRate))),
-    batchSize: Math.max(2, Math.min(32, Math.round(options.batchSize ?? fallback.batchSize))),
-    earlyStoppingPatience: Math.max(2, Math.min(20, Math.round(options.earlyStoppingPatience ?? fallback.earlyStoppingPatience))),
-    earlyStoppingMinDelta: Math.max(0.0001, Math.min(0.05, Number(options.earlyStoppingMinDelta ?? fallback.earlyStoppingMinDelta))),
+    learningRate: Math.max(0.0001, Math.min(0.01, finiteNumber(options.learningRate, fallback.learningRate))),
+    batchSize: Math.max(2, Math.min(32, Math.round(finiteNumber(options.batchSize, fallback.batchSize)))),
+    earlyStoppingPatience: Math.max(2, Math.min(20, Math.round(finiteNumber(options.earlyStoppingPatience, fallback.earlyStoppingPatience)))),
+    earlyStoppingMinDelta: Math.max(0.0001, Math.min(0.05, finiteNumber(options.earlyStoppingMinDelta, fallback.earlyStoppingMinDelta))),
   }
 }
 
