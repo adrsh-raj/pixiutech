@@ -33,11 +33,22 @@ const FACE_SOURCE = join(
 const MOVENET_SOURCE_URL =
   process.env.PIXIU_MOVENET_SOURCE_URL ??
   "https://tfhub.dev/google/tfjs-model/movenet/singlepose/lightning/4/model.json"
+const COCO_SSD_SOURCE_URL =
+  process.env.PIXIU_COCO_SSD_SOURCE_URL ??
+  "https://storage.googleapis.com/tfjs-models/savedmodel/ssdlite_mobilenet_v2/model.json"
 const SPEECH_SOURCE_URL =
   process.env.PIXIU_SPEECH_COMMANDS_SOURCE_URL ??
+  "https://storage.googleapis.com/tfjs-models/tfjs/speech-commands/v0.5/browser_fft/18w/model.json"
+const SPEECH_METADATA_SOURCE_URL =
+  process.env.PIXIU_SPEECH_METADATA_SOURCE_URL ??
+  "https://storage.googleapis.com/tfjs-models/tfjs/speech-commands/v0.5/browser_fft/18w/metadata.json"
+const SPEECH_SCRIPT_SOURCE_URL =
+  process.env.PIXIU_SPEECH_COMMANDS_SCRIPT_SOURCE_URL ??
   "https://cdn.jsdelivr.net/npm/@tensorflow-models/speech-commands@0.5.4/dist/speech-commands.min.js"
 
+const COCO_SSD_DIR = join(publicRoot, "models", "coco-ssd-lite-mobilenet-v2")
 const MOVENET_DIR = join(publicRoot, "models", "movenet")
+const SPEECH_MODEL_DIR = join(publicRoot, "models", "speech-commands", "18w")
 const SPEECH_DIR = join(
   publicRoot,
   "vendor",
@@ -214,9 +225,53 @@ async function ensureMoveNet() {
   )
 }
 
+async function ensureGraphModel(modelSourceUrl, destinationDir, label) {
+  const modelPath = join(destinationDir, "model.json")
+  const sourcePath = join(destinationDir, ".source-url")
+  let modelSource = modelSourceUrl
+
+  if (!(await exists(modelPath)) || (await stat(modelPath)).size === 0) {
+    const finalUrl = await ensureRemoteFile(modelSourceUrl, modelPath)
+    modelSource = finalUrl || modelSourceUrl
+    await writeFile(sourcePath, modelSource + "\n")
+  } else if (await exists(sourcePath)) {
+    const stored = (await readFile(sourcePath, "utf8")).trim()
+    if (stored) modelSource = stored
+  }
+
+  const model = JSON.parse(await readFile(modelPath, "utf8"))
+  if (!Array.isArray(model.weightsManifest) || !model.weightsManifest.length) {
+    throw new Error(label + " model.json has no weightsManifest.")
+  }
+
+  for (const manifest of model.weightsManifest) {
+    if (!Array.isArray(manifest?.paths)) {
+      throw new Error(label + " weightsManifest entry has no paths.")
+    }
+    for (const assetPath of manifest.paths) {
+      if (typeof assetPath !== "string" || !assetPath || assetPath.includes("..") || assetPath.startsWith("/")) {
+        throw new Error("Unsafe " + label + " shard path: " + String(assetPath))
+      }
+      const destination = join(destinationDir, assetPath)
+      const url = new URL(assetPath, modelSource).toString()
+      await ensureRemoteFile(url, destination)
+    }
+  }
+
+  return modelPath
+}
+
 async function ensureSpeechCommands() {
   const destination = join(SPEECH_DIR, "speech-commands.min.js")
-  await ensureRemoteFile(SPEECH_SOURCE_URL, destination)
+  await ensureRemoteFile(SPEECH_SCRIPT_SOURCE_URL, destination)
+
+  const modelPath = await ensureGraphModel(
+    SPEECH_SOURCE_URL,
+    SPEECH_MODEL_DIR,
+    "Speech Commands",
+  )
+  const metadataPath = join(SPEECH_MODEL_DIR, "metadata.json")
+  await ensureRemoteFile(SPEECH_METADATA_SOURCE_URL, metadataPath)
 
   const text = await readFile(destination, "utf8")
   if (
@@ -228,22 +283,16 @@ async function ensureSpeechCommands() {
     )
   }
 
-  console.log(
-    "Speech Commands local asset ready:",
-    join(
-      "public",
-      "vendor",
-      "tfjs",
-      "speech-commands",
-      "speech-commands.min.js",
-    ),
-  )
+  JSON.parse(await readFile(metadataPath, "utf8"))
+  console.log("Speech Commands local assets ready:", join("public", "models", "speech-commands", "18w"))
+  console.log("Speech Commands runtime ready:", join("public", "vendor", "tfjs", "speech-commands", "speech-commands.min.js"))
 }
 
 async function main() {
   await Promise.all([
     copyDirectoryAssets(HANDS_SOURCE, HANDS_DIR),
     copyDirectoryAssets(FACE_SOURCE, FACE_DIR),
+    ensureGraphModel(COCO_SSD_SOURCE_URL, COCO_SSD_DIR, "COCO-SSD"),
     ensureMoveNet(),
     ensureSpeechCommands(),
   ])
