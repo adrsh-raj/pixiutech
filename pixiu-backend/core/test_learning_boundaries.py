@@ -15,6 +15,9 @@ from learning.models import (
     QuizClassAssignment,
     QuizQuestion,
     Session,
+    SessionActivity,
+    Project,
+    ProjectEvidence,
 )
 
 
@@ -161,6 +164,74 @@ class LearningBoundaryTests(APITestCase):
         session_response = self.client.get(reverse("v1-session-list"))
         self.assertEqual(session_response.status_code, 200)
         self.assertEqual({row["id"] for row in session_response.data}, {str(self.session_a.id)})
+
+    def test_trainer_cannot_cross_school_assign_learning_foreign_keys(self):
+        from learning.serializers import (
+            ContentClassAssignmentSerializer,
+            CurriculumClassAssignmentSerializer,
+            QuizClassAssignmentSerializer,
+            QuizQuestionWriteSerializer,
+        )
+
+        for serializer_class, payload, expected_field in [
+            (CurriculumClassAssignmentSerializer, {"curriculum_unit": str(self.unit_b.id), "school_class": str(self.class_a.id)}, "curriculum_unit"),
+            (ContentClassAssignmentSerializer, {"content": str(self.content_b.id), "school_class": str(self.class_a.id)}, "content"),
+            (QuizClassAssignmentSerializer, {"quiz": str(self.quiz_b.id), "school_class": str(self.class_a.id)}, "quiz"),
+            (QuizQuestionWriteSerializer, {
+                "quiz": str(self.quiz_b.id), "question_order": 2, "question_text": "Blocked",
+                "option_a": "A", "option_b": "B", "option_c": "C", "option_d": "D",
+                "correct_option": "A", "points": 1,
+            }, "quiz"),
+        ]:
+            from rest_framework.test import APIRequestFactory, force_authenticate
+            factory = APIRequestFactory()
+            req = factory.post("/api/v1/test/", payload, format="json")
+            force_authenticate(req, user=self.trainer_user)
+            serializer = serializer_class(data=payload, context={"request": req})
+            self.assertFalse(serializer.is_valid(), (serializer_class.__name__, serializer.errors))
+            self.assertIn(expected_field, serializer.errors)
+
+    def test_trainer_cannot_move_activity_into_another_school_session(self):
+        from rest_framework.test import APIRequestFactory, force_authenticate
+        from learning.serializers import SessionActivitySerializer
+
+        activity = SessionActivity.objects.create(
+            session=self.session_a,
+            title="Scoped activity",
+            created_by=self.trainer_user,
+        )
+        req = APIRequestFactory().patch(
+            f"/api/v1/session-activities/{activity.id}",
+            {"session": str(self.session_b.id)},
+            format="json",
+        )
+        force_authenticate(req, user=self.trainer_user)
+        serializer = SessionActivitySerializer(
+            activity,
+            data={"session": str(self.session_b.id)},
+            partial=True,
+            context={"request": req},
+        )
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("session", serializer.errors)
+
+    def test_trainer_cannot_attach_evidence_to_another_school_project(self):
+        from rest_framework.test import APIRequestFactory, force_authenticate
+        from learning.serializers import ProjectEvidenceSerializer
+
+        other_project = Project.objects.create(student=self.student_b, title="Other school project")
+        req = APIRequestFactory().post(
+            "/api/v1/project-evidence/",
+            {"project": str(other_project.id), "title": "Blocked", "note": "cross-school"},
+            format="json",
+        )
+        force_authenticate(req, user=self.trainer_user)
+        serializer = ProjectEvidenceSerializer(
+            data={"project": str(other_project.id), "title": "Blocked", "note": "cross-school"},
+            context={"request": req},
+        )
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("project", serializer.errors)
 
     def test_direct_session_creation_persists_real_curriculum_fk(self):
         self.client.force_authenticate(self.trainer_user)
