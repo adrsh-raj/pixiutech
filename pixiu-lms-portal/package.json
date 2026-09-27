@@ -17,7 +17,7 @@
     "qa:phase2-3": "node ../scripts/phase2-3-inference-runtime-static-check.mjs",
     "predev": "npm run sync:ai-runtime-assets",
     "qa:phase4-9": "node ../scripts/phase4-9-reliability-static-check.mjs",
-    "test:ai": "node --experimental-strip-types --test test/ai/*.test.ts",
+    "test:ai": "node --experimental-strip-types --test test/ai",
     "qa:part4": "node ../scripts/part4-professional-hardening-static-check.mjs"
   },
   "dependencies": {
