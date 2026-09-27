@@ -1,7 +1,8 @@
 import { readFile } from "node:fs/promises"
 import { resolve } from "node:path"
+import { fileURLToPath } from "node:url"
 
-const root = resolve(process.cwd())
+const root = resolve(fileURLToPath(new URL("..", import.meta.url)))
 const files = [
   "pixiu-lms-portal/src/components/circuit-lab/ai-studio-panel.tsx",
   "pixiu-lms-portal/src/components/circuit-lab/toolbar.tsx",

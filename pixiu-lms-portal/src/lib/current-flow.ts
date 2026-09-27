@@ -208,6 +208,10 @@ export function computeWireCurrents(
     } else if (part.type === "rgb-led") {
       loadInPin = `${part.id}:red`
       loadOutPin = `${part.id}:gnd`
+    } else if (part.type === "l298n") {
+      // Show the driver's measured supply current on the VMotor → GND path.
+      loadInPin = `${part.id}:vs`
+      loadOutPin = `${part.id}:gnd`
     }
 
     if (loadInPin && loadOutPin) {

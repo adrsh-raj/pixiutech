@@ -31,10 +31,16 @@ async function expectStatus(url, expected, label, options) {
 
 async function main() {
   await expectOk(join(baseUrl, "/"), "Public website")
-  await expectOk(join(portalUrl, "/simulation"), "Portal Virtual Lab")
+  const portalResponse = await expectOk(join(portalUrl, "/simulation"), "Portal Virtual Lab")
+  const portalHtml = await portalResponse.text()
+  if (!/<html[\s>]/i.test(portalHtml) || !/root/i.test(portalHtml)) {
+    throw new Error("Portal /simulation did not return the application HTML shell")
+  }
   const health = await expectOk(join(apiUrl, "/health/"), "Django v1 health")
   const payload = await health.json()
-  if (payload.status !== "ok" || payload.version !== "v1") throw new Error("Django health contract is not v1/{status: ok}")
+  if (payload.status !== "ok" || payload.service !== "pixiu-django" || payload.database !== "ok") {
+    throw new Error("Django health contract is not {status: ok, service: pixiu-django, database: ok}")
+  }
 
   await expectStatus(join(apiUrl, "/public/enquiries"), 400, "Django public enquiry validation", {
     method: "POST",

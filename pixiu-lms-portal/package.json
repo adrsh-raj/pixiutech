@@ -8,6 +8,7 @@
     "build": "vite build",
     "lint": "oxlint",
     "qa:ai": "node --experimental-strip-types ../scripts/ai-phase6-qa.mjs",
+    "qa:phase4-6": "node ../scripts/phase4-6-static-check.mjs",
     "preview": "vite preview",
     "qa:brand": "node --experimental-strip-types ../scripts/pixiu-brand-qa.mjs"
   },

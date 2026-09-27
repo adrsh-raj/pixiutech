@@ -20,7 +20,7 @@ No school, trainer, class, student, database name, password, or relationship is 
 
 ## Phase 2 — Authentication, authorization and credentials
 
-The backend uses a custom `accounts.User` model with JWT Bearer authentication. Access tokens are short-lived, refresh tokens rotate, and refresh tokens are blacklisted after use. Logout blacklists the submitted refresh token.
+The backend uses a custom `accounts.User` model with JWT Bearer authentication. Access tokens are short-lived, refresh tokens are role-isolated and deliberately non-rotating to avoid concurrent-tab refresh races, and logout blacklists the selected refresh token.
 
 Four roles are defined: `admin`, `school`, `trainer`, and `student`.
 

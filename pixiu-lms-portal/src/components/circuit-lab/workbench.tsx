@@ -652,24 +652,38 @@ export function Workbench() {
           }))
         },
         getSensorValue: (type, pin) => {
-          const partId = pin && partsRef.current.some((pt) => pt.id === pin) ? pin : undefined
-          const p = partId
-            ? partsRef.current.find((pt) => pt.id === partId)
-            : partsRef.current.find((pt) => pt.type === type)
+          const directPart = pin ? partsRef.current.find((pt) => pt.id === pin) : undefined
+          const aliases: Record<string, string> = {
+            pir: "pir-sensor",
+            ir: "ir-sensor",
+            dht_temperature: "dht11",
+            dht_humidity: "dht11",
+            joystick_x: "joystick",
+            joystick_y: "joystick",
+            joystick_button: "joystick",
+            soil: "soil-moisture",
+            encoder: "rotary-encoder",
+          }
+          const partType = aliases[type] ?? type
+          const p = directPart ?? partsRef.current.find((pt) => pt.type === partType)
+          const liveRuntime = runningRef.current
+            ? computeRuntime(state, pressedRef.current, pinStatesRef.current)[p?.id ?? ""]
+            : undefined
+
           if (type === "pushbutton") return p ? (pressedRef.current.has(p.id) ? 1 : 0) : 0
-          if (type === "ultrasonic") return Number(p?.props?.distance ?? 100)
-          if (type === "ldr") return Number(p?.props?.light ?? 512)
-          if (type === "tmp36") return Number(p?.props?.temperature ?? 25)
-           if (type === "pir") return String(p?.props?.motion ?? "false") === "true" ? 1 : 0
-           if (type === "potentiometer") return Number(p?.props?.value ?? 512)
-          if (type === "ir") return String(p?.props?.detected ?? "false") === "true" ? 1 : 0
-          if (type === "dht_temperature") return Number(p?.props?.temperature ?? 25)
-          if (type === "dht_humidity") return Number(p?.props?.humidity ?? 55)
-          if (type === "joystick_x") return Number(p?.props?.x ?? 512)
-          if (type === "joystick_y") return Number(p?.props?.y ?? 512)
-          if (type === "joystick_button") return String(p?.props?.pressed ?? "false") === "true" ? 1 : 0
-          if (type === "soil") return Number(p?.props?.moisture ?? 620)
-          if (type === "encoder") return Number(p?.props?.value ?? 0)
+          if (type === "ultrasonic") return liveRuntime?.sensorValue ?? (runningRef.current ? 0 : Number(p?.props?.distance ?? 100))
+          if (type === "ldr") return liveRuntime?.sensorValue ?? (runningRef.current ? 0 : Number(p?.props?.light ?? 512))
+          if (type === "tmp36") return liveRuntime?.sensorValue ?? (runningRef.current ? 0 : Number(p?.props?.temperature ?? 25))
+          if (type === "pir") return liveRuntime?.level ?? (runningRef.current ? 0 : String(p?.props?.motion ?? "false") === "true" ? 1 : 0)
+          if (type === "potentiometer") return Number(p?.props?.value ?? 512)
+          if (type === "ir") return liveRuntime?.sensorValue ?? (runningRef.current ? 0 : String(p?.props?.detected ?? "false") === "true" ? 1 : 0)
+          if (type === "dht_temperature") return liveRuntime?.dhtTemperature ?? (runningRef.current ? 0 : Number(p?.props?.temperature ?? 25))
+          if (type === "dht_humidity") return liveRuntime?.dhtHumidity ?? (runningRef.current ? 0 : Number(p?.props?.humidity ?? 55))
+          if (type === "joystick_x") return liveRuntime?.joystickX ?? (runningRef.current ? 0 : Number(p?.props?.x ?? 512))
+          if (type === "joystick_y") return liveRuntime?.joystickY ?? (runningRef.current ? 0 : Number(p?.props?.y ?? 512))
+          if (type === "joystick_button") return liveRuntime?.joystickButton ? 1 : runningRef.current ? 0 : String(p?.props?.pressed ?? "false") === "true" ? 1 : 0
+          if (type === "soil") return liveRuntime?.sensorValue ?? (runningRef.current ? 0 : Number(p?.props?.moisture ?? 620))
+          if (type === "encoder") return liveRuntime?.encoderValue ?? Number(p?.props?.value ?? 0)
           if (type === "analog") {
             const pot = partsRef.current.find((pt) => pt.type === "potentiometer")
             return Number(pot?.props?.value ?? 512)

@@ -29,9 +29,9 @@ export type FaceDetector = {
 const FACE_VERSION = "3.0.0"
 const MAX_FACES = 1
 const FACE_MESH_SCRIPT =
-  "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"
+  "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/face_mesh.js"
 const FACE_MESH_ASSET_BASE =
-  "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/"
+  "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/"
 
 declare global {
   interface Window {

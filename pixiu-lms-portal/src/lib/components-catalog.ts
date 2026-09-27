@@ -400,6 +400,8 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "in2", label: "IN2", x: 116, y: 26, kind: "digital" },
       { id: "out1", label: "OUT1", x: 116, y: 48, kind: "passive" },
       { id: "out2", label: "OUT2", x: 116, y: 70, kind: "passive" },
+      { id: "out3", label: "OUT3", x: 34, y: 88, kind: "passive" },
+      { id: "out4", label: "OUT4", x: 18, y: 70, kind: "passive" },
       { id: "enb", label: "ENB", x: 100, y: 88, kind: "digital" },
       { id: "in3", label: "IN3", x: 78, y: 88, kind: "digital" },
       { id: "in4", label: "IN4", x: 56, y: 88, kind: "digital" },

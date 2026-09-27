@@ -194,7 +194,8 @@ export function AiCameraPanel({
           })
         }
       } else {
-        // No objects detected
+        // No objects detected. Explicitly publish an empty result so
+        // Blockly never keeps a stale detection after the camera goes clear.
         if (!manualOverrideRef.current) {
           onAiStateChange({
             ...aiStateRef.current,

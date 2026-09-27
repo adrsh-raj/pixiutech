@@ -848,7 +848,10 @@ arduino.forBlock['lcd_set_cursor'] = () =>
 arduino.forBlock['lcd_clear'] = () =>
   '/* PIXIU simulated LCD clear: runtime-only in CyberLab. */\\n'
 
-arduino.forBlock['ir_read'] = (block) => ['digitalRead(' + block.getFieldValue('SENSOR') + ')', ORDER.ATOMIC]
+arduino.forBlock['ir_read'] = (block) => [
+  'false /* PIXIU simulated IR obstacle sensor: ' + String(block.getFieldValue('SENSOR') || '') + ' */',
+  ORDER.ATOMIC,
+]
 arduino.forBlock['dht_temperature'] = (block) => [
   '0 /* PIXIU simulated DHT11 temperature: ' + String(block.getFieldValue('SENSOR') || 'dht') + ' */',
   ORDER.ATOMIC,
@@ -857,10 +860,22 @@ arduino.forBlock['dht_humidity'] = (block) => [
   '0 /* PIXIU simulated DHT11 humidity: ' + String(block.getFieldValue('SENSOR') || 'dht') + ' */',
   ORDER.ATOMIC,
 ]
-arduino.forBlock['joystick_x'] = (block) => [`analogRead(${block.getFieldValue('SENSOR') || 'A0'})`, ORDER.ATOMIC]
-arduino.forBlock['joystick_y'] = (block) => [`analogRead(${block.getFieldValue('SENSOR') || 'A1'})`, ORDER.ATOMIC]
-arduino.forBlock['joystick_button'] = (block) => [`digitalRead(${block.getFieldValue('SENSOR') || '2'})`, ORDER.ATOMIC]
-arduino.forBlock['soil_moisture_read'] = (block) => [`analogRead(${block.getFieldValue('SENSOR') || 'A0'})`, ORDER.ATOMIC]
+arduino.forBlock['joystick_x'] = (block) => [
+  '512 /* PIXIU simulated joystick X: ' + String(block.getFieldValue('SENSOR') || '') + ' */',
+  ORDER.ATOMIC,
+]
+arduino.forBlock['joystick_y'] = (block) => [
+  '512 /* PIXIU simulated joystick Y: ' + String(block.getFieldValue('SENSOR') || '') + ' */',
+  ORDER.ATOMIC,
+]
+arduino.forBlock['joystick_button'] = (block) => [
+  'false /* PIXIU simulated joystick button: ' + String(block.getFieldValue('SENSOR') || '') + ' */',
+  ORDER.ATOMIC,
+]
+arduino.forBlock['soil_moisture_read'] = (block) => [
+  '0 /* PIXIU simulated soil moisture: ' + String(block.getFieldValue('SENSOR') || '') + ' */',
+  ORDER.ATOMIC,
+]
 arduino.forBlock['encoder_read'] = (block) => [
   '0 /* PIXIU simulated rotary encoder: ' + String(block.getFieldValue('SENSOR') || '') + ' */',
   ORDER.ATOMIC,

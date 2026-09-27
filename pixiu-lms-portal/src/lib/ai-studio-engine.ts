@@ -130,11 +130,35 @@ export const AI_TRAINING_PROFILES: Record<Exclude<AiTrainingProfile, "custom">, 
   grade8: { epochs: 50, layers: [{ type: "dense", units: 128, activation: "relu" }, { type: "batchNormalization" }, { type: "dropout", rate: 0.2 }, { type: "dense", units: 96, activation: "relu" }, { type: "dropout", rate: 0.2 }], learningRate: 0.0008, batchSize: 8, earlyStoppingPatience: 10, earlyStoppingMinDelta: 0.001 },
 }
 
+function finiteNumber(value: unknown, fallback: number) {
+  const numeric = Number(value)
+  return Number.isFinite(numeric) ? numeric : fallback
+}
+
+function safeActivation(value: unknown): AiLayerSpec["activation"] {
+  return value === "relu" || value === "linear" || value === "tanh" || value === "sigmoid"
+    ? value
+    : "relu"
+}
+
 function sanitizeLayerSpecs(specs: AiLayerSpec[] | undefined): AiLayerSpec[] {
   return (Array.isArray(specs) ? specs : []).slice(0, MAX_CONFIGURABLE_LAYERS).map((spec) => {
-    if (spec.type === "dense") return { type: "dense", units: Math.max(16, Math.min(256, Math.round(spec.units ?? 64))), activation: spec.activation ?? "relu" }
-    if (spec.type === "dropout") return { type: "dropout", rate: Math.max(0, Math.min(0.5, Number(spec.rate ?? 0.2))) }
-    if (spec.type === "activation") return { type: "activation", activation: spec.activation ?? "relu" }
+    if (spec.type === "dense") {
+      return {
+        type: "dense",
+        units: Math.max(16, Math.min(256, Math.round(finiteNumber(spec.units, 64)))),
+        activation: safeActivation(spec.activation),
+      }
+    }
+    if (spec.type === "dropout") {
+      return {
+        type: "dropout",
+        rate: Math.max(0, Math.min(0.5, finiteNumber(spec.rate, 0.2))),
+      }
+    }
+    if (spec.type === "activation") {
+      return { type: "activation", activation: safeActivation(spec.activation) }
+    }
     return { type: "batchNormalization" }
   })
 }
@@ -193,12 +217,12 @@ export function estimateTrainingLoad(
 function clampTrainingConfig(options: TrainOptions = {}): AiTrainingConfig {
   const fallback = AI_TRAINING_PROFILES.grade7
   return {
-    epochs: Math.max(8, Math.min(150, Math.round(options.epochs ?? fallback.epochs))),
+    epochs: Math.max(8, Math.min(150, Math.round(finiteNumber(options.epochs, fallback.epochs)))),
     layers: sanitizeLayerSpecs(options.layers ?? fallback.layers),
-    learningRate: Math.max(0.0001, Math.min(0.01, Number(options.learningRate ?? fallback.learningRate))),
-    batchSize: Math.max(2, Math.min(32, Math.round(options.batchSize ?? fallback.batchSize))),
-    earlyStoppingPatience: Math.max(2, Math.min(20, Math.round(options.earlyStoppingPatience ?? fallback.earlyStoppingPatience))),
-    earlyStoppingMinDelta: Math.max(0.0001, Math.min(0.05, Number(options.earlyStoppingMinDelta ?? fallback.earlyStoppingMinDelta))),
+    learningRate: Math.max(0.0001, Math.min(0.01, finiteNumber(options.learningRate, fallback.learningRate))),
+    batchSize: Math.max(2, Math.min(32, Math.round(finiteNumber(options.batchSize, fallback.batchSize)))),
+    earlyStoppingPatience: Math.max(2, Math.min(20, Math.round(finiteNumber(options.earlyStoppingPatience, fallback.earlyStoppingPatience)))),
+    earlyStoppingMinDelta: Math.max(0.0001, Math.min(0.05, finiteNumber(options.earlyStoppingMinDelta, fallback.earlyStoppingMinDelta))),
   }
 }
 
@@ -1258,25 +1282,35 @@ export async function trainAiModel(
 export async function loadStoredAiModel(
   summary: AiModelSummary | null,
 ): Promise<tf.LayersModel | null> {
+  if (!summary || typeof summary !== "object") return null
   if (
-    !summary ||
     summary.storageKey !== MODEL_KEY ||
     summary.featureExtractor !== MY_AI_FEATURE_VERSION ||
-    !Number.isFinite(summary.embeddingSize) ||
+    summary.embeddingSize !== MY_AI_FEATURE_SIZE ||
+    !Array.isArray(summary.classes) ||
+    summary.classes.length < MIN_CLASSES ||
+    summary.classes.length > MAX_CLASSES ||
     !Array.isArray(summary.featureShape) ||
     summary.featureShape.length !== 1 ||
-    summary.featureShape[0] !== summary.embeddingSize ||
+    summary.featureShape[0] !== MY_AI_FEATURE_SIZE ||
     !Array.isArray(summary.modelInputShape) ||
     summary.modelInputShape.length !== 1 ||
-    summary.modelInputShape[0] !== summary.embeddingSize ||
+    summary.modelInputShape[0] !== MY_AI_FEATURE_SIZE ||
     !Array.isArray(summary.outputShape) ||
     summary.outputShape.length !== 1 ||
     summary.outputShape[0] !== summary.classes.length ||
     summary.classCount !== summary.classes.length ||
-    !Array.isArray(summary.classes) ||
-    summary.classes.length < MIN_CLASSES ||
-    summary.classes.length > MAX_CLASSES ||
-    new Set(summary.classes.map((value) => String(value).trim().toLowerCase())).size !== summary.classes.length
+    new Set(summary.classes.map((value) => String(value).trim().toLowerCase())).size !== summary.classes.length ||
+    !summary.classPrototypes ||
+    typeof summary.classPrototypes !== "object" ||
+    !summary.classes.every((className) => {
+      const prototype = summary.classPrototypes?.[className]
+      return (
+        Array.isArray(prototype) &&
+        prototype.length === MY_AI_FEATURE_SIZE &&
+        prototype.every((value) => Number.isFinite(Number(value)))
+      )
+    })
   ) {
     return null
   }
@@ -1376,6 +1410,18 @@ export async function predictAiImage(
           ? Math.max(0, Math.min(1, Number(value)))
           : 0,
       )
+
+    if (probabilities.length !== summary.classes.length) {
+      return {
+        label: "unknown",
+        confidence: 0,
+        probabilities: {},
+        unknown: true,
+        lowConfidence: true,
+        margin: 0,
+        reason: "low_confidence" as const,
+      }
+    }
 
     if (!probabilities.length) {
       return {

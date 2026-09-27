@@ -22,6 +22,31 @@ def assigned_class_ids(user):
     return accessible_class_queryset(user).values("id")
 
 
+def trainer_currently_assigned_to_school(user, school_id):
+    if user.role != UserRole.TRAINER:
+        return False
+    trainer = getattr(user, "trainer_profile", None)
+    if trainer is None:
+        return False
+    today = timezone.localdate()
+    return trainer.school_assignments.filter(
+        school_id=school_id,
+        status="active",
+        assigned_from__lte=today,
+    ).filter(
+        Q(assigned_to__isnull=True) | Q(assigned_to__gte=today)
+    ).exists()
+
+
+def ensure_trainer_session_mutation_access(user, session):
+    if user.role != UserRole.TRAINER:
+        return
+    if session.trainer.account_id != user.id:
+        raise PermissionDenied("A trainer can only manage their own sessions.")
+    if not trainer_currently_assigned_to_school(user, session.school_class.school_id):
+        raise PermissionDenied("Trainer is not currently assigned to this school.")
+
+
 def accessible_sessions(user):
     qs = Session.objects.select_related("school_class__school", "trainer", "created_by").prefetch_related("activities")
     if user.role == UserRole.ADMIN:
@@ -165,10 +190,7 @@ def start_session(*, user, session: Session):
         raise PermissionDenied("You do not have access to this session.")
     if locked.status != "planned":
         raise ValidationError("Only planned sessions can be started.")
-    if locked.trainer.account_id != user.id and user.role not in {UserRole.ADMIN, UserRole.SCHOOL}:
-        raise PermissionDenied("A trainer can only start their own session.")
-    if user.role == UserRole.TRAINER and not locked.trainer.school_assignments.filter(school_id=locked.school_class.school_id, status="active").exists():
-        raise PermissionDenied("Trainer is not currently assigned to this school.")
+    ensure_trainer_session_mutation_access(user, locked)
     locked.status = "in_progress"
     locked.save(update_fields=["status", "updated_at"])
     return locked
@@ -181,6 +203,7 @@ def complete_session(*, user, session: Session):
         raise PermissionDenied("You do not have access to this session.")
     if locked.status != "in_progress":
         raise ValidationError("Only in-progress sessions can be completed.")
+    ensure_trainer_session_mutation_access(user, locked)
     locked.status = "completed"
     locked.is_locked = True
     if locked.end_time is None or (locked.start_time and locked.end_time <= locked.start_time):
@@ -195,6 +218,7 @@ def create_session_activity(*, user, session: Session, title: str, activity_type
         raise PermissionDenied("You do not have access to this session.")
     if session.is_locked or session.status in {"completed", "cancelled"}:
         raise ValidationError("Locked or completed sessions cannot be changed.")
+    ensure_trainer_session_mutation_access(user, session)
     title = (title or "").strip()
     if not title:
         raise ValidationError({"title": "Activity title is required."})
@@ -214,11 +238,7 @@ def create_attendance(*, user, session: Session, student: Student, status: str, 
         raise PermissionDenied("You do not have access to this student.")
     if student.school_class_id != locked_session.school_class_id:
         raise ValidationError("Student does not belong to the session class.")
-    if user.role == UserRole.TRAINER:
-        if locked_session.trainer.account_id != user.id:
-            raise PermissionDenied("A trainer can only manage attendance for their own sessions.")
-        if not locked_session.trainer.school_assignments.filter(school_id=locked_session.school_class.school_id, status="active").exists():
-            raise PermissionDenied("Trainer is not currently assigned to this school.")
+    ensure_trainer_session_mutation_access(user, locked_session)
     normalized = str(status or "").strip().lower()
     if normalized not in {choice.value for choice in AttendanceStatus}:
         raise ValidationError({"status": "Status must be present, absent, late, or excused."})
@@ -239,8 +259,7 @@ def save_attendance_batch(*, user, session: Session, entries):
         raise ValidationError("Attendance is locked for this session.")
     if locked_session.status not in {"in_progress", "planned"}:
         raise ValidationError("Attendance cannot be recorded for this session.")
-    if user.role == UserRole.TRAINER and locked_session.trainer.account_id != user.id:
-        raise PermissionDenied("A trainer can only manage attendance for their own sessions.")
+    ensure_trainer_session_mutation_access(user, locked_session)
 
     roster_rows = list(Student.objects.filter(school_class_id=locked_session.school_class_id, status="active").order_by("roll_number"))
     roster_by_pk = {str(s.pk): s for s in roster_rows}

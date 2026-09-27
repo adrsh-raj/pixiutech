@@ -1,7 +1,8 @@
 import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
+import { fileURLToPath } from "node:url"
 
-const root = process.cwd()
+const root = fileURLToPath(new URL("..", import.meta.url))
 const read = (path) => readFileSync(join(root, path), "utf8")
 
 const panel = read("pixiu-lms-portal/src/components/circuit-lab/ai-studio-panel.tsx")
@@ -55,6 +56,9 @@ assert(
 )
 requireText(types, "export type PoseKeypoint", "Phase 0 pose typing")
 requireText(types, "export type PoseResult", "Phase 0 pose result typing")
+
+assert(engine.includes("function finiteNumber(value: unknown, fallback: number)"), "My AI training config does not sanitize non-finite numeric inputs")
+assert(engine.includes("function safeActivation(value: unknown)"), "My AI layer activation is not allowlisted")
 
 for (const name of ["trainEvaluation", "trainValues", "trainAccuracy"]) {
   const declarations =

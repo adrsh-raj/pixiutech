@@ -23,6 +23,8 @@ class LearningScopePermission(BasePermission):
             return accessible_class_queryset(user).filter(pk=obj.school_class_id).exists() and accessible_quizzes(user).filter(pk=obj.quiz_id).exists()
         if model_name == "QuizQuestion":
             return accessible_quizzes(user).filter(pk=obj.quiz_id).exists()
+        if model_name == "SessionActivity":
+            return accessible_sessions(user).filter(pk=obj.session_id).exists()
 
         mapping = {
             "Session": accessible_sessions,
