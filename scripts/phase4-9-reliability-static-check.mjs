@@ -42,7 +42,8 @@ assert(
     panel.includes('runtimeStatus: "ready"') &&
     panel.includes('runtimeStatus: "running"') &&
     panel.includes('runtimeStatus: "error"') &&
-    panel.includes('runtimeStatus: "stopped"'),
+    panel.includes('runtimeStatus: "stopped"') &&
+    panel.includes("createAiVisionState(next)"),
   "AI Studio does not publish the complete lifecycle state machine",
 )
 assert(
@@ -121,8 +122,8 @@ assert(
 )
 assert(
   pose.includes('await tf.setBackend("cpu")') &&
-    engine.includes('await tf.setBackend("cpu")') === false,
-  "MoveNet backend fallback must remain explicit; My AI fallback is handled by its extractor",
+    read("pixiu-lms-portal/src/lib/ai/my-ai-feature-extractor.ts").includes('await tf.setBackend("cpu")'),
+  "MoveNet and My AI backend fallback must remain explicit",
 )
 
 // Performance budget and memory diagnostics.
