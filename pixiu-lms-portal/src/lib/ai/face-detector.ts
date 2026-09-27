@@ -213,9 +213,17 @@ export async function loadFaceDetector(): Promise<FaceDetector> {
         reject: (reason: unknown) => void
       }
     | null = null
+  let pendingTimeout: number | null = null
+  const clearPendingTimeout = () => {
+    if (pendingTimeout !== null) {
+      window.clearTimeout(pendingTimeout)
+      pendingTimeout = null
+    }
+  }
 
   faceMesh.onResults((results: any) => {
     if (!pending) return
+    clearPendingTimeout()
 
     const detections: FaceDetection[] = (
       Array.isArray(results?.multiFaceLandmarks)
