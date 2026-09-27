@@ -1258,11 +1258,14 @@ export async function trainAiModel(
 export async function loadStoredAiModel(
   summary: AiModelSummary | null,
 ): Promise<tf.LayersModel | null> {
+  if (!summary || typeof summary !== "object") return null
   if (
-    !summary ||
     summary.storageKey !== MODEL_KEY ||
     summary.featureExtractor !== MY_AI_FEATURE_VERSION ||
     summary.embeddingSize !== MY_AI_FEATURE_SIZE ||
+    !Array.isArray(summary.classes) ||
+    summary.classes.length < MIN_CLASSES ||
+    summary.classes.length > MAX_CLASSES ||
     !Array.isArray(summary.featureShape) ||
     summary.featureShape.length !== 1 ||
     summary.featureShape[0] !== MY_AI_FEATURE_SIZE ||
@@ -1273,9 +1276,6 @@ export async function loadStoredAiModel(
     summary.outputShape.length !== 1 ||
     summary.outputShape[0] !== summary.classes.length ||
     summary.classCount !== summary.classes.length ||
-    !Array.isArray(summary.classes) ||
-    summary.classes.length < MIN_CLASSES ||
-    summary.classes.length > MAX_CLASSES ||
     new Set(summary.classes.map((value) => String(value).trim().toLowerCase())).size !== summary.classes.length ||
     !summary.classPrototypes ||
     typeof summary.classPrototypes !== "object" ||
