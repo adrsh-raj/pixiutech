@@ -12,7 +12,13 @@ const assert = (condition, message) => {
 
 const camera = read("pixiu-lms-portal/src/lib/ai/camera-session.ts")
 const engine = read("pixiu-lms-portal/src/lib/ai-studio-engine.ts")
-const panel = read("pixiu-lms-portal/src/components/circuit-lab/ai-studio-panel.tsx")
+const panel = [
+  read("pixiu-lms-portal/src/components/circuit-lab/ai-studio-panel.tsx"),
+  read("pixiu-lms-portal/src/components/circuit-lab/use-ai-studio-controller.ts"),
+  read("pixiu-lms-portal/src/components/circuit-lab/ai-try-panel.tsx"),
+  read("pixiu-lms-portal/src/components/circuit-lab/ai-teach-panel.tsx"),
+  read("pixiu-lms-portal/src/components/circuit-lab/ai-understand-panel.tsx"),
+].join("\n")
 const pose = read("pixiu-lms-portal/src/lib/ai/pose-detector.ts")
 const hands = read("pixiu-lms-portal/src/lib/ai/hand-detector.ts")
 const face = read("pixiu-lms-portal/src/lib/ai/face-detector.ts")
@@ -108,7 +114,7 @@ assert(
   "Build asset sync must copy MediaPipe runtime assets from pinned npm packages",
 )
 assert(
-  sync.includes("PIXIU_SPEECH_COMMANDS_SOURCE_URL") &&
+  sync.includes("PIXIU_SPEECH_COMMANDS_SCRIPT_SOURCE_URL") &&
     sync.includes("speech-commands.min.js"),
   "Build asset sync must provision the pinned Speech Commands browser runtime",
 )
