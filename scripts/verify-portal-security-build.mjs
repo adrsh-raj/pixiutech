@@ -2,7 +2,7 @@
 import { createHash } from "node:crypto"
 import { readFile, stat } from "node:fs/promises"
 import { fileURLToPath } from "node:url"
-import { dirname, join, resolve } from "node:path"
+import { dirname, join, resolve, relative, isAbsolute, sep } from "node:path"
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 const dist = join(root, "pixiu-lms-portal", "dist")
@@ -31,7 +31,12 @@ if (runtimeManifest.algorithm !== "sha256" || !runtimeManifest.files || typeof r
 for (const [path, metadata] of Object.entries(runtimeManifest.files)) {
   const safePath = path.replace(/\\/g, "/")
   if (!/^(models|vendor)\//.test(safePath)) fail("Runtime manifest path escapes allowed asset roots: " + safePath)
-  const body = await readFile(join(dist, safePath))
+  const filePath = resolve(dist, safePath)
+  const rel = relative(dist, filePath)
+  if (isAbsolute(rel) || rel.startsWith(".." + sep) || rel === "..") {
+    fail("Runtime manifest path escapes dist: " + safePath)
+  }
+  const body = await readFile(filePath)
   const actualHash = createHash("sha256").update(body).digest("hex")
   if (actualHash !== metadata.sha256) fail("AI runtime asset hash mismatch: " + safePath)
   if (body.length !== metadata.size) fail("AI runtime asset size mismatch: " + safePath)
