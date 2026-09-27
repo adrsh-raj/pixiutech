@@ -430,7 +430,7 @@ for (const marker of [
 
 const faceSource = read("pixiu-lms-portal/src/lib/ai/face-detector.ts")
 for (const marker of [
-  'const FACE_VERSION = "3.0.0",'
+  'const FACE_VERSION = "3.0.0"','
   'runtime: "mediapipe"',
   "solutionPath",
   "refineLandmarks: true",
