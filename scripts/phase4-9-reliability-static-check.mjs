@@ -19,6 +19,9 @@ const panel = [
   read("pixiu-lms-portal/src/components/circuit-lab/ai-try-panel.tsx"),
   read("pixiu-lms-portal/src/components/circuit-lab/ai-teach-panel.tsx"),
   read("pixiu-lms-portal/src/components/circuit-lab/ai-understand-panel.tsx"),
+  read("pixiu-lms-portal/src/components/circuit-lab/ai-permission-status.tsx"),
+  read("pixiu-lms-portal/src/components/circuit-lab/ai-runtime-controls.tsx"),
+  read("pixiu-lms-portal/src/components/circuit-lab/ai-dataset-panel.tsx"),
 ].join("\n")
 const visionCore = read("pixiu-lms-portal/src/components/circuit-lab/ai-camera-panel.tsx")
 const camera = read("pixiu-lms-portal/src/lib/ai/camera-session.ts")
@@ -49,7 +52,7 @@ assert(
     panel.includes('runtimeStatus: "running"') &&
     panel.includes('runtimeStatus: "error"') &&
     panel.includes('runtimeStatus: "stopped"') &&
-    panel.includes("createAiVisionState(next)"),
+    panel.includes("createAiVisionState(mode)"),
   "AI Studio does not publish the complete lifecycle state machine",
 )
 assert(
@@ -66,8 +69,8 @@ assert(camera.includes("getCameraPermissionState"), "Camera permission preflight
 assert(sound.includes("getMicrophonePermissionState"), "Microphone permission preflight is missing")
 assert(camera.includes("window.isSecureContext"), "Camera secure-context guard is missing")
 assert(sound.includes("window.isSecureContext"), "Microphone secure-context guard is missing")
-assert(panel.includes("classifyAiRuntimeError(cameraError)"), "Camera failures are not classified")
-assert(panel.includes("classifyAiRuntimeError(soundError)"), "Microphone failures are not classified")
+assert(panel.includes("toAiRuntimeError(cameraError"), "Camera failures are not structured")
+assert(panel.includes("toAiRuntimeError(soundError"), "Microphone failures are not structured")
 
 // Sound readiness must not fall back to the default idle state.
 assert(
