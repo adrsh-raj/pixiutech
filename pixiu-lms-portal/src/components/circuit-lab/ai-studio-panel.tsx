@@ -96,7 +96,6 @@ import {
   type AiRuntimeStatus,
 } from "@/lib/ai/ai-runtime-state"
 import {
-  AI_PERFORMANCE_BUDGETS,
   createAiRuntimeMetrics,
   isBudgetExceeded,
   type AiRuntimeMetrics,
@@ -1069,15 +1068,6 @@ export function AiStudioPanel({
                     ? "6E Emotion ready"
                     : "6I My AI ready",
       )
-      setStatus(
-        mode === "objects" ? "6B Objects ready"
-          : mode === "pose" ? "6C Pose ready"
-          : mode === "hands" ? "6D Fingers ready"
-          : mode === "numbers" ? "6G Numbers ready"
-          : mode === "emotion" ? "6E Emotion ready"
-          : "6I My AI ready",
-      )
-
       if (mode !== "sound") startInferenceLoop(activeSession)
     } catch (resourceError) {
       if (activeSession !== sessionRef.current) return
