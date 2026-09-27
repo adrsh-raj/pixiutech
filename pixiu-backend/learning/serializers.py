@@ -30,7 +30,7 @@ class SessionSerializer(serializers.ModelSerializer):
         if not school_class: raise serializers.ValidationError({"school_class": "Class is required."})
         if not trainer: raise serializers.ValidationError({"trainer": "Trainer is required."})
         if not __import__("academics.services", fromlist=["accessible_class_queryset"]).accessible_class_queryset(request.user).filter(pk=school_class.pk).exists(): raise serializers.ValidationError("You cannot manage a session for this class.")
-        curriculum = attrs.get("curriculum_unit", getattr(instance, "curriculum_unit", None))
+        curriculum = attrs.get("curriculum_unit", getattr(self.instance, "curriculum_unit", None))
         if curriculum is not None:
             if not accessible_curriculum(request.user).filter(pk=curriculum.pk).exists():
                 raise serializers.ValidationError({"curriculum_unit": "You cannot use this curriculum unit."})
