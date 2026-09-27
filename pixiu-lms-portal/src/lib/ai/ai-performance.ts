@@ -61,6 +61,7 @@ function readMemory(): MemorySnapshot {
 export function createAiRuntimeMetrics(mode: string) {
   const startedAt = performance.now()
   const before = readMemory()
+  let readyBaseline = before
   let loadMs: number | null = null
   let firstInferenceMs: number | null = null
   let lastInferenceMs: number | null = null
@@ -73,6 +74,7 @@ export function createAiRuntimeMetrics(mode: string) {
   return {
     markReady() {
       loadMs = performance.now() - startedAt
+      readyBaseline = readMemory()
     },
 
     recordInference(durationMs: number) {
@@ -113,7 +115,10 @@ export function createAiRuntimeMetrics(mode: string) {
         fps,
         tensorCount: memory.tensorCount,
         tensorBytes: memory.tensorBytes,
-        tensorGrowthBytes: Math.max(0, memory.tensorBytes - before.tensorBytes),
+        tensorGrowthBytes: Math.max(
+          0,
+          memory.tensorBytes - readyBaseline.tensorBytes,
+        ),
         jsHeapBytes: memory.jsHeapBytes,
         jsHeapGrowthBytes:
           memory.jsHeapBytes != null && before.jsHeapBytes != null

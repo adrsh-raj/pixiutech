@@ -266,9 +266,17 @@ export async function loadHandDetector(
         reject: (reason: unknown) => void
       }
     | null = null
+  let pendingTimeout: number | null = null
+  const clearPendingTimeout = () => {
+    if (pendingTimeout !== null) {
+      window.clearTimeout(pendingTimeout)
+      pendingTimeout = null
+    }
+  }
 
   hands.onResults((results: any) => {
     if (!pending) return
+    clearPendingTimeout()
 
     const normalized = Array.isArray(results?.multiHandLandmarks)
       ? results.multiHandLandmarks
@@ -306,8 +314,18 @@ export async function loadHandDetector(
 
     return await new Promise<HandDetection[]>((resolve, reject) => {
       pending = { resolve, reject }
+      pendingTimeout = window.setTimeout(() => {
+        if (!pending) return
+        const current = pending
+        pending = null
+        processing = false
+        pendingTimeout = null
+        current.reject(new Error("Hand detection timed out."))
+      }, 8000)
+
       hands.send({ image: video }).catch((error: unknown) => {
         if (!pending) return
+        clearPendingTimeout()
         const current = pending
         pending = null
         processing = false
@@ -321,6 +339,7 @@ export async function loadHandDetector(
     detect,
     dispose() {
       disposed = true
+      clearPendingTimeout()
       pending?.resolve([])
       pending = null
       processing = false
@@ -328,6 +347,7 @@ export async function loadHandDetector(
     },
     reset() {
       hands.reset?.()
+      clearPendingTimeout()
       pending?.resolve([])
       processing = false
       pending = null

@@ -213,9 +213,17 @@ export async function loadFaceDetector(): Promise<FaceDetector> {
         reject: (reason: unknown) => void
       }
     | null = null
+  let pendingTimeout: number | null = null
+  const clearPendingTimeout = () => {
+    if (pendingTimeout !== null) {
+      window.clearTimeout(pendingTimeout)
+      pendingTimeout = null
+    }
+  }
 
   faceMesh.onResults((results: any) => {
     if (!pending) return
+    clearPendingTimeout()
 
     const detections: FaceDetection[] = (
       Array.isArray(results?.multiFaceLandmarks)
@@ -252,8 +260,18 @@ export async function loadFaceDetector(): Promise<FaceDetector> {
 
     return await new Promise<FaceDetection[]>((resolve, reject) => {
       pending = { resolve, reject }
+      pendingTimeout = window.setTimeout(() => {
+        if (!pending) return
+        const current = pending
+        pending = null
+        processing = false
+        pendingTimeout = null
+        current.reject(new Error("Face detection timed out."))
+      }, 8000)
+
       faceMesh.send({ image: video }).catch((error: unknown) => {
         if (!pending) return
+        clearPendingTimeout()
         const current = pending
         pending = null
         processing = false
@@ -267,6 +285,7 @@ export async function loadFaceDetector(): Promise<FaceDetector> {
     detect,
     dispose() {
       disposed = true
+      clearPendingTimeout()
       pending?.resolve([])
       pending = null
       processing = false
@@ -274,6 +293,7 @@ export async function loadFaceDetector(): Promise<FaceDetector> {
     },
     reset() {
       faceMesh.reset?.()
+      clearPendingTimeout()
       pending?.resolve([])
       processing = false
       pending = null

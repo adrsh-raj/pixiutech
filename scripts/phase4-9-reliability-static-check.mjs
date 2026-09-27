@@ -63,6 +63,14 @@ assert(sound.includes("window.isSecureContext"), "Microphone secure-context guar
 assert(panel.includes("classifyAiRuntimeError(cameraError)"), "Camera failures are not classified")
 assert(panel.includes("classifyAiRuntimeError(soundError)"), "Microphone failures are not classified")
 
+// Sound readiness must not fall back to the default idle state.
+assert(
+  panel.includes("runtimeStatus: \"ready\"") &&
+    panel.includes("setSoundActive(true)") &&
+    panel.includes("detail: \"Microphone ready\""),
+  "Sound startup must publish an explicit ready state through the shared AI contract",
+)
+
 // Failure isolation: resource loading and inference errors are contained in-mode.
 assert(
   panel.includes("setStatus(\"AI unavailable\")") &&
@@ -96,7 +104,8 @@ assert(
 )
 assert(
   panel.includes("const activeSession = ++sessionRef.current") &&
-    panel.includes("if (activeSession !== sessionRef.current)"),
+    panel.includes("if (activeSession !== sessionRef.current)") &&
+    panel.includes("const activeSession = ++sessionRef.current"),
   "AI Studio async resources are not protected by generation/session guards",
 )
 assert(
@@ -108,6 +117,23 @@ assert(
   panel.includes("busyRef.current") &&
     visionCore.includes("busyRef.current"),
   "Visual inference paths are missing overlap protection",
+)
+
+assert(
+  hands.includes("pendingTimeout") &&
+    hands.includes("Hand detection timed out.") &&
+    hands.includes("clearPendingTimeout()"),
+  "Hands detector pending requests need a timeout and cleanup path",
+)
+assert(
+  face.includes("pendingTimeout") &&
+    face.includes("Face detection timed out.") &&
+    face.includes("clearPendingTimeout()"),
+  "Face detector pending requests need a timeout and cleanup path",
+)
+assert(
+  visionCore.includes('runtimeErrorKind: errorKind'),
+  "Vision Core must preserve the classified error kind instead of hard-coding inference",
 )
 
 // Browser compatibility.
@@ -137,14 +163,16 @@ assert(
 assert(
   performance.includes("tensorGrowthBytes") &&
     performance.includes("jsHeapGrowthBytes") &&
-    performance.includes("hardwareConcurrency"),
-  "Runtime memory/device diagnostics are incomplete",
+    performance.includes("hardwareConcurrency") &&
+    performance.includes("readyBaseline = readMemory()"),
+  "Runtime memory/device diagnostics must baseline steady-state memory after readiness",
 )
 assert(
   panel.includes("createAiRuntimeMetrics") &&
     panel.includes("recordInference") &&
-    panel.includes("isBudgetExceeded"),
-  "AI Studio is not collecting or applying performance metrics",
+    panel.includes("isBudgetExceeded") &&
+    panel.includes("budget.firstInference"),
+  "AI Studio is not collecting or applying the complete performance budget",
 )
 
 // Phase 2/3 continuity and local-runtime discipline.
@@ -159,6 +187,13 @@ assert(
   visionCore.includes('from "@/lib/ai/object-detector"') &&
     !visionCore.includes('@tensorflow-models/coco-ssd'),
   "Vision Core must use the shared COCO-SSD adapter",
+)
+
+assert(
+  sync.includes("hands_solution_packed_assets.data") &&
+    sync.includes("face_mesh_solution_packed_assets.data") &&
+    sync.includes(".wasm"),
+  "Local MediaPipe asset validation must cover packed data and WASM binaries",
 )
 
 // Exit gate wiring.
