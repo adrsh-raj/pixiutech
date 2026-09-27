@@ -48,7 +48,20 @@ assert(blocklyEditor.includes('timer = window.setTimeout(applyExternalXml, 0)'),
 assert(blocklyEditor.includes("lastParentXmlRef.current = expectedExternalXml"), "Blockly editor does not lock the completed external XML after hydration")
 
 const runner = read("pixiu-lms-portal/src/lib/blockly-runner.ts")
+const releaseGate = read("scripts/phase8-release-gate.mjs")
+const browserGate = read("scripts/cyberlab-browser-gate.mjs")
+
 assert(runner.includes('case "controls_whileUntil"'), "Blockly while/until block has no simulator execution path")
+assert(releaseGate.includes("payload.service !== \"pixiu-django\"") && releaseGate.includes("payload.database !== \"ok\""), "Phase 8 release gate does not validate the live Django health contract")
+assert(releaseGate.includes("/simulation"), "Phase 8 release gate does not cover the Virtual Lab route")
+assert(releaseGate.includes("/public/enquiries"), "Phase 8 release gate does not cover public enquiry validation")
+assert(browserGate.includes("browser.newContext"), "Phase 7 browser gate does not create an isolated browser context")
+assert(browserGate.includes("context.addInitScript"), "Phase 7 browser gate does not isolate protected-route authentication")
+assert(browserGate.includes("page.on(\"pageerror\""), "Phase 7 browser gate does not fail on page errors")
+assert(browserGate.includes("page.on(\"console\""), "Phase 7 browser gate does not fail on console errors")
+assert(browserGate.includes("page.on(\"requestfailed\""), "Phase 7 browser gate does not track failed requests")
+assert(browserGate.includes("PIXIU CyberLab browser gate PASSED"), "Phase 7 browser gate completion marker missing")
+assert(browserGate.includes("6C Pose ready") && browserGate.includes("6D Fingers ready") && browserGate.includes("6E Emotion ready"), "Phase 7 AI lifecycle coverage is incomplete")
 assert(runner.includes("getAiObjectCount"), "Blockly runner lacks AI object count bridge")
 
 if (failures.length) {
