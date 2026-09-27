@@ -68,7 +68,6 @@ import {
 import type { AiVisionMode, ReadyAiMode, AiVisionState } from "@/lib/ai/vision-types"
 import { createAiVisionState } from "@/lib/ai/vision-state"
 import {
-  classifyAiRuntimeError,
   runtimeDetail,
   type AiRuntimeStatus,
 } from "@/lib/ai/ai-runtime-state"
@@ -734,7 +733,7 @@ const [tab, setTab] = useState<Tab>("try")
     setFps(0)
   }
 
-  function releaseLoadedResource(resourceMode: AiVisionMode | null, resource: ReadyResource) {
+  function releaseLoadedResource(resourceMode: AiVisionMode | null, resource: ReadyResource | null) {
     if (!resource || !resourceMode) return
 
     if (resourceMode === "sound") {
@@ -922,7 +921,7 @@ const [tab, setTab] = useState<Tab>("try")
     })
 
     try {
-      let resource: ReadyResource = null
+      let resource: ReadyResource | null = null
 
       if (mode === "objects") {
         resource = await loadObjectDetector()
