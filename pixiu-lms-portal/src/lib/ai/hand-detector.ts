@@ -18,6 +18,27 @@ export type HandDetection = {
   fingerCount: number
 }
 
+
+export type MediaPipeHandLandmark = { x?: number; y?: number; z?: number; name?: string }
+export type MediaPipeHandsResults = {
+  multiHandLandmarks?: MediaPipeHandLandmark[][]
+  multiHandedness?: Array<{
+    classification?: Array<{ displayName?: string; categoryName?: string }>
+  }>
+}
+export type MediaPipeHandsInstance = {
+  setOptions: (options: {
+    maxNumHands: number
+    modelComplexity: number
+    minDetectionConfidence: number
+    minTrackingConfidence: number
+  }) => void
+  onResults: (callback: (results: MediaPipeHandsResults) => void) => void
+  send: (input: { image: HTMLVideoElement }) => Promise<void>
+  close: () => void
+  reset?: () => void
+}
+
 export type HandDetector = {
   version: string
   detect: (video: HTMLVideoElement) => Promise<HandDetection[]>
@@ -33,7 +54,7 @@ const HANDS_ASSET_BASE = "/vendor/mediapipe/hands/"
 
 declare global {
   interface Window {
-    Hands?: any
+    Hands?: new (options: { locateFile: (file: string) => string }) => MediaPipeHandsInstance
   }
 }
 
@@ -184,7 +205,7 @@ export function countExtendedFingers(points: HandPoint[]) {
   return getExtendedFingerMask(points).filter(Boolean).length
 }
 
-function toPoint(point: any, point3d?: any): HandPoint {
+function toPoint(point: MediaPipeHandLandmark, point3d?: MediaPipeHandLandmark): HandPoint {
   return {
     x: Number(point?.x ?? 0),
     y: Number(point?.y ?? 0),
@@ -206,9 +227,9 @@ function toBoxFromPoints(
   return [minX, minY, Math.max(0, maxX - minX), Math.max(0, maxY - minY)]
 }
 
-function normalizeHandResult(hand: any): HandDetection {
+function normalizeHandResult(hand: { keypoints: MediaPipeHandLandmark[]; keypoints3D?: MediaPipeHandLandmark[]; score?: number; handedness?: string; handednesses?: Array<{ classification?: Array<{ displayName?: string; categoryName?: string }> }> }): HandDetection {
   const keypoints = Array.isArray(hand?.keypoints)
-    ? hand.keypoints.map((point: any, index: number) =>
+    ? hand.keypoints.map((point: MediaPipeHandLandmark, index: number) =>
         toPoint(point, hand?.keypoints3D?.[index]),
       )
     : []
@@ -247,8 +268,8 @@ export async function loadHandDetector(
     Math.min(MAX_HANDS, Math.round(options.maxHands ?? MAX_HANDS)),
   )
 
-  const hands = new window.Hands({
-    locateFile: (file: string) => `${HANDS_ASSET_BASE}${file}`,
+  const hands = new window.Hands!({
+    locateFile: (file) => `${HANDS_ASSET_BASE}${file}`,
   })
 
   hands.setOptions({
@@ -274,14 +295,14 @@ export async function loadHandDetector(
     }
   }
 
-  hands.onResults((results: any) => {
+  hands.onResults((results: MediaPipeHandsResults) => {
     if (!pending) return
     clearPendingTimeout()
 
     const normalized = Array.isArray(results?.multiHandLandmarks)
       ? results.multiHandLandmarks
           .slice(0, maxHands)
-          .map((landmarks: any[], index: number) =>
+          .map((landmarks: MediaPipeHandLandmark[], index: number) =>
             normalizeHandResult({
               keypoints: landmarks,
               keypoints3D: results?.multiHandWorldLandmarks?.[index],
