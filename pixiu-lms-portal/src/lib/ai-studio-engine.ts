@@ -1135,9 +1135,13 @@ export async function trainAiModel(
       throw new Error("Training cancelled.")
     }
     if (bestWeights) {
-      model.setWeights(bestWeights)
-      bestWeights.forEach((weight) => weight.dispose())
+      const weightsToRestore = bestWeights
       bestWeights = null
+      try {
+        model.setWeights(weightsToRestore)
+      } finally {
+        weightsToRestore.forEach((weight) => weight.dispose())
+      }
     }
     model.stopTraining = false
 
