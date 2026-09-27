@@ -1,0 +1,82 @@
+name: PIXIU Part 4 Current Verification
+
+on:
+  push:
+    branches:
+      - fix/part-4-professional-ai-hardening
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "pixiu-lms-portal/**"
+      - "scripts/**"
+      - ".github/workflows/part4-current-verify.yml"
+      - "vite.config.js"
+      - "vercel.json"
+
+permissions:
+  contents: read
+
+jobs:
+  ai:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: pixiu-lms-portal/.node-version
+          cache: npm
+          cache-dependency-path:
+            pixiu-lms-portal/package-lock.json
+
+      - name: Install portal dependencies
+        working-directory: pixiu-lms-portal
+        run: npm ci
+
+      - name: Lint
+        working-directory: pixiu-lms-portal
+        run: npm run lint
+
+      - name: Part 4 professional hardening gate
+        working-directory: pixiu-lms-portal
+        run: npm run qa:part4
+
+      - name: AI module unit tests
+        working-directory: pixiu-lms-portal
+        run: npm run test:ai
+
+      - name: Phase A1 tensor lifecycle gate
+        working-directory: pixiu-lms-portal
+        run: npm run qa:phase-a1
+
+      - name: Phase 2-3 inference runtime gate
+        working-directory: pixiu-lms-portal
+        run: npm run qa:phase2-3
+
+      - name: Phase 4-6 gate
+        working-directory: pixiu-lms-portal
+        run: npm run qa:phase4-6
+
+      - name: Phase 4-9 reliability gate
+        working-directory: pixiu-lms-portal
+        run: npm run qa:phase4-9
+
+      - name: AI static contract gate
+        run: node scripts/ai-static-check.mjs
+
+      - name: AI executable regression matrix
+        run: node --experimental-strip-types scripts/ai-phase6-qa.mjs
+
+      - name: Cross-phase security gate
+        run: node scripts/security-static-check.mjs
+
+      - name: Provision local AI assets and build portal
+        working-directory: pixiu-lms-portal
+        run: npm run build
+
+      - name: Verify portal SRI and local AI asset integrity
+        run: node scripts/verify-portal-security-build.mjs
