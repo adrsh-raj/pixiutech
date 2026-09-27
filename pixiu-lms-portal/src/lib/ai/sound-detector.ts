@@ -19,6 +19,8 @@ export type SoundRecognizer = {
 
 const SPEECH_VERSION = "0.5.4"
 const SPEECH_SCRIPT = "/vendor/tfjs/speech-commands/speech-commands.min.js"
+export const SPEECH_MODEL_URL = "/models/speech-commands/18w/model.json"
+export const SPEECH_METADATA_URL = "/models/speech-commands/18w/metadata.json"
 
 declare global {
   interface Window {
@@ -157,7 +159,24 @@ export async function loadSoundRecognizer(): Promise<SoundRecognizer> {
   await tf.ready()
   await ensureSpeechRuntime()
 
-  const recognizer = window.speechCommands!.create("BROWSER_FFT", "18w")
+  const recognizer = window.speechCommands!.create("BROWSER_FFT", "18w") as any
+  const runtime = recognizer as {
+    modelArtifactsOrURL?: string
+    metadataOrURL?: string
+  }
+
+  // speech-commands@0.5.4's public factory selects the hosted model when a
+  // vocabulary name is supplied. The library's documented recognizer class
+  // accepts custom model/metadata URLs; keep the factory for compatibility,
+  // then bind its private loader inputs to our same-origin assets before the
+  // first load. The build gate verifies these internal field names against the
+  // pinned runtime version.
+  if (!("modelArtifactsOrURL" in runtime) || !("metadataOrURL" in runtime)) {
+    throw new Error("Unsupported Speech Commands runtime: local model binding is unavailable.")
+  }
+  runtime.modelArtifactsOrURL = SPEECH_MODEL_URL
+  runtime.metadataOrURL = SPEECH_METADATA_URL
+
   await recognizer.ensureModelLoaded()
 
   const labels = recognizer.wordLabels()
