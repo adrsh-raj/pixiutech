@@ -31,6 +31,7 @@ const pose = read("pixiu-lms-portal/src/lib/ai/pose-detector.ts")
 const gesture = read("pixiu-lms-portal/src/lib/ai/gesture-interpreter.ts")
 const extractor = read("pixiu-lms-portal/src/lib/ai/my-ai-feature-extractor.ts")
 const types = read("pixiu-lms-portal/src/lib/ai/vision-types.ts")
+const resultNormalizer = read("pixiu-lms-portal/src/lib/ai/ai-result-normalizer.ts")
 
 const failures = []
 
@@ -255,6 +256,16 @@ for (const [name, passed] of staticSourceChecks) {
   assert(passed, "static: " + name)
 }
 
+assert(engine.includes("trainingHistory: history"), "training history persistence missing")
+assert(engine.includes("validationConfusionMatrix"), "validation confusion matrix missing")
+assert(engine.includes("estimateTrainingLoad"), "training load guard missing")
+assert(panel.includes("MetricChart"), "training graph UI missing")
+assert(panel.includes("Add layer"), "layer editor missing")
+assert(panel.includes("Max epochs"), "extended epoch control missing")
+assert(!panel.includes("customDepth"), "obsolete depth control remains")
+assert(!panel.includes("customUnits"), "obsolete unit control remains")
+assert(!panel.includes("customDropout"), "obsolete dropout control remains")
+
 if (failures.length) {
   console.error("PIXIU Phase 6 QA matrix FAILED")
   for (const failure of failures) console.error(" - " + failure)
@@ -270,12 +281,3 @@ console.log("6N · Explain current result: PASS")
 console.log("6O · camera/mic activity + local cleanup controls: PASS")
 console.log("6P · cross-mode/restart/permission/no-input/integration matrix: PASS")
 
-assert(engine.includes("trainingHistory: history"), "training history persistence missing")
-assert(engine.includes("validationConfusionMatrix"), "validation confusion matrix missing")
-assert(engine.includes("estimateTrainingLoad"), "training load guard missing")
-assert(panel.includes("MetricChart"), "training graph UI missing")
-assert(panel.includes("Add layer"), "layer editor missing")
-assert(panel.includes("Max epochs"), "extended epoch control missing")
-assert(!panel.includes("customDepth"), "obsolete depth control remains")
-assert(!panel.includes("customUnits"), "obsolete unit control remains")
-assert(!panel.includes("customDropout"), "obsolete dropout control remains")

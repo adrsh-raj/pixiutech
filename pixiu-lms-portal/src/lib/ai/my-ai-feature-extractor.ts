@@ -64,14 +64,16 @@ export async function loadMyAiFeatureExtractor() {
       MY_AI_INPUT_SIZE,
       3,
     ])
+    const warmupMean = tf.mean(warmup)
     try {
       assertShape(
         warmup,
         [1, MY_AI_INPUT_SIZE, MY_AI_INPUT_SIZE, 3],
         "My AI warmup tensor",
       )
-      await tf.mean(warmup).data()
+      await warmupMean.data()
     } finally {
+      warmupMean.dispose()
       warmup.dispose()
     }
 

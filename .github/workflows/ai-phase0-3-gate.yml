@@ -1,0 +1,51 @@
+name: PIXIU AI Lab Phase 0-3 Gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "pixiu-lms-portal/**"
+      - "scripts/ai-static-check.mjs"
+      - "scripts/ai-phase6-qa.mjs"
+      - ".github/workflows/ai-phase0-3-gate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ai_phase_0_3:
+    name: AI Phase 0-3 verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: pixiu-lms-portal/.node-version
+          cache: npm
+          cache-dependency-path: pixiu-lms-portal/package-lock.json
+
+      - name: Install portal dependencies
+        working-directory: pixiu-lms-portal
+        run: npm ci
+
+      - name: Lint portal
+        working-directory: pixiu-lms-portal
+        run: npm run lint
+
+      - name: Run AI static contract checks
+        working-directory: pixiu-lms-portal
+        run: node ../scripts/ai-static-check.mjs
+
+      - name: Run AI regression matrix
+        working-directory: pixiu-lms-portal
+        run: node --experimental-strip-types ../scripts/ai-phase6-qa.mjs
+
+      - name: Production build
+        working-directory: pixiu-lms-portal
+        run: npm run build

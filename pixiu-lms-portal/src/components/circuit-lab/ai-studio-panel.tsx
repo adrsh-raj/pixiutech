@@ -45,12 +45,12 @@ import {
   saveAiStudioStore,
   estimateTrainingLoad,
   AI_TRAINING_PROFILES,
-  MY_AI_FEATURE_SIZE,
   trainAiModel,
   type AiLayerSpec,
   type AiTrainingHistoryPoint,
   type AiStudioStore, type AiTrainingProfile,
 } from "@/lib/ai-studio-engine"
+import { MY_AI_FEATURE_SIZE } from "@/lib/ai/my-ai-feature-extractor"
 import {
   captureVideoFrame,
   startCamera,
