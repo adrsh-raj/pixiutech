@@ -42,6 +42,9 @@ jobs:
         working-directory: pixiu-lms-portal
         run: npm ci
 
+      - name: Run cross-phase security static gate
+        run: node scripts/security-static-check.mjs
+
       - name: Run source/build final gate
         run: node scripts/phase9-final-gate.mjs
 
