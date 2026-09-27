@@ -314,8 +314,18 @@ export async function loadHandDetector(
 
     return await new Promise<HandDetection[]>((resolve, reject) => {
       pending = { resolve, reject }
+      pendingTimeout = window.setTimeout(() => {
+        if (!pending) return
+        const current = pending
+        pending = null
+        processing = false
+        pendingTimeout = null
+        current.reject(new Error("Hand detection timed out."))
+      }, 8000)
+
       hands.send({ image: video }).catch((error: unknown) => {
         if (!pending) return
+        clearPendingTimeout()
         const current = pending
         pending = null
         processing = false
