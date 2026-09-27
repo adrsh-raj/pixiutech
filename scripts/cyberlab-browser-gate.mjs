@@ -35,6 +35,16 @@ try {
   const pageErrors = []
   const consoleErrors = []
   const failedRequests = []
+  const remoteAiRuntimeRequests = []
+  page.on("request", (request) => {
+    const url = request.url()
+    if (/(tfhub\.dev|jsdelivr\.net|unpkg\.com|storage\.googleapis\.com)/i.test(url)) {
+      const type = request.resourceType()
+      if (type === "script" || type === "xhr" || type === "fetch" || type === "wasm") {
+        remoteAiRuntimeRequests.push(url)
+      }
+    }
+  })
   page.on("pageerror", (error) => pageErrors.push(error.message))
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text())
@@ -105,7 +115,11 @@ try {
   if (pageErrors.length) throw new Error("Browser page errors: " + pageErrors.join(" | "))
   if (consoleErrors.length) throw new Error("Browser console errors: " + consoleErrors.join(" | "))
   if (failedRequests.length) throw new Error("Browser request failures: " + failedRequests.join(" | "))
+  if (remoteAiRuntimeRequests.length) {
+    throw new Error("Runtime AI assets must stay same-origin; remote AI requests detected: " + remoteAiRuntimeRequests.join(" | "))
+  }
   console.log("PIXIU CyberLab browser gate PASSED")
+  console.log("Runtime AI origin policy · PASS")
  } finally {
   await browser.close()
 }
