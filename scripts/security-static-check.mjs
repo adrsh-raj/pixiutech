@@ -42,7 +42,7 @@ const workflows = readdirSync(join(root, ".github/workflows"))
   .filter((name) => /\.(yml|yaml)$/.test(name))
 for (const name of workflows) {
   const source = read(".github/workflows/" + name)
-  const refs = [...source.matchAll(/^\s*-?\s*uses:\s*([^\s#]+)\s*$/gm)].map((m) => m[1])
+  const refs = [...source.matchAll(/^\s*-?\s*uses:\s*([^\s#]+)(?:\s+#.*)?$/gm)].map((m) => m[1])
   for (const ref of refs) {
     if (ref.startsWith("actions/")) {
       const sha = ref.split("@")[1] || ""
