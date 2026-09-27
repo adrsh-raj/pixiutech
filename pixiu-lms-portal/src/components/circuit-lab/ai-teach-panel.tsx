@@ -22,8 +22,9 @@ export function AiTeachPanel({ viewModel }: { viewModel: AiStudioViewModel }) {
     setCustomBatchSize, customPatience, setCustomPatience, customMinDelta, setCustomMinDelta,
     customLayers, addCustomLayer, updateCustomLayer, removeCustomLayer, moveCustomLayer,
     selectedTrainingConfig, estimatedTrainingLoad, progress, canTrain, train, resetStudio,
-    model, trainingHistory,
+    model, trainingHistory, setStatus,
   } = viewModel
+  return (
 <div className="mx-auto max-w-5xl space-y-4">
               <div className="grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
                 <div className="rounded-2xl border border-violet-400/15 bg-violet-500/[0.04] p-4">
@@ -318,4 +319,5 @@ export function AiTeachPanel({ viewModel }: { viewModel: AiStudioViewModel }) {
                 <RefreshCcw size={13} /> Reset dataset + My AI
               </button>
             </div>
+  )
 }
