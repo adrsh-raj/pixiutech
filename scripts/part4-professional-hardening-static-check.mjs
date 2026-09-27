@@ -12,6 +12,8 @@ const objectDetector = read("pixiu-lms-portal/src/lib/ai/object-detector.ts")
 const soundDetector = read("pixiu-lms-portal/src/lib/ai/sound-detector.ts")
 const syncAssets = read("scripts/sync-ai-runtime-assets.mjs")
 const vite = read("pixiu-lms-portal/vite.config.js")
+const rootVite = read("vite.config.js")
+const rootVercel = read("vercel.json")
 const index = read("pixiu-lms-portal/index.html")
 const vercel = read("pixiu-lms-portal/vercel.json")
 const packageJson = JSON.parse(read("pixiu-lms-portal/package.json"))
@@ -29,13 +31,15 @@ assert(syncAssets.includes("COCO_SSD_SOURCE_URL"), "COCO-SSD asset provisioning 
 assert(syncAssets.includes("ensureGraphModel(COCO_SSD_SOURCE_URL"), "COCO-SSD weights are not provisioned from model.json manifest")
 assert(syncAssets.includes("SPEECH_METADATA_SOURCE_URL"), "Speech metadata provisioning is missing")
 assert(syncAssets.includes("SPEECH_SOURCE_URL"), "Speech model provisioning is missing")
-assert(vite.includes("sriAttributePlugin"), "Vite production SRI plugin is missing")
+assert(vite.includes("sriAttributePlugin"), "Portal Vite production SRI plugin is missing")
+assert(rootVite.includes("pixiu-root-sri-attributes"), "Root Vite production SRI plugin is missing")
 assert(vite.includes("sha384-"), "Vite SRI plugin does not generate SHA-384 integrity")
 assert(vite.includes("sri-manifest.json"), "Build does not emit an SRI manifest")
 assert(syncAssets.includes("PIXIU-AI-RUNTIME-MANIFEST.json"), "Build does not generate AI runtime integrity manifest")
 assert(!index.includes("fonts.googleapis.com"), "External Google Fonts stylesheet remains in portal HTML")
 assert(!index.includes("fonts.gstatic.com"), "External Google Fonts preconnect remains in portal HTML")
 assert(vercel.includes('"Content-Security-Policy"'), "Portal CSP header is missing")
+assert(rootVercel.includes('"Content-Security-Policy"'), "Root CSP header is missing")
 for (const directive of ["default-src 'self'", "object-src 'none'", "frame-ancestors 'none'", "script-src 'self'", "connect-src 'self' https:", "media-src 'self' blob:"]) {
   assert(vercel.includes(directive), "CSP directive missing: " + directive)
 }
@@ -47,6 +51,9 @@ for (const file of [
   "pixiu-lms-portal/src/components/circuit-lab/ai-teach-panel.tsx",
   "pixiu-lms-portal/src/components/circuit-lab/ai-understand-panel.tsx",
   "pixiu-lms-portal/src/components/circuit-lab/ai-training-diagnostics.tsx",
+  "pixiu-lms-portal/src/components/circuit-lab/ai-dataset-panel.tsx",
+  "pixiu-lms-portal/src/components/circuit-lab/ai-runtime-controls.tsx",
+  "pixiu-lms-portal/src/components/circuit-lab/ai-permission-status.tsx",
   "pixiu-lms-portal/src/components/circuit-lab/ai-studio-presenters.ts",
 ]) assert(existsSync(join(root, file)), "Split AI Studio module missing: " + file)
 assert(studio.split("\n").length <= 400, "AI Studio view shell is too large")
@@ -54,6 +61,9 @@ assert(controller.split("\n").length <= 2000, "AI Studio controller exceeded the
 const unitDir = join(root, "pixiu-lms-portal/test/ai")
 const unitFiles = readdirSync(unitDir).filter((name) => name.endsWith(".test.ts"))
 assert(unitFiles.length >= 5, "Expected at least five AI module unit-test files")
+assert(controller.includes('type ReadyResource ='), "Typed AI resource union is missing")
+assert(!controller.match(/\bany\b/), "AI Studio controller still contains broad any")
+assert(!soundDetector.match(/\bany\b/), "Sound detector still contains broad any")
 
 if (failures.length) {
   console.error("PIXIU Part 4 professional hardening gate FAILED")
