@@ -7,6 +7,7 @@ import {
   mkdir,
   readFile,
   readdir,
+  rename,
   stat,
   writeFile,
 } from "node:fs/promises"
@@ -110,8 +111,9 @@ async function fetchBytes(url, attempts = 3) {
     : new Error("Unable to download " + url)
 }
 
-async function ensureRemoteFile(url, destination) {
-  if (await exists(destination)) {
+async function ensureRemoteFile(url, destination, options = {}) {
+  const force = options.force === true
+  if (!force && (await exists(destination))) {
     const info = await stat(destination)
     if (info.size > 0) return null
   }
@@ -119,7 +121,22 @@ async function ensureRemoteFile(url, destination) {
   await mkdir(dirname(destination), { recursive: true })
   const result = await fetchBytes(url)
   if (!result.bytes.length) throw new Error("Downloaded empty asset: " + url)
-  await writeFile(destination, result.bytes)
+
+  // Write only the completed payload so a failed download cannot leave a
+  // partially-written model/shard for the next cached deployment.
+  const temporary = destination + ".tmp-" + process.pid + "-" + Date.now()
+  try {
+    await writeFile(temporary, result.bytes)
+    await rename(temporary, destination)
+  } catch (error) {
+    try {
+      await rename(temporary, destination)
+    } catch {
+      // Preserve the original error with no partial final file left behind.
+    }
+    throw error
+  }
+
   return result.finalUrl
 }
 
@@ -180,45 +197,12 @@ async function copyDirectoryAssets(sourceDir, destinationDir) {
 }
 
 async function ensureMoveNet() {
-  const modelPath = join(MOVENET_DIR, "model.json")
-  const sourcePath = join(MOVENET_DIR, ".source-url")
-  let modelSourceUrl = MOVENET_SOURCE_URL
-
-  if (!(await exists(modelPath)) || (await stat(modelPath)).size === 0) {
-    const finalUrl = await ensureRemoteFile(MOVENET_SOURCE_URL, modelPath)
-    modelSourceUrl = finalUrl || MOVENET_SOURCE_URL
-    await writeFile(sourcePath, modelSourceUrl + "\n")
-  } else if (await exists(sourcePath)) {
-    const storedSource = (await readFile(sourcePath, "utf8")).trim()
-    if (storedSource) modelSourceUrl = storedSource
-  }
-
-  const model = JSON.parse(await readFile(modelPath, "utf8"))
-  if (model.format !== "graph-model") {
-    throw new Error("MoveNet local model.json is not a TensorFlow.js graph model.")
-  }
-  if (!Array.isArray(model.weightsManifest) || !model.weightsManifest.length) {
-    throw new Error("MoveNet local model.json has no weightsManifest.")
-  }
-
-  const paths = []
-  for (const manifest of model.weightsManifest) {
-    if (!Array.isArray(manifest?.paths)) {
-      throw new Error("MoveNet weightsManifest entry has no paths.")
-    }
-    for (const assetPath of manifest.paths) {
-      if (typeof assetPath !== "string" || !assetPath || assetPath.includes("..")) {
-        throw new Error("Unsafe MoveNet shard path: " + String(assetPath))
-      }
-      paths.push(assetPath)
-    }
-  }
-
-  for (const assetPath of paths) {
-    const destination = join(MOVENET_DIR, assetPath)
-    const url = new URL(assetPath, modelSourceUrl).toString()
-    await ensureRemoteFile(url, destination)
-  }
+  await ensureGraphModel(
+    MOVENET_SOURCE_URL,
+    MOVENET_DIR,
+    "MoveNet",
+    "graph-model",
+  )
 
   console.log(
     "MoveNet local assets ready:",
@@ -284,36 +268,133 @@ async function writeRuntimeManifest() {
   )
 }
 
-async function ensureGraphModel(modelSourceUrl, destinationDir, label, expectedFormat) {
-  const modelPath = join(destinationDir, "model.json")
-  const sourcePath = join(destinationDir, ".source-url")
-  let modelSource = modelSourceUrl
+function isExpectedModelFormat(model, expectedFormat) {
+  if (!expectedFormat) return true
+  if (model.format === expectedFormat) return true
 
-  if (!(await exists(modelPath)) || (await stat(modelPath)).size === 0) {
-    const finalUrl = await ensureRemoteFile(modelSourceUrl, modelPath)
-    modelSource = finalUrl || modelSourceUrl
-    await writeFile(sourcePath, modelSource + "\n")
-  } else if (await exists(sourcePath)) {
-    const stored = (await readFile(sourcePath, "utf8")).trim()
-    if (stored) modelSource = stored
+  // Some legacy TF.js-hosted graph models omit the optional top-level
+  // format field. For graph models, modelTopology + weightsManifest is the
+  // runtime contract consumed by tf.loadGraphModel()/loadGraphModel().
+  if (
+    expectedFormat === "graph-model" &&
+    model.format == null &&
+    model.modelTopology &&
+    typeof model.modelTopology === "object" &&
+    Array.isArray(model.weightsManifest) &&
+    model.weightsManifest.length > 0
+  ) {
+    return true
   }
 
-  const model = JSON.parse(await readFile(modelPath, "utf8"))
-  if (expectedFormat && model.format !== expectedFormat) {
-    throw new Error(label + " model format mismatch: expected " + expectedFormat + ", got " + String(model.format))
+  // Speech Commands is a LayersModel. Accept the legacy topology shape only
+  // when its Keras model_config proves that this is a layers model.
+  if (
+    expectedFormat === "layers-model" &&
+    model.format == null &&
+    model.modelTopology &&
+    typeof model.modelTopology === "object" &&
+    model.modelTopology.model_config &&
+    typeof model.modelTopology.model_config === "object"
+  ) {
+    return true
   }
+
+  return false
+}
+
+function describeModelFormat(model) {
+  if (typeof model.format === "string" && model.format.trim()) {
+    return model.format
+  }
+  if (model.modelTopology && typeof model.modelTopology === "object") {
+    return "legacy-model-without-format"
+  }
+  return "unknown"
+}
+
+async function readModelJson(modelPath, label) {
+  const text = await readFile(modelPath, "utf8")
+  try {
+    return JSON.parse(text)
+  } catch {
+    throw new Error(label + " model.json is not valid JSON.")
+  }
+}
+
+function validateModelManifest(model, label, expectedFormat) {
+  if (!isExpectedModelFormat(model, expectedFormat)) {
+    throw new Error(
+      label +
+        " model format mismatch: expected " +
+        expectedFormat +
+        ", got " +
+        describeModelFormat(model),
+    )
+  }
+
   if (!Array.isArray(model.weightsManifest) || !model.weightsManifest.length) {
     throw new Error(label + " model.json has no weightsManifest.")
   }
 
+  let shardCount = 0
   for (const manifest of model.weightsManifest) {
-    if (!Array.isArray(manifest?.paths)) {
+    if (!Array.isArray(manifest?.paths) || !manifest.paths.length) {
       throw new Error(label + " weightsManifest entry has no paths.")
     }
+
     for (const assetPath of manifest.paths) {
-      if (typeof assetPath !== "string" || !assetPath || assetPath.includes("..") || assetPath.startsWith("/")) {
-        throw new Error("Unsafe " + label + " shard path: " + String(assetPath))
+      if (
+        typeof assetPath !== "string" ||
+        !assetPath ||
+        assetPath.includes("..") ||
+        assetPath.startsWith("/")
+      ) {
+        throw new Error(
+          "Unsafe " + label + " shard path: " + String(assetPath),
+        )
       }
+      shardCount += 1
+    }
+  }
+
+  if (!shardCount) {
+    throw new Error(label + " model.json declares no weight shards.")
+  }
+}
+
+async function ensureGraphModel(modelSourceUrl, destinationDir, label, expectedFormat) {
+  const modelPath = join(destinationDir, "model.json")
+  const sourcePath = join(destinationDir, ".source-url")
+  let modelSource = modelSourceUrl
+  let model = null
+
+  if (await exists(sourcePath)) {
+    const stored = (await readFile(sourcePath, "utf8")).trim()
+    if (stored) modelSource = stored
+  }
+
+  if (await exists(modelPath)) {
+    try {
+      model = await readModelJson(modelPath, label)
+      validateModelManifest(model, label, expectedFormat)
+    } catch {
+      // Deployment caches may contain an older model format or an interrupted
+      // artifact. Force a fresh download and validate the replacement.
+      model = null
+    }
+  }
+
+  if (!model) {
+    const finalUrl = await ensureRemoteFile(modelSource, modelPath, { force: true })
+    modelSource = finalUrl || modelSource
+    await writeFile(sourcePath, modelSource + "\n")
+    model = await readModelJson(modelPath, label)
+  }
+
+  validateModelManifest(model, label, expectedFormat)
+
+  for (const manifest of model.weightsManifest) {
+    for (const assetPath of manifest.paths) {
       const destination = join(destinationDir, assetPath)
       const url = new URL(assetPath, modelSource).toString()
       await ensureRemoteFile(url, destination)
@@ -386,5 +467,8 @@ async function main() {
 main().catch((error) => {
   console.error("PIXIU AI runtime asset sync FAILED")
   console.error(error instanceof Error ? error.message : error)
+  console.error(
+    "Cached model.json files are revalidated and replaced automatically when malformed or incompatible.",
+  )
   process.exit(1)
 })
