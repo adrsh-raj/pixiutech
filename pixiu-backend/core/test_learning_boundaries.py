@@ -131,6 +131,33 @@ class LearningBoundaryTests(APITestCase):
             status="planned", created_by=self.admin,
         )
 
+    def test_trainer_cannot_submit_quiz_attempt(self):
+        from rest_framework.test import APIRequestFactory, force_authenticate
+        from learning.views import QuizAttemptViewSet
+
+        payload = {
+            "quiz": str(self.quiz_a.id),
+            "student": str(self.student_a.id),
+            "answers": {},
+        }
+        request = APIRequestFactory().post("/api/v1/quiz-submissions/", payload, format="json")
+        force_authenticate(request, user=self.trainer_user)
+        response = QuizAttemptViewSet.as_view({"post": "create"})(request)
+        self.assertEqual(response.status_code, 403)
+
+    def test_trainer_cannot_submit_quiz_through_quiz_action(self):
+        from rest_framework.test import APIRequestFactory, force_authenticate
+        from learning.views import QuizViewSet
+
+        request = APIRequestFactory().post(
+            f"/api/v1/quizzes/{self.quiz_a.id}/submit",
+            {"student": str(self.student_a.id), "answers": {}},
+            format="json",
+        )
+        force_authenticate(request, user=self.trainer_user)
+        response = QuizViewSet.as_view({"post": "submit"})(request, pk=str(self.quiz_a.id))
+        self.assertEqual(response.status_code, 403)
+
     def test_student_cannot_see_other_school_learning_resources(self):
         self.client.force_authenticate(self.student_a_user)
 
