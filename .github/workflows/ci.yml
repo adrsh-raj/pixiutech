@@ -125,7 +125,7 @@ jobs:
           npm ci
           npm run lint
           node ../scripts/ai-static-check.mjs
-           node ../scripts/phase7-8-static-check.mjs
+          node ../scripts/phase7-8-static-check.mjs
           node ../scripts/security-static-check.mjs
           npm run qa:part4
           npm run test:ai
