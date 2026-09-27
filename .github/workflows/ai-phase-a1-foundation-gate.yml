@@ -1,0 +1,47 @@
+name: PIXIU AI Lab Phase A(1) Foundation Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+      - fix/ai-lab-phase-0-3-end-to-end
+      - fix/ai-lab-phase-4-6-end-to-end
+    paths:
+      - "pixiu-lms-portal/src/lib/ai/**"
+      - "pixiu-lms-portal/src/lib/ai-studio-engine.ts"
+      - "pixiu-lms-portal/src/components/circuit-lab/ai-studio-panel.tsx"
+      - "pixiu-lms-portal/package.json"
+      - "pixiu-lms-portal/package-lock.json"
+      - "scripts/phase-a1-foundation-static-check.mjs"
+      - ".github/workflows/ai-phase-a1-foundation-gate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ai_phase_a1:
+    name: AI/CyberLab Phase A(1) verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: pixiu-lms-portal/.node-version
+          cache: npm
+          cache-dependency-path: pixiu-lms-portal/package-lock.json
+      - name: Install portal dependencies
+        working-directory: pixiu-lms-portal
+        run: npm ci
+      - name: Phase A(1) static tensor lifecycle gate
+        working-directory: pixiu-lms-portal
+        run: npm run qa:phase-a1
+      - name: Portal lint
+        working-directory: pixiu-lms-portal
+        run: npm run lint
+      - name: Production build
+        working-directory: pixiu-lms-portal
+        run: npm run build

@@ -938,11 +938,20 @@ function makeTensorPair(
     [features.length, featureSize],
     "float32",
   )
-  const labelTensor = tf.tensor1d(labels, "int32")
-  const ys = tf.oneHot(labelTensor, classCount)
-  labelTensor.dispose()
+  let labelTensor: tf.Tensor1D | null = null
+  let ys: tf.Tensor2D | null = null
 
-  return { xs, ys, featureSize }
+  try {
+    labelTensor = tf.tensor1d(labels, "int32")
+    ys = tf.oneHot(labelTensor, classCount)
+    return { xs, ys, featureSize }
+  } catch (error) {
+    ys?.dispose()
+    xs.dispose()
+    throw error
+  } finally {
+    labelTensor?.dispose()
+  }
 }
 
 export async function trainAiModel(
@@ -1135,9 +1144,13 @@ export async function trainAiModel(
       throw new Error("Training cancelled.")
     }
     if (bestWeights) {
-      model.setWeights(bestWeights)
-      bestWeights.forEach((weight) => weight.dispose())
+      const weightsToRestore = bestWeights
       bestWeights = null
+      try {
+        model.setWeights(weightsToRestore)
+      } finally {
+        weightsToRestore.forEach((weight) => weight.dispose())
+      }
     }
     model.stopTraining = false
 
@@ -1272,6 +1285,8 @@ export async function trainAiModel(
     if (model) model.dispose()
     throw error instanceof Error ? error : new Error("Training failed.")
   } finally {
+    bestWeights?.forEach((weight) => weight.dispose())
+    bestWeights = null
     trainXs?.dispose()
     trainYs?.dispose()
     validationXs?.dispose()
