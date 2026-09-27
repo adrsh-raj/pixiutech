@@ -5,6 +5,7 @@ import "./pixiu-brand.css"
 import { AiTryPanel } from "./ai-try-panel"
 import { AiTeachPanel } from "./ai-teach-panel"
 import { AiUnderstandPanel } from "./ai-understand-panel"
+import { AiPermissionStatus } from "./ai-permission-status"
 import { useAiStudioController, type AiStudioPanelProps } from "./use-ai-studio-controller"
 
 export type { AiVisionState, ReadyAiMode } from "@/lib/ai/vision-types"
