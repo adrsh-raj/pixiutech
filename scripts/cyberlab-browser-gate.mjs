@@ -87,8 +87,13 @@ try {
   if ((await page.locator("video").count()) < 1) throw new Error("AI camera video element did not mount")
   await page.getByText("PIXIU AI ACTIVE", { exact: true }).waitFor()
 
-  // Pose browser lifecycle
+  // Object restart lifecycle
   await page.getByRole("button", { name: "Stop" }).click()
+  await page.getByRole("button", { name: "Run" }).click()
+  await page.getByText("PIXIU AI ACTIVE", { exact: true }).waitFor()
+  await page.getByRole("button", { name: "Stop" }).click()
+
+  // Pose browser lifecycle
   await page.getByRole("button", { name: "Tools" }).click()
   await page.getByText("PIXIU AI Studio", { exact: true }).click()
   await page.getByText("Pose", { exact: true }).click()
@@ -120,6 +125,7 @@ try {
   await page.getByText("PIXIU AI STUDIO", { exact: true }).first().waitFor()
   await page.screenshot({ path: artifactDir + "/ai-studio.png", fullPage: true })
 
+  if (aiRemoteRequests.length) throw new Error("AI runtime attempted a remote dependency: " + aiRemoteRequests.join(" | "))
   if (pageErrors.length) throw new Error("Browser page errors: " + pageErrors.join(" | "))
   if (consoleErrors.length) throw new Error("Browser console errors: " + consoleErrors.join(" | "))
   if (failedRequests.length) throw new Error("Browser request failures: " + failedRequests.join(" | "))
