@@ -18,10 +18,7 @@ export type SoundRecognizer = {
 }
 
 const SPEECH_VERSION = "0.5.4"
-const SPEECH_SOURCES = [
-  "https://cdn.jsdelivr.net/npm/@tensorflow-models/speech-commands@0.5.4/dist/speech-commands.min.js",
-  "https://unpkg.com/@tensorflow-models/speech-commands@0.5.4/dist/speech-commands.min.js",
-]
+const SPEECH_SCRIPT = "/vendor/tfjs/speech-commands/speech-commands.min.js"
 
 declare global {
   interface Window {
