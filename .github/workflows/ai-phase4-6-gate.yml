@@ -1,0 +1,48 @@
+name: PIXIU AI Lab Phase 4-6 Gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "pixiu-lms-portal/**"
+      - "scripts/phase4-6-static-check.mjs"
+      - "scripts/ai-static-check.mjs"
+      - "scripts/ai-phase6-qa.mjs"
+      - ".github/workflows/ai-phase4-6-gate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ai_phase_4_6:
+    name: AI/CyberLab Phase 4-6 verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: pixiu-lms-portal/.node-version
+          cache: npm
+          cache-dependency-path: pixiu-lms-portal/package-lock.json
+      - name: Install portal dependencies
+        working-directory: pixiu-lms-portal
+        run: npm ci
+      - name: Lint portal
+        working-directory: pixiu-lms-portal
+        run: npm run lint
+      - name: Phase 4-6 static gate
+        working-directory: pixiu-lms-portal
+        run: npm run qa:phase4-6
+      - name: Existing AI static contract gate
+        working-directory: pixiu-lms-portal
+        run: node ../scripts/ai-static-check.mjs
+      - name: AI executable regression matrix
+        working-directory: pixiu-lms-portal
+        run: npm run qa:ai
+      - name: Production build
+        working-directory: pixiu-lms-portal
+        run: npm run build
