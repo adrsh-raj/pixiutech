@@ -3,6 +3,7 @@ import type {
   AiRuntimeStatus,
   AiVisionMode,
 } from "./vision-types"
+import { AiRuntimeError } from "./ai-errors"
 
 export type { AiRuntimeErrorKind, AiRuntimeStatus }
 
