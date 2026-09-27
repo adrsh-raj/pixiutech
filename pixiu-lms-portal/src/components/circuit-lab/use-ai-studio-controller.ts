@@ -1354,11 +1354,16 @@ const [tab, setTab] = useState<Tab>("try")
         timerRef.current = window.setTimeout(tick, Math.max(180, 280 - elapsed))
       } catch (inferenceError) {
         if (activeSession === sessionRef.current) {
-          setError(
-            inferenceError instanceof Error
-              ? inferenceError.message
-              : "AI inference failed.",
-          )
+          const structuredError = toAiRuntimeError(inferenceError, "AI inference")
+          setError(structuredError.userMessage)
+          onAiStateChange({
+            ...aiStateRef.current,
+            mode,
+            runtimeStatus: "error",
+            runtimeErrorKind: structuredError.kind,
+            runtimeError: structuredError.userMessage,
+            detail: "AI inference unavailable · retrying",
+          })
           setStatus("Inference error · retrying")
           timerRef.current = window.setTimeout(tick, 600)
         }
