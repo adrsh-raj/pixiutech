@@ -268,7 +268,11 @@ export async function loadHandDetector(
     Math.min(MAX_HANDS, Math.round(options.maxHands ?? MAX_HANDS)),
   )
 
-  const hands = new window.Hands!({
+  const HandsConstructor = window.Hands
+  if (!HandsConstructor) {
+    throw new Error("MediaPipe Hands constructor is unavailable.")
+  }
+  const hands = new HandsConstructor({
     locateFile: (file) => `${HANDS_ASSET_BASE}${file}`,
   })
 
