@@ -89,11 +89,21 @@ export function toAiRuntimeError(error: unknown, context = "AI"): AiRuntimeError
 
   const message = error instanceof Error ? error.message : String(error ?? "")
   const lower = message.toLowerCase()
+  if (lower.includes("camera")) {
+    if (lower.includes("permission") || lower.includes("notallowed") || lower.includes("secure context")) {
+      return new AIPermissionError("Camera permission is required. Allow camera access and try again.", error)
+    }
+    return new AICameraError("The camera could not be started. Check the camera and browser permission.", error)
+  }
+  if (lower.includes("microphone")) {
+    if (lower.includes("permission") || lower.includes("notallowed") || lower.includes("secure context")) {
+      return new AIPermissionError("Microphone permission is required. Allow microphone access and try again.", error)
+    }
+    return new AIMicrophoneError("The microphone could not be started. Check the microphone and browser permission.", error)
+  }
   if (lower.includes("permission") || lower.includes("notallowed") || lower.includes("secure context")) {
     return new AIPermissionError(context + " needs browser permission. Allow access and try again.", error)
   }
-  if (lower.includes("camera")) return new AICameraError("The camera could not be started. Check the camera and browser permission.", error)
-  if (lower.includes("microphone")) return new AIMicrophoneError("The microphone could not be started. Check the microphone and browser permission.", error)
   if (lower.includes("not support") || lower.includes("unsupported")) return new AIUnsupportedBrowserError(undefined, error)
   if (lower.includes("shape") || lower.includes("tensor") || lower.includes("rank")) return new AITensorShapeError(undefined, error)
   if (lower.includes("model") || lower.includes("movenet") || lower.includes("mediapipe") || lower.includes("coco-ssd") || lower.includes("speech commands")) return new AIModelLoadError(undefined, error)
