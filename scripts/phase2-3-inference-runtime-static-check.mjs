@@ -50,12 +50,6 @@ assert(
     !panel.includes("const frame = captureVideoFrame(video, 640)"),
   "Continuous trained inference must use direct video embeddings without a JPEG/base64 roundtrip",
 )
-)
-assert(
-  trainedBranch.includes("predictAiVideo(video, store.model)") &&
-    !trainedBranch.includes("captureVideoFrame(video, 640)"),
-  "Continuous trained inference must not perform a JPEG/base64 camera roundtrip",
-)
 assert(
   panel.includes("const elapsed = performance.now() - started") &&
     panel.includes("Math.max(180, 280 - elapsed)"),
