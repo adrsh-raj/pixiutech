@@ -80,14 +80,17 @@ try {
   await page.getByText("Pose", { exact: true }).click()
   await page.getByRole("button", { name: "Start camera" }).click()
   await page.getByText("6C Pose ready", { exact: true }).waitFor()
+  await page.getByRole("button", { name: "Stop" }).click()
 
   await page.getByText("Fingers", { exact: true }).click()
   await page.getByRole("button", { name: "Start camera" }).click()
   await page.getByText("6D Fingers ready", { exact: true }).waitFor()
+  await page.getByRole("button", { name: "Stop" }).click()
 
   await page.getByText("Emotion", { exact: true }).click()
   await page.getByRole("button", { name: "Start camera" }).click()
   await page.getByText("6E Emotion ready", { exact: true }).waitFor()
+  await page.getByRole("button", { name: "Stop" }).click()
 
   // Separate portal AI Studio route.
   await page.goto(baseUrl + "/ai-studio", { waitUntil: "networkidle" })
