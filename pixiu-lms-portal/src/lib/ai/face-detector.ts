@@ -260,8 +260,18 @@ export async function loadFaceDetector(): Promise<FaceDetector> {
 
     return await new Promise<FaceDetection[]>((resolve, reject) => {
       pending = { resolve, reject }
+      pendingTimeout = window.setTimeout(() => {
+        if (!pending) return
+        const current = pending
+        pending = null
+        processing = false
+        pendingTimeout = null
+        current.reject(new Error("Face detection timed out."))
+      }, 8000)
+
       faceMesh.send({ image: video }).catch((error: unknown) => {
         if (!pending) return
+        clearPendingTimeout()
         const current = pending
         pending = null
         processing = false
