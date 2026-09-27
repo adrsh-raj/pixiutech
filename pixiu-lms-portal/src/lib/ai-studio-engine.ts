@@ -250,7 +250,7 @@ function normalizeLabel(label: string) {
     .slice(0, 32)
 }
 
-function isCompatibleModelSummary(summary: unknown): summary is AiModelSummary {
+export function isCompatibleModelSummary(summary: unknown): summary is AiModelSummary {
   if (!summary || typeof summary !== "object") return false
   const candidate = summary as Partial<AiModelSummary>
   if (
