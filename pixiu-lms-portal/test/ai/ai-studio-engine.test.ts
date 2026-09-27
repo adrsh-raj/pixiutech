@@ -4,6 +4,7 @@ import {
   addAiClass,
   getAiDatasetStats,
   estimateTrainingLoad,
+  isCompatibleModelSummary,
   MAX_CLASSES,
   MAX_SAMPLES_PER_CLASS,
   MAX_TOTAL_SAMPLES,
@@ -67,4 +68,28 @@ test("training-load estimation distinguishes browser-safe and heavy configuratio
 test("documented sample limits remain encoded in the engine", () => {
   assert.equal(MAX_SAMPLES_PER_CLASS, 20)
   assert.equal(MAX_TOTAL_SAMPLES, 80)
+})
+
+test("stored-model metadata rejects incompatible feature or output contracts", () => {
+  const base = {
+    storageKey: "pixiu-ai-studio-model-v4",
+    featureExtractor: "vision-features-v4-local",
+    embeddingSize: 512,
+    classes: ["Bottle", "Cup"],
+    featureShape: [512],
+    modelInputShape: [512],
+    outputShape: [2],
+    classCount: 2,
+    classPrototypes: {
+      Bottle: new Array(512).fill(0.1),
+      Cup: new Array(512).fill(0.2),
+    },
+  }
+  assert.equal(isCompatibleModelSummary(base), true)
+  assert.equal(isCompatibleModelSummary({ ...base, embeddingSize: 256 }), false)
+  assert.equal(isCompatibleModelSummary({ ...base, outputShape: [3] }), false)
+  assert.equal(isCompatibleModelSummary({
+    ...base,
+    classPrototypes: { Bottle: [0.1], Cup: new Array(512).fill(0.2) },
+  }), false)
 })
