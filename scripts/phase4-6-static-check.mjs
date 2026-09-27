@@ -64,8 +64,8 @@ for (const marker of ["PIXIU simulated IR obstacle sensor","PIXIU simulated joys
 }
 
 // Phase 5 — template registry + hydration
-const starterIds = [...templates.matchAll(/starter\\("([^"]+)"/g)].map((m) => m[1])
-const explicitIds = [...templates.matchAll(/^\\s*id:\\s*"([^"]+)"/gm)].map((m) => m[1])
+const starterIds = [...templates.matchAll(/starter\("([^"]+)"/g)].map((m) => m[1])
+const explicitIds = [...templates.matchAll(/^\s*id:\s*"([^"]+)"/gm)].map((m) => m[1])
 const allIds = [...new Set([...starterIds, ...explicitIds])]
 if (starterIds.length < 19) failures.push("Phase 5: fewer than 19 starter templates")
 if (allIds.length < 20) failures.push("Phase 5: fewer than 20 total templates")
