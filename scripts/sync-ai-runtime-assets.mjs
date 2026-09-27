@@ -33,9 +33,11 @@ const FACE_SOURCE = join(
   "face_mesh",
 )
 
+// The original TF Hub GCS bucket (tfhub-tfjs-modules) now returns 403.
+// MoveNet model files are bundled in git under public/models/movenet/.
+// Set PIXIU_MOVENET_SOURCE_URL to a custom mirror if needed.
 const MOVENET_SOURCE_URL =
-  process.env.PIXIU_MOVENET_SOURCE_URL ??
-  "https://storage.googleapis.com/tfhub-tfjs-modules/google/tfjs-model/movenet/singlepose/lightning/4/model.json"
+  process.env.PIXIU_MOVENET_SOURCE_URL ?? ""
 const COCO_SSD_SOURCE_URL =
   process.env.PIXIU_COCO_SSD_SOURCE_URL ??
   "https://storage.googleapis.com/tfjs-models/savedmodel/ssdlite_mobilenet_v2/model.json"
@@ -401,7 +403,7 @@ async function ensureGraphModel(modelSourceUrl, destinationDir, label, expectedF
     }
   }
 
-  if (!model) {
+  if (!model && modelSource) {
     const result = await fetchBytes(modelSource)
     const contentType = result.contentType.toLowerCase()
     if (
@@ -432,13 +434,32 @@ async function ensureGraphModel(modelSourceUrl, destinationDir, label, expectedF
     model = await readModelJson(modelPath, label)
   }
 
+  if (!model) {
+    throw new Error(
+      label +
+        " model.json not found at " +
+        modelPath +
+        " and no remote source URL is configured. " +
+        "Ensure model files are bundled or set the corresponding PIXIU_*_SOURCE_URL env var.",
+    )
+  }
+
   validateModelManifest(model, label, expectedFormat)
 
   for (const manifest of model.weightsManifest) {
     for (const assetPath of manifest.paths) {
       const destination = join(destinationDir, assetPath)
-      const url = new URL(assetPath, modelSource).toString()
-      await ensureRemoteFile(url, destination)
+      if (modelSource) {
+        const url = new URL(assetPath, modelSource).toString()
+        await ensureRemoteFile(url, destination)
+      } else if (!(await exists(destination)) || (await stat(destination)).size === 0) {
+        throw new Error(
+          label +
+            " weight shard " +
+            assetPath +
+            " is missing and no remote source URL is configured.",
+        )
+      }
     }
   }
 
