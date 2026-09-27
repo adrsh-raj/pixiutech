@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { createHash } from "node:crypto"
 import {
   access,
   copyFile,
@@ -225,6 +226,64 @@ async function ensureMoveNet() {
   )
 }
 
+async function listFilesRecursive(directory) {
+  const entries = await readdir(directory, { withFileTypes: true })
+  const files = []
+  for (const entry of entries) {
+    const fullPath = join(directory, entry.name)
+    if (entry.isDirectory()) {
+      files.push(...(await listFilesRecursive(fullPath)))
+    } else if (entry.isFile()) {
+      files.push(fullPath)
+    }
+  }
+  return files.sort()
+}
+
+async function writeRuntimeManifest() {
+  const roots = [
+    { dir: COCO_SSD_DIR, prefix: "models/coco-ssd-lite-mobilenet-v2/" },
+    { dir: MOVENET_DIR, prefix: "models/movenet/" },
+    { dir: SPEECH_MODEL_DIR, prefix: "models/speech-commands/18w/" },
+    { dir: HANDS_DIR, prefix: "vendor/mediapipe/hands/" },
+    { dir: FACE_DIR, prefix: "vendor/mediapipe/face_mesh/" },
+    { dir: SPEECH_DIR, prefix: "vendor/tfjs/speech-commands/" },
+  ]
+
+  const files = {}
+  for (const { dir, prefix } of roots) {
+    for (const fullPath of await listFilesRecursive(dir)) {
+      const fileName = fullPath.split(sep).pop() || ""
+      if (fileName.startsWith(".")) continue
+      const body = await readFile(fullPath)
+      const relativeToDir = relative(dir, fullPath).split(sep).join("/")
+      files[prefix + relativeToDir] = {
+        size: body.length,
+        sha256: createHash("sha256").update(body).digest("hex"),
+      }
+    }
+  }
+
+  const manifest = {
+    version: 1,
+    algorithm: "sha256",
+    models: {
+      cocoSsd: "lite_mobilenet_v2",
+      moveNet: "singlepose-lightning-v4",
+      speechCommands: "0.5.4/18w",
+      mediaPipeHands: "0.4.1675469240",
+      mediaPipeFaceMesh: "0.4.1633559619",
+    },
+    files: Object.fromEntries(Object.entries(files).sort(([a], [b]) => a.localeCompare(b))),
+  }
+
+  await mkdir(join(publicRoot, "vendor"), { recursive: true })
+  await writeFile(
+    join(publicRoot, "vendor", "PIXIU-AI-RUNTIME-MANIFEST.json"),
+    JSON.stringify(manifest, null, 2) + "\n",
+  )
+}
+
 async function ensureGraphModel(modelSourceUrl, destinationDir, label, expectedFormat) {
   const modelPath = join(destinationDir, "model.json")
   const sourcePath = join(destinationDir, ".source-url")
@@ -303,6 +362,8 @@ async function main() {
     ensureMoveNet(),
     ensureSpeechCommands(),
   ])
+
+  await writeRuntimeManifest()
 
   const notice = [
     "PIXIU AI local runtime assets",
