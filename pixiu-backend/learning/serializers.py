@@ -187,7 +187,7 @@ class ContentClassAssignmentSerializer(serializers.ModelSerializer):
         user = self.context["request"].user; school_class = attrs.get("school_class", getattr(self.instance, "school_class", None)); content = attrs.get("content", getattr(self.instance, "content", None))
         if not school_class or not content: raise serializers.ValidationError("Both content and class are required.")
         if not accessible_class_queryset(user).filter(pk=school_class.pk).exists(): raise serializers.ValidationError("You cannot assign content to this class.")
-        if not accessible_content(user).filter(pk=content.pk).exists():
+        if not __import__("learning.services", fromlist=["accessible_content"]).accessible_content(user).filter(pk=content.pk).exists():
             raise serializers.ValidationError({"content": "You cannot assign this learning content."})
         if content.grade and str(content.grade).upper() != str(school_class.grade).upper(): raise serializers.ValidationError("Content grade must match class grade.")
         if content.status == "archived": raise serializers.ValidationError("Archived content cannot be assigned.")
