@@ -21,6 +21,14 @@ class SessionSerializer(serializers.ModelSerializer):
         if not school_class: raise serializers.ValidationError({"school_class": "Class is required."})
         if not trainer: raise serializers.ValidationError({"trainer": "Trainer is required."})
         if not __import__("academics.services", fromlist=["accessible_class_queryset"]).accessible_class_queryset(request.user).filter(pk=school_class.pk).exists(): raise serializers.ValidationError("You cannot manage a session for this class.")
+        curriculum = attrs.get("curriculum_unit", getattr(instance, "curriculum_unit", None))
+        if curriculum is not None:
+            if not __import__("learning.services", fromlist=["accessible_curriculum"]).accessible_curriculum(request.user).filter(pk=curriculum.pk).exists():
+                raise serializers.ValidationError({"curriculum_unit": "You cannot use this curriculum unit."})
+            if str(curriculum.grade).strip().upper() != str(school_class.grade).strip().upper():
+                raise serializers.ValidationError({"curriculum_unit": "Curriculum grade must match the selected class."})
+            if not CurriculumClassAssignment.objects.filter(curriculum_unit=curriculum, school_class=school_class).exists():
+                raise serializers.ValidationError({"curriculum_unit": "This curriculum unit is not assigned to the selected class."})
         if trainer.status != "active": raise serializers.ValidationError({"trainer": "Only active trainers can be scheduled."})
         if request.user.role != UserRole.ADMIN and not trainer.school_assignments.filter(school_id=school_class.school_id, status="active").exists(): raise serializers.ValidationError("Trainer is not assigned to this school.")
         if request.user.role == UserRole.TRAINER and trainer.account_id != request.user.id: raise serializers.ValidationError("A trainer can only schedule their own sessions.")
