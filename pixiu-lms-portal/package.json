@@ -13,7 +13,8 @@
     "qa:brand": "node --experimental-strip-types ../scripts/pixiu-brand-qa.mjs",
     "qa:phase-a1": "node ../scripts/phase-a1-foundation-static-check.mjs",
     "sync:ai-runtime-assets": "node ../scripts/sync-ai-runtime-assets.mjs",
-    "prebuild": "npm run sync:ai-runtime-assets"
+    "prebuild": "npm run sync:ai-runtime-assets",
+    "qa:phase2-3": "node ../scripts/phase2-3-inference-runtime-static-check.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
