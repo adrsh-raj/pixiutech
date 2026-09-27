@@ -587,6 +587,7 @@ export function AiStudioPanel({
   const runtimeStatusRef = useRef<AiRuntimeStatus>("idle")
   const runtimeMetricsRef = useRef<ReturnType<typeof createAiRuntimeMetrics> | null>(null)
   const lastRuntimeMetricsRef = useRef<AiRuntimeMetrics | null>(null)
+  const runtimeBudgetWarnedRef = useRef(false)
   const [floatingPosition, setFloatingPosition] = useState<{ left: number; top: number } | null>(null)
 
   function publishRuntimeState(
@@ -1009,6 +1010,7 @@ export function AiStudioPanel({
   async function startModeResource() {
     const activeSession = ++sessionRef.current
     runtimeStatusRef.current = "loading"
+    runtimeBudgetWarnedRef.current = false
     runtimeMetricsRef.current = createAiRuntimeMetrics(String(mode))
     setLoading(true)
     onAiStateChange({
@@ -1049,6 +1051,24 @@ export function AiStudioPanel({
       lastRuntimeMetricsRef.current = runtimeMetricsRef.current?.snapshot() ?? null
       runtimeStatusRef.current = "ready"
       setLoading(false)
+      const loadBudget = lastRuntimeMetricsRef.current
+        ? isBudgetExceeded(lastRuntimeMetricsRef.current)
+        : null
+      setStatus(
+        loadBudget?.load
+          ? "AI ready · model load was slow"
+          : mode === "objects"
+            ? "6B Objects ready"
+            : mode === "pose"
+              ? "6C Pose ready"
+              : mode === "hands"
+                ? "6D Fingers ready"
+                : mode === "numbers"
+                  ? "6G Numbers ready"
+                  : mode === "emotion"
+                    ? "6E Emotion ready"
+                    : "6I My AI ready",
+      )
       setStatus(
         mode === "objects" ? "6B Objects ready"
           : mode === "pose" ? "6C Pose ready"
@@ -1446,6 +1466,21 @@ export function AiStudioPanel({
       } finally {
         runtimeMetricsRef.current?.recordInference(performance.now() - started)
         lastRuntimeMetricsRef.current = runtimeMetricsRef.current?.snapshot() ?? null
+        if (
+          activeSession === sessionRef.current &&
+          !runtimeBudgetWarnedRef.current &&
+          lastRuntimeMetricsRef.current
+        ) {
+          const budget = isBudgetExceeded(lastRuntimeMetricsRef.current)
+          if (budget.steadyInference || budget.tensorGrowth) {
+            runtimeBudgetWarnedRef.current = true
+            setStatus(
+              budget.tensorGrowth
+                ? "AI running · memory growth warning"
+                : "AI running · performance warning",
+            )
+          }
+        }
         if (busySessionRef.current === activeSession) {
           busyRef.current = false
           busySessionRef.current = null
