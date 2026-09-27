@@ -65,6 +65,7 @@ export function stopCamera(video: HTMLVideoElement | null, stream: MediaStream |
     video.pause()
     video.srcObject = null
   }
+  disposeCaptureFrameResource()
 }
 
 export function waitForVideoReady(video: HTMLVideoElement): Promise<void> {
