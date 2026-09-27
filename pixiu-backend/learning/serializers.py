@@ -38,7 +38,7 @@ class SessionActivitySerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         from .services import accessible_sessions
         request = self.context["request"]
-        title = attrs.get("title", "")
+        title = attrs.get("title", getattr(self.instance, "title", ""))
         session = self.instance.session if self.instance else attrs.get("session")
         if not str(title).strip(): raise serializers.ValidationError({"title": "Activity title is required."})
         if not session: raise serializers.ValidationError({"session": "Session is required."})
