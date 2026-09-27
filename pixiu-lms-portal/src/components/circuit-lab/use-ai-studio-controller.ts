@@ -65,7 +65,7 @@ import {
   estimateMoveNetPose,
   loadMoveNet,
 } from "@/lib/ai/pose-detector"
-import type { AiVisionMode, ReadyAiMode, AiVisionState } from "@/lib/ai/vision-types"
+import type { AiVisionMode, ReadyAiMode, AiVisionState, PoseResult } from "@/lib/ai/vision-types"
 import { createAiVisionState } from "@/lib/ai/vision-state"
 import {
   runtimeDetail,
@@ -218,7 +218,7 @@ function drawBoxes(
   })
 }
 
-function drawPose(canvas: HTMLCanvasElement, video: HTMLVideoElement, poseResult: { keypoints?: any[] } | null) {
+function drawPose(canvas: HTMLCanvasElement, video: HTMLVideoElement, poseResult: PoseResult | null) {
   const width = video.videoWidth || 640
   const height = video.videoHeight || 480
   if (canvas.width !== width || canvas.height !== height) {
@@ -414,7 +414,7 @@ const [tab, setTab] = useState<Tab>("try")
   const [error, setError] = useState<string | null>(null)
   const [fps, setFps] = useState(0)
   const [store, setStore] = useState<AiStudioStore>(() => ({ classes: [], samples: [], model: null }))
-  const [model, setModel] = useState<any>(null)
+  const [model, setModel] = useState<LayersModel | null>(null)
   const [label, setLabel] = useState("")
   const [renamingClass, setRenamingClass] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState("")
