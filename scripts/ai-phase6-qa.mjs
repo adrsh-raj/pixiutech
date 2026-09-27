@@ -23,6 +23,9 @@ const panel = [
   read("pixiu-lms-portal/src/components/circuit-lab/ai-teach-panel.tsx"),
   read("pixiu-lms-portal/src/components/circuit-lab/ai-understand-panel.tsx"),
   read("pixiu-lms-portal/src/components/circuit-lab/ai-training-diagnostics.tsx"),
+  read("pixiu-lms-portal/src/components/circuit-lab/ai-permission-status.tsx"),
+  read("pixiu-lms-portal/src/components/circuit-lab/ai-runtime-controls.tsx"),
+  read("pixiu-lms-portal/src/components/circuit-lab/ai-dataset-panel.tsx"),
 ].join("\n")
 const engine = read("pixiu-lms-portal/src/lib/ai-studio-engine.ts")
 const workbench = read("pixiu-lms-portal/src/components/circuit-lab/workbench.tsx")
