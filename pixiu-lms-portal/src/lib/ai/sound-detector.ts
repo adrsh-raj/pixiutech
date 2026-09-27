@@ -35,6 +35,16 @@ function ensureBrowserAudio() {
   if (typeof window === "undefined") {
     throw new Error("PIXIU Sound AI needs a browser.")
   }
+
+  const secure =
+    window.isSecureContext ||
+    window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1"
+
+  if (!secure) {
+    throw new Error("Microphone access requires HTTPS (or localhost).")
+  }
+
   if (!navigator.mediaDevices?.getUserMedia) {
     throw new Error("This browser does not support microphone input.")
   }
