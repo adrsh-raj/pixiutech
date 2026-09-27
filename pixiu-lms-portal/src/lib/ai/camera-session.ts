@@ -31,6 +31,25 @@ function assertCameraEnvironment() {
   }
 }
 
+export type MediaPermissionState = "granted" | "denied" | "prompt" | "unsupported" | "unknown"
+
+export async function getCameraPermissionState(): Promise<MediaPermissionState> {
+  if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+    return "unsupported"
+  }
+
+  try {
+    const permissions = navigator.permissions
+    if (!permissions?.query) return "unknown"
+    const result = await permissions.query({
+      name: "camera" as PermissionName,
+    })
+    return result.state
+  } catch {
+    return "unknown"
+  }
+}
+
 export async function startCamera(
   video: HTMLVideoElement,
   options: CameraOptions = {},
@@ -38,18 +57,39 @@ export async function startCamera(
   assertCameraEnvironment()
 
   const camera = { ...DEFAULT_CAMERA, ...options }
-  const stream = await navigator.mediaDevices.getUserMedia({
-    audio: false,
-    video: {
-      width: { ideal: camera.width, max: camera.width },
-      height: { ideal: camera.height, max: camera.height },
-      frameRate: { ideal: camera.frameRate, max: camera.frameRate },
-      facingMode: camera.facingMode,
-    },
-  })
+  let stream: MediaStream
+
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: {
+        width: { ideal: camera.width, max: camera.width },
+        height: { ideal: camera.height, max: camera.height },
+        frameRate: { ideal: camera.frameRate, max: camera.frameRate },
+        facingMode: camera.facingMode,
+      },
+    })
+  } catch (error) {
+    const name =
+      error && typeof error === "object" && "name" in error
+        ? String((error as { name?: unknown }).name ?? "")
+        : ""
+
+    // Some mobile/older browsers reject a constrained request even though a
+    // camera exists. Retry once with a minimal video request before surfacing
+    // the error to the UI.
+    if (name !== "OverconstrainedError") throw error
+
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: true,
+    })
+  }
 
   try {
     video.srcObject = stream
+    video.muted = true
+    video.playsInline = true
     await waitForVideoReady(video)
     await video.play()
     return stream
