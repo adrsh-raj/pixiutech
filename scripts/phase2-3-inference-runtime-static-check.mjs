@@ -45,10 +45,11 @@ assert(
     engine.includes("return predictAiEmbedding(embeddingValues, summary)"),
   "My AI must expose a direct video inference path",
 )
-const trainedBranch = panel.slice(
-  panel.indexOf('} else if (mode === "trained")'),
-  panel.indexOf("
-        }", panel.indexOf('} else if (mode === "trained")') + 10),
+assert(
+  panel.includes("const result = await predictAiVideo(video, store.model)") &&
+    !panel.includes("const frame = captureVideoFrame(video, 640)"),
+  "Continuous trained inference must use direct video embeddings without a JPEG/base64 roundtrip",
+)
 )
 assert(
   trainedBranch.includes("predictAiVideo(video, store.model)") &&
@@ -133,7 +134,8 @@ assert(
   "package-lock must pin the same MediaPipe versions as package.json",
 )
 assert(
-  packageJson.scripts?.prebuild === "npm run sync:ai-runtime-assets" &&
+  packageJson.scripts?.predev === "npm run sync:ai-runtime-assets" &&
+    packageJson.scripts?.prebuild === "npm run sync:ai-runtime-assets" &&
     packageJson.scripts?.["qa:phase2-3"] === "node ../scripts/phase2-3-inference-runtime-static-check.mjs",
   "Phase 2-3 build and QA entrypoints must be wired",
 )
