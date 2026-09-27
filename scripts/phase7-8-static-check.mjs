@@ -63,6 +63,8 @@ assert(browserGate.includes("page.on(\"requestfailed\""), "Phase 7 browser gate 
 assert(browserGate.includes("PIXIU CyberLab browser gate PASSED"), "Phase 7 browser gate completion marker missing")
 assert(browserGate.includes("6C Pose ready") && browserGate.includes("6D Fingers ready") && browserGate.includes("6E Emotion ready"), "Phase 7 AI lifecycle coverage is incomplete")
 assert(runner.includes("getAiObjectCount"), "Blockly runner lacks AI object count bridge")
+assert(runner.includes("MAX_BLOCK_LOOP_ITERATIONS = 10_000"), "Blockly loop execution is not bounded")
+assert(runner.includes("Number.isFinite(requestedTimes)"), "Blockly repeat count does not reject non-finite values")
 
 if (failures.length) {
   console.error("PIXIU Phase 7-8 static contract check FAILED")
