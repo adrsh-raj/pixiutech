@@ -468,12 +468,39 @@ async function ensureSpeechCommands() {
     )
   }
 
-  const metadata = JSON.parse(await readFile(metadataPath, "utf8"))
-  if (!Array.isArray(metadata.wordLabels) || metadata.wordLabels.length < 18) {
-    throw new Error("Speech Commands metadata has an invalid wordLabels list.")
+  let metadata
+  try {
+    metadata = JSON.parse(await readFile(metadataPath, "utf8"))
+  } catch {
+    throw new Error("Speech Commands metadata.json is not valid JSON.")
   }
-  console.log("Speech Commands local assets ready:", join("public", "models", "speech-commands", "18w"))
-  console.log("Speech Commands runtime ready:", join("public", "vendor", "tfjs", "speech-commands", "speech-commands.min.js"))
+
+  // The Speech Commands runtime officially supports both the current
+  // "wordLabels" field and the legacy "words" field.
+  const labels = Array.isArray(metadata.wordLabels)
+    ? metadata.wordLabels
+    : Array.isArray(metadata.words)
+      ? metadata.words
+      : null
+
+  if (
+    !labels ||
+    labels.length < 18 ||
+    labels.some((label) => typeof label !== "string" || !label.trim())
+  ) {
+    throw new Error(
+      "Speech Commands metadata has no valid wordLabels/words vocabulary (expected at least 18 labels).",
+    )
+  }
+
+  console.log(
+    "Speech Commands local assets ready:",
+    join("public", "models", "speech-commands", "18w"),
+  )
+  console.log(
+    "Speech Commands runtime ready:",
+    join("public", "vendor", "tfjs", "speech-commands", "speech-commands.min.js"),
+  )
 }
 
 async function main() {
