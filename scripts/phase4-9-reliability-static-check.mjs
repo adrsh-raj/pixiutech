@@ -31,6 +31,7 @@ const face = read("pixiu-lms-portal/src/lib/ai/face-detector.ts")
 const objectDetector = read("pixiu-lms-portal/src/lib/ai/object-detector.ts")
 const pose = read("pixiu-lms-portal/src/lib/ai/pose-detector.ts")
 const engine = read("pixiu-lms-portal/src/lib/ai-studio-engine.ts")
+const sync = read("scripts/sync-ai-runtime-assets.mjs")
 const pkg = JSON.parse(read("pixiu-lms-portal/package.json"))
 
 const statuses = ["idle","loading","ready","running","error","stopped"]
