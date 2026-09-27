@@ -36,12 +36,15 @@ const requiredScripts = [
   "scripts/security-static-check.mjs",
   "scripts/phase8-release-gate.mjs",
   "scripts/cyberlab-browser-gate.mjs",
+  "scripts/part4-professional-hardening-static-check.mjs",
 ]
 for (const relative of requiredScripts) {
   if (!existsSync(join(repoRoot, relative))) throw new Error("Required release gate missing: " + relative)
 }
 
 run("npm", ["run", "lint"], portalRoot, "Portal lint")
+run(process.execPath, ["scripts/part4-professional-hardening-static-check.mjs"], repoRoot, "Part 4 professional hardening gate")
+run("npm", ["run", "test:ai"], portalRoot, "AI module unit tests")
 run("npm", ["run", "qa:phase4-6"], portalRoot, "Phase 4-6 static gate")
 run(process.execPath, ["scripts/ai-static-check.mjs"], repoRoot, "AI static contract gate")
 run(process.execPath, ["--experimental-strip-types", "scripts/ai-phase6-qa.mjs"], repoRoot, "AI executable regression matrix")
