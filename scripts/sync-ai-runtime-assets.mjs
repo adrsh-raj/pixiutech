@@ -327,7 +327,7 @@ async function ensureSpeechCommands() {
   const destination = join(SPEECH_DIR, "speech-commands.min.js")
   await ensureRemoteFile(SPEECH_SCRIPT_SOURCE_URL, destination)
 
-  const modelPath = await ensureGraphModel(
+  await ensureGraphModel(
     SPEECH_SOURCE_URL,
     SPEECH_MODEL_DIR,
     "Speech Commands",
