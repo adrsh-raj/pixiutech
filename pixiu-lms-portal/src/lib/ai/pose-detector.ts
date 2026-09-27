@@ -81,9 +81,20 @@ function assertMoveNetOutputShape(output: tf.Tensor | tf.Tensor[] | tf.NamedTens
 }
 
 let moveNetLoadPromise: Promise<tf.GraphModel> | null = null
+let moveNetInstance: tf.GraphModel | null = null
+let moveNetReferences = 0
 
 export async function loadMoveNet(): Promise<tf.GraphModel> {
-  if (moveNetLoadPromise) return moveNetLoadPromise
+  moveNetReferences += 1
+  if (moveNetInstance) return moveNetInstance
+  if (moveNetLoadPromise) {
+    try {
+      return await moveNetLoadPromise
+    } catch (error) {
+      moveNetReferences = Math.max(0, moveNetReferences - 1)
+      throw error
+    }
+  }
 
   moveNetLoadPromise = (async () => {
     await tf.ready()
@@ -113,6 +124,7 @@ export async function loadMoveNet(): Promise<tf.GraphModel> {
         warmup.dispose()
       }
 
+      moveNetInstance = model
       return model
     } catch (error) {
       model.dispose()
@@ -122,7 +134,12 @@ export async function loadMoveNet(): Promise<tf.GraphModel> {
     moveNetLoadPromise = null
   })
 
-  return moveNetLoadPromise
+  try {
+    return await moveNetLoadPromise
+  } catch (error) {
+    moveNetReferences = Math.max(0, moveNetReferences - 1)
+    throw error
+  }
 }
 
 export async function estimateMoveNetPose(
@@ -196,5 +213,12 @@ export async function estimateMoveNetPose(
 }
 
 export function disposeMoveNet(model: tf.GraphModel | null) {
-  model?.dispose()
+  if (!model) return
+  moveNetReferences = Math.max(0, moveNetReferences - 1)
+  if (moveNetReferences > 0) return
+
+  if (model === moveNetInstance) {
+    moveNetInstance = null
+  }
+  model.dispose()
 }
