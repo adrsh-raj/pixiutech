@@ -18,6 +18,7 @@ import {
   type AiRuntimeErrorKind,
 } from "@/lib/ai/ai-runtime-state"
 import type { AiVisionState } from "@/lib/ai/vision-types"
+import { toAiRuntimeError } from "@/lib/ai/ai-errors"
 import { createAiVisionState } from "@/lib/ai/vision-state"
 import "./pixiu-brand.css"
 
@@ -273,9 +274,9 @@ export function AiCameraPanel({
             })
           } catch (error) {
             if (disposed || activeSession !== sessionRef.current) return
-            const errorKind = classifyAiRuntimeError(error)
-            const message =
-              error instanceof Error ? error.message : mediaErrorDetail(errorKind)
+            const structuredError = toAiRuntimeError(error, "Vision")
+            const errorKind = structuredError.kind
+            const message = structuredError.userMessage
             onAiStateChange({
               ...aiStateRef.current,
               enabled: false,
