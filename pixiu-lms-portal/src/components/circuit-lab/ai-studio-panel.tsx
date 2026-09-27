@@ -117,12 +117,11 @@ export function AiStudioPanel(props: AiStudioPanelProps) {
         </nav>
 
         <AiPermissionStatus
-          aiState={aiState}
           cameraActive={cameraActive}
           soundActive={soundActive}
           stopInput={stopInput}
           onGoToSimulation={onGoToSimulation}
-        />>
+        />
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-5 lg:p-6">
           {tab === "try" && <AiTryPanel viewModel={viewModel} />}
