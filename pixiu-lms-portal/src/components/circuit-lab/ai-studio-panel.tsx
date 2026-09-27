@@ -559,6 +559,10 @@ export function AiStudioPanel({
   const resourceModeRef = useRef<AiVisionMode | null>(null)
   const busyRef = useRef(false)
   const busySessionRef = useRef<number | null>(null)
+  const aiStateRef = useRef(aiState)
+  useEffect(() => {
+    aiStateRef.current = aiState
+  }, [aiState])
   useEffect(() => {
     if (!isOpen || typeof document === "undefined") return
 
@@ -592,7 +596,7 @@ export function AiStudioPanel({
   ) {
     runtimeStatusRef.current = status
     onAiStateChange({
-      ...aiState,
+      ...aiStateRef.current,
       mode,
       runtimeStatus: status,
       runtimeError: status === "error" ? extras.runtimeError : undefined,
