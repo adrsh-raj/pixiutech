@@ -78,6 +78,11 @@ import {
   type AiRuntimeMetrics,
 } from "@/lib/ai/ai-performance"
 import type { AiStudioViewModel } from "./ai-studio-view-model"
+import type { GraphModel, LayersModel } from "@tensorflow/tfjs"
+import type { FaceDetector } from "@/lib/ai/face-detector"
+import type { HandDetector } from "@/lib/ai/hand-detector"
+import type { ObjectDetector } from "@/lib/ai/object-detector"
+import { toAiRuntimeError } from "@/lib/ai/ai-errors"
 
 export interface AiStudioPanelProps {
   isOpen: boolean
@@ -95,7 +100,13 @@ export interface AiStudioPanelProps {
 
 
 type Tab = "try" | "teach" | "understand"
-type ReadyResource = any
+type ReadyResource =
+  | ObjectDetector
+  | GraphModel
+  | LayersModel
+  | HandDetector
+  | FaceDetector
+  | SoundRecognizer
 
 const OBJECT_MIN_SCORE = DEFAULT_OBJECT_MIN_SCORE
 const OBJECT_MAX_BOXES = DEFAULT_OBJECT_MAX_BOXES
@@ -983,7 +994,7 @@ const [tab, setTab] = useState<Tab>("try")
         resourceError instanceof Error
           ? resourceError.message
           : "The selected AI could not start."
-      const errorKind = classifyAiRuntimeError(resourceError)
+      const errorKind = structuredError.kind
       runtimeStatusRef.current = "error"
       setError(message)
       setStatus("AI unavailable")
@@ -1083,7 +1094,7 @@ const [tab, setTab] = useState<Tab>("try")
           ? soundError.message
           : "Microphone recognition could not start.",
       )
-      const errorKind = classifyAiRuntimeError(soundError)
+      const errorKind = structuredError.kind
       runtimeStatusRef.current = "error"
       setLoading(false)
       setSoundActive(false)
@@ -1150,9 +1161,9 @@ const [tab, setTab] = useState<Tab>("try")
           const pose = await estimateMoveNetPose(resourceRef.current, video)
           if (activeSession !== sessionRef.current) return
           drawPose(getActiveOverlay()!, video, pose)
-          const visiblePoints = pose?.keypoints?.filter((point: any) => (point.score ?? 0) >= 0.25) ?? []
+          const visiblePoints = pose?.keypoints?.filter((point) => (point.score ?? 0) >= 0.25) ?? []
           const score = visiblePoints.length
-            ? visiblePoints.reduce((sum: number, point: any) => sum + Number(point.score ?? 0), 0) / visiblePoints.length
+            ? visiblePoints.reduce((sum, point) => sum + Number(point.score ?? 0), 0) / visiblePoints.length
             : 0
           onAiStateChange({
             enabled: true,
