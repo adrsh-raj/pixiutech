@@ -1220,6 +1220,7 @@ export function AiStudioPanel({
           onAiStateChange({
             enabled: true,
             mode: "objects",
+            runtimeStatus: "running",
             detectedClass: primary?.class ?? "none",
             confidence: primary ? Math.round(primary.score * 100) : 0,
             allDetections: visible,
@@ -1237,6 +1238,7 @@ export function AiStudioPanel({
           onAiStateChange({
             enabled: true,
             mode: "pose",
+            runtimeStatus: "running",
             detectedClass: pose ? "person" : "none",
             confidence: Math.round(score * 100),
             allDetections: [],
@@ -1293,6 +1295,7 @@ export function AiStudioPanel({
           onAiStateChange({
             enabled: true,
             mode,
+            runtimeStatus: "running",
             detectedClass:
               mode === "numbers"
                 ? hand
@@ -1367,6 +1370,7 @@ export function AiStudioPanel({
           onAiStateChange({
             enabled: true,
             mode: "emotion",
+            runtimeStatus: "running",
             detectedClass: face ? stableExpression : "none",
             confidence: face ? Math.round(stableConfidence * 100) : 0,
             allDetections: [],
@@ -1384,6 +1388,7 @@ export function AiStudioPanel({
           onAiStateChange({
             enabled: true,
             mode: "trained",
+            runtimeStatus: "running",
             detectedClass: result?.label ?? "none",
             confidence: result?.confidence ?? 0,
             allDetections: [],
@@ -1422,6 +1427,11 @@ export function AiStudioPanel({
         }
 
         const elapsed = performance.now() - started
+        if (runtimeStatusRef.current === "ready") {
+          runtimeStatusRef.current = "running"
+          setStatus("AI running")
+        }
+
         timerRef.current = window.setTimeout(tick, Math.max(180, 280 - elapsed))
       } catch (inferenceError) {
         if (activeSession === sessionRef.current) {
@@ -1434,6 +1444,8 @@ export function AiStudioPanel({
           timerRef.current = window.setTimeout(tick, 600)
         }
       } finally {
+        runtimeMetricsRef.current?.recordInference(performance.now() - started)
+        lastRuntimeMetricsRef.current = runtimeMetricsRef.current?.snapshot() ?? null
         if (busySessionRef.current === activeSession) {
           busyRef.current = false
           busySessionRef.current = null
