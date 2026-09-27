@@ -42,13 +42,6 @@ function aiObjectIcon(value: string) {
   return "◉"
 }
 
-function mediaErrorDetail(kind: AiRuntimeErrorKind) {
-  if (kind === "permission") return "Camera permission is required for PIXIU Vision Core."
-  if (kind === "unsupported") return "This browser or camera device is not available for PIXIU Vision Core."
-  if (kind === "model") return "The local vision model could not be loaded."
-  return "PIXIU Vision Core could not start."
-}
-
 interface Props {
   isOpen: boolean
   onClose: () => void
