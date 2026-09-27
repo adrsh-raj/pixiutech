@@ -4,8 +4,8 @@ from academics.services import accessible_class_queryset
 from rest_framework import serializers
 from django.db.models import Q
 from django.utils import timezone
-from .models import (AttendanceRecord, ContentClassAssignment, CurriculumClassAssignment, CurriculumUnit, LearningContent, Project, ProjectEvidence, Quiz, QuizAttempt, QuizClassAssignment, QuizQuestion, Session, SessionActivity, StudentAssessment)
-from .services import (
+from learning.models import (AttendanceRecord, ContentClassAssignment, CurriculumClassAssignment, CurriculumUnit, LearningContent, Project, ProjectEvidence, Quiz, QuizAttempt, QuizClassAssignment, QuizQuestion, Session, SessionActivity, StudentAssessment)
+from learning.services import (
     accessible_content,
     accessible_curriculum,
     accessible_evidence,
@@ -309,7 +309,7 @@ class ProjectEvidenceSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "uploaded_by", "uploaded_by_username", "created_at"]
 
     def validate(self, attrs):
-        from .services import accessible_projects
+        from learning.services import accessible_projects
         request = self.context["request"]
         file_value = attrs.get("file", getattr(self.instance, "file", None))
         external_url = attrs.get("external_url", getattr(self.instance, "external_url", ""))
