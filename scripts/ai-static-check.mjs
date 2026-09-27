@@ -454,3 +454,9 @@ for (const marker of [
 assert(panelSource.includes("PIXIU AI is loading"), "AI Studio branded model loading state missing")
 assert(panelSource.includes("Training profile"), "AI Studio grade training profile control missing")
 assert(panelSource.includes("Advanced tuning"), "AI Studio advanced tuning control missing")
+
+if (failures.length) {
+  console.error("AI static contract check FAILED")
+  for (const failure of failures) console.error(" - " + failure)
+  process.exit(1)
+}
