@@ -17,6 +17,10 @@ const hand = read("pixiu-lms-portal/src/lib/ai/hand-detector.ts")
 const face = read("pixiu-lms-portal/src/lib/ai/face-detector.ts")
 const rootVercel = read("vercel.json")
 const portalVercel = read("pixiu-lms-portal/vercel.json")
+const portalIndex = read("pixiu-lms-portal/index.html")
+const portalVite = read("pixiu-lms-portal/vite.config.js")
+const objectDetector = read("pixiu-lms-portal/src/lib/ai/object-detector.ts")
+const soundDetector = read("pixiu-lms-portal/src/lib/ai/sound-detector.ts")
 
 assert(settings.includes('SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")'), "Render TLS proxy header is not explicitly configured")
 assert(settings.includes('if not DEBUG and CLOUDFLARE_TURNSTILE_ENABLED and not CLOUDFLARE_TURNSTILE_SECRET_KEY:'), "Production Turnstile is not fail-closed when its secret is missing")
@@ -35,6 +39,16 @@ assert(quizSerializers.includes('Session cannot be changed after activity creati
 assert(learningServices.includes('trainer = getattr(user, "trainer_profile", None)'), "Trainer scope helper can crash when trainer profile is missing")
 assert(learningViews.includes("self.role_only(UserRole.ADMIN, UserRole.STUDENT)"), "Quiz attempt submission is not restricted to learner/admin roles")
 assert(playback.includes('status=UserStatus.ACTIVE'), "Signed video playback does not reject suspended accounts")
+assert(portalVercel.includes('"Content-Security-Policy"'), "Portal CSP header is missing")
+assert(portalVercel.includes("object-src 'none'"), "Portal CSP does not block plugin objects")
+assert(portalVercel.includes("frame-ancestors 'none'"), "Portal CSP does not lock down framing")
+assert(portalVercel.includes("script-src 'self'"), "Portal CSP does not require same-origin scripts")
+assert(portalIndex.includes('meta charset="UTF-8"'), "Portal HTML is malformed after security changes")
+assert(!portalIndex.includes("fonts.googleapis.com"), "Portal HTML still depends on Google Fonts")
+assert(portalVite.includes("sha384-"), "Portal build does not generate SRI hashes")
+assert(portalVite.includes("sri-manifest.json"), "Portal build does not emit SRI manifest")
+assert(objectDetector.includes('"/models/coco-ssd-lite-mobilenet-v2/model.json"'), "COCO-SSD does not use a local model path")
+assert(soundDetector.includes('SPEECH_MODEL_URL = "/models/speech-commands/18w/model.json"'), "Speech Commands model path is not local")
 for (const file of [rootVercel, portalVercel]) {
   for (const header of [
     '"Strict-Transport-Security"',
@@ -65,4 +79,4 @@ if (failures.length) {
 }
 
 console.log("PIXIU security static gate PASSED")
-console.log("Secrets/defaults · TLS proxy · MediaPipe pinning · scoped writes · CI action pinning · response headers: PASS")
+console.log("Secrets/defaults · TLS proxy · MediaPipe pinning · local AI models · CSP/SRI · scoped writes · CI action pinning · response headers: PASS")
