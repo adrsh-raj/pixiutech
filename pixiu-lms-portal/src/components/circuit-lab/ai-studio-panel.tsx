@@ -55,6 +55,7 @@ import { MY_AI_FEATURE_SIZE } from "@/lib/ai/my-ai-feature-extractor"
 import {
   captureVideoFrame,
   startCamera,
+  getCameraPermissionState,
   stopCamera,
 } from "@/lib/ai/camera-session"
 import {
@@ -71,6 +72,7 @@ import {
   type FaceDetection,
 } from "@/lib/ai/face-detector"
 import {
+  getMicrophonePermissionState,
   loadSoundRecognizer,
   stopSoundRecognizer,
   type SoundRecognizer,
@@ -912,6 +914,14 @@ export function AiStudioPanel({
     setCameraActive(false)
 
     try {
+      const permission = await getCameraPermissionState()
+      if (permission === "denied") {
+        throw Object.assign(
+          new Error("Camera permission is blocked for this site. Allow camera access and try again."),
+          { name: "NotAllowedError" },
+        )
+      }
+
       const video = getActiveVideo()
       if (!video) throw new Error("Camera preview is not mounted.")
       const stream = await startCamera(video)
@@ -1114,6 +1124,14 @@ export function AiStudioPanel({
     })
 
     try {
+      const permission = await getMicrophonePermissionState()
+      if (permission === "denied") {
+        throw Object.assign(
+          new Error("Microphone permission is blocked for this site. Allow microphone access and try again."),
+          { name: "NotAllowedError" },
+        )
+      }
+
       const recognizer = await loadSoundRecognizer()
       if (activeSession !== sessionRef.current) {
         await stopSoundRecognizer(recognizer)
