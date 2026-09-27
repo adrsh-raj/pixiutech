@@ -23,6 +23,7 @@ const objectDetector = read("pixiu-lms-portal/src/lib/ai/object-detector.ts")
 const soundDetector = read("pixiu-lms-portal/src/lib/ai/sound-detector.ts")
 const portalPackage = JSON.parse(read("pixiu-lms-portal/package.json"))
 const runtimeSync = read("scripts/sync-ai-runtime-assets.mjs")
+const buildVerifier = read("scripts/verify-portal-security-build.mjs")
 
 assert(settings.includes('SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")'), "Render TLS proxy header is not explicitly configured")
 assert(settings.includes('if not DEBUG and CLOUDFLARE_TURNSTILE_ENABLED and not CLOUDFLARE_TURNSTILE_SECRET_KEY:'), "Production Turnstile is not fail-closed when its secret is missing")
@@ -49,6 +50,7 @@ assert(portalIndex.includes('meta charset="UTF-8"'), "Portal HTML is malformed a
 assert(!portalIndex.includes("fonts.googleapis.com"), "Portal HTML still depends on Google Fonts")
 assert(portalVite.includes("sha384-"), "Portal build does not generate SRI hashes")
 assert(portalVite.includes("sri-manifest.json"), "Portal build does not emit SRI manifest")
+assert(buildVerifier.includes("SRI hash does not match built bytes"), "Built SRI verification is missing")
 assert(objectDetector.includes('"/models/coco-ssd-lite-mobilenet-v2/model.json"'), "COCO-SSD does not use a local model path")
 assert(soundDetector.includes('SPEECH_MODEL_URL = "/models/speech-commands/18w/model.json"'), "Speech Commands model path is not local")
 for (const file of [rootVercel, portalVercel]) {
