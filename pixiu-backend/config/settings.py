@@ -30,7 +30,6 @@ PIXIU_BILLING_BANK_NAME = os.environ.get("PIXIU_BILLING_BANK_NAME", os.environ.g
 PIXIU_BILLING_ACCOUNT_NUMBER = os.environ.get("PIXIU_BILLING_ACCOUNT_NUMBER", os.environ.get("PIXIU_BANK_ACCOUNT_NUMBER", "")).strip()
 PIXIU_BILLING_IFSC = os.environ.get("PIXIU_BILLING_IFSC", os.environ.get("PIXIU_BANK_IFSC", "")).strip()
 PIXIU_BILLING_UPI = os.environ.get("PIXIU_BILLING_UPI", os.environ.get("PIXIU_UPI_ID", "")).strip()
-PIXIU_BILLING_UPI = os.environ.get("PIXIU_BILLING_UPI", os.environ.get("PIXIU_UPI_ID", "")).strip()
 LOGIN_MAX_FAILED_ATTEMPTS = int(os.environ.get("DJANGO_LOGIN_MAX_FAILED_ATTEMPTS", "5"))
 LOGIN_LOCKOUT_MINUTES = int(os.environ.get("DJANGO_LOGIN_LOCKOUT_MINUTES", "15"))
 PASSWORD_RESET_TIMEOUT = int(os.environ.get("DJANGO_PASSWORD_RESET_TIMEOUT", str(60 * 60)))
