@@ -25,8 +25,11 @@ def assigned_class_ids(user):
 def trainer_currently_assigned_to_school(user, school_id):
     if user.role != UserRole.TRAINER:
         return False
+    trainer = getattr(user, "trainer_profile", None)
+    if trainer is None:
+        return False
     today = timezone.localdate()
-    return user.trainer_profile.school_assignments.filter(
+    return trainer.school_assignments.filter(
         school_id=school_id,
         status="active",
         assigned_from__lte=today,
