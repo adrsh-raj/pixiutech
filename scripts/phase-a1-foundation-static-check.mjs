@@ -114,7 +114,7 @@ for (const [name, source] of [
   ["ai-studio-engine.ts", engine],
 ]) {
   assert(
-    !/tf\.tidy\(\s*async\\b/.test(source),
+    !/tf\.tidy\(\s*async\b/.test(source),
     name + ": async callbacks inside tf.tidy are forbidden",
   )
 }
