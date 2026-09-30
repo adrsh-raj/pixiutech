@@ -10,7 +10,7 @@ function getProductionLmsUrl() {
     }
   }
 
-  throw new Error('VITE_LMS_URL is required outside the PIXIU Tech production website.');
+  return 'https://portal.pixiutech.com';
 }
 
 export const LMS_BASE_URL = getProductionLmsUrl();

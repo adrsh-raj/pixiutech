@@ -75,7 +75,7 @@ export default function Login() {
     }
   };
 
-  if (authLoading || (isAuthenticated && user)) return <div className="min-h-screen bg-[#0D1212] flex items-center justify-center text-white"><div className="w-8 h-8 border-2 border-teal-500/30 border-t-teal-500 rounded-full animate-spin"></div></div>;
+  if (isAuthenticated && user) return <div className="min-h-screen bg-[#0D1212] flex items-center justify-center text-white"><div className="w-8 h-8 border-2 border-teal-500/30 border-t-teal-500 rounded-full animate-spin"></div></div>;
 
   return <div className="min-h-screen bg-[#101917] flex flex-col selection:bg-pixiu-blue selection:text-white relative overflow-hidden"><div className="absolute top-1/4 left-1/4 w-72 sm:w-96 h-72 sm:h-96 bg-[#B8D4D0]/8 rounded-full blur-3xl pointer-events-none"></div><div className="absolute bottom-1/4 right-1/4 w-72 sm:w-96 h-72 sm:h-96 bg-[#236F69]/10 rounded-full blur-3xl pointer-events-none"></div><div className="absolute inset-0 bg-grid-tech opacity-[0.03] pointer-events-none"></div><main className="relative z-10 flex flex-1 w-full items-center justify-center p-4"><div className="w-full max-w-md bg-[#0F1715] border border-slate-800/60 rounded-2xl p-6 sm:p-8 shadow-2xl">
     <div className="text-center mb-6"><div className="inline-block bg-white px-3.5 py-1.5 rounded-xl shadow-md border border-white/20 mb-3"><img src="/img/logo.png" alt="Pixiu Tech Logo" className="h-8 sm:h-9 w-auto object-contain" /></div><h1 className="text-xl sm:text-2xl font-extrabold text-white tracking-wide">PIXIU TECH</h1><p className="text-[11px] text-slate-500 font-medium mt-0.5">Robotics & AI Learning Management System</p></div>

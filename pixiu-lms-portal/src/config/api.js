@@ -3,9 +3,10 @@
 const explicitApiBase = import.meta.env.VITE_API_URL?.trim();
 const legacyDjangoBase = import.meta.env.VITE_DJANGO_API_URL?.trim();
 
+const defaultApiBase = 'https://pixiu-django-api.onrender.com/api/v1';
+
 function normalizeApiBase(value) {
-  const candidate = String(value || '').trim();
-  if (!candidate) throw new Error('Django API URL is not configured. Set VITE_API_URL.');
+  const candidate = String(value || defaultApiBase).trim();
 
   try {
     const url = new URL(candidate);

@@ -118,20 +118,22 @@ async function getCsrfToken(force = false) {
 async function authPostWithRetry(url, options = {}) {
   let lastError = null;
   const cookieAuthEndpoint = /\/auth\/(login|refresh|logout)\/$/.test(String(url));
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  const isRefresh = /\/auth\/refresh\/$/.test(String(url));
+  const maxAttempts = isRefresh ? 1 : 2;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     if (attempt) await new Promise(resolve => setTimeout(resolve, 1500));
     try {
       const headers = new Headers(options.headers || {});
       if (cookieAuthEndpoint) headers.set('X-CSRFToken', await getCsrfToken(attempt > 0));
       const response = await fetchOnce(url, { ...options, headers }, AUTH_REQUEST_TIMEOUT_MS);
-      if (response.status === 403 && cookieAuthEndpoint && attempt === 0) {
+      if (response.status === 403 && cookieAuthEndpoint && attempt === 0 && !isRefresh) {
         csrfTokenMemory = null;
         continue;
       }
       return response;
     } catch (error) {
       lastError = error;
-      if (error?.name !== 'AbortError' || attempt === 1) throw error;
+      if (error?.name !== 'AbortError' || attempt === maxAttempts - 1) throw error;
     }
   }
   throw lastError || new Error('Authentication request failed.');

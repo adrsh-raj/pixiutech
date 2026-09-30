@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import { markPerformance, measurePerformance } from './lib/performanceDiagnostics';
 import PortalMeta from './components/PortalMeta';
+import Login from './pages/Login';
 
 const CHUNK_RECOVERY_KEY = 'pixiu_chunk_recovery_attempted';
 
@@ -47,7 +48,6 @@ const SchoolsV2 = lazyWithChunkRecovery(() => import('./pages/SchoolsV2'));
 const Notifications = lazyWithChunkRecovery(() => import('./pages/Notifications'));
 const ContentHub = lazyWithChunkRecovery(() => import('./pages/ContentHub'));
 const Curriculum = lazyWithChunkRecovery(() => import('./pages/Curriculum'));
-const Login = lazyWithChunkRecovery(() => import('./pages/Login'));
 const VerifyV2 = lazyWithChunkRecovery(() => import('./pages/VerifyV2')); 
 const PrivacyPolicy = lazyWithChunkRecovery(() => import('./pages/PrivacyPolicy'));
 const TermsAndConditions = lazyWithChunkRecovery(() => import('./pages/TermsAndConditions'));
@@ -135,7 +135,7 @@ function TrainerConsoleRoute() { const { user } = useAuth(); return user?.role =
 function AttendanceRoute() { const { user } = useAuth(); return user?.role === 'trainer' ? <TrainerAttendance /> : <AttendanceCenter />; }
 function StudentRouteGuard() { const { isAuthenticated, user, loading } = useAuth(); if (loading) return <LoadingScreen />; if (!isAuthenticated) return <Navigate to="/login" replace />; if (user?.role !== 'student') return <Navigate to="/" replace />; return <RoutePerformance><StudentPortal /></RoutePerformance>; }
 function SchoolRouteGuard() { const { isAuthenticated, user, loading } = useAuth(); if (loading) return <LoadingScreen />; if (!isAuthenticated) return <Navigate to="/login" replace />; if (user?.role !== 'school') return <Navigate to="/" replace />; return <RoutePerformance><SchoolPortal /></RoutePerformance>; }
-function GuestRouteGuard({ children }) { const { isAuthenticated, user, loading } = useAuth(); const hasSessionHint = Boolean(typeof window !== 'undefined' && window.sessionStorage.getItem('pixiu_session_role')); if (loading && hasSessionHint) return <LoadingScreen />; if (isAuthenticated && user) { const destination = user.role === 'student' ? '/student-portal' : user.role === 'school' ? '/school-portal' : user.role === 'trainer' ? '/trainers' : '/'; return <Navigate to={destination} replace />; } return children; }
+function GuestRouteGuard({ children }) { const { isAuthenticated, user } = useAuth(); if (isAuthenticated && user) { const destination = user.role === 'student' ? '/student-portal' : user.role === 'school' ? '/school-portal' : user.role === 'trainer' ? '/trainers' : '/'; return <Navigate to={destination} replace />; } return children; }
 function TrainerRoleRoute() { const { isAuthenticated, user, loading } = useAuth(); if (loading) return <LoadingScreen />; if (!isAuthenticated) return <Navigate to="/login" replace />; if (!['trainer', 'admin', 'superadmin'].includes(user?.role)) return <Navigate to="/" replace />; return <ClassRankingPage />; }
 function SchoolPerformanceRoute() { return <PerformanceAnalyticsPage role="school" />; }
 function SessionsRoute() { const { user } = useAuth(); return user?.role === 'student' ? <StudentClasses /> : <SessionSchedulerV4 />; }
