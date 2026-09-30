@@ -42,11 +42,10 @@ export async function loadObjectDetector(): Promise<ObjectDetector> {
     }
   }
 
-  objectDetectorLoadPromise = cocoSsd
-    .load({
-      base: "lite_mobilenet_v2",
-      modelUrl: COCO_SSD_MODEL_URL,
-    })
+  objectDetectorLoadPromise = cocoSsd.load({
+    base: "lite_mobilenet_v2",
+    modelUrl: COCO_SSD_MODEL_URL,
+  })
     .then((model) => {
       objectDetectorInstance = model
       return model

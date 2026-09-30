@@ -35,6 +35,7 @@ const FACE_SOURCE = join(
 
 // The original TF Hub GCS bucket (tfhub-tfjs-modules) now returns 403.
 // MoveNet model files are bundled in git under public/models/movenet/.
+// Bundled local MoveNet model source: singlepose/lightning/4/model.json
 // Set PIXIU_MOVENET_SOURCE_URL to a custom mirror if needed.
 const MOVENET_SOURCE_URL =
   process.env.PIXIU_MOVENET_SOURCE_URL ?? ""

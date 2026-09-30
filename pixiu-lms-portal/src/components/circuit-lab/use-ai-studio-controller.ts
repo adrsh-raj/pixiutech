@@ -14,6 +14,7 @@ import {
   loadAiStudioStore,
   loadStoredAiModel,
   optimizeAiImage,
+  predictAiImage,
   predictAiVideo,
   removeAiClass,
   removeAiSample,
@@ -374,8 +375,6 @@ function drawFaces(
 }
 
 
-
-import type { AiStudioViewModel } from "./ai-studio-view-model"
 
 export interface AiStudioPanelProps {
   isOpen: boolean
@@ -1376,7 +1375,7 @@ const [tab, setTab] = useState<Tab>("try")
           lastRuntimeMetricsRef.current
         ) {
           const budget = isBudgetExceeded(lastRuntimeMetricsRef.current)
-          if (budget.steadyInference || budget.tensorGrowth) {
+          if (budget.firstInference || budget.steadyInference || budget.tensorGrowth) {
             runtimeBudgetWarnedRef.current = true
             setStatus(
               budget.tensorGrowth

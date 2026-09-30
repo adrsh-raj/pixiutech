@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "lint": "oxlint",
+    "lint": "oxlint src",
     "qa:ai": "node --experimental-strip-types ../scripts/ai-phase6-qa.mjs",
     "qa:phase4-6": "node ../scripts/phase4-6-static-check.mjs",
     "preview": "vite preview",

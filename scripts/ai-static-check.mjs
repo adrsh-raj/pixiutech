@@ -246,13 +246,17 @@ for (const marker of [
 ]) requireText(resultNormalizer, marker, "6J/6K result normalization")
 
 for (const marker of [
-  "cocoSsd.load",
-  'base: "lite_mobilenet_v2"',
-  "modelRef.current.detect(video)",
+  "loadObjectDetector",
+  "detectObjects",
   "runtimeEnabled",
   "Vision Signal:",
   "PIXIU VISION CORE",
 ]) requireText(canvasPanel, marker, "Integrated AI Vision Canvas runtime")
+
+for (const marker of [
+  "cocoSsd.load",
+  'base: "lite_mobilenet_v2"',
+]) requireText(objectAdapter, marker, "Integrated AI Vision model loader")
 for (const marker of [
   "lastParentXmlRef",
   "pendingExternalXmlRef",

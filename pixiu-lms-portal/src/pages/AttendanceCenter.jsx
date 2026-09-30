@@ -153,6 +153,20 @@ export default function AttendanceCenter() {
     }
   };
 
+  const filteredClasses = useMemo(() => (schoolFilter ? classes.filter(item => same(item.school_id || item.school_code, schoolFilter)) : classes), [classes, schoolFilter]);
+  const filteredTrainers = useMemo(() => (trainerFilter ? trainers.filter(item => String(item.id) === String(trainerFilter)) : trainers), [trainers, trainerFilter]);
+  const records = useMemo(() => attendance.filter(record => {
+    if (schoolFilter && !same(record.school_code || record.school_id, schoolFilter)) return false;
+    if (classFilter && !same(record.class_id || record.school_class, classFilter)) return false;
+    if (trainerFilter && !same(record.trainer_id || record.trainer, trainerFilter)) return false;
+    const recordDate = String(record.date || '').slice(0, 10);
+    if (user?.role === 'school' && date && recordDate !== date) return false;
+    if (user?.role !== 'school' && from && recordDate < from) return false;
+    if (user?.role !== 'school' && to && recordDate > to) return false;
+    if (search && !`${record.student_name || ''} ${record.student_id || ''}`.toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  }), [attendance, schoolFilter, classFilter, trainerFilter, user?.role, date, from, to, search]);
+
   if (user?.role === 'trainer') {
     return (
       <div className="space-y-5 pb-10">
@@ -247,20 +261,6 @@ export default function AttendanceCenter() {
       </div>
     );
   }
-
-  const filteredClasses = useMemo(() => (schoolFilter ? classes.filter(item => same(item.school_id || item.school_code, schoolFilter)) : classes), [classes, schoolFilter]);
-  const filteredTrainers = useMemo(() => (trainerFilter ? trainers.filter(item => String(item.id) === String(trainerFilter)) : trainers), [trainers, trainerFilter]);
-  const records = useMemo(() => attendance.filter(record => {
-    if (schoolFilter && !same(record.school_code || record.school_id, schoolFilter)) return false;
-    if (classFilter && !same(record.class_id || record.school_class, classFilter)) return false;
-    if (trainerFilter && !same(record.trainer_id || record.trainer, trainerFilter)) return false;
-    const recordDate = String(record.date || '').slice(0, 10);
-    if (user?.role === 'school' && date && recordDate !== date) return false;
-    if (user?.role !== 'school' && from && recordDate < from) return false;
-    if (user?.role !== 'school' && to && recordDate > to) return false;
-    if (search && !`${record.student_name || ''} ${record.student_id || ''}`.toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
-  }), [attendance, schoolFilter, classFilter, trainerFilter, user?.role, date, from, to, search]);
 
   return (
     <div className="space-y-5 pb-10">

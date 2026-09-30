@@ -57,9 +57,10 @@ export type HandDetector = {
 
 const HAND_VERSION = "4.0.0"
 const MAX_HANDS = 2
-const MIN_HAND_SCORE = 0.05
+const MIN_HAND_SCORE = 0.15
 const HANDS_SCRIPT = "/vendor/mediapipe/hands/hands.js"
 const HANDS_ASSET_BASE = "/vendor/mediapipe/hands/"
+const solutionPath = HANDS_ASSET_BASE
 
 declare global {
   interface Window {
@@ -171,7 +172,7 @@ function fingerExtended(
 
   return (
     pipAngle >= 135 &&
-    dipAngle >= 130 &&
+    dipAngle >= 135 &&
     tipDistance >= pipDistance * 1.01 &&
     straightness >= 0.68
   )
@@ -277,17 +278,18 @@ export async function loadHandDetector(
     Math.min(MAX_HANDS, Math.round(options.maxHands ?? MAX_HANDS)),
   )
 
-  const HandsConstructor = window.Hands
-  if (!HandsConstructor) {
+  if (!window.Hands) {
     throw new Error("MediaPipe Hands constructor is unavailable.")
   }
-  const hands = new HandsConstructor({
+  const hands = new window.Hands({
     locateFile: (file) => `${HANDS_ASSET_BASE}${file}`,
   })
 
   hands.setOptions({
     maxNumHands: maxHands,
     modelComplexity: 1,
+    // @ts-expect-error modelType contract
+    modelType: "full",
     minDetectionConfidence: 0.35,
     minTrackingConfidence: 0.35,
   })

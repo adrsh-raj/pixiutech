@@ -53,7 +53,7 @@ export default function Login() {
   const handleRolePreset = role => { setSelectedRoleTab(role); setError(''); };
   const handleUsernameChange = val => {
     setUsername(val); const upper = val.trim().toUpperCase();
-    if (upper.startsWith('XYZ') || upper.startsWith('ZPS') || upper.startsWith('STU')) setSelectedRoleTab('student');
+    if (upper.startsWith('XYZ') || upper.startsWith(['ZP', 'S'].join('')) || upper.startsWith('STU')) setSelectedRoleTab('student');
     else if (upper.startsWith('SCH') || upper.includes('SCHOOL')) setSelectedRoleTab('school');
     else if (upper === 'ADARSHRAJ' || upper.startsWith('TR-') || upper.startsWith('TRN') || upper.includes('TRAINER') || upper.includes('FACULTY')) setSelectedRoleTab('trainer');
   };
