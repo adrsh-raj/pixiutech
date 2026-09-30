@@ -8,10 +8,10 @@ const AUTH_LOGOUT_KEY = 'pixiu_portal_logout_at';
 const SESSION_ROLE_KEY = 'pixiu_session_role';
 const AUTH_REQUEST_TIMEOUT_MS = 60000;
 const LOGIN_REQUEST_TIMEOUT_MS = 60000;
-const PORTAL_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
+const PORTAL_IDLE_TIMEOUT_MS = 15 * 60 * 1000;
 const PORTAL_ACTIVITY_PERSIST_MS = 15 * 1000;
 const PORTAL_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
-const PORTAL_IDLE_MESSAGE = 'You were signed out after 10 minutes of inactivity. Please sign in again.';
+const PORTAL_IDLE_MESSAGE = 'You were signed out after 15 minutes of inactivity. Please sign in again.';
 const API_READ_CACHE_TTL_MS = 30 * 1000;
 const API_READ_CACHE_MAX_ENTRIES = 250;
 let accessTokenMemory = null;
@@ -349,15 +349,31 @@ export function AuthProvider({ children }) {
       if (!idleLogoutStarted) markActivity();
     };
 
-    const events = ['pointerdown', 'pointermove', 'keydown', 'wheel', 'touchstart', 'scroll', 'click'];
-    events.forEach(eventName => window.addEventListener(eventName, markActivity, { passive: true }));
+    const events = [
+      'mousemove',
+      'mousedown',
+      'mouseup',
+      'pointerdown',
+      'pointermove',
+      'pointerup',
+      'keydown',
+      'keyup',
+      'wheel',
+      'touchstart',
+      'touchmove',
+      'touchend',
+      'scroll',
+      'click',
+      'contextmenu',
+    ];
+    events.forEach(eventName => window.addEventListener(eventName, markActivity, { passive: true, capture: true }));
     window.addEventListener('storage', onStorage);
     document.addEventListener('visibilitychange', onVisibility);
     const interval = window.setInterval(checkIdle, 1000);
 
     return () => {
       window.clearInterval(interval);
-      events.forEach(eventName => window.removeEventListener(eventName, markActivity));
+      events.forEach(eventName => window.removeEventListener(eventName, markActivity, { capture: true }));
       window.removeEventListener('storage', onStorage);
       document.removeEventListener('visibilitychange', onVisibility);
     };

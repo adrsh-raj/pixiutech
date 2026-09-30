@@ -20,9 +20,9 @@ elif not ALLOWED_HOSTS and DEBUG:
 
 PERF_DIAGNOSTICS = os.environ.get("PERF_DIAGNOSTICS", "False").lower() == "true"
 
-# Portal security policy. The browser enforces the 10-minute inactivity timer;
+# Portal security policy. The browser enforces the 15-minute inactivity timer;
 # backend credentials are independently invalidated on password changes.
-PORTAL_IDLE_TIMEOUT_SECONDS = int(os.environ.get("DJANGO_PORTAL_IDLE_TIMEOUT_SECONDS", "600"))
+PORTAL_IDLE_TIMEOUT_SECONDS = int(os.environ.get("DJANGO_PORTAL_IDLE_TIMEOUT_SECONDS", "900"))
 
 # Pixiu Tech billing profile. Keep these values in the server environment rather than source control.
 PIXIU_BILLING_ACCOUNT_NAME = os.environ.get("PIXIU_BILLING_ACCOUNT_NAME", os.environ.get("PIXIU_BANK_ACCOUNT_NAME", "")).strip()

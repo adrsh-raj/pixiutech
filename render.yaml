@@ -64,7 +64,7 @@ services:
       - key: DJANGO_PUBLIC_ENQUIRY_RATE
         value: 10/hour
       - key: DJANGO_PORTAL_IDLE_TIMEOUT_SECONDS
-        value: "600"
+        value: "900"
       - key: DJANGO_LOGIN_MAX_FAILED_ATTEMPTS
         value: "5"
       - key: DJANGO_LOGIN_LOCKOUT_MINUTES
