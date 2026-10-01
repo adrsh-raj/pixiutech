@@ -118,9 +118,9 @@ export function Workbench() {
   const [probeBlack, setProbeBlack] = useState<PinRef | null>(null)
   const [activeProbeToPlace, setActiveProbeToPlace] = useState<"red" | "black" | null>(null)
 
-  const [isScopeOpen, setIsScopeOpen] = useState(true)
-  const [scopeProbeCH1, setScopeProbeCH1] = useState<PinRef | null>({ partId: "uno", pinId: "d13" })
-  const [scopeProbeCH2, setScopeProbeCH2] = useState<PinRef | null>({ partId: "pot", pinId: "wiper" })
+  const [isScopeOpen, setIsScopeOpen] = useState(false)
+  const [scopeProbeCH1, setScopeProbeCH1] = useState<PinRef | null>(null)
+  const [scopeProbeCH2, setScopeProbeCH2] = useState<PinRef | null>(null)
   const [activeScopeProbeToPlace, setActiveScopeProbeToPlace] = useState<"ch1" | "ch2" | null>(null)
 
   // Schematic view mode & AI Doctor state
@@ -1427,6 +1427,7 @@ export function Workbench() {
               viewMode={schematicMode ? "schematic" : "physical"}
               highlightPartIds={highlightPartIds}
               onResetMcu={handleResetMcu}
+              isScopeOpen={isScopeOpen}
             />
 
             {running && (

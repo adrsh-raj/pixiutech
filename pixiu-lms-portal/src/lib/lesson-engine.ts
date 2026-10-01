@@ -187,7 +187,11 @@ export function getLessonProgressPercent(lesson: Lesson, progress?: LessonProgre
 export function getUnlockedLessonIds(progress: Record<string, LessonProgress>) {
   return new Set(
     LESSONS.filter((lesson) =>
-      lesson.prerequisites.every((id) => getLessonProgressPercent(getLessonById(id)!, progress[id]) === 100),
+      lesson.prerequisites.every((id) => {
+        const prereq = getLessonById(id)
+        if (!prereq) return true
+        return getLessonProgressPercent(prereq, progress[id]) === 100
+      }),
     ).map((lesson) => lesson.id),
   )
 }
@@ -572,15 +576,151 @@ const DHT11_XML = `<xml xmlns="https://developers.google.com/blockly/xml">
   </block>
 </xml>`
 
+const MQ2_GAS_CIRCUIT: CircuitState = {
+  parts: [
+    { id: "uno", type: "arduino-uno", x: 60, y: 110, rotation: 0, props: {} },
+    { id: "gas", type: "mq2-gas", x: 380, y: 85, rotation: 0, props: { gasLevel: 150, threshold: 350 } },
+    { id: "bz", type: "buzzer", x: 550, y: 180, rotation: 0, props: {} },
+    { id: "r1", type: "resistor", x: 430, y: 220, rotation: 0, props: { resistance: 220 } },
+    { id: "led1", type: "led", x: 550, y: 70, rotation: 0, props: { color: "red" } },
+  ],
+  wires: [
+    { id: "gas-vcc", from: { partId: "uno", pinId: "5v" }, to: { partId: "gas", pinId: "vcc" }, color: "#ef4444" },
+    { id: "gas-gnd", from: { partId: "gas", pinId: "gnd" }, to: { partId: "uno", pinId: "gnd" }, color: "#1e293b" },
+    { id: "gas-ao", from: { partId: "gas", pinId: "ao" }, to: { partId: "uno", pinId: "a0" }, color: "#eab308" },
+    { id: "bz-pos", from: { partId: "uno", pinId: "d8" }, to: { partId: "bz", pinId: "pos" }, color: "#facc15" },
+    { id: "bz-neg", from: { partId: "bz", pinId: "neg" }, to: { partId: "uno", pinId: "gnd" }, color: "#1e293b" },
+    { id: "led-r-a", from: { partId: "uno", pinId: "d13" }, to: { partId: "r1", pinId: "a" }, color: "#ef4444" },
+    { id: "led-r-b", from: { partId: "r1", pinId: "b" }, to: { partId: "led1", pinId: "anode" }, color: "#ef4444" },
+    { id: "led-gnd", from: { partId: "led1", pinId: "cathode" }, to: { partId: "uno", pinId: "gnd" }, color: "#1e293b" },
+  ],
+}
+
+const MQ2_GAS_XML = `<xml xmlns="https://developers.google.com/blockly/xml">
+  <block type="arduino_program" x="40" y="40">
+    <statement name="SETUP">
+      <block type="serial_begin"><field name="BAUD">9600</field><next>
+      <block type="io_pinmode"><field name="PIN">8</field><field name="MODE">OUTPUT</field><next>
+      <block type="io_pinmode"><field name="PIN">13</field><field name="MODE">OUTPUT</field></block>
+      </next></block></next></block>
+    </statement>
+    <statement name="LOOP">
+      <block type="serial_print"><value name="TEXT"><block type="text_string"><field name="TEXT">Gas PPM: </field></block></value><next>
+      <block type="serial_println"><value name="TEXT"><block type="mq2_gas_read"><field name="SENSOR">gas</field></block></value><next>
+      <block type="controls_if">
+        <mutation else="1"></mutation>
+        <value name="IF0">
+          <block type="logic_compare">
+            <field name="OP">GT</field>
+            <value name="A"><block type="mq2_gas_read"><field name="SENSOR">gas</field></block></value>
+            <value name="B"><shadow type="math_number"><field name="NUM">300</field></shadow></value>
+          </block>
+        </value>
+        <statement name="DO0">
+          <block type="io_digitalwrite"><field name="PIN">8</field><field name="STATE">HIGH</field><next>
+          <block type="io_digitalwrite"><field name="PIN">13</field><field name="STATE">HIGH</field><next>
+          <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">200</field></shadow></value></block>
+          </next></block></next></block>
+        </statement>
+        <statement name="ELSE">
+          <block type="io_digitalwrite"><field name="PIN">8</field><field name="STATE">LOW</field><next>
+          <block type="io_digitalwrite"><field name="PIN">13</field><field name="STATE">LOW</field><next>
+          <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">200</field></shadow></value></block>
+          </next></block></next></block>
+        </statement>
+      </block>
+      </next></block></next></block>
+    </statement>
+  </block>
+</xml>`
+
+const NEOPIXEL_CIRCUIT: CircuitState = {
+  parts: [
+    { id: "uno", type: "arduino-uno", x: 60, y: 110, rotation: 0, props: {} },
+    { id: "ring", type: "neopixel-ring", x: 440, y: 100, rotation: 0, props: { numPixels: 8, brightness: 200, pattern: "rainbow", color: "#38bdf8" } },
+  ],
+  wires: [
+    { id: "ring-vcc", from: { partId: "uno", pinId: "5v" }, to: { partId: "ring", pinId: "vcc" }, color: "#ef4444" },
+    { id: "ring-gnd", from: { partId: "ring", pinId: "gnd" }, to: { partId: "uno", pinId: "gnd" }, color: "#1e293b" },
+    { id: "ring-din", from: { partId: "uno", pinId: "d6" }, to: { partId: "ring", pinId: "din" }, color: "#38bdf8" },
+  ],
+}
+
+const NEOPIXEL_XML = `<xml xmlns="https://developers.google.com/blockly/xml">
+  <block type="arduino_program" x="40" y="40">
+    <statement name="SETUP">
+      <block type="neopixel_set_color">
+        <field name="SENSOR">ring</field>
+        <value name="COLOR"><shadow type="colour_picker"><field name="COLOUR">#38bdf8</field></shadow></value>
+        <next>
+        <block type="neopixel_show"><field name="SENSOR">ring</field></block>
+        </next>
+      </block>
+    </statement>
+    <statement name="LOOP">
+      <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">500</field></shadow></value></block>
+    </statement>
+  </block>
+</xml>`
+
+const AI_GESTURE_CIRCUIT: CircuitState = {
+  parts: [
+    { id: "uno", type: "arduino-uno", x: 60, y: 110, rotation: 0, props: {} },
+    { id: "gate", type: "servo", x: 430, y: 80, rotation: 0, props: { arm: "barrier", angle: 0 } },
+    { id: "led1", type: "led", x: 570, y: 190, rotation: 0, props: { color: "green" } },
+    { id: "r1", type: "resistor", x: 450, y: 190, rotation: 0, props: { resistance: 220 } },
+  ],
+  wires: [
+    { id: "g-vcc", from: { partId: "uno", pinId: "5v" }, to: { partId: "gate", pinId: "vcc" }, color: "#ef4444" },
+    { id: "g-gnd", from: { partId: "gate", pinId: "gnd" }, to: { partId: "uno", pinId: "gnd" }, color: "#1e293b" },
+    { id: "g-sig", from: { partId: "uno", pinId: "d9" }, to: { partId: "gate", pinId: "sig" }, color: "#f97316" },
+    { id: "led-r-a", from: { partId: "uno", pinId: "d13" }, to: { partId: "r1", pinId: "a" }, color: "#22c55e" },
+    { id: "led-r-b", from: { partId: "r1", pinId: "b" }, to: { partId: "led1", pinId: "anode" }, color: "#22c55e" },
+    { id: "led-gnd", from: { partId: "led1", pinId: "cathode" }, to: { partId: "uno", pinId: "gnd" }, color: "#1e293b" },
+  ],
+}
+
+const AI_GESTURE_XML = `<xml xmlns="https://developers.google.com/blockly/xml">
+  <block type="arduino_program" x="40" y="40">
+    <statement name="SETUP">
+      <block type="serial_begin"><field name="BAUD">9600</field><next>
+      <block type="ai_camera_enable"><field name="STATE">ON</field><next>
+      <block type="servo_write"><field name="PIN">9</field><value name="ANGLE"><shadow type="math_number"><field name="NUM">0</field></shadow></value></block>
+      </next></block></next></block>
+    </statement>
+    <statement name="LOOP">
+      <block type="controls_if">
+        <mutation else="1"></mutation>
+        <value name="IF0">
+          <block type="ai_is_gesture"><field name="GESTURE">thumbs_up</field></block>
+        </value>
+        <statement name="DO0">
+          <block type="servo_write"><field name="PIN">9</field><value name="ANGLE"><shadow type="math_number"><field name="NUM">90</field></shadow></value><next>
+          <block type="io_digitalwrite"><field name="PIN">13</field><field name="STATE">HIGH</field><next>
+          <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">500</field></shadow></value></block>
+          </next></block></next></block>
+        </statement>
+        <statement name="ELSE">
+          <block type="servo_write"><field name="PIN">9</field><value name="ANGLE"><shadow type="math_number"><field name="NUM">0</field></shadow></value><next>
+          <block type="io_digitalwrite"><field name="PIN">13</field><field name="STATE">LOW</field><next>
+          <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">200</field></shadow></value></block>
+          </next></block></next></block>
+        </statement>
+      </block>
+    </statement>
+  </block>
+</xml>`
+
 export const LESSONS: Lesson[] = [
+  // --- TIER 1: BEGINNER (Foundations & Multi-component I/O) ---
   {
     id: "lesson-led-basics",
     title: "Mission 1 · Safe LED Blink",
     shortTitle: "Safe LED Blink",
     description: "Build a complete LED circuit, protect the LED with a resistor, then make Arduino blink it.",
     difficulty: "Beginner",
-    estimatedMinutes: 12,
-    concepts: ["GPIO", "Current limiting", "Digital output"],
+    estimatedMinutes: 10,
+    concepts: ["GPIO", "Current Limiting", "Digital Output"],
     prerequisites: [],
     templateId: "blink-led",
     steps: [
@@ -606,9 +746,9 @@ export const LESSONS: Lesson[] = [
         instructions: "Wire D13 → resistor A, resistor B → LED anode, and LED cathode → GND.",
         kind: "build",
         checks: [{ kind: "connections", requirements: [
-          { from: { partType: "arduino-uno", pinId: "d13", partId: "uno" }, to: { partType: "resistor", pinId: "a", partId: "r1" } },
-          { from: { partType: "resistor", pinId: "b", partId: "r1" }, to: { partType: "led", pinId: "anode", partId: "led1" } },
-          { from: { partType: "led", pinId: "cathode", partId: "led1" }, to: { partType: "arduino-uno", pinId: "gnd", partId: "uno" } },
+          { from: { partType: "arduino-uno", pinId: "d13" }, to: { partType: "resistor", pinId: "a" } },
+          { from: { partType: "resistor", pinId: "b" }, to: { partType: "led", pinId: "anode" } },
+          { from: { partType: "led", pinId: "cathode" }, to: { partType: "arduino-uno", pinId: "gnd" } },
         ] }],
         success: "The LED loop is wired correctly.",
       },
@@ -629,26 +769,322 @@ export const LESSONS: Lesson[] = [
         title: "Run and observe",
         instructions: "Press Run. Wait for the LED state to change, then check this step while the simulation is running.",
         kind: "run",
-        checks: [{ kind: "running" }, { kind: "runtime", requirements: [{ partId: "led1", field: "level", min: 0.05 }] }],
+        checks: [{ kind: "running" }, { kind: "runtime", requirements: [{ partType: "led", field: "level", min: 0.05 }] }],
         success: "The LED is responding to the running program.",
       },
     ],
   },
   {
+    id: "lesson-pushbutton-led",
+    title: "Mission 2 · Pushbutton Lamp",
+    shortTitle: "Pushbutton Lamp",
+    description: "Use a momentary tactile pushbutton as a digital input to turn an LED on and off interactively.",
+    difficulty: "Beginner",
+    estimatedMinutes: 12,
+    concepts: ["Digital Input", "Pushbutton", "Conditional Logic", "Interactive I/O"],
+    prerequisites: ["lesson-led-basics"],
+    templateId: "g6-pushbutton-led",
+    steps: [
+      {
+        id: "parts",
+        title: "Gather button and lamp parts",
+        instructions: "Place one Arduino Uno, one Pushbutton, one LED, and one 220Ω resistor on the bench.",
+        kind: "build",
+        checks: [{ kind: "parts", requirements: [
+          { type: "arduino-uno", count: 1 },
+          { type: "pushbutton", count: 1 },
+          { type: "led", count: 1 },
+          { type: "resistor", count: 1 },
+        ] }],
+        success: "All pushbutton and LED components are ready.",
+      },
+      {
+        id: "wiring",
+        title: "Wire input and output channels",
+        instructions: "Connect D2 → button pin 1a, button pin 2a → 5V, D13 → resistor A, resistor B → LED anode, and LED cathode → GND.",
+        kind: "build",
+        checks: [{ kind: "connections", requirements: [
+          { from: { partType: "arduino-uno", pinId: "d2" }, to: { partType: "pushbutton", pinId: "p1a" } },
+          { from: { partType: "pushbutton", pinId: "p2a" }, to: { partType: "arduino-uno", pinId: "5v" } },
+          { from: { partType: "arduino-uno", pinId: "d13" }, to: { partType: "resistor", pinId: "a" } },
+          { from: { partType: "resistor", pinId: "b" }, to: { partType: "led", pinId: "anode" } },
+          { from: { partType: "led", pinId: "cathode" }, to: { partType: "arduino-uno", pinId: "gnd" } },
+        ] }],
+        success: "Pushbutton input and LED output paths are wired.",
+      },
+      {
+        id: "code",
+        title: "Program conditional button response",
+        instructions: "Set D2 to INPUT and D13 to OUTPUT. Add an IF-ELSE block: if button is pressed, set D13 HIGH; else set D13 LOW.",
+        kind: "code",
+        checks: [{ kind: "blocks", requirements: [
+          { type: "io_pinmode", count: 1, fields: { PIN: "2", MODE: "INPUT" } },
+          { type: "io_pinmode", count: 1, fields: { PIN: "13", MODE: "OUTPUT" } },
+          { type: "pushbutton_read", count: 1 },
+          { type: "io_digitalwrite", count: 1, fields: { PIN: "13", STATE: "HIGH" } },
+          { type: "io_digitalwrite", count: 1, fields: { PIN: "13", STATE: "LOW" } },
+        ] }],
+        success: "Blockly logic checks the button state and controls the lamp.",
+      },
+      {
+        id: "run",
+        title: "Test interactive control",
+        instructions: "Press Run to start simulation. Click the pushbutton in the lab to test the light, then check this step.",
+        kind: "run",
+        checks: [{ kind: "running" }],
+        success: "The pushbutton lamp program is actively running.",
+      },
+    ],
+  },
+  {
+    id: "lesson-pot-dimmer",
+    title: "Mission 3 · Potentiometer LED Dimmer",
+    shortTitle: "Potentiometer Dimmer",
+    description: "Read continuous analog values (0–1023) from a potentiometer and map them to PWM brightness (0–255).",
+    difficulty: "Beginner",
+    estimatedMinutes: 14,
+    concepts: ["Analog Input", "ADC", "PWM Dimming", "Map Function"],
+    prerequisites: ["lesson-led-basics"],
+    templateId: "g6-pot-brightness",
+    steps: [
+      {
+        id: "parts",
+        title: "Place potentiometer and LED",
+        instructions: "Gather one Arduino Uno, one Potentiometer, one LED, and one resistor.",
+        kind: "build",
+        checks: [{ kind: "parts", requirements: [
+          { type: "arduino-uno", count: 1 },
+          { type: "potentiometer", count: 1 },
+          { type: "led", count: 1 },
+          { type: "resistor", count: 1 },
+        ] }],
+        success: "Analog input and PWM output parts are in place.",
+      },
+      {
+        id: "wiring",
+        title: "Wire analog wiper and PWM output",
+        instructions: "Connect 5V → Pot T1, GND → Pot T2, and Pot Wiper → A0. Wire D9 through the resistor to LED anode, and cathode to GND.",
+        kind: "build",
+        checks: [{ kind: "connections", requirements: [
+          { from: { partType: "arduino-uno", pinId: "5v" }, to: { partType: "potentiometer", pinId: "t1" } },
+          { from: { partType: "arduino-uno", pinId: "gnd" }, to: { partType: "potentiometer", pinId: "t2" } },
+          { from: { partType: "potentiometer", pinId: "wiper" }, to: { partType: "arduino-uno", pinId: "a0" } },
+          { from: { partType: "arduino-uno", pinId: "d9" }, to: { partType: "resistor", pinId: "a" } },
+          { from: { partType: "resistor", pinId: "b" }, to: { partType: "led", pinId: "anode" } },
+          { from: { partType: "led", pinId: "cathode" }, to: { partType: "arduino-uno", pinId: "gnd" } },
+        ] }],
+        success: "Potentiometer analog voltage divider and PWM LED are connected.",
+      },
+      {
+        id: "code",
+        title: "Map analog input to PWM",
+        instructions: "Use analog-write on pin 9 with the potentiometer reading mapped from 0–1023 to 0–255.",
+        kind: "code",
+        checks: [{ kind: "blocks", requirements: [
+          { type: "io_analogwrite", count: 1, fields: { PIN: "9" } },
+          { type: "potentiometer_read", count: 1 },
+        ] }],
+        success: "Analog-to-PWM mapping logic is present in code.",
+      },
+      {
+        id: "run",
+        title: "Run and adjust the dial",
+        instructions: "Start the simulation and drag the potentiometer dial to observe smooth brightness transitions.",
+        kind: "run",
+        checks: [{ kind: "running" }],
+        success: "Simulation is running and the dimmer is active.",
+      },
+    ],
+  },
+  {
+    id: "lesson-buzzer-doorbell",
+    title: "Mission 4 · Smart Doorbell Alert",
+    shortTitle: "Smart Doorbell",
+    description: "Combine a pushbutton trigger with an acoustic piezo buzzer to engineer an audible smart doorbell.",
+    difficulty: "Beginner",
+    estimatedMinutes: 10,
+    concepts: ["Piezo Buzzer", "Sound Alert", "Digital Trigger", "Audio Transducers"],
+    prerequisites: ["lesson-pushbutton-led"],
+    templateId: "g6-buzzer-doorbell",
+    steps: [
+      {
+        id: "parts",
+        title: "Place buzzer and button",
+        instructions: "Place one Arduino Uno, one Pushbutton, and one Piezo Buzzer on the bench.",
+        kind: "build",
+        checks: [{ kind: "parts", requirements: [
+          { type: "arduino-uno", count: 1 },
+          { type: "pushbutton", count: 1 },
+          { type: "buzzer", count: 1 },
+        ] }],
+        success: "Acoustic buzzer and button are placed.",
+      },
+      {
+        id: "wiring",
+        title: "Wire input and buzzer",
+        instructions: "Wire D2 → button pin 1a, button pin 2a → 5V, D8 → buzzer POS, and buzzer NEG → GND.",
+        kind: "build",
+        checks: [{ kind: "connections", requirements: [
+          { from: { partType: "arduino-uno", pinId: "d2" }, to: { partType: "pushbutton", pinId: "p1a" } },
+          { from: { partType: "pushbutton", pinId: "p2a" }, to: { partType: "arduino-uno", pinId: "5v" } },
+          { from: { partType: "arduino-uno", pinId: "d8" }, to: { partType: "buzzer", pinId: "pos" } },
+          { from: { partType: "buzzer", pinId: "neg" }, to: { partType: "arduino-uno", pinId: "gnd" } },
+        ] }],
+        success: "Buzzer and trigger are wired to the Arduino.",
+      },
+      {
+        id: "code",
+        title: "Program chime response",
+        instructions: "Configure D8 as OUTPUT and write HIGH when the pushbutton is pressed, followed by a short delay and LOW.",
+        kind: "code",
+        checks: [{ kind: "blocks", requirements: [
+          { type: "pushbutton_read", count: 1 },
+          { type: "io_digitalwrite", count: 1, fields: { PIN: "8", STATE: "HIGH" } },
+          { type: "io_digitalwrite", count: 1, fields: { PIN: "8", STATE: "LOW" } },
+        ] }],
+        success: "Audible doorbell logic is programmed.",
+      },
+      {
+        id: "run",
+        title: "Run and test chime",
+        instructions: "Press Run and test the chime by pressing the doorbell button.",
+        kind: "run",
+        checks: [{ kind: "running" }],
+        success: "Smart doorbell is live in the simulation.",
+      },
+    ],
+  },
+  {
+    id: "lesson-ldr-night-lamp",
+    title: "Mission 5 · Automatic Night Lamp",
+    shortTitle: "LDR Night Lamp",
+    description: "Build an automatic street lamp that senses ambient light using an LDR and turns on automatically when dark.",
+    difficulty: "Beginner",
+    estimatedMinutes: 14,
+    concepts: ["Photoresistor", "Analog Sensing", "Light Thresholds", "Automation"],
+    prerequisites: ["lesson-led-basics"],
+    templateId: "g6-ldr-night-lamp",
+    steps: [
+      {
+        id: "parts",
+        title: "Gather light sensor components",
+        instructions: "Place one Arduino Uno, one LDR (Photoresistor), one LED, and one resistor on the bench.",
+        kind: "build",
+        checks: [{ kind: "parts", requirements: [
+          { type: "arduino-uno", count: 1 },
+          { type: "ldr", count: 1 },
+          { type: "led", count: 1 },
+          { type: "resistor", count: 1 },
+        ] }],
+        success: "Light sensor and night lamp parts are ready.",
+      },
+      {
+        id: "wiring",
+        title: "Wire LDR and lamp",
+        instructions: "Connect 5V → LDR T1, LDR T2 → A0, D13 → Resistor A, Resistor B → LED anode, and cathode → GND.",
+        kind: "build",
+        checks: [{ kind: "connections", requirements: [
+          { from: { partType: "arduino-uno", pinId: "5v" }, to: { partType: "ldr", pinId: "t1" } },
+          { from: { partType: "ldr", pinId: "t2" }, to: { partType: "arduino-uno", pinId: "a0" } },
+          { from: { partType: "arduino-uno", pinId: "d13" }, to: { partType: "resistor", pinId: "a" } },
+          { from: { partType: "resistor", pinId: "b" }, to: { partType: "led", pinId: "anode" } },
+          { from: { partType: "led", pinId: "cathode" }, to: { partType: "arduino-uno", pinId: "gnd" } },
+        ] }],
+        success: "LDR sensor circuit and lamp are wired.",
+      },
+      {
+        id: "code",
+        title: "Program threshold automation",
+        instructions: "Read LDR analog value on A0. If light is below 400 (darkness), turn D13 HIGH; otherwise LOW.",
+        kind: "code",
+        checks: [{ kind: "blocks", requirements: [
+          { type: "ldr_read", count: 1 },
+          { type: "controls_if", count: 1 },
+          { type: "io_digitalwrite", count: 1, fields: { PIN: "13", STATE: "HIGH" } },
+          { type: "io_digitalwrite", count: 1, fields: { PIN: "13", STATE: "LOW" } },
+        ] }],
+        success: "Threshold automation logic is programmed.",
+      },
+      {
+        id: "run",
+        title: "Simulate day and night",
+        instructions: "Press Run. Select the LDR and move the light slider in the Inspector to simulate darkness.",
+        kind: "run",
+        checks: [{ kind: "running" }],
+        success: "Night lamp system is running.",
+      },
+    ],
+  },
+  {
+    id: "lesson-rgb-mood-lamp",
+    title: "Mission 6 · RGB Mood Lamp",
+    shortTitle: "RGB Mood Lamp",
+    description: "Drive Red, Green, and Blue PWM channels simultaneously to produce custom mixed colors.",
+    difficulty: "Beginner",
+    estimatedMinutes: 12,
+    concepts: ["RGB LED", "PWM Color Mixing", "Multi-channel GPIO"],
+    prerequisites: ["lesson-led-basics"],
+    templateId: "g6-rgb-mood-lamp",
+    steps: [
+      {
+        id: "parts",
+        title: "Place RGB LED",
+        instructions: "Place one Arduino Uno and one 4-pin RGB LED.",
+        kind: "build",
+        checks: [{ kind: "parts", requirements: [
+          { type: "arduino-uno", count: 1 },
+          { type: "rgb-led", count: 1 },
+        ] }],
+        success: "RGB LED is ready on the board.",
+      },
+      {
+        id: "wiring",
+        title: "Wire 3 PWM channels and ground",
+        instructions: "Connect D9 → RED pin, D10 → GREEN pin, D11 → BLUE pin, and GND → GND cathode pin.",
+        kind: "build",
+        checks: [{ kind: "connections", requirements: [
+          { from: { partType: "arduino-uno", pinId: "d9" }, to: { partType: "rgb-led", pinId: "red" } },
+          { from: { partType: "arduino-uno", pinId: "d10" }, to: { partType: "rgb-led", pinId: "green" } },
+          { from: { partType: "arduino-uno", pinId: "d11" }, to: { partType: "rgb-led", pinId: "blue" } },
+          { from: { partType: "rgb-led", pinId: "gnd" }, to: { partType: "arduino-uno", pinId: "gnd" } },
+        ] }],
+        success: "All 3 color channels and common cathode are connected.",
+      },
+      {
+        id: "code",
+        title: "Set channel color levels",
+        instructions: "Use 3 analog-write blocks to send PWM values to pins 9, 10, and 11.",
+        kind: "code",
+        checks: [{ kind: "blocks", requirements: [
+          { type: "io_analogwrite", count: 3 },
+        ] }],
+        success: "Three color channels are controlled by code.",
+      },
+      {
+        id: "run",
+        title: "Run and observe color mixing",
+        instructions: "Press Run and watch the mixed light glow on the RGB LED.",
+        kind: "run",
+        checks: [{ kind: "running" }],
+        success: "RGB mood lamp is operating.",
+      },
+    ],
+  },
+  {
     id: "lesson-traffic-light",
-    title: "Mission 2 · Traffic Light Logic",
+    title: "Mission 7 · Traffic Light Sequence",
     shortTitle: "Traffic Light",
-    description: "Coordinate three LEDs with a timed sequence and learn how multiple GPIO outputs work together.",
+    description: "Coordinate Red, Yellow, and Green LEDs with precise timing to build an intersection controller.",
     difficulty: "Beginner",
     estimatedMinutes: 15,
-    concepts: ["Sequencing", "GPIO", "Timing"],
+    concepts: ["Sequencing", "Multi-Output GPIO", "State Machine", "Timing"],
     prerequisites: ["lesson-led-basics"],
     templateId: "traffic-light",
     steps: [
       {
         id: "parts",
         title: "Build the signal set",
-        instructions: "Use three LEDs, three resistors and one Arduino. Each LED needs its own resistor.",
+        instructions: "Use three LEDs, three resistors and one Arduino. Each LED needs its own current-limiting resistor.",
         kind: "build",
         checks: [{ kind: "parts", requirements: [
           { type: "arduino-uno", count: 1 }, { type: "led", count: 3 }, { type: "resistor", count: 3 },
@@ -658,35 +1094,26 @@ export const LESSONS: Lesson[] = [
       {
         id: "wiring",
         title: "Wire three channels",
-        instructions: "Connect D12, D11 and D10 through their own resistors to the three LED anodes. Connect all cathodes to GND.",
+        instructions: "Connect D12, D11 and D10 through resistors to Red, Yellow, and Green LED anodes. Connect cathodes to GND.",
         kind: "build",
         checks: [{ kind: "connections", requirements: [
-          { from: { partType: "arduino-uno", pinId: "d12", partId: "uno" }, to: { partType: "resistor", pinId: "a", partId: "r1" } },
-          { from: { partType: "resistor", pinId: "b", partId: "r1" }, to: { partType: "led", pinId: "anode", partId: "red_led" } },
-          { from: { partType: "led", pinId: "cathode", partId: "red_led" }, to: { partType: "arduino-uno", pinId: "gnd", partId: "uno" } },
-          { from: { partType: "arduino-uno", pinId: "d11", partId: "uno" }, to: { partType: "resistor", pinId: "a", partId: "r2" } },
-          { from: { partType: "resistor", pinId: "b", partId: "r2" }, to: { partType: "led", pinId: "anode", partId: "yellow_led" } },
-          { from: { partType: "led", pinId: "cathode", partId: "yellow_led" }, to: { partType: "arduino-uno", pinId: "gnd", partId: "uno" } },
-          { from: { partType: "arduino-uno", pinId: "d10", partId: "uno" }, to: { partType: "resistor", pinId: "a", partId: "r3" } },
-          { from: { partType: "resistor", pinId: "b", partId: "r3" }, to: { partType: "led", pinId: "anode", partId: "green_led" } },
-          { from: { partType: "led", pinId: "cathode", partId: "green_led" }, to: { partType: "arduino-uno", pinId: "gnd", partId: "uno" } },
+          { from: { partType: "arduino-uno", pinId: "d12" }, to: { partType: "resistor", pinId: "a" } },
+          { from: { partType: "arduino-uno", pinId: "d11" }, to: { partType: "resistor", pinId: "a" } },
+          { from: { partType: "arduino-uno", pinId: "d10" }, to: { partType: "resistor", pinId: "a" } },
         ] }],
         success: "All three control lines are connected.",
       },
       {
         id: "code",
         title: "Create the sequence",
-        instructions: "Set up D12, D11 and D10 as digital outputs and use HIGH/LOW plus delays to cycle the lights.",
+        instructions: "Set D12, D11, and D10 as OUTPUTs and cycle HIGH/LOW states with delays.",
         kind: "code",
         checks: [{ kind: "blocks", requirements: [
           { type: "io_pinmode", count: 1, fields: { PIN: "12", MODE: "OUTPUT" } },
           { type: "io_pinmode", count: 1, fields: { PIN: "11", MODE: "OUTPUT" } },
           { type: "io_pinmode", count: 1, fields: { PIN: "10", MODE: "OUTPUT" } },
           { type: "io_digitalwrite", count: 1, fields: { PIN: "12", STATE: "HIGH" } },
-          { type: "io_digitalwrite", count: 1, fields: { PIN: "12", STATE: "LOW" } },
-          { type: "io_digitalwrite", count: 1, fields: { PIN: "11", STATE: "LOW" } },
           { type: "io_digitalwrite", count: 1, fields: { PIN: "11", STATE: "HIGH" } },
-          { type: "io_digitalwrite", count: 1, fields: { PIN: "10", STATE: "LOW" } },
           { type: "io_digitalwrite", count: 1, fields: { PIN: "10", STATE: "HIGH" } },
           { type: "time_delay", count: 3 },
         ] }],
@@ -695,32 +1122,34 @@ export const LESSONS: Lesson[] = [
       {
         id: "run",
         title: "Watch the intersection",
-        instructions: "Run the simulation and check this step. One of the signal LEDs should be active as the sequence progresses.",
+        instructions: "Run the simulation and check this step while lights cycle.",
         kind: "run",
         checks: [{ kind: "running" }, { kind: "runtime-any", requirements: [
           { partId: "red_led", field: "level", min: 0.05 },
           { partId: "yellow_led", field: "level", min: 0.05 },
           { partId: "green_led", field: "level", min: 0.05 },
         ] }],
-        success: "The traffic-light program is driving the red channel.",
+        success: "The traffic-light sequence is running.",
       },
     ],
   },
+
+  // --- TIER 2: INTERMEDIATE (Sensors, Actuators & Telemetry) ---
   {
     id: "lesson-servo",
-    title: "Mission 3 · Servo Motion",
+    title: "Mission 8 · Servo Motion Sweep",
     shortTitle: "Servo Sweep",
-    description: "Connect a servo and program three target angles to explore PWM-controlled motion.",
+    description: "Command a precision angular servo motor to rotate between target angles (0° to 180°).",
     difficulty: "Intermediate",
-    estimatedMinutes: 15,
-    concepts: ["Servo", "PWM", "Motion"],
+    estimatedMinutes: 14,
+    concepts: ["Servo Motor", "PWM Positioning", "Robotics", "Actuators"],
     prerequisites: ["lesson-led-basics"],
     templateId: "servo-sweep",
     steps: [
       {
         id: "parts",
         title: "Connect the servo",
-        instructions: "Use one Arduino and one servo. The servo needs power, ground and a signal connection.",
+        instructions: "Place one Arduino Uno and one Servo Motor.",
         kind: "build",
         checks: [{ kind: "parts", requirements: [{ type: "arduino-uno", count: 1 }, { type: "servo", count: 1 }] }],
         success: "The servo hardware is ready.",
@@ -728,60 +1157,118 @@ export const LESSONS: Lesson[] = [
       {
         id: "wiring",
         title: "Wire power and signal",
-        instructions: "Connect 5V → VCC, GND → GND and D9 → SIG.",
+        instructions: "Connect 5V → VCC, GND → GND, and D9 → SIG.",
         kind: "build",
         checks: [{ kind: "connections", requirements: [
           { from: { partType: "arduino-uno", pinId: "5v" }, to: { partType: "servo", pinId: "vcc" } },
           { from: { partType: "arduino-uno", pinId: "gnd" }, to: { partType: "servo", pinId: "gnd" } },
           { from: { partType: "arduino-uno", pinId: "d9" }, to: { partType: "servo", pinId: "sig" } },
         ] }],
-        success: "Servo power and signal are connected.",
+        success: "Servo power and signal lines are connected.",
       },
       {
         id: "code",
         title: "Program three angles",
-        instructions: "Add servo-write blocks for at least three target positions, including 0°, 90° and 180°.",
+        instructions: "Add servo-write blocks for at least three target positions, including 0°, 90°, and 180°.",
         kind: "code",
         checks: [{ kind: "blocks", requirements: [
           { type: "servo_write", count: 1, inputs: { ANGLE: 0 } },
           { type: "servo_write", count: 1, inputs: { ANGLE: 90 } },
           { type: "servo_write", count: 1, inputs: { ANGLE: 180 } },
         ] }],
-        success: "The program has multiple servo targets.",
+        success: "The program commands multiple servo target positions.",
       },
       {
         id: "run",
-        title: "Observe the motion",
-        instructions: "Press Run and check this step while the servo is moving. Its virtual angle should be in the 0–180° range.",
+        title: "Observe angular sweep",
+        instructions: "Press Run and check this step while the servo is moving across its 0–180° range.",
         kind: "run",
-        checks: [{ kind: "running" }, { kind: "runtime", requirements: [{ partId: "servo1", field: "angle", min: 0, max: 180 }] }],
+        checks: [{ kind: "running" }, { kind: "runtime", requirements: [{ partType: "servo", field: "angle", min: 0, max: 180 }] }],
         success: "The servo is responding to the control signal.",
       },
     ],
   },
   {
+    id: "lesson-servo-gate",
+    title: "Mission 9 · Automatic Servo Barrier",
+    shortTitle: "Servo Barrier",
+    description: "Use timed servo movements to raise and lower an automated boom barrier mechanism.",
+    difficulty: "Intermediate",
+    estimatedMinutes: 14,
+    concepts: ["Servo Actuators", "Automation Mechanism", "Robotics"],
+    prerequisites: ["lesson-servo", "lesson-pushbutton-led"],
+    templateId: "g7-servo-door",
+    steps: [
+      {
+        id: "parts",
+        title: "Place barrier servo",
+        instructions: "Place one Arduino Uno and one Servo on the bench.",
+        kind: "build",
+        checks: [{ kind: "parts", requirements: [
+          { type: "arduino-uno", count: 1 },
+          { type: "servo", count: 1 },
+        ] }],
+        success: "Barrier servo hardware is in place.",
+      },
+      {
+        id: "wiring",
+        title: "Wire servo control",
+        instructions: "Connect 5V → Servo VCC, GND → Servo GND, and D9 → Servo SIG.",
+        kind: "build",
+        checks: [{ kind: "connections", requirements: [
+          { from: { partType: "arduino-uno", pinId: "5v" }, to: { partType: "servo", pinId: "vcc" } },
+          { from: { partType: "arduino-uno", pinId: "gnd" }, to: { partType: "servo", pinId: "gnd" } },
+          { from: { partType: "arduino-uno", pinId: "d9" }, to: { partType: "servo", pinId: "sig" } },
+        ] }],
+        success: "Servo wiring complete.",
+      },
+      {
+        id: "code",
+        title: "Program open and close states",
+        instructions: "Program the servo to cycle between 0° (closed) and 90° (open) with delays.",
+        kind: "code",
+        checks: [{ kind: "blocks", requirements: [
+          { type: "servo_write", count: 2, fields: { PIN: "9" } },
+        ] }],
+        success: "Barrier open/close logic is programmed.",
+      },
+      {
+        id: "run",
+        title: "Test barrier motion",
+        instructions: "Run simulation and verify the barrier raises and lowers smoothly.",
+        kind: "run",
+        checks: [{ kind: "running" }, { kind: "runtime", requirements: [{ partType: "servo", field: "angle", min: 0, max: 180 }] }],
+        success: "Barrier gate is swinging dynamically.",
+      },
+    ],
+  },
+  {
     id: "lesson-ultrasonic",
-    title: "Mission 4 · Distance Alarm",
-    shortTitle: "Ultrasonic Alarm",
-    description: "Read distance from HC-SR04 and use a threshold to control a buzzer.",
-    difficulty: "Advanced",
-    estimatedMinutes: 18,
-    concepts: ["Sensors", "Thresholds", "Digital output"],
+    title: "Mission 10 · Sonar Distance Alarm",
+    shortTitle: "Distance Alarm",
+    description: "Read distance from an HC-SR04 ultrasonic sensor and trigger a proximity buzzer alert.",
+    difficulty: "Intermediate",
+    estimatedMinutes: 16,
+    concepts: ["HC-SR04 Sonar", "Time of Flight", "Threshold Detection", "Safety Alarm"],
     prerequisites: ["lesson-servo"],
     templateId: "ultrasonic-radar",
     steps: [
       {
         id: "parts",
-        title: "Place the sensor and buzzer",
-        instructions: "Use one Arduino, one ultrasonic sensor and one buzzer.",
+        title: "Place sensor and alarm",
+        instructions: "Use one Arduino, one ultrasonic sensor, and one buzzer.",
         kind: "build",
-        checks: [{ kind: "parts", requirements: [{ type: "arduino-uno", count: 1 }, { type: "ultrasonic", count: 1 }, { type: "buzzer", count: 1 }] }],
-        success: "Distance sensor and alarm hardware are ready.",
+        checks: [{ kind: "parts", requirements: [
+          { type: "arduino-uno", count: 1 },
+          { type: "ultrasonic", count: 1 },
+          { type: "buzzer", count: 1 },
+        ] }],
+        success: "Distance sensor and alarm hardware are placed.",
       },
       {
         id: "wiring",
-        title: "Wire the sensor",
-        instructions: "Connect sensor VCC/GND and use D9 for TRIG and D10 for ECHO. Put the buzzer on D8 and GND.",
+        title: "Wire sonar and buzzer",
+        instructions: "Connect sensor 5V/GND, D9 → TRIG, D10 → ECHO, D8 → Buzzer POS, and Buzzer NEG → GND.",
         kind: "build",
         checks: [{ kind: "connections", requirements: [
           { from: { partType: "arduino-uno", pinId: "5v" }, to: { partType: "ultrasonic", pinId: "vcc" } },
@@ -791,12 +1278,12 @@ export const LESSONS: Lesson[] = [
           { from: { partType: "arduino-uno", pinId: "d8" }, to: { partType: "buzzer", pinId: "pos" } },
           { from: { partType: "buzzer", pinId: "neg" }, to: { partType: "arduino-uno", pinId: "gnd" } },
         ] }],
-        success: "The sensor and alarm wiring is complete.",
+        success: "Ultrasonic sensor and buzzer connections verified.",
       },
       {
         id: "code",
-        title: "Add the distance threshold",
-        instructions: "Read the ultrasonic sensor and use an IF block to make D8 HIGH below 30 cm, otherwise LOW.",
+        title: "Add proximity threshold",
+        instructions: "Read distance and use an IF block to sound the buzzer on D8 when distance is under 30 cm.",
         kind: "code",
         checks: [{ kind: "blocks", requirements: [
           { type: "ultrasonic_read", count: 2, fields: { TRIG: "9", ECHO: "10" } },
@@ -804,30 +1291,92 @@ export const LESSONS: Lesson[] = [
           { type: "io_digitalwrite", count: 1, fields: { PIN: "8", STATE: "HIGH" } },
           { type: "io_digitalwrite", count: 1, fields: { PIN: "8", STATE: "LOW" } },
         ] }],
-        success: "The alarm logic is present.",
+        success: "Threshold logic is present in code.",
       },
       {
         id: "experiment",
         title: "Trigger the alarm",
-        instructions: "Select the ultrasonic sensor and set Distance to 25 cm or less. Press Run, then check this step.",
+        instructions: "Set ultrasonic Distance to 25 cm or less in the Inspector. Press Run and check this step.",
         kind: "experiment",
         checks: [
           { kind: "part-property", partType: "ultrasonic", property: "distance", max: 25 },
           { kind: "running" },
           { kind: "runtime", requirements: [{ partType: "buzzer", field: "level", min: 0.5 }] },
         ],
-        success: "Threshold reached: the virtual alarm is sounding.",
+        success: "Threshold reached: the alarm buzzer is sounding.",
+      },
+    ],
+  },
+  {
+    id: "lesson-mq2-gas",
+    title: "Mission 11 · MQ-2 Gas & Smoke Sentinel",
+    shortTitle: "Gas Sentinel",
+    description: "Detect combustible gas or smoke PPM levels and activate emergency sound and warning strobe.",
+    difficulty: "Intermediate",
+    estimatedMinutes: 16,
+    concepts: ["MQ-2 Gas Sensor", "PPM Concentration", "Environmental Safety", "Emergency Alarm"],
+    prerequisites: ["lesson-ultrasonic"],
+    seedCircuit: MQ2_GAS_CIRCUIT,
+    seedBlocklyXml: MQ2_GAS_XML,
+    steps: [
+      {
+        id: "parts",
+        title: "Gather gas detection parts",
+        instructions: "Place one Arduino Uno, one MQ-2 Gas sensor, one buzzer, one LED, and one resistor.",
+        kind: "build",
+        checks: [{ kind: "parts", requirements: [
+          { type: "arduino-uno", count: 1 },
+          { type: "mq2-gas", count: 1 },
+          { type: "buzzer", count: 1 },
+          { type: "led", count: 1 },
+          { type: "resistor", count: 1 },
+        ] }],
+        success: "All gas sentinel parts are present.",
+      },
+      {
+        id: "wiring",
+        title: "Wire sensor and dual alert",
+        instructions: "Connect MQ-2 VCC/GND, AO → A0. Wire D8 → Buzzer POS and D13 through resistor to LED.",
+        kind: "build",
+        checks: [{ kind: "connections", requirements: [
+          { from: { partType: "arduino-uno", pinId: "5v" }, to: { partType: "mq2-gas", pinId: "vcc" } },
+          { from: { partType: "mq2-gas", pinId: "gnd" }, to: { partType: "arduino-uno", pinId: "gnd" } },
+          { from: { partType: "mq2-gas", pinId: "ao" }, to: { partType: "arduino-uno", pinId: "a0" } },
+          { from: { partType: "arduino-uno", pinId: "d8" }, to: { partType: "buzzer", pinId: "pos" } },
+          { from: { partType: "arduino-uno", pinId: "d13" }, to: { partType: "resistor", pinId: "a" } },
+        ] }],
+        success: "Gas sensor and alert outputs are wired.",
+      },
+      {
+        id: "code",
+        title: "Program PPM threshold logic",
+        instructions: "Read the MQ-2 sensor with mq2_gas_read. If PPM > 300, turn D8 and D13 HIGH; else LOW.",
+        kind: "code",
+        checks: [{ kind: "blocks", requirements: [
+          { type: "mq2_gas_read", count: 1 },
+          { type: "controls_if", count: 1 },
+          { type: "io_digitalwrite", count: 2 },
+        ] }],
+        success: "PPM threshold logic is in place.",
+      },
+      {
+        id: "experiment",
+        title: "Test gas threshold trigger",
+        instructions: "Press Run and verify the gas sentinel actively monitors the simulated atmosphere.",
+        kind: "experiment",
+        checks: [{ kind: "running" }],
+        success: "MQ-2 gas sentinel is actively monitoring.",
       },
     ],
   },
   {
     id: "lesson-dht11",
-    title: "Mission 5 · Weather Station",
-    shortTitle: "DHT11 Weather Station",
-    description: "Wire a DHT11 sensor and build a tiny serial weather monitor with live temperature and humidity values.",
+    title: "Mission 12 · DHT11 Digital Weather Station",
+    shortTitle: "DHT11 Weather",
+    description: "Read digital temperature (°C) and relative humidity (%) over a 1-wire protocol and log to Serial.",
     difficulty: "Intermediate",
     estimatedMinutes: 15,
-    concepts: ["Sensors", "Temperature", "Humidity", "Serial output"],
+    concepts: ["DHT11", "Digital Protocol", "Telemetry", "Environmental Monitoring"],
     prerequisites: ["lesson-ultrasonic"],
     seedCircuit: DHT11_CIRCUIT,
     seedBlocklyXml: DHT11_XML,
@@ -837,11 +1386,14 @@ export const LESSONS: Lesson[] = [
         title: "Wire the DHT11",
         instructions: "Connect 5V → VCC, GND → GND, and D4 → DATA.",
         kind: "build",
-        checks: [{ kind: "parts", requirements: [{ type: "arduino-uno", count: 1 }, { type: "dht11", count: 1 }] }, { kind: "connections", requirements: [
-          { from: { partType: "arduino-uno", pinId: "5v" }, to: { partType: "dht11", pinId: "vcc" } },
-          { from: { partType: "arduino-uno", pinId: "gnd" }, to: { partType: "dht11", pinId: "gnd" } },
-          { from: { partType: "arduino-uno", pinId: "d4" }, to: { partType: "dht11", pinId: "data" } },
-        ] }],
+        checks: [
+          { kind: "parts", requirements: [{ type: "arduino-uno", count: 1 }, { type: "dht11", count: 1 }] },
+          { kind: "connections", requirements: [
+            { from: { partType: "arduino-uno", pinId: "5v" }, to: { partType: "dht11", pinId: "vcc" } },
+            { from: { partType: "arduino-uno", pinId: "gnd" }, to: { partType: "dht11", pinId: "gnd" } },
+            { from: { partType: "arduino-uno", pinId: "d4" }, to: { partType: "dht11", pinId: "data" } },
+          ] },
+        ],
         success: "The DHT11 sensor has power and a data line.",
       },
       {
@@ -855,18 +1407,427 @@ export const LESSONS: Lesson[] = [
           { type: "serial_print", count: 1 },
           { type: "serial_println", count: 1 },
         ] }],
-        success: "The weather station has both sensor readings in code.",
+        success: "Both DHT11 sensor readings are integrated in code.",
       },
       {
         id: "experiment",
         title: "Read live sensor values",
-        instructions: "Press Run and move the DHT11 Temperature/Humidity sliders in the Inspector. Check the step when live values appear.",
+        instructions: "Press Run and move the DHT11 Temperature/Humidity sliders in the Inspector. Check when values are live.",
         kind: "experiment",
         checks: [{ kind: "running" }, { kind: "runtime", requirements: [
           { partId: "dht", field: "dhtTemperature", min: 0, max: 50 },
           { partId: "dht", field: "dhtHumidity", min: 0, max: 100 },
         ] }],
         success: "The DHT11 values are live in the virtual lab.",
+      },
+    ],
+  },
+  {
+    id: "lesson-lcd-weather",
+    title: "Mission 13 · I2C 16x2 LCD Character Display",
+    shortTitle: "I2C LCD Display",
+    description: "Communicate over the I2C 2-wire serial bus (SDA/SCL) to render formatted alphanumeric text.",
+    difficulty: "Intermediate",
+    estimatedMinutes: 14,
+    concepts: ["I2C Bus", "SDA / SCL", "Alphanumeric Display", "Hardware Addressing"],
+    prerequisites: ["lesson-dht11"],
+    templateId: "g8-lcd-weather",
+    steps: [
+      {
+        id: "parts",
+        title: "Place LCD display",
+        instructions: "Place one Arduino Uno and one 16x2 I2C LCD Display module.",
+        kind: "build",
+        checks: [{ kind: "parts", requirements: [
+          { type: "arduino-uno", count: 1 },
+          { type: "lcd-i2c", count: 1 },
+        ] }],
+        success: "LCD module is on the bench.",
+      },
+      {
+        id: "wiring",
+        title: "Wire I2C bus",
+        instructions: "Connect 5V → VCC, GND → GND, A4 → SDA, and A5 → SCL.",
+        kind: "build",
+        checks: [{ kind: "connections", requirements: [
+          { from: { partType: "arduino-uno", pinId: "5v" }, to: { partType: "lcd-i2c", pinId: "vcc" } },
+          { from: { partType: "arduino-uno", pinId: "gnd" }, to: { partType: "lcd-i2c", pinId: "gnd" } },
+          { from: { partType: "arduino-uno", pinId: "a4" }, to: { partType: "lcd-i2c", pinId: "sda" } },
+          { from: { partType: "arduino-uno", pinId: "a5" }, to: { partType: "lcd-i2c", pinId: "scl" } },
+        ] }],
+        success: "I2C SDA and SCL bus lines are connected.",
+      },
+      {
+        id: "code",
+        title: "Print to display",
+        instructions: "Use lcd_print and lcd_clear blocks to output text.",
+        kind: "code",
+        checks: [{ kind: "blocks", requirements: [
+          { type: "lcd_print", count: 1 },
+          { type: "lcd_clear", count: 1 },
+        ] }],
+        success: "LCD print commands are present.",
+      },
+      {
+        id: "run",
+        title: "Run display program",
+        instructions: "Press Run and view the virtual LCD screen update.",
+        kind: "run",
+        checks: [{ kind: "running" }],
+        success: "LCD display is operational.",
+      },
+    ],
+  },
+  {
+    id: "lesson-neopixel-ring",
+    title: "Mission 14 · NeoPixel Cyber Ring",
+    shortTitle: "NeoPixel Ring",
+    description: "Control addressable WS2812 RGB LEDs in a circular ring with single-pin high-speed data.",
+    difficulty: "Intermediate",
+    estimatedMinutes: 15,
+    concepts: ["WS2812", "Addressable LEDs", "NeoPixel Ring", "High-speed Serial Data"],
+    prerequisites: ["lesson-rgb-mood-lamp"],
+    seedCircuit: NEOPIXEL_CIRCUIT,
+    seedBlocklyXml: NEOPIXEL_XML,
+    steps: [
+      {
+        id: "parts",
+        title: "Place NeoPixel Ring",
+        instructions: "Place one Arduino Uno and one NeoPixel 8-LED Ring.",
+        kind: "build",
+        checks: [{ kind: "parts", requirements: [
+          { type: "arduino-uno", count: 1 },
+          { type: "neopixel-ring", count: 1 },
+        ] }],
+        success: "NeoPixel Ring is placed.",
+      },
+      {
+        id: "wiring",
+        title: "Wire single-pin data line",
+        instructions: "Connect 5V → VCC, GND → GND, and D6 → DIN.",
+        kind: "build",
+        checks: [{ kind: "connections", requirements: [
+          { from: { partType: "arduino-uno", pinId: "5v" }, to: { partType: "neopixel-ring", pinId: "vcc" } },
+          { from: { partType: "neopixel-ring", pinId: "gnd" }, to: { partType: "arduino-uno", pinId: "gnd" } },
+          { from: { partType: "arduino-uno", pinId: "d6" }, to: { partType: "neopixel-ring", pinId: "din" } },
+        ] }],
+        success: "NeoPixel data in line is wired to D6.",
+      },
+      {
+        id: "code",
+        title: "Program pixel colors",
+        instructions: "Use neopixel_set_color and neopixel_show blocks to drive the ring.",
+        kind: "code",
+        checks: [{ kind: "blocks", requirements: [
+          { type: "neopixel_set_color", count: 1 },
+          { type: "neopixel_show", count: 1 },
+        ] }],
+        success: "NeoPixel color routines are programmed.",
+      },
+      {
+        id: "run",
+        title: "Illuminate cyber ring",
+        instructions: "Press Run and watch the NeoPixel ring light up.",
+        kind: "run",
+        checks: [{ kind: "running" }],
+        success: "NeoPixel ring is illuminating.",
+      },
+    ],
+  },
+
+  // --- TIER 3: ADVANCED & AI (Complex Sensors, Keypad Matrix & Pixiu AI) ---
+  {
+    id: "lesson-pir-security",
+    title: "Mission 15 · PIR Motion Intruder Alarm",
+    shortTitle: "PIR Security",
+    description: "Detect human body infrared thermal motion using a PIR sensor and trip an immediate intrusion alert.",
+    difficulty: "Advanced",
+    estimatedMinutes: 16,
+    concepts: ["PIR Pyroelectric Sensor", "Thermal Infrared", "Perimeter Security", "Digital Inputs"],
+    prerequisites: ["lesson-servo-gate"],
+    templateId: "g7-pir-security",
+    steps: [
+      {
+        id: "parts",
+        title: "Place PIR sensor and alert lamp",
+        instructions: "Place one Arduino Uno, one PIR Motion Sensor, one LED, and one resistor.",
+        kind: "build",
+        checks: [{ kind: "parts", requirements: [
+          { type: "arduino-uno", count: 1 },
+          { type: "pir-sensor", count: 1 },
+          { type: "led", count: 1 },
+          { type: "resistor", count: 1 },
+        ] }],
+        success: "Security hardware is on the bench.",
+      },
+      {
+        id: "wiring",
+        title: "Wire PIR and indicator",
+        instructions: "Connect 5V → PIR VCC, GND → PIR GND, D7 → PIR OUT, and D13 through resistor to LED.",
+        kind: "build",
+        checks: [{ kind: "connections", requirements: [
+          { from: { partType: "arduino-uno", pinId: "5v" }, to: { partType: "pir-sensor", pinId: "vcc" } },
+          { from: { partType: "arduino-uno", pinId: "gnd" }, to: { partType: "pir-sensor", pinId: "gnd" } },
+          { from: { partType: "arduino-uno", pinId: "d7" }, to: { partType: "pir-sensor", pinId: "out" } },
+          { from: { partType: "arduino-uno", pinId: "d13" }, to: { partType: "resistor", pinId: "a" } },
+        ] }],
+        success: "PIR and alert indicator lines connected.",
+      },
+      {
+        id: "code",
+        title: "Program intruder trigger",
+        instructions: "Configure D7 as INPUT. When pir_motion is detected, set D13 HIGH; else LOW.",
+        kind: "code",
+        checks: [{ kind: "blocks", requirements: [
+          { type: "io_pinmode", count: 1, fields: { PIN: "7", MODE: "INPUT" } },
+          { type: "pir_motion", count: 1 },
+          { type: "io_digitalwrite", count: 1, fields: { PIN: "13", STATE: "HIGH" } },
+        ] }],
+        success: "Intruder detection logic programmed.",
+      },
+      {
+        id: "run",
+        title: "Run security sentinel",
+        instructions: "Press Run and test triggering motion using the Inspector.",
+        kind: "run",
+        checks: [{ kind: "running" }],
+        success: "PIR motion security system is active.",
+      },
+    ],
+  },
+  {
+    id: "lesson-soil-smart-farm",
+    title: "Mission 16 · Smart Farm Soil Moisture Monitor",
+    shortTitle: "Smart Farm Soil",
+    description: "Measure soil volumetric water content using analog conductivity and automate agricultural irrigation alerts.",
+    difficulty: "Advanced",
+    estimatedMinutes: 16,
+    concepts: ["Soil Moisture Sensor", "Analog Conductivity", "Smart Agriculture", "IoT Automation"],
+    prerequisites: ["lesson-ldr-night-lamp"],
+    templateId: "g7-soil-smart-farm",
+    steps: [
+      {
+        id: "parts",
+        title: "Place soil sensor and pump indicator",
+        instructions: "Place one Arduino Uno, one Soil Moisture sensor, one LED, and one resistor.",
+        kind: "build",
+        checks: [{ kind: "parts", requirements: [
+          { type: "arduino-uno", count: 1 },
+          { type: "soil-moisture", count: 1 },
+          { type: "led", count: 1 },
+          { type: "resistor", count: 1 },
+        ] }],
+        success: "Smart farm hardware is placed.",
+      },
+      {
+        id: "wiring",
+        title: "Wire soil probe",
+        instructions: "Connect 5V → Soil VCC, GND → Soil GND, Soil AO → A0, and D13 through resistor to LED.",
+        kind: "build",
+        checks: [{ kind: "connections", requirements: [
+          { from: { partType: "arduino-uno", pinId: "5v" }, to: { partType: "soil-moisture", pinId: "vcc" } },
+          { from: { partType: "arduino-uno", pinId: "gnd" }, to: { partType: "soil-moisture", pinId: "gnd" } },
+          { from: { partType: "soil-moisture", pinId: "ao" }, to: { partType: "arduino-uno", pinId: "a0" } },
+          { from: { partType: "arduino-uno", pinId: "d13" }, to: { partType: "resistor", pinId: "a" } },
+        ] }],
+        success: "Soil probe and pump indicator wired.",
+      },
+      {
+        id: "code",
+        title: "Program irrigation threshold",
+        instructions: "Use soil_moisture_read and turn D13 HIGH if moisture exceeds threshold.",
+        kind: "code",
+        checks: [{ kind: "blocks", requirements: [
+          { type: "soil_moisture_read", count: 1 },
+          { type: "controls_if", count: 1 },
+          { type: "io_digitalwrite", count: 1, fields: { PIN: "13" } },
+        ] }],
+        success: "Irrigation automation logic is programmed.",
+      },
+      {
+        id: "run",
+        title: "Test soil hydration response",
+        instructions: "Run simulation and adjust soil moisture slider in Inspector.",
+        kind: "run",
+        checks: [{ kind: "running" }],
+        success: "Smart farm monitor is running.",
+      },
+    ],
+  },
+  {
+    id: "lesson-keypad-lock",
+    title: "Mission 17 · Keypad Digital Security Vault",
+    shortTitle: "Keypad Vault",
+    description: "Scan a 4×4 matrix keypad using row-column multiplexing to accept secure user PIN authentication.",
+    difficulty: "Advanced",
+    estimatedMinutes: 20,
+    concepts: ["4x4 Matrix Keypad", "Multiplexing", "Security PIN", "Human Interface"],
+    prerequisites: ["lesson-pir-security"],
+    templateId: "g8-keypad-lock",
+    steps: [
+      {
+        id: "parts",
+        title: "Place 4x4 keypad and vault lock LED",
+        instructions: "Place one Arduino Uno, one 4x4 Keypad, one LED, and one resistor.",
+        kind: "build",
+        checks: [{ kind: "parts", requirements: [
+          { type: "arduino-uno", count: 1 },
+          { type: "keypad-4x4", count: 1 },
+          { type: "led", count: 1 },
+          { type: "resistor", count: 1 },
+        ] }],
+        success: "Keypad access hardware is in place.",
+      },
+      {
+        id: "wiring",
+        title: "Wire matrix rows, columns and indicator",
+        instructions: "Connect D2..D5 to keypad rows R1..R4, D6..D9 to columns C1..C4, and D13 to LED.",
+        kind: "build",
+        checks: [{ kind: "connections", requirements: [
+          { from: { partType: "arduino-uno", pinId: "d2" }, to: { partType: "keypad-4x4", pinId: "r1" } },
+          { from: { partType: "arduino-uno", pinId: "d6" }, to: { partType: "keypad-4x4", pinId: "c1" } },
+          { from: { partType: "arduino-uno", pinId: "d13" }, to: { partType: "resistor", pinId: "a" } },
+        ] }],
+        success: "Matrix rows, columns and indicator wired.",
+      },
+      {
+        id: "code",
+        title: "Program keypad input scanning",
+        instructions: "Read keypad input with keypad_read and drive the lock indicator on D13.",
+        kind: "code",
+        checks: [{ kind: "blocks", requirements: [
+          { type: "keypad_read", count: 1 },
+          { type: "io_digitalwrite", count: 1, fields: { PIN: "13" } },
+        ] }],
+        success: "Keypad scanning logic ready.",
+      },
+      {
+        id: "run",
+        title: "Test keypad entry",
+        instructions: "Press Run and click keys on the 4x4 keypad in the Inspector.",
+        kind: "run",
+        checks: [{ kind: "running" }],
+        success: "Keypad vault lock is actively running.",
+      },
+    ],
+  },
+  {
+    id: "lesson-ai-vision-barrier",
+    title: "Mission 18 · AI Vision Smart Boom Barrier (Pixiu AI)",
+    shortTitle: "AI Vision Barrier",
+    description: "Combine AI Computer Vision with a servo boom barrier: when the AI camera detects an oncoming car, open the barrier and illuminate the green pass light!",
+    difficulty: "Advanced",
+    estimatedMinutes: 22,
+    concepts: ["Computer Vision", "Pixiu AI", "Edge AI Inference", "Autonomous Robotics", "Smart City"],
+    prerequisites: ["lesson-servo-gate"],
+    templateId: "ai-smart-barrier",
+    steps: [
+      {
+        id: "parts",
+        title: "Gather smart barrier components",
+        instructions: "Place one Arduino Uno, one Servo (configured as barrier), two LEDs (Green Pass & Red Stop), and two resistors.",
+        kind: "build",
+        checks: [{ kind: "parts", requirements: [
+          { type: "arduino-uno", count: 1 },
+          { type: "servo", count: 1 },
+          { type: "led", count: 2 },
+          { type: "resistor", count: 2 },
+        ] }],
+        success: "Autonomous barrier gate parts are placed.",
+      },
+      {
+        id: "wiring",
+        title: "Wire barrier servo and dual indicators",
+        instructions: "Connect 5V/GND and D6 to Servo SIG. Wire D12 through resistor to Green LED and D13 to Red LED.",
+        kind: "build",
+        checks: [{ kind: "connections", requirements: [
+          { from: { partType: "arduino-uno", pinId: "5v" }, to: { partType: "servo", pinId: "vcc" } },
+          { from: { partType: "servo", pinId: "gnd" }, to: { partType: "arduino-uno", pinId: "gnd" } },
+          { from: { partType: "arduino-uno", pinId: "d6" }, to: { partType: "servo", pinId: "sig" } },
+          { from: { partType: "arduino-uno", pinId: "d12" }, to: { partType: "resistor", pinId: "a" } },
+          { from: { partType: "arduino-uno", pinId: "d13" }, to: { partType: "resistor", pinId: "a" } },
+        ] }],
+        success: "Servo and dual LED indicator circuits are complete.",
+      },
+      {
+        id: "code",
+        title: "Program AI Computer Vision detection",
+        instructions: "Use ai_is_detected with class 'car'. When detected, swing the servo to 90° and set D12 HIGH / D13 LOW; else return to 0° with D12 LOW / D13 HIGH.",
+        kind: "code",
+        checks: [{ kind: "blocks", requirements: [
+          { type: "ai_is_detected", count: 1, fields: { CLASS: "car" } },
+          { type: "servo_write", count: 2 },
+          { type: "io_digitalwrite", count: 2 },
+        ] }],
+        success: "Pixiu AI Vision object classifier is wired into control loop.",
+      },
+      {
+        id: "run",
+        title: "Run AI Vision Barrier",
+        instructions: "Press Run to start simulation and trigger AI inference.",
+        kind: "run",
+        checks: [{ kind: "running" }, { kind: "runtime", requirements: [{ partType: "servo", field: "angle", min: 0, max: 180 }] }],
+        success: "AI Vision Smart Barrier is running live in the simulator!",
+      },
+    ],
+  },
+  {
+    id: "lesson-ai-gesture-controller",
+    title: "Mission 19 · AI Hand Gesture Smart Controller",
+    shortTitle: "AI Gesture Controller",
+    description: "Track hand gestures via AI Computer Vision (e.g. Thumbs Up) to command smart home servo and LED actuators without touching hardware.",
+    difficulty: "Advanced",
+    estimatedMinutes: 22,
+    concepts: ["Hand Gesture Recognition", "Pixiu AI Vision", "Touchless Control", "Smart Home"],
+    prerequisites: ["lesson-ai-vision-barrier"],
+    seedCircuit: AI_GESTURE_CIRCUIT,
+    seedBlocklyXml: AI_GESTURE_XML,
+    steps: [
+      {
+        id: "parts",
+        title: "Place smart home actuators",
+        instructions: "Place one Arduino Uno, one Servo, one LED, and one resistor on the bench.",
+        kind: "build",
+        checks: [{ kind: "parts", requirements: [
+          { type: "arduino-uno", count: 1 },
+          { type: "servo", count: 1 },
+          { type: "led", count: 1 },
+          { type: "resistor", count: 1 },
+        ] }],
+        success: "Actuators are ready for AI gesture control.",
+      },
+      {
+        id: "wiring",
+        title: "Wire servo and indicator",
+        instructions: "Connect 5V → Servo VCC, GND → Servo GND, D9 → Servo SIG, and D13 through resistor to LED.",
+        kind: "build",
+        checks: [{ kind: "connections", requirements: [
+          { from: { partType: "arduino-uno", pinId: "5v" }, to: { partType: "servo", pinId: "vcc" } },
+          { from: { partType: "servo", pinId: "gnd" }, to: { partType: "arduino-uno", pinId: "gnd" } },
+          { from: { partType: "arduino-uno", pinId: "d9" }, to: { partType: "servo", pinId: "sig" } },
+          { from: { partType: "arduino-uno", pinId: "d13" }, to: { partType: "resistor", pinId: "a" } },
+        ] }],
+        success: "Servo and indicator wired.",
+      },
+      {
+        id: "code",
+        title: "Program AI Hand Gesture recognition",
+        instructions: "Enable camera with ai_camera_enable. Use ai_is_gesture for 'thumbs_up' to rotate servo to 90° and turn on LED.",
+        kind: "code",
+        checks: [{ kind: "blocks", requirements: [
+          { type: "ai_camera_enable", count: 1 },
+          { type: "ai_is_gesture", count: 1 },
+          { type: "servo_write", count: 2 },
+        ] }],
+        success: "AI hand gesture tracking logic is programmed.",
+      },
+      {
+        id: "run",
+        title: "Run gesture controller",
+        instructions: "Press Run to start AI camera vision and gesture control.",
+        kind: "run",
+        checks: [{ kind: "running" }],
+        success: "AI Gesture Smart Controller is live and active.",
       },
     ],
   },
