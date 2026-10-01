@@ -44,6 +44,13 @@ export interface PartRuntime {
   keypadKey?: string
   /** Transistor: conducting */
   conducting?: boolean
+  /** NeoPixel WS2812B 8-RGB pixel colors */
+  pixelColors?: string[]
+  /** MQ-2 Gas sensor runtime values */
+  gasLevel?: number
+  gasAlert?: boolean
+  /** Arduino board active digital/analog pins for live LED indicators */
+  activePins?: Record<string, boolean | number>
 }
 
 const LED_COLORS: Record<string, string> = {
@@ -74,42 +81,212 @@ function ResistorBands({ resistance }: { resistance: number }) {
 
 export function PartArt({ part, runtime }: { part: PlacedPart; runtime?: PartRuntime }) {
   switch (part.type) {
-    case "arduino-uno":
+    case "arduino-uno": {
+      const topPinLabels = ["AREF", "GND", "13", "12", "~11", "~10", "~9", "8", "7", "~6", "~5", "4", "~3", "2", "TX>1", "RX<0"]
+      const topPinKeys = ["aref", "gnd", "d13", "d12", "d11", "d10", "d9", "d8", "d7", "d6", "d5", "d4", "d3", "d2", "d1", "d0"]
+      const bottomPinLabels = ["5V", "3V3", "RST", "VIN", "GND", "A0", "A1", "A2", "A3", "A4", "A5"]
+      const bottomPinKeys = ["5v", "3v3", "rst", "vin", "gnd_pwr", "a0", "a1", "a2", "a3", "a4", "a5"]
+
       return (
-        <g>
-          <rect x={0} y={0} width={320} height={200} rx={10} fill="#0f8a7e" stroke="#0b6b61" strokeWidth={2} />
-          <rect x={8} y={20} width={304} height={160} rx={6} fill="#0d7a70" opacity={0.6} />
-          {/* headers */}
-          <rect x={14} y={2} width={292} height={13} rx={2} fill="#111827" />
-          <rect x={30} y={185} width={260} height={13} rx={2} fill="#111827" />
-          {/* USB */}
-          <rect x={-6} y={40} width={30} height={44} rx={3} fill="#c0c4cc" stroke="#8b8f96" />
-          {/* power jack */}
-          <rect x={-4} y={120} width={26} height={34} rx={4} fill="#1f2937" stroke="#0b0f16" />
-          {/* MCU chip */}
-          <rect x={120} y={92} width={90} height={54} rx={3} fill="#1f2937" />
-          <circle cx={130} cy={102} r={3} fill="#374151" />
-          <text x={165} y={124} textAnchor="middle" fontSize={11} fill="#9ca3af" fontFamily="monospace">
-            ATmega328P
-          </text>
-          {/* reset button */}
-          <rect x={40} y={96} width={20} height={20} rx={3} fill="#b91c1c" />
+        <g className="select-none">
+          {/* Main PCB substrate with rich teal color and rounded corners */}
+          <rect x={0} y={0} width={320} height={200} rx={10} fill="#0d5c58" stroke="#063f3b" strokeWidth={2.5} />
+          {/* Internal ground planes and routed zone shading */}
+          <rect x={6} y={18} width={308} height={164} rx={6} fill="#0b504c" opacity={0.7} />
+          <path d="M 10,40 L 40,40 L 50,86 L 10,86 Z" fill="#09423e" opacity={0.5} />
+          <path d="M 270,30 L 310,30 L 310,170 L 270,170 Z" fill="#09423e" opacity={0.4} />
 
-          {/* Onboard SMD L LED (Pin 13 indicator) */}
-          <rect x={122} y={40} width={8} height={12} rx={1.5} fill={runtime?.pin13High ? "#fbbf24" : "#374151"} />
-          {runtime?.pin13High && <circle cx={126} cy={46} r={10} fill="#f59e0b" opacity={0.5} />}
-          <text x={126} y={60} textAnchor="middle" fontSize={7} fill="#bdeee7" fontFamily="sans-serif" fontWeight={700}>
-            L
-          </text>
+          {/* Brass mounting holes */}
+          {[
+            { cx: 16, cy: 16 },
+            { cx: 306, cy: 16 },
+            { cx: 64, cy: 184 },
+            { cx: 306, cy: 184 },
+          ].map((h, i) => (
+            <g key={i}>
+              <circle cx={h.cx} cy={h.cy} r={6.5} fill="#d97706" stroke="#b45309" strokeWidth={1} />
+              <circle cx={h.cx} cy={h.cy} r={4} fill="#0f172a" />
+            </g>
+          ))}
 
-          <text x={160} y={70} textAnchor="middle" fontSize={16} fill="#e5fffb" fontFamily="monospace" fontWeight={700}>
+          {/* Metallic USB Type-B Port */}
+          <g>
+            <rect x={-6} y={38} width={34} height={46} rx={3} fill="#cbd5e1" stroke="#64748b" strokeWidth={1.5} />
+            <rect x={-6} y={42} width={28} height={38} rx={2} fill="#94a3b8" />
+            <rect x={-2} y={46} width={20} height={30} rx={2} fill="#334155" />
+            <rect x={2} y={54} width={12} height={14} fill="#0f172a" />
+          </g>
+
+          {/* 2.1mm DC Barrel Power Jack */}
+          <g>
+            <rect x={-6} y={120} width={30} height={38} rx={4} fill="#1e293b" stroke="#090d16" strokeWidth={2} />
+            <rect x={-6} y={126} width={24} height={26} rx={2} fill="#0f172a" />
+            <circle cx={4} cy={139} r={4.5} fill="#64748b" />
+            <circle cx={4} cy={139} r={2} fill="#e2e8f0" />
+          </g>
+
+          {/* 16.000 MHz Crystal Oscillator */}
+          <g>
+            <rect x={86} y={54} width={22} height={14} rx={6} fill="#e2e8f0" stroke="#94a3b8" strokeWidth={1} />
+            <text x={97} y={64} textAnchor="middle" fontSize={6} fill="#334155" fontFamily="monospace" fontWeight={700}>
+              16.0
+            </text>
+          </g>
+
+          {/* AMS1117 Voltage Regulator & SMT Caps */}
+          <g>
+            <rect x={66} y={136} width={18} height={14} rx={1} fill="#1e293b" />
+            <rect x={70} y={132} width={10} height={4} fill="#64748b" />
+            <rect x={68} y={150} width={4} height={4} fill="#94a3b8" />
+            <rect x={78} y={150} width={4} height={4} fill="#94a3b8" />
+            {/* Capacitors */}
+            <circle cx={48} cy={144} r={6} fill="#334155" stroke="#94a3b8" strokeWidth={1} />
+            <path d="M 44,141 L 52,141" stroke="#cbd5e1" strokeWidth={1} />
+            <circle cx={48} cy={166} r={6} fill="#334155" stroke="#94a3b8" strokeWidth={1} />
+            <path d="M 44,163 L 52,163" stroke="#cbd5e1" strokeWidth={1} />
+          </g>
+
+          {/* ATmega328P DIP-28 Microcontroller with socket & pins */}
+          <g>
+            {/* DIP Socket Base */}
+            <rect x={126} y={92} width={128} height={56} rx={3} fill="#18202c" stroke="#334155" strokeWidth={1} />
+            {/* 28 IC Silver Lead Pins (14 on top, 14 on bottom) */}
+            {Array.from({ length: 14 }).map((_, i) => (
+              <g key={i}>
+                <rect x={132 + i * 8.6} y={87} width={3.5} height={6} fill="#cbd5e1" rx={0.5} />
+                <rect x={132 + i * 8.6} y={147} width={3.5} height={6} fill="#cbd5e1" rx={0.5} />
+              </g>
+            ))}
+            {/* Main IC Package */}
+            <rect x={130} y={94} width={120} height={52} rx={2} fill="#0f172a" />
+            {/* Pin 1 semicircular orientation notch */}
+            <path d="M 130,116 A 4,4 0 0,0 130,124 Z" fill="#1e293b" />
+            <circle cx={138} cy={102} r={2} fill="#334155" />
+            {/* Silkscreen text on chip */}
+            <text x={190} y={116} textAnchor="middle" fontSize={10} fill="#cbd5e1" fontFamily="monospace" fontWeight={700}>
+              ATMEGA328P-PU
+            </text>
+            <text x={190} y={130} textAnchor="middle" fontSize={7} fill="#64748b" fontFamily="monospace">
+              ATMEL 2134 U
+            </text>
+          </g>
+
+          {/* Interactive Red Tactile Reset Switch */}
+          <g className="cursor-pointer">
+            <rect x={38} y={94} width={22} height={22} rx={3} fill="#cbd5e1" stroke="#64748b" strokeWidth={1} />
+            <circle cx={49} cy={105} r={7} fill="#dc2626" stroke="#991b1b" strokeWidth={1.2} />
+            <circle cx={49} cy={105} r={3} fill="#ef4444" />
+            <text x={49} y={124} textAnchor="middle" fontSize={6} fill="#fca5a5" fontFamily="sans-serif" fontWeight={700}>
+              RESET
+            </text>
+          </g>
+
+          {/* Top Female Header Socket */}
+          <rect x={14} y={2} width={292} height={14} rx={2} fill="#0f172a" stroke="#1e293b" strokeWidth={1} />
+          {/* Bottom Female Header Socket */}
+          <rect x={30} y={184} width={260} height={14} rx={2} fill="#0f172a" stroke="#1e293b" strokeWidth={1} />
+
+          {/* Top Header Pin Holes, Labels and Live Indicator LEDs */}
+          {topPinLabels.map((label, i) => {
+            const px = Math.round(22 + (i / 15) * (320 - 44))
+            const pinKey = topPinKeys[i]
+            const isPinActive = Boolean(
+              runtime?.activePins?.[pinKey] ||
+              (pinKey === "d13" && runtime?.pin13High),
+            )
+            const isPwm = label.startsWith("~")
+            return (
+              <g key={i}>
+                {/* Socket hole */}
+                <rect x={px - 2.5} y={5} width={5} height={7} rx={1} fill="#1e293b" stroke="#334155" strokeWidth={0.5} />
+                {/* Pin label text */}
+                <text x={px} y={26} textAnchor="middle" fontSize={6.5} fill="#e2e8f0" fontFamily="monospace" fontWeight={600}>
+                  {label}
+                </text>
+                {/* Live SMD Indicator LED next to pin */}
+                <circle
+                  cx={px}
+                  cy={33}
+                  r={isPinActive ? 2.5 : 1.5}
+                  fill={isPinActive ? (isPwm ? "#f59e0b" : "#22c55e") : "#1e293b"}
+                  stroke={isPinActive ? "#ffffff" : "#334155"}
+                  strokeWidth={0.6}
+                />
+                {isPinActive && (
+                  <circle cx={px} cy={33} r={5} fill={isPwm ? "#f59e0b" : "#22c55e"} opacity={0.4} />
+                )}
+              </g>
+            )
+          })}
+
+          {/* Bottom Header Pin Holes, Labels and Live Indicator LEDs */}
+          {bottomPinLabels.map((label, i) => {
+            const px = Math.round(40 + (i / 10) * (320 - 80))
+            const pinKey = bottomPinKeys[i]
+            const isPinActive = Boolean(runtime?.activePins?.[pinKey])
+            const isAnalog = label.startsWith("A")
+            return (
+              <g key={i}>
+                {/* Socket hole */}
+                <rect x={px - 2.5} y={187} width={5} height={7} rx={1} fill="#1e293b" stroke="#334155" strokeWidth={0.5} />
+                {/* Pin label text */}
+                <text x={px} y={178} textAnchor="middle" fontSize={6.5} fill="#e2e8f0" fontFamily="monospace" fontWeight={600}>
+                  {label}
+                </text>
+                {/* Live indicator LED */}
+                {isAnalog && (
+                  <>
+                    <circle
+                      cx={px}
+                      cy={168}
+                      r={isPinActive ? 2.5 : 1.5}
+                      fill={isPinActive ? "#06b6d4" : "#1e293b"}
+                      stroke={isPinActive ? "#ffffff" : "#334155"}
+                      strokeWidth={0.6}
+                    />
+                    {isPinActive && <circle cx={px} cy={168} r={5} fill="#06b6d4" opacity={0.4} />}
+                  </>
+                )}
+              </g>
+            )
+          })}
+
+          {/* Silkscreen Board Branding */}
+          <text x={160} y={54} textAnchor="middle" fontSize={15} fill="#f0fdfa" fontFamily="monospace" fontWeight={900} letterSpacing="0.05em">
             ARDUINO
           </text>
-          <text x={160} y={168} textAnchor="middle" fontSize={11} fill="#bdeee7" fontFamily="monospace">
-            UNO
+          <text x={160} y={68} textAnchor="middle" fontSize={10} fill="#99f6e4" fontFamily="monospace" fontWeight={700}>
+            UNO R3
           </text>
+          <text x={266} y={78} textAnchor="end" fontSize={6} fill="#5eead4" fontFamily="sans-serif">
+            MADE IN ITALY
+          </text>
+
+          {/* Onboard System Status LEDs: ON, L, TX, RX */}
+          {/* ON Power LED (Green) */}
+          <g>
+            <rect x={80} y={76} width={5} height={7} rx={1} fill="#22c55e" stroke="#15803d" strokeWidth={0.5} />
+            <circle cx={82.5} cy={79.5} r={6} fill="#22c55e" opacity={0.4} />
+            <text x={82.5} y={90} textAnchor="middle" fontSize={6} fill="#86efac" fontWeight={700}>ON</text>
+          </g>
+
+          {/* Built-in L LED (Pin 13 Indicator) */}
+          <g>
+            <rect x={122} y={42} width={6} height={8} rx={1} fill={runtime?.pin13High ? "#f59e0b" : "#334155"} />
+            {runtime?.pin13High && <circle cx={125} cy={46} r={7} fill="#f59e0b" opacity={0.5} />}
+            <text x={125} y={58} textAnchor="middle" fontSize={6.5} fill="#fde68a" fontWeight={700}>L</text>
+          </g>
+
+          {/* TX & RX LEDs */}
+          <g>
+            <rect x={96} y={42} width={5} height={7} rx={1} fill="#334155" />
+            <text x={98.5} y={56} textAnchor="middle" fontSize={5.5} fill="#cbd5e1">TX</text>
+            <rect x={106} y={42} width={5} height={7} rx={1} fill="#334155" />
+            <text x={108.5} y={56} textAnchor="middle" fontSize={5.5} fill="#cbd5e1">RX</text>
+          </g>
         </g>
       )
+    }
 
     case "breadboard":
       return (
@@ -790,6 +967,138 @@ export function PartArt({ part, runtime }: { part: PlacedPart; runtime?: PartRun
               </g>
             )
           }))}
+        </g>
+      )
+    }
+
+    case "neopixel-ring": {
+      const colors = runtime?.pixelColors ?? [
+        "#ef4444", "#f97316", "#eab308", "#22c55e",
+        "#06b6d4", "#3b82f6", "#8b5cf6", "#ec4899",
+      ]
+      return (
+        <g className="select-none">
+          {/* Circular Matte Black PCB Ring */}
+          <circle cx={50} cy={50} r={48} fill="#090d16" stroke="#1e293b" strokeWidth={2} />
+          <circle cx={50} cy={50} r={28} fill="#020617" stroke="#1e293b" strokeWidth={1.5} />
+
+          {/* Golden Copper Ring Solder Tracks */}
+          <circle cx={50} cy={50} r={46} fill="none" stroke="#d97706" strokeWidth={0.5} opacity={0.4} />
+          <circle cx={50} cy={50} r={30} fill="none" stroke="#d97706" strokeWidth={0.5} opacity={0.4} />
+
+          {/* Solder Pads at Bottom: DI, 5V, GND, DO */}
+          {[
+            { id: "di", x: 22, y: 92, label: "IN" },
+            { id: "vcc", x: 40, y: 92, label: "5V" },
+            { id: "gnd", x: 60, y: 92, label: "GND" },
+            { id: "do", x: 78, y: 92, label: "OUT" },
+          ].map((pad) => (
+            <g key={pad.id}>
+              <circle cx={pad.x} cy={pad.y} r={4.5} fill="#d97706" stroke="#b45309" strokeWidth={1} />
+              <circle cx={pad.x} cy={pad.y} r={2.5} fill="#1e293b" />
+              <text x={pad.x} y={pad.y - 7} textAnchor="middle" fontSize={5.5} fill="#fbbf24" fontFamily="monospace" fontWeight={700}>
+                {pad.label}
+              </text>
+            </g>
+          ))}
+
+          {/* 8 SMD 5050 RGB LEDs placed radially */}
+          {Array.from({ length: 8 }).map((_, i) => {
+            const rad = (i * Math.PI * 2) / 8 - Math.PI / 2
+            const cx = 50 + Math.cos(rad) * 38
+            const cy = 50 + Math.sin(rad) * 38
+            const deg = (i * 360) / 8
+            const col = colors[i] || "#0f172a"
+            const isLit = col !== "#0f172a" && col !== "#000000"
+            return (
+              <g key={i} transform={`translate(${cx}, ${cy}) rotate(${deg})`}>
+                {/* 5050 SMT White Ceramic Package */}
+                <rect x={-5.5} y={-5.5} width={11} height={11} rx={1.5} fill="#f8fafc" stroke="#cbd5e1" strokeWidth={0.6} />
+                {/* 4 Corner Solder Contacts */}
+                <rect x={-6} y={-4.5} width={1.5} height={2} fill="#94a3b8" />
+                <rect x={-6} y={2.5} width={1.5} height={2} fill="#94a3b8" />
+                <rect x={4.5} y={-4.5} width={1.5} height={2} fill="#94a3b8" />
+                <rect x={4.5} y={2.5} width={1.5} height={2} fill="#94a3b8" />
+                {/* Inner circular silicone lens */}
+                <circle cx={0} cy={0} r={4} fill={col} stroke="#ffffff" strokeWidth={0.5} />
+                {/* Glow filter / halo when illuminated */}
+                {isLit && (
+                  <circle cx={0} cy={0} r={9} fill={col} opacity={0.35} />
+                )}
+              </g>
+            )
+          })}
+
+          {/* Silkscreen text */}
+          <text x={50} y={47} textAnchor="middle" fontSize={7} fill="#f8fafc" fontFamily="monospace" fontWeight={800}>
+            WS2812B
+          </text>
+          <text x={50} y={56} textAnchor="middle" fontSize={5.5} fill="#a855f7" fontFamily="monospace" fontWeight={700}>
+            8-RGB RING
+          </text>
+        </g>
+      )
+    }
+
+    case "mq2-gas": {
+      const gasLevel = Number(runtime?.gasLevel ?? part.props.gasLevel ?? 150)
+      const threshold = Number(part.props.threshold ?? 350)
+      const alert = runtime?.gasAlert ?? (gasLevel >= threshold)
+      return (
+        <g className="select-none">
+          {/* Main PCB substrate */}
+          <rect x={2} y={2} width={76} height={86} rx={6} fill="#1e3a8a" stroke="#1d4ed8" strokeWidth={2} />
+          <rect x={6} y={6} width={68} height={78} rx={4} fill="#172554" opacity={0.7} />
+
+          {/* Stainless Steel Wire Mesh Sensor Cylinder */}
+          <circle cx={40} cy={38} r={25} fill="#475569" stroke="#94a3b8" strokeWidth={2} />
+          <circle cx={40} cy={38} r={23} fill="#334155" stroke="#cbd5e1" strokeWidth={1} />
+          {/* Concentric perforated mesh rings */}
+          <circle cx={40} cy={38} r={17} fill="none" stroke="#94a3b8" strokeWidth={1.5} strokeDasharray="3 2" />
+          <circle cx={40} cy={38} r={11} fill="none" stroke="#94a3b8" strokeWidth={1.5} strokeDasharray="2 2" />
+          <circle cx={40} cy={38} r={5} fill="#1e293b" />
+          {/* Gas chamber top label */}
+          <text x={40} y={35} textAnchor="middle" fontSize={7} fill="#f8fafc" fontFamily="monospace" fontWeight={800}>
+            MQ-2
+          </text>
+          <text x={40} y={43} textAnchor="middle" fontSize={5} fill="#cbd5e1" fontFamily="monospace">
+            GAS SENSOR
+          </text>
+
+          {/* Trimpot & Comparator Chip */}
+          <rect x={12} y={66} width={12} height={8} rx={1} fill="#0284c7" stroke="#0369a1" strokeWidth={0.5} />
+          <circle cx={18} cy={70} r={2} fill="#d97706" />
+
+          {/* Power & Alert LEDs */}
+          {/* Power LED (Green) */}
+          <circle cx={32} cy={70} r={2} fill="#22c55e" stroke="#16a34a" strokeWidth={0.5} />
+          <text x={32} y={66} textAnchor="middle" fontSize={4.5} fill="#86efac">PWR</text>
+          {/* D-OUT Alert LED (Red) */}
+          <circle cx={44} cy={70} r={2.5} fill={alert ? "#ef4444" : "#450a0a"} stroke="#dc2626" strokeWidth={0.5} />
+          {alert && <circle cx={44} cy={70} r={5} fill="#ef4444" opacity={0.5} />}
+          <text x={44} y={66} textAnchor="middle" fontSize={4.5} fill={alert ? "#fca5a5" : "#7f1d1d"}>ALRT</text>
+
+          {/* Live PPM Digital Badge */}
+          <rect x={52} y={66} width={22} height={8} rx={2} fill="#0f172a" stroke="#334155" strokeWidth={0.5} />
+          <text x={63} y={72.5} textAnchor="middle" fontSize={5} fill={alert ? "#f87171" : "#38bdf8"} fontFamily="monospace" fontWeight={700}>
+            {gasLevel}PPM
+          </text>
+
+          {/* Solder Header Pins at Bottom: VCC, GND, DO, AO */}
+          {[
+            { id: "vcc", x: 16, y: 84, label: "VCC" },
+            { id: "gnd", x: 32, y: 84, label: "GND" },
+            { id: "do", x: 48, y: 84, label: "DO" },
+            { id: "ao", x: 64, y: 84, label: "AO" },
+          ].map((pad) => (
+            <g key={pad.id}>
+              <circle cx={pad.x} cy={pad.y} r={3} fill="#d97706" stroke="#b45309" strokeWidth={0.8} />
+              <circle cx={pad.x} cy={pad.y} r={1.5} fill="#1e293b" />
+              <text x={pad.x} y={pad.y - 4.5} textAnchor="middle" fontSize={4.5} fill="#93c5fd" fontFamily="monospace">
+                {pad.label}
+              </text>
+            </g>
+          ))}
         </g>
       )
     }

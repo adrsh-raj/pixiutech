@@ -39,6 +39,8 @@ export type PartType =
   | "rotary-encoder"
   | "soil-moisture"
   | "keypad-4x4"
+  | "neopixel-ring"
+  | "mq2-gas"
 
 export interface PartEducationalMeta {
   gradeBand: "6-8" | "8-10" | "9-11"

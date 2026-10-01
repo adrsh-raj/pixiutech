@@ -6,13 +6,13 @@ import type { CircuitState, PartType, PinRef, PlacedPart } from "@/lib/circuit-t
 import { CATALOG } from "@/lib/components-catalog"
 import { samePin } from "@/lib/geometry"
 import { computeRuntime, type ArduinoPinState } from "@/lib/simulation"
-import { defineArduinoBlocks, setAiClassContext } from "@/lib/arduino-blocks"
+import { defineArduinoBlocks, setAiClassContext, arduino } from "@/lib/arduino-blocks"
 import { runBlocklyProgram, type ExecutionEnvironment, type BlockStepInfo } from "@/lib/blockly-runner"
 import { audioEngine } from "@/lib/audio-engine"
 import { createHistory, pushState, undo as historyUndo, redo as historyRedo, canUndo, canRedo, type HistoryState } from "@/lib/history"
 import { saveCircuit, loadCurrentCircuit, saveCurrentCircuit, clearCurrentCircuit, importFromJSON, exportAsJSON, type SavedCircuit } from "@/lib/storage"
 import * as Blockly from "blockly"
-import { Boxes, Camera, Sparkles, Terminal, Trash2, Gauge, Sliders } from "lucide-react"
+import { Boxes, Camera, Sparkles, Terminal, Trash2, Gauge, Sliders, ShieldAlert } from "lucide-react"
 import { computeWireCurrents } from "@/lib/current-flow"
 import { Multimeter } from "./multimeter"
 import { Oscilloscope } from "./oscilloscope"
@@ -35,6 +35,9 @@ import type { ProjectTemplate } from "@/lib/templates"
 import { getLessonSeed, type Lesson } from "@/lib/lesson-engine"
 import { ProjectManager } from "./project-manager"
 import { WelcomeOverlay } from "./welcome-overlay"
+import { CircuitDoctorHud } from "./circuit-doctor-hud"
+import { diagnoseCircuit } from "@/lib/circuit-doctor"
+import { buildInoSketch, triggerInoDownload } from "@/lib/sketch-exporter"
 
 function PixiuModuleLoading({ title, subtitle }: { title: string; subtitle: string }) {
   return (
@@ -119,6 +122,11 @@ export function Workbench() {
   const [scopeProbeCH1, setScopeProbeCH1] = useState<PinRef | null>({ partId: "uno", pinId: "d13" })
   const [scopeProbeCH2, setScopeProbeCH2] = useState<PinRef | null>({ partId: "pot", pinId: "wiper" })
   const [activeScopeProbeToPlace, setActiveScopeProbeToPlace] = useState<"ch1" | "ch2" | null>(null)
+
+  // Schematic view mode & AI Doctor state
+  const [schematicMode, setSchematicMode] = useState(false)
+  const [isDoctorOpen, setIsDoctorOpen] = useState(false)
+  const [highlightPartIds, setHighlightPartIds] = useState<string[]>([])
 
   // Stepping debugger state & refs
   const [isPaused, setIsPaused] = useState(false)
@@ -431,10 +439,11 @@ export function Workbench() {
     setWiring(null)
   }, [wiring, activeWireColor, updateState])
 
-  const interact = useCallback((id: string, mode: "down" | "up") => {
+  const interact = useCallback((id: string, mode: "down" | "up" | boolean) => {
     setPressed((prev) => {
       const next = new Set(prev)
-      if (mode === "down") next.add(id)
+      const isDown = mode === "down" || mode === true
+      if (isDown) next.add(id)
       else next.delete(id)
       pressedRef.current = next
       return next
@@ -663,6 +672,8 @@ export function Workbench() {
             joystick_button: "joystick",
             soil: "soil-moisture",
             encoder: "rotary-encoder",
+            "mq2-gas": "mq2-gas",
+            mq2_gas: "mq2-gas",
           }
           const partType = aliases[type] ?? type
           const p = directPart ?? partsRef.current.find((pt) => pt.type === partType)
@@ -684,6 +695,7 @@ export function Workbench() {
           if (type === "joystick_button") return liveRuntime?.joystickButton ? 1 : runningRef.current ? 0 : String(p?.props?.pressed ?? "false") === "true" ? 1 : 0
           if (type === "soil") return liveRuntime?.sensorValue ?? (runningRef.current ? 0 : Number(p?.props?.moisture ?? 620))
           if (type === "encoder") return liveRuntime?.encoderValue ?? Number(p?.props?.value ?? 0)
+          if (type === "mq2-gas" || type === "mq2_gas") return liveRuntime?.sensorValue ?? (runningRef.current ? 0 : Number(p?.props?.gasPpm ?? 120))
           if (type === "analog") {
             const pot = partsRef.current.find((pt) => pt.type === "potentiometer")
             return Number(pot?.props?.value ?? 512)
@@ -902,6 +914,46 @@ export function Workbench() {
     }
   }, [startProgram])
 
+  // AI Circuit Doctor diagnostic report
+  const doctorReport = useMemo(
+    () => diagnoseCircuit(state, runtime, pinStates),
+    [state, runtime, pinStates],
+  )
+
+  const handleResetMcu = useCallback(() => {
+    audioEngine.stopTone()
+    setPinStates({})
+    if (runningRef.current) {
+      startProgram(false, false)
+    }
+  }, [startProgram])
+
+  const handleHighlightParts = useCallback((partIds: string[]) => {
+    setHighlightPartIds(partIds)
+  }, [])
+
+  const handleDownloadIno = useCallback(() => {
+    defineArduinoBlocks()
+    let code = ""
+    try {
+      const liveWs = visualWorkspaceRef.current
+      if (liveWs) {
+        code = arduino.workspaceToCode(liveWs)
+      } else {
+        const headless = new Blockly.Workspace()
+        const dom = Blockly.utils.xml.textToDom(blocklyXml)
+        Blockly.Xml.domToWorkspace(dom, headless)
+        code = arduino.workspaceToCode(headless)
+        headless.dispose()
+      }
+    } catch (err) {
+      console.error("Failed to generate C++ code for sketch:", err)
+    }
+    const sketchContent = buildInoSketch(state, code)
+    const safeName = (currentProjectName || "pixiu_circuit").toLowerCase().replace(/[^a-z0-9_-]/g, "_")
+    triggerInoDownload(`${safeName}.ino`, sketchContent)
+  }, [blocklyXml, currentProjectName, state])
+
   // Keyboard shortcut listener and DevTools protection (placed after toggleRun and edit callbacks)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -933,6 +985,13 @@ export function Workbench() {
       if (e.code === "Space") {
         e.preventDefault()
         toggleRun()
+        return
+      }
+
+      // 'S' toggles Schematic vs Physical view
+      if ((e.key === "s" || e.key === "S") && !e.ctrlKey && !e.metaKey && view === "circuit") {
+        e.preventDefault()
+        setSchematicMode((prev) => !prev)
         return
       }
 
@@ -1005,7 +1064,7 @@ export function Workbench() {
       window.removeEventListener("keydown", handleKeyDown)
       window.removeEventListener("contextmenu", handleGlobalContextMenu)
     }
-  }, [handleUndo, handleRedo, selectedWireId, selectedId, deleteWire, deletePart, rotatePart, duplicatePart, toggleRun, handleStepNext, handlePause, handleResume, isPaused, running])
+  }, [handleUndo, handleRedo, selectedWireId, selectedId, deleteWire, deletePart, rotatePart, duplicatePart, toggleRun, handleStepNext, handlePause, handleResume, isPaused, running, view])
 
   const handleSave = useCallback(async (requestedName?: string): Promise<void> => {
     const name = requestedName?.trim() || currentProjectName.trim() || "Untitled Circuit"
@@ -1203,6 +1262,12 @@ export function Workbench() {
         debugSpeed={debugSpeed}
         onDebugSpeedChange={handleDebugSpeedChange}
         activeStepLabel={activeStepBlock?.label ?? null}
+        schematicMode={schematicMode}
+        onToggleSchematic={() => setSchematicMode((prev) => !prev)}
+        isDoctorOpen={isDoctorOpen}
+        onToggleDoctor={() => setIsDoctorOpen((prev) => !prev)}
+        doctorScore={doctorReport.score}
+        onDownloadIno={handleDownloadIno}
       />
 
       <WelcomeOverlay onOpenProjects={() => setIsProjectManagerOpen(true)} />
@@ -1359,6 +1424,9 @@ export function Workbench() {
               }}
               onCanvasContextMenu={handleCanvasContextMenu}
               onChangeProp={changeProp}
+              viewMode={schematicMode ? "schematic" : "physical"}
+              highlightPartIds={highlightPartIds}
+              onResetMcu={handleResetMcu}
             />
 
             {running && (
@@ -1449,6 +1517,17 @@ export function Workbench() {
             >
               <Sparkles size={18} />
               <span className="text-[10px]">Projects</span>
+            </button>
+
+            <button
+              onClick={() => setIsDoctorOpen((prev) => !prev)}
+              className={`flex flex-col items-center gap-0.5 p-1 transition active:scale-95 ${
+                isDoctorOpen ? "text-cyan-400 font-bold" : "text-muted-foreground hover:text-foreground"
+              }`}
+              title="AI Circuit Doctor"
+            >
+              <ShieldAlert size={18} className={isDoctorOpen ? "text-cyan-400" : ""} />
+              <span className="text-[10px]">Doctor</span>
             </button>
 
             <button
@@ -1555,6 +1634,14 @@ export function Workbench() {
         onSetProbeCH2={setScopeProbeCH2}
         activeProbeToPlace={activeScopeProbeToPlace}
         onSetActiveProbeToPlace={setActiveScopeProbeToPlace}
+      />
+
+      {/* AI Circuit Doctor Diagnostics Drawer */}
+      <CircuitDoctorHud
+        report={doctorReport}
+        isOpen={isDoctorOpen && view === "circuit"}
+        onClose={() => setIsDoctorOpen(false)}
+        onHighlightParts={handleHighlightParts}
       />
     </div>
   )

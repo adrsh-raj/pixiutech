@@ -463,6 +463,45 @@ export function defineArduinoBlocks() {
     }
   }
 
+  Blockly.Blocks['neopixel_set_color'] = {
+    init() {
+      this.appendDummyInput()
+        .appendField('NeoPixel')
+        .appendField(new Blockly.FieldDropdown(componentDropdown(['neopixel-ring'])), 'SENSOR')
+        .appendField('pixel #')
+      this.appendValueInput('PIXEL').setCheck('Number')
+      this.appendDummyInput().appendField('color')
+      this.appendValueInput('COLOR').setCheck('String')
+      this.setPreviousStatement(true)
+      this.setNextStatement(true)
+      this.setColour(280)
+      this.setTooltip('Set the color of an individual NeoPixel RGB LED.')
+    }
+  }
+
+  Blockly.Blocks['neopixel_show'] = {
+    init() {
+      this.appendDummyInput()
+        .appendField('NeoPixel show')
+        .appendField(new Blockly.FieldDropdown(componentDropdown(['neopixel-ring'])), 'SENSOR')
+      this.setPreviousStatement(true)
+      this.setNextStatement(true)
+      this.setColour(280)
+      this.setTooltip('Refresh and display updated colors on the NeoPixel ring.')
+    }
+  }
+
+  Blockly.Blocks['mq2_gas_read'] = {
+    init() {
+      this.appendDummyInput()
+        .appendField('MQ-2 Gas level (ppm)')
+        .appendField(new Blockly.FieldDropdown(componentDropdown(['mq2-gas'])), 'SENSOR')
+      this.setOutput(true, 'Number')
+      this.setColour(230)
+      this.setTooltip('Read simulated gas concentration in parts per million (ppm).')
+    }
+  }
+
   Blockly.Blocks['arduino_map'] = {
     init() {
       this.appendValueInput('VALUE').setCheck('Number').appendField('map')
@@ -906,6 +945,15 @@ arduino.forBlock['pir_motion'] = (block) => ['false /* PIXIU simulated PIR: ' + 
 arduino.forBlock['ldr_read'] = () => ['analogRead(A0) /* PIXIU simulated LDR */', ORDER.ATOMIC]
 arduino.forBlock['tmp36_temperature'] = () => ['analogRead(A0) /* PIXIU simulated TMP36 */', ORDER.ATOMIC]
 arduino.forBlock['potentiometer_read'] = () => ['analogRead(A0) /* PIXIU simulated potentiometer */', ORDER.ATOMIC]
+arduino.forBlock['neopixel_set_color'] = (block, generator) => {
+  const pixel = generator.valueToCode(block, 'PIXEL', ORDER.NONE) || '0'
+  const color = generator.valueToCode(block, 'COLOR', ORDER.NONE) || '"#ff0000"'
+  return `/* PIXIU NeoPixel: setPixelColor(${pixel}, ${color}) */\n`
+}
+arduino.forBlock['neopixel_show'] = () => {
+  return '/* PIXIU NeoPixel: show() */\n'
+}
+arduino.forBlock['mq2_gas_read'] = () => ['analogRead(A0) /* PIXIU simulated MQ-2 Gas PPM */', ORDER.ATOMIC]
 arduino.forBlock['arduino_map'] = (block, generator) => {
   const value = generator.valueToCode(block, 'VALUE', ORDER.NONE) || '0'
   const fromLow = generator.valueToCode(block, 'FROM_LOW', ORDER.NONE) || '0'

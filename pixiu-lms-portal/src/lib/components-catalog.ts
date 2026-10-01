@@ -454,6 +454,34 @@ export const CATALOG: Record<PartType, PartDef> = {
     ],
     defaults: { lastKey: "" },
   },
+  "neopixel-ring": {
+    type: "neopixel-ring",
+    name: "NeoPixel RGB Ring (8x)",
+    blurb: "Addressable WS2812B 8-LED circular ring module",
+    width: 100,
+    height: 100,
+    pins: [
+      { id: "di", label: "DI", x: 22, y: 92, kind: "digital" },
+      { id: "vcc", label: "VCC (5V)", x: 40, y: 92, kind: "power" },
+      { id: "gnd", label: "GND", x: 60, y: 92, kind: "ground" },
+      { id: "do", label: "DO", x: 78, y: 92, kind: "digital" },
+    ],
+    defaults: { numPixels: 8, brightness: 200, pattern: "rainbow", color: "#38bdf8" },
+  },
+  "mq2-gas": {
+    type: "mq2-gas",
+    name: "MQ-2 Gas / Smoke Sensor",
+    blurb: "LPG, propane, methane, hydrogen and smoke detection module",
+    width: 80,
+    height: 90,
+    pins: [
+      { id: "vcc", label: "VCC", x: 16, y: 84, kind: "power" },
+      { id: "gnd", label: "GND", x: 32, y: 84, kind: "ground" },
+      { id: "do", label: "DO", x: 48, y: 84, kind: "digital" },
+      { id: "ao", label: "AO", x: 64, y: 84, kind: "analog" },
+    ],
+    defaults: { gasLevel: 150, threshold: 350 },
+  },
 }
 
 export const PALETTE_ORDER: PartType[] = [
@@ -461,6 +489,7 @@ export const PALETTE_ORDER: PartType[] = [
   "breadboard",
   "led",
   "rgb-led",
+  "neopixel-ring",
   "seven-segment",
   "lcd-i2c",
   "resistor",
@@ -469,6 +498,7 @@ export const PALETTE_ORDER: PartType[] = [
   "ldr",
   "ultrasonic",
   "pir-sensor",
+  "mq2-gas",
   "tmp36",
   "servo",
   "dc-motor",

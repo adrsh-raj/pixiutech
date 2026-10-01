@@ -43,6 +43,8 @@ const CATEGORY_MAP: Record<PartType, ComponentCategory> = {
   "rotary-encoder": "input",
   "soil-moisture": "sensor",
   "keypad-4x4": "input",
+  "neopixel-ring": "display",
+  "mq2-gas": "sensor",
 }
 
 const DEFAULT_EDUCATION = (type: PartType): PartEducationalMeta => ({

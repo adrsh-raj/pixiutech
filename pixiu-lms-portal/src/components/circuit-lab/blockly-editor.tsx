@@ -97,6 +97,8 @@ const TOOLBOX = {
         { kind: 'block', type: 'lcd_clear' },
         { kind: 'block', type: 'oled_print' },
         { kind: 'block', type: 'oled_clear' },
+        { kind: 'block', type: 'neopixel_set_color' },
+        { kind: 'block', type: 'neopixel_show' },
         { kind: 'block', type: 'motor_driver_write' },
       ],
     },
@@ -107,6 +109,7 @@ const TOOLBOX = {
       contents: [
         { kind: 'block', type: 'pushbutton_read' },
         { kind: 'block', type: 'ultrasonic_read' },
+        { kind: 'block', type: 'mq2_gas_read' },
         { kind: 'block', type: 'ir_read' },
         { kind: 'block', type: 'dht_temperature' },
         { kind: 'block', type: 'dht_humidity' },

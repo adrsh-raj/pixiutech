@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom"
 import { useEffect, useRef, useState } from "react"
-import { CircuitBoard, Play, Square, Trash2, ArrowLeft, Undo2, Redo2, FolderOpen, BookOpen, Terminal, Volume2, VolumeX, Sparkles, Camera, Sliders, Pause, StepForward, FastForward, MoreHorizontal, HelpCircle } from "lucide-react"
+import { CircuitBoard, Play, Square, Trash2, ArrowLeft, Undo2, Redo2, FolderOpen, BookOpen, Terminal, Volume2, VolumeX, Sparkles, Camera, Sliders, Pause, StepForward, FastForward, MoreHorizontal, HelpCircle, ShieldAlert, Download, Cpu } from "lucide-react"
 import "./pixiu-brand.css"
 
 export type WorkbenchView = "circuit" | "code" | "3d"
@@ -39,6 +39,13 @@ interface Props {
   debugSpeed?: "normal" | "slow" | "step"
   onDebugSpeedChange?: (speed: "normal" | "slow" | "step") => void
   activeStepLabel?: string | null
+  // Schematic & Doctor & Export props
+  schematicMode?: boolean
+  onToggleSchematic?: () => void
+  isDoctorOpen?: boolean
+  onToggleDoctor?: () => void
+  doctorScore?: number
+  onDownloadIno?: () => void
 }
 
 const VIEWS: { id: WorkbenchView; label: string; soon?: boolean }[] = [
@@ -80,6 +87,12 @@ export function Toolbar({
   debugSpeed = "normal",
   onDebugSpeedChange,
   activeStepLabel,
+  schematicMode = false,
+  onToggleSchematic,
+  isDoctorOpen = false,
+  onToggleDoctor,
+  doctorScore,
+  onDownloadIno,
 }: Props) {
   const [toolsOpen, setToolsOpen] = useState(false)
   const toolsRef = useRef<HTMLDivElement | null>(null)
@@ -151,6 +164,21 @@ export function Toolbar({
           </button>
         </div>
 
+        {/* Physical Breadboard ↔ Professional IEEE Schematic Toggle */}
+        {view === "circuit" && onToggleSchematic && (
+          <button
+            onClick={onToggleSchematic}
+            className={`flex items-center gap-1 rounded-lg px-2 sm:px-2.5 py-1 text-xs font-mono font-bold transition cursor-pointer border ${
+              schematicMode
+                ? "bg-cyan-950/80 text-cyan-300 border-cyan-500/60 shadow-sm"
+                : "bg-background text-muted-foreground hover:text-foreground border-border hover:bg-secondary"
+            }`}
+            title="Toggle between Physical Artwork and Professional IEEE Schematic Symbols (Shortcut: S)"
+          >
+            <span>{schematicMode ? "⚡ Schematic" : "🎨 Physical"}</span>
+          </button>
+        )}
+
         {/* PRIMARY EXECUTION & STEPPING CONTROLLER (Always Front & Center, Never Cut Off) */}
         <div className="pixiu-toolbar-execution flex items-center gap-1 bg-background p-0.5 sm:p-1 rounded-lg border border-border shadow-xs shrink-0">
           {/* Main Run / Stop Simulation Button */}
@@ -217,6 +245,31 @@ export function Toolbar({
 
       {/* RIGHT: compact grouped tools */}
       <div className="flex items-center gap-1.5 shrink-0" ref={toolsRef}>
+        {/* AI Circuit Doctor Live Button */}
+        {onToggleDoctor && (
+          <button
+            onClick={onToggleDoctor}
+            className={`flex items-center gap-1.5 rounded-lg border px-2 sm:px-2.5 py-1.5 text-xs font-bold transition cursor-pointer shadow-sm ${
+              isDoctorOpen
+                ? "border-cyan-400 bg-cyan-500/20 text-cyan-200"
+                : doctorScore !== undefined && doctorScore < 90
+                ? "border-amber-500/50 bg-amber-500/20 text-amber-200 animate-pulse"
+                : "border-border bg-background text-muted-foreground hover:text-foreground hover:bg-secondary"
+            }`}
+            title="Open AI Circuit Doctor: Real-time electrical safety analysis"
+          >
+            <ShieldAlert size={14} className={doctorScore !== undefined && doctorScore < 90 ? "text-amber-400" : "text-cyan-400"} />
+            <span className="hidden sm:inline">Doctor</span>
+            {doctorScore !== undefined && (
+              <span className={`text-[10px] font-mono px-1 rounded ${
+                doctorScore >= 90 ? "bg-emerald-950 text-emerald-300 border border-emerald-500/30" : "bg-amber-950 text-amber-300 border border-amber-500/30"
+              }`}>
+                {doctorScore}%
+              </span>
+            )}
+          </button>
+        )}
+
         {onOpenProjects && (
           <button
             onClick={onOpenProjects}
@@ -277,6 +330,17 @@ export function Toolbar({
                 >
                   <Sparkles size={14} className="text-violet-300" />
                   <span><span className="block">Templates</span><span className="text-[9px] font-normal text-slate-500">Start from a curriculum project</span></span>
+                </button>
+              )}
+
+              {onDownloadIno && (
+                <button
+                  onClick={() => { setToolsOpen(false); onDownloadIno() }}
+                  className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-xs font-semibold text-cyan-200 hover:bg-slate-800"
+                  role="menuitem"
+                >
+                  <Download size={14} className="text-cyan-400" />
+                  <span><span className="block font-bold">Download .ino Sketch</span><span className="text-[9px] font-normal text-slate-400">Export ready-to-flash Arduino code</span></span>
                 </button>
               )}
 

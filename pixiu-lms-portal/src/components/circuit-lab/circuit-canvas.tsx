@@ -6,6 +6,7 @@ import type { PartType, PinRef, PlacedPart, Wire } from "@/lib/circuit-types"
 import { CATALOG, PIN_KIND_COLOR } from "@/lib/components-catalog"
 import { getPinRefPosition, wirePath } from "@/lib/geometry"
 import { PartArt, type PartRuntime } from "./part-art"
+import { SchematicPartArt } from "./schematic-art"
 import { Maximize2, Plus, Minus } from "lucide-react"
 import type { ContextMenuTarget } from "./context-menu"
 import type { WireCurrentState } from "@/lib/current-flow"
@@ -44,6 +45,9 @@ interface Props {
   onSelectWire?: (id: string | null) => void
   onCanvasContextMenu?: (e: React.MouseEvent, target: ContextMenuTarget) => void
   onChangeProp?: (id: string, prop: string, value: unknown) => void
+  viewMode?: "physical" | "schematic"
+  highlightPartIds?: string[]
+  onResetMcu?: () => void
 }
 
 export function CircuitCanvas(props: Props) {
@@ -75,6 +79,9 @@ export function CircuitCanvas(props: Props) {
     onSelectWire,
     onCanvasContextMenu,
     onChangeProp,
+    viewMode = "physical",
+    highlightPartIds = [],
+    onResetMcu,
   } = props
 
   const svgRef = useRef<SVGSVGElement | null>(null)
@@ -262,14 +269,26 @@ export function CircuitCanvas(props: Props) {
           <pattern id="grid-lg" width={120} height={120} patternUnits="userSpaceOnUse">
             <path d="M 120 0 L 0 0 0 120" fill="none" stroke="var(--color-border)" strokeWidth={1.5} opacity={0.6} />
           </pattern>
+          {/* Engineering Schematic Blueprint Grid */}
+          <pattern id="grid-schematic" width={20} height={20} patternUnits="userSpaceOnUse">
+            <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#1e293b" strokeWidth={0.7} opacity={0.6} />
+            <circle cx={20} cy={20} r={0.75} fill="#38bdf8" opacity={0.4} />
+          </pattern>
+          <pattern id="grid-schematic-lg" width={100} height={100} patternUnits="userSpaceOnUse">
+            <path d="M 100 0 L 0 0 0 100" fill="none" stroke="#0369a1" strokeWidth={1} opacity={0.35} />
+          </pattern>
         </defs>
+
+        {viewMode === "schematic" && (
+          <rect x={0} y={0} width="100%" height="100%" fill="#070c18" />
+        )}
 
         <rect
           x={0}
           y={0}
           width="100%"
           height="100%"
-          fill="url(#grid)"
+          fill={viewMode === "schematic" ? "url(#grid-schematic)" : "url(#grid)"}
           onContextMenu={(e) => {
             e.preventDefault()
             onCanvasContextMenu?.(e, { type: "canvas" })
@@ -280,7 +299,7 @@ export function CircuitCanvas(props: Props) {
           y={0}
           width="100%"
           height="100%"
-          fill="url(#grid-lg)"
+          fill={viewMode === "schematic" ? "url(#grid-schematic-lg)" : "url(#grid-lg)"}
           onContextMenu={(e) => {
             e.preventDefault()
             onCanvasContextMenu?.(e, { type: "canvas" })
@@ -318,6 +337,27 @@ export function CircuitCanvas(props: Props) {
                       strokeDasharray="5 4"
                     />
                   )}
+
+                  {/* AI Circuit Doctor Highlight Beacon */}
+                  {highlightPartIds?.includes(part.id) && (
+                    <g>
+                      <rect
+                        x={-10}
+                        y={-10}
+                        width={def.width + 20}
+                        height={def.height + 20}
+                        rx={12}
+                        fill="none"
+                        stroke="#f43f5e"
+                        strokeWidth={3}
+                        strokeDasharray="6 4"
+                        className="animate-pulse"
+                      />
+                      <circle cx={def.width + 6} cy={-6} r={7} fill="#f43f5e" className="animate-ping" opacity={0.7} />
+                      <circle cx={def.width + 6} cy={-6} r={5} fill="#f43f5e" />
+                    </g>
+                  )}
+
                   <g
                     onPointerDown={(e) => (interactive ? undefined : startPartDrag(e, part))}
                     onPointerUp={() => interactive && onInteract(part.id, false)}
@@ -326,7 +366,14 @@ export function CircuitCanvas(props: Props) {
                   >
                     {/* hit area */}
                     <rect x={0} y={0} width={def.width} height={def.height} fill="transparent" />
-                    <PartArt part={part} runtime={runtime[part.id]} />
+
+                    {/* Artwork Rendering: Physical Breadboard View vs Professional IEEE Schematic */}
+                    {viewMode === "schematic" ? (
+                      <SchematicPartArt part={part} runtime={runtime[part.id]} />
+                    ) : (
+                      <PartArt part={part} runtime={runtime[part.id]} />
+                    )}
+
                     {interactive && part.type === "pushbutton" && (
                       <rect
                         x={0}
@@ -405,6 +452,21 @@ export function CircuitCanvas(props: Props) {
                         }}
                       />
                     )}
+
+                    {/* Arduino Uno Interactive Reset Switch Hitbox */}
+                    {part.type === "arduino-uno" && (
+                      <circle
+                        cx={49}
+                        cy={105}
+                        r={12}
+                        fill="transparent"
+                        className="cursor-pointer"
+                        onPointerDown={(e) => {
+                          e.stopPropagation()
+                          onResetMcu?.()
+                        }}
+                      />
+                    )}
                   </g>
 
                   {/* Direct Floating Potentiometer Knob / Range Slider on Canvas */}
@@ -450,6 +512,292 @@ export function CircuitCanvas(props: Props) {
                       </div>
                     </foreignObject>
                   )}
+
+                  {/* On-Canvas Live Ultrasonic Draggable Distance Obstacle Slider */}
+                  {part.type === "ultrasonic" && (
+                    <>
+                      <foreignObject
+                        x={-20}
+                        y={-54}
+                        width={130}
+                        height={48}
+                        className="overflow-visible pointer-events-auto"
+                      >
+                        <div
+                          className="bg-slate-950/95 border border-cyan-500/50 shadow-xl rounded-lg px-2 py-1 text-white flex flex-col gap-0.5 select-none backdrop-blur-sm"
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onClick={(e) => e.stopPropagation()}
+                          onContextMenu={(e) => {
+                            e.stopPropagation()
+                            onSelect(part.id)
+                            onCanvasContextMenu?.(e, { type: "part", id: part.id })
+                          }}
+                        >
+                          <div className="flex items-center justify-between text-[9px] font-mono leading-tight">
+                            <span className="text-cyan-400 font-bold flex items-center gap-1">
+                              <span>🎯</span>
+                              <span>Target Dist</span>
+                            </span>
+                            <span className="text-cyan-200 font-extrabold font-mono bg-cyan-950/70 px-1 rounded border border-cyan-500/30 text-[9px]">
+                              {part.props.distance ?? 42} cm
+                            </span>
+                          </div>
+                          <input
+                            type="range"
+                            min={2}
+                            max={400}
+                            value={Number(part.props.distance ?? 42)}
+                            onChange={(e) => {
+                              e.stopPropagation()
+                              onChangeProp?.(part.id, "distance", Number(e.target.value))
+                            }}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            className="w-full accent-cyan-400 cursor-pointer h-1.5 bg-slate-800 rounded"
+                          />
+                        </div>
+                      </foreignObject>
+
+                      {/* Animated Sonar Reflection Beam in World Coordinates */}
+                      {running && (
+                        <g opacity={0.7} className="pointer-events-none">
+                          <line
+                            x1={10}
+                            y1={def.height + Math.min(70, Number(part.props.distance ?? 42) * 0.35)}
+                            x2={def.width - 10}
+                            y2={def.height + Math.min(70, Number(part.props.distance ?? 42) * 0.35)}
+                            stroke="#06b6d4"
+                            strokeWidth={3}
+                            strokeDasharray="4 3"
+                          />
+                          <path
+                            d={`M 26,${def.height + 4} Q 45,${def.height + 15} 64,${def.height + 4}`}
+                            fill="none"
+                            stroke="#38bdf8"
+                            strokeWidth={1.5}
+                            className="animate-pulse"
+                          />
+                        </g>
+                      )}
+                    </>
+                  )}
+
+                  {/* On-Canvas Live LDR Torch / Ambient Light Lux Slider */}
+                  {part.type === "ldr" && (
+                    <foreignObject
+                      x={-24}
+                      y={-52}
+                      width={120}
+                      height={46}
+                      className="overflow-visible pointer-events-auto"
+                    >
+                      <div
+                        className="bg-slate-950/95 border border-amber-500/50 shadow-xl rounded-lg px-2 py-1 text-white flex flex-col gap-0.5 select-none backdrop-blur-sm"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
+                        onContextMenu={(e) => {
+                          e.stopPropagation()
+                          onSelect(part.id)
+                          onCanvasContextMenu?.(e, { type: "part", id: part.id })
+                        }}
+                      >
+                        <div className="flex items-center justify-between text-[9px] font-mono leading-tight">
+                          <span className="text-amber-400 font-bold flex items-center gap-1">
+                            <span>☀️</span>
+                            <span>Torch Lux</span>
+                          </span>
+                          <span className="text-amber-200 font-extrabold font-mono bg-amber-950/70 px-1 rounded border border-amber-500/30 text-[9px]">
+                            {part.props.light ?? 512}
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min={0}
+                          max={1023}
+                          value={Number(part.props.light ?? 512)}
+                          onChange={(e) => {
+                            e.stopPropagation()
+                            onChangeProp?.(part.id, "light", Number(e.target.value))
+                          }}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          className="w-full accent-amber-400 cursor-pointer h-1.5 bg-slate-800 rounded"
+                        />
+                      </div>
+                    </foreignObject>
+                  )}
+
+                  {/* On-Canvas Live DHT11 Temp & Humidity Dual Sliders */}
+                  {part.type === "dht11" && (
+                    <foreignObject
+                      x={-28}
+                      y={-76}
+                      width={132}
+                      height={72}
+                      className="overflow-visible pointer-events-auto"
+                    >
+                      <div
+                        className="bg-slate-950/95 border border-blue-500/50 shadow-xl rounded-lg px-2 py-1 text-white flex flex-col gap-1 select-none backdrop-blur-sm"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
+                        onContextMenu={(e) => {
+                          e.stopPropagation()
+                          onSelect(part.id)
+                          onCanvasContextMenu?.(e, { type: "part", id: part.id })
+                        }}
+                      >
+                        <div className="flex items-center justify-between text-[9px] font-mono leading-tight">
+                          <span className="text-blue-300 font-bold">🌡️ Temp</span>
+                          <span className="text-blue-200 font-bold">{part.props.temperature ?? 25}°C</span>
+                        </div>
+                        <input
+                          type="range"
+                          min={-20}
+                          max={80}
+                          value={Number(part.props.temperature ?? 25)}
+                          onChange={(e) => {
+                            e.stopPropagation()
+                            onChangeProp?.(part.id, "temperature", Number(e.target.value))
+                          }}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          className="w-full accent-blue-400 cursor-pointer h-1 bg-slate-800 rounded"
+                        />
+                        <div className="flex items-center justify-between text-[9px] font-mono leading-tight">
+                          <span className="text-cyan-300 font-bold">💧 Humidity</span>
+                          <span className="text-cyan-200 font-bold">{part.props.humidity ?? 55}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min={0}
+                          max={100}
+                          value={Number(part.props.humidity ?? 55)}
+                          onChange={(e) => {
+                            e.stopPropagation()
+                            onChangeProp?.(part.id, "humidity", Number(e.target.value))
+                          }}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          className="w-full accent-cyan-400 cursor-pointer h-1 bg-slate-800 rounded"
+                        />
+                      </div>
+                    </foreignObject>
+                  )}
+
+                  {/* On-Canvas Live PIR Motion Sensor Trigger Button */}
+                  {part.type === "pir-sensor" && (
+                    <foreignObject
+                      x={-16}
+                      y={-44}
+                      width={112}
+                      height={40}
+                      className="overflow-visible pointer-events-auto"
+                    >
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onChangeProp?.(part.id, "motion", part.props.motion === "true" ? "false" : "true")
+                        }}
+                        className={`w-full py-1 px-2 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1.5 transition-all shadow-lg ${
+                          part.props.motion === "true"
+                            ? "bg-rose-600 text-white animate-pulse border border-rose-400"
+                            : "bg-slate-900/90 text-slate-200 border border-slate-700 hover:border-cyan-500"
+                        }`}
+                      >
+                        <span>👋</span>
+                        <span>{part.props.motion === "true" ? "Motion Active!" : "Wave Hand"}</span>
+                      </button>
+                    </foreignObject>
+                  )}
+
+                  {/* On-Canvas Live MQ-2 Gas / Smoke Sensor Density Slider */}
+                  {part.type === "mq2-gas" && (
+                    <foreignObject
+                      x={-20}
+                      y={-52}
+                      width={124}
+                      height={48}
+                      className="overflow-visible pointer-events-auto"
+                    >
+                      <div
+                        className="bg-slate-950/95 border border-amber-500/50 shadow-xl rounded-lg px-2 py-1 text-white flex flex-col gap-0.5 select-none backdrop-blur-sm"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
+                        onContextMenu={(e) => {
+                          e.stopPropagation()
+                          onSelect(part.id)
+                          onCanvasContextMenu?.(e, { type: "part", id: part.id })
+                        }}
+                      >
+                        <div className="flex items-center justify-between text-[9px] font-mono leading-tight">
+                          <span className="text-amber-400 font-bold flex items-center gap-1">
+                            <span>💨</span>
+                            <span>Gas PPM</span>
+                          </span>
+                          <span className={`font-mono text-[9px] font-extrabold px-1 rounded ${
+                            Number(part.props.gasLevel ?? 150) >= Number(part.props.threshold ?? 350)
+                              ? "bg-rose-950 text-rose-300 border border-rose-500/40 animate-pulse"
+                              : "bg-slate-900 text-slate-300"
+                          }`}>
+                            {part.props.gasLevel ?? 150} ppm
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min={0}
+                          max={1000}
+                          value={Number(part.props.gasLevel ?? 150)}
+                          onChange={(e) => {
+                            e.stopPropagation()
+                            onChangeProp?.(part.id, "gasLevel", Number(e.target.value))
+                          }}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          className="w-full accent-amber-400 cursor-pointer h-1.5 bg-slate-800 rounded"
+                        />
+                      </div>
+                    </foreignObject>
+                  )}
+
+                  {/* On-Canvas Live NeoPixel RGB Ring Quick-Test Buttons */}
+                  {part.type === "neopixel-ring" && (
+                    <foreignObject
+                      x={-26}
+                      y={-48}
+                      width={154}
+                      height={44}
+                      className="overflow-visible pointer-events-auto"
+                    >
+                      <div
+                        className="bg-slate-950/95 border border-purple-500/50 shadow-xl rounded-lg p-1 text-white flex flex-col gap-1 select-none backdrop-blur-sm"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
+                        onContextMenu={(e) => {
+                          e.stopPropagation()
+                          onSelect(part.id)
+                          onCanvasContextMenu?.(e, { type: "part", id: part.id })
+                        }}
+                      >
+                        <div className="flex items-center justify-between text-[8px] font-mono leading-tight">
+                          <span className="text-purple-300 font-bold">✨ NeoPixel</span>
+                          <span className="text-purple-400 uppercase font-mono text-[8px]">{String(part.props.pattern ?? "rainbow")}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {(["rainbow", "chase", "solid", "off"] as const).map((pat) => (
+                            <button
+                              key={pat}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                onChangeProp?.(part.id, "pattern", pat)
+                              }}
+                              className={`px-1.5 py-0.5 rounded text-[8px] font-mono capitalize transition-colors ${
+                                (part.props.pattern ?? "rainbow") === pat
+                                  ? "bg-purple-600 text-white font-bold"
+                                  : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                              }`}
+                            >
+                              {pat}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </foreignObject>
+                  )}
                 </g>
               </g>
             )
@@ -488,8 +836,8 @@ export function CircuitCanvas(props: Props) {
                 <path
                   d={wirePath(a, b)}
                   fill="none"
-                  stroke={wire.color}
-                  strokeWidth={3.5}
+                  stroke={viewMode === "schematic" ? "#38bdf8" : wire.color}
+                  strokeWidth={viewMode === "schematic" ? 2.2 : 3.5}
                   strokeLinecap="round"
                   opacity={0.98}
                 />
@@ -510,9 +858,9 @@ export function CircuitCanvas(props: Props) {
                     }}
                   />
                 )}
-                {/* Wire terminal dots */}
-                <circle cx={a.x} cy={a.y} r={3} fill={wire.color} stroke="#ffffff" strokeWidth={1} />
-                <circle cx={b.x} cy={b.y} r={3} fill={wire.color} stroke="#ffffff" strokeWidth={1} />
+                {/* Wire terminal dots / schematic junction nodes */}
+                <circle cx={a.x} cy={a.y} r={viewMode === "schematic" ? 3.5 : 3} fill={viewMode === "schematic" ? "#38bdf8" : wire.color} stroke="#ffffff" strokeWidth={1} />
+                <circle cx={b.x} cy={b.y} r={viewMode === "schematic" ? 3.5 : 3} fill={viewMode === "schematic" ? "#38bdf8" : wire.color} stroke="#ffffff" strokeWidth={1} />
                 {/* Hit area */}
                 <path
                   d={wirePath(a, b)}

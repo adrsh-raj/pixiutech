@@ -72,6 +72,10 @@ export function evaluateNumber(target: Blockly.Block | null, env?: ExecutionEnvi
     const id = target.getFieldValue("SENSOR") ?? ""
     return env?.getSensorValue ? env.getSensorValue("encoder", id) : 0
   }
+  if (target.type === "mq2_gas_read") {
+    const id = target.getFieldValue("SENSOR") ?? ""
+    return env?.getSensorValue ? env.getSensorValue("mq2-gas", id) : 150
+  }
   if (target.type === "io_analogread") {
     const pin = target.getFieldValue("PIN") ?? "A0"
     return env?.getSensorValue ? env.getSensorValue("analog", pin) : 512
@@ -495,6 +499,9 @@ async function executeSingleBlock(block: Blockly.Block, env: ExecutionEnvironmen
       break
     }
 
+    case "neopixel_set_color":
+    case "neopixel_show":
+    case "mq2_gas_read":
     case "ai_get_gesture":
     case "ai_get_finger_count":
       // Value blocks are evaluated by evaluateValueInput/evaluateNumber.
