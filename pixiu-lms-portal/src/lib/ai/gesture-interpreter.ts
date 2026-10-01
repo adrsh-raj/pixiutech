@@ -6,6 +6,8 @@ export type HandGesture =
   | "thumbs_down"
   | "point"
   | "peace"
+  | "rock_on"
+  | "ok"
   | "three"
   | "four"
   | "open_palm"
@@ -56,8 +58,26 @@ export function interpretHandGesture(hand: HandDetection): HandGestureResult {
   let gesture: HandGesture = number === 0 ? "fist" : number === 5 ? "open_palm" : "one"
   const thumbDirection = thumbVerticalDirection(hand)
 
+  const thumbTip = hand.keypoints[4]
+  const indexTip = hand.keypoints[8]
+  const wrist = hand.keypoints[0]
+  const palmSpan =
+    wrist && hand.keypoints[9]
+      ? Math.hypot(wrist.x - hand.keypoints[9].x, wrist.y - hand.keypoints[9].y)
+      : 100
+  const thumbIndexDist =
+    thumbTip && indexTip
+      ? Math.hypot(thumbTip.x - indexTip.x, thumbTip.y - indexTip.y)
+      : 999
+  const isOkSign =
+    thumbIndexDist < palmSpan * 0.38 && fingers[MIDDLE] && fingers[RING] && fingers[PINKY]
+
   if (number === 0) {
     gesture = "fist"
+  } else if (isOkSign) {
+    gesture = "ok"
+  } else if (isOnly(fingers, INDEX, PINKY) || (number === 2 && fingers[INDEX] && fingers[PINKY])) {
+    gesture = "rock_on"
   } else if (isOnly(fingers, THUMB)) {
     gesture =
       thumbDirection === "up"
@@ -86,27 +106,31 @@ export function interpretHandGesture(hand: HandDetection): HandGestureResult {
   }
 
   const patternConfidence =
-    gesture === "fist" || gesture === "open_palm" || gesture === "peace"
+    gesture === "fist" || gesture === "open_palm" || gesture === "peace" || gesture === "rock_on"
       ? 0.96
-      : gesture === "point" || gesture === "thumbs_up" || gesture === "thumbs_down"
-        ? 0.9
-        : 0.82
+      : gesture === "point" || gesture === "thumbs_up" || gesture === "thumbs_down" || gesture === "ok"
+        ? 0.92
+        : 0.85
 
   const confidence = Math.round(clamp(hand.score * patternConfidence) * 100)
   const detail =
     gesture === "thumbs_up"
-      ? "Thumbs up"
+      ? "Thumbs up · positive sign"
       : gesture === "thumbs_down"
         ? "Thumbs down"
         : gesture === "open_palm"
           ? "Open palm · 5 fingers"
           : gesture === "peace"
-            ? "Peace sign · 2 fingers"
-            : gesture === "point"
-              ? "Pointing · index finger"
-              : gesture === "fist"
-                ? "Closed fist · 0 fingers"
-                : `${gesture} · ${number} finger${number === 1 ? "" : "s"}`
+            ? "Peace / Victory sign · 2 fingers"
+            : gesture === "rock_on"
+              ? "Rock on / Horns sign"
+              : gesture === "ok"
+                ? "OK sign"
+                : gesture === "point"
+                  ? "Pointing · index finger"
+                  : gesture === "fist"
+                    ? "Closed fist · 0 fingers"
+                    : `${gesture} · ${number} finger${number === 1 ? "" : "s"}`
 
   return {
     gesture,

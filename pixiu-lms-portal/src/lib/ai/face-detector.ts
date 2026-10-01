@@ -10,6 +10,10 @@ export type FaceEmotion = {
   score: number
 }
 
+export type ExpressionClassification = FaceEmotion & {
+  allEmotions: FaceEmotion[]
+}
+
 export type FaceDetection = {
   score: number
   box: [number, number, number, number]
@@ -132,18 +136,33 @@ function distance(a: FacePoint, b: FacePoint) {
 export function classifyExpression(
   points: FacePoint[],
   box: [number, number, number, number],
-): FaceEmotion {
-  if (points.length < 200) return { emotion: "neutral", score: 0.35 }
+): ExpressionClassification {
+  if (points.length < 200) {
+    return {
+      emotion: "neutral",
+      score: 0.35,
+      allEmotions: [
+        { emotion: "neutral", score: 0.35 },
+        { emotion: "happy", score: 0 },
+        { emotion: "surprised", score: 0 },
+        { emotion: "sad", score: 0 },
+        { emotion: "angry", score: 0 },
+        { emotion: "thinking", score: 0 },
+      ],
+    }
+  }
 
   const width = Math.max(
     1,
-    box[2] || Math.max(...points.map((point) => point.x)) -
-      Math.min(...points.map((point) => point.x)),
+    box[2] ||
+      Math.max(...points.map((point) => point.x)) -
+        Math.min(...points.map((point) => point.x)),
   )
   const height = Math.max(
     1,
-    box[3] || Math.max(...points.map((point) => point.y)) -
-      Math.min(...points.map((point) => point.y)),
+    box[3] ||
+      Math.max(...points.map((point) => point.y)) -
+        Math.min(...points.map((point) => point.y)),
   )
   const p = (index: number) => points[index]
 
@@ -157,7 +176,18 @@ export function classifyExpression(
   const rightEyeBottom = p(374)
 
   if (!leftCorner || !rightCorner || !upperLip || !lowerLip) {
-    return { emotion: "neutral", score: 0.4 }
+    return {
+      emotion: "neutral",
+      score: 0.4,
+      allEmotions: [
+        { emotion: "neutral", score: 0.4 },
+        { emotion: "happy", score: 0 },
+        { emotion: "surprised", score: 0 },
+        { emotion: "sad", score: 0 },
+        { emotion: "angry", score: 0 },
+        { emotion: "thinking", score: 0 },
+      ],
+    }
   }
 
   const mouthWidth = Math.abs(rightCorner.x - leftCorner.x)
@@ -177,25 +207,123 @@ export function classifyExpression(
 
   const lipCenterY = (upperLip.y + lowerLip.y) / 2
   const cornerCenterY = (leftCorner.y + rightCorner.y) / 2
-  const cornerLiftRatio = safeRatio(lipCenterY - cornerCenterY, height)
+  const cornerLift = lipCenterY - cornerCenterY
+  const cornerLiftRatio = safeRatio(cornerLift, height)
 
-  const smileBreadth = clamp01((widthRatio - 0.22) / 0.18)
-  const smileLift = clamp01((cornerLiftRatio + 0.001) / 0.028)
-  const smileScore = clamp01(smileBreadth * 0.42 + smileLift * 0.58)
+  // Eyebrows (MediaPipe landmarks: 105 left arch, 334 right arch, 107 left inner, 336 right inner)
+  const leftBrowArch = p(105)
+  const rightBrowArch = p(334)
+  const leftBrowInner = p(107)
+  const rightBrowInner = p(336)
+  const hasBrows = Boolean(
+    leftBrowArch &&
+      rightBrowArch &&
+      leftBrowInner &&
+      rightBrowInner &&
+      (leftBrowArch.x !== 0 || leftBrowArch.y !== 0),
+  )
 
-  const mouthOpenScore = clamp01((openRatio - 0.045) / 0.10)
-  const eyeOpenScore = clamp01((eyeRatio - 0.055) / 0.09)
-  const surpriseScore = clamp01(mouthOpenScore * 0.65 + eyeOpenScore * 0.35)
+  const leftBrowEye =
+    hasBrows && leftEyeTop ? Math.abs(leftBrowArch.y - leftEyeTop.y) : 0
+  const rightBrowEye =
+    hasBrows && rightEyeTop ? Math.abs(rightBrowArch.y - rightEyeTop.y) : 0
+  const avgBrowEyeRatio = hasBrows
+    ? safeRatio((leftBrowEye + rightBrowEye) / 2, height)
+    : 0.12
+  const innerBrowDistRatio = hasBrows
+    ? safeRatio(Math.abs(rightBrowInner.x - leftBrowInner.x), width)
+    : 0.22
 
-  if (surpriseScore >= 0.68 && openRatio >= 0.06) {
-    return { emotion: "surprised", score: surpriseScore }
+  const browAsymmetry = hasBrows
+    ? safeRatio(Math.abs(leftBrowArch.y - rightBrowArch.y), height)
+    : 0
+  const mouthAsymmetry = safeRatio(
+    Math.abs(
+      Math.abs(leftCorner.y - lipCenterY) - Math.abs(rightCorner.y - lipCenterY),
+    ),
+    height,
+  )
+
+  // 1. HAPPY: Wide smiling mouth + upward corner lift
+  const smileBreadth = clamp01((widthRatio - 0.2) / 0.16)
+  const smileLift = clamp01((cornerLiftRatio + 0.002) / 0.024)
+  const happyScore = clamp01(smileBreadth * 0.52 + smileLift * 0.48)
+
+  // 2. SURPRISED: Open jaw/mouth + open eyes + raised eyebrows
+  const mouthOpenScore = clamp01((openRatio - 0.035) / 0.075)
+  const eyeOpenScore = clamp01((eyeRatio - 0.042) / 0.07)
+  const browRaiseScore = hasBrows
+    ? clamp01((avgBrowEyeRatio - 0.11) / 0.06)
+    : mouthOpenScore
+  const surprisedScore = clamp01(
+    mouthOpenScore * 0.5 + eyeOpenScore * 0.3 + browRaiseScore * 0.2,
+  )
+
+  // 3. SAD: Downward drooping mouth corners + non-smiling mouth
+  const frownScore = clamp01((-cornerLiftRatio - 0.003) / 0.022)
+  const sadScore = clamp01(
+    frownScore * 0.7 + (1 - smileBreadth) * 0.2 + (1 - openRatio) * 0.1,
+  )
+
+  // 4. ANGRY: Eyebrows furrowed & pressed down towards eyes + tense lips
+  const browFurrow = hasBrows ? clamp01((0.18 - innerBrowDistRatio) / 0.08) : 0
+  const browLower = hasBrows ? clamp01((0.11 - avgBrowEyeRatio) / 0.05) : 0
+  const angryScore = hasBrows
+    ? clamp01(browFurrow * 0.5 + browLower * 0.35 + (1 - smileLift) * 0.15)
+    : 0
+
+  // 5. THINKING: Asymmetric eyebrow arch or mouth smirk + focused face
+  const asymmetry = Math.max(browAsymmetry * 1.5, mouthAsymmetry)
+  const asymmetryScore = clamp01((asymmetry - 0.01) / 0.022)
+  const thinkingScore = clamp01(
+    asymmetryScore * 0.75 + (1 - openRatio) * 0.15 + (1 - smileBreadth) * 0.1,
+  )
+
+  // 6. NEUTRAL: Resting baseline when active facial muscles are relaxed
+  const maxActive = Math.max(
+    happyScore,
+    surprisedScore,
+    sadScore,
+    angryScore,
+    thinkingScore,
+  )
+  const neutralScore = clamp01(Math.max(0.35, 1 - maxActive * 0.85))
+
+  const candidateScores: Array<{
+    emotion: string
+    score: number
+    threshold: number
+  }> = [
+    { emotion: "happy", score: happyScore, threshold: 0.42 },
+    { emotion: "surprised", score: surprisedScore, threshold: 0.4 },
+    { emotion: "sad", score: sadScore, threshold: 0.38 },
+    { emotion: "angry", score: angryScore, threshold: 0.44 },
+    { emotion: "thinking", score: thinkingScore, threshold: 0.38 },
+    { emotion: "neutral", score: neutralScore, threshold: 0.3 },
+  ]
+
+  const allEmotions: FaceEmotion[] = [
+    { emotion: "happy", score: Number(happyScore.toFixed(2)) },
+    { emotion: "surprised", score: Number(surprisedScore.toFixed(2)) },
+    { emotion: "sad", score: Number(sadScore.toFixed(2)) },
+    { emotion: "angry", score: Number(angryScore.toFixed(2)) },
+    { emotion: "thinking", score: Number(thinkingScore.toFixed(2)) },
+    { emotion: "neutral", score: Number(neutralScore.toFixed(2)) },
+  ].sort((a, b) => b.score - a.score)
+
+  let best = candidateScores
+    .filter((c) => c.emotion !== "neutral" && c.score >= c.threshold)
+    .sort((a, b) => b.score - a.score)[0]
+
+  if (!best) {
+    best = { emotion: "neutral", score: neutralScore, threshold: 0.3 }
   }
-  if (smileScore >= 0.45) {
-    return { emotion: "happy", score: smileScore }
-  }
 
-  const neutralScore = Math.max(0.45, 1 - Math.max(smileScore, surpriseScore))
-  return { emotion: "neutral", score: neutralScore }
+  return {
+    emotion: best.emotion,
+    score: Number(best.score.toFixed(2)),
+    allEmotions,
+  }
 }
 
 function boundsFromMesh(mesh: FacePoint[]): [number, number, number, number] {
@@ -262,7 +390,7 @@ export async function loadFaceDetector(): Promise<FaceDetector> {
           box,
           expression: expression.emotion,
           expressionScore: expression.score,
-          emotions: [expression],
+          emotions: expression.allEmotions ?? [expression],
           mesh,
         }
       })

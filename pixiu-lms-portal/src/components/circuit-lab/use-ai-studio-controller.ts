@@ -134,11 +134,11 @@ function explainCurrentAiResult(
   }
 
   if (state.mode === "numbers") {
-    return "6G first reads the 21 hand landmarks, converts them to extended-finger geometry, then uses short temporal smoothing. Current gesture: " + (state.detectedGesture ?? "none") + "."
+    return "6G counts extended fingers (0 to 5) from 21 hand landmarks and outputs the recognized digit for circuits and logic."
   }
 
   if (state.mode === "hands") {
-    return "6D uses the detected hand landmarks and handedness. Finger counts are derived from landmark geometry rather than a separate image classifier."
+    return "6D tracks 21 skeletal joints, handedness (Left/Right), and classifies gestures (thumbs up/down, peace, ok, rock on, point, fist, palm)."
   }
 
   if (state.mode === "objects") {
@@ -150,7 +150,7 @@ function explainCurrentAiResult(
   }
 
   if (state.mode === "emotion") {
-    return "6E uses the FaceMesh landmark geometry and the project's expression heuristic. This is an expression demo, not a definitive measurement of a person's internal emotional state."
+    return "6E analyzes 468 FaceMesh landmarks (lips, brows, eyes) to detect 6 facial expressions: happy, surprised, sad, angry, thinking, and neutral."
   }
 
   if (state.mode === "sound") {
@@ -181,10 +181,10 @@ function mediaPermissionMessage(error: unknown, fallback: string) {
 const MODES: Array<{ id: ReadyAiMode; title: string; subtitle: string }> = [
   { id: "objects", title: "Objects", subtitle: "COCO-SSD object boxes" },
   { id: "pose", title: "Pose", subtitle: "17 body keypoints" },
-  { id: "hands", title: "Fingers", subtitle: "21 hand landmarks" },
-  { id: "emotion", title: "Emotion", subtitle: "Expression demo" },
+  { id: "hands", title: "Hands", subtitle: "Gestures & 21 joints" },
+  { id: "emotion", title: "Emotion", subtitle: "6 facial expressions" },
   { id: "sound", title: "Sound", subtitle: "Words + digits" },
-  { id: "numbers", title: "Numbers", subtitle: "0–5 + gestures" },
+  { id: "numbers", title: "Numbers", subtitle: "0–5 optical counter" },
 ]
 
 
@@ -259,10 +259,24 @@ function drawPose(canvas: HTMLCanvasElement, video: HTMLVideoElement, poseResult
   }
 }
 
+const GESTURE_EMOJIS: Record<string, string> = {
+  thumbs_up: "👍",
+  thumbs_down: "👎",
+  peace: "✌️",
+  rock_on: "🤘",
+  ok: "👌",
+  fist: "✊",
+  open_palm: "✋",
+  point: "👉",
+}
+
 function drawHands(
   canvas: HTMLCanvasElement,
   video: HTMLVideoElement,
   hands: HandDetection[],
+  isNumbers: boolean = false,
+  gesture: string = "none",
+  stableCount: number = 0,
 ) {
   const width = video.videoWidth || 640
   const height = video.videoHeight || 480
@@ -275,8 +289,13 @@ function drawHands(
   if (!ctx) return
   ctx.clearRect(0, 0, canvas.width, canvas.height)
   ctx.lineWidth = 3
-  ctx.strokeStyle = "#38bdf8"
-  ctx.fillStyle = "#e0f2fe"
+
+  const strokeColor = isNumbers ? "#22c55e" : "#38bdf8"
+  const pointFill = isNumbers ? "#86efac" : "#bae6fd"
+  const badgeColor = isNumbers ? "#16a34a" : "#0284c7"
+
+  ctx.strokeStyle = strokeColor
+  ctx.fillStyle = pointFill
   ctx.font = "700 12px system-ui"
 
   const edges = [
@@ -308,13 +327,16 @@ function drawHands(
     const [x, y, w, h] = hand.box
     if (w > 0 && h > 0) {
       ctx.strokeRect(x, y, w, h)
-      const label = `${hand.handedness} · ${hand.fingerCount} fingers · ${Math.round(hand.score * 100)}%`
+      const emoji = GESTURE_EMOJIS[gesture] ?? "✋"
+      const label = isNumbers
+        ? `DIGIT: ${stableCount} (${stableCount} finger${stableCount === 1 ? "" : "s"}) · ${hand.handedness}`
+        : `${hand.handedness} · ${emoji} ${gesture.replace(/_/g, " ").toUpperCase()} · ${Math.round(hand.score * 100)}%`
       const tw = ctx.measureText(label).width + 12
-      ctx.fillStyle = "#38bdf8"
+      ctx.fillStyle = badgeColor
       ctx.fillRect(x, Math.max(0, y - 22), tw, 22)
-      ctx.fillStyle = "#0f172a"
+      ctx.fillStyle = "#ffffff"
       ctx.fillText(label, x + 6, Math.max(15, y - 7))
-      ctx.fillStyle = "#e0f2fe"
+      ctx.fillStyle = pointFill
     }
   })
 }
@@ -329,6 +351,15 @@ function readFileAsDataUrl(file: File) {
     reader.onerror = () => reject(new Error("Image could not be read."))
     reader.readAsDataURL(file)
   })
+}
+
+const EMOTION_THEMES: Record<string, { color: string; badge: string; emoji: string }> = {
+  happy: { color: "#22c55e", badge: "#15803d", emoji: "😄" },
+  surprised: { color: "#06b6d4", badge: "#0e7490", emoji: "😲" },
+  sad: { color: "#a855f7", badge: "#7e22ce", emoji: "😢" },
+  angry: { color: "#f43f5e", badge: "#be123c", emoji: "😠" },
+  thinking: { color: "#eab308", badge: "#a16207", emoji: "🤔" },
+  neutral: { color: "#94a3b8", badge: "#475569", emoji: "😐" },
 }
 
 function drawFaces(
@@ -353,11 +384,12 @@ function drawFaces(
     const [x, y, w, h] = face.box
     if (w <= 0 || h <= 0) continue
 
-    ctx.strokeStyle = "#f472b6"
+    const theme = EMOTION_THEMES[face.expression] ?? EMOTION_THEMES.neutral
+    ctx.strokeStyle = theme.color
     ctx.strokeRect(x, y, w, h)
 
     if (face.mesh.length) {
-      ctx.fillStyle = "rgba(244, 114, 182, 0.75)"
+      ctx.fillStyle = theme.color + "bf"
       for (const point of face.mesh) {
         ctx.beginPath()
         ctx.arc(point.x, point.y, 1.5, 0, Math.PI * 2)
@@ -365,11 +397,11 @@ function drawFaces(
       }
     }
 
-    const label = `${face.expression} · ${Math.round(face.expressionScore * 100)}%`
+    const label = `${theme.emoji} ${face.expression.toUpperCase()} · ${Math.round(face.expressionScore * 100)}%`
     const tw = ctx.measureText(label).width + 12
-    ctx.fillStyle = "#f472b6"
+    ctx.fillStyle = theme.badge
     ctx.fillRect(x, Math.max(0, y - 22), tw, 22)
-    ctx.fillStyle = "#0f172a"
+    ctx.fillStyle = "#ffffff"
     ctx.fillText(label, x + 6, Math.max(15, y - 7))
   }
 }
@@ -1184,7 +1216,6 @@ const [tab, setTab] = useState<Tab>("try")
             emptyHandFramesRef.current = 0
           }
 
-          drawHands(getActiveOverlay()!, video, hands)
           const hand = hands[0]
           const interpreted = hand ? interpretHandGesture(hand) : null
 
@@ -1217,6 +1248,15 @@ const [tab, setTab] = useState<Tab>("try")
             Object.entries(gestureHistogram).sort((a, b) => b[1] - a[1])[0]?.[0] ??
             "none"
 
+          drawHands(
+            getActiveOverlay()!,
+            video,
+            hands,
+            mode === "numbers",
+            stableGesture,
+            stableCount,
+          )
+
           onAiStateChange({
             enabled: true,
             mode,
@@ -1227,14 +1267,12 @@ const [tab, setTab] = useState<Tab>("try")
                   ? String(stableCount)
                   : "none"
                 : hand
-                  ? "hand"
+                  ? stableGesture
                   : "none",
             confidence:
               mode === "numbers"
                 ? interpreted?.confidence ?? (hand ? Math.round(hand.score * 100) : 0)
-                : hand
-                  ? Math.round(hand.score * 100)
-                  : 0,
+                : interpreted?.confidence ?? (hand ? Math.round(hand.score * 100) : 0),
             allDetections: [],
             detectedGesture: hand ? stableGesture : "none",
             fingerCount: hand ? stableCount : 0,
@@ -1242,13 +1280,24 @@ const [tab, setTab] = useState<Tab>("try")
             modelClasses:
               mode === "numbers"
                 ? ["0", "1", "2", "3", "4", "5"]
-                : ["hand"],
+                : [
+                    "thumbs_up",
+                    "thumbs_down",
+                    "peace",
+                    "rock_on",
+                    "ok",
+                    "point",
+                    "open_palm",
+                    "fist",
+                  ],
             modelSource: "ready",
             detail: hand
               ? mode === "numbers"
-                ? stableCount + " finger" + (stableCount === 1 ? "" : "s") + " · " + stableGesture.replace("_", " ") + " · " + hand.handedness
-                : hand.handedness + " hand · " + hand.fingerCount + " fingers · " + (interpreted?.gesture.replace("_", " ") ?? "hand")
-              : "Show a hand",
+                ? stableCount + " finger" + (stableCount === 1 ? "" : "s") + " · Digit " + stableCount + " · " + hand.handedness
+                : hand.handedness + " hand · " + (interpreted?.detail ?? stableGesture.replace(/_/g, " "))
+              : mode === "numbers"
+                ? "Show fingers to count (0 to 5)"
+                : "Show a hand gesture",
           })
         } else if (mode === "emotion") {
           const faces: FaceDetection[] = await detectFaces(resourceRef.current as FaceDetector, video)
@@ -1292,6 +1341,11 @@ const [tab, setTab] = useState<Tab>("try")
           )
           const stableConfidence = stableEmotion?.score ?? face?.expressionScore ?? 0
 
+          const emotionProbabilities: Record<string, number> = {}
+          face?.emotions.forEach((e) => {
+            emotionProbabilities[e.emotion] = Math.round(e.score * 100)
+          })
+
           onAiStateChange({
             enabled: true,
             mode: "emotion",
@@ -1299,11 +1353,12 @@ const [tab, setTab] = useState<Tab>("try")
             detectedClass: face ? stableExpression : "none",
             confidence: face ? Math.round(stableConfidence * 100) : 0,
             allDetections: [],
-            modelClasses: ["neutral", "happy", "surprised"],
+            probabilities: emotionProbabilities,
+            modelClasses: ["happy", "surprised", "sad", "angry", "thinking", "neutral"],
             modelSource: "ready",
             detail: face
-              ? String(faces.length) + " face" + (faces.length === 1 ? "" : "s") + " · " + stableExpression
-              : "Show your face",
+              ? String(faces.length) + " face" + (faces.length === 1 ? "" : "s") + " · " + stableExpression + " (" + Math.round(stableConfidence * 100) + "%)"
+              : "Position your face in front of the camera",
           })
         } else if (mode === "trained") {
           // Continuous My AI inference stays on the live video path. JPEG/base64

@@ -5,11 +5,69 @@ import { AiRuntimeControls } from "./ai-runtime-controls"
 const MODES = [
   { id: "objects", title: "Objects", subtitle: "Detect common objects." },
   { id: "pose", title: "Pose", subtitle: "Track 17 body keypoints." },
-  { id: "hands", title: "Hands", subtitle: "Track hand landmarks." },
-  { id: "emotion", title: "Emotion", subtitle: "Read simple facial geometry." },
-  { id: "sound", title: "Sound", subtitle: "Recognize local spoken words." },
-  { id: "numbers", title: "Numbers", subtitle: "Count fingers and gestures." },
+  { id: "hands", title: "Hands", subtitle: "Gestures & 21 joints." },
+  { id: "emotion", title: "Emotion", subtitle: "6 facial expressions." },
+  { id: "sound", title: "Sound", subtitle: "Recognize spoken words." },
+  { id: "numbers", title: "Numbers", subtitle: "Count fingers (0 to 5)." },
 ] as const
+
+const GESTURE_LABELS: Record<string, { label: string; emoji: string }> = {
+  thumbs_up: { label: "Thumbs Up", emoji: "👍" },
+  thumbs_down: { label: "Thumbs Down", emoji: "👎" },
+  peace: { label: "Peace", emoji: "✌️" },
+  rock_on: { label: "Rock On", emoji: "🤘" },
+  ok: { label: "OK Sign", emoji: "👌" },
+  point: { label: "Point", emoji: "👉" },
+  open_palm: { label: "Open Palm", emoji: "✋" },
+  fist: { label: "Closed Fist", emoji: "✊" },
+}
+
+const EMOTION_LABELS: Record<string, { label: string; emoji: string }> = {
+  happy: { label: "Happy", emoji: "😄" },
+  surprised: { label: "Surprised", emoji: "😲" },
+  sad: { label: "Sad", emoji: "😢" },
+  angry: { label: "Angry", emoji: "😠" },
+  thinking: { label: "Thinking", emoji: "🤔" },
+  neutral: { label: "Neutral", emoji: "😐" },
+}
+
+function formatLiveResult(
+  mode: string,
+  detectedClass: string,
+  fingerCount?: number,
+  detectedGesture?: string,
+  handedness?: string,
+  isSound?: boolean,
+): string {
+  if (detectedClass === "none") {
+    if (isSound) return "Listening…"
+    if (mode === "emotion") return "No face detected"
+    if (mode === "numbers") return "No hand detected · show fingers (0 to 5)"
+    if (mode === "hands") return "No hand detected · show a gesture"
+    return "No object detected"
+  }
+
+  if (mode === "numbers") {
+    return `NUMBER: ${detectedClass} (${fingerCount ?? 0} finger${fingerCount === 1 ? "" : "s"})${handedness && handedness !== "none" ? ` · ${handedness}` : ""}`
+  }
+
+  if (mode === "hands") {
+    const key = detectedClass in GESTURE_LABELS ? detectedClass : (detectedGesture ?? detectedClass)
+    const meta = GESTURE_LABELS[key]
+    const emoji = meta?.emoji ?? "✋"
+    const label = meta?.label ?? key.replace(/_/g, " ").toUpperCase()
+    return `${emoji} ${label}${handedness && handedness !== "none" ? ` · ${handedness}` : ""}`
+  }
+
+  if (mode === "emotion") {
+    const meta = EMOTION_LABELS[detectedClass]
+    const emoji = meta?.emoji ?? "😐"
+    const label = meta?.label ?? detectedClass
+    return `${emoji} ${label.toUpperCase()} Expression`
+  }
+
+  return detectedClass.replace(/_/g, " ")
+}
 
 export function AiTryPanel({ viewModel }: { viewModel: AiStudioViewModel }) {
   const {
@@ -114,19 +172,14 @@ export function AiTryPanel({ viewModel }: { viewModel: AiStudioViewModel }) {
                         <div className="min-w-0">
                           <p className="text-[7.5px] font-mono uppercase tracking-[0.16em] text-cyan-200">LIVE RESULT</p>
                           <p className="mt-0.5 truncate text-sm font-black text-white sm:text-base">
-                            {aiState.detectedClass === "none"
-                              ? isSound
-                                ? "Listening…"
-                                : mode === "emotion"
-                                  ? "No face detected"
-                                  : mode === "numbers" || mode === "hands"
-                                    ? "No hand detected"
-                                    : "No object detected"
-                              : mode === "emotion"
-                                ? "Person detected · " + String(aiState.detectedClass).replace(/_/g, " ") + " expression"
-                                : mode === "numbers" || mode === "hands"
-                                  ? String(aiState.fingerCount ?? 0) + " fingers · " + String(aiState.detectedGesture ?? "hand").replace(/_/g, " ")
-                                  : String(aiState.detectedClass).replace(/_/g, " ")}
+                            {formatLiveResult(
+                              mode,
+                              aiState.detectedClass,
+                              aiState.fingerCount,
+                              aiState.detectedGesture,
+                              aiState.handedness,
+                              isSound,
+                            )}
                           </p>
                           <p className="mt-0.5 text-[8.5px] leading-3.5 text-slate-400">
                             {aiState.detail}
@@ -159,13 +212,90 @@ export function AiTryPanel({ viewModel }: { viewModel: AiStudioViewModel }) {
                         </div>
                       )}
                       {mode === "numbers" && (
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          <span className="rounded-lg border border-cyan-400/15 bg-cyan-400/5 px-2 py-1 text-[8px] font-mono text-cyan-200">
-                            Gesture · {aiState.detectedGesture ?? "none"}
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                          <span className="text-[8px] font-mono uppercase text-slate-500 mr-1">Digits:</span>
+                          {["0", "1", "2", "3", "4", "5"].map((digit) => {
+                            const isActive = aiState.detectedClass === digit
+                            return (
+                              <span
+                                key={digit}
+                                className={`rounded-lg border px-2 py-0.5 text-[8.5px] font-mono font-bold transition-all ${
+                                  isActive
+                                    ? "border-emerald-400/60 bg-emerald-500/20 text-emerald-200 shadow-sm shadow-emerald-500/20"
+                                    : "border-slate-800 bg-slate-950 text-slate-500"
+                                }`}
+                              >
+                                {digit}
+                              </span>
+                            )
+                          })}
+                          <span className="ml-2 rounded-lg border border-slate-800 bg-slate-950 px-2 py-0.5 text-[8px] font-mono text-slate-400">
+                            {aiState.fingerCount ?? 0} fingers · {aiState.handedness ?? "none"}
                           </span>
-                          <span className="rounded-lg border border-slate-800 bg-slate-950 px-2 py-1 text-[8px] font-mono text-slate-500">
-                            {aiState.fingerCount ?? 0} fingers
-                          </span>
+                        </div>
+                      )}
+                      {mode === "hands" && (
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                          <span className="text-[8px] font-mono uppercase text-slate-500 mr-1">Signs:</span>
+                          {[
+                            { id: "thumbs_up", label: "👍 Up" },
+                            { id: "thumbs_down", label: "👎 Down" },
+                            { id: "peace", label: "✌️ Peace" },
+                            { id: "rock_on", label: "🤘 Rock" },
+                            { id: "ok", label: "👌 OK" },
+                            { id: "point", label: "👉 Point" },
+                            { id: "open_palm", label: "✋ Palm" },
+                            { id: "fist", label: "✊ Fist" },
+                          ].map((item) => {
+                            const isActive =
+                              aiState.detectedClass === item.id ||
+                              aiState.detectedGesture === item.id
+                            return (
+                              <span
+                                key={item.id}
+                                className={`rounded-lg border px-2 py-0.5 text-[8.5px] font-mono font-bold transition-all ${
+                                  isActive
+                                    ? "border-sky-400/60 bg-sky-500/20 text-sky-200 shadow-sm shadow-sky-500/20"
+                                    : "border-slate-800 bg-slate-950 text-slate-500"
+                                }`}
+                              >
+                                {item.label}
+                              </span>
+                            )
+                          })}
+                          {aiState.handedness && aiState.handedness !== "none" && (
+                            <span className="ml-1 rounded-lg border border-slate-800 bg-slate-950 px-2 py-0.5 text-[8px] font-mono text-slate-400">
+                              {aiState.handedness}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {mode === "emotion" && (
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                          <span className="text-[8px] font-mono uppercase text-slate-500 mr-1">Expressions:</span>
+                          {[
+                            { id: "happy", label: "😄 Happy" },
+                            { id: "surprised", label: "😲 Surprised" },
+                            { id: "sad", label: "😢 Sad" },
+                            { id: "angry", label: "😠 Angry" },
+                            { id: "thinking", label: "🤔 Thinking" },
+                            { id: "neutral", label: "😐 Neutral" },
+                          ].map((item) => {
+                            const isActive = aiState.detectedClass === item.id
+                            const prob = aiState.probabilities?.[item.id]
+                            return (
+                              <span
+                                key={item.id}
+                                className={`rounded-lg border px-2 py-0.5 text-[8.5px] font-mono font-bold transition-all ${
+                                  isActive
+                                    ? "border-pink-400/60 bg-pink-500/20 text-pink-200 shadow-sm shadow-pink-500/20"
+                                    : "border-slate-800 bg-slate-950 text-slate-500"
+                                }`}
+                              >
+                                {item.label}{prob !== undefined ? ` · ${prob}%` : ""}
+                              </span>
+                            )
+                          })}
                         </div>
                       )}
                       {isSound && (
@@ -189,13 +319,14 @@ export function AiTryPanel({ viewModel }: { viewModel: AiStudioViewModel }) {
                       <div className="min-w-0">
                         <p className="text-[7.5px] font-mono uppercase tracking-[0.16em] text-cyan-200">LIVE RESULT</p>
                         <p className="mt-0.5 truncate text-xs font-black text-white">
-                          {aiState.detectedClass === "none"
-                            ? "Waiting for detection"
-                            : mode === "emotion"
-                              ? "Person · " + String(aiState.detectedClass).replace(/_/g, " ") + " expression"
-                              : mode === "numbers" || mode === "hands"
-                                ? String(aiState.fingerCount ?? 0) + " fingers · " + String(aiState.detectedGesture ?? "hand").replace(/_/g, " ")
-                                : String(aiState.detectedClass).replace(/_/g, " ")}
+                          {formatLiveResult(
+                            mode,
+                            aiState.detectedClass,
+                            aiState.fingerCount,
+                            aiState.detectedGesture,
+                            aiState.handedness,
+                            isSound,
+                          )}
                         </p>
                       </div>
                       <span className="shrink-0 rounded-md border border-slate-700 bg-slate-950 px-2 py-0.5 font-mono text-[8px] text-violet-200">{aiState.confidence}%</span>
