@@ -442,6 +442,7 @@ const [tab, setTab] = useState<Tab>("try")
   // switching UI state never turns the camera off or loses the overlay target.
   const studioVideoRef = useRef<HTMLVideoElement | null>(null)
   const floatingVideoRef = useRef<HTMLVideoElement | null>(null)
+  const teachVideoRef = useRef<HTMLVideoElement | null>(null)
   const overlayRef = useRef<HTMLCanvasElement | null>(null)
   const floatingOverlayRef = useRef<HTMLCanvasElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -651,9 +652,13 @@ const [tab, setTab] = useState<Tab>("try")
   }, [store.model, model])
 
   function getActiveVideo() {
-    return ((compact || !isOpen) ? floatingVideoRef.current : studioVideoRef.current)
-      ?? studioVideoRef.current
-      ?? floatingVideoRef.current
+    if (compact || !isOpen) {
+      return floatingVideoRef.current ?? studioVideoRef.current ?? teachVideoRef.current
+    }
+    if (tab === "teach") {
+      return teachVideoRef.current ?? studioVideoRef.current ?? floatingVideoRef.current
+    }
+    return studioVideoRef.current ?? floatingVideoRef.current ?? teachVideoRef.current
   }
 
   function getActiveOverlay() {
@@ -666,7 +671,7 @@ const [tab, setTab] = useState<Tab>("try")
     const stream = streamRef.current
     if (!stream) return
 
-    for (const video of [studioVideoRef.current, floatingVideoRef.current]) {
+    for (const video of [studioVideoRef.current, floatingVideoRef.current, teachVideoRef.current]) {
       if (!video) continue
       if (video.srcObject !== stream) video.srcObject = stream
       void video.play().catch(() => {})
@@ -773,6 +778,7 @@ const [tab, setTab] = useState<Tab>("try")
 
     stopCamera(studioVideoRef.current, stream)
     stopCamera(floatingVideoRef.current, stream)
+    stopCamera(teachVideoRef.current, stream)
     streamRef.current = null
   }
 
@@ -873,6 +879,7 @@ const [tab, setTab] = useState<Tab>("try")
       const stream = streamRef.current
       stopCamera(studioVideoRef.current, stream)
       stopCamera(floatingVideoRef.current, stream)
+      stopCamera(teachVideoRef.current, stream)
       streamRef.current = null
 
       const resource = resourceRef.current
@@ -1469,10 +1476,10 @@ const [tab, setTab] = useState<Tab>("try")
       const before = store.samples.length
       const next = addAiSample(store, label, optimized)
       commitStore(next)
-      setLabel("")
+      const currentClassCount = next.samples.filter((s) => s.label === label).length
       setStatus(
         next.samples.length > before
-          ? "Example captured and added."
+          ? `Example captured for "${label}" (${currentClassCount}/20).`
           : "That example could not be added.",
       )
     } catch (sampleError) {
@@ -1615,10 +1622,12 @@ const [tab, setTab] = useState<Tab>("try")
     canTrain,
     currentExplanation,
     studioVideoRef,
+    teachVideoRef,
     overlayRef,
     stopInput,
     startSound,
     startCameraForMode,
+    startTeachCamera,
     selectMode,
     label,
     setLabel,

@@ -47,11 +47,13 @@ export type AiStudioViewModel = {
   currentExplanation: string
 
   studioVideoRef: MutableRefObject<HTMLVideoElement | null>
+  teachVideoRef: MutableRefObject<HTMLVideoElement | null>
   overlayRef: MutableRefObject<HTMLCanvasElement | null>
 
   stopInput: () => void
   startSound: () => Promise<void>
   startCameraForMode: () => Promise<void>
+  startTeachCamera: () => Promise<void>
   selectMode: (mode: ReadyAiMode | "trained") => void
 
   label: string

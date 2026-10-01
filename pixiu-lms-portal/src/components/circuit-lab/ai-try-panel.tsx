@@ -56,8 +56,24 @@ export function AiTryPanel({ viewModel }: { viewModel: AiStudioViewModel }) {
                     {isSound ? (
                       <div className="flex h-full flex-col items-center justify-center bg-slate-950/90 p-6 text-center">
                         <Mic size={42} className={soundActive ? "text-violet-300 animate-pulse" : "text-slate-600"} />
-                        <p className="mt-3 text-sm font-black">{aiState.detectedClass === "none" ? "Ready for a voice command" : aiState.detectedClass}</p>
-                        <p className="mt-1 max-w-sm text-[10px] leading-5 text-slate-600">{aiState.detail}</p>
+                        <p className="mt-3 text-sm font-black">{aiState.detectedClass === "none" ? (soundActive ? "Ready for a voice command · listening…" : "Microphone off") : aiState.detectedClass}</p>
+                        <p className="mt-1 max-w-sm text-[10px] leading-5 text-slate-500">
+                          {soundActive
+                            ? aiState.detail
+                            : "Turn on your microphone to recognize spoken words locally in your browser."}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={soundActive ? stopInput : () => void startSound()}
+                          className={
+                            "mt-4 inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-black transition-all cursor-pointer " +
+                            (soundActive
+                              ? "border border-rose-500/50 bg-rose-500/15 text-rose-200 hover:bg-rose-500/25"
+                              : "bg-violet-600 text-white shadow-lg shadow-violet-600/30 hover:bg-violet-500")
+                          }
+                        >
+                          <Mic size={14} /> {soundActive ? "Turn Off Microphone" : "Turn On Microphone"}
+                        </button>
                       </div>
                     ) : (
                       <>
@@ -67,14 +83,31 @@ export function AiTryPanel({ viewModel }: { viewModel: AiStudioViewModel }) {
                     )}
                     {!inputActive && !isSound && (
                       <div className="absolute inset-0 grid place-items-center bg-slate-950/95 p-6 text-center">
-                        {isSound ? <Mic size={32} className="mx-auto text-violet-300" /> : <Camera size={32} className="mx-auto text-violet-300" />}
-                        <p className="mt-3 text-sm font-black">{isSound ? "Microphone off" : "Camera off"}</p>
-                        <p className="mt-1 max-w-sm text-[11px] leading-5 text-slate-500">
-                          {isSound
-                            ? "Sound AI runs locally in your browser. Try words such as yes, no, go, stop, up, down, left or right."
-                            : "6A loads only the selected Ready AI. 6I uses My AI. 6K is the normalized Blockly bridge."}
+                        <Camera size={36} className="mx-auto text-violet-400/80" />
+                        <p className="mt-3 text-sm font-black text-white">Camera is off</p>
+                        <p className="mt-1 max-w-sm text-[11px] leading-5 text-slate-400">
+                          {mode === "trained"
+                            ? "Turn on your camera to test your trained custom model in real time."
+                            : `Turn on your camera to start ${activeTitle} vision AI in your browser.`}
                         </p>
+                        <button
+                          type="button"
+                          onClick={() => void startCameraForMode()}
+                          className="mt-4 inline-flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-2.5 text-xs font-black text-white shadow-lg shadow-violet-600/30 hover:bg-violet-500 transition-all cursor-pointer"
+                        >
+                          <Camera size={15} /> Turn On Camera
+                        </button>
                       </div>
+                    )}
+                    {inputActive && !isSound && (
+                      <button
+                        type="button"
+                        onClick={stopInput}
+                        className="absolute right-3 top-3 z-30 inline-flex items-center gap-1.5 rounded-full border border-rose-500/40 bg-slate-950/85 px-3 py-1 font-mono text-[9px] text-rose-300 backdrop-blur hover:bg-rose-500/20 transition-all cursor-pointer"
+                        title="Click to turn off camera"
+                      >
+                        <CameraOff size={11} /> Turn Off Camera
+                      </button>
                     )}
                     <div className="absolute bottom-3 left-3 right-3 z-30 max-w-2xl rounded-2xl border border-cyan-300/20 bg-slate-950/90 px-4 py-3 shadow-xl backdrop-blur-md">
                       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -149,6 +182,8 @@ export function AiTryPanel({ viewModel }: { viewModel: AiStudioViewModel }) {
                 </div>
 
                 <aside className="space-y-3">
+                  <AiRuntimeControls viewModel={viewModel} />
+
                   <div className="rounded-2xl border border-cyan-300/15 bg-slate-950/55 p-4 shadow-lg">
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">

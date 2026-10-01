@@ -120,6 +120,22 @@ export function AiStudioPanel(props: AiStudioPanelProps) {
           cameraActive={cameraActive}
           soundActive={soundActive}
           stopInput={stopInput}
+          onToggleCamera={() => {
+            if (cameraActive) {
+              stopInput()
+            } else if (tab === "teach") {
+              void viewModel.startTeachCamera()
+            } else {
+              void (isSound ? viewModel.startSound() : viewModel.startCameraForMode())
+            }
+          }}
+          onToggleSound={() => {
+            if (soundActive) {
+              stopInput()
+            } else {
+              void viewModel.startSound()
+            }
+          }}
           onGoToSimulation={onGoToSimulation}
         />
 

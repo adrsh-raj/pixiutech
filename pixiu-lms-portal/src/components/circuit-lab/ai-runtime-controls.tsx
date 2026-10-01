@@ -2,18 +2,57 @@ import { Camera, CameraOff, Mic } from "lucide-react"
 import type { AiStudioViewModel } from "./ai-studio-view-model"
 
 export function AiRuntimeControls({ viewModel }: { viewModel: AiStudioViewModel }) {
-  const { isSound, cameraActive, soundActive, startSound, startCameraForMode, stopInput } = viewModel
+  const { isSound, cameraActive, soundActive, startSound, startCameraForMode, stopInput, activeTitle } = viewModel
+  const isActive = isSound ? soundActive : cameraActive
 
   return (
-<div className="rounded-2xl border border-slate-800 bg-slate-950/45 p-4">
-                    <p className="text-xs font-black">6B–6G · Ready AI</p>
-                    <p className="mt-2 text-[10px] leading-5 text-slate-500">
-                      Objects, Pose, Fingers, Emotion and Numbers use the Vision camera. Sound uses a separate microphone lifecycle. Only the selected AI model loads.
-                    </p>
-                    <button onClick={isSound ? (soundActive ? stopInput : startSound) : (cameraActive ? stopInput : startCameraForMode)} className="pixiu-ai-command mt-3 inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[10px] font-black">
-                      {(isSound ? soundActive : cameraActive) ? (isSound ? <Mic size={13} /> : <CameraOff size={13} />) : isSound ? <Mic size={13} /> : <Camera size={13} />}
-                      {(isSound ? soundActive : cameraActive) ? "Stop" : isSound ? "Start microphone" : "Start camera"}
-                    </button>
-                  </div>
+    <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4 shadow-lg">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-black text-white">Camera & Microphone</p>
+        <span
+          className={
+            "rounded-full px-2 py-0.5 text-[8px] font-mono " +
+            (isActive
+              ? "border border-emerald-400/40 bg-emerald-500/10 text-emerald-300"
+              : "border border-slate-800 bg-slate-900 text-slate-500")
+          }
+        >
+          {isActive ? "ACTIVE" : "STANDBY"}
+        </span>
+      </div>
+      <p className="mt-2 text-[10px] leading-5 text-slate-400">
+        {isSound
+          ? "Microphone is used for speech recognition. Audio runs 100% locally in your browser."
+          : `Vision camera feeds ${activeTitle.toLowerCase()} inference via TensorFlow.js. Frames stay in your local browser.`}
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={
+            isSound
+              ? (soundActive ? stopInput : () => void startSound())
+              : (cameraActive ? stopInput : () => void startCameraForMode())
+          }
+          className={
+            "inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-[10px] font-black transition-all cursor-pointer " +
+            (isActive
+              ? "border border-rose-500/50 bg-rose-500/15 text-rose-200 hover:bg-rose-500/25"
+              : "bg-violet-600 text-white shadow-md shadow-violet-600/20 hover:bg-violet-500")
+          }
+        >
+          {isActive ? (
+            <>
+              {isSound ? <Mic size={13} /> : <CameraOff size={13} />}
+              {isSound ? "Turn Off Microphone" : "Turn Off Camera"}
+            </>
+          ) : (
+            <>
+              {isSound ? <Mic size={13} /> : <Camera size={13} />}
+              {isSound ? "Turn On Microphone" : "Turn On Camera"}
+            </>
+          )}
+        </button>
+      </div>
+    </div>
   )
 }
