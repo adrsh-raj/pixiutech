@@ -7,16 +7,20 @@
  * Features:
  * - 4-Pillar XP Model (Curriculum Missions, Custom Creation, Daily Consistency, Multimodal/AI Bonus)
  * - Cryptographic FNV-1a checksum signatures to prevent localStorage manipulation
+ * - Cloud-Backed Synchronization with Pixiu backend (Zero data loss if localStorage is cleared)
+ * - Per-student scoped ledgers + guest offline persistence
  * - Idempotent event keys to prevent spamming/re-granting
  * - Daily XP caps (500 XP / day) against auto-clickers/bots
  * - Multi-surface synchronization between Circuit Lab and Student Portal
- * - Fair School-wise Ranking calculation
+ * - Live School-wise & Class-wise Leaderboard aggregation
  */
 
 import type { CircuitState } from "./circuit-types"
+import { apiFetch } from "@/context/AuthContext"
 
 export const XP_STORAGE_KEY = "pixiu_xp_ledger_v2"
 export const XP_UPDATE_EVENT = "pixiu_xp_updated"
+export const XP_SYNC_EVENT = "pixiu_xp_synced"
 export const DAILY_XP_CAP = 500
 
 export type XpCategory = "mission" | "creation" | "tinkering" | "streak" | "bonus"
@@ -73,9 +77,15 @@ export interface XpSummary {
   totalCreationsSaved: number
   events: XpEvent[]
   badges: string[]
+  cloudSynced: boolean
+  lastSyncedAt?: number
 }
 
 const SECRET_SALT = "pixiu_cyberlab_anti_tamper_salt_2026"
+let activeStudentId: string | null = null
+let syncTimeout: number | null = null
+let lastSyncTimestamp: number = 0
+let isSyncInProgress = false
 
 function fnv1a(str: string): string {
   let hash = 0x811c9dc5
@@ -110,7 +120,33 @@ function getDeviceSalt(): string {
   }
 }
 
-export function loadXpLedger(): XpLedger {
+export function setActiveStudentId(studentId: string | null) {
+  activeStudentId = studentId ? String(studentId).trim().toUpperCase() : null
+  if (typeof window !== "undefined" && activeStudentId) {
+    try {
+      // If student key doesn't exist yet, but general key does, migrate general key
+      const studentKey = `${XP_STORAGE_KEY}_${activeStudentId}`
+      const studentData = window.localStorage.getItem(studentKey)
+      const genericData = window.localStorage.getItem(XP_STORAGE_KEY)
+      if (!studentData && genericData) {
+        window.localStorage.setItem(studentKey, genericData)
+      }
+    } catch {
+      // Storage unavailable
+    }
+  }
+}
+
+export function getActiveStudentId(): string | null {
+  return activeStudentId
+}
+
+export function getXpStorageKey(studentId?: string | null): string {
+  const sid = studentId ? String(studentId).trim().toUpperCase() : activeStudentId
+  return sid ? `${XP_STORAGE_KEY}_${sid}` : XP_STORAGE_KEY
+}
+
+export function loadXpLedger(studentId?: string | null): XpLedger {
   const salt = getDeviceSalt()
   const defaultLedger: XpLedger = {
     version: 2,
@@ -123,7 +159,12 @@ export function loadXpLedger(): XpLedger {
   if (typeof window === "undefined") return defaultLedger
 
   try {
-    const raw = window.localStorage.getItem(XP_STORAGE_KEY)
+    const key = getXpStorageKey(studentId)
+    let raw = window.localStorage.getItem(key)
+    if (!raw && key !== XP_STORAGE_KEY) {
+      // Check generic fallback
+      raw = window.localStorage.getItem(XP_STORAGE_KEY)
+    }
     if (!raw) return defaultLedger
 
     const parsed = JSON.parse(raw) as Partial<XpLedger>
@@ -150,11 +191,17 @@ export function loadXpLedger(): XpLedger {
   }
 }
 
-export function saveXpLedger(ledger: XpLedger) {
+export function saveXpLedger(ledger: XpLedger, studentId?: string | null) {
   if (typeof window === "undefined") return
   try {
-    window.localStorage.setItem(XP_STORAGE_KEY, JSON.stringify(ledger))
+    const key = getXpStorageKey(studentId)
+    const jsonStr = JSON.stringify(ledger)
+    window.localStorage.setItem(key, jsonStr)
+    if (key !== XP_STORAGE_KEY) {
+      window.localStorage.setItem(XP_STORAGE_KEY, jsonStr)
+    }
     window.dispatchEvent(new CustomEvent(XP_UPDATE_EVENT, { detail: getXpSummary(ledger) }))
+    scheduleXpSync()
   } catch {
     // Best effort local persistence
   }
@@ -173,7 +220,6 @@ export function getXpSummary(ledger?: XpLedger): XpSummary {
   const currentLedger = ledger || loadXpLedger()
   const today = getTodayKey()
 
-  // Group events by day to enforce daily cap
   let totalXp = 0
   let todayXp = 0
   const dailyTotals: Record<string, number> = {}
@@ -233,6 +279,8 @@ export function getXpSummary(ledger?: XpLedger): XpSummary {
     totalCreationsSaved: totalCreations,
     events: [...currentLedger.events].reverse(),
     badges,
+    cloudSynced: lastSyncTimestamp > 0,
+    lastSyncedAt: lastSyncTimestamp,
   }
 }
 
@@ -308,7 +356,6 @@ export function awardMissionXp(lessonId: string, difficulty: "Beginner" | "Inter
  * Award XP for saving a verified custom circuit
  */
 export function awardCreationXp(circuit: CircuitState, blocklyXml: string, projectName: string): boolean {
-  // Validate minimum circuit complexity: at least 1 Uno + 2 distinct parts + 2 wires + valid code
   const unoCount = circuit.parts.filter((p) => p.type === "arduino-uno").length
   const totalParts = circuit.parts.length
   const totalWires = circuit.wires.length
@@ -317,7 +364,6 @@ export function awardCreationXp(circuit: CircuitState, blocklyXml: string, proje
     return false
   }
 
-  // Deterministic structural hash of parts & wires (ignoring minor visual x,y position shifts)
   const partTypes = circuit.parts.map((p) => p.type).sort().join(",")
   const wireNet = circuit.wires.map((w) => `${w.from.partId}:${w.from.pinId}->${w.to.partId}:${w.to.pinId}`).sort().join(";")
   const circuitHash = fnv1a(`${partTypes}|${wireNet}`)
@@ -330,12 +376,24 @@ export function awardCreationXp(circuit: CircuitState, blocklyXml: string, proje
   if (hasAi) basePoints += 100
   if (hasDisplay && hasSensor) basePoints += 50
 
-  return awardXp(`circuit:${circuitHash}`, "creation", `Built Custom Circuit: ${projectName || "Project"}`, basePoints, {
+  const awarded = awardXp(`circuit:${circuitHash}`, "creation", `Built Custom Circuit: ${projectName || "Project"}`, basePoints, {
     partTypes,
     hasAi,
     hasDisplay,
     hasSensor,
   })
+
+  // Trigger background creation backup to student profile
+  if (awarded) {
+    void syncXpWithServer(null, {
+      newCreation: {
+        name: projectName || "Custom Circuit",
+        summary: `Verified circuit with ${totalParts} components and ${totalWires} connections. Hash: ${circuitHash}`,
+      },
+    })
+  }
+
+  return awarded
 }
 
 /**
@@ -345,4 +403,158 @@ export function awardTinkeringXp(): boolean {
   const today = getTodayKey()
   const intervalIndex = Math.floor(Date.now() / (1000 * 60 * 5)) // 5 minute slot
   return awardXp(`tinker:${today}:${intervalIndex}`, "tinkering", "Active Circuit Simulation & Testing", 10)
+}
+
+/**
+ * Schedule a debounced cloud sync (1200ms)
+ */
+export function scheduleXpSync() {
+  if (typeof window === "undefined") return
+  if (syncTimeout) {
+    window.clearTimeout(syncTimeout)
+  }
+  syncTimeout = window.setTimeout(() => {
+    syncTimeout = null
+    void syncXpWithServer()
+  }, 1200)
+}
+
+/**
+ * Cloud-Backed Synchronization
+ * 
+ * If localStorage was cleared, this fetches the authoritative ledger from backend and re-hydrates local storage.
+ * If local ledger has newer events, it pushes them to the server to ensure zero progress loss.
+ */
+export async function syncXpWithServer(
+  studentId?: string | null,
+  options?: {
+    forceFetch?: boolean
+    newCreation?: { name: string; summary: string }
+  },
+): Promise<XpSummary | null> {
+  if (typeof window === "undefined" || isSyncInProgress) return null
+
+  if (studentId) {
+    setActiveStudentId(studentId)
+  }
+
+  isSyncInProgress = true
+  try {
+    let localLedger = loadXpLedger()
+    const shouldFetch = options?.forceFetch || localLedger.events.length === 0
+
+    // Step 1: Query server for cloud backup
+    let remoteLedger: Partial<XpLedger> | null = null
+    try {
+      const getResp = await apiFetch("/student-xp", { method: "GET", cache: "no-store" })
+      if (getResp.ok) {
+        const body = await getResp.json().catch(() => ({}))
+        if (body?.ledger && Array.isArray(body.ledger.events)) {
+          remoteLedger = body.ledger as Partial<XpLedger>
+        }
+      }
+    } catch {
+      // Offline / guest mode - continue gracefully with local ledger
+    }
+
+    // Step 2: If remote ledger exists, merge remote events into local
+    let hasRemoteNewEvents = false
+    if (remoteLedger && Array.isArray(remoteLedger.events)) {
+      const existingIds = new Set(localLedger.events.map((e) => e.id))
+      for (const remoteEvt of remoteLedger.events) {
+        if (remoteEvt?.id && !existingIds.has(remoteEvt.id)) {
+          // Re-sign with current device salt for tamper resilience
+          const evtWithoutSig = {
+            id: remoteEvt.id,
+            category: remoteEvt.category || "tinkering",
+            title: remoteEvt.title || "Restored Cloud Event",
+            xp: Number(remoteEvt.xp || 0),
+            timestamp: Number(remoteEvt.timestamp || Date.now()),
+            metadata: remoteEvt.metadata,
+          }
+          const signature = generateSignature(evtWithoutSig, localLedger.salt)
+          localLedger.events.push({
+            ...evtWithoutSig,
+            signature,
+          })
+          hasRemoteNewEvents = true
+        }
+      }
+
+      if (remoteLedger.streakDays && remoteLedger.streakDays > localLedger.streakDays) {
+        localLedger.streakDays = remoteLedger.streakDays
+      }
+    }
+
+    // If local was empty (cleared) or remote had more events, save and re-hydrate immediately
+    if (hasRemoteNewEvents || (localLedger.events.length === 0 && remoteLedger?.events?.length)) {
+      saveXpLedger(localLedger)
+    }
+
+    // Step 3: If local has unsynced events or newCreation, push to server
+    const remoteEventCount = remoteLedger?.events?.length || 0
+    const needsPush = localLedger.events.length > remoteEventCount || Boolean(options?.newCreation)
+
+    if (needsPush) {
+      try {
+        const pushPayload = {
+          events: localLedger.events,
+          streakDays: localLedger.streakDays,
+          salt: localLedger.salt,
+          newCreation: options?.newCreation,
+        }
+        const postResp = await apiFetch("/student-xp", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(pushPayload),
+        })
+        if (postResp.ok) {
+          lastSyncTimestamp = Date.now()
+          window.dispatchEvent(new CustomEvent(XP_SYNC_EVENT, { detail: { syncedAt: lastSyncTimestamp } }))
+        }
+      } catch {
+        // Postponed to next online sync
+      }
+    } else if (remoteLedger) {
+      lastSyncTimestamp = Date.now()
+      window.dispatchEvent(new CustomEvent(XP_SYNC_EVENT, { detail: { syncedAt: lastSyncTimestamp } }))
+    }
+
+    return getXpSummary(localLedger)
+  } catch {
+    return getXpSummary()
+  } finally {
+    isSyncInProgress = false
+  }
+}
+
+export interface SchoolLeaderboardEntry {
+  school_id: string
+  school_code: string
+  school_name: string
+  total_xp: number
+  active_students: number
+  creations_count: number
+  rank: number
+}
+
+export interface LeaderboardResult {
+  leaderboard: SchoolLeaderboardEntry[]
+  total_schools: number
+  student_class_rank: number | null
+  student_class_total: number
+}
+
+/**
+ * Fetch live school-wise ranking and class rank from backend
+ */
+export async function fetchSchoolLeaderboard(): Promise<LeaderboardResult | null> {
+  if (typeof window === "undefined") return null
+  try {
+    const resp = await apiFetch("/school-leaderboard", { method: "GET", cache: "no-store" })
+    if (!resp.ok) return null
+    return (await resp.json().catch(() => null)) as LeaderboardResult | null
+  } catch {
+    return null
+  }
 }

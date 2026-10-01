@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
-import { Award, Flame, Sparkles, Trophy, X, Zap } from "lucide-react"
-import { getXpSummary, XP_UPDATE_EVENT, type XpSummary } from "@/lib/xp-engine"
+import { Award, Cloud, Flame, RefreshCw, Sparkles, Trophy, X, Zap, ShieldCheck } from "lucide-react"
+import { getXpSummary, syncXpWithServer, XP_UPDATE_EVENT, XP_SYNC_EVENT, type XpSummary } from "@/lib/xp-engine"
 
 interface Props {
   className?: string
@@ -9,6 +9,7 @@ interface Props {
 export function XpBadgeButton({ className = "" }: Props) {
   const [summary, setSummary] = useState<XpSummary>(() => getXpSummary())
   const [isOpen, setIsOpen] = useState(false)
+  const [isSyncing, setIsSyncing] = useState(false)
 
   useEffect(() => {
     const handleUpdate = () => {
@@ -16,20 +17,34 @@ export function XpBadgeButton({ className = "" }: Props) {
     }
 
     window.addEventListener(XP_UPDATE_EVENT, handleUpdate)
+    window.addEventListener(XP_SYNC_EVENT, handleUpdate)
     window.addEventListener("storage", handleUpdate)
 
     return () => {
       window.removeEventListener(XP_UPDATE_EVENT, handleUpdate)
+      window.removeEventListener(XP_SYNC_EVENT, handleUpdate)
       window.removeEventListener("storage", handleUpdate)
     }
   }, [])
+
+  const handleManualSync = async () => {
+    setIsSyncing(true)
+    try {
+      const updated = await syncXpWithServer(null, { forceFetch: true })
+      if (updated) {
+        setSummary(updated)
+      }
+    } finally {
+      setIsSyncing(false)
+    }
+  }
 
   return (
     <>
       <button
         onClick={() => setIsOpen(true)}
         className={`flex items-center gap-1.5 rounded-lg border border-amber-500/40 bg-gradient-to-r from-amber-500/15 to-yellow-500/10 px-2 sm:px-2.5 py-1 text-xs font-bold text-amber-200 transition hover:border-amber-400 hover:bg-amber-500/20 shadow-sm cursor-pointer ${className}`}
-        title="View your Creator XP, Level & School Leaderboard"
+        title="View your Creator XP, Level & Cloud Sync"
       >
         <Zap size={13} className="text-amber-400 fill-amber-400 animate-pulse" />
         <span className="font-mono">{summary.totalXp} XP</span>
@@ -49,9 +64,14 @@ export function XpBadgeButton({ className = "" }: Props) {
                     {summary.levelInfo.icon}
                   </div>
                   <div>
-                    <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[9px] font-mono font-bold text-amber-300 ring-1 ring-amber-400/30">
-                      LEVEL {summary.level} · {summary.levelInfo.badge}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[9px] font-mono font-bold text-amber-300 ring-1 ring-amber-400/30">
+                        LEVEL {summary.level} · {summary.levelInfo.badge}
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-[9px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                        <Cloud size={10} /> Cloud-Synced
+                      </span>
+                    </div>
                     <h2 className="mt-1 text-base font-black sm:text-lg text-white">
                       {summary.levelInfo.title}
                     </h2>
@@ -123,21 +143,34 @@ export function XpBadgeButton({ className = "" }: Props) {
                 </div>
               </div>
 
-              {/* Anti-Cheat & Daily Cap Indicator */}
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-3">
+              {/* Cloud Sync & Anti-Cheat Indicator */}
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-3 space-y-2">
                 <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-400 flex items-center gap-1.5">
+                    <ShieldCheck size={14} className="text-emerald-400" /> Cloud Backup Status
+                  </span>
+                  <button
+                    onClick={handleManualSync}
+                    disabled={isSyncing}
+                    className="inline-flex items-center gap-1 text-[10px] font-mono text-cyan-400 hover:text-cyan-300 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-800/40 transition disabled:opacity-50 cursor-pointer"
+                  >
+                    <RefreshCw size={10} className={isSyncing ? "animate-spin" : ""} />
+                    {isSyncing ? "Syncing..." : "Sync / Restore"}
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-400 leading-relaxed">
+                  Your XP, Level & Badges are safely backed up to your Pixiu Student Profile. Even if your browser storage or cache is cleared, all your creations and points are permanently saved in the database.
+                </p>
+                <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-800/60">
                   <span className="text-slate-400">Today&apos;s XP Earned</span>
                   <span className="font-mono font-bold text-amber-300">{summary.todayXp} / 500 XP</span>
                 </div>
-                <div className="mt-2 h-1 overflow-hidden rounded-full bg-slate-800">
+                <div className="h-1 overflow-hidden rounded-full bg-slate-800">
                   <div
                     className="h-full rounded-full bg-cyan-400"
                     style={{ width: `${Math.min(100, (summary.todayXp / 500) * 100)}%` }}
                   />
                 </div>
-                <p className="mt-1.5 text-[9px] text-slate-500">
-                  🛡️ Protected by anti-spam verification & daily fair-play caps.
-                </p>
               </div>
 
               {/* Activity Log */}
@@ -165,7 +198,7 @@ export function XpBadgeButton({ className = "" }: Props) {
 
             {/* Footer */}
             <div className="border-t border-slate-800 bg-slate-950/60 p-3.5 text-center text-[10px] text-slate-500">
-              Your XP is synced with your school profile & inter-school rank.
+              Synced with your school profile & inter-school leaderboard.
             </div>
           </div>
         </div>

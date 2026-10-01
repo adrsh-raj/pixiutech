@@ -38,7 +38,7 @@ import { WelcomeOverlay } from "./welcome-overlay"
 import { CircuitDoctorHud } from "./circuit-doctor-hud"
 import { diagnoseCircuit } from "@/lib/circuit-doctor"
 import { buildInoSketch, triggerInoDownload } from "@/lib/sketch-exporter"
-import { awardCreationXp, awardTinkeringXp } from "@/lib/xp-engine"
+import { awardCreationXp, awardTinkeringXp, syncXpWithServer } from "@/lib/xp-engine"
 
 function PixiuModuleLoading({ title, subtitle }: { title: string; subtitle: string }) {
   return (
@@ -169,6 +169,7 @@ export function Workbench() {
     }
 
     void restoreCurrentProject()
+    void syncXpWithServer()
     return () => {
       cancelled = true
     }

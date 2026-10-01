@@ -11,6 +11,7 @@ from billing.views import InvoiceLineItemViewSet, PaymentViewSet, ReceiptViewSet
 from inventory.views import KitMaintenanceViewSet
 from .analytics import SchoolPerformanceView, StudentProgressView, TrainerPerformanceView
 from .class_ranking import ClassRankingView
+from .student_xp_views import SchoolLeaderboardView, StudentXpView
 from .api_v1_compat import health
 from .secure_upload import SecureUploadView
 from .assessment_views_v2 import IdempotentAssessmentViewSet
@@ -106,6 +107,7 @@ urlpatterns = [
     path('content/<uuid:pk>/playback', LearningContentPlaybackTokenView.as_view(), name='v1-learning-content-playback'),
     path('content/<uuid:pk>/video', LearningContentVideoView.as_view(), name='v1-learning-content-video'), path('billing-summary', billing_summary, name='v1-billing-summary'), path('billing-profile', billing_profile, name='v1-billing-profile'),
     path('class-ranking', ClassRankingView.as_view(), name='v1-class-ranking'), path('student-progress', StudentProgressView.as_view(), name='v1-student-progress'), path('trainer-performance', TrainerPerformanceView.as_view(), name='v1-trainer-performance'), path('school-performance', SchoolPerformanceView.as_view(), name='v1-school-performance'),
+    path('student-xp', StudentXpView.as_view(), name='v1-student-xp'), path('school-leaderboard', SchoolLeaderboardView.as_view(), name='v1-school-leaderboard'),
     path('quizzes/<uuid:pk>/start', QuizStartView.as_view(), name='v1-quiz-start'), path('quizzes/<uuid:pk>/single-attempt', QuizSingleAttemptView.as_view(), name='v1-quiz-single-attempt'),
     path('quiz-review', QuizReviewView.as_view(), name='v1-quiz-review'), path('quiz-results/<uuid:pk>', QuizResultView.as_view(), name='v1-quiz-result'), path('quiz-results/<uuid:pk>/pdf', QuizResultPdfView.as_view(), name='v1-quiz-result-pdf'),
     path('trainer-units', TrainerUnitListCreateView.as_view(), name='v1-trainer-units'),
