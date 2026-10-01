@@ -82,21 +82,57 @@ function ResistorBands({ resistance }: { resistance: number }) {
 export function PartArt({ part, runtime }: { part: PlacedPart; runtime?: PartRuntime }) {
   switch (part.type) {
     case "arduino-uno": {
-      const topPinLabels = ["AREF", "GND", "13", "12", "~11", "~10", "~9", "8", "7", "~6", "~5", "4", "~3", "2", "TX>1", "RX<0"]
-      const topPinKeys = ["aref", "gnd", "d13", "d12", "d11", "d10", "d9", "d8", "d7", "d6", "d5", "d4", "d3", "d2", "d1", "d0"]
-      const bottomPinLabels = ["5V", "3V3", "RST", "VIN", "GND", "A0", "A1", "A2", "A3", "A4", "A5"]
-      const bottomPinKeys = ["5v", "3v3", "rst", "vin", "gnd_pwr", "a0", "a1", "a2", "a3", "a4", "a5"]
+      const TOP_PINS_META = [
+        { id: "aref", label: "AREF", isPwm: false },
+        { id: "gnd", label: "GND", isPwm: false },
+        { id: "d13", label: "13", isPwm: false },
+        { id: "d12", label: "12", isPwm: false },
+        { id: "d11", label: "11", isPwm: true },
+        { id: "d10", label: "10", isPwm: true },
+        { id: "d9", label: "9", isPwm: true },
+        { id: "d8", label: "8", isPwm: false },
+        { id: "d7", label: "7", isPwm: false },
+        { id: "d6", label: "6", isPwm: true },
+        { id: "d5", label: "5", isPwm: true },
+        { id: "d4", label: "4", isPwm: false },
+        { id: "d3", label: "3", isPwm: true },
+        { id: "d2", label: "2", isPwm: false },
+        { id: "d1", label: "1", isPwm: false, sub: "TX" },
+        { id: "d0", label: "0", isPwm: false, sub: "RX" },
+      ]
+
+      const BOTTOM_PINS_META = [
+        { id: "5v", label: "5V", isAnalog: false },
+        { id: "3v3", label: "3.3V", isAnalog: false },
+        { id: "rst", label: "RESET", isAnalog: false },
+        { id: "vin", label: "VIN", isAnalog: false },
+        { id: "gnd_pwr", label: "GND", isAnalog: false },
+        { id: "a0", label: "A0", isAnalog: true },
+        { id: "a1", label: "A1", isAnalog: true },
+        { id: "a2", label: "A2", isAnalog: true },
+        { id: "a3", label: "A3", isAnalog: true },
+        { id: "a4", label: "A4", isAnalog: true },
+        { id: "a5", label: "A5", isAnalog: true },
+      ]
 
       return (
         <g className="select-none">
-          {/* Main PCB substrate with rich teal color and rounded corners */}
-          <rect x={0} y={0} width={320} height={200} rx={10} fill="#0d5c58" stroke="#063f3b" strokeWidth={2.5} />
-          {/* Internal ground planes and routed zone shading */}
-          <rect x={6} y={18} width={308} height={164} rx={6} fill="#0b504c" opacity={0.7} />
-          <path d="M 10,40 L 40,40 L 50,86 L 10,86 Z" fill="#09423e" opacity={0.5} />
-          <path d="M 270,30 L 310,30 L 310,170 L 270,170 Z" fill="#09423e" opacity={0.4} />
+          {/* Main PCB substrate with official vibrant Arduino Teal */}
+          <rect x={0} y={0} width={320} height={200} rx={10} fill="#00878f" stroke="#005d63" strokeWidth={2.5} />
+          {/* Internal copper zones and routed ground planes */}
+          <rect x={6} y={17} width={308} height={166} rx={6} fill="#007a82" opacity={0.8} />
+          <path d="M 8,36 L 44,36 L 54,86 L 8,86 Z" fill="#006b72" opacity={0.6} />
+          <path d="M 268,26 L 312,26 L 312,174 L 268,174 Z" fill="#006b72" opacity={0.5} />
+          {/* Subtle gold PCB via pads */}
+          {[
+            { cx: 72, cy: 30 }, { cx: 78, cy: 30 }, { cx: 72, cy: 36 },
+            { cx: 270, cy: 88 }, { cx: 270, cy: 94 }, { cx: 270, cy: 100 },
+            { cx: 110, cy: 154 }, { cx: 116, cy: 154 },
+          ].map((v, i) => (
+            <circle key={i} cx={v.cx} cy={v.cy} r={1.2} fill="#eab308" stroke="#ca8a04" strokeWidth={0.5} />
+          ))}
 
-          {/* Brass mounting holes */}
+          {/* Brass corner mounting holes */}
           {[
             { cx: 16, cy: 16 },
             { cx: 306, cy: 16 },
@@ -104,185 +140,224 @@ export function PartArt({ part, runtime }: { part: PlacedPart; runtime?: PartRun
             { cx: 306, cy: 184 },
           ].map((h, i) => (
             <g key={i}>
-              <circle cx={h.cx} cy={h.cy} r={6.5} fill="#d97706" stroke="#b45309" strokeWidth={1} />
+              <circle cx={h.cx} cy={h.cy} r={6.5} fill="#eab308" stroke="#ca8a04" strokeWidth={1} />
               <circle cx={h.cx} cy={h.cy} r={4} fill="#0f172a" />
             </g>
           ))}
 
           {/* Metallic USB Type-B Port */}
           <g>
-            <rect x={-6} y={38} width={34} height={46} rx={3} fill="#cbd5e1" stroke="#64748b" strokeWidth={1.5} />
-            <rect x={-6} y={42} width={28} height={38} rx={2} fill="#94a3b8" />
-            <rect x={-2} y={46} width={20} height={30} rx={2} fill="#334155" />
-            <rect x={2} y={54} width={12} height={14} fill="#0f172a" />
+            <rect x={-6} y={36} width={34} height={48} rx={3} fill="#cbd5e1" stroke="#475569" strokeWidth={1.5} />
+            <rect x={-6} y={40} width={28} height={40} rx={2} fill="#94a3b8" />
+            <rect x={-2} y={45} width={20} height={30} rx={2} fill="#334155" />
+            <rect x={2} y={53} width={12} height={14} fill="#0f172a" />
           </g>
 
           {/* 2.1mm DC Barrel Power Jack */}
           <g>
-            <rect x={-6} y={120} width={30} height={38} rx={4} fill="#1e293b" stroke="#090d16" strokeWidth={2} />
-            <rect x={-6} y={126} width={24} height={26} rx={2} fill="#0f172a" />
-            <circle cx={4} cy={139} r={4.5} fill="#64748b" />
-            <circle cx={4} cy={139} r={2} fill="#e2e8f0" />
+            <rect x={-6} y={118} width={32} height={42} rx={4} fill="#1e293b" stroke="#090d16" strokeWidth={2} />
+            <rect x={-6} y={124} width={26} height={30} rx={2} fill="#0f172a" />
+            <circle cx={4} cy={139} r={5} fill="#475569" />
+            <circle cx={4} cy={139} r={2.5} fill="#cbd5e1" />
           </g>
 
           {/* 16.000 MHz Crystal Oscillator */}
           <g>
-            <rect x={86} y={54} width={22} height={14} rx={6} fill="#e2e8f0" stroke="#94a3b8" strokeWidth={1} />
-            <text x={97} y={64} textAnchor="middle" fontSize={6} fill="#334155" fontFamily="monospace" fontWeight={700}>
-              16.0
+            <rect x={76} y={52} width={24} height={15} rx={6} fill="#e2e8f0" stroke="#64748b" strokeWidth={1} />
+            <rect x={78} y={54} width={20} height={11} rx={4} fill="#f1f5f9" />
+            <text x={88} y={62.5} textAnchor="middle" fontSize={5.5} fill="#334155" fontFamily="system-ui, sans-serif" fontWeight={800}>
+              16.000
             </text>
           </g>
 
-          {/* AMS1117 Voltage Regulator & SMT Caps */}
+          {/* 5V Voltage Regulator & SMT Caps */}
           <g>
-            <rect x={66} y={136} width={18} height={14} rx={1} fill="#1e293b" />
-            <rect x={70} y={132} width={10} height={4} fill="#64748b" />
-            <rect x={68} y={150} width={4} height={4} fill="#94a3b8" />
-            <rect x={78} y={150} width={4} height={4} fill="#94a3b8" />
+            <rect x={66} y={134} width={18} height={15} rx={1} fill="#1e293b" stroke="#334155" strokeWidth={0.8} />
+            <rect x={70} y={130} width={10} height={4} fill="#64748b" />
+            <rect x={68} y={149} width={3.5} height={4} fill="#94a3b8" />
+            <rect x={73.5} y={149} width={3.5} height={4} fill="#94a3b8" />
+            <rect x={79} y={149} width={3.5} height={4} fill="#94a3b8" />
             {/* Capacitors */}
-            <circle cx={48} cy={144} r={6} fill="#334155" stroke="#94a3b8" strokeWidth={1} />
+            <circle cx={48} cy={144} r={6} fill="#334155" stroke="#64748b" strokeWidth={1} />
             <path d="M 44,141 L 52,141" stroke="#cbd5e1" strokeWidth={1} />
-            <circle cx={48} cy={166} r={6} fill="#334155" stroke="#94a3b8" strokeWidth={1} />
+            <circle cx={48} cy={166} r={6} fill="#334155" stroke="#64748b" strokeWidth={1} />
             <path d="M 44,163 L 52,163" stroke="#cbd5e1" strokeWidth={1} />
           </g>
 
           {/* ATmega328P DIP-28 Microcontroller with socket & pins */}
           <g>
             {/* DIP Socket Base */}
-            <rect x={126} y={92} width={128} height={56} rx={3} fill="#18202c" stroke="#334155" strokeWidth={1} />
+            <rect x={120} y={90} width={138} height={58} rx={3} fill="#111827" stroke="#374151" strokeWidth={1.2} />
             {/* 28 IC Silver Lead Pins (14 on top, 14 on bottom) */}
             {Array.from({ length: 14 }).map((_, i) => (
               <g key={i}>
-                <rect x={132 + i * 8.6} y={87} width={3.5} height={6} fill="#cbd5e1" rx={0.5} />
-                <rect x={132 + i * 8.6} y={147} width={3.5} height={6} fill="#cbd5e1" rx={0.5} />
+                <rect x={126 + i * 9.2} y={85} width={4} height={6} fill="#cbd5e1" rx={0.5} stroke="#64748b" strokeWidth={0.5} />
+                <rect x={126 + i * 9.2} y={147} width={4} height={6} fill="#cbd5e1" rx={0.5} stroke="#64748b" strokeWidth={0.5} />
               </g>
             ))}
             {/* Main IC Package */}
-            <rect x={130} y={94} width={120} height={52} rx={2} fill="#0f172a" />
+            <rect x={124} y={92} width={130} height={54} rx={2} fill="#1c2430" />
             {/* Pin 1 semicircular orientation notch */}
-            <path d="M 130,116 A 4,4 0 0,0 130,124 Z" fill="#1e293b" />
-            <circle cx={138} cy={102} r={2} fill="#334155" />
-            {/* Silkscreen text on chip */}
-            <text x={190} y={116} textAnchor="middle" fontSize={10} fill="#cbd5e1" fontFamily="monospace" fontWeight={700}>
+            <path d="M 124,114 A 5,5 0 0,0 124,124 Z" fill="#111827" />
+            <circle cx={133} cy={100} r={2.2} fill="#111827" stroke="#374151" strokeWidth={0.6} />
+            {/* High-contrast laser-etched silkscreen on chip */}
+            <text x={189} y={117} textAnchor="middle" fontSize={11} fill="#f8fafc" fontFamily="monospace" fontWeight={800} letterSpacing="0.08em">
               ATMEGA328P-PU
             </text>
-            <text x={190} y={130} textAnchor="middle" fontSize={7} fill="#64748b" fontFamily="monospace">
-              ATMEL 2134 U
+            <text x={189} y={132} textAnchor="middle" fontSize={7.5} fill="#94a3b8" fontFamily="monospace" fontWeight={600} letterSpacing="0.05em">
+              MICROCHIP 2348
             </text>
           </g>
 
           {/* Interactive Red Tactile Reset Switch */}
           <g className="cursor-pointer">
-            <rect x={38} y={94} width={22} height={22} rx={3} fill="#cbd5e1" stroke="#64748b" strokeWidth={1} />
+            <rect x={38} y={94} width={22} height={22} rx={3} fill="#e2e8f0" stroke="#94a3b8" strokeWidth={1} />
             <circle cx={49} cy={105} r={7} fill="#dc2626" stroke="#991b1b" strokeWidth={1.2} />
-            <circle cx={49} cy={105} r={3} fill="#ef4444" />
-            <text x={49} y={124} textAnchor="middle" fontSize={6} fill="#fca5a5" fontFamily="sans-serif" fontWeight={700}>
+            <circle cx={48.5} cy={104.5} r={3.5} fill="#ef4444" />
+            <text x={49} y={124} textAnchor="middle" fontSize={6.5} fill="#ffffff" fontFamily="system-ui, sans-serif" fontWeight={800}>
               RESET
             </text>
           </g>
 
           {/* Top Female Header Socket */}
-          <rect x={14} y={2} width={292} height={14} rx={2} fill="#0f172a" stroke="#1e293b" strokeWidth={1} />
-          {/* Bottom Female Header Socket */}
-          <rect x={30} y={184} width={260} height={14} rx={2} fill="#0f172a" stroke="#1e293b" strokeWidth={1} />
+          <rect x={14} y={1} width={292} height={14} rx={2} fill="#111827" stroke="#1f2937" strokeWidth={1} />
 
-          {/* Top Header Pin Holes, Labels and Live Indicator LEDs */}
-          {topPinLabels.map((label, i) => {
-            const px = Math.round(22 + (i / 15) * (320 - 44))
-            const pinKey = topPinKeys[i]
-            const isPinActive = Boolean(
-              runtime?.activePins?.[pinKey] ||
-              (pinKey === "d13" && runtime?.pin13High),
-            )
-            const isPwm = label.startsWith("~")
+          {/* Top Header Pin Sockets, Clean High-Contrast Labels */}
+          {TOP_PINS_META.map((pin, i) => {
+            const px = Math.round(22 + (i / 15) * 276)
             return (
-              <g key={i}>
-                {/* Socket hole */}
-                <rect x={px - 2.5} y={5} width={5} height={7} rx={1} fill="#1e293b" stroke="#334155" strokeWidth={0.5} />
-                {/* Pin label text */}
-                <text x={px} y={26} textAnchor="middle" fontSize={6.5} fill="#e2e8f0" fontFamily="monospace" fontWeight={600}>
-                  {label}
-                </text>
-                {/* Live SMD Indicator LED next to pin */}
-                <circle
-                  cx={px}
-                  cy={33}
-                  r={isPinActive ? 2.5 : 1.5}
-                  fill={isPinActive ? (isPwm ? "#f59e0b" : "#22c55e") : "#1e293b"}
-                  stroke={isPinActive ? "#ffffff" : "#334155"}
-                  strokeWidth={0.6}
-                />
-                {isPinActive && (
-                  <circle cx={px} cy={33} r={5} fill={isPwm ? "#f59e0b" : "#22c55e"} opacity={0.4} />
-                )}
-              </g>
-            )
-          })}
+              <g key={pin.id}>
+                {/* Outer socket cell */}
+                <rect x={px - 6.5} y={1.5} width={13} height={13} rx={1.5} fill="#182026" stroke="#2d3748" strokeWidth={0.8} />
+                {/* Inner pin socket hole (matches canvas pin circle center at y=8) */}
+                <rect x={px - 4} y={4} width={8} height={8} rx={1} fill="#0b0f17" stroke="#374151" strokeWidth={0.8} />
+                <rect x={px - 2} y={5.5} width={4} height={5} fill="#4b5563" />
 
-          {/* Bottom Header Pin Holes, Labels and Live Indicator LEDs */}
-          {bottomPinLabels.map((label, i) => {
-            const px = Math.round(40 + (i / 10) * (320 - 80))
-            const pinKey = bottomPinKeys[i]
-            const isPinActive = Boolean(runtime?.activePins?.[pinKey])
-            const isAnalog = label.startsWith("A")
-            return (
-              <g key={i}>
-                {/* Socket hole */}
-                <rect x={px - 2.5} y={187} width={5} height={7} rx={1} fill="#1e293b" stroke="#334155" strokeWidth={0.5} />
-                {/* Pin label text */}
-                <text x={px} y={178} textAnchor="middle" fontSize={6.5} fill="#e2e8f0" fontFamily="monospace" fontWeight={600}>
-                  {label}
-                </text>
-                {/* Live indicator LED */}
-                {isAnalog && (
+                {/* Crystal-clear Pin Label */}
+                {pin.sub ? (
                   <>
-                    <circle
-                      cx={px}
-                      cy={168}
-                      r={isPinActive ? 2.5 : 1.5}
-                      fill={isPinActive ? "#06b6d4" : "#1e293b"}
-                      stroke={isPinActive ? "#ffffff" : "#334155"}
-                      strokeWidth={0.6}
-                    />
-                    {isPinActive && <circle cx={px} cy={168} r={5} fill="#06b6d4" opacity={0.4} />}
+                    <text x={px} y={23} textAnchor="middle" fontSize={8} fill="#ffffff" fontFamily="system-ui, -apple-system, sans-serif" fontWeight={800}>
+                      {pin.label}
+                    </text>
+                    <text x={px} y={31} textAnchor="middle" fontSize={5.5} fill="#38bdf8" fontFamily="system-ui, -apple-system, sans-serif" fontWeight={800}>
+                      {pin.sub}
+                    </text>
                   </>
+                ) : pin.isPwm ? (
+                  <text x={px} y={25} textAnchor="middle" fontSize={8} fill="#ffffff" fontFamily="system-ui, -apple-system, sans-serif" fontWeight={800}>
+                    <tspan fill="#f59e0b" fontWeight={900}>~</tspan>{pin.label}
+                  </text>
+                ) : (
+                  <text x={px} y={25} textAnchor="middle" fontSize={pin.label.length > 2 ? 6.5 : 8} fill="#ffffff" fontFamily="system-ui, -apple-system, sans-serif" fontWeight={800}>
+                    {pin.label}
+                  </text>
                 )}
               </g>
             )
           })}
 
-          {/* Silkscreen Board Branding */}
-          <text x={160} y={54} textAnchor="middle" fontSize={15} fill="#f0fdfa" fontFamily="monospace" fontWeight={900} letterSpacing="0.05em">
+          {/* Top Silkscreen Section Brackets */}
+          <path d="M 52,32 L 52,34 L 268,34 L 268,32" stroke="#ffffff" strokeWidth={0.8} fill="none" opacity={0.85} />
+          <text x={160} y={42} textAnchor="middle" fill="#ffffff" fontSize={6.5} fontFamily="system-ui, -apple-system, sans-serif" fontWeight={800} letterSpacing="0.08em">
+            DIGITAL (PWM ~)
+          </text>
+          <path d="M 274,32 L 274,34 L 304,34 L 304,32" stroke="#38bdf8" strokeWidth={0.8} fill="none" opacity={0.85} />
+          <text x={289} y={42} textAnchor="middle" fill="#38bdf8" fontSize={6} fontFamily="system-ui, -apple-system, sans-serif" fontWeight={800} letterSpacing="0.06em">
+            COMM
+          </text>
+
+          {/* Bottom Female Header Socket */}
+          <rect x={30} y={185} width={260} height={14} rx={2} fill="#111827" stroke="#1f2937" strokeWidth={1} />
+
+          {/* Bottom Header Pin Sockets, Clean High-Contrast Labels */}
+          {BOTTOM_PINS_META.map((pin, i) => {
+            const px = Math.round(40 + (i / 10) * 240)
+            return (
+              <g key={pin.id}>
+                {/* Outer socket cell */}
+                <rect x={px - 6.5} y={186} width={13} height={12} rx={1.5} fill="#182026" stroke="#2d3748" strokeWidth={0.8} />
+                {/* Inner pin socket hole (matches canvas pin circle center at y=192) */}
+                <rect x={px - 4} y={188} width={8} height={8} rx={1} fill="#0b0f17" stroke="#374151" strokeWidth={0.8} />
+                <rect x={px - 2} y={189.5} width={4} height={5} fill="#4b5563" />
+
+                {/* Pin label text */}
+                <text
+                  x={px}
+                  y={179}
+                  textAnchor="middle"
+                  fontSize={pin.label.length > 3 ? 6.5 : 7.5}
+                  fill={pin.isAnalog ? "#38bdf8" : "#ffffff"}
+                  fontFamily="system-ui, -apple-system, sans-serif"
+                  fontWeight={800}
+                >
+                  {pin.label}
+                </text>
+              </g>
+            )
+          })}
+
+          {/* Bottom Silkscreen Section Brackets */}
+          <path d="M 34,171 L 34,169 L 142,169 L 142,171" stroke="#ffffff" strokeWidth={0.8} fill="none" opacity={0.85} />
+          <text x={88} y={164} textAnchor="middle" fill="#ffffff" fontSize={6.5} fontFamily="system-ui, -apple-system, sans-serif" fontWeight={800} letterSpacing="0.08em">
+            POWER
+          </text>
+          <path d="M 154,171 L 154,169 L 286,169 L 286,171" stroke="#38bdf8" strokeWidth={0.8} fill="none" opacity={0.85} />
+          <text x={220} y={164} textAnchor="middle" fill="#38bdf8" fontSize={6.5} fontFamily="system-ui, -apple-system, sans-serif" fontWeight={800} letterSpacing="0.08em">
+            ANALOG IN
+          </text>
+
+          {/* Silkscreen Board Branding & Iconic Infinity Loop */}
+          <g transform="translate(142, 50)">
+            <path d="M 0,6 C 0,0 10,0 14,6 C 18,12 28,12 28,6 C 28,0 18,0 14,6 C 10,12 0,12 0,6 Z" fill="none" stroke="#ffffff" strokeWidth={2.4} />
+            <text x={4.5} y={8} fontSize={7} fill="#ffffff" fontWeight={900}>-</text>
+            <text x={20.5} y={8} fontSize={7} fill="#ffffff" fontWeight={900}>+</text>
+          </g>
+          <text x={180} y={56} fontSize={13} fill="#ffffff" fontFamily="system-ui, -apple-system, sans-serif" fontWeight={900} letterSpacing="0.08em">
             ARDUINO
           </text>
-          <text x={160} y={68} textAnchor="middle" fontSize={10} fill="#99f6e4" fontFamily="monospace" fontWeight={700}>
+          <text x={180} y={70} fontSize={10} fill="#99f6e4" fontFamily="system-ui, -apple-system, sans-serif" fontWeight={800} letterSpacing="0.04em">
             UNO R3
           </text>
-          <text x={266} y={78} textAnchor="end" fontSize={6} fill="#5eead4" fontFamily="sans-serif">
+          <text x={180} y={80} fontSize={6.5} fill="#cbd5e1" fontFamily="system-ui, -apple-system, sans-serif" fontWeight={700} letterSpacing="0.08em">
             MADE IN ITALY
           </text>
 
-          {/* Onboard System Status LEDs: ON, L, TX, RX */}
+          {/* Onboard Status LEDs: ON, L, TX, RX */}
           {/* ON Power LED (Green) */}
           <g>
-            <rect x={80} y={76} width={5} height={7} rx={1} fill="#22c55e" stroke="#15803d" strokeWidth={0.5} />
-            <circle cx={82.5} cy={79.5} r={6} fill="#22c55e" opacity={0.4} />
-            <text x={82.5} y={90} textAnchor="middle" fontSize={6} fill="#86efac" fontWeight={700}>ON</text>
+            <circle cx={98} cy={105} r={3.5} fill="#22c55e" stroke="#15803d" strokeWidth={0.8} />
+            <circle cx={98} cy={105} r={6} fill="#22c55e" opacity={0.4} />
+            <text x={98} y={116} textAnchor="middle" fontSize={6} fill="#ffffff" fontFamily="system-ui, sans-serif" fontWeight={800}>
+              ON
+            </text>
           </g>
 
           {/* Built-in L LED (Pin 13 Indicator) */}
           <g>
-            <rect x={122} y={42} width={6} height={8} rx={1} fill={runtime?.pin13High ? "#f59e0b" : "#334155"} />
-            {runtime?.pin13High && <circle cx={125} cy={46} r={7} fill="#f59e0b" opacity={0.5} />}
-            <text x={125} y={58} textAnchor="middle" fontSize={6.5} fill="#fde68a" fontWeight={700}>L</text>
+            <circle
+              cx={108}
+              cy={60}
+              r={3.5}
+              fill={runtime?.pin13High ? "#f59e0b" : "#78350f"}
+              stroke={runtime?.pin13High ? "#ffffff" : "#451a03"}
+              strokeWidth={0.8}
+            />
+            {runtime?.pin13High && <circle cx={108} cy={60} r={7} fill="#f59e0b" opacity={0.5} />}
+            <text x={117} y={62.5} fontSize={7} fill="#ffffff" fontFamily="system-ui, sans-serif" fontWeight={800}>
+              L
+            </text>
           </g>
 
           {/* TX & RX LEDs */}
           <g>
-            <rect x={96} y={42} width={5} height={7} rx={1} fill="#334155" />
-            <text x={98.5} y={56} textAnchor="middle" fontSize={5.5} fill="#cbd5e1">TX</text>
-            <rect x={106} y={42} width={5} height={7} rx={1} fill="#334155" />
-            <text x={108.5} y={56} textAnchor="middle" fontSize={5.5} fill="#cbd5e1">RX</text>
+            <circle cx={108} cy={72} r={3} fill="#78350f" stroke="#451a03" strokeWidth={0.6} />
+            <text x={117} y={74} fontSize={6} fill="#cbd5e1" fontFamily="system-ui, sans-serif" fontWeight={700}>
+              TX
+            </text>
+            <circle cx={108} cy={83} r={3} fill="#78350f" stroke="#451a03" strokeWidth={0.6} />
+            <text x={117} y={85} fontSize={6} fill="#cbd5e1" fontFamily="system-ui, sans-serif" fontWeight={700}>
+              RX
+            </text>
           </g>
         </g>
       )
