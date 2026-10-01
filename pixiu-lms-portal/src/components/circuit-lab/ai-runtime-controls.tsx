@@ -6,7 +6,7 @@ export function AiRuntimeControls({ viewModel }: { viewModel: AiStudioViewModel 
   const isActive = isSound ? soundActive : cameraActive
 
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4 shadow-lg">
+    <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-3 shadow-md">
       <div className="flex items-center justify-between">
         <p className="text-xs font-black text-white">Camera & Microphone</p>
         <span
@@ -20,12 +20,12 @@ export function AiRuntimeControls({ viewModel }: { viewModel: AiStudioViewModel 
           {isActive ? "ACTIVE" : "STANDBY"}
         </span>
       </div>
-      <p className="mt-2 text-[10px] leading-5 text-slate-400">
+      <p className="mt-1.5 text-[9.5px] leading-4 text-slate-400">
         {isSound
           ? "Microphone is used for speech recognition. Audio runs 100% locally in your browser."
           : `Vision camera feeds ${activeTitle.toLowerCase()} inference via TensorFlow.js. Frames stay in your local browser.`}
       </p>
-      <div className="mt-3 flex flex-wrap gap-2">
+      <div className="mt-2.5 flex flex-wrap gap-2">
         <button
           type="button"
           onClick={
@@ -34,7 +34,7 @@ export function AiRuntimeControls({ viewModel }: { viewModel: AiStudioViewModel 
               : (cameraActive ? stopInput : () => void startCameraForMode())
           }
           className={
-            "inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-[10px] font-black transition-all cursor-pointer " +
+            "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-black transition-all cursor-pointer " +
             (isActive
               ? "border border-rose-500/50 bg-rose-500/15 text-rose-200 hover:bg-rose-500/25"
               : "bg-violet-600 text-white shadow-md shadow-violet-600/20 hover:bg-violet-500")
