@@ -12,6 +12,7 @@ import {
   markStepComplete,
   resetLessonProgress,
 } from "@/lib/lesson-engine"
+import { awardMissionXp } from "@/lib/xp-engine"
 
 interface Props {
   isOpen: boolean
@@ -79,7 +80,14 @@ export function LessonBrowser({
     const result = evaluateLessonStep(lesson, step, context)
     setLastResults((current) => ({ ...current, [`${lesson.id}:${step.id}`]: result }))
     if (result.passed) {
-      setProgress((current) => markStepComplete(current, lesson, step.id))
+      setProgress((current) => {
+        const next = markStepComplete(current, lesson, step.id)
+        const completed = next[lesson.id]?.completedStepIds || []
+        if (completed.length >= lesson.steps.length) {
+          awardMissionXp(lesson.id, lesson.difficulty, lesson.shortTitle || lesson.title)
+        }
+        return next
+      })
     }
   }
 

@@ -38,6 +38,7 @@ import { WelcomeOverlay } from "./welcome-overlay"
 import { CircuitDoctorHud } from "./circuit-doctor-hud"
 import { diagnoseCircuit } from "@/lib/circuit-doctor"
 import { buildInoSketch, triggerInoDownload } from "@/lib/sketch-exporter"
+import { awardCreationXp, awardTinkeringXp } from "@/lib/xp-engine"
 
 function PixiuModuleLoading({ title, subtitle }: { title: string; subtitle: string }) {
   return (
@@ -1078,6 +1079,9 @@ export function Workbench() {
       setCurrentProjectName(saved.name)
       setLastSaved(saved.savedAt)
       setIsDirty(false)
+      if (name && name !== "Untitled Circuit") {
+        awardCreationXp(state, xmlToSave, name)
+      }
     } catch (error) {
       setIsDirty(true)
       throw error
@@ -1085,6 +1089,15 @@ export function Workbench() {
       setIsSaving(false)
     }
   }, [blocklyXml, currentProjectName, state])
+
+  // Active simulation tinkering heartbeat (awards engagement XP for interactive testing)
+  useEffect(() => {
+    if (!running) return
+    const interval = window.setInterval(() => {
+      awardTinkeringXp()
+    }, 5 * 60 * 1000)
+    return () => window.clearInterval(interval)
+  }, [running])
 
   useEffect(() => {
     saveNowRef.current = () => {

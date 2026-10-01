@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom"
 import { useEffect, useRef, useState } from "react"
 import { CircuitBoard, Play, Square, Trash2, ArrowLeft, Undo2, Redo2, FolderOpen, BookOpen, Terminal, Volume2, VolumeX, Sparkles, Camera, Sliders, Pause, StepForward, FastForward, MoreHorizontal, HelpCircle, ShieldAlert, Download, Cpu } from "lucide-react"
+import { XpBadgeButton } from "./xp-badge-modal"
 import "./pixiu-brand.css"
 
 export type WorkbenchView = "circuit" | "code" | "3d"
@@ -269,6 +270,9 @@ export function Toolbar({
             )}
           </button>
         )}
+
+        {/* Creator XP & Level Badge Button */}
+        <XpBadgeButton />
 
         {onOpenProjects && (
           <button
