@@ -12,9 +12,9 @@ import { audioEngine } from "@/lib/audio-engine"
 import { createHistory, pushState, undo as historyUndo, redo as historyRedo, canUndo, canRedo, type HistoryState } from "@/lib/history"
 import { saveCircuit, loadCurrentCircuit, saveCurrentCircuit, clearCurrentCircuit, importFromJSON, exportAsJSON, type SavedCircuit } from "@/lib/storage"
 import * as Blockly from "blockly"
-import { Boxes, Camera, Sparkles, Terminal, Trash2, Gauge, Sliders, ShieldAlert } from "lucide-react"
 import { computeWireCurrents } from "@/lib/current-flow"
-import { isBoardPart } from "@/lib/board-registry"
+import { isBoardPart, getActiveBoard, scaleAdcReading } from "@/lib/board-registry"
+import { solveCircuitNodalPotentials } from "@/lib/circuit-solver"
 import { Multimeter } from "./multimeter"
 import { Oscilloscope } from "./oscilloscope"
 import { CircuitCanvas } from "./circuit-canvas"
@@ -673,6 +673,7 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
           }))
         },
         getSensorValue: (type, pin) => {
+          const activeBoard = getActiveBoard(state)
           const directPart = pin ? partsRef.current.find((pt) => pt.id === pin) : undefined
           const aliases: Record<string, string> = {
             pir: "pir-sensor",
@@ -695,22 +696,73 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
 
           if (type === "pushbutton") return p ? (pressedRef.current.has(p.id) ? 1 : 0) : 0
           if (type === "ultrasonic") return liveRuntime?.sensorValue ?? (runningRef.current ? 0 : Number(p?.props?.distance ?? 100))
-          if (type === "ldr") return liveRuntime?.sensorValue ?? (runningRef.current ? 0 : Number(p?.props?.light ?? 512))
+          if (type === "ldr") {
+            const raw = liveRuntime?.sensorValue ?? (runningRef.current ? 0 : Number(p?.props?.light ?? 512))
+            return scaleAdcReading(Math.max(0, Math.min(1, raw / 1023)), activeBoard)
+          }
           if (type === "tmp36") return liveRuntime?.sensorValue ?? (runningRef.current ? 0 : Number(p?.props?.temperature ?? 25))
           if (type === "pir") return liveRuntime?.level ?? (runningRef.current ? 0 : String(p?.props?.motion ?? "false") === "true" ? 1 : 0)
-          if (type === "potentiometer") return Number(p?.props?.value ?? 512)
+          if (type === "potentiometer") {
+            const raw = Number(p?.props?.value ?? 512)
+            return scaleAdcReading(Math.max(0, Math.min(1, raw / 1023)), activeBoard)
+          }
           if (type === "ir") return liveRuntime?.sensorValue ?? (runningRef.current ? 0 : String(p?.props?.detected ?? "false") === "true" ? 1 : 0)
           if (type === "dht_temperature") return liveRuntime?.dhtTemperature ?? (runningRef.current ? 0 : Number(p?.props?.temperature ?? 25))
           if (type === "dht_humidity") return liveRuntime?.dhtHumidity ?? (runningRef.current ? 0 : Number(p?.props?.humidity ?? 55))
-          if (type === "joystick_x") return liveRuntime?.joystickX ?? (runningRef.current ? 0 : Number(p?.props?.x ?? 512))
-          if (type === "joystick_y") return liveRuntime?.joystickY ?? (runningRef.current ? 0 : Number(p?.props?.y ?? 512))
+          if (type === "joystick_x") {
+            const raw = liveRuntime?.joystickX ?? (runningRef.current ? 0 : Number(p?.props?.x ?? 512))
+            return scaleAdcReading(Math.max(0, Math.min(1, raw / 1023)), activeBoard)
+          }
+          if (type === "joystick_y") {
+            const raw = liveRuntime?.joystickY ?? (runningRef.current ? 0 : Number(p?.props?.y ?? 512))
+            return scaleAdcReading(Math.max(0, Math.min(1, raw / 1023)), activeBoard)
+          }
           if (type === "joystick_button") return liveRuntime?.joystickButton ? 1 : runningRef.current ? 0 : String(p?.props?.pressed ?? "false") === "true" ? 1 : 0
-          if (type === "soil") return liveRuntime?.sensorValue ?? (runningRef.current ? 0 : Number(p?.props?.moisture ?? 620))
+          if (type === "soil") {
+            const raw = liveRuntime?.sensorValue ?? (runningRef.current ? 0 : Number(p?.props?.moisture ?? 620))
+            return scaleAdcReading(Math.max(0, Math.min(1, raw / 1023)), activeBoard)
+          }
           if (type === "encoder") return liveRuntime?.encoderValue ?? Number(p?.props?.value ?? 0)
-          if (type === "mq2-gas" || type === "mq2_gas") return liveRuntime?.sensorValue ?? (runningRef.current ? 0 : Number(p?.props?.gasPpm ?? 120))
+          if (type === "mq2-gas" || type === "mq2_gas") {
+            const raw = liveRuntime?.sensorValue ?? (runningRef.current ? 0 : Number(p?.props?.gasLevel ?? p?.props?.gasPpm ?? 120))
+            return scaleAdcReading(Math.max(0, Math.min(1, raw / 1000)), activeBoard)
+          }
           if (type === "analog") {
+            const boardPart = partsRef.current.find((pt) => isBoardPart(pt.type))
+            if (boardPart && pin) {
+              const rawPin = String(pin).trim().toLowerCase()
+              const pinDigits = rawPin.replace(/^d|^gpio/, "")
+              const targetBoardPin = activeBoard.pins.find(
+                (bp) =>
+                  bp.id.toLowerCase() === rawPin ||
+                  bp.label.toLowerCase() === rawPin ||
+                  bp.id.toLowerCase() === pinDigits ||
+                  bp.label.toLowerCase() === pinDigits ||
+                  bp.alternateNames?.some((alt) => alt.toLowerCase() === rawPin || alt.toLowerCase() === pinDigits)
+              )
+
+              if (targetBoardPin) {
+                const nodal = solveCircuitNodalPotentials(state, pressedRef.current, pinStatesRef.current, true)
+                const vPin = nodal.getPinVoltage({ partId: boardPart.id, pinId: targetBoardPin.id })
+                const isWired = state.wires.some(
+                  (w) =>
+                    (w.from.partId === boardPart.id && w.from.pinId === targetBoardPin.id) ||
+                    (w.to.partId === boardPart.id && w.to.pinId === targetBoardPin.id)
+                )
+
+                if (vPin > 0 || isWired) {
+                  const ratio = Math.max(0, Math.min(1, vPin / activeBoard.adcMaxVoltage))
+                  return scaleAdcReading(ratio, activeBoard)
+                }
+              }
+            }
+
             const pot = partsRef.current.find((pt) => pt.type === "potentiometer")
-            return Number(pot?.props?.value ?? 512)
+            if (pot) {
+              const norm = Math.max(0, Math.min(1, Number(pot.props.value ?? 512) / 1023))
+              return scaleAdcReading(norm, activeBoard)
+            }
+            return 0
           }
           return 0
         },

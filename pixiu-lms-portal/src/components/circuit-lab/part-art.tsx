@@ -7,6 +7,8 @@ export interface PartRuntime {
   angle?: number
   /** for Arduino Uno: is Pin 13 HIGH */
   pin13High?: boolean
+  /** for ESP32: is Pin D2 (GPIO2) HIGH */
+  pin2High?: boolean
   /** Real electrical burnout states */
   burnt?: boolean
   currentMa?: number
@@ -481,10 +483,18 @@ export function PartArt({ part, runtime }: { part: PlacedPart; runtime?: PartRun
               PWR
             </text>
 
-            {/* D2 User Blue LED */}
-            <circle cx={162} cy={212} r={3} fill="#3b82f6" stroke="#1d4ed8" strokeWidth={0.8} />
-            <circle cx={162} cy={212} r={1.2} fill="#93c5fd" />
-            <text x={162} y={204} textAnchor="middle" fontSize={6} fill="#94a3b8" fontFamily="monospace" fontWeight={700}>
+            {/* D2 User Blue LED (Active when GPIO2 / D2 is HIGH) */}
+            <circle
+              cx={162}
+              cy={212}
+              r={3}
+              fill={runtime?.pin2High ? "#60a5fa" : "#1e3a8a"}
+              stroke={runtime?.pin2High ? "#bfdbfe" : "#172554"}
+              strokeWidth={0.8}
+            />
+            {runtime?.pin2High && <circle cx={162} cy={212} r={7} fill="#3b82f6" opacity={0.5} />}
+            <circle cx={162} cy={212} r={1.2} fill={runtime?.pin2High ? "#ffffff" : "#3b82f6"} />
+            <text x={162} y={204} textAnchor="middle" fontSize={6} fill={runtime?.pin2High ? "#93c5fd" : "#94a3b8"} fontFamily="monospace" fontWeight={700}>
               D2/LED
             </text>
           </g>

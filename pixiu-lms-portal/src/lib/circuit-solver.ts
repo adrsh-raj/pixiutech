@@ -186,6 +186,15 @@ export function solveCircuitNodalPotentials(
       case "soil-moisture":
         for (const pin of ["vcc", "ao", "gnd"]) allPins.add(pinKey(part.id, pin))
         break
+      case "ldr":
+        for (const pin of ["t1", "t2", "ao", "vcc", "gnd"]) allPins.add(pinKey(part.id, pin))
+        break
+      case "tmp36":
+        for (const pin of ["vcc", "out", "vout", "gnd"]) allPins.add(pinKey(part.id, pin))
+        break
+      case "mq2-gas":
+        for (const pin of ["vcc", "gnd", "do", "ao"]) allPins.add(pinKey(part.id, pin))
+        break
       case "keypad-4x4":
         for (const pin of ["r1", "r2", "r3", "r4", "c1", "c2", "c3", "c4"]) allPins.add(pinKey(part.id, pin))
         break
@@ -320,8 +329,12 @@ export function solveCircuitNodalPotentials(
           if (pState?.state === "HIGH") {
             fixedNets.set(netD, { voltage: board.logicVoltage, label: `${board.shortName} Pin ${pin.label} (HIGH = ${board.logicVoltage}V)` })
           } else if (pState?.value !== undefined && pState.value > 0) {
-            const vPwm = Number((board.logicVoltage * (pState.value / 255)).toFixed(2))
-            fixedNets.set(netD, { voltage: vPwm, label: `${board.shortName} Pin ${pin.label} (PWM ${pState.value}/255 = ${vPwm}V)` })
+            const isDac = pin.capabilities?.dac === true
+            const vOut = Number((board.logicVoltage * (pState.value / 255)).toFixed(2))
+            const label = isDac
+              ? `${board.shortName} DAC Output ${pin.label} (${pState.value}/255 = ${vOut}V DC)`
+              : `${board.shortName} Pin ${pin.label} (PWM ${pState.value}/255 = ${vOut}V)`
+            fixedNets.set(netD, { voltage: vOut, label })
           } else if (pState?.state === "LOW") {
             fixedNets.set(netD, {
               voltage: 0.0,
@@ -343,11 +356,13 @@ export function solveCircuitNodalPotentials(
   // 5. Expose deterministic module outputs only when their power and ground
   // nets are actually connected to a fixed source/sink.
   for (const part of state.parts) {
-    const poweredTypes = ["ir-sensor", "dht11", "oled-i2c", "joystick", "soil-moisture"]
+    const poweredTypes = ["ir-sensor", "dht11", "oled-i2c", "joystick", "soil-moisture", "ldr", "tmp36", "mq2-gas"]
     if (!poweredTypes.includes(part.type)) continue
     const vccPin = pinToNetId(part.id, "vcc")
     const gndPin = pinToNetId(part.id, "gnd")
     if (!fixedNets.has(vccPin) || !fixedNets.has(gndPin)) continue
+
+    const vSupply = fixedNets.get(vccPin)?.voltage ?? 5.0
 
     const setOutputIfFree = (pinId: string, voltage: number, label: string) => {
       const net = pinToNetId(part.id, pinId)
@@ -355,18 +370,29 @@ export function solveCircuitNodalPotentials(
     }
 
     if (part.type === "ir-sensor") {
-      setOutputIfFree("out", String(part.props.detected ?? "false") === "true" ? 5 : 0, "IR sensor " + part.id + " OUT")
+      setOutputIfFree("out", String(part.props.detected ?? "false") === "true" ? vSupply : 0, "IR sensor " + part.id + " OUT")
     } else if (part.type === "dht11") {
-      setOutputIfFree("data", 3.3, "DHT11 " + part.id + " DATA")
+      setOutputIfFree("data", Math.min(3.3, vSupply), "DHT11 " + part.id + " DATA")
     } else if (part.type === "oled-i2c") {
-      setOutputIfFree("sda", 3.3, "OLED " + part.id + " SDA")
-      setOutputIfFree("scl", 3.3, "OLED " + part.id + " SCL")
+      setOutputIfFree("sda", Math.min(3.3, vSupply), "OLED " + part.id + " SDA")
+      setOutputIfFree("scl", Math.min(3.3, vSupply), "OLED " + part.id + " SCL")
     } else if (part.type === "joystick") {
-      setOutputIfFree("vrx", Math.max(0, Math.min(5, Number(part.props.x ?? 512) / 1023 * 5)), "Joystick " + part.id + " VRx")
-      setOutputIfFree("vry", Math.max(0, Math.min(5, Number(part.props.y ?? 512) / 1023 * 5)), "Joystick " + part.id + " VRy")
-      setOutputIfFree("sw", String(part.props.pressed ?? "false") === "true" ? 5 : 0, "Joystick " + part.id + " SW")
+      setOutputIfFree("vrx", Math.max(0, Math.min(vSupply, (Number(part.props.x ?? 512) / 1023) * vSupply)), "Joystick " + part.id + " VRx")
+      setOutputIfFree("vry", Math.max(0, Math.min(vSupply, (Number(part.props.y ?? 512) / 1023) * vSupply)), "Joystick " + part.id + " VRy")
+      setOutputIfFree("sw", String(part.props.pressed ?? "false") === "true" ? vSupply : 0, "Joystick " + part.id + " SW")
     } else if (part.type === "soil-moisture") {
-      setOutputIfFree("ao", Math.max(0, Math.min(5, Number(part.props.moisture ?? 620) / 1023 * 5)), "Soil moisture " + part.id + " AO")
+      setOutputIfFree("ao", Math.max(0, Math.min(vSupply, (Number(part.props.moisture ?? 620) / 1023) * vSupply)), "Soil moisture " + part.id + " AO")
+    } else if (part.type === "ldr") {
+      setOutputIfFree("ao", Math.max(0, Math.min(vSupply, (Number(part.props.light ?? 512) / 1023) * vSupply)), "LDR " + part.id + " AO")
+    } else if (part.type === "tmp36") {
+      const vTemp = Math.max(0, Math.min(vSupply, (Number(part.props.temperature ?? 25) * 0.01) + 0.5))
+      setOutputIfFree("out", vTemp, "TMP36 " + part.id + " OUT")
+      setOutputIfFree("vout", vTemp, "TMP36 " + part.id + " VOUT")
+    } else if (part.type === "mq2-gas") {
+      const gas = Number(part.props.gasLevel ?? part.props.gasPpm ?? 150)
+      const thresh = Number(part.props.threshold ?? 350)
+      setOutputIfFree("ao", Math.max(0, Math.min(vSupply, (gas / 1000) * vSupply)), "MQ-2 " + part.id + " AO")
+      setOutputIfFree("do", gas >= thresh ? vSupply : 0, "MQ-2 " + part.id + " DO")
     }
   }
 
@@ -388,6 +414,14 @@ export function solveCircuitNodalPotentials(
         const netB = pinToNetId(part.id, "b")
         const rVal = Math.max(0.1, Number(part.props.resistance || 220))
         branches.push({ netA, netB, conductance: 1 / rVal })
+        break
+      }
+      case "ldr": {
+        const netT1 = pinToNetId(part.id, "t1")
+        const netT2 = pinToNetId(part.id, "t2")
+        const light = Math.max(0, Math.min(1023, Number(part.props.light ?? 512)))
+        const rLdr = Math.max(200, Math.round(50000 / (1 + (light / 1023) * 99)))
+        branches.push({ netA: netT1, netB: netT2, conductance: 1 / rLdr })
         break
       }
       case "potentiometer": {

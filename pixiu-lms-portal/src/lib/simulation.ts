@@ -219,24 +219,33 @@ export function computeRuntime(
   for (const part of state.parts) {
     const k = (pin: string) => key(part.id, pin)
 
-    if (part.type === "arduino-uno") {
+    const board = getBoardForPart(part)
+    if (board) {
       const activePins: Record<string, boolean | number> = {}
-      for (let i = 0; i <= 13; i++) {
-        const pState = pinStates[String(i)] ?? pinStates[`d${i}`]
+      for (const pin of board.pins) {
+        const pinId = pin.id
+        const altId = pinId.replace(/^d|^gpio/, "")
+        const pState = pinStates[pinId] ?? pinStates[altId]
         if (pState?.state === "HIGH") {
-          activePins[`d${i}`] = true
+          activePins[pinId] = true
+          activePins[altId] = true
         } else if ((pState?.value ?? 0) > 0) {
-          activePins[`d${i}`] = pState.value!
+          activePins[pinId] = pState.value!
+          activePins[altId] = pState.value!
         }
       }
-      for (let i = 0; i <= 5; i++) {
-        const pState = pinStates[`a${i}`] ?? pinStates[String(i + 14)]
-        if (pState?.state === "HIGH") {
-          activePins[`a${i}`] = true
-        }
-      }
+
+      // Check board built-in LED state (D13 on Uno, D2 on ESP32)
+      const ledPState = board.builtInLedPin
+        ? pinStates[board.builtInLedPin] ??
+          pinStates[board.builtInLedPin.replace(/^d|^gpio/, "")] ??
+          pinStates[`gpio${board.builtInLedPin.replace(/^d|^gpio/, "")}`]
+        : undefined
+      const isBuiltInLedActive = Boolean(ledPState && (ledPState.state === "HIGH" || (ledPState.value ?? 0) > 0))
+
       runtime[part.id] = {
-        pin13High: pinStates["13"]?.state === "HIGH" || pinStates["d13"]?.state === "HIGH",
+        pin13High: board.id === "arduino-uno" ? isBuiltInLedActive : undefined,
+        pin2High: board.id === "esp32-devkit" ? isBuiltInLedActive : undefined,
         activePins,
       }
     } else if (part.type === "led") {

@@ -131,7 +131,7 @@ export function defineArduinoBlocks() {
       previousStatement: null,
       nextStatement: null,
       colour: 260,
-      tooltip: "Write a 0-255 PWM value to a pin.",
+      tooltip: "Write a 0-255 PWM value (or true DAC voltage on ESP32 DAC pins) to a pin.",
     },
     {
       type: "io_analogread",
@@ -139,7 +139,7 @@ export function defineArduinoBlocks() {
       args0: [{ type: "field_dropdown", name: "PIN", options: pinDropdown }],
       output: "Number",
       colour: 260,
-      tooltip: "Read a 0-1023 value from an analog pin.",
+      tooltip: "Read an analog value from a pin (0-1023 on Arduino Uno, 0-4095 on ESP32 12-bit ADC).",
     },
     {
       type: "time_delay",

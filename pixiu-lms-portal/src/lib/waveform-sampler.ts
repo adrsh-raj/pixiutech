@@ -41,15 +41,29 @@ export function samplePinVoltage(
     if (board.powerPins.v33?.includes(rawPin) || rawPin === "3v3") return 3.3
     if (board.powerPins.gnd.includes(rawPin) || rawPin.includes("gnd")) return 0.0
 
-    // Digital pins with potential PWM
+    // Digital pins with potential PWM or true DAC output
+    const boardPin = board.pins.find(
+      (bp) =>
+        bp.id.toLowerCase() === rawPin ||
+        bp.label.toLowerCase() === rawPin ||
+        bp.id.replace(/^d|^gpio/, "") === pinDigits ||
+        bp.label.replace(/^d|^gpio/, "") === pinDigits
+    )
     const pinData = pinStates[rawPin] || pinStates[pinDigits]
     if (pinData) {
-      if (typeof pinData.value === "number" && pinData.value > 0 && pinData.value < 255) {
-        // Authentic board PWM period
-        const periodMs = 1000 / board.pwmFrequencyDefaultHz
-        const duty = pinData.value / 255
-        const phase = (simTimeMs % periodMs) / periodMs
-        return phase < duty ? board.logicVoltage : 0.0
+      if (typeof pinData.value === "number" && pinData.value > 0) {
+        // True hardware DAC channels (e.g. D25/D26 on ESP32) output true continuous DC voltage
+        if (boardPin?.capabilities?.dac) {
+          return Number((board.logicVoltage * (pinData.value / 255)).toFixed(3))
+        }
+
+        if (pinData.value < 255) {
+          // Authentic board PWM period
+          const periodMs = 1000 / board.pwmFrequencyDefaultHz
+          const duty = pinData.value / 255
+          const phase = (simTimeMs % periodMs) / periodMs
+          return phase < duty ? board.logicVoltage : 0.0
+        }
       }
       return pinData.state === "HIGH" ? board.logicVoltage : 0.0
     }
@@ -57,7 +71,7 @@ export function samplePinVoltage(
 
   // 2. Pure nodal potential solver for rest of circuit
   const nodal = cachedNodalSolution ?? solveCircuitNodalPotentials(state, new Set(), pinStates, true)
-  return Math.max(0, Math.min(5.0, nodal.getPinVoltage(ref)))
+  return Math.max(0, Math.min(12.0, nodal.getPinVoltage(ref)))
 }
 
 export function computeChannelMetrics(
