@@ -1,6 +1,9 @@
 import type { CircuitState, PartType } from "./circuit-types"
 import type { PartRuntime } from "@/components/circuit-lab/part-art"
 import { TEMPLATES, type ProjectTemplate } from "./templates"
+import { ESP32_LESSONS } from "./curriculum/esp32-curriculum"
+import { PICO_LESSONS } from "./curriculum/pico-curriculum"
+import { MICROBIT_LESSONS } from "./curriculum/microbit-curriculum"
 
 export type LessonDifficulty = "Beginner" | "Intermediate" | "Advanced"
 export type LessonStepKind = "build" | "code" | "run" | "experiment"
@@ -64,6 +67,7 @@ export interface Lesson {
   shortTitle: string
   description: string
   difficulty: LessonDifficulty
+  board?: "arduino-uno" | "esp32-devkit" | "rpi-pico" | "microbit-v2"
   estimatedMinutes: number
   concepts: string[]
   prerequisites: string[]
@@ -201,10 +205,42 @@ function countParts(state: CircuitState, type: PartType) {
 }
 
 function pinMatches(partType: PartType, expectedPinId: string, actualPinId: string) {
-  if (partType === "arduino-uno" && (expectedPinId === "gnd" || expectedPinId === "gnd_pwr")) {
-    return actualPinId === "gnd" || actualPinId === "gnd_pwr"
+  if (expectedPinId === actualPinId) return true
+  const expLower = expectedPinId.toLowerCase()
+  const actLower = actualPinId.toLowerCase()
+  if (expLower === actLower) return true
+
+  // Ground matching across boards
+  if (partType === "arduino-uno" && (expLower === "gnd" || expLower === "gnd_pwr")) {
+    return actLower === "gnd" || actLower === "gnd_pwr"
   }
-  return expectedPinId === actualPinId
+  if (partType === "esp32-devkit" && (expLower === "gnd" || expLower === "gnd_l" || expLower === "gnd_r" || expLower.startsWith("gnd_"))) {
+    return actLower === "gnd" || actLower === "gnd_l" || actLower === "gnd_r" || actLower.startsWith("gnd_")
+  }
+  if (partType === "rpi-pico" && (expLower === "gnd" || expLower === "gnd_1" || expLower.startsWith("gnd_"))) {
+    return actLower === "gnd" || actLower === "gnd_1" || actLower.startsWith("gnd_")
+  }
+  if (partType === "microbit-v2" && (expLower === "gnd" || expLower === "gnd_edge")) {
+    return actLower === "gnd" || actLower === "gnd_edge"
+  }
+
+  // 3.3V and Power pins across boards
+  if (partType === "esp32-devkit" && (expLower === "3v3" || expLower === "3.3v")) {
+    return actLower === "3v3" || actLower === "3.3v"
+  }
+  if (partType === "rpi-pico" && (expLower === "3v3" || expLower === "3.3v")) {
+    return actLower === "3v3" || actLower === "3.3v"
+  }
+  if (partType === "microbit-v2" && (expLower === "3v" || expLower === "3v3")) {
+    return actLower === "3v" || actLower === "3v3"
+  }
+
+  // Digital / Analog Pin alias normalization
+  const expStripped = expLower.replace(/^(gpio|gp|d|p)/i, "")
+  const actStripped = actLower.replace(/^(gpio|gp|d|p)/i, "")
+  if (expStripped && actStripped && expStripped === actStripped) return true
+
+  return false
 }
 
 function endpointMatches(state: CircuitState, endpoint: LessonEndpoint, actual: PinRef) {
@@ -711,7 +747,7 @@ const AI_GESTURE_XML = `<xml xmlns="https://developers.google.com/blockly/xml">
   </block>
 </xml>`
 
-export const LESSONS: Lesson[] = [
+const UNO_LESSONS: Lesson[] = [
   // --- TIER 1: BEGINNER (Foundations & Multi-component I/O) ---
   {
     id: "lesson-led-basics",
@@ -1831,6 +1867,13 @@ export const LESSONS: Lesson[] = [
       },
     ],
   },
+]
+
+export const LESSONS: Lesson[] = [
+  ...UNO_LESSONS.map((l) => ({ ...l, board: l.board ?? ("arduino-uno" as const) })),
+  ...ESP32_LESSONS,
+  ...PICO_LESSONS,
+  ...MICROBIT_LESSONS,
 ]
 
 export function getLessonSeed(lesson: Lesson): { state: CircuitState; blocklyXml: string; sourceTemplateId?: string } {

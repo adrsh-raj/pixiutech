@@ -29,6 +29,20 @@ function difficultyClass(difficulty: Lesson["difficulty"]) {
   return "border-violet-500/30 bg-violet-500/10 text-violet-300"
 }
 
+function boardBadge(board?: Lesson["board"]) {
+  switch (board) {
+    case "esp32-devkit":
+      return { label: "ESP32", color: "border-red-500/30 bg-red-500/10 text-red-300" }
+    case "rpi-pico":
+      return { label: "Pico", color: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300" }
+    case "microbit-v2":
+      return { label: "micro:bit", color: "border-amber-500/30 bg-amber-500/10 text-amber-300" }
+    case "arduino-uno":
+    default:
+      return { label: "Uno", color: "border-cyan-500/30 bg-cyan-500/10 text-cyan-300" }
+  }
+}
+
 export function LessonBrowser({
   isOpen,
   onClose,
@@ -39,6 +53,7 @@ export function LessonBrowser({
 }: Props) {
   const [progress, setProgress] = useState<Record<string, LessonProgress>>({})
   const [lastResults, setLastResults] = useState<Record<string, ReturnType<typeof evaluateLessonStep>>>({})
+  const [boardFilter, setBoardFilter] = useState<"all" | "arduino-uno" | "esp32-devkit" | "rpi-pico" | "microbit-v2">("all")
   const [categoryFilter, setCategoryFilter] = useState<"all" | "Beginner" | "Intermediate" | "Advanced">("all")
   const [searchQuery, setSearchQuery] = useState("")
 
@@ -56,21 +71,28 @@ export function LessonBrowser({
     beginner: LESSONS.filter((l) => l.difficulty === "Beginner").length,
     intermediate: LESSONS.filter((l) => l.difficulty === "Intermediate").length,
     advanced: LESSONS.filter((l) => l.difficulty === "Advanced").length,
+    uno: LESSONS.filter((l) => (l.board ?? "arduino-uno") === "arduino-uno").length,
+    esp32: LESSONS.filter((l) => l.board === "esp32-devkit").length,
+    pico: LESSONS.filter((l) => l.board === "rpi-pico").length,
+    microbit: LESSONS.filter((l) => l.board === "microbit-v2").length,
   }), [])
 
   const filteredLessons = useMemo(() => {
     return LESSONS.filter((lesson) => {
+      const lessonBoard = lesson.board ?? "arduino-uno"
+      if (boardFilter !== "all" && lessonBoard !== boardFilter) return false
       if (categoryFilter !== "all" && lesson.difficulty !== categoryFilter) return false
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim()
         const matchTitle = lesson.title.toLowerCase().includes(q) || lesson.shortTitle.toLowerCase().includes(q)
         const matchDesc = lesson.description.toLowerCase().includes(q)
         const matchConcepts = lesson.concepts.some((c) => c.toLowerCase().includes(q))
-        if (!matchTitle && !matchDesc && !matchConcepts) return false
+        const matchBoard = lessonBoard.toLowerCase().includes(q)
+        if (!matchTitle && !matchDesc && !matchConcepts && !matchBoard) return false
       }
       return true
     })
-  }, [categoryFilter, searchQuery])
+  }, [boardFilter, categoryFilter, searchQuery])
 
   if (!isOpen) return null
 
@@ -125,32 +147,72 @@ export function LessonBrowser({
               />
             </div>
 
+            {/* Board Architecture filter tabs */}
+            <div>
+              <div className="mb-1 text-[8px] font-mono uppercase tracking-wider text-slate-500">Board Architecture</div>
+              <div className="grid grid-cols-5 gap-1 rounded-xl bg-slate-900/80 p-1 text-[8px] font-bold">
+                <button
+                  onClick={() => setBoardFilter("all")}
+                  className={`rounded-lg py-1 transition ${boardFilter === "all" ? "bg-cyan-500 text-slate-950 shadow" : "text-slate-400 hover:text-white"}`}
+                >
+                  All ({counts.all})
+                </button>
+                <button
+                  onClick={() => setBoardFilter("arduino-uno")}
+                  className={`rounded-lg py-1 transition ${boardFilter === "arduino-uno" ? "bg-cyan-400 text-slate-950 shadow" : "text-slate-400 hover:text-white"}`}
+                >
+                  Uno ({counts.uno})
+                </button>
+                <button
+                  onClick={() => setBoardFilter("esp32-devkit")}
+                  className={`rounded-lg py-1 transition ${boardFilter === "esp32-devkit" ? "bg-red-500 text-slate-950 shadow" : "text-slate-400 hover:text-white"}`}
+                >
+                  ESP32 ({counts.esp32})
+                </button>
+                <button
+                  onClick={() => setBoardFilter("rpi-pico")}
+                  className={`rounded-lg py-1 transition ${boardFilter === "rpi-pico" ? "bg-emerald-500 text-slate-950 shadow" : "text-slate-400 hover:text-white"}`}
+                >
+                  Pico ({counts.pico})
+                </button>
+                <button
+                  onClick={() => setBoardFilter("microbit-v2")}
+                  className={`rounded-lg py-1 transition ${boardFilter === "microbit-v2" ? "bg-amber-500 text-slate-950 shadow" : "text-slate-400 hover:text-white"}`}
+                >
+                  micro ({counts.microbit})
+                </button>
+              </div>
+            </div>
+
             {/* Category filter tabs */}
-            <div className="grid grid-cols-4 gap-1 rounded-xl bg-slate-900/60 p-1 text-[9px] font-bold">
-              <button
-                onClick={() => setCategoryFilter("all")}
-                className={`rounded-lg py-1 transition ${categoryFilter === "all" ? "bg-cyan-500 text-slate-950 shadow" : "text-slate-400 hover:text-white"}`}
-              >
-                All ({counts.all})
-              </button>
-              <button
-                onClick={() => setCategoryFilter("Beginner")}
-                className={`rounded-lg py-1 transition ${categoryFilter === "Beginner" ? "bg-emerald-500 text-slate-950 shadow" : "text-slate-400 hover:text-white"}`}
-              >
-                Basic ({counts.beginner})
-              </button>
-              <button
-                onClick={() => setCategoryFilter("Intermediate")}
-                className={`rounded-lg py-1 transition ${categoryFilter === "Intermediate" ? "bg-amber-500 text-slate-950 shadow" : "text-slate-400 hover:text-white"}`}
-              >
-                Med ({counts.intermediate})
-              </button>
-              <button
-                onClick={() => setCategoryFilter("Advanced")}
-                className={`rounded-lg py-1 transition ${categoryFilter === "Advanced" ? "bg-violet-500 text-slate-950 shadow" : "text-slate-400 hover:text-white"}`}
-              >
-                Adv & AI ({counts.advanced})
-              </button>
+            <div>
+              <div className="mb-1 text-[8px] font-mono uppercase tracking-wider text-slate-500">Difficulty Tier</div>
+              <div className="grid grid-cols-4 gap-1 rounded-xl bg-slate-900/60 p-1 text-[9px] font-bold">
+                <button
+                  onClick={() => setCategoryFilter("all")}
+                  className={`rounded-lg py-1 transition ${categoryFilter === "all" ? "bg-cyan-500 text-slate-950 shadow" : "text-slate-400 hover:text-white"}`}
+                >
+                  All
+                </button>
+                <button
+                  onClick={() => setCategoryFilter("Beginner")}
+                  className={`rounded-lg py-1 transition ${categoryFilter === "Beginner" ? "bg-emerald-500 text-slate-950 shadow" : "text-slate-400 hover:text-white"}`}
+                >
+                  Basic ({counts.beginner})
+                </button>
+                <button
+                  onClick={() => setCategoryFilter("Intermediate")}
+                  className={`rounded-lg py-1 transition ${categoryFilter === "Intermediate" ? "bg-amber-500 text-slate-950 shadow" : "text-slate-400 hover:text-white"}`}
+                >
+                  Med ({counts.intermediate})
+                </button>
+                <button
+                  onClick={() => setCategoryFilter("Advanced")}
+                  className={`rounded-lg py-1 transition ${categoryFilter === "Advanced" ? "bg-violet-500 text-slate-950 shadow" : "text-slate-400 hover:text-white"}`}
+                >
+                  Adv ({counts.advanced})
+                </button>
+              </div>
             </div>
           </div>
           <div className="flex-1 space-y-2 overflow-y-auto p-3">
@@ -160,6 +222,7 @@ export function LessonBrowser({
               filteredLessons.map((lesson) => {
                 const locked = !unlocked.has(lesson.id)
                 const percent = getLessonProgressPercent(lesson, progress[lesson.id])
+                const badge = boardBadge(lesson.board)
                 return (
                   <button
                     key={lesson.id}
@@ -178,11 +241,16 @@ export function LessonBrowser({
                         {locked ? <Lock size={14} /> : percent === 100 ? <Check size={14} /> : <Circle size={14} />}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center justify-between gap-1.5">
                           <p className="truncate text-xs font-bold text-white">{lesson.shortTitle}</p>
-                          <span className={`rounded-full border px-1.5 py-0.5 text-[8px] font-bold ${difficultyClass(lesson.difficulty)}`}>
-                            {lesson.difficulty}
-                          </span>
+                          <div className="flex shrink-0 items-center gap-1">
+                            <span className={`rounded-md border px-1.5 py-0.5 text-[8px] font-mono font-bold ${badge.color}`}>
+                              {badge.label}
+                            </span>
+                            <span className={`rounded-full border px-1.5 py-0.5 text-[8px] font-bold ${difficultyClass(lesson.difficulty)}`}>
+                              {lesson.difficulty}
+                            </span>
+                          </div>
                         </div>
                         <p className="mt-1 line-clamp-2 text-[9px] leading-4 text-slate-500">{lesson.description}</p>
                         <div className="mt-2 h-1 overflow-hidden rounded-full bg-slate-800">
@@ -222,19 +290,29 @@ export function LessonBrowser({
           </div>
 
           <div className="md:hidden border-b border-slate-800 bg-slate-950/35 p-3 space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-[9px] font-mono uppercase tracking-[0.18em] text-slate-500"><BookOpen size={12} className="text-cyan-300" /> Missions</div>
-              <div className="flex gap-1 text-[8px]">
-                <button onClick={() => setCategoryFilter("all")} className={`px-1.5 py-0.5 rounded ${categoryFilter === "all" ? "bg-cyan-500 text-slate-950 font-bold" : "text-slate-400"}`}>All</button>
-                <button onClick={() => setCategoryFilter("Beginner")} className={`px-1.5 py-0.5 rounded ${categoryFilter === "Beginner" ? "bg-emerald-500 text-slate-950 font-bold" : "text-slate-400"}`}>Basic</button>
-                <button onClick={() => setCategoryFilter("Intermediate")} className={`px-1.5 py-0.5 rounded ${categoryFilter === "Intermediate" ? "bg-amber-500 text-slate-950 font-bold" : "text-slate-400"}`}>Med</button>
-                <button onClick={() => setCategoryFilter("Advanced")} className={`px-1.5 py-0.5 rounded ${categoryFilter === "Advanced" ? "bg-violet-500 text-slate-950 font-bold" : "text-slate-400"}`}>Adv</button>
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-[9px] font-mono uppercase tracking-[0.18em] text-slate-500"><BookOpen size={12} className="text-cyan-300" /> Missions</div>
+                <div className="flex gap-1 text-[8px]">
+                  <button onClick={() => setCategoryFilter("all")} className={`px-1.5 py-0.5 rounded ${categoryFilter === "all" ? "bg-cyan-500 text-slate-950 font-bold" : "text-slate-400"}`}>All</button>
+                  <button onClick={() => setCategoryFilter("Beginner")} className={`px-1.5 py-0.5 rounded ${categoryFilter === "Beginner" ? "bg-emerald-500 text-slate-950 font-bold" : "text-slate-400"}`}>Basic</button>
+                  <button onClick={() => setCategoryFilter("Intermediate")} className={`px-1.5 py-0.5 rounded ${categoryFilter === "Intermediate" ? "bg-amber-500 text-slate-950 font-bold" : "text-slate-400"}`}>Med</button>
+                  <button onClick={() => setCategoryFilter("Advanced")} className={`px-1.5 py-0.5 rounded ${categoryFilter === "Advanced" ? "bg-violet-500 text-slate-950 font-bold" : "text-slate-400"}`}>Adv</button>
+                </div>
+              </div>
+              <div className="flex gap-1 text-[8px] overflow-x-auto pb-0.5">
+                <button onClick={() => setBoardFilter("all")} className={`px-2 py-0.5 rounded whitespace-nowrap ${boardFilter === "all" ? "bg-cyan-500 text-slate-950 font-bold" : "bg-slate-900 text-slate-400"}`}>All Boards</button>
+                <button onClick={() => setBoardFilter("arduino-uno")} className={`px-2 py-0.5 rounded whitespace-nowrap ${boardFilter === "arduino-uno" ? "bg-cyan-400 text-slate-950 font-bold" : "bg-slate-900 text-slate-400"}`}>Uno</button>
+                <button onClick={() => setBoardFilter("esp32-devkit")} className={`px-2 py-0.5 rounded whitespace-nowrap ${boardFilter === "esp32-devkit" ? "bg-red-500 text-slate-950 font-bold" : "bg-slate-900 text-slate-400"}`}>ESP32</button>
+                <button onClick={() => setBoardFilter("rpi-pico")} className={`px-2 py-0.5 rounded whitespace-nowrap ${boardFilter === "rpi-pico" ? "bg-emerald-500 text-slate-950 font-bold" : "bg-slate-900 text-slate-400"}`}>Pico</button>
+                <button onClick={() => setBoardFilter("microbit-v2")} className={`px-2 py-0.5 rounded whitespace-nowrap ${boardFilter === "microbit-v2" ? "bg-amber-500 text-slate-950 font-bold" : "bg-slate-900 text-slate-400"}`}>micro:bit</button>
               </div>
             </div>
             <div className="grid grid-cols-1 gap-1.5 max-h-40 overflow-y-auto">
               {filteredLessons.map((lesson) => {
                 const locked = !unlocked.has(lesson.id)
                 const percent = getLessonProgressPercent(lesson, progress[lesson.id])
+                const badge = boardBadge(lesson.board)
                 return (
                   <button
                     key={lesson.id}
@@ -244,6 +322,7 @@ export function LessonBrowser({
                   >
                     {locked ? <Lock size={12} className="text-slate-600" /> : percent === 100 ? <Check size={12} className="text-emerald-300" /> : <Circle size={12} className="text-cyan-300" />}
                     <span className="min-w-0 flex-1 truncate text-[10px] font-semibold text-slate-200">{lesson.shortTitle}</span>
+                    <span className={`shrink-0 rounded px-1 py-0.2 text-[7px] font-mono border ${badge.color}`}>{badge.label}</span>
                     <span className="font-mono text-[8px] text-slate-600">{percent}%</span>
                   </button>
                 )
@@ -258,9 +337,20 @@ export function LessonBrowser({
                 <h3 className="mt-4 text-lg font-black">Choose your first mission</h3>
                 <p className="mt-2 text-xs leading-5 text-slate-500">Complete lessons in order. Each lesson gives you a starter circuit, guided steps and automatic checks for wiring, Blockly blocks and live simulation.</p>
                 <div className="mt-4 flex flex-wrap justify-center gap-1.5">
-                  {LESSONS.slice(0, 4).map((lesson, index) => (
-                    <button key={lesson.id} onClick={() => unlocked.has(lesson.id) && onSelectLesson(lesson)} disabled={!unlocked.has(lesson.id)} className="rounded-full border border-slate-800 bg-slate-900 px-2.5 py-1 text-[9px] font-semibold text-slate-400 disabled:opacity-40">{index + 1}. {lesson.shortTitle}</button>
-                  ))}
+                  {LESSONS.filter((l) => l.prerequisites.length === 0).map((lesson) => {
+                    const badge = boardBadge(lesson.board)
+                    return (
+                      <button
+                        key={lesson.id}
+                        onClick={() => unlocked.has(lesson.id) && onSelectLesson(lesson)}
+                        disabled={!unlocked.has(lesson.id)}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-slate-800 bg-slate-900 px-3 py-1 text-[9px] font-semibold text-slate-300 hover:border-slate-700 hover:text-white disabled:opacity-40"
+                      >
+                        <span className={`rounded px-1 text-[7px] font-mono border ${badge.color}`}>{badge.label}</span>
+                        <span>{lesson.shortTitle}</span>
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
             </div>
