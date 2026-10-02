@@ -1,6 +1,6 @@
 import type { CircuitState } from "./circuit-types"
 import { CATALOG } from "./components-catalog"
-import { getBoardForPart, getDefaultBoard, isBoardPart } from "./board-registry"
+import { getBoardForPart, getDefaultBoard, isBoardPart, getActiveBoard } from "./board-registry"
 
 export interface PinOption {
   /** numeric/label pin as used in code, e.g. "13" or "A0" */
@@ -47,8 +47,8 @@ function partDescriptor(circuit: CircuitState, partId: string): string | null {
  * component are labeled with what they drive; everything else stays selectable.
  */
 export function getPinOptions(circuit: CircuitState): PinOption[] {
-  const boardPart = circuit.parts.find((p) => isBoardPart(p.type))
-  const board = boardPart ? (getBoardForPart(boardPart) ?? getDefaultBoard()) : getDefaultBoard()
+  const board = getActiveBoard(circuit)
+  const boardPart = circuit.parts.find((p) => getBoardForPart(p)?.id === board.id) ?? circuit.parts.find((p) => isBoardPart(p.type))
 
   const pinList: { id: string; code: string }[] = board.pins
     .filter((p) => p.kind === "digital" || p.kind === "analog")
@@ -58,6 +58,8 @@ export function getPinOptions(circuit: CircuitState): PinOption[] {
         code = p.label.substring(1)
       } else if (p.label.startsWith("GP") && !isNaN(Number(p.label.substring(2)))) {
         code = p.label.substring(2)
+      } else if (p.label.startsWith("P") && !isNaN(Number(p.label.substring(1)))) {
+        code = p.label.substring(1)
       }
       return { id: p.id, code }
     })

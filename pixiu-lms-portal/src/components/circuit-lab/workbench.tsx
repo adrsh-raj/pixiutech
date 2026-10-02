@@ -17,7 +17,7 @@ import { saveCircuit, loadCurrentCircuit, saveCurrentCircuit, clearCurrentCircui
 import * as Blockly from "blockly"
 import { Boxes, Camera, Sparkles, Terminal, Trash2, Gauge, Sliders, ShieldAlert } from "lucide-react"
 import { computeWireCurrents } from "@/lib/current-flow"
-import { isBoardPart, getActiveBoard, scaleAdcReading } from "@/lib/board-registry"
+import { isBoardPart, getActiveBoard, scaleAdcReading, lookupBoardPinState } from "@/lib/board-registry"
 import { solveCircuitNodalPotentials } from "@/lib/circuit-solver"
 import { Multimeter } from "./multimeter"
 import { Oscilloscope } from "./oscilloscope"
@@ -384,7 +384,26 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
       rotation: 0,
       props: { ...(def.defaults ?? {}) },
     }
-    updateState((s) => ({ ...s, parts: [...s.parts, part] }))
+    updateState((s) => {
+      // Auto-replace unused controller board if student drops a new board
+      if (isBoardPart(type)) {
+        const unusedBoard = s.parts.find(
+          (p) => isBoardPart(p.type) && !s.wires.some((w) => w.from.partId === p.id || w.to.partId === p.id)
+        )
+        if (unusedBoard) {
+          const replacedPart: PlacedPart = {
+            ...part,
+            x: x ?? unusedBoard.x,
+            y: y ?? unusedBoard.y,
+          }
+          return {
+            ...s,
+            parts: s.parts.map((p) => (p.id === unusedBoard.id ? replacedPart : p)),
+          }
+        }
+      }
+      return { ...s, parts: [...s.parts, part] }
+    })
     setSelectedId(part.id)
     setSelectedWireId(null)
   }, [updateState])
@@ -648,22 +667,68 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
 
       const env: ExecutionEnvironment = {
         setDigitalPin: (pin, state) => {
-          setPinStates((prev) => ({ ...prev, [pin]: { ...prev[pin], state } }))
+          const raw = String(pin).trim()
+          const digits = raw.replace(/^(gpio|gp|d|p)/i, "")
+          setPinStates((prev) => {
+            const next = { ...prev, [raw]: { ...prev[raw], state } }
+            if (raw.toLowerCase() !== raw) next[raw.toLowerCase()] = { ...next[raw.toLowerCase()], state }
+            if (digits) {
+              next[digits] = { ...next[digits], state }
+              next[`d${digits}`] = { ...next[`d${digits}`], state }
+              next[`gpio${digits}`] = { ...next[`gpio${digits}`], state }
+              next[`gp${digits}`] = { ...next[`gp${digits}`], state }
+              next[`p${digits}`] = { ...next[`p${digits}`], state }
+            }
+            return next
+          })
         },
         setAnalogPin: (pin, value) => {
-          setPinStates((prev) => ({
-            ...prev,
-            [pin]: { ...prev[pin], state: value > 0 ? "HIGH" : "LOW", value },
-          }))
+          const raw = String(pin).trim()
+          const digits = raw.replace(/^(gpio|gp|d|p)/i, "")
+          const state = value > 0 ? "HIGH" : "LOW"
+          setPinStates((prev) => {
+            const next = { ...prev, [raw]: { ...prev[raw], state, value } }
+            if (raw.toLowerCase() !== raw) next[raw.toLowerCase()] = { ...next[raw.toLowerCase()], state, value }
+            if (digits) {
+              next[digits] = { ...next[digits], state, value }
+              next[`d${digits}`] = { ...next[`d${digits}`], state, value }
+              next[`gpio${digits}`] = { ...next[`gpio${digits}`], state, value }
+              next[`gp${digits}`] = { ...next[`gp${digits}`], state, value }
+              next[`p${digits}`] = { ...next[`p${digits}`], state, value }
+            }
+            return next
+          })
         },
         setServoAngle: (pin, angle) => {
-          setPinStates((prev) => ({ ...prev, [pin]: { ...prev[pin], angle } }))
+          const raw = String(pin).trim()
+          const digits = raw.replace(/^(gpio|gp|d|p)/i, "")
+          setPinStates((prev) => {
+            const next = { ...prev, [raw]: { ...prev[raw], angle } }
+            if (raw.toLowerCase() !== raw) next[raw.toLowerCase()] = { ...next[raw.toLowerCase()], angle }
+            if (digits) {
+              next[digits] = { ...next[digits], angle }
+              next[`d${digits}`] = { ...next[`d${digits}`], angle }
+              next[`gpio${digits}`] = { ...next[`gpio${digits}`], angle }
+              next[`gp${digits}`] = { ...next[`gp${digits}`], angle }
+              next[`p${digits}`] = { ...next[`p${digits}`], angle }
+            }
+            return next
+          })
         },
         setTone: (pin, freq) => {
-          setPinStates((prev) => ({
-            ...prev,
-            [pin]: { ...prev[pin], state: freq ? "HIGH" : "LOW", value: freq ?? 0 },
-          }))
+          const raw = String(pin).trim()
+          const digits = raw.replace(/^(gpio|gp|d|p)/i, "")
+          const state = freq ? "HIGH" : "LOW"
+          const value = freq ?? 0
+          setPinStates((prev) => {
+            const next = { ...prev, [raw]: { ...prev[raw], state, value } }
+            if (digits) {
+              next[digits] = { ...next[digits], state, value }
+              next[`d${digits}`] = { ...next[`d${digits}`], state, value }
+              next[`gpio${digits}`] = { ...next[`gpio${digits}`], state, value }
+            }
+            return next
+          })
           if (freq) {
             audioEngine.playTone(freq)
           } else {
@@ -797,8 +862,38 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
           }
           return 0
         },
-         getAiObjectCount: () => aiStateRef.current.allDetections?.length ?? 0,
-         getDigitalPin: (pin) => (pinStatesRef.current[pin]?.state ?? "LOW") === "HIGH",
+        getDigitalPin: (pin) => {
+          const activeBoard = getActiveBoard(state)
+          const boardPart = partsRef.current.find((pt) => isBoardPart(pt.type))
+
+          // 1. Direct state lookup with universal prefix normalization
+          const direct = lookupBoardPinState(pinStatesRef.current, pin, activeBoard)
+          if (direct?.state === "HIGH") return true
+
+          // 2. Physical circuit potential check (e.g. wired pushbutton, switch, or digital sensor output)
+          if (boardPart) {
+            const rawPin = String(pin).trim().toLowerCase()
+            const pinDigits = rawPin.replace(/^(gpio|gp|d|p)/i, "")
+            const targetBoardPin = activeBoard.pins.find(
+              (bp) =>
+                bp.id.toLowerCase() === rawPin ||
+                bp.label.toLowerCase() === rawPin ||
+                bp.id.replace(/^(gpio|gp|d|p)/i, "") === pinDigits ||
+                bp.label.toLowerCase().replace(/^(gpio|gp|d|p)/i, "") === pinDigits ||
+                bp.alternateNames?.some((alt) => alt.toLowerCase() === rawPin || alt.toLowerCase() === pinDigits)
+            )
+
+            if (targetBoardPin) {
+              const nodal = solveCircuitNodalPotentials(state, pressedRef.current, pinStatesRef.current, true)
+              const vPin = nodal.getPinVoltage({ partId: boardPart.id, pinId: targetBoardPin.id })
+              if (vPin >= activeBoard.logicVoltage * 0.45) {
+                return true
+              }
+            }
+          }
+
+          return false
+        },
         getSensorText: (type, id) => {
           if (type !== "keypad") return ""
           const keypad = partsRef.current.find((pt) => pt.id === id && pt.type === "keypad-4x4")

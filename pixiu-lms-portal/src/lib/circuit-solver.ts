@@ -1,7 +1,6 @@
 import type { CircuitState, PinRef } from "./circuit-types"
 import type { ArduinoPinState } from "./simulation"
-import type { PartRuntime } from "@/components/circuit-lab/part-art"
-import { getBoardForPart } from "./board-registry"
+import { getBoardForPart, lookupBoardPinState } from "./board-registry"
 
 export interface PinPotentialInfo {
   voltage: number
@@ -121,9 +120,14 @@ export function solveCircuitNodalPotentials(
     if (board) {
       for (const pin of board.pins) {
         allPins.add(pinKey(part.id, pin.id))
-        const num = pin.id.replace(/^d|^gpio/, "")
-        if (num !== pin.id) {
+        allPins.add(pinKey(part.id, pin.id.toLowerCase()))
+        allPins.add(pinKey(part.id, pin.label.toLowerCase()))
+        const num = pin.id.replace(/^(gpio|gp|d|p)/i, "")
+        if (num && num !== pin.id) {
           allPins.add(pinKey(part.id, num))
+        }
+        for (const alt of pin.alternateNames ?? []) {
+          allPins.add(pinKey(part.id, alt.toLowerCase()))
         }
       }
       for (const g of board.powerPins.gnd) {
@@ -322,9 +326,8 @@ export function solveCircuitNodalPotentials(
       for (const pin of board.pins) {
         if (pin.kind === "digital" || pin.kind === "analog") {
           const pinId = pin.id
-          const altId = pinId.replace(/^d|^gpio/, "")
           const netD = pinToNetId(part.id, pinId)
-          const pState = pinStates[altId] || pinStates[pinId]
+          const pState = lookupBoardPinState(pinStates, pinId, board)
 
           if (pState?.state === "HIGH") {
             fixedNets.set(netD, { voltage: board.logicVoltage, label: `${board.shortName} Pin ${pin.label} (HIGH = ${board.logicVoltage}V)` })

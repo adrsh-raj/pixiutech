@@ -525,11 +525,23 @@ export function getBoardForPart(part: PlacedPart | PartType | string): BoardDefi
 
 /**
  * Finds the active controller board in a circuit state, falling back to Arduino Uno.
+ * Prioritizes a preferredPartId if provided, or the most recently added board,
+ * or non-default board if a student added an ESP32, Pico, or micro:bit.
  */
-export function getActiveBoard(circuit: CircuitState): BoardDefinition {
-  const boardPart = circuit.parts.find((p) => isBoardPart(p.type))
-  if (boardPart) {
-    const def = getBoardDefinition(boardPart.type)
+export function getActiveBoard(circuit: CircuitState, preferredPartId?: string | null): BoardDefinition {
+  if (preferredPartId) {
+    const pref = circuit.parts.find((p) => p.id === preferredPartId && isBoardPart(p.type))
+    if (pref) {
+      const def = getBoardDefinition(pref.type)
+      if (def) return def
+    }
+  }
+
+  const boardParts = circuit.parts.filter((p) => isBoardPart(p.type))
+  if (boardParts.length > 0) {
+    const nonUno = [...boardParts].reverse().find((p) => p.type !== "arduino-uno")
+    const target = nonUno ?? boardParts[boardParts.length - 1]
+    const def = getBoardDefinition(target.type)
     if (def) return def
   }
   return getDefaultBoard()
@@ -615,4 +627,102 @@ export function validatePinVoltageTolerance(
   }
 
   return { safe: true }
+}
+
+export interface GenericPinState {
+  state?: "HIGH" | "LOW" | string
+  value?: number
+  angle?: number
+}
+
+/**
+ * Universal pin state resolver that matches pin queries across all 4 microcontroller
+ * architectures (Uno, ESP32, Pico, micro:bit) regardless of how the pin was addressed
+ * in code (e.g. "2", "D2", "gpio2", "GPIO2", "25", "GP25", "P0", "0").
+ */
+export function lookupBoardPinState(
+  pinStates: Record<string, GenericPinState | any> = {},
+  pinQuery: string,
+  board?: BoardDefinition | null
+): { state: "HIGH" | "LOW"; value?: number; angle?: number } | undefined {
+  if (!pinStates || !pinQuery) return undefined
+
+  const normalizeEntry = (entry: any): { state: "HIGH" | "LOW"; value?: number; angle?: number } | undefined => {
+    if (!entry) return undefined
+    if (typeof entry === "string") {
+      return { state: entry.toUpperCase() === "HIGH" ? "HIGH" : "LOW" }
+    }
+    if (typeof entry === "number") {
+      return { state: entry > 0 ? "HIGH" : "LOW", value: entry }
+    }
+    if (typeof entry === "object") {
+      const state = entry.state === "HIGH" || (entry.value !== undefined && entry.value > 0) ? "HIGH" : "LOW"
+      return {
+        state,
+        value: entry.value,
+        angle: entry.angle,
+      }
+    }
+    return undefined
+  }
+
+  // Case-insensitive pin state getter
+  const findEntry = (k: string): any => {
+    if (!k) return undefined
+    if (pinStates[k] !== undefined) return pinStates[k]
+    const l = k.toLowerCase()
+    if (pinStates[l] !== undefined) return pinStates[l]
+    const u = k.toUpperCase()
+    if (pinStates[u] !== undefined) return pinStates[u]
+    for (const key of Object.keys(pinStates)) {
+      if (key.toLowerCase() === l) return pinStates[key]
+    }
+    return undefined
+  }
+
+  // 1. Direct query lookup
+  const direct = findEntry(pinQuery)
+  if (direct !== undefined) return normalizeEntry(direct)
+
+  // 2. Prefix stripped numeric ID (e.g. "d13" -> "13", "gpio2" -> "2", "gp25" -> "25", "p0" -> "0")
+  const lower = pinQuery.toLowerCase()
+  const stripped = lower.replace(/^(gpio|gp|d|p)/i, "")
+  if (stripped) {
+    const candidates = [
+      stripped,
+      `d${stripped}`,
+      `gpio${stripped}`,
+      `gp${stripped}`,
+      `p${stripped}`,
+    ]
+    for (const cand of candidates) {
+      const val = findEntry(cand)
+      if (val !== undefined) return normalizeEntry(val)
+    }
+  }
+
+  // 3. Search target board pin definition and its alternateNames
+  if (board) {
+    const pin = board.pins.find(
+      (p) =>
+        p.id.toLowerCase() === lower ||
+        p.label.toLowerCase() === lower ||
+        p.id.replace(/^(gpio|gp|d|p)/i, "") === stripped ||
+        p.label.toLowerCase().replace(/^(gpio|gp|d|p)/i, "") === stripped ||
+        p.alternateNames?.some((alt) => alt.toLowerCase() === lower || alt.toLowerCase() === stripped)
+    )
+    if (pin) {
+      const boardPinCandidates = [
+        pin.id,
+        pin.label,
+        ...(pin.alternateNames ?? []),
+      ]
+      for (const cand of boardPinCandidates) {
+        const val = findEntry(cand)
+        if (val !== undefined) return normalizeEntry(val)
+      }
+    }
+  }
+
+  return undefined
 }

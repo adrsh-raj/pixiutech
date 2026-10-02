@@ -77,8 +77,127 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
 </xml>`,
   },
   {
+    id: "esp32-iot-smart-light",
+    title: "2. 📱 ESP32 Smart Home Web Server & Phone Controller",
+    description: "Connect ESP32 to Virtual Wi-Fi, host a local HTTP Web Server, and control Living Room and Bedroom lights directly from your simulated Smartphone!",
+    difficulty: "Intermediate",
+    tags: ["ESP32", "Virtual Wi-Fi", "IoT", "Web Server", "Smartphone", "Smart Home"],
+    circuit: {
+      parts: [
+        { id: "esp", type: "esp32-devkit", x: 40, y: 70, rotation: 0, props: {} },
+        { id: "r_red", type: "resistor", x: 380, y: 100, rotation: 0, props: { resistance: 220 } },
+        { id: "led_red", type: "led", x: 500, y: 100, rotation: 0, props: { color: "red" } },
+        { id: "r_blue", type: "resistor", x: 380, y: 220, rotation: 0, props: { resistance: 220 } },
+        { id: "led_blue", type: "led", x: 500, y: 220, rotation: 0, props: { color: "blue" } },
+      ],
+      wires: [
+        { id: "w_r1", from: { partId: "esp", pinId: "d4" }, to: { partId: "r_red", pinId: "a" }, color: "#ef4444" },
+        { id: "w_r2", from: { partId: "r_red", pinId: "b" }, to: { partId: "led_red", pinId: "anode" }, color: "#ef4444" },
+        { id: "w_rgnd", from: { partId: "led_red", pinId: "cathode" }, to: { partId: "esp", pinId: "gnd_r" }, color: "#1e293b" },
+        { id: "w_b1", from: { partId: "esp", pinId: "d15" }, to: { partId: "r_blue", pinId: "a" }, color: "#3b82f6" },
+        { id: "w_b2", from: { partId: "r_blue", pinId: "b" }, to: { partId: "led_blue", pinId: "anode" }, color: "#3b82f6" },
+        { id: "w_bgnd", from: { partId: "led_blue", pinId: "cathode" }, to: { partId: "esp", pinId: "gnd_r" }, color: "#1e293b" },
+      ],
+    },
+    blocklyXml: `<xml xmlns="https://developers.google.com/blockly/xml">
+  <block type="arduino_program" x="40" y="40">
+    <statement name="SETUP">
+      <block type="serial_begin"><field name="BAUD">115200</field><next>
+      <block type="io_pinmode"><field name="PIN">4</field><field name="MODE">OUTPUT</field><next>
+      <block type="io_pinmode"><field name="PIN">15</field><field name="MODE">OUTPUT</field><next>
+      <block type="wifi_connect">
+        <value name="SSID"><block type="text_string"><field name="TEXT">SmartHome-WiFi</field></block></value>
+        <value name="PASS"><block type="text_string"><field name="TEXT">pixiu123</field></block></value>
+        <next>
+        <block type="wifi_server_begin">
+          <field name="PORT">80</field>
+          <next>
+          <block type="wifi_server_on">
+            <field name="ROUTE">/</field>
+            <statement name="HANDLER">
+              <block type="wifi_server_send">
+                <field name="CODE">200</field>
+                <field name="TYPE">text/html</field>
+                <value name="BODY">
+                  <block type="text_string"><field name="TEXT">&lt;h1&gt;🏠 ESP32 Smart Home&lt;/h1&gt;&lt;p&gt;Tap to control room lights:&lt;/p&gt;&lt;div&gt;&lt;a href="/red/on"&gt;Turn ON Living Room&lt;/a&gt;&lt;a href="/red/off"&gt;Turn OFF Living Room&lt;/a&gt;&lt;/div&gt;&lt;div style="margin-top:10px;"&gt;&lt;a href="/blue/on"&gt;Turn ON Bedroom&lt;/a&gt;&lt;a href="/blue/off"&gt;Turn OFF Bedroom&lt;/a&gt;&lt;/div&gt;</field></block>
+                </value>
+              </block>
+            </statement>
+            <next>
+            <block type="wifi_server_on">
+              <field name="ROUTE">/red/on</field>
+              <statement name="HANDLER">
+                <block type="io_digitalwrite"><field name="PIN">4</field><field name="STATE">HIGH</field><next>
+                <block type="wifi_server_send">
+                  <field name="CODE">200</field>
+                  <field name="TYPE">text/html</field>
+                  <value name="BODY">
+                    <block type="text_string"><field name="TEXT">&lt;h2 style="color:#ef4444"&gt;🔴 Living Room Light: ON&lt;/h2&gt;&lt;a href="/"&gt;← Back to Dashboard&lt;/a&gt;</field></block>
+                  </value>
+                </block>
+                </next></block>
+              </statement>
+              <next>
+              <block type="wifi_server_on">
+                <field name="ROUTE">/red/off</field>
+                <statement name="HANDLER">
+                  <block type="io_digitalwrite"><field name="PIN">4</field><field name="STATE">LOW</field><next>
+                  <block type="wifi_server_send">
+                    <field name="CODE">200</field>
+                    <field name="TYPE">text/html</field>
+                    <value name="BODY">
+                      <block type="text_string"><field name="TEXT">&lt;h2&gt;⚪ Living Room Light: OFF&lt;/h2&gt;&lt;a href="/"&gt;← Back to Dashboard&lt;/a&gt;</field></block>
+                    </value>
+                  </block>
+                  </next></block>
+                </statement>
+                <next>
+                <block type="wifi_server_on">
+                  <field name="ROUTE">/blue/on</field>
+                  <statement name="HANDLER">
+                    <block type="io_digitalwrite"><field name="PIN">15</field><field name="STATE">HIGH</field><next>
+                    <block type="wifi_server_send">
+                      <field name="CODE">200</field>
+                      <field name="TYPE">text/html</field>
+                      <value name="BODY">
+                        <block type="text_string"><field name="TEXT">&lt;h2 style="color:#38bdf8"&gt;🔵 Bedroom Light: ON&lt;/h2&gt;&lt;a href="/"&gt;← Back to Dashboard&lt;/a&gt;</field></block>
+                      </value>
+                    </block>
+                    </next></block>
+                  </statement>
+                  <next>
+                  <block type="wifi_server_on">
+                    <field name="ROUTE">/blue/off</field>
+                    <statement name="HANDLER">
+                      <block type="io_digitalwrite"><field name="PIN">15</field><field name="STATE">LOW</field><next>
+                      <block type="wifi_server_send">
+                        <field name="CODE">200</field>
+                        <field name="TYPE">text/html</field>
+                        <value name="BODY">
+                          <block type="text_string"><field name="TEXT">&lt;h2&gt;⚪ Bedroom Light: OFF&lt;/h2&gt;&lt;a href="/"&gt;← Back to Dashboard&lt;/a&gt;</field></block>
+                        </value>
+                      </block>
+                      </next></block>
+                    </statement>
+                  </block>
+                  </next></block>
+                </next></block>
+              </next></block>
+            </next></block>
+          </block>
+          </next></block>
+        </next></block>
+      </next></block></next></block></next></block>
+    </statement>
+    <statement name="LOOP">
+      <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">100</field></shadow></value></block>
+    </statement>
+  </block>
+</xml>`,
+  },
+  {
     id: "blink-led",
-    title: "2. Arduino Blink with 220Ω Resistor",
+    title: "3. Arduino Blink with 220Ω Resistor",
     description: "The classic 'Hello World' of electronics. Learn how current-limiting resistors protect LEDs from burning out.",
     difficulty: "Beginner",
     tags: ["LED", "Resistor", "Digital Output"],
@@ -272,6 +391,15 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
 ]
 
 const BASE_TEMPLATE_META: Record<string, { gradeBand: TemplateGrade; unit: string; tutorial: string[] }> = {
+  "esp32-iot-smart-light": {
+    gradeBand: 8,
+    unit: "IoT & Cloud",
+    tutorial: [
+      "Click 'Run' to connect ESP32 to Virtual Wi-Fi and spin up the HTTP Web Server.",
+      "Open the 📱 IoT Web Portal in the toolbar to see your Smartphone View.",
+      "Tap 'Turn ON Living Room' or 'Turn ON Bedroom' to switch physical LEDs on the canvas in real-time!",
+    ],
+  },
   "blink-led": { gradeBand: 6, unit: "Digital Output", tutorial: ["Place Arduino, LED and resistor.", "Wire D13 → resistor → LED → GND.", "Run the circuit and observe the blink sequence."] },
   "traffic-light": { gradeBand: 6, unit: "Sequencing", tutorial: ["Place three LEDs and three resistors.", "Connect each LED to its own Arduino output.", "Run the program and observe the red → yellow → green cycle."] },
   "servo-sweep": { gradeBand: 7, unit: "Motion + PWM", tutorial: ["Place Arduino and servo.", "Connect 5V, GND and D9 signal.", "Run 0° → 90° → 180° and observe motion."] },

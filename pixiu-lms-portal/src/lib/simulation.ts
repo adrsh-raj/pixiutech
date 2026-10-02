@@ -1,7 +1,7 @@
 import type { CircuitState } from "./circuit-types"
 import { CATALOG } from "./components-catalog"
 import type { PartRuntime } from "@/components/circuit-lab/part-art"
-import { getBoardForPart } from "./board-registry"
+import { getBoardForPart, isBoardPart, lookupBoardPinState } from "./board-registry"
 
 export interface ArduinoPinState {
   state: "HIGH" | "LOW"
@@ -143,8 +143,7 @@ export function computeRuntime(
       for (const pin of board.pins) {
         if (pin.kind === "digital" || pin.kind === "analog") {
           const pinId = pin.id
-          const altId = pinId.replace(/^d|^gpio/, "")
-          const pState = pinStates[pinId] ?? pinStates[altId]
+          const pState = lookupBoardPinState(pinStates, pinId, board)
           if (pState?.state === "HIGH" || (pState?.value ?? 0) > 0) {
             const duty = pState.value !== undefined ? pState.value / 255 : 1.0
             activeSources.push({ key: k(pinId), voltage: board.logicVoltage * duty })
@@ -224,24 +223,20 @@ export function computeRuntime(
       const activePins: Record<string, boolean | number> = {}
       for (const pin of board.pins) {
         const pinId = pin.id
-        const altId = pinId.replace(/^d|^gpio/, "")
-        const pState = pinStates[pinId] ?? pinStates[altId]
+        const altId = pinId.replace(/^(gpio|gp|d|p)/i, "")
+        const pState = lookupBoardPinState(pinStates, pinId, board)
         if (pState?.state === "HIGH") {
           activePins[pinId] = true
-          activePins[altId] = true
+          if (altId) activePins[altId] = true
         } else if ((pState?.value ?? 0) > 0) {
           activePins[pinId] = pState.value!
-          activePins[altId] = pState.value!
+          if (altId) activePins[altId] = pState.value!
         }
       }
 
       // Check board built-in LED state (D13 on Uno, D2 on ESP32, GP25 on Pico)
       const ledPState = board.builtInLedPin
-        ? pinStates[board.builtInLedPin] ??
-          pinStates[board.builtInLedPin.replace(/^(d|gpio|gp)/i, "")] ??
-          pinStates[`gpio${board.builtInLedPin.replace(/^(d|gpio|gp)/i, "")}`] ??
-          pinStates[`gp${board.builtInLedPin.replace(/^(d|gpio|gp)/i, "")}`] ??
-          pinStates[`d${board.builtInLedPin.replace(/^(d|gpio|gp)/i, "")}`]
+        ? lookupBoardPinState(pinStates, board.builtInLedPin, board)
         : undefined
       const isBuiltInLedActive = Boolean(ledPState && (ledPState.state === "HIGH" || (ledPState.value ?? 0) > 0))
 
@@ -397,20 +392,42 @@ export function computeRuntime(
     } else if (part.type === "servo") {
       const sigKey = k("sig")
       let drivenAngle: number | undefined
-      const unoPart = state.parts.find((pt) => pt.type === "arduino-uno")
-      if (unoPart) {
+      const boardParts = state.parts.filter((pt) => isBoardPart(pt.type))
+      for (const bPart of boardParts) {
+        const bDef = getBoardForPart(bPart)
+        if (!bDef) continue
         for (const [pinNum, p] of Object.entries(pinStates)) {
-          if (p.angle !== undefined) {
-            const cleanPin = pinNum.toLowerCase().replace(/^d/, "")
-            const unoPinKey1 = key(unoPart.id, `d${cleanPin}`)
-            const unoPinKey2 = key(unoPart.id, cleanPin)
-            const path = shortestResistance([{ key: unoPinKey1 }, { key: unoPinKey2 }], sigKey)
+          if (p?.angle !== undefined) {
+            const cleanPin = pinNum.toLowerCase().replace(/^(gpio|gp|d|p)/i, "")
+            const candidateKeys: { key: string }[] = [
+              { key: key(bPart.id, pinNum) },
+              { key: key(bPart.id, pinNum.toLowerCase()) },
+              { key: key(bPart.id, `d${cleanPin}`) },
+              { key: key(bPart.id, `gpio${cleanPin}`) },
+              { key: key(bPart.id, `gp${cleanPin}`) },
+              { key: key(bPart.id, `p${cleanPin}`) },
+              { key: key(bPart.id, cleanPin) },
+            ]
+            const bPin = bDef.pins.find(
+              (bp) =>
+                bp.id.toLowerCase() === pinNum.toLowerCase() ||
+                bp.label.toLowerCase() === pinNum.toLowerCase() ||
+                bp.id.replace(/^(gpio|gp|d|p)/i, "") === cleanPin
+            )
+            if (bPin) {
+              candidateKeys.push({ key: key(bPart.id, bPin.id) })
+              for (const alt of bPin.alternateNames ?? []) {
+                candidateKeys.push({ key: key(bPart.id, alt.toLowerCase()) })
+              }
+            }
+            const path = shortestResistance(candidateKeys, sigKey)
             if (path) {
               drivenAngle = p.angle
               break
             }
           }
         }
+        if (drivenAngle !== undefined) break
       }
       runtime[part.id] = { angle: drivenAngle ?? Number(part.props.angle ?? 0) }
     } else if (part.type === "seven-segment") {
@@ -507,13 +524,24 @@ export function computeRuntime(
       const powered = hasExternalPower(part.id, "vs", "gnd")
       const clampPwm = (value: unknown) =>
         Math.max(0, Math.min(255, Number.isFinite(Number(value)) ? Number(value) : 0))
-      const findArduinoPinState = (targetKey: string) => {
-        for (const uno of state.parts.filter((candidate) => candidate.type === "arduino-uno")) {
-          for (let pin = 0; pin <= 13; pin += 1) {
-            const candidates = [key(uno.id, "d" + pin), key(uno.id, String(pin))]
+      const findBoardPinState = (targetKey: string) => {
+        for (const bPart of state.parts.filter((candidate) => isBoardPart(candidate.type))) {
+          const bDef = getBoardForPart(bPart)
+          if (!bDef) continue
+          for (const bp of bDef.pins) {
+            if (bp.kind !== "digital" && bp.kind !== "analog") continue
+            const stripped = bp.id.replace(/^(gpio|gp|d|p)/i, "")
+            const candidates = [
+              key(bPart.id, bp.id),
+              key(bPart.id, bp.label.toLowerCase()),
+              key(bPart.id, stripped),
+              key(bPart.id, `d${stripped}`),
+              key(bPart.id, `gpio${stripped}`),
+              ...(bp.alternateNames ?? []).map((alt) => key(bPart.id, alt.toLowerCase())),
+            ]
             for (const candidate of candidates) {
               if (shortestResistance([{ key: candidate }], targetKey)) {
-                return pinStates[String(pin)] ?? pinStates["d" + pin] ?? null
+                return lookupBoardPinState(pinStates, bp.id, bDef) ?? null
               }
             }
           }
@@ -521,7 +549,7 @@ export function computeRuntime(
         return null
       }
       const readDrive = (pin: string) => {
-        const stateForPin = findArduinoPinState(k(pin))
+        const stateForPin = findBoardPinState(k(pin))
         if (!stateForPin) {
           return { connected: false, enabled: false, pwm: 0 }
         }
@@ -531,8 +559,8 @@ export function computeRuntime(
         return { connected: true, enabled: pwm > 0, pwm }
       }
       const readDirection = (highPin: string, lowPin: string) => {
-        const highState = findArduinoPinState(k(highPin))
-        const lowState = findArduinoPinState(k(lowPin))
+        const highState = findBoardPinState(k(highPin))
+        const lowState = findBoardPinState(k(lowPin))
         const highOn = highState ? highState.state === "HIGH" || Number(highState.value ?? 0) > 0 : false
         const lowOn = lowState ? lowState.state === "HIGH" || Number(lowState.value ?? 0) > 0 : false
         if (highOn === lowOn) return "stopped" as const
