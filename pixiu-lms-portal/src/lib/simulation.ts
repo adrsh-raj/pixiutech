@@ -235,17 +235,21 @@ export function computeRuntime(
         }
       }
 
-      // Check board built-in LED state (D13 on Uno, D2 on ESP32)
+      // Check board built-in LED state (D13 on Uno, D2 on ESP32, GP25 on Pico)
       const ledPState = board.builtInLedPin
         ? pinStates[board.builtInLedPin] ??
-          pinStates[board.builtInLedPin.replace(/^d|^gpio/, "")] ??
-          pinStates[`gpio${board.builtInLedPin.replace(/^d|^gpio/, "")}`]
+          pinStates[board.builtInLedPin.replace(/^(d|gpio|gp)/i, "")] ??
+          pinStates[`gpio${board.builtInLedPin.replace(/^(d|gpio|gp)/i, "")}`] ??
+          pinStates[`gp${board.builtInLedPin.replace(/^(d|gpio|gp)/i, "")}`] ??
+          pinStates[`d${board.builtInLedPin.replace(/^(d|gpio|gp)/i, "")}`]
         : undefined
       const isBuiltInLedActive = Boolean(ledPState && (ledPState.state === "HIGH" || (ledPState.value ?? 0) > 0))
 
       runtime[part.id] = {
+        ...runtime[part.id],
         pin13High: board.id === "arduino-uno" ? isBuiltInLedActive : undefined,
         pin2High: board.id === "esp32-devkit" ? isBuiltInLedActive : undefined,
+        pin25High: board.id === "rpi-pico" ? isBuiltInLedActive : undefined,
         activePins,
       }
     } else if (part.type === "led") {

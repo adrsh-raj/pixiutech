@@ -9,6 +9,12 @@ export interface PartRuntime {
   pin13High?: boolean
   /** for ESP32: is Pin D2 (GPIO2) HIGH */
   pin2High?: boolean
+  /** for Raspberry Pi Pico: is GP25 HIGH */
+  pin25High?: boolean
+  /** for BBC micro:bit v2: 5x5 LED matrix active cells & button press state */
+  matrix5x5?: boolean[][]
+  btnAPressed?: boolean
+  btnBPressed?: boolean
   /** Real electrical burnout states */
   burnt?: boolean
   currentMa?: number
@@ -588,6 +594,23 @@ export function PartArt({ part, runtime }: { part: PlacedPart; runtime?: PartRun
           {/* USB Port at top */}
           <rect x={86} y={-4} width={48} height={28} rx={3} fill="#cbd5e1" stroke="#475569" strokeWidth={1.5} />
 
+          {/* GP25 Onboard Green User LED */}
+          <g>
+            <rect x={52} y={34} width={12} height={8} rx={1.5} fill="#1e293b" stroke="#0f172a" strokeWidth={0.8} />
+            <circle
+              cx={58}
+              cy={38}
+              r={2.5}
+              fill={runtime?.pin25High ? "#22c55e" : "#14532d"}
+              stroke={runtime?.pin25High ? "#86efac" : "#052e16"}
+              strokeWidth={0.6}
+            />
+            {runtime?.pin25High && <circle cx={58} cy={38} r={6} fill="#22c55e" opacity={0.4} />}
+            <text x={58} y={50} textAnchor="middle" fontSize={5} fill={runtime?.pin25High ? "#86efac" : "#6ee7b7"} fontFamily="monospace" fontWeight={700}>
+              GP25
+            </text>
+          </g>
+
           {/* BOOTSEL Button */}
           <rect x={148} y={55} width={18} height={18} rx={2} fill="#334155" />
           <circle cx={157} cy={64} r={5} fill="#f8fafc" />
@@ -626,33 +649,46 @@ export function PartArt({ part, runtime }: { part: PlacedPart; runtime?: PartRun
           <g>
             <rect x={110} y={65} width={100} height={100} rx={6} fill="#09090b" stroke="#27272a" />
             {Array.from({ length: 5 }).map((_, r) =>
-              Array.from({ length: 5 }).map((__, c) => (
-                <rect
-                  key={`${r}-${c}`}
-                  x={120 + c * 16}
-                  y={75 + r * 16}
-                  width={10}
-                  height={10}
-                  rx={2}
-                  fill="#7f1d1d"
-                  stroke="#ef4444"
-                  strokeWidth={0.5}
-                />
-              )),
+              Array.from({ length: 5 }).map((__, c) => {
+                const isLit = runtime?.matrix5x5?.[r]?.[c] === true
+                return (
+                  <g key={`${r}-${c}`}>
+                    <rect
+                      x={120 + c * 16}
+                      y={75 + r * 16}
+                      width={10}
+                      height={10}
+                      rx={2}
+                      fill={isLit ? "#ef4444" : "#450a0a"}
+                      stroke={isLit ? "#fca5a5" : "#7f1d1d"}
+                      strokeWidth={isLit ? 1 : 0.5}
+                    />
+                    {isLit && (
+                      <circle
+                        cx={125 + c * 16}
+                        cy={80 + r * 16}
+                        r={6}
+                        fill="#ef4444"
+                        opacity={0.4}
+                      />
+                    )}
+                  </g>
+                )
+              }),
             )}
           </g>
 
           {/* Button A & Button B */}
           <g>
             <circle cx={50} cy={115} r={14} fill="#27272a" stroke="#3f3f46" strokeWidth={1.5} />
-            <circle cx={50} cy={115} r={9} fill="#09090b" />
-            <text x={50} y={145} textAnchor="middle" fontSize={11} fill="#f4f4f5" fontWeight={700}>
+            <circle cx={50} cy={115} r={9} fill={runtime?.btnAPressed ? "#38bdf8" : "#09090b"} />
+            <text x={50} y={145} textAnchor="middle" fontSize={11} fill={runtime?.btnAPressed ? "#38bdf8" : "#f4f4f5"} fontWeight={700}>
               A
             </text>
 
             <circle cx={270} cy={115} r={14} fill="#27272a" stroke="#3f3f46" strokeWidth={1.5} />
-            <circle cx={270} cy={115} r={9} fill="#09090b" />
-            <text x={270} y={145} textAnchor="middle" fontSize={11} fill="#f4f4f5" fontWeight={700}>
+            <circle cx={270} cy={115} r={9} fill={runtime?.btnBPressed ? "#38bdf8" : "#09090b"} />
+            <text x={270} y={145} textAnchor="middle" fontSize={11} fill={runtime?.btnBPressed ? "#38bdf8" : "#f4f4f5"} fontWeight={700}>
               B
             </text>
           </g>

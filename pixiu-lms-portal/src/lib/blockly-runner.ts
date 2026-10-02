@@ -30,6 +30,19 @@ export interface ExecutionEnvironment {
   isAiGesture?: (gesture: string) => boolean
   setAiCamera?: (enabled: boolean) => void
   setAiMicrophone?: (enabled: boolean) => void
+  // Virtual Wi-Fi & Web Server hooks
+  wifiConnect?: (ssid: string, pass: string) => void
+  wifiIsConnected?: () => boolean
+  wifiGetIp?: () => string
+  wifiServerBegin?: (port: number) => void
+  wifiServerOn?: (route: string, branch: Blockly.Block | null) => void
+  wifiServerSend?: (code: number, contentType: string, body: string) => void
+  // micro:bit 5x5 LED Matrix & buttons
+  showMatrixIcon?: (icon: string) => void
+  showMatrixNumber?: (num: number) => void
+  showMatrixText?: (text: string) => void
+  clearMatrix?: () => void
+  isButtonPressed?: (btn: "A" | "B") => boolean
   sleep: (ms: number) => Promise<void>
   isRunning: () => boolean
   // Stepping & Debugging methods
@@ -165,6 +178,13 @@ export function evaluateBoolean(target: Blockly.Block | null, env?: ExecutionEnv
   if (target.type === "ai_is_unknown") {
     return env?.isAiUnknown ? env.isAiUnknown() : false
   }
+  if (target.type === "wifi_is_connected") {
+    return env?.wifiIsConnected ? env.wifiIsConnected() : true
+  }
+  if (target.type === "microbit_button_pressed") {
+    const btn = (target.getFieldValue("BTN") ?? "A") as "A" | "B"
+    return env?.isButtonPressed ? env.isButtonPressed(btn) : false
+  }
   if (target.type === "logic_boolean") {
     return target.getFieldValue("BOOL") === "TRUE"
   }
@@ -236,6 +256,9 @@ function evaluateValueInput(block: Blockly.Block, inputName: string, env?: Execu
   }
   if (target.type === "ai_get_gesture") {
     return env?.getAiGesture ? env.getAiGesture() : "none"
+  }
+  if (target.type === "wifi_local_ip") {
+    return env?.wifiGetIp ? env.wifiGetIp() : "192.168.1.105"
   }
   return defaultValue
 }
@@ -337,6 +360,22 @@ function getBlockDescription(block: Blockly.Block, env: ExecutionEnvironment): s
       const times = evaluateNumberInput(block, "TIMES", env, 1)
       return `repeat (${times}x)`
     }
+    case "wifi_connect":
+      return `WiFi.begin("${block.getFieldValue("SSID") ?? "Pixiu_IoT"}")`
+    case "wifi_server_begin":
+      return `server.begin(${block.getFieldValue("PORT") ?? 80})`
+    case "wifi_server_on":
+      return `server.on("${block.getFieldValue("PATH") ?? "/"}")`
+    case "wifi_server_send":
+      return `server.send(${block.getFieldValue("STATUS") ?? 200})`
+    case "microbit_show_icon":
+      return `display.show(${block.getFieldValue("ICON") ?? "heart"})`
+    case "microbit_show_number":
+      return "display.showNumber()"
+    case "microbit_show_string":
+      return "display.scroll()"
+    case "microbit_clear":
+      return "display.clear()"
     default:
       return block.type
   }
@@ -499,6 +538,56 @@ async function executeSingleBlock(block: Blockly.Block, env: ExecutionEnvironmen
       break
     }
 
+    case "wifi_connect": {
+      const ssid = block.getFieldValue("SSID") ?? "Pixiu_IoT"
+      const pass = block.getFieldValue("PASS") ?? ""
+      env.wifiConnect?.(ssid, pass)
+      break
+    }
+
+    case "wifi_server_begin": {
+      const port = Number(block.getFieldValue("PORT") ?? 80)
+      env.wifiServerBegin?.(port)
+      break
+    }
+
+    case "wifi_server_on": {
+      const route = block.getFieldValue("PATH") ?? "/"
+      const branch = block.getInputTargetBlock("DO")
+      env.wifiServerOn?.(route, branch)
+      break
+    }
+
+    case "wifi_server_send": {
+      const status = Number(block.getFieldValue("STATUS") ?? 200)
+      const content = evaluateValueInput(block, "CONTENT", env, "OK")
+      env.wifiServerSend?.(status, "text/html", String(content))
+      break
+    }
+
+    case "microbit_show_icon": {
+      const icon = block.getFieldValue("ICON") ?? "heart"
+      env.showMatrixIcon?.(icon)
+      break
+    }
+
+    case "microbit_show_number": {
+      const num = evaluateNumberInput(block, "NUM", env, 0)
+      env.showMatrixNumber?.(num)
+      break
+    }
+
+    case "microbit_show_string": {
+      const text = evaluateValueInput(block, "TEXT", env, "")
+      env.showMatrixText?.(String(text))
+      break
+    }
+
+    case "microbit_clear": {
+      env.clearMatrix?.()
+      break
+    }
+
     case "neopixel_set_color":
     case "neopixel_show":
     case "mq2_gas_read":
@@ -562,7 +651,7 @@ async function executeSingleBlock(block: Blockly.Block, env: ExecutionEnvironmen
   }
 }
 
-async function executeStatement(startBlock: Blockly.Block | null, env: ExecutionEnvironment, signal: AbortSignal) {
+export async function executeStatement(startBlock: Blockly.Block | null, env: ExecutionEnvironment, signal: AbortSignal) {
   let cur = startBlock
   while (cur && !signal.aborted && env.isRunning()) {
     await executeSingleBlock(cur, env, signal)

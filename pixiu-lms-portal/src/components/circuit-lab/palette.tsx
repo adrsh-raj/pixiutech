@@ -105,6 +105,23 @@ function OscilloscopeThumb() {
   )
 }
 
+function IotThumb() {
+  return (
+    <svg viewBox="0 0 56 56" className="h-10 w-10">
+      <rect x="6" y="8" width="44" height="40" rx="6" fill="#0f172a" stroke="#0284c7" strokeWidth="1.5" />
+      <rect x="6" y="8" width="44" height="12" rx="4" fill="#0369a1" />
+      <circle cx="12" cy="14" r="2" fill="#f87171" />
+      <circle cx="18" cy="14" r="2" fill="#facc15" />
+      <circle cx="24" cy="14" r="2" fill="#4ade80" />
+      <rect x="30" y="11" width="16" height="6" rx="2" fill="#0c4a6e" />
+      {/* Wi-Fi Waves */}
+      <path d="M 18 36 A 12 12 0 0 1 38 36" fill="none" stroke="#38bdf8" strokeWidth="2.2" strokeLinecap="round" />
+      <path d="M 22 40 A 7 7 0 0 1 34 40" fill="none" stroke="#38bdf8" strokeWidth="2.2" strokeLinecap="round" />
+      <circle cx="28" cy="43" r="2" fill="#38bdf8" />
+    </svg>
+  )
+}
+
 const CATEGORIES = [
   { id: "all", label: "All" },
   { id: "controller", label: "Boards" },
@@ -125,6 +142,9 @@ interface Props {
   onToggleDmm?: () => void
   isScopeOpen?: boolean
   onToggleScope?: () => void
+  isIotOpen?: boolean
+  onToggleIot?: () => void
+  wifiRunning?: boolean
   activeWireColor?: string
   onSelectWireColor?: (color: string) => void
 }
@@ -137,6 +157,9 @@ export function Palette({
   onToggleDmm,
   isScopeOpen = false,
   onToggleScope,
+  isIotOpen = false,
+  onToggleIot,
+  wifiRunning = false,
   activeWireColor = "#22c55e",
   onSelectWireColor,
 }: Props) {
@@ -178,6 +201,10 @@ export function Palette({
   const matchesScopeSearch =
     !search ||
     "oscilloscope scope logic waveform grapher signal analyzer pwm frequency voltage crt".toLowerCase().includes(search.toLowerCase())
+
+  const matchesIotSearch =
+    !search ||
+    "wifi wi-fi web server iot browser http internet esp32 smart home".toLowerCase().includes(search.toLowerCase())
 
   const activeColorObj = WIRE_COLOR_OPTIONS.find((c) => c.color === activeWireColor)
 
@@ -317,7 +344,45 @@ export function Palette({
             </div>
           )}
 
-          {/* 2. Jumper Wires Tool in Palette */}
+          {/* 3. Virtual Wi-Fi & Web Browser in Palette */}
+          {showTools && matchesIotSearch && (
+            <div
+              onClick={onToggleIot}
+              className={`group flex w-full items-center gap-3 rounded-xl border p-2 text-left transition-all cursor-pointer ${
+                isIotOpen
+                  ? "border-sky-500/60 bg-sky-500/10 shadow-xs"
+                  : "border-transparent hover:border-border hover:bg-secondary/70"
+              }`}
+              title={isIotOpen ? "IoT Web Browser is active (Click to close)" : "Open Virtual IoT Web Browser"}
+            >
+              <span className="grid h-14 w-14 place-items-center rounded-lg bg-background/80 ring-1 ring-border shadow-xs shrink-0">
+                <IotThumb />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="flex items-center justify-between gap-1">
+                  <span className="block truncate font-bold text-xs text-foreground group-hover:text-primary transition">
+                    IoT Web Browser
+                  </span>
+                  <span
+                    className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md uppercase font-mono ${
+                      wifiRunning
+                        ? "bg-emerald-500/25 text-emerald-300 border border-emerald-500/50"
+                        : isIotOpen
+                        ? "bg-sky-500/25 text-sky-300 border border-sky-500/50"
+                        : "bg-secondary text-muted-foreground"
+                    }`}
+                  >
+                    {wifiRunning ? "Live :80" : isIotOpen ? "Active" : "Open"}
+                  </span>
+                </span>
+                <span className="block text-[10px] text-muted-foreground line-clamp-2 leading-tight mt-0.5">
+                  Virtual 192.168.1.105 web browser & HTTP traffic inspector for ESP32 IoT projects.
+                </span>
+              </span>
+            </div>
+          )}
+
+          {/* 4. Jumper Wires Tool in Palette */}
           {showTools && matchesWireSearch && (
             <div className="rounded-xl border border-border/80 bg-card/60 p-2.5 space-y-2 hover:border-primary/40 transition">
               <div className="flex items-center gap-3">

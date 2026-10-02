@@ -87,8 +87,16 @@ export const Oscilloscope = memo(function Oscilloscope({
     let cachedNodalSolution: NodalSolution | null = null
 
     const interval = window.setInterval(() => {
+      if (!probeCH1 && !probeCH2) return
+
       const snapshot = simulationRef.current
-      if (!snapshot.running) return
+      const isSimRunning = snapshot.running
+
+      // When stopped, sample resting DC potential every 100ms (every 4th tick) to conserve CPU
+      if (!isSimRunning && frameCounter % 4 !== 0) {
+        frameCounter += 1
+        return
+      }
 
       const currentState = snapshot.state
       const currentPinStates = snapshot.pinStates
@@ -146,9 +154,16 @@ export const Oscilloscope = memo(function Oscilloscope({
   }, [activeWindowMs, isHold, isOpen, probeCH1, probeCH2, simulationRef, pressed])
 
   useEffect(() => {
-    historyRef.current = []
+    const now = performance.now()
+    const snapshot = simulationRef.current
+    const v1 = samplePinVoltage(probeCH1, snapshot.state, snapshot.pinStates, now)
+    const v2 = samplePinVoltage(probeCH2, snapshot.state, snapshot.pinStates, now)
+    historyRef.current = [
+      { t: now - activeWindowMs, v1, v2 },
+      { t: now, v1, v2 },
+    ]
     setRenderTick((prev) => prev + 1)
-  }, [probeCH1, probeCH2])
+  }, [probeCH1, probeCH2, activeWindowMs])
 
   // Compute metrics from the ref-backed waveform only when a render tick is requested.
   const metricsCH1 = useMemo(

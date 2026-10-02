@@ -49,7 +49,11 @@ export function samplePinVoltage(
         bp.id.replace(/^d|^gpio/, "") === pinDigits ||
         bp.label.replace(/^d|^gpio/, "") === pinDigits
     )
-    const pinData = pinStates[rawPin] || pinStates[pinDigits]
+    const pinData =
+      pinStates[rawPin] ||
+      pinStates[pinDigits] ||
+      pinStates[`d${pinDigits}`] ||
+      pinStates[`gpio${pinDigits}`]
     if (pinData) {
       if (typeof pinData.value === "number" && pinData.value > 0) {
         // True hardware DAC channels (e.g. D25/D26 on ESP32) output true continuous DC voltage
@@ -57,13 +61,15 @@ export function samplePinVoltage(
           return Number((board.logicVoltage * (pinData.value / 255)).toFixed(3))
         }
 
-        if (pinData.value < 255) {
-          // Authentic board PWM period
-          const periodMs = 1000 / board.pwmFrequencyDefaultHz
-          const duty = pinData.value / 255
-          const phase = (simTimeMs % periodMs) / periodMs
-          return phase < duty ? board.logicVoltage : 0.0
+        if (pinData.value >= 255) {
+          return board.logicVoltage
         }
+
+        // Authentic board PWM period
+        const periodMs = 1000 / board.pwmFrequencyDefaultHz
+        const duty = pinData.value / 255
+        const phase = (simTimeMs % periodMs) / periodMs
+        return phase < duty ? board.logicVoltage : 0.0
       }
       return pinData.state === "HIGH" ? board.logicVoltage : 0.0
     }

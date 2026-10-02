@@ -653,6 +653,145 @@ export function defineArduinoBlocks() {
       this.setTooltip('Browser AI Studio block: enable or disable the microphone and Sound AI input.')
     },
   }
+
+  /* --- ESP32 Virtual Wi-Fi & Web Server Blocks --- */
+  Blockly.Blocks['wifi_connect'] = {
+    init() {
+      this.appendDummyInput()
+        .appendField('📡 Wi-Fi connect SSID')
+        .appendField(new Blockly.FieldTextInput('Pixiu_IoT'), 'SSID')
+        .appendField('password')
+        .appendField(new Blockly.FieldTextInput('12345678'), 'PASS')
+      this.setPreviousStatement(true)
+      this.setNextStatement(true)
+      this.setColour(205)
+      this.setTooltip('Connect ESP32 to virtual Wi-Fi network with given SSID and password.')
+    },
+  }
+
+  Blockly.Blocks['wifi_is_connected'] = {
+    init() {
+      this.appendDummyInput().appendField('📡 Wi-Fi connected?')
+      this.setOutput(true, 'Boolean')
+      this.setColour(205)
+      this.setTooltip('Returns true when ESP32 has connected to the Wi-Fi network.')
+    },
+  }
+
+  Blockly.Blocks['wifi_local_ip'] = {
+    init() {
+      this.appendDummyInput().appendField('📡 Wi-Fi IP address')
+      this.setOutput(true, 'String')
+      this.setColour(205)
+      this.setTooltip('Returns the IP address assigned to ESP32 on the network.')
+    },
+  }
+
+  Blockly.Blocks['wifi_server_begin'] = {
+    init() {
+      this.appendDummyInput()
+        .appendField('🌐 start Web Server port')
+        .appendField(new Blockly.FieldNumber(80, 1, 65535), 'PORT')
+      this.setPreviousStatement(true)
+      this.setNextStatement(true)
+      this.setColour(205)
+      this.setTooltip('Start the HTTP Web Server on the given port (default: 80).')
+    },
+  }
+
+  Blockly.Blocks['wifi_server_on'] = {
+    init() {
+      this.appendDummyInput()
+        .appendField('🌐 on HTTP request route')
+        .appendField(new Blockly.FieldTextInput('/led/on'), 'PATH')
+      this.appendStatementInput('DO').appendField('do')
+      this.setPreviousStatement(true)
+      this.setNextStatement(true)
+      this.setColour(205)
+      this.setTooltip('Define an HTTP endpoint route and handler callback.')
+    },
+  }
+
+  Blockly.Blocks['wifi_server_send'] = {
+    init() {
+      this.appendValueInput('CONTENT')
+        .setCheck(null)
+        .appendField('🌐 send HTTP response')
+        .appendField(new Blockly.FieldNumber(200, 100, 599), 'STATUS')
+        .appendField('content')
+      this.setPreviousStatement(true)
+      this.setNextStatement(true)
+      this.setColour(205)
+      this.setTooltip('Send an HTTP response status code and HTML/text payload to the client.')
+    },
+  }
+
+  /* --- BBC micro:bit v2 Blocks --- */
+  Blockly.Blocks['microbit_show_icon'] = {
+    init() {
+      const icons = [
+        ['Heart', 'heart'],
+        ['Smile', 'smile'],
+        ['Check', 'check'],
+        ['Sad', 'sad'],
+        ['Ghost', 'ghost'],
+        ['Square', 'square'],
+      ]
+      this.appendDummyInput()
+        .appendField('🟩 micro:bit show icon')
+        .appendField(new Blockly.FieldDropdown(icons), 'ICON')
+      this.setPreviousStatement(true)
+      this.setNextStatement(true)
+      this.setColour(345)
+      this.setTooltip('Display a built-in symbol on the 5x5 LED matrix display.')
+    },
+  }
+
+  Blockly.Blocks['microbit_show_number'] = {
+    init() {
+      this.appendValueInput('NUM')
+        .setCheck('Number')
+        .appendField('🟩 micro:bit show number')
+      this.setPreviousStatement(true)
+      this.setNextStatement(true)
+      this.setColour(345)
+      this.setTooltip('Display a number on the 5x5 LED matrix.')
+    },
+  }
+
+  Blockly.Blocks['microbit_show_string'] = {
+    init() {
+      this.appendValueInput('TEXT')
+        .setCheck(null)
+        .appendField('🟩 micro:bit show text')
+      this.setPreviousStatement(true)
+      this.setNextStatement(true)
+      this.setColour(345)
+      this.setTooltip('Scroll text across the 5x5 LED matrix display.')
+    },
+  }
+
+  Blockly.Blocks['microbit_clear'] = {
+    init() {
+      this.appendDummyInput().appendField('🟩 micro:bit clear display')
+      this.setPreviousStatement(true)
+      this.setNextStatement(true)
+      this.setColour(345)
+      this.setTooltip('Clear all LEDs on the 5x5 matrix display.')
+    },
+  }
+
+  Blockly.Blocks['microbit_button_pressed'] = {
+    init() {
+      this.appendDummyInput()
+        .appendField('🟩 micro:bit button')
+        .appendField(new Blockly.FieldDropdown([['A', 'A'], ['B', 'B']]), 'BTN')
+        .appendField('is pressed?')
+      this.setOutput(true, 'Boolean')
+      this.setColour(345)
+      this.setTooltip('Check whether tactile button A or B on the micro:bit is pressed.')
+    },
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -1033,6 +1172,63 @@ arduino.forBlock['ai_microphone_enable'] = (block) => {
   return '/* PIXIU AI Studio browser runtime: AI microphone ' +
     state.toLowerCase() +
     '. This is not an Arduino microphone API. */\n'
+}
+
+/* --- Wi-Fi & Web Server C++ Generators --- */
+arduino.forBlock['wifi_connect'] = (block) => {
+  const ssid = block.getFieldValue('SSID') || 'Pixiu_IoT'
+  const pass = block.getFieldValue('PASS') || ''
+  return `WiFi.begin("${ssid}", "${pass}");\n`
+}
+
+arduino.forBlock['wifi_is_connected'] = () => [
+  '(WiFi.status() == WL_CONNECTED)',
+  ORDER.EQUALITY,
+]
+
+arduino.forBlock['wifi_local_ip'] = () => [
+  'WiFi.localIP().toString()',
+  ORDER.ATOMIC,
+]
+
+arduino.forBlock['wifi_server_begin'] = (block) => {
+  const port = block.getFieldValue('PORT') || 80
+  return `server.begin(${port});\n`
+}
+
+arduino.forBlock['wifi_server_on'] = (block, generator) => {
+  const path = block.getFieldValue('PATH') || '/'
+  const branch = generator.statementToCode(block, 'DO')
+  return `server.on("${path}", []() {\n${branch}});\n`
+}
+
+arduino.forBlock['wifi_server_send'] = (block, generator) => {
+  const status = block.getFieldValue('STATUS') || 200
+  const content = generator.valueToCode(block, 'CONTENT', ORDER.NONE) || '""'
+  return `server.send(${status}, "text/html", ${content});\n`
+}
+
+/* --- micro:bit C++ Generators --- */
+arduino.forBlock['microbit_show_icon'] = (block) => {
+  const icon = block.getFieldValue('ICON') || 'heart'
+  return `uBit.display.show(IconNames::${icon});\n`
+}
+
+arduino.forBlock['microbit_show_number'] = (block, generator) => {
+  const num = generator.valueToCode(block, 'NUM', ORDER.NONE) || '0'
+  return `uBit.display.print(${num});\n`
+}
+
+arduino.forBlock['microbit_show_string'] = (block, generator) => {
+  const text = generator.valueToCode(block, 'TEXT', ORDER.NONE) || '""'
+  return `uBit.display.scroll(${text});\n`
+}
+
+arduino.forBlock['microbit_clear'] = () => 'uBit.display.clear();\n'
+
+arduino.forBlock['microbit_button_pressed'] = (block) => {
+  const btn = block.getFieldValue('BTN') || 'A'
+  return [`uBit.button${btn}.isPressed()`, ORDER.ATOMIC]
 }
 
 // keep indent helper referenced (used by callers that post-process)

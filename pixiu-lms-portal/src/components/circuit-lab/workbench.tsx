@@ -7,7 +7,10 @@ import { CATALOG } from "@/lib/components-catalog"
 import { samePin } from "@/lib/geometry"
 import { computeRuntime, type ArduinoPinState } from "@/lib/simulation"
 import { defineArduinoBlocks, setAiClassContext, arduino } from "@/lib/arduino-blocks"
-import { runBlocklyProgram, type ExecutionEnvironment, type BlockStepInfo } from "@/lib/blockly-runner"
+import { runBlocklyProgram, executeStatement, type ExecutionEnvironment, type BlockStepInfo } from "@/lib/blockly-runner"
+import { virtualWifiManager, type VirtualWifiState } from "@/lib/virtual-wifi"
+import { IotWebPortal } from "./iot-web-portal"
+import { MICROBIT_ICONS, MICROBIT_DIGITS, createEmptyMatrix } from "@/lib/microbit-patterns"
 import { audioEngine } from "@/lib/audio-engine"
 import { createHistory, pushState, undo as historyUndo, redo as historyRedo, canUndo, canRedo, type HistoryState } from "@/lib/history"
 import { saveCircuit, loadCurrentCircuit, saveCurrentCircuit, clearCurrentCircuit, importFromJSON, exportAsJSON, type SavedCircuit } from "@/lib/storage"
@@ -135,6 +138,18 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
   const [scopeProbeCH2, setScopeProbeCH2] = useState<PinRef | null>(null)
   const [activeScopeProbeToPlace, setActiveScopeProbeToPlace] = useState<"ch1" | "ch2" | null>(null)
 
+  // Virtual Wi-Fi & micro:bit v2 state
+  const [isIotPortalOpen, setIsIotPortalOpen] = useState(false)
+  const [wifiState, setWifiState] = useState<VirtualWifiState>(() => virtualWifiManager.getState())
+  const [microbitMatrix, setMicrobitMatrix] = useState<boolean[][]>(() => createEmptyMatrix())
+  const currentHttpRouteRef = useRef<string>("/")
+
+  useEffect(() => {
+    return virtualWifiManager.subscribe((st) => {
+      setWifiState(st)
+    })
+  }, [])
+
   // Schematic view mode & AI Doctor state
   const [schematicMode, setSchematicMode] = useState(false)
   const [isDoctorOpen, setIsDoctorOpen] = useState(false)
@@ -257,10 +272,22 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
   const selected = state.parts.find((p) => p.id === selectedId) ?? null
   const selectedWire = state.wires.find((w) => w.id === selectedWireId) ?? null
 
-  const runtime = useMemo(
-    () => (running ? computeRuntime(state, pressed, pinStates) : {}),
-    [running, state, pressed, pinStates],
-  )
+  const runtime = useMemo(() => {
+    if (!running) return {}
+    const baseRuntime = computeRuntime(state, pressed, pinStates)
+    const microbitPart = state.parts.find((p) => p.type === "microbit-v2")
+    if (microbitPart) {
+      const btnA = pressed.has(`${microbitPart.id}_a`) || pressed.has("microbit_a")
+      const btnB = pressed.has(`${microbitPart.id}_b`) || pressed.has("microbit_b")
+      baseRuntime[microbitPart.id] = {
+        ...baseRuntime[microbitPart.id],
+        matrix5x5: microbitMatrix,
+        btnAPressed: btnA,
+        btnBPressed: btnB,
+      }
+    }
+    return baseRuntime
+  }, [running, state, pressed, pinStates, microbitMatrix])
 
   const oscilloscopeSimulationRef = useRef({ state, pinStates, running, pressed })
   oscilloscopeSimulationRef.current = { state, pinStates, running, pressed }
@@ -482,6 +509,9 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
     setIsPaused(false)
     isPausedRef.current = false
     setActiveStepBlock(null)
+    virtualWifiManager.reset()
+    setMicrobitMatrix(createEmptyMatrix())
+    currentHttpRouteRef.current = "/"
   }, [])
 
   // AI runtime lifecycle is deliberately separate from the Arduino runner.
@@ -818,6 +848,71 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
             stopAiRuntime()
           }
         },
+        // Virtual Wi-Fi & Web Server hooks
+        wifiConnect: (ssid: string, pass: string) => {
+          virtualWifiManager.connect(ssid, pass)
+          setSerialLines((prev) => [
+            ...prev,
+            { text: `[WiFi] Connecting to "${ssid}"...`, timestamp: Date.now(), type: "info" },
+            { text: `[WiFi] Connected! IP: 192.168.1.105 (RSSI: -54 dBm)`, timestamp: Date.now(), type: "info" },
+          ])
+        },
+        wifiIsConnected: () => virtualWifiManager.getState().status === "connected",
+        wifiGetIp: () => virtualWifiManager.getState().ipAddress,
+        wifiServerBegin: (port: number) => {
+          virtualWifiManager.startServer(port)
+          setSerialLines((prev) => [
+            ...prev,
+            { text: `[HTTP] Web Server started on port ${port}. Listening at http://${virtualWifiManager.getState().ipAddress}:${port}/`, timestamp: Date.now(), type: "info" },
+          ])
+        },
+        wifiServerOn: (route: string, branch: Blockly.Block | null) => {
+          currentHttpRouteRef.current = route
+          virtualWifiManager.registerRoute(route, async () => {
+            currentHttpRouteRef.current = route
+            if (branch && runningRef.current && runnerAbortRef.current) {
+              await executeStatement(branch, env, runnerAbortRef.current.signal)
+            }
+          })
+        },
+        wifiServerSend: (code: number, contentType: string, body: string) => {
+          const route = currentHttpRouteRef.current
+          virtualWifiManager.setRouteResponse(route, code, contentType, body)
+          setSerialLines((prev) => [
+            ...prev,
+            { text: `[HTTP] Sent ${code} response for ${route} (${body.length} bytes)`, timestamp: Date.now(), type: "info" },
+          ])
+        },
+
+        // BBC micro:bit v2 hooks
+        showMatrixIcon: (icon: string) => {
+          const pattern = MICROBIT_ICONS[icon.toLowerCase()] ?? MICROBIT_ICONS.heart
+          setMicrobitMatrix(pattern)
+        },
+        showMatrixNumber: (num: number) => {
+          const digit = Math.abs(Math.floor(num)) % 10
+          setMicrobitMatrix(MICROBIT_DIGITS[digit] ?? MICROBIT_DIGITS[0])
+        },
+        showMatrixText: (text: string) => {
+          const clean = String(text).trim()
+          if (clean.length > 0 && /^[0-9]$/.test(clean[0])) {
+            const digit = parseInt(clean[0], 10)
+            setMicrobitMatrix(MICROBIT_DIGITS[digit] ?? MICROBIT_DIGITS[0])
+          } else {
+            setMicrobitMatrix(MICROBIT_ICONS.heart)
+          }
+        },
+        clearMatrix: () => {
+          setMicrobitMatrix(createEmptyMatrix())
+        },
+        isButtonPressed: (btn: "A" | "B") => {
+          const k = btn.toLowerCase()
+          return (
+            pressedRef.current.has(`microbit_${k}`) ||
+            Array.from(pressedRef.current).some((id) => id.endsWith(`_${k}`))
+          )
+        },
+
         sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
         isRunning: () => runningRef.current,
 
@@ -1437,6 +1532,9 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
           onToggleDmm={() => setIsDmmOpen((prev) => !prev)}
           isScopeOpen={isScopeOpen}
           onToggleScope={() => setIsScopeOpen((prev) => !prev)}
+          isIotOpen={isIotPortalOpen}
+          onToggleIot={() => setIsIotPortalOpen((prev) => !prev)}
+          wifiRunning={wifiState.serverRunning}
           activeWireColor={selectedWire ? selectedWire.color : activeWireColor}
           onSelectWireColor={handleSelectWireColor}
         />
@@ -1528,6 +1626,18 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
                   </span>
                 )}
               </div>
+            )}
+
+            {running && wifiState.serverRunning && (
+              <button
+                onClick={() => setIsIotPortalOpen(true)}
+                className="absolute left-1/2 top-14 -translate-x-1/2 z-20 flex items-center gap-2 rounded-full border border-sky-500/60 bg-sky-950/90 hover:bg-sky-900/90 text-sky-300 px-3.5 py-1 font-mono text-xs shadow-xl backdrop-blur-sm cursor-pointer transition animate-in fade-in"
+                title="Open Simulated IoT Web Server"
+              >
+                <span className="h-2 w-2 rounded-full bg-sky-400 animate-ping" />
+                <span className="font-bold">🌐 Web Server:</span>
+                <span className="underline decoration-sky-400">http://{wifiState.ipAddress}:{wifiState.port}/</span>
+              </button>
             )}
           </div>
 
@@ -1721,6 +1831,12 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
         isOpen={isDoctorOpen && view === "circuit"}
         onClose={() => setIsDoctorOpen(false)}
         onHighlightParts={handleHighlightParts}
+      />
+
+      {/* ESP32 Virtual IoT Web Browser & Traffic Inspector */}
+      <IotWebPortal
+        isOpen={isIotPortalOpen}
+        onClose={() => setIsIotPortalOpen(false)}
       />
     </div>
   )

@@ -348,7 +348,7 @@ export function CircuitCanvas(props: Props) {
           {parts.map((part) => {
             const def = CATALOG[part.type]
             const selected = part.id === selectedId
-            const interactive = running && ["pushbutton", "potentiometer", "ir-sensor", "joystick", "rotary-encoder", "keypad-4x4"].includes(part.type)
+            const interactive = running && ["pushbutton", "potentiometer", "ir-sensor", "joystick", "rotary-encoder", "keypad-4x4", "microbit-v2"].includes(part.type)
             return (
               <g
                 key={part.id}
@@ -423,6 +423,49 @@ export function CircuitCanvas(props: Props) {
                           onInteract(part.id, true)
                         }}
                       />
+                    )}
+
+                    {interactive && part.type === "microbit-v2" && (
+                      <g>
+                        <circle
+                          cx={50}
+                          cy={115}
+                          r={16}
+                          fill="transparent"
+                          className="cursor-pointer"
+                          onPointerDown={(e) => {
+                            e.stopPropagation()
+                            onInteract(`${part.id}_a`, true)
+                          }}
+                          onPointerUp={(e) => {
+                            e.stopPropagation()
+                            onInteract(`${part.id}_a`, false)
+                          }}
+                          onPointerLeave={(e) => {
+                            e.stopPropagation()
+                            onInteract(`${part.id}_a`, false)
+                          }}
+                        />
+                        <circle
+                          cx={270}
+                          cy={115}
+                          r={16}
+                          fill="transparent"
+                          className="cursor-pointer"
+                          onPointerDown={(e) => {
+                            e.stopPropagation()
+                            onInteract(`${part.id}_b`, true)
+                          }}
+                          onPointerUp={(e) => {
+                            e.stopPropagation()
+                            onInteract(`${part.id}_b`, false)
+                          }}
+                          onPointerLeave={(e) => {
+                            e.stopPropagation()
+                            onInteract(`${part.id}_b`, false)
+                          }}
+                        />
+                      </g>
                     )}
 
                     {interactive && part.type === "ir-sensor" && (

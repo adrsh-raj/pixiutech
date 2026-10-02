@@ -142,6 +142,31 @@ const TOOLBOX = {
         { kind: 'block', type: 'ai_microphone_enable' },
       ],
     },
+    {
+      kind: 'category',
+      name: '📡 IoT & Wi-Fi',
+      colour: '#0284c7',
+      contents: [
+        { kind: 'block', type: 'wifi_connect' },
+        { kind: 'block', type: 'wifi_is_connected' },
+        { kind: 'block', type: 'wifi_local_ip' },
+        { kind: 'block', type: 'wifi_server_begin' },
+        { kind: 'block', type: 'wifi_server_on' },
+        { kind: 'block', type: 'wifi_server_send' },
+      ],
+    },
+    {
+      kind: 'category',
+      name: '🟩 micro:bit v2',
+      colour: '#e11d48',
+      contents: [
+        { kind: 'block', type: 'microbit_show_icon' },
+        { kind: 'block', type: 'microbit_show_number' },
+        { kind: 'block', type: 'microbit_show_string' },
+        { kind: 'block', type: 'microbit_clear' },
+        { kind: 'block', type: 'microbit_button_pressed' },
+      ],
+    },
   ],
 }
 
