@@ -1,5 +1,6 @@
 import {
   BookOpen,
+  Brain,
   ChevronDown,
   ChevronUp,
   Info,

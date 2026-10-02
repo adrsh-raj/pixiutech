@@ -574,33 +574,61 @@ export const Oscilloscope = memo(function Oscilloscope({
             </div>
 
             {/* Quick Test Presets */}
-            {uno && (
+            {boardPart && (
               <div className="mt-2 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px]">
                 <span className="text-slate-500 font-mono flex items-center gap-1">
                   <Sparkles size={11} className="text-indigo-400" /> Presets:
                 </span>
                 <div className="flex items-center gap-1 font-mono">
-                  <button
-                    onClick={() => attachPresetCH1("d13")}
-                    className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-yellow-500/20 hover:text-yellow-300 text-slate-300 transition cursor-pointer"
-                    title="Probe CH1 to Uno Pin 13 (Blink)"
-                  >
-                    CH1: D13
-                  </button>
-                  <button
-                    onClick={() => attachPresetCH2("d9")}
-                    className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-cyan-500/20 hover:text-cyan-300 text-slate-300 transition cursor-pointer"
-                    title="Probe CH2 to Uno Pin 9 (PWM)"
-                  >
-                    CH2: D9
-                  </button>
-                  <button
-                    onClick={() => attachPresetCH2("5v")}
-                    className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-red-500/20 hover:text-red-300 text-slate-300 transition cursor-pointer"
-                    title="Probe CH2 to 5V Rail"
-                  >
-                    CH2: 5V
-                  </button>
+                  {boardPart.type === "esp32-devkit" ? (
+                    <>
+                      <button
+                        onClick={() => attachPresetCH1("d2")}
+                        className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-yellow-500/20 hover:text-yellow-300 text-slate-300 transition cursor-pointer"
+                        title="Probe CH1 to ESP32 Pin D2 (Built-in LED / PWM)"
+                      >
+                        CH1: D2
+                      </button>
+                      <button
+                        onClick={() => attachPresetCH2("d25")}
+                        className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-cyan-500/20 hover:text-cyan-300 text-slate-300 transition cursor-pointer"
+                        title="Probe CH2 to ESP32 Pin D25 (Hardware DAC 1)"
+                      >
+                        CH2: D25 (DAC)
+                      </button>
+                      <button
+                        onClick={() => attachPresetCH2("3v3")}
+                        className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-red-500/20 hover:text-red-300 text-slate-300 transition cursor-pointer"
+                        title="Probe CH2 to 3.3V Rail"
+                      >
+                        CH2: 3V3
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => attachPresetCH1("d13")}
+                        className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-yellow-500/20 hover:text-yellow-300 text-slate-300 transition cursor-pointer"
+                        title="Probe CH1 to Uno Pin 13 (Blink)"
+                      >
+                        CH1: D13
+                      </button>
+                      <button
+                        onClick={() => attachPresetCH2("d9")}
+                        className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-cyan-500/20 hover:text-cyan-300 text-slate-300 transition cursor-pointer"
+                        title="Probe CH2 to Uno Pin 9 (PWM)"
+                      >
+                        CH2: D9
+                      </button>
+                      <button
+                        onClick={() => attachPresetCH2("5v")}
+                        className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-red-500/20 hover:text-red-300 text-slate-300 transition cursor-pointer"
+                        title="Probe CH2 to 5V Rail"
+                      >
+                        CH2: 5V
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             )}

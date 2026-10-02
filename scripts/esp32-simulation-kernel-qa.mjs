@@ -258,6 +258,33 @@ assert.ok(
 
 console.log("✔ Step 7 Passed: Dual-architecture Blockly tooltips and workbench integration verified.")
 
+// ---------------------------------------------------------------------------
+// Step 8: Oscilloscope & Workbench UI Component Integrity
+// ---------------------------------------------------------------------------
+console.log("\n[Test 8] Verifying Oscilloscope & Workbench Component Safety...")
+
+const oscilloscopeSrc = readSource("pixiu-lms-portal/src/components/circuit-lab/oscilloscope.tsx")
+const aiTeachPanelSrc = readSource("pixiu-lms-portal/src/components/circuit-lab/ai-teach-panel.tsx")
+
+// Ensure oscilloscope has no undeclared uno reference
+assert.ok(!oscilloscopeSrc.includes("{uno &&"), "oscilloscope.tsx must not reference undeclared uno variable")
+assert.ok(oscilloscopeSrc.includes("{boardPart &&"), "oscilloscope.tsx must check active boardPart")
+assert.ok(oscilloscopeSrc.includes('attachPresetCH1("d2")'), "oscilloscope.tsx must support ESP32 preset D2")
+assert.ok(oscilloscopeSrc.includes('attachPresetCH2("d25")'), "oscilloscope.tsx must support ESP32 preset D25 (DAC)")
+
+// Ensure workbench has all required Lucide icons imported
+assert.ok(workbenchSrc.includes("Boxes"), "workbench.tsx must import Boxes icon")
+assert.ok(workbenchSrc.includes("Sliders"), "workbench.tsx must import Sliders icon")
+assert.ok(workbenchSrc.includes("Camera"), "workbench.tsx must import Camera icon")
+assert.ok(workbenchSrc.includes("Gauge"), "workbench.tsx must import Gauge icon")
+assert.ok(workbenchSrc.includes("ShieldAlert"), "workbench.tsx must import ShieldAlert icon")
+assert.ok(workbenchSrc.includes("Terminal"), "workbench.tsx must import Terminal icon")
+
+// Ensure ai-teach-panel has Brain imported
+assert.ok(aiTeachPanelSrc.includes("Brain"), "ai-teach-panel.tsx must import Brain icon")
+
+console.log("✔ Step 8 Passed: Oscilloscope & Workbench UI component safety verified.")
+
 console.log("\n=======================================================")
 console.log("🎉 ALL PHASE 3 SIMULATION KERNEL CHECKS PASSED SUCCESSFULLY!")
 console.log("=======================================================\n")
