@@ -1452,6 +1452,7 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
               highlightPartIds={highlightPartIds}
               onResetMcu={handleResetMcu}
               isScopeOpen={isScopeOpen}
+              activeWireColor={activeWireColor}
             />
 
             {running && (

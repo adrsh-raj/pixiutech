@@ -1,8 +1,10 @@
+import { useState } from "react"
 import type { PlacedPart } from "@/lib/circuit-types"
 import { CATALOG } from "@/lib/components-catalog"
 import { getComponentMeta } from "@/lib/component-registry"
+import { getBoardDefinition, isBoardType } from "@/lib/board-registry"
 import type { PartRuntime } from "./part-art"
-import { X } from "lucide-react"
+import { X, Cpu, Zap, Wifi } from "lucide-react"
 
 interface Props {
   part: PlacedPart | null
@@ -29,6 +31,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 export function Inspector({ part, runtime, partCount, wireCount, onChangeProp, onRotate, onDelete, onDuplicate, onClose }: Props) {
+  const [pinFilter, setPinFilter] = useState<"all" | "power" | "analog" | "digital">("all")
   return (
     <aside
       className={`
@@ -105,6 +108,168 @@ export function Inspector({ part, runtime, partCount, wireCount, onChangeProp, o
                 <span className="font-bold text-primary">Hint:</span> {getComponentMeta(part.type).educational.hint}
               </div>
             </div>
+
+            {/* Board Hardware Architecture & Telemetry Section */}
+            {isBoardType(part.type) && (() => {
+              const board = getBoardDefinition(part.type)
+              if (!board) return null
+
+              const filteredPins = board.pins.filter((p) => {
+                if (pinFilter === "power") return p.kind === "power" || p.kind === "ground"
+                if (pinFilter === "analog") return p.kind === "analog" || !!p.capabilities?.adc || !!p.capabilities?.dac
+                if (pinFilter === "digital") return p.kind === "digital"
+                return true
+              })
+
+              return (
+                <div className="rounded-xl border border-border bg-card/60 p-3 flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground font-bold flex items-center gap-1.5">
+                      <Cpu size={13} className="text-primary" />
+                      <span>Hardware Specs</span>
+                    </span>
+                    <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 font-bold border border-cyan-500/20">
+                      {board.mcu}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-[10px] font-mono">
+                    <div className="rounded-lg bg-background/70 border border-border/70 p-2">
+                      <div className="text-muted-foreground text-[8.5px] uppercase font-bold flex items-center gap-1">
+                        <Zap size={10} className="text-amber-400" />
+                        <span>Logic Level</span>
+                      </div>
+                      <div className={`font-bold text-xs mt-0.5 ${board.logicVoltage === 3.3 ? "text-cyan-400" : "text-amber-400"}`}>
+                        {board.logicVoltage}V DC
+                      </div>
+                      <div className="text-[8.5px] text-muted-foreground/80 mt-0.5">
+                        {board.logicVoltage === 3.3 ? "Safe range 0-3.3V" : "Safe range 0-5.0V"}
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg bg-background/70 border border-border/70 p-2">
+                      <div className="text-muted-foreground text-[8.5px] uppercase font-bold">Clock Speed</div>
+                      <div className="font-bold text-xs mt-0.5 text-foreground">
+                        {board.clockSpeedMhz} MHz
+                      </div>
+                      <div className="text-[8.5px] text-muted-foreground/80 mt-0.5">
+                        {board.architecture === "xtensa-lx6" ? "Dual 32-bit" : board.architecture === "avr" ? "8-bit AVR" : "ARM Cortex"}
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg bg-background/70 border border-border/70 p-2">
+                      <div className="text-muted-foreground text-[8.5px] uppercase font-bold">ADC Engine</div>
+                      <div className="font-bold text-xs mt-0.5 text-foreground">
+                        {board.adcResolutionBits}-bit
+                      </div>
+                      <div className="text-[8.5px] text-muted-foreground/80 mt-0.5">
+                        0 .. {(1 << board.adcResolutionBits) - 1} steps
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg bg-background/70 border border-border/70 p-2">
+                      <div className="text-muted-foreground text-[8.5px] uppercase font-bold">Flash / SRAM</div>
+                      <div className="font-bold text-xs mt-0.5 text-foreground">
+                        {board.flashSizeKb >= 1024 ? `${board.flashSizeKb / 1024}MB` : `${board.flashSizeKb}KB`} / {board.ramSizeKb}KB
+                      </div>
+                      <div className="text-[8.5px] text-muted-foreground/80 mt-0.5">
+                        {board.capabilities.hasWifi ? "Wireless MCU" : "Standard MCU"}
+                      </div>
+                    </div>
+                  </div>
+
+                  {board.capabilities.hasWifi && (
+                    <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px]">
+                      <Wifi size={13} className="shrink-0" />
+                      <span className="font-bold">Wi-Fi 802.11 b/g/n + Bluetooth 4.2 / BLE</span>
+                    </div>
+                  )}
+
+                  {/* Header Pin Quick Reference & Filter */}
+                  <div className="flex flex-col gap-1.5 pt-1 border-t border-border/60">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[9px] font-mono uppercase text-muted-foreground font-bold">
+                        Header Pins ({filteredPins.length}/{board.pins.length})
+                      </span>
+                      <div className="flex items-center gap-1 font-mono text-[8.5px]">
+                        {(["all", "power", "analog", "digital"] as const).map((cat) => (
+                          <button
+                            key={cat}
+                            onClick={() => setPinFilter(cat)}
+                            className={`px-1.5 py-0.5 rounded capitalize transition-colors ${
+                              pinFilter === cat
+                                ? "bg-primary text-primary-foreground font-bold"
+                                : "bg-secondary text-muted-foreground hover:text-foreground"
+                            }`}
+                          >
+                            {cat}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="max-h-40 overflow-y-auto space-y-1 pr-1 font-mono text-[9px]">
+                      {filteredPins.map((p) => (
+                        <div
+                          key={p.id}
+                          className="flex items-center justify-between px-2 py-1 rounded bg-background/60 hover:bg-background/90 border border-border/40 transition-colors"
+                        >
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span
+                              className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                                p.kind === "power"
+                                  ? "bg-red-400"
+                                  : p.kind === "ground"
+                                  ? "bg-slate-400"
+                                  : p.kind === "analog"
+                                  ? "bg-amber-400"
+                                  : "bg-cyan-400"
+                              }`}
+                            />
+                            <span className="font-bold text-foreground truncate">{p.label}</span>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            {p.capabilities?.builtInLed && (
+                              <span className="text-[7.5px] px-1 py-0.2 rounded bg-blue-500/20 text-blue-300 font-bold">
+                                LED
+                              </span>
+                            )}
+                            {p.capabilities?.touch && (
+                              <span className="text-[7.5px] px-1 py-0.2 rounded bg-purple-500/20 text-purple-300 font-bold">
+                                TOUCH
+                              </span>
+                            )}
+                            {p.capabilities?.dac && (
+                              <span className="text-[7.5px] px-1 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-bold">
+                                DAC
+                              </span>
+                            )}
+                            {p.capabilities?.i2cRole && (
+                              <span className="text-[7.5px] px-1 py-0.2 rounded bg-indigo-500/20 text-indigo-300 font-bold uppercase">
+                                {p.capabilities.i2cRole}
+                              </span>
+                            )}
+                            <span
+                              className={`text-[8px] font-bold px-1.5 py-0.5 rounded ${
+                                p.kind === "power"
+                                  ? "bg-red-500/15 text-red-300"
+                                  : p.kind === "ground"
+                                  ? "bg-slate-700 text-slate-300"
+                                  : p.kind === "analog"
+                                  ? "bg-amber-500/15 text-amber-300"
+                                  : "bg-cyan-500/15 text-cyan-300"
+                              }`}
+                            >
+                              {p.capabilities?.adc ? "ADC" : p.kind.toUpperCase()}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )
+            })()}
 
             {part.type === "led" && (
               <>

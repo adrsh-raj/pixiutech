@@ -107,6 +107,7 @@ function OscilloscopeThumb() {
 
 const CATEGORIES = [
   { id: "all", label: "All" },
+  { id: "controller", label: "Boards" },
   { id: "basic", label: "Build" },
   { id: "input", label: "Input" },
   { id: "sensor", label: "Sensors" },

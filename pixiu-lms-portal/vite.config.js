@@ -2,6 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { createHash } from 'node:crypto'
+import { existsSync } from 'node:fs'
 import { readFile, writeFile, mkdir } from 'node:fs/promises'
 import path from 'node:path'
 
@@ -13,6 +14,7 @@ function sriAttributePlugin() {
     async closeBundle() {
       const distDir = path.resolve(import.meta.dirname, 'dist')
       const indexPath = path.join(distDir, 'index.html')
+      if (!existsSync(indexPath)) return
       const html = await readFile(indexPath, 'utf8')
       const manifest = {}
       const resourcePattern = /<(script|link)\b[^>]*?(?:src|href)="(\/[^"]+\.(?:js|css))"[^>]*>/gi

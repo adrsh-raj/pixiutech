@@ -2,8 +2,9 @@
 
 import type React from "react"
 import { useCallback, useEffect, useRef, useState } from "react"
-import type { PartType, PinRef, PlacedPart, Wire } from "@/lib/circuit-types"
+import type { PartType, PinRef, PlacedPart, Wire, PinKind } from "@/lib/circuit-types"
 import { CATALOG, PIN_KIND_COLOR } from "@/lib/components-catalog"
+import { getBoardDefinition } from "@/lib/board-registry"
 import { getPinRefPosition, wirePath } from "@/lib/geometry"
 import { PartArt, type PartRuntime } from "./part-art"
 import { SchematicPartArt } from "./schematic-art"
@@ -49,6 +50,39 @@ interface Props {
   highlightPartIds?: string[]
   onResetMcu?: () => void
   isScopeOpen?: boolean
+  activeWireColor?: string
+}
+
+function getPinDisplayInfo(type: PartType, pinId: string): { label: string; kind: PinKind; details?: string } {
+  const boardDef = getBoardDefinition(type)
+  if (boardDef) {
+    const bp = boardDef.pins.find((p) => p.id === pinId)
+    if (bp) {
+      const tags: string[] = []
+      if (bp.capabilities?.builtInLed) tags.push("LED")
+      if (bp.capabilities?.touch) tags.push("Touch")
+      if (bp.capabilities?.dac) tags.push("DAC")
+      if (bp.capabilities?.adc) tags.push("ADC")
+      if (bp.capabilities?.pwm) tags.push("PWM")
+      if (bp.capabilities?.i2cRole) tags.push(`I2C ${bp.capabilities.i2cRole.toUpperCase()}`)
+      if (bp.capabilities?.spiRole) tags.push(`SPI ${bp.capabilities.spiRole.toUpperCase()}`)
+      if (bp.capabilities?.uartRole) tags.push(`UART ${bp.capabilities.uartRole.toUpperCase()}`)
+      if (bp.capabilities?.inputOnly) tags.push("Input only")
+      const details =
+        tags.length > 0
+          ? tags.join(" · ")
+          : bp.alternateNames?.[0] || (bp.kind === "ground" ? "Ground (0V)" : bp.kind === "power" ? `${boardDef.logicVoltage}V Power` : undefined)
+      return { label: bp.label, kind: bp.kind, details }
+    }
+  }
+  const def = CATALOG[type]
+  const pin = def?.pins.find((p) => p.id === pinId)
+  if (!pin) return { label: pinId, kind: "digital" }
+  let details: string | undefined
+  if (pin.kind === "ground") details = "GND (0V)"
+  else if (pin.kind === "power") details = "VCC Power"
+  else if (pin.kind === "analog") details = "Analog"
+  return { label: pin.label, kind: pin.kind, details }
 }
 
 export function CircuitCanvas(props: Props) {
@@ -84,6 +118,7 @@ export function CircuitCanvas(props: Props) {
     highlightPartIds = [],
     onResetMcu,
     isScopeOpen = false,
+    activeWireColor = "#22c55e",
   } = props
 
   const svgRef = useRef<SVGSVGElement | null>(null)
@@ -908,36 +943,83 @@ export function CircuitCanvas(props: Props) {
             )
           })}
 
-          {/* 3. Temp Wire being dragged */}
-          {wiringPos && cursor && (
-            <path
-              d={wirePath(wiringPos, cursor)}
-              fill="none"
-              stroke="var(--color-primary)"
-              strokeWidth={3.5}
-              strokeDasharray="6 5"
-              strokeLinecap="round"
-            />
-          )}
+          {/* 3. Temp Wire being dragged (with magnetic snap to hovered pin) */}
+          {wiringPos && cursor && (() => {
+            let snapPos = cursor
+            if (hoverPin && (!wiring || hoverPin !== `${wiring.partId}:${wiring.pinId}`)) {
+              const [hPartId, hPinId] = hoverPin.split(":")
+              const hp = getPinRefPosition({ partId: hPartId, pinId: hPinId }, parts)
+              if (hp) snapPos = hp
+            }
+            return (
+              <path
+                d={wirePath(wiringPos, snapPos)}
+                fill="none"
+                stroke={activeWireColor || "var(--color-primary, #38bdf8)"}
+                strokeWidth={3.5}
+                strokeDasharray="6 5"
+                strokeLinecap="round"
+              />
+            )
+          })()}
 
           {/* 4. Interactive Pins (TOPMOST - NEVER BLOCKED BY WIRES) */}
           {parts.map((part) => {
             const def = CATALOG[part.type]
+            const hitRadius = part.type === "breadboard" ? 5.5 : 10
             return (
               <g key={`pins-${part.id}`} transform={`translate(${part.x} ${part.y})`}>
                 <g transform={`rotate(${part.rotation} ${def.width / 2} ${def.height / 2})`}>
                   {def.pins.map((pin) => {
                     const key = `${part.id}:${pin.id}`
                     const isWiringStart = wiring && wiring.partId === part.id && wiring.pinId === pin.id
+                    const isHovered = hoverPin === key
+
                     return (
                       <g key={pin.id}>
+                        {/* Wiring Start Origin Indicator Ripple */}
+                        {isWiringStart && (
+                          <>
+                            <circle
+                              cx={pin.x}
+                              cy={pin.y}
+                              r={9}
+                              fill="none"
+                              stroke="var(--color-primary, #38bdf8)"
+                              strokeWidth={2}
+                              className="animate-ping pointer-events-none"
+                              opacity={0.7}
+                            />
+                            <circle
+                              cx={pin.x}
+                              cy={pin.y}
+                              r={7.5}
+                              fill="none"
+                              stroke="var(--color-primary, #38bdf8)"
+                              strokeWidth={1.8}
+                              strokeDasharray="3 2"
+                              className="pointer-events-none"
+                            />
+                          </>
+                        )}
+
+                        {/* Visible Pin Dot */}
                         <circle
                           cx={pin.x}
                           cy={pin.y}
-                          r={hoverPin === key ? 6 : 4}
+                          r={isHovered ? 5.5 : 4}
                           fill={PIN_KIND_COLOR[pin.kind]}
-                          stroke={isWiringStart ? "var(--color-primary)" : "var(--color-background)"}
-                          strokeWidth={1.5}
+                          stroke={isWiringStart ? "var(--color-primary, #38bdf8)" : isHovered ? "#ffffff" : "#090d16"}
+                          strokeWidth={isHovered ? 2 : 1.2}
+                          className="pointer-events-none transition-all duration-75"
+                        />
+
+                        {/* Generous Tactile Hit Target (20px diameter on ESP32/Arduino, 11px on Breadboard) */}
+                        <circle
+                          cx={pin.x}
+                          cy={pin.y}
+                          r={hitRadius}
+                          fill="transparent"
                           className={running ? "" : "cursor-crosshair"}
                           onPointerDown={(e) => onPinPointerDown(e, { partId: part.id, pinId: pin.id })}
                           onPointerEnter={() => setHoverPin(key)}
@@ -945,19 +1027,6 @@ export function CircuitCanvas(props: Props) {
                         >
                           <title>{`${def.name} · ${pin.label}`}</title>
                         </circle>
-                        {hoverPin === key && (
-                          <text
-                            x={pin.x}
-                            y={pin.y - 9}
-                            textAnchor="middle"
-                            fontSize={9}
-                            fill="var(--color-foreground)"
-                            fontFamily="monospace"
-                            className="pointer-events-none font-bold"
-                          >
-                            {pin.label}
-                          </text>
-                        )}
                       </g>
                     )
                   })}
@@ -965,6 +1034,67 @@ export function CircuitCanvas(props: Props) {
               </g>
             )
           })}
+
+          {/* 4b. Floating High-Contrast World-Space Pin Tooltip Badge */}
+          {hoverPin && (() => {
+            const [hPartId, hPinId] = hoverPin.split(":")
+            const hPart = parts.find((p) => p.id === hPartId)
+            if (!hPart) return null
+            const pos = getPinRefPosition({ partId: hPartId, pinId: hPinId }, parts)
+            if (!pos) return null
+
+            const info = getPinDisplayInfo(hPart.type, hPinId)
+            const isNearTop = pos.y < 45
+            const badgeY = isNearTop ? pos.y + 16 : pos.y - 14
+            const kindColor = PIN_KIND_COLOR[info.kind] || "#38bdf8"
+            const labelLen = info.label.length
+            const detailsLen = info.details ? info.details.length : 0
+            const badgeW = Math.max(54, labelLen * 7.5 + detailsLen * 6.2 + 28)
+
+            return (
+              <g transform={`translate(${pos.x} ${badgeY})`} className="pointer-events-none select-none z-50">
+                {/* Pill Background with Drop Shadow */}
+                <rect
+                  x={-badgeW / 2}
+                  y={-10}
+                  width={badgeW}
+                  height={20}
+                  rx={5}
+                  fill="#050811"
+                  stroke="#334155"
+                  strokeWidth={1}
+                />
+                {/* Accent border on top edge */}
+                <line
+                  x1={-badgeW / 2 + 5}
+                  y1={-10}
+                  x2={badgeW / 2 - 5}
+                  y2={-10}
+                  stroke={kindColor}
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                />
+                {/* Kind indicator dot */}
+                <circle cx={-badgeW / 2 + 10} cy={0} r={3} fill={kindColor} />
+                {/* Label & Educational Details */}
+                <text
+                  x={-badgeW / 2 + 17}
+                  y={3.5}
+                  fontSize={9.5}
+                  fontFamily="ui-monospace, monospace"
+                  fontWeight={700}
+                  fill="#f8fafc"
+                >
+                  {info.label}
+                  {info.details && (
+                    <tspan fill="#94a3b8" fontWeight={500} fontSize={8.5}>
+                      {" · " + info.details}
+                    </tspan>
+                  )}
+                </text>
+              </g>
+            )
+          })()}
           {/* 5. Multimeter Probe Clips Overlay */}
           {probeRed && (() => {
             const pos = getPinRefPosition(probeRed, parts)

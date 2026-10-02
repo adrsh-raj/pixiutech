@@ -492,6 +492,7 @@ const BOARD_TYPE_SET = new Set<string>(Object.keys(BOARD_REGISTRY))
 export function isBoardPart(type: PartType | string): boolean {
   return BOARD_TYPE_SET.has(type)
 }
+export const isBoardType = isBoardPart
 
 /**
  * Returns the BoardDefinition for the given board ID or part type.
