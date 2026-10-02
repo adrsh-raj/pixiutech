@@ -2,6 +2,7 @@ import type { CircuitState, PinRef } from "./circuit-types"
 import type { ArduinoPinState } from "./simulation"
 import type { NodalSolution } from "./circuit-solver"
 import { solveCircuitNodalPotentials } from "./circuit-solver"
+import { getBoardForPart } from "./board-registry"
 
 export interface WaveformPoint {
   t: number // timestamp in ms (monotonic)
@@ -28,28 +29,29 @@ export function samplePinVoltage(
 ): number {
   if (!ref) return 0
 
-  // 1. Direct Arduino Pin check for high-fidelity PWM / Digital simulation
+  // 1. Direct Board Pin check for high-fidelity PWM / Digital simulation
   const part = state.parts.find((p) => p.id === ref.partId)
-  if (part?.type === "arduino-uno") {
+  const board = part ? getBoardForPart(part) : undefined
+  if (board) {
     const rawPin = ref.pinId.toLowerCase()
-    const pinDigits = rawPin.replace(/^d/, "")
+    const pinDigits = rawPin.replace(/^d|^gpio/, "")
 
     // Power rails
-    if (rawPin === "5v" || rawPin === "vin" || rawPin === "pos_top" || rawPin === "pos_bot") return 5.0
-    if (rawPin === "3v3") return 3.3
-    if (rawPin.includes("gnd")) return 0.0
+    if (board.powerPins.v5?.includes(rawPin) || rawPin === "vin" || rawPin === "pos_top" || rawPin === "pos_bot") return 5.0
+    if (board.powerPins.v33?.includes(rawPin) || rawPin === "3v3") return 3.3
+    if (board.powerPins.gnd.includes(rawPin) || rawPin.includes("gnd")) return 0.0
 
-    // Digital pins with potential PWM (check both "d13" and "13")
+    // Digital pins with potential PWM
     const pinData = pinStates[rawPin] || pinStates[pinDigits]
     if (pinData) {
       if (typeof pinData.value === "number" && pinData.value > 0 && pinData.value < 255) {
-        // Authentic Arduino PWM (490Hz default, period ~2.04ms)
-        const periodMs = 2.04
+        // Authentic board PWM period
+        const periodMs = 1000 / board.pwmFrequencyDefaultHz
         const duty = pinData.value / 255
         const phase = (simTimeMs % periodMs) / periodMs
-        return phase < duty ? 5.0 : 0.0
+        return phase < duty ? board.logicVoltage : 0.0
       }
-      return pinData.state === "HIGH" ? 5.0 : 0.0
+      return pinData.state === "HIGH" ? board.logicVoltage : 0.0
     }
   }
 

@@ -18,6 +18,7 @@
 
 import type { CircuitState } from "./circuit-types"
 import { apiFetch } from "@/context/AuthContext"
+import { isBoardPart } from "./board-registry"
 
 export const XP_STORAGE_KEY = "pixiu_xp_ledger_v2"
 export const XP_UPDATE_EVENT = "pixiu_xp_updated"
@@ -428,11 +429,11 @@ export function awardMissionXp(lessonId: string, difficulty: "Beginner" | "Inter
 export function awardCreationXp(circuit: CircuitState, blocklyXml: string, projectName: string): boolean {
   if (!isStudentUser()) return false
 
-  const unoCount = circuit.parts.filter((p) => p.type === "arduino-uno").length
+  const controllerCount = circuit.parts.filter((p) => isBoardPart(p.type)).length
   const totalParts = circuit.parts.length
   const totalWires = circuit.wires.length
 
-  if (unoCount < 1 || totalParts < 3 || totalWires < 2) {
+  if (controllerCount < 1 || totalParts < 3 || totalWires < 2) {
     return false
   }
 

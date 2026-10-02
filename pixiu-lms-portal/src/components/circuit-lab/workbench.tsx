@@ -14,6 +14,7 @@ import { saveCircuit, loadCurrentCircuit, saveCurrentCircuit, clearCurrentCircui
 import * as Blockly from "blockly"
 import { Boxes, Camera, Sparkles, Terminal, Trash2, Gauge, Sliders, ShieldAlert } from "lucide-react"
 import { computeWireCurrents } from "@/lib/current-flow"
+import { isBoardPart } from "@/lib/board-registry"
 import { Multimeter } from "./multimeter"
 import { Oscilloscope } from "./oscilloscope"
 import { CircuitCanvas } from "./circuit-canvas"
@@ -533,10 +534,10 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
       isPausedRef.current = true
     }
 
-    // Only run Arduino code and AI Vision if an Arduino board actually exists in the circuit
-    const hasArduino = state.parts.some((p) => p.type === "arduino-uno")
-    if (!hasArduino) {
-      // Pure DC circuit (battery, resistor, LED, etc.) - no Arduino code, no AI camera.
+    // Only run embedded program and AI Vision if a controller board actually exists in the circuit
+    const hasController = state.parts.some((p) => isBoardPart(p.type))
+    if (!hasController) {
+      // Pure DC circuit (battery, resistor, LED, etc.) - no MCU code, no AI camera.
       // Keep the Workbench run-state consistent with the early return.
       runningRef.current = false
       setRunning(false)

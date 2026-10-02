@@ -1,4 +1,5 @@
 import type { PartDef, PartType, PinDef, PinKind } from "./circuit-types"
+import { ESP32_DEVKIT_BOARD, RPI_PICO_BOARD, MICROBIT_V2_BOARD } from "./board-registry"
 
 function distribute(labels: { label: string; kind: PinKind }[], left: number, right: number, y: number): PinDef[] {
   const n = labels.length
@@ -71,6 +72,30 @@ export const CATALOG: Record<PartType, PartDef> = {
     width: ARDUINO_W,
     height: ARDUINO_H,
     pins: [...topPins, ...bottomPins],
+  },
+  "esp32-devkit": {
+    type: "esp32-devkit",
+    name: ESP32_DEVKIT_BOARD.name,
+    blurb: ESP32_DEVKIT_BOARD.blurb,
+    width: ESP32_DEVKIT_BOARD.width,
+    height: ESP32_DEVKIT_BOARD.height,
+    pins: ESP32_DEVKIT_BOARD.pins,
+  },
+  "rpi-pico": {
+    type: "rpi-pico",
+    name: RPI_PICO_BOARD.name,
+    blurb: RPI_PICO_BOARD.blurb,
+    width: RPI_PICO_BOARD.width,
+    height: RPI_PICO_BOARD.height,
+    pins: RPI_PICO_BOARD.pins,
+  },
+  "microbit-v2": {
+    type: "microbit-v2",
+    name: MICROBIT_V2_BOARD.name,
+    blurb: MICROBIT_V2_BOARD.blurb,
+    width: MICROBIT_V2_BOARD.width,
+    height: MICROBIT_V2_BOARD.height,
+    pins: MICROBIT_V2_BOARD.pins,
   },
   breadboard: {
     type: "breadboard",
@@ -486,6 +511,9 @@ export const CATALOG: Record<PartType, PartDef> = {
 
 export const PALETTE_ORDER: PartType[] = [
   "arduino-uno",
+  "esp32-devkit",
+  "rpi-pico",
+  "microbit-v2",
   "breadboard",
   "led",
   "rgb-led",

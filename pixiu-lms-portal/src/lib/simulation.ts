@@ -1,6 +1,7 @@
 import type { CircuitState } from "./circuit-types"
 import { CATALOG } from "./components-catalog"
 import type { PartRuntime } from "@/components/circuit-lab/part-art"
+import { getBoardForPart } from "./board-registry"
 
 export interface ArduinoPinState {
   state: "HIGH" | "LOW"
@@ -123,24 +124,34 @@ export function computeRuntime(
   for (const part of state.parts) {
     const k = (pin: string) => key(part.id, pin)
 
-    if (part.type === "arduino-uno") {
-      activeSources.push({ key: k("5v"), voltage: 5.0 })
-      activeSources.push({ key: k("3v3"), voltage: 3.3 })
-      activeSources.push({ key: k("vin"), voltage: 5.0 })
+    const board = getBoardForPart(part)
+    if (board) {
+      if (board.powerPins.v5) {
+        for (const p of board.powerPins.v5) activeSources.push({ key: k(p), voltage: 5.0 })
+      }
+      if (board.powerPins.v33) {
+        for (const p of board.powerPins.v33) activeSources.push({ key: k(p), voltage: 3.3 })
+      }
+      if (board.powerPins.vin) {
+        for (const p of board.powerPins.vin) activeSources.push({ key: k(p), voltage: 5.0 })
+      }
+      for (const g of board.powerPins.gnd) {
+        groundSinks.push(k(g))
+      }
 
-      groundSinks.push(k("gnd"))
-      groundSinks.push(k("gnd_pwr"))
-
-      // Check digital pins d0..d13
-      for (let i = 0; i <= 13; i++) {
-        const pinId = `d${i}`
-        const pState = pinStates[String(i)] ?? pinStates[pinId]
-        if (pState?.state === "HIGH" || (pState?.value ?? 0) > 0) {
-          const duty = pState.value !== undefined ? pState.value / 255 : 1.0
-          activeSources.push({ key: k(pinId), voltage: 5.0 * duty })
-        } else {
-          // LOW digital pin acts as Ground sink
-          groundSinks.push(k(pinId))
+      // Check digital and analog pins
+      for (const pin of board.pins) {
+        if (pin.kind === "digital" || pin.kind === "analog") {
+          const pinId = pin.id
+          const altId = pinId.replace(/^d|^gpio/, "")
+          const pState = pinStates[pinId] ?? pinStates[altId]
+          if (pState?.state === "HIGH" || (pState?.value ?? 0) > 0) {
+            const duty = pState.value !== undefined ? pState.value / 255 : 1.0
+            activeSources.push({ key: k(pinId), voltage: board.logicVoltage * duty })
+          } else {
+            // LOW digital pin acts as Ground sink
+            groundSinks.push(k(pinId))
+          }
         }
       }
     } else if (part.type === "battery") {

@@ -363,6 +363,317 @@ export function PartArt({ part, runtime }: { part: PlacedPart; runtime?: PartRun
       )
     }
 
+    case "esp32-devkit": {
+      const LEFT_LABELS = [
+        { id: "en", label: "EN", color: "#94a3b8" },
+        { id: "vp", label: "VP", color: "#fcd34d" },
+        { id: "vn", label: "VN", color: "#fcd34d" },
+        { id: "d34", label: "D34", color: "#fcd34d" },
+        { id: "d35", label: "D35", color: "#fcd34d" },
+        { id: "d32", label: "D32", color: "#38bdf8" },
+        { id: "d33", label: "D33", color: "#38bdf8" },
+        { id: "d25", label: "D25", color: "#38bdf8" },
+        { id: "d26", label: "D26", color: "#38bdf8" },
+        { id: "d27", label: "D27", color: "#38bdf8" },
+        { id: "d14", label: "D14", color: "#38bdf8" },
+        { id: "d12", label: "D12", color: "#38bdf8" },
+        { id: "d13", label: "D13", color: "#38bdf8" },
+        { id: "gnd_l", label: "GND", color: "#cbd5e1" },
+        { id: "vin", label: "VIN", color: "#f87171" },
+      ]
+
+      const RIGHT_LABELS = [
+        { id: "d23", label: "D23", color: "#38bdf8" },
+        { id: "d22", label: "D22", color: "#38bdf8" },
+        { id: "tx0", label: "TX0", color: "#cbd5e1" },
+        { id: "rx0", label: "RX0", color: "#cbd5e1" },
+        { id: "d21", label: "D21", color: "#38bdf8" },
+        { id: "d19", label: "D19", color: "#38bdf8" },
+        { id: "d18", label: "D18", color: "#38bdf8" },
+        { id: "d5", label: "D5", color: "#38bdf8" },
+        { id: "tx2", label: "TX2", color: "#cbd5e1" },
+        { id: "rx2", label: "RX2", color: "#cbd5e1" },
+        { id: "d4", label: "D4", color: "#38bdf8" },
+        { id: "d2", label: "D2", color: "#60a5fa" },
+        { id: "d15", label: "D15", color: "#38bdf8" },
+        { id: "gnd_r", label: "GND", color: "#cbd5e1" },
+        { id: "3v3", label: "3V3", color: "#f87171" },
+      ]
+
+      return (
+        <g className="select-none">
+          {/* Main PCB substrate - Matte Charcoal Black */}
+          <rect x={0} y={0} width={240} height={370} rx={12} fill="#121316" stroke="#272b35" strokeWidth={2.5} />
+          {/* Inner routing area */}
+          <rect x={22} y={16} width={196} height={338} rx={6} fill="#0d0e11" opacity={0.6} />
+
+          {/* 4 Corner mounting holes with gold pads */}
+          {[
+            { cx: 14, cy: 14 },
+            { cx: 226, cy: 14 },
+            { cx: 14, cy: 356 },
+            { cx: 226, cy: 356 },
+          ].map((h, i) => (
+            <g key={i}>
+              <circle cx={h.cx} cy={h.cy} r={5.5} fill="#eab308" stroke="#ca8a04" strokeWidth={0.8} />
+              <circle cx={h.cx} cy={h.cy} r={3.2} fill="#020617" />
+            </g>
+          ))}
+
+          {/* Onboard 2.4GHz Inverted-F Meandering PCB Antenna */}
+          <g>
+            <rect x={56} y={16} width={128} height={42} rx={3} fill="#0a0a0d" stroke="#1f242d" strokeWidth={1} />
+            <path
+              d="M 64,48 L 74,48 L 74,24 L 84,24 L 84,48 L 94,48 L 94,24 L 104,24 L 104,48 L 114,48 L 114,24 L 124,24 L 124,48 L 134,48 L 134,24 L 144,24 L 144,48 L 154,48 L 154,24 L 164,24 L 164,48 L 174,48"
+              fill="none"
+              stroke="#eab308"
+              strokeWidth={2}
+              strokeLinecap="round"
+            />
+          </g>
+
+          {/* ESP-WROOM-32 Laser-Engraved Metal RF Shield */}
+          <g>
+            <rect x={50} y={64} width={140} height={132} rx={5} fill="#cbd5e1" stroke="#64748b" strokeWidth={1.5} />
+            <rect x={53} y={67} width={134} height={126} rx={3} fill="#94a3b8" opacity={0.3} />
+            {/* Shield Engravings */}
+            <text x={120} y={92} textAnchor="middle" fontSize={11} fill="#1e293b" fontFamily="system-ui, sans-serif" fontWeight={900} letterSpacing={2}>
+              ESPRESSIF
+            </text>
+            <text x={120} y={114} textAnchor="middle" fontSize={13} fill="#0f172a" fontFamily="monospace" fontWeight={800}>
+              ESP-WROOM-32
+            </text>
+            <text x={120} y={134} textAnchor="middle" fontSize={7.5} fill="#334155" fontFamily="monospace" fontWeight={600}>
+              FCC ID: 2AC7Z-ESPWROOM32
+            </text>
+            <text x={120} y={148} textAnchor="middle" fontSize={7} fill="#334155" fontFamily="monospace">
+              2.4GHz WiFi + BLE 4.2
+            </text>
+            <text x={120} y={166} textAnchor="middle" fontSize={7} fill="#475569" fontFamily="monospace">
+              CE 0700 · RoHS Compliant
+            </text>
+          </g>
+
+          {/* CP2102 / CH340 USB-to-UART Bridge IC */}
+          <g>
+            <rect x={96} y={232} width={48} height={42} rx={2} fill="#1e293b" stroke="#090d16" strokeWidth={1.5} />
+            <circle cx={102} cy={238} r={1.5} fill="#94a3b8" />
+            <text x={120} y={256} textAnchor="middle" fontSize={8} fill="#e2e8f0" fontFamily="monospace" fontWeight={700}>
+              CP2102
+            </text>
+          </g>
+
+          {/* AMS1117-3.3 Linear Voltage Regulator */}
+          <g>
+            <rect x={52} y={242} width={30} height={20} rx={1.5} fill="#1e293b" stroke="#0f172a" strokeWidth={1} />
+            <rect x={58} y={238} width={18} height={4} fill="#64748b" />
+            <text x={67} y={255} textAnchor="middle" fontSize={6} fill="#cbd5e1" fontFamily="monospace" fontWeight={700}>
+              3.3V
+            </text>
+          </g>
+
+          {/* Status LEDs */}
+          <g>
+            {/* PWR Red LED */}
+            <circle cx={78} cy={212} r={3} fill="#ef4444" stroke="#991b1b" strokeWidth={0.8} />
+            <circle cx={78} cy={212} r={1.2} fill="#fca5a5" />
+            <text x={78} y={204} textAnchor="middle" fontSize={6} fill="#94a3b8" fontFamily="monospace" fontWeight={700}>
+              PWR
+            </text>
+
+            {/* D2 User Blue LED */}
+            <circle cx={162} cy={212} r={3} fill="#3b82f6" stroke="#1d4ed8" strokeWidth={0.8} />
+            <circle cx={162} cy={212} r={1.2} fill="#93c5fd" />
+            <text x={162} y={204} textAnchor="middle" fontSize={6} fill="#94a3b8" fontFamily="monospace" fontWeight={700}>
+              D2/LED
+            </text>
+          </g>
+
+          {/* Reset / EN Tactile Button */}
+          <g>
+            <rect x={28} y={328} width={22} height={22} rx={2.5} fill="#334155" stroke="#1e293b" strokeWidth={1} />
+            <circle cx={39} cy={339} r={6} fill="#dc2626" stroke="#991b1b" strokeWidth={1} />
+            <text x={39} y={322} textAnchor="middle" fontSize={7} fill="#f87171" fontFamily="monospace" fontWeight={800}>
+              EN
+            </text>
+          </g>
+
+          {/* BOOT Tactile Button */}
+          <g>
+            <rect x={190} y={328} width={22} height={22} rx={2.5} fill="#334155" stroke="#1e293b" strokeWidth={1} />
+            <circle cx={201} cy={339} r={6} fill="#1e293b" stroke="#0f172a" strokeWidth={1} />
+            <text x={201} y={322} textAnchor="middle" fontSize={7} fill="#94a3b8" fontFamily="monospace" fontWeight={800}>
+              BOOT
+            </text>
+          </g>
+
+          {/* Micro-USB Port at bottom */}
+          <g>
+            <rect x={88} y={342} width={64} height={30} rx={3} fill="#cbd5e1" stroke="#475569" strokeWidth={1.5} />
+            <rect x={94} y={352} width={52} height={16} rx={2} fill="#1e293b" />
+            <rect x={104} y={356} width={32} height={8} fill="#090d16" />
+          </g>
+
+          {/* Dual Pin Header Sockets and Silkscreen Labels */}
+          {/* Left Socket Strip */}
+          <rect x={3} y={24} width={18} height={324} rx={2} fill="#0a0a0f" stroke="#1e293b" strokeWidth={1} />
+          {/* Right Socket Strip */}
+          <rect x={219} y={24} width={18} height={324} rx={2} fill="#0a0a0f" stroke="#1e293b" strokeWidth={1} />
+
+          {/* Left Pins */}
+          {LEFT_LABELS.map((item, i) => {
+            const py = 35 + i * 22
+            return (
+              <g key={item.id}>
+                {/* Pin Socket Hole */}
+                <circle cx={12} cy={py} r={4.5} fill="#eab308" stroke="#ca8a04" strokeWidth={0.8} />
+                <circle cx={12} cy={py} r={2.5} fill="#020617" />
+                {/* Silkscreen Pin Label */}
+                <text x={25} y={py + 3} textAnchor="start" fontSize={7.5} fill={item.color} fontFamily="monospace" fontWeight={700}>
+                  {item.label}
+                </text>
+              </g>
+            )
+          })}
+
+          {/* Right Pins */}
+          {RIGHT_LABELS.map((item, i) => {
+            const py = 35 + i * 22
+            return (
+              <g key={item.id}>
+                {/* Pin Socket Hole */}
+                <circle cx={228} cy={py} r={4.5} fill="#eab308" stroke="#ca8a04" strokeWidth={0.8} />
+                <circle cx={228} cy={py} r={2.5} fill="#020617" />
+                {/* Silkscreen Pin Label */}
+                <text x={215} y={py + 3} textAnchor="end" fontSize={7.5} fill={item.color} fontFamily="monospace" fontWeight={700}>
+                  {item.label}
+                </text>
+              </g>
+            )
+          })}
+
+          {/* Center Brand Silkscreen */}
+          <text x={120} y={305} textAnchor="middle" fontSize={8} fill="#38bdf8" fontFamily="monospace" fontWeight={700} letterSpacing={1}>
+            PIXIU CYBERLAB
+          </text>
+          <text x={120} y={317} textAnchor="middle" fontSize={6.5} fill="#64748b" fontFamily="system-ui, sans-serif" fontWeight={600}>
+            ESP32 NodeMCU-32S · 3.3V
+          </text>
+        </g>
+      )
+    }
+
+    case "rpi-pico": {
+      return (
+        <g className="select-none">
+          <rect x={0} y={0} width={220} height={380} rx={10} fill="#059669" stroke="#047857" strokeWidth={2.5} />
+          <rect x={16} y={20} width={188} height={340} rx={6} fill="#047857" opacity={0.6} />
+
+          {/* RP2040 chip */}
+          <rect x={82} y={150} width={56} height={56} rx={3} fill="#1e293b" stroke="#0f172a" strokeWidth={1.5} />
+          <text x={110} y={182} textAnchor="middle" fontSize={9} fill="#f1f5f9" fontFamily="monospace" fontWeight={700}>
+            RP2040
+          </text>
+
+          {/* USB Port at top */}
+          <rect x={86} y={-4} width={48} height={28} rx={3} fill="#cbd5e1" stroke="#475569" strokeWidth={1.5} />
+
+          {/* BOOTSEL Button */}
+          <rect x={148} y={55} width={18} height={18} rx={2} fill="#334155" />
+          <circle cx={157} cy={64} r={5} fill="#f8fafc" />
+          <text x={157} y={80} textAnchor="middle" fontSize={5} fill="#cbd5e1" fontFamily="monospace">
+            BOOTSEL
+          </text>
+
+          {/* Header Pins Left & Right */}
+          {Array.from({ length: 20 }).map((_, i) => (
+            <g key={i}>
+              <circle cx={12} cy={25 + i * 17.5} r={3.8} fill="#eab308" stroke="#ca8a04" strokeWidth={0.6} />
+              <circle cx={12} cy={25 + i * 17.5} r={2} fill="#020617" />
+              <circle cx={208} cy={25 + i * 17.5} r={3.8} fill="#eab308" stroke="#ca8a04" strokeWidth={0.6} />
+              <circle cx={208} cy={25 + i * 17.5} r={2} fill="#020617" />
+            </g>
+          ))}
+
+          <text x={110} y={240} textAnchor="middle" fontSize={9} fill="#ecfdf5" fontFamily="monospace" fontWeight={700}>
+            Raspberry Pi Pico
+          </text>
+          <text x={110} y={254} textAnchor="middle" fontSize={7} fill="#a7f3d0" fontFamily="sans-serif">
+            RP2040 Dual ARM Cortex-M0+
+          </text>
+        </g>
+      )
+    }
+
+    case "microbit-v2": {
+      return (
+        <g className="select-none">
+          <rect x={0} y={0} width={320} height={260} rx={16} fill="#18181b" stroke="#27272a" strokeWidth={2.5} />
+          {/* Top Yellow Accents */}
+          <path d="M 0,40 Q 160,-20 320,40 L 320,0 L 0,0 Z" fill="#eab308" />
+
+          {/* 5x5 LED Matrix */}
+          <g>
+            <rect x={110} y={65} width={100} height={100} rx={6} fill="#09090b" stroke="#27272a" />
+            {Array.from({ length: 5 }).map((_, r) =>
+              Array.from({ length: 5 }).map((__, c) => (
+                <rect
+                  key={`${r}-${c}`}
+                  x={120 + c * 16}
+                  y={75 + r * 16}
+                  width={10}
+                  height={10}
+                  rx={2}
+                  fill="#7f1d1d"
+                  stroke="#ef4444"
+                  strokeWidth={0.5}
+                />
+              )),
+            )}
+          </g>
+
+          {/* Button A & Button B */}
+          <g>
+            <circle cx={50} cy={115} r={14} fill="#27272a" stroke="#3f3f46" strokeWidth={1.5} />
+            <circle cx={50} cy={115} r={9} fill="#09090b" />
+            <text x={50} y={145} textAnchor="middle" fontSize={11} fill="#f4f4f5" fontWeight={700}>
+              A
+            </text>
+
+            <circle cx={270} cy={115} r={14} fill="#27272a" stroke="#3f3f46" strokeWidth={1.5} />
+            <circle cx={270} cy={115} r={9} fill="#09090b" />
+            <text x={270} y={145} textAnchor="middle" fontSize={11} fill="#f4f4f5" fontWeight={700}>
+              B
+            </text>
+          </g>
+
+          {/* Gold Edge Connector at bottom */}
+          <g>
+            <rect x={0} y={230} width={320} height={30} rx={4} fill="#18181b" stroke="#eab308" strokeWidth={1} />
+            {[
+              { id: "p0", label: "0", x: 40 },
+              { id: "p1", label: "1", x: 100 },
+              { id: "p2", label: "2", x: 160 },
+              { id: "3v", label: "3V", x: 220 },
+              { id: "gnd", label: "GND", x: 280 },
+            ].map((pin) => (
+              <g key={pin.id}>
+                <rect x={pin.x - 14} y={232} width={28} height={24} rx={2} fill="#eab308" stroke="#ca8a04" />
+                <circle cx={pin.x} cy={248} r={5} fill="#09090b" />
+                <text x={pin.x} y={222} textAnchor="middle" fontSize={10} fill="#fef08a" fontWeight={700} fontFamily="monospace">
+                  {pin.label}
+                </text>
+              </g>
+            ))}
+          </g>
+
+          <text x={160} y={45} textAnchor="middle" fontSize={12} fill="#09090b" fontFamily="sans-serif" fontWeight={800} letterSpacing={1}>
+            micro:bit v2
+          </text>
+        </g>
+      )
+    }
+
     case "breadboard":
       return (
         <g>

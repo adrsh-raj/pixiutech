@@ -5,6 +5,7 @@ import type { PartRuntime } from "./part-art"
 import type { ArduinoPinState } from "@/lib/simulation"
 import { audioEngine } from "@/lib/audio-engine"
 import { solveCircuitNodalPotentials } from "@/lib/circuit-solver"
+import { getBoardForPart, isBoardPart } from "@/lib/board-registry"
 
 export type DmmMode = "voltage" | "current" | "resistance" | "continuity" | "off"
 
@@ -612,36 +613,47 @@ export function Multimeter({
       <div className="mt-3 pt-2.5 border-t border-slate-800 flex items-center justify-between text-[10px] text-slate-400 flex-wrap gap-1.5">
         <span className="font-semibold">Quick Test:</span>
         <div className="flex gap-1 flex-wrap">
-          <button
-            onClick={() => {
-              audioEngine.unlockAudio()
-              const uno = state.parts.find((p) => p.type === "arduino-uno")
-              if (uno) {
-                onSetProbeRed({ partId: uno.id, pinId: "5v" })
-                onSetProbeBlack({ partId: uno.id, pinId: "gnd" })
-                setMode("voltage")
-              }
-            }}
-            className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 font-mono font-semibold cursor-pointer transition"
-            title="Clip probes across 5V and GND (Measures 5.00V)"
-          >
-            5V - GND
-          </button>
-          <button
-            onClick={() => {
-              audioEngine.unlockAudio()
-              const uno = state.parts.find((p) => p.type === "arduino-uno")
-              if (uno) {
-                onSetProbeRed({ partId: uno.id, pinId: "d13" })
-                onSetProbeBlack({ partId: uno.id, pinId: "gnd" })
-                setMode("voltage")
-              }
-            }}
-            className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-cyan-300 font-mono font-semibold cursor-pointer transition"
-            title="Clip probes across Pin 13 and GND"
-          >
-            D13 - GND
-          </button>
+          {(() => {
+            const boardPart = state.parts.find((p) => isBoardPart(p.type))
+            const boardDef = boardPart ? getBoardForPart(boardPart) : undefined
+            const is3v3 = (boardDef?.logicVoltage ?? 5) <= 3.3
+            const pwrPin = is3v3 ? "3v3" : "5v"
+            const gndPin = is3v3 ? "gnd_r" : "gnd"
+            const ledPin = boardDef?.builtInLedPin ?? "d13"
+
+            return (
+              <>
+                <button
+                  onClick={() => {
+                    audioEngine.unlockAudio()
+                    if (boardPart) {
+                      onSetProbeRed({ partId: boardPart.id, pinId: pwrPin })
+                      onSetProbeBlack({ partId: boardPart.id, pinId: gndPin })
+                      setMode("voltage")
+                    }
+                  }}
+                  className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 font-mono font-semibold cursor-pointer transition"
+                  title={`Clip probes across ${pwrPin.toUpperCase()} and GND (Measures ${is3v3 ? "3.30V" : "5.00V"})`}
+                >
+                  {is3v3 ? "3V3 - GND" : "5V - GND"}
+                </button>
+                <button
+                  onClick={() => {
+                    audioEngine.unlockAudio()
+                    if (boardPart) {
+                      onSetProbeRed({ partId: boardPart.id, pinId: ledPin })
+                      onSetProbeBlack({ partId: boardPart.id, pinId: gndPin })
+                      setMode("voltage")
+                    }
+                  }}
+                  className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-cyan-300 font-mono font-semibold cursor-pointer transition"
+                  title={`Clip probes across Pin ${ledPin.toUpperCase()} and GND`}
+                >
+                  {`${ledPin.toUpperCase()} - GND`}
+                </button>
+              </>
+            )
+          })()}
 
           {/* Quick preset for Resistor drop */}
           {firstResistor && (

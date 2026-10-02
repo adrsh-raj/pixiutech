@@ -1,18 +1,20 @@
 import type { CircuitState } from "./circuit-types"
 import { CATALOG } from "./components-catalog"
+import { getActiveBoard, isBoardPart } from "./board-registry"
 
 export function buildInoSketch(circuit: CircuitState, cppCode: string): string {
   const dateStr = new Date().toISOString().split("T")[0]
+  const board = getActiveBoard(circuit)
+  const boardPart = circuit.parts.find((p) => isBoardPart(p.type))
 
   const pinUsageList: string[] = []
-  const uno = circuit.parts.find((p) => p.type === "arduino-uno")
-  if (uno) {
+  if (boardPart) {
     for (const w of circuit.wires) {
-      if (w.from.partId === uno.id) {
+      if (w.from.partId === boardPart.id) {
         const targetPart = circuit.parts.find((p) => p.id === w.to.partId)
         const targetName = targetPart ? (CATALOG[targetPart.type]?.name ?? targetPart.type) : w.to.partId
         pinUsageList.push(`// Pin ${w.from.pinId.toUpperCase()} -> ${targetName} (${w.to.pinId.toUpperCase()})`)
-      } else if (w.to.partId === uno.id) {
+      } else if (w.to.partId === boardPart.id) {
         const sourcePart = circuit.parts.find((p) => p.id === w.from.partId)
         const sourceName = sourcePart ? (CATALOG[sourcePart.type]?.name ?? sourcePart.type) : w.from.partId
         pinUsageList.push(`// Pin ${w.to.pinId.toUpperCase()} <- ${sourceName} (${w.from.pinId.toUpperCase()})`)
@@ -37,8 +39,9 @@ export function buildInoSketch(circuit: CircuitState, cppCode: string): string {
 
   const banner = `/*
  * -----------------------------------------------------------
- * PIXIU TECH CYBERLAB - ARDUINO SKETCH (.ino)
- * Target Board: Arduino Uno R3 (ATmega328P)
+ * PIXIU TECH CYBERLAB - EMBEDDED C/C++ SKETCH (.ino)
+ * Target Board: ${board.name} (${board.mcu})
+ * Architecture: ${board.family.toUpperCase()} · Logic: ${board.logicVoltage}V
  * Exported Date: ${dateStr}
  *
  * Circuit Wiring Map:

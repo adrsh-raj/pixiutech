@@ -2,6 +2,7 @@ import type { CircuitState, PinRef } from "./circuit-types"
 import type { PartRuntime } from "@/components/circuit-lab/part-art"
 import type { ArduinoPinState } from "./simulation"
 import { solveCircuitNodalPotentials } from "./circuit-solver"
+import { getBoardForPart } from "./board-registry"
 
 export interface WireCurrentState {
   currentMa: number
@@ -34,23 +35,33 @@ export function computeWireCurrents(
   for (const part of state.parts) {
     const k = (pin: string) => `${part.id}:${pin}`
 
-    if (part.type === "arduino-uno") {
-      powerPins.add(k("5v"))
-      powerPins.add(k("3v3"))
-      powerPins.add(k("vin"))
+    const board = getBoardForPart(part)
+    if (board) {
+      if (board.powerPins.v5) {
+        for (const p of board.powerPins.v5) powerPins.add(k(p))
+      }
+      if (board.powerPins.v33) {
+        for (const p of board.powerPins.v33) powerPins.add(k(p))
+      }
+      if (board.powerPins.vin) {
+        for (const p of board.powerPins.vin) powerPins.add(k(p))
+      }
+      for (const g of board.powerPins.gnd) {
+        groundPins.add(k(g))
+      }
 
-      groundPins.add(k("gnd"))
-      groundPins.add(k("gnd_pwr"))
-
-      // Digital pins d0..d13
-      for (let i = 0; i <= 13; i++) {
-        const pState = pinStates[String(i)] || pinStates[`d${i}`]
-        if (pState?.state === "HIGH" || (pState?.value ?? 0) > 0) {
-          powerPins.add(k(`d${i}`))
-          powerPins.add(k(String(i)))
-        } else {
-          groundPins.add(k(`d${i}`))
-          groundPins.add(k(String(i)))
+      for (const pin of board.pins) {
+        if (pin.kind === "digital" || pin.kind === "analog") {
+          const pinId = pin.id
+          const altId = pinId.replace(/^d|^gpio/, "")
+          const pState = pinStates[altId] || pinStates[pinId]
+          if (pState?.state === "HIGH" || (pState?.value ?? 0) > 0) {
+            powerPins.add(k(pinId))
+            powerPins.add(k(altId))
+          } else {
+            groundPins.add(k(pinId))
+            groundPins.add(k(altId))
+          }
         }
       }
     } else if (part.type === "battery") {

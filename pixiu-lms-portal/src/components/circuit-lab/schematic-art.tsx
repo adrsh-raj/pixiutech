@@ -217,6 +217,65 @@ export function SchematicPartArt({ part, runtime }: { part: PlacedPart; runtime?
       )
     }
 
+    case "esp32-devkit": {
+      return (
+        <g className="schematic-symbol select-none">
+          <rect x={10} y={10} width={220} height={350} rx={4} fill="#090d16" stroke="#06b6d4" strokeWidth={2.5} />
+          <rect x={10} y={10} width={220} height={26} fill="#0e7490" />
+          <text x={120} y={27} textAnchor="middle" fontSize={11} fill="#f0f9ff" fontFamily="monospace" fontWeight={700}>
+            U1 : ESP32-WROOM-32 (3.3V)
+          </text>
+          <text x={20} y={48} fontSize={8} fill="#38bdf8" fontWeight={700}>[LEFT HEADER]</text>
+          <text x={220} y={48} textAnchor="end" fontSize={8} fill="#38bdf8" fontWeight={700}>[RIGHT HEADER]</text>
+          {Array.from({ length: 15 }).map((_, i) => (
+            <g key={i}>
+              <line x1={0} y1={35 + i * 22} x2={10} y2={35 + i * 22} stroke="#06b6d4" strokeWidth={1.5} />
+              <line x1={230} y1={35 + i * 22} x2={240} y2={35 + i * 22} stroke="#06b6d4" strokeWidth={1.5} />
+            </g>
+          ))}
+          <text x={120} y={190} textAnchor="middle" fontSize={10} fill="#67e8f9" fontFamily="monospace" fontWeight={700}>
+            WiFi 802.11 b/g/n
+          </text>
+          <text x={120} y={205} textAnchor="middle" fontSize={10} fill="#67e8f9" fontFamily="monospace" fontWeight={700}>
+            Bluetooth 4.2 / BLE
+          </text>
+          <text x={120} y={220} textAnchor="middle" fontSize={8.5} fill="#94a3b8" fontFamily="monospace">
+            240MHz Dual-Core
+          </text>
+        </g>
+      )
+    }
+
+    case "rpi-pico": {
+      return (
+        <g className="schematic-symbol select-none">
+          <rect x={10} y={10} width={200} height={360} rx={4} fill="#090d16" stroke="#10b981" strokeWidth={2.5} />
+          <rect x={10} y={10} width={200} height={26} fill="#047857" />
+          <text x={110} y={27} textAnchor="middle" fontSize={11} fill="#f0f9ff" fontFamily="monospace" fontWeight={700}>
+            U1 : RP2040 (PICO 3.3V)
+          </text>
+          <text x={110} y={190} textAnchor="middle" fontSize={10} fill="#34d399" fontFamily="monospace" fontWeight={700}>
+            ARM Cortex-M0+
+          </text>
+        </g>
+      )
+    }
+
+    case "microbit-v2": {
+      return (
+        <g className="schematic-symbol select-none">
+          <rect x={10} y={10} width={300} height={240} rx={4} fill="#090d16" stroke="#f59e0b" strokeWidth={2.5} />
+          <rect x={10} y={10} width={300} height={26} fill="#b45309" />
+          <text x={160} y={27} textAnchor="middle" fontSize={11} fill="#f0f9ff" fontFamily="monospace" fontWeight={700}>
+            U1 : nRF52833 (MICRO:BIT 3.3V)
+          </text>
+          <text x={160} y={130} textAnchor="middle" fontSize={10} fill="#fbbf24" fontFamily="monospace" fontWeight={700}>
+            5x5 LED MATRIX & BLE
+          </text>
+        </g>
+      )
+    }
+
     case "neopixel-ring": {
       const colors = runtime?.pixelColors ?? ["#38bdf8", "#38bdf8", "#38bdf8", "#38bdf8", "#38bdf8", "#38bdf8", "#38bdf8", "#38bdf8"]
       return (

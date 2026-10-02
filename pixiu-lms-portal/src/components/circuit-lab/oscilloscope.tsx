@@ -7,6 +7,7 @@ import type { ArduinoPinState } from "@/lib/simulation"
 import { CATALOG } from "@/lib/components-catalog"
 import { samplePinVoltage, computeChannelMetrics, type WaveformPoint } from "@/lib/waveform-sampler"
 import { solveCircuitNodalPotentials, type NodalSolution } from "@/lib/circuit-solver"
+import { isBoardPart } from "@/lib/board-registry"
 
 interface SimulationSnapshot {
   state: CircuitState
@@ -95,7 +96,7 @@ export const Oscilloscope = memo(function Oscilloscope({
 
       const needsNodalSolve = [probeCH1, probeCH2].some((probe) => {
         if (!probe) return false
-        return currentState.parts.find((part) => part.id === probe.partId)?.type !== "arduino-uno"
+        return !isBoardPart(currentState.parts.find((part) => part.id === probe.partId)?.type ?? "")
       })
 
       if (
@@ -218,12 +219,12 @@ export const Oscilloscope = memo(function Oscilloscope({
     return `${def?.name ?? ref.partId} · ${pin?.label ?? ref.pinId}`
   }
 
-  const uno = state.parts.find((p) => p.type === "arduino-uno")
+  const boardPart = state.parts.find((p) => isBoardPart(p.type))
   const attachPresetCH1 = (pin: string) => {
-    if (uno) onSetProbeCH1({ partId: uno.id, pinId: pin })
+    if (boardPart) onSetProbeCH1({ partId: boardPart.id, pinId: pin })
   }
   const attachPresetCH2 = (pin: string) => {
-    if (uno) onSetProbeCH2({ partId: uno.id, pinId: pin })
+    if (boardPart) onSetProbeCH2({ partId: boardPart.id, pinId: pin })
   }
 
   if (!isOpen) return null

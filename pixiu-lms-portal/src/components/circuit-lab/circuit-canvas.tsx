@@ -469,6 +469,21 @@ export function CircuitCanvas(props: Props) {
                         }}
                       />
                     )}
+
+                    {/* ESP32 Interactive EN Reset Switch Hitbox */}
+                    {part.type === "esp32-devkit" && (
+                      <circle
+                        cx={39}
+                        cy={339}
+                        r={12}
+                        fill="transparent"
+                        className="cursor-pointer"
+                        onPointerDown={(e) => {
+                          e.stopPropagation()
+                          onResetMcu?.()
+                        }}
+                      />
+                    )}
                   </g>
 
                   {/* Direct Floating Potentiometer Knob / Range Slider on Canvas */}

@@ -13,6 +13,9 @@ export interface PinDef {
 
 export type PartType =
   | "arduino-uno"
+  | "esp32-devkit"
+  | "rpi-pico"
+  | "microbit-v2"
   | "breadboard"
   | "led"
   | "resistor"

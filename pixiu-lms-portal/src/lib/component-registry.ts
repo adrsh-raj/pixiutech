@@ -17,6 +17,9 @@ export interface ComponentRegistryEntry {
 
 const CATEGORY_MAP: Record<PartType, ComponentCategory> = {
   "arduino-uno": "controller",
+  "esp32-devkit": "controller",
+  "rpi-pico": "controller",
+  "microbit-v2": "controller",
   breadboard: "basic",
   resistor: "basic",
   pushbutton: "input",
@@ -67,6 +70,42 @@ const OVERRIDES: Partial<Record<PartType, Partial<ComponentRegistryEntry>>> = {
       realWorld: "Robots, sensors, automation and embedded controllers",
       experiment: "Blink an LED, read a button, and drive an actuator.",
       hint: "Every sensor needs power, ground and a signal path.",
+    },
+  },
+  "esp32-devkit": {
+    category: "controller",
+    electricalModel: "microcontroller-3v3",
+    runtimeModel: "esp32-pin-state",
+    blockIds: ["io_pinmode", "io_digitalwrite", "io_digitalread", "io_analogwrite", "io_analogread"],
+    educational: {
+      gradeBand: "8-10",
+      concept: "ESP32 Dual-Core IoT Microcontroller (3.3V Logic, WiFi & Bluetooth)",
+      realWorld: "Smart home IoT systems, remote telemetry, BLE automation, robotics",
+      experiment: "Connect sensors to 3.3V ADC inputs and write digital/PWM controls.",
+      hint: "ESP32 uses 3.3V logic. Never connect 5V signals directly to GPIOs!",
+    },
+  },
+  "rpi-pico": {
+    category: "controller",
+    electricalModel: "microcontroller-3v3",
+    runtimeModel: "pico-pin-state",
+    blockIds: ["io_pinmode", "io_digitalwrite", "io_digitalread", "io_analogwrite", "io_analogread"],
+    educational: {
+      gradeBand: "8-10",
+      concept: "RP2040 Dual ARM Cortex-M0+ 133MHz Embedded Microcontroller",
+      realWorld: "Industrial automation, custom USB peripherals, STEM education",
+      experiment: "Interface digital peripherals and analog sensors on 3.3V GPIO pins.",
+      hint: "Pico operates at 3.3V logic level with 12-bit ADC on GP26, GP27, GP28.",
+    },
+  },
+  "microbit-v2": {
+    category: "controller",
+    educational: {
+      gradeBand: "6-8",
+      concept: "nRF52833 ARM Cortex-M4 Board with 5x5 LED Matrix & BLE",
+      realWorld: "Classroom STEM robotics, wearable tech, game controllers",
+      experiment: "Use edge connector pins to read analog inputs and trigger LEDs.",
+      hint: "Edge connector pins P0, P1, P2 support analog and digital signals at 3.3V.",
     },
   },
   "ir-sensor": {

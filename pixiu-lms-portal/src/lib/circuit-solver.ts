@@ -1,6 +1,7 @@
 import type { CircuitState, PinRef } from "./circuit-types"
 import type { ArduinoPinState } from "./simulation"
 import type { PartRuntime } from "@/components/circuit-lab/part-art"
+import { getBoardForPart } from "./board-registry"
 
 export interface PinPotentialInfo {
   voltage: number
@@ -116,21 +117,22 @@ export function solveCircuitNodalPotentials(
   // 1. Gather all pins across all placed components
   const allPins = new Set<string>()
   for (const part of state.parts) {
-    switch (part.type) {
-      case "arduino-uno": {
-        for (let i = 0; i <= 13; i++) {
-          allPins.add(pinKey(part.id, `d${i}`))
-          allPins.add(pinKey(part.id, String(i)))
+    const board = getBoardForPart(part)
+    if (board) {
+      for (const pin of board.pins) {
+        allPins.add(pinKey(part.id, pin.id))
+        const num = pin.id.replace(/^d|^gpio/, "")
+        if (num !== pin.id) {
+          allPins.add(pinKey(part.id, num))
         }
-        allPins.add(pinKey(part.id, "5v"))
-        allPins.add(pinKey(part.id, "3v3"))
-        allPins.add(pinKey(part.id, "vin"))
-        allPins.add(pinKey(part.id, "gnd"))
-        allPins.add(pinKey(part.id, "gnd_pwr"))
-        allPins.add(pinKey(part.id, "aref"))
-        for (let i = 0; i <= 5; i++) allPins.add(pinKey(part.id, `a${i}`))
-        break
       }
+      for (const g of board.powerPins.gnd) {
+        allPins.add(pinKey(part.id, g))
+      }
+      continue
+    }
+
+    switch (part.type) {
       case "resistor":
         allPins.add(pinKey(part.id, "a"))
         allPins.add(pinKey(part.id, "b"))
@@ -287,37 +289,47 @@ export function solveCircuitNodalPotentials(
   const fixedNets = new Map<number, { voltage: number; label: string; isDigitalLow?: boolean; digitalPinName?: string }>()
 
   for (const part of state.parts) {
-    if (part.type === "arduino-uno") {
-      const net5V = pinToNetId(part.id, "5v")
-      fixedNets.set(net5V, { voltage: 5.0, label: "Arduino 5V Power Rail" })
-      const netVin = pinToNetId(part.id, "vin")
-      fixedNets.set(netVin, { voltage: 5.0, label: "Arduino VIN (5.0V)" })
+    const board = getBoardForPart(part)
+    if (board) {
+      if (board.powerPins.v5) {
+        for (const p of board.powerPins.v5) {
+          fixedNets.set(pinToNetId(part.id, p), { voltage: 5.0, label: `${board.shortName} 5V Power Rail` })
+        }
+      }
+      if (board.powerPins.vin) {
+        for (const p of board.powerPins.vin) {
+          fixedNets.set(pinToNetId(part.id, p), { voltage: 5.0, label: `${board.shortName} VIN (5.0V)` })
+        }
+      }
+      if (board.powerPins.v33) {
+        for (const p of board.powerPins.v33) {
+          fixedNets.set(pinToNetId(part.id, p), { voltage: 3.3, label: `${board.shortName} 3.3V Rail` })
+        }
+      }
+      for (const g of board.powerPins.gnd) {
+        fixedNets.set(pinToNetId(part.id, g), { voltage: 0.0, label: "Ground (0V)" })
+      }
 
-      const net3V3 = pinToNetId(part.id, "3v3")
-      fixedNets.set(net3V3, { voltage: 3.3, label: "Arduino 3.3V Rail" })
+      for (const pin of board.pins) {
+        if (pin.kind === "digital" || pin.kind === "analog") {
+          const pinId = pin.id
+          const altId = pinId.replace(/^d|^gpio/, "")
+          const netD = pinToNetId(part.id, pinId)
+          const pState = pinStates[altId] || pinStates[pinId]
 
-      const netGnd = pinToNetId(part.id, "gnd")
-      fixedNets.set(netGnd, { voltage: 0.0, label: "Ground (0V)" })
-      const netGndPwr = pinToNetId(part.id, "gnd_pwr")
-      fixedNets.set(netGndPwr, { voltage: 0.0, label: "Ground (0V)" })
-
-      for (let i = 0; i <= 13; i++) {
-        const pinId = `d${i}`
-        const netD = pinToNetId(part.id, pinId)
-        const pState = pinStates[String(i)] || pinStates[pinId]
-
-        if (pState?.state === "HIGH") {
-          fixedNets.set(netD, { voltage: 5.0, label: `Arduino Pin D${i} (HIGH = 5.0V)` })
-        } else if (pState?.value !== undefined && pState.value > 0) {
-          const vPwm = Number((5.0 * (pState.value / 255)).toFixed(2))
-          fixedNets.set(netD, { voltage: vPwm, label: `Arduino Pin D${i} (PWM ${pState.value}/255 = ${vPwm}V)` })
-        } else if (pState?.state === "LOW") {
-          fixedNets.set(netD, {
-            voltage: 0.0,
-            label: `Arduino Pin D${i} (OUTPUT LOW = 0.0V)`,
-            isDigitalLow: true,
-            digitalPinName: `D${i}`,
-          })
+          if (pState?.state === "HIGH") {
+            fixedNets.set(netD, { voltage: board.logicVoltage, label: `${board.shortName} Pin ${pin.label} (HIGH = ${board.logicVoltage}V)` })
+          } else if (pState?.value !== undefined && pState.value > 0) {
+            const vPwm = Number((board.logicVoltage * (pState.value / 255)).toFixed(2))
+            fixedNets.set(netD, { voltage: vPwm, label: `${board.shortName} Pin ${pin.label} (PWM ${pState.value}/255 = ${vPwm}V)` })
+          } else if (pState?.state === "LOW") {
+            fixedNets.set(netD, {
+              voltage: 0.0,
+              label: `${board.shortName} Pin ${pin.label} (OUTPUT LOW = 0.0V)`,
+              isDigitalLow: true,
+              digitalPinName: pin.label,
+            })
+          }
         }
       }
     } else if (part.type === "battery") {
