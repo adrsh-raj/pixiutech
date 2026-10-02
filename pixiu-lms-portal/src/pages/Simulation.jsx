@@ -25,7 +25,7 @@ function CyberLabLoading() {
 }
 
 export default function Simulation() {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) return <CyberLabLoading />;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
@@ -34,7 +34,7 @@ export default function Simulation() {
 
   return (
     <Suspense fallback={<CyberLabLoading />}>
-      <Workbench />
+      <Workbench userRole={user?.role} />
     </Suspense>
   );
 }

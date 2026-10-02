@@ -38,7 +38,7 @@ import { WelcomeOverlay } from "./welcome-overlay"
 import { CircuitDoctorHud } from "./circuit-doctor-hud"
 import { diagnoseCircuit } from "@/lib/circuit-doctor"
 import { buildInoSketch, triggerInoDownload } from "@/lib/sketch-exporter"
-import { awardCreationXp, awardTinkeringXp, syncXpWithServer } from "@/lib/xp-engine"
+import { awardCreationXp, awardTinkeringXp, syncXpWithServer, setUserRole } from "@/lib/xp-engine"
 
 function PixiuModuleLoading({ title, subtitle }: { title: string; subtitle: string }) {
   return (
@@ -69,7 +69,16 @@ const INITIAL_STATE: CircuitState = {
   wires: [],
 }
 
-export function Workbench() {
+interface WorkbenchProps {
+  userRole?: string
+}
+
+export function Workbench({ userRole }: WorkbenchProps = {}) {
+  useEffect(() => {
+    if (userRole) {
+      setUserRole(userRole)
+    }
+  }, [userRole])
   const [history, setHistory] = useState<HistoryState<CircuitState>>(() => createHistory(INITIAL_STATE))
   const state = history.present
 

@@ -8,6 +8,7 @@
  * - 4-Pillar XP Model (Curriculum Missions, Custom Creation, Daily Consistency, Multimodal/AI Bonus)
  * - Cryptographic FNV-1a checksum signatures to prevent localStorage manipulation
  * - Cloud-Backed Synchronization with Pixiu backend (Zero data loss if localStorage is cleared)
+ * - Role-Aware Isolation: Students earn XP; Admins & Trainers operate in Sandbox Mode (XP Disabled)
  * - Per-student scoped ledgers + guest offline persistence
  * - Idempotent event keys to prevent spamming/re-granting
  * - Daily XP caps (500 XP / day) against auto-clickers/bots
@@ -79,10 +80,13 @@ export interface XpSummary {
   badges: string[]
   cloudSynced: boolean
   lastSyncedAt?: number
+  isSandbox: boolean
+  userRole: string | null
 }
 
 const SECRET_SALT = "pixiu_cyberlab_anti_tamper_salt_2026"
 let activeStudentId: string | null = null
+let inMemoryRole: string | null = null
 let syncTimeout: number | null = null
 let lastSyncTimestamp: number = 0
 let isSyncInProgress = false
@@ -120,11 +124,37 @@ function getDeviceSalt(): string {
   }
 }
 
+export function setUserRole(role: string | null) {
+  inMemoryRole = role ? String(role).trim().toLowerCase() : null
+}
+
+export function getUserRole(): string | null {
+  if (inMemoryRole) return inMemoryRole
+  if (typeof window === "undefined") return null
+  try {
+    const role = window.sessionStorage.getItem("pixiu_session_role")
+    if (role) return role.trim().toLowerCase()
+  } catch {
+    // Session storage not accessible
+  }
+  return null
+}
+
+/**
+ * Returns true if the user is a student or unauthenticated guest.
+ * Returns false if the user is an Administrator, SuperAdmin, Trainer, or School.
+ */
+export function isStudentUser(): boolean {
+  const role = getUserRole()
+  // Unauthenticated guests in standalone simulator can tinker locally
+  if (!role) return true
+  return role === "student"
+}
+
 export function setActiveStudentId(studentId: string | null) {
   activeStudentId = studentId ? String(studentId).trim().toUpperCase() : null
   if (typeof window !== "undefined" && activeStudentId) {
     try {
-      // If student key doesn't exist yet, but general key does, migrate general key
       const studentKey = `${XP_STORAGE_KEY}_${activeStudentId}`
       const studentData = window.localStorage.getItem(studentKey)
       const genericData = window.localStorage.getItem(XP_STORAGE_KEY)
@@ -142,6 +172,11 @@ export function getActiveStudentId(): string | null {
 }
 
 export function getXpStorageKey(studentId?: string | null): string {
+  const role = getUserRole()
+  // Non-students (admin/trainer) have their own isolated sandbox storage key
+  if (role && role !== "student") {
+    return `${XP_STORAGE_KEY}_${role}_sandbox`
+  }
   const sid = studentId ? String(studentId).trim().toUpperCase() : activeStudentId
   return sid ? `${XP_STORAGE_KEY}_${sid}` : XP_STORAGE_KEY
 }
@@ -161,8 +196,8 @@ export function loadXpLedger(studentId?: string | null): XpLedger {
   try {
     const key = getXpStorageKey(studentId)
     let raw = window.localStorage.getItem(key)
-    if (!raw && key !== XP_STORAGE_KEY) {
-      // Check generic fallback
+    if (!raw && key !== XP_STORAGE_KEY && isStudentUser()) {
+      // Check generic fallback only for student accounts
       raw = window.localStorage.getItem(XP_STORAGE_KEY)
     }
     if (!raw) return defaultLedger
@@ -197,7 +232,7 @@ export function saveXpLedger(ledger: XpLedger, studentId?: string | null) {
     const key = getXpStorageKey(studentId)
     const jsonStr = JSON.stringify(ledger)
     window.localStorage.setItem(key, jsonStr)
-    if (key !== XP_STORAGE_KEY) {
+    if (key !== XP_STORAGE_KEY && isStudentUser()) {
       window.localStorage.setItem(XP_STORAGE_KEY, jsonStr)
     }
     window.dispatchEvent(new CustomEvent(XP_UPDATE_EVENT, { detail: getXpSummary(ledger) }))
@@ -217,6 +252,31 @@ export function getXpLevel(totalXp: number): XpLevelInfo {
 }
 
 export function getXpSummary(ledger?: XpLedger): XpSummary {
+  const role = getUserRole()
+  const isSandbox = !isStudentUser()
+
+  // If in admin/trainer sandbox mode, return a clean sandbox profile with 0 XP
+  if (isSandbox) {
+    return {
+      totalXp: 0,
+      level: 1,
+      levelInfo: XP_LEVELS[0],
+      currentLevelXp: 0,
+      nextLevelXp: 200,
+      progressPercent: 0,
+      todayXp: 0,
+      dailyCapRemaining: DAILY_XP_CAP,
+      streakDays: 0,
+      totalMissionsCompleted: 0,
+      totalCreationsSaved: 0,
+      events: [],
+      badges: [],
+      cloudSynced: false,
+      isSandbox: true,
+      userRole: role,
+    }
+  }
+
   const currentLedger = ledger || loadXpLedger()
   const today = getTodayKey()
 
@@ -281,11 +341,14 @@ export function getXpSummary(ledger?: XpLedger): XpSummary {
     badges,
     cloudSynced: lastSyncTimestamp > 0,
     lastSyncedAt: lastSyncTimestamp,
+    isSandbox: false,
+    userRole: role,
   }
 }
 
 /**
- * Grants XP for an event if not already rewarded and not exceeding daily cap
+ * Grants XP for an event if not already rewarded and not exceeding daily cap.
+ * Admins, Trainers, and Staff run in Sandbox Mode and do not earn student XP.
  */
 export function awardXp(
   id: string,
@@ -295,6 +358,12 @@ export function awardXp(
   metadata?: Record<string, unknown>,
 ): boolean {
   if (typeof window === "undefined") return false
+
+  // Strictly block XP awarding for Admin, Trainer, and School staff
+  if (!isStudentUser()) {
+    return false
+  }
+
   const ledger = loadXpLedger()
 
   // Idempotency: Check if this specific event ID was already awarded
@@ -348,6 +417,7 @@ export function awardXp(
  * Award XP for completing an interactive curriculum mission
  */
 export function awardMissionXp(lessonId: string, difficulty: "Beginner" | "Intermediate" | "Advanced", title: string): boolean {
+  if (!isStudentUser()) return false
   const points = difficulty === "Beginner" ? 50 : difficulty === "Intermediate" ? 100 : 200
   return awardXp(`mission:${lessonId}`, "mission", `Completed ${title}`, points, { lessonId, difficulty })
 }
@@ -356,6 +426,8 @@ export function awardMissionXp(lessonId: string, difficulty: "Beginner" | "Inter
  * Award XP for saving a verified custom circuit
  */
 export function awardCreationXp(circuit: CircuitState, blocklyXml: string, projectName: string): boolean {
+  if (!isStudentUser()) return false
+
   const unoCount = circuit.parts.filter((p) => p.type === "arduino-uno").length
   const totalParts = circuit.parts.length
   const totalWires = circuit.wires.length
@@ -400,6 +472,7 @@ export function awardCreationXp(circuit: CircuitState, blocklyXml: string, proje
  * Award XP for active simulation interactive experimentation
  */
 export function awardTinkeringXp(): boolean {
+  if (!isStudentUser()) return false
   const today = getTodayKey()
   const intervalIndex = Math.floor(Date.now() / (1000 * 60 * 5)) // 5 minute slot
   return awardXp(`tinker:${today}:${intervalIndex}`, "tinkering", "Active Circuit Simulation & Testing", 10)
@@ -409,7 +482,7 @@ export function awardTinkeringXp(): boolean {
  * Schedule a debounced cloud sync (1200ms)
  */
 export function scheduleXpSync() {
-  if (typeof window === "undefined") return
+  if (typeof window === "undefined" || !isStudentUser()) return
   if (syncTimeout) {
     window.clearTimeout(syncTimeout)
   }
@@ -424,6 +497,7 @@ export function scheduleXpSync() {
  * 
  * If localStorage was cleared, this fetches the authoritative ledger from backend and re-hydrates local storage.
  * If local ledger has newer events, it pushes them to the server to ensure zero progress loss.
+ * Admins and Trainers do not push to student XP endpoints.
  */
 export async function syncXpWithServer(
   studentId?: string | null,
@@ -434,6 +508,11 @@ export async function syncXpWithServer(
 ): Promise<XpSummary | null> {
   if (typeof window === "undefined" || isSyncInProgress) return null
 
+  // Admin & staff do not sync with student XP endpoints
+  if (!isStudentUser()) {
+    return getXpSummary()
+  }
+
   if (studentId) {
     setActiveStudentId(studentId)
   }
@@ -441,7 +520,6 @@ export async function syncXpWithServer(
   isSyncInProgress = true
   try {
     let localLedger = loadXpLedger()
-    const shouldFetch = options?.forceFetch || localLedger.events.length === 0
 
     // Step 1: Query server for cloud backup
     let remoteLedger: Partial<XpLedger> | null = null
