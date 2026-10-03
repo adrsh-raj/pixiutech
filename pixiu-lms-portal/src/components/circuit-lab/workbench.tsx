@@ -15,7 +15,7 @@ import { audioEngine } from "@/lib/audio-engine"
 import { createHistory, pushState, undo as historyUndo, redo as historyRedo, canUndo, canRedo, type HistoryState } from "@/lib/history"
 import { saveCircuit, loadCurrentCircuit, saveCurrentCircuit, clearCurrentCircuit, importFromJSON, exportAsJSON, type SavedCircuit } from "@/lib/storage"
 import * as Blockly from "blockly"
-import { Boxes, Camera, Sparkles, Terminal, Trash2, Gauge, Sliders, ShieldAlert } from "lucide-react"
+import { Boxes, Camera, Sparkles, Terminal, Trash2, Gauge, Sliders, ShieldAlert, RotateCw, Copy, X, Smartphone } from "lucide-react"
 import { computeWireCurrents } from "@/lib/current-flow"
 import { isBoardPart, getActiveBoard, scaleAdcReading, lookupBoardPinState } from "@/lib/board-registry"
 import { solveCircuitNodalPotentials } from "@/lib/circuit-solver"
@@ -1868,7 +1868,114 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
               <span className="text-[10px]">Serial</span>
             </button>
 
+            {/* ESP32 Virtual IoT Smart Device Button */}
+            {(state.parts.some((p) => p.type === "esp32-nodemcu") || wifiState.status === "connected") && (
+              <button
+                onClick={() => setIsIotPortalOpen((prev) => !prev)}
+                className={`flex flex-col items-center gap-0.5 p-1 transition active:scale-95 ${
+                  isIotPortalOpen ? "text-cyan-400 font-bold" : "text-muted-foreground hover:text-foreground"
+                }`}
+                title="ESP32 Virtual IoT Device"
+              >
+                <Smartphone size={18} className={isIotPortalOpen ? "text-cyan-400" : ""} />
+                <span className="text-[10px]">IoT Phone</span>
+              </button>
+            )}
           </div>
+
+          {/* Universal Quick Selection Action HUD (Touch-friendly & Desktop-friendly) */}
+          {(selected || selectedWire) && (
+            <div className="fixed bottom-16 md:bottom-6 left-1/2 -translate-x-1/2 z-35 flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 rounded-2xl border border-slate-700/90 bg-slate-900/95 shadow-2xl backdrop-blur-md text-white select-none animate-in slide-in-from-bottom-2 duration-150">
+              {selected && (
+                <>
+                  <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-slate-800 text-[11px] font-mono border border-slate-700/60 mr-1 max-w-[120px] sm:max-w-[180px] truncate">
+                    <span className="font-bold text-cyan-300 truncate">{CATALOG[selected.type]?.name || selected.type}</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      deletePart(selected.id)
+                      setSelectedId(null)
+                    }}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-red-600/90 hover:bg-red-500 text-white font-bold text-xs shadow-md active:scale-95 transition cursor-pointer"
+                    title="Delete this component"
+                  >
+                    <Trash2 size={14} />
+                    <span>Delete</span>
+                  </button>
+                  <button
+                    onClick={() => rotatePart(selected.id)}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-semibold text-xs border border-slate-700 active:scale-95 transition cursor-pointer"
+                    title="Rotate 90° (R)"
+                  >
+                    <RotateCw size={14} />
+                    <span className="hidden sm:inline">Rotate</span>
+                  </button>
+                  <button
+                    onClick={() => duplicatePart(selected.id)}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-semibold text-xs border border-slate-700 active:scale-95 transition cursor-pointer"
+                    title="Duplicate (D)"
+                  >
+                    <Copy size={14} />
+                    <span className="hidden sm:inline">Duplicate</span>
+                  </button>
+                  <button
+                    onClick={() => setIsInspectorOpen((prev) => !prev)}
+                    className="flex items-center gap-1 px-2 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 text-xs border border-slate-700 active:scale-95 transition cursor-pointer"
+                    title="Toggle Inspector"
+                  >
+                    <Sliders size={14} />
+                  </button>
+                  <button
+                    onClick={() => setSelectedId(null)}
+                    className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition cursor-pointer ml-1"
+                    title="Deselect"
+                  >
+                    <X size={14} />
+                  </button>
+                </>
+              )}
+
+              {selectedWire && (
+                <>
+                  <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-slate-800 text-[11px] font-mono border border-slate-700/60 mr-1">
+                    <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: selectedWire.color }} />
+                    <span className="font-bold text-cyan-300">Wire</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      deleteWire(selectedWire.id)
+                      setSelectedWireId(null)
+                    }}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-red-600/90 hover:bg-red-500 text-white font-bold text-xs shadow-md active:scale-95 transition cursor-pointer"
+                    title="Delete this wire"
+                  >
+                    <Trash2 size={14} />
+                    <span>Delete Wire</span>
+                  </button>
+                  <div className="flex items-center gap-1 px-1">
+                    {["#ef4444", "#22c55e", "#3b82f6", "#eab308", "#1e293b", "#f97316"].map((col) => (
+                      <button
+                        key={col}
+                        onClick={() => handleSelectWireColor(col)}
+                        style={{ backgroundColor: col }}
+                        className={`w-5 h-5 rounded-full border transition-all cursor-pointer ${
+                          selectedWire.color === col ? "border-white scale-110 shadow-md ring-2 ring-cyan-400" : "border-slate-600 hover:scale-105"
+                        }`}
+                        title={`Color ${col}`}
+                      />
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => setSelectedWireId(null)}
+                    className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition cursor-pointer ml-1"
+                    title="Deselect"
+                  >
+                    <X size={14} />
+                  </button>
+                </>
+              )}
+            </div>
+          )}
         </main>
         {isInspectorOpen && (
           <Inspector

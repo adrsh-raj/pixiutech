@@ -92,14 +92,16 @@ export function ContextMenu({
   const menuRef = useRef<HTMLDivElement>(null)
 
   // Keep menu inside viewport boundaries
-  const menuWidth = 240
+  const screenW = typeof window !== "undefined" ? window.innerWidth : 1200
+  const screenH = typeof window !== "undefined" ? window.innerHeight : 800
+  const menuWidth = Math.min(240, screenW - 20)
   const menuHeight = target.type === "part" ? 340 : target.type === "wire" ? 280 : 360
-  const posX = Math.min(x, (typeof window !== "undefined" ? window.innerWidth : 1200) - menuWidth - 10)
-  const posY = Math.min(y, (typeof window !== "undefined" ? window.innerHeight : 800) - menuHeight - 10)
+  const posX = Math.max(10, Math.min(x, screenW - menuWidth - 10))
+  const posY = Math.max(10, Math.min(y, screenH - menuHeight - 10))
 
   // Close when clicking outside or pressing Escape
   useEffect(() => {
-    const handleOutside = (e: MouseEvent) => {
+    const handleOutside = (e: MouseEvent | TouchEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         onClose()
       }
@@ -109,15 +111,17 @@ export function ContextMenu({
     }
 
     const timer = setTimeout(() => {
-      window.addEventListener("click", handleOutside)
-      window.addEventListener("contextmenu", handleOutside)
+      window.addEventListener("click", handleOutside as EventListener)
+      window.addEventListener("touchstart", handleOutside as EventListener)
+      window.addEventListener("contextmenu", handleOutside as EventListener)
       window.addEventListener("keydown", handleKey)
     }, 50)
 
     return () => {
       clearTimeout(timer)
-      window.removeEventListener("click", handleOutside)
-      window.removeEventListener("contextmenu", handleOutside)
+      window.removeEventListener("click", handleOutside as EventListener)
+      window.removeEventListener("touchstart", handleOutside as EventListener)
+      window.removeEventListener("contextmenu", handleOutside as EventListener)
       window.removeEventListener("keydown", handleKey)
     }
   }, [onClose])
@@ -130,8 +134,8 @@ export function ContextMenu({
   return (
     <div
       ref={menuRef}
-      style={{ left: Math.max(10, posX), top: Math.max(10, posY) }}
-      className="fixed z-50 w-[240px] rounded-2xl border border-slate-700/80 bg-slate-950/95 p-1.5 text-xs text-slate-200 shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-100 select-none"
+      style={{ left: posX, top: posY, width: menuWidth }}
+      className="fixed z-50 max-h-[85vh] overflow-y-auto rounded-2xl border border-slate-700/80 bg-slate-950/95 p-1.5 text-xs text-slate-200 shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-100 select-none"
     >
       {/* Branded Header */}
       <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-slate-800/80 mb-1">

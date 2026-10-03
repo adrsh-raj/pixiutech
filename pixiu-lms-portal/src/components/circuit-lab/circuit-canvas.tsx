@@ -200,12 +200,63 @@ export function CircuitCanvas(props: Props) {
     return () => window.removeEventListener("circuit-fit-screen", handleFit)
   }, [fitToScreen])
 
+  // Multi-Touch Pinch-to-Zoom & Long-Press Detection for Mobile & Tablet
+  const activePointersRef = useRef<Map<number, { x: number; y: number }>>(new Map())
+  const prevPinchDistanceRef = useRef<number | null>(null)
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const longPressPosRef = useRef<{ x: number; y: number } | null>(null)
+
+  const clearLongPress = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current)
+      longPressTimerRef.current = null
+    }
+    longPressPosRef.current = null
+  }
+
+  const startLongPress = (clientX: number, clientY: number, target: ContextMenuTarget) => {
+    clearLongPress()
+    longPressPosRef.current = { x: clientX, y: clientY }
+    longPressTimerRef.current = setTimeout(() => {
+      if (typeof navigator !== "undefined" && navigator.vibrate) {
+        try {
+          navigator.vibrate(40)
+        } catch {
+          /* noop */
+        }
+      }
+      const syntheticEvent = {
+        clientX,
+        clientY,
+        preventDefault: () => {},
+        stopPropagation: () => {},
+      } as unknown as React.MouseEvent
+      onCanvasContextMenu?.(syntheticEvent, target)
+      clearLongPress()
+    }, 450)
+  }
+
   const onSvgPointerDown = (e: React.PointerEvent) => {
     // background: pan + deselect
     if (wiring) {
       onCancelWire()
       return
     }
+
+    activePointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+
+    // Two-finger touch detection: cancel long press and prepare pinch zoom
+    if (activePointersRef.current.size === 2) {
+      const pts = Array.from(activePointersRef.current.values())
+      prevPinchDistanceRef.current = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y)
+      clearLongPress()
+      return
+    }
+
+    if (e.pointerType === "touch") {
+      startLongPress(e.clientX, e.clientY, { type: "canvas" })
+    }
+
     panRef.current = { sx: e.clientX, sy: e.clientY, tx: view.tx, ty: view.ty }
     svgRef.current?.setPointerCapture(e.pointerId)
     onSelect(null)
@@ -213,6 +264,38 @@ export function CircuitCanvas(props: Props) {
   }
 
   const onSvgPointerMove = (e: React.PointerEvent) => {
+    if (activePointersRef.current.has(e.pointerId)) {
+      activePointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    }
+
+    // Cancel long press if moved more than 8 pixels
+    if (longPressPosRef.current) {
+      const dist = Math.hypot(e.clientX - longPressPosRef.current.x, e.clientY - longPressPosRef.current.y)
+      if (dist > 8) clearLongPress()
+    }
+
+    // Multi-touch Pinch to Zoom on Tablet / Mobile
+    if (activePointersRef.current.size === 2) {
+      const pts = Array.from(activePointersRef.current.values())
+      const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y)
+      if (prevPinchDistanceRef.current && prevPinchDistanceRef.current > 0) {
+        const factor = dist / prevPinchDistanceRef.current
+        const midX = (pts[0].x + pts[1].x) / 2
+        const midY = (pts[0].y + pts[1].y) / 2
+        setView((v) => {
+          const nextScale = Math.max(0.2, Math.min(3, v.scale * factor))
+          const ds = nextScale - v.scale
+          return {
+            scale: nextScale,
+            tx: v.tx - (midX - v.tx) * (ds / v.scale),
+            ty: v.ty - (midY - v.ty) * (ds / v.scale),
+          }
+        })
+      }
+      prevPinchDistanceRef.current = dist
+      return
+    }
+
     const w = toWorld(e.clientX, e.clientY)
     if (wiring) setCursor(w)
 
@@ -229,6 +312,11 @@ export function CircuitCanvas(props: Props) {
   }
 
   const endInteraction = (e: React.PointerEvent) => {
+    activePointersRef.current.delete(e.pointerId)
+    if (activePointersRef.current.size < 2) {
+      prevPinchDistanceRef.current = null
+    }
+    clearLongPress()
     dragRef.current = null
     panRef.current = null
     try {
@@ -241,6 +329,11 @@ export function CircuitCanvas(props: Props) {
   const startPartDrag = (e: React.PointerEvent, part: PlacedPart) => {
     if (tool !== "select" || running) return
     e.stopPropagation()
+
+    if (e.pointerType === "touch") {
+      startLongPress(e.clientX, e.clientY, { type: "part", id: part.id })
+    }
+
     const w = toWorld(e.clientX, e.clientY)
     dragRef.current = { id: part.id, offX: w.x - part.x, offY: w.y - part.y }
     svgRef.current?.setPointerCapture(e.pointerId)
@@ -961,13 +1054,16 @@ export function CircuitCanvas(props: Props) {
                   d={wirePath(a, b)}
                   fill="none"
                   stroke="transparent"
-                  strokeWidth={14}
+                  strokeWidth={20}
                   className="cursor-pointer"
                   onPointerDown={(e) => {
                     e.stopPropagation()
                     if (!running) {
                       onSelect(null)
                       onSelectWire?.(wire.id)
+                      if (e.pointerType === "touch") {
+                        startLongPress(e.clientX, e.clientY, { type: "wire", id: wire.id })
+                      }
                     }
                   }}
                   onContextMenu={(e) => {
