@@ -408,9 +408,9 @@ export const PICO_LESSONS: Lesson[] = [
     seedBlocklyXml: `<xml xmlns="https://developers.google.com/blockly/xml">
   <block type="arduino_program" x="40" y="40">
     <statement name="LOOP">
-      <block type="io_tone"><field name="PIN">15</field><value name="FREQ"><shadow type="math_number"><field name="NUM">523</field></shadow></value><next>
+      <block type="tone_play"><field name="PIN">15</field><value name="FREQ"><shadow type="math_number"><field name="NUM">523</field></shadow></value><next>
       <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">300</field></shadow></value><next>
-      <block type="io_notone"><field name="PIN">15</field><next>
+      <block type="tone_stop"><field name="PIN">15</field><next>
       <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">200</field></shadow></value></block>
       </next></block></next></block></next></block>
     </statement>
@@ -438,9 +438,9 @@ export const PICO_LESSONS: Lesson[] = [
       {
         id: "code",
         title: "Generate Tone",
-        instructions: "Use io_tone block on pin 15 with 523 Hz (Note C5).",
+        instructions: "Use tone_play block on pin 15 with 523 Hz (Note C5).",
         kind: "code",
-        checks: [{ kind: "blocks", requirements: [{ type: "io_tone", count: 1, fields: { PIN: "15" } }] }],
+        checks: [{ kind: "blocks", requirements: [{ type: "tone_play", count: 1, fields: { PIN: "15" } }] }],
         success: "Tone block programmed.",
       },
       {
@@ -747,7 +747,7 @@ export const PICO_LESSONS: Lesson[] = [
         instructions: "Connect Soil AO to GP27 (ADC1) and Relay IN to GP13.",
         kind: "build",
         checks: [{ kind: "connections", requirements: [
-          { from: { partType: "pico", pinId: "gp27" }, to: { partType: "soil-moisture", pinId: "ao" } },
+          { from: { partType: "rpi-pico", pinId: "gp27" }, to: { partType: "soil-moisture", pinId: "ao" } },
         ] }],
         success: "Sensor and relay wired.",
       },

@@ -204,38 +204,69 @@ function countParts(state: CircuitState, type: PartType) {
   return state.parts.filter((part) => part.type === type).length
 }
 
-function pinMatches(partType: PartType, expectedPinId: string, actualPinId: string) {
+function pinMatches(partType: PartType, expectedPinId: string, actualPinId: string): boolean {
   if (expectedPinId === actualPinId) return true
-  const expLower = expectedPinId.toLowerCase()
-  const actLower = actualPinId.toLowerCase()
+  const expLower = expectedPinId.toLowerCase().trim()
+  const actLower = actualPinId.toLowerCase().trim()
   if (expLower === actLower) return true
 
-  // Ground matching across boards
-  if (partType === "arduino-uno" && (expLower === "gnd" || expLower === "gnd_pwr")) {
-    return actLower === "gnd" || actLower === "gnd_pwr"
-  }
-  if (partType === "esp32-devkit" && (expLower === "gnd" || expLower === "gnd_l" || expLower === "gnd_r" || expLower.startsWith("gnd_"))) {
-    return actLower === "gnd" || actLower === "gnd_l" || actLower === "gnd_r" || actLower.startsWith("gnd_")
-  }
-  if (partType === "rpi-pico" && (expLower === "gnd" || expLower === "gnd_1" || expLower.startsWith("gnd_"))) {
-    return actLower === "gnd" || actLower === "gnd_1" || actLower.startsWith("gnd_")
-  }
-  if (partType === "microbit-v2" && (expLower === "gnd" || expLower === "gnd_edge")) {
-    return actLower === "gnd" || actLower === "gnd_edge"
+  // Resistor pins are symmetric/passive
+  if (partType === "resistor") {
+    const isResPin = (p: string) => ["a", "b", "t1", "t2", "terminal1", "terminal2"].includes(p)
+    if (isResPin(expLower) && isResPin(actLower)) return true
   }
 
-  // 3.3V and Power pins across boards
-  if (partType === "esp32-devkit" && (expLower === "3v3" || expLower === "3.3v")) {
-    return actLower === "3v3" || actLower === "3.3v"
-  }
-  if (partType === "rpi-pico" && (expLower === "3v3" || expLower === "3.3v")) {
-    return actLower === "3v3" || actLower === "3.3v"
-  }
-  if (partType === "microbit-v2" && (expLower === "3v" || expLower === "3v3")) {
-    return actLower === "3v" || actLower === "3v3"
+  // LED polarity aliases
+  if (partType === "led" || partType === "rgb-led") {
+    const isAnode = (p: string) => ["anode", "a", "pos", "+"].includes(p)
+    const isCathode = (p: string) => ["cathode", "k", "c", "neg", "-"].includes(p)
+    if (isAnode(expLower) && isAnode(actLower)) return true
+    if (isCathode(expLower) && isCathode(actLower)) return true
   }
 
-  // Digital / Analog Pin alias normalization
+  // Buzzer polarity aliases
+  if (partType === "buzzer") {
+    const isPos = (p: string) => ["pos", "positive", "+", "p"].includes(p)
+    const isNeg = (p: string) => ["neg", "negative", "-", "n", "gnd"].includes(p)
+    if (isPos(expLower) && isPos(actLower)) return true
+    if (isNeg(expLower) && isNeg(actLower)) return true
+  }
+
+  // NeoPixel Ring pin aliases
+  if (partType === "neopixel-ring") {
+    const isDi = (p: string) => ["di", "din", "data", "in", "data-in"].includes(p)
+    const isDo = (p: string) => ["do", "dout", "out", "data-out"].includes(p)
+    if (isDi(expLower) && isDi(actLower)) return true
+    if (isDo(expLower) && isDo(actLower)) return true
+  }
+
+  // Servo pin aliases
+  if (partType === "servo") {
+    const isSig = (p: string) => ["sig", "signal", "control", "pwm"].includes(p)
+    if (isSig(expLower) && isSig(actLower)) return true
+  }
+
+  // Potentiometer pin aliases
+  if (partType === "potentiometer") {
+    const isWiper = (p: string) => ["wiper", "w", "sig", "out"].includes(p)
+    if (isWiper(expLower) && isWiper(actLower)) return true
+  }
+
+  // Soil moisture sensor pin aliases
+  if (partType === "soil-moisture") {
+    const isAo = (p: string) => ["ao", "a0", "analog", "sig"].includes(p)
+    if (isAo(expLower) && isAo(actLower)) return true
+  }
+
+  // Common power rail aliases across boards & components
+  const isPower = (p: string) => ["vcc", "5v", "3v3", "3.3v", "3v", "vin", "power"].includes(p)
+  if (isPower(expLower) && isPower(actLower)) return true
+
+  // Common ground rail aliases across boards & components
+  const isGround = (p: string) => ["gnd", "gnd_l", "gnd_r", "gnd_1", "ground", "neg", "0v", "gnd_edge", "gnd_pwr"].includes(p) || p.startsWith("gnd_")
+  if (isGround(expLower) && isGround(actLower)) return true
+
+  // Digital / Analog Pin alias normalization (e.g. "d4" vs "4", "gp15" vs "15", "p0" vs "0")
   const expStripped = expLower.replace(/^(gpio|gp|d|p)/i, "")
   const actStripped = actLower.replace(/^(gpio|gp|d|p)/i, "")
   if (expStripped && actStripped && expStripped === actStripped) return true
@@ -470,7 +501,28 @@ export function evaluateLessonStep(lesson: Lesson, step: LessonStep, context: Le
     }
 
     if (check.kind === "connections") {
-      for (const req of check.requirements) {
+      const rawReqs = (check as any).requirements || (check as any).connections || []
+      for (const rawReq of rawReqs) {
+        const resolveEndpoint = (ep: any): LessonEndpoint => {
+          if (typeof ep === "string") {
+            const [partIdentifier, pinId] = ep.split(":")
+            const matchedPart = context.state.parts.find(
+              (p) => p.id === partIdentifier || p.type === partIdentifier,
+            )
+            return {
+              partType: (matchedPart ? matchedPart.type : partIdentifier) as PartType,
+              pinId: pinId || "gnd",
+              partId: matchedPart ? matchedPart.id : undefined,
+            }
+          }
+          return ep as LessonEndpoint
+        }
+
+        const req: LessonConnectionRequirement = {
+          from: resolveEndpoint(rawReq.from),
+          to: resolveEndpoint(rawReq.to),
+        }
+
         const passed = hasConnection(context.state, req)
         results.push({
           passed,
@@ -500,9 +552,16 @@ export function evaluateLessonStep(lesson: Lesson, step: LessonStep, context: Le
 
     if (check.kind === "blocks") {
       const blocks = extractBlocks(context.blocklyXml)
+      const normalizeBlockType = (type: string) => {
+        if (type === "io_tone") return "tone_play"
+        if (type === "io_notone") return "tone_stop"
+        if (type === "actuator_servo_write") return "servo_write"
+        return type
+      }
+
       for (const req of check.requirements) {
         const matchingBlocks = blocks.filter((block) => {
-          if (block.type !== req.type) return false
+          if (normalizeBlockType(block.type) !== normalizeBlockType(req.type)) return false
           if (req.connected !== false && !block.attachedToProgram) return false
           if (req.fields && !Object.entries(req.fields).every(([name, value]) => normalizeBlocklyValue(name, block.fields[name] ?? "") === normalizeBlocklyValue(name, value))) {
             return false

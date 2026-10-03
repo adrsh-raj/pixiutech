@@ -185,6 +185,11 @@ export function defineArduinoBlocks() {
     },
   ])
 
+  // Backward compatibility block aliases
+  Blockly.Blocks['io_tone'] = Blockly.Blocks['tone_play']
+  Blockly.Blocks['io_notone'] = Blockly.Blocks['tone_stop']
+  Blockly.Blocks['actuator_servo_write'] = Blockly.Blocks['servo_write']
+
   Blockly.Blocks['serial_begin'] = {
     init() {
       this.appendDummyInput().appendField('Serial.begin').appendField(new Blockly.FieldDropdown([['9600','9600'],['115200','115200']]), 'BAUD')
@@ -891,6 +896,10 @@ arduino.forBlock["tone_play"] = (block, generator) => {
 arduino.forBlock["tone_stop"] = (block) => {
   return `noTone(${block.getFieldValue("PIN")});\n`
 }
+
+arduino.forBlock["io_tone"] = arduino.forBlock["tone_play"]
+arduino.forBlock["io_notone"] = arduino.forBlock["tone_stop"]
+arduino.forBlock["actuator_servo_write"] = arduino.forBlock["servo_write"]
 
 /* ---- generators for the built-in blocks used in the toolbox ---- */
 

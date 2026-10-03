@@ -58,11 +58,11 @@ export interface XpLevelInfo {
 
 export const XP_LEVELS: XpLevelInfo[] = [
   { level: 1, title: "Circuit Novice", icon: "🔌", badge: "Novice", minXp: 0, maxXp: 200, color: "text-emerald-400", bgGlow: "from-emerald-500/20 to-transparent" },
-  { level: 2, title: "Logic Wireman", icon: "⚙️", badge: "Wireman", minXp: 201, maxXp: 600, color: "text-cyan-400", bgGlow: "from-cyan-500/20 to-transparent" },
-  { level: 3, title: "Sensor Explorer", icon: "📡", badge: "Explorer", minXp: 601, maxXp: 1200, color: "text-amber-400", bgGlow: "from-amber-500/20 to-transparent" },
-  { level: 4, title: "Robotics Builder", icon: "🤖", badge: "Builder", minXp: 1201, maxXp: 2200, color: "text-blue-400", bgGlow: "from-blue-500/20 to-transparent" },
-  { level: 5, title: "AI Hardware Architect", icon: "🧠", badge: "Architect", minXp: 2201, maxXp: 3500, color: "text-purple-400", bgGlow: "from-purple-500/20 to-transparent" },
-  { level: 6, title: "Grandmaster Innovator", icon: "🏆", badge: "Grandmaster", minXp: 3501, maxXp: 100000, color: "text-yellow-400", bgGlow: "from-yellow-500/20 to-transparent" },
+  { level: 2, title: "Logic Wireman", icon: "⚙️", badge: "Wireman", minXp: 200, maxXp: 600, color: "text-cyan-400", bgGlow: "from-cyan-500/20 to-transparent" },
+  { level: 3, title: "Sensor Explorer", icon: "📡", badge: "Explorer", minXp: 600, maxXp: 1200, color: "text-amber-400", bgGlow: "from-amber-500/20 to-transparent" },
+  { level: 4, title: "Robotics Builder", icon: "🤖", badge: "Builder", minXp: 1200, maxXp: 2200, color: "text-blue-400", bgGlow: "from-blue-500/20 to-transparent" },
+  { level: 5, title: "AI Hardware Architect", icon: "🧠", badge: "Architect", minXp: 2200, maxXp: 3500, color: "text-purple-400", bgGlow: "from-purple-500/20 to-transparent" },
+  { level: 6, title: "Grandmaster Innovator", icon: "🏆", badge: "Grandmaster", minXp: 3500, maxXp: 100000, color: "text-yellow-400", bgGlow: "from-yellow-500/20 to-transparent" },
 ]
 
 export interface XpSummary {
@@ -83,6 +83,7 @@ export interface XpSummary {
   lastSyncedAt?: number
   isSandbox: boolean
   userRole: string | null
+  isMaxLevel: boolean
 }
 
 const SECRET_SALT = "pixiu_cyberlab_anti_tamper_salt_2026"
@@ -91,6 +92,7 @@ let inMemoryRole: string | null = null
 let syncTimeout: number | null = null
 let lastSyncTimestamp: number = 0
 let isSyncInProgress = false
+let hasPendingSyncRequest = false
 
 function fnv1a(str: string): string {
   let hash = 0x811c9dc5
@@ -106,9 +108,11 @@ function generateSignature(event: Omit<XpEvent, "signature">, salt: string): str
   return fnv1a(payload)
 }
 
+/**
+ * Returns UTC calendar date YYYY-MM-DD for consistent cross-timezone daily aggregation.
+ */
 function getTodayKey(): string {
-  const now = new Date()
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`
+  return new Date().toISOString().split("T")[0]
 }
 
 function getDeviceSalt(): string {
@@ -159,6 +163,7 @@ export function setActiveStudentId(studentId: string | null) {
       const studentKey = `${XP_STORAGE_KEY}_${activeStudentId}`
       const studentData = window.localStorage.getItem(studentKey)
       const genericData = window.localStorage.getItem(XP_STORAGE_KEY)
+      // Only migrate generic offline progress if the student key is completely fresh
       if (!studentData && genericData) {
         window.localStorage.setItem(studentKey, genericData)
       }
@@ -169,7 +174,14 @@ export function setActiveStudentId(studentId: string | null) {
 }
 
 export function getActiveStudentId(): string | null {
-  return activeStudentId
+  if (activeStudentId) return activeStudentId
+  if (typeof window !== "undefined") {
+    try {
+      const stored = window.sessionStorage.getItem("pixiu_session_student_id")
+      if (stored) return stored.trim().toUpperCase()
+    } catch {}
+  }
+  return null
 }
 
 export function getXpStorageKey(studentId?: string | null): string {
@@ -188,7 +200,7 @@ export function loadXpLedger(studentId?: string | null): XpLedger {
     version: 2,
     events: [],
     lastActiveDate: getTodayKey(),
-    streakDays: 1,
+    streakDays: 0,
     salt,
   }
 
@@ -197,8 +209,8 @@ export function loadXpLedger(studentId?: string | null): XpLedger {
   try {
     const key = getXpStorageKey(studentId)
     let raw = window.localStorage.getItem(key)
-    if (!raw && key !== XP_STORAGE_KEY && isStudentUser()) {
-      // Check generic fallback only for student accounts
+    // Only fall back to generic key if NOT authenticated as a specific student
+    if (!raw && key === XP_STORAGE_KEY && isStudentUser()) {
       raw = window.localStorage.getItem(XP_STORAGE_KEY)
     }
     if (!raw) return defaultLedger
@@ -219,7 +231,7 @@ export function loadXpLedger(studentId?: string | null): XpLedger {
       version: 2,
       events: validEvents,
       lastActiveDate: typeof parsed.lastActiveDate === "string" ? parsed.lastActiveDate : getTodayKey(),
-      streakDays: typeof parsed.streakDays === "number" ? parsed.streakDays : 1,
+      streakDays: typeof parsed.streakDays === "number" ? parsed.streakDays : 0,
       salt: parsed.salt || salt,
     }
   } catch {
@@ -227,17 +239,27 @@ export function loadXpLedger(studentId?: string | null): XpLedger {
   }
 }
 
-export function saveXpLedger(ledger: XpLedger, studentId?: string | null) {
+export function saveXpLedger(
+  ledger: XpLedger,
+  studentId?: string | null,
+  options?: { skipSync?: boolean },
+) {
   if (typeof window === "undefined") return
   try {
     const key = getXpStorageKey(studentId)
     const jsonStr = JSON.stringify(ledger)
     window.localStorage.setItem(key, jsonStr)
-    if (key !== XP_STORAGE_KEY && isStudentUser()) {
+
+    // Mirror to generic fallback ONLY for offline/unauthenticated guests
+    if (key === XP_STORAGE_KEY && !studentId && !activeStudentId && isStudentUser()) {
       window.localStorage.setItem(XP_STORAGE_KEY, jsonStr)
     }
+
     window.dispatchEvent(new CustomEvent(XP_UPDATE_EVENT, { detail: getXpSummary(ledger) }))
-    scheduleXpSync()
+
+    if (!options?.skipSync) {
+      scheduleXpSync()
+    }
   } catch {
     // Best effort local persistence
   }
@@ -275,6 +297,7 @@ export function getXpSummary(ledger?: XpLedger): XpSummary {
       cloudSynced: false,
       isSandbox: true,
       userRole: role,
+      isMaxLevel: false,
     }
   }
 
@@ -307,13 +330,20 @@ export function getXpSummary(ledger?: XpLedger): XpSummary {
   }
 
   const levelInfo = getXpLevel(totalXp)
+  const isMaxLevel = levelInfo.level === XP_LEVELS[XP_LEVELS.length - 1].level
   const nextLevel = XP_LEVELS.find((l) => l.level === levelInfo.level + 1)
   const currentLevelMin = levelInfo.minXp
-  const nextLevelMin = nextLevel ? nextLevel.minXp : levelInfo.maxXp
+  const nextLevelMin = nextLevel ? nextLevel.minXp : totalXp
 
-  const levelXpSpan = Math.max(1, nextLevelMin - currentLevelMin)
+  const levelXpSpan = Math.max(1, (nextLevel ? nextLevel.minXp : levelInfo.maxXp) - currentLevelMin)
   const progressInLevel = Math.max(0, totalXp - currentLevelMin)
-  const progressPercent = nextLevel ? Math.min(100, Math.round((progressInLevel / levelXpSpan) * 100)) : 100
+  const progressPercent = isMaxLevel ? 100 : Math.min(100, Math.round((progressInLevel / levelXpSpan) * 100))
+
+  // Inactive streak detection: if no activity in last 1 day, active streak is 0
+  const curTime = new Date(`${today}T00:00:00Z`).getTime()
+  const lastTime = currentLedger.lastActiveDate ? new Date(`${currentLedger.lastActiveDate}T00:00:00Z`).getTime() : 0
+  const daysSinceActive = Math.round((curTime - lastTime) / (1000 * 60 * 60 * 24))
+  const effectiveStreak = daysSinceActive <= 1 ? (currentLedger.streakDays || 0) : 0
 
   // Badges collection
   const badges: string[] = []
@@ -323,8 +353,8 @@ export function getXpSummary(ledger?: XpLedger): XpSummary {
   if (totalMissions >= 18) badges.push("🚗 AI Pioneer")
   if (totalCreations >= 1) badges.push("🎨 Creator")
   if (totalCreations >= 5) badges.push("🚀 Master Architect")
-  if (currentLedger.streakDays >= 3) badges.push("🔥 3-Day Streak")
-  if (currentLedger.streakDays >= 7) badges.push("⚡ 7-Day Champion")
+  if (effectiveStreak >= 3) badges.push("🔥 3-Day Streak")
+  if (effectiveStreak >= 7) badges.push("⚡ 7-Day Champion")
 
   return {
     totalXp,
@@ -335,7 +365,7 @@ export function getXpSummary(ledger?: XpLedger): XpSummary {
     progressPercent,
     todayXp,
     dailyCapRemaining: Math.max(0, DAILY_XP_CAP - todayXp),
-    streakDays: currentLedger.streakDays,
+    streakDays: effectiveStreak,
     totalMissionsCompleted: totalMissions,
     totalCreationsSaved: totalCreations,
     events: [...currentLedger.events].reverse(),
@@ -344,6 +374,7 @@ export function getXpSummary(ledger?: XpLedger): XpSummary {
     lastSyncedAt: lastSyncTimestamp,
     isSandbox: false,
     userRole: role,
+    isMaxLevel,
   }
 }
 
@@ -398,15 +429,20 @@ export function awardXp(
     signature,
   }
 
-  // Update streak if needed
+  // Robust calendar-day streak computation
   if (ledger.lastActiveDate !== today) {
-    const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0]
-    if (ledger.lastActiveDate === yesterday) {
-      ledger.streakDays = (ledger.streakDays || 1) + 1
+    const curTime = new Date(`${today}T00:00:00Z`).getTime()
+    const lastTime = ledger.lastActiveDate ? new Date(`${ledger.lastActiveDate}T00:00:00Z`).getTime() : 0
+    const diffDays = Math.round((curTime - lastTime) / (1000 * 60 * 60 * 24))
+
+    if (diffDays === 1) {
+      ledger.streakDays = (ledger.streakDays || 0) + 1
     } else {
       ledger.streakDays = 1
     }
     ledger.lastActiveDate = today
+  } else if (!ledger.streakDays) {
+    ledger.streakDays = 1
   }
 
   ledger.events.push(newEvent)
@@ -417,9 +453,13 @@ export function awardXp(
 /**
  * Award XP for completing an interactive curriculum mission
  */
-export function awardMissionXp(lessonId: string, difficulty: "Beginner" | "Intermediate" | "Advanced", title: string): boolean {
+export function awardMissionXp(
+  lessonId: string,
+  difficulty: "Beginner" | "Intermediate" | "Advanced" | string,
+  title: string,
+): boolean {
   if (!isStudentUser()) return false
-  const points = difficulty === "Beginner" ? 50 : difficulty === "Intermediate" ? 100 : 200
+  const points = difficulty === "Beginner" ? 50 : difficulty === "Intermediate" ? 100 : difficulty === "Advanced" ? 200 : 50
   return awardXp(`mission:${lessonId}`, "mission", `Completed ${title}`, points, { lessonId, difficulty })
 }
 
@@ -427,7 +467,7 @@ export function awardMissionXp(lessonId: string, difficulty: "Beginner" | "Inter
  * Award XP for saving a verified custom circuit
  */
 export function awardCreationXp(circuit: CircuitState, blocklyXml: string, projectName: string): boolean {
-  if (!isStudentUser()) return false
+  if (!isStudentUser() || !circuit || !Array.isArray(circuit.parts) || !Array.isArray(circuit.wires)) return false
 
   const controllerCount = circuit.parts.filter((p) => isBoardPart(p.type)).length
   const totalParts = circuit.parts.length
@@ -438,11 +478,23 @@ export function awardCreationXp(circuit: CircuitState, blocklyXml: string, proje
   }
 
   const partTypes = circuit.parts.map((p) => p.type).sort().join(",")
-  const wireNet = circuit.wires.map((w) => `${w.from.partId}:${w.from.pinId}->${w.to.partId}:${w.to.pinId}`).sort().join(";")
+  
+  // Canonical bidirectional wire sorting to avoid hash duplicates
+  const wireNet = circuit.wires
+    .filter((w) => w?.from?.partId && w?.to?.partId)
+    .map((w) => {
+      const a = `${w.from.partId}:${w.from.pinId}`
+      const b = `${w.to.partId}:${w.to.pinId}`
+      return a < b ? `${a}<->${b}` : `${b}<->${a}`
+    })
+    .sort()
+    .join(";")
+
   const circuitHash = fnv1a(`${partTypes}|${wireNet}`)
 
   let basePoints = 75
-  const hasAi = blocklyXml.includes('type="ai_') || circuit.parts.some((p) => p.type === "servo" && p.props?.arm === "barrier")
+  const xmlSafe = typeof blocklyXml === "string" ? blocklyXml : ""
+  const hasAi = xmlSafe.includes('type="ai_') || circuit.parts.some((p) => p.type === "servo" && p.props?.arm === "barrier")
   const hasDisplay = circuit.parts.some((p) => p.type === "lcd-i2c" || p.type === "oled-i2c" || p.type === "neopixel-ring" || p.type === "seven-segment")
   const hasSensor = circuit.parts.some((p) => ["ultrasonic", "ldr", "tmp36", "dht11", "mq2-gas", "soil-moisture", "pir-sensor"].includes(p.type))
 
@@ -458,7 +510,7 @@ export function awardCreationXp(circuit: CircuitState, blocklyXml: string, proje
 
   // Trigger background creation backup to student profile
   if (awarded) {
-    void syncXpWithServer(null, {
+    void syncXpWithServer(activeStudentId, {
       newCreation: {
         name: projectName || "Custom Circuit",
         summary: `Verified circuit with ${totalParts} components and ${totalWires} connections. Hash: ${circuitHash}`,
@@ -507,7 +559,13 @@ export async function syncXpWithServer(
     newCreation?: { name: string; summary: string }
   },
 ): Promise<XpSummary | null> {
-  if (typeof window === "undefined" || isSyncInProgress) return null
+  if (typeof window === "undefined") return null
+
+  // If sync already in progress, remember request and execute immediately after
+  if (isSyncInProgress) {
+    hasPendingSyncRequest = true
+    return getXpSummary()
+  }
 
   // Admin & staff do not sync with student XP endpoints
   if (!isStudentUser()) {
@@ -528,6 +586,9 @@ export async function syncXpWithServer(
       const getResp = await apiFetch("/student-xp", { method: "GET", cache: "no-store" })
       if (getResp.ok) {
         const body = await getResp.json().catch(() => ({}))
+        if (body?.student?.student_id && !activeStudentId) {
+          setActiveStudentId(body.student.student_id)
+        }
         if (body?.ledger && Array.isArray(body.ledger.events)) {
           remoteLedger = body.ledger as Partial<XpLedger>
         }
@@ -562,12 +623,15 @@ export async function syncXpWithServer(
 
       if (remoteLedger.streakDays && remoteLedger.streakDays > localLedger.streakDays) {
         localLedger.streakDays = remoteLedger.streakDays
+        if (remoteLedger.lastActiveDate) {
+          localLedger.lastActiveDate = remoteLedger.lastActiveDate
+        }
       }
     }
 
-    // If local was empty (cleared) or remote had more events, save and re-hydrate immediately
+    // If local was empty (cleared) or remote had more events, save and re-hydrate without triggering sync loop
     if (hasRemoteNewEvents || (localLedger.events.length === 0 && remoteLedger?.events?.length)) {
-      saveXpLedger(localLedger)
+      saveXpLedger(localLedger, activeStudentId, { skipSync: true })
     }
 
     // Step 3: If local has unsynced events or newCreation, push to server
@@ -579,6 +643,7 @@ export async function syncXpWithServer(
         const pushPayload = {
           events: localLedger.events,
           streakDays: localLedger.streakDays,
+          lastActiveDate: localLedger.lastActiveDate,
           salt: localLedger.salt,
           newCreation: options?.newCreation,
         }
@@ -604,6 +669,10 @@ export async function syncXpWithServer(
     return getXpSummary()
   } finally {
     isSyncInProgress = false
+    if (hasPendingSyncRequest) {
+      hasPendingSyncRequest = false
+      scheduleXpSync()
+    }
   }
 }
 

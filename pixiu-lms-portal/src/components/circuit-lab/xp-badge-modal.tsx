@@ -122,7 +122,7 @@ export function XpBadgeButton({ className = "" }: Props) {
                 <div className="mt-4">
                   <div className="flex items-center justify-between text-[10px] font-mono text-slate-400">
                     <span>{summary.totalXp} Total XP</span>
-                    <span>{summary.nextLevelXp} XP for next title</span>
+                    <span>{summary.isMaxLevel ? "Max Tier Achieved 🏆" : `${summary.nextLevelXp} XP for next title`}</span>
                   </div>
                   <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-800 ring-1 ring-white/5">
                     <div
@@ -202,7 +202,7 @@ export function XpBadgeButton({ className = "" }: Props) {
                     <div className="flex items-center justify-center gap-1 text-[9px] uppercase tracking-wider text-slate-500">
                       <Trophy size={11} className="text-amber-400" /> Missions
                     </div>
-                    <p className="mt-1 font-mono text-base font-black text-amber-300">{summary.totalMissionsCompleted} / 19</p>
+                    <p className="mt-1 font-mono text-base font-black text-amber-300">{summary.totalMissionsCompleted} Finished</p>
                   </div>
                   <div className="rounded-xl border border-slate-800/80 bg-slate-900/50 p-2.5 text-center">
                     <div className="flex items-center justify-center gap-1 text-[9px] uppercase tracking-wider text-slate-500">

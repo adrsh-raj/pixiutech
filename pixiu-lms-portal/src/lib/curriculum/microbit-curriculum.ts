@@ -65,7 +65,7 @@ export const MICROBIT_LESSONS: Lesson[] = [
         id: "run",
         title: "Simulate Heartbeat",
         instructions: "Click Start Simulation to watch the 25 matrix LEDs pulse with a bright beating heart pattern.",
-        kind: "observe",
+        kind: "run",
         checks: [{ kind: "running" }],
         success: "Your micro:bit matrix is beating with life!",
       },
@@ -127,7 +127,7 @@ export const MICROBIT_LESSONS: Lesson[] = [
         id: "run",
         title: "Test Button Input",
         instructions: "Start the simulator and click Button A on the micro:bit to reveal the glowing smile.",
-        kind: "observe",
+        kind: "run",
         checks: [{ kind: "running" }],
         success: "Button presses detected and rendered on the matrix.",
       },
@@ -187,11 +187,11 @@ export const MICROBIT_LESSONS: Lesson[] = [
         id: "wiring",
         title: "Wire to Edge Pin P0 and GND",
         instructions: "Connect micro:bit P0 to resistor pin a, resistor pin b to LED anode, and LED cathode to micro:bit GND.",
-        kind: "wire",
-        checks: [{ kind: "connections", connections: [
-          { from: "microbit:p0", to: "resistor-1:a" },
-          { from: "resistor-1:b", to: "led-1:anode" },
-          { from: "led-1:cathode", to: "microbit:gnd" },
+        kind: "build",
+        checks: [{ kind: "connections", requirements: [
+          { from: { partType: "microbit-v2", pinId: "p0" }, to: { partType: "resistor", pinId: "a" } },
+          { from: { partType: "resistor", pinId: "b" }, to: { partType: "led", pinId: "anode" } },
+          { from: { partType: "led", pinId: "cathode" }, to: { partType: "microbit-v2", pinId: "gnd" } },
         ] }],
         success: "External LED circuit correctly wired to P0 ring.",
       },
@@ -213,7 +213,7 @@ export const MICROBIT_LESSONS: Lesson[] = [
         id: "run",
         title: "Verify LED Blink",
         instructions: "Run simulation and observe the external red LED flash rhythmically from micro:bit Pin P0.",
-        kind: "observe",
+        kind: "run",
         checks: [{ kind: "running" }],
         success: "External hardware blink accomplished on micro:bit P0!",
       },
@@ -271,11 +271,11 @@ export const MICROBIT_LESSONS: Lesson[] = [
         id: "wiring",
         title: "Wire Potentiometer to 3V, P0 and GND",
         instructions: "Wire potentiometer terminal 1 to micro:bit 3V, wiper to Pin P0, and terminal 2 to GND.",
-        kind: "wire",
-        checks: [{ kind: "connections", connections: [
-          { from: "microbit:3v", to: "pot-1:t1" },
-          { from: "microbit:p0", to: "pot-1:wiper" },
-          { from: "microbit:gnd", to: "pot-1:t2" },
+        kind: "build",
+        checks: [{ kind: "connections", requirements: [
+          { from: { partType: "microbit-v2", pinId: "3v" }, to: { partType: "potentiometer", pinId: "t1" } },
+          { from: { partType: "microbit-v2", pinId: "p0" }, to: { partType: "potentiometer", pinId: "wiper" } },
+          { from: { partType: "microbit-v2", pinId: "gnd" }, to: { partType: "potentiometer", pinId: "t2" } },
         ] }],
         success: "Potentiometer voltage divider connected.",
       },
@@ -296,7 +296,7 @@ export const MICROBIT_LESSONS: Lesson[] = [
         id: "run",
         title: "Inspect ADC Values",
         instructions: "Start simulation and drag the potentiometer dial to observe readings scale between 0 and 1023 in the Serial Monitor.",
-        kind: "observe",
+        kind: "run",
         checks: [{ kind: "running" }],
         success: "10-bit analog conversion verified.",
       },
@@ -329,9 +329,9 @@ export const MICROBIT_LESSONS: Lesson[] = [
     seedBlocklyXml: `<xml xmlns="https://developers.google.com/blockly/xml">
   <block type="arduino_program" x="40" y="40">
     <statement name="LOOP">
-      <block type="io_tone"><field name="PIN">0</field><value name="FREQ"><shadow type="math_number"><field name="NUM">523</field></shadow></value><value name="DUR"><shadow type="math_number"><field name="NUM">250</field></shadow></value><next>
+      <block type="tone_play"><field name="PIN">0</field><value name="FREQ"><shadow type="math_number"><field name="NUM">523</field></shadow></value><next>
       <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">300</field></shadow></value><next>
-      <block type="io_tone"><field name="PIN">0</field><value name="FREQ"><shadow type="math_number"><field name="NUM">659</field></shadow></value><value name="DUR"><shadow type="math_number"><field name="NUM">400</field></shadow></value><next>
+      <block type="tone_play"><field name="PIN">0</field><value name="FREQ"><shadow type="math_number"><field name="NUM">659</field></shadow></value><next>
       <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">1000</field></shadow></value></block>
       </next></block></next></block></next></block>
     </statement>
@@ -353,10 +353,10 @@ export const MICROBIT_LESSONS: Lesson[] = [
         id: "wiring",
         title: "Wire Buzzer to Pin P0 and GND",
         instructions: "Connect buzzer positive pin to micro:bit P0 and negative pin to micro:bit GND.",
-        kind: "wire",
-        checks: [{ kind: "connections", connections: [
-          { from: "microbit:p0", to: "buzzer-1:pos" },
-          { from: "buzzer-1:neg", to: "microbit:gnd" },
+        kind: "build",
+        checks: [{ kind: "connections", requirements: [
+          { from: { partType: "microbit-v2", pinId: "p0" }, to: { partType: "buzzer", pinId: "pos" } },
+          { from: { partType: "buzzer", pinId: "neg" }, to: { partType: "microbit-v2", pinId: "gnd" } },
         ] }],
         success: "Piezo buzzer connected to micro:bit P0.",
       },
@@ -367,7 +367,7 @@ export const MICROBIT_LESSONS: Lesson[] = [
         kind: "code",
         checks: [
           { kind: "blocks", requirements: [
-            { type: "io_tone", count: 2, fields: { PIN: "0" } },
+            { type: "tone_play", count: 2, fields: { PIN: "0" } },
           ] },
         ],
         success: "Tone generation blocks programmed.",
@@ -376,7 +376,7 @@ export const MICROBIT_LESSONS: Lesson[] = [
         id: "run",
         title: "Simulate Chime",
         instructions: "Run simulation to hear the synthesized audio melody play through the virtual audio engine.",
-        kind: "observe",
+        kind: "run",
         checks: [{ kind: "running" }],
         success: "Two-tone chime played successfully!",
       },
@@ -456,11 +456,11 @@ export const MICROBIT_LESSONS: Lesson[] = [
         id: "wiring",
         title: "Wire LDR to P1 and LED to P0",
         instructions: "Wire LDR and 10kΩ divider to 3V, P1, and GND. Wire 220Ω resistor and LED to P0 and GND.",
-        kind: "wire",
-        checks: [{ kind: "connections", connections: [
-          { from: "microbit:p1", to: "ldr-1:t2" },
-          { from: "microbit:p0", to: "resistor-led:a" },
-          { from: "led-1:cathode", to: "microbit:gnd" },
+        kind: "build",
+        checks: [{ kind: "connections", requirements: [
+          { from: { partType: "microbit-v2", pinId: "p1" }, to: { partType: "ldr", pinId: "t2" } },
+          { from: { partType: "microbit-v2", pinId: "p0" }, to: { partType: "resistor", pinId: "a" } },
+          { from: { partType: "led", pinId: "cathode" }, to: { partType: "microbit-v2", pinId: "gnd" } },
         ] }],
         success: "Optical divider and nightlight LED wired.",
       },
@@ -482,7 +482,7 @@ export const MICROBIT_LESSONS: Lesson[] = [
         id: "run",
         title: "Test Ambient Light Response",
         instructions: "Start simulation and drag the LDR light slider below 400. Observe the nightlight LED trigger automatically.",
-        kind: "observe",
+        kind: "run",
         checks: [{ kind: "running" }],
         success: "Autonomous twilight sensing works perfectly.",
       },
@@ -540,11 +540,11 @@ export const MICROBIT_LESSONS: Lesson[] = [
         id: "wiring",
         title: "Wire TMP36 to 3V, P0 and GND",
         instructions: "Connect TMP36 VCC to micro:bit 3V, OUT to Pin P0, and GND to micro:bit GND.",
-        kind: "wire",
-        checks: [{ kind: "connections", connections: [
-          { from: "microbit:3v", to: "tmp36-1:vcc" },
-          { from: "microbit:p0", to: "tmp36-1:out" },
-          { from: "microbit:gnd", to: "tmp36-1:gnd" },
+        kind: "build",
+        checks: [{ kind: "connections", requirements: [
+          { from: { partType: "microbit-v2", pinId: "3v" }, to: { partType: "tmp36", pinId: "vcc" } },
+          { from: { partType: "microbit-v2", pinId: "p0" }, to: { partType: "tmp36", pinId: "out" } },
+          { from: { partType: "microbit-v2", pinId: "gnd" }, to: { partType: "tmp36", pinId: "gnd" } },
         ] }],
         success: "TMP36 circuit wired.",
       },
@@ -565,7 +565,7 @@ export const MICROBIT_LESSONS: Lesson[] = [
         id: "run",
         title: "Observe Temperature Telemetry",
         instructions: "Run simulation and slide the temperature control to watch sensor output change in real time.",
-        kind: "observe",
+        kind: "run",
         checks: [{ kind: "running" }],
         success: "Thermal telemetry operational!",
       },
@@ -599,11 +599,11 @@ export const MICROBIT_LESSONS: Lesson[] = [
     seedBlocklyXml: `<xml xmlns="https://developers.google.com/blockly/xml">
   <block type="arduino_program" x="40" y="40">
     <statement name="LOOP">
-      <block type="actuator_servo_write"><field name="PIN">0</field><value name="ANGLE"><shadow type="math_number"><field name="NUM">0</field></shadow></value><next>
+      <block type="servo_write"><field name="PIN">0</field><value name="ANGLE"><shadow type="math_number"><field name="NUM">0</field></shadow></value><next>
       <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">1000</field></shadow></value><next>
-      <block type="actuator_servo_write"><field name="PIN">0</field><value name="ANGLE"><shadow type="math_number"><field name="NUM">90</field></shadow></value><next>
+      <block type="servo_write"><field name="PIN">0</field><value name="ANGLE"><shadow type="math_number"><field name="NUM">90</field></shadow></value><next>
       <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">1000</field></shadow></value><next>
-      <block type="actuator_servo_write"><field name="PIN">0</field><value name="ANGLE"><shadow type="math_number"><field name="NUM">180</field></shadow></value><next>
+      <block type="servo_write"><field name="PIN">0</field><value name="ANGLE"><shadow type="math_number"><field name="NUM">180</field></shadow></value><next>
       <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">1000</field></shadow></value></block>
       </next></block></next></block></next></block></next></block></next></block>
     </statement>
@@ -625,11 +625,11 @@ export const MICROBIT_LESSONS: Lesson[] = [
         id: "wiring",
         title: "Wire Servo Signal to P0, 3V, and GND",
         instructions: "Connect servo signal wire to micro:bit P0, VCC to 3V, and GND to GND.",
-        kind: "wire",
-        checks: [{ kind: "connections", connections: [
-          { from: "microbit:p0", to: "servo-1:sig" },
-          { from: "microbit:3v", to: "servo-1:vcc" },
-          { from: "microbit:gnd", to: "servo-1:gnd" },
+        kind: "build",
+        checks: [{ kind: "connections", requirements: [
+          { from: { partType: "microbit-v2", pinId: "p0" }, to: { partType: "servo", pinId: "sig" } },
+          { from: { partType: "microbit-v2", pinId: "3v" }, to: { partType: "servo", pinId: "vcc" } },
+          { from: { partType: "microbit-v2", pinId: "gnd" }, to: { partType: "servo", pinId: "gnd" } },
         ] }],
         success: "Servo wiring complete.",
       },
@@ -640,7 +640,7 @@ export const MICROBIT_LESSONS: Lesson[] = [
         kind: "code",
         checks: [
           { kind: "blocks", requirements: [
-            { type: "actuator_servo_write", count: 3, fields: { PIN: "0" } },
+            { type: "servo_write", count: 3, fields: { PIN: "0" } },
           ] },
         ],
         success: "Servo actuation sweep logic verified.",
@@ -649,7 +649,7 @@ export const MICROBIT_LESSONS: Lesson[] = [
         id: "run",
         title: "Simulate Servo Arm Motion",
         instructions: "Run simulation to see the servo horn rotate between 0, 90, and 180 degrees.",
-        kind: "observe",
+        kind: "run",
         checks: [{ kind: "running" }],
         success: "Robotic servo articulation running smoothly!",
       },
@@ -708,11 +708,11 @@ export const MICROBIT_LESSONS: Lesson[] = [
         id: "wiring",
         title: "Connect DI to P0, VCC to 3V, GND to GND",
         instructions: "Wire the DI (Data Input) pin of the NeoPixel ring to micro:bit P0, VCC to 3V, and GND to GND.",
-        kind: "wire",
-        checks: [{ kind: "connections", connections: [
-          { from: "microbit:p0", to: "neopixel-ring-1:di" },
-          { from: "microbit:3v", to: "neopixel-ring-1:vcc" },
-          { from: "microbit:gnd", to: "neopixel-ring-1:gnd" },
+        kind: "build",
+        checks: [{ kind: "connections", requirements: [
+          { from: { partType: "microbit-v2", pinId: "p0" }, to: { partType: "neopixel-ring", pinId: "di" } },
+          { from: { partType: "microbit-v2", pinId: "3v" }, to: { partType: "neopixel-ring", pinId: "vcc" } },
+          { from: { partType: "microbit-v2", pinId: "gnd" }, to: { partType: "neopixel-ring", pinId: "gnd" } },
         ] }],
         success: "High-speed addressable bus connected.",
       },
@@ -733,7 +733,7 @@ export const MICROBIT_LESSONS: Lesson[] = [
         id: "run",
         title: "Run NeoPixel Animation",
         instructions: "Start simulation and observe the NeoPixel LEDs light up in vibrant color.",
-        kind: "observe",
+        kind: "run",
         checks: [{ kind: "running" }],
         success: "Addressable RGB ring glowing brilliantly!",
       },
@@ -780,21 +780,17 @@ export const MICROBIT_LESSONS: Lesson[] = [
       <block type="controls_if">
         <mutation else="1"></mutation>
         <value name="IF0">
-          <block type="logic_compare">
-            <field name="OP">EQ</field>
-            <value name="A"><block type="io_digitalread"><field name="PIN">1</field></block></value>
-            <value name="B"><block type="io_highlow"><field name="BOOL">HIGH</field></block></value>
-          </block>
+          <block type="io_digitalread"><field name="PIN">1</field></block>
         </value>
         <statement name="DO0">
           <block type="io_digitalwrite"><field name="PIN">2</field><field name="STATE">HIGH</field><next>
-          <block type="io_tone"><field name="PIN">0</field><value name="FREQ"><shadow type="math_number"><field name="NUM">880</field></shadow></value><value name="DUR"><shadow type="math_number"><field name="NUM">200</field></shadow></value><next>
+          <block type="tone_play"><field name="PIN">0</field><value name="FREQ"><shadow type="math_number"><field name="NUM">880</field></shadow></value><next>
           <block type="microbit_show_icon"><field name="ICON">ghost</field></block>
           </next></block></next></block>
         </statement>
         <statement name="ELSE">
           <block type="io_digitalwrite"><field name="PIN">2</field><field name="STATE">LOW</field><next>
-          <block type="io_notone"><field name="PIN">0</field><next>
+          <block type="tone_stop"><field name="PIN">0</field><next>
           <block type="microbit_clear"></block>
           </next></block></next></block>
         </statement>
@@ -823,24 +819,24 @@ export const MICROBIT_LESSONS: Lesson[] = [
         id: "wiring",
         title: "Wire Sensors and Annunciators",
         instructions: "Wire PIR OUT to Pin P1, buzzer positive to Pin P0, and LED anode through 220Ω resistor to Pin P2. Wire common 3V power and GND.",
-        kind: "wire",
-        checks: [{ kind: "connections", connections: [
-          { from: "microbit:p1", to: "pir-1:out" },
-          { from: "microbit:p0", to: "buzzer-1:pos" },
-          { from: "microbit:p2", to: "resistor-1:a" },
-          { from: "led-1:cathode", to: "microbit:gnd" },
+        kind: "build",
+        checks: [{ kind: "connections", requirements: [
+          { from: { partType: "microbit-v2", pinId: "p1" }, to: { partType: "pir-sensor", pinId: "out" } },
+          { from: { partType: "microbit-v2", pinId: "p0" }, to: { partType: "buzzer", pinId: "pos" } },
+          { from: { partType: "microbit-v2", pinId: "p2" }, to: { partType: "resistor", pinId: "a" } },
+          { from: { partType: "led", pinId: "cathode" }, to: { partType: "microbit-v2", pinId: "gnd" } },
         ] }],
         success: "All sensor and actuator channels connected.",
       },
       {
         id: "code",
         title: "Program Security Logic",
-        instructions: "Read digital Pin P1. When HIGH (motion detected), sound buzzer on P0, light LED on P2, and show the 'ghost' icon on the micro:bit matrix.",
+        instructions: "Read digital Pin P1. When motion detected, sound buzzer on P0, light LED on P2, and show the 'ghost' icon on the micro:bit matrix.",
         kind: "code",
         checks: [
           { kind: "blocks", requirements: [
             { type: "io_digitalread", count: 1, fields: { PIN: "1" } },
-            { type: "io_tone", count: 1, fields: { PIN: "0" } },
+            { type: "tone_play", count: 1, fields: { PIN: "0" } },
             { type: "io_digitalwrite", count: 1, fields: { PIN: "2", STATE: "HIGH" } },
             { type: "microbit_show_icon", count: 1, fields: { ICON: "ghost" } },
           ] },
@@ -851,7 +847,7 @@ export const MICROBIT_LESSONS: Lesson[] = [
         id: "run",
         title: "Test Security System",
         instructions: "Start simulation and trigger motion on the PIR sensor to verify the simultaneous siren, strobe LED, and ghost matrix icon.",
-        kind: "observe",
+        kind: "run",
         checks: [{ kind: "running" }],
         success: "Complete multi-peripheral security system verified!",
       },

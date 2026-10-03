@@ -6,6 +6,7 @@ const AuthContext = createContext(null);
 const AUTH_EVENT = 'pixiu_auth_state_changed';
 const AUTH_LOGOUT_KEY = 'pixiu_portal_logout_at';
 const SESSION_ROLE_KEY = 'pixiu_session_role';
+const SESSION_STUDENT_ID_KEY = 'pixiu_session_student_id';
 const AUTH_REQUEST_TIMEOUT_MS = 60000;
 const LOGIN_REQUEST_TIMEOUT_MS = 60000;
 const PORTAL_IDLE_TIMEOUT_MS = 15 * 60 * 1000;
@@ -45,6 +46,10 @@ function getSessionRole() {
 }
 function setSessionRole(role) {
   try { if (role) window.sessionStorage.setItem(SESSION_ROLE_KEY, String(role).trim().toLowerCase()); else window.sessionStorage.removeItem(SESSION_ROLE_KEY); }
+  catch {}
+}
+function setSessionStudentId(sid) {
+  try { if (sid) window.sessionStorage.setItem(SESSION_STUDENT_ID_KEY, String(sid).trim().toUpperCase()); else window.sessionStorage.removeItem(SESSION_STUDENT_ID_KEY); }
   catch {}
 }
 function broadcastAuthChange() { window.dispatchEvent(new Event(AUTH_EVENT)); }
@@ -203,7 +208,7 @@ export function clearAuthStorage({ clearRole = true } = {}) {
   csrfTokenMemory = null;
   clearApiReadCache();
   clearLegacyAuthStorage();
-  if (clearRole) setSessionRole(null);
+  if (clearRole) { setSessionRole(null); setSessionStudentId(null); }
 }
 export function AuthProvider({ children }) {
   const [token, setToken] = useState(() => accessTokenMemory);
@@ -219,6 +224,7 @@ export function AuthProvider({ children }) {
       setToken(null);
       setUser(null);
       setSessionRole(null);
+      setSessionStudentId(null);
     };
     window.addEventListener(AUTH_EVENT, syncAuthState);
     window.addEventListener('storage', syncCrossTabLogout);
@@ -238,7 +244,13 @@ export function AuthProvider({ children }) {
         if (!response.ok) throw new Error('Session expired');
         const data = await readJson(response);
         if (!data.user?.id || !data.user?.role) throw new Error('Invalid session response');
-        if (active) { accessTokenMemory = access; setToken(access); setUser(data.user); setSessionRole(data.user.role); }
+        if (active) {
+          accessTokenMemory = access;
+          setToken(access);
+          setUser(data.user);
+          setSessionRole(data.user.role);
+          setSessionStudentId(data.user.student_id || data.user.id);
+        }
       } catch {
         clearAuthStorage({ clearRole: false });
         if (active) { setToken(null); setUser(null); }
@@ -277,7 +289,15 @@ export function AuthProvider({ children }) {
       const response = await authPostWithRetry(`${API_BASE}/auth/login/`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, cache: 'no-store', credentials: 'include' });
       const data = await readJson(response);
       if (response.ok && data.access && data.user) {
-        clearApiReadCache(); accessTokenMemory = data.access; setToken(data.access); setUser(data.user); setSessionRole(data.user.role); broadcastAuthChange(); measurePerformance('login.e2e', 'login.e2e.start'); return { success: true, user: data.user };
+        clearApiReadCache();
+        accessTokenMemory = data.access;
+        setToken(data.access);
+        setUser(data.user);
+        setSessionRole(data.user.role);
+        setSessionStudentId(data.user.student_id || data.user.id);
+        broadcastAuthChange();
+        measurePerformance('login.e2e', 'login.e2e.start');
+        return { success: true, user: data.user };
       }
       measurePerformance('login.e2e.failed', 'login.e2e.start'); return { success: false, error: data.detail || data.error || 'Invalid username or password.' };
     } catch (error) {

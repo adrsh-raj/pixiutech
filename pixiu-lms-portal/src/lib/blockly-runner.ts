@@ -43,6 +43,9 @@ export interface ExecutionEnvironment {
   showMatrixText?: (text: string) => void
   clearMatrix?: () => void
   isButtonPressed?: (btn: "A" | "B") => boolean
+  // NeoPixel ring support
+  setNeoPixelColor?: (sensorId: string, pixel: number, color: string) => void
+  showNeoPixel?: (sensorId: string) => void
   sleep: (ms: number) => Promise<void>
   isRunning: () => boolean
   // Stepping & Debugging methods
@@ -279,19 +282,30 @@ function getBlockDescription(block: Blockly.Block, env: ExecutionEnvironment): s
       const val = evaluateNumberInput(block, "VALUE", env, 255)
       return `analogWrite(Pin ${pin}, ${val})`
     }
+    case "actuator_servo_write":
     case "servo_write": {
       const pin = block.getFieldValue("PIN") ?? "9"
       const angle = evaluateNumberInput(block, "ANGLE", env, 90)
       return `servo.write(Pin ${pin}, ${angle}°)`
     }
+    case "io_tone":
     case "tone_play": {
       const pin = block.getFieldValue("PIN") ?? "8"
       const freq = evaluateNumberInput(block, "FREQ", env, 440)
       return `tone(Pin ${pin}, ${freq} Hz)`
     }
+    case "io_notone":
     case "tone_stop": {
       const pin = block.getFieldValue("PIN") ?? "8"
       return `noTone(Pin ${pin})`
+    }
+    case "neopixel_set_color": {
+      const sensor = block.getFieldValue("SENSOR") ?? "NeoPixel"
+      return `neopixel.setPixel(${sensor})`
+    }
+    case "neopixel_show": {
+      const sensor = block.getFieldValue("SENSOR") ?? "NeoPixel"
+      return `neopixel.show(${sensor})`
     }
     case "ir_read":
     case "dht_temperature":
@@ -435,6 +449,7 @@ async function executeSingleBlock(block: Blockly.Block, env: ExecutionEnvironmen
       break
     }
 
+    case "actuator_servo_write":
     case "servo_write": {
       const pin = String(block.getFieldValue("PIN") ?? "9")
       const angle = evaluateNumberInput(block, "ANGLE", env, 90)
@@ -442,6 +457,7 @@ async function executeSingleBlock(block: Blockly.Block, env: ExecutionEnvironmen
       break
     }
 
+    case "io_tone":
     case "tone_play": {
       const pin = String(block.getFieldValue("PIN") ?? "8")
       const freq = evaluateNumberInput(block, "FREQ", env, 440)
@@ -449,6 +465,7 @@ async function executeSingleBlock(block: Blockly.Block, env: ExecutionEnvironmen
       break
     }
 
+    case "io_notone":
     case "tone_stop": {
       const pin = String(block.getFieldValue("PIN") ?? "8")
       env.setTone(pin, null)
@@ -588,8 +605,20 @@ async function executeSingleBlock(block: Blockly.Block, env: ExecutionEnvironmen
       break
     }
 
-    case "neopixel_set_color":
-    case "neopixel_show":
+    case "neopixel_set_color": {
+      const sensor = block.getFieldValue("SENSOR") ?? ""
+      const pixel = evaluateNumberInput(block, "PIXEL", env, 0)
+      const color = String(evaluateValueInput(block, "COLOR", env, "#ef4444") ?? "#ef4444")
+      env.setNeoPixelColor?.(sensor, pixel, color)
+      break
+    }
+
+    case "neopixel_show": {
+      const sensor = block.getFieldValue("SENSOR") ?? ""
+      env.showNeoPixel?.(sensor)
+      break
+    }
+
     case "mq2_gas_read":
     case "ai_get_gesture":
     case "ai_get_finger_count":

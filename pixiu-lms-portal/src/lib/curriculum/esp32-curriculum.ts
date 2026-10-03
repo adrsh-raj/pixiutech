@@ -354,9 +354,9 @@ export const ESP32_LESSONS: Lesson[] = [
     seedBlocklyXml: `<xml xmlns="https://developers.google.com/blockly/xml">
   <block type="arduino_program" x="40" y="40">
     <statement name="LOOP">
-      <block type="io_tone"><field name="PIN">25</field><value name="FREQ"><shadow type="math_number"><field name="NUM">440</field></shadow></value><next>
+      <block type="tone_play"><field name="PIN">25</field><value name="FREQ"><shadow type="math_number"><field name="NUM">440</field></shadow></value><next>
       <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">400</field></shadow></value><next>
-      <block type="io_notone"><field name="PIN">25</field><next>
+      <block type="tone_stop"><field name="PIN">25</field><next>
       <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">300</field></shadow></value></block>
       </next></block></next></block></next></block>
     </statement>
@@ -384,10 +384,10 @@ export const ESP32_LESSONS: Lesson[] = [
       {
         id: "code",
         title: "Generate Audio Tone",
-        instructions: "Use io_tone block on pin 25 with 440 Hz frequency.",
+        instructions: "Use tone_play block on pin 25 with 440 Hz frequency.",
         kind: "code",
         checks: [{ kind: "blocks", requirements: [
-          { type: "io_tone", count: 1, fields: { PIN: "25" } },
+          { type: "tone_play", count: 1, fields: { PIN: "25" } },
         ] }],
         success: "Tone generation programmed.",
       },

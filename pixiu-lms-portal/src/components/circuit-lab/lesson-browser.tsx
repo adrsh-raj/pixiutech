@@ -102,14 +102,13 @@ export function LessonBrowser({
     const result = evaluateLessonStep(lesson, step, context)
     setLastResults((current) => ({ ...current, [`${lesson.id}:${step.id}`]: result }))
     if (result.passed) {
-      setProgress((current) => {
-        const next = markStepComplete(current, lesson, step.id)
-        const completed = next[lesson.id]?.completedStepIds || []
-        if (completed.length >= lesson.steps.length) {
-          awardMissionXp(lesson.id, lesson.difficulty, lesson.shortTitle || lesson.title)
-        }
-        return next
-      })
+      const wasCompleted = (progress[lesson.id]?.completedStepIds?.length ?? 0) >= lesson.steps.length
+      const nextProgress = markStepComplete(progress, lesson, step.id)
+      setProgress(nextProgress)
+      const isCompleted = (nextProgress[lesson.id]?.completedStepIds?.length ?? 0) >= lesson.steps.length
+      if (!wasCompleted && isCompleted) {
+        awardMissionXp(lesson.id, lesson.difficulty, lesson.shortTitle || lesson.title)
+      }
     }
   }
 
