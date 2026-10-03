@@ -957,6 +957,37 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
         wifiGetIp: () => virtualWifiManager.getState().ipAddress,
         wifiServerBegin: (port: number) => {
           virtualWifiManager.startServer(port)
+          // Default hardware interaction for /led/on and /led/off if not overridden
+          if (!virtualWifiManager.getState().routes["/led/on"]?.handler) {
+            virtualWifiManager.registerRoute(
+              "/led/on",
+              () => {
+                env.setDigitalPin("2", "HIGH")
+                setSerialLines((prev) => [
+                  ...prev,
+                  { text: `[HTTP] GET /led/on -> Digital Pin 2 (Built-in LED) set to HIGH`, timestamp: Date.now(), type: "info" },
+                ])
+              },
+              200,
+              "text/html",
+              virtualWifiManager.getState().routes["/led/on"]?.responseBody
+            )
+          }
+          if (!virtualWifiManager.getState().routes["/led/off"]?.handler) {
+            virtualWifiManager.registerRoute(
+              "/led/off",
+              () => {
+                env.setDigitalPin("2", "LOW")
+                setSerialLines((prev) => [
+                  ...prev,
+                  { text: `[HTTP] GET /led/off -> Digital Pin 2 (Built-in LED) set to LOW`, timestamp: Date.now(), type: "info" },
+                ])
+              },
+              200,
+              "text/html",
+              virtualWifiManager.getState().routes["/led/off"]?.responseBody
+            )
+          }
           setSerialLines((prev) => [
             ...prev,
             { text: `[HTTP] Web Server started on port ${port}. Listening at http://${virtualWifiManager.getState().ipAddress}:${port}/`, timestamp: Date.now(), type: "info" },

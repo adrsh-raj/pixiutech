@@ -120,7 +120,23 @@ class VirtualWifiManager {
         path: "/",
         statusCode: 200,
         contentType: "text/html",
-        responseBody: `<!DOCTYPE html><html><head><title>Pixiu ESP32 IoT Server</title><meta name='viewport' content='width=device-width, initial-scale=1'></head><body style='font-family:sans-serif;text-align:center;padding:20px;background:#090d16;color:#f8fafc'><h1>🌐 ESP32 IoT Node</h1><p>Status: Online (192.168.1.105)</p><div style='margin-top:20px;'><a href='/led/on' style='display:inline-block;padding:10px 20px;background:#22c55e;color:#000;border-radius:8px;text-decoration:none;font-weight:bold;margin:6px;'>Turn ON LED</a><a href='/led/off' style='display:inline-block;padding:10px 20px;background:#ef4444;color:#fff;border-radius:8px;text-decoration:none;font-weight:bold;margin:6px;'>Turn OFF LED</a></div></body></html>`,
+        responseBody: `<!DOCTYPE html><html><head><title>Pixiu ESP32 IoT Server</title><meta name='viewport' content='width=device-width, initial-scale=1'></head><body style='font-family:sans-serif;text-align:center;padding:20px;background:#090d16;color:#f8fafc'><h1>🌐 ESP32 IoT Node</h1><p>Status: Online (192.168.1.105)</p><div style='margin-top:20px;'><a href='/led/on' data-href='/led/on' style='display:inline-block;padding:10px 20px;background:#22c55e;color:#000;border-radius:8px;text-decoration:none;font-weight:bold;margin:6px;'>Turn ON LED</a><a href='/led/off' data-href='/led/off' style='display:inline-block;padding:10px 20px;background:#ef4444;color:#fff;border-radius:8px;text-decoration:none;font-weight:bold;margin:6px;'>Turn OFF LED</a></div></body></html>`,
+      }
+    }
+    if (!this.state.routes["/led/on"]) {
+      this.state.routes["/led/on"] = {
+        path: "/led/on",
+        statusCode: 200,
+        contentType: "text/html",
+        responseBody: `<!DOCTYPE html><html><head><title>LED Status: ON</title><meta name='viewport' content='width=device-width, initial-scale=1'></head><body style='font-family:sans-serif;text-align:center;padding:20px;background:#090d16;color:#f8fafc'><div style='font-size:42px;margin-bottom:12px;'>💡</div><h2 style='color:#22c55e;margin:0 0 8px 0;'>LED Status: ON</h2><p style='color:#94a3b8;font-size:13px;'>Virtual Pin D2 set to HIGH</p><div style='margin-top:20px;'><a href='/led/off' data-href='/led/off' style='display:inline-block;padding:10px 20px;background:#ef4444;color:#fff;border-radius:8px;text-decoration:none;font-weight:bold;margin:6px;'>Turn OFF LED</a><a href='/' data-href='/' style='display:inline-block;padding:10px 20px;background:#38bdf8;color:#000;border-radius:8px;text-decoration:none;font-weight:bold;margin:6px;'>← Dashboard</a></div></body></html>`,
+      }
+    }
+    if (!this.state.routes["/led/off"]) {
+      this.state.routes["/led/off"] = {
+        path: "/led/off",
+        statusCode: 200,
+        contentType: "text/html",
+        responseBody: `<!DOCTYPE html><html><head><title>LED Status: OFF</title><meta name='viewport' content='width=device-width, initial-scale=1'></head><body style='font-family:sans-serif;text-align:center;padding:20px;background:#090d16;color:#f8fafc'><div style='font-size:42px;margin-bottom:12px;'>⚫</div><h2 style='color:#94a3b8;margin:0 0 8px 0;'>LED Status: OFF</h2><p style='color:#64748b;font-size:13px;'>Virtual Pin D2 set to LOW</p><div style='margin-top:20px;'><a href='/led/on' data-href='/led/on' style='display:inline-block;padding:10px 20px;background:#22c55e;color:#000;border-radius:8px;text-decoration:none;font-weight:bold;margin:6px;'>Turn ON LED</a><a href='/' data-href='/' style='display:inline-block;padding:10px 20px;background:#38bdf8;color:#000;border-radius:8px;text-decoration:none;font-weight:bold;margin:6px;'>← Dashboard</a></div></body></html>`,
       }
     }
     this.notify()
@@ -133,21 +149,31 @@ class VirtualWifiManager {
     contentType: string = "text/html",
     responseBody?: string
   ): void {
-    const cleanPath = path.startsWith("/") ? path : `/${path}`
+    let cleanPath = (path || "/").trim()
+    cleanPath = cleanPath.replace(/^https?:\/\/[^\/]+/i, "")
+    cleanPath = cleanPath.replace(/^192\.168\.\d+\.\d+(:\d+)?/i, "")
+    if (!cleanPath.startsWith("/")) {
+      cleanPath = `/${cleanPath}`
+    }
     this.state.routes[cleanPath] = {
       path: cleanPath,
       statusCode,
       contentType,
       responseBody:
         responseBody ??
-        `<!DOCTYPE html><html><head><title>Route ${cleanPath}</title></head><body style='font-family:sans-serif;padding:20px;background:#090d16;color:#f8fafc'><h2>Route: ${cleanPath} executed!</h2><p><a href='/' style='color:#38bdf8'>← Return to Dashboard</a></p></body></html>`,
+        `<!DOCTYPE html><html><head><title>Route ${cleanPath}</title></head><body style='font-family:sans-serif;padding:20px;background:#090d16;color:#f8fafc'><h2>Route: ${cleanPath} executed!</h2><p><a href='/' data-href='/' style='color:#38bdf8'>← Return to Dashboard</a></p></body></html>`,
       handler,
     }
     this.notify()
   }
 
   public setRouteResponse(path: string, statusCode: number, contentType: string, responseBody: string): void {
-    const cleanPath = path.startsWith("/") ? path : `/${path}`
+    let cleanPath = (path || "/").trim()
+    cleanPath = cleanPath.replace(/^https?:\/\/[^\/]+/i, "")
+    cleanPath = cleanPath.replace(/^192\.168\.\d+\.\d+(:\d+)?/i, "")
+    if (!cleanPath.startsWith("/")) {
+      cleanPath = `/${cleanPath}`
+    }
     if (this.state.routes[cleanPath]) {
       this.state.routes[cleanPath].statusCode = statusCode
       this.state.routes[cleanPath].contentType = contentType
@@ -168,7 +194,12 @@ class VirtualWifiManager {
     method: "GET" | "POST" = "GET",
   ): Promise<{ statusCode: number; contentType: string; body: string }> {
     const startTime = performance.now()
-    const cleanPath = path.startsWith("/") ? path : `/${path}`
+    let cleanPath = (path || "/").trim()
+    cleanPath = cleanPath.replace(/^https?:\/\/[^\/]+/i, "")
+    cleanPath = cleanPath.replace(/^192\.168\.\d+\.\d+(:\d+)?/i, "")
+    if (!cleanPath.startsWith("/")) {
+      cleanPath = `/${cleanPath}`
+    }
     const route = this.state.routes[cleanPath]
 
     if (!route) {

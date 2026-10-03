@@ -21,12 +21,69 @@ interface Props {
   onClose: () => void
 }
 
+function virtualizeHtml(raw: string): string {
+  if (!raw) return ""
+
+  let content = raw
+
+  // Extract head styles if full document
+  let extractedStyles = ""
+  const styleMatches = content.match(/<style[^>]*>([\s\S]*?)<\/style>/gi)
+  if (styleMatches) {
+    extractedStyles = styleMatches.join("\n")
+  }
+
+  // If full HTML document, extract inner body content
+  const bodyMatch = content.match(/<body[^>]*>([\s\S]*?)<\/body>/i)
+  if (bodyMatch) {
+    content = bodyMatch[1]
+  } else {
+    // Strip <!DOCTYPE>, <html>, <head> tags if lingering
+    content = content
+      .replace(/<!DOCTYPE[^>]*>/gi, "")
+      .replace(/<html[^>]*>/gi, "")
+      .replace(/<\/html>/gi, "")
+      .replace(/<head[^>]*>[\s\S]*?<\/head>/gi, "")
+      .replace(/<body[^>]*>/gi, "")
+      .replace(/<\/body>/gi, "")
+  }
+
+  // Rewrite all <a href="..."> tags:
+  content = content.replace(/<a\b([^>]*)>/gi, (match, attrs) => {
+    const hrefMatch = attrs.match(/href=(["'])(.*?)\1/i)
+    if (!hrefMatch) return match
+    const hrefVal = hrefMatch[2]
+
+    const cleanPath =
+      hrefVal.replace(/^https?:\/\/[^\/]+/i, "").replace(/^192\.168\.\d+\.\d+(:\d+)?/i, "") || "/"
+
+    let cleanAttrs = attrs.replace(/href=(["'])(.*?)\1/i, "")
+    cleanAttrs = cleanAttrs.replace(/onclick=(["'])(.*?)\1/i, "")
+
+    return `<a${cleanAttrs} href="#" data-href="${cleanPath}" onclick="window.parent.postMessage({type:'PIXIU_IOT_NAVIGATE',path:'${cleanPath}'},'*');return false;">`
+  })
+
+  // Rewrite <form action="..."> tags
+  content = content.replace(/<form\b([^>]*)>/gi, (match, attrs) => {
+    const actionMatch = attrs.match(/action=(["'])(.*?)\1/i)
+    const actionVal = actionMatch ? actionMatch[2] : "/"
+    const cleanPath =
+      actionVal.replace(/^https?:\/\/[^\/]+/i, "").replace(/^192\.168\.\d+\.\d+(:\d+)?/i, "") || "/"
+
+    let cleanAttrs = attrs.replace(/onsubmit=(["'])(.*?)\1/i, "")
+    return `<form${cleanAttrs} onsubmit="window.parent.postMessage({type:'PIXIU_IOT_NAVIGATE',path:'${cleanPath}'},'*');return false;">`
+  })
+
+  return extractedStyles ? `${extractedStyles}\n${content}` : content
+}
+
 export function IotWebPortal({ isOpen, onClose }: Props) {
   const [wifiState, setWifiState] = useState<VirtualWifiState>(() => virtualWifiManager.getState())
   const [currentPath, setCurrentPath] = useState("/")
   const [renderedHtml, setRenderedHtml] = useState("")
   const [statusCode, setStatusCode] = useState(200)
   const [deviceMode, setDeviceMode] = useState<"phone" | "desktop" | "network">("phone")
+  const [navIndex, setNavIndex] = useState(0)
   const iframeRef = useRef<HTMLIFrameElement | null>(null)
 
   useEffect(() => {
@@ -37,8 +94,14 @@ export function IotWebPortal({ isOpen, onClose }: Props) {
 
   // Execute initial request when opened or path changed
   const navigateTo = async (path: string) => {
-    const clean = path.startsWith("/") ? path : `/${path}`
+    let clean = (path || "/").trim()
+    clean = clean.replace(/^https?:\/\/[^\/]+/i, "")
+    clean = clean.replace(/^192\.168\.\d+\.\d+(:\d+)?/i, "")
+    if (!clean.startsWith("/")) {
+      clean = `/${clean}`
+    }
     setCurrentPath(clean)
+    setNavIndex((i) => i + 1)
     const res = await virtualWifiManager.dispatchRequest(clean, "GET")
     setStatusCode(res.statusCode)
     setRenderedHtml(res.body)
@@ -64,7 +127,7 @@ export function IotWebPortal({ isOpen, onClose }: Props) {
   if (!isOpen) return null
 
   // Inject link click interceptor script & styling into simulated HTML
-  const displayBody =
+  const displayBody = virtualizeHtml(
     renderedHtml ||
     `
     <div style="padding: 20px 8px; text-align: center;">
@@ -87,12 +150,14 @@ export function IotWebPortal({ isOpen, onClose }: Props) {
       </p>
     </div>
   `
+  )
 
   const injectedHtml = `
     <!DOCTYPE html>
     <html>
       <head>
         <meta charset="utf-8">
+        <base href="about:blank" target="_self">
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
         <style>
           * { box-sizing: border-box; }
@@ -138,19 +203,32 @@ export function IotWebPortal({ isOpen, onClose }: Props) {
             text-align: left;
           }
         </style>
+        <script>
+          (function() {
+            window.addEventListener('click', function(e) {
+              var a = e.target.closest('a');
+              if (a) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                var path = a.getAttribute('data-href') || a.getAttribute('href');
+                if (path && path !== '#' && !path.startsWith('javascript:')) {
+                  window.parent.postMessage({ type: 'PIXIU_IOT_NAVIGATE', path: path }, '*');
+                }
+                return false;
+              }
+            }, true);
+            window.addEventListener('submit', function(e) {
+              e.preventDefault();
+              e.stopImmediatePropagation();
+              var act = e.target.getAttribute('action') || '/';
+              window.parent.postMessage({ type: 'PIXIU_IOT_NAVIGATE', path: act }, '*');
+              return false;
+            }, true);
+          })();
+        </script>
       </head>
       <body>
         ${displayBody}
-        <script>
-          document.addEventListener('click', function(e) {
-            var target = e.target.closest('a');
-            if (target && target.getAttribute('href')) {
-              e.preventDefault();
-              var href = target.getAttribute('href');
-              window.parent.postMessage({ type: 'PIXIU_IOT_NAVIGATE', path: href }, '*');
-            }
-          });
-        </script>
       </body>
     </html>
   `
@@ -283,6 +361,7 @@ export function IotWebPortal({ isOpen, onClose }: Props) {
               {/* Interactive Phone Screen Content */}
               <div className="flex-1 bg-slate-950 rounded-[32px] overflow-hidden border border-slate-800 relative flex flex-col shadow-inner">
                 <iframe
+                  key={`iot-frame-phone-${navIndex}`}
                   ref={iframeRef}
                   srcDoc={injectedHtml}
                   title="ESP32 Smartphone View"
@@ -396,6 +475,7 @@ export function IotWebPortal({ isOpen, onClose }: Props) {
             {/* Desktop Viewport */}
             <div className="flex-1 bg-slate-950 overflow-hidden relative">
               <iframe
+                key={`iot-frame-desktop-${navIndex}`}
                 ref={iframeRef}
                 srcDoc={injectedHtml}
                 title="Virtual ESP32 Page"
