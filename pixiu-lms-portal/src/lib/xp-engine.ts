@@ -19,6 +19,8 @@
 import type { CircuitState } from "./circuit-types"
 import { apiFetch } from "@/context/AuthContext"
 import { isBoardPart } from "./board-registry"
+import { TEMPLATES } from "./templates"
+import { LESSONS } from "./lesson-engine"
 
 export const XP_STORAGE_KEY = "pixiu_xp_ledger_v2"
 export const XP_UPDATE_EVENT = "pixiu_xp_updated"
@@ -57,12 +59,12 @@ export interface XpLevelInfo {
 }
 
 export const XP_LEVELS: XpLevelInfo[] = [
-  { level: 1, title: "Circuit Novice", icon: "🔌", badge: "Novice", minXp: 0, maxXp: 200, color: "text-emerald-400", bgGlow: "from-emerald-500/20 to-transparent" },
-  { level: 2, title: "Logic Wireman", icon: "⚙️", badge: "Wireman", minXp: 200, maxXp: 600, color: "text-cyan-400", bgGlow: "from-cyan-500/20 to-transparent" },
-  { level: 3, title: "Sensor Explorer", icon: "📡", badge: "Explorer", minXp: 600, maxXp: 1200, color: "text-amber-400", bgGlow: "from-amber-500/20 to-transparent" },
-  { level: 4, title: "Robotics Builder", icon: "🤖", badge: "Builder", minXp: 1200, maxXp: 2200, color: "text-blue-400", bgGlow: "from-blue-500/20 to-transparent" },
-  { level: 5, title: "AI Hardware Architect", icon: "🧠", badge: "Architect", minXp: 2200, maxXp: 3500, color: "text-purple-400", bgGlow: "from-purple-500/20 to-transparent" },
-  { level: 6, title: "Grandmaster Innovator", icon: "🏆", badge: "Grandmaster", minXp: 3500, maxXp: 100000, color: "text-yellow-400", bgGlow: "from-yellow-500/20 to-transparent" },
+  { level: 1, title: "Circuit Novice", icon: "🔌", badge: "Novice", minXp: 0, maxXp: 300, color: "text-emerald-400", bgGlow: "from-emerald-500/20 to-transparent" },
+  { level: 2, title: "Logic Wireman", icon: "⚙️", badge: "Wireman", minXp: 300, maxXp: 900, color: "text-cyan-400", bgGlow: "from-cyan-500/20 to-transparent" },
+  { level: 3, title: "Sensor Explorer", icon: "📡", badge: "Explorer", minXp: 900, maxXp: 1800, color: "text-amber-400", bgGlow: "from-amber-500/20 to-transparent" },
+  { level: 4, title: "Robotics Builder", icon: "🤖", badge: "Builder", minXp: 1800, maxXp: 3200, color: "text-blue-400", bgGlow: "from-blue-500/20 to-transparent" },
+  { level: 5, title: "AI Hardware Architect", icon: "🧠", badge: "Architect", minXp: 3200, maxXp: 5000, color: "text-purple-400", bgGlow: "from-purple-500/20 to-transparent" },
+  { level: 6, title: "Grandmaster Innovator", icon: "🏆", badge: "Grandmaster", minXp: 5000, maxXp: 100000, color: "text-yellow-400", bgGlow: "from-yellow-500/20 to-transparent" },
 ]
 
 export interface XpSummary {
@@ -285,7 +287,7 @@ export function getXpSummary(ledger?: XpLedger): XpSummary {
       level: 1,
       levelInfo: XP_LEVELS[0],
       currentLevelXp: 0,
-      nextLevelXp: 200,
+      nextLevelXp: 300,
       progressPercent: 0,
       todayXp: 0,
       dailyCapRemaining: DAILY_XP_CAP,
@@ -463,11 +465,175 @@ export function awardMissionXp(
   return awardXp(`mission:${lessonId}`, "mission", `Completed ${title}`, points, { lessonId, difficulty })
 }
 
+export function normalizePinId(pin: string): string {
+  let p = String(pin || "").toLowerCase().trim()
+  p = p.replace(/^(gpio|gp|d|p)/i, "")
+  if (["vcc", "5v", "3v3", "3.3v", "3v", "vin", "power"].includes(p)) return "vcc"
+  if (["gnd", "gnd_l", "gnd_r", "gnd_1", "ground", "neg", "0v", "gnd_edge", "gnd_pwr"].includes(p) || p.startsWith("gnd_")) return "gnd"
+  if (["anode", "a", "pos", "+"].includes(p)) return "anode"
+  if (["cathode", "k", "c", "neg", "-"].includes(p)) return "cathode"
+  if (["terminal1", "terminal2", "t1", "t2", "a", "b"].includes(p)) return "terminal"
+  return p
+}
+
+export interface CircuitNetlistSignature {
+  partTypes: string[]
+  wires: string[]
+}
+
+export function extractCircuitSignature(circuit: CircuitState): CircuitNetlistSignature {
+  if (!circuit || !Array.isArray(circuit.parts) || !Array.isArray(circuit.wires)) {
+    return { partTypes: [], wires: [] }
+  }
+
+  const partTypeMap = new Map<string, string>()
+  const partTypes: string[] = []
+
+  for (const part of circuit.parts) {
+    if (!part?.id || !part?.type) continue
+    partTypeMap.set(part.id, part.type)
+    partTypes.push(part.type)
+  }
+  partTypes.sort()
+
+  const wires: string[] = []
+  for (const wire of circuit.wires) {
+    if (!wire?.from?.partId || !wire?.to?.partId) continue
+    const typeFrom = partTypeMap.get(wire.from.partId)
+    const typeTo = partTypeMap.get(wire.to.partId)
+    if (!typeFrom || !typeTo) continue
+
+    const pinFrom = normalizePinId(wire.from.pinId || "")
+    const pinTo = normalizePinId(wire.to.pinId || "")
+
+    const epA = `${typeFrom}:${pinFrom}`
+    const epB = `${typeTo}:${pinTo}`
+    wires.push(epA < epB ? `${epA}<->${epB}` : `${epB}<->${epA}`)
+  }
+  wires.sort()
+
+  return { partTypes, wires }
+}
+
+export function isDerivativeCircuit(
+  candidate: CircuitState | CircuitNetlistSignature,
+  reference: CircuitState | CircuitNetlistSignature,
+): boolean {
+  const sigA = "partTypes" in candidate && "wires" in candidate ? candidate : extractCircuitSignature(candidate as CircuitState)
+  const sigB = "partTypes" in reference && "wires" in reference ? reference : extractCircuitSignature(reference as CircuitState)
+
+  if (sigA.partTypes.length === 0 || sigB.partTypes.length === 0) return false
+  if (sigA.wires.length === 0 || sigB.wires.length === 0) return false
+
+  // Compare Part Types multiset
+  const partsA = [...sigA.partTypes]
+  const partsB = [...sigB.partTypes]
+
+  let matchedParts = 0
+  for (const pt of partsA) {
+    const idx = partsB.indexOf(pt)
+    if (idx !== -1) {
+      matchedParts++
+      partsB.splice(idx, 1)
+    }
+  }
+  const maxPartCount = Math.max(sigA.partTypes.length, sigB.partTypes.length)
+  const partSimilarity = maxPartCount > 0 ? matchedParts / maxPartCount : 0
+
+  if (partSimilarity < 0.7) {
+    return false
+  }
+
+  // Compare Wire Connections
+  const wiresA = new Set(sigA.wires)
+  const wiresB = new Set(sigB.wires)
+
+  let commonWires = 0
+  for (const w of wiresA) {
+    if (wiresB.has(w)) {
+      commonWires++
+    }
+  }
+
+  const maxWires = Math.max(wiresA.size, wiresB.size)
+  const wireOverlapRatio = maxWires > 0 ? commonWires / maxWires : 0
+  const diffConnections = maxWires - commonWires
+
+  // Rule 1: High part similarity with 1 or 2 wire difference (e.g. user just shifted pin D10 -> D11)
+  if (partSimilarity >= 0.8 && (diffConnections <= 2 || wireOverlapRatio >= 0.6)) {
+    return true
+  }
+
+  // Rule 2: High wire overlap
+  if (wireOverlapRatio >= 0.75) {
+    return true
+  }
+
+  return false
+}
+
+let cachedReferenceSignatures: { id: string; name: string; signature: CircuitNetlistSignature }[] | null = null
+
+export function getReferenceSignatures(): { id: string; name: string; signature: CircuitNetlistSignature }[] {
+  if (cachedReferenceSignatures) return cachedReferenceSignatures
+
+  const refs: { id: string; name: string; signature: CircuitNetlistSignature }[] = []
+
+  if (Array.isArray(TEMPLATES)) {
+    for (const t of TEMPLATES) {
+      if (t?.circuit && Array.isArray(t.circuit.parts) && t.circuit.parts.length >= 2) {
+        refs.push({
+          id: t.id,
+          name: t.name || t.id,
+          signature: extractCircuitSignature(t.circuit),
+        })
+      }
+    }
+  }
+
+  if (Array.isArray(LESSONS)) {
+    for (const l of LESSONS) {
+      if (l?.seedCircuit && Array.isArray(l.seedCircuit.parts) && l.seedCircuit.parts.length >= 2) {
+        refs.push({
+          id: l.id,
+          name: l.title || l.id,
+          signature: extractCircuitSignature(l.seedCircuit),
+        })
+      }
+    }
+  }
+
+  cachedReferenceSignatures = refs
+  return refs
+}
+
+export interface CreationXpOptions {
+  activeTemplateId?: string | null
+  isMission?: boolean
+}
+
 /**
  * Award XP for saving a verified custom circuit
  */
-export function awardCreationXp(circuit: CircuitState, blocklyXml: string, projectName: string): boolean {
+export function awardCreationXp(
+  circuit: CircuitState,
+  blocklyXml: string,
+  projectName: string,
+  options?: CreationXpOptions,
+): boolean {
   if (!isStudentUser() || !circuit || !Array.isArray(circuit.parts) || !Array.isArray(circuit.wires)) return false
+
+  // Anti-Cheat Guard 1: Mission-named or active mission circuits do not earn Creation XP
+  const cleanName = (projectName || "").trim()
+  const isMission = Boolean(options?.isMission) || cleanName.startsWith("Mission ·") || cleanName.toLowerCase().startsWith("mission ")
+  if (isMission) {
+    return false
+  }
+
+  // Anti-Cheat Guard 2: Active loaded templates do not earn Creation XP
+  if (options?.activeTemplateId) {
+    return false
+  }
 
   const controllerCount = circuit.parts.filter((p) => isBoardPart(p.type)).length
   const totalParts = circuit.parts.length
@@ -475,6 +641,17 @@ export function awardCreationXp(circuit: CircuitState, blocklyXml: string, proje
 
   if (controllerCount < 1 || totalParts < 3 || totalWires < 2) {
     return false
+  }
+
+  // Anti-Cheat Guard 3: Algorithmic Derivation Check
+  // Rejects circuits cloned from pre-built templates or lessons, including single-pin mutations (e.g. D10 -> D11)
+  const candidateSig = extractCircuitSignature(circuit)
+  const references = getReferenceSignatures()
+
+  for (const ref of references) {
+    if (isDerivativeCircuit(candidateSig, ref.signature)) {
+      return false
+    }
   }
 
   const partTypes = circuit.parts.map((p) => p.type).sort().join(",")
@@ -686,11 +863,22 @@ export interface SchoolLeaderboardEntry {
   rank: number
 }
 
+export interface ClassLeaderboardStudent {
+  student_id: string
+  name: string
+  roll_number: number | null
+  total_xp: number
+  rank: number
+  is_current_user?: boolean
+}
+
 export interface LeaderboardResult {
   leaderboard: SchoolLeaderboardEntry[]
   total_schools: number
   student_class_rank: number | null
   student_class_total: number
+  student_class_name?: string | null
+  class_leaderboard?: ClassLeaderboardStudent[]
 }
 
 /**
@@ -706,3 +894,60 @@ export async function fetchSchoolLeaderboard(): Promise<LeaderboardResult | null
     return null
   }
 }
+
+export interface DedicatedClassRankingStudent {
+  student_id: string
+  name: string
+  roll_number: number | null
+  rank: number
+  rank_display?: string
+  score: number
+  practical?: number
+  quiz?: number
+  attendance?: number
+  trainer_review?: number
+  is_current_user?: boolean
+}
+
+export interface DedicatedClassRankingResult {
+  class_name: string
+  school_name: string
+  school_code?: string
+  total_students: number
+  student_rank: number | null
+  student_score: number | null
+  ranking: DedicatedClassRankingStudent[]
+}
+
+/**
+ * Fetch live class-wise leaderboard & peer standings from backend
+ */
+export async function fetchClassLeaderboard(): Promise<DedicatedClassRankingResult | null> {
+  if (typeof window === "undefined") return null
+  try {
+    const resp = await apiFetch("/class-ranking", { method: "GET", cache: "no-store" })
+    if (!resp.ok) return null
+    const data = await resp.json().catch(() => null)
+    if (!data) return null
+    const currentId = data.student?.student_id
+    const rankingList: DedicatedClassRankingStudent[] = Array.isArray(data.ranking)
+      ? data.ranking.map((r: any) => ({
+          ...r,
+          is_current_user: Boolean(currentId && r.student_id === currentId),
+        }))
+      : []
+
+    return {
+      class_name: data.class?.name || (data.class ? `Class ${data.class.grade || ""}-${data.class.section || ""}`.trim() : "My Class"),
+      school_name: data.class?.school_name || "",
+      school_code: data.class?.school_code || "",
+      total_students: data.total_students || rankingList.length,
+      student_rank: data.student?.rank ?? null,
+      student_score: data.student?.score ?? null,
+      ranking: rankingList,
+    }
+  } catch {
+    return null
+  }
+}
+

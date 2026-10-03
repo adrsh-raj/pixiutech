@@ -268,34 +268,57 @@ class SchoolLeaderboardView(APIView):
         for index, item in enumerate(schools_ranked, start=1):
             item["rank"] = index
 
-        # If student request, compute rank in their class
+        # If student request, compute rank in their class and full class leaderboard
         class_rank = None
         class_total_students = 0
-        if student:
+        class_name = None
+        class_leaderboard = []
+        if student and getattr(student, "school_class", None):
+            school_class = student.school_class
+            class_name = school_class.display_name or f"Class {school_class.grade}-{school_class.section}"
+
+            class_students_qs = list(
+                Student.objects.filter(school_class=school_class, status="active")
+                .only("id", "student_id", "name", "roll_number")
+                .order_by("roll_number", "student_id")
+            )
+            class_total_students = len(class_students_qs)
+
             class_ledgers = list(
                 Project.objects.filter(
                     title=LEDGER_PROJECT_TITLE,
-                    student__school_class=student.school_class,
+                    student__school_class=school_class,
                 ).values("student_id", "score")
             )
             class_students_map = {item["student_id"]: int(item.get("score") or 0) for item in class_ledgers}
-            all_class_student_ids = list(
-                Student.objects.filter(school_class=student.school_class, status="active").values_list("id", flat=True)
-            )
-            class_total_students = len(all_class_student_ids)
 
-            sorted_class = sorted(
-                all_class_student_ids,
-                key=lambda sid: (-class_students_map.get(sid, 0), str(sid)),
+            class_rows = []
+            for s in class_students_qs:
+                score = class_students_map.get(s.id, 0)
+                class_rows.append({
+                    "student_id": s.student_id,
+                    "name": s.name,
+                    "roll_number": s.roll_number,
+                    "total_xp": score,
+                    "is_current_user": s.id == student.id,
+                })
+
+            class_rows.sort(
+                key=lambda row: (-row["total_xp"], row["roll_number"] if row["roll_number"] is not None else 999, row["student_id"])
             )
-            try:
-                class_rank = sorted_class.index(student.id) + 1
-            except ValueError:
-                class_rank = len(sorted_class)
+            for index, row in enumerate(class_rows, start=1):
+                row["rank"] = index
+                if row["is_current_user"]:
+                    class_rank = index
+
+            class_leaderboard = class_rows
 
         return Response({
             "leaderboard": schools_ranked[:20],
             "total_schools": len(schools_ranked),
             "student_class_rank": class_rank,
             "student_class_total": class_total_students,
+            "student_class_name": class_name,
+            "class_leaderboard": class_leaderboard,
         })
+

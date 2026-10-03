@@ -115,6 +115,7 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
   const [isTemplatesOpen, setIsTemplatesOpen] = useState(false)
   const [isLessonsOpen, setIsLessonsOpen] = useState(false)
   const [activeLessonId, setActiveLessonId] = useState<string | null>(null)
+  const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null)
   const [isAiCameraOpen, setIsAiCameraOpen] = useState(false)
   const [isAiStudioOpen, setIsAiStudioOpen] = useState(false)
   const [aiRuntimeEnabled, setAiRuntimeEnabled] = useState(false)
@@ -1333,8 +1334,12 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
       setCurrentProjectName(saved.name)
       setLastSaved(saved.savedAt)
       setIsDirty(false)
+      const isMission = Boolean(activeLessonId) || name.startsWith("Mission ·")
       if (name && name !== "Untitled Circuit") {
-        awardCreationXp(state, xmlToSave, name)
+        awardCreationXp(state, xmlToSave, name, {
+          activeTemplateId,
+          isMission,
+        })
       }
     } catch (error) {
       setIsDirty(true)
@@ -1342,7 +1347,7 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
     } finally {
       setIsSaving(false)
     }
-  }, [blocklyXml, currentProjectName, state])
+  }, [activeLessonId, activeTemplateId, blocklyXml, currentProjectName, state])
 
   // Active simulation tinkering heartbeat (awards engagement XP for interactive testing)
   useEffect(() => {
@@ -1416,6 +1421,8 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
     setIsScopeOpen(false)
     setLastSaved(project.savedAt)
     setIsDirty(false)
+    setActiveLessonId(null)
+    setActiveTemplateId(null)
   }, [stopProgram, stopAiRuntime])
 
   const handleNewProject = useCallback(async (): Promise<void> => {
@@ -1434,10 +1441,13 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
     stopAiRuntime()
     setIsDmmOpen(false)
     setIsScopeOpen(false)
+    setActiveLessonId(null)
+    setActiveTemplateId(null)
   }, [stopProgram, stopAiRuntime])
 
   const handleSelectLesson = useCallback((lesson: Lesson) => {
     setActiveLessonId(lesson.id)
+    setActiveTemplateId(null)
   }, [])
 
   const handleLoadLesson = useCallback(
@@ -1458,6 +1468,7 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
       setIsScopeOpen(false)
       stopAiRuntime()
       setActiveLessonId(lesson.id)
+      setActiveTemplateId(null)
       setView("circuit")
     },
     [stopProgram, stopAiRuntime, updateState],
@@ -1468,6 +1479,7 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
       stopProgram()
       updateState(() => tmpl.circuit)
       setActiveLessonId(null)
+      setActiveTemplateId(tmpl.id)
       setBlocklyXml(tmpl.blocklyXml)
       setBlocklyDocumentVersion((value) => value + 1)
       if (storageReady) setIsDirty(true)

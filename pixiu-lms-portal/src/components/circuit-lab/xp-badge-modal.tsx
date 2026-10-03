@@ -1,6 +1,14 @@
 import { useEffect, useState } from "react"
-import { Award, Cloud, Flame, RefreshCw, Sparkles, Trophy, X, Zap, ShieldCheck, CheckCircle2, ShieldAlert } from "lucide-react"
-import { getXpSummary, syncXpWithServer, XP_UPDATE_EVENT, XP_SYNC_EVENT, type XpSummary } from "@/lib/xp-engine"
+import { Award, Cloud, Flame, RefreshCw, Sparkles, Trophy, X, Zap, ShieldCheck, CheckCircle2, ShieldAlert, Users } from "lucide-react"
+import {
+  getXpSummary,
+  syncXpWithServer,
+  fetchClassLeaderboard,
+  XP_UPDATE_EVENT,
+  XP_SYNC_EVENT,
+  type XpSummary,
+  type DedicatedClassRankingResult,
+} from "@/lib/xp-engine"
 
 interface Props {
   className?: string
@@ -10,6 +18,9 @@ export function XpBadgeButton({ className = "" }: Props) {
   const [summary, setSummary] = useState<XpSummary>(() => getXpSummary())
   const [isOpen, setIsOpen] = useState(false)
   const [isSyncing, setIsSyncing] = useState(false)
+  const [activeTab, setActiveTab] = useState<"stats" | "class">("stats")
+  const [classRanking, setClassRanking] = useState<DedicatedClassRankingResult | null>(null)
+  const [isLoadingClass, setIsLoadingClass] = useState(false)
 
   useEffect(() => {
     const handleUpdate = () => {
@@ -212,79 +223,213 @@ export function XpBadgeButton({ className = "" }: Props) {
                   </div>
                 </div>
 
-                {/* Badges and Activity Scroll Area */}
-                <div className="flex-1 overflow-y-auto p-5 space-y-4">
-                  {/* Badges Section */}
-                  <div>
-                    <p className="text-[10px] font-mono uppercase tracking-[0.16em] text-slate-400 mb-2">Unlocked Badges</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {summary.badges.length === 0 ? (
-                        <span className="text-xs text-slate-600">Complete missions or save custom circuits to unlock badges!</span>
-                      ) : (
-                        summary.badges.map((b) => (
-                          <span
-                            key={b}
-                            className="inline-flex items-center gap-1 rounded-xl border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-[11px] font-bold text-amber-200"
-                          >
-                            <Award size={12} className="text-amber-400" /> {b}
-                          </span>
-                        ))
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Cloud Sync & Anti-Cheat Indicator */}
-                  <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-3 space-y-2">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-400 flex items-center gap-1.5">
-                        <ShieldCheck size={14} className="text-emerald-400" /> Cloud Backup Status
-                      </span>
-                      <button
-                        onClick={handleManualSync}
-                        disabled={isSyncing}
-                        className="inline-flex items-center gap-1 text-[10px] font-mono text-cyan-400 hover:text-cyan-300 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-800/40 transition disabled:opacity-50 cursor-pointer"
-                      >
-                        <RefreshCw size={10} className={isSyncing ? "animate-spin" : ""} />
-                        {isSyncing ? "Syncing..." : "Sync / Restore"}
-                      </button>
-                    </div>
-                    <p className="text-[10px] text-slate-400 leading-relaxed">
-                      Your XP, Level & Badges are safely backed up to your Pixiu Student Profile. Even if your browser storage or cache is cleared, all your creations and points are permanently saved in the database.
-                    </p>
-                    <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-800/60">
-                      <span className="text-slate-400">Today&apos;s XP Earned</span>
-                      <span className="font-mono font-bold text-amber-300">{summary.todayXp} / 500 XP</span>
-                    </div>
-                    <div className="h-1 overflow-hidden rounded-full bg-slate-800">
-                      <div
-                        className="h-full rounded-full bg-cyan-400"
-                        style={{ width: `${Math.min(100, (summary.todayXp / 500) * 100)}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Activity Log */}
-                  <div>
-                    <p className="text-[10px] font-mono uppercase tracking-[0.16em] text-slate-400 mb-2">Recent Accomplishments</p>
-                    <div className="space-y-1.5">
-                      {summary.events.slice(0, 5).map((e) => (
-                        <div
-                          key={e.id}
-                          className="flex items-center justify-between rounded-xl border border-slate-800/70 bg-slate-950/40 px-3 py-2 text-xs"
-                        >
-                          <div className="min-w-0 flex-1 pr-2">
-                            <p className="truncate font-semibold text-slate-300">{e.title}</p>
-                            <p className="text-[9px] text-slate-500">{new Date(e.timestamp).toLocaleDateString()}</p>
-                          </div>
-                          <span className="font-mono font-black text-amber-400">+{e.xp} XP</span>
-                        </div>
-                      ))}
-                      {summary.events.length === 0 && (
-                        <p className="text-xs text-slate-600">No activity yet. Start by passing Mission 1!</p>
-                      )}
-                    </div>
-                  </div>
+                {/* Tab Navigation */}
+                <div className="flex border-b border-slate-800 bg-slate-950/60 px-5 pt-2">
+                  <button
+                    onClick={() => setActiveTab("stats")}
+                    className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-xs font-bold transition cursor-pointer ${
+                      activeTab === "stats"
+                        ? "border-amber-400 text-amber-300"
+                        : "border-transparent text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    <Award size={13} /> Badges & Stats
+                  </button>
+                  <button
+                    onClick={() => {
+                      setActiveTab("class")
+                      if (!classRanking && !isLoadingClass) {
+                        setIsLoadingClass(true)
+                        fetchClassLeaderboard()
+                          .then((res) => setClassRanking(res))
+                          .finally(() => setIsLoadingClass(false))
+                      }
+                    }}
+                    className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-xs font-bold transition cursor-pointer ${
+                      activeTab === "class"
+                        ? "border-cyan-400 text-cyan-300"
+                        : "border-transparent text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    <Trophy size={13} /> Class Standings 🏆
+                  </button>
                 </div>
+
+                {/* Tab Content */}
+                {activeTab === "class" ? (
+                  <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                    {isLoadingClass ? (
+                      <div className="flex flex-col items-center justify-center py-10 space-y-2 text-slate-400">
+                        <RefreshCw size={20} className="animate-spin text-cyan-400" />
+                        <span className="text-xs">Loading class standings & classmates...</span>
+                      </div>
+                    ) : classRanking && classRanking.ranking && classRanking.ranking.length > 0 ? (
+                      <>
+                        {/* Class Overview Header */}
+                        <div className="rounded-2xl border border-cyan-500/30 bg-gradient-to-r from-cyan-950/40 to-slate-900/60 p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <span className="text-[10px] font-mono uppercase tracking-wider text-cyan-400">
+                                {classRanking.school_name || "Your School Batch"}
+                              </span>
+                              <h3 className="text-base font-black text-white">{classRanking.class_name}</h3>
+                            </div>
+                            {classRanking.student_rank ? (
+                              <div className="text-right">
+                                <span className="rounded-full bg-amber-500/20 px-2.5 py-1 text-xs font-mono font-black text-amber-300 border border-amber-500/30">
+                                  🏆 Rank #{classRanking.student_rank}
+                                </span>
+                                <p className="text-[10px] text-slate-400 mt-1">of {classRanking.total_students} Students</p>
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        {/* Classmate Leaderboard */}
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 px-3 py-1 uppercase tracking-wider">
+                            <span>Rank & Student</span>
+                            <span>Score / XP</span>
+                          </div>
+                          {classRanking.ranking.map((s, idx) => {
+                            const isMe = s.is_current_user || (summary.events[0]?.metadata?.studentId && s.student_id === summary.events[0]?.metadata?.studentId)
+                            const medal = s.rank === 1 ? "🥇" : s.rank === 2 ? "🥈" : s.rank === 3 ? "🥉" : `#${s.rank}`
+                            return (
+                              <div
+                                key={s.student_id || idx}
+                                className={`flex items-center justify-between rounded-xl px-3 py-2 text-xs border transition ${
+                                  isMe
+                                    ? "border-amber-400/60 bg-amber-500/15 shadow-md shadow-amber-950/20"
+                                    : "border-slate-800/80 bg-slate-950/40"
+                                }`}
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <span className={`w-6 text-center font-mono font-bold ${
+                                    s.rank <= 3 ? "text-base" : "text-[11px] text-slate-400"
+                                  }`}>
+                                    {medal}
+                                  </span>
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-1.5">
+                                      <p className={`font-semibold truncate ${isMe ? "text-amber-200 font-bold" : "text-slate-200"}`}>
+                                        {s.name}
+                                      </p>
+                                      {isMe && (
+                                        <span className="rounded bg-amber-400/20 px-1 py-0.2 text-[9px] font-bold text-amber-300">
+                                          YOU
+                                        </span>
+                                      )}
+                                    </div>
+                                    {s.roll_number && (
+                                      <p className="text-[9px] text-slate-500">Roll No: {s.roll_number}</p>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="text-right pl-2">
+                                  <span className="font-mono font-black text-amber-400">{s.score ?? 0}</span>
+                                  <span className="text-[10px] text-slate-400 ml-1">pts</span>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6 text-center space-y-3">
+                        <Users size={32} className="mx-auto text-slate-500" />
+                        <p className="text-sm font-bold text-slate-300">Class Standings Offline / Syncing</p>
+                        <p className="text-xs text-slate-400 max-w-xs mx-auto">
+                          Sign in with your Pixiu student account to view your live rank and classmate leaderboard.
+                        </p>
+                        <button
+                          onClick={() => {
+                            setIsLoadingClass(true)
+                            fetchClassLeaderboard()
+                              .then((res) => setClassRanking(res))
+                              .finally(() => setIsLoadingClass(false))
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-3 py-1.5 text-xs font-bold text-cyan-300 hover:bg-cyan-500/20 transition cursor-pointer"
+                        >
+                          <RefreshCw size={12} /> Refresh Standings
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* Badges and Activity Scroll Area */
+                  <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                    {/* Badges Section */}
+                    <div>
+                      <p className="text-[10px] font-mono uppercase tracking-[0.16em] text-slate-400 mb-2">Unlocked Badges</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {summary.badges.length === 0 ? (
+                          <span className="text-xs text-slate-600">Complete missions or save custom circuits to unlock badges!</span>
+                        ) : (
+                          summary.badges.map((b) => (
+                            <span
+                              key={b}
+                              className="inline-flex items-center gap-1 rounded-xl border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-[11px] font-bold text-amber-200"
+                            >
+                              <Award size={12} className="text-amber-400" /> {b}
+                            </span>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Cloud Sync & Anti-Cheat Indicator */}
+                    <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-3 space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-400 flex items-center gap-1.5">
+                          <ShieldCheck size={14} className="text-emerald-400" /> Cloud Backup Status
+                        </span>
+                        <button
+                          onClick={handleManualSync}
+                          disabled={isSyncing}
+                          className="inline-flex items-center gap-1 text-[10px] font-mono text-cyan-400 hover:text-cyan-300 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-800/40 transition disabled:opacity-50 cursor-pointer"
+                        >
+                          <RefreshCw size={10} className={isSyncing ? "animate-spin" : ""} />
+                          {isSyncing ? "Syncing..." : "Sync / Restore"}
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-slate-400 leading-relaxed">
+                        Your XP, Level & Badges are safely backed up to your Pixiu Student Profile. Even if your browser storage or cache is cleared, all your creations and points are permanently saved in the database.
+                      </p>
+                      <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-800/60">
+                        <span className="text-slate-400">Today&apos;s XP Earned</span>
+                        <span className="font-mono font-bold text-amber-300">{summary.todayXp} / 500 XP</span>
+                      </div>
+                      <div className="h-1 overflow-hidden rounded-full bg-slate-800">
+                        <div
+                          className="h-full rounded-full bg-cyan-400"
+                          style={{ width: `${Math.min(100, (summary.todayXp / 500) * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Activity Log */}
+                    <div>
+                      <p className="text-[10px] font-mono uppercase tracking-[0.16em] text-slate-400 mb-2">Recent Accomplishments</p>
+                      <div className="space-y-1.5">
+                        {summary.events.slice(0, 5).map((e) => (
+                          <div
+                            key={e.id}
+                            className="flex items-center justify-between rounded-xl border border-slate-800/70 bg-slate-950/40 px-3 py-2 text-xs"
+                          >
+                            <div className="min-w-0 flex-1 pr-2">
+                              <p className="truncate font-semibold text-slate-300">{e.title}</p>
+                              <p className="text-[9px] text-slate-500">{new Date(e.timestamp).toLocaleDateString()}</p>
+                            </div>
+                            <span className="font-mono font-black text-amber-400">+{e.xp} XP</span>
+                          </div>
+                        ))}
+                        {summary.events.length === 0 && (
+                          <p className="text-xs text-slate-600">No activity yet. Start by passing Mission 1!</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </>
             )}
 
