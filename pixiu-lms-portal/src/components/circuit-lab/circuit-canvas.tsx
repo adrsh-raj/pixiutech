@@ -734,9 +734,9 @@ export function CircuitCanvas(props: Props) {
                   {part.type === "ultrasonic" && (
                     <>
                       <foreignObject
-                        x={-20}
+                        x={-24}
                         y={-54}
-                        width={130}
+                        width={142}
                         height={48}
                         className="overflow-visible pointer-events-auto"
                       >
@@ -801,9 +801,9 @@ export function CircuitCanvas(props: Props) {
                   {/* On-Canvas Live LDR Torch / Ambient Light Lux Slider */}
                   {part.type === "ldr" && (
                     <foreignObject
-                      x={-24}
+                      x={-28}
                       y={-52}
-                      width={120}
+                      width={138}
                       height={46}
                       className="overflow-visible pointer-events-auto"
                     >
@@ -845,9 +845,9 @@ export function CircuitCanvas(props: Props) {
                   {/* On-Canvas Live DHT11 Temp & Humidity Dual Sliders */}
                   {part.type === "dht11" && (
                     <foreignObject
-                      x={-28}
+                      x={-32}
                       y={-76}
-                      width={132}
+                      width={146}
                       height={72}
                       className="overflow-visible pointer-events-auto"
                     >
@@ -926,9 +926,9 @@ export function CircuitCanvas(props: Props) {
                   {/* On-Canvas Live MQ-2 Gas / Smoke Sensor Density Slider */}
                   {part.type === "mq2-gas" && (
                     <foreignObject
-                      x={-20}
+                      x={-28}
                       y={-52}
-                      width={124}
+                      width={142}
                       height={48}
                       className="overflow-visible pointer-events-auto"
                     >
@@ -1269,7 +1269,7 @@ export function CircuitCanvas(props: Props) {
             const kindColor = PIN_KIND_COLOR[info.kind] || "#38bdf8"
             const labelLen = info.label.length
             const detailsLen = info.details ? info.details.length : 0
-            const badgeW = Math.max(54, labelLen * 7.5 + detailsLen * 6.2 + 28)
+            const badgeW = Math.max(64, labelLen * 8.5 + detailsLen * 7.2 + 34)
 
             return (
               <g transform={`translate(${pos.x} ${badgeY})`} className="pointer-events-none select-none z-50">

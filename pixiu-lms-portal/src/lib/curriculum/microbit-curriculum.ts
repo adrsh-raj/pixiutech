@@ -321,6 +321,11 @@ export const MICROBIT_LESSONS: Lesson[] = [
     concepts: ["PWM Frequencies", "Piezo Sounder", "Musical Notes", "Square Wave Synthesis", "P0 Output"],
     prerequisites: ["lesson-microbit-analog-pot"],
     finalGoal: "🎯 What You Will Build: An acoustic two-tone melodic entryway chime producing 523Hz (C5) and 659Hz (E5) audio waveforms on edge ring P0.",
+    codingHints: [
+      "In Loop, place a Tone Play block on Pin 0 with frequency 523 Hz (C5 chime).",
+      "Add a Time Delay of 300 ms.",
+      "Add a second Tone Play block on Pin 0 with frequency 659 Hz (E5 chime) and a 1000 ms delay.",
+    ],
     seedCircuit: {
       parts: [
         part("microbit", "microbit-v2", 60, 80),
@@ -399,6 +404,12 @@ export const MICROBIT_LESSONS: Lesson[] = [
     concepts: ["Photoresistor", "Light Dependent Resistor", "Darkness Detection", "Closed Loop Automation", "P1 ADC & P0 GPIO"],
     prerequisites: ["lesson-microbit-piezo-melody"],
     finalGoal: "🎯 What You Will Build: An autonomous dusk-to-dawn nightlight reading ambient light on analog Pin P1 and automatically triggering a yellow safety LED on Pin P0 when dark.",
+    codingHints: [
+      "In Setup, configure Pin 0 as OUTPUT for the nightlight LED.",
+      "In Loop, read light level using Analog Read on Pin 1 inside an If/Else comparison (< 400).",
+      "If light is under 400 (darkness): turn Pin 0 HIGH.",
+      "Else: turn Pin 0 LOW.",
+    ],
     seedCircuit: {
       parts: [
         part("microbit", "microbit-v2", 60, 80),
@@ -506,6 +517,10 @@ export const MICROBIT_LESSONS: Lesson[] = [
     concepts: ["TMP36 Sensor", "Analog Millivolts", "Transfer Function", "3.3V ADC Math", "Celsius Conversion"],
     prerequisites: ["lesson-microbit-optical-nightlight"],
     finalGoal: "🎯 What You Will Build: A precision temperature station measuring millivolts from a TMP36 sensor on Pin P0 and streaming converted Celsius telemetry.",
+    codingHints: [
+      "In Loop, place a Serial Print block containing the Analog Read block for Pin 0.",
+      "Add a Time Delay of 500 ms to sample continuous millivolt temperature data.",
+    ],
     seedCircuit: {
       parts: [
         part("microbit", "microbit-v2", 60, 80),
@@ -593,6 +608,11 @@ export const MICROBIT_LESSONS: Lesson[] = [
     concepts: ["Servo Motor", "50Hz PWM", "Duty Cycle", "Robotic Articulation", "P0 Control Signal"],
     prerequisites: ["lesson-microbit-climate-temp"],
     finalGoal: "🎯 What You Will Build: A robotic micro servo arm sweeping across 0°, 90°, and 180° calibrated angular targets using 50Hz PWM control on Pin P0.",
+    codingHints: [
+      "In Loop, command the servo on Pin 0 to 0° using Servo Write, then wait 1000 ms.",
+      "Command Servo Write Pin 0 to 90°, then wait 1000 ms.",
+      "Command Servo Write Pin 0 to 180°, then wait 1000 ms to complete the sweep cycle.",
+    ],
     seedCircuit: {
       parts: [
         part("microbit", "microbit-v2", 60, 80),
@@ -675,6 +695,12 @@ export const MICROBIT_LESSONS: Lesson[] = [
     concepts: ["WS2812B NeoPixel", "Addressable RGB", "800kHz Timing", "Color Arrays", "P0 Data Stream"],
     prerequisites: ["lesson-microbit-servo-sweep"],
     finalGoal: "🎯 What You Will Build: An 8-LED WS2812B addressable NeoPixel cyber ring displaying vivid RGB animations streamed over high-speed single-wire data from Pin P0.",
+    codingHints: [
+      "Target the NeoPixel Ring component connected to Pin P0.",
+      "Use the NeoPixel Set Color block to set pixel indices to desired colors (e.g. #ef4444).",
+      "Call NeoPixel Show to refresh LED ring hardware output.",
+      "Add a Time Delay of 500 ms between animation frames.",
+    ],
     seedCircuit: {
       parts: [
         part("microbit", "microbit-v2", 60, 80),
@@ -760,6 +786,12 @@ export const MICROBIT_LESSONS: Lesson[] = [
     concepts: ["PIR Motion Sensor", "Digital Inputs", "Alarm Siren", "Visual Strobe", "Multi-Peripheral Integration"],
     prerequisites: ["lesson-microbit-neopixel-rainbow"],
     finalGoal: "🎯 What You Will Build: A multi-peripheral intrusion alarm system that detects human motion via PIR (P1), triggers an audible siren (P0), flashes a warning strobe (P2), and paints a ghost icon on the matrix.",
+    codingHints: [
+      "In Setup, configure Pin 1 as INPUT (PIR Sensor) and Pin 2 as OUTPUT (Strobe LED).",
+      "In Loop, read Pin 1 with Digital Read inside an If/Else block.",
+      "If motion detected: set Pin 2 HIGH, play alarm Tone on Pin 0 (880 Hz), and show 'ghost' icon on 5x5 LED matrix.",
+      "Else: set Pin 2 LOW, stop Tone on Pin 0, and clear matrix display.",
+    ],
     seedCircuit: {
       parts: [
         part("microbit", "microbit-v2", 60, 80),

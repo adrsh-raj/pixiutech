@@ -348,10 +348,59 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
   const runningRef = useRef(false)
   const addCounter = useRef(0)
   const partsRef = useRef(state.parts)
+  const stateRef = useRef(state)
 
   useEffect(() => {
     partsRef.current = state.parts
-  }, [state.parts])
+    stateRef.current = state
+  }, [state])
+
+  // Synchronize dynamic IoT sensor telemetry to virtual web server responses
+  useEffect(() => {
+    virtualWifiManager.setBodyTransformer((rawBody) => {
+      if (!rawBody) return rawBody
+      let text = rawBody
+      const parts = partsRef.current
+      const dht = parts.find((p) => p.type === "dht11")
+      const ldr = parts.find((p) => p.type === "ldr")
+      const mq2 = parts.find((p) => p.type === "mq2-gas")
+      const soil = parts.find((p) => p.type === "soil-moisture")
+      const dist = parts.find((p) => p.type === "ultrasonic")
+      const pot = parts.find((p) => p.type === "potentiometer")
+
+      const curTemp = dht?.props?.temperature ?? 25
+      const curHum = dht?.props?.humidity ?? 55
+      const curLux = ldr?.props?.light ?? 512
+      const curGas = mq2?.props?.gasLevel ?? mq2?.props?.gasPpm ?? 120
+      const curMoist = soil?.props?.moisture ?? 500
+      const curDist = dist?.props?.distance ?? 42
+      const curPot = pot?.props?.value ?? 512
+
+      // 1. Explicit placeholder replacements
+      text = text
+        .replace(/\{\{\s*temp(erature)?\s*\}\}/gi, String(curTemp))
+        .replace(/\{\{\s*humidity?\s*\}\}/gi, String(curHum))
+        .replace(/\{\{\s*(light|lux)\s*\}\}/gi, String(curLux))
+        .replace(/\{\{\s*gas\s*\}\}/gi, String(curGas))
+        .replace(/\{\{\s*moisture\s*\}\}/gi, String(curMoist))
+        .replace(/\{\{\s*distance\s*\}\}/gi, String(curDist))
+        .replace(/\{\{\s*pot\s*\}\}/gi, String(curPot))
+
+      // 2. Dynamically update formatted sensor telemetry strings
+      text = text.replace(/(Temperature:\s*)\d+(\.?\d*)\s*(°?C)?/gi, `$1${curTemp}°C`)
+      text = text.replace(/(Humidity:\s*)\d+(\.?\d*)\s*(%?)/gi, `$1${curHum}%`)
+      text = text.replace(/(Ambient Light:\s*)\d+(\.?\d*)\s*(Lux)?/gi, `$1${curLux} Lux`)
+      text = text.replace(/(Gas Level:\s*)\d+(\.?\d*)\s*(ppm)?/gi, `$1${curGas} ppm`)
+      text = text.replace(/(Soil Moisture:\s*)\d+(\.?\d*)/gi, `$1${curMoist}`)
+      text = text.replace(/(Target Dist:\s*)\d+(\.?\d*)\s*(cm)?/gi, `$1${curDist} cm`)
+
+      return text
+    })
+
+    return () => {
+      virtualWifiManager.setBodyTransformer(undefined)
+    }
+  }, [])
 
   const selected = state.parts.find((p) => p.id === selectedId) ?? null
   const selectedWire = state.wires.find((w) => w.id === selectedWireId) ?? null
@@ -853,7 +902,9 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
           }))
         },
         getSensorValue: (type, pin) => {
-          const activeBoard = getActiveBoard(state)
+          const state = stateRef.current
+          const currentState = state
+          const activeBoard = getActiveBoard(currentState)
           const directPart = pin ? partsRef.current.find((pt) => pt.id === pin) : undefined
           const aliases: Record<string, string> = {
             pir: "pir-sensor",
@@ -875,36 +926,59 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
             : undefined
 
           if (type === "pushbutton") return p ? (pressedRef.current.has(p.id) ? 1 : 0) : 0
-          if (type === "ultrasonic") return liveRuntime?.sensorValue ?? (runningRef.current ? 0 : Number(p?.props?.distance ?? 100))
+          if (type === "ultrasonic") {
+            const currentDist = Number(p?.props?.distance ?? 100)
+            return liveRuntime?.sensorValue !== undefined ? liveRuntime.sensorValue : currentDist
+          }
           if (type === "ldr") {
-            const raw = liveRuntime?.sensorValue ?? (runningRef.current ? 0 : Number(p?.props?.light ?? 512))
+            const currentLight = Number(p?.props?.light ?? 512)
+            const raw = liveRuntime?.sensorValue !== undefined ? liveRuntime.sensorValue : currentLight
             return scaleAdcReading(Math.max(0, Math.min(1, raw / 1023)), activeBoard)
           }
-          if (type === "tmp36") return liveRuntime?.sensorValue ?? (runningRef.current ? 0 : Number(p?.props?.temperature ?? 25))
-          if (type === "pir") return liveRuntime?.level ?? (runningRef.current ? 0 : String(p?.props?.motion ?? "false") === "true" ? 1 : 0)
+          if (type === "tmp36") {
+            const currentTemp = Number(p?.props?.temperature ?? 25)
+            return liveRuntime?.sensorValue !== undefined ? liveRuntime.sensorValue : currentTemp
+          }
+          if (type === "pir") {
+            return liveRuntime?.level !== undefined ? liveRuntime.level : (String(p?.props?.motion ?? "false") === "true" ? 1 : 0)
+          }
           if (type === "potentiometer") {
             const raw = Number(p?.props?.value ?? 512)
             return scaleAdcReading(Math.max(0, Math.min(1, raw / 1023)), activeBoard)
           }
-          if (type === "ir") return liveRuntime?.sensorValue ?? (runningRef.current ? 0 : String(p?.props?.detected ?? "false") === "true" ? 1 : 0)
-          if (type === "dht_temperature") return liveRuntime?.dhtTemperature ?? (runningRef.current ? 0 : Number(p?.props?.temperature ?? 25))
-          if (type === "dht_humidity") return liveRuntime?.dhtHumidity ?? (runningRef.current ? 0 : Number(p?.props?.humidity ?? 55))
+          if (type === "ir") {
+            return liveRuntime?.sensorValue !== undefined ? liveRuntime.sensorValue : (String(p?.props?.detected ?? "false") === "true" ? 1 : 0)
+          }
+          if (type === "dht_temperature") {
+            const currentTemp = Number(p?.props?.temperature ?? 25)
+            return liveRuntime?.dhtTemperature !== undefined ? liveRuntime.dhtTemperature : currentTemp
+          }
+          if (type === "dht_humidity") {
+            const currentHum = Number(p?.props?.humidity ?? 55)
+            return liveRuntime?.dhtHumidity !== undefined ? liveRuntime.dhtHumidity : currentHum
+          }
           if (type === "joystick_x") {
-            const raw = liveRuntime?.joystickX ?? (runningRef.current ? 0 : Number(p?.props?.x ?? 512))
+            const raw = liveRuntime?.joystickX !== undefined ? liveRuntime.joystickX : Number(p?.props?.x ?? 512)
             return scaleAdcReading(Math.max(0, Math.min(1, raw / 1023)), activeBoard)
           }
           if (type === "joystick_y") {
-            const raw = liveRuntime?.joystickY ?? (runningRef.current ? 0 : Number(p?.props?.y ?? 512))
+            const raw = liveRuntime?.joystickY !== undefined ? liveRuntime.joystickY : Number(p?.props?.y ?? 512)
             return scaleAdcReading(Math.max(0, Math.min(1, raw / 1023)), activeBoard)
           }
-          if (type === "joystick_button") return liveRuntime?.joystickButton ? 1 : runningRef.current ? 0 : String(p?.props?.pressed ?? "false") === "true" ? 1 : 0
+          if (type === "joystick_button") {
+            return liveRuntime?.joystickButton ? 1 : (String(p?.props?.pressed ?? "false") === "true" ? 1 : 0)
+          }
           if (type === "soil") {
-            const raw = liveRuntime?.sensorValue ?? (runningRef.current ? 0 : Number(p?.props?.moisture ?? 620))
+            const currentMoist = Number(p?.props?.moisture ?? 620)
+            const raw = liveRuntime?.sensorValue !== undefined ? liveRuntime.sensorValue : currentMoist
             return scaleAdcReading(Math.max(0, Math.min(1, raw / 1023)), activeBoard)
           }
-          if (type === "encoder") return liveRuntime?.encoderValue ?? Number(p?.props?.value ?? 0)
+          if (type === "encoder") {
+            return liveRuntime?.encoderValue !== undefined ? liveRuntime.encoderValue : Number(p?.props?.value ?? 0)
+          }
           if (type === "mq2-gas" || type === "mq2_gas") {
-            const raw = liveRuntime?.sensorValue ?? (runningRef.current ? 0 : Number(p?.props?.gasLevel ?? p?.props?.gasPpm ?? 120))
+            const currentGas = Number(p?.props?.gasLevel ?? p?.props?.gasPpm ?? 120)
+            const raw = liveRuntime?.sensorValue !== undefined ? liveRuntime.sensorValue : currentGas
             return scaleAdcReading(Math.max(0, Math.min(1, raw / 1000)), activeBoard)
           }
           if (type === "analog") {
@@ -922,9 +996,9 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
               )
 
               if (targetBoardPin) {
-                const nodal = solveCircuitNodalPotentials(state, pressedRef.current, pinStatesRef.current, true)
+                const nodal = solveCircuitNodalPotentials(currentState, pressedRef.current, pinStatesRef.current, true)
                 const vPin = nodal.getPinVoltage({ partId: boardPart.id, pinId: targetBoardPin.id })
-                const isWired = state.wires.some(
+                const isWired = currentState.wires.some(
                   (w) =>
                     (w.from.partId === boardPart.id && w.from.pinId === targetBoardPin.id) ||
                     (w.to.partId === boardPart.id && w.to.pinId === targetBoardPin.id)
@@ -947,7 +1021,8 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
           return 0
         },
         getDigitalPin: (pin) => {
-          const activeBoard = getActiveBoard(state)
+          const currentState = stateRef.current
+          const activeBoard = getActiveBoard(currentState)
           const boardPart = partsRef.current.find((pt) => isBoardPart(pt.type))
 
           // 1. Direct state lookup with universal prefix normalization
@@ -968,7 +1043,7 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
             )
 
             if (targetBoardPin) {
-              const nodal = solveCircuitNodalPotentials(state, pressedRef.current, pinStatesRef.current, true)
+              const nodal = solveCircuitNodalPotentials(currentState, pressedRef.current, pinStatesRef.current, true)
               const vPin = nodal.getPinVoltage({ partId: boardPart.id, pinId: targetBoardPin.id })
               if (vPin >= activeBoard.logicVoltage * 0.45) {
                 return true
@@ -1040,14 +1115,15 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
         wifiGetIp: () => virtualWifiManager.getState().ipAddress,
         wifiServerBegin: (port: number) => {
           virtualWifiManager.startServer(port)
-          const activeBoard = getActiveBoard(state)
-          const { mappings, builtIn } = findCircuitLedPinMappings(state, activeBoard)
+          const currentState = stateRef.current
+          const activeBoard = getActiveBoard(currentState)
+          const { mappings, builtIn } = findCircuitLedPinMappings(currentState, activeBoard)
 
           const allLedPins = Array.from(
             new Set([
               builtIn,
               ...mappings.map((m) => m.pinId),
-              ...(activeBoard.id === "esp32-devkit" && mappings.length === 0 && state.parts.some((p) => p.type === "led")
+              ...(activeBoard.id === "esp32-devkit" && mappings.length === 0 && currentState.parts.some((p) => p.type === "led")
                 ? ["4", "15"]
                 : []),
             ])
@@ -1172,8 +1248,9 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
             }
             // Hardware pin driver guarantee
             const clean = (route || "").toLowerCase()
-            const board = getActiveBoard(state)
-            const { mappings, builtIn } = findCircuitLedPinMappings(state, board)
+            const currentState = stateRef.current
+            const board = getActiveBoard(currentState)
+            const { mappings, builtIn } = findCircuitLedPinMappings(currentState, board)
             if (clean.includes("/led/on") || clean === "/on") {
               env.setDigitalPin(builtIn, "HIGH")
               for (const m of mappings) env.setDigitalPin(m.pinId, "HIGH")

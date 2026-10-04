@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { BookOpen, Check, Circle, Lock, Play, RotateCcw, Search, Target, X, Zap } from "lucide-react"
+import { BookOpen, Check, Circle, Lock, Play, RotateCcw, Search, Sparkles, Target, X, Zap } from "lucide-react"
 import type { Lesson, LessonContext, LessonProgress } from "@/lib/lesson-engine"
 import {
   LESSONS,
@@ -378,6 +378,26 @@ export function LessonBrowser({
                     <p className="mt-1 text-xs leading-relaxed text-slate-200 font-medium">
                       {activeLesson.finalGoal}
                     </p>
+                  </div>
+                )}
+
+                {/* Step-by-Step Coding Guide & Block Hints for Intermediate & Advanced Missions */}
+                {activeLesson.codingHints && activeLesson.codingHints.length > 0 && (
+                  <div className="mt-3 rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-950/30 via-slate-900/40 to-slate-950/40 p-3 shadow-inner">
+                    <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-amber-300">
+                      <Sparkles size={13} className="text-amber-400 shrink-0" />
+                      <span>💡 Coding Guide & Block Hints ({activeLesson.difficulty} Mission)</span>
+                    </div>
+                    <ul className="mt-2 space-y-1.5 text-xs text-slate-300 leading-relaxed font-sans">
+                      {activeLesson.codingHints.map((hint, idx) => (
+                        <li key={idx} className="flex items-start gap-2">
+                          <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-amber-500/20 text-[9px] font-bold text-amber-300 border border-amber-500/40">
+                            {idx + 1}
+                          </span>
+                          <span className="text-slate-300 text-[11px] leading-snug">{hint}</span>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 )}
 

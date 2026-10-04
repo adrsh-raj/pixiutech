@@ -221,8 +221,13 @@ export function IotWebPortal({ isOpen, onClose }: Props) {
   useEffect(() => {
     return virtualWifiManager.subscribe((state) => {
       setWifiState(state)
+      const clean = (currentPath || "/").trim()
+      const route = state.routes[clean] || state.routes["/"]
+      if (route?.responseBody) {
+        setRenderedHtml(route.responseBody)
+      }
     })
-  }, [])
+  }, [currentPath])
 
   const navigateTo = async (path: string) => {
     let clean = (path || "/").trim()
@@ -238,10 +243,18 @@ export function IotWebPortal({ isOpen, onClose }: Props) {
   }
 
   useEffect(() => {
-    if (isOpen) {
-      navigateTo(currentPath)
-    }
-  }, [isOpen])
+    if (!isOpen) return
+    navigateTo(currentPath)
+
+    // Periodic telemetry sync so live sensor slider changes immediately reflect on phone screen
+    const interval = setInterval(() => {
+      if (virtualWifiManager.getState().status === "connected") {
+        navigateTo(currentPath)
+      }
+    }, 1200)
+
+    return () => clearInterval(interval)
+  }, [isOpen, currentPath])
 
   if (!isOpen) return null
 

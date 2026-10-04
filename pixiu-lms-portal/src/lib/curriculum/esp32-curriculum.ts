@@ -346,6 +346,11 @@ export const ESP32_LESSONS: Lesson[] = [
     concepts: ["ESP32", "Hardware DAC", "Analog Voltage", "Tone Generation"],
     prerequisites: ["lesson-esp32-rgb-mood"],
     finalGoal: "🎯 What You Will Build: An authentic hardware Digital-to-Analog Converter (DAC) audio generator producing true analog voltage waveforms on GPIO25 through a piezo speaker.",
+    codingHints: [
+      "In Loop, use the Tone Play block on Pin 25 with 440 Hz frequency.",
+      "Add a Time Delay of 400 ms to hold the note.",
+      "Add a Tone Stop block on Pin 25 followed by a Time Delay of 300 ms.",
+    ],
     seedCircuit: {
       parts: [
         part("esp", "esp32-devkit", 60, 100),
@@ -417,6 +422,11 @@ export const ESP32_LESSONS: Lesson[] = [
     concepts: ["ESP32", "Servo Motors", "PWM Angle Sweep", "Robotics"],
     prerequisites: ["lesson-esp32-dac-tone"],
     finalGoal: "🎯 What You Will Build: A 50Hz precision PWM robotic servo actuator sweeping across 0°, 90°, and 180° positions from ESP32 GPIO18.",
+    codingHints: [
+      "In Loop, place a Servo Write block on Pin 18 set to 0°.",
+      "Add a Time Delay of 800 ms to allow the servo horn to settle.",
+      "Place a second Servo Write block on Pin 18 set to 90° followed by an 800 ms delay.",
+    ],
     seedCircuit: {
       parts: [
         part("esp", "esp32-devkit", 60, 100),
@@ -489,6 +499,11 @@ export const ESP32_LESSONS: Lesson[] = [
     concepts: ["ESP32", "DHT11 Sensor", "One-Wire Digital", "Serial Telemetry"],
     prerequisites: ["lesson-esp32-servo-pwm"],
     finalGoal: "🎯 What You Will Build: A dual-parameter environmental telemetry station reading digital temperature (°C) and relative humidity (%) from a DHT11 sensor on GPIO4.",
+    codingHints: [
+      "In Setup, initialize serial communication with Serial Begin at 115200 baud.",
+      "In Loop, place a Serial Println block containing the DHT Temperature block.",
+      "Insert a Time Delay of 1000 ms to observe stable continuous environmental telemetry.",
+    ],
     seedCircuit: {
       parts: [
         part("esp", "esp32-devkit", 60, 100),
@@ -574,6 +589,11 @@ export const ESP32_LESSONS: Lesson[] = [
     concepts: ["ESP32", "I2C Bus", "OLED Display", "Visual Dashboard"],
     prerequisites: ["lesson-esp32-dht11-env"],
     finalGoal: "🎯 What You Will Build: A high-contrast 128×64 I2C OLED graphical dashboard displaying real-time telemetry metrics using hardware I2C lines (SDA on GPIO21, SCL on GPIO22).",
+    codingHints: [
+      "In Setup, place an OLED Print block with your desired dashboard string (e.g. 'ESP32 CYBERLAB').",
+      "Notice that the OLED automatically uses ESP32 hardware I2C pins D21 (SDA) and D22 (SCL).",
+      "In Loop, add a Time Delay block to keep the display active and prevent CPU throttling.",
+    ],
     seedCircuit: {
       parts: [
         part("esp", "esp32-devkit", 60, 100),
@@ -647,6 +667,11 @@ export const ESP32_LESSONS: Lesson[] = [
     concepts: ["ESP32", "Virtual Wi-Fi", "DHCP", "Station Mode", "Networking"],
     prerequisites: ["lesson-esp32-oled-i2c"],
     finalGoal: "🎯 What You Will Build: A Virtual Wi-Fi network link connecting the ESP32 to a local simulated wireless access point with full IP address assignment and connection logging.",
+    codingHints: [
+      "In Setup, configure Serial Begin at 115200 baud for network status logs.",
+      "Add a WiFi Connect block with SSID ('CyberLab-WiFi') and Password ('secret123').",
+      "In Loop, add a Time Delay of 500 ms while the ESP32 maintains its station connection.",
+    ],
     seedCircuit: {
       parts: [part("esp", "esp32-devkit", 80, 100)],
       wires: [],
@@ -704,6 +729,12 @@ export const ESP32_LESSONS: Lesson[] = [
     concepts: ["ESP32", "HTTP Web Server", "IoT Smartphone", "Smart Home Automation", "Routes"],
     prerequisites: ["lesson-esp32-wifi-connect"],
     finalGoal: "🎯 What You Will Build: A full IoT HTTP Web Server hosted directly on the ESP32, allowing remote smartphone browser control to switch physical living room and bedroom LEDs.",
+    codingHints: [
+      "In Setup, connect to WiFi with WiFi Connect ('SmartHome-WiFi', 'pixiu123').",
+      "Initialize web service with WiFi Server Begin on Port 80.",
+      "Add a WiFi Server On route for '/' sending HTML controls with WiFi Server Send.",
+      "Add an action route for '/red/on' that sets Pin 4 HIGH and responds with status HTML.",
+    ],
     seedCircuit: {
       parts: [
         part("esp", "esp32-devkit", 40, 70),

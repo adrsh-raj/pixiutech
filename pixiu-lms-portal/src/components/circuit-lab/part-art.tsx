@@ -1030,8 +1030,14 @@ export function PartArt({ part, runtime }: { part: PlacedPart; runtime?: PartRun
       const line1 = runtime?.lcdLine1 ?? ""
       const line2 = runtime?.lcdLine2 ?? ""
       const backlit = runtime?.lcdBacklight !== false
+      const clipId = `lcd-clip-${part.id}`
       return (
         <g>
+          <defs>
+            <clipPath id={clipId}>
+              <rect x={20} y={15} width={140} height={42} rx={2} />
+            </clipPath>
+          </defs>
           {/* PCB Board */}
           <rect x={0} y={0} width={180} height={72} rx={4} fill="#166534" stroke="#14532d" strokeWidth={1.5} />
           {/* Mounting holes */}
@@ -1043,12 +1049,32 @@ export function PartArt({ part, runtime }: { part: PlacedPart; runtime?: PartRun
           <rect x={14} y={10} width={152} height={52} rx={2} fill={backlit ? "#1a4a1a" : "#0a2a0a"} stroke="#052e16" />
           {/* Text area background */}
           <rect x={18} y={14} width={144} height={44} rx={1} fill={backlit ? "#0d3d0d" : "#061a06"} />
-          {/* Line 1 text */}
-          <text x={22} y={32} fontSize={13} fill={backlit ? "#4ade80" : "#1a5c1a"} fontFamily="monospace" letterSpacing={3}>
+          {/* Line 1 text - mathematically clamped so 16 characters never exceed bezel */}
+          <text
+            x={22}
+            y={32}
+            fontSize={9.2}
+            fill={backlit ? "#4ade80" : "#1a5c1a"}
+            fontFamily="monospace"
+            letterSpacing={1.2}
+            textLength={134}
+            lengthAdjust="spacingAndGlyphs"
+            clipPath={`url(#${clipId})`}
+          >
             {(line1 || "").padEnd(16, " ").slice(0, 16)}
           </text>
           {/* Line 2 text */}
-          <text x={22} y={52} fontSize={13} fill={backlit ? "#4ade80" : "#1a5c1a"} fontFamily="monospace" letterSpacing={3}>
+          <text
+            x={22}
+            y={50}
+            fontSize={9.2}
+            fill={backlit ? "#4ade80" : "#1a5c1a"}
+            fontFamily="monospace"
+            letterSpacing={1.2}
+            textLength={134}
+            lengthAdjust="spacingAndGlyphs"
+            clipPath={`url(#${clipId})`}
+          >
             {(line2 || "").padEnd(16, " ").slice(0, 16)}
           </text>
           {/* I2C backpack chip */}
@@ -1278,13 +1304,19 @@ export function PartArt({ part, runtime }: { part: PlacedPart; runtime?: PartRun
       const line1 = String(runtime?.lcdLine1 ?? part.props.line1 ?? "").slice(0, 18)
       const line2 = String(runtime?.lcdLine2 ?? part.props.line2 ?? "").slice(0, 18)
       const line3 = String(part.props.line3 ?? "").slice(0, 18)
+      const clipId = `oled-clip-${part.id}`
       return (
         <g>
+          <defs>
+            <clipPath id={clipId}>
+              <rect x="14" y="16" width="122" height="56" rx="4" />
+            </clipPath>
+          </defs>
           <rect x="2" y="3" width="146" height="86" rx="9" fill="#111827" stroke="#334155" strokeWidth="2" />
           <rect x="12" y="14" width="126" height="60" rx="5" fill="#03111b" stroke="#0e7490" strokeWidth="1.5" />
-          <text x="20" y="31" fontSize="9" fill="#67e8f9" fontFamily="monospace">{line1 || "PIXIU OLED"}</text>
-          <text x="20" y="47" fontSize="9" fill="#22d3ee" fontFamily="monospace">{line2 || "READY"}</text>
-          <text x="20" y="63" fontSize="8" fill="#0891b2" fontFamily="monospace">{line3}</text>
+          <text x="20" y="31" fontSize="8.5" fill="#67e8f9" fontFamily="monospace" clipPath={`url(#${clipId})`}>{line1 || "PIXIU OLED"}</text>
+          <text x="20" y="47" fontSize="8.5" fill="#22d3ee" fontFamily="monospace" clipPath={`url(#${clipId})`}>{line2 || "READY"}</text>
+          <text x="20" y="63" fontSize="8" fill="#0891b2" fontFamily="monospace" clipPath={`url(#${clipId})`}>{line3}</text>
           <circle cx="126" cy="81" r="2" fill="#22d3ee" className={line1 || line2 ? "animate-pulse" : ""} />
         </g>
       )

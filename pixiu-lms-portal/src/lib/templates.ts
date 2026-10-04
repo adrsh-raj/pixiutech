@@ -306,14 +306,14 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
   {
     id: "esp32-weather-telemetry",
     title: "5. ⛅ ESP32 IoT Weather Station & Smartphone Telemetry",
-    description: "Cloud-connected microclimate monitoring station! The ESP32 samples digital temperature and humidity data from DHT11 on GPIO 4 and analog ambient sunlight from an LDR on GPIO 34. Connecting over Virtual Wi-Fi, it hosts a real-time web portal on port 80 that formats and streams live environmental telemetry directly to simulated smartphones, while illuminating a green health LED on GPIO 2.",
+    description: "Cloud-connected microclimate monitoring station! The ESP32 samples digital temperature and humidity data from DHT11 on GPIO 4 and analog ambient sunlight from an LDR on GPIO 34. Connecting over Virtual Wi-Fi, it hosts a real-time web portal on port 80 that formats and streams live environmental telemetry directly to simulated smartphones, while pulsing the green telemetry TX activity LED on GPIO 2 each time data packets are dispatched.",
     difficulty: "Advanced",
     tags: ["ESP32", "DHT11", "LDR", "IoT", "Telemetry", "Smartphone"],
     circuit: {
       parts: [
         { id: "esp", type: "esp32-devkit", x: 40, y: 70, rotation: 0, props: {} },
-        { id: "dht", type: "dht11", x: 380, y: 60, rotation: 0, props: { temperature: 27, humidity: 62 } },
-        { id: "ldr", type: "ldr", x: 380, y: 190, rotation: 0, props: { light: 650 } },
+        { id: "dht", type: "dht11", x: 380, y: 60, rotation: 0, props: { temperature: 25, humidity: 60 } },
+        { id: "ldr", type: "ldr", x: 380, y: 190, rotation: 0, props: { light: 500 } },
         { id: "led_ok", type: "led", x: 550, y: 190, rotation: 0, props: { color: "green" } },
         { id: "r_led", type: "resistor", x: 550, y: 110, rotation: 0, props: { resistance: 220 } },
       ],
@@ -348,8 +348,13 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
                 <field name="STATUS">200</field>
                 <field name="TYPE">text/html</field>
                 <value name="CONTENT">
-                  <block type="text_string"><field name="TEXT">&lt;h1&gt;⛅ ESP32 Cloud Weather&lt;/h1&gt;&lt;div style="background:#0f172a;padding:12px;border-radius:8px;"&gt;&lt;h3 style="color:#38bdf8;"&gt;🌡️ Temperature: 27°C&lt;/h3&gt;&lt;h3 style="color:#22c55e;"&gt;💧 Humidity: 62%&lt;/h3&gt;&lt;h3 style="color:#eab308;"&gt;☀️ Ambient Light: 650 Lux&lt;/h3&gt;&lt;/div&gt;&lt;p style="color:#94a3b8;"&gt;Live Virtual Wi-Fi telemetry stream active.&lt;/p&gt;</field></block>
+                  <block type="text_string"><field name="TEXT">&lt;h1&gt;⛅ ESP32 Cloud Weather&lt;/h1&gt;&lt;div style="background:#0f172a;padding:12px;border-radius:8px;"&gt;&lt;h3 style="color:#38bdf8;"&gt;🌡️ Temperature: {{TEMP}}°C&lt;/h3&gt;&lt;h3 style="color:#22c55e;"&gt;💧 Humidity: {{HUMIDITY}}%&lt;/h3&gt;&lt;h3 style="color:#eab308;"&gt;☀️ Ambient Light: {{LUX}} Lux&lt;/h3&gt;&lt;/div&gt;&lt;p style="color:#94a3b8;"&gt;Live Virtual Wi-Fi telemetry stream active.&lt;/p&gt;</field></block>
                 </value>
+                <next>
+                <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">150</field></shadow></value><next>
+                <block type="io_digitalwrite"><field name="PIN">2</field><field name="STATE">LOW</field></block>
+                </next></block>
+                </next>
               </block>
               </next></block>
             </statement>
@@ -810,10 +815,10 @@ const BASE_TEMPLATE_META: Record<string, { gradeBand: TemplateGrade; unit: strin
     gradeBand: 8,
     unit: "IoT & Cloud",
     tutorial: [
-      "1. 🔌 Circuit Wiring & Hardware Setup: Connect DHT11 data to GPIO 4, LDR voltage divider to analog GPIO 34, status LED to GPIO 2 via 220Ω resistor, and supply 3.3V/GND to all sensors.",
-      "2. ⚙️ Code Architecture & Logic: ESP32 joins Wi-Fi network 'SmartHome-WiFi' and registers an HTTP GET '/' endpoint returning HTML formatted with live temperature, humidity, and lux.",
-      "3. ▶️ Simulation Execution & Interaction Controls: Click Run to boot the server. Open the 📱 Smartphone Portal and use the Inspector to alter DHT11 temperature or LDR ambient light.",
-      "4. 📊 Outcomes & Real-Time Observations: The smartphone display reflects updated weather metrics in real-time while the green status LED confirms active network telemetry.",
+      "1. 🔌 Circuit Wiring & Hardware Setup: Connect DHT11 data to GPIO 4, LDR ambient light sensor to analog GPIO 34, Green Telemetry TX Activity LED to GPIO 2 via 220Ω resistor, and supply 3.3V/GND rails to all sensors.",
+      "2. ⚙️ Code Architecture & Logic: ESP32 connects to 'SmartHome-WiFi' and registers an HTTP GET '/' endpoint. When queried, it pulses the GPIO 2 green TX LED for 150ms and streams dynamic HTML containing real-time temperature, humidity, and lux telemetry.",
+      "3. ▶️ Simulation Execution & Interaction Controls: Click Run to start the IoT server. Open the 📱 Smartphone Portal (movable floating device) and drag the DHT11 temperature or LDR light slider on the circuit canvas.",
+      "4. 📊 Outcomes & Real-Time Observations: The smartphone dashboard live-updates with current temperature and lux metrics while the green GPIO 2 LED pulses on every data transmission packet.",
     ],
   },
   "ultrasonic-radar-scanner": {

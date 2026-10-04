@@ -51,9 +51,25 @@ class VirtualWifiManager {
   }
 
   private listeners = new Set<Listener>()
+  private bodyTransformer?: (body: string) => string
+
+  public setBodyTransformer(fn: ((body: string) => string) | undefined): void {
+    this.bodyTransformer = fn
+  }
+
+  public getTransformedBody(body: string): string {
+    return this.bodyTransformer ? this.bodyTransformer(body) : body
+  }
 
   public getState(): VirtualWifiState {
-    return { ...this.state, routes: { ...this.state.routes }, requests: [...this.state.requests] }
+    const transformedRoutes: Record<string, VirtualHttpRoute> = {}
+    for (const [k, r] of Object.entries(this.state.routes)) {
+      transformedRoutes[k] = {
+        ...r,
+        responseBody: this.bodyTransformer ? this.bodyTransformer(r.responseBody) : r.responseBody,
+      }
+    }
+    return { ...this.state, routes: transformedRoutes, requests: [...this.state.requests] }
   }
 
   public subscribe(listener: Listener): () => void {
@@ -230,7 +246,7 @@ class VirtualWifiManager {
     return {
       statusCode: route.statusCode,
       contentType: route.contentType,
-      body: route.responseBody,
+      body: this.getTransformedBody(route.responseBody),
     }
   }
 

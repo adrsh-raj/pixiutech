@@ -324,6 +324,12 @@ export const PICO_LESSONS: Lesson[] = [
     concepts: ["RP2040", "PWM Slice", "Analog Write", "RGB LED"],
     prerequisites: ["lesson-pico-pot-adc"],
     finalGoal: "🎯 What You Will Build: A hardware PWM multi-slice color fader modulating Red (GP16), Green (GP17), and Blue (GP18) channels to blend vivid custom hues.",
+    codingHints: [
+      "In Setup, configure pins 16, 17, and 18 as OUTPUT.",
+      "In Loop, use Analog Write (PWM) blocks to drive pin 16 (Red), 17 (Green), and 18 (Blue).",
+      "Assign PWM duty levels between 0 and 255 to mix vibrant custom colors.",
+      "Add a Time Delay of 500 ms to observe color transitions.",
+    ],
     seedCircuit: {
       parts: [
         part("pico", "rpi-pico", 60, 100),
@@ -401,6 +407,11 @@ export const PICO_LESSONS: Lesson[] = [
     concepts: ["RP2040", "Audio PWM", "Buzzer", "Alert System"],
     prerequisites: ["lesson-pico-rgb-fader"],
     finalGoal: "🎯 What You Will Build: A melodic acoustic transducer generating clear 523Hz (Note C5) audio chime tones on GP15 through a piezo buzzer.",
+    codingHints: [
+      "In Loop, place a Tone Play block on Pin 15 with frequency 523 Hz (Note C5).",
+      "Add a Time Delay of 300 ms.",
+      "Add a Tone Stop block on Pin 15 followed by a Time Delay of 200 ms to form distinct audio notes.",
+    ],
     seedCircuit: {
       parts: [
         part("pico", "rpi-pico", 60, 100),
@@ -470,6 +481,11 @@ export const PICO_LESSONS: Lesson[] = [
     concepts: ["RP2040", "Ultrasonic HC-SR04", "Distance Sensing", "Threshold Alarm"],
     prerequisites: ["lesson-pico-buzzer-melody"],
     finalGoal: "🎯 What You Will Build: An active sonar parking radar that measures obstacle distance using an HC-SR04 sensor and trips an audible proximity buzzer under 40cm.",
+    codingHints: [
+      "In Loop, create an If/Else statement using a comparison block: Ultrasonic Read < 40 cm.",
+      "If distance is under 40 cm: turn Pin 4 (Buzzer) HIGH to sound collision alarm.",
+      "Else: turn Pin 4 LOW to silence alarm.",
+    ],
     seedCircuit: {
       parts: [
         part("pico", "rpi-pico", 60, 100),
@@ -559,6 +575,11 @@ export const PICO_LESSONS: Lesson[] = [
     concepts: ["RP2040", "Servo Motors", "PWM", "Robotics"],
     prerequisites: ["lesson-pico-ultrasonic-radar"],
     finalGoal: "🎯 What You Will Build: A calibrated robotic positioning arm commanded to cycle between 0° and 90° angles using precision PWM timing on GP15.",
+    codingHints: [
+      "In Loop, command the servo to 0° using Servo Write on Pin 15.",
+      "Insert a Time Delay of 800 ms to give the mechanical arm time to sweep.",
+      "Command Servo Write Pin 15 to 90° followed by an 800 ms delay to loop the articulation.",
+    ],
     seedCircuit: {
       parts: [
         part("pico", "rpi-pico", 60, 100),
@@ -629,6 +650,11 @@ export const PICO_LESSONS: Lesson[] = [
     concepts: ["RP2040", "I2C Bus", "16x2 LCD", "Text Formatting"],
     prerequisites: ["lesson-pico-servo-motion"],
     finalGoal: "🎯 What You Will Build: An alphanumeric status display rendering real-time formatted text on an I2C 16×2 LCD screen via GP4 (SDA) and GP5 (SCL).",
+    codingHints: [
+      "In Setup, place an LCD Print block with your custom status string (e.g. 'RPI PICO RP2040').",
+      "Notice that the I2C LCD is wired to default hardware I2C0 pins GP4 (SDA) and GP5 (SCL).",
+      "In Loop, add a Time Delay block to keep the LCD backlight and text stable.",
+    ],
     seedCircuit: {
       parts: [
         part("pico", "rpi-pico", 60, 100),
@@ -702,6 +728,12 @@ export const PICO_LESSONS: Lesson[] = [
     concepts: ["RP2040", "Soil Moisture Sensor", "Relay Driver", "Automated Irrigation"],
     prerequisites: ["lesson-pico-i2c-lcd"],
     finalGoal: "🎯 What You Will Build: An autonomous smart agriculture station that measures soil moisture on ADC1 (GP27) and automatically engages a 5V relay irrigation pump on GP13 when soil dries.",
+    codingHints: [
+      "In Setup, set Pin 13 as OUTPUT to drive the electromechanical relay coil.",
+      "In Loop, read soil dryness using Soil Moisture Read on analog pin GP27 (ADC1).",
+      "If Soil Moisture < 400: drive Pin 13 HIGH to energize relay and start the water pump.",
+      "Else: drive Pin 13 LOW to turn off the pump when soil is sufficiently hydrated.",
+    ],
     seedCircuit: {
       parts: [
         part("pico", "rpi-pico", 60, 100),

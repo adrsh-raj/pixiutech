@@ -76,6 +76,7 @@ export interface Lesson {
   seedBlocklyXml?: string
   steps: LessonStep[]
   finalGoal?: string
+  codingHints?: string[]
 }
 
 export interface LessonContext {
@@ -1249,6 +1250,11 @@ const UNO_LESSONS: Lesson[] = [
     prerequisites: ["lesson-led-basics"],
     templateId: "servo-sweep",
     finalGoal: "🎯 What You Will Build: A robotic servo positioning arm that sweeps dynamically across calibrated angular positions (0°, 90°, and 180°) using precise pulse-width modulation on digital pin D9.",
+    codingHints: [
+      "Place a Servo Write block on Pin 9 inside the Loop statement.",
+      "Set target angle to 0° followed by a Delay of 500 ms.",
+      "Add a second Servo Write block to 90° and a third block to 180° with delays between each.",
+    ],
     steps: [
       {
         id: "parts",
@@ -1303,6 +1309,11 @@ const UNO_LESSONS: Lesson[] = [
     prerequisites: ["lesson-servo", "lesson-pushbutton-led"],
     templateId: "g7-servo-door",
     finalGoal: "🎯 What You Will Build: An automated parking boom barrier mechanism that raises to 90° to admit authorized vehicles and returns to 0° to secure the gate.",
+    codingHints: [
+      "Configure Servo on Pin 9 and initialize barrier gate to 0° (Closed).",
+      "In Loop, add two Servo Write blocks: one to rotate to 90° (Gate Raised) and one to 0° (Gate Lowered).",
+      "Insert a Time Delay of 1000 ms between gate actions so vehicles have time to pass.",
+    ],
     steps: [
       {
         id: "parts",
@@ -1358,6 +1369,12 @@ const UNO_LESSONS: Lesson[] = [
     prerequisites: ["lesson-servo"],
     templateId: "ultrasonic-radar",
     finalGoal: "🎯 What You Will Build: An active sonar collision detection and parking sensor that measures distance in centimeters using HC-SR04 sound waves and sounds a buzzer alarm when an obstacle is within 30cm.",
+    codingHints: [
+      "In Setup, set Pin 8 (Buzzer) to OUTPUT.",
+      "In Loop, use an If/Else block comparing Ultrasonic Read (Trig: 9, Echo: 10) < 30 cm.",
+      "If obstacle is under 30 cm: set Pin 8 to HIGH to sound emergency alarm.",
+      "Else: set Pin 8 to LOW to keep alarm silent.",
+    ],
     steps: [
       {
         id: "parts",
@@ -1425,6 +1442,12 @@ const UNO_LESSONS: Lesson[] = [
     seedCircuit: MQ2_GAS_CIRCUIT,
     seedBlocklyXml: MQ2_GAS_XML,
     finalGoal: "🎯 What You Will Build: An environmental hazard safety sentinel that continuously samples air quality via an MQ-2 sensor and trips an emergency buzzer alarm and flashing warning strobe if gas PPM exceeds 300.",
+    codingHints: [
+      "In Setup, configure digital alarm outputs: Pin 8 (Buzzer) and Pin 13 (Alert Strobe).",
+      "In Loop, sample the gas sensor using the MQ-2 Gas Read block on Pin A0.",
+      "Compare: If (Gas PPM > 300), turn Pin 8 and Pin 13 HIGH (Hazard Alert Active!).",
+      "Else: set Pin 8 and Pin 13 to LOW (Air Clean).",
+    ],
     steps: [
       {
         id: "parts",
@@ -1488,6 +1511,12 @@ const UNO_LESSONS: Lesson[] = [
     seedCircuit: DHT11_CIRCUIT,
     seedBlocklyXml: DHT11_XML,
     finalGoal: "🎯 What You Will Build: A digital weather telemetry monitor that reads temperature (°C) and humidity (%) over a single-wire digital protocol from a DHT11 sensor and logs formatted climate data to the Serial console.",
+    codingHints: [
+      "In Setup, initialize the Serial monitor with Serial Begin (9600 baud).",
+      "In Loop, read temperature using DHT Temperature block and humidity using DHT Humidity block.",
+      "Send sensor values to Serial Monitor using Serial Print and Serial Println blocks.",
+      "Add a Time Delay of 1000 ms to give the DHT sensor sufficient sampling interval.",
+    ],
     steps: [
       {
         id: "wiring",
@@ -1541,6 +1570,11 @@ const UNO_LESSONS: Lesson[] = [
     prerequisites: ["lesson-dht11"],
     templateId: "g8-lcd-weather",
     finalGoal: "🎯 What You Will Build: An alphanumeric smart dashboard that uses the 2-wire I2C communication protocol (SDA/SCL) on pins A4 & A5 to render custom greetings and telemetry on a 16×2 character LCD screen.",
+    codingHints: [
+      "In Setup, clear any residual display artifacts with the LCD Clear block.",
+      "Use LCD Print to render your custom text string on row 0, column 0.",
+      "In Loop, refresh telemetry readings or display dynamic strings with an update delay.",
+    ],
     steps: [
       {
         id: "parts",
@@ -1599,6 +1633,12 @@ const UNO_LESSONS: Lesson[] = [
     seedCircuit: NEOPIXEL_CIRCUIT,
     seedBlocklyXml: NEOPIXEL_XML,
     finalGoal: "🎯 What You Will Build: An 8-pixel WS2812B addressable NeoPixel cyber ring displaying flowing rainbow color animations and patterns controlled over a single high-speed digital data pin (D6).",
+    codingHints: [
+      "Target the NeoPixel Ring component (Pin D6, 8 pixels).",
+      "Use the NeoPixel Set Color block to set pixel indices (0 to 7) to your desired color.",
+      "Call the NeoPixel Show block to push color data buffer out to the WS2812 hardware LEDs.",
+      "Add a Time Delay block to create sequential rainbow or chase animations.",
+    ],
     steps: [
       {
         id: "parts",
@@ -1657,6 +1697,12 @@ const UNO_LESSONS: Lesson[] = [
     prerequisites: ["lesson-servo-gate"],
     templateId: "g7-pir-security",
     finalGoal: "🎯 What You Will Build: An intrusion perimeter security system that senses human thermal infrared radiation via a PIR sensor on pin D7 and immediately activates a security alert strobe on pin D13.",
+    codingHints: [
+      "In Setup, configure Pin D7 as INPUT (PIR Sensor) and Pin D13 as OUTPUT (Security LED).",
+      "In Loop, test motion status using the PIR Motion block inside an If/Else statement.",
+      "If motion is HIGH: turn Pin 13 HIGH (Intruder Alert!).",
+      "Else: turn Pin 13 LOW (Perimeter Secure).",
+    ],
     steps: [
       {
         id: "parts",
@@ -1717,6 +1763,12 @@ const UNO_LESSONS: Lesson[] = [
     prerequisites: ["lesson-ldr-night-lamp"],
     templateId: "g7-soil-smart-farm",
     finalGoal: "🎯 What You Will Build: An automated smart irrigation controller that measures soil moisture content via analog conductivity on pin A0 and automatically switches an irrigation pump indicator on when soil is dry.",
+    codingHints: [
+      "In Setup, set Pin D13 as OUTPUT (Irrigation Pump / Water Valve indicator).",
+      "In Loop, sample moisture using the Soil Moisture Read block on Pin A0.",
+      "Use an If/Else block: if Soil Moisture is less than threshold (Dry Soil), turn Pin 13 HIGH to start irrigation pump.",
+      "Else (Soil Hydrated): turn Pin 13 LOW to conserve water.",
+    ],
     steps: [
       {
         id: "parts",
@@ -1777,6 +1829,12 @@ const UNO_LESSONS: Lesson[] = [
     prerequisites: ["lesson-pir-security"],
     templateId: "g8-keypad-lock",
     finalGoal: "🎯 What You Will Build: A digital electronic security vault door that scans user keystrokes from a 4×4 matrix keypad using row-column multiplexing to verify a secure PIN and unlock the vault.",
+    codingHints: [
+      "In Setup, configure Pin D13 as OUTPUT for the Vault Lock status indicator.",
+      "In Loop, scan for user input using the Keypad Read block across pins D2..D9.",
+      "Compare the pressed key to your secret access digit (e.g. key '1').",
+      "If matched: drive Pin 13 HIGH to unlock the electronic vault solenoid.",
+    ],
     steps: [
       {
         id: "parts",
@@ -1835,6 +1893,12 @@ const UNO_LESSONS: Lesson[] = [
     prerequisites: ["lesson-servo-gate"],
     templateId: "ai-smart-barrier",
     finalGoal: "🎯 What You Will Build: An autonomous AI-powered boom barrier that runs real-time computer vision to detect oncoming vehicles, swinging the servo arm to 90° and illuminating the Green Pass light for authorized cars.",
+    codingHints: [
+      "In Setup, initialize Servo on Pin D6 to 0° (Closed Barrier) and set Pin 12 (Pass) & Pin 13 (Stop) as OUTPUTs.",
+      "In Loop, inspect the camera feed with AI Is Detected for class 'car'.",
+      "If detected: command Servo Write Pin 6 to 90° (Raise Barrier), turn Pin 12 HIGH (Green Pass) and Pin 13 LOW.",
+      "Else: command Servo Write Pin 6 to 0° (Lower Barrier), turn Pin 12 LOW and Pin 13 HIGH (Red Stop).",
+    ],
     steps: [
       {
         id: "parts",
@@ -1897,6 +1961,12 @@ const UNO_LESSONS: Lesson[] = [
     seedCircuit: AI_GESTURE_CIRCUIT,
     seedBlocklyXml: AI_GESTURE_XML,
     finalGoal: "🎯 What You Will Build: A touchless smart home automation system that uses AI hand gesture recognition (such as Thumbs Up) to wirelessly actuate servo mechanisms and lighting indicators without physical contact.",
+    codingHints: [
+      "In Setup, enable camera stream with the AI Camera Enable block and configure Pin 13 as OUTPUT.",
+      "In Loop, check the hand classifier with AI Is Gesture for 'thumbs_up'.",
+      "If Thumbs Up detected: command Servo Write Pin 9 to 90° and turn Pin 13 HIGH.",
+      "Else: command Servo Write Pin 9 to 0° and turn Pin 13 LOW.",
+    ],
     steps: [
       {
         id: "parts",
