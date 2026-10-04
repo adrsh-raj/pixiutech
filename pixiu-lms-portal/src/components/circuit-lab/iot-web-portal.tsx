@@ -449,7 +449,7 @@ export function IotWebPortal({ isOpen, onClose }: Props) {
           {/* VIEW 1: SMARTPHONE VIEW                                       */}
           {/* ============================================================== */}
           {deviceMode === "phone" && (
-            <div className="relative w-[320px] h-[500px] bg-slate-900 border-[5px] border-slate-700/90 rounded-[44px] shadow-2xl p-2 flex flex-col select-none ring-1 ring-cyan-500/20">
+            <div className="relative w-[320px] h-[500px] bg-slate-900 border-[5px] border-slate-700/90 rounded-[48px] shadow-2xl p-2 flex flex-col select-none ring-1 ring-cyan-500/20">
               {/* Left Hardware Volume buttons */}
               <div className="absolute -left-[7px] top-20 w-[3px] h-7 bg-slate-600 rounded-l-sm" />
               <div className="absolute -left-[7px] top-30 w-[3px] h-7 bg-slate-600 rounded-l-sm" />

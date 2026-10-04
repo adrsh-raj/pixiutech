@@ -281,6 +281,58 @@ export function solveCircuitNodalPotentials(
       if (pressed.has(part.id)) {
         union(k("p1a"), k("p2a"))
       }
+    } else {
+      const board = getBoardForPart(part)
+      if (board) {
+        const k = (pin: string) => pinKey(part.id, pin)
+        // Union all ground pins together and with standard gnd alias
+        const gnds = board.powerPins.gnd ?? []
+        for (let i = 0; i < gnds.length; i++) {
+          allPins.add(k(gnds[i]))
+          allPins.add(k("gnd"))
+          union(k(gnds[0]), k(gnds[i]))
+          union(k(gnds[i]), k("gnd"))
+        }
+        // Union all 3.3V power pins
+        const v33s = board.powerPins.v33 ?? []
+        for (let i = 0; i < v33s.length; i++) {
+          allPins.add(k(v33s[i]))
+          allPins.add(k("3v3"))
+          allPins.add(k("3.3v"))
+          union(k(v33s[0]), k(v33s[i]))
+          union(k(v33s[i]), k("3v3"))
+          union(k(v33s[i]), k("3.3v"))
+        }
+        // Union all 5V power pins
+        const v5s = board.powerPins.v5 ?? []
+        for (let i = 0; i < v5s.length; i++) {
+          allPins.add(k(v5s[i]))
+          allPins.add(k("5v"))
+          union(k(v5s[0]), k(v5s[i]))
+          union(k(v5s[i]), k("5v"))
+        }
+        // Union all pin aliases
+        for (const bp of board.pins) {
+          allPins.add(k(bp.id))
+          const stripped = bp.id.replace(/^(gpio|gp|d|p)/i, "")
+          if (stripped) {
+            allPins.add(k(stripped))
+            allPins.add(k(`d${stripped}`))
+            allPins.add(k(`gpio${stripped}`))
+            allPins.add(k(`gp${stripped}`))
+            allPins.add(k(`p${stripped}`))
+            union(k(bp.id), k(stripped))
+            union(k(bp.id), k(`d${stripped}`))
+            union(k(bp.id), k(`gpio${stripped}`))
+            union(k(bp.id), k(`gp${stripped}`))
+            union(k(bp.id), k(`p${stripped}`))
+          }
+          for (const alt of bp.alternateNames ?? []) {
+            allPins.add(k(alt.toLowerCase()))
+            union(k(bp.id), k(alt.toLowerCase()))
+          }
+        }
+      }
     }
   }
 

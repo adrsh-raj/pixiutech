@@ -569,15 +569,15 @@ async function executeSingleBlock(block: Blockly.Block, env: ExecutionEnvironmen
     }
 
     case "wifi_server_on": {
-      const route = block.getFieldValue("PATH") ?? "/"
-      const branch = block.getInputTargetBlock("DO")
+      const route = block.getFieldValue("PATH") || block.getFieldValue("ROUTE") || "/"
+      const branch = block.getInputTargetBlock("DO") || block.getInputTargetBlock("HANDLER")
       env.wifiServerOn?.(route, branch)
       break
     }
 
     case "wifi_server_send": {
-      const status = Number(block.getFieldValue("STATUS") ?? 200)
-      const content = evaluateValueInput(block, "CONTENT", env, "OK")
+      const status = Number(block.getFieldValue("STATUS") || block.getFieldValue("CODE") || 200)
+      const content = evaluateValueInput(block, "CONTENT", env, "") || evaluateValueInput(block, "BODY", env, "OK")
       env.wifiServerSend?.(status, "text/html", String(content))
       break
     }

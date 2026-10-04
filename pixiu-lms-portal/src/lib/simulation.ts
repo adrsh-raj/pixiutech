@@ -112,8 +112,50 @@ export function computeRuntime(
         break
       }
 
-      default:
+      default: {
+        const board = getBoardForPart(part)
+        if (board) {
+          // 1. Tie all ground pins together and to universal ground aliases
+          const gnds = board.powerPins.gnd ?? []
+          for (let i = 0; i < gnds.length; i++) {
+            addEdge(k(gnds[0]), k(gnds[i]), 0.0001)
+            addEdge(k(gnds[i]), k("gnd"), 0.0001)
+            addEdge(k(gnds[i]), k("ground"), 0.0001)
+          }
+          // 2. Tie all 3.3V pins together and to 3v3 aliases
+          const v33s = board.powerPins.v33 ?? []
+          for (let i = 0; i < v33s.length; i++) {
+            addEdge(k(v33s[0]), k(v33s[i]), 0.0001)
+            addEdge(k(v33s[i]), k("3v3"), 0.0001)
+            addEdge(k(v33s[i]), k("3.3v"), 0.0001)
+          }
+          // 3. Tie all 5V pins together and to 5v aliases
+          const v5s = board.powerPins.v5 ?? []
+          for (let i = 0; i < v5s.length; i++) {
+            addEdge(k(v5s[0]), k(v5s[i]), 0.0001)
+            addEdge(k(v5s[i]), k("5v"), 0.0001)
+            addEdge(k(v5s[i]), k("v5"), 0.0001)
+          }
+          // 4. Tie each pin to its numeric stripped name and alternateNames
+          for (const bp of board.pins) {
+            const stripped = bp.id.replace(/^(gpio|gp|d|p)/i, "")
+            if (stripped) {
+              addEdge(k(bp.id), k(stripped), 0.0001)
+              addEdge(k(bp.id), k(`d${stripped}`), 0.0001)
+              addEdge(k(bp.id), k(`gpio${stripped}`), 0.0001)
+              addEdge(k(bp.id), k(`gp${stripped}`), 0.0001)
+              addEdge(k(bp.id), k(`p${stripped}`), 0.0001)
+            }
+            if (bp.label && bp.label.toLowerCase() !== bp.id.toLowerCase()) {
+              addEdge(k(bp.id), k(bp.label.toLowerCase()), 0.0001)
+            }
+            for (const alt of bp.alternateNames ?? []) {
+              addEdge(k(bp.id), k(alt.toLowerCase()), 0.0001)
+            }
+          }
+        }
         break
+      }
     }
   }
 
@@ -128,9 +170,13 @@ export function computeRuntime(
     if (board) {
       if (board.powerPins.v5) {
         for (const p of board.powerPins.v5) activeSources.push({ key: k(p), voltage: 5.0 })
+        activeSources.push({ key: k("5v"), voltage: 5.0 })
+        activeSources.push({ key: k("v5"), voltage: 5.0 })
       }
       if (board.powerPins.v33) {
         for (const p of board.powerPins.v33) activeSources.push({ key: k(p), voltage: 3.3 })
+        activeSources.push({ key: k("3v3"), voltage: 3.3 })
+        activeSources.push({ key: k("3.3v"), voltage: 3.3 })
       }
       if (board.powerPins.vin) {
         for (const p of board.powerPins.vin) activeSources.push({ key: k(p), voltage: 5.0 })
@@ -138,18 +184,30 @@ export function computeRuntime(
       for (const g of board.powerPins.gnd) {
         groundSinks.push(k(g))
       }
+      groundSinks.push(k("gnd"))
+      groundSinks.push(k("ground"))
 
       // Check digital and analog pins
       for (const pin of board.pins) {
         if (pin.kind === "digital" || pin.kind === "analog") {
           const pinId = pin.id
+          const stripped = pinId.replace(/^(gpio|gp|d|p)/i, "")
           const pState = lookupBoardPinState(pinStates, pinId, board)
           if (pState?.state === "HIGH" || (pState?.value ?? 0) > 0) {
             const duty = pState.value !== undefined ? pState.value / 255 : 1.0
-            activeSources.push({ key: k(pinId), voltage: board.logicVoltage * duty })
+            const v = board.logicVoltage * duty
+            activeSources.push({ key: k(pinId), voltage: v })
+            if (stripped) activeSources.push({ key: k(stripped), voltage: v })
+            for (const alt of pin.alternateNames ?? []) {
+              activeSources.push({ key: k(alt.toLowerCase()), voltage: v })
+            }
           } else {
             // LOW digital pin acts as Ground sink
             groundSinks.push(k(pinId))
+            if (stripped) groundSinks.push(k(stripped))
+            for (const alt of pin.alternateNames ?? []) {
+              groundSinks.push(k(alt.toLowerCase()))
+            }
           }
         }
       }

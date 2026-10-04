@@ -722,25 +722,25 @@ export const ESP32_LESSONS: Lesson[] = [
           <field name="PORT">80</field>
           <next>
           <block type="wifi_server_on">
-            <field name="ROUTE">/</field>
-            <statement name="HANDLER">
+            <field name="PATH">/</field>
+            <statement name="DO">
               <block type="wifi_server_send">
-                <field name="CODE">200</field>
+                <field name="STATUS">200</field>
                 <field name="TYPE">text/html</field>
-                <value name="BODY">
+                <value name="CONTENT">
                   <block type="text_string"><field name="TEXT">&lt;h1&gt;🏠 Smart Home&lt;/h1&gt;&lt;a href="/red/on"&gt;Turn ON Red&lt;/a&gt;&lt;a href="/red/off"&gt;Turn OFF Red&lt;/a&gt;</field></block>
                 </value>
               </block>
             </statement>
             <next>
             <block type="wifi_server_on">
-              <field name="ROUTE">/red/on</field>
-              <statement name="HANDLER">
+              <field name="PATH">/red/on</field>
+              <statement name="DO">
                 <block type="io_digitalwrite"><field name="PIN">4</field><field name="STATE">HIGH</field><next>
                 <block type="wifi_server_send">
-                  <field name="CODE">200</field>
+                  <field name="STATUS">200</field>
                   <field name="TYPE">text/html</field>
-                  <value name="BODY">
+                  <value name="CONTENT">
                     <block type="text_string"><field name="TEXT">&lt;h2&gt;🔴 Red ON&lt;/h2&gt;&lt;a href="/"&gt;Back&lt;/a&gt;</field></block>
                   </value>
                 </block>

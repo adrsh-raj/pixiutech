@@ -1206,14 +1206,14 @@ arduino.forBlock['wifi_server_begin'] = (block) => {
 }
 
 arduino.forBlock['wifi_server_on'] = (block, generator) => {
-  const path = block.getFieldValue('PATH') || '/'
-  const branch = generator.statementToCode(block, 'DO')
+  const path = block.getFieldValue('PATH') || block.getFieldValue('ROUTE') || '/'
+  const branch = generator.statementToCode(block, 'DO') || generator.statementToCode(block, 'HANDLER') || ''
   return `server.on("${path}", []() {\n${branch}});\n`
 }
 
 arduino.forBlock['wifi_server_send'] = (block, generator) => {
-  const status = block.getFieldValue('STATUS') || 200
-  const content = generator.valueToCode(block, 'CONTENT', ORDER.NONE) || '""'
+  const status = block.getFieldValue('STATUS') || block.getFieldValue('CODE') || 200
+  const content = generator.valueToCode(block, 'CONTENT', ORDER.NONE) || generator.valueToCode(block, 'BODY', ORDER.NONE) || '""'
   return `server.send(${status}, "text/html", ${content});\n`
 }
 
@@ -1242,3 +1242,42 @@ arduino.forBlock['microbit_button_pressed'] = (block) => {
 
 // keep indent helper referenced (used by callers that post-process)
 export { indent }
+
+/**
+ * Normalizes Blockly XML strings to ensure backward and forward compatibility
+ * across different schema conventions (e.g. ROUTE -> PATH, HANDLER -> DO,
+ * CODE -> STATUS, BODY -> CONTENT).
+ */
+export function normalizeBlocklyXml(xml: string): string {
+  if (!xml || typeof xml !== "string") return xml
+  let normalized = xml
+
+  // 1. wifi_server_on: ROUTE -> PATH, HANDLER -> DO
+  normalized = normalized.replace(
+    /(<block[^>]*type=["']wifi_server_on["'][^>]*>[\s\S]*?)<field name=["']ROUTE["']>([\s\S]*?)<\/field>/g,
+    '$1<field name="PATH">$2</field>'
+  )
+  normalized = normalized.replace(
+    /(<block[^>]*type=["']wifi_server_on["'][^>]*>[\s\S]*?)<statement name=["']HANDLER["']>/g,
+    '$1<statement name="DO">'
+  )
+
+  // 2. wifi_server_send: CODE -> STATUS, BODY -> CONTENT
+  normalized = normalized.replace(
+    /(<block[^>]*type=["']wifi_server_send["'][^>]*>[\s\S]*?)<field name=["']CODE["']>([\s\S]*?)<\/field>/g,
+    '$1<field name="STATUS">$2</field>'
+  )
+  normalized = normalized.replace(
+    /(<block[^>]*type=["']wifi_server_send["'][^>]*>[\s\S]*?)<value name=["']BODY["']>/g,
+    '$1<value name="CONTENT">'
+  )
+
+  // 3. Fallback generic tag normalization for safety
+  normalized = normalized
+    .replace(/<field name="ROUTE">/g, '<field name="PATH">')
+    .replace(/<statement name="HANDLER">/g, '<statement name="DO">')
+    .replace(/<field name="CODE">/g, '<field name="STATUS">')
+    .replace(/<value name="BODY">/g, '<value name="CONTENT">')
+
+  return normalized
+}

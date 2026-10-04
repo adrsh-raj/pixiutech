@@ -113,25 +113,25 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
           <field name="PORT">80</field>
           <next>
           <block type="wifi_server_on">
-            <field name="ROUTE">/</field>
-            <statement name="HANDLER">
+            <field name="PATH">/</field>
+            <statement name="DO">
               <block type="wifi_server_send">
-                <field name="CODE">200</field>
+                <field name="STATUS">200</field>
                 <field name="TYPE">text/html</field>
-                <value name="BODY">
+                <value name="CONTENT">
                   <block type="text_string"><field name="TEXT">&lt;h1&gt;🏠 ESP32 Smart Home&lt;/h1&gt;&lt;p&gt;Tap to control room lights:&lt;/p&gt;&lt;div&gt;&lt;a href="/red/on"&gt;Turn ON Living Room&lt;/a&gt;&lt;a href="/red/off"&gt;Turn OFF Living Room&lt;/a&gt;&lt;/div&gt;&lt;div style="margin-top:10px;"&gt;&lt;a href="/blue/on"&gt;Turn ON Bedroom&lt;/a&gt;&lt;a href="/blue/off"&gt;Turn OFF Bedroom&lt;/a&gt;&lt;/div&gt;</field></block>
                 </value>
               </block>
             </statement>
             <next>
             <block type="wifi_server_on">
-              <field name="ROUTE">/red/on</field>
-              <statement name="HANDLER">
+              <field name="PATH">/red/on</field>
+              <statement name="DO">
                 <block type="io_digitalwrite"><field name="PIN">4</field><field name="STATE">HIGH</field><next>
                 <block type="wifi_server_send">
-                  <field name="CODE">200</field>
+                  <field name="STATUS">200</field>
                   <field name="TYPE">text/html</field>
-                  <value name="BODY">
+                  <value name="CONTENT">
                     <block type="text_string"><field name="TEXT">&lt;h2 style="color:#ef4444"&gt;🔴 Living Room Light: ON&lt;/h2&gt;&lt;a href="/"&gt;← Back to Dashboard&lt;/a&gt;</field></block>
                   </value>
                 </block>
@@ -139,13 +139,13 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
               </statement>
               <next>
               <block type="wifi_server_on">
-                <field name="ROUTE">/red/off</field>
-                <statement name="HANDLER">
+                <field name="PATH">/red/off</field>
+                <statement name="DO">
                   <block type="io_digitalwrite"><field name="PIN">4</field><field name="STATE">LOW</field><next>
                   <block type="wifi_server_send">
-                    <field name="CODE">200</field>
+                    <field name="STATUS">200</field>
                     <field name="TYPE">text/html</field>
-                    <value name="BODY">
+                    <value name="CONTENT">
                       <block type="text_string"><field name="TEXT">&lt;h2&gt;⚪ Living Room Light: OFF&lt;/h2&gt;&lt;a href="/"&gt;← Back to Dashboard&lt;/a&gt;</field></block>
                     </value>
                   </block>
@@ -153,13 +153,13 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
                 </statement>
                 <next>
                 <block type="wifi_server_on">
-                  <field name="ROUTE">/blue/on</field>
-                  <statement name="HANDLER">
+                  <field name="PATH">/blue/on</field>
+                  <statement name="DO">
                     <block type="io_digitalwrite"><field name="PIN">15</field><field name="STATE">HIGH</field><next>
                     <block type="wifi_server_send">
-                      <field name="CODE">200</field>
+                      <field name="STATUS">200</field>
                       <field name="TYPE">text/html</field>
-                      <value name="BODY">
+                      <value name="CONTENT">
                         <block type="text_string"><field name="TEXT">&lt;h2 style="color:#38bdf8"&gt;🔵 Bedroom Light: ON&lt;/h2&gt;&lt;a href="/"&gt;← Back to Dashboard&lt;/a&gt;</field></block>
                       </value>
                     </block>
@@ -167,13 +167,13 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
                   </statement>
                   <next>
                   <block type="wifi_server_on">
-                    <field name="ROUTE">/blue/off</field>
-                    <statement name="HANDLER">
+                    <field name="PATH">/blue/off</field>
+                    <statement name="DO">
                       <block type="io_digitalwrite"><field name="PIN">15</field><field name="STATE">LOW</field><next>
                       <block type="wifi_server_send">
-                        <field name="CODE">200</field>
+                        <field name="STATUS">200</field>
                         <field name="TYPE">text/html</field>
-                        <value name="BODY">
+                        <value name="CONTENT">
                           <block type="text_string"><field name="TEXT">&lt;h2&gt;⚪ Bedroom Light: OFF&lt;/h2&gt;&lt;a href="/"&gt;← Back to Dashboard&lt;/a&gt;</field></block>
                         </value>
                       </block>

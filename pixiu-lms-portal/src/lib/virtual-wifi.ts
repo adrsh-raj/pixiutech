@@ -142,6 +142,20 @@ class VirtualWifiManager {
     this.notify()
   }
 
+  private normalizePath(path: string): string {
+    let clean = (path || "/").trim()
+    clean = clean.split("?")[0].split("#")[0]
+    clean = clean.replace(/^https?:\/\/[^\/]+/i, "")
+    clean = clean.replace(/^192\.168\.\d+\.\d+(:\d+)?/i, "")
+    if (!clean.startsWith("/")) {
+      clean = `/${clean}`
+    }
+    if (clean.length > 1 && clean.endsWith("/")) {
+      clean = clean.slice(0, -1)
+    }
+    return clean
+  }
+
   public registerRoute(
     path: string,
     handler?: () => void,
@@ -149,31 +163,29 @@ class VirtualWifiManager {
     contentType: string = "text/html",
     responseBody?: string
   ): void {
-    let cleanPath = (path || "/").trim()
-    cleanPath = cleanPath.replace(/^https?:\/\/[^\/]+/i, "")
-    cleanPath = cleanPath.replace(/^192\.168\.\d+\.\d+(:\d+)?/i, "")
-    if (!cleanPath.startsWith("/")) {
-      cleanPath = `/${cleanPath}`
-    }
+    const cleanPath = this.normalizePath(path)
+    const isActivating = cleanPath.includes("on")
+    const isDeactivating = cleanPath.includes("off")
+    const badgeHtml = isActivating
+      ? "<div style='display:inline-block;padding:6px 14px;background:#064e3b;border:1px solid #059669;border-radius:9999px;color:#34d399;font-size:11px;font-weight:700;margin-bottom:10px;'>🟢 PIN ACTIVE (HIGH)</div>"
+      : isDeactivating
+      ? "<div style='display:inline-block;padding:6px 14px;background:#1e293b;border:1px solid #475569;border-radius:9999px;color:#94a3b8;font-size:11px;font-weight:700;margin-bottom:10px;'>⚪ PIN INACTIVE (LOW)</div>"
+      : "<div style='display:inline-block;padding:6px 14px;background:#0369a1;border:1px solid #0284c7;border-radius:9999px;color:#bae6fd;font-size:11px;font-weight:700;margin-bottom:10px;'>🌐 HTTP 200 OK</div>"
+
+    const defaultHtml = `<!DOCTYPE html><html><head><title>Route ${cleanPath}</title></head><body style='font-family:system-ui,sans-serif;padding:24px 16px;background:#090d16;color:#f8fafc;text-align:center;'>${badgeHtml}<h2 style='color:#38bdf8;margin:6px 0 12px 0;font-size:18px;'>Route: ${cleanPath} executed!</h2><p style='color:#94a3b8;font-size:13px;line-height:1.5;margin-bottom:18px;'>ESP32 web server handled this endpoint and drove circuit state.</p><div style='display:flex;gap:8px;justify-content:center;flex-wrap:wrap;'><a href='/' data-href='/' style='display:inline-block;padding:8px 16px;background:#0284c7;color:#fff;border-radius:10px;text-decoration:none;font-size:12px;font-weight:600;'>← Dashboard</a>${isActivating ? "<a href='/led/off' data-href='/led/off' style='display:inline-block;padding:8px 16px;background:#334155;color:#f8fafc;border-radius:10px;text-decoration:none;font-size:12px;font-weight:600;'>Turn OFF</a>" : isDeactivating ? "<a href='/led/on' data-href='/led/on' style='display:inline-block;padding:8px 16px;background:#10b981;color:#fff;border-radius:10px;text-decoration:none;font-size:12px;font-weight:600;'>Turn ON</a>" : ""}</div></body></html>`
+
     this.state.routes[cleanPath] = {
       path: cleanPath,
       statusCode,
       contentType,
-      responseBody:
-        responseBody ??
-        `<!DOCTYPE html><html><head><title>Route ${cleanPath}</title></head><body style='font-family:sans-serif;padding:20px;background:#090d16;color:#f8fafc'><h2>Route: ${cleanPath} executed!</h2><p><a href='/' data-href='/' style='color:#38bdf8'>← Return to Dashboard</a></p></body></html>`,
+      responseBody: responseBody ?? defaultHtml,
       handler,
     }
     this.notify()
   }
 
   public setRouteResponse(path: string, statusCode: number, contentType: string, responseBody: string): void {
-    let cleanPath = (path || "/").trim()
-    cleanPath = cleanPath.replace(/^https?:\/\/[^\/]+/i, "")
-    cleanPath = cleanPath.replace(/^192\.168\.\d+\.\d+(:\d+)?/i, "")
-    if (!cleanPath.startsWith("/")) {
-      cleanPath = `/${cleanPath}`
-    }
+    const cleanPath = this.normalizePath(path)
     if (this.state.routes[cleanPath]) {
       this.state.routes[cleanPath].statusCode = statusCode
       this.state.routes[cleanPath].contentType = contentType
@@ -194,16 +206,11 @@ class VirtualWifiManager {
     method: "GET" | "POST" = "GET",
   ): Promise<{ statusCode: number; contentType: string; body: string }> {
     const startTime = performance.now()
-    let cleanPath = (path || "/").trim()
-    cleanPath = cleanPath.replace(/^https?:\/\/[^\/]+/i, "")
-    cleanPath = cleanPath.replace(/^192\.168\.\d+\.\d+(:\d+)?/i, "")
-    if (!cleanPath.startsWith("/")) {
-      cleanPath = `/${cleanPath}`
-    }
+    const cleanPath = this.normalizePath(path)
     const route = this.state.routes[cleanPath]
 
     if (!route) {
-      const notFoundBody = `<!DOCTYPE html><html><body style='font-family:sans-serif;padding:20px;background:#090d16;color:#f8fafc'><h2>404 Not Found</h2><p>No route registered for: ${cleanPath}</p></body></html>`
+      const notFoundBody = `<!DOCTYPE html><html><body style='font-family:sans-serif;padding:20px;background:#090d16;color:#f8fafc'><h2>404 Not Found</h2><p>No route registered for: ${cleanPath}</p><a href='/' data-href='/' style='color:#38bdf8'>← Return to Dashboard</a></body></html>`
       this.logRequest(method, cleanPath, 404, Math.round(performance.now() - startTime))
       return { statusCode: 404, contentType: "text/html", body: notFoundBody }
     }

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import * as Blockly from "blockly"
 import type { CircuitState } from "@/lib/circuit-types"
-import { defineArduinoBlocks, setPinContext, arduino } from "@/lib/arduino-blocks"
+import { defineArduinoBlocks, setPinContext, arduino, normalizeBlocklyXml } from "@/lib/arduino-blocks"
 import { Copy, Check, Terminal, Code2 } from "lucide-react"
 
 interface Props {
@@ -253,7 +253,7 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
     lastParentXmlRef.current = initialXml
 
     try {
-      const dom = Blockly.utils.xml.textToDom(initialXml)
+      const dom = Blockly.utils.xml.textToDom(normalizeBlocklyXml(initialXml))
       Blockly.Xml.domToWorkspace(dom, workspace)
       setTimeout(() => {
         Blockly.svgResize(workspace)
@@ -334,7 +334,7 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
 
       try {
         activeWorkspace.clear()
-        const dom = Blockly.utils.xml.textToDom(expectedExternalXml)
+        const dom = Blockly.utils.xml.textToDom(normalizeBlocklyXml(expectedExternalXml))
         Blockly.Xml.domToWorkspace(dom, activeWorkspace)
 
         lastWorkspaceXmlRef.current = expectedExternalXml

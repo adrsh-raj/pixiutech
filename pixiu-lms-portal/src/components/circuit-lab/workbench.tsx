@@ -6,7 +6,7 @@ import type { CircuitState, PartType, PinRef, PlacedPart } from "@/lib/circuit-t
 import { CATALOG } from "@/lib/components-catalog"
 import { samePin } from "@/lib/geometry"
 import { computeRuntime, type ArduinoPinState } from "@/lib/simulation"
-import { defineArduinoBlocks, setAiClassContext, arduino } from "@/lib/arduino-blocks"
+import { defineArduinoBlocks, setAiClassContext, arduino, normalizeBlocklyXml } from "@/lib/arduino-blocks"
 import { runBlocklyProgram, executeStatement, type ExecutionEnvironment, type BlockStepInfo } from "@/lib/blockly-runner"
 import { virtualWifiManager, type VirtualWifiState } from "@/lib/virtual-wifi"
 import { IotWebPortal } from "./iot-web-portal"
@@ -72,6 +72,89 @@ const DEFAULT_XML = `<xml xmlns="https://developers.google.com/blockly/xml">
 const INITIAL_STATE: CircuitState = {
   parts: [],
   wires: [],
+}
+
+function findCircuitLedPinMappings(currentState: CircuitState, activeBoard: ReturnType<typeof getActiveBoard>) {
+  const boardPart = currentState.parts.find((pt) => isBoardPart(pt.type))
+  const builtIn = activeBoard?.builtInLedPin ?? (activeBoard?.id === "esp32-devkit" ? "d2" : activeBoard?.id === "arduino-uno" ? "d13" : "gp25")
+  const ledParts = currentState.parts.filter((pt) => pt.type === "led")
+  const mappings: { partId: string; color: string; pinId: string; cleanPin: string }[] = []
+
+  if (!boardPart) return { mappings, builtIn }
+
+  const adj = new Map<string, string[]>()
+  const addEdge = (u: string, v: string) => {
+    if (!adj.has(u)) adj.set(u, [])
+    if (!adj.has(v)) adj.set(v, [])
+    adj.get(u)!.push(v)
+    adj.get(v)!.push(u)
+  }
+
+  for (const w of currentState.wires) {
+    addEdge(`${w.from.partId}:${w.from.pinId}`, `${w.to.partId}:${w.to.pinId}`)
+  }
+
+  for (const pt of currentState.parts) {
+    if (pt.type === "resistor") {
+      addEdge(`${pt.id}:a`, `${pt.id}:b`)
+    } else if (pt.type === "breadboard") {
+      for (let c = 1; c <= 20; c++) {
+        const top = ["a", "b", "c", "d", "e"]
+        for (let i = 0; i < top.length - 1; i++) {
+          addEdge(`${pt.id}:${top[i]}_${c}`, `${pt.id}:${top[i + 1]}_${c}`)
+        }
+        const bot = ["f", "g", "h", "i", "j"]
+        for (let i = 0; i < bot.length - 1; i++) {
+          addEdge(`${pt.id}:${bot[i]}_${c}`, `${pt.id}:${bot[i + 1]}_${c}`)
+        }
+      }
+    }
+  }
+
+  const isBoardDigitalPin = (pinId: string) => {
+    if (!activeBoard) return false
+    const lower = pinId.toLowerCase()
+    if (lower.includes("gnd") || lower.includes("3v") || lower.includes("5v") || lower.includes("vin") || lower === "rst") return false
+    return activeBoard.pins.some((bp) => bp.id.toLowerCase() === lower && bp.kind === "digital")
+  }
+
+  for (const led of ledParts) {
+    const color = String(led.props?.color ?? "red").toLowerCase()
+    let foundPin: string | null = null
+
+    for (const startPin of ["anode", "cathode"]) {
+      const startNode = `${led.id}:${startPin}`
+      const queue = [startNode]
+      const visited = new Set<string>([startNode])
+
+      while (queue.length > 0) {
+        const curr = queue.shift()!
+        const [pId, pinId] = curr.split(":")
+        if (pId === boardPart.id && isBoardDigitalPin(pinId)) {
+          foundPin = pinId
+          break
+        }
+        for (const neighbor of adj.get(curr) ?? []) {
+          if (!visited.has(neighbor)) {
+            visited.add(neighbor)
+            queue.push(neighbor)
+          }
+        }
+      }
+      if (foundPin) break
+    }
+
+    if (foundPin) {
+      mappings.push({
+        partId: led.id,
+        color,
+        pinId: foundPin,
+        cleanPin: foundPin.replace(/^(gpio|gp|d|p)/i, ""),
+      })
+    }
+  }
+
+  return { mappings, builtIn }
 }
 
 interface WorkbenchProps {
@@ -657,7 +740,7 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
       // The mounted Blockly editor is the execution source of truth. React XML
       // is only the hydration fallback when the editor is not mounted yet.
       if (!liveWorkspace) {
-        const dom = Blockly.utils.xml.textToDom(blocklyXml)
+        const dom = Blockly.utils.xml.textToDom(normalizeBlocklyXml(blocklyXml))
         Blockly.Xml.domToWorkspace(dom, workspace)
       }
 
@@ -828,7 +911,7 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
             const boardPart = partsRef.current.find((pt) => isBoardPart(pt.type))
             if (boardPart && pin) {
               const rawPin = String(pin).trim().toLowerCase()
-              const pinDigits = rawPin.replace(/^d|^gpio/, "")
+              const pinDigits = rawPin.replace(/^(gpio|gp|d|p)/i, "")
               const targetBoardPin = activeBoard.pins.find(
                 (bp) =>
                   bp.id.toLowerCase() === rawPin ||
@@ -957,37 +1040,123 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
         wifiGetIp: () => virtualWifiManager.getState().ipAddress,
         wifiServerBegin: (port: number) => {
           virtualWifiManager.startServer(port)
-          // Default hardware interaction for /led/on and /led/off if not overridden
+          const activeBoard = getActiveBoard(state)
+          const { mappings, builtIn } = findCircuitLedPinMappings(state, activeBoard)
+
+          const allLedPins = Array.from(
+            new Set([
+              builtIn,
+              ...mappings.map((m) => m.pinId),
+              ...(activeBoard.id === "esp32-devkit" && mappings.length === 0 && state.parts.some((p) => p.type === "led")
+                ? ["4", "15"]
+                : []),
+            ])
+          )
+
+          const redPins = mappings.filter((m) => m.color === "red" || m.partId.includes("red")).map((m) => m.pinId)
+          if (redPins.length === 0 && activeBoard.id === "esp32-devkit") redPins.push("4")
+
+          const bluePins = mappings.filter((m) => m.color === "blue" || m.partId.includes("blue")).map((m) => m.pinId)
+          if (bluePins.length === 0 && activeBoard.id === "esp32-devkit") bluePins.push("15")
+
+          // Default /led/on
           if (!virtualWifiManager.getState().routes["/led/on"]?.handler) {
             virtualWifiManager.registerRoute(
               "/led/on",
               () => {
-                env.setDigitalPin("2", "HIGH")
+                for (const pin of allLedPins) env.setDigitalPin(pin, "HIGH")
                 setSerialLines((prev) => [
                   ...prev,
-                  { text: `[HTTP] GET /led/on -> Digital Pin 2 (Built-in LED) set to HIGH`, timestamp: Date.now(), type: "info" },
+                  { text: `[HTTP] GET /led/on -> Digital Pins [${allLedPins.join(", ")}] set to HIGH`, timestamp: Date.now(), type: "info" },
                 ])
               },
               200,
-              "text/html",
-              virtualWifiManager.getState().routes["/led/on"]?.responseBody
+              "text/html"
             )
           }
+
+          // Default /led/off
           if (!virtualWifiManager.getState().routes["/led/off"]?.handler) {
             virtualWifiManager.registerRoute(
               "/led/off",
               () => {
-                env.setDigitalPin("2", "LOW")
+                for (const pin of allLedPins) env.setDigitalPin(pin, "LOW")
                 setSerialLines((prev) => [
                   ...prev,
-                  { text: `[HTTP] GET /led/off -> Digital Pin 2 (Built-in LED) set to LOW`, timestamp: Date.now(), type: "info" },
+                  { text: `[HTTP] GET /led/off -> Digital Pins [${allLedPins.join(", ")}] set to LOW`, timestamp: Date.now(), type: "info" },
                 ])
               },
               200,
-              "text/html",
-              virtualWifiManager.getState().routes["/led/off"]?.responseBody
+              "text/html"
             )
           }
+
+          // Default /red/on and /red/off
+          if (!virtualWifiManager.getState().routes["/red/on"]?.handler) {
+            virtualWifiManager.registerRoute(
+              "/red/on",
+              () => {
+                for (const pin of redPins) env.setDigitalPin(pin, "HIGH")
+                setSerialLines((prev) => [
+                  ...prev,
+                  { text: `[HTTP] GET /red/on -> Red Light Pin [${redPins.join(", ")}] set to HIGH`, timestamp: Date.now(), type: "info" },
+                ])
+              },
+              200,
+              "text/html"
+            )
+          }
+          if (!virtualWifiManager.getState().routes["/red/off"]?.handler) {
+            virtualWifiManager.registerRoute(
+              "/red/off",
+              () => {
+                for (const pin of redPins) env.setDigitalPin(pin, "LOW")
+                setSerialLines((prev) => [
+                  ...prev,
+                  { text: `[HTTP] GET /red/off -> Red Light Pin [${redPins.join(", ")}] set to LOW`, timestamp: Date.now(), type: "info" },
+                ])
+              },
+              200,
+              "text/html"
+            )
+          }
+
+          // Default /blue/on and /blue/off
+          if (!virtualWifiManager.getState().routes["/blue/on"]?.handler) {
+            virtualWifiManager.registerRoute(
+              "/blue/on",
+              () => {
+                for (const pin of bluePins) env.setDigitalPin(pin, "HIGH")
+                setSerialLines((prev) => [
+                  ...prev,
+                  { text: `[HTTP] GET /blue/on -> Blue Light Pin [${bluePins.join(", ")}] set to HIGH`, timestamp: Date.now(), type: "info" },
+                ])
+              },
+              200,
+              "text/html"
+            )
+          }
+          if (!virtualWifiManager.getState().routes["/blue/off"]?.handler) {
+            virtualWifiManager.registerRoute(
+              "/blue/off",
+              () => {
+                for (const pin of bluePins) env.setDigitalPin(pin, "LOW")
+                setSerialLines((prev) => [
+                  ...prev,
+                  { text: `[HTTP] GET /blue/off -> Blue Light Pin [${bluePins.join(", ")}] set to LOW`, timestamp: Date.now(), type: "info" },
+                ])
+              },
+              200,
+              "text/html"
+            )
+          }
+
+          // Default / (Root Dashboard)
+          if (!virtualWifiManager.getState().routes["/"]?.handler) {
+            const rootHtml = `<!DOCTYPE html><html><head><title>ESP32 IoT Dashboard</title></head><body style='font-family:system-ui,sans-serif;padding:20px 14px;background:#090d16;color:#f8fafc;text-align:center;'><h1 style='color:#38bdf8;font-size:20px;margin-bottom:4px;'>🏠 ESP32 Smart Home</h1><p style='color:#94a3b8;font-size:12px;margin-bottom:16px;'>Server: 192.168.1.105 | Tap button to switch lamps:</p><div style='background:#1e293b;border:1px solid #334155;border-radius:12px;padding:12px;margin-bottom:10px;text-align:left;'><div style='font-size:12px;font-weight:700;color:#ef4444;margin-bottom:6px;'>🔴 Living Room Lamp (${redPins.join(", ")})</div><div style='display:flex;gap:6px;'><a href='/red/on' data-href='/red/on' style='flex:1;padding:8px;background:#dc2626;color:#fff;border-radius:8px;text-align:center;text-decoration:none;font-size:12px;font-weight:600;'>Turn ON</a><a href='/red/off' data-href='/red/off' style='flex:1;padding:8px;background:#334155;color:#fff;border-radius:8px;text-align:center;text-decoration:none;font-size:12px;font-weight:600;'>Turn OFF</a></div></div><div style='background:#1e293b;border:1px solid #334155;border-radius:12px;padding:12px;margin-bottom:12px;text-align:left;'><div style='font-size:12px;font-weight:700;color:#38bdf8;margin-bottom:6px;'>🔵 Bedroom Lamp (${bluePins.join(", ")})</div><div style='display:flex;gap:6px;'><a href='/blue/on' data-href='/blue/on' style='flex:1;padding:8px;background:#0284c7;color:#fff;border-radius:8px;text-align:center;text-decoration:none;font-size:12px;font-weight:600;'>Turn ON</a><a href='/blue/off' data-href='/blue/off' style='flex:1;padding:8px;background:#334155;color:#fff;border-radius:8px;text-align:center;text-decoration:none;font-size:12px;font-weight:600;'>Turn OFF</a></div></div><div style='display:flex;gap:8px;'><a href='/led/on' data-href='/led/on' style='flex:1;padding:10px;background:#10b981;color:#fff;border-radius:10px;text-decoration:none;font-size:12px;font-weight:700;'>💡 Turn All ON</a><a href='/led/off' data-href='/led/off' style='flex:1;padding:10px;background:#475569;color:#fff;border-radius:10px;text-decoration:none;font-size:12px;font-weight:700;'>Turn All OFF</a></div></body></html>`
+            virtualWifiManager.registerRoute("/", undefined, 200, "text/html", rootHtml)
+          }
+
           setSerialLines((prev) => [
             ...prev,
             { text: `[HTTP] Web Server started on port ${port}. Listening at http://${virtualWifiManager.getState().ipAddress}:${port}/`, timestamp: Date.now(), type: "info" },
@@ -997,8 +1166,44 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
           currentHttpRouteRef.current = route
           virtualWifiManager.registerRoute(route, async () => {
             currentHttpRouteRef.current = route
-            if (branch && runningRef.current && runnerAbortRef.current) {
-              await executeStatement(branch, env, runnerAbortRef.current.signal)
+            if (branch && runningRef.current) {
+              const signal = runnerAbortRef.current?.signal ?? new AbortController().signal
+              await executeStatement(branch, env, signal)
+            }
+            // Hardware pin driver guarantee
+            const clean = (route || "").toLowerCase()
+            const board = getActiveBoard(state)
+            const { mappings, builtIn } = findCircuitLedPinMappings(state, board)
+            if (clean.includes("/led/on") || clean === "/on") {
+              env.setDigitalPin(builtIn, "HIGH")
+              for (const m of mappings) env.setDigitalPin(m.pinId, "HIGH")
+              if (board.id === "esp32-devkit" && mappings.length === 0) {
+                env.setDigitalPin("4", "HIGH")
+                env.setDigitalPin("15", "HIGH")
+              }
+            } else if (clean.includes("/led/off") || clean === "/off") {
+              env.setDigitalPin(builtIn, "LOW")
+              for (const m of mappings) env.setDigitalPin(m.pinId, "LOW")
+              if (board.id === "esp32-devkit" && mappings.length === 0) {
+                env.setDigitalPin("4", "LOW")
+                env.setDigitalPin("15", "LOW")
+              }
+            } else if (clean.includes("red") && clean.includes("on")) {
+              const reds = mappings.filter((m) => m.color === "red" || m.partId.includes("red"))
+              if (reds.length > 0) for (const r of reds) env.setDigitalPin(r.pinId, "HIGH")
+              else env.setDigitalPin("4", "HIGH")
+            } else if (clean.includes("red") && clean.includes("off")) {
+              const reds = mappings.filter((m) => m.color === "red" || m.partId.includes("red"))
+              if (reds.length > 0) for (const r of reds) env.setDigitalPin(r.pinId, "LOW")
+              else env.setDigitalPin("4", "LOW")
+            } else if (clean.includes("blue") && clean.includes("on")) {
+              const blues = mappings.filter((m) => m.color === "blue" || m.partId.includes("blue"))
+              if (blues.length > 0) for (const b of blues) env.setDigitalPin(b.pinId, "HIGH")
+              else env.setDigitalPin("15", "HIGH")
+            } else if (clean.includes("blue") && clean.includes("off")) {
+              const blues = mappings.filter((m) => m.color === "blue" || m.partId.includes("blue"))
+              if (blues.length > 0) for (const b of blues) env.setDigitalPin(b.pinId, "LOW")
+              else env.setDigitalPin("15", "LOW")
             }
           })
         },
@@ -1228,7 +1433,7 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
         code = arduino.workspaceToCode(liveWs)
       } else {
         const headless = new Blockly.Workspace()
-        const dom = Blockly.utils.xml.textToDom(blocklyXml)
+        const dom = Blockly.utils.xml.textToDom(normalizeBlocklyXml(blocklyXml))
         Blockly.Xml.domToWorkspace(dom, headless)
         code = arduino.workspaceToCode(headless)
         headless.dispose()
