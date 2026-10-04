@@ -23,6 +23,7 @@ export const MICROBIT_LESSONS: Lesson[] = [
     estimatedMinutes: 8,
     concepts: ["BBC micro:bit v2", "5x5 LED Matrix", "Matrix Icons", "Animation Loop", "Visual Feedback"],
     prerequisites: [],
+    finalGoal: "🎯 What You Will Build: An animated pulsing heartbeat graphic rendered across the 25 integrated red LEDs of the onboard 5×5 LED matrix.",
     seedCircuit: {
       parts: [part("microbit", "microbit-v2", 120, 100)],
       wires: [],
@@ -82,6 +83,7 @@ export const MICROBIT_LESSONS: Lesson[] = [
     estimatedMinutes: 10,
     concepts: ["Tactile Inputs", "Button A & B", "Conditional Branches", "Interactive UI", "nRF52833"],
     prerequisites: ["lesson-microbit-heartbeat"],
+    finalGoal: "🎯 What You Will Build: An interactive facial expression switcher using physical Buttons A and B to display dynamic emotional icons like Smiles on the LED matrix.",
     seedCircuit: {
       parts: [part("microbit", "microbit-v2", 120, 100)],
       wires: [],
@@ -144,6 +146,7 @@ export const MICROBIT_LESSONS: Lesson[] = [
     estimatedMinutes: 12,
     concepts: ["Edge Connector", "Large Rings", "Pin P0", "Current Limiting", "3.3V Logic Rail"],
     prerequisites: ["lesson-microbit-heartbeat"],
+    finalGoal: "🎯 What You Will Build: A safe 3.3V alligator-clip circuit driving an external red LED through a 220Ω resistor connected to large edge ring P0.",
     seedCircuit: {
       parts: [
         part("microbit", "microbit-v2", 60, 80),
@@ -230,6 +233,7 @@ export const MICROBIT_LESSONS: Lesson[] = [
     estimatedMinutes: 12,
     concepts: ["Analog Input", "10-Bit ADC", "Potentiometer", "Voltage Divider", "3.3V Reference"],
     prerequisites: ["lesson-microbit-external-led"],
+    finalGoal: "🎯 What You Will Build: A 10-bit analog-to-digital converter telemetry monitor reading 1024 discrete voltage steps from a potentiometer on edge ring P0.",
     seedCircuit: {
       parts: [
         part("microbit", "microbit-v2", 60, 80),
@@ -316,6 +320,7 @@ export const MICROBIT_LESSONS: Lesson[] = [
     estimatedMinutes: 15,
     concepts: ["PWM Frequencies", "Piezo Sounder", "Musical Notes", "Square Wave Synthesis", "P0 Output"],
     prerequisites: ["lesson-microbit-analog-pot"],
+    finalGoal: "🎯 What You Will Build: An acoustic two-tone melodic entryway chime producing 523Hz (C5) and 659Hz (E5) audio waveforms on edge ring P0.",
     seedCircuit: {
       parts: [
         part("microbit", "microbit-v2", 60, 80),
@@ -393,6 +398,7 @@ export const MICROBIT_LESSONS: Lesson[] = [
     estimatedMinutes: 16,
     concepts: ["Photoresistor", "Light Dependent Resistor", "Darkness Detection", "Closed Loop Automation", "P1 ADC & P0 GPIO"],
     prerequisites: ["lesson-microbit-piezo-melody"],
+    finalGoal: "🎯 What You Will Build: An autonomous dusk-to-dawn nightlight reading ambient light on analog Pin P1 and automatically triggering a yellow safety LED on Pin P0 when dark.",
     seedCircuit: {
       parts: [
         part("microbit", "microbit-v2", 60, 80),
@@ -499,6 +505,7 @@ export const MICROBIT_LESSONS: Lesson[] = [
     estimatedMinutes: 18,
     concepts: ["TMP36 Sensor", "Analog Millivolts", "Transfer Function", "3.3V ADC Math", "Celsius Conversion"],
     prerequisites: ["lesson-microbit-optical-nightlight"],
+    finalGoal: "🎯 What You Will Build: A precision temperature station measuring millivolts from a TMP36 sensor on Pin P0 and streaming converted Celsius telemetry.",
     seedCircuit: {
       parts: [
         part("microbit", "microbit-v2", 60, 80),
@@ -585,6 +592,7 @@ export const MICROBIT_LESSONS: Lesson[] = [
     estimatedMinutes: 20,
     concepts: ["Servo Motor", "50Hz PWM", "Duty Cycle", "Robotic Articulation", "P0 Control Signal"],
     prerequisites: ["lesson-microbit-climate-temp"],
+    finalGoal: "🎯 What You Will Build: A robotic micro servo arm sweeping across 0°, 90°, and 180° calibrated angular targets using 50Hz PWM control on Pin P0.",
     seedCircuit: {
       parts: [
         part("microbit", "microbit-v2", 60, 80),
@@ -666,6 +674,7 @@ export const MICROBIT_LESSONS: Lesson[] = [
     estimatedMinutes: 22,
     concepts: ["WS2812B NeoPixel", "Addressable RGB", "800kHz Timing", "Color Arrays", "P0 Data Stream"],
     prerequisites: ["lesson-microbit-servo-sweep"],
+    finalGoal: "🎯 What You Will Build: An 8-LED WS2812B addressable NeoPixel cyber ring displaying vivid RGB animations streamed over high-speed single-wire data from Pin P0.",
     seedCircuit: {
       parts: [
         part("microbit", "microbit-v2", 60, 80),
@@ -750,6 +759,7 @@ export const MICROBIT_LESSONS: Lesson[] = [
     estimatedMinutes: 25,
     concepts: ["PIR Motion Sensor", "Digital Inputs", "Alarm Siren", "Visual Strobe", "Multi-Peripheral Integration"],
     prerequisites: ["lesson-microbit-neopixel-rainbow"],
+    finalGoal: "🎯 What You Will Build: A multi-peripheral intrusion alarm system that detects human motion via PIR (P1), triggers an audible siren (P0), flashes a warning strobe (P2), and paints a ghost icon on the matrix.",
     seedCircuit: {
       parts: [
         part("microbit", "microbit-v2", 60, 80),

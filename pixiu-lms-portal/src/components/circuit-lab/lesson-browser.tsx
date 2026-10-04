@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { BookOpen, Check, Circle, Lock, Play, RotateCcw, Search, X, Zap } from "lucide-react"
+import { BookOpen, Check, Circle, Lock, Play, RotateCcw, Search, Target, X, Zap } from "lucide-react"
 import type { Lesson, LessonContext, LessonProgress } from "@/lib/lesson-engine"
 import {
   LESSONS,
@@ -251,7 +251,9 @@ export function LessonBrowser({
                             </span>
                           </div>
                         </div>
-                        <p className="mt-1 line-clamp-2 text-[9px] leading-4 text-slate-500">{lesson.description}</p>
+                        <p className="mt-1 line-clamp-2 text-[9px] leading-4 text-slate-400 font-medium">
+                          {lesson.finalGoal ? lesson.finalGoal.replace(/^🎯\s*/, "") : lesson.description}
+                        </p>
                         <div className="mt-2 h-1 overflow-hidden rounded-full bg-slate-800">
                           <div className="h-full rounded-full bg-cyan-400 transition-all" style={{ width: `${percent}%` }} />
                         </div>
@@ -365,6 +367,20 @@ export function LessonBrowser({
                     <Play size={12} fill="currentColor" /> Load starter
                   </button>
                 </div>
+
+                {/* What You Will Build (Final Project Goal) Banner */}
+                {activeLesson.finalGoal && (
+                  <div className="mt-3 rounded-xl border border-cyan-500/30 bg-gradient-to-r from-cyan-950/40 via-blue-950/30 to-slate-900/40 p-3 shadow-inner">
+                    <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-cyan-300">
+                      <Target size={13} className="text-cyan-400 shrink-0" />
+                      <span>What You Will Build (Final Project Goal)</span>
+                    </div>
+                    <p className="mt-1 text-xs leading-relaxed text-slate-200 font-medium">
+                      {activeLesson.finalGoal}
+                    </p>
+                  </div>
+                )}
+
                 <div className="mt-3">
                   <div className="mb-1 flex items-center justify-between text-[9px] font-mono text-slate-500"><span>{activePercent}% complete</span><span>{activeLesson.steps.length} steps</span></div>
                   <div className="h-1.5 overflow-hidden rounded-full bg-slate-800"><div className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 transition-all" style={{ width: `${activePercent}%` }} /></div>

@@ -23,6 +23,7 @@ export const PICO_LESSONS: Lesson[] = [
     estimatedMinutes: 8,
     concepts: ["Raspberry Pi Pico", "RP2040", "GP25", "Built-in LED", "Digital Output"],
     prerequisites: [],
+    finalGoal: "🎯 What You Will Build: An RP2040 dual-core digital flasher controlling the onboard green user LED on GP25 with 500ms intervals.",
     seedCircuit: {
       parts: [part("pico", "rpi-pico", 80, 100)],
       wires: [],
@@ -82,6 +83,7 @@ export const PICO_LESSONS: Lesson[] = [
     estimatedMinutes: 10,
     concepts: ["RP2040", "Current Limiting", "GP15", "Ohm's Law"],
     prerequisites: ["lesson-pico-gp25-blink"],
+    finalGoal: "🎯 What You Will Build: A safe 3.3V external LED flasher on GP15 protected by a 220Ω current-limiting resistor to explore Ohm's Law.",
     seedCircuit: {
       parts: [
         part("pico", "rpi-pico", 60, 100),
@@ -155,6 +157,7 @@ export const PICO_LESSONS: Lesson[] = [
     estimatedMinutes: 10,
     concepts: ["RP2040", "Digital Read", "Interactive Button", "Conditional Logic"],
     prerequisites: ["lesson-pico-external-led"],
+    finalGoal: "🎯 What You Will Build: An interactive button-controlled lamp reading digital tactile inputs on GP14 to dynamically illuminate an external blue LED on GP15.",
     seedCircuit: {
       parts: [
         part("pico", "rpi-pico", 60, 100),
@@ -240,6 +243,7 @@ export const PICO_LESSONS: Lesson[] = [
     estimatedMinutes: 10,
     concepts: ["RP2040", "12-bit ADC", "ADC0", "Analog In"],
     prerequisites: ["lesson-pico-tactile-button"],
+    finalGoal: "🎯 What You Will Build: A 12-bit analog converter telemetry monitor reading 4096 discrete voltage steps from a rotary potentiometer on ADC0 (GP26).",
     seedCircuit: {
       parts: [
         part("pico", "rpi-pico", 60, 100),
@@ -319,6 +323,7 @@ export const PICO_LESSONS: Lesson[] = [
     estimatedMinutes: 12,
     concepts: ["RP2040", "PWM Slice", "Analog Write", "RGB LED"],
     prerequisites: ["lesson-pico-pot-adc"],
+    finalGoal: "🎯 What You Will Build: A hardware PWM multi-slice color fader modulating Red (GP16), Green (GP17), and Blue (GP18) channels to blend vivid custom hues.",
     seedCircuit: {
       parts: [
         part("pico", "rpi-pico", 60, 100),
@@ -395,6 +400,7 @@ export const PICO_LESSONS: Lesson[] = [
     estimatedMinutes: 12,
     concepts: ["RP2040", "Audio PWM", "Buzzer", "Alert System"],
     prerequisites: ["lesson-pico-rgb-fader"],
+    finalGoal: "🎯 What You Will Build: A melodic acoustic transducer generating clear 523Hz (Note C5) audio chime tones on GP15 through a piezo buzzer.",
     seedCircuit: {
       parts: [
         part("pico", "rpi-pico", 60, 100),
@@ -463,6 +469,7 @@ export const PICO_LESSONS: Lesson[] = [
     estimatedMinutes: 15,
     concepts: ["RP2040", "Ultrasonic HC-SR04", "Distance Sensing", "Threshold Alarm"],
     prerequisites: ["lesson-pico-buzzer-melody"],
+    finalGoal: "🎯 What You Will Build: An active sonar parking radar that measures obstacle distance using an HC-SR04 sensor and trips an audible proximity buzzer under 40cm.",
     seedCircuit: {
       parts: [
         part("pico", "rpi-pico", 60, 100),
@@ -551,6 +558,7 @@ export const PICO_LESSONS: Lesson[] = [
     estimatedMinutes: 15,
     concepts: ["RP2040", "Servo Motors", "PWM", "Robotics"],
     prerequisites: ["lesson-pico-ultrasonic-radar"],
+    finalGoal: "🎯 What You Will Build: A calibrated robotic positioning arm commanded to cycle between 0° and 90° angles using precision PWM timing on GP15.",
     seedCircuit: {
       parts: [
         part("pico", "rpi-pico", 60, 100),
@@ -577,7 +585,7 @@ export const PICO_LESSONS: Lesson[] = [
       {
         id: "parts",
         title: "Place Servo",
-        instructions: "Place Pico and a Servo motor on the workbench.",
+        instructions: "Place Pico and a Servo motor on the bench.",
         kind: "build",
         checks: [{ kind: "parts", requirements: [{ type: "rpi-pico", count: 1 }, { type: "servo", count: 1 }] }],
         success: "Actuator placed.",
@@ -620,6 +628,7 @@ export const PICO_LESSONS: Lesson[] = [
     estimatedMinutes: 15,
     concepts: ["RP2040", "I2C Bus", "16x2 LCD", "Text Formatting"],
     prerequisites: ["lesson-pico-servo-motion"],
+    finalGoal: "🎯 What You Will Build: An alphanumeric status display rendering real-time formatted text on an I2C 16×2 LCD screen via GP4 (SDA) and GP5 (SCL).",
     seedCircuit: {
       parts: [
         part("pico", "rpi-pico", 60, 100),
@@ -692,6 +701,7 @@ export const PICO_LESSONS: Lesson[] = [
     estimatedMinutes: 20,
     concepts: ["RP2040", "Soil Moisture Sensor", "Relay Driver", "Automated Irrigation"],
     prerequisites: ["lesson-pico-i2c-lcd"],
+    finalGoal: "🎯 What You Will Build: An autonomous smart agriculture station that measures soil moisture on ADC1 (GP27) and automatically engages a 5V relay irrigation pump on GP13 when soil dries.",
     seedCircuit: {
       parts: [
         part("pico", "rpi-pico", 60, 100),

@@ -75,6 +75,7 @@ export interface Lesson {
   seedCircuit?: CircuitState
   seedBlocklyXml?: string
   steps: LessonStep[]
+  finalGoal?: string
 }
 
 export interface LessonContext {
@@ -818,6 +819,7 @@ const UNO_LESSONS: Lesson[] = [
     concepts: ["GPIO", "Current Limiting", "Digital Output"],
     prerequisites: [],
     templateId: "blink-led",
+    finalGoal: "🎯 What You Will Build: A safe blinking electronic signal beacon on Arduino Uno pin D13, learning how forward-bias current illuminates a diode and how a 220Ω resistor protects it from burning out.",
     steps: [
       {
         id: "parts",
@@ -879,6 +881,7 @@ const UNO_LESSONS: Lesson[] = [
     concepts: ["Digital Input", "Pushbutton", "Conditional Logic", "Interactive I/O"],
     prerequisites: ["lesson-led-basics"],
     templateId: "g6-pushbutton-led",
+    finalGoal: "🎯 What You Will Build: A tactile interactive desk lamp where pressing a momentary pushbutton switch on digital pin D2 instantly lights up a Green LED through conditional code logic.",
     steps: [
       {
         id: "parts",
@@ -941,6 +944,7 @@ const UNO_LESSONS: Lesson[] = [
     concepts: ["Analog Input", "ADC", "PWM Dimming", "Map Function"],
     prerequisites: ["lesson-led-basics"],
     templateId: "g6-pot-brightness",
+    finalGoal: "🎯 What You Will Build: A smooth analog dimmer light system using a 10kΩ potentiometer on pin A0 to continuously dial LED brightness up and down via 8-bit PWM modulation.",
     steps: [
       {
         id: "parts",
@@ -1001,6 +1005,7 @@ const UNO_LESSONS: Lesson[] = [
     concepts: ["Piezo Buzzer", "Sound Alert", "Digital Trigger", "Audio Transducers"],
     prerequisites: ["lesson-pushbutton-led"],
     templateId: "g6-buzzer-doorbell",
+    finalGoal: "🎯 What You Will Build: A smart acoustic entryway doorbell that produces a crisp 250ms melodic chime tone on a piezo buzzer whenever a visitor rings the front pushbutton.",
     steps: [
       {
         id: "parts",
@@ -1059,6 +1064,7 @@ const UNO_LESSONS: Lesson[] = [
     concepts: ["Photoresistor", "Analog Sensing", "Light Thresholds", "Automation"],
     prerequisites: ["lesson-led-basics"],
     templateId: "g6-ldr-night-lamp",
+    finalGoal: "🎯 What You Will Build: An autonomous solar dusk-to-dawn street lamp that senses ambient light levels with an LDR photoresistor and automatically switches illumination ON when darkness falls.",
     steps: [
       {
         id: "parts",
@@ -1120,6 +1126,7 @@ const UNO_LESSONS: Lesson[] = [
     concepts: ["RGB LED", "PWM Color Mixing", "Multi-channel GPIO"],
     prerequisites: ["lesson-led-basics"],
     templateId: "g6-rgb-mood-lamp",
+    finalGoal: "🎯 What You Will Build: An ambient RGB mood light capable of blending vibrant colors by dynamically modulating 8-bit PWM signals across Red (D9), Green (D10), and Blue (D11) channels.",
     steps: [
       {
         id: "parts",
@@ -1175,6 +1182,7 @@ const UNO_LESSONS: Lesson[] = [
     concepts: ["Sequencing", "Multi-Output GPIO", "State Machine", "Timing"],
     prerequisites: ["lesson-led-basics"],
     templateId: "traffic-light",
+    finalGoal: "🎯 What You Will Build: A fully automated municipal traffic intersection signal that coordinates Red (D12), Yellow (D11), and Green (D10) LEDs with precise timed state transitions.",
     steps: [
       {
         id: "parts",
@@ -1240,6 +1248,7 @@ const UNO_LESSONS: Lesson[] = [
     concepts: ["Servo Motor", "PWM Positioning", "Robotics", "Actuators"],
     prerequisites: ["lesson-led-basics"],
     templateId: "servo-sweep",
+    finalGoal: "🎯 What You Will Build: A robotic servo positioning arm that sweeps dynamically across calibrated angular positions (0°, 90°, and 180°) using precise pulse-width modulation on digital pin D9.",
     steps: [
       {
         id: "parts",
@@ -1293,6 +1302,7 @@ const UNO_LESSONS: Lesson[] = [
     concepts: ["Servo Actuators", "Automation Mechanism", "Robotics"],
     prerequisites: ["lesson-servo", "lesson-pushbutton-led"],
     templateId: "g7-servo-door",
+    finalGoal: "🎯 What You Will Build: An automated parking boom barrier mechanism that raises to 90° to admit authorized vehicles and returns to 0° to secure the gate.",
     steps: [
       {
         id: "parts",
@@ -1347,6 +1357,7 @@ const UNO_LESSONS: Lesson[] = [
     concepts: ["HC-SR04 Sonar", "Time of Flight", "Threshold Detection", "Safety Alarm"],
     prerequisites: ["lesson-servo"],
     templateId: "ultrasonic-radar",
+    finalGoal: "🎯 What You Will Build: An active sonar collision detection and parking sensor that measures distance in centimeters using HC-SR04 sound waves and sounds a buzzer alarm when an obstacle is within 30cm.",
     steps: [
       {
         id: "parts",
@@ -1413,6 +1424,7 @@ const UNO_LESSONS: Lesson[] = [
     prerequisites: ["lesson-ultrasonic"],
     seedCircuit: MQ2_GAS_CIRCUIT,
     seedBlocklyXml: MQ2_GAS_XML,
+    finalGoal: "🎯 What You Will Build: An environmental hazard safety sentinel that continuously samples air quality via an MQ-2 sensor and trips an emergency buzzer alarm and flashing warning strobe if gas PPM exceeds 300.",
     steps: [
       {
         id: "parts",
@@ -1475,6 +1487,7 @@ const UNO_LESSONS: Lesson[] = [
     prerequisites: ["lesson-ultrasonic"],
     seedCircuit: DHT11_CIRCUIT,
     seedBlocklyXml: DHT11_XML,
+    finalGoal: "🎯 What You Will Build: A digital weather telemetry monitor that reads temperature (°C) and humidity (%) over a single-wire digital protocol from a DHT11 sensor and logs formatted climate data to the Serial console.",
     steps: [
       {
         id: "wiring",
@@ -1527,6 +1540,7 @@ const UNO_LESSONS: Lesson[] = [
     concepts: ["I2C Bus", "SDA / SCL", "Alphanumeric Display", "Hardware Addressing"],
     prerequisites: ["lesson-dht11"],
     templateId: "g8-lcd-weather",
+    finalGoal: "🎯 What You Will Build: An alphanumeric smart dashboard that uses the 2-wire I2C communication protocol (SDA/SCL) on pins A4 & A5 to render custom greetings and telemetry on a 16×2 character LCD screen.",
     steps: [
       {
         id: "parts",
@@ -1584,6 +1598,7 @@ const UNO_LESSONS: Lesson[] = [
     prerequisites: ["lesson-rgb-mood-lamp"],
     seedCircuit: NEOPIXEL_CIRCUIT,
     seedBlocklyXml: NEOPIXEL_XML,
+    finalGoal: "🎯 What You Will Build: An 8-pixel WS2812B addressable NeoPixel cyber ring displaying flowing rainbow color animations and patterns controlled over a single high-speed digital data pin (D6).",
     steps: [
       {
         id: "parts",
@@ -1641,6 +1656,7 @@ const UNO_LESSONS: Lesson[] = [
     concepts: ["PIR Pyroelectric Sensor", "Thermal Infrared", "Perimeter Security", "Digital Inputs"],
     prerequisites: ["lesson-servo-gate"],
     templateId: "g7-pir-security",
+    finalGoal: "🎯 What You Will Build: An intrusion perimeter security system that senses human thermal infrared radiation via a PIR sensor on pin D7 and immediately activates a security alert strobe on pin D13.",
     steps: [
       {
         id: "parts",
@@ -1700,6 +1716,7 @@ const UNO_LESSONS: Lesson[] = [
     concepts: ["Soil Moisture Sensor", "Analog Conductivity", "Smart Agriculture", "IoT Automation"],
     prerequisites: ["lesson-ldr-night-lamp"],
     templateId: "g7-soil-smart-farm",
+    finalGoal: "🎯 What You Will Build: An automated smart irrigation controller that measures soil moisture content via analog conductivity on pin A0 and automatically switches an irrigation pump indicator on when soil is dry.",
     steps: [
       {
         id: "parts",
@@ -1759,6 +1776,7 @@ const UNO_LESSONS: Lesson[] = [
     concepts: ["4x4 Matrix Keypad", "Multiplexing", "Security PIN", "Human Interface"],
     prerequisites: ["lesson-pir-security"],
     templateId: "g8-keypad-lock",
+    finalGoal: "🎯 What You Will Build: A digital electronic security vault door that scans user keystrokes from a 4×4 matrix keypad using row-column multiplexing to verify a secure PIN and unlock the vault.",
     steps: [
       {
         id: "parts",
@@ -1816,6 +1834,7 @@ const UNO_LESSONS: Lesson[] = [
     concepts: ["Computer Vision", "Pixiu AI", "Edge AI Inference", "Autonomous Robotics", "Smart City"],
     prerequisites: ["lesson-servo-gate"],
     templateId: "ai-smart-barrier",
+    finalGoal: "🎯 What You Will Build: An autonomous AI-powered boom barrier that runs real-time computer vision to detect oncoming vehicles, swinging the servo arm to 90° and illuminating the Green Pass light for authorized cars.",
     steps: [
       {
         id: "parts",
@@ -1877,6 +1896,7 @@ const UNO_LESSONS: Lesson[] = [
     prerequisites: ["lesson-ai-vision-barrier"],
     seedCircuit: AI_GESTURE_CIRCUIT,
     seedBlocklyXml: AI_GESTURE_XML,
+    finalGoal: "🎯 What You Will Build: A touchless smart home automation system that uses AI hand gesture recognition (such as Thumbs Up) to wirelessly actuate servo mechanisms and lighting indicators without physical contact.",
     steps: [
       {
         id: "parts",

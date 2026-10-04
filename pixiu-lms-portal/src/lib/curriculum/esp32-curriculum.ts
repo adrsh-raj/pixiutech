@@ -23,6 +23,7 @@ export const ESP32_LESSONS: Lesson[] = [
     estimatedMinutes: 8,
     concepts: ["ESP32", "3.3V Logic", "GPIO 2", "Built-in LED", "Digital Output"],
     prerequisites: [],
+    finalGoal: "🎯 What You Will Build: A 3.3V dual-core digital flasher controlling the onboard Blue status LED on ESP32 GPIO2 with 500ms intervals.",
     seedCircuit: {
       parts: [part("esp", "esp32-devkit", 80, 100)],
       wires: [],
@@ -82,6 +83,7 @@ export const ESP32_LESSONS: Lesson[] = [
     estimatedMinutes: 10,
     concepts: ["ESP32", "Digital Input", "Pushbutton", "GPIO 4", "Conditional Logic"],
     prerequisites: ["lesson-esp32-builtin-led"],
+    finalGoal: "🎯 What You Will Build: An interactive 3.3V digital input circuit reading a tactile pushbutton on GPIO4 to dynamically switch an external green LED on and off.",
     seedCircuit: {
       parts: [
         part("esp", "esp32-devkit", 60, 100),
@@ -177,6 +179,7 @@ export const ESP32_LESSONS: Lesson[] = [
     estimatedMinutes: 10,
     concepts: ["ESP32", "12-Bit ADC", "Analog Input", "Resolution (0..4095)"],
     prerequisites: ["lesson-esp32-pushbutton"],
+    finalGoal: "🎯 What You Will Build: A high-precision 12-bit analog-to-digital converter telemetry monitor reading 4096 discrete voltage steps from a potentiometer on pin D34.",
     seedCircuit: {
       parts: [
         part("esp", "esp32-devkit", 60, 100),
@@ -257,6 +260,7 @@ export const ESP32_LESSONS: Lesson[] = [
     estimatedMinutes: 10,
     concepts: ["ESP32", "RGB LED", "LEDC PWM", "Color Mixing"],
     prerequisites: ["lesson-esp32-pot-12bit"],
+    finalGoal: "🎯 What You Will Build: An LEDC multi-channel PWM ambient light controller driving Red (GPIO25), Green (GPIO26), and Blue (GPIO27) channels to blend custom color hues.",
     seedCircuit: {
       parts: [
         part("esp", "esp32-devkit", 60, 100),
@@ -341,6 +345,7 @@ export const ESP32_LESSONS: Lesson[] = [
     estimatedMinutes: 12,
     concepts: ["ESP32", "Hardware DAC", "Analog Voltage", "Tone Generation"],
     prerequisites: ["lesson-esp32-rgb-mood"],
+    finalGoal: "🎯 What You Will Build: An authentic hardware Digital-to-Analog Converter (DAC) audio generator producing true analog voltage waveforms on GPIO25 through a piezo speaker.",
     seedCircuit: {
       parts: [
         part("esp", "esp32-devkit", 60, 100),
@@ -411,6 +416,7 @@ export const ESP32_LESSONS: Lesson[] = [
     estimatedMinutes: 12,
     concepts: ["ESP32", "Servo Motors", "PWM Angle Sweep", "Robotics"],
     prerequisites: ["lesson-esp32-dac-tone"],
+    finalGoal: "🎯 What You Will Build: A 50Hz precision PWM robotic servo actuator sweeping across 0°, 90°, and 180° positions from ESP32 GPIO18.",
     seedCircuit: {
       parts: [
         part("esp", "esp32-devkit", 60, 100),
@@ -482,6 +488,7 @@ export const ESP32_LESSONS: Lesson[] = [
     estimatedMinutes: 12,
     concepts: ["ESP32", "DHT11 Sensor", "One-Wire Digital", "Serial Telemetry"],
     prerequisites: ["lesson-esp32-servo-pwm"],
+    finalGoal: "🎯 What You Will Build: A dual-parameter environmental telemetry station reading digital temperature (°C) and relative humidity (%) from a DHT11 sensor on GPIO4.",
     seedCircuit: {
       parts: [
         part("esp", "esp32-devkit", 60, 100),
@@ -566,6 +573,7 @@ export const ESP32_LESSONS: Lesson[] = [
     estimatedMinutes: 15,
     concepts: ["ESP32", "I2C Bus", "OLED Display", "Visual Dashboard"],
     prerequisites: ["lesson-esp32-dht11-env"],
+    finalGoal: "🎯 What You Will Build: A high-contrast 128×64 I2C OLED graphical dashboard displaying real-time telemetry metrics using hardware I2C lines (SDA on GPIO21, SCL on GPIO22).",
     seedCircuit: {
       parts: [
         part("esp", "esp32-devkit", 60, 100),
@@ -638,6 +646,7 @@ export const ESP32_LESSONS: Lesson[] = [
     estimatedMinutes: 15,
     concepts: ["ESP32", "Virtual Wi-Fi", "DHCP", "Station Mode", "Networking"],
     prerequisites: ["lesson-esp32-oled-i2c"],
+    finalGoal: "🎯 What You Will Build: A Virtual Wi-Fi network link connecting the ESP32 to a local simulated wireless access point with full IP address assignment and connection logging.",
     seedCircuit: {
       parts: [part("esp", "esp32-devkit", 80, 100)],
       wires: [],
@@ -694,6 +703,7 @@ export const ESP32_LESSONS: Lesson[] = [
     estimatedMinutes: 20,
     concepts: ["ESP32", "HTTP Web Server", "IoT Smartphone", "Smart Home Automation", "Routes"],
     prerequisites: ["lesson-esp32-wifi-connect"],
+    finalGoal: "🎯 What You Will Build: A full IoT HTTP Web Server hosted directly on the ESP32, allowing remote smartphone browser control to switch physical living room and bedroom LEDs.",
     seedCircuit: {
       parts: [
         part("esp", "esp32-devkit", 40, 70),
