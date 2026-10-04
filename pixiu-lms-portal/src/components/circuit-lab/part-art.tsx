@@ -1393,9 +1393,29 @@ export function PartArt({ part, runtime }: { part: PlacedPart; runtime?: PartRun
             const y = 12 + r * 26
             const active = label === lastKey
             return (
-              <g key={label}>
-                <rect x={x} y={y} width="20" height="20" rx="5" fill={active ? "#2563eb" : "#1e293b"} stroke={active ? "#93c5fd" : "#475569"} />
-                <text x={x + 10} y={y + 13} textAnchor="middle" fontSize="8" fill="#e2e8f0" fontFamily="monospace" fontWeight="700">{label}</text>
+              <g key={label} className="cursor-pointer select-none">
+                <rect
+                  x={x}
+                  y={y}
+                  width="20"
+                  height="20"
+                  rx="5"
+                  fill={active ? "#2563eb" : "#1e293b"}
+                  stroke={active ? "#93c5fd" : "#475569"}
+                  strokeWidth={active ? 2 : 1}
+                  style={active ? { filter: "drop-shadow(0 0 5px rgba(59, 130, 246, 0.9))" } : undefined}
+                />
+                <text
+                  x={x + 10}
+                  y={y + 13}
+                  textAnchor="middle"
+                  fontSize="8"
+                  fill={active ? "#ffffff" : "#e2e8f0"}
+                  fontFamily="monospace"
+                  fontWeight="700"
+                >
+                  {label}
+                </text>
               </g>
             )
           }))}

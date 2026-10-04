@@ -610,20 +610,49 @@ export function CircuitCanvas(props: Props) {
                     )}
 
                     {interactive && part.type === "keypad-4x4" && (
-                      <rect
-                        x={0}
-                        y={0}
-                        width={def.width}
-                        height={def.height}
-                        fill="transparent"
-                        onPointerDown={(e) => {
-                          e.stopPropagation()
-                          const keys = ["1","2","3","A","4","5","6","B","7","8","9","C","*","0","#","D"]
-                          const current = String(part.props.lastKey ?? "")
-                          const index = Math.max(0, keys.indexOf(current))
-                          onChangeProp?.(part.id, "lastKey", keys[(index + 1) % keys.length])
-                        }}
-                      />
+                      <g>
+                        {[
+                          ["1","2","3","A"],
+                          ["4","5","6","B"],
+                          ["7","8","9","C"],
+                          ["*","0","#","D"],
+                        ].flatMap((row, r) =>
+                          row.map((label, col) => {
+                            const kx = 10 + col * 26
+                            const ky = 12 + r * 26
+                            return (
+                              <rect
+                                key={label}
+                                x={kx}
+                                y={ky}
+                                width={20}
+                                height={20}
+                                rx={5}
+                                fill="rgba(0,0,0,0.001)"
+                                pointerEvents="all"
+                                className="cursor-pointer"
+                                onPointerDown={(e) => {
+                                  e.stopPropagation()
+                                  onChangeProp?.(part.id, "lastKey", label)
+                                }}
+                                onPointerUp={(e) => {
+                                  e.stopPropagation()
+                                  setTimeout(() => {
+                                    onChangeProp?.(part.id, "lastKey", "")
+                                  }, 400)
+                                }}
+                                onPointerLeave={() => {
+                                  setTimeout(() => {
+                                    if (String(part.props.lastKey ?? "") === label) {
+                                      onChangeProp?.(part.id, "lastKey", "")
+                                    }
+                                  }, 500)
+                                }}
+                              />
+                            )
+                          })
+                        )}
+                      </g>
                     )}
 
                     {/* Arduino Uno Interactive Reset Switch Hitbox */}
@@ -980,6 +1009,58 @@ export function CircuitCanvas(props: Props) {
                               }`}
                             >
                               {pat}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </foreignObject>
+                  )}
+
+                  {/* On-Canvas Live Keypad Quick Action Controller */}
+                  {part.type === "keypad-4x4" && (
+                    <foreignObject
+                      x={-6}
+                      y={-44}
+                      width={130}
+                      height={40}
+                      className="overflow-visible pointer-events-auto"
+                    >
+                      <div
+                        className="bg-slate-950/95 border border-blue-500/50 shadow-xl rounded-lg px-2 py-1 text-white flex items-center justify-between gap-1 select-none backdrop-blur-sm"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
+                        onContextMenu={(e) => {
+                          e.stopPropagation()
+                          onSelect(part.id)
+                          onCanvasContextMenu?.(e, { type: "part", id: part.id })
+                        }}
+                      >
+                        <div className="flex items-center gap-1 text-[9px] font-mono font-bold text-blue-300">
+                          <span>🔢</span>
+                          <span className="text-white bg-blue-900/60 px-1 py-0.5 rounded border border-blue-400/40">
+                            {part.props.lastKey ? `Key: ${part.props.lastKey}` : "Keypad"}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {["1", "2", "3", "A", "#"].map((k) => (
+                            <button
+                              key={k}
+                              type="button"
+                              onPointerDown={(e) => {
+                                e.stopPropagation()
+                                onChangeProp?.(part.id, "lastKey", k)
+                              }}
+                              onPointerUp={(e) => {
+                                e.stopPropagation()
+                                setTimeout(() => onChangeProp?.(part.id, "lastKey", ""), 400)
+                              }}
+                              className={`w-4 h-4 rounded text-[9px] font-mono font-bold flex items-center justify-center border transition-all ${
+                                String(part.props.lastKey ?? "") === k
+                                  ? "bg-blue-600 text-white border-blue-400 scale-110 shadow"
+                                  : "bg-slate-800 text-slate-200 border-slate-700 hover:border-blue-400 hover:bg-slate-700 active:scale-95"
+                              }`}
+                            >
+                              {k}
                             </button>
                           ))}
                         </div>

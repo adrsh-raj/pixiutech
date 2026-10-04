@@ -677,9 +677,12 @@ export function Inspector({ part, runtime, partCount, wireCount, onChangeProp, o
                 <div className="grid grid-cols-4 gap-1">
                   {["1","2","3","A","4","5","6","B","7","8","9","C","*","0","#","D"].map((key) => (
                     <button key={key}
-                      onClick={() => onChangeProp(part.id, "lastKey", key)}
-                      className={"rounded-lg border px-1 py-2 text-xs font-bold " + (
-                        String(part.props.lastKey ?? "") === key ? "border-primary bg-primary/15 text-primary" : "border-border bg-secondary text-foreground hover:bg-secondary/80"
+                      onClick={() => {
+                        onChangeProp(part.id, "lastKey", key)
+                        setTimeout(() => onChangeProp(part.id, "lastKey", ""), 400)
+                      }}
+                      className={"rounded-lg border px-1 py-2 text-xs font-bold transition-all " + (
+                        String(part.props.lastKey ?? "") === key ? "border-primary bg-primary/25 text-primary scale-105 shadow" : "border-border bg-secondary text-foreground hover:bg-secondary/80"
                       )}
                     >
                       {key}
