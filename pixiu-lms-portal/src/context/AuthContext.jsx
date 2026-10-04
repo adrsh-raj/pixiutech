@@ -18,6 +18,7 @@ const API_READ_CACHE_MAX_ENTRIES = 250;
 let accessTokenMemory = null;
 let refreshPromise = null;
 let csrfTokenMemory = null;
+let csrfTokenPromise = null;
 const apiReadCache = new Map();
 
 function clearApiReadCache() { apiReadCache.clear(); }
@@ -107,18 +108,32 @@ async function fetchWithRetry(url, options = {}) {
   if (lastResponse) return lastResponse;
   throw lastError || new Error('Request failed.');
 }
-async function getCsrfToken(force = false) {
+export async function getCsrfToken(force = false) {
   if (csrfTokenMemory && !force) return csrfTokenMemory;
-  const response = await fetchOnce(`${API_BASE}/auth/csrf/`, {
-    method: 'GET',
-    cache: 'no-store',
-    credentials: 'include',
-    headers: { Accept: 'application/json' },
-  }, 15000);
-  const data = await readJson(response);
-  if (!response.ok || !data.csrfToken) throw new Error('Unable to initialize the security token.');
-  csrfTokenMemory = String(data.csrfToken);
-  return csrfTokenMemory;
+  if (csrfTokenPromise && !force) return csrfTokenPromise;
+
+  csrfTokenPromise = (async () => {
+    try {
+      const response = await fetchOnce(`${API_BASE}/auth/csrf/`, {
+        method: 'GET',
+        cache: 'no-store',
+        credentials: 'include',
+        headers: { Accept: 'application/json' },
+      }, 45000);
+      const data = await readJson(response);
+      if (!response.ok || !data.csrfToken) throw new Error('Unable to initialize the security token.');
+      csrfTokenMemory = String(data.csrfToken);
+      return csrfTokenMemory;
+    } finally {
+      csrfTokenPromise = null;
+    }
+  })();
+
+  return csrfTokenPromise;
+}
+
+export function warmAuthService() {
+  void getCsrfToken().catch(() => {});
 }
 async function authPostWithRetry(url, options = {}) {
   let lastError = null;
@@ -203,9 +218,11 @@ export async function apiFetch(path, options = {}) {
   if (response.ok && !['GET', 'HEAD'].includes(method)) clearApiReadCache();
   return response;
 }
-export function clearAuthStorage({ clearRole = true } = {}) {
+export function clearAuthStorage({ clearRole = true, clearCsrf = false } = {}) {
   accessTokenMemory = null;
-  csrfTokenMemory = null;
+  if (clearCsrf) {
+    csrfTokenMemory = null;
+  }
   clearApiReadCache();
   clearLegacyAuthStorage();
   if (clearRole) { setSessionRole(null); setSessionStudentId(null); }
@@ -252,7 +269,7 @@ export function AuthProvider({ children }) {
           setSessionStudentId(data.user.student_id || data.user.id);
         }
       } catch {
-        clearAuthStorage({ clearRole: false });
+        clearAuthStorage({ clearRole: false, clearCsrf: false });
         if (active) { setToken(null); setUser(null); }
       } finally { if (active) setLoading(false); }
     };
@@ -315,7 +332,7 @@ export function AuthProvider({ children }) {
     finally {
       setUser(null);
       setToken(null);
-      clearAuthStorage();
+      clearAuthStorage({ clearCsrf: true });
       try { window.localStorage.setItem(AUTH_LOGOUT_KEY, String(Date.now())); } catch {}
       broadcastAuthChange();
     }
