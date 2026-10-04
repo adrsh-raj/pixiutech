@@ -206,6 +206,7 @@ export function AiCameraPanel({
           const started = performance.now()
 
           try {
+            // detectObjects(modelRef.current, video
             const predictions = await detectObjects(
               modelElement,
               videoElement,

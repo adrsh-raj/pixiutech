@@ -10,6 +10,9 @@ import {
   MY_AI_PREDICTION_THRESHOLD,
 } from "./ai/my-ai-feature-extractor"
 
+// Standard feature contract: MY_AI_FEATURE_SIZE = 512
+export { MY_AI_FEATURE_SIZE }
+
 export type AiSample = {
   id: string
   label: string

@@ -120,7 +120,7 @@ const OVERRIDES: Partial<Record<PartType, Partial<ComponentRegistryEntry>>> = {
       hint: "Most modules use VCC, GND and OUT; OUT is the signal you read.",
     },
   },
-  dht11: {
+  "dht11": {
     electricalModel: "powered-digital-sensor",
     runtimeModel: "temperature-humidity",
     blockIds: ["dht_temperature", "dht_humidity"],
@@ -144,7 +144,7 @@ const OVERRIDES: Partial<Record<PartType, Partial<ComponentRegistryEntry>>> = {
       hint: "SDA and SCL are communication lines; VCC/GND power the module.",
     },
   },
-  joystick: {
+  "joystick": {
     electricalModel: "dual-analog-plus-digital",
     runtimeModel: "joystick-xy-button",
     blockIds: ["joystick_x", "joystick_y", "joystick_button"],
@@ -156,7 +156,7 @@ const OVERRIDES: Partial<Record<PartType, Partial<ComponentRegistryEntry>>> = {
       hint: "The center position is near 512 on a 10-bit analog scale.",
     },
   },
-  l298n: {
+  "l298n": {
     electricalModel: "dual-h-bridge",
     runtimeModel: "dual-motor-driver",
     blockIds: ["motor_driver_write"],

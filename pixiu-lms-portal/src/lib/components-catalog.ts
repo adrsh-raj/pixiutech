@@ -368,7 +368,7 @@ export const CATALOG: Record<PartType, PartDef> = {
     ],
     defaults: { detected: "false" },
   },
-  dht11: {
+  "dht11": {
     type: "dht11",
     name: "DHT11 Climate Sensor",
     blurb: "Temperature + humidity digital sensor",
@@ -395,7 +395,7 @@ export const CATALOG: Record<PartType, PartDef> = {
     ],
     defaults: { line1: "PIXIU TECH", line2: "READY", line3: "" },
   },
-  joystick: {
+  "joystick": {
     type: "joystick",
     name: "2-Axis Joystick",
     blurb: "X/Y analog control + push button",
@@ -410,7 +410,7 @@ export const CATALOG: Record<PartType, PartDef> = {
     ],
     defaults: { x: 512, y: 512, pressed: "false" },
   },
-  l298n: {
+  "l298n": {
     type: "l298n",
     name: "L298N Motor Driver",
     blurb: "Dual H-bridge for two DC motors",

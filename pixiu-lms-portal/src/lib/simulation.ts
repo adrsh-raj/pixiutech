@@ -606,6 +606,7 @@ export function computeRuntime(
         }
         return null
       }
+      const findArduinoPinState = findBoardPinState
       const readDrive = (pin: string) => {
         const stateForPin = findBoardPinState(k(pin))
         if (!stateForPin) {
@@ -641,6 +642,23 @@ export function computeRuntime(
       }
       if (directionA !== "stopped") addEdge(k("out1"), k("out2"), 2)
       if (directionB !== "stopped") addEdge(k("out3"), k("out4"), 2)
+
+      // Propagate motor rotation to connected DC motors
+      for (const mPart of state.parts) {
+        if (mPart.type !== "dc-motor") continue
+        const mPos = key(mPart.id, "pos")
+        const mNeg = key(mPart.id, "neg")
+        const connectedToA = shortestResistance([{ key: k("out1") }, { key: k("out2") }], mPos) ||
+                             shortestResistance([{ key: k("out1") }, { key: k("out2") }], mNeg)
+        if (connectedToA) {
+          runtime[mPart.id] = { rpm: rpmA, motorDirection: directionA }
+        }
+        const connectedToB = shortestResistance([{ key: k("out3") }, { key: k("out4") }], mPos) ||
+                             shortestResistance([{ key: k("out3") }, { key: k("out4") }], mNeg)
+        if (connectedToB) {
+          runtime[mPart.id] = { rpm: rpmB, motorDirection: directionB }
+        }
+      }
     } else if (part.type === "rotary-encoder") {
       const value = Number(part.props.value ?? 0)
       const previousValue = Number(part.props.previousValue ?? value)
