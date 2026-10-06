@@ -62,7 +62,8 @@ class PublicLabEnquiryTests(TestCase):
     def test_think_rethink_enquiry_is_captured_with_private_attachment(self):
         with tempfile.TemporaryDirectory() as media_root:
             with override_settings(MEDIA_ROOT=media_root, CLAMAV_ENABLED=False, CLAMAV_REQUIRED=False):
-                response = PublicEnquiryView.as_view()(self.lab_request(user=self.admin))
+                request = self.lab_request(user=self.admin)
+                response = PublicEnquiryView.as_view()(request)
 
                 self.assertEqual(response.status_code, 201)
                 lead = Lead.objects.get()
@@ -76,7 +77,7 @@ class PublicLabEnquiryTests(TestCase):
 
                 serializer = LeadSerializer(
                     lead,
-                    context={"request": response.wsgi_request},
+                    context={"request": request},
                 )
                 attachment_url = serializer.data["lab_attachments"][0]["url"]
                 self.assertIn(f"/api/v1/lab-enquiry-attachments/{attachment.id}", attachment_url)
