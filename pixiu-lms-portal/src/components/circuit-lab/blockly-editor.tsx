@@ -228,8 +228,9 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
         colour: "#ccc",
         snap: true,
       },
+      renderer: "zelos",
       zoom: {
-        controls: true,
+        controls: false,
         wheel: true,
         startScale: 0.9,
         maxScale: 2,
@@ -237,6 +238,7 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
         scaleSpeed: 1.2,
       },
       trashcan: true,
+      theme: PIXIU_BLOCKLY_THEME,
       media: "https://unpkg.com/blockly/media/",
     })
 
