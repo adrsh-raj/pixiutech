@@ -1,12 +1,18 @@
-import { useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Camera, CircleHelp, Mail, MessageCircle, Paperclip, Send, ShieldCheck, X } from "lucide-react"
-import { apiFetch } from "@/context/AuthContext"
+import { apiFetch, useAuth } from "@/context/AuthContext"
 
 const EMAIL = "director@pixiutech.com"
 const WHATSAPP_NUMBER = "917985403186"
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024
 const ALLOWED_MIME = new Set(["image/png", "image/jpeg", "image/webp"])
 const ALLOWED_EXT = new Set([".png", ".jpg", ".jpeg", ".webp"])
+const KIND_OPTIONS = [
+  { value: "bug", label: "Bug / Problem" },
+  { value: "help", label: "Help" },
+  { value: "other", label: "Other" },
+  { value: "philosophy", label: "Think / Rethink · Philosophy" },
+] as const
 
 function formatBytes(value: number) {
   if (value < 1024) return value + " B"
@@ -26,13 +32,30 @@ function initialStudentId() {
 export function LabSupportWidget() {
   const [open, setOpen] = useState(false)
   const [studentId, setStudentId] = useState(initialStudentId)
-  const [kind, setKind] = useState<"bug" | "help" | "other">("bug")
+  const { user } = useAuth()
+  const [kind, setKind] = useState<"bug" | "help" | "other" | "philosophy">("bug")
   const [message, setMessage] = useState("")
   const [image, setImage] = useState<File | null>(null)
   const [dragging, setDragging] = useState(false)
   const [sending, setSending] = useState(false)
   const [status, setStatus] = useState<{ type: "success" | "error"; text: string } | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    const verifiedId = String((user as any)?.student_id || "").trim().toUpperCase()
+    if (verifiedId) setStudentId(verifiedId)
+  }, [user])
+
+  useEffect(() => {
+    if (!image) {
+      setPreviewUrl(null)
+      return undefined
+    }
+    const url = URL.createObjectURL(image)
+    setPreviewUrl(url)
+    return () => URL.revokeObjectURL(url)
+  }, [image])
 
   const imageMeta = useMemo(() => (image ? formatBytes(image.size) : null), [image])
 
