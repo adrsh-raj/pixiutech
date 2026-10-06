@@ -55,6 +55,7 @@ export function LessonBrowser({
   const [lastResults, setLastResults] = useState<Record<string, ReturnType<typeof evaluateLessonStep>>>({})
   const [boardFilter, setBoardFilter] = useState<"all" | "arduino-uno" | "esp32-devkit" | "rpi-pico" | "microbit-v2">("all")
   const [categoryFilter, setCategoryFilter] = useState<"all" | "Beginner" | "Intermediate" | "Advanced">("all")
+  const [aiOnly, setAiOnly] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
 
   useEffect(() => {
@@ -82,6 +83,7 @@ export function LessonBrowser({
       const lessonBoard = lesson.board ?? "arduino-uno"
       if (boardFilter !== "all" && lessonBoard !== boardFilter) return false
       if (categoryFilter !== "all" && lesson.difficulty !== categoryFilter) return false
+      if (aiOnly && !lesson.concepts.some((concept) => /ai|vision|gesture|finger|computer vision/i.test(concept)) && !/AI/i.test(lesson.title)) return false
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim()
         const matchTitle = lesson.title.toLowerCase().includes(q) || lesson.shortTitle.toLowerCase().includes(q)
@@ -92,7 +94,7 @@ export function LessonBrowser({
       }
       return true
     })
-  }, [boardFilter, categoryFilter, searchQuery])
+  }, [aiOnly, boardFilter, categoryFilter, searchQuery])
 
   if (!isOpen) return null
 
