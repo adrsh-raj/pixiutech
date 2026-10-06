@@ -98,7 +98,7 @@ export async function encodePixiuProtocol(payload: unknown, password?: string): 
   header.set(salt, 11)
   header.set(iv, 27)
   view.setUint32(39, ciphertext.byteLength, false)
-  return new Blob([header.buffer, ciphertext], { type: "application/x-pixiu-circuit" })
+  return new Blob([header, ciphertext], { type: "application/octet-stream" })
 }
 
 export async function decodePixiuProtocol(input: string | ArrayBuffer | Uint8Array, password?: string): Promise<unknown> {
