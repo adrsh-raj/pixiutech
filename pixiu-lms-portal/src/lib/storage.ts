@@ -450,6 +450,10 @@ export async function exportAsJSON(
 
   const normalizedName = normalizeProjectName(name)
   const now = new Date().toISOString()
+  if (typeof blocklyXml !== "string" || getByteLength(blocklyXml) > MAX_BLOCKLY_XML_BYTES) {
+    throw new Error("Blockly data is too large to export")
+  }
+
   const circuit: SavedCircuit = {
     format: PIXIU_FILE_FORMAT,
     version: PIXIU_FILE_VERSION,
@@ -465,10 +469,13 @@ export async function exportAsJSON(
   const anchor = document.createElement("a")
   anchor.href = url
   anchor.download = normalizedName.replace(/\s+/g, "_") + ".pixiu"
+  anchor.type = "application/octet-stream"
+  anchor.rel = "noopener"
   document.body.appendChild(anchor)
   anchor.click()
   anchor.remove()
-  URL.revokeObjectURL(url)
+  // Keep the object URL alive briefly so Chromium/Safari have time to start the download.
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
 export function importFromJSON(file: File, password?: string): Promise<SavedCircuit> {
