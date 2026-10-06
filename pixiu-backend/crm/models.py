@@ -27,6 +27,12 @@ class LeadSource(models.TextChoices):
     OTHER = "other", "Other"
 
 
+class LeadEnquiryType(models.TextChoices):
+    SALES = "sales", "Sales"
+    BUG = "bug", "Bug"
+    HELP = "help", "Help"
+    OTHER = "other", "Other"
+
 class Lead(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     organization_name = models.CharField(max_length=250)
@@ -34,6 +40,7 @@ class Lead(models.Model):
     email = models.EmailField(blank=True)
     phone = models.CharField(max_length=30, blank=True)
     source = models.CharField(max_length=20, choices=LeadSource.choices, default=LeadSource.OTHER)
+    enquiry_type = models.CharField(max_length=20, choices=LeadEnquiryType.choices, default=LeadEnquiryType.SALES)
     status = models.CharField(max_length=20, choices=LeadStatus.choices, default=LeadStatus.NEW)
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="crm_leads")
     converted_school = models.ForeignKey(School, on_delete=models.PROTECT, null=True, blank=True, related_name="converted_leads")
@@ -48,6 +55,26 @@ class Lead(models.Model):
         self.organization_name = sanitize_plain_text(self.organization_name, 250)
         self.contact_name = sanitize_plain_text(self.contact_name, 200)
         self.notes = sanitize_plain_text(self.notes, 10000, preserve_newlines=True)
+        self.enquiry_type = str(self.enquiry_type or LeadEnquiryType.SALES)
+        super().save(*args, **kwargs)
+
+
+class LabEnquiryAttachment(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    lead = models.ForeignKey(Lead, on_delete=models.CASCADE, related_name="lab_attachments")
+    file = models.FileField(upload_to="private_lab_enquiries/", max_length=320)
+    original_name = models.CharField(max_length=255)
+    size = models.PositiveIntegerField()
+    content_type = models.CharField(max_length=120)
+    sha256 = models.CharField(max_length=64)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+
+    def save(self, *args, **kwargs):
+        self.original_name = sanitize_plain_text(self.original_name, 255)
+        self.content_type = sanitize_plain_text(self.content_type, 120)
         super().save(*args, **kwargs)
 
 

@@ -10,10 +10,11 @@ import { defineArduinoBlocks, setAiClassContext, arduino, normalizeBlocklyXml } 
 import { runBlocklyProgram, executeStatement, type ExecutionEnvironment, type BlockStepInfo } from "@/lib/blockly-runner"
 import { virtualWifiManager, type VirtualWifiState } from "@/lib/virtual-wifi"
 import { IotWebPortal } from "./iot-web-portal"
+import { LabSupportWidget } from "./lab-support-widget"
 import { MICROBIT_ICONS, MICROBIT_DIGITS, createEmptyMatrix } from "@/lib/microbit-patterns"
 import { audioEngine } from "@/lib/audio-engine"
 import { createHistory, pushState, undo as historyUndo, redo as historyRedo, canUndo, canRedo, type HistoryState } from "@/lib/history"
-import { saveCircuit, loadCurrentCircuit, saveCurrentCircuit, clearCurrentCircuit, importFromJSON, exportAsJSON, type SavedCircuit } from "@/lib/storage"
+import { saveCircuit, saveCurrentCircuit, clearCurrentCircuit, importFromJSON, exportAsJSON, type SavedCircuit } from "@/lib/storage"
 import * as Blockly from "blockly"
 import { Boxes, Camera, Sparkles, Terminal, Trash2, Gauge, Sliders, ShieldAlert, RotateCw, Copy, X, Smartphone } from "lucide-react"
 import { computeWireCurrents } from "@/lib/current-flow"
@@ -254,35 +255,11 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
     isPausedRef.current = isPaused
   }, [isPaused])
 
+  // A fresh Lab session is intentionally blank. Existing projects are opened
+  // explicitly through Projects so an old circuit never masquerades as a new one.
   useEffect(() => {
-    let cancelled = false
-
-    const restoreCurrentProject = async () => {
-      try {
-        const saved = await loadCurrentCircuit()
-        if (cancelled) return
-
-        if (saved) {
-          setHistory(createHistory(saved.state))
-          setBlocklyXml(saved.blocklyXml || DEFAULT_XML)
-          setBlocklyDocumentVersion((value) => value + 1)
-          setCurrentProjectName(saved.name === "default" ? "Untitled Circuit" : saved.name)
-          setLastSaved(saved.savedAt)
-        }
-
-        setIsDirty(false)
-      } catch (error) {
-        console.warn("Unable to restore the previous Pixiu circuit:", error)
-      } finally {
-        if (!cancelled) setStorageReady(true)
-      }
-    }
-
-    void restoreCurrentProject()
+    setStorageReady(true)
     void syncXpWithServer()
-    return () => {
-      cancelled = true
-    }
   }, [])
 
   useEffect(() => {
@@ -1821,6 +1798,8 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
 
   return (
     <div className="circuit-lab-blue-theme flex h-screen flex-col bg-background text-foreground overflow-hidden select-none">
+      <LabSupportWidget />
+
       <Toolbar
         view={view}
         onViewChange={setView}

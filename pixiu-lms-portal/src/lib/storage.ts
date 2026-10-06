@@ -484,23 +484,16 @@ export function importFromJSON(file: File, password?: string): Promise<SavedCirc
       return
     }
 
-    const reader = new FileReader()
-    reader.onload = async (event) => {
-      try {
-        const rawText = event.target?.result
-        if (typeof rawText !== "string") throw new Error("Unable to read the selected file")
-
-        if (getByteLength(rawText) > 3 * 1024 * 1024) {
-          throw new Error("This circuit file is too large.")
+    file.arrayBuffer()
+      .then(async (rawBytes) => {
+        try {
+          if (rawBytes.byteLength > 3 * 1024 * 1024) throw new Error("This circuit file is too large.")
+          const parsed = await decodePixiuProtocol(rawBytes, password) as Record<string, unknown>
+          resolve(normalizeSavedCircuit(parsed))
+        } catch (error) {
+          reject(new Error(error instanceof Error ? error.message : String(error)))
         }
-
-        const parsed = await decodePixiuProtocol(rawText, password) as Record<string, unknown>
-        resolve(normalizeSavedCircuit(parsed))
-      } catch (error) {
-        reject(new Error(error instanceof Error ? error.message : String(error)))
-      }
-    }
-    reader.onerror = () => reject(new Error("Failed to read circuit file"))
-    reader.readAsText(file)
+      })
+      .catch(() => reject(new Error("Failed to read circuit file")))
   })
 }

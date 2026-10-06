@@ -20,12 +20,15 @@ function normalize(lead) {
     city: lead.city || (text(lead.notes).match(/^City:\s*(.+)$/m)?.[1] || ''),
     strength: Number(lead.expected_students ?? lead.student_strength ?? 0) || 0,
     status: text(lead.status || lead.stage || 'new').toLowerCase(),
+    enquiryType: text(lead.enquiry_type || 'sales').toLowerCase(),
+    labAttachments: Array.isArray(lead.lab_attachments) ? lead.lab_attachments : [],
     notes: lead.notes || '',
     createdLabel: parsed && !Number.isNaN(parsed.getTime()) ? parsed.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : text(created) || '—',
   };
 }
 
 const STATUS_LABELS = { new: 'New', contacted: 'Contacted', qualified: 'Qualified', proposal: 'Proposal', negotiation: 'Negotiation', won: 'Won', lost: 'Lost' };
+const ENQUIRY_TYPES = { sales: 'Sales', bug: 'Bug', help: 'Help', other: 'Other' };
 
 export default function WebsiteEnquiries() {
   const { leads = [], refreshAll, loading } = useData();
@@ -38,7 +41,7 @@ export default function WebsiteEnquiries() {
       .filter(lead => text(lead.source).toLowerCase() === 'website')
       .map(normalize)
       .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
-      .filter(row => !q || [row.school, row.person, row.email, row.phone, row.city, row.notes, row.status].some(value => text(value).toLowerCase().includes(q)));
+      .filter(row => !q || [row.school, row.person, row.email, row.phone, row.city, row.notes, row.status, row.enquiryType].some(value => text(value).toLowerCase().includes(q)));
   }, [leads, query]);
 
   const newCount = enquiries.filter(item => item.status === 'new').length;
@@ -71,7 +74,7 @@ export default function WebsiteEnquiries() {
         <div className="bg-white border border-slate-200/80 rounded-2xl shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs min-w-[1000px]">
-              <thead className="bg-slate-50 border-b border-slate-200 text-[10px] uppercase tracking-wider text-slate-500 font-black"><tr><th className="px-5 py-3">School / Contact</th><th className="px-5 py-3">Reach</th><th className="px-5 py-3">Location</th><th className="px-5 py-3">Students</th><th className="px-5 py-3">Submitted</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Message</th></tr></thead>
+              <thead className="bg-slate-50 border-b border-slate-200 text-[10px] uppercase tracking-wider text-slate-500 font-black"><tr><th className="px-5 py-3">School / Contact</th><th className="px-5 py-3">Reach</th><th className="px-5 py-3">Location</th><th className="px-5 py-3">Students</th><th className="px-5 py-3">Submitted</th><th className="px-5 py-3">Type</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Message</th></tr></thead>
               <tbody className="divide-y divide-slate-100">
                 {enquiries.map(item => (
                   <tr key={item.id} className="hover:bg-slate-50 align-top">
@@ -80,8 +83,22 @@ export default function WebsiteEnquiries() {
                     <td className="px-5 py-4"><div className="flex items-center gap-2 text-slate-600"><MapPin size={13} /> {item.city || '—'}</div></td>
                     <td className="px-5 py-4"><div className="flex items-center gap-2 font-bold text-slate-700"><Users size={13} /> {item.strength || '—'}</div></td>
                     <td className="px-5 py-4"><div className="flex items-center gap-2 text-slate-600 whitespace-nowrap"><CalendarDays size={13} /> {item.createdLabel}</div></td>
+                    <td className="px-5 py-4">
+                      <span className={"inline-flex px-2.5 py-1 rounded-full border text-[10px] font-black uppercase " + (item.enquiryType === "bug" ? "bg-red-50 text-red-700 border-red-200" : item.enquiryType === "help" ? "bg-blue-50 text-blue-700 border-blue-200" : item.enquiryType === "other" ? "bg-slate-50 text-slate-600 border-slate-200" : "bg-emerald-50 text-emerald-700 border-emerald-200")}>
+                        {ENQUIRY_TYPES[item.enquiryType] || item.enquiryType}
+                      </span>
+                    </td>
                     <td className="px-5 py-4"><span className={`inline-flex px-2.5 py-1 rounded-full border text-[10px] font-black uppercase ${item.status === 'new' ? 'bg-amber-50 text-amber-700 border-amber-200' : item.status === 'won' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-600 border-slate-200'}`}>{STATUS_LABELS[item.status] || item.status}</span></td>
-                    <td className="px-5 py-4 max-w-sm"><p className="text-slate-500 whitespace-pre-line line-clamp-4">{item.notes || 'No message provided.'}</p></td>
+                    <td className="px-5 py-4 max-w-sm"><p className="text-slate-500 whitespace-pre-line line-clamp-4">{item.notes || 'No message provided.'}</p>
+                      {item.labAttachments.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {item.labAttachments.map(file => (
+                            <a key={file.id} href={file.url || "#"} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] font-bold text-blue-700 hover:bg-blue-100">
+                              <ExternalLink size={11} /> {file.original_name}
+                            </a>
+                          ))}
+                        </div>
+                      )}</td>
                   </tr>
                 ))}
               </tbody>

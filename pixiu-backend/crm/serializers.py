@@ -5,10 +5,26 @@ from .models import (
     CareerOpening,
     CareerOpeningStatus,
     CommunicationLog,
+    LabEnquiryAttachment,
     Lead,
     LeadActivity,
     LeadContact,
 )
+
+
+class LabEnquiryAttachmentSerializer(serializers.ModelSerializer):
+    url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = LabEnquiryAttachment
+        fields = ["id", "original_name", "size", "content_type", "created_at", "url"]
+        read_only_fields = fields
+
+    def get_url(self, obj):
+        try:
+            return obj.file.url if obj.file else ""
+        except Exception:
+            return ""
 
 
 class LeadContactSerializer(serializers.ModelSerializer):
@@ -28,10 +44,11 @@ class LeadActivitySerializer(serializers.ModelSerializer):
 class LeadSerializer(serializers.ModelSerializer):
     activities = LeadActivitySerializer(many=True, read_only=True)
     contacts = LeadContactSerializer(many=True, read_only=True)
+    lab_attachments = LabEnquiryAttachmentSerializer(many=True, read_only=True)
 
     class Meta:
         model = Lead
-        fields = ["id", "organization_name", "contact_name", "email", "phone", "source", "status", "owner", "converted_school", "expected_students", "estimated_value", "next_follow_up", "notes", "created_at", "updated_at", "activities", "contacts"]
+        fields = ["id", "organization_name", "contact_name", "email", "phone", "source", "enquiry_type", "status", "owner", "converted_school", "expected_students", "estimated_value", "next_follow_up", "notes", "created_at", "updated_at", "activities", "contacts", "lab_attachments"]
         read_only_fields = ["id", "owner", "created_at", "updated_at", "activities", "contacts"]
 
 

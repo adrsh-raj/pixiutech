@@ -343,7 +343,7 @@ export function ProjectManager({
 
             <div className="mt-3 flex items-start gap-2 rounded-xl border border-slate-800 bg-slate-950/40 p-3 text-[10px] leading-4 text-slate-500">
               <HardDrive size={13} className="mt-0.5 shrink-0 text-slate-400" />
-              <span>Projects are stored locally in this browser. The .pixiu file is the portable backup and transfer format.</span>
+              <span>Projects are stored locally in this browser. The .pixiu file is Pixiu’s portable binary project format.</span>
             </div>
 
             {passwordPromptOpen && pendingImportFile && (
