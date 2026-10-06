@@ -387,11 +387,56 @@ class ContractInventoryViewSet(LegacyShapeMixin, KitViewSet):
 
 
 class ContractLeadViewSet(LegacyShapeMixin, LeadViewSet):
+    def get_queryset(self):
+        return super().get_queryset().prefetch_related("lab_attachments")
+
     def map_in(self, data):
-        return {"organization_name": _first(data, "organization_name", "name", default=""), "contact_name": _first(data, "contact_name", "contact_person", default=""), "email": _first(data, "email", default=""), "phone": _first(data, "phone", default=""), "source": str(_first(data, "source", default="other")).lower(), "status": str(_first(data, "status", "stage", default="new")).lower().replace(" ", "_"), "expected_students": int(_first(data, "expected_students", default=0) or 0), "estimated_value": _first(data, "estimated_value", "expected_value", default=0), "next_follow_up": _first(data, "next_follow_up"), "notes": _first(data, "notes", default="")}
+        return {
+            "organization_name": _first(data, "organization_name", "name", default=""),
+            "contact_name": _first(data, "contact_name", "contact_person", default=""),
+            "email": _first(data, "email", default=""),
+            "phone": _first(data, "phone", default=""),
+            "source": str(_first(data, "source", default="other")).lower(),
+            "enquiry_type": str(_first(data, "enquiry_type", "kind", default="sales")).lower(),
+            "status": str(_first(data, "status", "stage", default="new")).lower().replace(" ", "_"),
+            "expected_students": int(_first(data, "expected_students", default=0) or 0),
+            "estimated_value": _first(data, "estimated_value", "expected_value", default=0),
+            "next_follow_up": _first(data, "next_follow_up"),
+            "notes": _first(data, "notes", default=""),
+        }
 
     def map_out(self, obj):
-        return {"id": str(obj.pk), "name": obj.organization_name, "organization_name": obj.organization_name, "contact_person": obj.contact_name, "email": obj.email, "phone": obj.phone, "source": obj.source, "stage": obj.status, "status": obj.status, "expected_students": obj.expected_students, "expected_value": float(obj.estimated_value), "estimated_value": float(obj.estimated_value), "notes": obj.notes}
+        attachments = []
+        for attachment in obj.lab_attachments.all():
+            try:
+                url = attachment.file.url if attachment.file else ""
+            except Exception:
+                url = ""
+            attachments.append({
+                "id": str(attachment.pk),
+                "original_name": attachment.original_name,
+                "size": attachment.size,
+                "content_type": attachment.content_type,
+                "created_at": attachment.created_at,
+                "url": url,
+            })
+        return {
+            "id": str(obj.pk),
+            "name": obj.organization_name,
+            "organization_name": obj.organization_name,
+            "contact_person": obj.contact_name,
+            "email": obj.email,
+            "phone": obj.phone,
+            "source": obj.source,
+            "enquiry_type": obj.enquiry_type,
+            "stage": obj.status,
+            "status": obj.status,
+            "expected_students": obj.expected_students,
+            "expected_value": float(obj.estimated_value),
+            "estimated_value": float(obj.estimated_value),
+            "notes": obj.notes,
+            "lab_attachments": attachments,
+        }
 
     @action(detail=True, methods=["put"], url_path="stage")
     def stage(self, request, pk=None):
