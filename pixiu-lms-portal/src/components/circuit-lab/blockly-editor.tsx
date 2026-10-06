@@ -238,6 +238,7 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
         scaleSpeed: 1.2,
       },
       trashcan: true,
+      sounds: true,
       theme: PIXIU_BLOCKLY_THEME,
       media: "https://unpkg.com/blockly/media/",
     })
