@@ -91,12 +91,12 @@ export const REAL_LAB_SHOWCASE = {
       meta: 'Hands-On Build',
     },
     {
-      title: 'Graded Curriculum Lab Books',
-      desc: 'Dedicated instructors guide students through graded Robotics Lab Books covering microcontrollers, ultrasonic sensing, and automation logic.',
-      img: '/img/zenith/zenith_curriculum_slide.jpg',
-      alt: 'Robotics trainer guiding students through curriculum presentation in partner school lab',
-      badge: 'Structured Curriculum',
-      meta: 'Trainer Delivery',
+      title: 'AI & Embedded Systems Curriculum',
+      desc: 'Structured curriculum pathways from Class 3 to 12 covering microcontrollers, sensor integration, computer vision, and applied machine learning.',
+      img: '/img/ai_learning.jpg',
+      alt: 'Students collaborating on applied AI and intelligent computing curriculum in a school lab',
+      badge: 'Applied AI & Robotics',
+      meta: 'Curriculum Delivery',
     },
   ],
 }

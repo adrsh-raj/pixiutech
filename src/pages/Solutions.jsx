@@ -105,13 +105,6 @@ export default function Solutions() {
               <p className="wide-img__caption">A working Pixiu Tech robotics and STEM lab at Zenith Public School, Dadha</p>
             </div>
           </Reveal>
-          <Reveal delay={120}>
-            <p style={{ marginTop: 34 }}>
-              <Link className="btn btn--primary btn--lg" to="/contact#demo-form">
-                Book a Free Consultation for Your School <span className="arw">→</span>
-              </Link>
-            </p>
-          </Reveal>
         </div>
       </section>
 

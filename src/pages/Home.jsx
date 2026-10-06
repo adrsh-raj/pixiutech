@@ -32,18 +32,18 @@ export default function Home() {
           <Reveal>
             <p className="hero-v2__tag">STEM · Robotics · AI · IoT · Drones</p>
             <h1 className="hero-v2__title">
-              Helping Schools Build and Run<br />
-              <span className="hero-v2__accent">Working STEM & Technology Labs</span>
+              Turnkey Robotics, AI & IoT Labs<br />
+              <span className="hero-v2__accent">Engineered for Modern Schools</span>
             </h1>
             <p className="hero-v2__sub">
-              Lab setup, practical curriculum, trained instructors, and ongoing support. Your school gets the equipment, teaching plan, and delivery team needed to run STEM, Robotics, and AI classes.
+              Complete innovation lab setup, plug-and-play hardware kits, graded NEP 2020 curriculum, resident expert instructors, and browser-based virtual circuit simulation.
             </p>
             <div className="hero-v2__cta">
               <Link className="btn btn--primary btn--lg" to="/contact#demo-form">
                 Book a Free Consultation <span className="arw">→</span>
               </Link>
               <Link className="btn btn--ghost-light" to="/solutions">
-                Explore Solutions
+                Explore Lab Solutions
               </Link>
             </div>
           </Reveal>
@@ -189,11 +189,6 @@ export default function Home() {
                 </blockquote>
                 <cite>{REAL_LAB_SHOWCASE.quote.cite}</cite>
               </div>
-              <div>
-                <Link className="btn btn--primary" to="/contact#demo-form">
-                  Book a Consultation for Your School <span className="arw">→</span>
-                </Link>
-              </div>
             </div>
           </Reveal>
         </div>
@@ -242,8 +237,8 @@ export default function Home() {
                 <li>Ongoing mentorship & support</li>
               </ul>
               <p style={{ marginTop: 24 }}>
-                <Link className="btn btn--outline" to="/contact#demo-form">
-                  Discuss Teacher Training <span className="arw">→</span>
+                <Link className="btn btn--outline" to="/solutions">
+                  Explore Training Curriculum <span className="arw">→</span>
                 </Link>
               </p>
             </div>
