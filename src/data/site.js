@@ -11,10 +11,96 @@ export const NAV = [
 ]
 
 export const STATS = [
-  { number: '1', label: 'Partner School' },
-  { number: '5+', label: 'Workshops Delivered' },
-  { number: '1000+', label: 'Students Influenced' },
+  { number: '1', label: 'Flagship Partner School' },
+  { number: '4', label: 'Microcontroller Platforms' },
+  { number: '30+', label: 'Prototyping & Sensor Modules' },
+  { number: '1000+', label: 'Students Engaged' },
 ]
+
+export const PILLARS = [
+  {
+    id: 'physical-lab',
+    number: '01',
+    title: 'Physical Lab Infrastructure',
+    tagline: 'Hardware, Tooling & Weekly On-Site Mentorship',
+    desc: 'Turnkey lab installation with heavy-duty workstations, Arduino Uno and ESP32 prototyping kits, sensor bins, tools, and dedicated weekly instructors deployed directly to your school.',
+    points: [
+      'Industrial-grade workstations and component organizers',
+      'Arduino, ESP32, motor drivers, and sensor kits per bench',
+      'Graded physical lab workbooks for Class 6 to 10',
+      'Trained Pixiu Tech specialists co-teaching weekly sessions',
+    ],
+    actionText: 'Explore Lab Solutions',
+    to: '/solutions',
+  },
+  {
+    id: 'cyberlab',
+    number: '02',
+    title: 'Virtual Cyberlab Simulator',
+    tagline: 'Zero-Install Browser Circuit Simulator',
+    desc: 'Full-featured online electronics workbench powered by a real-time SPICE solver. Students design, wire, and test circuits without risk of damaged components or hardware bottlenecks.',
+    points: [
+      'Real-time SPICE simulation kernel for analog and digital circuits',
+      'Dual Blockly block coding and standard Arduino C++',
+      'Support for Uno, ESP32, Raspberry Pi Pico, and micro:bit',
+      'Virtual 2-channel oscilloscope, multimeter, and serial monitor',
+    ],
+    actionText: 'Launch Cyberlab',
+    to: '/simulation',
+  },
+  {
+    id: 'portal',
+    number: '03',
+    title: 'Dedicated School LMS Portal',
+    tagline: 'Missions, Automated Grading & Verifiable Credentials',
+    desc: 'Purpose-built student and teacher learning management system at portal.pixiutech.com. Structured curriculum missions, automated step verification, teacher gradebooks, and verifiable certificates.',
+    points: [
+      'Interactive step-by-step student missions with circuit checks',
+      'Gamified XP progression, skill mastery, and streak engine',
+      'Teacher gradebook with class rosters and completion tracking',
+      'Tamper-proof certificate issuance with instant hash verification',
+    ],
+    actionText: 'Access School Portal',
+    to: '/portal',
+  },
+]
+
+export const CYBERLAB_SPECS = {
+  badge: 'Interactive Simulation',
+  title: 'Virtual Cyberlab: Zero-Install Circuit & Code Simulator',
+  desc: 'Before picking up a physical screwdriver or soldering iron, students prototype their ideas in our browser-based Cyberlab. Built for speed, safety, and deep conceptual understanding.',
+  points: [
+    { title: 'SPICE Simulation Engine', detail: 'Accurate real-time voltage, current, and logic simulation directly inside modern web browsers with zero plugin requirements.' },
+    { title: '4 Microcontroller Boards', detail: 'Arduino Uno R3, ESP32 with virtual Wi-Fi emulation, Raspberry Pi Pico (RP2040), and BBC micro:bit v2.' },
+    { title: 'Dual Visual & C++ Coding', detail: 'Drag-and-drop Blockly blocks for Class 6 to 8 students; standard Arduino C++ and MicroPython for senior students.' },
+    { title: '30+ Sensor & Display Parts', detail: 'Ultrasonic distance sensors, PIR motion, DHT11 temperature/humidity, servo motors, LCD1602, OLED displays, and buzzers.' },
+    { title: 'Built-In Instrumentation', detail: 'Interactive 2-channel oscilloscope, digital multimeter, and virtual serial monitor for signal debugging.' },
+  ],
+  passportImage: {
+    src: '/img/zenith/zenith_arduino_hands_on.jpg',
+    alt: 'Student testing circuit wiring on Arduino Uno at Zenith Public School',
+    caption: 'Bridge Virtual to Physical: Circuits simulated in Cyberlab are wired on breadboards at Zenith Public School.',
+    tag: 'Physical & Virtual Parity',
+  },
+}
+
+export const PORTAL_SPECS = {
+  badge: 'School & Student LMS',
+  title: 'Dedicated Learning Portal for Students & Educators',
+  desc: 'A complete operating system for school STEM labs available at portal.pixiutech.com. Connects hands-on experimentation with structured academic accountability.',
+  studentFeatures: [
+    { title: 'Guided Mission Workbooks', desc: 'Step-by-step schematics and coding prompts that walk students from basic LED blink to autonomous obstacle-avoidance rovers.' },
+    { title: 'Instant Circuit Doctor', desc: 'Real-time diagnostic checks pinpoint missing ground connections, misplaced resistors, or invalid pin assignments.' },
+    { title: 'Mission XP & Mastery Engine', desc: 'Earn verified experience points, complete streak challenges, and unlock advanced engineering tiers.' },
+    { title: 'Verifiable Digital Credentials', desc: 'Cryptographically hashed certificates of completion that schools, parents, and universities can verify at /verify.' },
+  ],
+  schoolFeatures: [
+    { title: 'Class Roster & Attendance', desc: 'Manage batches across sections and grades with attendance records and student lab logins.' },
+    { title: 'Automated Evaluation Gradebook', desc: 'Track mission completion percentages, circuit check scores, and submission timelines per student.' },
+    { title: 'Anti-Cheat & Plagiarism Audit', desc: 'Built-in code structure analysis ensures students build genuine problem-solving skills.' },
+    { title: 'Curriculum Standards Alignment', desc: 'Aligned with CBSE Skill Education standards, Atal Tinkering Lab (ATL) guidelines, and ICSE robotics outcomes.' },
+  ],
+}
 
 export const SOLUTIONS = [
   {
