@@ -9,13 +9,13 @@ export default function Work() {
       <PageHead crumb="Proof of work" title="Show the work. Show the room. Show the people." intro="A school technology company earns trust by showing what delivery looks like after the pitch. This is one implementation story from the Pixiu programme." />
       <section className="case-hero">
         <div className="shell case-hero__grid">
-          <Reveal className="case-hero__image"><img src={PROOF.images[0].src} alt={PROOF.images[0].alt} /><span>01 / THE ROOM</span></Reveal>
+          <Reveal className="case-hero__image"><img src={PROOF.images[0].src} alt={PROOF.images[0].alt} loading="eager" decoding="async" /><span>01 / THE ROOM</span></Reveal>
           <Reveal delay={100}><span className="section-kicker">{PROOF.school}</span><h2>{PROOF.title}</h2><p>{PROOF.text}</p><div className="case-facts"><div><span>FORMAT</span><strong>Innovation lab</strong></div><div><span>DELIVERY</span><strong>Hands-on sessions</strong></div><div><span>PARTNERSHIP</span><strong>School + Pixiu</strong></div></div></Reveal>
         </div>
       </section>
       <section className="case-gallery">
-        <div className="shell"><div className="case-gallery__intro"><Reveal><span className="section-kicker">Inside the implementation</span><h2>Three views tell more than one hero image.</h2></Reveal><Reveal delay={100}><p>The visual story moves from infrastructure to people to student work—because that is the sequence a real programme depends on.</p></Reveal></div>
-          <div className="case-gallery__grid">{PROOF.images.slice(1).map((item, index) => <Reveal key={item.label} delay={index * 80}><figure><img src={item.src} alt={item.alt} loading="lazy" /><figcaption><span>0{index + 2}</span><strong>{item.label}</strong></figcaption></figure></Reveal>)}</div>
+        <div className="shell"><div className="case-gallery__intro"><Reveal><span className="section-kicker">Inside the implementation</span><h2>Three views tell more than one hero image.</h2></Reveal><Reveal delay={100}><p>The visual story moves from infrastructure to people to student work, because that is the sequence a real programme depends on.</p></Reveal></div>
+          <div className="case-gallery__grid">{PROOF.images.slice(1).map((item, index) => <Reveal key={item.label} delay={index * 80}><figure><img src={item.src} alt={item.alt} loading="lazy" decoding="async" /><figcaption><span>0{index + 2}</span><strong>{item.label}</strong></figcaption></figure></Reveal>)}</div>
         </div>
       </section>
       <section className="case-lessons">

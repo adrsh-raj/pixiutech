@@ -15,7 +15,7 @@ export default function Solutions() {
 
   return (
     <>
-      <PageHead crumb="What we do" title="A school innovation programme is more than the equipment in the room." intro="We design the lab, learning path, delivery model and digital layer as one system—then adapt the mix to the school in front of us." aside={<div><span className="mono-label">CAPABILITY INDEX</span><strong>06 domains<br />04 system layers<br />01 connected programme</strong></div>} />
+      <PageHead crumb="What we do" title="A school innovation programme is more than the equipment in the room." intro="We design the lab, learning path, delivery model and digital layer as one system; then adapt the mix to the school in front of us." aside={<div><span className="mono-label">CAPABILITY INDEX</span><strong>06 domains<br />04 system layers<br />01 connected programme</strong></div>} />
 
       <section className="capability-index">
         <div className="shell">
@@ -33,7 +33,7 @@ export default function Solutions() {
       {CAPABILITIES.map((item, index) => (
         <section className={'capability-band ' + (index % 2 ? 'capability-band--reverse' : '')} id={item.id} key={item.id}>
           <div className="shell capability-layout">
-            <Reveal className="capability-image"><img src={item.image} alt={item.imageAlt} loading="lazy" /><div className="capability-image__label"><span>{item.no}</span><span>{item.navTitle}</span></div></Reveal>
+            <Reveal className="capability-image"><img src={item.image} alt={item.imageAlt} loading="lazy" decoding="async" /><div className="capability-image__label"><span>{item.no}</span><span>{item.navTitle}</span></div></Reveal>
             <Reveal delay={80} className="capability-copy"><span className="section-kicker">{item.no} / capability</span><h2>{item.title}</h2><p className="capability-copy__short">{item.short}</p><p>{item.desc}</p><div className="included-list"><span className="mono-label">What this can include</span><ul>{item.includes.map(feature => <li key={feature}>{feature}</li>)}</ul></div><Link className="text-link" to="/contact?intent=proposal#demo-form">Discuss this capability <span>→</span></Link></Reveal>
           </div>
         </section>

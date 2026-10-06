@@ -9,7 +9,7 @@ export default function About() {
       <PageHead crumb={COMPANY.kicker} title={COMPANY.title} intro={COMPANY.intro} aside={<div><span className="mono-label">OUR WORK SITS BETWEEN</span><strong>Curriculum<br />Hardware<br />People<br />Software</strong></div>} />
       <section className="about-story">
         <div className="shell about-story__grid">
-          <Reveal className="about-story__image"><img src="/img/innovation_lab.webp" alt="Students collaborating in a school innovation lab" loading="lazy" /><span>THE ENVIRONMENT MATTERS</span></Reveal>
+          <Reveal className="about-story__image"><img src="/img/innovation_lab.webp" alt="Students collaborating in a school innovation lab" loading="lazy" decoding="async" /><span>THE ENVIRONMENT MATTERS</span></Reveal>
           <Reveal delay={100}><span className="section-kicker">Why Pixiu exists</span><h2>{COMPANY.detail}</h2><p>That sounds operational. It is. Good educational technology has to survive real rooms, real teachers, real class periods and real constraints.</p><p>We care about the part after the demo: whether the kit still gets opened next month, whether a teacher knows what the next lesson is, whether a student can understand the failure mode, and whether the school can see what is happening.</p></Reveal>
         </div>
       </section>

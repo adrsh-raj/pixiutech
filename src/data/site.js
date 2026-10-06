@@ -99,7 +99,7 @@ export const CAPABILITIES = [
     no: '06',
     title: 'Custom school programme design',
     navTitle: 'Custom programme',
-    short: 'Start with the timetable, room and goals—not a pre-packed catalogue.',
+    short: 'Start with the timetable, room and goals, not a pre-packed catalogue.',
     desc: 'Schools differ in space, timetable, staffing, board requirements and starting point. We can combine technology domains, hardware, curriculum and teaching support into a programme that fits the actual school environment.',
     image: '/img/workshop_action.webp',
     imageAlt: 'Students working together during a hands-on STEM workshop',

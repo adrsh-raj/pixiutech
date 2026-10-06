@@ -174,7 +174,7 @@ export default function Careers() {
           <Reveal delay={90}>
             {status?.kind === 'success' ? (
               <div className="form-success" role="status" aria-live="polite">
-                <span>✓ RECEIVED</span>
+                <span>RECEIVED</span>
                 <h3>Thank you, {submittedName}.</h3>
                 <p>{status.text} We will review your application and contact you using the details provided.</p>
                 <button className="button button--outline" type="button" onClick={() => { setStatus(null); setSubmittedName('') }}>Submit another application ↗</button>

@@ -13,7 +13,7 @@ export default function Home() {
             <Reveal>
               <span className="section-kicker section-kicker--light">School innovation, built to run</span>
               <h1>Build the room.<br /><em>Build the programme.</em><br />Keep it alive.</h1>
-              <p>Pixiu Tech brings the physical lab, curriculum, instructors and school software together so technology becomes part of the academic year—not a room that gets installed and forgotten.</p>
+              <p>Pixiu Tech brings the physical lab, curriculum, instructors and school software together so technology becomes part of the academic year, not a room that gets installed and forgotten.</p>
               <div className="hero-new__actions">
                 <Link className="button button--accent" to="/contact#demo-form">Plan a school lab <span>↗</span></Link>
                 <Link className="text-link text-link--light" to="/solutions">See what we build <span>→</span></Link>
@@ -23,11 +23,11 @@ export default function Home() {
 
           <Reveal delay={120} className="hero-new__visual">
             <figure className="hero-image-main">
-              <img src="/img/zenith/zenith_lab_setup.webp" alt="Completed innovation and robotics lab setup at Zenith Public School, Dadha" width="1200" height="800" fetchPriority="high" />
+              <img src="/img/zenith/zenith_lab_setup.webp" alt="Completed innovation and robotics lab setup at Zenith Public School, Dadha" width="1200" height="800" fetchPriority="high" loading="eager" decoding="async" />
               <figcaption><span>FIELD NOTE 01</span><span>REAL SCHOOL IMPLEMENTATION</span></figcaption>
             </figure>
             <figure className="hero-image-detail">
-              <img src="/img/zenith/zenith_robot_rover_demo.webp" alt="Students demonstrating a robotics rover" width="800" height="600" loading="eager" />
+              <img src="/img/zenith/zenith_robot_rover_demo.webp" alt="Students demonstrating a robotics rover" width="800" height="600" loading="eager" decoding="async" />
               <figcaption>Students testing an autonomous build</figcaption>
             </figure>
             <div className="hero-rail-label">DESIGNED FOR REAL TIMETABLES · REAL CLASSROOMS · REAL BUILDS</div>
@@ -93,7 +93,7 @@ export default function Home() {
           <div className="project-rail">
             {PROJECTS.map(project => (
               <article className="project-card" key={project.title}>
-                <div className="project-card__image"><img src={project.image} alt="" loading="lazy" /></div>
+                <div className="project-card__image"><img src={project.image} alt={project.title} loading="lazy" decoding="async" /></div>
                 <div className="project-card__body"><div className="project-card__meta"><span>{project.label}</span><span>{project.grade}</span></div><h3>{project.title}</h3><p>{project.text}</p></div>
               </article>
             ))}
@@ -125,7 +125,7 @@ export default function Home() {
           </div>
           <div className="proof-gallery">
             {PROOF.images.map((item, index) => (
-              <Reveal key={item.label} delay={70 * index} className={'proof-photo proof-photo--' + (index + 1)}><img src={item.src} alt={item.alt} loading="lazy" /><span>{item.label}</span></Reveal>
+              <Reveal key={item.label} delay={70 * index} className={'proof-photo proof-photo--' + (index + 1)}><img src={item.src} alt={item.alt} loading="lazy" decoding="async" /><span>{item.label}</span></Reveal>
             ))}
           </div>
         </div>

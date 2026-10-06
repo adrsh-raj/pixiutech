@@ -45,7 +45,7 @@ export default function Nav() {
     <header className={'site-nav ' + (scrolled ? 'site-nav--scrolled' : '')}>
       <div className="shell site-nav__inner">
         <Link className="site-brand" to="/" aria-label="Pixiu Tech home">
-          <img src="/img/logo.png" alt="Pixiu Tech" width="104" height="58" decoding="async" />
+          <img src="/img/logo.png" alt="Pixiu Tech" width="104" height="58" decoding="async" loading="eager" />
         </Link>
 
         <nav className="site-nav__desktop" aria-label="Primary navigation">
