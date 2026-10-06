@@ -270,9 +270,95 @@ export function computeRuntime(
     return Boolean(vccPath && gndPath)
   }
 
+  // 4. Prepare dynamic topology before solving any component runtime.
+  // Conductive state must be independent of the order in state.parts.
+  const boardParts = state.parts.filter((part) => isBoardPart(part.type))
+
+  function readBoardPinStateForTarget(targetKey: string): ArduinoPinState | null {
+    for (const bPart of boardParts) {
+      const bDef = getBoardForPart(bPart)
+      if (!bDef) continue
+      for (const bp of bDef.pins) {
+        if (bp.kind !== "digital" && bp.kind !== "analog") continue
+        const stripped = bp.id.replace(/^(gpio|gp|d|p)/i, "")
+        const candidates = [
+          key(bPart.id, bp.id),
+          key(bPart.id, bp.label.toLowerCase()),
+          key(bPart.id, stripped),
+          key(bPart.id, `d${stripped}`),
+          key(bPart.id, `gpio${stripped}`),
+          key(bPart.id, `gp${stripped}`),
+          key(bPart.id, `p${stripped}`),
+          ...(bp.alternateNames ?? []).map((alt) => key(bPart.id, alt.toLowerCase())),
+        ]
+        for (const candidate of candidates) {
+          if (shortestResistance([{ key: candidate }], targetKey)) {
+            return lookupBoardPinState(pinStates, bp.id, bDef) ?? null
+          }
+        }
+      }
+    }
+    return null
+  }
+
+  function readL298Drive(part: Extract<CircuitState["parts"][number], { type: "l298n" }>, pin: string) {
+    const stateForPin = readBoardPinStateForTarget(key(part.id, pin))
+    if (!stateForPin) return { connected: false, pwm: 0 }
+    const rawValue = stateForPin.value
+    const pwm = Math.max(
+      0,
+      Math.min(255, Number.isFinite(Number(rawValue)) ? Number(rawValue) : stateForPin.state === "HIGH" ? 255 : 0),
+    )
+    return { connected: true, pwm }
+  }
+
+  function readL298Direction(
+    part: Extract<CircuitState["parts"][number], { type: "l298n" }>,
+    highPin: string,
+    lowPin: string,
+  ) {
+    const highState = readBoardPinStateForTarget(key(part.id, highPin))
+    const lowState = readBoardPinStateForTarget(key(part.id, lowPin))
+    const highOn = highState ? highState.state === "HIGH" || Number(highState.value ?? 0) > 0 : false
+    const lowOn = lowState ? lowState.state === "HIGH" || Number(lowState.value ?? 0) > 0 : false
+    if (highOn === lowOn) return "stopped" as const
+    return highOn ? "cw" as const : "ccw" as const
+  }
+
+  for (const part of state.parts) {
+    const k = (pin: string) => key(part.id, pin)
+
+    if (part.type === "npn-transistor") {
+      const conducting = Boolean(shortestResistance(activeSources, k("base")))
+      if (conducting) addEdge(k("collector"), k("emitter"), 0.2)
+    }
+
+    if (part.type === "relay") {
+      const hasSignal = Boolean(shortestResistance(activeSources, k("in")))
+      const energized = hasSignal && hasExternalPower(part.id, "vcc", "gnd")
+      addEdge(k("com"), k(energized ? "no" : "nc"), 0.1)
+    }
+
+    if (part.type === "l298n") {
+      const powered = hasExternalPower(part.id, "vs", "gnd")
+      const enaDrive = readL298Drive(part, "ena")
+      const enbDrive = readL298Drive(part, "enb")
+      const speedA = enaDrive.connected
+        ? enaDrive.pwm
+        : Math.max(0, Math.min(255, Number(part.props.speedA ?? 0)))
+      const speedB = enbDrive.connected
+        ? enbDrive.pwm
+        : Math.max(0, Math.min(255, Number(part.props.speedB ?? 0)))
+      const directionA = !powered || speedA <= 0 ? "stopped" : readL298Direction(part, "in1", "in2")
+      const directionB = !powered || speedB <= 0 ? "stopped" : readL298Direction(part, "in3", "in4")
+      if (directionA !== "stopped") addEdge(k("out1"), k("out2"), 2)
+      if (directionB !== "stopped") addEdge(k("out3"), k("out4"), 2)
+    }
+  }
+
   const runtime: Record<string, PartRuntime> = {}
 
-  // 4. Solve for each component in the circuit
+  // 5. Solve for each component in the circuit
   for (const part of state.parts) {
     const k = (pin: string) => key(part.id, pin)
 
@@ -530,16 +616,23 @@ export function computeRuntime(
       const temp = powered ? Number(part.props.temperature ?? 25) : undefined
       runtime[part.id] = { sensorValue: temp }
     } else if (part.type === "dc-motor") {
-      const posKey = k("pos")
-      const negKey = k("neg")
-      const toPos = shortestResistance(activeSources, posKey)
-      const toNeg = shortestResistance(groundSinks.map((g) => ({ key: g })), negKey)
-      if (toPos && toNeg) {
-        const voltage = toPos.voltage
-        const rpm = Math.round(voltage * 200)
-        runtime[part.id] = { rpm, motorDirection: "cw" }
-      } else {
-        runtime[part.id] = { rpm: 0, motorDirection: "stopped" }
+      // Preserve a driver-resolved motor result when L298N appears before
+      // the motor in the circuit state.
+      const driverRuntime = runtime[part.id]
+      const hasDriverResult = driverRuntime?.motorARpm !== undefined || driverRuntime?.motorBRpm !== undefined
+
+      if (!hasDriverResult) {
+        const posKey = k("pos")
+        const negKey = k("neg")
+        const toPos = shortestResistance(activeSources, posKey)
+        const toNeg = shortestResistance(groundSinks.map((g) => ({ key: g })), negKey)
+        if (toPos && toNeg) {
+          const voltage = toPos.voltage
+          const rpm = Math.round(voltage * 200)
+          runtime[part.id] = { rpm, motorDirection: "cw" }
+        } else {
+          runtime[part.id] = { rpm: 0, motorDirection: "stopped" }
+        }
       }
     } else if (part.type === "npn-transistor") {
       const baseKey = k("base")
@@ -640,8 +733,8 @@ export function computeRuntime(
         motorBDirection: directionB,
         currentMa: rpmA + rpmB > 0 ? Math.round(120 + ((rpmA + rpmB) / 2000) * 180) : 0,
       }
-      if (directionA !== "stopped") addEdge(k("out1"), k("out2"), 2)
-      if (directionB !== "stopped") addEdge(k("out3"), k("out4"), 2)
+      // Driver output conductivity was prepared before runtime solving,
+      // so downstream components do not depend on array ordering.
 
       // Propagate motor rotation to connected DC motors
       for (const mPart of state.parts) {

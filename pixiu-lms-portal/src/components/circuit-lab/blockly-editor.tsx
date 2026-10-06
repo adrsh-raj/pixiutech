@@ -18,7 +18,7 @@ const TOOLBOX = {
   contents: [
     {
       kind: "category",
-      name: "⚡ Arduino",
+      name: "Arduino",
       colour: "#00878F",
       contents: [
         { kind: "block", type: "arduino_program" },
@@ -35,7 +35,7 @@ const TOOLBOX = {
     },
     {
       kind: "category",
-      name: "◆ Logic",
+      name: "Logic",
       colour: "#5C81A6",
       contents: [
         {
@@ -51,7 +51,7 @@ const TOOLBOX = {
     },
     {
       kind: "category",
-      name: "↻ Loops",
+      name: "Loops",
       colour: "#5CA65C",
       contents: [
         { kind: "block", type: "controls_repeat_ext" },
@@ -60,7 +60,7 @@ const TOOLBOX = {
     },
     {
       kind: "category",
-      name: "∑ Math",
+      name: "Math",
       colour: "#5C68A6",
       contents: [
         { kind: "block", type: "math_number" },
@@ -72,13 +72,13 @@ const TOOLBOX = {
     },
     {
       kind: "category",
-      name: "● Variables",
+      name: "Variables",
       colour: "#A65C81",
       custom: "VARIABLE",
     },
     {
       kind: 'category',
-      name: '▤ Serial',
+      name: 'Serial',
       colour: '160',
       contents: [
         { kind: 'block', type: 'serial_begin' },
@@ -89,7 +89,7 @@ const TOOLBOX = {
     },
     {
       kind: 'category',
-      name: '▣ Displays & Modules',
+      name: 'Displays & Modules',
       colour: '120',
       contents: [
         { kind: 'block', type: 'lcd_print' },
@@ -104,7 +104,7 @@ const TOOLBOX = {
     },
     {
       kind: 'category',
-      name: '⌁ Sensors & Inputs',
+      name: 'Sensors & Inputs',
       colour: '230',
       contents: [
         { kind: 'block', type: 'pushbutton_read' },
@@ -170,36 +170,6 @@ const TOOLBOX = {
   ],
 }
 
-const PIXIU_BLOCKLY_THEME = Blockly.Theme.defineTheme("pixiuBlockly", {
-  base: Blockly.Themes.Zelos,
-  componentStyles: {
-    workspaceBackgroundColour: "#F8FAFC",
-    toolboxBackgroundColour: "#EEF2F6",
-    toolboxForegroundColour: "#243047",
-    flyoutBackgroundColour: "#FFFFFF",
-    flyoutForegroundColour: "#243047",
-    flyoutOpacity: 0.98,
-    scrollbarColour: "#94A3B8",
-    scrollbarOpacity: 0.45,
-    insertionMarkerColour: "#2563EB",
-    insertionMarkerOpacity: 0.18,
-    cursorColour: "#2563EB",
-  },
-  categoryStyles: {
-    arduino_category: { colour: "#00878F" },
-    logic_category: { colour: "#5C81A6" },
-    loops_category: { colour: "#5CA65C" },
-    math_category: { colour: "#5C68A6" },
-    variables_category: { colour: "#A65C81" },
-    serial_category: { colour: "#7C3AED" },
-    displays_category: { colour: "#0891B2" },
-    sensors_category: { colour: "#2563EB" },
-    ai_category: { colour: "#A855F7" },
-    iot_category: { colour: "#0284C7" },
-    microbit_category: { colour: "#E11D48" },
-  },
-})
-
 export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: Props) {
   const blocklyDiv = useRef<HTMLDivElement>(null)
   const workspaceRef = useRef<Blockly.WorkspaceSvg | null>(null)
@@ -228,9 +198,8 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
         colour: "#ccc",
         snap: true,
       },
-      renderer: "zelos",
       zoom: {
-        controls: false,
+        controls: true,
         wheel: true,
         startScale: 0.9,
         maxScale: 2,
@@ -238,8 +207,6 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
         scaleSpeed: 1.2,
       },
       trashcan: true,
-      sounds: true,
-      theme: PIXIU_BLOCKLY_THEME,
       media: "https://unpkg.com/blockly/media/",
     })
 
@@ -432,110 +399,6 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
           max-width: none !important;
         }
 
-        .pixiu-blockly-host .blocklyMainBackground {
-          fill: #F8FAFC !important;
-        }
-
-        .pixiu-blockly-host .blocklyWorkspace {
-          background: #F8FAFC !important;
-        }
-
-        .pixiu-blockly-host .blocklyToolboxDiv {
-          background: #EEF2F6 !important;
-          border-right: 1px solid #D7DEE8 !important;
-          box-shadow: 2px 0 10px rgba(23, 32, 51, 0.04);
-          scrollbar-width: thin;
-        }
-
-        .pixiu-blockly-host .blocklyTreeRoot {
-          padding: 8px 6px 12px;
-        }
-
-        .pixiu-blockly-host .blocklyTreeRow {
-          height: 40px !important;
-          margin: 3px 4px !important;
-          padding: 0 10px !important;
-          border-radius: 10px !important;
-          transition: background-color .14s ease, transform .14s ease, box-shadow .14s ease;
-          cursor: pointer !important;
-        }
-
-        .pixiu-blockly-host .blocklyTreeRow:hover {
-          background: #FFFFFF !important;
-          box-shadow: 0 2px 8px rgba(37, 99, 235, .10);
-          transform: translateX(1px);
-        }
-
-        .pixiu-blockly-host .blocklyTreeRow.blocklyTreeSelected {
-          background: #FFFFFF !important;
-          box-shadow: 0 0 0 1px #C7D7EE, 0 3px 10px rgba(37, 99, 235, .10);
-        }
-
-        .pixiu-blockly-host .blocklyTreeLabel {
-          color: #344054 !important;
-          font: 600 12px/1.1 Inter, ui-sans-serif, system-ui, sans-serif !important;
-          letter-spacing: .01em;
-        }
-
-        .pixiu-blockly-host .blocklyFlyoutBackground {
-          fill: #FFFFFF !important;
-          fill-opacity: .98 !important;
-        }
-
-        .pixiu-blockly-host .blocklyFlyout {
-          filter: drop-shadow(3px 0 10px rgba(23,32,51,.08));
-        }
-
-        .pixiu-blockly-host .blocklyScrollbarHandle {
-          fill: #94A3B8 !important;
-          rx: 6px;
-        }
-
-        .pixiu-blockly-host .blocklyWidgetDiv,
-        .pixiu-blockly-host .blocklyDropDownDiv {
-          font-family: Inter, ui-sans-serif, system-ui, sans-serif;
-        }
-
-        .pixiu-blockly-host .blocklyToolboxCategoryIcon {
-          margin-right: 5px;
-        }
-
-        .pixiu-blockly-host .blocklyDraggable {
-          cursor: grab !important;
-        }
-
-        .pixiu-blockly-host .blocklyDraggable:hover {
-          filter: drop-shadow(0 4px 5px rgba(37, 99, 235, .10));
-        }
-
-        .pixiu-blockly-host .blocklyDragging {
-          cursor: grabbing !important;
-          filter: drop-shadow(0 8px 10px rgba(37, 99, 235, .16));
-        }
-
-        .pixiu-blockly-host .blocklySelected > .blocklyPath {
-          stroke: #2563EB !important;
-          stroke-width: 2px !important;
-        }
-
-        .pixiu-blockly-host .blocklyInsertionMarker > .blocklyPath {
-          opacity: .42 !important;
-        }
-
-        .pixiu-blockly-host .blocklyToolboxDiv::-webkit-scrollbar {
-          width: 8px;
-        }
-
-        .pixiu-blockly-host .blocklyToolboxDiv::-webkit-scrollbar-thumb {
-          background: #C3CBD7;
-          border-radius: 999px;
-        }
-
-        .pixiu-blockly-host .blocklyScrollbarVertical,
-        .pixiu-blockly-host .blocklyScrollbarHorizontal {
-          opacity: .7;
-        }
-
         .pixiu-blockly-host,
         .pixiu-blockly-host .blocklySvg {
           touch-action: none;
@@ -605,47 +468,6 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
           mobileTab === "blocks" ? "flex" : "hidden lg:flex"
         }`}
       >
-        <div className="absolute bottom-4 right-4 z-20 flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white/95 p-1.5 shadow-lg backdrop-blur-sm">
-          <button
-            type="button"
-            onClick={() => {
-              const workspace = workspaceRef.current
-              if (!workspace) return
-              workspace.setScale(Math.min(1.8, workspace.getScale() + 0.1))
-              Blockly.svgResize(workspace)
-            }}
-            className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-lg font-bold text-slate-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 active:scale-95"
-            aria-label="Zoom in"
-            title="Zoom in"
-          >+</button>
-          <button
-            type="button"
-            onClick={() => {
-              const workspace = workspaceRef.current
-              if (!workspace) return
-              workspace.setScale(Math.max(0.5, workspace.getScale() - 0.1))
-              Blockly.svgResize(workspace)
-            }}
-            className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-lg font-bold text-slate-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 active:scale-95"
-            aria-label="Zoom out"
-            title="Zoom out"
-          >−</button>
-          <button
-            type="button"
-            onClick={() => {
-              const workspace = workspaceRef.current
-              if (!workspace) return
-              workspace.setScale(0.9)
-              if (typeof (workspace as any).scrollCenter === "function") {
-                (workspace as any).scrollCenter()
-              }
-              Blockly.svgResize(workspace)
-            }}
-            className="h-8 rounded-lg border border-slate-200 bg-slate-50 px-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-600 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 active:scale-95"
-            aria-label="Reset zoom and center"
-            title="Reset zoom and center"
-          >Fit</button>
-        </div>
         <div ref={blocklyDiv} className="pixiu-blockly-host absolute inset-0 w-full h-full" />
       </div>
 
@@ -670,14 +492,7 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
         </div>
 
         <div className="flex-1 p-4 overflow-auto font-mono text-xs text-emerald-400 bg-slate-950 leading-relaxed select-text">
-          <pre className="min-w-max">
-            {(cppCode || "// Drag Arduino blocks to generate sketch...").split("\n").map((line, index) => (
-              <div key={index} className="flex">
-                <span className="mr-4 inline-block w-8 select-none text-right text-slate-600">{index + 1}</span>
-                <span>{line || " "}</span>
-              </div>
-            ))}
-          </pre>
+          <pre>{cppCode || "// Drag Arduino blocks to generate sketch..."}</pre>
         </div>
 
         <div className="border-t border-slate-800 p-3 bg-slate-900/50 flex items-center justify-between text-[11px] text-slate-400">
