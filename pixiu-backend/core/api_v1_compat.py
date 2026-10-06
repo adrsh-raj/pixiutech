@@ -424,7 +424,7 @@ class ContractNotificationViewSet(LegacyShapeMixin, NotificationViewSet):
         return super().create(request, *args, **kwargs)
 
 
-@api_view(["GET"])
+@api_view(["GET", "HEAD"])
 @permission_classes([AllowAny])
 def health(request):
     return Response({"status": "ok", "service": "Pixiu Django API", "version": "v1"})
