@@ -62,6 +62,9 @@ export default function Nav() {
             {n.label}
           </NavLink>
         ))}
+        <div className="drawer__cta">
+          <Link className="btn btn--primary btn--sm" to="/contact#demo-form" onClick={() => setOpen(false)}>Book a Free Consultation</Link>
+        </div>
       </nav>
     </header>
   )

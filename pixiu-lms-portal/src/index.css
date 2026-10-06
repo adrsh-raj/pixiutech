@@ -116,6 +116,11 @@ input, select, textarea { min-width: 0; }
   object-fit: contain;
 }
 
+@media (min-width: 768px) and (max-width: 1024px) {
+  .grid.grid-cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .grid.grid-cols-6 { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+}
+
 @media (max-width: 767px) {
   .grid.grid-cols-2 { grid-template-columns: minmax(0, 1fr) !important; }
   .grid.grid-cols-3 { grid-template-columns: minmax(0, 1fr) !important; }
@@ -125,6 +130,21 @@ input, select, textarea { min-width: 0; }
   .min-w-\[220px\], .min-w-\[240px\], .min-w-\[260px\] { min-width: min(100%, calc(100vw - 1.5rem)) !important; }
   .field, input, select, textarea { max-width: 100%; }
   .fixed.inset-0 > [class*="bg-white"] { max-height: calc(100dvh - 1.25rem); overflow-y: auto; }
+}
+
+@media (max-width: 480px) {
+  .grid.grid-cols-4, .grid.grid-cols-6 { grid-template-columns: minmax(0, 1fr) !important; }
+  .fixed.inset-0 > [class*="rounded-3xl"] {
+    margin: 0.5rem;
+    max-height: calc(100dvh - 1rem);
+    padding: 1.25rem !important;
+  }
+}
+
+@media (max-width: 1024px) {
+  button, a, input, select, textarea {
+    touch-action: manipulation;
+  }
 }
 
 /* ============================================================
