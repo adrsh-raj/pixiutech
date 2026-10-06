@@ -28,7 +28,7 @@ function normalize(lead) {
 }
 
 const STATUS_LABELS = { new: 'New', contacted: 'Contacted', qualified: 'Qualified', proposal: 'Proposal', negotiation: 'Negotiation', won: 'Won', lost: 'Lost' };
-const ENQUIRY_TYPES = { sales: 'Sales', bug: 'Bug', help: 'Help', other: 'Other' };
+const ENQUIRY_TYPES = { sales: 'Sales', bug: 'Bug', help: 'Help', other: 'Other', philosophy: 'Think / Rethink Philosophy' };
 
 export default function WebsiteEnquiries() {
   const { leads = [], refreshAll, loading } = useData();
@@ -84,7 +84,7 @@ export default function WebsiteEnquiries() {
                     <td className="px-5 py-4"><div className="flex items-center gap-2 font-bold text-slate-700"><Users size={13} /> {item.strength || '—'}</div></td>
                     <td className="px-5 py-4"><div className="flex items-center gap-2 text-slate-600 whitespace-nowrap"><CalendarDays size={13} /> {item.createdLabel}</div></td>
                     <td className="px-5 py-4">
-                      <span className={"inline-flex px-2.5 py-1 rounded-full border text-[10px] font-black uppercase " + (item.enquiryType === "bug" ? "bg-red-50 text-red-700 border-red-200" : item.enquiryType === "help" ? "bg-blue-50 text-blue-700 border-blue-200" : item.enquiryType === "other" ? "bg-slate-50 text-slate-600 border-slate-200" : "bg-emerald-50 text-emerald-700 border-emerald-200")}>
+                      <span className={"inline-flex px-2.5 py-1 rounded-full border text-[10px] font-black uppercase " + (item.enquiryType === "bug" ? "bg-red-50 text-red-700 border-red-200" : item.enquiryType === "help" ? "bg-blue-50 text-blue-700 border-blue-200" : item.enquiryType === "philosophy" ? "bg-violet-50 text-violet-700 border-violet-200" : item.enquiryType === "other" ? "bg-slate-50 text-slate-600 border-slate-200" : "bg-emerald-50 text-emerald-700 border-emerald-200")}>
                         {ENQUIRY_TYPES[item.enquiryType] || item.enquiryType}
                       </span>
                     </td>
