@@ -124,7 +124,9 @@ export function LabSupportWidget() {
     }
   }
 
-  const whatsappHref = "https://wa.me/" + WHATSAPP_NUMBER + "?text=" + encodeURIComponent("Hi Pixiu Tech, I need help with the Virtual Lab.")
+  const contactMessage = "Hi Pixiu Tech, I need help with the Virtual Lab.\\nStudent ID: " + (studentId.trim().toUpperCase() || "—")
+  const whatsappHref = "https://wa.me/" + WHATSAPP_NUMBER + "?text=" + encodeURIComponent(contactMessage)
+  const emailHref = "mailto:" + EMAIL + "?subject=" + encodeURIComponent("PIXIU LAB HELP") + "&body=" + encodeURIComponent(contactMessage)
 
   return (
     <>
@@ -158,7 +160,7 @@ export function LabSupportWidget() {
             </div>
 
             <div className="mt-3 grid grid-cols-2 gap-2">
-              <a href={"mailto:" + EMAIL + "?subject=" + encodeURIComponent("PIXIU LAB HELP")} className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-[11px] font-bold text-slate-200 transition hover:border-slate-500 hover:bg-slate-800">
+              <a href={emailHref} className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-[11px] font-bold text-slate-200 transition hover:border-slate-500 hover:bg-slate-800">
                 <Mail size={13} /> Email
               </a>
               <a href={whatsappHref} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-[11px] font-bold text-emerald-200 transition hover:bg-emerald-500/15">
