@@ -12,6 +12,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from accounts.authentication import CachedJWTAuthentication
 from accounts.models import UserRole, UserStatus
 from audit.models import AuditAction
 from audit.services import record_audit
