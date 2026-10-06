@@ -808,6 +808,49 @@ const AI_GESTURE_XML = `<xml xmlns="https://developers.google.com/blockly/xml">
   </block>
 </xml>`
 
+const AI_LED_CIRCUIT: CircuitState = {
+  parts: [
+    { id: "uno", type: "arduino-uno", x: 60, y: 110, rotation: 0, props: {} },
+    { id: "led1", type: "led", x: 450, y: 180, rotation: 0, props: { color: "green" } },
+    { id: "r1", type: "resistor", x: 330, y: 180, rotation: 0, props: { resistance: 220 } },
+  ],
+  wires: [
+    { id: "led-a", from: { partId: "uno", pinId: "d13" }, to: { partId: "r1", pinId: "a" }, color: "#22c55e" },
+    { id: "led-b", from: { partId: "r1", pinId: "b" }, to: { partId: "led1", pinId: "anode" }, color: "#22c55e" },
+    { id: "led-gnd", from: { partId: "led1", pinId: "cathode" }, to: { partId: "uno", pinId: "gnd" }, color: "#1e293b" },
+  ],
+}
+
+const AI_DUAL_LED_CIRCUIT: CircuitState = {
+  parts: [
+    { id: "uno", type: "arduino-uno", x: 60, y: 110, rotation: 0, props: {} },
+    { id: "green", type: "led", x: 410, y: 120, rotation: 0, props: { color: "green" } },
+    { id: "red", type: "led", x: 410, y: 240, rotation: 0, props: { color: "red" } },
+    { id: "rg", type: "resistor", x: 280, y: 120, rotation: 0, props: { resistance: 220 } },
+    { id: "rr", type: "resistor", x: 280, y: 240, rotation: 0, props: { resistance: 220 } },
+  ],
+  wires: [
+    { id: "green-a", from: { partId: "uno", pinId: "d12" }, to: { partId: "rg", pinId: "a" }, color: "#22c55e" },
+    { id: "green-b", from: { partId: "rg", pinId: "b" }, to: { partId: "green", pinId: "anode" }, color: "#22c55e" },
+    { id: "red-a", from: { partId: "uno", pinId: "d13" }, to: { partId: "rr", pinId: "a" }, color: "#ef4444" },
+    { id: "red-b", from: { partId: "rr", pinId: "b" }, to: { partId: "red", pinId: "anode" }, color: "#ef4444" },
+    { id: "green-gnd", from: { partId: "green", pinId: "cathode" }, to: { partId: "uno", pinId: "gnd" }, color: "#1e293b" },
+    { id: "red-gnd", from: { partId: "red", pinId: "cathode" }, to: { partId: "uno", pinId: "gnd" }, color: "#1e293b" },
+  ],
+}
+
+const AI_SERVO_CIRCUIT: CircuitState = {
+  parts: [
+    { id: "uno", type: "arduino-uno", x: 60, y: 110, rotation: 0, props: {} },
+    { id: "servo", type: "servo", x: 450, y: 110, rotation: 0, props: { angle: 0 } },
+  ],
+  wires: [
+    { id: "servo-vcc", from: { partId: "uno", pinId: "5v" }, to: { partId: "servo", pinId: "vcc" }, color: "#ef4444" },
+    { id: "servo-gnd", from: { partId: "servo", pinId: "gnd" }, to: { partId: "uno", pinId: "gnd" }, color: "#1e293b" },
+    { id: "servo-sig", from: { partId: "uno", pinId: "d9" }, to: { partId: "servo", pinId: "sig" }, color: "#f97316" },
+  ],
+}
+
 const UNO_LESSONS: Lesson[] = [
   // --- TIER 1: BEGINNER (Foundations & Multi-component I/O) ---
   {
@@ -2016,6 +2059,241 @@ const UNO_LESSONS: Lesson[] = [
       },
     ],
   },
+  {
+    id: "lesson-ai-object-counter",
+    title: "Mission 20 · AI Vision Object Counter",
+    shortTitle: "AI Object Counter",
+    description: "Use Pixiu AI vision to count the objects currently visible to the camera and stream the result to the Arduino Serial Monitor.",
+    difficulty: "Advanced",
+    estimatedMinutes: 14,
+    concepts: ["Computer Vision", "Object Counting", "Pixiu AI", "Serial Monitor"],
+    prerequisites: ["lesson-ai-gesture-controller"],
+    seedCircuit: { parts: [{ id: "uno", type: "arduino-uno", x: 60, y: 110, rotation: 0, props: {} }], wires: [] },
+    seedBlocklyXml: `<xml xmlns="https://developers.google.com/blockly/xml">
+  <block type="arduino_program" x="40" y="40">
+    <statement name="SETUP">
+      <block type="serial_begin"><field name="BAUD">9600</field><next>
+      <block type="ai_camera_enable"><field name="STATE">ON</field></block>
+      </next></block>
+    </statement>
+    <statement name="LOOP">
+      <block type="serial_println">
+        <value name="TEXT"><block type="ai_get_object_count"></block></value>
+        <next><block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">500</field></shadow></value></block></next>
+      </block>
+    </statement>
+  </block>
+</xml>`,
+    finalGoal: "🎯 What You Will Build: An AI vision counter that reads the number of accepted object detections in each camera frame and reports the count to Arduino Serial.",
+    codingHints: [
+      "Enable the AI camera in Setup.",
+      "Use AI Objects in View as a value block.",
+      "Send that value to Serial.println so you can watch the count update.",
+      "Run the simulation and place different objects in front of the camera."
+    ],
+    steps: [
+      { id: "parts", title: "Place the Arduino", instructions: "Place one Arduino Uno. No external sensor is required because the AI camera is the input.", kind: "build", checks: [{ kind: "parts", requirements: [{ type: "arduino-uno", count: 1 }] }], success: "Arduino is ready for AI vision." },
+      { id: "code", title: "Program the object counter", instructions: "Enable the AI camera, read AI object count and print it repeatedly to Serial.", kind: "code", checks: [{ kind: "blocks", requirements: [{ type: "ai_camera_enable", count: 1 }, { type: "ai_get_object_count", count: 1 }, { type: "serial_println", count: 1 }] }], success: "AI object counter code is ready." },
+      { id: "run", title: "Watch object count", instructions: "Press Run and observe the Serial Monitor while changing what the camera can see.", kind: "run", checks: [{ kind: "running" }], success: "Pixiu AI is counting objects live." }
+    ],
+  },
+  {
+    id: "lesson-ai-confidence-alarm",
+    title: "Mission 21 · AI Confidence Alarm",
+    shortTitle: "AI Confidence Alarm",
+    description: "Turn AI confidence into a physical signal: when vision confidence passes your chosen threshold, light a warning LED.",
+    difficulty: "Advanced",
+    estimatedMinutes: 16,
+    concepts: ["AI Confidence", "Thresholds", "Decision Logic", "Physical Output"],
+    prerequisites: ["lesson-ai-object-counter"],
+    seedCircuit: AI_LED_CIRCUIT,
+    seedBlocklyXml: `<xml xmlns="https://developers.google.com/blockly/xml">
+  <block type="arduino_program" x="40" y="40">
+    <statement name="SETUP">
+      <block type="ai_camera_enable"><field name="STATE">ON</field><next>
+      <block type="io_pinmode"><field name="PIN">13</field><field name="MODE">OUTPUT</field></block>
+      </next></block>
+    </statement>
+    <statement name="LOOP">
+      <block type="controls_if">
+        <mutation else="1"></mutation>
+        <value name="IF0"><block type="logic_compare"><field name="OP">GT</field>
+          <value name="A"><block type="ai_confidence"></block></value>
+          <value name="B"><shadow type="math_number"><field name="NUM">75</field></shadow></value>
+        </block></value>
+        <statement name="DO0"><block type="io_digitalwrite"><field name="PIN">13</field><field name="STATE">HIGH</field></statement>
+        <statement name="ELSE"><block type="io_digitalwrite"><field name="PIN">13</field><field name="STATE">LOW</field></statement>
+      </block>
+    </statement>
+  </block>
+</xml>`,
+    finalGoal: "🎯 What You Will Build: A confidence-triggered AI alarm that converts model confidence into a real Arduino output.",
+    codingHints: ["Choose a confidence threshold such as 75%.", "Compare AI confidence against that threshold.", "Drive D13 HIGH when confidence is above the threshold.", "Use the camera and try to create both high- and low-confidence frames."],
+    steps: [
+      { id: "parts", title: "Place the warning LED", instructions: "Place one Arduino Uno, one LED and one resistor.", kind: "build", checks: [{ kind: "parts", requirements: [{ type: "arduino-uno", count: 1 }, { type: "led", count: 1 }, { type: "resistor", count: 1 }] }], success: "Warning indicator is ready." },
+      { id: "code", title: "Program the confidence threshold", instructions: "Enable AI, configure D13 as output and compare AI confidence to 75%.", kind: "code", checks: [{ kind: "blocks", requirements: [{ type: "ai_camera_enable", count: 1 }, { type: "ai_confidence", count: 1 }, { type: "logic_compare", count: 1 }, { type: "io_digitalwrite", count: 2 }] }], success: "Confidence threshold logic is programmed." },
+      { id: "run", title: "Test the alarm", instructions: "Press Run and vary the camera input.", kind: "run", checks: [{ kind: "running" }], success: "AI confidence alarm is running." }
+    ],
+  },
+  {
+    id: "lesson-ai-smart-presence",
+    title: "Mission 22 · AI Smart Presence Light",
+    shortTitle: "AI Presence Light",
+    description: "Detect a person with Pixiu AI and automatically switch a physical light on only when a person is visible.",
+    difficulty: "Advanced",
+    estimatedMinutes: 15,
+    concepts: ["Person Detection", "Computer Vision", "Automation", "GPIO"],
+    prerequisites: ["lesson-ai-confidence-alarm"],
+    seedCircuit: AI_LED_CIRCUIT,
+    seedBlocklyXml: `<xml xmlns="https://developers.google.com/blockly/xml">
+  <block type="arduino_program" x="40" y="40">
+    <statement name="SETUP">
+      <block type="ai_camera_enable"><field name="STATE">ON</field><next>
+      <block type="io_pinmode"><field name="PIN">13</field><field name="MODE">OUTPUT</field></block>
+      </next></block>
+    </statement>
+    <statement name="LOOP">
+      <block type="controls_if">
+        <mutation else="1"></mutation>
+        <value name="IF0"><block type="ai_is_detected"><field name="CLASS">person</field></block></value>
+        <statement name="DO0"><block type="io_digitalwrite"><field name="PIN">13</field><field name="STATE">HIGH</field></statement>
+        <statement name="ELSE"><block type="io_digitalwrite"><field name="PIN">13</field><field name="STATE">LOW</field></statement>
+      </block>
+    </statement>
+  </block>
+</xml>`,
+    finalGoal: "🎯 What You Will Build: A contactless smart light that turns on when the AI camera recognizes a person.",
+    codingHints: ["Use AI Is Detected with the class person.", "Put the detection condition inside If/Else.", "Set D13 HIGH for presence and LOW when the area is empty.", "Try moving in and out of the camera view."],
+    steps: [
+      { id: "parts", title: "Build the presence light", instructions: "Place one Arduino Uno, one LED and one resistor.", kind: "build", checks: [{ kind: "parts", requirements: [{ type: "arduino-uno", count: 1 }, { type: "led", count: 1 }, { type: "resistor", count: 1 }] }], success: "Presence light hardware is placed." },
+      { id: "code", title: "Program person detection", instructions: "Enable the camera and switch D13 from the AI person detection result.", kind: "code", checks: [{ kind: "blocks", requirements: [{ type: "ai_is_detected", count: 1 }, { type: "controls_if", count: 1 }, { type: "io_digitalwrite", count: 2 }] }], success: "Presence automation is programmed." },
+      { id: "run", title: "Test smart presence", instructions: "Press Run and step into the camera view.", kind: "run", checks: [{ kind: "running" }], success: "AI smart presence lighting is live." }
+    ],
+  },
+  {
+    id: "lesson-ai-gesture-signal",
+    title: "Mission 23 · AI Gesture Traffic Signal",
+    shortTitle: "AI Gesture Signal",
+    description: "Use thumbs-up and thumbs-down gestures to control two physical signal lights without touching the circuit.",
+    difficulty: "Advanced",
+    estimatedMinutes: 18,
+    concepts: ["Hand Gestures", "Touchless Control", "Decision Logic", "Robotics"],
+    prerequisites: ["lesson-ai-smart-presence"],
+    seedCircuit: AI_DUAL_LED_CIRCUIT,
+    seedBlocklyXml: `<xml xmlns="https://developers.google.com/blockly/xml">
+  <block type="arduino_program" x="40" y="40">
+    <statement name="SETUP">
+      <block type="ai_camera_enable"><field name="STATE">ON</field><next>
+      <block type="io_pinmode"><field name="PIN">12</field><field name="MODE">OUTPUT</field><next>
+      <block type="io_pinmode"><field name="PIN">13</field><field name="MODE">OUTPUT</field></next>
+      </block></next></block>
+    </statement>
+    <statement name="LOOP">
+      <block type="controls_if">
+        <mutation else="1"></mutation>
+        <value name="IF0"><block type="ai_is_gesture"><field name="GESTURE">thumbs_up</field></block></value>
+        <statement name="DO0">
+          <block type="io_digitalwrite"><field name="PIN">12</field><field name="STATE">HIGH</field><next>
+          <block type="io_digitalwrite"><field name="PIN">13</field><field name="STATE">LOW</field></next>
+          </block>
+        </statement>
+        <statement name="ELSE">
+          <block type="io_digitalwrite"><field name="PIN">12</field><field name="STATE">LOW</field><next>
+          <block type="io_digitalwrite"><field name="PIN">13</field><field name="STATE">HIGH</field></next>
+          </block>
+        </statement>
+      </block>
+    </statement>
+  </block>
+</xml>`,
+    finalGoal: "🎯 What You Will Build: A touchless signal controller where your hand gesture decides which physical light is active.",
+    codingHints: ["Enable camera input.", "Use thumbs_up as the positive signal.", "Map D12 to green and D13 to red.", "Change the ELSE behavior later to a second gesture such as thumbs_down."],
+    steps: [
+      { id: "parts", title: "Place two signal lights", instructions: "Place one Arduino Uno, two LEDs and two resistors.", kind: "build", checks: [{ kind: "parts", requirements: [{ type: "arduino-uno", count: 1 }, { type: "led", count: 2 }, { type: "resistor", count: 2 }] }], success: "Dual signal hardware is placed." },
+      { id: "code", title: "Program gesture control", instructions: "Enable AI gesture input and drive the two outputs from thumbs-up logic.", kind: "code", checks: [{ kind: "blocks", requirements: [{ type: "ai_is_gesture", count: 1 }, { type: "io_digitalwrite", count: 4 }] }], success: "Gesture signal logic is ready." },
+      { id: "run", title: "Test the gesture signal", instructions: "Press Run and make a thumbs-up gesture.", kind: "run", checks: [{ kind: "running" }], success: "AI gesture signal is active." }
+    ],
+  },
+  {
+    id: "lesson-ai-finger-servo",
+    title: "Mission 24 · AI Finger Count Servo",
+    shortTitle: "AI Finger Servo",
+    description: "Turn finger count into motion: show three or more fingers to open a servo mechanism, otherwise keep it closed.",
+    difficulty: "Advanced",
+    estimatedMinutes: 18,
+    concepts: ["Hand Tracking", "Finger Counting", "Servo Control", "Human-Machine Interaction"],
+    prerequisites: ["lesson-ai-gesture-signal"],
+    seedCircuit: AI_SERVO_CIRCUIT,
+    seedBlocklyXml: `<xml xmlns="https://developers.google.com/blockly/xml">
+  <block type="arduino_program" x="40" y="40">
+    <statement name="SETUP">
+      <block type="ai_camera_enable"><field name="STATE">ON</field><next>
+      <block type="servo_write"><field name="PIN">9</field><value name="ANGLE"><shadow type="math_number"><field name="NUM">0</field></shadow></value></block>
+      </next></block>
+    </statement>
+    <statement name="LOOP">
+      <block type="controls_if">
+        <mutation else="1"></mutation>
+        <value name="IF0"><block type="logic_compare"><field name="OP">GT</field><value name="A"><block type="ai_get_finger_count"></block></value><value name="B"><shadow type="math_number"><field name="NUM">2</field></shadow></value></block></value>
+        <statement name="DO0"><block type="servo_write"><field name="PIN">9</field><value name="ANGLE"><shadow type="math_number"><field name="NUM">90</field></shadow></value></block></statement>
+        <statement name="ELSE"><block type="servo_write"><field name="PIN">9</field><value name="ANGLE"><shadow type="math_number"><field name="NUM">0</field></shadow></value></block></statement>
+      </block>
+    </statement>
+  </block>
+</xml>`,
+    finalGoal: "🎯 What You Will Build: A servo actuator controlled by the number of fingers detected by Pixiu AI.",
+    codingHints: ["Enable the camera.", "Read AI finger count as a number.", "Compare it against 2.", "Rotate the servo to 90° when three or more fingers are visible."],
+    steps: [
+      { id: "parts", title: "Place the servo", instructions: "Place one Arduino Uno and one Servo motor.", kind: "build", checks: [{ kind: "parts", requirements: [{ type: "arduino-uno", count: 1 }, { type: "servo", count: 1 }] }], success: "Servo hardware is ready." },
+      { id: "code", title: "Map fingers to motion", instructions: "Compare AI finger count with 2 and drive the servo accordingly.", kind: "code", checks: [{ kind: "blocks", requirements: [{ type: "ai_get_finger_count", count: 1 }, { type: "logic_compare", count: 1 }, { type: "servo_write", count: 3 }] }], success: "Finger-count motion logic is programmed." },
+      { id: "run", title: "Move with your hand", instructions: "Press Run and change the number of visible fingers.", kind: "run", checks: [{ kind: "running" }, { kind: "runtime", requirements: [{ partType: "servo", field: "angle", min: 0, max: 180 }] }], success: "AI finger-controlled servo is moving live." }
+    ],
+  },
+  {
+    id: "lesson-ai-smart-doorbell",
+    title: "Mission 25 · AI Smart Doorbell",
+    shortTitle: "AI Smart Doorbell",
+    description: "Detect a person, open a virtual door servo and sound an electronic doorbell using one AI-driven decision loop.",
+    difficulty: "Advanced",
+    estimatedMinutes: 20,
+    concepts: ["Person Detection", "Servo Automation", "Buzzer", "Smart Home AI"],
+    prerequisites: ["lesson-ai-finger-servo"],
+    seedCircuit: AI_SERVO_CIRCUIT,
+    seedBlocklyXml: `<xml xmlns="https://developers.google.com/blockly/xml">
+  <block type="arduino_program" x="40" y="40">
+    <statement name="SETUP">
+      <block type="ai_camera_enable"><field name="STATE">ON</field><next>
+      <block type="servo_write"><field name="PIN">9</field><value name="ANGLE"><shadow type="math_number"><field name="NUM">0</field></shadow></value></block>
+      </next></block>
+    </statement>
+    <statement name="LOOP">
+      <block type="controls_if">
+        <mutation else="1"></mutation>
+        <value name="IF0"><block type="ai_is_detected"><field name="CLASS">person</field></block></value>
+        <statement name="DO0">
+          <block type="servo_write"><field name="PIN">9</field><value name="ANGLE"><shadow type="math_number"><field name="NUM">90</field></shadow></value><next>
+          <block type="tone_play"><field name="PIN">8</field><value name="FREQ"><shadow type="math_number"><field name="NUM">880</field></shadow></value><next>
+          <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">500</field></shadow></value></block>
+          </next></block></next></block>
+        </statement>
+        <statement name="ELSE">
+          <block type="servo_write"><field name="PIN">9</field><value name="ANGLE"><shadow type="math_number"><field name="NUM">0</field></shadow></value><next>
+          <block type="tone_stop"><field name="PIN">8</field></block>
+          </next></block>
+        </statement>
+      </block>
+    </statement>
+  </block>
+</xml>`,
+    finalGoal: "🎯 What You Will Build: An AI smart-door system that recognizes a person, opens a servo mechanism and rings a virtual doorbell.",
+    codingHints: ["Enable AI camera input.", "Check for the person class.", "Open the servo to 90° and play an 880 Hz tone.", "When no person is detected, close the servo and stop the tone."],
+    steps: [
+      { id: "parts", title: "Place the door mechanism", instructions: "Place one Arduino Uno and one Servo.", kind: "build", checks: [{ kind: "parts", requirements: [{ type: "arduino-uno", count: 1 }, { type: "servo", count: 1 }] }], success: "Smart door mechanism is placed." },
+      { id: "code", title: "Program AI doorbell logic", instructions: "Detect a person, open the servo and trigger the buzzer.", kind: "code", checks: [{ kind: "blocks", requirements: [{ type: "ai_is_detected", count: 1 }, { type: "servo_write", count: 2 }, { type: "tone_play", count: 1 }, { type: "tone_stop", count: 1 }] }], success: "AI doorbell logic is programmed." },
+      { id: "run", title: "Test the smart doorbell", instructions: "Press Run and move into the AI camera view.", kind: "run", checks: [{ kind: "running" }], success: "AI smart doorbell is live." }
+    ],
+  },
+
 ]
 
 export const LESSONS: Lesson[] = [
