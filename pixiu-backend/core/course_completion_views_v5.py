@@ -354,6 +354,7 @@ class CertificatePdfView(APIView):
 
 class PublicCertificatePdfView(APIView):
     permission_classes = [AllowAny]
+    throttle_scope = "public_pdf"
 
     def get(self, request, certificate_id):
         certificate = Certificate.objects.filter(certificate_id__iexact=str(certificate_id).strip(), status='issued').first()
@@ -364,6 +365,7 @@ class PublicCertificatePdfView(APIView):
 
 class VerifyProgrammeCertificateView(APIView):
     permission_classes = [AllowAny]
+    throttle_scope = "public_verification"
 
     def get(self, request, student_id=None):
         if student_id:

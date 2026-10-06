@@ -9,6 +9,7 @@ from rest_framework.views import APIView
 from accounts.models import UserRole
 from accounts.permissions import IsActiveAccount
 from academics.models import School, Student
+from academics.services import accessible_student_queryset
 from learning.models import Project
 
 LEDGER_PROJECT_TITLE = "__pixiu_xp_ledger__"
@@ -52,9 +53,9 @@ class StudentXpView(APIView):
         elif user.role in [UserRole.ADMIN, UserRole.TRAINER, UserRole.SCHOOL]:
             req_student_id = request.query_params.get("student_id")
             if req_student_id:
-                target_student = Student.objects.filter(student_id=req_student_id).first()
+                target_student = accessible_student_queryset(user).filter(student_id=req_student_id).first()
             if not target_student:
-                return Response({"detail": "Student not found."}, status=404)
+                return Response({"detail": "Student not found or outside authorized scope."}, status=404)
         else:
             return Response({"detail": "Unauthorized role for XP ledger."}, status=403)
 
@@ -144,7 +145,16 @@ class StudentXpView(APIView):
             clamped_xp = max(0, min(base_xp, 200))
             category = str(evt.get("category", "tinkering"))[:30]
             title = str(evt.get("title", "Hardware Experiment"))[:150]
-            timestamp = int(evt.get("timestamp") or (timezone.now().timestamp() * 1000))
+            now_ms = int(timezone.now().timestamp() * 1000)
+            try:
+                raw_ts = int(evt.get("timestamp") or now_ms)
+            except (ValueError, TypeError):
+                raw_ts = now_ms
+            # Anti-tamper: reject arbitrary past back-dating or future dates
+            if raw_ts < now_ms - (24 * 3600 * 1000) or raw_ts > now_ms + (600 * 1000):
+                timestamp = now_ms
+            else:
+                timestamp = raw_ts
             signature = str(evt.get("signature", ""))[:64]
             metadata = evt.get("metadata") if isinstance(evt.get("metadata"), dict) else {}
 
@@ -176,8 +186,22 @@ class StudentXpView(APIView):
                 daily_totals[day_key] = current_day_total + allowed
                 total_xp += allowed
 
-        client_streak = int(payload.get("streakDays") or 1)
-        streak_days = max(existing_ledger.get("streakDays", 1), client_streak)
+        # Server-side streak calculation prevents arbitrary client streak spoofing
+        prev_date = str(existing_ledger.get("lastActiveDate") or "")
+        prev_streak = int(existing_ledger.get("streakDays", 1) or 1)
+        if prev_date == today_str:
+            streak_days = prev_streak
+        else:
+            try:
+                prev_dt = timezone.datetime.strptime(prev_date, "%Y-%m-%d").date()
+                curr_dt = timezone.datetime.strptime(today_str, "%Y-%m-%d").date()
+                if (curr_dt - prev_dt).days == 1:
+                    streak_days = prev_streak + 1
+                else:
+                    streak_days = 1
+            except Exception:
+                streak_days = 1
+        streak_days = max(1, min(streak_days, 1000))
 
         updated_ledger = {
             "version": 2,

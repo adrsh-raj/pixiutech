@@ -29,11 +29,31 @@ function virtualizeHtml(raw: string): string {
 
   let content = raw
 
+  // Strip script, iframe, object, embed, base, and applet tags entirely
+  content = content
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script\s*>/gi, "")
+    .replace(/<script\b[^>]*>/gi, "")
+    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe\s*>/gi, "")
+    .replace(/<iframe\b[^>]*>/gi, "")
+    .replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object\s*>/gi, "")
+    .replace(/<object\b[^>]*>/gi, "")
+    .replace(/<embed\b[^>]*>/gi, "")
+    .replace(/<base\b[^>]*>/gi, "")
+
+  // Strip all inline javascript event handlers (e.g. onerror=, onload=, onclick=, onmouseover=)
+  content = content.replace(/\s+on[a-z0-9_-]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+
+  // Neutralize javascript: and vbscript: URIs
+  content = content.replace(/\b(href|src|action|xlink:href)\s*=\s*(["']?)\s*(?:javascript|vbscript|data:\s*text\/html):/gi, '$1=$2about:blank#')
+
   // Extract head styles if full document
   let extractedStyles = ""
   const styleMatches = content.match(/<style[^>]*>([\s\S]*?)<\/style>/gi)
   if (styleMatches) {
-    extractedStyles = styleMatches.join("\n")
+    extractedStyles = styleMatches
+      .join("\n")
+      .replace(/expression\s*\([^)]*\)/gi, "")
+      .replace(/url\s*\(\s*(['"]?)\s*javascript:/gi, "url($1about:blank")
   }
 
   // If full HTML document, extract inner body content
@@ -61,8 +81,6 @@ function virtualizeHtml(raw: string): string {
       hrefVal.replace(/^https?:\/\/[^\/]+/i, "").replace(/^192\.168\.\d+\.\d+(:\d+)?/i, "") || "/"
 
     let cleanAttrs = attrs.replace(/href=(["'])(.*?)\1/i, "")
-    cleanAttrs = cleanAttrs.replace(/onclick=(["'])(.*?)\1/i, "")
-
     return `<a${cleanAttrs} href="#" data-href="${cleanPath}">`
   })
 
@@ -73,8 +91,7 @@ function virtualizeHtml(raw: string): string {
     const cleanPath =
       actionVal.replace(/^https?:\/\/[^\/]+/i, "").replace(/^192\.168\.\d+\.\d+(:\d+)?/i, "") || "/"
 
-    let cleanAttrs = attrs.replace(/onsubmit=(["'])(.*?)\1/i, "")
-    return `<form${cleanAttrs} data-action="${cleanPath}">`
+    return `<form${attrs.replace(/action=(["'])(.*?)\1/i, "")} data-action="${cleanPath}">`
   })
 
   return extractedStyles ? `${extractedStyles}\n${content}` : content
