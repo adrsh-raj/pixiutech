@@ -1,31 +1,31 @@
 /*
  * Dedicated Virtual Arduino Lab theme.
- * This file intentionally restores the lab's original blue/navy engineering
- * palette without changing the rest of the Pixiu portal.
+ * Light workbench surface with restrained engineering accents.
+ * Floating tools can remain dark so the lab keeps strong visual hierarchy.
  */
 
 :root .circuit-lab-blue-theme {
-  --color-pixiu-dark: #070B14;
-  --color-pixiu-blue: #1D6EFF;
-  --color-pixiu-cyan: #00D2FF;
-  --color-pixiu-gold: #C9A227;
+  --color-pixiu-dark: #172033;
+  --color-pixiu-blue: #2563EB;
+  --color-pixiu-cyan: #0284C7;
+  --color-pixiu-gold: #B7791F;
   --color-pixiu-gray: #F7F8FA;
 
-  --color-background: #0F172A !important;
-  --color-foreground: #F8FAFC !important;
-  --color-card: #1E293B !important;
-  --color-card-foreground: #F8FAFC !important;
-  --color-border: #334155 !important;
-  --color-sidebar: #131D31 !important;
-  --color-sidebar-foreground: #F8FAFC !important;
-  --color-muted: #1E293B !important;
-  --color-muted-foreground: #94A3B8 !important;
-  --color-accent: #38BDF8 !important;
-  --color-accent-foreground: #0F172A !important;
-  --color-primary: #1D6EFF !important;
+  --color-background: #F5F7FA !important;
+  --color-foreground: #172033 !important;
+  --color-card: #FFFFFF !important;
+  --color-card-foreground: #172033 !important;
+  --color-border: #D7DEE8 !important;
+  --color-sidebar: #F1F5F9 !important;
+  --color-sidebar-foreground: #172033 !important;
+  --color-muted: #EEF2F6 !important;
+  --color-muted-foreground: #667085 !important;
+  --color-accent: #0284C7 !important;
+  --color-accent-foreground: #FFFFFF !important;
+  --color-primary: #2563EB !important;
   --color-primary-foreground: #FFFFFF !important;
-  --color-secondary: #253349 !important;
-  --color-secondary-foreground: #F8FAFC !important;
+  --color-secondary: #E9EEF4 !important;
+  --color-secondary-foreground: #243047 !important;
 
   --color-blue-50: #EFF6FF !important;
   --color-blue-100: #DBEAFE !important;
@@ -70,67 +70,61 @@
   --color-amber-600: #D97706 !important;
 }
 
-/* Hard overrides for the semantic utility classes used by the lab. */
+/* Workbench semantic surfaces. Keep explicit tool overlays untouched. */
 :root .circuit-lab-blue-theme .bg-background,
 :root .circuit-lab-blue-theme [class*="bg-background/"] {
-  background-color: #0F172A !important;
+  background-color: #F5F7FA !important;
 }
 
 :root .circuit-lab-blue-theme .bg-card,
 :root .circuit-lab-blue-theme [class*="bg-card/"] {
-  background-color: #1E293B !important;
+  background-color: #FFFFFF !important;
 }
 
 :root .circuit-lab-blue-theme .bg-sidebar {
-  background-color: #131D31 !important;
+  background-color: #F1F5F9 !important;
 }
 
 :root .circuit-lab-blue-theme .bg-secondary,
 :root .circuit-lab-blue-theme [class*="bg-secondary/"] {
-  background-color: #253349 !important;
+  background-color: #E9EEF4 !important;
 }
 
 :root .circuit-lab-blue-theme .text-foreground {
-  color: #F8FAFC !important;
+  color: #172033 !important;
 }
 
 :root .circuit-lab-blue-theme .text-muted-foreground,
 :root .circuit-lab-blue-theme [class*="text-muted-foreground/"] {
-  color: #94A3B8 !important;
+  color: #667085 !important;
 }
 
 :root .circuit-lab-blue-theme .text-primary {
-  color: #1D6EFF !important;
+  color: #2563EB !important;
 }
 
 :root .circuit-lab-blue-theme .border-border,
 :root .circuit-lab-blue-theme [class*="border-border/"] {
-  border-color: #334155 !important;
+  border-color: #D7DEE8 !important;
 }
 
-:root .circuit-lab-blue-theme .text-blue-300 { color: #93C5FD !important; }
-:root .circuit-lab-blue-theme .text-blue-400 { color: #60A5FA !important; }
-:root .circuit-lab-blue-theme .text-blue-500 { color: #3B82F6 !important; }
-:root .circuit-lab-blue-theme .text-blue-600 { color: #2563EB !important; }
+:root .circuit-lab-blue-theme .text-blue-300 { color: #2563EB !important; }
+:root .circuit-lab-blue-theme .text-blue-400 { color: #2563EB !important; }
+:root .circuit-lab-blue-theme .text-blue-500 { color: #2563EB !important; }
+:root .circuit-lab-blue-theme .text-blue-600 { color: #1D4ED8 !important; }
 
-:root .circuit-lab-blue-theme .text-cyan-300 { color: #67E8F9 !important; }
-:root .circuit-lab-blue-theme .text-cyan-400 { color: #22D3EE !important; }
-:root .circuit-lab-blue-theme .text-cyan-500 { color: #06B6D4 !important; }
+:root .circuit-lab-blue-theme .text-cyan-300 { color: #0E7490 !important; }
+:root .circuit-lab-blue-theme .text-cyan-400 { color: #0284C7 !important; }
+:root .circuit-lab-blue-theme .text-cyan-500 { color: #0891B2 !important; }
 
-:root .circuit-lab-blue-theme .bg-slate-800,
-:root .circuit-lab-blue-theme [class*="bg-slate-800/"] { background-color: #1E293B !important; }
-:root .circuit-lab-blue-theme .bg-slate-900,
-:root .circuit-lab-blue-theme [class*="bg-slate-900/"] { background-color: #0F172A !important; }
-:root .circuit-lab-blue-theme .bg-slate-950,
-:root .circuit-lab-blue-theme [class*="bg-slate-950/"] { background-color: #020617 !important; }
+/* Inputs/selectors that rely on the old slate semantic palette. */
+:root .circuit-lab-blue-theme input,
+:root .circuit-lab-blue-theme select,
+:root .circuit-lab-blue-theme textarea {
+  color-scheme: light;
+}
 
-:root .circuit-lab-blue-theme .text-slate-200 { color: #E2E8F0 !important; }
-:root .circuit-lab-blue-theme .text-slate-300 { color: #CBD5E1 !important; }
-:root .circuit-lab-blue-theme .text-slate-400 { color: #94A3B8 !important; }
-:root .circuit-lab-blue-theme .text-slate-500 { color: #64748B !important; }
-:root .circuit-lab-blue-theme .text-slate-600 { color: #475569 !important; }
-
-:root .circuit-lab-blue-theme .border-slate-700,
-:root .circuit-lab-blue-theme [class*="border-slate-700/"] { border-color: #334155 !important; }
-:root .circuit-lab-blue-theme .border-slate-800,
-:root .circuit-lab-blue-theme [class*="border-slate-800/"] { border-color: #1E293B !important; }
+:root .circuit-lab-blue-theme ::selection {
+  background: rgba(37, 99, 235, 0.16);
+  color: #172033;
+}
