@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CalendarDays, ExternalLink, Mail, MapPin, Phone, RefreshCw, Search, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { apiFetch } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useToast } from '../context/ToastContext';
 import EmptyState from '../components/ui/EmptyState';
@@ -34,6 +35,8 @@ export default function WebsiteEnquiries() {
   const { leads = [], refreshAll, loading } = useData();
   const toast = useToast();
   const [query, setQuery] = useState('');
+  const [attachmentPreview, setAttachmentPreview] = useState(null);
+  const [attachmentBusy, setAttachmentBusy] = useState(null);
 
   const enquiries = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -45,6 +48,47 @@ export default function WebsiteEnquiries() {
   }, [leads, query]);
 
   const newCount = enquiries.filter(item => item.status === 'new').length;
+
+  useEffect(() => () => {
+    if (attachmentPreview?.url) URL.revokeObjectURL(attachmentPreview.url);
+  }, [attachmentPreview]);
+
+  const getAttachmentApiPath = fileUrl => {
+    const raw = text(fileUrl);
+    if (!raw) return '';
+    try {
+      const parsed = new URL(raw, window.location.origin);
+      const marker = '/api/v1';
+      const index = parsed.pathname.indexOf(marker);
+      return (index >= 0 ? parsed.pathname.slice(index + marker.length) : parsed.pathname) + parsed.search;
+    } catch {
+      return raw.startsWith('/api/v1') ? raw.slice('/api/v1'.length) : raw;
+    }
+  };
+
+  const handleAttachmentPreview = async file => {
+    const apiPath = getAttachmentApiPath(file?.url);
+    if (!apiPath) return;
+    setAttachmentBusy(file.id);
+    try {
+      const response = await apiFetch(apiPath, { method: 'GET', cache: 'no-store' });
+      if (!response.ok) throw new Error('Attachment could not be opened.');
+      const blob = await response.blob();
+      if (!String(blob.type).startsWith('image/')) throw new Error('The stored attachment is not an image.');
+      setAttachmentPreview({ url: URL.createObjectURL(blob), name: file.original_name || 'Lab image' });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Attachment could not be opened.');
+    } finally {
+      setAttachmentBusy(null);
+    }
+  };
+
+  const closeAttachmentPreview = () => {
+    setAttachmentPreview(current => {
+      if (current?.url) URL.revokeObjectURL(current.url);
+      return null;
+    });
+  };
 
   const handleRefresh = async () => {
     await refreshAll();
@@ -93,9 +137,9 @@ export default function WebsiteEnquiries() {
                       {item.labAttachments.length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-1.5">
                           {item.labAttachments.map(file => (
-                            <a key={file.id} href={file.url || "#"} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] font-bold text-blue-700 hover:bg-blue-100">
-                              <ExternalLink size={11} /> {file.original_name}
-                            </a>
+                            <button key={file.id} type="button" onClick={() => void handleAttachmentPreview(file)} disabled={!file.url || attachmentBusy === file.id} className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] font-bold text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50">
+                              <ExternalLink size={11} /> {attachmentBusy === file.id ? 'Opening…' : file.original_name}
+                            </button>
                           ))}
                         </div>
                       )}</td>
@@ -103,6 +147,23 @@ export default function WebsiteEnquiries() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {attachmentPreview && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Lab enquiry attachment preview" onMouseDown={event => { if (event.target === event.currentTarget) closeAttachmentPreview(); }}>
+          <div className="w-full max-w-4xl overflow-hidden rounded-2xl border border-slate-700 bg-slate-950 shadow-2xl">
+            <div className="flex items-center justify-between gap-3 border-b border-slate-800 px-4 py-3">
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Private Lab attachment</p>
+                <p className="truncate text-sm font-bold text-white">{attachmentPreview.name}</p>
+              </div>
+              <button type="button" onClick={closeAttachmentPreview} className="rounded-lg px-3 py-1.5 text-xs font-bold text-slate-300 hover:bg-slate-800 hover:text-white">Close</button>
+            </div>
+            <div className="max-h-[78vh] overflow-auto p-3 bg-black/30">
+              <img src={attachmentPreview.url} alt={attachmentPreview.name} className="mx-auto max-h-[72vh] max-w-full rounded-xl object-contain" />
+            </div>
           </div>
         </div>
       )}
