@@ -173,7 +173,7 @@ export default function Careers() {
           <Reveal delay={80}>
             {status?.kind === 'success' ? (
               <div className="form__done" role="status" aria-live="polite" style={{ marginTop: 24 }}>
-                <span className="form__status-mark" aria-hidden="true">✓</span>
+                <span className="form__status-mark" aria-hidden="true" />
                 <h3>Thank you, {submittedName}.</h3>
                 <p>{status.text} Our team will review your application and contact you using the details provided.</p>
                 <button
@@ -201,7 +201,7 @@ export default function Careers() {
                 <button className="btn btn--primary" type="submit" disabled={sending}>{sending ? 'Submitting…' : 'Submit Application'} <span className="arw">→</span></button>
                 <span className="form__note">Your CV is submitted securely for recruitment review.</span>
               </div>
-              {status && <p className={`form__status ${status.kind === 'success' ? '' : 'err'}`} role="status" aria-live="polite">{status.kind === 'success' ? <span aria-hidden="true" className="form__status-mark">✓</span> : null}{status.text}</p>}
+              {status && <p className={`form__status ${status.kind === 'success' ? '' : 'err'}`} role="status" aria-live="polite">{status.kind === 'success' ? <span aria-hidden="true" className="form__status-mark" /> : null}{status.text}</p>}
             </form>
             )}
           </Reveal>

@@ -4,7 +4,7 @@ export default function Plate({ src, alt, caption }) {
   return (
     <figure style={{ margin: 0 }}>
       <div className="plate">
-        <img src={src} alt={alt} loading="lazy" />
+        <img src={src} alt={alt} loading="lazy" decoding="async" />
       </div>
       {caption && <figcaption className="plate__cap">{caption}</figcaption>}
     </figure>

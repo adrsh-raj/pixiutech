@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,400..800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+
 /* ============================================================
    PIXIU TECH: DESIGN TOKENS (v2 Redesign)
    ============================================================ */
@@ -248,6 +250,42 @@ a{color:inherit;text-decoration:none}
 @media(max-width:860px){.process-grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:520px){.process-grid{grid-template-columns:1fr}}
 
+/* ==================== PARTNER SHOWCASE =================== */
+.band--partner{background:var(--gray-50);border-top:1px solid var(--gray-300);border-bottom:1px solid var(--gray-300)}
+.partner-header{max-width:760px;margin-bottom:36px}
+.partner-header__top{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.partner-pill{
+  display:inline-block;padding:4px 12px;background:var(--blue);color:#fff;
+  font-family:var(--f-mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;border-radius:999px;font-weight:600;
+}
+.partner-est{font-family:var(--f-mono);font-size:12px;color:var(--muted);letter-spacing:.08em}
+.partner-grid{
+  display:grid;grid-template-columns:repeat(2,1fr);gap:24px;margin-top:28px;
+}
+.partner-card{
+  background:#fff;border:1px solid var(--gray-300);border-radius:12px;overflow:hidden;
+  display:flex;flex-direction:column;transition:transform .2s,box-shadow .2s;
+}
+.partner-card:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(13,18,18,.08);border-color:#B5C6C2}
+.partner-card__img{height:260px;overflow:hidden;background:#000}
+.partner-card__img img{width:100%;height:100%;object-fit:cover;transition:transform .3s ease}
+.partner-card:hover .partner-card__img img{transform:scale(1.03)}
+.partner-card__body{padding:22px;display:flex;flex-direction:column;gap:8px;flex:1}
+.partner-card__title{font-size:1.18rem;margin:0;color:var(--ink);font-weight:700}
+.partner-card__desc{font-size:.95rem;color:var(--muted);line-height:1.55;margin:0}
+.partner-proof{
+  display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:24px;
+  background:#fff;border:1px solid var(--gray-300);border-radius:12px;padding:clamp(24px,3vw,36px);margin-top:32px;
+}
+.partner-proof__quote{flex:1 1 500px}
+.partner-proof__quote blockquote{margin:0;font-size:1.05rem;line-height:1.6;color:var(--ink);font-weight:500}
+.partner-proof__quote cite{display:block;margin-top:10px;font-family:var(--f-mono);font-size:12px;letter-spacing:.08em;color:var(--blue-600);font-style:normal}
+.partner-proof__cta{flex:0 0 auto}
+@media(max-width:860px){
+  .partner-grid{grid-template-columns:1fr}
+  .partner-card__img{height:220px}
+}
+
 /* ==================== SPLIT LAYOUT ======================= */
 .split{display:grid;grid-template-columns:1fr 1fr;gap:clamp(30px,5vw,72px);align-items:center}
 .split__img{border-radius:12px;overflow:hidden}
@@ -260,7 +298,7 @@ a{color:inherit;text-decoration:none}
   padding-left:28px;position:relative;font-size:1rem;color:var(--muted);
 }
 .check-list li::before{
-  content:"✓";position:absolute;left:0;color:var(--blue);font-weight:700;
+  content:"";position:absolute;left:4px;top:6px;width:5px;height:10px;border:solid var(--blue);border-width:0 2px 2px 0;transform:rotate(45deg);
 }
 .check-list--light li{color:var(--muted-dark)}
 .check-list--light li::before{color:var(--blue-soft)}
@@ -339,6 +377,7 @@ a{color:inherit;text-decoration:none}
 .form__status{margin-top:16px;font-family:var(--f-mono);font-size:12.5px;letter-spacing:.05em;line-height:1.6}
 .form__status.ok{color:var(--blue-600)}
 .form__status.err{color:#B4451F}
+.form__status-mark{display:inline-block;width:5px;height:10px;border:solid currentColor;border-width:0 2px 2px 0;transform:rotate(45deg);margin-right:8px;vertical-align:baseline}
 .form__done{padding:22px;border:1px solid rgba(35,111,105,.32);background:rgba(35,111,105,.05);border-radius:12px}
 .form__done h3{font-size:22px}
 .form__done p{margin-top:12px;color:var(--muted);font-size:15.5px}

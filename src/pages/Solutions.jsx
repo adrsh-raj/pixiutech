@@ -62,7 +62,7 @@ export default function Solutions() {
           <Reveal>
             <div className="sol-detail">
               <div className="sol-detail__img">
-                <img src="/img/teacher_training.jpg" alt="Teacher training workshop" loading="lazy" decoding="async" />
+                <img src="/img/zenith/zenith_teacher_co_teaching.jpg" alt="Teacher training and co-teaching session at Zenith Public School" loading="lazy" decoding="async" />
               </div>
               <div className="sol-detail__body">
                 <p className="eyebrow">TEACHER TRAINING</p>
@@ -101,8 +101,8 @@ export default function Solutions() {
           </Reveal>
           <Reveal delay={80}>
             <div className="wide-img" style={{ marginTop: 40 }}>
-              <img src="/img/hero_lab.jpg" alt="Complete innovation lab setup" loading="lazy" decoding="async" />
-              <p className="wide-img__caption">A working Pixiu Tech lab designed for weekly teaching</p>
+              <img src="/img/zenith/zenith_lab_setup.jpg" alt="A complete innovation and robotics lab setup at Zenith Public School, Dadha" loading="lazy" decoding="async" />
+              <p className="wide-img__caption">A working Pixiu Tech robotics and STEM lab at Zenith Public School, Dadha</p>
             </div>
           </Reveal>
           <Reveal delay={120}>

@@ -31,7 +31,7 @@ const warnings = [];
 for (const [file, source] of textByFile) {
   for (const m of source.matchAll(/(?:\bto|\bhref)\s*=\s*[\"'`]([^\"'`]+)[\"'`]/g)) {
     const target = m[1];
-    if (!target.startsWith('/') || target.startsWith('//') || target.startsWith('/img/')) continue;
+    if (!target.startsWith('/') || target.startsWith('//') || target.startsWith('/img/') || /\.(png|jpg|jpeg|svg|ico|webmanifest|xml|txt|json)$/i.test(target)) continue;
     const route = normalize(target);
     if (route.startsWith('/api/') || route === '#') continue;
     if (!routeSet.has(route) && !routeSet.has(target) && !route.startsWith('/contact')) {

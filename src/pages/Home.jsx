@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import Reveal from '../components/Reveal.jsx'
 import CTAStrip from '../components/CTAStrip.jsx'
 import CountUp from '../components/CountUp.jsx'
-import { STATS, SOLUTIONS, PROCESS, WHY } from '../data/site.js'
+import { STATS, SOLUTIONS, PROCESS, WHY, PARTNER_SCHOOL } from '../data/site.js'
 
 export default function Home() {
   return (
@@ -86,13 +86,63 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ===================== PARTNER SCHOOL SHOWCASE ===================== */}
+      <section className="band band--partner" id="partner-school">
+        <div className="shell">
+          <Reveal>
+            <div className="partner-header">
+              <div className="partner-header__top">
+                <span className="partner-pill">Flagship Partner School</span>
+                <span className="partner-est">Estd. 1999</span>
+              </div>
+              <h2 className="h-sect">Zenith Public School, Dadha</h2>
+              <p className="lede">
+                Real-world classroom implementation: complete computer lab setup, graded Class 6 to 10 robotics curriculum, physical prototyping kits, and weekly hands-on instruction delivered by Pixiu Tech specialists.
+              </p>
+            </div>
+          </Reveal>
+
+          <Reveal delay={80}>
+            <div className="partner-grid">
+              {PARTNER_SCHOOL.highlights.map((h) => (
+                <div className="partner-card" key={h.title}>
+                  <div className="partner-card__img">
+                    <img src={h.img} alt={h.alt} loading="lazy" decoding="async" />
+                  </div>
+                  <div className="partner-card__body">
+                    <h3 className="partner-card__title">{h.title}</h3>
+                    <p className="partner-card__desc">{h.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Reveal>
+
+          <Reveal delay={120}>
+            <div className="partner-proof">
+              <div className="partner-proof__quote">
+                <blockquote>
+                  "Pixiu Tech provides the complete ecosystem: the curriculum books, the physical component kits, and the specialist instructors who teach our students while our teachers upskill alongside."
+                </blockquote>
+                <cite>Robotics & STEM Innovation Lab · Zenith Public School, Dadha</cite>
+              </div>
+              <div className="partner-proof__cta">
+                <Link className="btn btn--primary" to="/contact#demo-form">
+                  Book a Consultation for Your School <span className="arw">→</span>
+                </Link>
+              </div>
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
       {/* ====================== WORKSHOP IMAGE ======================== */}
       <section className="band band--no-pad-top">
         <div className="shell">
           <Reveal>
             <div className="wide-img">
-              <img src="/img/workshop_action.jpg" alt="Students in an energetic STEM robotics workshop" loading="lazy" decoding="async" />
-              <p className="wide-img__caption">Live workshops where students build, test, fix, and improve</p>
+              <img src="/img/zenith/zenith_arduino_hands_on.jpg" alt="Students in hands-on robotics session at Zenith Public School, Dadha" loading="lazy" decoding="async" />
+              <p className="wide-img__caption">Live robotics lab session at Zenith Public School, Dadha: hands-on circuit wiring, coding, and testing</p>
             </div>
           </Reveal>
         </div>
@@ -125,7 +175,7 @@ export default function Home() {
         <div className="shell split">
           <Reveal>
             <div className="split__img">
-              <img src="/img/teacher_training.jpg" alt="Teacher training workshop" loading="lazy" decoding="async" />
+              <img src="/img/zenith/zenith_teacher_co_teaching.jpg" alt="Teacher training and co-teaching session at Zenith Public School" loading="lazy" decoding="async" />
             </div>
           </Reveal>
           <Reveal delay={80}>

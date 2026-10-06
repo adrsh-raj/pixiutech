@@ -9,7 +9,7 @@ export default function PortalBridge() {
         <Reveal>
           <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.1)', padding: '3rem 2rem', borderRadius: '24px', backdropFilter: 'blur(10px)', boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)' }}>
             <div style={{ display: 'inline-block', background: '#fff', padding: '8px 16px', borderRadius: '12px', marginBottom: '1.5rem', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
-              <img src="/img/logo.png" alt="Pixiu Tech" decoding="async" style={{ height: '36px', width: 'auto', display: 'block' }} />
+              <img src="/img/logo.png" alt="Pixiu Tech" decoding="async" loading="lazy" style={{ height: '36px', width: 'auto', display: 'block' }} />
             </div>
 
             <h1 style={{ fontSize: '2rem', fontWeight: '800', margin: '0 0 0.75rem 0', color: '#fff' }}>

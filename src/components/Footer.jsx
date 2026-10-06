@@ -8,7 +8,7 @@ export default function Footer() {
         <div className="foot__grid">
           <div className="foot__about">
             <Link className="brand" to="/">
-              <img className="brand__logo" src="/img/logo.png" alt="Pixiu Tech" decoding="async" />
+              <img className="brand__logo" src="/img/logo.png" alt="Pixiu Tech" decoding="async" loading="lazy" />
             </Link>
             <p className="foot__desc">
               Pixiu Tech is an end-to-end STEM, Robotics, AI, and Innovation solutions provider for schools. 
