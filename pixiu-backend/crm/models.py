@@ -32,6 +32,7 @@ class LeadEnquiryType(models.TextChoices):
     BUG = "bug", "Bug"
     HELP = "help", "Help"
     OTHER = "other", "Other"
+    PHILOSOPHY = "philosophy", "Think / Rethink Philosophy"
 
 class Lead(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
