@@ -43,7 +43,7 @@ export function LabSupportWidget() {
   const inputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
-    const verifiedId = String((user as any)?.student_id || "").trim().toUpperCase()
+    const verifiedId = String(user?.student_id || "").trim().toUpperCase()
     if (verifiedId) setStudentId(verifiedId)
   }, [user])
 
@@ -63,7 +63,7 @@ export function LabSupportWidget() {
     if (!file) return null
     const dot = file.name.lastIndexOf(".")
     const ext = dot >= 0 ? file.name.slice(dot).toLowerCase() : ""
-    if (!ALLOWED_EXT.has(ext) || !ALLOWED_MIME.has(file.type)) {
+    if (!ALLOWED_EXT.has(ext) || !ALLOWED_MIME.has(String(file.type || "").toLowerCase())) {
       throw new Error("Only PNG, JPG/JPEG or WEBP images are accepted.")
     }
     if (file.size <= 0 || file.size > MAX_IMAGE_BYTES) {
@@ -176,10 +176,8 @@ export function LabSupportWidget() {
 
             <label className="block">
               <span className="mb-1.5 block text-[10px] font-black uppercase tracking-wide text-slate-500">Category</span>
-              <select value={kind} onChange={event => setKind(event.target.value as "bug" | "help" | "other")} className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-xs font-semibold text-white outline-none focus:border-cyan-400">
-                <option value="bug">Bug / Problem</option>
-                <option value="help">Help</option>
-                <option value="other">Other</option>
+              <select value={kind} onChange={event => setKind(event.target.value as "bug" | "help" | "other" | "philosophy")} className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-xs font-semibold text-white outline-none focus:border-cyan-400">
+                {KIND_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </label>
 
@@ -208,7 +206,13 @@ export function LabSupportWidget() {
               <p className="mt-1 flex items-center gap-1 text-[9px] leading-4 text-slate-500">
                 <Paperclip size={10} /> PNG/JPG/JPEG/WEBP · max 3 MB · images only
               </p>
-              {imageMeta && <p className="mt-1 text-[9px] font-semibold text-emerald-300">{imageMeta}</p>}
+              {imageMeta && <div className="mt-2 flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-950/70 p-1.5">
+                {previewUrl ? <img src={previewUrl} alt="" className="h-10 w-14 shrink-0 rounded-md border border-slate-700 object-cover" /> : null}
+                <div className="min-w-0">
+                  <p className="truncate text-[9px] font-semibold text-emerald-300">{imageMeta}</p>
+                  <p className="text-[9px] text-slate-600">Small preview · original image is uploaded securely</p>
+                </div>
+              </div>}
             </div>
 
             <button type="button" onClick={() => void submit()} disabled={sending} className="flex w-full items-center justify-center gap-2 rounded-xl bg-cyan-500 px-3 py-2.5 text-xs font-black text-slate-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-50">
@@ -229,7 +233,7 @@ export function LabSupportWidget() {
             )}
 
             <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-2.5 text-[9px] leading-4 text-slate-500">
-              Never attach passwords, OTPs or documents. The server accepts only validated images.
+              PNG, JPG/JPEG or WEBP only · 3 MB max. Files are checked for type, image validity and malware before storage.
             </div>
           </div>
         </section>
