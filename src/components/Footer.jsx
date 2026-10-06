@@ -1,51 +1,35 @@
 import { Link } from 'react-router-dom'
-import { NAV } from '../data/site.js'
+import { FOOTER_GROUPS } from '../data/site.js'
 
 export default function Footer() {
   return (
-    <footer className="foot">
+    <footer className="site-footer">
       <div className="shell">
-        <div className="foot__grid">
-          <div className="foot__about">
-            <Link className="brand" to="/">
-              <img className="brand__logo" src="/img/logo.png" alt="Pixiu Tech" decoding="async" loading="lazy" width="100" height="56" />
+        <div className="site-footer__top">
+          <div className="site-footer__about">
+            <Link className="footer-brand" to="/">
+              <img src="/img/logo.png" alt="Pixiu Tech" width="104" height="58" loading="lazy" decoding="async" />
             </Link>
-            <p className="foot__desc">
-              Pixiu Tech is an end-to-end STEM, Robotics, AI, and Innovation solutions provider for schools. 
-              We design labs, deliver curriculum, train teachers, and support schools long-term.
-            </p>
+            <p>School technology, treated as a connected system: lab, curriculum, instructors and digital tools.</p>
+            <a className="footer-email" href="mailto:director@pixiutech.com">director@pixiutech.com ↗</a>
           </div>
 
-          <div className="foot__links-group">
-            <h3 className="foot__heading">Quick Links</h3>
-            <nav className="foot__nav-col foot__quick-links" aria-label="Footer quick links">
-              {NAV.filter((n) => n.to !== '/contact').map((n) => (
-                <Link key={n.to} to={n.to}>{n.label}</Link>
-              ))}
-            </nav>
-          </div>
-
-          <div className="foot__links-group">
-            <h3 className="foot__heading">Connect</h3>
-            <nav className="foot__nav-col">
-              <Link to="/contact#enquiry">Contact Us</Link>
-              <a href="mailto:director@pixiutech.com">Email Us</a>
-            </nav>
-          </div>
-
-          <div className="foot__links-group">
-            <h3 className="foot__heading">Legal</h3>
-            <nav className="foot__nav-col">
-              <Link to="/privacy">Privacy Policy</Link>
-              <Link to="/terms">Terms &amp; Conditions</Link>
-              <button className="foot__privacy-btn" type="button" onClick={() => window.dispatchEvent(new Event('pixiu:privacy-open'))}>Privacy choices</button>
-            </nav>
+          <div className="site-footer__links">
+            {FOOTER_GROUPS.map(group => (
+              <div key={group.title}>
+                <span className="mono-label mono-label--light">{group.title}</span>
+                <nav aria-label={group.title + ' links'}>
+                  {group.links.map(link => <Link key={link.to} to={link.to}>{link.label}</Link>)}
+                </nav>
+              </div>
+            ))}
           </div>
         </div>
 
-        <div className="foot__bot">
-          <span>© {new Date().getFullYear()} Pixiu Tech LLP. All rights reserved.</span>
-          <span>End-to-end STEM & Innovation solutions for schools</span>
+        <div className="site-footer__bottom">
+          <span>© {new Date().getFullYear()} Pixiu Tech LLP</span>
+          <span>STEM · Robotics · AI · IoT · Innovation</span>
+          <button type="button" onClick={() => window.dispatchEvent(new Event('pixiu:privacy-open'))}>Privacy choices</button>
         </div>
       </div>
     </footer>

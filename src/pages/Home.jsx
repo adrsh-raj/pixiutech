@@ -1,268 +1,162 @@
 import { Link } from 'react-router-dom'
 import Reveal from '../components/Reveal.jsx'
 import CTAStrip from '../components/CTAStrip.jsx'
-import CountUp from '../components/CountUp.jsx'
-import {
-  STATS,
-  SOLUTIONS,
-  PROCESS,
-  WHY,
-  REAL_LAB_SHOWCASE,
-  PORTAL_SHOWCASE,
-} from '../data/site.js'
+import { DELIVERY, PLATFORM, PRINCIPLES, PROJECTS, PROOF, STARTING_POINTS, SYSTEM_LAYERS } from '../data/site.js'
 
 export default function Home() {
   return (
     <>
-      {/* ============================= HERO ============================= */}
-      <section className="hero-v2">
-        <div className="hero-v2__bg">
-          <img
-            src="/img/hero_lab.jpg"
-            alt="Pixiu Tech classroom session on AI and machine learning"
-            loading="eager"
-            fetchPriority="high"
-            decoding="async"
-            width="1440"
-            height="804"
-          />
-          <div className="hero-v2__overlay" />
-        </div>
-        <div className="shell hero-v2__content">
-          <Reveal>
-            <p className="hero-v2__tag">STEM · Robotics · AI · IoT · Drones</p>
-            <h1 className="hero-v2__title">
-              Turnkey Robotics, AI & IoT Labs<br />
-              <span className="hero-v2__accent">Engineered for Modern Schools</span>
-            </h1>
-            <p className="hero-v2__sub">
-              Complete innovation lab setup, plug-and-play hardware kits, graded NEP 2020 curriculum, resident expert instructors, and browser-based virtual circuit simulation.
-            </p>
-            <div className="hero-v2__cta">
-              <Link className="btn btn--primary btn--lg" to="/contact#demo-form">
-                Book a Free Consultation <span className="arw">→</span>
-              </Link>
-              <Link className="btn btn--ghost-light" to="/solutions">
-                Explore Lab Solutions
-              </Link>
-            </div>
+      <section className="hero-new">
+        <div className="shell hero-new__grid">
+          <div className="hero-new__copy">
+            <div className="hero-stamp"><span>STEM</span><span>ROBOTICS</span><span>AI</span><span>IoT</span></div>
+            <Reveal>
+              <span className="section-kicker section-kicker--light">School innovation, built to run</span>
+              <h1>Build the room.<br /><em>Build the programme.</em><br />Keep it alive.</h1>
+              <p>Pixiu Tech brings the physical lab, curriculum, instructors and school software together so technology becomes part of the academic year—not a room that gets installed and forgotten.</p>
+              <div className="hero-new__actions">
+                <Link className="button button--accent" to="/contact#demo-form">Plan a school lab <span>↗</span></Link>
+                <Link className="text-link text-link--light" to="/solutions">See what we build <span>→</span></Link>
+              </div>
+            </Reveal>
+          </div>
+
+          <Reveal delay={120} className="hero-new__visual">
+            <figure className="hero-image-main">
+              <img src="/img/zenith/zenith_lab_setup.webp" alt="Completed innovation and robotics lab setup at Zenith Public School, Dadha" width="1200" height="800" fetchPriority="high" />
+              <figcaption><span>FIELD NOTE 01</span><span>REAL SCHOOL IMPLEMENTATION</span></figcaption>
+            </figure>
+            <figure className="hero-image-detail">
+              <img src="/img/zenith/zenith_robot_rover_demo.webp" alt="Students demonstrating a robotics rover" width="800" height="600" loading="eager" />
+              <figcaption>Students testing an autonomous build</figcaption>
+            </figure>
+            <div className="hero-rail-label">DESIGNED FOR REAL TIMETABLES · REAL CLASSROOMS · REAL BUILDS</div>
           </Reveal>
         </div>
       </section>
 
-      {/* ========================== STATS BAR ========================== */}
-      <section className="stats-bar">
+      <section className="statement-band">
+        <div className="shell statement-band__grid">
+          <Reveal><span className="section-kicker">The Pixiu idea</span></Reveal>
+          <Reveal delay={90}><h2>The school should not have to assemble the pieces <span>itself.</span></h2></Reveal>
+          <Reveal delay={140}><p>Hardware vendors, curriculum files, trainers and software can all exist separately. The student experience does not. We design the system around the way a school actually operates.</p></Reveal>
+        </div>
+      </section>
+
+      <section className="system-section">
         <div className="shell">
-          <div className="stats-bar__grid">
-            {STATS.map((s) => (
-              <div className="stat" key={s.label}>
-                <span className="stat__number"><CountUp text={s.number} /></span>
-                <span className="stat__label">{s.label}</span>
-              </div>
+          <div className="section-intro section-intro--split">
+            <Reveal>
+              <span className="section-kicker">One connected system</span>
+              <h2>Behind one school partner are four layers that have to work together.</h2>
+            </Reveal>
+            <Reveal delay={100}><p>Think of the programme as a loop: the room enables the lesson, the lesson creates work, the people make the work happen, and the digital layer keeps the system visible.</p></Reveal>
+          </div>
+          <div className="system-map">
+            <div className="system-map__line" aria-hidden="true" />
+            {SYSTEM_LAYERS.map(layer => (
+              <Reveal key={layer.no} delay={Number(layer.no) * 45} className="system-layer">
+                <div className="system-layer__no">{layer.no}</div>
+                <div><span className="mono-label">{layer.kicker}</span><h3>{layer.title}</h3><p>{layer.text}</p></div>
+              </Reveal>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ====================== SOLUTIONS PREVIEW ====================== */}
-      <section className="band">
+      <section className="starting-section">
         <div className="shell">
-          <Reveal>
-            <p className="eyebrow">Technology Domains</p>
-            <h2 className="h-sect">Six Technology Domains, One Delivery Team</h2>
-            <p className="lede">
-              Robotics, AI, IoT, drones, computational design, and 3D printing, with the lab setup and teaching support needed to use each domain in school.
-            </p>
-          </Reveal>
-
-          <Reveal delay={80}>
-            <div className="solutions-grid">
-              {SOLUTIONS.map((s) => (
-                <Link to={`/solutions#${s.id}`} className="sol-card" key={s.id}>
-                  <div className="sol-card__img">
-                    <img src={s.img} alt={s.alt || s.title} loading="lazy" decoding="async" width="900" height="562" />
-                  </div>
-                  <div className="sol-card__body">
-                    <h3>{s.title}</h3>
-                    <p>{s.short}</p>
-                  </div>
+          <div className="section-intro">
+            <Reveal><span className="section-kicker">Start where your school is</span><h2>Four starting points. One way of working.</h2></Reveal>
+          </div>
+          <div className="starting-grid">
+            {STARTING_POINTS.map((item, index) => (
+              <Reveal key={item.id} delay={index * 55}>
+                <Link className="starting-card" to={item.href}>
+                  <div><span className="mono-label">{item.label}</span><span className="starting-card__no">0{index + 1}</span></div>
+                  <h3>{item.title}</h3>
+                  <p>{item.text}</p>
+                  <span className="starting-card__arrow">↗</span>
                 </Link>
-              ))}
-            </div>
-          </Reveal>
-
-          <Reveal delay={140}>
-            <p style={{ marginTop: 34, textAlign: 'center' }}>
-              <Link className="btn btn--outline" to="/solutions">
-                See all solutions in detail <span className="arw">→</span>
-              </Link>
-            </p>
-          </Reveal>
+              </Reveal>
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* ================= SECTION: DEDICATED LMS & VIRTUAL LAB ================= */}
-      <section className="band band--gray" id="school-portal">
+      <section className="projects-section">
         <div className="shell">
-          <Reveal>
-            <p className="eyebrow">{PORTAL_SHOWCASE.badge}</p>
-            <h2 className="h-sect">{PORTAL_SHOWCASE.title}</h2>
-            <p className="lede">{PORTAL_SHOWCASE.desc}</p>
-          </Reveal>
-
-          <Reveal delay={80}>
-            <div className="portal-showcase-grid">
-              <div className="portal-card">
-                <div className="portal-card__role">Student Mission Hub</div>
-                <h3 className="portal-card__title">Guided Missions & Virtual Circuit Simulator</h3>
-                <div className="portal-card__features">
-                  {PORTAL_SHOWCASE.studentFeatures.map((f) => (
-                    <div className="portal-feature" key={f.title}>
-                      <strong>{f.title}</strong>
-                      <p>{f.desc}</p>
-                    </div>
-                  ))}
-                </div>
-                <div>
-                  <Link className="btn btn--outline" to="/portal">
-                    Access Student Portal <span className="arw">→</span>
-                  </Link>
-                </div>
-              </div>
-
-              <div className="portal-card">
-                <div className="portal-card__role">School Management</div>
-                <h3 className="portal-card__title">Teacher Dashboards & Academic Analytics</h3>
-                <div className="portal-card__features">
-                  {PORTAL_SHOWCASE.schoolFeatures.map((f) => (
-                    <div className="portal-feature" key={f.title}>
-                      <strong>{f.title}</strong>
-                      <p>{f.desc}</p>
-                    </div>
-                  ))}
-                </div>
-                <div>
-                  <Link className="btn btn--primary" to="/portal">
-                    School Management Suite <span className="arw">→</span>
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </Reveal>
+          <div className="projects-head">
+            <Reveal><span className="section-kicker section-kicker--light">What students actually make</span><h2>The technology is the medium. <em>The build is the point.</em></h2></Reveal>
+            <Reveal delay={100}><Link className="text-link text-link--light" to="/solutions">Explore all capabilities →</Link></Reveal>
+          </div>
+          <div className="project-rail">
+            {PROJECTS.map(project => (
+              <article className="project-card" key={project.title}>
+                <div className="project-card__image"><img src={project.image} alt="" loading="lazy" /></div>
+                <div className="project-card__body"><div className="project-card__meta"><span>{project.label}</span><span>{project.grade}</span></div><h3>{project.title}</h3><p>{project.text}</p></div>
+              </article>
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* ================= SECTION: REAL LAB SHOWCASE (2 REAL IMAGES) ================= */}
-      <section className="band" id="real-lab">
+      <section className="delivery-section" id="delivery">
         <div className="shell">
-          <Reveal>
-            <p className="eyebrow">{REAL_LAB_SHOWCASE.badge}</p>
-            <h2 className="h-sect">{REAL_LAB_SHOWCASE.title}</h2>
-            <p className="lede">{REAL_LAB_SHOWCASE.desc}</p>
-          </Reveal>
+          <div className="section-intro section-intro--split">
+            <Reveal><span className="section-kicker">From room to routine</span><h2>A lab launch is not the finish line.</h2></Reveal>
+            <Reveal delay={100}><p>The delivery model is deliberately longer than installation. The aim is to get from an empty room to repeatable weekly learning, then keep improving the programme with the school.</p></Reveal>
+          </div>
+          <div className="delivery-timeline">
+            <div className="delivery-timeline__track" aria-hidden="true" />
+            {DELIVERY.map((step, index) => (
+              <Reveal key={step.no} delay={index * 50} className="delivery-step">
+                <div className="delivery-step__dot">{step.no}</div><div><h3>{step.title}</h3><p>{step.text}</p></div>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
 
-          <Reveal delay={80}>
-            <div className="real-lab-grid">
-              {REAL_LAB_SHOWCASE.items.map((item) => (
-                <div className="real-lab-card" key={item.title}>
-                  <div className="real-lab-card__header">
-                    <span className="real-lab-card__badge">{item.badge}</span>
-                    <span className="real-lab-card__meta">{item.meta}</span>
-                  </div>
-                  <div className="real-lab-card__img">
-                    <img src={item.img} alt={item.alt} loading="lazy" decoding="async" width="900" height="675" />
-                  </div>
-                  <div className="real-lab-card__body">
-                    <h3>{item.title}</h3>
-                    <p>{item.desc}</p>
-                  </div>
-                </div>
-              ))}
+      <section className="proof-section">
+        <div className="shell proof-layout">
+          <div className="proof-copy">
+            <Reveal><span className="section-kicker">Proof of work</span><h2>{PROOF.title}</h2><p>{PROOF.text}</p><div className="proof-school"><strong>{PROOF.school}</strong><span>Physical lab · hands-on delivery · teacher co-teaching</span></div><Link className="button button--outline" to="/work">Open the implementation story <span>↗</span></Link></Reveal>
+          </div>
+          <div className="proof-gallery">
+            {PROOF.images.map((item, index) => (
+              <Reveal key={item.label} delay={70 * index} className={'proof-photo proof-photo--' + (index + 1)}><img src={item.src} alt={item.alt} loading="lazy" /><span>{item.label}</span></Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="platform-section">
+        <div className="shell platform-layout">
+          <Reveal className="platform-screen">
+            <div className="platform-screen__top"><span>PIXIU / SCHOOL PORTAL</span><span>LIVE SYSTEM</span></div>
+            <div className="platform-screen__body">
+              <div className="platform-screen__sidebar"><span className="is-current">MISSIONS</span><span>CLASSROOMS</span><span>ATTENDANCE</span><span>REPORTS</span></div>
+              <div className="platform-screen__content"><span className="mono-label">STUDENT MISSION / 04</span><h3>Build a responsive rover.</h3><div className="platform-screen__diagram"><span>01 INPUT</span><i /><span>02 LOGIC</span><i /><span>03 ACTION</span></div><div className="platform-progress"><span /><span /><span /><span /><b>72%</b></div></div>
             </div>
           </Reveal>
-
-          <Reveal delay={120}>
-            <div className="real-lab-proof">
-              <div className="real-lab-proof__quote">
-                <blockquote>
-                  "{REAL_LAB_SHOWCASE.quote.text}"
-                </blockquote>
-                <cite>{REAL_LAB_SHOWCASE.quote.cite}</cite>
-              </div>
-            </div>
+          <Reveal delay={100}>
+            <span className="section-kicker section-kicker--light">School portal</span>
+            <h2>{PLATFORM.title}</h2>
+            <p>{PLATFORM.text}</p>
+            <ul className="feature-list feature-list--light">{PLATFORM.features.map(item => <li key={item}>{item}</li>)}</ul>
+            <Link className="text-link text-link--light" to="/portal">See the portal entry point <span>→</span></Link>
           </Reveal>
         </div>
       </section>
 
-      {/* ======================== HOW IT WORKS ========================= */}
-      <section className="band band--gray">
-        <div className="shell">
-          <Reveal>
-            <p className="eyebrow">How It Works</p>
-            <h2 className="h-sect">How We Take a Lab from Plan to Weekly Classes</h2>
-          </Reveal>
-          <Reveal delay={80}>
-            <div className="process-grid">
-              {PROCESS.map((p, i) => (
-                <div className="process-step" key={p.no}>
-                  <div className="process-step__no" aria-hidden="true">{p.no}</div>
-                  <h3>{p.name}</h3>
-                  <p>{p.text}</p>
-                  {i < PROCESS.length - 1 && <div className="process-step__arrow">→</div>}
-                </div>
-              ))}
-            </div>
-          </Reveal>
+      <section className="about-preview">
+        <div className="shell about-preview__grid">
+          <Reveal><span className="section-kicker">Who we are</span><h2>Not a kit catalogue. Not a one-day workshop.</h2></Reveal>
+          <Reveal delay={100}><p>Our job is to make advanced technology teachable, repeatable and usable inside a real school environment. That means thinking about students, teachers, rooms, calendars and the software around all of them.</p><Link className="text-link" to="/about">Meet the thinking behind Pixiu <span>→</span></Link></Reveal>
         </div>
-      </section>
-
-      {/* ======================== TEACHER TRAINING ===================== */}
-      <section className="band">
-        <div className="shell split">
-          <Reveal>
-            <div className="split__img">
-              <img src="/img/teacher_training.jpg" alt="Teacher training workshop" loading="lazy" decoding="async" width="900" height="600" />
-            </div>
-          </Reveal>
-          <Reveal delay={80}>
-            <div>
-              <p className="eyebrow">Teacher Training</p>
-              <h2 className="h-sect">Train Your Teachers to Run STEM Sessions</h2>
-              <p className="lede">
-                Our instructors teach students while training your faculty. Over the academic year, teachers learn the tools, lesson flow, and lab routines needed to run STEM sessions independently.
-              </p>
-              <ul className="check-list">
-                <li>Hands-on Arduino & electronics training</li>
-                <li>Curriculum walkthrough & session planning</li>
-                <li>Ongoing mentorship & support</li>
-              </ul>
-              <p style={{ marginTop: 24 }}>
-                <Link className="btn btn--outline" to="/solutions">
-                  Explore Training Curriculum <span className="arw">→</span>
-                </Link>
-              </p>
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* ========================== WHY PIXIU ========================== */}
-      <section className="band on-dark gridfield">
-        <div className="shell">
-          <Reveal>
-            <p className="eyebrow">Why Pixiu Tech</p>
-            <h2 className="h-sect">Built for Implementation, Not a One-Time Installation</h2>
-          </Reveal>
-          <Reveal delay={80}>
-            <div className="why-v2">
-              {WHY.map((w) => (
-                <div className="why-v2__item" key={w.title}>
-                  <h3>{w.title}</h3>
-                  <p>{w.desc}</p>
-                </div>
-              ))}
-            </div>
-          </Reveal>
+        <div className="shell principles-strip">
+          {PRINCIPLES.map(item => <div key={item.no}><span>{item.no}</span><strong>{item.title}</strong></div>)}
         </div>
       </section>
 

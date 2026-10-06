@@ -1,24 +1,21 @@
 import { Link } from 'react-router-dom'
 
 export default function CTAStrip({
-  title = "Ready to Build Your School's Innovation Ecosystem?",
-  primary = 'Book a Free Consultation',
-  secondary = 'Request a Proposal',
+  title = 'Have a room, a problem or a school goal? Start there.',
+  primary = 'Plan a school lab',
+  secondary = 'Request a proposal',
 }) {
   return (
-    <section className="ctastrip gridfield">
-      <div className="shell ctastrip__in">
+    <section className="cta-block">
+      <div className="shell cta-block__inner">
         <div>
-          <p className="eyebrow">Start a school conversation</p>
+          <span className="section-kicker section-kicker--light">Start a conversation</span>
           <h2>{title}</h2>
+          <p>Tell us what you already have and what you want students to be able to do.</p>
         </div>
-        <div className="ctastrip__btns">
-          <Link className="btn btn--primary" to="/contact#demo-form">
-            {primary} <span className="arw">→</span>
-          </Link>
-          <Link className="btn btn--ghost-light" to="/contact?intent=proposal#demo-form">
-            {secondary} <span className="arw">→</span>
-          </Link>
+        <div className="cta-block__actions">
+          <Link className="button button--light" to="/contact#demo-form">{primary}<span>↗</span></Link>
+          <Link className="button button--dark-outline" to="/contact?intent=proposal#demo-form">{secondary}<span>↗</span></Link>
         </div>
       </div>
     </section>

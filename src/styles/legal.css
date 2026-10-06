@@ -1,15 +1,1 @@
-.legal-page{background:var(--gray-50);border-top:1px solid var(--gray-300)}
-.legal-doc{max-width:900px;margin:0 auto;background:#fff;border:1px solid var(--gray-300);border-radius:14px;padding:clamp(28px,5vw,56px);box-shadow:0 10px 35px rgba(10,26,51,.05)}
-.legal-meta{font-family:var(--f-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding-bottom:20px;margin-bottom:28px;border-bottom:1px solid var(--gray-100)}
-.legal-doc>p,.legal-doc section p,.legal-doc li{font-size:16px;color:var(--muted);line-height:1.75}
-.legal-doc>p{font-size:17px;color:var(--ink)}
-.legal-doc section{margin-top:42px}
-.legal-doc h2{font-size:clamp(22px,3vw,30px);margin-bottom:14px;color:var(--ink)}
-.legal-doc h3{font-size:17px;margin:22px 0 7px;color:var(--ink)}
-.legal-doc ul{margin:12px 0 0;padding-left:22px}
-.legal-doc li+li{margin-top:9px}
-.legal-doc a{color:var(--blue-600);text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px}
-.legal-doc a:hover{color:var(--blue)}
-.legal-contact{padding-top:8px}
-.legal-note{margin-top:42px;padding:18px 20px;border:1px solid rgba(196,154,80,.28);border-left:4px solid var(--gold);border-radius:10px;background:rgba(196,154,80,.06);font-size:14px;color:var(--muted);line-height:1.65}
-@media(max-width:640px){.legal-doc{padding:24px 20px}.legal-doc>p,.legal-doc section p,.legal-doc li{font-size:15px}}
+/* Legal page-specific rules are intentionally centralized in the public editorial design system. */
