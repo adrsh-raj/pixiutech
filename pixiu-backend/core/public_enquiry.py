@@ -1,10 +1,14 @@
 import hashlib
 from pathlib import Path
+from urllib.parse import quote
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.http import FileResponse
+from django.shortcuts import get_object_or_404
 from rest_framework.parsers import FormParser
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -16,7 +20,7 @@ from core.upload_security import SecureMultiPartParser, SecureUploadError, valid
 from crm.models import LabEnquiryAttachment, Lead, LeadEnquiryType, LeadSource, LeadStatus
 
 User = get_user_model()
-LAB_SUPPORT_TYPES = {"bug", "help", "other"}
+LAB_SUPPORT_TYPES = {"bug", "help", "other", "philosophy"}
 LAB_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 LAB_IMAGE_MAX_BYTES = 3 * 1024 * 1024
 
@@ -38,7 +42,8 @@ def _validate_lab_image(uploaded):
 
 class PublicEnquiryView(APIView):
     permission_classes = [AllowAny]
-    authentication_classes = []
+    # JWT is optional for the public sales form, but required for authenticated Lab support.
+    authentication_classes = [CachedJWTAuthentication]
     parser_classes = [SecureMultiPartParser, FormParser]
     throttle_scope = "public_enquiry"
 
@@ -56,6 +61,15 @@ class PublicEnquiryView(APIView):
         raw_attachment = request.FILES.get("image") or request.FILES.get("attachment")
 
         if enquiry_type in LAB_SUPPORT_TYPES:
+            if not request.user.is_authenticated:
+                return Response({"success": False, "error": "Please sign in to the Lab before sending support."}, status=401)
+            if request.user.role == UserRole.STUDENT:
+                try:
+                    verified_student_id = str(request.user.student_profile.student_id).strip().upper()
+                except Exception:
+                    verified_student_id = ""
+                if verified_student_id:
+                    student_id = verified_student_id
             if not student_id:
                 return Response({"success": False, "error": "Student ID is required."}, status=400)
             if not message:
@@ -94,6 +108,7 @@ class PublicEnquiryView(APIView):
             LeadEnquiryType.BUG: "Bug",
             LeadEnquiryType.HELP: "Help",
             LeadEnquiryType.OTHER: "Other",
+            LeadEnquiryType.PHILOSOPHY: "Think / Rethink Philosophy",
         }[enquiry_type]
 
         notes = "\n".join(part for part in [
@@ -157,3 +172,28 @@ class PublicEnquiryView(APIView):
             return Response({"success": False, "error": str(exc)}, status=400)
 
         return Response({"success": True, "lead_id": str(lead.id), "status": lead.status}, status=201)
+
+class LabEnquiryAttachmentView(APIView):
+    """Serve Lab screenshots through the authenticated admin inbox only."""
+
+    permission_classes = [IsAuthenticated, IsActiveAccount]
+    authentication_classes = [CachedJWTAuthentication]
+
+    def get(self, request, attachment_id):
+        if request.user.role != UserRole.ADMIN:
+            raise PermissionDenied("Only administrators can view Lab enquiry attachments.")
+
+        attachment = get_object_or_404(LabEnquiryAttachment, pk=attachment_id)
+        if not attachment.file:
+            return Response({"success": False, "error": "Attachment is unavailable."}, status=404)
+
+        content_type = str(attachment.content_type or "application/octet-stream").split(";", 1)[0].lower()
+        if content_type not in {"image/png", "image/jpeg", "image/webp"}:
+            content_type = "application/octet-stream"
+
+        response = FileResponse(attachment.file.open("rb"), content_type=content_type)
+        safe_name = _clean(getattr(attachment, "original_name", "image"), 255) or "image"
+        response["Content-Disposition"] = f"inline; filename*=UTF-8''{quote(safe_name)}"
+        response["Cache-Control"] = "private, no-store"
+        response["X-Content-Type-Options"] = "nosniff"
+        return response
