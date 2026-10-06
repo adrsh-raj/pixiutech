@@ -9,8 +9,6 @@ import CookieConsent from './components/CookieConsent.jsx'
 
 const Home = lazy(() => import('./pages/Home.jsx'))
 const Solutions = lazy(() => import('./pages/Solutions.jsx'))
-const About = lazy(() => import('./pages/About.jsx'))
-const Work = lazy(() => import('./pages/Work.jsx'))
 const Careers = lazy(() => import('./pages/Careers.jsx'))
 const FAQ = lazy(() => import('./pages/FAQ.jsx'))
 const PortalBridge = lazy(() => import('./pages/PortalBridge.jsx'))
@@ -21,10 +19,12 @@ const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy.jsx'))
 const TermsAndConditions = lazy(() => import('./pages/TermsAndConditions.jsx'))
 const NotFound = lazy(() => import('./pages/NotFound.jsx'))
 
+
 function ProductionLoginRedirect() {
   useEffect(() => {
     window.location.replace(LMS_LOGIN_URL)
   }, [])
+
   return null
 }
 
@@ -36,26 +36,25 @@ export default function App() {
       <a className="skip-link" href="#main-content">Skip to main content</a>
       <Nav />
       <main id="main-content" tabIndex={-1}>
-        <Suspense fallback={<div className="route-loading" role="status" aria-live="polite">Loading page…</div>}>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/solutions" element={<Solutions />} />
-            <Route path="/about" element={<About />} />
-            <Route path="/work" element={<Work />} />
-            <Route path="/careers" element={<Careers />} />
-            <Route path="/faq" element={<FAQ />} />
-            <Route path="/portal" element={<PortalBridge />} />
-            <Route path="/hub" element={<Navigate to="/portal" replace />} />
-            <Route path="/login" element={<ProductionLoginRedirect />} />
-            <Route path="/simulation" element={<Simulation />} />
-            <Route path="/verify" element={<Verify />} />
-            <Route path="/privacy" element={<PrivacyPolicy />} />
-            <Route path="/terms" element={<TermsAndConditions />} />
-            <Route path="/contact" element={<Contact />} />
-            <Route path="/curriculum" element={<Navigate to="/solutions#programme" replace />} />
-            <Route path="/partnership" element={<Navigate to="/contact?intent=proposal#demo-form" replace />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+        <Suspense fallback={<div className="route-loading" role="status" aria-live="polite">Loading…</div>}>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/solutions" element={<Solutions />} />
+          <Route path="/careers" element={<Careers />} />
+          <Route path="/faq" element={<FAQ />} />
+          <Route path="/portal" element={<PortalBridge />} />
+          <Route path="/hub" element={<PortalBridge />} />
+          <Route path="/login" element={<ProductionLoginRedirect />} />
+          <Route path="/simulation" element={<Simulation />} />
+          <Route path="/verify" element={<Verify />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/terms" element={<TermsAndConditions />} />
+          <Route path="/contact" element={<Contact />} />
+          <Route path="/curriculum" element={<Navigate to="/solutions" replace />} />
+          <Route path="/partnership" element={<Navigate to="/" replace />} />
+          <Route path="/about" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
         </Suspense>
       </main>
       <Footer />
