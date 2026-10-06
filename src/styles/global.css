@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,400..800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
-
 /* ============================================================
    PIXIU TECH: DESIGN TOKENS (v2 Redesign)
    ============================================================ */
@@ -132,8 +130,8 @@ a{color:inherit;text-decoration:none}
 .nav--scrolled{background:rgba(255,255,255,1);box-shadow:0 4px 14px rgba(0,0,0,.08)}
 .nav__in{display:flex;align-items:center;justify-content:space-between;gap:24px;height:76px}
 .brand{display:flex;align-items:center}
-.brand__logo{height:56px;width:auto;display:block}
-.foot .brand__logo{height:48px;padding:5px 12px;background:rgba(255,255,255,.95);border-radius:8px}
+.brand__logo{height:56px;width:auto;aspect-ratio:16/9;display:block}
+.foot .brand__logo{height:48px;width:auto;aspect-ratio:16/9;padding:5px 12px;background:rgba(255,255,255,.95);border-radius:8px}
 .nav__links{display:flex;align-items:center;gap:28px}
 .nav__links a{
   font-family:var(--f-mono);font-size:13.5px;font-weight:500;letter-spacing:.08em;
@@ -526,8 +524,8 @@ a{color:inherit;text-decoration:none}
 
 /* ==================== SPLIT LAYOUT ======================= */
 .split{display:grid;grid-template-columns:1fr 1fr;gap:clamp(30px,5vw,72px);align-items:center}
-.split__img{border-radius:12px;overflow:hidden}
-.split__img img{width:100%;height:auto;display:block}
+.split__img{border-radius:12px;overflow:hidden;aspect-ratio:3/2;background:#0B132B}
+.split__img img{width:100%;height:100%;object-fit:cover;display:block}
 @media(max-width:880px){.split{grid-template-columns:1fr}}
 
 /* ==================== CHECK LIST ========================= */
@@ -640,9 +638,11 @@ a{color:inherit;text-decoration:none}
 .foot{background:var(--navy-900);color:#92A9A5;padding-block:52px 40px;border-top:1px solid var(--line-dark)}
 .foot__grid{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:clamp(24px,4vw,48px);padding-bottom:30px;border-bottom:1px solid var(--line-dark)}
 .foot__desc{margin-top:16px;font-size:.95rem;color:var(--muted-dark);line-height:1.6;max-width:36ch}
-.foot__links-group h4{
+.foot__links-group h3,
+.foot__links-group h4,
+.foot__heading{
   font-family:var(--f-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;
-  color:var(--blue-soft);margin-bottom:16px;
+  color:var(--blue-soft);margin-bottom:16px;font-weight:600;
 }
 .foot__nav-col{display:flex;flex-direction:column;gap:10px;align-items:flex-start}
 .foot__nav-col a{font-size:.95rem;color:#92A9A5;transition:color .2s}

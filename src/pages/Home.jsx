@@ -23,6 +23,8 @@ export default function Home() {
             loading="eager"
             fetchPriority="high"
             decoding="async"
+            width="1440"
+            height="804"
           />
           <div className="hero-v2__overlay" />
         </div>
@@ -78,7 +80,7 @@ export default function Home() {
               {SOLUTIONS.map((s) => (
                 <Link to={`/solutions#${s.id}`} className="sol-card" key={s.id}>
                   <div className="sol-card__img">
-                    <img src={s.img} alt={s.alt || s.title} loading="lazy" decoding="async" />
+                    <img src={s.img} alt={s.alt || s.title} loading="lazy" decoding="async" width="900" height="562" />
                   </div>
                   <div className="sol-card__body">
                     <h3>{s.title}</h3>
@@ -168,7 +170,7 @@ export default function Home() {
                     <span className="real-lab-card__meta">{item.meta}</span>
                   </div>
                   <div className="real-lab-card__img">
-                    <img src={item.img} alt={item.alt} loading="lazy" decoding="async" />
+                    <img src={item.img} alt={item.alt} loading="lazy" decoding="async" width="900" height="675" />
                   </div>
                   <div className="real-lab-card__body">
                     <h3>{item.title}</h3>
@@ -224,7 +226,7 @@ export default function Home() {
         <div className="shell split">
           <Reveal>
             <div className="split__img">
-              <img src="/img/teacher_training.jpg" alt="Teacher training workshop" loading="lazy" decoding="async" />
+              <img src="/img/teacher_training.jpg" alt="Teacher training workshop" loading="lazy" decoding="async" width="900" height="600" />
             </div>
           </Reveal>
           <Reveal delay={80}>

@@ -8,7 +8,7 @@ export default function Footer() {
         <div className="foot__grid">
           <div className="foot__about">
             <Link className="brand" to="/">
-              <img className="brand__logo" src="/img/logo.png" alt="Pixiu Tech" decoding="async" loading="lazy" />
+              <img className="brand__logo" src="/img/logo.png" alt="Pixiu Tech" decoding="async" loading="lazy" width="100" height="56" />
             </Link>
             <p className="foot__desc">
               Pixiu Tech is an end-to-end STEM, Robotics, AI, and Innovation solutions provider for schools. 
@@ -17,7 +17,7 @@ export default function Footer() {
           </div>
 
           <div className="foot__links-group">
-            <h4>Quick Links</h4>
+            <h3 className="foot__heading">Quick Links</h3>
             <nav className="foot__nav-col foot__quick-links" aria-label="Footer quick links">
               {NAV.filter((n) => n.to !== '/contact').map((n) => (
                 <Link key={n.to} to={n.to}>{n.label}</Link>
@@ -26,7 +26,7 @@ export default function Footer() {
           </div>
 
           <div className="foot__links-group">
-            <h4>Connect</h4>
+            <h3 className="foot__heading">Connect</h3>
             <nav className="foot__nav-col">
               <Link to="/contact#enquiry">Contact Us</Link>
               <a href="mailto:director@pixiutech.com">Email Us</a>
@@ -34,7 +34,7 @@ export default function Footer() {
           </div>
 
           <div className="foot__links-group">
-            <h4>Legal</h4>
+            <h3 className="foot__heading">Legal</h3>
             <nav className="foot__nav-col">
               <Link to="/privacy">Privacy Policy</Link>
               <Link to="/terms">Terms &amp; Conditions</Link>

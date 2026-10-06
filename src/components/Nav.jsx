@@ -40,7 +40,7 @@ export default function Nav() {
     <header className={`nav ${scrolled ? 'nav--scrolled' : ''}`}>
       <div className="shell nav__in">
         <Link className="brand" to="/">
-          <img className="brand__logo" src="/img/logo.png" alt="Pixiu Tech" decoding="async" loading="eager" />
+          <img className="brand__logo" src="/img/logo.png" alt="Pixiu Tech" decoding="async" loading="eager" width="100" height="56" />
         </Link>
         <nav className="nav__links" aria-label="Primary navigation">
           {NAV.filter((n) => n.to !== '/contact').map((n) => (
