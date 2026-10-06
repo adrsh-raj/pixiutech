@@ -401,16 +401,16 @@ export function CircuitCanvas(props: Props) {
           </pattern>
           {/* Engineering Schematic Blueprint Grid */}
           <pattern id="grid-schematic" width={20} height={20} patternUnits="userSpaceOnUse">
-            <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#1e293b" strokeWidth={0.7} opacity={0.6} />
-            <circle cx={20} cy={20} r={0.75} fill="#38bdf8" opacity={0.4} />
+            <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#D5DEE9" strokeWidth={0.7} opacity={0.8} />
+            <circle cx={20} cy={20} r={0.75} fill="#60A5FA" opacity={0.35} />
           </pattern>
           <pattern id="grid-schematic-lg" width={100} height={100} patternUnits="userSpaceOnUse">
-            <path d="M 100 0 L 0 0 0 100" fill="none" stroke="#0369a1" strokeWidth={1} opacity={0.35} />
+            <path d="M 100 0 L 0 0 0 100" fill="none" stroke="#A7BDD6" strokeWidth={1} opacity={0.45} />
           </pattern>
         </defs>
 
         {viewMode === "schematic" && (
-          <rect x={0} y={0} width="100%" height="100%" fill="#070c18" />
+          <rect x={0} y={0} width="100%" height="100%" fill="#F5F7FA" />
         )}
 
         <rect
