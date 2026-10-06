@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from rest_framework.reverse import reverse
 
 from .models import (
     CareerApplication,
@@ -21,8 +22,11 @@ class LabEnquiryAttachmentSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_url(self, obj):
+        request = self.context.get("request")
+        if not request:
+            return ""
         try:
-            return obj.file.url if obj.file else ""
+            return reverse("v1-lab-enquiry-attachment", kwargs={"attachment_id": obj.id}, request=request)
         except Exception:
             return ""
 
