@@ -54,7 +54,25 @@ class PublicLabEnquiryTests(TestCase):
             force_authenticate(request, user=user)
         return request
 
-    def test_lab_support_requires_authentication(self):
+
+    def test_public_sales_enquiry_remains_anonymous(self):
+        request = self.factory.post(
+            "/api/v1/public/enquiries",
+            {
+                "enquiry_type": "sales",
+                "school": "Example School",
+                "person": "Principal",
+                "phone": "9876543210",
+                "email": "principal@example.com",
+                "message": "Please contact us.",
+                "website": "",
+            },
+            format="multipart",
+        )
+        response = PublicEnquiryView.as_view()(request)
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(Lead.objects.get().enquiry_type, "sales")
+\n    def test_lab_support_requires_authentication(self):
         response = PublicEnquiryView.as_view()(self.lab_request(user=None))
         self.assertEqual(response.status_code, 401)
         self.assertEqual(Lead.objects.count(), 0)
