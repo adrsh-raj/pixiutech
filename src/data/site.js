@@ -83,20 +83,20 @@ export const REAL_LAB_SHOWCASE = {
   },
   items: [
     {
-      title: 'Hands-On Circuit Wiring on Breadboards',
-      desc: 'Every student wires live circuits with Arduino Uno, LEDs, breadboards, and sensors, writing and testing code directly in class.',
-      img: '/img/zenith/zenith_arduino_hands_on.jpg',
-      alt: 'Student coding Arduino Uno with lit LED on breadboard in partner school lab',
+      title: 'Physical Computing on Breadboards',
+      desc: 'Students learn hands-on electronics by wiring live circuits with microcontrollers, LEDs, breadboards, and sensors, building foundational engineering skills.',
+      img: '/img/iot_circuit.jpg',
+      alt: 'Students assembling and prototyping electronic circuits on breadboards',
       badge: 'Physical Computing',
-      meta: 'Weekly Practical',
+      meta: 'Hands-On Build',
     },
     {
       title: 'Graded Curriculum Lab Books',
-      desc: 'Class 8 Robotics Lab Book delivered directly on classroom projectors, guiding students through microcontrollers, sensors, and logic.',
+      desc: 'Dedicated instructors guide students through graded Robotics Lab Books covering microcontrollers, ultrasonic sensing, and automation logic.',
       img: '/img/zenith/zenith_curriculum_slide.jpg',
-      alt: 'Robotics Lab Book curriculum presentation delivered in partner school classroom',
+      alt: 'Robotics trainer guiding students through curriculum presentation in partner school lab',
       badge: 'Structured Curriculum',
-      meta: 'Class 8 Robotics',
+      meta: 'Trainer Delivery',
     },
   ],
 }
