@@ -92,10 +92,10 @@ try {
   await page.getByText("LIVE FEED", { exact: true }).waitFor()
 
   // Object restart lifecycle
-  await page.getByRole("button", { name: "Stop" }).click()
+  await page.getByRole("button", { name: "Turn Off Camera" }).click()
   await page.getByRole("button", { name: "Run" }).click()
   await page.getByText("LIVE FEED", { exact: true }).waitFor()
-  await page.getByRole("button", { name: "Stop" }).click()
+  await page.getByRole("button", { name: "Turn Off Camera" }).click()
 
   // Pose browser lifecycle
   await page.getByRole("button", { name: "Tools" }).click()
@@ -103,25 +103,25 @@ try {
   await page.getByText("Pose", { exact: true }).click()
   await page.getByRole("button", { name: "Turn On Camera" }).click()
   await page.getByText("6C Pose ready", { exact: true }).waitFor()
-  await page.getByRole("button", { name: "Stop" }).click()
+  await page.getByRole("button", { name: "Turn Off Camera" }).click()
   await page.getByRole("button", { name: "Turn On Camera" }).click()
   await page.getByText("6C Pose ready", { exact: true }).waitFor()
-  await page.getByRole("button", { name: "Stop" }).click()
+  await page.getByRole("button", { name: "Turn Off Camera" }).click()
 
   await page.getByText("Fingers", { exact: true }).click()
   await page.getByRole("button", { name: "Turn On Camera" }).click()
   await page.getByText("6D Fingers ready", { exact: true }).waitFor()
-  await page.getByRole("button", { name: "Stop" }).click()
+  await page.getByRole("button", { name: "Turn Off Camera" }).click()
 
   await page.getByText("Emotion", { exact: true }).click()
   await page.getByRole("button", { name: "Turn On Camera" }).click()
   await page.getByText("6E Emotion ready", { exact: true }).waitFor()
-  await page.getByRole("button", { name: "Stop" }).click()
+  await page.getByRole("button", { name: "Turn Off Camera" }).click()
 
   await page.getByText("Sound", { exact: true }).click()
-  await page.getByRole("button", { name: "Start microphone" }).click()
+  await page.getByRole("button", { name: "Turn On Microphone" }).click()
   await page.getByText("6F Sound ready", { exact: true }).waitFor()
-  await page.getByRole("button", { name: "Stop" }).click()
+  await page.getByRole("button", { name: "Turn Off Camera" }).click()
 
   // Standalone portal AI Studio route + real My AI train/persist/predict flow.
   await page.goto(baseUrl + "/ai-studio", { waitUntil: "networkidle" })
@@ -167,14 +167,14 @@ try {
   await myAiButton.click()
   await page.getByRole("button", { name: "Turn On Camera", exact: true }).click()
   await page.getByText("6I My AI ready", { exact: true }).waitFor({ timeout: 60_000 })
-  await page.getByRole("button", { name: "Stop", exact: true }).click()
+  await page.getByRole("button", { name: "Turn Off Camera", exact: true }).click()
 
   await page.reload({ waitUntil: "networkidle" })
   await page.getByText("Try", { exact: true }).click()
   await page.getByRole("button").filter({ hasText: /^My AI/i }).last().click()
   await page.getByRole("button", { name: "Turn On Camera", exact: true }).click()
   await page.getByText("6I My AI ready", { exact: true }).waitFor({ timeout: 60_000 })
-  await page.getByRole("button", { name: "Stop", exact: true }).click()
+  await page.getByRole("button", { name: "Turn Off Camera", exact: true }).click()
 
   await page.screenshot({ path: artifactDir + "/ai-studio.png", fullPage: true })
 
