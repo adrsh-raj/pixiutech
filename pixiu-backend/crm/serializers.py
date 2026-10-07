@@ -52,8 +52,8 @@ class LeadSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Lead
-        fields = ["id", "organization_name", "contact_name", "email", "phone", "source", "enquiry_type", "status", "owner", "converted_school", "expected_students", "estimated_value", "next_follow_up", "notes", "created_at", "updated_at", "activities", "contacts", "lab_attachments"]
-        read_only_fields = ["id", "owner", "created_at", "updated_at", "activities", "contacts"]
+        fields = ["id", "organization_name", "contact_name", "email", "phone", "source", "enquiry_type", "status", "owner", "converted_school", "expected_students", "estimated_value", "next_follow_up", "notes", "read_at", "created_at", "updated_at", "activities", "contacts", "lab_attachments"]
+        read_only_fields = ["id", "owner", "read_at", "created_at", "updated_at", "activities", "contacts", "lab_attachments"]
 
 
 class CommunicationLogSerializer(serializers.ModelSerializer):
