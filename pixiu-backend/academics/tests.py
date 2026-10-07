@@ -144,6 +144,20 @@ class Phase3ScopeAndValidationTests(TestCase):
         returned_ids = {item["id"] for item in response.data}
         self.assertEqual(returned_ids, {str(self.school_a.id)})
 
+    def test_class_create_api_accepts_arbitrary_grade_and_blank_section(self):
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.school_a_user if hasattr(self, "school_a_user") else self.admin)
+        school = getattr(self, "school_a", self.school)
+        response = self.client.post("/api/v1/classes", {
+            "school": str(school.id),
+            "grade": "12",
+            "section": "",
+        }, format="json")
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data["grade"], "12")
+        self.assertEqual(response.data["section"], "A")
+        self.assertEqual(response.data["display_name"], "12A")
+
     def test_class_with_students_cannot_change_identity_fields(self):
         Student.objects.create(student_id="AAA8A 01", school_class=self.class_a, roll_number=1, name="Locked")
         request = self._request_with_user(method="patch", path=f"/api/academics/classes/{self.class_a.id}/")
