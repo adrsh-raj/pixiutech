@@ -124,7 +124,12 @@ def secure_storage_name(original_name: str | None, *, extension: str | None = No
     return f"{uuid4().hex}{suffix}"
 
 
-def validate_uploaded_file(uploaded: UploadedFile | None, *, scan: bool = True) -> UploadedFile:
+def validate_uploaded_file(
+    uploaded: UploadedFile | None,
+    *,
+    scan: bool = True,
+    raise_clamav_unavailable: bool = False,
+) -> UploadedFile:
     """Validate, malware-scan, and rename an upload before storage."""
     if uploaded is None:
         raise SecureUploadError("A file is required.")
@@ -164,6 +169,8 @@ def validate_uploaded_file(uploaded: UploadedFile | None, *, scan: bool = True) 
         except ClamAVMalwareDetectedError as exc:
             raise SecureUploadError("Uploaded file failed malware scanning.") from exc
         except ClamAVUnavailableError as exc:
+            if raise_clamav_unavailable:
+                raise
             raise SecureUploadError("Malware scanning is currently unavailable.") from exc
 
     uploaded.name = secure_storage_name(original_name, extension=extension)
