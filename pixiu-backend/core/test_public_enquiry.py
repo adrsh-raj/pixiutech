@@ -92,7 +92,7 @@ class PublicLabEnquiryTests(TestCase):
         Trainer.objects.create(account=self.trainer, trainer_id="TR-001", name="Trainer One")
         lead = self._post_lab(self.trainer)
         self.assertEqual(lead.contact_name, "TR-001")
-        self.assertIn("Student ID: TR-001", lead.notes)
+        self.assertIn("Pixiu ID: TR-001", lead.notes)
 
     def test_student_enquiry_uses_student_id_not_account_id(self):
         from academics.models import School, SchoolClass, Student
@@ -113,7 +113,7 @@ class PublicLabEnquiryTests(TestCase):
         )
         lead = self._post_lab(student.account)
         self.assertEqual(lead.contact_name, "ZPS6A 01")
-        self.assertIn("Student ID: ZPS6A 01", lead.notes)
+        self.assertIn("Pixiu ID: ZPS6A 01", lead.notes)
 
     def test_think_rethink_enquiry_is_captured_with_private_attachment(self):
         with tempfile.TemporaryDirectory() as media_root:
