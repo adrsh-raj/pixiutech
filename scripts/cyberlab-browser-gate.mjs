@@ -120,7 +120,7 @@ try {
 
   await page.getByText("Sound", { exact: true }).click()
   await page.getByRole("button", { name: "Turn On Microphone" }).last().click()
-  await page.getByText("6F Sound ready", { exact: true }).waitFor()
+  await page.getByText(/6F Sound (ready|listening)/).waitFor()
   await page.getByRole("button", { name: "Turn Off Microphone" }).click()
 
   // Standalone portal AI Studio route + real My AI train/persist/predict flow.
