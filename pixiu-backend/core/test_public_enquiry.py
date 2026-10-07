@@ -119,6 +119,31 @@ class PublicLabEnquiryTests(TestCase):
         self.assertEqual(lead.contact_name, "ZPS6A 01")
         self.assertIn("Pixiu ID: ZPS6A 01", lead.notes)
 
+    def test_admin_can_mark_website_enquiry_as_read(self):
+        from core.api_v1_compat import ContractLeadViewSet
+
+        lead = Lead.objects.create(
+            organization_name="Example School",
+            contact_name="Principal",
+            email="principal@example.com",
+            phone="9876543210",
+            source="website",
+            enquiry_type="sales",
+            status="new",
+            owner=self.admin,
+            expected_students=100,
+            estimated_value=0,
+            notes="Website enquiry",
+        )
+        request = self.factory.post(f"/api/v1/leads/{lead.id}/read", {}, format="json")
+        force_authenticate(request, user=self.admin)
+        response = ContractLeadViewSet.as_view({"post": "read"})(request, pk=lead.id)
+        self.assertEqual(response.status_code, 200)
+        lead.refresh_from_db()
+        self.assertIsNotNone(lead.read_at)
+        self.assertTrue(response.data["read"])
+        self.assertIsNotNone(response.data["read_at"])
+
     def test_lab_image_upload_falls_back_to_safe_rebuild_when_clamav_is_unavailable(self):
         with tempfile.TemporaryDirectory() as media_root:
             with override_settings(MEDIA_ROOT=media_root, CLAMAV_ENABLED=True, CLAMAV_REQUIRED=True):
