@@ -58,6 +58,10 @@ try {
 
   await page.goto(baseUrl + "/simulation", { waitUntil: "networkidle" })
   if (!(await page.title()).includes("PIXIU CYBERLAB")) throw new Error("Virtual Lab route did not load")
+  const welcomeClose = page.getByRole("button", { name: "Close welcome" })
+  if (await welcomeClose.isVisible().catch(() => false)) {
+    await welcomeClose.click()
+  }
 
   // Template → Blockly
   await page.getByRole("button", { name: "Tools" }).click()
@@ -174,7 +178,7 @@ try {
 
   await page.screenshot({ path: artifactDir + "/ai-studio.png", fullPage: true })
 
-  if (aiRemoteRequests.length) throw new Error("AI runtime attempted a remote dependency: " + aiRemoteRequests.join(" | "))
+  if (remoteAiRuntimeRequests.length) throw new Error("AI runtime attempted a remote dependency: " + remoteAiRuntimeRequests.join(" | "))
   if (pageErrors.length) throw new Error("Browser page errors: " + pageErrors.join(" | "))
   if (consoleErrors.length) throw new Error("Browser console errors: " + consoleErrors.join(" | "))
   if (failedRequests.length) throw new Error("Browser request failures: " + failedRequests.join(" | "))
