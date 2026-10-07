@@ -20,7 +20,7 @@ from .certificate_pdf_views_v2 import CertificatePdfViewV2, PublicCertificatePdf
 from .cohort_evaluation_views import ClassEvaluationView, StudentProgressReportDataView
 from .course_completion_session_v4 import ProgrammeAwareSessionViewSet
 from .course_completion_compat import cohort_rank
-from .public_enquiry import PublicEnquiryView
+from .public_enquiry import LabEnquiryAttachmentView, PublicEnquiryView
 from crm.career_views import CareerApplicationViewSet, CareerOpeningViewSet, PublicCareerApplicationView, PublicCareerOpeningsView
 from .phase7_compat_extras import ContractCommunicationLogViewSet
 from .billing_contract_overrides import TransactionalInvoiceViewSet
@@ -98,6 +98,7 @@ urlpatterns = [
     path('course-completion/<str:student_key>/complete', ApproveFinalProgrammeView.as_view(), name='v1-course-completion-complete'),
     path('course-completion/<str:student_key>/certificate', IssueProgrammeCertificateView.as_view(), name='v1-course-completion-certificate'),
     path('public/enquiries', PublicEnquiryView.as_view(), name='v1-public-enquiry'),
+    path('lab-enquiry-attachments/<uuid:attachment_id>', LabEnquiryAttachmentView.as_view(), name='v1-lab-enquiry-attachment'),
     path('public/careers/openings', PublicCareerOpeningsView.as_view(), name='v1-public-career-openings'),
     path('public/careers/apply', PublicCareerApplicationView.as_view(), name='v1-public-career-apply'),
     path('schools/<uuid:pk>/reset-password', SchoolProfilePasswordResetView.as_view(), name='v1-school-password-reset'), path('schools/<uuid:pk>/activate', activate_school, name='v1-school-activate'),

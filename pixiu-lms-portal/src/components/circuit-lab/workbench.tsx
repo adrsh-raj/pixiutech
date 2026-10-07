@@ -160,9 +160,15 @@ function findCircuitLedPinMappings(currentState: CircuitState, activeBoard: Retu
 
 interface WorkbenchProps {
   userRole?: string
+  pixiuId?: string
+  accountId?: string | number
 }
 
-export function Workbench({ userRole }: WorkbenchProps = {}) {
+export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {}) {
+  const projectStorageScope = useMemo(
+    () => `${String(userRole || "user").toLowerCase()}:${String(pixiuId || accountId || "account")}`,
+    [accountId, pixiuId, userRole],
+  )
   useEffect(() => {
     if (userRole) {
       setUserRole(userRole)
@@ -1620,7 +1626,7 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
       const xmlToSave = liveWorkspace
         ? Blockly.utils.xml.domToText(Blockly.Xml.workspaceToDom(liveWorkspace))
         : blocklyXml
-      const saved = await saveCircuit(name, state, xmlToSave)
+      const saved = await saveCircuit(name, state, xmlToSave, projectStorageScope)
       setCurrentProjectName(saved.name)
       setLastSaved(saved.savedAt)
       setIsDirty(false)
@@ -1637,7 +1643,7 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
     } finally {
       setIsSaving(false)
     }
-  }, [activeLessonId, activeTemplateId, blocklyXml, currentProjectName, state])
+  }, [activeLessonId, activeTemplateId, blocklyXml, currentProjectName, projectStorageScope, state])
 
   // Active simulation tinkering heartbeat (awards engagement XP for interactive testing)
   useEffect(() => {
@@ -1679,7 +1685,7 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
     const imported = await importFromJSON(file, password)
     stopProgram()
 
-    const saved = await saveCircuit(imported.name, imported.state, imported.blocklyXml || DEFAULT_XML)
+    const saved = await saveCircuit(imported.name, imported.state, imported.blocklyXml || DEFAULT_XML, projectStorageScope)
     setHistory(createHistory(saved.state))
     setBlocklyXml(saved.blocklyXml || DEFAULT_XML)
     setBlocklyDocumentVersion((value) => value + 1)
@@ -1693,11 +1699,11 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
     setIsScopeOpen(false)
     setLastSaved(saved.savedAt)
     setIsDirty(false)
-  }, [stopProgram, stopAiRuntime])
+  }, [projectStorageScope, stopProgram, stopAiRuntime])
 
   const handleLoadProject = useCallback(async (project: SavedCircuit): Promise<void> => {
     stopProgram()
-    await saveCurrentCircuit(project)
+    await saveCurrentCircuit(project, projectStorageScope)
     setHistory(createHistory(project.state))
     setBlocklyXml(project.blocklyXml || DEFAULT_XML)
     setBlocklyDocumentVersion((value) => value + 1)
@@ -1713,11 +1719,11 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
     setIsDirty(false)
     setActiveLessonId(null)
     setActiveTemplateId(null)
-  }, [stopProgram, stopAiRuntime])
+  }, [projectStorageScope, stopProgram, stopAiRuntime])
 
   const handleNewProject = useCallback(async (): Promise<void> => {
     stopProgram()
-    await clearCurrentCircuit()
+    await clearCurrentCircuit(projectStorageScope)
     setHistory(createHistory(INITIAL_STATE))
     setBlocklyXml(DEFAULT_XML)
     setBlocklyDocumentVersion((value) => value + 1)
@@ -1733,7 +1739,7 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
     setIsScopeOpen(false)
     setActiveLessonId(null)
     setActiveTemplateId(null)
-  }, [stopProgram, stopAiRuntime])
+  }, [projectStorageScope, stopProgram, stopAiRuntime])
 
   const handleSelectLesson = useCallback((lesson: Lesson) => {
     setActiveLessonId(lesson.id)
@@ -1850,6 +1856,8 @@ export function Workbench({ userRole }: WorkbenchProps = {}) {
         dirty={isDirty}
         storageReady={storageReady}
         isSaving={isSaving}
+        storageScope={projectStorageScope}
+        displayPixiuId={pixiuId}
         onClose={() => setIsProjectManagerOpen(false)}
         onSave={handleSave}
         onNew={handleNewProject}

@@ -18,7 +18,7 @@ export default function NotificationCenter() {
       if (document.visibilityState === 'visible' && !busy) {
         loadData(['/notifications']).catch(() => {});
       }
-    }, 15000);
+    }, 5000);
     return () => window.clearInterval(poll);
   }, [busy, loadData]);
 

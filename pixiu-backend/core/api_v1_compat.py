@@ -409,7 +409,7 @@ class ContractLeadViewSet(LegacyShapeMixin, LeadViewSet):
         attachments = []
         for attachment in obj.lab_attachments.all():
             try:
-                url = attachment.file.url if attachment.file else ""
+                url = f"/api/v1/lab-enquiry-attachments/{attachment.pk}"
             except Exception:
                 url = ""
             attachments.append({
@@ -436,7 +436,21 @@ class ContractLeadViewSet(LegacyShapeMixin, LeadViewSet):
             "estimated_value": float(obj.estimated_value),
             "notes": obj.notes,
             "lab_attachments": attachments,
+            "read": obj.read_at is not None,
+            "read_at": obj.read_at,
         }
+
+    @action(detail=True, methods=["post"], url_path="read")
+    def read(self, request, pk=None):
+        lead = self.get_object()
+        lead.read_at = timezone.now()
+        lead.save(update_fields=["read_at", "updated_at"])
+        Notification.objects.filter(
+            recipient=request.user,
+            read_at__isnull=True,
+            metadata__lead_id=str(lead.pk),
+        ).update(read_at=timezone.now())
+        return Response(self.map_out(lead))
 
     @action(detail=True, methods=["put"], url_path="stage")
     def stage(self, request, pk=None):

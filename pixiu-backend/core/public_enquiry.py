@@ -1,27 +1,60 @@
 import hashlib
 from pathlib import Path
+from urllib.parse import quote
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.http import FileResponse
+from django.shortcuts import get_object_or_404
 from rest_framework.parsers import FormParser
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from accounts.authentication import CachedJWTAuthentication
 from accounts.models import UserRole, UserStatus
+from accounts.permissions import IsActiveAccount
 from audit.models import AuditAction
 from audit.services import record_audit
 from core.input_sanitization import sanitize_plain_text
 from core.upload_security import SecureMultiPartParser, SecureUploadError, validate_uploaded_file
 from crm.models import LabEnquiryAttachment, Lead, LeadEnquiryType, LeadSource, LeadStatus
+from notifications.models import Notification, NotificationType
 
 User = get_user_model()
-LAB_SUPPORT_TYPES = {"bug", "help", "other"}
+LAB_SUPPORT_TYPES = {"bug", "help", "other", "philosophy"}
 LAB_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 LAB_IMAGE_MAX_BYTES = 3 * 1024 * 1024
 
 def _clean(value, max_length, *, preserve_newlines=False):
     return sanitize_plain_text(value, max_length, preserve_newlines=preserve_newlines)
+
+def _canonical_sender_id(user):
+    """Return the stable human-facing portal ID for the signed-in sender."""
+    role = getattr(user, "role", "")
+    if role == UserRole.STUDENT:
+        try:
+            value = str(user.student_profile.student_id or "").strip()
+        except Exception:
+            value = ""
+    elif role == UserRole.TRAINER:
+        try:
+            value = str(user.trainer_profile.trainer_id or "").strip()
+        except Exception:
+            value = ""
+    elif role == UserRole.ADMIN:
+        value = str(getattr(user, "pixiu_id", "") or "").strip()
+        if not value:
+            raw = str(getattr(user, "display_name", "") or user.get_full_name() or user.username or "").strip()
+            value = "".join(ch for ch in raw.upper() if ch.isalnum())
+    else:
+        try:
+            value = str(user.school_profile.school_code or "").strip()
+        except Exception:
+            value = ""
+    return value.strip().upper()
+
 
 def _validate_lab_image(uploaded):
     if uploaded is None:
@@ -38,7 +71,8 @@ def _validate_lab_image(uploaded):
 
 class PublicEnquiryView(APIView):
     permission_classes = [AllowAny]
-    authentication_classes = []
+    # JWT is optional for the public sales form, but required for authenticated Lab support.
+    authentication_classes = [CachedJWTAuthentication]
     parser_classes = [SecureMultiPartParser, FormParser]
     throttle_scope = "public_enquiry"
 
@@ -56,8 +90,12 @@ class PublicEnquiryView(APIView):
         raw_attachment = request.FILES.get("image") or request.FILES.get("attachment")
 
         if enquiry_type in LAB_SUPPORT_TYPES:
-            if not student_id:
-                return Response({"success": False, "error": "Student ID is required."}, status=400)
+            if not request.user.is_authenticated:
+                return Response({"success": False, "error": "Please sign in to the Lab before sending support."}, status=401)
+            canonical_id = _canonical_sender_id(request.user)
+            if not canonical_id:
+                return Response({"success": False, "error": "Your account does not have a valid portal ID."}, status=400)
+            student_id = canonical_id
             if not message:
                 return Response({"success": False, "error": "Please describe the problem or question."}, status=400)
             try:
@@ -65,7 +103,7 @@ class PublicEnquiryView(APIView):
             except SecureUploadError as exc:
                 return Response({"success": False, "error": str(exc)}, status=400)
             school = "PIXIU Virtual Lab"
-            person = f"Lab User · {student_id}"
+            person = canonical_id
             phone = _clean(request.data.get("phone"), 30)
             email = _clean(request.data.get("email"), 254)
             city = ""
@@ -94,10 +132,11 @@ class PublicEnquiryView(APIView):
             LeadEnquiryType.BUG: "Bug",
             LeadEnquiryType.HELP: "Help",
             LeadEnquiryType.OTHER: "Other",
+            LeadEnquiryType.PHILOSOPHY: "Think / Rethink Philosophy",
         }[enquiry_type]
 
         notes = "\n".join(part for part in [
-            f"Student ID: {student_id}" if student_id else "",
+            f"Pixiu ID: {student_id}" if student_id else "",
             f"Category: {type_label}",
             f"City: {city}" if city else "",
             f"Student Strength: {expected_students}" if expected_students else "",
@@ -148,12 +187,75 @@ class PublicEnquiryView(APIView):
                         "email": email,
                         "city": city,
                         "expected_students": expected_students,
-                        "student_id": student_id,
+                        "pixiu_id": student_id,
                         "has_attachment": attachment is not None,
+                        "sender_role": str(getattr(request.user, "role", "") or ""),
+                        "sender_id": student_id,
                     },
                     request=request,
                 )
+
+                # Mandatory operational notification: every Lab enquiry creates
+                # an unread server-side in-app notification for every active admin,
+                # independent of optional user notification preferences.
+                admin_ids = list(
+                    User.objects.filter(
+                        role=UserRole.ADMIN,
+                        status=UserStatus.ACTIVE,
+                        is_active=True,
+                    ).values_list("id", flat=True)
+                )
+                sender_label = student_id or person or email or "Website contact"
+                notification_message = (
+                    f"New {type_label} enquiry from {sender_label}. "
+                    "Open Website Enquiries to review the report."
+                )
+                notification_source = "PIXIU Virtual Lab" if enquiry_type in LAB_SUPPORT_TYPES else "pixiutech.com Website"
+                metadata = {
+                    "source": notification_source,
+                    "lead_id": str(lead.id),
+                    "enquiry_type": enquiry_type,
+                    "sender_id": student_id,
+                    "sender_role": str(getattr(request.user, "role", "") or ""),
+                    "requires_action": True,
+                }
+                for admin_id in admin_ids:
+                    Notification.objects.get_or_create(
+                        recipient_id=admin_id,
+                        event_key=f"lab-enquiry:{lead.id}:{admin_id}",
+                        defaults={
+                            "notification_type": NotificationType.CRM,
+                            "title": f"New Lab enquiry · {type_label}",
+                            "message": notification_message,
+                            "metadata": metadata,
+                        },
+                    )
         except SecureUploadError as exc:
             return Response({"success": False, "error": str(exc)}, status=400)
 
         return Response({"success": True, "lead_id": str(lead.id), "status": lead.status}, status=201)
+
+class LabEnquiryAttachmentView(APIView):
+    """Serve Lab screenshots through the authenticated admin inbox only."""
+
+    permission_classes = [IsAuthenticated, IsActiveAccount]
+    authentication_classes = [CachedJWTAuthentication]
+
+    def get(self, request, attachment_id):
+        if request.user.role != UserRole.ADMIN:
+            raise PermissionDenied("Only administrators can view Lab enquiry attachments.")
+
+        attachment = get_object_or_404(LabEnquiryAttachment, pk=attachment_id)
+        if not attachment.file:
+            return Response({"success": False, "error": "Attachment is unavailable."}, status=404)
+
+        content_type = str(attachment.content_type or "application/octet-stream").split(";", 1)[0].lower()
+        if content_type not in {"image/png", "image/jpeg", "image/webp"}:
+            content_type = "application/octet-stream"
+
+        response = FileResponse(attachment.file.open("rb"), content_type=content_type)
+        safe_name = _clean(getattr(attachment, "original_name", "image"), 255) or "image"
+        response["Content-Disposition"] = f"inline; filename*=UTF-8''{quote(safe_name)}"
+        response["Cache-Control"] = "private, no-store"
+        response["X-Content-Type-Options"] = "nosniff"
+        return response

@@ -266,7 +266,7 @@ export function AuthProvider({ children }) {
           setToken(access);
           setUser(data.user);
           setSessionRole(data.user.role);
-          setSessionStudentId(data.user.student_id || data.user.id);
+          setSessionStudentId(data.user.pixiu_id || data.user.related_id || data.user.id);
         }
       } catch {
         clearAuthStorage({ clearRole: false, clearCsrf: false });
@@ -311,7 +311,7 @@ export function AuthProvider({ children }) {
         setToken(data.access);
         setUser(data.user);
         setSessionRole(data.user.role);
-        setSessionStudentId(data.user.student_id || data.user.id);
+        setSessionStudentId(data.user.pixiu_id || data.user.related_id || data.user.id);
         broadcastAuthChange();
         measurePerformance('login.e2e', 'login.e2e.start');
         return { success: true, user: data.user };

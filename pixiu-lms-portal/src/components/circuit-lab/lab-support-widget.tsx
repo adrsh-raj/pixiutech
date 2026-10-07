@@ -1,12 +1,18 @@
-import { useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Camera, CircleHelp, Mail, MessageCircle, Paperclip, Send, ShieldCheck, X } from "lucide-react"
-import { apiFetch } from "@/context/AuthContext"
+import { apiFetch, useAuth } from "@/context/AuthContext"
 
 const EMAIL = "director@pixiutech.com"
 const WHATSAPP_NUMBER = "917985403186"
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024
 const ALLOWED_MIME = new Set(["image/png", "image/jpeg", "image/webp"])
 const ALLOWED_EXT = new Set([".png", ".jpg", ".jpeg", ".webp"])
+const KIND_OPTIONS = [
+  { value: "bug", label: "Bug / Problem" },
+  { value: "help", label: "Help" },
+  { value: "other", label: "Other" },
+  { value: "philosophy", label: "Think / Rethink · Philosophy" },
+] as const
 
 function formatBytes(value: number) {
   if (value < 1024) return value + " B"
@@ -14,25 +20,41 @@ function formatBytes(value: number) {
   return (value / (1024 * 1024)).toFixed(2) + " MB"
 }
 
+function normalizePortalId(value: unknown) {
+  return String(value || "").trim().toUpperCase()
+}
+
 function initialStudentId() {
-  if (typeof window === "undefined") return ""
-  try {
-    return window.sessionStorage.getItem("pixiu_session_student_id")?.trim().toUpperCase() || ""
-  } catch {
-    return ""
-  }
+  return ""
 }
 
 export function LabSupportWidget() {
   const [open, setOpen] = useState(false)
   const [studentId, setStudentId] = useState(initialStudentId)
-  const [kind, setKind] = useState<"bug" | "help" | "other">("bug")
+  const { user } = useAuth()
+  const [kind, setKind] = useState<"bug" | "help" | "other" | "philosophy">("bug")
   const [message, setMessage] = useState("")
   const [image, setImage] = useState<File | null>(null)
   const [dragging, setDragging] = useState(false)
   const [sending, setSending] = useState(false)
   const [status, setStatus] = useState<{ type: "success" | "error"; text: string } | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    const verifiedId = normalizePortalId(user?.pixiu_id || user?.related_id || (user?.role === "admin" ? user?.display_name : ""))
+    if (verifiedId) setStudentId(verifiedId)
+  }, [user])
+
+  useEffect(() => {
+    if (!image) {
+      setPreviewUrl(null)
+      return undefined
+    }
+    const url = URL.createObjectURL(image)
+    setPreviewUrl(url)
+    return () => URL.revokeObjectURL(url)
+  }, [image])
 
   const imageMeta = useMemo(() => (image ? formatBytes(image.size) : null), [image])
 
@@ -40,7 +62,7 @@ export function LabSupportWidget() {
     if (!file) return null
     const dot = file.name.lastIndexOf(".")
     const ext = dot >= 0 ? file.name.slice(dot).toLowerCase() : ""
-    if (!ALLOWED_EXT.has(ext) || !ALLOWED_MIME.has(file.type)) {
+    if (!ALLOWED_EXT.has(ext) || !ALLOWED_MIME.has(String(file.type || "").toLowerCase())) {
       throw new Error("Only PNG, JPG/JPEG or WEBP images are accepted.")
     }
     if (file.size <= 0 || file.size > MAX_IMAGE_BYTES) {
@@ -64,7 +86,7 @@ export function LabSupportWidget() {
     const cleanId = studentId.trim().toUpperCase()
     const cleanMessage = message.trim()
     if (!cleanId) {
-      setStatus({ type: "error", text: "Enter your Student ID first." })
+      setStatus({ type: "error", text: "Your Pixiu ID is unavailable. Please sign in again." })
       return
     }
     if (!cleanMessage) {
@@ -77,6 +99,7 @@ export function LabSupportWidget() {
     try {
       const form = new FormData()
       form.append("enquiry_type", kind)
+      form.append("pixiu_id", cleanId)
       form.append("student_id", cleanId)
       form.append("message", cleanMessage)
       form.append("website", "")
@@ -101,7 +124,9 @@ export function LabSupportWidget() {
     }
   }
 
-  const whatsappHref = "https://wa.me/" + WHATSAPP_NUMBER + "?text=" + encodeURIComponent("Hi Pixiu Tech, I need help with the Virtual Lab.")
+  const contactMessage = "Hi Pixiu Tech, I need help with the Virtual Lab.\\nPixiu ID: " + (studentId.trim().toUpperCase() || "—")
+  const whatsappHref = "https://wa.me/" + WHATSAPP_NUMBER + "?text=" + encodeURIComponent(contactMessage)
+  const emailHref = "mailto:" + EMAIL + "?subject=" + encodeURIComponent("PIXIU LAB HELP") + "&body=" + encodeURIComponent(contactMessage)
 
   return (
     <>
@@ -135,7 +160,7 @@ export function LabSupportWidget() {
             </div>
 
             <div className="mt-3 grid grid-cols-2 gap-2">
-              <a href={"mailto:" + EMAIL + "?subject=" + encodeURIComponent("PIXIU LAB HELP")} className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-[11px] font-bold text-slate-200 transition hover:border-slate-500 hover:bg-slate-800">
+              <a href={emailHref} className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-[11px] font-bold text-slate-200 transition hover:border-slate-500 hover:bg-slate-800">
                 <Mail size={13} /> Email
               </a>
               <a href={whatsappHref} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-[11px] font-bold text-emerald-200 transition hover:bg-emerald-500/15">
@@ -147,16 +172,14 @@ export function LabSupportWidget() {
 
           <div className="space-y-3 p-4">
             <label className="block">
-              <span className="mb-1.5 block text-[10px] font-black uppercase tracking-wide text-slate-500">Student ID</span>
-              <input value={studentId} onChange={event => setStudentId(event.target.value.slice(0, 80))} placeholder="Your Student ID" maxLength={80} autoComplete="off" className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-xs font-semibold text-white outline-none focus:border-cyan-400" />
+              <span className="mb-1.5 block text-[10px] font-black uppercase tracking-wide text-slate-500">PIXIU ID · {String(user?.role || "USER").toUpperCase()}</span>
+              <input value={studentId} readOnly placeholder="Your Pixiu ID" maxLength={80} autoComplete="off" aria-readonly="true" className="w-full cursor-not-allowed rounded-xl border border-slate-700 bg-slate-950/80 px-3 py-2.5 text-xs font-semibold text-slate-300 outline-none" />
             </label>
 
             <label className="block">
               <span className="mb-1.5 block text-[10px] font-black uppercase tracking-wide text-slate-500">Category</span>
-              <select value={kind} onChange={event => setKind(event.target.value as "bug" | "help" | "other")} className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-xs font-semibold text-white outline-none focus:border-cyan-400">
-                <option value="bug">Bug / Problem</option>
-                <option value="help">Help</option>
-                <option value="other">Other</option>
+              <select value={kind} onChange={event => setKind(event.target.value as "bug" | "help" | "other" | "philosophy")} className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-xs font-semibold text-white outline-none focus:border-cyan-400">
+                {KIND_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </label>
 
@@ -185,7 +208,13 @@ export function LabSupportWidget() {
               <p className="mt-1 flex items-center gap-1 text-[9px] leading-4 text-slate-500">
                 <Paperclip size={10} /> PNG/JPG/JPEG/WEBP · max 3 MB · images only
               </p>
-              {imageMeta && <p className="mt-1 text-[9px] font-semibold text-emerald-300">{imageMeta}</p>}
+              {imageMeta && <div className="mt-2 flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-950/70 p-1.5">
+                {previewUrl ? <img src={previewUrl} alt="" className="h-10 w-14 shrink-0 rounded-md border border-slate-700 object-cover" /> : null}
+                <div className="min-w-0">
+                  <p className="truncate text-[9px] font-semibold text-emerald-300">{imageMeta}</p>
+                  <p className="text-[9px] text-slate-600">Small preview · original image is uploaded securely</p>
+                </div>
+              </div>}
             </div>
 
             <button type="button" onClick={() => void submit()} disabled={sending} className="flex w-full items-center justify-center gap-2 rounded-xl bg-cyan-500 px-3 py-2.5 text-xs font-black text-slate-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-50">
@@ -206,7 +235,7 @@ export function LabSupportWidget() {
             )}
 
             <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-2.5 text-[9px] leading-4 text-slate-500">
-              Never attach passwords, OTPs or documents. The server accepts only validated images.
+              PNG, JPG/JPEG or WEBP only · 3 MB max. Files are checked for type, image validity and malware before storage.
             </div>
           </div>
         </section>
