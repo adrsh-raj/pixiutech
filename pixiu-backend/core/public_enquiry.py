@@ -139,7 +139,7 @@ class PublicEnquiryView(APIView):
         }[enquiry_type]
 
         notes = "\n".join(part for part in [
-            f"Student ID: {student_id}" if student_id else "",
+            f"Pixiu ID: {student_id}" if student_id else "",
             f"Category: {type_label}",
             f"City: {city}" if city else "",
             f"Student Strength: {expected_students}" if expected_students else "",
@@ -190,7 +190,7 @@ class PublicEnquiryView(APIView):
                         "email": email,
                         "city": city,
                         "expected_students": expected_students,
-                        "student_id": student_id,
+                        "pixiu_id": student_id,
                         "has_attachment": attachment is not None,
                         "sender_role": str(getattr(request.user, "role", "") or ""),
                         "sender_id": student_id,
@@ -208,8 +208,9 @@ class PublicEnquiryView(APIView):
                         is_active=True,
                     ).values_list("id", flat=True)
                 )
+                sender_label = student_id or person or email or "Website contact"
                 notification_message = (
-                    f"New {type_label} enquiry from {student_id}. "
+                    f"New {type_label} enquiry from {sender_label}. "
                     "Open Website Enquiries to review the report."
                 )
                 metadata = {
