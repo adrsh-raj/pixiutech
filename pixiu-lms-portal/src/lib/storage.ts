@@ -23,9 +23,9 @@ interface StoredCircuit extends SavedCircuit {
 const DB_NAME = "pixiu-circuit-studio"
 const DB_VERSION = 1
 const STORE_NAME = "projects"
-const CURRENT_ID = "__pixiu_current__"
 const IDB_PREFIX = "pixiu-circuit-v2-"
-const LEGACY_PREFIX = "pixiu-circuit-"
+const CURRENT_ID = "__pixiu_current__"
+const STORAGE_VERSION = "v3"
 const MAX_PROJECTS = 100
 const MAX_PARTS = 250
 const MAX_WIRES = 600
@@ -33,6 +33,28 @@ const MAX_BLOCKLY_XML_BYTES = 1024 * 1024
 
 function isBrowser(): boolean {
   return typeof window !== "undefined" && typeof document !== "undefined"
+}
+
+function normalizeStorageScope(input: string | undefined): string {
+  const raw = String(input || "guest").trim().toLowerCase()
+  const safe = raw.replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 100)
+  return safe || "guest"
+}
+
+function scopedProjectId(scopeKey: string | undefined, name: string): string {
+  return normalizeStorageScope(scopeKey) + ":" + projectId(name)
+}
+
+function scopedCurrentId(scopeKey: string | undefined): string {
+  return CURRENT_ID + ":" + normalizeStorageScope(scopeKey)
+}
+
+function localProjectKey(scopeKey: string | undefined, name: string): string {
+  return IDB_PREFIX + STORAGE_VERSION + "-" + normalizeStorageScope(scopeKey) + "-" + projectId(name)
+}
+
+function localCurrentKey(scopeKey: string | undefined): string {
+  return IDB_PREFIX + STORAGE_VERSION + "-" + normalizeStorageScope(scopeKey) + "-current"
 }
 
 function normalizeProjectName(input: string): string {
@@ -238,9 +260,9 @@ function removeLocal(key: string): void {
   localStorage.removeItem(key)
 }
 
-async function putCircuit(circuit: SavedCircuit): Promise<SavedCircuit> {
-  const current = toStored(circuit, CURRENT_ID, true)
-  const named = toStored(circuit, projectId(circuit.name), false)
+async function putCircuit(circuit: SavedCircuit, scopeKey?: string): Promise<SavedCircuit> {
+  const current = toStored(circuit, scopedCurrentId(scopeKey), true)
+  const named = toStored(circuit, scopedProjectId(scopeKey, circuit.name), false)
 
   const ok = await withIdb(async (db) => {
     await new Promise<void>((resolve, reject) => {
@@ -256,32 +278,13 @@ async function putCircuit(circuit: SavedCircuit): Promise<SavedCircuit> {
   })
 
   if (ok !== null) {
-    removeLocal(IDB_PREFIX + projectId(circuit.name))
-    removeLocal(LEGACY_PREFIX + circuit.name)
-    removeLocal(LEGACY_PREFIX + "current")
+    removeLocal(localProjectKey(scopeKey, circuit.name))
     return circuit
   }
 
-  writeLocal(IDB_PREFIX + projectId(circuit.name), circuit)
-  writeLocal(LEGACY_PREFIX + circuit.name, circuit)
-  writeLocal(LEGACY_PREFIX + "current", circuit)
+  writeLocal(localProjectKey(scopeKey, circuit.name), circuit)
+  writeLocal(localCurrentKey(scopeKey), circuit)
   return circuit
-}
-
-async function migrateLegacyCurrent(): Promise<SavedCircuit | null> {
-  const current = readLocal(LEGACY_PREFIX + "current")
-  const legacyDefault = current ?? readLocal(LEGACY_PREFIX + "default")
-  if (!legacyDefault) return null
-
-  const migrated = legacyDefault.name === "default"
-    ? { ...legacyDefault, name: "Untitled Circuit" }
-    : legacyDefault
-
-  try {
-    return await putCircuit(migrated)
-  } catch {
-    return migrated
-  }
 }
 
 function uniqueByProjectId(circuits: SavedCircuit[]): SavedCircuit[] {
@@ -296,7 +299,7 @@ function uniqueByProjectId(circuits: SavedCircuit[]): SavedCircuit[] {
   return [...map.values()].sort((a, b) => Date.parse(b.savedAt) - Date.parse(a.savedAt))
 }
 
-export async function saveCircuit(name: string, state: CircuitState, blocklyXml: string): Promise<SavedCircuit> {
+export async function saveCircuit(name: string, state: CircuitState, blocklyXml: string, scopeKey?: string): Promise<SavedCircuit> {
   if (!validateCircuitState(state)) throw new Error("Cannot save an invalid circuit")
   if (typeof blocklyXml !== "string" || getByteLength(blocklyXml) > MAX_BLOCKLY_XML_BYTES) {
     throw new Error("Blockly data is too large to save")
@@ -304,7 +307,7 @@ export async function saveCircuit(name: string, state: CircuitState, blocklyXml:
 
   const normalizedName = normalizeProjectName(name)
   const now = new Date().toISOString()
-  const previous = await loadCircuit(normalizedName)
+  const previous = await loadCircuit(normalizedName, scopeKey)
   const circuit: SavedCircuit = {
     format: PIXIU_FILE_FORMAT,
     version: PIXIU_FILE_VERSION,
@@ -315,11 +318,11 @@ export async function saveCircuit(name: string, state: CircuitState, blocklyXml:
     createdAt: previous?.createdAt ?? now,
   }
 
-  return putCircuit(circuit)
+  return putCircuit(circuit, scopeKey)
 }
 
-export async function loadCircuit(name: string): Promise<SavedCircuit | null> {
-  const key = projectId(name)
+export async function loadCircuit(name: string, scopeKey?: string): Promise<SavedCircuit | null> {
+  const key = scopedProjectId(scopeKey, name)
 
   const idbResult = await withIdb(async (db) => {
     const tx = db.transaction(STORE_NAME, "readonly")
@@ -330,12 +333,12 @@ export async function loadCircuit(name: string): Promise<SavedCircuit | null> {
 
   if (idbResult !== null) return idbResult
 
-  return readLocal(IDB_PREFIX + key) ?? readLocal(LEGACY_PREFIX + name)
+  return readLocal(localProjectKey(scopeKey, name))
 }
 
-export async function saveCurrentCircuit(circuit: SavedCircuit): Promise<void> {
+export async function saveCurrentCircuit(circuit: SavedCircuit, scopeKey?: string): Promise<void> {
   const normalized = normalizeSavedCircuit(circuit)
-  const current = toStored(normalized, CURRENT_ID, true)
+  const current = toStored(normalized, scopedCurrentId(scopeKey), true)
 
   const ok = await withIdb(async (db) => {
     await new Promise<void>((resolve, reject) => {
@@ -349,19 +352,17 @@ export async function saveCurrentCircuit(circuit: SavedCircuit): Promise<void> {
   })
 
   if (ok !== null) {
-    removeLocal(LEGACY_PREFIX + "current")
     return
   }
 
-  writeLocal(IDB_PREFIX + "current", normalized)
-  writeLocal(LEGACY_PREFIX + "current", normalized)
+  writeLocal(localCurrentKey(scopeKey), normalized)
 }
 
-export async function clearCurrentCircuit(): Promise<void> {
+export async function clearCurrentCircuit(scopeKey?: string): Promise<void> {
   await withIdb(async (db) => {
     await new Promise<void>((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, "readwrite")
-      tx.objectStore(STORE_NAME).delete(CURRENT_ID)
+      tx.objectStore(STORE_NAME).delete(scopedCurrentId(scopeKey))
       tx.oncomplete = () => resolve()
       tx.onerror = () => reject(tx.error ?? new Error("Failed to clear current project"))
       tx.onabort = () => reject(tx.error ?? new Error("Current project clear aborted"))
@@ -369,36 +370,37 @@ export async function clearCurrentCircuit(): Promise<void> {
     return true
   })
 
-  removeLocal(IDB_PREFIX + "current")
-  removeLocal(LEGACY_PREFIX + "current")
+  removeLocal(localCurrentKey(scopeKey))
 }
 
-export async function loadCurrentCircuit(): Promise<SavedCircuit | null> {
+export async function loadCurrentCircuit(scopeKey?: string): Promise<SavedCircuit | null> {
   const idbResult = await withIdb(async (db) => {
     const tx = db.transaction(STORE_NAME, "readonly")
-    const request = tx.objectStore(STORE_NAME).get(CURRENT_ID)
+    const request = tx.objectStore(STORE_NAME).get(scopedCurrentId(scopeKey))
     const raw = await requestPromise<StoredCircuit | undefined>(request)
     return raw ? toSaved(raw) : null
   })
 
   if (idbResult !== null && idbResult) return idbResult
-  return (idbResult === null ? readLocal(IDB_PREFIX + "current") : null) ?? migrateLegacyCurrent()
+  return idbResult === null ? readLocal(localCurrentKey(scopeKey)) : null
 }
 
-export async function listSavedCircuits(): Promise<SavedCircuit[]> {
+export async function listSavedCircuits(scopeKey?: string): Promise<SavedCircuit[]> {
   const idbResult = await withIdb(async (db) => {
     const tx = db.transaction(STORE_NAME, "readonly")
     const request = tx.objectStore(STORE_NAME).getAll()
     const raw = await requestPromise<StoredCircuit[]>(request)
-    return raw.filter((item) => item.id !== CURRENT_ID).map(toSaved)
+    return raw
+      .filter((item) => item.id.startsWith(normalizeStorageScope(scopeKey) + ":"))
+      .map(toSaved)
   })
 
   const localCandidates: SavedCircuit[] = []
   if (isBrowser()) {
+    const prefix = IDB_PREFIX + STORAGE_VERSION + "-" + normalizeStorageScope(scopeKey) + "-"
     for (let i = 0; i < localStorage.length; i += 1) {
       const key = localStorage.key(i)
-      if (!key || (!(key.startsWith(LEGACY_PREFIX)) && !(key.startsWith(IDB_PREFIX)))) continue
-      if (key === LEGACY_PREFIX + "current" || key === LEGACY_PREFIX + "default") continue
+      if (!key || !key.startsWith(prefix) || key === localCurrentKey(scopeKey)) continue
       const saved = readLocal(key)
       if (saved) localCandidates.push(saved)
     }
@@ -407,8 +409,8 @@ export async function listSavedCircuits(): Promise<SavedCircuit[]> {
   return uniqueByProjectId([...(idbResult ?? []), ...localCandidates]).slice(0, MAX_PROJECTS)
 }
 
-export async function deleteSavedCircuit(name: string): Promise<void> {
-  const key = projectId(name)
+export async function deleteSavedCircuit(name: string, scopeKey?: string): Promise<void> {
+  const key = scopedProjectId(scopeKey, name)
 
   await withIdb(async (db) => {
     await new Promise<void>((resolve, reject) => {
@@ -421,11 +423,10 @@ export async function deleteSavedCircuit(name: string): Promise<void> {
     return true
   })
 
-  removeLocal(IDB_PREFIX + key)
-  removeLocal(LEGACY_PREFIX + name)
+  removeLocal(localProjectKey(scopeKey, name))
 
-  const current = await loadCurrentCircuit()
-  if (current && projectId(current.name) === key) {
+  const current = await loadCurrentCircuit(scopeKey)
+  if (current && scopedProjectId(scopeKey, current.name) === key) {
     await withIdb(async (db) => {
       await new Promise<void>((resolve, reject) => {
         const tx = db.transaction(STORE_NAME, "readwrite")
@@ -435,7 +436,7 @@ export async function deleteSavedCircuit(name: string): Promise<void> {
       })
       return true
     })
-    removeLocal(LEGACY_PREFIX + "current")
+    removeLocal(localCurrentKey(scopeKey))
   }
 }
 
