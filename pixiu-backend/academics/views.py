@@ -1,6 +1,6 @@
 import json
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status, viewsets
@@ -53,7 +53,7 @@ class SchoolViewSet(Phase3ViewSet):
                 )
         except ValueError as exc:
             raise ValidationError({"school_code": str(exc)})
-        except transaction.IntegrityError:
+        except IntegrityError:
             raise ValidationError({"school_code": "School setup conflicted with an existing account. Refresh the page and try again."})
     def perform_update(self, serializer):
         self.assert_role(UserRole.ADMIN, UserRole.SCHOOL); school = serializer.save(); record_audit(actor=self.request.user, action="update", entity_type="school", entity_id=school.id, summary=f"School {school.school_code} updated", request=self.request)
