@@ -165,7 +165,7 @@ class SchoolOnboardingApiTests(TestCase):
 
     def test_orphan_school_username_is_reused_instead_of_returning_500(self):
         orphan = User.objects.create_user("XYZ", "ignored-password", role=UserRole.SCHOOL)
-        self.assertIsNone(orphan.school_profile.first())
+        self.assertFalse(School.objects.filter(account_id=orphan.pk).exists())
         response = self.client.post("/api/v1/schools", self._payload(), format="json")
         self.assertEqual(response.status_code, 201, response.data)
         school = School.objects.get(school_code="XYZ")
