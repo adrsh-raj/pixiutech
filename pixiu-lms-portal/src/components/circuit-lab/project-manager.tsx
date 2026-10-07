@@ -32,6 +32,8 @@ interface Props {
   onImport: (file: File, password?: string) => Promise<void>
   onLoad: (project: SavedCircuit) => Promise<void>
   onExportCurrent: (password?: string) => Promise<void> | void
+  storageScope: string
+  displayPixiuId?: string
   isSaving: boolean
 }
 
@@ -65,6 +67,8 @@ export function ProjectManager({
   onImport,
   onLoad,
   onExportCurrent,
+  storageScope,
+  displayPixiuId,
   isSaving,
 }: Props) {
   const [projects, setProjects] = useState<SavedCircuit[]>([])
@@ -84,7 +88,7 @@ export function ProjectManager({
     setLoading(true)
     setError(null)
     try {
-      setProjects(await listSavedCircuits())
+      setProjects(await listSavedCircuits(storageScope))
     } catch {
       setError("Could not read saved projects from this browser.")
     } finally {
@@ -96,7 +100,7 @@ export function ProjectManager({
     if (!isOpen) return
     setName(currentProjectName)
     void refreshProjects()
-  }, [isOpen, currentProjectName, refreshProjects])
+  }, [isOpen, currentProjectName, refreshProjects, storageScope])
 
   const currentStatus = useMemo(() => {
     if (!storageReady) return { label: "Starting storage…", tone: "text-slate-400" }
@@ -168,7 +172,7 @@ export function ProjectManager({
     setBusyProject(project.name)
     setError(null)
     try {
-      await deleteSavedCircuit(project.name)
+      await deleteSavedCircuit(project.name, storageScope)
       if (project.name === currentProjectName) {
         await onNew()
       }
@@ -394,7 +398,7 @@ export function ProjectManager({
             <div className="mb-3 flex items-center justify-between gap-2">
               <div>
                 <p className="text-sm font-bold">Saved projects</p>
-                <p className="text-[10px] text-slate-500">Your recent browser-local workspaces.</p>
+                <p className="text-[10px] text-slate-500">Private workspace for {displayPixiuId || "this account"}.</p>
               </div>
               <button
                 onClick={() => void refreshProjects()}
@@ -470,7 +474,7 @@ export function ProjectManager({
         </div>
 
         <div className="flex items-center justify-between gap-3 border-t border-slate-800 px-4 py-2.5 text-[10px] text-slate-500 sm:px-5">
-          <span>Pixiu Circuit Studio · local-first project storage</span>
+          <span>Pixiu Circuit Studio · workspace {displayPixiuId || "account"} · local-first</span>
           <button onClick={onClose} className="font-semibold text-slate-300 transition hover:text-white">Done</button>
         </div>
       </div>
