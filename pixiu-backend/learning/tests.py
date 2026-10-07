@@ -63,19 +63,19 @@ class Phase4DomainTests(TestCase):
         self.assertEqual(response.status_code, 403)
 
     def test_curriculum_content_and_quiz_assignments_match_grade(self):
-        unit = CurriculumUnit.objects.create(grade="8", level="Level 1", unit_code="UNIT 2", title="Arduino", objectives="Build circuits", created_by=self.admin)
+        unit = CurriculumUnit.objects.create(grade="8", unit_code="UNIT 2", title="Arduino", objectives="Build circuits", created_by=self.admin)
         assignment_data = {"curriculum_unit": str(unit.id), "school_class": str(self.cls.id)}
         req = self.request("post", "/api/learning/curriculum-assignments/", self.admin, assignment_data)
         serializer = CurriculumClassAssignmentSerializer(data=assignment_data, context={"request": req})
         self.assertTrue(serializer.is_valid(), serializer.errors)
         assignment = serializer.save()
         self.assertEqual(assignment.school_class_id, self.cls.id)
-        content = LearningContent.objects.create(title="Arduino PDF", grade="8", level="Level 1", unit_code="UNIT 2", created_by=self.admin, status="published", url="https://example.com/arduino.pdf")
+        content = LearningContent.objects.create(title="Arduino PDF", grade="8", unit_code="UNIT 2", created_by=self.admin, status="published", url="https://example.com/arduino.pdf")
         content_req = self.request("post", "/api/learning/content-assignments/", self.admin)
         content_serializer = ContentClassAssignmentSerializer(data={"content": str(content.id), "school_class": str(self.cls.id)}, context={"request": content_req})
         self.assertTrue(content_serializer.is_valid(), content_serializer.errors)
         self.assertEqual(content_serializer.save().content_id, content.id)
-        quiz = Quiz.objects.create(title="Arduino MCQ", grade="8", level="Level 1", status="active", created_by=self.admin)
+        quiz = Quiz.objects.create(title="Arduino MCQ", grade="8", status="active", created_by=self.admin)
         quiz_req = self.request("post", "/api/learning/quiz-assignments/", self.admin)
         quiz_serializer = QuizClassAssignmentSerializer(data={"quiz": str(quiz.id), "school_class": str(self.cls.id)}, context={"request": quiz_req})
         self.assertTrue(quiz_serializer.is_valid(), quiz_serializer.errors)
@@ -88,7 +88,7 @@ class Phase4DomainTests(TestCase):
         self.assertIn("Published content must have a URL or file.", str(serializer.errors))
 
     def test_quiz_never_exposes_answer_to_student_and_server_grades(self):
-        quiz = Quiz.objects.create(title="Arduino MCQ", grade="8", level="Level 1", duration_minutes=10, max_attempts=2, status="active", created_by=self.admin)
+        quiz = Quiz.objects.create(title="Arduino MCQ", grade="8", duration_minutes=10, max_attempts=2, status="active", created_by=self.admin)
         QuizClassAssignment.objects.create(quiz=quiz, school_class=self.cls, assigned_by=self.admin)
         q = QuizQuestion.objects.create(quiz=quiz, question_order=1, question_text="Arduino brain?", option_a="UNO", option_b="LED", option_c="Resistor", option_d="Wire", correct_option="A", points=2)
         attempt = grade_attempt(quiz=quiz, student=self.student, answers={str(q.id): "A"})
@@ -101,12 +101,12 @@ class Phase4DomainTests(TestCase):
         self.assertNotIn("explanation", str(response.data))
 
     def test_trainer_sees_owned_quiz_even_before_class_assignment(self):
-        quiz = Quiz.objects.create(title="Trainer Draft Quiz", grade="8", level="Level 1", status="active", created_by=self.trainer_user)
+        quiz = Quiz.objects.create(title="Trainer Draft Quiz", grade="8", status="active", created_by=self.trainer_user)
         visible = accessible_quizzes(self.trainer_user).filter(pk=quiz.pk).exists()
         self.assertTrue(visible)
 
     def test_quiz_attempt_limit_is_enforced(self):
-        quiz = Quiz.objects.create(title="Retry Test", grade="8", level="Level 1", max_attempts=1, status="active", created_by=self.admin)
+        quiz = Quiz.objects.create(title="Retry Test", grade="8", max_attempts=1, status="active", created_by=self.admin)
         QuizClassAssignment.objects.create(quiz=quiz, school_class=self.cls, assigned_by=self.admin)
         q = QuizQuestion.objects.create(quiz=quiz, question_order=1, question_text="Q", option_a="A", option_b="B", option_c="C", option_d="D", correct_option="A", points=1)
         grade_attempt(quiz=quiz, student=self.student, answers={str(q.id): "B"})
@@ -114,7 +114,7 @@ class Phase4DomainTests(TestCase):
         with self.assertRaises(ValidationError): grade_attempt(quiz=quiz, student=self.student, answers={str(q.id): "A"})
 
     def test_quiz_rejects_answers_for_other_questions(self):
-        quiz = Quiz.objects.create(title="Answer Scope", grade="8", level="Level 1", status="active", created_by=self.admin)
+        quiz = Quiz.objects.create(title="Answer Scope", grade="8", status="active", created_by=self.admin)
         QuizClassAssignment.objects.create(quiz=quiz, school_class=self.cls, assigned_by=self.admin)
         q = QuizQuestion.objects.create(quiz=quiz, question_order=1, question_text="Q", option_a="A", option_b="B", option_c="C", option_d="D", correct_option="A")
         from rest_framework.exceptions import ValidationError
@@ -143,7 +143,7 @@ class Phase4DomainTests(TestCase):
         other_trainer = Trainer.objects.create(trainer_id="TR-002", name="Trainer Two", account=other_trainer_user)
         TrainerSchoolAssignment.objects.create(trainer=other_trainer, school=other_school, assigned_from=date(2026, 1, 1))
         other_class = SchoolClass.objects.create(school=other_school, grade="8", section="A")
-        unit = CurriculumUnit.objects.create(grade="8", level="Level 1", unit_code="UNIT 9", title="Robotics", objectives="Build", created_by=self.admin)
+        unit = CurriculumUnit.objects.create(grade="8", unit_code="UNIT 9", title="Robotics", objectives="Build", created_by=self.admin)
         assignment = CurriculumClassAssignment.objects.create(curriculum_unit=unit, school_class=self.cls, assigned_by=self.admin)
         request = self.request("get", f"/api/learning/curriculum-assignments/{assignment.id}/", other_trainer_user)
         response = CurriculumAssignmentViewSet.as_view({"get": "retrieve"})(request, pk=str(assignment.id))
