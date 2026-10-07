@@ -73,6 +73,8 @@ def _lab_secure_derivative(uploaded):
         image_file = BytesIO(source)
         from PIL import Image
         image = Image.open(image_file)
+        if image.width * image.height > 25_000_000:
+            raise SecureUploadError("The attached image dimensions are too large.")
         image.load()
 
         # Re-encode from decoded pixels. This strips metadata and rejects
