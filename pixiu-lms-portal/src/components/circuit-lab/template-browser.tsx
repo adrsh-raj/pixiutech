@@ -113,8 +113,8 @@ export const TemplateBrowser: React.FC<Props> = ({ isOpen, onClose, onSelectTemp
               <div
                 key={tmpl.id}
                 onClick={() => {
-                  onSelectTemplate(tmpl)
                   onClose()
+                  onSelectTemplate(tmpl)
                 }}
                 className="group relative flex flex-col justify-between rounded-xl border border-slate-800 bg-slate-950/60 p-5 transition hover:border-blue-500/60 hover:bg-slate-800/40 cursor-pointer shadow-sm hover:shadow-lg"
               >
