@@ -442,14 +442,25 @@ class ContractLeadViewSet(LegacyShapeMixin, LeadViewSet):
 
     @action(detail=True, methods=["post"], url_path="read")
     def read(self, request, pk=None):
+        if request.user.role != UserRole.ADMIN:
+            raise PermissionDenied("Only administrators can mark website enquiries as read.")
         lead = self.get_object()
-        lead.read_at = timezone.now()
-        lead.save(update_fields=["read_at", "updated_at"])
-        Notification.objects.filter(
-            recipient=request.user,
-            read_at__isnull=True,
-            metadata__lead_id=str(lead.pk),
-        ).update(read_at=timezone.now())
+        now = timezone.now()
+        if lead.read_at is None:
+            lead.read_at = now
+            lead.save(update_fields=["read_at", "updated_at"])
+
+        # The enquiry read-state is authoritative on Lead. Notification cleanup
+        # is secondary so a malformed/legacy notification cannot break the action.
+        try:
+            Notification.objects.filter(
+                recipient=request.user,
+                read_at__isnull=True,
+                metadata__lead_id=str(lead.pk),
+            ).update(read_at=now)
+        except Exception:
+            pass
+
         return Response(self.map_out(lead))
 
     @action(detail=True, methods=["put"], url_path="stage")
