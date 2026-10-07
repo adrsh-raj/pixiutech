@@ -13,12 +13,14 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.authentication import CachedJWTAuthentication
+from accounts.authentication import CachedJWTAuthentication
 from accounts.models import UserRole, UserStatus
 from audit.models import AuditAction
 from audit.services import record_audit
 from core.input_sanitization import sanitize_plain_text
 from core.upload_security import SecureMultiPartParser, SecureUploadError, validate_uploaded_file
 from crm.models import LabEnquiryAttachment, Lead, LeadEnquiryType, LeadSource, LeadStatus
+from notifications.models import Notification, NotificationType
 
 User = get_user_model()
 LAB_SUPPORT_TYPES = {"bug", "help", "other", "philosophy"}
@@ -27,6 +29,29 @@ LAB_IMAGE_MAX_BYTES = 3 * 1024 * 1024
 
 def _clean(value, max_length, *, preserve_newlines=False):
     return sanitize_plain_text(value, max_length, preserve_newlines=preserve_newlines)
+
+def _canonical_sender_id(user):
+    """Return the stable human-facing portal ID for the signed-in sender."""
+    role = getattr(user, "role", "")
+    if role == UserRole.STUDENT:
+        try:
+            value = str(user.student_profile.student_id or "").strip()
+        except Exception:
+            value = ""
+    elif role == UserRole.TRAINER:
+        try:
+            value = str(user.trainer_profile.trainer_id or "").strip()
+        except Exception:
+            value = ""
+    elif role == UserRole.ADMIN:
+        value = str(getattr(user, "username", "") or "").strip()
+    else:
+        try:
+            value = str(user.school_profile.school_code or "").strip()
+        except Exception:
+            value = ""
+    return value
+
 
 def _validate_lab_image(uploaded):
     if uploaded is None:
@@ -71,8 +96,10 @@ class PublicEnquiryView(APIView):
                     verified_student_id = ""
                 if verified_student_id:
                     student_id = verified_student_id
-            if not student_id:
-                return Response({"success": False, "error": "Student ID is required."}, status=400)
+            canonical_id = _canonical_sender_id(request.user)
+            if not canonical_id:
+                return Response({"success": False, "error": "Your account does not have a valid portal ID."}, status=400)
+            student_id = canonical_id
             if not message:
                 return Response({"success": False, "error": "Please describe the problem or question."}, status=400)
             try:
@@ -80,7 +107,7 @@ class PublicEnquiryView(APIView):
             except SecureUploadError as exc:
                 return Response({"success": False, "error": str(exc)}, status=400)
             school = "PIXIU Virtual Lab"
-            person = f"Lab User · {student_id}"
+            person = canonical_id
             phone = _clean(request.data.get("phone"), 30)
             email = _clean(request.data.get("email"), 254)
             city = ""
@@ -166,9 +193,45 @@ class PublicEnquiryView(APIView):
                         "expected_students": expected_students,
                         "student_id": student_id,
                         "has_attachment": attachment is not None,
+                        "sender_role": str(getattr(request.user, "role", "") or ""),
+                        "sender_id": student_id,
                     },
                     request=request,
                 )
+
+                # Mandatory operational notification: every Lab enquiry creates
+                # an unread server-side in-app notification for every active admin,
+                # independent of optional user notification preferences.
+                admin_ids = list(
+                    User.objects.filter(
+                        role=UserRole.ADMIN,
+                        status=UserStatus.ACTIVE,
+                        is_active=True,
+                    ).values_list("id", flat=True)
+                )
+                notification_message = (
+                    f"New {type_label} enquiry from {student_id}. "
+                    "Open Website Enquiries to review the report."
+                )
+                metadata = {
+                    "source": "PIXIU Virtual Lab",
+                    "lead_id": str(lead.id),
+                    "enquiry_type": enquiry_type,
+                    "sender_id": student_id,
+                    "sender_role": str(getattr(request.user, "role", "") or ""),
+                    "requires_action": True,
+                }
+                for admin_id in admin_ids:
+                    Notification.objects.get_or_create(
+                        recipient_id=admin_id,
+                        event_key=f"lab-enquiry:{lead.id}:{admin_id}",
+                        defaults={
+                            "notification_type": NotificationType.CRM,
+                            "title": f"New Lab enquiry · {type_label}",
+                            "message": notification_message,
+                            "metadata": metadata,
+                        },
+                    )
         except SecureUploadError as exc:
             return Response({"success": False, "error": str(exc)}, status=400)
 
