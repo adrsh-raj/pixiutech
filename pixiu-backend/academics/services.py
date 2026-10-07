@@ -37,7 +37,16 @@ def create_school_account(*, school: School) -> User:
     if existing:
         if existing.role != UserRole.SCHOOL:
             raise ValueError(f"School code '{username}' is already used by a different account role.")
-        if existing.school_profile_id not in (None, school.id):
+
+        # User.school_profile is a reverse OneToOne relation, so there is no
+        # school_profile_id attribute on User. Resolve the linked school through
+        # the School table instead of raising AttributeError -> HTTP 500.
+        linked_school_id = (
+            School.objects.filter(account_id=existing.pk)
+            .values_list("pk", flat=True)
+            .first()
+        )
+        if linked_school_id not in (None, school.id):
             raise ValueError(f"School code '{username}' is already linked to another school.")
 
     user = existing or User(username=username, role=UserRole.SCHOOL)
