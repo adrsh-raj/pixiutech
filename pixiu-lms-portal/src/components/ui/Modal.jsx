@@ -11,11 +11,16 @@ export default function Modal({
   closeOnBackdrop = true,
 }) {
   const closeRef = useRef(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!isOpen) return undefined;
     const handleEscape = (event) => {
-      if (event.key === 'Escape') onClose?.();
+      if (event.key === 'Escape') onCloseRef.current?.();
     };
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -26,7 +31,7 @@ export default function Modal({
       document.removeEventListener('keydown', handleEscape);
       document.body.style.overflow = previousOverflow;
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
