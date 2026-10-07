@@ -50,6 +50,10 @@ class User(AbstractUser):
     )
     must_change_password = models.BooleanField(default=False)
     display_name = models.CharField(max_length=200, blank=True)
+    # Stable human-facing ID for privileged/admin accounts. Student, trainer and
+    # school IDs remain owned by their role profiles and are exposed through the
+    # unified serializer field.
+    pixiu_id = models.CharField(max_length=80, unique=True, null=True, blank=True, editable=False)
     auth_version = models.PositiveIntegerField(default=0)
     failed_login_attempts = models.PositiveSmallIntegerField(default=0)
     locked_until = models.DateTimeField(null=True, blank=True)
@@ -67,6 +71,21 @@ class User(AbstractUser):
         if self.role == UserRole.ADMIN and self.is_superuser:
             self.is_staff = True
 
+    def _generate_admin_pixiu_id(self):
+        raw = " ".join(
+            part for part in [self.display_name.strip(), self.first_name.strip(), self.last_name.strip()]
+            if part
+        )
+        base = "".join(ch for ch in raw.upper() if ch.isalnum())[:72]
+        if not base or base.isdigit():
+            base = "ADMIN"
+        candidate = base
+        suffix = 2
+        while type(self).objects.filter(pixiu_id__iexact=candidate).exclude(pk=self.pk).exists():
+            candidate = f"{base}{suffix}"
+            suffix += 1
+        return candidate[:80]
+
     def save(self, *args, **kwargs):
         self.username = self.username.strip()
         if not self.display_name:
@@ -76,8 +95,11 @@ class User(AbstractUser):
         if self.role != UserRole.ADMIN:
             self.is_staff = False
             self.is_superuser = False
+            self.pixiu_id = None
         elif self.is_superuser:
             self.is_staff = True
+        if self.role == UserRole.ADMIN and not self.pixiu_id:
+            self.pixiu_id = self._generate_admin_pixiu_id()
         super().save(*args, **kwargs)
 
     def __str__(self):
