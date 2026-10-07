@@ -25,7 +25,8 @@ class Phase3ViewSet(viewsets.ModelViewSet):
     def get_queryset(self): return self.scoped_queryset()
     def scoped_queryset(self): return self.queryset
     def get_object(self):
-        queryset = self.filter_queryset(self.queryset)
+        # Resolve details from the same scoped queryset used by list/create/update.
+        queryset = self.filter_queryset(self.get_queryset())
         obj = get_object_or_404(queryset, **{self.lookup_field: self.kwargs[self.lookup_url_kwarg or self.lookup_field]})
         self.check_object_permissions(self.request, obj)
         return obj
@@ -38,9 +39,22 @@ class SchoolViewSet(Phase3ViewSet):
     def scoped_queryset(self): return accessible_school_queryset(self.request.user)
     def perform_create(self, serializer):
         self.assert_role(UserRole.ADMIN)
-        with transaction.atomic():
-            school = serializer.save(); create_school_account(school=school)
-            record_audit(actor=self.request.user, action="create", entity_type="school", entity_id=school.id, summary=f"School {school.school_code} created", request=self.request)
+        try:
+            with transaction.atomic():
+                school = serializer.save()
+                create_school_account(school=school)
+                record_audit(
+                    actor=self.request.user,
+                    action="create",
+                    entity_type="school",
+                    entity_id=school.id,
+                    summary=f"School {school.school_code} created",
+                    request=self.request,
+                )
+        except ValueError as exc:
+            raise ValidationError({"school_code": str(exc)})
+        except transaction.IntegrityError:
+            raise ValidationError({"school_code": "School setup conflicted with an existing account. Refresh the page and try again."})
     def perform_update(self, serializer):
         self.assert_role(UserRole.ADMIN, UserRole.SCHOOL); school = serializer.save(); record_audit(actor=self.request.user, action="update", entity_type="school", entity_id=school.id, summary=f"School {school.school_code} updated", request=self.request)
     def perform_destroy(self, instance):
