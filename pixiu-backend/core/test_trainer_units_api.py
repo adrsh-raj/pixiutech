@@ -23,8 +23,8 @@ class TrainerUnitsApiTests(TestCase):
             assigned_from=date(2026, 1, 1),
         )
         self.school_class = SchoolClass.objects.create(school=self.school, grade="6", section="A")
-        self.robotics = Technology.objects.create(code="robotics", name="Robotics", active=True)
-        self.ai = Technology.objects.create(code="ai", name="AI", active=True)
+        self.robotics, _ = Technology.objects.get_or_create(code="robotics", defaults={"name": "Robotics", "active": True})
+        self.ai, _ = Technology.objects.get_or_create(code="ai", defaults={"name": "AI", "active": True})
         self.robotics_unit = CurriculumUnit.objects.create(
             grade="6",
             level="Level 1",
