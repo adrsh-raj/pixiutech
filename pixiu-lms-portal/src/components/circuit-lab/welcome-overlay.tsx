@@ -70,7 +70,7 @@ export function WelcomeOverlay({ onOpenProjects }: { onOpenProjects: () => void 
         <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-blue-500 via-cyan-400 to-violet-500" />
         <button
           onClick={() => dismiss()}
-          className="absolute right-3 top-3 rounded-xl p-2 text-slate-400 transition hover:bg-slate-800 hover:text-white"
+          className="absolute right-3 top-3 z-10 rounded-xl p-2 text-slate-400 transition hover:bg-slate-800 hover:text-white"
           aria-label="Close welcome"
         >
           <X size={18} />
@@ -116,7 +116,11 @@ export function WelcomeOverlay({ onOpenProjects }: { onOpenProjects: () => void 
           </div>
 
           <div className="relative hidden overflow-hidden bg-gradient-to-br from-blue-600/15 via-cyan-500/5 to-violet-500/10 p-8 md:flex md:items-center md:justify-center">
-            <div className="absolute inset-0 opacity-20" style={{ backgroundImage: "radial-gradient(circle at 1px 1px, #60a5fa 1px, transparent 0)", backgroundSize: "22px 22px" }} />
+            <div
+              className="pointer-events-none absolute inset-0 opacity-20"
+              aria-hidden="true"
+              style={{ backgroundImage: "radial-gradient(circle at 1px 1px, #60a5fa 1px, transparent 0)", backgroundSize: "22px 22px" }}
+            />
             <div className="relative grid w-full max-w-xs gap-3">
               {["Palette → Canvas", "Interactive Inspector", "Run + Scope", "Projects + .pixiu"].map((label, i) => (
                 <div key={label} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-950/65 p-3 backdrop-blur">
