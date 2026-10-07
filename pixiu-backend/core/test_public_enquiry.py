@@ -77,6 +77,44 @@ class PublicLabEnquiryTests(TestCase):
         self.assertEqual(response.status_code, 401)
         self.assertEqual(Lead.objects.count(), 0)
 
+    def _post_lab(self, user, enquiry_type="help"):
+        request = self.lab_request(enquiry_type=enquiry_type, user=user, with_image=False)
+        response = PublicEnquiryView.as_view()(request)
+        self.assertEqual(response.status_code, 201)
+        return Lead.objects.order_by("-created_at").first()
+
+    def test_admin_enquiry_uses_username_as_id(self):
+        lead = self._post_lab(self.admin)
+        self.assertEqual(lead.contact_name, "LAB-ADMIN")
+
+    def test_trainer_enquiry_uses_trainer_id(self):
+        from academics.models import Trainer
+        Trainer.objects.create(account=self.trainer, trainer_id="TR-001", name="Trainer One")
+        lead = self._post_lab(self.trainer)
+        self.assertEqual(lead.contact_name, "TR-001")
+        self.assertIn("Student ID: TR-001", lead.notes)
+
+    def test_student_enquiry_uses_student_id_not_account_id(self):
+        from academics.models import School, SchoolClass, Student
+        school = School.objects.create(school_code="ZPS", name="Zenith Public School")
+        school_class = SchoolClass.objects.create(school=school, grade="6", section="A")
+        student = Student.objects.create(
+            account=User.objects.create_user(
+                "student-login",
+                password="test-password",
+                role=UserRole.STUDENT,
+                status=UserStatus.ACTIVE,
+                is_active=True,
+            ),
+            school_class=school_class,
+            student_id="ZPS6A 01",
+            roll_number=1,
+            name="Student One",
+        )
+        lead = self._post_lab(student.account)
+        self.assertEqual(lead.contact_name, "ZPS6A 01")
+        self.assertIn("Student ID: ZPS6A 01", lead.notes)
+
     def test_think_rethink_enquiry_is_captured_with_private_attachment(self):
         with tempfile.TemporaryDirectory() as media_root:
             with override_settings(MEDIA_ROOT=media_root, CLAMAV_ENABLED=False, CLAMAV_REQUIRED=False):
