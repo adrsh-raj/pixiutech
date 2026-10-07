@@ -65,7 +65,7 @@ try {
 
   // Template → Blockly
   await page.getByRole("button", { name: "Tools" }).click()
-  await page.getByRole("button", { name: /Templates/ }).click()
+  await page.getByRole("menuitem", { name: /Templates/ }).click()
   await page.locator("h3").filter({ hasText: "Arduino Blink with 220Ω Resistor" }).click()
   await page.getByRole("button", { name: "Code" }).click()
   const blink = await page.locator("body").innerText()
