@@ -127,6 +127,7 @@ class LoginSerializer(serializers.Serializer):
 class UserMeSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
     name = serializers.SerializerMethodField()
+    pixiu_id = serializers.SerializerMethodField()
     related_id = serializers.SerializerMethodField()
     school_id = serializers.SerializerMethodField()
 
@@ -134,7 +135,7 @@ class UserMeSerializer(serializers.ModelSerializer):
         model = User
         fields = (
             "id", "username", "first_name", "last_name", "full_name", "name", "display_name", "email",
-            "role", "status", "must_change_password", "related_id", "school_id",
+            "role", "status", "must_change_password", "pixiu_id", "related_id", "school_id",
         )
         read_only_fields = fields
 
@@ -178,8 +179,18 @@ class UserMeSerializer(serializers.ModelSerializer):
     def get_name(self, obj):
         return self.get_full_name(obj)
 
+    def get_pixiu_id(self, obj):
+        if obj.role == UserRole.ADMIN:
+            value = str(getattr(obj, "pixiu_id", "") or "").strip()
+            if value:
+                return value.upper()
+            raw = str(obj.display_name or obj.get_full_name() or obj.username or "").strip()
+            return "".join(ch for ch in raw.upper() if ch.isalnum())[:80]
+        value = self._profile_scope(obj)["related_id"]
+        return str(value or "").strip().upper() or None
+
     def get_related_id(self, obj):
-        return self._profile_scope(obj)["related_id"]
+        return self.get_pixiu_id(obj) if obj.role == UserRole.ADMIN else self._profile_scope(obj)["related_id"]
 
     def get_school_id(self, obj):
         return self._profile_scope(obj)["school_id"]
