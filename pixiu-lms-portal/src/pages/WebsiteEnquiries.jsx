@@ -185,7 +185,7 @@ export default function WebsiteEnquiries() {
                                 <ExternalLink size={11} /> {attachmentBusy === file.id ? 'Opening…' : file.original_name}
                               </button>
                               <button type="button" onClick={() => void handleAttachmentDownload(file)} disabled={!file.url || attachmentBusy === file.id || attachmentBusy === `download:${file.id}`} className="border-l border-blue-200 px-2 py-1 text-[10px] font-black text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50" title="Download image" aria-label={`Download ${file.original_name || 'image'}`}>
-                                ↓
+                                Download
                               </button>
                             </div>
                           ))}
