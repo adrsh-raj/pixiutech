@@ -190,7 +190,7 @@ class UserMeSerializer(serializers.ModelSerializer):
         return str(value or "").strip().upper() or None
 
     def get_related_id(self, obj):
-        return self.get_pixiu_id(obj) if obj.role == UserRole.ADMIN else self._profile_scope(obj)["related_id"]
+        return self._profile_scope(obj)["related_id"]
 
     def get_school_id(self, obj):
         return self._profile_scope(obj)["school_id"]
