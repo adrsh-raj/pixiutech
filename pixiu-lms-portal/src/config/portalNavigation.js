@@ -1,9 +1,9 @@
-import { BarChart3, BookOpen, Box, CalendarDays, ClipboardCheck, Cpu, CreditCard, FileText, FolderKanban, GraduationCap, Inbox, LayoutDashboard, Megaphone, PlaySquare, ReceiptText, School, Settings, ShieldCheck, Trophy, Users, Video, WalletCards, KeyRound, BriefcaseBusiness, Link2, Award, ClipboardList, Sparkles } from 'lucide-react';
+import { BarChart3, BookOpen, Box, CalendarDays, Layers3, ClipboardCheck, Cpu, CreditCard, FileText, FolderKanban, GraduationCap, Inbox, LayoutDashboard, Megaphone, PlaySquare, ReceiptText, School, Settings, ShieldCheck, Trophy, Users, Video, WalletCards, KeyRound, BriefcaseBusiness, Link2, Award, ClipboardList, Sparkles } from 'lucide-react';
 export const PORTAL_NAVIGATION={
  admin:[
   {title:'COMMAND CENTER',links:[{name:'Dashboard',href:'/',icon:LayoutDashboard}]},
   {title:'BUSINESS',links:[{name:'Website Enquiries',href:'/website-enquiries',icon:Inbox},{name:'Careers',href:'/careers',icon:BriefcaseBusiness},{name:'Sales Pipeline',href:'/leads',icon:FolderKanban},{name:'Partner Schools',href:'/schools',icon:School},{name:'Billing',href:'/billing',icon:CreditCard}]},
-  {title:'ACADEMICS',links:[{name:'Student Directory',href:'/students',icon:Users},{name:'Trainer Faculty',href:'/trainers',icon:GraduationCap},{name:'Trainer–School Assignments',href:'/trainer-assignments',icon:Link2},{name:'Classes & Sessions',href:'/sessions',icon:CalendarDays},{name:'Curriculum',href:'/curriculum',icon:BookOpen},{name:'Content Hub',href:'/content',icon:PlaySquare},{name:'Quizzes',href:'/quizzes',icon:ClipboardCheck},{name:'Projects',href:'/projects',icon:FolderKanban},{name:'Attendance',href:'/attendance',icon:CalendarDays},{name:'Course Completion',href:'/course-completion',icon:ClipboardList}]},
+  {title:'ACADEMICS',links:[{name:'Student Directory',href:'/students',icon:Users},{name:'Classes',href:'/classes',icon:Layers3},{name:'Trainer Faculty',href:'/trainers',icon:GraduationCap},{name:'Trainer–School Assignments',href:'/trainer-assignments',icon:Link2},{name:'Classes & Sessions',href:'/sessions',icon:CalendarDays},{name:'Curriculum',href:'/curriculum',icon:BookOpen},{name:'Content Hub',href:'/content',icon:PlaySquare},{name:'Quizzes',href:'/quizzes',icon:ClipboardCheck},{name:'Projects',href:'/projects',icon:FolderKanban},{name:'Attendance',href:'/attendance',icon:CalendarDays},{name:'Course Completion',href:'/course-completion',icon:ClipboardList}]},
   {title:'ANALYTICS & OPERATIONS',links:[{name:'Hardware & Kits',href:'/inventory',icon:Box},{name:'Virtual Arduino Lab',href:'/simulation',icon:Cpu},{name:'PIXIU AI Studio',href:'/ai-studio',icon:Sparkles},{name:'Notifications',href:'/notifications',icon:ReceiptText},{name:'Audit Logs',href:'/logs',icon:ShieldCheck},{name:'Announcements & Comms',href:'/comms',icon:Megaphone}]},
   {title:'SYSTEM',links:[{name:'Trainer Credentials',href:'/trainer-credentials',icon:KeyRound},{name:'School Credentials',href:'/school-credentials',icon:KeyRound},{name:'Student Credentials',href:'/student-credentials',icon:KeyRound},{name:'Settings',href:'/settings',icon:Settings}]},
  ],
@@ -16,7 +16,7 @@ export const PORTAL_NAVIGATION={
  ],
  school:[
   {title:'MY SCHOOL',links:[{name:'Overview',key:'overview',icon:LayoutDashboard},{name:'Students',key:'students',icon:Users},{name:'Trainers',key:'trainers',icon:GraduationCap}]},
-  {title:'ACADEMICS',links:[{name:'Attendance',href:'/attendance',icon:CalendarDays}]},
+  {title:'ACADEMICS',links:[{name:'Classes',href:'/classes',icon:Layers3},{name:'Attendance',href:'/attendance',icon:CalendarDays}]},
   {title:'PERFORMANCE',links:[{name:'Progress Reports',href:'/school-progress-reports',icon:BarChart3},{name:'School Performance',href:'/school-performance',icon:BarChart3}]},
   {title:'FINANCE',links:[{name:'Billing',href:'/billing',icon:WalletCards}]},
   {title:'COMMUNICATION',links:[{name:'Announcements',key:'announcements',icon:Megaphone},{name:'Notifications',href:'/notifications',icon:ReceiptText}]},

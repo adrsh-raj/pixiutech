@@ -255,7 +255,33 @@ export function DataProvider({ children }) {
   const updateSchool = (id, data) => save(`/schools/${encodeURIComponent(id)}`, 'PUT', data);
   const deleteSchool = id => remove(`/schools/${encodeURIComponent(id)}`);
   const resolveClassId = (value, schoolCode = '') => { const raw = text(value); if (!raw) return ''; const exact = classes.find(item => String(item.id) === raw); if (exact) return exact.id; const byName = classes.find(item => (!schoolCode || text(item.school_id || item.school_code).toUpperCase() === schoolCode.toUpperCase()) && text(item.display_name).toUpperCase() === raw.toUpperCase()); return byName?.id || raw; };
-  const addClass = data => { const school = text(data?.school || data?.school_id || data?.school_code); return save('/classes', 'POST', { ...data, school: school || data?.school }); };
+  const resolveSchoolId = value => {
+    const raw = text(value);
+    if (!raw) return '';
+    const exact = schools.find(item => String(item.id) === raw);
+    if (exact) return exact.id;
+    const key = raw.toUpperCase();
+    const byCode = schools.find(item => [item.school_code, item.school_id, item.code].filter(Boolean).some(v => String(v).trim().toUpperCase() === key));
+    return byCode?.id || raw;
+  };
+  const addClass = data => {
+    const school = resolveSchoolId(data?.school || data?.school_id || data?.school_code);
+    const grade = text(data?.grade).toUpperCase();
+    const section = text(data?.section).toUpperCase();
+    if (!school) return Promise.resolve({ success: false, error: 'School is required.' });
+    if (!grade || !/^\d{1,2}$/.test(grade)) return Promise.resolve({ success: false, error: 'Enter a valid numeric grade.' });
+    if (!section || !/^[A-Z0-9]{1,5}$/.test(section)) return Promise.resolve({ success: false, error: 'Enter a valid section.' });
+    return save('/classes', 'POST', { ...data, school, grade, section, display_name: text(data?.display_name), status: lower(data?.status || 'active') });
+  };
+  const updateClass = (id, data) => {
+    const schoolValue = data?.school || data?.school_id || data?.school_code;
+    const school = schoolValue ? resolveSchoolId(schoolValue) : '';
+    const payload = { ...data, ...(school ? { school } : {}) };
+    if (data?.grade !== undefined) payload.grade = text(data.grade).toUpperCase();
+    if (data?.section !== undefined) payload.section = text(data.section).toUpperCase();
+    return save(`/classes/${encodeURIComponent(id)}`, 'PUT', payload);
+  };
+  const deleteClass = id => remove(`/classes/${encodeURIComponent(id)}`);
   const addStudent = data => { const schoolCode = text(data?.school_code || data?.schoolCode || data?.school_id).toUpperCase(); const schoolClass = resolveClassId(data?.school_class || data?.class_id || data?.class, schoolCode); const rollNumber = Number(data?.roll_number ?? data?.roll); if (!schoolClass || !Number.isInteger(rollNumber) || rollNumber <= 0) return Promise.resolve({ success: false, error: 'A valid class and positive roll number are required.' }); return save('/students', 'POST', { school_class: schoolClass, roll_number: rollNumber, name: text(data?.name), date_of_birth: normalizeDateOnly(data?.date_of_birth), gender: data?.gender || '', email: data?.email || '', phone: data?.phone || '', guardian_name: data?.guardian_name || data?.parent || '', guardian_phone: data?.guardian_phone || '', guardian_email: data?.guardian_email || '', address: data?.address || '', status: lower(data?.status || 'active') }); };
   const updateStudent = (id, data) => save(`/students/${encodeURIComponent(id)}`, 'PUT', { ...data, date_of_birth: normalizeDateOnly(data?.date_of_birth) });
   const deleteStudent = id => remove(`/students/${encodeURIComponent(id)}`);
@@ -313,7 +339,7 @@ export function DataProvider({ children }) {
   const value = {
     loading, endpointErrors, refreshAll, loadData,
     schools, addSchool, updateSchool, deleteSchool,
-    classes, addClass,
+    classes, addClass, updateClass, deleteClass,
     students, addStudent, updateStudent, deleteStudent, getNextRollNumber, getStudentAttendance, getStudentAttendanceRecords,
     trainers, addTrainer, updateTrainer, updateTrainerStatus, deleteTrainer,
     sessions, scheduleSession, completeSession, unlockSession, startNewSession,

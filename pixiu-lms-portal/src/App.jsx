@@ -27,6 +27,7 @@ function lazyWithChunkRecovery(importer) {
 
 const AdminCommandCenter = lazyWithChunkRecovery(() => import('./pages/AdminCommandCenter'));
 const Students = lazyWithChunkRecovery(() => import('./pages/StudentsV2'));
+const Classes = lazyWithChunkRecovery(() => import('./pages/ClassesV2'));
 const HardwareKitsV2 = lazyWithChunkRecovery(() => import('./pages/HardwareKitsV2'));
 const TrainerOperationsV2 = lazyWithChunkRecovery(() => import('./pages/TrainerOperationsV2'));
 const TrainerAssignments = lazyWithChunkRecovery(() => import('./pages/TrainerAssignments'));
@@ -162,6 +163,7 @@ export default function App() { return <ToastProvider><AuthProvider><DataProvide
     <Route path="settings" element={<AdminOnly><Settings /></AdminOnly>} />
     <Route path="logs" element={<AdminOnly><AuditLogs /></AdminOnly>} />
     <Route path="students" element={<RoleRoute roles={['admin','superadmin','trainer']}><Students /></RoleRoute>} />
+    <Route path="classes" element={<RoleRoute roles={['admin','superadmin','school']}><Classes /></RoleRoute>} />
     <Route path="comms" element={<AdminOnly><Comms /></AdminOnly>} />
     <Route path="trainers" element={<TrainerConsoleRoute />} />
     <Route path="trainer-assignments" element={<AdminOnly><TrainerAssignments /></AdminOnly>} />
