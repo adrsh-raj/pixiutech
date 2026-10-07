@@ -43,7 +43,7 @@ export function LabSupportWidget() {
   const inputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
-    const verifiedId = String(user?.student_id || "").trim().toUpperCase()
+    const verifiedId = String(user?.related_id || user?.username || "").trim().toUpperCase()
     if (verifiedId) setStudentId(verifiedId)
   }, [user])
 
@@ -172,8 +172,8 @@ export function LabSupportWidget() {
 
           <div className="space-y-3 p-4">
             <label className="block">
-              <span className="mb-1.5 block text-[10px] font-black uppercase tracking-wide text-slate-500">Student ID</span>
-              <input value={studentId} onChange={event => setStudentId(event.target.value.slice(0, 80))} placeholder="Your Student ID" maxLength={80} autoComplete="off" className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-xs font-semibold text-white outline-none focus:border-cyan-400" />
+              <span className="mb-1.5 block text-[10px] font-black uppercase tracking-wide text-slate-500">Your Pixiu ID</span>
+              <input value={studentId} readOnly placeholder="Your Pixiu ID" maxLength={80} autoComplete="off" aria-readonly="true" className="w-full cursor-not-allowed rounded-xl border border-slate-700 bg-slate-950/80 px-3 py-2.5 text-xs font-semibold text-slate-300 outline-none" />
             </label>
 
             <label className="block">
