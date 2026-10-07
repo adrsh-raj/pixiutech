@@ -137,7 +137,7 @@ def _validate_lab_image(uploaded):
         raise SecureUploadError("Lab screenshots/images must be 3 MB or smaller.")
 
     try:
-        return validate_uploaded_file(uploaded)
+        return validate_uploaded_file(uploaded, raise_clamav_unavailable=True)
     except ClamAVUnavailableError:
         # Keep normal AV scanning as the first choice. During a temporary
         # ClamAV outage, rebuild the already type/signature/Pillow-validated
