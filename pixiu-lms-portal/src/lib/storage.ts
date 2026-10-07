@@ -430,7 +430,7 @@ export async function deleteSavedCircuit(name: string, scopeKey?: string): Promi
     await withIdb(async (db) => {
       await new Promise<void>((resolve, reject) => {
         const tx = db.transaction(STORE_NAME, "readwrite")
-        tx.objectStore(STORE_NAME).delete(CURRENT_ID)
+        tx.objectStore(STORE_NAME).delete(scopedCurrentId(scopeKey))
         tx.oncomplete = () => resolve()
         tx.onerror = () => reject(tx.error ?? new Error("Failed to clear current project"))
       })
