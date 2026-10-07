@@ -27,12 +27,31 @@ def _current_trainer_school_ids(user):
 
 
 def create_school_account(*, school: School) -> User:
-    username = school.school_code
-    existing = User.objects.filter(username=username).first()
-    if existing and (existing.role != UserRole.SCHOOL or existing.school_profile_id != school.id): raise ValueError("School code is already used by another account.")
+    username = str(school.school_code or "").strip().upper()
+    if not username:
+        raise ValueError("School code is required.")
+
+    # Lock an existing username row so two admins cannot race while linking a
+    # school profile to the same managed login.
+    existing = User.objects.select_for_update().filter(username=username).first()
+    if existing:
+        if existing.role != UserRole.SCHOOL:
+            raise ValueError(f"School code '{username}' is already used by a different account role.")
+        if existing.school_profile_id not in (None, school.id):
+            raise ValueError(f"School code '{username}' is already linked to another school.")
+
     user = existing or User(username=username, role=UserRole.SCHOOL)
-    user.role = UserRole.SCHOOL; user.display_name = school.name; user.email = school.email; user.status = UserStatus.INACTIVE; user.is_active = False; user.set_unusable_password(); user.save()
-    school.account = user; school.save(update_fields=["account", "updated_at"]); return user
+    user.role = UserRole.SCHOOL
+    user.display_name = school.name
+    user.email = school.email
+    user.status = UserStatus.INACTIVE
+    user.is_active = False
+    user.set_unusable_password()
+    user.save()
+
+    school.account = user
+    school.save(update_fields=["account", "updated_at"])
+    return user
 
 
 def create_trainer_account(*, trainer: Trainer, password: str) -> User:
