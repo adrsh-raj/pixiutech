@@ -89,7 +89,7 @@ try {
   await page.getByRole("button", { name: "Run" }).click()
   await page.getByText("PIXIU VISION CORE", { exact: true }).waitFor()
   if ((await page.locator("video").count()) < 1) throw new Error("AI camera video element did not mount")
-  await page.getByText("PIXIU AI ACTIVE", { exact: true }).waitFor()
+  await page.getByText("LIVE FEED", { exact: true }).waitFor()
 
   // Object restart lifecycle
   await page.getByRole("button", { name: "Stop" }).click()
