@@ -98,8 +98,14 @@ class User(AbstractUser):
             self.pixiu_id = None
         elif self.is_superuser:
             self.is_staff = True
+        generated_pixiu_id = False
         if self.role == UserRole.ADMIN and not self.pixiu_id:
             self.pixiu_id = self._generate_admin_pixiu_id()
+            generated_pixiu_id = True
+        if generated_pixiu_id and kwargs.get("update_fields") is not None:
+            fields = set(kwargs["update_fields"])
+            fields.add("pixiu_id")
+            kwargs["update_fields"] = fields
         super().save(*args, **kwargs)
 
     def __str__(self):
