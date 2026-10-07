@@ -94,7 +94,7 @@ try {
   // Object restart lifecycle
   await page.getByRole("button", { name: "Stop" }).click()
   await page.getByRole("button", { name: "Run" }).click()
-  await page.getByText("PIXIU AI ACTIVE", { exact: true }).waitFor()
+  await page.getByText("LIVE FEED", { exact: true }).waitFor()
   await page.getByRole("button", { name: "Stop" }).click()
 
   // Pose browser lifecycle
