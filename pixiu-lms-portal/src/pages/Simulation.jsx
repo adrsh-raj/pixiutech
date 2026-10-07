@@ -34,7 +34,11 @@ export default function Simulation() {
 
   return (
     <Suspense fallback={<CyberLabLoading />}>
-      <Workbench userRole={user?.role} />
+      <Workbench
+        userRole={user?.role}
+        pixiuId={user?.pixiu_id || user?.related_id || (user?.role === 'admin' ? user?.display_name : '')}
+        accountId={user?.id}
+      />
     </Suspense>
   );
 }
