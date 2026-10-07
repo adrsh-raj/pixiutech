@@ -25,6 +25,7 @@ class PublicLabEnquiryTests(TestCase):
             "lab-admin",
             password="test-password",
             role=UserRole.ADMIN,
+            display_name="Adarsh Raj",
             status=UserStatus.ACTIVE,
             is_active=True,
         )
@@ -83,9 +84,11 @@ class PublicLabEnquiryTests(TestCase):
         self.assertEqual(response.status_code, 201)
         return Lead.objects.order_by("-created_at").first()
 
-    def test_admin_enquiry_uses_username_as_id(self):
+    def test_admin_enquiry_uses_dedicated_pixiu_id(self):
+        self.assertEqual(self.admin.pixiu_id, "ADARSHRAJ")
         lead = self._post_lab(self.admin)
-        self.assertEqual(lead.contact_name, "LAB-ADMIN")
+        self.assertEqual(lead.contact_name, "ADARSHRAJ")
+        self.assertIn("Pixiu ID: ADARSHRAJ", lead.notes)
 
     def test_trainer_enquiry_uses_trainer_id(self):
         from academics.models import Trainer
