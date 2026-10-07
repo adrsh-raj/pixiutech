@@ -21,18 +21,18 @@ class CourseCompletionWorkflowTests(TestCase):
         TrainerSchoolAssignment.objects.create(trainer=self.trainer, school=self.school, assigned_from=date(2026, 1, 1))
         self.cls = SchoolClass.objects.create(school=self.school, grade='6', section='A')
         self.student = Student.objects.create(school_class=self.cls, roll_number=1, name='Completion Student')
-        self.technology = Technology.objects.create(code='robotics', name='Robotics', sort_order=10)
-        self.unit = CurriculumUnit.objects.create(grade='6', level='Level 1', unit_code='R-01', title='Robotics Basics', objectives='Build a simple robot', status='published', created_by=self.admin)
+        self.technology, _ = Technology.objects.get_or_create(code='robotics', defaults={'name': 'Robotics', 'sort_order': 10, 'active': True})
+        self.unit = CurriculumUnit.objects.create(grade='6', unit_code='R-01', title='Robotics Basics', objectives='Build a simple robot', status='published', created_by=self.admin)
         CurriculumUnitProfile.objects.create(curriculum_unit=self.unit, technology=self.technology, certificate_required=True)
         CurriculumClassAssignment.objects.create(curriculum_unit=self.unit, school_class=self.cls, assigned_by=self.admin)
         self.session = Session.objects.create(school_class=self.cls, curriculum_unit=self.unit, trainer=self.trainer, date=date(2026, 9, 12), start_time=time(10, 0), end_time=time(11, 0), topic='Robotics final build', created_by=self.trainer_user, status='completed', is_locked=True)
         SessionWorkflow.objects.create(session=self.session, technology=self.technology, is_last_session_for_unit=True)
         AttendanceRecord.objects.create(session=self.session, student=self.student, status='present', marked_by=self.trainer_user)
-        self.quiz = Quiz.objects.create(title='Robotics Unit Quiz', grade='6', level='Level 1', unit_code='R-01', status='active', created_by=self.admin)
+        self.quiz = Quiz.objects.create(title='Robotics Unit Quiz', grade='6', unit_code='R-01', status='active', created_by=self.admin)
         QuizClassAssignment.objects.create(quiz=self.quiz, school_class=self.cls, assigned_by=self.admin)
         question = QuizQuestion.objects.create(quiz=self.quiz, question_order=1, question_text='Robot brain?', option_a='Arduino', option_b='Wire', option_c='Wheel', option_d='Battery', correct_option='A', points=10)
         QuizAttempt.objects.create(quiz=self.quiz, student=self.student, attempt_number=1, status='completed', total_marks=10, total_questions=1, attempted_count=1, correct_count=1, score=10, percentage=100, answers={str(question.id): 'A'}, completed_at=timezone.now())
-        StudentAssessment.objects.create(student=self.student, trainer=self.trainer, unit_code='R-01', level='Level 1', title='Robotics final assessment', score=80, rating=4, status='published', assessment_date=date(2026, 9, 12), feedback='Good build')
+        StudentAssessment.objects.create(student=self.student, trainer=self.trainer, unit_code='R-01', title='Robotics final assessment', score=80, rating=4, status='published', assessment_date=date(2026, 9, 12), feedback='Good build')
 
     def test_last_session_requires_all_enabled_criteria(self):
         completion = evaluate_last_session(self.session)[0]
