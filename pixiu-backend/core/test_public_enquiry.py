@@ -1,5 +1,6 @@
 import tempfile
 from io import BytesIO
+from unittest.mock import patch
 
 from django.test import TestCase, override_settings
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -117,6 +118,19 @@ class PublicLabEnquiryTests(TestCase):
         lead = self._post_lab(student.account)
         self.assertEqual(lead.contact_name, "ZPS6A 01")
         self.assertIn("Pixiu ID: ZPS6A 01", lead.notes)
+
+    def test_lab_image_upload_falls_back_to_safe_rebuild_when_clamav_is_unavailable(self):
+        with tempfile.TemporaryDirectory() as media_root:
+            with override_settings(MEDIA_ROOT=media_root, CLAMAV_ENABLED=True, CLAMAV_REQUIRED=True):
+                with patch(
+                    "core.upload_security.ensure_clean_upload",
+                    side_effect=__import__("core.clamav_client", fromlist=["ClamAVUnavailableError"]).ClamAVUnavailableError(),
+                ):
+                    response = PublicEnquiryView.as_view()(self.lab_request(user=self.admin))
+                self.assertEqual(response.status_code, 201)
+                attachment = LabEnquiryAttachment.objects.get()
+                self.assertEqual(attachment.content_type, "image/png")
+                self.assertTrue(attachment.file.name.endswith(".png"))
 
     def test_think_rethink_enquiry_is_captured_with_private_attachment(self):
         with tempfile.TemporaryDirectory() as media_root:
