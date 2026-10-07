@@ -80,11 +80,11 @@ class LearningBoundaryTests(APITestCase):
         )
 
         self.unit_a = CurriculumUnit.objects.create(
-            grade="7", level="Level 1", unit_code="U1", title="A Unit 1",
+            grade="7", unit_code="U1", title="A Unit 1",
             week="Unit 1", topic="A Topic", objectives="A objectives", status="published", created_by=self.admin,
         )
         self.unit_b = CurriculumUnit.objects.create(
-            grade="7", level="Level 1", unit_code="U2", title="B Unit 2",
+            grade="7", unit_code="U2", title="B Unit 2",
             week="Unit 2", topic="B Topic", objectives="B objectives", status="published", created_by=self.admin,
         )
         CurriculumClassAssignment.objects.create(
@@ -95,21 +95,21 @@ class LearningBoundaryTests(APITestCase):
         )
 
         self.content_a = LearningContent.objects.create(
-            title="A Video", content_type="video", grade="7", level="Level 1", unit_code="U1",
+            title="A Video", content_type="video", grade="7", unit_code="U1",
             url="https://example.com/a.mp4", target_role="student", status="published", created_by=self.admin,
         )
         self.content_b = LearningContent.objects.create(
-            title="B Video", content_type="video", grade="7", level="Level 1", unit_code="U2",
+            title="B Video", content_type="video", grade="7", unit_code="U2",
             url="https://example.com/b.mp4", target_role="student", status="published", created_by=self.admin,
         )
         ContentClassAssignment.objects.create(content=self.content_a, school_class=self.class_a, assigned_by=self.admin)
         ContentClassAssignment.objects.create(content=self.content_b, school_class=self.class_b, assigned_by=self.admin)
 
         self.quiz_a = Quiz.objects.create(
-            title="A Quiz", grade="7", level="Level 1", unit_code="U1", status="active", created_by=self.admin
+            title="A Quiz", grade="7", unit_code="U1", status="active", created_by=self.admin
         )
         self.quiz_b = Quiz.objects.create(
-            title="B Quiz", grade="7", level="Level 1", unit_code="U2", status="active", created_by=self.admin
+            title="B Quiz", grade="7", unit_code="U2", status="active", created_by=self.admin
         )
         for quiz in (self.quiz_a, self.quiz_b):
             QuizQuestion.objects.create(
