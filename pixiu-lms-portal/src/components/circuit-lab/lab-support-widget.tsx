@@ -21,12 +21,7 @@ function formatBytes(value: number) {
 }
 
 function initialStudentId() {
-  if (typeof window === "undefined") return ""
-  try {
-    return window.sessionStorage.getItem("pixiu_session_student_id")?.trim().toUpperCase() || ""
-  } catch {
-    return ""
-  }
+  return ""
 }
 
 export function LabSupportWidget() {
