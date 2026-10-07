@@ -445,6 +445,11 @@ class ContractLeadViewSet(LegacyShapeMixin, LeadViewSet):
         lead = self.get_object()
         lead.read_at = timezone.now()
         lead.save(update_fields=["read_at", "updated_at"])
+        Notification.objects.filter(
+            recipient=request.user,
+            read_at__isnull=True,
+            metadata__lead_id=str(lead.pk),
+        ).update(read_at=timezone.now())
         return Response(self.map_out(lead))
 
     @action(detail=True, methods=["put"], url_path="stage")
