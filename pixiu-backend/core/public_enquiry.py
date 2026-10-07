@@ -1,4 +1,5 @@
 import hashlib
+from io import BytesIO
 from pathlib import Path
 from urllib.parse import quote
 
@@ -12,6 +13,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from core.clamav_client import ClamAVUnavailableError
 from accounts.authentication import CachedJWTAuthentication
 from accounts.models import UserRole, UserStatus
 from accounts.permissions import IsActiveAccount
@@ -56,6 +58,70 @@ def _canonical_sender_id(user):
     return value.strip().upper()
 
 
+def _lab_secure_derivative(uploaded):
+    """Rebuild a raster image when the AV sidecar is temporarily unavailable."""
+    original_name = Path(str(getattr(uploaded, "name", "") or "")).name
+    extension = Path(original_name).suffix.lower()
+    format_map = {".png": "PNG", ".jpg": "JPEG", ".jpeg": "JPEG", ".webp": "WEBP"}
+    output_format = format_map.get(extension)
+    if not output_format:
+        raise SecureUploadError("Only PNG, JPG, JPEG or WEBP images can be attached.")
+
+    try:
+        uploaded.seek(0)
+        source = uploaded.read()
+        image_file = BytesIO(source)
+        from PIL import Image
+        image = Image.open(image_file)
+        image.load()
+
+        # Re-encode from decoded pixels. This strips metadata and rejects
+        # malformed/active payloads that Pillow cannot safely decode.
+        if output_format == "JPEG":
+            if image.mode not in {"RGB", "L"}:
+                background = Image.new("RGB", image.size, "white")
+                if "A" in image.getbands():
+                    background.paste(image.convert("RGBA"), mask=image.convert("RGBA").getchannel("A"))
+                else:
+                    background.paste(image.convert("RGB"))
+                image = background
+            else:
+                image = image.convert("RGB") if image.mode != "RGB" else image
+        elif image.mode not in {"1", "L", "LA", "RGB", "RGBA", "P", "I", "F"}:
+            image = image.convert("RGBA")
+
+        output = BytesIO()
+        save_kwargs = {}
+        if output_format == "WEBP":
+            save_kwargs = {"quality": 90, "method": 4}
+        elif output_format == "JPEG":
+            save_kwargs = {"quality": 90, "optimize": True}
+        image.save(output, format=output_format, **save_kwargs)
+        rebuilt = output.getvalue()
+    except Exception as exc:
+        raise SecureUploadError("The attached image could not be safely rebuilt.") from exc
+    finally:
+        try:
+            uploaded.seek(0)
+        except Exception:
+            pass
+
+    if not rebuilt or len(rebuilt) > LAB_IMAGE_MAX_BYTES:
+        raise SecureUploadError("The sanitized image is larger than the 3 MB limit.")
+
+    from django.core.files.uploadedfile import SimpleUploadedFile
+    return SimpleUploadedFile(
+        original_name,
+        rebuilt,
+        content_type={
+            ".png": "image/png",
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".webp": "image/webp",
+        }[extension],
+    )
+
+
 def _validate_lab_image(uploaded):
     if uploaded is None:
         return None
@@ -67,7 +133,15 @@ def _validate_lab_image(uploaded):
         raise SecureUploadError("The attached image is empty.")
     if int(uploaded.size) > LAB_IMAGE_MAX_BYTES:
         raise SecureUploadError("Lab screenshots/images must be 3 MB or smaller.")
-    return validate_uploaded_file(uploaded)
+
+    try:
+        return validate_uploaded_file(uploaded)
+    except ClamAVUnavailableError:
+        # Keep normal AV scanning as the first choice. During a temporary
+        # ClamAV outage, rebuild the already type/signature/Pillow-validated
+        # raster image, then run the full file validation again without AV.
+        derivative = _lab_secure_derivative(uploaded)
+        return validate_uploaded_file(derivative, scan=False)
 
 class PublicEnquiryView(APIView):
     permission_classes = [AllowAny]
