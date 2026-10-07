@@ -1,4 +1,5 @@
 from datetime import datetime
+import re
 
 from django.db import transaction
 from rest_framework import serializers
@@ -99,6 +100,7 @@ class TrainerSchoolAssignmentSerializer(serializers.ModelSerializer):
 
 
 class SchoolClassSerializer(serializers.ModelSerializer):
+    section = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     school_code = serializers.CharField(source="school.school_code", read_only=True)
     active_student_count = serializers.SerializerMethodField()
     class Meta:
@@ -112,7 +114,10 @@ class SchoolClassSerializer(serializers.ModelSerializer):
         return obj.students.filter(status="active").count()
     def validate(self, attrs):
         request = self.context["request"]; current_school = getattr(self.instance, "school", None); school = attrs.get("school", current_school)
-        grade = str(attrs.get("grade", getattr(self.instance, "grade", ""))).strip().upper(); section = str(attrs.get("section", getattr(self.instance, "section", ""))).strip().upper()
+        grade = str(attrs.get("grade", getattr(self.instance, "grade", ""))).strip().upper(); section = str(attrs.get("section", getattr(self.instance, "section", "")) or "").strip().upper()
+        if not grade.isdigit() or not 1 <= int(grade) <= 99: raise serializers.ValidationError({"grade": "Grade must be a number from 1 to 99."})
+        grade = str(int(grade)); section = section or "A"
+        if not re.fullmatch(r"[A-Z0-9]{1,5}", section): raise serializers.ValidationError({"section": "Section must contain 1-5 uppercase letters or numbers."})
         if request.user.role == "school" and (not school or school.account_id != request.user.id): raise serializers.ValidationError("A school can only manage its own classes.")
         if self.instance is not None and self.instance.students.exists() and (school != self.instance.school or grade != self.instance.grade or section != self.instance.section):
             raise serializers.ValidationError("A class with students cannot change school, grade, or section because those fields define student IDs.")

@@ -143,9 +143,21 @@ class SchoolClassViewSet(Phase3ViewSet):
     queryset = SchoolClass.objects.select_related("school"); serializer_class = SchoolClassSerializer
     def scoped_queryset(self): return accessible_class_queryset(self.request.user)
     def perform_create(self, serializer):
-        self.assert_role(UserRole.ADMIN, UserRole.SCHOOL); obj = serializer.save(); record_audit(actor=self.request.user, action="create", entity_type="class", entity_id=obj.id, summary=f"Class {obj.display_name} created", request=self.request)
+        self.assert_role(UserRole.ADMIN, UserRole.SCHOOL)
+        try:
+            with transaction.atomic():
+                obj = serializer.save()
+        except IntegrityError:
+            raise ValidationError({"detail": "This class already exists for the school."})
+        record_audit(actor=self.request.user, action="create", entity_type="class", entity_id=obj.id, summary=f"Class {obj.display_name} created", request=self.request)
     def perform_update(self, serializer):
-        self.assert_role(UserRole.ADMIN, UserRole.SCHOOL); obj = serializer.save(); record_audit(actor=self.request.user, action="update", entity_type="class", entity_id=obj.id, summary=f"Class {obj.display_name} updated", request=self.request)
+        self.assert_role(UserRole.ADMIN, UserRole.SCHOOL)
+        try:
+            with transaction.atomic():
+                obj = serializer.save()
+        except IntegrityError:
+            raise ValidationError({"detail": "This class already exists for the school."})
+        record_audit(actor=self.request.user, action="update", entity_type="class", entity_id=obj.id, summary=f"Class {obj.display_name} updated", request=self.request)
     def perform_destroy(self, instance): self.assert_role(UserRole.ADMIN, UserRole.SCHOOL); instance.status = "inactive"; instance.save(update_fields=["status", "updated_at"]); record_audit(actor=self.request.user, action="update", entity_type="class", entity_id=instance.id, summary=f"Class {instance.display_name} deactivated", request=self.request)
 
 

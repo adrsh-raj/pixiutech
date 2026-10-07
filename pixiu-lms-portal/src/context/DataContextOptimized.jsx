@@ -266,19 +266,32 @@ export function DataProvider({ children }) {
   };
   const addClass = data => {
     const school = resolveSchoolId(data?.school || data?.school_id || data?.school_code);
-    const grade = text(data?.grade).toUpperCase();
-    const section = text(data?.section).toUpperCase();
+    const gradeRaw = text(data?.grade).toUpperCase();
+    const section = text(data?.section).toUpperCase() || 'A';
     if (!school) return Promise.resolve({ success: false, error: 'School is required.' });
-    if (!grade || !/^\d{1,2}$/.test(grade)) return Promise.resolve({ success: false, error: 'Enter a valid numeric grade.' });
-    if (!section || !/^[A-Z0-9]{1,5}$/.test(section)) return Promise.resolve({ success: false, error: 'Enter a valid section.' });
+    if (!/^\d{1,2}$/.test(gradeRaw)) return Promise.resolve({ success: false, error: 'Enter a valid numeric grade from 1 to 99.' });
+    const gradeNumber = Number(gradeRaw);
+    if (!Number.isInteger(gradeNumber) || gradeNumber < 1 || gradeNumber > 99) return Promise.resolve({ success: false, error: 'Grade must be between 1 and 99.' });
+    const grade = String(gradeNumber);
+    if (!/^[A-Z0-9]{1,5}$/.test(section)) return Promise.resolve({ success: false, error: 'Enter a valid section (1-5 letters/numbers).' });
     return save('/classes', 'POST', { ...data, school, grade, section, display_name: text(data?.display_name), status: lower(data?.status || 'active') });
   };
   const updateClass = (id, data) => {
     const schoolValue = data?.school || data?.school_id || data?.school_code;
     const school = schoolValue ? resolveSchoolId(schoolValue) : '';
     const payload = { ...data, ...(school ? { school } : {}) };
-    if (data?.grade !== undefined) payload.grade = text(data.grade).toUpperCase();
-    if (data?.section !== undefined) payload.section = text(data.section).toUpperCase();
+    if (data?.grade !== undefined) {
+      const gradeRaw = text(data.grade).toUpperCase();
+      if (!/^\d{1,2}$/.test(gradeRaw)) return Promise.resolve({ success: false, error: 'Enter a valid numeric grade from 1 to 99.' });
+      const gradeNumber = Number(gradeRaw);
+      if (!Number.isInteger(gradeNumber) || gradeNumber < 1 || gradeNumber > 99) return Promise.resolve({ success: false, error: 'Grade must be between 1 and 99.' });
+      payload.grade = String(gradeNumber);
+    }
+    if (data?.section !== undefined) {
+      const section = text(data.section).toUpperCase() || 'A';
+      if (!/^[A-Z0-9]{1,5}$/.test(section)) return Promise.resolve({ success: false, error: 'Enter a valid section (1-5 letters/numbers).' });
+      payload.section = section;
+    }
     return save(`/classes/${encodeURIComponent(id)}`, 'PUT', payload);
   };
   const deleteClass = id => remove(`/classes/${encodeURIComponent(id)}`);

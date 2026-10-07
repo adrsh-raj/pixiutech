@@ -140,7 +140,9 @@ class SchoolClass(models.Model):
 
     def save(self, *args, **kwargs):
         self.grade = self.grade.strip().upper()
-        self.section = self.section.strip().upper()
+        if self.grade.isdigit():
+            self.grade = str(int(self.grade))
+        self.section = self.section.strip().upper() or "A"
         if not self.display_name:
             self.display_name = f"{self.grade}{self.section}"
         else:

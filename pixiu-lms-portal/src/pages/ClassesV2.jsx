@@ -73,9 +73,9 @@ export default function ClassesV2() {
     if (saving) return;
     const school = selectedSchool?.id || form.school;
     const grade = norm(form.grade);
-    const section = norm(form.section);
+    const section = norm(form.section) || 'A';
     if (!school) return toast.error('Select a school.');
-    if (!/^\d{1,2}$/.test(grade)) return toast.error('Grade must be a number such as 6, 7, 8 or 10.');
+    if (!/^\d{1,2}$/.test(grade)) return toast.error('Grade must be a number from 1 to 99.');
     if (!/^[A-Z0-9]{1,5}$/.test(section)) return toast.error('Section must contain 1-5 letters or numbers.');
     setSaving(true);
     try {
@@ -129,10 +129,10 @@ export default function ClassesV2() {
         <form onSubmit={submit} className="grid gap-4 p-5 sm:grid-cols-2">
           <label className="sm:col-span-2"><span className="label">School</span><select value={form.school} disabled={Boolean(editing) || role === 'school'} onChange={e => setForm(v => ({ ...v, school: e.target.value }))} className="field" required><option value="">Select school</option>{selectableSchools.map(s => <option key={s.id} value={s.id}>{s.name} ({s.school_code})</option>)}</select></label>
           <label><span className="label">Grade</span><input type="number" min="1" max="99" value={form.grade} disabled={Boolean(editing && studentCount(editing) > 0)} onChange={e => setForm(v => ({ ...v, grade: e.target.value }))} className="field" placeholder="6" required/></label>
-          <label><span className="label">Section</span><input value={form.section} disabled={Boolean(editing && studentCount(editing) > 0)} onChange={e => setForm(v => ({ ...v, section: e.target.value.toUpperCase() }))} className="field" placeholder="A" maxLength={5} required/></label>
+          <label><span className="label">Section <span className="font-normal text-slate-400">(optional)</span></span><input value={form.section} disabled={Boolean(editing && studentCount(editing) > 0)} onChange={e => setForm(v => ({ ...v, section: e.target.value.toUpperCase() }))} className="field" placeholder="A" maxLength={5}/><span className="mt-1 block text-[10px] font-semibold text-slate-400">Leave blank to automatically create Section A (for example, 6 → 6A).</span></label>
           <label className="sm:col-span-2"><span className="label">Class name <span className="font-normal text-slate-400">(optional)</span></span><input value={form.display_name} onChange={e => setForm(v => ({ ...v, display_name: e.target.value }))} className="field" placeholder="Grade 6 - A" maxLength={30}/></label>
           <label><span className="label">Status</span><select value={form.status} onChange={e => setForm(v => ({ ...v, status: e.target.value }))} className="field"><option value="active">Active</option><option value="inactive">Inactive</option></select></label>
-          <div className="sm:col-span-2 rounded-2xl bg-slate-50 p-4 text-xs leading-relaxed text-slate-600">Student IDs depend on school + grade + section. Once students are enrolled, grade and section become locked.</div>
+          <div className="sm:col-span-2 rounded-2xl bg-slate-50 p-4 text-xs leading-relaxed text-slate-600">Student IDs depend on school + grade + section. A blank section is stored as A. Once students are enrolled, grade and section become locked.</div>
           <div className="sm:col-span-2 flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" onClick={close} disabled={saving} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-black">Cancel</button><button disabled={saving} className="rounded-xl bg-blue-600 px-5 py-2.5 text-xs font-black text-white">{saving ? 'Saving…' : editing ? 'Save changes' : 'Create class'}</button></div>
         </form></div></div>}
       <style>{`.field{width:100%;min-height:44px;border:1px solid #e2e8f0;border-radius:12px;padding:10px 12px;font-size:12px;font-weight:600;color:#334155;background:#fff;outline:none}.field:focus{border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.12)}.label{display:block;margin-bottom:6px;font-size:9px;font-weight:900;letter-spacing:.13em;text-transform:uppercase;color:#94a3b8}`}</style>
