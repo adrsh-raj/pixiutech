@@ -92,10 +92,10 @@ try {
   await page.getByText("LIVE FEED", { exact: true }).waitFor()
 
   // Object restart lifecycle
-  await page.getByRole("button", { name: "Turn Off Camera" }).click()
+  await page.getByRole("button", { name: "Stop" }).click()
   await page.getByRole("button", { name: "Run" }).click()
   await page.getByText("LIVE FEED", { exact: true }).waitFor()
-  await page.getByRole("button", { name: "Turn Off Camera" }).click()
+  await page.getByRole("button", { name: "Stop" }).click()
 
   // Pose browser lifecycle
   await page.getByRole("button", { name: "Tools" }).click()
@@ -121,7 +121,7 @@ try {
   await page.getByText("Sound", { exact: true }).click()
   await page.getByRole("button", { name: "Turn On Microphone" }).click()
   await page.getByText("6F Sound ready", { exact: true }).waitFor()
-  await page.getByRole("button", { name: "Turn Off Camera" }).click()
+  await page.getByRole("button", { name: "Turn Off Microphone" }).click()
 
   // Standalone portal AI Studio route + real My AI train/persist/predict flow.
   await page.goto(baseUrl + "/ai-studio", { waitUntil: "networkidle" })
