@@ -16,7 +16,18 @@ import Breadcrumbs from '../components/ui/Breadcrumbs';
 const emptySchool = { name: '', school_code: '', principal_name: '', phone: '', email: '', address: '', lab_name: '', lab_location: '' };
 const text = value => String(value ?? '').trim();
 const amount = value => { const n = Number(String(value ?? '').replace(/[^0-9.-]/g, '')); return Number.isFinite(n) ? n : 0; };
-const dateKey = value => { if (!value) return ''; const d = new Date(value); return Number.isNaN(d.getTime()) ? text(value).slice(0, 10) : d.toISOString().slice(0, 10); };
+const dateKey = value => {
+  if (!value) return '';
+  const raw = text(value);
+  const dateOnly = raw.match(/^(\d{4}-\d{2}-\d{2})(?:$|T)/);
+  if (dateOnly && raw.length === 10) return dateOnly[1];
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return raw.slice(0, 10);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return year + '-' + month + '-' + day;
+};
 const sameDay = (value, target) => dateKey(value) === target;
 const lower = value => text(value).toLowerCase();
 function pickAmount(row, keys) { for (const key of keys) { const n = amount(row?.[key]); if (n) return n; } return 0; }
