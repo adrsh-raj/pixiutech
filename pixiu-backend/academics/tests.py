@@ -128,3 +128,61 @@ class Phase3ScopeAndValidationTests(TestCase):
         )
         self.assertFalse(serializer.is_valid())
         self.assertIn("student ids", str(serializer.errors).lower())
+
+
+class SchoolOnboardingApiTests(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            username="school-onboard-admin",
+            password="AdminPass123!",
+            role=UserRole.ADMIN,
+            is_staff=True,
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.admin)
+
+    def _payload(self, code="XYZ"):
+        return {
+            "school_code": code,
+            "name": "XYZ Academy",
+            "principal_name": "MR. Anand Rathi",
+            "phone": "9876543210",
+            "email": "principal@example.com",
+            "lab_name": "AI Lab",
+            "lab_location": "First Floor",
+            "address": "Test Road",
+        }
+
+    def test_school_onboarding_creates_profile_and_managed_login(self):
+        response = self.client.post("/api/v1/schools", self._payload(), format="json")
+        self.assertEqual(response.status_code, 201, response.data)
+        school = School.objects.get(school_code="XYZ")
+        self.assertIsNotNone(school.account_id)
+        self.assertEqual(school.account.username, "XYZ")
+        self.assertEqual(school.account.role, UserRole.SCHOOL)
+        self.assertFalse(school.account.is_active)
+        self.assertEqual(response.data["school_code"], "XYZ")
+
+    def test_orphan_school_username_is_reused_instead_of_returning_500(self):
+        orphan = User.objects.create_user("XYZ", "ignored-password", role=UserRole.SCHOOL)
+        self.assertIsNone(orphan.school_profile.first())
+        response = self.client.post("/api/v1/schools", self._payload(), format="json")
+        self.assertEqual(response.status_code, 201, response.data)
+        school = School.objects.get(school_code="XYZ")
+        self.assertEqual(school.account_id, orphan.id)
+
+    def test_school_code_collision_with_other_role_is_validation_error(self):
+        User.objects.create_user("XYZ", "ignored-password", role=UserRole.TRAINER)
+        response = self.client.post("/api/v1/schools", self._payload(), format="json")
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertIn("school_code", response.data.get("fields", response.data))
+
+    def test_cross_scope_retrieve_uses_scoped_queryset(self):
+        school_a = School.objects.create(school_code="AAA", name="School A")
+        school_b = School.objects.create(school_code="BBB", name="School B")
+        school_user = User.objects.create_user("AAA", "SchoolPass123!", role=UserRole.SCHOOL)
+        school_a.account = school_user
+        school_a.save(update_fields=["account", "updated_at"])
+        self.client.force_authenticate(user=school_user)
+        response = self.client.get(f"/api/v1/schools/{school_b.pk}")
+        self.assertEqual(response.status_code, 404)
