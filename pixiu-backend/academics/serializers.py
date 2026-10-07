@@ -100,6 +100,7 @@ class TrainerSchoolAssignmentSerializer(serializers.ModelSerializer):
 
 
 class SchoolClassSerializer(serializers.ModelSerializer):
+    section = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     school_code = serializers.CharField(source="school.school_code", read_only=True)
     active_student_count = serializers.SerializerMethodField()
     class Meta:
@@ -113,7 +114,7 @@ class SchoolClassSerializer(serializers.ModelSerializer):
         return obj.students.filter(status="active").count()
     def validate(self, attrs):
         request = self.context["request"]; current_school = getattr(self.instance, "school", None); school = attrs.get("school", current_school)
-        grade = str(attrs.get("grade", getattr(self.instance, "grade", ""))).strip().upper(); section = str(attrs.get("section", getattr(self.instance, "section", ""))).strip().upper()
+        grade = str(attrs.get("grade", getattr(self.instance, "grade", ""))).strip().upper(); section = str(attrs.get("section", getattr(self.instance, "section", "")) or "").strip().upper()
         if not grade.isdigit() or not 1 <= int(grade) <= 99: raise serializers.ValidationError({"grade": "Grade must be a number from 1 to 99."})
         grade = str(int(grade)); section = section or "A"
         if not re.fullmatch(r"[A-Z0-9]{1,5}", section): raise serializers.ValidationError({"section": "Section must contain 1-5 uppercase letters or numbers."})

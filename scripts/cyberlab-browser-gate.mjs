@@ -108,7 +108,7 @@ try {
   await page.getByText("6C Pose ready", { exact: true }).waitFor()
   await page.getByRole("button", { name: "Turn Off Camera" }).last().click()
 
-  await page.getByText("Fingers", { exact: true }).click()
+  await page.getByText("Hands", { exact: true }).click()
   await page.getByRole("button", { name: "Turn On Camera" }).last().click()
   await page.getByText("6D Fingers ready", { exact: true }).waitFor()
   await page.getByRole("button", { name: "Turn Off Camera" }).last().click()
@@ -167,7 +167,7 @@ try {
   await myAiButton.click()
   await page.getByRole("button", { name: "Turn On Camera", exact: true }).last().click()
   await page.getByText("6I My AI ready", { exact: true }).waitFor({ timeout: 60_000 })
-  await page.getByRole("button", { name: "Turn Off Camera", exact: true }).click()
+  await page.getByRole("button", { name: "Turn Off Camera", exact: true }).last().click()
 
   await page.reload({ waitUntil: "networkidle" })
   await page.getByText("Try", { exact: true }).click()

@@ -145,10 +145,10 @@ class Phase3ScopeAndValidationTests(TestCase):
         self.assertEqual(returned_ids, {str(self.school_a.id)})
 
     def test_class_create_api_accepts_arbitrary_grade_and_blank_section(self):
-        self.client = APIClient()
-        self.client.force_authenticate(user=self.school_a_user if hasattr(self, "school_a_user") else self.admin)
-        school = getattr(self, "school_a", self.school)
-        response = self.client.post("/api/v1/classes", {
+        client = APIClient()
+        client.force_authenticate(user=self.school_a_user)
+        school = self.school_a
+        response = client.post("/api/v1/classes", {
             "school": str(school.id),
             "grade": "12",
             "section": "",
