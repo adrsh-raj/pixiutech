@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import * as Blockly from "blockly"
 import type { CircuitState } from "@/lib/circuit-types"
 import { defineArduinoBlocks, setPinContext, arduino, normalizeBlocklyXml } from "@/lib/arduino-blocks"
-import { Copy, Check, Terminal, Code2 } from "lucide-react"
+import { Copy, Check, Terminal, Code2, ZoomIn, ZoomOut, Maximize2, Sparkles } from "lucide-react"
 
 interface Props {
   circuit: CircuitState
@@ -199,15 +199,15 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
         snap: true,
       },
       zoom: {
-        controls: true,
+        controls: false,
         wheel: true,
         startScale: 0.9,
         maxScale: 2,
         minScale: 0.4,
         scaleSpeed: 1.2,
       },
-      trashcan: true,
-      media: "https://unpkg.com/blockly/media/",
+      trashcan: false,
+      media: "/blockly/media/",
     })
 
     workspaceRef.current = workspace
@@ -398,6 +398,10 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
         .blocklySvg g {
           max-width: none !important;
         }
+        .blocklyZoom,
+        .blocklyTrash {
+          display: none !important;
+        }
 
         .pixiu-blockly-host,
         .pixiu-blockly-host .blocklySvg {
@@ -469,6 +473,49 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
         }`}
       >
         <div ref={blocklyDiv} className="pixiu-blockly-host absolute inset-0 w-full h-full" />
+
+        {/* Floating Zoom & Canvas Controls */}
+        <div className="absolute bottom-3 left-3 z-20 flex items-center gap-1 rounded-xl bg-slate-900/90 p-1 backdrop-blur-md border border-slate-700/80 shadow-lg text-slate-300">
+          <button
+            type="button"
+            onClick={() => workspaceRef.current?.zoom(0, 0, 1)}
+            title="Zoom In"
+            className="p-1.5 hover:bg-slate-800 hover:text-white rounded-lg transition cursor-pointer"
+          >
+            <ZoomIn size={14} />
+          </button>
+          <button
+            type="button"
+            onClick={() => workspaceRef.current?.zoom(0, 0, -1)}
+            title="Zoom Out"
+            className="p-1.5 hover:bg-slate-800 hover:text-white rounded-lg transition cursor-pointer"
+          >
+            <ZoomOut size={14} />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (workspaceRef.current) {
+                workspaceRef.current.setScale(1)
+                if (typeof (workspaceRef.current as any).scrollCenter === "function") {
+                  (workspaceRef.current as any).scrollCenter()
+                }
+              }
+            }}
+            title="Reset Zoom & Center Workspace"
+            className="p-1.5 hover:bg-slate-800 hover:text-white rounded-lg transition cursor-pointer"
+          >
+            <Maximize2 size={14} />
+          </button>
+          <button
+            type="button"
+            onClick={() => workspaceRef.current?.cleanUp()}
+            title="Clean Up & Arrange Blocks"
+            className="p-1.5 hover:bg-slate-800 hover:text-white rounded-lg transition cursor-pointer"
+          >
+            <Sparkles size={14} />
+          </button>
+        </div>
       </div>
 
       {/* Generated Arduino C++ Sketch Panel */}

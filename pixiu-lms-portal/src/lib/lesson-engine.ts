@@ -2307,9 +2307,22 @@ const EMPTY_STARTER_BLOCKLY_XML = `<xml xmlns="https://developers.google.com/blo
   <block type="arduino_program" x="40" y="40"></block>
 </xml>`
 
-export function getLessonSeed(_lesson: Lesson): { state: CircuitState; blocklyXml: string; sourceTemplateId?: string } {
-  // Option B: Interactive Missions start with a clean blank canvas.
-  // Students gather parts from the palette, wire connections, and write code step-by-step.
+export function getLessonSeed(lesson: Lesson): { state: CircuitState; blocklyXml: string; sourceTemplateId?: string } {
+  // Option B: Interactive Missions start with a clean blank canvas for wiring (parts: [], wires: []).
+  // For Beginner missions: Blockly code is automatically loaded so beginner students only focus on wiring.
+  // For Intermediate & Advanced missions: Clean starter blockly block so students construct code step-by-step.
+  if (lesson.difficulty === "Beginner") {
+    const beginnerXml =
+      lesson.seedBlocklyXml ||
+      (lesson.templateId ? TEMPLATES.find((t) => t.id === lesson.templateId)?.blocklyXml : undefined) ||
+      EMPTY_STARTER_BLOCKLY_XML
+    return {
+      state: { parts: [], wires: [] },
+      blocklyXml: beginnerXml,
+      sourceTemplateId: lesson.templateId,
+    }
+  }
+
   return {
     state: { parts: [], wires: [] },
     blocklyXml: EMPTY_STARTER_BLOCKLY_XML,

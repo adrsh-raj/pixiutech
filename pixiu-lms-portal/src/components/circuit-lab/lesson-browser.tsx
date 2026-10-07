@@ -374,12 +374,29 @@ export function LessonBrowser({
                         return next
                       })
                     }}
-                    title="Start this mission with a clean blank canvas (gather parts and wire manually)"
+                    title={
+                      activeLesson.difficulty === "Beginner"
+                        ? "Start this mission with a clean wiring canvas (Blockly code is loaded automatically for Beginners)"
+                        : "Start this mission with a clean blank canvas (gather parts, wire manually, and build code)"
+                    }
                     className="inline-flex items-center gap-1.5 rounded-xl bg-cyan-500 px-3.5 py-2 text-[10px] font-black text-slate-950 hover:bg-cyan-400 transition cursor-pointer shadow-sm"
                   >
-                    <Play size={12} fill="currentColor" /> Start Mission (Blank Canvas)
+                    <Play size={12} fill="currentColor" />{" "}
+                    {activeLesson.difficulty === "Beginner"
+                      ? "Start Mission (Auto-Code · Wiring Only)"
+                      : "Start Mission (Blank Canvas)"}
                   </button>
                 </div>
+
+                {/* Beginner Auto-Code Banner */}
+                {activeLesson.difficulty === "Beginner" && (
+                  <div className="mt-3 flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-950/20 px-3 py-2 text-[11px] text-emerald-300 font-medium">
+                    <Sparkles size={14} className="text-emerald-400 shrink-0" />
+                    <span>
+                      <strong>Beginner Mission:</strong> Code is automatically loaded into Blockly! You only need to place components and complete the wiring.
+                    </span>
+                  </div>
+                )}
 
                 {/* What You Will Build (Final Project Goal) Banner */}
                 {activeLesson.finalGoal && (
