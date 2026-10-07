@@ -77,7 +77,7 @@ try {
   // AI template → AI Blockly → automatic Pixiu runtime HUD
   await page.getByRole("button", { name: "Circuit" }).click()
   await page.getByRole("button", { name: "Tools" }).click()
-  await page.getByRole("button", { name: /Templates/ }).click()
+  await page.getByRole("menuitem", { name: /Templates/ }).click()
   await page.locator("h3").filter({ hasText: "AI Vision Smart Boom Barrier Gate" }).click()
   await page.getByRole("button", { name: "Code" }).click()
   const aiCodeView = await page.locator("body").innerText()
