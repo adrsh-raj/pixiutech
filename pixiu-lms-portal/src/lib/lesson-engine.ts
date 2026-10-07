@@ -2303,15 +2303,16 @@ export const LESSONS: Lesson[] = [
   ...MICROBIT_LESSONS,
 ]
 
-export function getLessonSeed(lesson: Lesson): { state: CircuitState; blocklyXml: string; sourceTemplateId?: string } {
-  if (lesson.seedCircuit && lesson.seedBlocklyXml) {
-    return { state: JSON.parse(JSON.stringify(lesson.seedCircuit)), blocklyXml: lesson.seedBlocklyXml }
-  }
-  const template = lesson.templateId ? findTemplate(lesson.templateId) : undefined
-  if (!template) throw new Error(`No starter project found for lesson: ${lesson.title}`)
+const EMPTY_STARTER_BLOCKLY_XML = `<xml xmlns="https://developers.google.com/blockly/xml">
+  <block type="arduino_program" x="40" y="40"></block>
+</xml>`
+
+export function getLessonSeed(_lesson: Lesson): { state: CircuitState; blocklyXml: string; sourceTemplateId?: string } {
+  // Option B: Interactive Missions start with a clean blank canvas.
+  // Students gather parts from the palette, wire connections, and write code step-by-step.
   return {
-    state: JSON.parse(JSON.stringify(template.circuit)),
-    blocklyXml: template.blocklyXml,
-    sourceTemplateId: template.id,
+    state: { parts: [], wires: [] },
+    blocklyXml: EMPTY_STARTER_BLOCKLY_XML,
   }
 }
+

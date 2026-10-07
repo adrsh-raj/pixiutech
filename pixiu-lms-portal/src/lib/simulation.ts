@@ -619,7 +619,10 @@ export function computeRuntime(
       // Preserve a driver-resolved motor result when L298N appears before
       // the motor in the circuit state.
       const driverRuntime = runtime[part.id]
-      const hasDriverResult = driverRuntime?.motorARpm !== undefined || driverRuntime?.motorBRpm !== undefined
+      const hasDriverResult =
+        driverRuntime?.rpm !== undefined ||
+        driverRuntime?.motorARpm !== undefined ||
+        driverRuntime?.motorBRpm !== undefined
 
       if (!hasDriverResult) {
         const posKey = k("pos")
@@ -630,7 +633,7 @@ export function computeRuntime(
           const voltage = toPos.voltage
           const rpm = Math.round(voltage * 200)
           runtime[part.id] = { rpm, motorDirection: "cw" }
-        } else {
+        } else if (!runtime[part.id]) {
           runtime[part.id] = { rpm: 0, motorDirection: "stopped" }
         }
       }

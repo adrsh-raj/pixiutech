@@ -134,3 +134,14 @@
 :root .circuit-lab-blue-theme [class*="border-slate-700/"] { border-color: #334155 !important; }
 :root .circuit-lab-blue-theme .border-slate-800,
 :root .circuit-lab-blue-theme [class*="border-slate-800/"] { border-color: #1E293B !important; }
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes spin-reverse {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(-360deg); }
+}
+

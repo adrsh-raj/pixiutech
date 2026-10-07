@@ -639,7 +639,7 @@ export function CircuitCanvas(props: Props) {
                                   e.stopPropagation()
                                   setTimeout(() => {
                                     onChangeProp?.(part.id, "lastKey", "")
-                                  }, 400)
+                                  }, 750)
                                 }}
                                 onPointerLeave={() => {
                                   setTimeout(() => {
@@ -1052,7 +1052,7 @@ export function CircuitCanvas(props: Props) {
                               }}
                               onPointerUp={(e) => {
                                 e.stopPropagation()
-                                setTimeout(() => onChangeProp?.(part.id, "lastKey", ""), 400)
+                                setTimeout(() => onChangeProp?.(part.id, "lastKey", ""), 750)
                               }}
                               className={`w-4 h-4 rounded text-[9px] font-mono font-bold flex items-center justify-center border transition-all ${
                                 String(part.props.lastKey ?? "") === k

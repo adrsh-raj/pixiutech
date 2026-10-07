@@ -529,6 +529,9 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
   }, [updateState])
 
   const changeProp = useCallback((id: string, k: string, value: string | number) => {
+    partsRef.current = partsRef.current.map((p) =>
+      p.id === id ? { ...p, props: { ...p.props, [k]: value } } : p
+    )
     updateState((s) => ({
       ...s,
       parts: s.parts.map((p) => (p.id === id ? { ...p, props: { ...p.props, [k]: value } } : p)),

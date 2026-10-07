@@ -204,6 +204,26 @@ export function evaluateBoolean(target: Blockly.Block | null, env?: ExecutionEnv
     const op = target.getFieldValue("OP") ?? "EQ"
     const aTarget = target.getInputTargetBlock("A")
     const bTarget = target.getInputTargetBlock("B")
+
+    const isTextLike = (blk: Blockly.Block | null) => {
+      if (!blk) return false
+      return ["text_string", "text", "keypad_read", "ai_get_detected_class", "ai_get_gesture"].includes(blk.type)
+    }
+
+    if (isTextLike(aTarget) || isTextLike(bTarget)) {
+      const aStr = evaluateValueInput(target, "A", env, "")
+      const bStr = evaluateValueInput(target, "B", env, "")
+      switch (op) {
+        case "EQ": return aStr === bStr
+        case "NEQ": return aStr !== bStr
+        case "LT": return aStr < bStr
+        case "LTE": return aStr <= bStr
+        case "GT": return aStr > bStr
+        case "GTE": return aStr >= bStr
+        default: return false
+      }
+    }
+
     const a = evaluateNumber(aTarget, env, 0)
     const b = evaluateNumber(bTarget, env, 0)
 

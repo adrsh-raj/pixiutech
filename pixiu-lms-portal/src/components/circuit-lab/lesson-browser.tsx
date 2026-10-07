@@ -365,8 +365,19 @@ export function LessonBrowser({
                 </div>
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                   <p className="max-w-2xl text-[11px] leading-5 text-slate-400">{activeLesson.description}</p>
-                  <button onClick={() => { onLoadLesson(activeLesson); setLastResults((current) => { const next = { ...current }; activeLesson.steps.forEach((step) => delete next[`${activeLesson.id}:${step.id}`]); return next }) }} className="inline-flex items-center gap-1.5 rounded-xl bg-cyan-500 px-3 py-2 text-[10px] font-black text-slate-950 hover:bg-cyan-400">
-                    <Play size={12} fill="currentColor" /> Load starter
+                  <button
+                    onClick={() => {
+                      onLoadLesson(activeLesson)
+                      setLastResults((current) => {
+                        const next = { ...current }
+                        activeLesson.steps.forEach((step) => delete next[`${activeLesson.id}:${step.id}`])
+                        return next
+                      })
+                    }}
+                    title="Start this mission with a clean blank canvas (gather parts and wire manually)"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-cyan-500 px-3.5 py-2 text-[10px] font-black text-slate-950 hover:bg-cyan-400 transition cursor-pointer shadow-sm"
+                  >
+                    <Play size={12} fill="currentColor" /> Start Mission (Blank Canvas)
                   </button>
                 </div>
 

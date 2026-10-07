@@ -1192,6 +1192,8 @@ export function PartArt({ part, runtime }: { part: PlacedPart; runtime?: PartRun
     case "dc-motor": {
       const spinning = runtime?.motorDirection && runtime.motorDirection !== "stopped"
       const rpm = runtime?.rpm ?? 0
+      const isCcw = runtime?.motorDirection === "ccw"
+      const duration = Math.max(0.08, 60 / (rpm || 120))
       return (
         <g>
           {/* Motor cylinder body */}
@@ -1200,8 +1202,18 @@ export function PartArt({ part, runtime }: { part: PlacedPart; runtime?: PartRun
           {/* Center shaft */}
           <circle cx={30} cy={30} r={4} fill="#52525b" stroke="#3f3f46" />
           {/* Shaft marker for rotation */}
-          <g style={spinning ? { animation: `spin ${Math.max(0.1, 60 / (rpm || 60))}s linear infinite` } : {}}>
-            <line x1={30} y1={30} x2={30} y2={14} stroke="#27272a" strokeWidth={3} />
+          <g
+            style={
+              spinning
+                ? {
+                    transformOrigin: "30px 30px",
+                    animation: `${isCcw ? "spin-reverse" : "spin"} ${duration}s linear infinite`,
+                  }
+                : {}
+            }
+          >
+            <line x1={30} y1={30} x2={30} y2={14} stroke="#27272a" strokeWidth={3} strokeLinecap="round" />
+            <circle cx={30} cy={14} r={2} fill="#ef4444" />
           </g>
           {/* Terminal tabs */}
           <rect x={10} y={50} width={10} height={8} rx={1} fill="#ef4444" />
@@ -1210,10 +1222,12 @@ export function PartArt({ part, runtime }: { part: PlacedPart; runtime?: PartRun
           <text x={45} y={57} textAnchor="middle" fontSize={7} fill="#fff" fontWeight={700}>−</text>
           {/* RPM readout */}
           {spinning && (
-            <text x={30} y={-4} textAnchor="middle" fontSize={8} fill="#a3e635" fontFamily="mono">{rpm} RPM</text>
+            <text x={30} y={-4} textAnchor="middle" fontSize={8} fill="#a3e635" fontFamily="monospace" fontWeight={700}>
+              {rpm} RPM {isCcw ? "CCW" : "CW"}
+            </text>
           )}
           {/* Label */}
-          <text x={30} y={34} textAnchor="middle" fontSize={7} fill="#3f3f46" fontFamily="sans-serif" fontWeight={700}>M</text>
+          <text x={30} y={33} textAnchor="middle" fontSize={7} fill="#3f3f46" fontFamily="sans-serif" fontWeight={700}>M</text>
         </g>
       )
     }
@@ -1367,17 +1381,19 @@ export function PartArt({ part, runtime }: { part: PlacedPart; runtime?: PartRun
       )
       const directionA = runtime?.motorADirection ?? "stopped"
       const directionB = runtime?.motorBDirection ?? "stopped"
+      const dirShortA = directionA === "stopped" ? "OFF" : directionA.toUpperCase()
+      const dirShortB = directionB === "stopped" ? "OFF" : directionB.toUpperCase()
       return (
         <g>
           <rect x="2" y="4" width="116" height="88" rx="7" fill="#153e75" stroke="#1d4ed8" strokeWidth="2" />
-          <rect x="46" y="16" width="28" height="36" rx="2" fill="#0f172a" stroke="#334155" />
-          <text x="60" y="37" textAnchor="middle" fontSize="8" fill="#cbd5e1" fontFamily="monospace" fontWeight="700">L298N</text>
-          <text x="10" y="66" fontSize="7" fill="#93c5fd" fontFamily="monospace">A:{speedA} {directionA.toUpperCase()}</text>
-          <text x="64" y="66" fontSize="7" fill="#93c5fd" fontFamily="monospace">B:{speedB} {directionB.toUpperCase()}</text>
-          <rect x="10" y="74" width="100" height="6" rx="3" fill="#0f172a" />
-          <rect x="11" y="75" width={98 * (speedA / 255)} height="4" rx="2" fill="#22c55e" />
-          <rect x="10" y="84" width="100" height="4" rx="2" fill="#0f172a" />
-          <rect x="11" y="84.5" width={98 * (speedB / 255)} height="3" rx="1.5" fill="#38bdf8" />
+          <rect x="46" y="14" width="28" height="34" rx="2" fill="#0f172a" stroke="#334155" />
+          <text x="60" y="34" textAnchor="middle" fontSize="8" fill="#cbd5e1" fontFamily="monospace" fontWeight="700">L298N</text>
+          <text x="12" y="58" fontSize="6.5" fill="#93c5fd" fontFamily="monospace" fontWeight="600">MOT A: {speedA} ({dirShortA})</text>
+          <text x="12" y="67" fontSize="6.5" fill="#38bdf8" fontFamily="monospace" fontWeight="600">MOT B: {speedB} ({dirShortB})</text>
+          <rect x="12" y="72" width="96" height="5" rx="2.5" fill="#0f172a" />
+          <rect x="12" y="72" width={Math.max(0, 96 * (speedA / 255))} height="5" rx="2.5" fill="#22c55e" />
+          <rect x="12" y="80" width="96" height="4" rx="2" fill="#0f172a" />
+          <rect x="12" y="80" width={Math.max(0, 96 * (speedB / 255))} height="4" rx="2" fill="#38bdf8" />
         </g>
       )
     }
