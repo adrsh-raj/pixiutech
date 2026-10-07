@@ -16,7 +16,8 @@ class _User:
     is_active = True
     status = UserStatus.ACTIVE
 
-    def __init__(self, role, *, active=True):
+    def __init__(self, role, *, active=True, pk=1):
+        self.pk = pk
         self.role = role
         self.is_active = active
         self.status = UserStatus.ACTIVE if active else UserStatus.SUSPENDED
