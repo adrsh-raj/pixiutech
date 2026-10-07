@@ -27,6 +27,35 @@ class Phase3ModelTests(TestCase):
         username = build_student_username("xyz", "8", "a", 3)
         self.assertEqual(username, "XYZ8A 03")
 
+    def test_blank_section_defaults_to_a_and_numeric_grade_is_normalized(self):
+        school_class = SchoolClass.objects.create(school=self.school, grade="06", section="")
+        self.assertEqual(school_class.grade, "6")
+        self.assertEqual(school_class.section, "A")
+        self.assertEqual(school_class.display_name, "6A")
+
+    def test_serializer_accepts_arbitrary_numeric_grade_and_blank_section(self):
+        request = APIRequestFactory().post("/api/academics/classes/", {}, format="json")
+        request.user = self.admin
+        serializer = SchoolClassSerializer(
+            data={"school": str(self.school.id), "grade": "12", "section": ""},
+            context={"request": request},
+        )
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        school_class = serializer.save()
+        self.assertEqual(school_class.grade, "12")
+        self.assertEqual(school_class.section, "A")
+        self.assertEqual(school_class.display_name, "12A")
+
+    def test_serializer_rejects_invalid_numeric_grade(self):
+        request = APIRequestFactory().post("/api/academics/classes/", {}, format="json")
+        request.user = self.admin
+        serializer = SchoolClassSerializer(
+            data={"school": str(self.school.id), "grade": "100", "section": "A"},
+            context={"request": request},
+        )
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("1 to 99", str(serializer.errors))
+
     def test_duplicate_active_trainer_school_assignment_is_blocked(self):
         with self.assertRaises(IntegrityError):
             with transaction.atomic():
