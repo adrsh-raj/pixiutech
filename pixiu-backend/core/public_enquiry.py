@@ -13,7 +13,6 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.authentication import CachedJWTAuthentication
-from accounts.authentication import CachedJWTAuthentication
 from accounts.models import UserRole, UserStatus
 from audit.models import AuditAction
 from audit.services import record_audit
@@ -50,7 +49,7 @@ def _canonical_sender_id(user):
             value = str(user.school_profile.school_code or "").strip()
         except Exception:
             value = ""
-    return value
+    return value.strip().upper()
 
 
 def _validate_lab_image(uploaded):
