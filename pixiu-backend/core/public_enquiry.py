@@ -14,6 +14,7 @@ from rest_framework.views import APIView
 
 from accounts.authentication import CachedJWTAuthentication
 from accounts.models import UserRole, UserStatus
+from accounts.permissions import IsActiveAccount
 from audit.models import AuditAction
 from audit.services import record_audit
 from core.input_sanitization import sanitize_plain_text
@@ -43,7 +44,10 @@ def _canonical_sender_id(user):
         except Exception:
             value = ""
     elif role == UserRole.ADMIN:
-        value = str(getattr(user, "username", "") or "").strip()
+        value = str(getattr(user, "pixiu_id", "") or "").strip()
+        if not value:
+            raw = str(getattr(user, "display_name", "") or user.get_full_name() or user.username or "").strip()
+            value = "".join(ch for ch in raw.upper() if ch.isalnum())
     else:
         try:
             value = str(user.school_profile.school_code or "").strip()
@@ -88,13 +92,6 @@ class PublicEnquiryView(APIView):
         if enquiry_type in LAB_SUPPORT_TYPES:
             if not request.user.is_authenticated:
                 return Response({"success": False, "error": "Please sign in to the Lab before sending support."}, status=401)
-            if request.user.role == UserRole.STUDENT:
-                try:
-                    verified_student_id = str(request.user.student_profile.student_id).strip().upper()
-                except Exception:
-                    verified_student_id = ""
-                if verified_student_id:
-                    student_id = verified_student_id
             canonical_id = _canonical_sender_id(request.user)
             if not canonical_id:
                 return Response({"success": False, "error": "Your account does not have a valid portal ID."}, status=400)
@@ -213,8 +210,9 @@ class PublicEnquiryView(APIView):
                     f"New {type_label} enquiry from {sender_label}. "
                     "Open Website Enquiries to review the report."
                 )
+                notification_source = "PIXIU Virtual Lab" if enquiry_type in LAB_SUPPORT_TYPES else "pixiutech.com Website"
                 metadata = {
-                    "source": "PIXIU Virtual Lab",
+                    "source": notification_source,
                     "lead_id": str(lead.id),
                     "enquiry_type": enquiry_type,
                     "sender_id": student_id,
