@@ -50,6 +50,7 @@ export default function WebsiteEnquiries() {
   }, [leads, query]);
 
   const newCount = enquiries.filter(item => item.status === 'new').length;
+  const unreadCount = enquiries.filter(item => !item.read).length;
 
   useEffect(() => () => {
     if (attachmentPreview?.url) URL.revokeObjectURL(attachmentPreview.url);
@@ -145,8 +146,8 @@ export default function WebsiteEnquiries() {
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm"><p className="text-[10px] uppercase tracking-wider font-black text-slate-400">Total Website Enquiries</p><p className="text-3xl font-black text-slate-900 mt-1">{enquiries.length}</p></div>
-        <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm"><p className="text-[10px] uppercase tracking-wider font-black text-slate-400">New / Unworked</p><p className="text-3xl font-black text-amber-600 mt-1">{newCount}</p></div>
-        <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm"><p className="text-[10px] uppercase tracking-wider font-black text-slate-400">CRM Destination</p><p className="text-sm font-black text-emerald-700 mt-2">Live Lead Registry</p></div>
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm"><p className="text-[10px] uppercase tracking-wider font-black text-slate-400">Unread</p><p className="text-3xl font-black text-amber-600 mt-1">{unreadCount}</p></div>
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm"><p className="text-[10px] uppercase tracking-wider font-black text-slate-400">New / Unworked</p><p className="text-3xl font-black text-blue-600 mt-1">{newCount}</p></div>
       </div>
 
       <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm">
