@@ -22,6 +22,8 @@ function normalize(lead) {
     strength: Number(lead.expected_students ?? lead.student_strength ?? 0) || 0,
     status: text(lead.status || lead.stage || 'new').toLowerCase(),
     enquiryType: text(lead.enquiry_type || 'sales').toLowerCase(),
+    read: Boolean(lead.read),
+    readAt: lead.read_at || null,
     labAttachments: Array.isArray(lead.lab_attachments) ? lead.lab_attachments : [],
     notes: lead.notes || '',
     createdLabel: parsed && !Number.isNaN(parsed.getTime()) ? parsed.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : text(created) || '—',
@@ -90,6 +92,43 @@ export default function WebsiteEnquiries() {
     });
   };
 
+  const handleMarkRead = async item => {
+    if (!item?.id || item.read) return;
+    try {
+      const response = await apiFetch(`/leads/${encodeURIComponent(item.id)}/read`, { method: 'POST' });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.detail || payload.error || 'Unable to mark enquiry as read.');
+      await refreshAll();
+      toast.success('Enquiry marked as read.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to mark enquiry as read.');
+    }
+  };
+
+  const handleAttachmentDownload = async file => {
+    const apiPath = getAttachmentApiPath(file?.url);
+    if (!apiPath) return;
+    setAttachmentBusy(`download:${file.id}`);
+    try {
+      const response = await apiFetch(apiPath + (apiPath.includes('?') ? '&' : '?') + 'download=1', { method: 'GET', cache: 'no-store' });
+      if (!response.ok) throw new Error('Image could not be downloaded.');
+      const blob = await response.blob();
+      if (!String(blob.type).startsWith('image/')) throw new Error('The stored attachment is not an image.');
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = text(file.original_name) || 'lab-enquiry-image';
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Image could not be downloaded.');
+    } finally {
+      setAttachmentBusy(null);
+    }
+  };
+
   const handleRefresh = async () => {
     await refreshAll();
     toast.success('Website enquiries refreshed.');
@@ -121,7 +160,7 @@ export default function WebsiteEnquiries() {
               <thead className="bg-slate-50 border-b border-slate-200 text-[10px] uppercase tracking-wider text-slate-500 font-black"><tr><th className="px-5 py-3">School / Contact</th><th className="px-5 py-3">Reach</th><th className="px-5 py-3">Location</th><th className="px-5 py-3">Students</th><th className="px-5 py-3">Submitted</th><th className="px-5 py-3">Type</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Message</th></tr></thead>
               <tbody className="divide-y divide-slate-100">
                 {enquiries.map(item => (
-                  <tr key={item.id} className="hover:bg-slate-50 align-top">
+                  <tr key={item.id} className={`hover:bg-slate-50 align-top ${item.read ? '' : 'bg-amber-50/30'}`}>
                     <td className="px-5 py-4"><div className="font-black text-slate-800">{item.school}</div><div className="text-slate-500 mt-1">{item.person}</div></td>
                     <td className="px-5 py-4 space-y-1"><a href={`mailto:${item.email}`} className="flex items-center gap-2 text-blue-600 hover:underline"><Mail size={13} /> {item.email || '—'}</a><a href={`tel:${item.phone}`} className="flex items-center gap-2 text-slate-600 hover:text-blue-600"><Phone size={13} /> {item.phone || '—'}</a></td>
                     <td className="px-5 py-4"><div className="flex items-center gap-2 text-slate-600"><MapPin size={13} /> {item.city || '—'}</div></td>
@@ -132,14 +171,23 @@ export default function WebsiteEnquiries() {
                         {ENQUIRY_TYPES[item.enquiryType] || item.enquiryType}
                       </span>
                     </td>
-                    <td className="px-5 py-4"><span className={`inline-flex px-2.5 py-1 rounded-full border text-[10px] font-black uppercase ${item.status === 'new' ? 'bg-amber-50 text-amber-700 border-amber-200' : item.status === 'won' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-600 border-slate-200'}`}>{STATUS_LABELS[item.status] || item.status}</span></td>
+                    <td className="px-5 py-4">
+                        <span className={`inline-flex px-2.5 py-1 rounded-full border text-[10px] font-black uppercase ${item.status === 'new' ? 'bg-amber-50 text-amber-700 border-amber-200' : item.status === 'won' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-600 border-slate-200'}`}>{STATUS_LABELS[item.status] || item.status}</span>
+                        {!item.read && <button type="button" onClick={() => void handleMarkRead(item)} className="ml-2 inline-flex items-center rounded-lg border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] font-black text-blue-700 hover:bg-blue-100">Mark as read</button>}
+                        {item.read && <span className="ml-2 text-[10px] font-bold text-slate-400">Read</span>}
+                      </td>
                     <td className="px-5 py-4 max-w-sm"><p className="text-slate-500 whitespace-pre-line line-clamp-4">{item.notes || 'No message provided.'}</p>
                       {item.labAttachments.length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-1.5">
                           {item.labAttachments.map(file => (
-                            <button key={file.id} type="button" onClick={() => void handleAttachmentPreview(file)} disabled={!file.url || attachmentBusy === file.id} className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] font-bold text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50">
-                              <ExternalLink size={11} /> {attachmentBusy === file.id ? 'Opening…' : file.original_name}
-                            </button>
+                            <div key={file.id} className="inline-flex overflow-hidden rounded-lg border border-blue-200 bg-blue-50">
+                              <button type="button" onClick={() => void handleAttachmentPreview(file)} disabled={!file.url || attachmentBusy === file.id || attachmentBusy === `download:${file.id}`} className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50">
+                                <ExternalLink size={11} /> {attachmentBusy === file.id ? 'Opening…' : file.original_name}
+                              </button>
+                              <button type="button" onClick={() => void handleAttachmentDownload(file)} disabled={!file.url || attachmentBusy === file.id || attachmentBusy === `download:${file.id}`} className="border-l border-blue-200 px-2 py-1 text-[10px] font-black text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50" title="Download image" aria-label={`Download ${file.original_name || 'image'}`}>
+                                ↓
+                              </button>
+                            </div>
                           ))}
                         </div>
                       )}</td>
