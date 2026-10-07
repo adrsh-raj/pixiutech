@@ -20,6 +20,10 @@ function formatBytes(value: number) {
   return (value / (1024 * 1024)).toFixed(2) + " MB"
 }
 
+function normalizePortalId(value: unknown) {
+  return String(value || "").trim().toUpperCase()
+}
+
 function initialStudentId() {
   return ""
 }
@@ -38,7 +42,7 @@ export function LabSupportWidget() {
   const inputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
-    const verifiedId = String(user?.related_id || user?.username || "").trim().toUpperCase()
+    const verifiedId = normalizePortalId(user?.pixiu_id || user?.related_id || (user?.role === "admin" ? user?.display_name : ""))
     if (verifiedId) setStudentId(verifiedId)
   }, [user])
 
@@ -82,7 +86,7 @@ export function LabSupportWidget() {
     const cleanId = studentId.trim().toUpperCase()
     const cleanMessage = message.trim()
     if (!cleanId) {
-      setStatus({ type: "error", text: "Enter your Student ID first." })
+      setStatus({ type: "error", text: "Your Pixiu ID is unavailable. Please sign in again." })
       return
     }
     if (!cleanMessage) {
@@ -95,6 +99,7 @@ export function LabSupportWidget() {
     try {
       const form = new FormData()
       form.append("enquiry_type", kind)
+      form.append("pixiu_id", cleanId)
       form.append("student_id", cleanId)
       form.append("message", cleanMessage)
       form.append("website", "")
@@ -119,7 +124,7 @@ export function LabSupportWidget() {
     }
   }
 
-  const contactMessage = "Hi Pixiu Tech, I need help with the Virtual Lab.\\nStudent ID: " + (studentId.trim().toUpperCase() || "—")
+  const contactMessage = "Hi Pixiu Tech, I need help with the Virtual Lab.\\nPixiu ID: " + (studentId.trim().toUpperCase() || "—")
   const whatsappHref = "https://wa.me/" + WHATSAPP_NUMBER + "?text=" + encodeURIComponent(contactMessage)
   const emailHref = "mailto:" + EMAIL + "?subject=" + encodeURIComponent("PIXIU LAB HELP") + "&body=" + encodeURIComponent(contactMessage)
 
@@ -167,7 +172,7 @@ export function LabSupportWidget() {
 
           <div className="space-y-3 p-4">
             <label className="block">
-              <span className="mb-1.5 block text-[10px] font-black uppercase tracking-wide text-slate-500">Your Pixiu ID</span>
+              <span className="mb-1.5 block text-[10px] font-black uppercase tracking-wide text-slate-500">PIXIU ID · {String(user?.role || "USER").toUpperCase()}</span>
               <input value={studentId} readOnly placeholder="Your Pixiu ID" maxLength={80} autoComplete="off" aria-readonly="true" className="w-full cursor-not-allowed rounded-xl border border-slate-700 bg-slate-950/80 px-3 py-2.5 text-xs font-semibold text-slate-300 outline-none" />
             </label>
 
