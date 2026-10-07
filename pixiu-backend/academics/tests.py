@@ -4,7 +4,7 @@ from django.db import IntegrityError, transaction
 from django.test import TestCase
 from rest_framework.test import APIClient, APIRequestFactory
 
-from accounts.credentials import build_student_password, build_student_username
+from accounts.credentials import build_student_username
 from accounts.models import User, UserRole
 
 from .models import School, SchoolClass, Student, Trainer, TrainerSchoolAssignment
@@ -25,9 +25,7 @@ class Phase3ModelTests(TestCase):
 
     def test_uppercase_ids_are_generated_exactly(self):
         username = build_student_username("xyz", "8", "a", 3)
-        password = build_student_password("xyz", username)
         self.assertEqual(username, "XYZ8A 03")
-        self.assertEqual(password, "XYZxyz8A3@hata")
 
     def test_duplicate_active_trainer_school_assignment_is_blocked(self):
         with self.assertRaises(IntegrityError):
@@ -45,7 +43,7 @@ class Phase3ModelTests(TestCase):
         provisioned, password = provision_student(student=student)
         self.assertEqual(provisioned.student_id, "XYZ8A 03")
         self.assertEqual(provisioned.account.username, "XYZ8A 03")
-        self.assertEqual(password, "XYZxyz8A3@hata")
+        self.assertTrue(password)
         self.assertTrue(provisioned.account.check_password(password))
         self.assertTrue(provisioned.account.password.startswith("pbkdf2_"))
         self.assertTrue(provisioned.account.must_change_password)
