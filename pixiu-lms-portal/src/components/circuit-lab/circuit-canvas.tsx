@@ -11,6 +11,7 @@ import { SchematicPartArt } from "./schematic-art"
 import { Maximize2, Plus, Minus } from "lucide-react"
 import type { ContextMenuTarget } from "./context-menu"
 import type { WireCurrentState } from "@/lib/current-flow"
+import { decodeSevenSegment } from "@/lib/seven-segment"
 
 interface View {
   scale: number
@@ -1085,44 +1086,93 @@ export function CircuitCanvas(props: Props) {
                     </foreignObject>
                   )}
                   {/* On-Canvas Live 7-Segment Quick Action Digit Controller */}
-                  {part.type === "seven-segment" && (
-                    <foreignObject
-                      x={-50}
-                      y={-46}
-                      width={170}
-                      height={42}
-                      className="overflow-visible pointer-events-auto"
-                    >
-                      <div
-                        className="bg-slate-950/95 border border-red-500/50 shadow-xl rounded-lg px-2 py-1 text-white flex items-center justify-between gap-1 select-none backdrop-blur-sm"
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onClick={(e) => e.stopPropagation()}
+                  {part.type === "seven-segment" && (() => {
+                    const seg = runtime?.[part.id]?.segments ?? {}
+                    const propDigit = part.props.digit !== undefined ? Number(part.props.digit) : undefined
+                    const activeFromWires = Object.values(seg).some(Boolean)
+                    const effectiveSegs: Record<string, boolean> = { ...seg }
+                    if (!activeFromWires && propDigit !== undefined && propDigit >= 0 && propDigit <= 9) {
+                      const map: Record<number, string[]> = {
+                        0: ["a", "b", "c", "d", "e", "f"],
+                        1: ["b", "c"],
+                        2: ["a", "b", "g", "e", "d"],
+                        3: ["a", "b", "g", "c", "d"],
+                        4: ["f", "g", "b", "c"],
+                        5: ["a", "f", "g", "c", "d"],
+                        6: ["a", "f", "g", "e", "c", "d"],
+                        7: ["a", "b", "c"],
+                        8: ["a", "b", "c", "d", "e", "f", "g"],
+                        9: ["a", "b", "c", "d", "f", "g"],
+                      }
+                      for (const s of map[propDigit] || []) {
+                        effectiveSegs[s] = true
+                      }
+                    }
+                    const decoded = decodeSevenSegment(effectiveSegs)
+
+                    return (
+                      <foreignObject
+                        x={-55}
+                        y={-48}
+                        width={175}
+                        height={46}
+                        className="overflow-visible pointer-events-auto"
                       >
-                        <div className="flex items-center gap-1 text-[9px] font-mono font-bold text-red-400">
-                          <span>🔢</span>
-                          <span className="text-white bg-red-950/80 px-1 py-0.5 rounded border border-red-500/40 font-bold min-w-[16px] text-center">
-                            {part.props.digit !== undefined ? String(part.props.digit) : "0"}
-                          </span>
+                        <div
+                          className="bg-slate-950/95 border border-red-500/40 shadow-2xl rounded-lg p-1 text-white flex flex-col gap-1 select-none backdrop-blur-md"
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="flex items-center justify-between gap-1 text-[9px] font-mono px-0.5">
+                            <div className="flex items-center gap-1">
+                              <span>🔢</span>
+                              <span
+                                className={`px-1.5 py-0.2 rounded font-bold border text-[9px] ${
+                                  decoded.digit !== undefined
+                                    ? "bg-emerald-950 text-emerald-300 border-emerald-500/50"
+                                    : decoded.status === "partial"
+                                    ? "bg-amber-950 text-amber-300 border-amber-500/50"
+                                    : "bg-slate-900 text-slate-400 border-slate-700"
+                                }`}
+                              >
+                                {decoded.digit !== undefined
+                                  ? `Digit ${decoded.digit}`
+                                  : decoded.glyph
+                                  ? `Glyph ${decoded.glyph}`
+                                  : "OFF"}
+                              </span>
+                            </div>
+                            {decoded.missingForDigit && (
+                              <span
+                                className="text-[8px] text-amber-400 font-sans font-medium truncate max-w-[95px]"
+                                title={decoded.tip}
+                              >
+                                Wire {decoded.missingForDigit.missing.join(",")} for {decoded.missingForDigit.targetDigit}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center justify-between gap-0.5">
+                            {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((d) => (
+                              <button
+                                key={d}
+                                type="button"
+                                title={`Set display to digit ${d}`}
+                                onClick={() => onChangeProp?.(part.id, "digit", d)}
+                                className={`flex-1 h-3.5 rounded text-[8px] font-mono font-bold flex items-center justify-center border transition-all ${
+                                  decoded.digit === d || (!activeFromWires && Number(part.props.digit ?? 0) === d)
+                                    ? "bg-red-600 text-white border-red-400 scale-105 shadow"
+                                    : "bg-slate-800 text-slate-300 border-slate-700 hover:border-red-400 hover:bg-slate-700 active:scale-95"
+                                }`}
+                              >
+                                {d}
+                              </button>
+                            ))}
+                          </div>
                         </div>
-                        <div className="flex items-center gap-0.5">
-                          {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((d) => (
-                            <button
-                              key={d}
-                              type="button"
-                              onClick={() => onChangeProp?.(part.id, "digit", d)}
-                              className={`w-3.5 h-4 rounded text-[8px] font-mono font-bold flex items-center justify-center border transition-all ${
-                                Number(part.props.digit ?? 0) === d
-                                  ? "bg-red-600 text-white border-red-400 scale-110 shadow"
-                                  : "bg-slate-800 text-slate-300 border-slate-700 hover:border-red-400 hover:bg-slate-700 active:scale-95"
-                              }`}
-                            >
-                              {d}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </foreignObject>
-                  )}
+                      </foreignObject>
+                    )
+                  })()}
+
                 </g>
               </g>
             )

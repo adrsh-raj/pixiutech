@@ -5,6 +5,7 @@ import { getComponentMeta } from "@/lib/component-registry"
 import { getBoardDefinition, isBoardType } from "@/lib/board-registry"
 import type { PartRuntime } from "./part-art"
 import { X, Cpu, Zap, Wifi } from "lucide-react"
+import { decodeSevenSegment } from "@/lib/seven-segment"
 
 interface Props {
   part: PlacedPart | null
@@ -529,19 +530,102 @@ export function Inspector({ part, runtime, partCount, wireCount, onChangeProp, o
               </Field>
             )}
 
-            {part.type === "seven-segment" && runtime?.segments && (
-              <Field label="Active Segments">
-                <div className="flex flex-wrap gap-1.5">
-                  {["a","b","c","d","e","f","g","dp"].map(s => (
-                    <span key={s} className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${
-                      runtime.segments?.[s] ? "bg-red-500/20 text-red-300" : "bg-slate-800 text-slate-500"
-                    }`}>
-                      {s.toUpperCase()}
-                    </span>
-                  ))}
+            {part.type === "seven-segment" && (() => {
+              const seg = (runtime as any)?.segments ?? {}
+              const propDigit = part.props.digit !== undefined ? Number(part.props.digit) : undefined
+              const activeFromWires = Object.values(seg).some(Boolean)
+              const effectiveSegs: Record<string, boolean> = { ...seg }
+              if (!activeFromWires && propDigit !== undefined && propDigit >= 0 && propDigit <= 9) {
+                const map: Record<number, string[]> = {
+                  0: ["a", "b", "c", "d", "e", "f"],
+                  1: ["b", "c"],
+                  2: ["a", "b", "g", "e", "d"],
+                  3: ["a", "b", "g", "c", "d"],
+                  4: ["f", "g", "b", "c"],
+                  5: ["a", "c", "d", "f", "g"],
+                  6: ["a", "c", "d", "e", "f", "g"],
+                  7: ["a", "b", "c"],
+                  8: ["a", "b", "c", "d", "e", "f", "g"],
+                  9: ["a", "b", "c", "d", "f", "g"],
+                }
+                for (const s of map[propDigit] || []) {
+                  effectiveSegs[s] = true
+                }
+              }
+              const decoded = decodeSevenSegment(effectiveSegs)
+
+              return (
+                <div className="space-y-3 rounded-xl border border-slate-800 bg-slate-900/60 p-3">
+                  <Field label="Decoded Output">
+                    <div className="flex items-center justify-between gap-2">
+                      <div
+                        className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-mono font-bold border ${
+                          decoded.digit !== undefined
+                            ? "bg-emerald-950/80 text-emerald-300 border-emerald-500/40"
+                            : decoded.status === "partial"
+                            ? "bg-amber-950/80 text-amber-300 border-amber-500/40"
+                            : "bg-slate-950 text-slate-400 border-slate-800"
+                        }`}
+                      >
+                        <span className="text-base">{decoded.digit !== undefined ? decoded.digit : decoded.glyph || "—"}</span>
+                        <span>{decoded.label}</span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        {decoded.activeSegments.length} of 7 segments lit
+                      </span>
+                    </div>
+                  </Field>
+
+                  <Field label="Segment States (a-g, dp)">
+                    <div className="grid grid-cols-4 gap-1">
+                      {["a", "b", "c", "d", "e", "f", "g", "dp"].map((s) => {
+                        const on = Boolean(effectiveSegs[s])
+                        return (
+                          <div
+                            key={s}
+                            className={`flex items-center justify-between rounded px-1.5 py-1 text-[10px] font-mono border ${
+                              on
+                                ? "bg-red-500/20 text-red-300 border-red-500/40 font-bold"
+                                : "bg-slate-950 text-slate-500 border-slate-800"
+                            }`}
+                          >
+                            <span>{s.toUpperCase()}</span>
+                            <span className={on ? "text-red-400" : "text-slate-600"}>{on ? "ON" : "OFF"}</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </Field>
+
+                  {/* Educational wiring alert when incomplete pattern like ']' is detected */}
+                  {decoded.tip && (
+                    <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-[11px] text-amber-200 leading-relaxed">
+                      <span className="font-bold text-amber-300">💡 Electronics Tip: </span>
+                      {decoded.tip}
+                    </div>
+                  )}
+
+                  <Field label="Interactive Digit Test">
+                    <div className="grid grid-cols-5 gap-1">
+                      {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((d) => (
+                        <button
+                          key={d}
+                          type="button"
+                          onClick={() => onChangeProp(part.id, "digit", d)}
+                          className={`rounded py-1 text-[11px] font-mono font-bold border transition ${
+                            decoded.digit === d || (!activeFromWires && Number(part.props.digit ?? 0) === d)
+                              ? "bg-red-600 text-white border-red-400 shadow-sm shadow-red-500/30"
+                              : "bg-slate-800 text-slate-300 border-slate-700 hover:border-red-400 hover:bg-slate-700"
+                          }`}
+                        >
+                          {d}
+                        </button>
+                      ))}
+                    </div>
+                  </Field>
                 </div>
-              </Field>
-            )}
+              )
+            })()}
 
             {part.type === "ir-sensor" && (
               <Field label="Virtual obstacle">

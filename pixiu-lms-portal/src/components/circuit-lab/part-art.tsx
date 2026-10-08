@@ -1,4 +1,5 @@
 import type { PlacedPart } from "@/lib/circuit-types"
+import { decodeSevenSegment } from "@/lib/seven-segment"
 
 export interface PartRuntime {
   /** 0..1 brightness for LEDs / on-off for others */
@@ -1026,27 +1027,96 @@ export function PartArt({ part, runtime }: { part: PlacedPart; runtime?: PartRun
         }
         return false
       }
-      const segColor = (id: string) => isSegOn(id) ? "#ef4444" : "#1f1f1f"
-      const segOpacity = (id: string) => isSegOn(id) ? 1 : 0.15
-      const segStyle = (id: string) => isSegOn(id) ? { filter: "drop-shadow(0 0 3.5px rgba(239, 68, 68, 0.95))" } : undefined
+      const segColor = (id: string) => (isSegOn(id) ? "#ef4444" : "#1f1f1f")
+      const segOpacity = (id: string) => (isSegOn(id) ? 1 : 0.15)
+      const segStyle = (id: string) =>
+        isSegOn(id) ? { filter: "drop-shadow(0 0 3.5px rgba(239, 68, 68, 0.95))" } : undefined
+      const segTextFill = (id: string) => (isSegOn(id) ? "#ffffff" : "#3f3f46")
+
+      const effectiveSegs: Record<string, boolean> = {
+        a: isSegOn("a"),
+        b: isSegOn("b"),
+        c: isSegOn("c"),
+        d: isSegOn("d"),
+        e: isSegOn("e"),
+        f: isSegOn("f"),
+        g: isSegOn("g"),
+        dp: isSegOn("dp"),
+      }
+      const decoded = decodeSevenSegment(effectiveSegs)
 
       return (
         <g>
+          {/* Main Bezel */}
           <rect x={2} y={2} width={56} height={76} rx={4} fill="#0a0a0a" stroke="#27272a" strokeWidth={1.5} />
+
+          {/* Top Pin labels: e, f, g, dp */}
+          <text x={5} y={3.8} textAnchor="middle" fontSize={3} fill="#71717a" fontFamily="monospace">e</text>
+          <text x={15} y={3.8} textAnchor="middle" fontSize={3} fill="#71717a" fontFamily="monospace">f</text>
+          <text x={25} y={3.8} textAnchor="middle" fontSize={3} fill="#71717a" fontFamily="monospace">g</text>
+          <text x={35} y={3.8} textAnchor="middle" fontSize={3} fill="#71717a" fontFamily="monospace">dp</text>
+
+          {/* Bottom Pin labels: a, b, c, d */}
+          <text x={5} y={79} textAnchor="middle" fontSize={3} fill="#71717a" fontFamily="monospace">a</text>
+          <text x={15} y={79} textAnchor="middle" fontSize={3} fill="#71717a" fontFamily="monospace">b</text>
+          <text x={25} y={79} textAnchor="middle" fontSize={3} fill="#71717a" fontFamily="monospace">c</text>
+          <text x={35} y={79} textAnchor="middle" fontSize={3} fill="#71717a" fontFamily="monospace">d</text>
+
+          {/* Common pin label on right */}
+          <text x={55} y={36} textAnchor="middle" fontSize={2.8} fill="#71717a" fontFamily="monospace">com</text>
+
           {/* Horizontal segments: a(top), g(mid), d(bottom) */}
           <rect x={14} y={10} width={28} height={5} rx={1.5} fill={segColor("a")} opacity={segOpacity("a")} style={segStyle("a")} />
+          <text x={28} y={13.8} textAnchor="middle" fontSize={3.6} fill={segTextFill("a")} fontWeight="bold" pointerEvents="none">a</text>
+
           <rect x={14} y={36} width={28} height={5} rx={1.5} fill={segColor("g")} opacity={segOpacity("g")} style={segStyle("g")} />
+          <text x={28} y={39.8} textAnchor="middle" fontSize={3.6} fill={segTextFill("g")} fontWeight="bold" pointerEvents="none">g</text>
+
           <rect x={14} y={62} width={28} height={5} rx={1.5} fill={segColor("d")} opacity={segOpacity("d")} style={segStyle("d")} />
+          <text x={28} y={65.8} textAnchor="middle" fontSize={3.6} fill={segTextFill("d")} fontWeight="bold" pointerEvents="none">d</text>
+
           {/* Vertical segments: f(TL), b(TR), e(BL), c(BR) */}
           <rect x={10} y={14} width={5} height={24} rx={1.5} fill={segColor("f")} opacity={segOpacity("f")} style={segStyle("f")} />
+          <text x={12.5} y={27} textAnchor="middle" fontSize={3.6} fill={segTextFill("f")} fontWeight="bold" pointerEvents="none">f</text>
+
           <rect x={41} y={14} width={5} height={24} rx={1.5} fill={segColor("b")} opacity={segOpacity("b")} style={segStyle("b")} />
+          <text x={43.5} y={27} textAnchor="middle" fontSize={3.6} fill={segTextFill("b")} fontWeight="bold" pointerEvents="none">b</text>
+
           <rect x={10} y={40} width={5} height={24} rx={1.5} fill={segColor("e")} opacity={segOpacity("e")} style={segStyle("e")} />
+          <text x={12.5} y={53} textAnchor="middle" fontSize={3.6} fill={segTextFill("e")} fontWeight="bold" pointerEvents="none">e</text>
+
           <rect x={41} y={40} width={5} height={24} rx={1.5} fill={segColor("c")} opacity={segOpacity("c")} style={segStyle("c")} />
+          <text x={43.5} y={53} textAnchor="middle" fontSize={3.6} fill={segTextFill("c")} fontWeight="bold" pointerEvents="none">c</text>
+
           {/* Decimal point */}
           <circle cx={50} cy={66} r={3} fill={segColor("dp")} opacity={segOpacity("dp")} style={segStyle("dp")} />
+
+          {/* On-bezel decoded readout */}
+          <rect
+            x={15}
+            y={70}
+            width={26}
+            height={6}
+            rx={1.5}
+            fill="#09090b"
+            stroke={decoded.digit !== undefined ? "#22c55e" : decoded.status === "partial" ? "#eab308" : "#27272a"}
+            strokeWidth={0.6}
+          />
+          <text
+            x={28}
+            y={74.5}
+            textAnchor="middle"
+            fontSize={3.8}
+            fontWeight="bold"
+            fontFamily="monospace"
+            fill={decoded.digit !== undefined ? "#4ade80" : decoded.status === "partial" ? "#facc15" : "#71717a"}
+          >
+            {decoded.digit !== undefined ? `VAL: ${decoded.digit}` : decoded.glyph ? `[ ${decoded.glyph} ]` : "OFF"}
+          </text>
         </g>
       )
     }
+
 
     case "lcd-i2c": {
       const line1 = runtime?.lcdLine1 ?? part.props.line1 ?? ""
