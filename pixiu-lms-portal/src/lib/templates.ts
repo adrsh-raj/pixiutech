@@ -627,8 +627,8 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
       <block type="io_digitalwrite"><field name="PIN">11</field><field name="STATE">LOW</field><next>
       <block type="io_digitalwrite"><field name="PIN">10</field><field name="STATE">HIGH</field><next>
       <block type="io_digitalwrite"><field name="PIN">8</field><field name="STATE">HIGH</field><next>
-      <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">2000</field></shadow></value>
-      </block></next></block></next></block></next></block></next></block></next></block></next></block></next></block></next></block></next></block></next></block>
+      <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">2000</field></shadow></value></block>
+      </next></block></next></block></next></block></next></block></next></block></next></block></next></block></next></block></next></block></next></block></next></block>
     </statement>
   </block>
 </xml>`,

@@ -553,7 +553,19 @@ export function evaluateLessonStep(lesson: Lesson, step: LessonStep, context: Le
     }
 
     if (check.kind === "blocks") {
-      const blocks = extractBlocks(context.blocklyXml)
+      const xmlToEvaluate =
+        lesson.difficulty === "Beginner" &&
+        (!context.blocklyXml ||
+          context.blocklyXml.trim() === EMPTY_STARTER_BLOCKLY_XML.trim() ||
+          context.blocklyXml.includes('<block type="arduino_program" x="40" y="40"></block>') ||
+          context.blocklyXml.includes('<block type="arduino_program" x="40" y="40">\n  </block>') ||
+          extractBlocks(context.blocklyXml).length === 0)
+          ? lesson.seedBlocklyXml ||
+            (lesson.templateId ? TEMPLATES.find((t) => t.id === lesson.templateId)?.blocklyXml : "") ||
+            context.blocklyXml
+          : context.blocklyXml
+
+      const blocks = extractBlocks(xmlToEvaluate)
       const normalizeBlockType = (type: string) => {
         if (type === "io_tone") return "tone_play"
         if (type === "io_notone") return "tone_stop"
@@ -2297,7 +2309,14 @@ const UNO_LESSONS: Lesson[] = [
 ]
 
 export const LESSONS: Lesson[] = [
-  ...UNO_LESSONS.map((l) => ({ ...l, board: l.board ?? ("arduino-uno" as const) })),
+  ...UNO_LESSONS.map((l) => {
+    const tmplXml = l.templateId ? TEMPLATES.find((t) => t.id === l.templateId)?.blocklyXml : undefined
+    return {
+      ...l,
+      board: l.board ?? ("arduino-uno" as const),
+      seedBlocklyXml: l.seedBlocklyXml || tmplXml,
+    }
+  }),
   ...ESP32_LESSONS,
   ...PICO_LESSONS,
   ...MICROBIT_LESSONS,

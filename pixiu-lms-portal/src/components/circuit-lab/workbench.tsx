@@ -38,7 +38,7 @@ import { normalizeAiVisionState } from "@/lib/ai/ai-result-normalizer"
 const AiStudioPanel = lazy(() => import("./ai-studio-panel").then((module) => ({ default: module.AiStudioPanel })))
 import { ContextMenu, type ContextMenuTarget } from "./context-menu"
 import type { ProjectTemplate } from "@/lib/templates"
-import { getLessonSeed, type Lesson } from "@/lib/lesson-engine"
+import { getLessonSeed, getLessonById, type Lesson } from "@/lib/lesson-engine"
 import { ProjectManager } from "./project-manager"
 import { WelcomeOverlay } from "./welcome-overlay"
 import { CircuitDoctorHud } from "./circuit-doctor-hud"
@@ -283,6 +283,28 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
       return () => clearTimeout(timer)
     }
   }, [view])
+
+  // Ensure that whenever a Beginner mission is active, its Blockly code is automatically loaded
+  useEffect(() => {
+    if (!activeLessonId) return
+    const lesson = getLessonById(activeLessonId)
+    if (!lesson || lesson.difficulty !== "Beginner") return
+
+    const seed = getLessonSeed(lesson)
+    if (!seed.blocklyXml) return
+
+    const isBlank =
+      !blocklyXml ||
+      blocklyXml.trim() === DEFAULT_XML.trim() ||
+      blocklyXml.includes('<block type="arduino_program" x="40" y="40"></block>') ||
+      blocklyXml.includes('<block type="arduino_program" x="40" y="40">\n  </block>') ||
+      blocklyXml.includes('<block type="arduino_program" x="40" y="40">\r\n  </block>')
+
+    if (isBlank && seed.blocklyXml !== blocklyXml) {
+      setBlocklyXml(seed.blocklyXml)
+      setBlocklyDocumentVersion((v) => v + 1)
+    }
+  }, [activeLessonId, blocklyXml])
 
   const handleProbeClip = useCallback((ref: PinRef) => {
     if (activeProbeToPlace === "red") {
@@ -1747,6 +1769,13 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
   const handleSelectLesson = useCallback((lesson: Lesson) => {
     setActiveLessonId(lesson.id)
     setActiveTemplateId(null)
+    if (lesson.difficulty === "Beginner") {
+      const seed = getLessonSeed(lesson)
+      if (seed.blocklyXml) {
+        setBlocklyXml(seed.blocklyXml)
+        setBlocklyDocumentVersion((value) => value + 1)
+      }
+    }
   }, [])
 
   const handleLoadLesson = useCallback(
