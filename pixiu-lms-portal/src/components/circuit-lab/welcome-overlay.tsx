@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { ArrowLeft, ArrowRight, CheckCircle2, CircuitBoard, MousePointer2, Sparkles, Zap, X } from "lucide-react"
+import { ArrowLeft, ArrowRight, BookOpen, Boxes, CheckCircle2, CircuitBoard, MousePointer2, Sparkles, Zap, X } from "lucide-react"
 
 const STORAGE_KEY = "pixiu-circuit-studio-welcome-v1"
 
@@ -26,7 +26,13 @@ const TOUR = [
   },
 ]
 
-export function WelcomeOverlay({ onOpenProjects }: { onOpenProjects: () => void }) {
+interface Props {
+  onOpenProjects: () => void
+  onOpenLessons: () => void
+  onOpenTemplates: () => void
+}
+
+export function WelcomeOverlay({ onOpenProjects, onOpenLessons, onOpenTemplates }: Props) {
   const [show, setShow] = useState(false)
   const [tourOpen, setTourOpen] = useState(false)
   const [tourIndex, setTourIndex] = useState(0)
@@ -89,11 +95,29 @@ export function WelcomeOverlay({ onOpenProjects }: { onOpenProjects: () => void 
             <div className="mt-6 grid gap-2 sm:grid-cols-2">
               <button
                 onClick={() => {
+                  dismiss()
+                  onOpenLessons()
+                }}
+                className="flex items-center justify-center gap-2 rounded-xl bg-cyan-500 px-4 py-3 text-xs font-bold text-slate-950 transition hover:bg-cyan-400"
+              >
+                <BookOpen size={14} /> Start a guided mission
+              </button>
+              <button
+                onClick={() => {
+                  dismiss()
+                  onOpenTemplates()
+                }}
+                className="flex items-center justify-center gap-2 rounded-xl border border-cyan-500/30 bg-cyan-950/40 px-4 py-3 text-xs font-bold text-cyan-100 transition hover:bg-cyan-900/60"
+              >
+                <Boxes size={14} /> Try a starter circuit
+              </button>
+              <button
+                onClick={() => {
                   setShow(true)
                   setTourIndex(0)
                   setTourOpen(true)
                 }}
-                className="rounded-xl bg-blue-600 px-4 py-3 text-xs font-bold text-white transition hover:bg-blue-500"
+                className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-xs font-bold text-slate-200 transition hover:bg-slate-800"
               >
                 Take the 1-minute tour
               </button>

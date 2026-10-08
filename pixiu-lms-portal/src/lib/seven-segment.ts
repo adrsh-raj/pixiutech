@@ -17,6 +17,21 @@ export const DIGIT_SEGMENTS: Record<number, string[]> = {
   9: ["a", "b", "c", "d", "f", "g"],
 }
 
+const SEGMENT_IDS = ["a", "b", "c", "d", "e", "f", "g", "dp"] as const
+
+export function resolveSevenSegmentSegments(
+  runtimeSegments?: Record<string, boolean>,
+  previewDigit?: number,
+): Record<string, boolean> {
+  if (runtimeSegments !== undefined) {
+    return Object.fromEntries(SEGMENT_IDS.map((segment) => [segment, Boolean(runtimeSegments[segment])]))
+  }
+
+  const digit = Number(previewDigit)
+  const litSegments = Number.isInteger(digit) ? DIGIT_SEGMENTS[digit] : undefined
+  return Object.fromEntries(SEGMENT_IDS.map((segment) => [segment, litSegments?.includes(segment) ?? false]))
+}
+
 export interface DecodedSevenSegment {
   digit?: number
   glyph?: string
@@ -45,6 +60,15 @@ export function decodeSevenSegment(segments: Record<string, boolean> = {}): Deco
     .filter((s) => Boolean(segments[s]))
     .sort()
     .join("")
+
+  if (!sig) {
+    return {
+      glyph: ".",
+      status: "glyph",
+      label: "Decimal point only",
+      activeSegments,
+    }
+  }
 
   // Check 0-9
   for (let d = 0; d <= 9; d++) {
