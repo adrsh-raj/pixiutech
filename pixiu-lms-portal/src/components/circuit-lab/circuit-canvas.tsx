@@ -1021,14 +1021,14 @@ export function CircuitCanvas(props: Props) {
                   {/* On-Canvas Live Keypad Quick Action Controller */}
                   {part.type === "keypad-4x4" && (
                     <foreignObject
-                      x={-25}
+                      x={-45}
                       y={-46}
-                      width={175}
-                      height={42}
+                      width={265}
+                      height={44}
                       className="overflow-visible pointer-events-auto"
                     >
                       <div
-                        className="bg-slate-950/95 border border-blue-500/50 shadow-xl rounded-lg px-2 py-1 text-white flex items-center justify-between gap-1 select-none backdrop-blur-sm"
+                        className="w-full bg-slate-950/95 border border-blue-500/60 shadow-2xl rounded-xl px-2.5 py-1 text-white flex items-center justify-between gap-1.5 select-none backdrop-blur-md overflow-hidden"
                         onPointerDown={(e) => e.stopPropagation()}
                         onClick={(e) => e.stopPropagation()}
                         onContextMenu={(e) => {
@@ -1037,13 +1037,13 @@ export function CircuitCanvas(props: Props) {
                           onCanvasContextMenu?.(e, { type: "part", id: part.id })
                         }}
                       >
-                        <div className="flex items-center gap-1 text-[9px] font-mono">
+                        <div className="flex items-center gap-1 text-[9px] font-mono shrink-0">
                           <span className="text-blue-400 font-bold">PIN:</span>
-                          <span className="text-white bg-slate-900 px-1.5 py-0.5 rounded border border-slate-700 font-bold tracking-wider min-w-[34px] text-center">
+                          <span className="text-white bg-slate-900 px-1.5 py-0.5 rounded border border-slate-700 font-bold tracking-wider w-12 text-center truncate">
                             {part.props.enteredPin ? String(part.props.enteredPin) : "____"}
                           </span>
                         </div>
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1 shrink-0">
                           {["1", "2", "3", "4"].map((k) => (
                             <button
                               key={k}
@@ -1052,7 +1052,7 @@ export function CircuitCanvas(props: Props) {
                                 const curr = String(part.props.enteredPin ?? "")
                                 onChangeProp?.(part.id, "enteredPin", (curr + k).slice(0, 8))
                               }}
-                              className="w-4 h-4 rounded text-[9px] font-mono font-bold flex items-center justify-center border border-slate-700 bg-slate-800 text-slate-200 hover:border-blue-400 hover:bg-slate-700 active:scale-95"
+                              className="w-5 h-5 rounded text-[10px] font-mono font-bold flex items-center justify-center border border-slate-700 bg-slate-800 text-slate-200 hover:border-blue-400 hover:bg-slate-700 active:scale-95 cursor-pointer"
                             >
                               {k}
                             </button>
@@ -1066,7 +1066,7 @@ export function CircuitCanvas(props: Props) {
                               onChangeProp?.(part.id, "enteredPin", "")
                               setTimeout(() => onChangeProp?.(part.id, "lastKey", ""), 1200)
                             }}
-                            className="px-1.5 h-4 rounded text-[8px] font-bold flex items-center justify-center border border-emerald-500 bg-emerald-600/30 text-emerald-300 hover:bg-emerald-600 hover:text-white transition active:scale-95"
+                            className="px-2 h-5 rounded text-[9px] font-bold flex items-center justify-center border border-emerald-500 bg-emerald-600/40 text-emerald-300 hover:bg-emerald-600 hover:text-white transition active:scale-95 cursor-pointer"
                           >
                             OK
                           </button>
@@ -1077,7 +1077,7 @@ export function CircuitCanvas(props: Props) {
                               onChangeProp?.(part.id, "enteredPin", "")
                               onChangeProp?.(part.id, "lastKey", "")
                             }}
-                            className="px-1 h-4 rounded text-[8px] font-bold flex items-center justify-center border border-rose-500 bg-rose-600/30 text-rose-300 hover:bg-rose-600 hover:text-white transition active:scale-95"
+                            className="px-1.5 h-5 rounded text-[9px] font-bold flex items-center justify-center border border-rose-500 bg-rose-600/40 text-rose-300 hover:bg-rose-600 hover:text-white transition active:scale-95 cursor-pointer"
                           >
                             CLR
                           </button>

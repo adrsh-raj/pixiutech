@@ -1459,7 +1459,8 @@ const EXTRA_TEMPLATES: ProjectTemplate[] = [
           block("lcd_set_cursor",{COL:"0",ROW:"0"}),
           block("lcd_print",{},{TEXT:textBlock("ENTER PASSWORD")}),
           block("lcd_set_cursor",{COL:"0",ROW:"1"}),
-          block("lcd_print",{},{TEXT:textBlock("PRESS 1234 + OK")})
+          block("lcd_print",{},{TEXT:textBlock("PRESS 1234 + OK")}),
+          block("keypad_clear_pin")
         ],
         [
           ifElseBlock(
@@ -1478,7 +1479,8 @@ const EXTRA_TEMPLATES: ProjectTemplate[] = [
               block("lcd_set_cursor",{COL:"0",ROW:"0"}),
               block("lcd_print",{},{TEXT:textBlock("ENTER PASSWORD")}),
               block("lcd_set_cursor",{COL:"0",ROW:"1"}),
-              block("lcd_print",{},{TEXT:textBlock("PRESS 1234 + OK")})
+              block("lcd_print",{},{TEXT:textBlock("PRESS 1234 + OK")}),
+              block("keypad_clear_pin")
             ],
             [delay(100)]
           )

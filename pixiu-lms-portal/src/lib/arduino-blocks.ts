@@ -263,6 +263,41 @@ export function defineArduinoBlocks() {
     }
   }
 
+  Blockly.Blocks['lcd_print_line'] = {
+    init() {
+      this.appendValueInput('TEXT')
+        .setCheck(null)
+        .appendField('LCD print on line')
+        .appendField(new Blockly.FieldDropdown([['1 (Top)', '1'], ['2 (Bottom)', '2']]), 'LINE')
+      this.setPreviousStatement(true)
+      this.setNextStatement(true)
+      this.setColour(120)
+      this.setTooltip('Print text on LCD line 1 or line 2 (16 characters max)')
+    }
+  }
+
+  Blockly.Blocks['seven_segment_write'] = {
+    init() {
+      this.appendValueInput('DIGIT')
+        .setCheck('Number')
+        .appendField('7-Segment display digit')
+      this.setPreviousStatement(true)
+      this.setNextStatement(true)
+      this.setColour(120)
+      this.setTooltip('Display a number (0-9) on the 7-segment display')
+    }
+  }
+
+  Blockly.Blocks['seven_segment_clear'] = {
+    init() {
+      this.appendDummyInput().appendField('7-Segment clear')
+      this.setPreviousStatement(true)
+      this.setNextStatement(true)
+      this.setColour(120)
+      this.setTooltip('Turn off all segments on the 7-segment display')
+    }
+  }
+
   Blockly.Blocks['ir_read'] = {
     init() {
       this.appendDummyInput()
@@ -358,7 +393,28 @@ export function defineArduinoBlocks() {
         .appendField(new Blockly.FieldDropdown(componentDropdown(['keypad-4x4'])), 'SENSOR')
       this.setOutput(true, 'String')
       this.setColour(45)
-      this.setTooltip('Read the last virtual key pressed.')
+      this.setTooltip('Read the last virtual key pressed or entered PIN.')
+    }
+  }
+
+  Blockly.Blocks['keypad_check_pin'] = {
+    init() {
+      this.appendValueInput('PIN')
+        .setCheck(null)
+        .appendField('Keypad PIN matches')
+      this.setOutput(true, 'Boolean')
+      this.setColour(45)
+      this.setTooltip('Checks if entered keypad PIN matches the secret password')
+    }
+  }
+
+  Blockly.Blocks['keypad_clear_pin'] = {
+    init() {
+      this.appendDummyInput().appendField('clear keypad PIN')
+      this.setPreviousStatement(true)
+      this.setNextStatement(true)
+      this.setColour(45)
+      this.setTooltip('Clears the entered keypad PIN buffer')
     }
   }
 
@@ -1026,14 +1082,44 @@ arduino.forBlock['text_string'] = (block) => [
   ORDER.ATOMIC,
 ]
 
-arduino.forBlock['lcd_print'] = () =>
-  '/* PIXIU simulated LCD print: runtime-only in CyberLab. */\\n'
+arduino.forBlock['lcd_print'] = function (block, generator) {
+  const gg = generator as ArduinoGen
+  gg.definitions_['wire_include'] = '#include <Wire.h>'
+  gg.definitions_['lcd_include'] = '#include <LiquidCrystal_I2C.h>'
+  gg.definitions_['lcd_decl'] = 'LiquidCrystal_I2C lcd(0x27, 16, 2);'
+  const text = generator.valueToCode(block, 'TEXT', ORDER.NONE) || '""'
+  return `lcd.print(${text});\n`
+}
 
-arduino.forBlock['lcd_set_cursor'] = () =>
-  '/* PIXIU simulated LCD cursor: runtime-only in CyberLab. */\\n'
+arduino.forBlock['lcd_print_line'] = function (block, generator) {
+  const gg = generator as ArduinoGen
+  gg.definitions_['wire_include'] = '#include <Wire.h>'
+  gg.definitions_['lcd_include'] = '#include <LiquidCrystal_I2C.h>'
+  gg.definitions_['lcd_decl'] = 'LiquidCrystal_I2C lcd(0x27, 16, 2);'
+  const line = block.getFieldValue('LINE') || '1'
+  const row = Number(line) === 2 ? 1 : 0
+  const text = generator.valueToCode(block, 'TEXT', ORDER.NONE) || '""'
+  return `lcd.setCursor(0, ${row});\nlcd.print(${text});\n`
+}
 
-arduino.forBlock['lcd_clear'] = () =>
-  '/* PIXIU simulated LCD clear: runtime-only in CyberLab. */\\n'
+arduino.forBlock['lcd_set_cursor'] = function (block) {
+  const col = block.getFieldValue('COL') ?? '0'
+  const row = block.getFieldValue('ROW') ?? '0'
+  return `lcd.setCursor(${col}, ${row});\n`
+}
+
+arduino.forBlock['lcd_clear'] = function () {
+  return 'lcd.clear();\n'
+}
+
+arduino.forBlock['seven_segment_write'] = function (block, generator) {
+  const digit = generator.valueToCode(block, 'DIGIT', ORDER.NONE) || '0'
+  return `displayDigit(${digit});\n`
+}
+
+arduino.forBlock['seven_segment_clear'] = function () {
+  return 'clearDisplay();\n'
+}
 
 arduino.forBlock['ir_read'] = (block) => [
   'false /* PIXIU simulated IR obstacle sensor: ' + String(block.getFieldValue('SENSOR') || '') + ' */',
@@ -1067,14 +1153,32 @@ arduino.forBlock['encoder_read'] = (block) => [
   '0 /* PIXIU simulated rotary encoder: ' + String(block.getFieldValue('SENSOR') || '') + ' */',
   ORDER.ATOMIC,
 ]
-arduino.forBlock['keypad_read'] = (block) => [
-  '"" /* PIXIU simulated keypad: ' + String(block.getFieldValue('SENSOR') || '') + ' */',
-  ORDER.ATOMIC,
-]
-arduino.forBlock['oled_print'] = () =>
-  '/* PIXIU simulated OLED print: runtime-only in CyberLab. */\\n'
-arduino.forBlock['oled_clear'] = () =>
-  '/* PIXIU simulated OLED clear: runtime-only in CyberLab. */\\n'
+arduino.forBlock['keypad_read'] = function () {
+  return ['keypad.getKey()', ORDER.ATOMIC]
+}
+
+arduino.forBlock['keypad_check_pin'] = function (block, generator) {
+  const pin = generator.valueToCode(block, 'PIN', ORDER.NONE) || '"1234"'
+  return [`(enteredPin == ${pin})`, ORDER.EQUALITY]
+}
+
+arduino.forBlock['keypad_clear_pin'] = function () {
+  return 'enteredPin = "";\n'
+}
+
+arduino.forBlock['oled_print'] = function (block, generator) {
+  const gg = generator as ArduinoGen
+  gg.definitions_['wire_include'] = '#include <Wire.h>'
+  gg.definitions_['adafruit_gfx'] = '#include <Adafruit_GFX.h>'
+  gg.definitions_['adafruit_ssd1306'] = '#include <Adafruit_SSD1306.h>'
+  gg.definitions_['oled_decl'] = 'Adafruit_SSD1306 oled(128, 64, &Wire, -1);'
+  const text = generator.valueToCode(block, 'TEXT', ORDER.NONE) || '""'
+  return `oled.println(${text});\noled.display();\n`
+}
+
+arduino.forBlock['oled_clear'] = function () {
+  return 'oled.clearDisplay();\noled.display();\n'
+}
 arduino.forBlock['motor_driver_write'] = (block, generator) => {
   const channel = block.getFieldValue('CHANNEL') || 'A'
   const speed = generator.valueToCode(block, 'SPEED', ORDER.NONE) || '0'

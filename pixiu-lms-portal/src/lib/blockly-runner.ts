@@ -46,6 +46,10 @@ export interface ExecutionEnvironment {
   // NeoPixel ring support
   setNeoPixelColor?: (sensorId: string, pixel: number, color: string) => void
   showNeoPixel?: (sensorId: string) => void
+  // Keypad & 7-Segment hooks
+  clearKeypadPin?: () => void
+  setSevenSegmentDigit?: (digit: number) => void
+  clearSevenSegment?: () => void
   sleep: (ms: number) => Promise<void>
   isRunning: () => boolean
   // Stepping & Debugging methods
@@ -187,6 +191,11 @@ export function evaluateBoolean(target: Blockly.Block | null, env?: ExecutionEnv
   if (target.type === "microbit_button_pressed") {
     const btn = (target.getFieldValue("BTN") ?? "A") as "A" | "B"
     return env?.isButtonPressed ? env.isButtonPressed(btn) : false
+  }
+  if (target.type === "keypad_check_pin") {
+    const targetPin = String(target.getFieldValue("PIN") ?? "1234").trim()
+    const entered = String(env?.getSensorText ? env.getSensorText("keypad", "keypad") : "").trim()
+    return entered === targetPin
   }
   if (target.type === "logic_boolean") {
     return target.getFieldValue("BOOL") === "TRUE"
@@ -372,6 +381,23 @@ function getBlockDescription(block: Blockly.Block, env: ExecutionEnvironment): s
     }
     case "lcd_clear":
       return "lcd.clear()"
+    case "lcd_print_line": {
+      const line = block.getFieldValue("LINE") ?? "1"
+      const text = evaluateValueInput(block, "TEXT", env, "")
+      return `lcd.printLine(L${line}: "${text}")`
+    }
+    case "seven_segment_write": {
+      const digit = evaluateNumberInput(block, "DIGIT", env, 0)
+      return `7-segment.write(${digit})`
+    }
+    case "seven_segment_clear":
+      return "7-segment.clear()"
+    case "keypad_check_pin": {
+      const pin = block.getFieldValue("PIN") ?? "1234"
+      return `keypad PIN == "${pin}"`
+    }
+    case "keypad_clear_pin":
+      return "keypad.clearPIN()"
     case "ai_is_unknown":
       return "AI unknown / low confidence"
     case "ai_camera_enable": {
@@ -560,6 +586,29 @@ async function executeSingleBlock(block: Blockly.Block, env: ExecutionEnvironmen
       lcdCursorCol = 0
       lcdCursorRow = 0
       env.clearLcd?.()
+      break
+    }
+
+    case "lcd_print_line": {
+      const line = Math.max(0, Math.min(1, Number(block.getFieldValue("LINE") ?? 1) - 1))
+      const text = evaluateValueInput(block, "TEXT", env, "")
+      env.setLcdText?.(0, line, text)
+      break
+    }
+
+    case "seven_segment_write": {
+      const digit = evaluateNumberInput(block, "DIGIT", env, 0)
+      env.setSevenSegmentDigit?.(Math.floor(digit))
+      break
+    }
+
+    case "seven_segment_clear": {
+      env.clearSevenSegment?.()
+      break
+    }
+
+    case "keypad_clear_pin": {
+      env.clearKeypadPin?.()
       break
     }
 

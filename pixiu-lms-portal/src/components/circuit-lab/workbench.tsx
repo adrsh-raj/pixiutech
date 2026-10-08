@@ -916,6 +916,40 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
             oled_line3: "" as any,
           }))
         },
+        clearKeypadPin: () => {
+          partsRef.current = partsRef.current.map((p) =>
+            p.type === "keypad-4x4" ? { ...p, props: { ...p.props, lastKey: "", enteredPin: "" } } : p
+          )
+          updateState((s) => ({
+            ...s,
+            parts: s.parts.map((p) =>
+              p.type === "keypad-4x4" ? { ...p, props: { ...p.props, lastKey: "", enteredPin: "" } } : p
+            ),
+          }))
+        },
+        setSevenSegmentDigit: (digit: number) => {
+          const d = Math.max(0, Math.min(9, Math.floor(digit)))
+          partsRef.current = partsRef.current.map((p) =>
+            p.type === "seven-segment" ? { ...p, props: { ...p.props, digit: d } } : p
+          )
+          updateState((s) => ({
+            ...s,
+            parts: s.parts.map((p) =>
+              p.type === "seven-segment" ? { ...p, props: { ...p.props, digit: d } } : p
+            ),
+          }))
+        },
+        clearSevenSegment: () => {
+          partsRef.current = partsRef.current.map((p) =>
+            p.type === "seven-segment" ? { ...p, props: { ...p.props, digit: -1 } } : p
+          )
+          updateState((s) => ({
+            ...s,
+            parts: s.parts.map((p) =>
+              p.type === "seven-segment" ? { ...p, props: { ...p.props, digit: -1 } } : p
+            ),
+          }))
+        },
         getSensorValue: (type, pin) => {
           const state = stateRef.current
           const currentState = state
@@ -1072,7 +1106,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
           if (type !== "keypad") return ""
           const keypad = partsRef.current.find((pt) => pt.id === id && pt.type === "keypad-4x4")
             ?? partsRef.current.find((pt) => pt.type === "keypad-4x4")
-          return String(keypad?.props?.lastKey ?? "")
+          return String(keypad?.props?.lastKey || keypad?.props?.enteredPin || "")
         },
         isAiDetected: (cls) => {
           const state = aiStateRef.current

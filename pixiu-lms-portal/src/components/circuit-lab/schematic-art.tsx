@@ -592,11 +592,11 @@ export function SchematicPartArt({ part, runtime }: { part: PlacedPart; runtime?
         <g className="schematic-symbol select-none">
           <rect x={4} y={6} width={172} height={68} rx={4} fill="#090d16" stroke="#22c55e" strokeWidth={2} />
           <rect x={12} y={12} width={156} height={36} rx={2} fill="#052e16" stroke="#15803d" strokeWidth={1.5} />
-          <text x={18} y={25} fontSize={8.5} fill="#4ade80" fontFamily="monospace">
-            {(l1 || "LCD 1602").slice(0, 16)}
+          <text x={18} y={25} fontSize={8} textLength={132} lengthAdjust="spacingAndGlyphs" fill="#4ade80" fontFamily="monospace">
+            {(l1 || "LCD 1602").slice(0, 16).padEnd(16, " ")}
           </text>
-          <text x={18} y={38} fontSize={8.5} fill="#4ade80" fontFamily="monospace">
-            {(l2 || "I2C BUS PCF8574").slice(0, 16)}
+          <text x={18} y={38} fontSize={8} textLength={132} lengthAdjust="spacingAndGlyphs" fill="#4ade80" fontFamily="monospace">
+            {(l2 || "I2C BUS PCF8574").slice(0, 16).padEnd(16, " ")}
           </text>
           {/* I2C Backpack pins */}
           <rect x={20} y={52} width={140} height={16} rx={2} fill="#1e293b" />

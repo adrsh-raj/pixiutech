@@ -1113,31 +1113,37 @@ export function PartArt({ part, runtime }: { part: PlacedPart; runtime?: PartRun
           <rect x={14} y={10} width={152} height={52} rx={2} fill={backlit ? "#1a4a1a" : "#0a2a0a"} stroke="#052e16" />
           {/* Text area background */}
           <rect x={18} y={14} width={144} height={44} rx={1} fill={backlit ? "#0d3d0d" : "#061a06"} />
-          {/* Line 1 text - cleanly centered, clamped to 16 chars, never exceeds bezel */}
+          {/* Line 1 text - strictly aligned to 16 columns, lengthAdjust guarantees 0 overflow */}
           <text
-            x={90}
+            x={24}
             y={32}
-            textAnchor="middle"
-            fontSize={8.8}
+            textAnchor="start"
+            fontSize={7.8}
+            textLength={132}
+            lengthAdjust="spacingAndGlyphs"
             fill={backlit ? "#4ade80" : "#1a5c1a"}
-            fontFamily="'Courier New', Courier, ui-monospace, monospace"
+            fontFamily="'Courier New', Courier, 'Lucida Console', monospace"
             fontWeight="bold"
+            letterSpacing="0.4px"
             clipPath={`url(#${clipId})`}
           >
-            {String(line1 || "").slice(0, 16)}
+            {String(line1 || "").slice(0, 16).padEnd(16, " ")}
           </text>
           {/* Line 2 text */}
           <text
-            x={90}
+            x={24}
             y={48}
-            textAnchor="middle"
-            fontSize={8.8}
+            textAnchor="start"
+            fontSize={7.8}
+            textLength={132}
+            lengthAdjust="spacingAndGlyphs"
             fill={backlit ? "#4ade80" : "#1a5c1a"}
-            fontFamily="'Courier New', Courier, ui-monospace, monospace"
+            fontFamily="'Courier New', Courier, 'Lucida Console', monospace"
             fontWeight="bold"
+            letterSpacing="0.4px"
             clipPath={`url(#${clipId})`}
           >
-            {String(line2 || "").slice(0, 16)}
+            {String(line2 || "").slice(0, 16).padEnd(16, " ")}
           </text>
           {/* I2C backpack chip */}
           <rect x={70} y={66} width={40} height={8} rx={1} fill="#1f2937" />
@@ -1377,9 +1383,9 @@ export function PartArt({ part, runtime }: { part: PlacedPart; runtime?: PartRun
     }
 
     case "oled-i2c": {
-      const line1 = String(runtime?.lcdLine1 ?? part.props.line1 ?? "").slice(0, 18)
-      const line2 = String(runtime?.lcdLine2 ?? part.props.line2 ?? "").slice(0, 18)
-      const line3 = String(part.props.line3 ?? "").slice(0, 18)
+      const line1 = String(runtime?.lcdLine1 ?? part.props.line1 ?? "").slice(0, 16)
+      const line2 = String(runtime?.lcdLine2 ?? part.props.line2 ?? "").slice(0, 16)
+      const line3 = String(part.props.line3 ?? "").slice(0, 16)
       const clipId = `oled-clip-${part.id}`
       return (
         <g>
@@ -1390,9 +1396,9 @@ export function PartArt({ part, runtime }: { part: PlacedPart; runtime?: PartRun
           </defs>
           <rect x="2" y="3" width="146" height="86" rx="9" fill="#111827" stroke="#334155" strokeWidth="2" />
           <rect x="12" y="14" width="126" height="60" rx="5" fill="#03111b" stroke="#0e7490" strokeWidth="1.5" />
-          <text x="20" y="31" fontSize="8.5" fill="#67e8f9" fontFamily="monospace" clipPath={`url(#${clipId})`}>{line1 || "PIXIU OLED"}</text>
-          <text x="20" y="47" fontSize="8.5" fill="#22d3ee" fontFamily="monospace" clipPath={`url(#${clipId})`}>{line2 || "READY"}</text>
-          <text x="20" y="63" fontSize="8" fill="#0891b2" fontFamily="monospace" clipPath={`url(#${clipId})`}>{line3}</text>
+          <text x="18" y="31" fontSize="7.8" textLength={114} lengthAdjust="spacingAndGlyphs" fill="#67e8f9" fontFamily="'Courier New', Courier, monospace" clipPath={`url(#${clipId})`}>{(line1 || "PIXIU OLED").padEnd(16, " ")}</text>
+          <text x="18" y="47" fontSize="7.8" textLength={114} lengthAdjust="spacingAndGlyphs" fill="#22d3ee" fontFamily="'Courier New', Courier, monospace" clipPath={`url(#${clipId})`}>{(line2 || "READY").padEnd(16, " ")}</text>
+          <text x="18" y="63" fontSize="7.8" textLength={114} lengthAdjust="spacingAndGlyphs" fill="#0891b2" fontFamily="'Courier New', Courier, monospace" clipPath={`url(#${clipId})`}>{line3.padEnd(16, " ")}</text>
           <circle cx="126" cy="81" r="2" fill="#22d3ee" className={line1 || line2 ? "animate-pulse" : ""} />
         </g>
       )
