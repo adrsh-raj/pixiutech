@@ -1106,7 +1106,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
           if (type !== "keypad") return ""
           const keypad = partsRef.current.find((pt) => pt.id === id && pt.type === "keypad-4x4")
             ?? partsRef.current.find((pt) => pt.type === "keypad-4x4")
-          return String(keypad?.props?.lastKey || keypad?.props?.enteredPin || "")
+          return String(keypad?.props?.lastKey ?? "")
         },
         isAiDetected: (cls) => {
           const state = aiStateRef.current

@@ -1153,16 +1153,22 @@ arduino.forBlock['encoder_read'] = (block) => [
   '0 /* PIXIU simulated rotary encoder: ' + String(block.getFieldValue('SENSOR') || '') + ' */',
   ORDER.ATOMIC,
 ]
-arduino.forBlock['keypad_read'] = function () {
+arduino.forBlock['keypad_read'] = function (_block, generator) {
+  const gg = generator as ArduinoGen
+  gg.definitions_['keypad_include'] = '#include <Keypad.h>\nconst byte ROWS = 4;\nconst byte COLS = 4;\nchar keys[ROWS][COLS] = {\n  {\'1\',\'2\',\'3\',\'A\'},\n  {\'4\',\'5\',\'6\',\'B\'},\n  {\'7\',\'8\',\'9\',\'C\'},\n  {\'*\',\'0\',\'#\',\'D\'}\n};\nbyte rowPins[ROWS] = {2, 3, 4, 5};\nbyte colPins[COLS] = {6, 7, 8, 9};\nKeypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);'
   return ['keypad.getKey()', ORDER.ATOMIC]
 }
 
 arduino.forBlock['keypad_check_pin'] = function (block, generator) {
+  const gg = generator as ArduinoGen
+  gg.definitions_['keypad_pin_var'] = 'String enteredPin = "";'
   const pin = generator.valueToCode(block, 'PIN', ORDER.NONE) || '"1234"'
   return [`(enteredPin == ${pin})`, ORDER.EQUALITY]
 }
 
-arduino.forBlock['keypad_clear_pin'] = function () {
+arduino.forBlock['keypad_clear_pin'] = function (_block, generator) {
+  const gg = generator as ArduinoGen
+  gg.definitions_['keypad_pin_var'] = 'String enteredPin = "";'
   return 'enteredPin = "";\n'
 }
 

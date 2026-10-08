@@ -193,9 +193,9 @@ export function evaluateBoolean(target: Blockly.Block | null, env?: ExecutionEnv
     return env?.isButtonPressed ? env.isButtonPressed(btn) : false
   }
   if (target.type === "keypad_check_pin") {
-    const targetPin = String(target.getFieldValue("PIN") ?? "1234").trim()
+    const targetPin = evaluateValueInput(target, "PIN", env, target.getFieldValue("PIN") || "1234").trim()
     const entered = String(env?.getSensorText ? env.getSensorText("keypad", "keypad") : "").trim()
-    return entered === targetPin
+    return entered !== "" && entered === targetPin
   }
   if (target.type === "logic_boolean") {
     return target.getFieldValue("BOOL") === "TRUE"

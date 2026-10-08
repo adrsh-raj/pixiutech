@@ -764,10 +764,10 @@ export function Inspector({ part, runtime, running = false, partCount, wireCount
                               onChangeProp(part.id, "enteredPin", "")
                               onChangeProp(part.id, "lastKey", "")
                             } else if (isOk) {
-                              const pinToSubmit = currentPin || "#"
-                              onChangeProp(part.id, "lastKey", pinToSubmit)
+                              if (!currentPin) return
+                              onChangeProp(part.id, "lastKey", currentPin)
                               onChangeProp(part.id, "enteredPin", "")
-                              setTimeout(() => onChangeProp(part.id, "lastKey", ""), 1200)
+                              setTimeout(() => onChangeProp(part.id, "lastKey", ""), 2000)
                             } else {
                               const newPin = (currentPin + key).slice(0, 8)
                               onChangeProp(part.id, "enteredPin", newPin)

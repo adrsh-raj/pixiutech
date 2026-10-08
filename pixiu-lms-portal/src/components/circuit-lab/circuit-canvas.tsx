@@ -639,12 +639,12 @@ export function CircuitCanvas(props: Props) {
                                     onChangeProp?.(part.id, "enteredPin", "")
                                     onChangeProp?.(part.id, "lastKey", "")
                                   } else if (label === "OK") {
-                                    const pinToSubmit = currentPin || "#"
-                                    onChangeProp?.(part.id, "lastKey", pinToSubmit)
+                                    if (!currentPin) return
+                                    onChangeProp?.(part.id, "lastKey", currentPin)
                                     onChangeProp?.(part.id, "enteredPin", "")
                                     setTimeout(() => {
                                       onChangeProp?.(part.id, "lastKey", "")
-                                    }, 1200)
+                                    }, 2000)
                                   } else {
                                     const newPin = (currentPin + label).slice(0, 8)
                                     onChangeProp?.(part.id, "enteredPin", newPin)
@@ -1061,10 +1061,11 @@ export function CircuitCanvas(props: Props) {
                             type="button"
                             title="Submit PIN"
                             onClick={() => {
-                              const pin = String(part.props.enteredPin ?? "") || "#"
+                              const pin = String(part.props.enteredPin ?? "")
+                              if (!pin) return
                               onChangeProp?.(part.id, "lastKey", pin)
                               onChangeProp?.(part.id, "enteredPin", "")
-                              setTimeout(() => onChangeProp?.(part.id, "lastKey", ""), 1200)
+                              setTimeout(() => onChangeProp?.(part.id, "lastKey", ""), 2000)
                             }}
                             className="px-2 h-5 rounded text-[9px] font-bold flex items-center justify-center border border-emerald-500 bg-emerald-600/40 text-emerald-300 hover:bg-emerald-600 hover:text-white transition active:scale-95 cursor-pointer"
                           >

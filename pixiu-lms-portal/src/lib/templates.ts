@@ -1013,6 +1013,7 @@ function analogWrite(pin: string, value: number) { return block("io_analogwrite"
 function delay(ms: number) { return block("time_delay", {}, { MS: numberBlock(ms) }) }
 function serialBegin() { return block("serial_begin", { BAUD: "9600" }) }
 function serialPrint(value: string) { return block("serial_print", {}, { TEXT: textBlock(value) }) }
+function serialPrintln(value: string) { return block("serial_println", {}, { TEXT: textBlock(value) }) }
 function serialPrintValue(type: string, fields: Record<string, string> = {}) { return block("serial_println", {}, { TEXT: block(type, fields) }) }
 
 function program(setup: string[], loop: string[]) {
@@ -1428,6 +1429,7 @@ const EXTRA_TEMPLATES: ProjectTemplate[] = [
     { parts: [part("uno","arduino-uno",210,130),part("keypad","keypad-4x4",40,80,{lastKey:"",enteredPin:""}),part("lcd","lcd-i2c",280,20,{line1:"ENTER PASSWORD",line2:"PRESS 1234 + OK"}),part("servo","servo",580,40,{angle:0}),part("buzzer","buzzer",580,130),part("r1","resistor",580,230,{resistance:220}),part("led1","led",690,200,{color:"green"})], wires: [wire("a","uno","d2","keypad","r1","#60a5fa"),wire("b","uno","d3","keypad","r2","#60a5fa"),wire("c","uno","d4","keypad","r3","#60a5fa"),wire("d","uno","d5","keypad","r4","#60a5fa"),wire("e","uno","d6","keypad","c1","#3b82f6"),wire("f","uno","d7","keypad","c2","#3b82f6"),wire("g","uno","d8","keypad","c3","#3b82f6"),wire("h","uno","d9","keypad","c4","#3b82f6"),wire("w_lvcc","uno","5v","lcd","vcc","#ef4444"),wire("w_lgnd","uno","gnd","lcd","gnd","#1e293b"),wire("w_lsda","uno","a4","lcd","sda","#60a5fa"),wire("w_lscl","uno","a5","lcd","scl","#3b82f6"),wire("w_svcc","uno","5v","servo","vcc","#ef4444"),wire("w_sgnd","uno","gnd","servo","gnd","#1e293b"),wire("w_ssig","uno","d10","servo","sig","#f97316"),wire("w_bzpos","uno","d11","buzzer","pos","#eab308"),wire("w_bzgnd","buzzer","neg","uno","gnd","#1e293b"),wire("i","uno","d13","r1","a","#22c55e"),wire("j","r1","b","led1","anode","#22c55e"),wire("k","led1","cathode","uno","gnd","#1e293b")] },
     program([
       serialBegin(),
+      serialPrintln("Vault Online. Enter PIN + OK"),
       pinMode("10","OUTPUT"),pinMode("11","OUTPUT"),pinMode("13","OUTPUT"),
       block("servo_write",{PIN:"10"},{ANGLE:numberBlock(0)}),
       digitalWrite("13","LOW"),
@@ -1438,10 +1440,10 @@ const EXTRA_TEMPLATES: ProjectTemplate[] = [
       block("lcd_set_cursor",{COL:"0",ROW:"1"}),
       block("lcd_print",{},{TEXT:textBlock("PRESS 1234 + OK")})
     ],[
-      serialPrintValue("keypad_read",{SENSOR:"keypad"}),
       ifElseBlock(
         compareBlock("EQ", sensorBlock("keypad_read","keypad"), textBlock("1234")),
         [
+          serialPrintln("PIN Accepted: Vault Unlocked"),
           block("lcd_clear"),
           block("lcd_set_cursor",{COL:"0",ROW:"0"}),
           block("lcd_print",{},{TEXT:textBlock("ACCESS GRANTED!")}),
@@ -1466,6 +1468,7 @@ const EXTRA_TEMPLATES: ProjectTemplate[] = [
           ifElseBlock(
             compareBlock("NEQ", sensorBlock("keypad_read","keypad"), textBlock("")),
             [
+              serialPrintln("Access Denied: Wrong PIN"),
               block("lcd_clear"),
               block("lcd_set_cursor",{COL:"0",ROW:"0"}),
               block("lcd_print",{},{TEXT:textBlock("WRONG PASSWORD!")}),
