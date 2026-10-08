@@ -126,8 +126,10 @@ export function Multimeter({
 
   // Solve only when a real measurement needs the circuit network.
   // The solver result is memoized across render-only changes.
+  // Solve when a real measurement needs the circuit network.
+  // Works with either or both probes connected for single-probe Auto-GND reference.
   const nodalSolution = useMemo(() => {
-    if (mode === "off" || !probeRed || !probeBlack) return null
+    if (mode === "off" || (!probeRed && !probeBlack)) return null
     return solveCircuitNodalPotentials(state, pressed, pinStates, running)
   }, [mode, probeBlack, probeRed, pinStates, pressed, running, state])
 
@@ -136,11 +138,11 @@ export function Multimeter({
     [],
   )
   const infoRed = useMemo(
-    () => (nodalSolution ? nodalSolution.getPinInfo(probeRed) : emptyPinInfo),
+    () => (nodalSolution && probeRed ? nodalSolution.getPinInfo(probeRed) : emptyPinInfo),
     [emptyPinInfo, nodalSolution, probeRed],
   )
   const infoBlack = useMemo(
-    () => (nodalSolution ? nodalSolution.getPinInfo(probeBlack) : emptyPinInfo),
+    () => (nodalSolution && probeBlack ? nodalSolution.getPinInfo(probeBlack) : emptyPinInfo),
     [emptyPinInfo, nodalSolution, probeBlack],
   )
 
@@ -165,13 +167,13 @@ export function Multimeter({
       return { value: "", unit: "", isContinuityBeep: false, explanation: "Multimeter is powered OFF" }
     }
 
-    if (!probeRed || !probeBlack) {
+    if (!probeRed && !probeBlack) {
       return {
-        value: "O.L",
+        value: "---",
         unit: "",
         isContinuityBeep: false,
-        explanation: "Clip both RED (+) and BLACK (-) probes to measure",
-        subtext: "Click 'Clip Pin' below and select any component terminal on the canvas",
+        explanation: "Ready to measure: Clip RED (+) probe to any pin",
+        subtext: "Single probe mode will automatically measure voltage referenced to Ground (0V)",
       }
     }
 
@@ -199,6 +201,15 @@ export function Multimeter({
       }
 
       case "resistance": {
+        if (!probeRed || !probeBlack) {
+          return {
+            value: "O.L",
+            unit: "kΩ",
+            isContinuityBeep: false,
+            explanation: "Clip BOTH probes across component terminals to measure resistance",
+            subtext: "Resistance requires a closed circuit path between Red and Black probes.",
+          }
+        }
         const res = nodalSolution.computeResistanceBetweenPins(probeRed, probeBlack)
         if (res.resistance === Infinity) {
           return {
@@ -221,6 +232,15 @@ export function Multimeter({
       }
 
       case "continuity": {
+        if (!probeRed || !probeBlack) {
+          return {
+            value: "O.L",
+            unit: "Ω",
+            isContinuityBeep: false,
+            explanation: "Clip BOTH probes across pins to test continuity (threshold < 30Ω)",
+            subtext: "Place one probe on each terminal of the wire or component under test.",
+          }
+        }
         const res = nodalSolution.computeResistanceBetweenPins(probeRed, probeBlack)
         const isContinuous = Number.isFinite(res.resistance) && res.resistance < 30
 
@@ -238,6 +258,15 @@ export function Multimeter({
       }
 
       case "current": {
+        if (!probeRed || !probeBlack) {
+          return {
+            value: "0.0",
+            unit: "mA",
+            isContinuityBeep: false,
+            explanation: "Clip BOTH probes to measure current through component",
+            subtext: "Place probes across an active component, source pin, or series resistor.",
+          }
+        }
         const cur = nodalSolution.computeCurrentBetweenPins(probeRed, probeBlack, runtime)
         return {
           value: cur.currentMa.toFixed(1),
@@ -273,11 +302,245 @@ export function Multimeter({
     }
   }, [isOpen, mode, reading.isContinuityBeep])
 
-  if (!isOpen) return null
+  const boardPart = state.parts.find((p) => isBoardPart(p.type))
+  const boardDef = boardPart ? getBoardForPart(boardPart) : undefined
+  const is3v3 = (boardDef?.logicVoltage ?? 5) <= 3.3
+  const boardGndPin =
+    boardDef?.pins.find((p) => p.kind === "ground")?.id || (is3v3 ? "gnd_r" : "gnd")
 
-  // Find first resistor and LED for quick test presets
-  const firstResistor = state.parts.find((p) => p.type === "resistor")
-  const firstLed = state.parts.find((p) => p.type === "led")
+  const isEquipotential = Boolean(
+    probeRed &&
+    probeBlack &&
+    Math.abs(infoRed.voltage - infoBlack.voltage) < 0.05 &&
+    infoRed.voltage > 0.5
+  )
+
+  const handleClipBlackToGnd = () => {
+    if (boardPart) {
+      audioEngine.unlockAudio()
+      onSetProbeBlack({ partId: boardPart.id, pinId: boardGndPin })
+      if (mode === "off") setMode("voltage")
+    }
+  }
+
+  const handleSwapProbes = () => {
+    audioEngine.unlockAudio()
+    const prevRed = probeRed
+    const prevBlack = probeBlack
+    onSetProbeRed(prevBlack)
+    onSetProbeBlack(prevRed)
+  }
+
+  // Dynamically discover all testable components on the canvas
+  const quickPresets = useMemo(() => {
+    const list: Array<{
+      id: string
+      label: string
+      colorClass: string
+      title: string
+      red: PinRef
+      black: PinRef
+      targetMode?: DmmMode
+    }> = []
+
+    const pwrPin =
+      boardDef?.pins.find((p) => (is3v3 ? p.id === "3v3" || p.id === "3v" : p.id === "5v" || p.id === "vin"))?.id ||
+      (is3v3 ? "3v3" : "5v")
+    const ledPin = boardDef?.builtInLedPin ?? "d13"
+
+    if (boardPart) {
+      list.push({
+        id: "board-pwr",
+        label: is3v3 ? "3V3 - GND" : "5V - GND",
+        colorClass: "text-amber-300 bg-slate-800 hover:bg-slate-700 border border-amber-500/30",
+        title: `Measure board power rail (${is3v3 ? "3.3V" : "5.0V"})`,
+        red: { partId: boardPart.id, pinId: pwrPin },
+        black: { partId: boardPart.id, pinId: boardGndPin },
+      })
+      list.push({
+        id: "board-led",
+        label: `${ledPin.toUpperCase()} - GND`,
+        colorClass: "text-cyan-300 bg-slate-800 hover:bg-slate-700 border border-cyan-500/30",
+        title: `Measure board Pin ${ledPin.toUpperCase()} voltage`,
+        red: { partId: boardPart.id, pinId: ledPin },
+        black: { partId: boardPart.id, pinId: boardGndPin },
+      })
+    }
+
+    const defaultGndRef: PinRef | null = boardPart ? { partId: boardPart.id, pinId: boardGndPin } : null
+
+    for (const part of state.parts) {
+      if (isBoardPart(part.type) || part.type === "breadboard") continue
+
+      if (part.type === "resistor") {
+        list.push({
+          id: `res-${part.id}`,
+          label: "Across R",
+          colorClass: "text-amber-300 bg-amber-950/60 hover:bg-amber-900 border border-amber-500/30",
+          title: `Measure voltage drop across ${part.props.resistance || 220}Ω resistor`,
+          red: { partId: part.id, pinId: "a" },
+          black: { partId: part.id, pinId: "b" },
+        })
+      } else if (part.type === "led") {
+        list.push({
+          id: `led-${part.id}`,
+          label: "Across LED",
+          colorClass: "text-rose-300 bg-rose-950/60 hover:bg-rose-900 border border-rose-500/30",
+          title: "Measure LED diode forward voltage (Vf)",
+          red: { partId: part.id, pinId: "anode" },
+          black: { partId: part.id, pinId: "cathode" },
+        })
+      } else if (part.type === "mq2-gas") {
+        const sensorGnd: PinRef = defaultGndRef ?? { partId: part.id, pinId: "gnd" }
+        list.push({
+          id: `mq2-ao-${part.id}`,
+          label: "MQ2 (AO)",
+          colorClass: "text-emerald-300 bg-emerald-950/60 hover:bg-emerald-900 border border-emerald-500/30",
+          title: "Measure MQ-2 Gas Sensor Analog Output (AO - GND)",
+          red: { partId: part.id, pinId: "ao" },
+          black: sensorGnd,
+        })
+        list.push({
+          id: `mq2-vcc-${part.id}`,
+          label: "MQ2 (VCC)",
+          colorClass: "text-emerald-300 bg-emerald-950/60 hover:bg-emerald-900 border border-emerald-500/30",
+          title: "Measure MQ-2 Sensor Supply Voltage (VCC - GND)",
+          red: { partId: part.id, pinId: "vcc" },
+          black: sensorGnd,
+        })
+      } else if (part.type === "potentiometer") {
+        const refBlack = defaultGndRef ?? { partId: part.id, pinId: "t1" }
+        list.push({
+          id: `pot-${part.id}`,
+          label: "Pot Wiper",
+          colorClass: "text-sky-300 bg-sky-950/60 hover:bg-sky-900 border border-sky-500/30",
+          title: "Measure Potentiometer Wiper Output Voltage",
+          red: { partId: part.id, pinId: "wiper" },
+          black: refBlack,
+        })
+      } else if (part.type === "tmp36") {
+        const sensorGnd: PinRef = defaultGndRef ?? { partId: part.id, pinId: "gnd" }
+        list.push({
+          id: `tmp36-${part.id}`,
+          label: "TMP36 Vout",
+          colorClass: "text-orange-300 bg-orange-950/60 hover:bg-orange-900 border border-orange-500/30",
+          title: "Measure TMP36 Temperature Sensor Output Voltage",
+          red: { partId: part.id, pinId: "out" },
+          black: sensorGnd,
+        })
+      } else if (part.type === "ldr") {
+        list.push({
+          id: `ldr-${part.id}`,
+          label: "Across LDR",
+          colorClass: "text-yellow-300 bg-yellow-950/60 hover:bg-yellow-900 border border-yellow-500/30",
+          title: "Measure Photoresistor (LDR) Terminal Voltage",
+          red: { partId: part.id, pinId: "t1" },
+          black: { partId: part.id, pinId: "t2" },
+        })
+      } else if (part.type === "buzzer") {
+        list.push({
+          id: `buzz-${part.id}`,
+          label: "Across Buzzer",
+          colorClass: "text-purple-300 bg-purple-950/60 hover:bg-purple-900 border border-purple-500/30",
+          title: "Measure Piezo Buzzer Terminal Voltage (+ / -)",
+          red: { partId: part.id, pinId: "pos" },
+          black: { partId: part.id, pinId: "neg" },
+        })
+      } else if (part.type === "dc-motor") {
+        list.push({
+          id: `motor-${part.id}`,
+          label: "Across Motor",
+          colorClass: "text-teal-300 bg-teal-950/60 hover:bg-teal-900 border border-teal-500/30",
+          title: "Measure DC Motor Terminal Voltage (+ / -)",
+          red: { partId: part.id, pinId: "pos" },
+          black: { partId: part.id, pinId: "neg" },
+        })
+      } else if (part.type === "servo") {
+        const sensorGnd: PinRef = defaultGndRef ?? { partId: part.id, pinId: "gnd" }
+        list.push({
+          id: `servo-${part.id}`,
+          label: "Servo Sig",
+          colorClass: "text-blue-300 bg-blue-950/60 hover:bg-blue-900 border border-blue-500/30",
+          title: "Measure Servo Control Signal Voltage (Signal - GND)",
+          red: { partId: part.id, pinId: "sig" },
+          black: sensorGnd,
+        })
+      } else if (part.type === "ultrasonic") {
+        const sensorGnd: PinRef = defaultGndRef ?? { partId: part.id, pinId: "gnd" }
+        list.push({
+          id: `us-echo-${part.id}`,
+          label: "HC-SR04 Echo",
+          colorClass: "text-indigo-300 bg-indigo-950/60 hover:bg-indigo-900 border border-indigo-500/30",
+          title: "Measure Ultrasonic Echo Pin Voltage (Echo - GND)",
+          red: { partId: part.id, pinId: "echo" },
+          black: sensorGnd,
+        })
+      } else if (part.type === "dht11") {
+        const sensorGnd: PinRef = defaultGndRef ?? { partId: part.id, pinId: "gnd" }
+        list.push({
+          id: `dht11-${part.id}`,
+          label: "DHT11 Data",
+          colorClass: "text-lime-300 bg-lime-950/60 hover:bg-lime-900 border border-lime-500/30",
+          title: "Measure DHT11 Data Pin Voltage (Data - GND)",
+          red: { partId: part.id, pinId: "data" },
+          black: sensorGnd,
+        })
+      } else if (part.type === "soil-moisture") {
+        const sensorGnd: PinRef = defaultGndRef ?? { partId: part.id, pinId: "gnd" }
+        list.push({
+          id: `soil-${part.id}`,
+          label: "Soil AO",
+          colorClass: "text-emerald-300 bg-emerald-950/60 hover:bg-emerald-900 border border-emerald-500/30",
+          title: "Measure Soil Moisture Sensor AO (AO - GND)",
+          red: { partId: part.id, pinId: "ao" },
+          black: sensorGnd,
+        })
+      } else if (part.type === "ir-sensor") {
+        const sensorGnd: PinRef = defaultGndRef ?? { partId: part.id, pinId: "gnd" }
+        list.push({
+          id: `ir-${part.id}`,
+          label: "IR Out",
+          colorClass: "text-red-300 bg-red-950/60 hover:bg-red-900 border border-red-500/30",
+          title: "Measure IR Obstacle Sensor Output (OUT - GND)",
+          red: { partId: part.id, pinId: "out" },
+          black: sensorGnd,
+        })
+      } else if (part.type === "pir-sensor") {
+        const sensorGnd: PinRef = defaultGndRef ?? { partId: part.id, pinId: "gnd" }
+        list.push({
+          id: `pir-${part.id}`,
+          label: "PIR Out",
+          colorClass: "text-purple-300 bg-purple-950/60 hover:bg-purple-900 border border-purple-500/30",
+          title: "Measure PIR Motion Sensor Output (OUT - GND)",
+          red: { partId: part.id, pinId: "out" },
+          black: sensorGnd,
+        })
+      } else if (part.type === "joystick") {
+        const sensorGnd: PinRef = defaultGndRef ?? { partId: part.id, pinId: "gnd" }
+        list.push({
+          id: `joy-vrx-${part.id}`,
+          label: "Joy VRx",
+          colorClass: "text-violet-300 bg-violet-950/60 hover:bg-violet-900 border border-violet-500/30",
+          title: "Measure Joystick VRx Output (VRx - GND)",
+          red: { partId: part.id, pinId: "vrx" },
+          black: sensorGnd,
+        })
+      } else if (part.type === "battery") {
+        list.push({
+          id: `bat-${part.id}`,
+          label: "9V Battery",
+          colorClass: "text-yellow-300 bg-yellow-950/60 hover:bg-yellow-900 border border-yellow-500/30",
+          title: "Measure 9V Battery Terminal Voltage (+ / -)",
+          red: { partId: part.id, pinId: "pos" },
+          black: { partId: part.id, pinId: "neg" },
+        })
+      }
+    }
+
+    return list
+  }, [boardDef, boardGndPin, boardPart, is3v3, state.parts])
+
+  if (!isOpen) return null
 
   return (
     <div
@@ -429,14 +692,34 @@ export function Multimeter({
         </div>
       </div>
 
-      {/* Warning Notice Banner (e.g. Arduino pin is LOW) */}
+      {/* Warning Notice Banner (e.g. Arduino pin is LOW or Equipotential) */}
       {reading.isWarning && (
-        <div className="mt-2.5 rounded-xl bg-amber-500/15 border border-amber-500/40 p-2 text-[11px] text-amber-200 font-mono flex items-start gap-2 animate-in fade-in">
-          <AlertTriangle size={15} className="shrink-0 text-amber-400 mt-0.5" />
-          <div className="leading-snug">
-            <span className="font-bold">Voltage Notice: </span>
-            <span>{reading.explanation}. {reading.subtext}</span>
+        <div className="mt-2.5 rounded-xl bg-amber-500/15 border border-amber-500/40 p-2.5 text-[11px] text-amber-200 font-mono animate-in fade-in">
+          <div className="flex items-start gap-2">
+            <AlertTriangle size={15} className="shrink-0 text-amber-400 mt-0.5" />
+            <div className="leading-snug flex-1">
+              <span className="font-bold text-amber-300">Notice: </span>
+              <span>{reading.explanation}</span>
+              {reading.subtext && (
+                <p className="mt-1 text-[10px] text-amber-300/80 leading-normal">
+                  💡 {reading.subtext}
+                </p>
+              )}
+            </div>
           </div>
+          {isEquipotential && boardPart && (
+            <div className="mt-2 pt-2 border-t border-amber-500/30 flex items-center justify-between">
+              <span className="text-[10px] text-amber-200 font-sans font-medium">Fix: Move Black probe to Ground:</span>
+              <button
+                onClick={handleClipBlackToGnd}
+                className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold font-mono text-[10px] flex items-center gap-1 cursor-pointer shadow-md transition"
+                title="Automatically attach Black (-) probe to Ground pin"
+              >
+                <Zap size={12} />
+                <span>Clip Black to GND</span>
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -609,85 +892,74 @@ export function Multimeter({
         </div>
       </div>
 
-      {/* Quick Test Presets (1-Click learning buttons) */}
-      <div className="mt-3 pt-2.5 border-t border-slate-800 flex items-center justify-between text-[10px] text-slate-400 flex-wrap gap-1.5">
-        <span className="font-semibold">Quick Test:</span>
-        <div className="flex gap-1 flex-wrap">
-          {(() => {
-            const boardPart = state.parts.find((p) => isBoardPart(p.type))
-            const boardDef = boardPart ? getBoardForPart(boardPart) : undefined
-            const is3v3 = (boardDef?.logicVoltage ?? 5) <= 3.3
-            const pwrPin = is3v3 ? "3v3" : "5v"
-            const gndPin = is3v3 ? "gnd_r" : "gnd"
-            const ledPin = boardDef?.builtInLedPin ?? "d13"
-
-            return (
-              <>
-                <button
-                  onClick={() => {
-                    audioEngine.unlockAudio()
-                    if (boardPart) {
-                      onSetProbeRed({ partId: boardPart.id, pinId: pwrPin })
-                      onSetProbeBlack({ partId: boardPart.id, pinId: gndPin })
-                      setMode("voltage")
-                    }
-                  }}
-                  className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 font-mono font-semibold cursor-pointer transition"
-                  title={`Clip probes across ${pwrPin.toUpperCase()} and GND (Measures ${is3v3 ? "3.30V" : "5.00V"})`}
-                >
-                  {is3v3 ? "3V3 - GND" : "5V - GND"}
-                </button>
-                <button
-                  onClick={() => {
-                    audioEngine.unlockAudio()
-                    if (boardPart) {
-                      onSetProbeRed({ partId: boardPart.id, pinId: ledPin })
-                      onSetProbeBlack({ partId: boardPart.id, pinId: gndPin })
-                      setMode("voltage")
-                    }
-                  }}
-                  className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-cyan-300 font-mono font-semibold cursor-pointer transition"
-                  title={`Clip probes across Pin ${ledPin.toUpperCase()} and GND`}
-                >
-                  {`${ledPin.toUpperCase()} - GND`}
-                </button>
-              </>
-            )
-          })()}
-
-          {/* Quick preset for Resistor drop */}
-          {firstResistor && (
+      {/* Probe Utilities Bar: Swap / Reference to GND / Clear */}
+      <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-slate-400 px-0.5">
+        <div className="flex items-center gap-1.5">
+          {probeRed && !probeBlack && boardPart && (
             <button
-              onClick={() => {
-                audioEngine.unlockAudio()
-                onSetProbeRed({ partId: firstResistor.id, pinId: "a" })
-                onSetProbeBlack({ partId: firstResistor.id, pinId: "b" })
-                setMode("voltage")
-              }}
-              className="px-2 py-0.5 rounded bg-amber-950/60 hover:bg-amber-900 border border-amber-500/30 text-amber-300 font-mono font-semibold cursor-pointer transition"
-              title="Clip probes across Resistor terminals to measure voltage drop ΔV"
+              onClick={handleClipBlackToGnd}
+              className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700/80 cursor-pointer transition flex items-center gap-1"
+              title="Clip Black (-) probe to Board Ground"
             >
-              Across R
+              <Zap size={10} />
+              <span>Reference to GND</span>
             </button>
           )}
-
-          {/* Quick preset for LED */}
-          {firstLed && (
+          {probeRed && probeBlack && (
             <button
-              onClick={() => {
-                audioEngine.unlockAudio()
-                onSetProbeRed({ partId: firstLed.id, pinId: "anode" })
-                onSetProbeBlack({ partId: firstLed.id, pinId: "cathode" })
-                setMode("voltage")
-              }}
-              className="px-2 py-0.5 rounded bg-rose-950/60 hover:bg-rose-900 border border-rose-500/30 text-rose-300 font-mono font-semibold cursor-pointer transition"
-              title="Clip probes across LED diode to measure forward drop Vf"
+              onClick={handleSwapProbes}
+              className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/80 cursor-pointer transition flex items-center gap-1"
+              title="Swap Red (+) and Black (-) probe locations"
             >
-              Across LED
+              <span>⇄ Swap Probes</span>
             </button>
           )}
         </div>
+        {(probeRed || probeBlack) && (
+          <button
+            onClick={() => {
+              onSetProbeRed(null)
+              onSetProbeBlack(null)
+            }}
+            className="px-2 py-0.5 rounded text-slate-400 hover:text-red-400 hover:bg-slate-800/80 cursor-pointer transition"
+            title="Unclip both probes"
+          >
+            Clear Probes
+          </button>
+        )}
       </div>
+
+      {/* Quick Test Presets (1-Click learning buttons) */}
+      {quickPresets.length > 0 && (
+        <div className="mt-3 pt-2.5 border-t border-slate-800 text-[10px] text-slate-400">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="font-semibold flex items-center gap-1">
+              <Sparkles size={11} className="text-amber-400" />
+              <span>1-Click Test Presets:</span>
+            </span>
+            <span className="text-[9px] text-slate-500 font-mono">
+              {quickPresets.length} available
+            </span>
+          </div>
+          <div className="flex gap-1 flex-wrap max-h-24 overflow-y-auto pr-0.5 custom-scrollbar">
+            {quickPresets.map((preset) => (
+              <button
+                key={preset.id}
+                onClick={() => {
+                  audioEngine.unlockAudio()
+                  onSetProbeRed(preset.red)
+                  onSetProbeBlack(preset.black)
+                  setMode(preset.targetMode ?? "voltage")
+                }}
+                className={`px-2 py-0.5 rounded font-mono font-semibold cursor-pointer transition ${preset.colorClass}`}
+                title={preset.title}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
         </>
       )}
     </div>

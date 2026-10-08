@@ -774,15 +774,64 @@ export function solveCircuitNodalPotentials(
     circuit: CircuitState,
     states: Record<string, ArduinoPinState>
   ) => {
-    if (!red || !black) {
+    if (!red && !black) {
       return {
         diff: 0,
         vRed: 0,
         vBlack: 0,
-        explanation: "Clip both RED (+) and BLACK (-) probes to measure",
+        explanation: "Clip RED (+) or BLACK (-) probe to measure voltage",
+        subtext: "Single-probe mode will automatically measure potential referenced to Ground (0V).",
       }
     }
 
+    const formatPinLabel = (ref: PinRef) => {
+      const p = circuit.parts.find((item) => item.id === ref.partId)
+      const pName = p ? p.type.replace("-", " ").toUpperCase() : ref.partId
+      return `${pName} (${ref.pinId})`
+    }
+
+    // Single-probe mode: Red probe only (Auto-referenced to Ground 0V)
+    if (red && !black) {
+      const infoRed = getPinInfo(red)
+      const vRed = infoRed.voltage
+      const label = formatPinLabel(red)
+
+      if (infoRed.isDigitalLow) {
+        return {
+          diff: 0,
+          vRed: 0,
+          vBlack: 0,
+          explanation: `Single Probe: ${label} is OUTPUT LOW (0.00V)`,
+          subtext: `Referenced to Ground (0V). Set ${infoRed.digitalPinName || red.pinId} HIGH in code to output voltage.`,
+          isWarning: true,
+        }
+      }
+
+      return {
+        diff: Number(vRed.toFixed(2)),
+        vRed,
+        vBlack: 0,
+        explanation: `Single Probe: ${label} = ${vRed >= 0 ? "+" : ""}${vRed.toFixed(2)}V (Referenced to Ground)`,
+        subtext: "Auto-GND active. Clip Black probe (-) to any other pin for differential ΔV measurement.",
+      }
+    }
+
+    // Single-probe mode: Black probe only (Referenced to Ground 0V)
+    if (!red && black) {
+      const infoBlack = getPinInfo(black)
+      const vBlack = infoBlack.voltage
+      const label = formatPinLabel(black)
+
+      return {
+        diff: Number((-vBlack).toFixed(2)),
+        vRed: 0,
+        vBlack,
+        explanation: `Single Probe: Black on ${label} = ${vBlack.toFixed(2)}V (Referenced to Ground)`,
+        subtext: "Clip Red probe (+) to a signal or power pin to measure positive potential.",
+      }
+    }
+
+    // Dual-probe mode: Both probes connected
     const infoRed = getPinInfo(red)
     const infoBlack = getPinInfo(black)
     const vRed = infoRed.voltage
@@ -880,22 +929,51 @@ export function solveCircuitNodalPotentials(
       }
     }
 
+    // Check if both probes are attached to the SAME electrical power rail / net (Equipotential)
+    if (Math.abs(diff) < 0.05 && vRed > 0.5 && vBlack > 0.5) {
+      const netLabel = infoRed.sourceLabel || infoBlack.sourceLabel || `+${vRed.toFixed(2)}V Power Rail`
+      return {
+        diff: 0,
+        vRed,
+        vBlack,
+        explanation: `⚡ Equipotential Rail: Both probes are attached to the same +${vRed.toFixed(2)}V line (${netLabel})!`,
+        subtext: `The multimeter measures potential difference (ΔV = V_Red - V_Black). Across the same wire or rail, ΔV = 0.00V. Move the BLACK probe (-) to Ground (0V) to measure supply voltage.`,
+        isWarning: true,
+      }
+    }
+
+    // Check if both probes are attached to Ground
+    if (Math.abs(diff) < 0.05 && infoRed.isGnd && infoBlack.isGnd) {
+      return {
+        diff: 0,
+        vRed: 0,
+        vBlack: 0,
+        explanation: "Both probes are connected to Ground (GND = 0.00V)",
+        subtext: "Common ground reference. Connect Red probe (+) to a power or signal pin to measure voltage.",
+      }
+    }
+
     // Reversed polarity note
     let polarityNote = ""
     if (diff < 0) {
       polarityNote = ` (Reversed Polarity: Black probe is on higher potential +${vBlack.toFixed(2)}V)`
+      return {
+        diff,
+        vRed,
+        vBlack,
+        explanation: `Potential Difference: Red (${vRed.toFixed(2)}V) minus Black (${vBlack.toFixed(2)}V)${polarityNote}`,
+        subtext: `Reversed polarity: Connect Red (+) to higher potential and Black (-) to Ground for positive reading. Click [Swap Probes] to flip.`,
+      }
     }
 
     return {
       diff,
       vRed,
       vBlack,
-      explanation: `Potential Difference: Red (${vRed.toFixed(2)}V) minus Black (${vBlack.toFixed(2)}V)${polarityNote}`,
-      subtext: diff < 0
-        ? "Reversed polarity: Connect Red (+) to higher potential and Black (-) to Ground for positive reading."
-        : infoBlack.isGnd
-          ? "Absolute potential measured relative to Ground (0V reference)."
-          : undefined,
+      explanation: `Potential Difference: Red (${vRed.toFixed(2)}V) minus Black (${vBlack.toFixed(2)}V)`,
+      subtext: infoBlack.isGnd
+        ? "Absolute potential measured relative to Ground (0V reference)."
+        : "Differential voltage between two circuit nodes.",
     }
   }
 
