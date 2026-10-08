@@ -1886,7 +1886,11 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
         onDownloadIno={handleDownloadIno}
       />
 
-      <WelcomeOverlay onOpenProjects={() => setIsProjectManagerOpen(true)} />
+      <WelcomeOverlay
+        onOpenProjects={() => setIsProjectManagerOpen(true)}
+        onOpenLessons={() => setIsLessonsOpen(true)}
+        onOpenTemplates={() => setIsTemplatesOpen(true)}
+      />
 
       <ProjectManager
         isOpen={isProjectManagerOpen}
@@ -2289,6 +2293,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
           <Inspector
             part={selected}
             runtime={selected ? runtime[selected.id] : undefined}
+            running={running}
             partCount={state.parts.length}
             wireCount={state.wires.length}
             onChangeProp={changeProp}

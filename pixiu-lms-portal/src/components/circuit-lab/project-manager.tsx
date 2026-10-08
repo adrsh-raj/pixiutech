@@ -19,6 +19,7 @@ import {
   listSavedCircuits,
   type SavedCircuit,
 } from "@/lib/storage"
+import { BackendHealth } from "./backend-health"
 
 interface Props {
   isOpen: boolean
@@ -210,7 +211,7 @@ export function ProjectManager({
             </div>
             <div className="min-w-0">
               <h2 className="truncate text-sm font-bold sm:text-base">Circuit Projects</h2>
-              <p className="text-[11px] text-slate-400">Save, restore, import and carry your Pixiu circuits.</p>
+              <p className="text-[11px] text-slate-400">Circuit files stay in this browser; export a .pixiu file to carry them.</p>
             </div>
           </div>
           <button
@@ -224,6 +225,7 @@ export function ProjectManager({
 
         <div className="grid max-h-[78vh] overflow-y-auto md:grid-cols-[minmax(280px,0.95fr)_minmax(340px,1.25fr)]">
           <section className="border-b border-slate-800 p-4 sm:p-5 md:border-b-0 md:border-r">
+            <BackendHealth />
             <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-4">
               <div className="mb-2 flex items-center justify-between gap-2">
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-300">Current project</p>

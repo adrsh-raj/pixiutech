@@ -11,7 +11,7 @@ import { SchematicPartArt } from "./schematic-art"
 import { Maximize2, Plus, Minus } from "lucide-react"
 import type { ContextMenuTarget } from "./context-menu"
 import type { WireCurrentState } from "@/lib/current-flow"
-import { decodeSevenSegment } from "@/lib/seven-segment"
+import { decodeSevenSegment, resolveSevenSegmentSegments } from "@/lib/seven-segment"
 
 interface View {
   scale: number
@@ -1089,25 +1089,8 @@ export function CircuitCanvas(props: Props) {
                   {part.type === "seven-segment" && (() => {
                     const seg = runtime?.[part.id]?.segments ?? {}
                     const propDigit = part.props.digit !== undefined ? Number(part.props.digit) : undefined
-                    const activeFromWires = Object.values(seg).some(Boolean)
-                    const effectiveSegs: Record<string, boolean> = { ...seg }
-                    if (!activeFromWires && propDigit !== undefined && propDigit >= 0 && propDigit <= 9) {
-                      const map: Record<number, string[]> = {
-                        0: ["a", "b", "c", "d", "e", "f"],
-                        1: ["b", "c"],
-                        2: ["a", "b", "g", "e", "d"],
-                        3: ["a", "b", "g", "c", "d"],
-                        4: ["f", "g", "b", "c"],
-                        5: ["a", "f", "g", "c", "d"],
-                        6: ["a", "f", "g", "e", "c", "d"],
-                        7: ["a", "b", "c"],
-                        8: ["a", "b", "c", "d", "e", "f", "g"],
-                        9: ["a", "b", "c", "d", "f", "g"],
-                      }
-                      for (const s of map[propDigit] || []) {
-                        effectiveSegs[s] = true
-                      }
-                    }
+                    const isPreview = runtime?.[part.id]?.segments === undefined
+                    const effectiveSegs = resolveSevenSegmentSegments(runtime?.[part.id]?.segments, propDigit)
                     const decoded = decodeSevenSegment(effectiveSegs)
 
                     return (
@@ -1157,12 +1140,13 @@ export function CircuitCanvas(props: Props) {
                                 key={d}
                                 type="button"
                                 title={`Set display to digit ${d}`}
+                                disabled={running}
                                 onClick={() => onChangeProp?.(part.id, "digit", d)}
                                 className={`flex-1 h-3.5 rounded text-[8px] font-mono font-bold flex items-center justify-center border transition-all ${
-                                  decoded.digit === d || (!activeFromWires && Number(part.props.digit ?? 0) === d)
+                                  decoded.digit === d || (isPreview && Number(part.props.digit ?? 0) === d)
                                     ? "bg-red-600 text-white border-red-400 scale-105 shadow"
                                     : "bg-slate-800 text-slate-300 border-slate-700 hover:border-red-400 hover:bg-slate-700 active:scale-95"
-                                }`}
+                                } disabled:cursor-not-allowed disabled:opacity-50`}
                               >
                                 {d}
                               </button>
