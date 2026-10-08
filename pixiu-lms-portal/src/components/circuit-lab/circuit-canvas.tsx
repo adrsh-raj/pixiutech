@@ -612,10 +612,10 @@ export function CircuitCanvas(props: Props) {
                     {interactive && part.type === "keypad-4x4" && (
                       <g>
                         {[
-                          ["1","2","3","A"],
-                          ["4","5","6","B"],
-                          ["7","8","9","C"],
-                          ["*","0","#","D"],
+                          ["1", "2", "3", "A"],
+                          ["4", "5", "6", "B"],
+                          ["7", "8", "9", "C"],
+                          ["CLR", "0", "OK", "D"],
                         ].flatMap((row, r) =>
                           row.map((label, col) => {
                             const kx = 10 + col * 26
@@ -633,20 +633,21 @@ export function CircuitCanvas(props: Props) {
                                 className="cursor-pointer"
                                 onPointerDown={(e) => {
                                   e.stopPropagation()
-                                  onChangeProp?.(part.id, "lastKey", label)
-                                }}
-                                onPointerUp={(e) => {
-                                  e.stopPropagation()
-                                  setTimeout(() => {
+                                  const currentPin = String(part.props.enteredPin ?? "")
+                                  if (label === "CLR") {
+                                    onChangeProp?.(part.id, "enteredPin", "")
                                     onChangeProp?.(part.id, "lastKey", "")
-                                  }, 750)
-                                }}
-                                onPointerLeave={() => {
-                                  setTimeout(() => {
-                                    if (String(part.props.lastKey ?? "") === label) {
+                                  } else if (label === "OK") {
+                                    const pinToSubmit = currentPin || "#"
+                                    onChangeProp?.(part.id, "lastKey", pinToSubmit)
+                                    onChangeProp?.(part.id, "enteredPin", "")
+                                    setTimeout(() => {
                                       onChangeProp?.(part.id, "lastKey", "")
-                                    }
-                                  }, 500)
+                                    }, 1200)
+                                  } else {
+                                    const newPin = (currentPin + label).slice(0, 8)
+                                    onChangeProp?.(part.id, "enteredPin", newPin)
+                                  }
                                 }}
                               />
                             )
@@ -1019,10 +1020,10 @@ export function CircuitCanvas(props: Props) {
                   {/* On-Canvas Live Keypad Quick Action Controller */}
                   {part.type === "keypad-4x4" && (
                     <foreignObject
-                      x={-6}
-                      y={-44}
-                      width={130}
-                      height={40}
+                      x={-25}
+                      y={-46}
+                      width={175}
+                      height={42}
                       className="overflow-visible pointer-events-auto"
                     >
                       <div
@@ -1035,34 +1036,50 @@ export function CircuitCanvas(props: Props) {
                           onCanvasContextMenu?.(e, { type: "part", id: part.id })
                         }}
                       >
-                        <div className="flex items-center gap-1 text-[9px] font-mono font-bold text-blue-300">
-                          <span>🔢</span>
-                          <span className="text-white bg-blue-900/60 px-1 py-0.5 rounded border border-blue-400/40">
-                            {part.props.lastKey ? `Key: ${part.props.lastKey}` : "Keypad"}
+                        <div className="flex items-center gap-1 text-[9px] font-mono">
+                          <span className="text-blue-400 font-bold">PIN:</span>
+                          <span className="text-white bg-slate-900 px-1.5 py-0.5 rounded border border-slate-700 font-bold tracking-wider min-w-[34px] text-center">
+                            {part.props.enteredPin ? String(part.props.enteredPin) : "____"}
                           </span>
                         </div>
                         <div className="flex items-center gap-1">
-                          {["1", "2", "3", "A", "#"].map((k) => (
+                          {["1", "2", "3", "4"].map((k) => (
                             <button
                               key={k}
                               type="button"
-                              onPointerDown={(e) => {
-                                e.stopPropagation()
-                                onChangeProp?.(part.id, "lastKey", k)
+                              onClick={() => {
+                                const curr = String(part.props.enteredPin ?? "")
+                                onChangeProp?.(part.id, "enteredPin", (curr + k).slice(0, 8))
                               }}
-                              onPointerUp={(e) => {
-                                e.stopPropagation()
-                                setTimeout(() => onChangeProp?.(part.id, "lastKey", ""), 750)
-                              }}
-                              className={`w-4 h-4 rounded text-[9px] font-mono font-bold flex items-center justify-center border transition-all ${
-                                String(part.props.lastKey ?? "") === k
-                                  ? "bg-blue-600 text-white border-blue-400 scale-110 shadow"
-                                  : "bg-slate-800 text-slate-200 border-slate-700 hover:border-blue-400 hover:bg-slate-700 active:scale-95"
-                              }`}
+                              className="w-4 h-4 rounded text-[9px] font-mono font-bold flex items-center justify-center border border-slate-700 bg-slate-800 text-slate-200 hover:border-blue-400 hover:bg-slate-700 active:scale-95"
                             >
                               {k}
                             </button>
                           ))}
+                          <button
+                            type="button"
+                            title="Submit PIN"
+                            onClick={() => {
+                              const pin = String(part.props.enteredPin ?? "") || "#"
+                              onChangeProp?.(part.id, "lastKey", pin)
+                              onChangeProp?.(part.id, "enteredPin", "")
+                              setTimeout(() => onChangeProp?.(part.id, "lastKey", ""), 1200)
+                            }}
+                            className="px-1.5 h-4 rounded text-[8px] font-bold flex items-center justify-center border border-emerald-500 bg-emerald-600/30 text-emerald-300 hover:bg-emerald-600 hover:text-white transition active:scale-95"
+                          >
+                            OK
+                          </button>
+                          <button
+                            type="button"
+                            title="Clear PIN"
+                            onClick={() => {
+                              onChangeProp?.(part.id, "enteredPin", "")
+                              onChangeProp?.(part.id, "lastKey", "")
+                            }}
+                            className="px-1 h-4 rounded text-[8px] font-bold flex items-center justify-center border border-rose-500 bg-rose-600/30 text-rose-300 hover:bg-rose-600 hover:text-white transition active:scale-95"
+                          >
+                            CLR
+                          </button>
                         </div>
                       </div>
                     </foreignObject>

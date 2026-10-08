@@ -1027,15 +1027,15 @@ export function PartArt({ part, runtime }: { part: PlacedPart; runtime?: PartRun
     }
 
     case "lcd-i2c": {
-      const line1 = runtime?.lcdLine1 ?? ""
-      const line2 = runtime?.lcdLine2 ?? ""
+      const line1 = runtime?.lcdLine1 ?? part.props.line1 ?? ""
+      const line2 = runtime?.lcdLine2 ?? part.props.line2 ?? ""
       const backlit = runtime?.lcdBacklight !== false
       const clipId = `lcd-clip-${part.id}`
       return (
         <g>
           <defs>
             <clipPath id={clipId}>
-              <rect x={20} y={15} width={140} height={42} rx={2} />
+              <rect x={18} y={14} width={144} height={44} rx={2} />
             </clipPath>
           </defs>
           {/* PCB Board */}
@@ -1049,33 +1049,31 @@ export function PartArt({ part, runtime }: { part: PlacedPart; runtime?: PartRun
           <rect x={14} y={10} width={152} height={52} rx={2} fill={backlit ? "#1a4a1a" : "#0a2a0a"} stroke="#052e16" />
           {/* Text area background */}
           <rect x={18} y={14} width={144} height={44} rx={1} fill={backlit ? "#0d3d0d" : "#061a06"} />
-          {/* Line 1 text - mathematically clamped so 16 characters never exceed bezel */}
+          {/* Line 1 text - cleanly centered, clamped to 16 chars, never exceeds bezel */}
           <text
-            x={22}
+            x={90}
             y={32}
-            fontSize={9.2}
+            textAnchor="middle"
+            fontSize={8.8}
             fill={backlit ? "#4ade80" : "#1a5c1a"}
-            fontFamily="monospace"
-            letterSpacing={1.2}
-            textLength={134}
-            lengthAdjust="spacingAndGlyphs"
+            fontFamily="'Courier New', Courier, ui-monospace, monospace"
+            fontWeight="bold"
             clipPath={`url(#${clipId})`}
           >
-            {(line1 || "").padEnd(16, " ").slice(0, 16)}
+            {String(line1 || "").slice(0, 16)}
           </text>
           {/* Line 2 text */}
           <text
-            x={22}
-            y={50}
-            fontSize={9.2}
+            x={90}
+            y={48}
+            textAnchor="middle"
+            fontSize={8.8}
             fill={backlit ? "#4ade80" : "#1a5c1a"}
-            fontFamily="monospace"
-            letterSpacing={1.2}
-            textLength={134}
-            lengthAdjust="spacingAndGlyphs"
+            fontFamily="'Courier New', Courier, ui-monospace, monospace"
+            fontWeight="bold"
             clipPath={`url(#${clipId})`}
           >
-            {(line2 || "").padEnd(16, " ").slice(0, 16)}
+            {String(line2 || "").slice(0, 16)}
           </text>
           {/* I2C backpack chip */}
           <rect x={70} y={66} width={40} height={8} rx={1} fill="#1f2937" />
@@ -1431,7 +1429,12 @@ export function PartArt({ part, runtime }: { part: PlacedPart; runtime?: PartRun
     }
 
     case "keypad-4x4": {
-      const keys = [["1","2","3","A"],["4","5","6","B"],["7","8","9","C"],["*","0","#","D"]]
+      const keys = [
+        ["1", "2", "3", "A"],
+        ["4", "5", "6", "B"],
+        ["7", "8", "9", "C"],
+        ["CLR", "0", "OK", "D"]
+      ]
       const lastKey = String(part.props.lastKey ?? "")
       return (
         <g>
@@ -1439,7 +1442,10 @@ export function PartArt({ part, runtime }: { part: PlacedPart; runtime?: PartRun
           {keys.flatMap((row, r) => row.map((label, col) => {
             const x = 10 + col * 26
             const y = 12 + r * 26
-            const active = label === lastKey
+            const rawKey = label === "OK" ? "#" : label === "CLR" ? "*" : label
+            const active = label === lastKey || rawKey === lastKey
+            const isOk = label === "OK"
+            const isClr = label === "CLR"
             return (
               <g key={label} className="cursor-pointer select-none">
                 <rect
@@ -1448,17 +1454,17 @@ export function PartArt({ part, runtime }: { part: PlacedPart; runtime?: PartRun
                   width="20"
                   height="20"
                   rx="5"
-                  fill={active ? "#2563eb" : "#1e293b"}
-                  stroke={active ? "#93c5fd" : "#475569"}
-                  strokeWidth={active ? 2 : 1}
+                  fill={active ? "#2563eb" : isOk ? "#065f46" : isClr ? "#881337" : "#1e293b"}
+                  stroke={active ? "#93c5fd" : isOk ? "#34d399" : isClr ? "#f43f5e" : "#475569"}
+                  strokeWidth={active || isOk || isClr ? 1.5 : 1}
                   style={active ? { filter: "drop-shadow(0 0 5px rgba(59, 130, 246, 0.9))" } : undefined}
                 />
                 <text
                   x={x + 10}
                   y={y + 13}
                   textAnchor="middle"
-                  fontSize="8"
-                  fill={active ? "#ffffff" : "#e2e8f0"}
+                  fontSize={isOk || isClr ? "6.5" : "8"}
+                  fill={active ? "#ffffff" : isOk ? "#a7f3d0" : isClr ? "#fecdd3" : "#e2e8f0"}
                   fontFamily="monospace"
                   fontWeight="700"
                 >

@@ -883,10 +883,17 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
           setSerialLines((prev) => [...prev, { text, timestamp: Date.now(), type: "output" }])
         },
         setLcdText: (col, row, text) => {
-          setPinStates((prev) => ({
-            ...prev,
-            [row === 0 ? "lcd_line1" : "lcd_line2"]: text as any,
-          }))
+          setPinStates((prev) => {
+            const key = row === 0 ? "lcd_line1" : "lcd_line2"
+            const current = String(prev[key] ?? "").padEnd(16, " ")
+            const c = Math.max(0, Math.min(15, Number(col) || 0))
+            const str = String(text ?? "")
+            const updated = (current.slice(0, c) + str + current.slice(c + str.length)).slice(0, 16)
+            return {
+              ...prev,
+              [key]: updated as any,
+            }
+          })
         },
         clearLcd: () => {
           setPinStates((prev) => ({

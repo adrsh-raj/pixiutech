@@ -673,21 +673,50 @@ export function Inspector({ part, runtime, partCount, wireCount, onChangeProp, o
             )}
 
             {part.type === "keypad-4x4" && (
-              <Field label={"Key pressed: " + (part.props.lastKey || "none")}>
-                <div className="grid grid-cols-4 gap-1">
-                  {["1","2","3","A","4","5","6","B","7","8","9","C","*","0","#","D"].map((key) => (
-                    <button key={key}
-                      onClick={() => {
-                        onChangeProp(part.id, "lastKey", key)
-                        setTimeout(() => onChangeProp(part.id, "lastKey", ""), 400)
-                      }}
-                      className={"rounded-lg border px-1 py-2 text-xs font-bold transition-all " + (
-                        String(part.props.lastKey ?? "") === key ? "border-primary bg-primary/25 text-primary scale-105 shadow" : "border-border bg-secondary text-foreground hover:bg-secondary/80"
-                      )}
-                    >
-                      {key}
-                    </button>
-                  ))}
+              <Field label="Keypad PIN Entry">
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between rounded-md border border-border bg-background/80 px-2.5 py-1.5 font-mono text-xs">
+                    <span className="text-[10px] text-muted-foreground">PIN Buffer:</span>
+                    <span className="font-bold tracking-widest text-primary">
+                      {part.props.enteredPin ? String(part.props.enteredPin) : "____"}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-4 gap-1">
+                    {["1", "2", "3", "A", "4", "5", "6", "B", "7", "8", "9", "C", "CLR", "0", "OK", "D"].map((key) => {
+                      const isOk = key === "OK"
+                      const isClr = key === "CLR"
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => {
+                            const currentPin = String(part.props.enteredPin ?? "")
+                            if (isClr) {
+                              onChangeProp(part.id, "enteredPin", "")
+                              onChangeProp(part.id, "lastKey", "")
+                            } else if (isOk) {
+                              const pinToSubmit = currentPin || "#"
+                              onChangeProp(part.id, "lastKey", pinToSubmit)
+                              onChangeProp(part.id, "enteredPin", "")
+                              setTimeout(() => onChangeProp(part.id, "lastKey", ""), 1200)
+                            } else {
+                              const newPin = (currentPin + key).slice(0, 8)
+                              onChangeProp(part.id, "enteredPin", newPin)
+                            }
+                          }}
+                          className={`rounded-lg border px-1 py-2 text-xs font-bold transition-all ${
+                            isOk
+                              ? "border-emerald-500 bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30"
+                              : isClr
+                              ? "border-rose-500 bg-rose-600/20 text-rose-400 hover:bg-rose-600/30"
+                              : "border-border bg-secondary text-foreground hover:bg-secondary/80"
+                          }`}
+                        >
+                          {key}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
               </Field>
             )}

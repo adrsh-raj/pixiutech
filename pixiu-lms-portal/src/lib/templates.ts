@@ -1202,40 +1202,72 @@ const EXTRA_TEMPLATES: ProjectTemplate[] = [
       "3. ▶️ Simulation Execution & Interaction Controls: Click Run to start the rover. Click and drag the joystick thumbstick on canvas in any direction (forward, back, left, right).",
       "4. 📊 Outcomes & Real-Time Observations: Both rover motors respond dynamically with forward, reverse, and skid-steering spin directions accompanied by live RPM telemetry.",
     ]),
-  starter("g8-keypad-lock", "🔒 Smart Security Vault Safe (Keypad + LCD + Servo Lock)", "Electronic combination safe with matrix keypad authentication! A 4×4 matrix keypad scans rows (D2-D5) and columns (D6-D9) to detect keypresses. While locked, a 16×2 I2C LCD displays 'VAULT LOCKED'. When any key is entered, the safe grants access: the LCD shows 'ACCESS GRANTED!', green LED lights up (D13), buzzer sounds a confirmation chime (D11), and a servo deadbolt unlocks to 90° on D10 before auto-relocking.", 8, "Human Interface", "Advanced", ["Keypad", "Security", "LCD", "Servo", "Access Control"],
-    { parts: [part("uno","arduino-uno",210,130),part("keypad","keypad-4x4",40,80,{lastKey:""}),part("lcd","lcd-i2c",280,20,{line1:"VAULT LOCKED",line2:"PRESS 1 TO OPEN"}),part("servo","servo",580,40,{angle:0}),part("buzzer","buzzer",580,130),part("r1","resistor",580,230,{resistance:220}),part("led1","led",690,200,{color:"green"})], wires: [wire("a","uno","d2","keypad","r1","#60a5fa"),wire("b","uno","d3","keypad","r2","#60a5fa"),wire("c","uno","d4","keypad","r3","#60a5fa"),wire("d","uno","d5","keypad","r4","#60a5fa"),wire("e","uno","d6","keypad","c1","#3b82f6"),wire("f","uno","d7","keypad","c2","#3b82f6"),wire("g","uno","d8","keypad","c3","#3b82f6"),wire("h","uno","d9","keypad","c4","#3b82f6"),wire("w_lvcc","uno","5v","lcd","vcc","#ef4444"),wire("w_lgnd","uno","gnd","lcd","gnd","#1e293b"),wire("w_lsda","uno","a4","lcd","sda","#60a5fa"),wire("w_lscl","uno","a5","lcd","scl","#3b82f6"),wire("w_svcc","uno","5v","servo","vcc","#ef4444"),wire("w_sgnd","uno","gnd","servo","gnd","#1e293b"),wire("w_ssig","uno","d10","servo","sig","#f97316"),wire("w_bzpos","uno","d11","buzzer","pos","#eab308"),wire("w_bzgnd","buzzer","neg","uno","gnd","#1e293b"),wire("i","uno","d13","r1","a","#22c55e"),wire("j","r1","b","led1","anode","#22c55e"),wire("k","led1","cathode","uno","gnd","#1e293b")] },
+  starter("g8-keypad-lock", "🔒 Smart Security Vault Safe (Keypad + LCD + Servo Lock)", "Electronic combination safe with matrix keypad authentication! Enter secret PIN 1234 on the 4×4 keypad and press OK to unlock. The 16×2 LCD guides the user with live prompts, the deadbolt servo unlocks to 90°, a green LED illuminates, and the buzzer plays a confirmation chime.", 8, "Human Interface", "Advanced", ["Keypad", "Security", "LCD", "Servo", "Access Control"],
+    { parts: [part("uno","arduino-uno",210,130),part("keypad","keypad-4x4",40,80,{lastKey:"",enteredPin:""}),part("lcd","lcd-i2c",280,20,{line1:"ENTER PASSWORD",line2:"PRESS 1234 + OK"}),part("servo","servo",580,40,{angle:0}),part("buzzer","buzzer",580,130),part("r1","resistor",580,230,{resistance:220}),part("led1","led",690,200,{color:"green"})], wires: [wire("a","uno","d2","keypad","r1","#60a5fa"),wire("b","uno","d3","keypad","r2","#60a5fa"),wire("c","uno","d4","keypad","r3","#60a5fa"),wire("d","uno","d5","keypad","r4","#60a5fa"),wire("e","uno","d6","keypad","c1","#3b82f6"),wire("f","uno","d7","keypad","c2","#3b82f6"),wire("g","uno","d8","keypad","c3","#3b82f6"),wire("h","uno","d9","keypad","c4","#3b82f6"),wire("w_lvcc","uno","5v","lcd","vcc","#ef4444"),wire("w_lgnd","uno","gnd","lcd","gnd","#1e293b"),wire("w_lsda","uno","a4","lcd","sda","#60a5fa"),wire("w_lscl","uno","a5","lcd","scl","#3b82f6"),wire("w_svcc","uno","5v","servo","vcc","#ef4444"),wire("w_sgnd","uno","gnd","servo","gnd","#1e293b"),wire("w_ssig","uno","d10","servo","sig","#f97316"),wire("w_bzpos","uno","d11","buzzer","pos","#eab308"),wire("w_bzgnd","buzzer","neg","uno","gnd","#1e293b"),wire("i","uno","d13","r1","a","#22c55e"),wire("j","r1","b","led1","anode","#22c55e"),wire("k","led1","cathode","uno","gnd","#1e293b")] },
     program([
       serialBegin(),
       pinMode("10","OUTPUT"),pinMode("11","OUTPUT"),pinMode("13","OUTPUT"),
       block("servo_write",{PIN:"10"},{ANGLE:numberBlock(0)}),
       digitalWrite("13","LOW"),
-      block("lcd_print",{},{TEXT:textBlock("VAULT LOCKED")})
+      digitalWrite("11","LOW"),
+      block("lcd_clear"),
+      block("lcd_set_cursor",{COL:"0",ROW:"0"}),
+      block("lcd_print",{},{TEXT:textBlock("ENTER PASSWORD")}),
+      block("lcd_set_cursor",{COL:"0",ROW:"1"}),
+      block("lcd_print",{},{TEXT:textBlock("PRESS 1234 + OK")})
     ],[
       serialPrintValue("keypad_read",{SENSOR:"keypad"}),
       ifElseBlock(
-        compareBlock("NEQ", sensorBlock("keypad_read","keypad"), textBlock("")),
+        compareBlock("EQ", sensorBlock("keypad_read","keypad"), textBlock("1234")),
         [
           block("lcd_clear"),
+          block("lcd_set_cursor",{COL:"0",ROW:"0"}),
           block("lcd_print",{},{TEXT:textBlock("ACCESS GRANTED!")}),
+          block("lcd_set_cursor",{COL:"0",ROW:"1"}),
+          block("lcd_print",{},{TEXT:textBlock("VAULT UNLOCKED")}),
           digitalWrite("13","HIGH"),
           digitalWrite("11","HIGH"),
           block("servo_write",{PIN:"10"},{ANGLE:numberBlock(90)}),
           delay(250),
           digitalWrite("11","LOW"),
-          delay(1200),
+          delay(2000),
           block("servo_write",{PIN:"10"},{ANGLE:numberBlock(0)}),
           digitalWrite("13","LOW"),
           block("lcd_clear"),
-          block("lcd_print",{},{TEXT:textBlock("VAULT LOCKED")})
+          block("lcd_set_cursor",{COL:"0",ROW:"0"}),
+          block("lcd_print",{},{TEXT:textBlock("ENTER PASSWORD")}),
+          block("lcd_set_cursor",{COL:"0",ROW:"1"}),
+          block("lcd_print",{},{TEXT:textBlock("PRESS 1234 + OK")})
         ],
-        [delay(100)]
+        [
+          ifElseBlock(
+            compareBlock("NEQ", sensorBlock("keypad_read","keypad"), textBlock("")),
+            [
+              block("lcd_clear"),
+              block("lcd_set_cursor",{COL:"0",ROW:"0"}),
+              block("lcd_print",{},{TEXT:textBlock("WRONG PASSWORD!")}),
+              block("lcd_set_cursor",{COL:"0",ROW:"1"}),
+              block("lcd_print",{},{TEXT:textBlock("ACCESS DENIED")}),
+              digitalWrite("11","HIGH"),
+              delay(350),
+              digitalWrite("11","LOW"),
+              delay(1200),
+              block("lcd_clear"),
+              block("lcd_set_cursor",{COL:"0",ROW:"0"}),
+              block("lcd_print",{},{TEXT:textBlock("ENTER PASSWORD")}),
+              block("lcd_set_cursor",{COL:"0",ROW:"1"}),
+              block("lcd_print",{},{TEXT:textBlock("PRESS 1234 + OK")})
+            ],
+            [delay(100)]
+          )
+        ]
       ),
     ]),
     [
-      "1. 🔌 Circuit Wiring & Hardware Setup: Wire 4x4 keypad rows to D2-D5 and cols to D6-D9. Connect I2C LCD to A4/A5, deadbolt servo to D10, buzzer to D11, and green LED to D13.",
-      "2. ⚙️ Code Architecture & Logic: Setup sets servo to 0° (locked) and LCD to 'VAULT LOCKED'. Loop polls keypad_read; when a key is pressed, it opens servo (90°), chimes buzzer, and relocks.",
-      "3. ▶️ Simulation Execution & Interaction Controls: Click Run to arm vault. Click key '1' on the 4x4 matrix keypad component on the canvas to trigger unlock sequence.",
-      "4. 📊 Outcomes & Real-Time Observations: The deadbolt servo swings 90°, the green access LED illuminates, the buzzer sounds a chime, and the LCD confirms 'ACCESS GRANTED!'.",
+      "1. 🔌 Circuit Wiring: Wire Keypad rows to D2-D5 and cols to D6-D9. Connect I2C LCD to A4/A5, deadbolt servo to D10, buzzer to D11, and green LED to D13.",
+      "2. ⚙️ Code Architecture: Initialize locked servo at 0° and prompt user. Loop verifies keypad PIN; entry of 1234 and OK unlocks vault.",
+      "3. ▶️ Interaction: Enter 1234 and press OK on keypad to disengage deadbolt.",
+      "4. 📊 Output: Access Granted notification on 16x2 LCD, 90° servo deadbolt swing, and chime confirmation.",
     ]),
   starter("g8-relay-home", "🏠 Automated Smart Home (PIR Motion + Relay + Cooling Fan + Lamp)", "High-voltage home automation with PIR motion and electromechanical relay! The PIR motion sensor monitors room occupancy on digital pin D7. When movement is detected, Arduino energizes an electromechanical relay module on pin D8. The relay's internal electromagnet closes the Normally Open (NO) contacts, routing power from a 9V battery to spin a ceiling cooling fan (DC motor) at 1800 RPM and illuminate the room lamp.", 8, "Automation", "Advanced", ["Relay", "Automation", "PIR Motion", "DC Motor", "Smart Home"],
     { parts: [part("uno","arduino-uno",40,110),part("pir","pir-sensor",310,50,{motion:"false"}),part("relay","relay",310,190),part("fan","dc-motor",540,60),part("lamp","led",540,180,{color:"blue"}),part("r1","resistor",540,260,{resistance:220}),part("bat","battery",710,120,{voltage:9})], wires: [wire("a","uno","5v","relay","vcc","#ef4444"),wire("b","uno","gnd","relay","gnd","#1e293b"),wire("c","uno","d8","relay","in","#facc15"),wire("w_pvcc","uno","5v","pir","vcc","#ef4444"),wire("w_pgnd","uno","gnd","pir","gnd","#1e293b"),wire("w_pout","uno","d7","pir","out","#60a5fa"),wire("b_com","bat","pos","relay","com","#ef4444"),wire("d","relay","no","fan","pos","#60a5fa"),wire("r_lamp","relay","no","r1","a","#60a5fa"),wire("e","r1","b","lamp","anode","#3b82f6"),wire("fan_gnd","fan","neg","bat","neg","#1e293b"),wire("f","lamp","cathode","bat","neg","#1e293b"),wire("bat_gnd","bat","neg","uno","gnd","#1e293b")] },
