@@ -1,5 +1,5 @@
 import type { PlacedPart } from "@/lib/circuit-types"
-import { decodeSevenSegment } from "@/lib/seven-segment"
+import { decodeSevenSegment, resolveSevenSegmentSegments } from "@/lib/seven-segment"
 
 export interface PartRuntime {
   /** 0..1 brightness for LEDs / on-off for others */
@@ -1006,43 +1006,15 @@ export function PartArt({ part, runtime }: { part: PlacedPart; runtime?: PartRun
     }
 
     case "seven-segment": {
-      const seg = runtime?.segments ?? {}
       const propDigit = part.props.digit !== undefined ? Number(part.props.digit) : undefined
-      const isSegOn = (id: string) => {
-        if (seg[id]) return true
-        if (propDigit !== undefined && propDigit >= 0 && propDigit <= 9) {
-          const map: Record<number, string[]> = {
-            0: ["a", "b", "c", "d", "e", "f"],
-            1: ["b", "c"],
-            2: ["a", "b", "g", "e", "d"],
-            3: ["a", "b", "g", "c", "d"],
-            4: ["f", "g", "b", "c"],
-            5: ["a", "f", "g", "c", "d"],
-            6: ["a", "f", "g", "e", "c", "d"],
-            7: ["a", "b", "c"],
-            8: ["a", "b", "c", "d", "e", "f", "g"],
-            9: ["a", "b", "c", "d", "f", "g"],
-          }
-          return (map[propDigit] || []).includes(id)
-        }
-        return false
-      }
+      const effectiveSegs = resolveSevenSegmentSegments(runtime?.segments, propDigit)
+      const isSegOn = (id: string) => Boolean(effectiveSegs[id])
       const segColor = (id: string) => (isSegOn(id) ? "#ef4444" : "#1f1f1f")
       const segOpacity = (id: string) => (isSegOn(id) ? 1 : 0.15)
       const segStyle = (id: string) =>
         isSegOn(id) ? { filter: "drop-shadow(0 0 3.5px rgba(239, 68, 68, 0.95))" } : undefined
       const segTextFill = (id: string) => (isSegOn(id) ? "#ffffff" : "#3f3f46")
 
-      const effectiveSegs: Record<string, boolean> = {
-        a: isSegOn("a"),
-        b: isSegOn("b"),
-        c: isSegOn("c"),
-        d: isSegOn("d"),
-        e: isSegOn("e"),
-        f: isSegOn("f"),
-        g: isSegOn("g"),
-        dp: isSegOn("dp"),
-      }
       const decoded = decodeSevenSegment(effectiveSegs)
 
       return (

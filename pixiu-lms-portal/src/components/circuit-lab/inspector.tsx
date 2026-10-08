@@ -5,11 +5,12 @@ import { getComponentMeta } from "@/lib/component-registry"
 import { getBoardDefinition, isBoardType } from "@/lib/board-registry"
 import type { PartRuntime } from "./part-art"
 import { X, Cpu, Zap, Wifi } from "lucide-react"
-import { decodeSevenSegment } from "@/lib/seven-segment"
+import { decodeSevenSegment, resolveSevenSegmentSegments } from "@/lib/seven-segment"
 
 interface Props {
   part: PlacedPart | null
   runtime?: PartRuntime
+  running?: boolean
   partCount: number
   wireCount: number
   onChangeProp: (id: string, key: string, value: string | number) => void
@@ -31,7 +32,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
-export function Inspector({ part, runtime, partCount, wireCount, onChangeProp, onRotate, onDelete, onDuplicate, onClose }: Props) {
+export function Inspector({ part, runtime, running = false, partCount, wireCount, onChangeProp, onRotate, onDelete, onDuplicate, onClose }: Props) {
   const [pinFilter, setPinFilter] = useState<"all" | "power" | "analog" | "digital">("all")
   return (
     <aside
@@ -531,27 +532,10 @@ export function Inspector({ part, runtime, partCount, wireCount, onChangeProp, o
             )}
 
             {part.type === "seven-segment" && (() => {
-              const seg = (runtime as any)?.segments ?? {}
               const propDigit = part.props.digit !== undefined ? Number(part.props.digit) : undefined
-              const activeFromWires = Object.values(seg).some(Boolean)
-              const effectiveSegs: Record<string, boolean> = { ...seg }
-              if (!activeFromWires && propDigit !== undefined && propDigit >= 0 && propDigit <= 9) {
-                const map: Record<number, string[]> = {
-                  0: ["a", "b", "c", "d", "e", "f"],
-                  1: ["b", "c"],
-                  2: ["a", "b", "g", "e", "d"],
-                  3: ["a", "b", "g", "c", "d"],
-                  4: ["f", "g", "b", "c"],
-                  5: ["a", "c", "d", "f", "g"],
-                  6: ["a", "c", "d", "e", "f", "g"],
-                  7: ["a", "b", "c"],
-                  8: ["a", "b", "c", "d", "e", "f", "g"],
-                  9: ["a", "b", "c", "d", "f", "g"],
-                }
-                for (const s of map[propDigit] || []) {
-                  effectiveSegs[s] = true
-                }
-              }
+              const runtimeSegments = (runtime as any)?.segments as Record<string, boolean> | undefined
+              const isPreview = runtimeSegments === undefined
+              const effectiveSegs = resolveSevenSegmentSegments(runtimeSegments, propDigit)
               const decoded = decodeSevenSegment(effectiveSegs)
 
               return (
@@ -571,7 +555,7 @@ export function Inspector({ part, runtime, partCount, wireCount, onChangeProp, o
                         <span>{decoded.label}</span>
                       </div>
                       <span className="text-[10px] text-slate-400 font-mono">
-                        {decoded.activeSegments.length} of 7 segments lit
+                        {decoded.activeSegments.filter((segment) => segment !== "dp").length} of 7 segments lit
                       </span>
                     </div>
                   </Field>
@@ -611,12 +595,13 @@ export function Inspector({ part, runtime, partCount, wireCount, onChangeProp, o
                         <button
                           key={d}
                           type="button"
+                          disabled={running}
                           onClick={() => onChangeProp(part.id, "digit", d)}
                           className={`rounded py-1 text-[11px] font-mono font-bold border transition ${
-                            decoded.digit === d || (!activeFromWires && Number(part.props.digit ?? 0) === d)
+                            decoded.digit === d || (isPreview && Number(part.props.digit ?? 0) === d)
                               ? "bg-red-600 text-white border-red-400 shadow-sm shadow-red-500/30"
                               : "bg-slate-800 text-slate-300 border-slate-700 hover:border-red-400 hover:bg-slate-700"
-                          }`}
+                          } disabled:cursor-not-allowed disabled:opacity-50`}
                         >
                           {d}
                         </button>

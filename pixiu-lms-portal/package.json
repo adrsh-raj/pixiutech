@@ -18,7 +18,8 @@
     "predev": "npm run sync:ai-runtime-assets",
     "qa:phase4-9": "node ../scripts/phase4-9-reliability-static-check.mjs",
     "test:ai": "node --experimental-strip-types --test test/ai/*.test.mjs",
-    "qa:part4": "node ../scripts/part4-professional-hardening-static-check.mjs"
+    "qa:part4": "node ../scripts/part4-professional-hardening-static-check.mjs",
+    "test:lab": "node --test test/circuit-lab/*.test.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
