@@ -567,8 +567,10 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
           <block type="servo_write"><field name="PIN">9</field><value name="ANGLE"><shadow type="math_number"><field name="NUM">0</field></shadow></value><next>
           <block type="io_digitalwrite"><field name="PIN">12</field><field name="STATE">LOW</field><next>
           <block type="io_digitalwrite"><field name="PIN">8</field><field name="STATE">LOW</field><next>
+          <block type="lcd_clear"><next>
+          <block type="lcd_print"><value name="TEXT"><block type="text_string"><field name="TEXT">AIR QUALITY: OK</field></block></value><next>
           <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">300</field></shadow></value>
-          </block></next></block></next></block></next></block>
+          </block></next></block></next></block></next></block></next></block></next></block>
         </statement>
       </block>
     </statement>

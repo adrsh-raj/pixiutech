@@ -13,9 +13,14 @@ export interface WireCurrentState {
 const pinKey = (ref: PinRef) => `${ref.partId}:${ref.pinId}`
 
 /**
- * Computes the electrical current magnitude and direction through every wire on the canvas.
+ * Computes the electrical current magnitude and direction through wires on the canvas.
  * Used to drive 60fps animated SVG dashoffset electron/charge flow lines.
- * Fully supports LEDs, Buzzers, Motors, and standalone Multiple Resistor / Voltage Divider networks.
+ *
+ * STRICT PHYSICAL LAW ENFORCEMENT:
+ * Current flows IF AND ONLY IF:
+ * 1. The component/load is actively ON and conducting (e.g. LED level > 0, Buzzer sounding, Motor rotating).
+ * 2. There is a complete CLOSED circuit path to BOTH an active Power Source AND a Ground Sink.
+ * 3. When a bulb/LED or buzzer is OFF, its current is STRICTLY 0 mA (zero electron movement).
  */
 export function computeWireCurrents(
   state: CircuitState,
@@ -58,7 +63,8 @@ export function computeWireCurrents(
           if (pState?.state === "HIGH" || (pState?.value ?? 0) > 0) {
             powerPins.add(k(pinId))
             powerPins.add(k(altId))
-          } else {
+          } else if (pState?.mode === "OUTPUT" && pState?.state === "LOW") {
+            // Only output pins driven LOW act as active low ground sinks
             groundPins.add(k(pinId))
             groundPins.add(k(altId))
           }
@@ -107,8 +113,17 @@ export function computeWireCurrents(
     } else if (part.type === "pushbutton") {
       linkInternal(k("p1a"), k("p1b"))
       linkInternal(k("p2a"), k("p2b"))
+      // ONLY conduct across switch when pressed!
       if (pressed.has(part.id)) {
         linkInternal(k("p1a"), k("p2a"))
+      }
+    } else if (part.type === "relay") {
+      // Switched contacts conduct ONLY when relay coil is active
+      const r = runtime[part.id]
+      if (r?.level && r.level > 0) {
+        linkInternal(k("com"), k("no"))
+      } else {
+        linkInternal(k("com"), k("nc"))
       }
     }
   }
@@ -123,6 +138,7 @@ export function computeWireCurrents(
   }
 
   function traceComponentFlow(loadInPin: string, loadOutPin: string, currentMa: number) {
+    if (currentMa <= 0) return
     const effectiveMa = Math.max(0.5, currentMa)
     const period = Math.max(0.25, Math.min(2.5, Number((20 / effectiveMa).toFixed(2))))
 
@@ -135,12 +151,11 @@ export function computeWireCurrents(
     ]
     upstreamVisited.add(loadInPin)
 
+    let foundUpstreamWires: { id: string; forward: boolean }[] | null = null
     while (queueUp.length > 0) {
       const { pin, pathWires } = queueUp.shift()!
       if (powerPins.has(pin)) {
-        for (const w of pathWires) {
-          markWireFlow(w.id, effectiveMa, w.forward, period)
-        }
+        foundUpstreamWires = pathWires
         break
       }
 
@@ -171,12 +186,11 @@ export function computeWireCurrents(
     ]
     downstreamVisited.add(loadOutPin)
 
+    let foundDownstreamWires: { id: string; forward: boolean }[] | null = null
     while (queueDown.length > 0) {
       const { pin, pathWires } = queueDown.shift()!
       if (groundPins.has(pin)) {
-        for (const w of pathWires) {
-          markWireFlow(w.id, effectiveMa, w.forward, period)
-        }
+        foundDownstreamWires = pathWires
         break
       }
 
@@ -200,81 +214,106 @@ export function computeWireCurrents(
         }
       }
     }
+
+    // STRICT PHYSICAL LAW: Current can ONLY flow if the circuit is a CLOSED LOOP
+    // Connected to BOTH an active Power Source AND a Ground Sink!
+    // If either side is missing or open, current is STRICTLY ZERO!
+    if (foundUpstreamWires !== null && foundDownstreamWires !== null) {
+      for (const w of foundUpstreamWires) {
+        markWireFlow(w.id, effectiveMa, w.forward, period)
+      }
+      for (const w of foundDownstreamWires) {
+        markWireFlow(w.id, effectiveMa, w.forward, period)
+      }
+    }
   }
 
   // A. Check active consumers in runtime
   for (const part of state.parts) {
     const r = runtime[part.id]
-    const currentMa = r?.currentMa ?? (r?.level && r.level > 0 ? 15.0 : 0)
-    if (currentMa <= 0 && !r?.burnt) continue
 
-    let loadInPin = ""
-    let loadOutPin = ""
     if (part.type === "led") {
-      loadInPin = `${part.id}:anode`
-      loadOutPin = `${part.id}:cathode`
-    } else if (part.type === "buzzer" || part.type === "dc-motor") {
-      loadInPin = `${part.id}:pos`
-      loadOutPin = `${part.id}:neg`
+      // LED MUST be actively ON (level > 0 or burnt) to conduct!
+      // When bulb is OFF (level === 0), current is STRICTLY ZERO!
+      if ((r?.level && r.level > 0) || r?.burnt || (r?.currentMa && r.currentMa > 0)) {
+        const current = r?.currentMa ?? (r?.level ? r.level * 18.0 : 15.0)
+        traceComponentFlow(`${part.id}:anode`, `${part.id}:cathode`, current)
+      }
+    } else if (part.type === "buzzer") {
+      // Buzzer MUST be actively sounding (level > 0) to conduct!
+      // When buzzer is silent (level === 0), current is STRICTLY ZERO!
+      if (r?.level && r.level > 0) {
+        traceComponentFlow(`${part.id}:pos`, `${part.id}:neg`, 15.0)
+      }
+    } else if (part.type === "dc-motor") {
+      // Motor MUST be running to conduct!
+      if ((r?.level && r.level > 0) || (r?.speed && r.speed !== 0)) {
+        traceComponentFlow(`${part.id}:pos`, `${part.id}:neg`, 25.0)
+      }
     } else if (part.type === "rgb-led") {
-      loadInPin = `${part.id}:red`
-      loadOutPin = `${part.id}:gnd`
-    } else if (part.type === "servo") {
-      loadInPin = `${part.id}:vcc`
-      loadOutPin = `${part.id}:gnd`
-      traceComponentFlow(`${part.id}:sig`, `${part.id}:gnd`, 12.0)
+      // Only conduct on channels that are actively illuminated
+      if (r?.redLevel && r.redLevel > 0) {
+        traceComponentFlow(`${part.id}:red`, `${part.id}:gnd`, r.redLevel * 15.0)
+      }
+      if (r?.greenLevel && r.greenLevel > 0) {
+        traceComponentFlow(`${part.id}:green`, `${part.id}:gnd`, r.greenLevel * 15.0)
+      }
+      if (r?.blueLevel && r.blueLevel > 0) {
+        traceComponentFlow(`${part.id}:blue`, `${part.id}:gnd`, r.blueLevel * 15.0)
+      }
     } else if (part.type === "seven-segment") {
+      // ONLY conduct through segment pins that are ACTUALLY ON!
+      const segs = r?.segments ?? {}
       for (const segId of ["a", "b", "c", "d", "e", "f", "g", "dp"]) {
-        traceComponentFlow(`${part.id}:${segId}`, `${part.id}:com`, 15.0)
+        if (segs[segId]) {
+          traceComponentFlow(`${part.id}:${segId}`, `${part.id}:com`, 15.0)
+        }
+      }
+    } else if (part.type === "servo") {
+      // Servo power wires
+      traceComponentFlow(`${part.id}:vcc`, `${part.id}:gnd`, 10.0)
+      // Signal wire carries pulse current only when driven
+      if (r?.angle !== undefined) {
+        traceComponentFlow(`${part.id}:sig`, `${part.id}:gnd`, 5.0)
       }
     } else if (part.type === "lcd-i2c" || part.type === "oled-i2c") {
-      loadInPin = `${part.id}:vcc`
-      loadOutPin = `${part.id}:gnd`
-      traceComponentFlow(`${part.id}:sda`, `${part.id}:gnd`, 8.0)
-      traceComponentFlow(`${part.id}:scl`, `${part.id}:gnd`, 8.0)
+      // Only powered displays conduct
+      if (r?.lcdBacklight !== false) {
+        traceComponentFlow(`${part.id}:vcc`, `${part.id}:gnd`, 15.0)
+        traceComponentFlow(`${part.id}:sda`, `${part.id}:gnd`, 4.0)
+        traceComponentFlow(`${part.id}:scl`, `${part.id}:gnd`, 4.0)
+      }
     } else if (part.type === "ultrasonic") {
-      loadInPin = `${part.id}:vcc`
-      loadOutPin = `${part.id}:gnd`
-      traceComponentFlow(`${part.id}:trig`, `${part.id}:gnd`, 10.0)
-      traceComponentFlow(`${part.id}:echo`, `${part.id}:gnd`, 10.0)
-    } else if (part.type === "potentiometer") {
-      loadInPin = `${part.id}:vcc`
-      loadOutPin = `${part.id}:gnd`
-      traceComponentFlow(`${part.id}:wiper`, `${part.id}:gnd`, 8.0)
-    } else if (part.type === "ldr") {
-      loadInPin = `${part.id}:t1`
-      loadOutPin = `${part.id}:t2`
-    } else if (part.type === "pir-sensor" || part.type === "ir-sensor") {
-      loadInPin = `${part.id}:vcc`
-      loadOutPin = `${part.id}:gnd`
-      traceComponentFlow(`${part.id}:out`, `${part.id}:gnd`, 8.0)
-    } else if (part.type === "dht11") {
-      loadInPin = `${part.id}:vcc`
-      loadOutPin = `${part.id}:gnd`
-      traceComponentFlow(`${part.id}:data`, `${part.id}:gnd`, 8.0)
+      traceComponentFlow(`${part.id}:vcc`, `${part.id}:gnd`, 10.0)
+      traceComponentFlow(`${part.id}:trig`, `${part.id}:gnd`, 4.0)
+      traceComponentFlow(`${part.id}:echo`, `${part.id}:gnd`, 4.0)
     } else if (part.type === "mq2-gas" || part.type === "soil-moisture") {
-      loadInPin = `${part.id}:vcc`
-      loadOutPin = `${part.id}:gnd`
-      traceComponentFlow(`${part.id}:ao`, `${part.id}:gnd`, 8.0)
-    } else if (part.type === "mpu6050" || part.type === "rotary-encoder") {
-      loadInPin = `${part.id}:vcc`
-      loadOutPin = `${part.id}:gnd`
+      traceComponentFlow(`${part.id}:vcc`, `${part.id}:gnd`, 12.0)
+      traceComponentFlow(`${part.id}:ao`, `${part.id}:gnd`, 4.0)
+    } else if (part.type === "dht11") {
+      traceComponentFlow(`${part.id}:vcc`, `${part.id}:gnd`, 8.0)
+      traceComponentFlow(`${part.id}:data`, `${part.id}:gnd`, 4.0)
+    } else if (part.type === "pir-sensor" || part.type === "ir-sensor") {
+      traceComponentFlow(`${part.id}:vcc`, `${part.id}:gnd`, 8.0)
+      if (r?.level && r.level > 0) {
+        traceComponentFlow(`${part.id}:out`, `${part.id}:gnd`, 6.0)
+      }
+    } else if (part.type === "potentiometer") {
+      traceComponentFlow(`${part.id}:vcc`, `${part.id}:gnd`, 8.0)
+      traceComponentFlow(`${part.id}:wiper`, `${part.id}:gnd`, 4.0)
+    } else if (part.type === "ldr") {
+      traceComponentFlow(`${part.id}:t1`, `${part.id}:t2`, 8.0)
     } else if (part.type === "relay") {
-      loadInPin = `${part.id}:vcc`
-      loadOutPin = `${part.id}:gnd`
-      traceComponentFlow(`${part.id}:in`, `${part.id}:gnd`, 8.0)
+      traceComponentFlow(`${part.id}:vcc`, `${part.id}:gnd`, 12.0)
+      if (r?.level && r.level > 0) {
+        traceComponentFlow(`${part.id}:in`, `${part.id}:gnd`, 6.0)
+      }
     } else if (part.type === "neopixel-ring" || part.type === "neopixel-strip") {
-      loadInPin = `${part.id}:vcc`
-      loadOutPin = `${part.id}:gnd`
-      traceComponentFlow(`${part.id}:din`, `${part.id}:gnd`, 10.0)
-    } else if (part.type === "l298n") {
-      loadInPin = `${part.id}:vs`
-      loadOutPin = `${part.id}:gnd`
       traceComponentFlow(`${part.id}:vcc`, `${part.id}:gnd`, 20.0)
-    }
-
-    if (loadInPin && loadOutPin) {
-      traceComponentFlow(loadInPin, loadOutPin, r?.burnt ? 45.0 : currentMa)
+      traceComponentFlow(`${part.id}:din`, `${part.id}:gnd`, 6.0)
+    } else if (part.type === "l298n") {
+      traceComponentFlow(`${part.id}:vs`, `${part.id}:gnd`, 25.0)
+      traceComponentFlow(`${part.id}:vcc`, `${part.id}:gnd`, 15.0)
     }
   }
 
@@ -287,7 +326,8 @@ export function computeWireCurrents(
       const rVal = Math.max(0.1, Number(part.props.resistance || 220))
       const rCurrentMa = (diff / rVal) * 1000
 
-      if (rCurrentMa > 0.2) {
+      // ONLY trace if there is an ACTUAL non-zero potential difference (> 0.2V) across the resistor!
+      if (diff > 0.2 && rCurrentMa > 0.5) {
         const inPin = vA >= vB ? `${part.id}:a` : `${part.id}:b`
         const outPin = vA >= vB ? `${part.id}:b` : `${part.id}:a`
         traceComponentFlow(inPin, outPin, rCurrentMa)
@@ -295,38 +335,7 @@ export function computeWireCurrents(
     }
   }
 
-  // C. Universal Active Circuit Wire Energization:
-  // Guarantee that every connected wire in an active running simulation has dynamic electron current flow
-  for (const wire of state.wires) {
-    if (result[wire.id]) continue
-    const fromKey = pinKey(wire.from)
-    const toKey = pinKey(wire.to)
-
-    const isFromPwr = powerPins.has(fromKey)
-    const isToPwr = powerPins.has(toKey)
-    const isFromGnd = groundPins.has(fromKey)
-    const isToGnd = groundPins.has(toKey)
-
-    if (isFromPwr || isToGnd) {
-      result[wire.id] = {
-        currentMa: 15.0,
-        isForward: true,
-        period: 1.1,
-      }
-    } else if (isToPwr || isFromGnd) {
-      result[wire.id] = {
-        currentMa: 15.0,
-        isForward: false,
-        period: 1.1,
-      }
-    } else {
-      result[wire.id] = {
-        currentMa: 12.0,
-        isForward: true,
-        period: 1.25,
-      }
-    }
-  }
-
+  // NOTICE: No Section C fallback!
+  // Any wire that is connected to an OFF device or an OPEN circuit receives ZERO current.
   return result
 }
