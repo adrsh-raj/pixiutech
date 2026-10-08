@@ -1084,6 +1084,45 @@ export function CircuitCanvas(props: Props) {
                       </div>
                     </foreignObject>
                   )}
+                  {/* On-Canvas Live 7-Segment Quick Action Digit Controller */}
+                  {part.type === "seven-segment" && (
+                    <foreignObject
+                      x={-50}
+                      y={-46}
+                      width={170}
+                      height={42}
+                      className="overflow-visible pointer-events-auto"
+                    >
+                      <div
+                        className="bg-slate-950/95 border border-red-500/50 shadow-xl rounded-lg px-2 py-1 text-white flex items-center justify-between gap-1 select-none backdrop-blur-sm"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="flex items-center gap-1 text-[9px] font-mono font-bold text-red-400">
+                          <span>🔢</span>
+                          <span className="text-white bg-red-950/80 px-1 py-0.5 rounded border border-red-500/40 font-bold min-w-[16px] text-center">
+                            {part.props.digit !== undefined ? String(part.props.digit) : "0"}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-0.5">
+                          {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((d) => (
+                            <button
+                              key={d}
+                              type="button"
+                              onClick={() => onChangeProp?.(part.id, "digit", d)}
+                              className={`w-3.5 h-4 rounded text-[8px] font-mono font-bold flex items-center justify-center border transition-all ${
+                                Number(part.props.digit ?? 0) === d
+                                  ? "bg-red-600 text-white border-red-400 scale-110 shadow"
+                                  : "bg-slate-800 text-slate-300 border-slate-700 hover:border-red-400 hover:bg-slate-700 active:scale-95"
+                              }`}
+                            >
+                              {d}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </foreignObject>
+                  )}
                 </g>
               </g>
             )
@@ -1133,14 +1172,15 @@ export function CircuitCanvas(props: Props) {
                     d={wirePath(a, b)}
                     fill="none"
                     stroke="#ffffff"
-                    strokeWidth={2}
+                    strokeWidth={2.4}
                     strokeLinecap="round"
-                    strokeDasharray="4 8"
+                    strokeDasharray="4 6"
+                    pointerEvents="none"
                     style={{
                       animation: `pixiuCurrentFlow ${wireCurrents[wire.id].period}s linear infinite ${
                         wireCurrents[wire.id].isForward ? "normal" : "reverse"
                       }`,
-                      filter: "drop-shadow(0 0 3px rgba(96, 165, 250, 0.95))",
+                      filter: "drop-shadow(0 0 3.5px #38bdf8)",
                     }}
                   />
                 )}

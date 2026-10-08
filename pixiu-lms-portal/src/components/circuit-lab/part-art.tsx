@@ -1006,22 +1006,44 @@ export function PartArt({ part, runtime }: { part: PlacedPart; runtime?: PartRun
 
     case "seven-segment": {
       const seg = runtime?.segments ?? {}
-      const segColor = (id: string) => seg[id] ? "#ef4444" : "#1f1f1f"
-      const segOpacity = (id: string) => seg[id] ? 1 : 0.15
+      const propDigit = part.props.digit !== undefined ? Number(part.props.digit) : undefined
+      const isSegOn = (id: string) => {
+        if (seg[id]) return true
+        if (propDigit !== undefined && propDigit >= 0 && propDigit <= 9) {
+          const map: Record<number, string[]> = {
+            0: ["a", "b", "c", "d", "e", "f"],
+            1: ["b", "c"],
+            2: ["a", "b", "g", "e", "d"],
+            3: ["a", "b", "g", "c", "d"],
+            4: ["f", "g", "b", "c"],
+            5: ["a", "f", "g", "c", "d"],
+            6: ["a", "f", "g", "e", "c", "d"],
+            7: ["a", "b", "c"],
+            8: ["a", "b", "c", "d", "e", "f", "g"],
+            9: ["a", "b", "c", "d", "f", "g"],
+          }
+          return (map[propDigit] || []).includes(id)
+        }
+        return false
+      }
+      const segColor = (id: string) => isSegOn(id) ? "#ef4444" : "#1f1f1f"
+      const segOpacity = (id: string) => isSegOn(id) ? 1 : 0.15
+      const segStyle = (id: string) => isSegOn(id) ? { filter: "drop-shadow(0 0 3.5px rgba(239, 68, 68, 0.95))" } : undefined
+
       return (
         <g>
-          <rect x={2} y={2} width={56} height={76} rx={4} fill="#0f0f0f" stroke="#27272a" />
+          <rect x={2} y={2} width={56} height={76} rx={4} fill="#0a0a0a" stroke="#27272a" strokeWidth={1.5} />
           {/* Horizontal segments: a(top), g(mid), d(bottom) */}
-          <rect x={14} y={10} width={28} height={5} rx={1.5} fill={segColor("a")} opacity={segOpacity("a")} />
-          <rect x={14} y={36} width={28} height={5} rx={1.5} fill={segColor("g")} opacity={segOpacity("g")} />
-          <rect x={14} y={62} width={28} height={5} rx={1.5} fill={segColor("d")} opacity={segOpacity("d")} />
+          <rect x={14} y={10} width={28} height={5} rx={1.5} fill={segColor("a")} opacity={segOpacity("a")} style={segStyle("a")} />
+          <rect x={14} y={36} width={28} height={5} rx={1.5} fill={segColor("g")} opacity={segOpacity("g")} style={segStyle("g")} />
+          <rect x={14} y={62} width={28} height={5} rx={1.5} fill={segColor("d")} opacity={segOpacity("d")} style={segStyle("d")} />
           {/* Vertical segments: f(TL), b(TR), e(BL), c(BR) */}
-          <rect x={10} y={14} width={5} height={24} rx={1.5} fill={segColor("f")} opacity={segOpacity("f")} />
-          <rect x={41} y={14} width={5} height={24} rx={1.5} fill={segColor("b")} opacity={segOpacity("b")} />
-          <rect x={10} y={40} width={5} height={24} rx={1.5} fill={segColor("e")} opacity={segOpacity("e")} />
-          <rect x={41} y={40} width={5} height={24} rx={1.5} fill={segColor("c")} opacity={segOpacity("c")} />
+          <rect x={10} y={14} width={5} height={24} rx={1.5} fill={segColor("f")} opacity={segOpacity("f")} style={segStyle("f")} />
+          <rect x={41} y={14} width={5} height={24} rx={1.5} fill={segColor("b")} opacity={segOpacity("b")} style={segStyle("b")} />
+          <rect x={10} y={40} width={5} height={24} rx={1.5} fill={segColor("e")} opacity={segOpacity("e")} style={segStyle("e")} />
+          <rect x={41} y={40} width={5} height={24} rx={1.5} fill={segColor("c")} opacity={segOpacity("c")} style={segStyle("c")} />
           {/* Decimal point */}
-          <circle cx={50} cy={66} r={3} fill={segColor("dp")} opacity={segOpacity("dp")} />
+          <circle cx={50} cy={66} r={3} fill={segColor("dp")} opacity={segOpacity("dp")} style={segStyle("dp")} />
         </g>
       )
     }

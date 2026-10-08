@@ -219,10 +219,58 @@ export function computeWireCurrents(
     } else if (part.type === "rgb-led") {
       loadInPin = `${part.id}:red`
       loadOutPin = `${part.id}:gnd`
+    } else if (part.type === "servo") {
+      loadInPin = `${part.id}:vcc`
+      loadOutPin = `${part.id}:gnd`
+      traceComponentFlow(`${part.id}:sig`, `${part.id}:gnd`, 12.0)
+    } else if (part.type === "seven-segment") {
+      for (const segId of ["a", "b", "c", "d", "e", "f", "g", "dp"]) {
+        traceComponentFlow(`${part.id}:${segId}`, `${part.id}:com`, 15.0)
+      }
+    } else if (part.type === "lcd-i2c" || part.type === "oled-i2c") {
+      loadInPin = `${part.id}:vcc`
+      loadOutPin = `${part.id}:gnd`
+      traceComponentFlow(`${part.id}:sda`, `${part.id}:gnd`, 8.0)
+      traceComponentFlow(`${part.id}:scl`, `${part.id}:gnd`, 8.0)
+    } else if (part.type === "ultrasonic") {
+      loadInPin = `${part.id}:vcc`
+      loadOutPin = `${part.id}:gnd`
+      traceComponentFlow(`${part.id}:trig`, `${part.id}:gnd`, 10.0)
+      traceComponentFlow(`${part.id}:echo`, `${part.id}:gnd`, 10.0)
+    } else if (part.type === "potentiometer") {
+      loadInPin = `${part.id}:vcc`
+      loadOutPin = `${part.id}:gnd`
+      traceComponentFlow(`${part.id}:wiper`, `${part.id}:gnd`, 8.0)
+    } else if (part.type === "ldr") {
+      loadInPin = `${part.id}:t1`
+      loadOutPin = `${part.id}:t2`
+    } else if (part.type === "pir-sensor" || part.type === "ir-sensor") {
+      loadInPin = `${part.id}:vcc`
+      loadOutPin = `${part.id}:gnd`
+      traceComponentFlow(`${part.id}:out`, `${part.id}:gnd`, 8.0)
+    } else if (part.type === "dht11") {
+      loadInPin = `${part.id}:vcc`
+      loadOutPin = `${part.id}:gnd`
+      traceComponentFlow(`${part.id}:data`, `${part.id}:gnd`, 8.0)
+    } else if (part.type === "mq2-gas" || part.type === "soil-moisture") {
+      loadInPin = `${part.id}:vcc`
+      loadOutPin = `${part.id}:gnd`
+      traceComponentFlow(`${part.id}:ao`, `${part.id}:gnd`, 8.0)
+    } else if (part.type === "mpu6050" || part.type === "rotary-encoder") {
+      loadInPin = `${part.id}:vcc`
+      loadOutPin = `${part.id}:gnd`
+    } else if (part.type === "relay") {
+      loadInPin = `${part.id}:vcc`
+      loadOutPin = `${part.id}:gnd`
+      traceComponentFlow(`${part.id}:in`, `${part.id}:gnd`, 8.0)
+    } else if (part.type === "neopixel-ring" || part.type === "neopixel-strip") {
+      loadInPin = `${part.id}:vcc`
+      loadOutPin = `${part.id}:gnd`
+      traceComponentFlow(`${part.id}:din`, `${part.id}:gnd`, 10.0)
     } else if (part.type === "l298n") {
-      // Show the driver's measured supply current on the VMotor → GND path.
       loadInPin = `${part.id}:vs`
       loadOutPin = `${part.id}:gnd`
+      traceComponentFlow(`${part.id}:vcc`, `${part.id}:gnd`, 20.0)
     }
 
     if (loadInPin && loadOutPin) {
@@ -243,6 +291,39 @@ export function computeWireCurrents(
         const inPin = vA >= vB ? `${part.id}:a` : `${part.id}:b`
         const outPin = vA >= vB ? `${part.id}:b` : `${part.id}:a`
         traceComponentFlow(inPin, outPin, rCurrentMa)
+      }
+    }
+  }
+
+  // C. Universal Active Circuit Wire Energization:
+  // Guarantee that every connected wire in an active running simulation has dynamic electron current flow
+  for (const wire of state.wires) {
+    if (result[wire.id]) continue
+    const fromKey = pinKey(wire.from)
+    const toKey = pinKey(wire.to)
+
+    const isFromPwr = powerPins.has(fromKey)
+    const isToPwr = powerPins.has(toKey)
+    const isFromGnd = groundPins.has(fromKey)
+    const isToGnd = groundPins.has(toKey)
+
+    if (isFromPwr || isToGnd) {
+      result[wire.id] = {
+        currentMa: 15.0,
+        isForward: true,
+        period: 1.1,
+      }
+    } else if (isToPwr || isFromGnd) {
+      result[wire.id] = {
+        currentMa: 15.0,
+        isForward: false,
+        period: 1.1,
+      }
+    } else {
+      result[wire.id] = {
+        currentMa: 12.0,
+        isForward: true,
+        period: 1.25,
       }
     }
   }
