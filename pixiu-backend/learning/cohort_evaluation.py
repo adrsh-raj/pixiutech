@@ -127,8 +127,8 @@ def _assessments(student):
 
 
 def _project(student):
-    latest = Project.objects.filter(student=student).order_by("-created_at").first()
-    completed = Project.objects.filter(student=student, status="completed").exists()
+    latest = Project.objects.filter(student=student).exclude(title__startswith="__").order_by("-created_at").first()
+    completed = Project.objects.filter(student=student, status="completed").exclude(title__startswith="__").exists()
     return {
         "complete": completed,
         "status": latest.status if latest else None,

@@ -139,7 +139,7 @@ def accessible_assessments(user):
 
 
 def accessible_projects(user):
-    qs = Project.objects.select_related("student__school_class__school").prefetch_related("evidence")
+    qs = Project.objects.exclude(title__startswith="__").select_related("student__school_class__school").prefetch_related("evidence")
     if user.role == UserRole.ADMIN:
         return qs
     if user.role == UserRole.STUDENT:
@@ -152,7 +152,7 @@ def accessible_projects(user):
 
 
 def accessible_evidence(user):
-    qs = ProjectEvidence.objects.select_related("project__student", "uploaded_by")
+    qs = ProjectEvidence.objects.exclude(project__title__startswith="__").select_related("project__student", "uploaded_by")
     if user.role == UserRole.ADMIN:
         return qs
     if user.role == UserRole.STUDENT:

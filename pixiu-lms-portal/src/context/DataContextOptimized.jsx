@@ -122,7 +122,7 @@ export function DataProvider({ children }) {
       '/inventory': rows => setInventory(rows),
       '/billing': rows => setBilling(rows),
       '/comms': rows => setComms(rows),
-      '/projects': rows => setProjects(rows),
+      '/projects': rows => setProjects((rows || []).filter(p => !p?.title?.startsWith('__'))),
       '/notifications': rows => setNotifications(rows),
       '/reviews': rows => setStudentReviews(rows),
       '/quizzes': rows => setQuizzes(rows),

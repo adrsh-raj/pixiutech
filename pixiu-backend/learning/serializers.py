@@ -352,4 +352,6 @@ class ProjectSerializer(serializers.ModelSerializer):
         title = attrs.get("title", getattr(self.instance, "title", ""))
         if not str(title).strip():
             raise serializers.ValidationError({"title": "Project title is required."})
+        if str(title).strip().startswith("__"):
+            raise serializers.ValidationError({"title": "Project title cannot begin with '__'."})
         return attrs

@@ -206,8 +206,8 @@ def assessment_metrics(student, taught_unit_codes):
 
 
 def project_metrics(student):
-    completed = Project.objects.filter(student=student, status='completed').exists()
-    latest = Project.objects.filter(student=student).order_by('-created_at').first()
+    completed = Project.objects.filter(student=student, status='completed').exclude(title__startswith='__').exists()
+    latest = Project.objects.filter(student=student).exclude(title__startswith='__').order_by('-created_at').first()
     return {
         'complete': completed,
         'status': latest.status if latest else None,

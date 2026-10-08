@@ -237,7 +237,7 @@ class AssessmentViewSet(LearningViewSet):
     def perform_destroy(self, instance): self.role_only(UserRole.ADMIN); instance.status = "draft"; instance.save(update_fields=["status", "updated_at"])
 
 class ProjectViewSet(LearningViewSet):
-    queryset = Project.objects.select_related("student__school_class__school").prefetch_related("evidence"); serializer_class = ProjectSerializer
+    queryset = Project.objects.exclude(title__startswith="__").select_related("student__school_class__school").prefetch_related("evidence"); serializer_class = ProjectSerializer
     def scoped_queryset(self): return accessible_projects(self.request.user)
     def perform_create(self, serializer):
         self.role_only(UserRole.ADMIN, UserRole.SCHOOL, UserRole.TRAINER, UserRole.STUDENT)

@@ -21,7 +21,7 @@ def _pct(value):
 def _activity_dates(student):
     dates = set(AttendanceRecord.objects.filter(student=student, status__in=["present", "late"]).values_list("session__date", flat=True))
     dates.update(QuizAttempt.objects.filter(student=student, status="completed").values_list("completed_at__date", flat=True))
-    dates.update(Project.objects.filter(student=student).exclude(status="draft").values_list("updated_at__date", flat=True))
+    dates.update(Project.objects.filter(student=student).exclude(title__startswith="__").exclude(status="draft").values_list("updated_at__date", flat=True))
     dates.update(StudentAssessment.objects.filter(student=student, status="published").values_list("assessment_date", flat=True))
     return {item for item in dates if item}
 
@@ -43,7 +43,7 @@ def _student_snapshot(student):
     attempts = list(QuizAttempt.objects.filter(student=student, status="completed").order_by("completed_at"))
     quiz_avg = _pct(sum(float(item.percentage or 0) for item in attempts) / len(attempts)) if attempts else None
     best_quiz = _pct(max((float(item.percentage or 0) for item in attempts), default=0)) if attempts else None
-    projects = Project.objects.filter(student=student)
+    projects = Project.objects.filter(student=student).exclude(title__startswith="__")
     completed_projects = projects.filter(status="completed")
     attendance_total = AttendanceRecord.objects.filter(student=student).count()
     attendance_present = AttendanceRecord.objects.filter(student=student, status__in=["present", "late"]).count()
@@ -95,7 +95,7 @@ class TrainerPerformanceView(APIView):
         for student_id in student_ids:
             scores=list(QuizAttempt.objects.filter(student_id=student_id,status="completed").order_by("completed_at").values_list("percentage",flat=True))
             if len(scores)>=2: improvements.append(float(scores[-1] or 0)-float(scores[0] or 0))
-        quiz_total=QuizAttempt.objects.filter(quiz__created_by=trainer.account,status="completed").count() if trainer.account_id else 0; project_total=Project.objects.filter(student__school_class__sessions__trainer=trainer,status="completed").distinct().count()
+        quiz_total=QuizAttempt.objects.filter(quiz__created_by=trainer.account,status="completed").count() if trainer.account_id else 0; project_total=Project.objects.filter(student__school_class__sessions__trainer=trainer,status="completed").exclude(title__startswith="__").distinct().count()
         return Response({"trainer":{"id":str(trainer.id),"trainer_id":trainer.trainer_id,"name":trainer.name},"metrics":{"sessions_delivered":completed_sessions,"attendance_rate":_pct(present_att/total_att*100) if total_att else None,"student_improvement":_pct(sum(improvements)/len(improvements)) if improvements else None,"reviews_completed":reviews.count(),"quiz_completion":quiz_total,"project_completion":project_total}})
 
 
@@ -109,7 +109,7 @@ class SchoolPerformanceView(APIView):
             school=School.objects.filter(pk=selector).first() or School.objects.filter(school_code=str(selector).strip().upper()).first()
         else: return Response({"detail":"School performance is not available for this account."},status=403)
         if not school: return Response({"detail":"School profile is not linked to an active school record."},status=404)
-        classes=school.classes.filter(status="active"); students=Student.objects.filter(school_class__school=school,status="active"); attendance=AttendanceRecord.objects.filter(student__school_class__school=school); total_att=attendance.count(); present_att=attendance.filter(status__in=["present","late"]).count(); quiz_avg=QuizAttempt.objects.filter(student__school_class__school=school,status="completed").aggregate(avg=Avg("percentage"))["avg"]; project_count=Project.objects.filter(student__school_class__school=school,status="completed").count(); trainer_count=Trainer.objects.filter(school_assignments__school=school,school_assignments__status="active",status="active").distinct().count(); comparison=[]
+        classes=school.classes.filter(status="active"); students=Student.objects.filter(school_class__school=school,status="active"); attendance=AttendanceRecord.objects.filter(student__school_class__school=school); total_att=attendance.count(); present_att=attendance.filter(status__in=["present","late"]).count(); quiz_avg=QuizAttempt.objects.filter(student__school_class__school=school,status="completed").aggregate(avg=Avg("percentage"))["avg"]; project_count=Project.objects.filter(student__school_class__school=school,status="completed").exclude(title__startswith="__").count(); trainer_count=Trainer.objects.filter(school_assignments__school=school,school_assignments__status="active",status="active").distinct().count(); comparison=[]
         for school_class in classes:
             class_students=Student.objects.filter(school_class=school_class,status="active"); ids=list(class_students.values_list("id",flat=True)); c_att=AttendanceRecord.objects.filter(student_id__in=ids); c_total=c_att.count(); c_present=c_att.filter(status__in=["present","late"]).count(); c_quiz=QuizAttempt.objects.filter(student_id__in=ids,status="completed").aggregate(avg=Avg("percentage"))["avg"]; comparison.append({"class_id":str(school_class.id),"name":school_class.display_name,"students":class_students.count(),"attendance":_pct(c_present/c_total*100) if c_total else None,"quiz":_pct(c_quiz) if c_quiz is not None else None})
         return Response({"school":{"id":str(school.id),"code":school.school_code,"name":school.name},"summary":{"students":students.count(),"classes":classes.count(),"attendance":_pct(present_att/total_att*100) if total_att else None,"avg_quiz":_pct(quiz_avg) if quiz_avg is not None else None,"projects":project_count,"active_trainers":trainer_count},"class_comparison":comparison})
