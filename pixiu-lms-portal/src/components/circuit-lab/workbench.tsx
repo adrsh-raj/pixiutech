@@ -44,7 +44,7 @@ import { WelcomeOverlay } from "./welcome-overlay"
 import { CircuitDoctorHud } from "./circuit-doctor-hud"
 import { diagnoseCircuit } from "@/lib/circuit-doctor"
 import { buildInoSketch, triggerInoDownload } from "@/lib/sketch-exporter"
-import { awardCreationXp, awardTinkeringXp, syncXpWithServer, setUserRole } from "@/lib/xp-engine"
+import { awardCreationXp, awardTinkeringXp, syncXpWithServer, setActiveStudentId, setUserRole } from "@/lib/xp-engine"
 
 function PixiuModuleLoading({ title, subtitle }: { title: string; subtitle: string }) {
   return (
@@ -172,8 +172,9 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
   useEffect(() => {
     if (userRole) {
       setUserRole(userRole)
+      setActiveStudentId(userRole.toLowerCase() === "student" ? pixiuId || null : null)
     }
-  }, [userRole])
+  }, [pixiuId, userRole])
   const [history, setHistory] = useState<HistoryState<CircuitState>>(() => createHistory(INITIAL_STATE))
   const state = history.present
 

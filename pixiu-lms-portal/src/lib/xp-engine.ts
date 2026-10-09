@@ -136,7 +136,6 @@ export function setUserRole(role: string | null) {
 }
 
 export function getUserRole(): string | null {
-  if (inMemoryRole) return inMemoryRole
   if (typeof window === "undefined") return null
   try {
     const role = window.sessionStorage.getItem("pixiu_session_role")
@@ -144,7 +143,7 @@ export function getUserRole(): string | null {
   } catch {
     // Session storage not accessible
   }
-  return null
+  return inMemoryRole
 }
 
 /**
@@ -184,6 +183,30 @@ export function getActiveStudentId(): string | null {
     } catch {}
   }
   return null
+}
+
+function syncXpIdentityFromSession() {
+  if (typeof window === "undefined") return
+  try {
+    const role = window.sessionStorage.getItem("pixiu_session_role")
+    const studentId = window.sessionStorage.getItem("pixiu_session_student_id")
+    setUserRole(role)
+    setActiveStudentId(role?.trim().toLowerCase() === "student" ? studentId : null)
+  } catch {
+    setUserRole(null)
+    setActiveStudentId(null)
+  }
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("pixiu_auth_state_changed", syncXpIdentityFromSession)
+  window.addEventListener("storage", (event) => {
+    if (event.key === "pixiu_portal_logout_at" && event.newValue) {
+      setUserRole(null)
+      setActiveStudentId(null)
+    }
+  })
+  syncXpIdentityFromSession()
 }
 
 export function getXpStorageKey(studentId?: string | null): string {
@@ -950,4 +973,3 @@ export async function fetchClassLeaderboard(): Promise<DedicatedClassRankingResu
     return null
   }
 }
-

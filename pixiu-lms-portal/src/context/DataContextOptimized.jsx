@@ -315,7 +315,10 @@ export function DataProvider({ children }) {
   const addLead = data => save('/leads', 'POST', data);
   const updateLeadStage = (id, stage) => save(`/leads/${encodeURIComponent(id)}/stage`, 'PUT', { stage });
   const deleteLead = id => remove(`/leads/${encodeURIComponent(id)}`);
-  const convertLeadToSchool = () => ({ success: false, error: 'Lead conversion requires an explicit school code and school setup fields.' });
+  const convertLeadToSchool = (lead, schoolId) => {
+    if (!lead?.id || !schoolId) return Promise.resolve({ success: false, error: 'Select an existing school to convert this lead.' });
+    return save(`/leads/${encodeURIComponent(lead.id)}/convert`, 'POST', { school: schoolId });
+  };
   const uploadContent = data => save('/content', 'POST', data);
   const deleteContent = id => remove(`/content/${encodeURIComponent(id)}`);
   const addCurriculumPlan = data => save('/curriculum', 'POST', data);

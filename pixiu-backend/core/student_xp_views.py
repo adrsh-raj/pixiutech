@@ -1,4 +1,5 @@
 import json
+from datetime import timezone as datetime_timezone
 from decimal import Decimal, ROUND_HALF_UP
 from django.db.models import Count, Sum
 from django.utils import timezone
@@ -178,7 +179,7 @@ class StudentXpView(APIView):
 
         for evt in merged_events:
             ts = evt.get("timestamp", 0) / 1000.0
-            day_key = timezone.datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d")
+            day_key = timezone.datetime.fromtimestamp(ts, tz=datetime_timezone.utc).strftime("%Y-%m-%d")
             current_day_total = daily_totals.get(day_key, 0)
             available_cap = max(0, MAX_DAILY_XP - current_day_total)
             allowed = min(evt.get("xp", 0), available_cap)
@@ -345,4 +346,3 @@ class SchoolLeaderboardView(APIView):
             "student_class_name": class_name,
             "class_leaderboard": class_leaderboard,
         })
-
