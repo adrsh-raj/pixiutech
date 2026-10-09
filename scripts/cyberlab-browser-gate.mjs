@@ -121,7 +121,7 @@ try {
   await page.getByText("Sound", { exact: true }).click()
   await page.getByRole("button", { name: "Turn On Microphone" }).last().click()
   await page.getByText(/6F Sound (ready|listening)/).waitFor()
-  await page.getByRole("button", { name: "Turn Off Microphone" }).click()
+  await page.getByRole("button", { name: "Turn Off Microphone" }).first().click()
 
   // Standalone portal AI Studio route + real My AI train/persist/predict flow.
   await page.goto(baseUrl + "/ai-studio", { waitUntil: "networkidle" })
@@ -174,7 +174,7 @@ try {
   await page.getByRole("button").filter({ hasText: /^My AI/i }).last().click()
   await page.getByRole("button", { name: "Turn On Camera", exact: true }).last().click()
   await page.getByText("6I My AI ready", { exact: true }).waitFor({ timeout: 60_000 })
-  await page.getByRole("button", { name: "Turn Off Camera", exact: true }).click()
+  await page.getByRole("button", { name: "Turn Off Camera", exact: true }).first().click()
 
   await page.screenshot({ path: artifactDir + "/ai-studio.png", fullPage: true })
 
@@ -187,6 +187,17 @@ try {
   }
   console.log("PIXIU CyberLab browser gate PASSED")
   console.log("Runtime AI origin policy · PASS")
- } finally {
+} catch (err) {
+  console.error("Browser gate execution failed:", err.message)
+  if (typeof pageErrors !== "undefined" && pageErrors.length) console.error("Collected pageErrors:", pageErrors)
+  if (typeof consoleErrors !== "undefined" && consoleErrors.length) console.error("Collected consoleErrors:", consoleErrors)
+  if (typeof failedRequests !== "undefined" && failedRequests.length) console.error("Collected failedRequests:", failedRequests)
+  try {
+    if (typeof page !== "undefined") {
+      await page.screenshot({ path: artifactDir + "/failure.png", fullPage: true })
+    }
+  } catch {}
+  throw err
+} finally {
   await browser.close()
 }

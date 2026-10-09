@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Synced AI runtime assets (downloaded/generated during prebuild)
+public/vendor/
+public/models/coco-ssd-lite-mobilenet-v2/
+public/models/speech-commands/

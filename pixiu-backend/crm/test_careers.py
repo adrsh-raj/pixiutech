@@ -32,7 +32,7 @@ class CareerPublicApiTests(APITestCase):
         bad = SimpleUploadedFile('resume.exe', b'MZ' + b'0' * 100, content_type='application/octet-stream')
         response = self.client.post('/api/v1/public/careers/apply', {'opening': str(opening.id), 'name': 'Test Candidate', 'email': 'test@example.com', 'phone': '9876543210', 'cv': bad}, format='multipart')
         self.assertEqual(response.status_code, 400)
-        self.assertIn('cv', response.data)
+        self.assertIn('cv', response.data.get('fields', response.data))
 
     def test_application_accepts_valid_pdf(self):
         opening = CareerOpening.objects.create(title='STEM Instructor', description='Teach STEM', status=CareerOpeningStatus.PUBLISHED)
@@ -89,4 +89,4 @@ class CareerPublicApiTests(APITestCase):
         pdf = SimpleUploadedFile('resume.pdf', valid_pdf_bytes(), content_type='application/pdf')
         response = self.client.post('/api/v1/public/careers/apply', {'opening': str(opening.id), 'name': 'Test Candidate', 'email': 'test@example.com', 'phone': '1234', 'cv': pdf}, format='multipart')
         self.assertEqual(response.status_code, 400)
-        self.assertIn('phone', response.data)
+        self.assertIn('phone', response.data.get('fields', response.data))

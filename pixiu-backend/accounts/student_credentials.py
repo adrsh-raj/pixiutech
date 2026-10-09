@@ -15,7 +15,13 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-from accounts.credentials import build_student_username, generate_student_temp_pin, invalidate_user_sessions, bump_auth_version
+from accounts.credentials import (
+    build_student_username,
+    generate_student_temp_pin,
+    invalidate_user_sessions,
+    bump_auth_version,
+    revoke_all_refresh_tokens,
+)
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 from accounts.models import User, UserRole, UserStatus
 from academics.models import Student

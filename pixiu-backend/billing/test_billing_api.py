@@ -1,6 +1,7 @@
 from datetime import date
 from decimal import Decimal
 
+from django.test import override_settings
 from django.urls import reverse
 from rest_framework.test import APITestCase
 
@@ -11,6 +12,13 @@ from notifications.models import Notification
 from .services import add_invoice_line
 
 
+@override_settings(
+    PIXIU_BILLING_ACCOUNT_NAME="PIXIU TECH LLP",
+    PIXIU_BILLING_BANK_NAME="CENTRAL BANK OF INDIA",
+    PIXIU_BILLING_ACCOUNT_NUMBER="382910293847",
+    PIXIU_BILLING_IFSC="CBIN0280001",
+    PIXIU_BILLING_UPI="pixiutech@cbin",
+)
 class BillingApiTests(APITestCase):
     def setUp(self):
         self.admin = User.objects.create_user("billing-api-admin", "strong-pass", role=UserRole.ADMIN, is_staff=True)
@@ -92,8 +100,8 @@ class BillingApiTests(APITestCase):
         visible = self.client.get("/api/v1/invoices")
         self.assertEqual(visible.status_code, 200, visible.data)
         row = next(item for item in visible.data if str(item["id"]) == str(invoice_id))
-        self.assertEqual(row["total_amount"], "10000.00")
-        self.assertEqual(row["balance_due"], "10000.00")
+        self.assertEqual(str(row["total_amount"]), "10000.00")
+        self.assertEqual(str(row["balance_due"]), "10000.00")
         self.assertEqual(row["status"], BillingStatus.ISSUED)
         self.assertEqual(row["billing_profile"]["bank_name"], "CENTRAL BANK OF INDIA")
         self.assertTrue(row["billing_profile"]["account_number"])
