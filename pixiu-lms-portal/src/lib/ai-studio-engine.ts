@@ -1338,8 +1338,14 @@ export async function loadStoredAiModel(
   if (!isCompatibleModelSummary(summary)) return null
 
   try {
-    await modelStorageQueue
-    const model = await tf.loadLayersModel(`indexeddb://${MODEL_KEY}`)
+    await Promise.race([
+      modelStorageQueue,
+      new Promise<void>((resolve) => setTimeout(resolve, 3000)),
+    ])
+    const model = await Promise.race([
+      tf.loadLayersModel(`indexeddb://${MODEL_KEY}`),
+      new Promise<tf.LayersModel>((_, reject) => setTimeout(() => reject(new Error("IndexedDB load timed out")), 4000)),
+    ])
     const inputShape = model.inputs?.[0]?.shape
     const inputSize = Number(inputShape?.[inputShape.length - 1] ?? 0)
     const outputShape = model.outputs?.[0]?.shape

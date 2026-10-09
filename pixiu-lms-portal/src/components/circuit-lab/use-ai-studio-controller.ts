@@ -652,9 +652,11 @@ const [tab, setTab] = useState<Tab>("try")
     } else if (!isOpen) {
       stopAll()
     } else if (!training) {
-      stopInput()
+      if (cameraActive || soundActive) {
+        stopInput()
+      }
     }
-  }, [runtimeEnabled, mode, isOpen, compact])
+  }, [runtimeEnabled, mode, isOpen, compact, cameraActive, soundActive])
 
   useEffect(() => {
     if (!store.model) {
@@ -1470,7 +1472,7 @@ const [tab, setTab] = useState<Tab>("try")
       runtimeStatus: "stopped",
       detail: "AI stopped",
     })
-    setStatus("AI stopped")
+    setStatus((current) => current.startsWith("My AI learned") ? current : "AI stopped")
   }
 
   function selectMode(next: ReadyAiMode | "trained") {
@@ -1622,8 +1624,6 @@ const [tab, setTab] = useState<Tab>("try")
       const next = { ...store, samples: trainingSamples, model: result.summary }
       commitStore(next)
       setModel(result.model)
-      setMode("trained")
-      setTab("try")
       setStatus("My AI learned " + result.summary.classes.length + " concepts.")
       console.log("-> My AI training complete! Learned", result.summary.classes.length, "concepts.")
     } catch (trainError) {
