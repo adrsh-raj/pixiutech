@@ -1299,7 +1299,10 @@ export async function trainAiModel(
     options.onStage?.("Saving model locally")
     try {
       await queueModelOperation(async () => {
-        await model!.save(`indexeddb://${MODEL_KEY}`)
+        await Promise.race([
+          model!.save(`indexeddb://${MODEL_KEY}`),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("IndexedDB save timed out")), 4000)),
+        ])
       })
     } catch (saveError) {
       console.warn("My AI IndexedDB model save failed; continuing with active model:", saveError)

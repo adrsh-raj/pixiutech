@@ -13,7 +13,7 @@ from .models import User, UserRole, UserStatus
 
 class AuthenticationAndCredentialTests(APITestCase):
     def setUp(self):
-        self.client = APIClient(enforce_csrf=True)
+        self.client = APIClient(enforce_csrf_checks=True)
         self.admin = User.objects.create_superuser(
             username="testadmin",
             password="AdminStrongPassword!123",

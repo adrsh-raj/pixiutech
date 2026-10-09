@@ -444,7 +444,7 @@ const [tab, setTab] = useState<Tab>("try")
   const [status, setStatus] = useState("AI idle")
   const [error, setError] = useState<string | null>(null)
   const [fps, setFps] = useState(0)
-  const [store, setStore] = useState<AiStudioStore>(() => ({ classes: [], samples: [], model: null }))
+  const [store, setStore] = useState<AiStudioStore>(() => loadAiStudioStore())
   const [model, setModel] = useState<LayersModel | null>(null)
   const [label, setLabel] = useState("")
   const [renamingClass, setRenamingClass] = useState<string | null>(null)
@@ -1579,6 +1579,7 @@ const [tab, setTab] = useState<Tab>("try")
   }
 
   async function train() {
+    console.log("-> train() called: canTrain =", canTrain, "training =", training, "runtimeEnabled =", runtimeEnabled, "samples =", store.samples.length)
     if (!canTrain || training || runtimeEnabled) {
       if (runtimeEnabled && !training) setStatus("Stop the live AI runtime before training My AI.")
       return
@@ -1592,6 +1593,7 @@ const [tab, setTab] = useState<Tab>("try")
     setProgress({ epoch: 0, total: selectedTrainingConfig.epochs, accuracy: 0, loss: 0, valAccuracy: null, valLoss: null, stage: "Preparing dataset" })
 
     try {
+      console.log("-> Starting trainAiModel for", trainingSamples.length, "samples...")
       const result = await trainAiModel(trainingSamples, {
         profile: advancedTuning ? "custom" : trainingProfile,
         epochs: selectedTrainingConfig.epochs,
@@ -1601,8 +1603,12 @@ const [tab, setTab] = useState<Tab>("try")
         earlyStoppingPatience: selectedTrainingConfig.earlyStoppingPatience,
         earlyStoppingMinDelta: selectedTrainingConfig.earlyStoppingMinDelta,
         shouldCancel: () => runId !== trainingRunRef.current || datasetVersion !== datasetVersionRef.current,
-        onStage: (stage) => setProgress((current) => ({ ...current, stage })),
+        onStage: (stage) => {
+          console.log("-> Training stage:", stage)
+          setProgress((current) => ({ ...current, stage }))
+        },
         onEpoch: (point) => {
+          console.log("-> Training epoch", point.epoch, "accuracy:", point.accuracy, "loss:", point.loss)
           setTrainingHistory((current) => [...current, point])
           setProgress((current) => ({ ...current, epoch: point.epoch, total: selectedTrainingConfig.epochs, accuracy: point.accuracy, loss: point.loss, valAccuracy: point.valAccuracy, valLoss: point.valLoss, stage: "Training classifier " + point.epoch + "/" + selectedTrainingConfig.epochs }))
         },
@@ -1619,6 +1625,7 @@ const [tab, setTab] = useState<Tab>("try")
       setMode("trained")
       setTab("try")
       setStatus("My AI learned " + result.summary.classes.length + " concepts.")
+      console.log("-> My AI training complete! Learned", result.summary.classes.length, "concepts.")
     } catch (trainError) {
       console.error("AI training failed:", trainError)
       if (runId !== trainingRunRef.current) return
