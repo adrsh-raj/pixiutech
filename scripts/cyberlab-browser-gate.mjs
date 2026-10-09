@@ -48,6 +48,7 @@ try {
   page.on("pageerror", (error) => pageErrors.push(error.message))
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text())
+    console.log(`[browser:${message.type()}] ${message.text()}`)
   })
   page.on("requestfailed", (request) => {
     const resourceType = request.resourceType()
@@ -158,9 +159,13 @@ try {
   if (seededDataset !== 6) throw new Error("My AI browser dataset seed failed.")
   await page.reload({ waitUntil: "networkidle" })
 
+  console.log("-> Switching to Teach tab...")
   await page.getByText("Teach", { exact: true }).click()
+  console.log("-> Clicking Train My AI button...")
   await page.getByRole("button", { name: "Train My AI", exact: true }).click()
+  console.log("-> Waiting for My AI to finish training...")
   await page.getByText(/My AI learned 2 concepts/i).waitFor({ timeout: 180_000 })
+  console.log("-> Training verified: My AI learned 2 concepts.")
 
   await page.getByText("Try", { exact: true }).click()
   const myAiButton = page.getByRole("button").filter({ hasText: /^My AI/i }).last()

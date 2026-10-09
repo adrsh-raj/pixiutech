@@ -1296,9 +1296,13 @@ export async function trainAiModel(
 
 
     options.onStage?.("Saving model locally")
-    await queueModelOperation(async () => {
-      await model!.save(`indexeddb://${MODEL_KEY}`)
-    })
+    try {
+      await queueModelOperation(async () => {
+        await model!.save(`indexeddb://${MODEL_KEY}`)
+      })
+    } catch (saveError) {
+      console.warn("My AI IndexedDB model save failed; continuing with active model:", saveError)
+    }
 
     if (previousActiveModel && previousActiveModel !== model) {
       previousActiveModel.dispose()
@@ -1547,6 +1551,9 @@ function loadImage(src: string) {
     image.onload = () => resolve(image)
     image.onerror = () => reject(new Error("Could not read that image."))
     image.src = src
+    if (image.complete && image.naturalWidth > 0) {
+      resolve(image)
+    }
   })
 }
 

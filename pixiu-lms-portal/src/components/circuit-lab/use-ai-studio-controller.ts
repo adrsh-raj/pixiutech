@@ -1620,6 +1620,7 @@ const [tab, setTab] = useState<Tab>("try")
       setTab("try")
       setStatus("My AI learned " + result.summary.classes.length + " concepts.")
     } catch (trainError) {
+      console.error("AI training failed:", trainError)
       if (runId !== trainingRunRef.current) return
       setError(toAiRuntimeError(trainError, "My AI training").userMessage)
     } finally {
