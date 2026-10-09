@@ -179,6 +179,10 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
   }, [pixiuId, userRole])
   const [history, setHistory] = useState<HistoryState<CircuitState>>(() => createHistory(INITIAL_STATE))
   const state = history.present
+  // The Copilot accepts the selected board ID, not the full board descriptor.
+  // Keep this in component scope so the widget mount cannot reference an
+  // undeclared local and crash the entire CyberLab route.
+  const activeBoard = getActiveBoard(state).id
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [selectedWireId, setSelectedWireId] = useState<string | null>(null)
@@ -1963,6 +1967,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
         onOpenProjects={() => setIsProjectManagerOpen(true)}
         onOpenLessons={() => setIsLessonsOpen(true)}
         onOpenTemplates={() => setIsTemplatesOpen(true)}
+        onOpenCopilot={() => setIsCopilotOpen(true)}
       />
 
       <ProjectManager
