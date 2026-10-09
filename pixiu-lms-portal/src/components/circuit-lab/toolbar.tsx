@@ -47,6 +47,9 @@ interface Props {
   onToggleDoctor?: () => void
   doctorScore?: number
   onDownloadIno?: () => void
+  isCopilotOpen?: boolean
+  onToggleCopilot?: () => void
+  isCopilotStaged?: boolean
 }
 
 const VIEWS: { id: WorkbenchView; label: string; soon?: boolean }[] = [
@@ -94,6 +97,9 @@ export function Toolbar({
   onToggleDoctor,
   doctorScore,
   onDownloadIno,
+  isCopilotOpen = false,
+  onToggleCopilot,
+  isCopilotStaged = false,
 }: Props) {
   const [toolsOpen, setToolsOpen] = useState(false)
   const toolsRef = useRef<HTMLDivElement | null>(null)
@@ -267,6 +273,27 @@ export function Toolbar({
               }`}>
                 {doctorScore}%
               </span>
+            )}
+          </button>
+        )}
+
+        {/* PIXIU AI Copilot Toolbar Button */}
+        {onToggleCopilot && (
+          <button
+            onClick={onToggleCopilot}
+            className={`flex items-center gap-1.5 rounded-lg border px-2 sm:px-2.5 py-1.5 text-xs font-bold transition cursor-pointer shadow-sm ${
+              isCopilotOpen
+                ? "border-cyan-400 bg-gradient-to-r from-cyan-500 to-indigo-600 text-slate-950 font-black shadow-cyan-500/25"
+                : isCopilotStaged
+                ? "border-cyan-400/80 bg-cyan-950/60 text-cyan-200 animate-pulse"
+                : "border-cyan-500/30 bg-slate-900/80 text-cyan-300 hover:border-cyan-400 hover:bg-slate-800"
+            }`}
+            title="Open PIXIU AI Copilot Chatbot"
+          >
+            <Sparkles size={14} className={isCopilotOpen ? "text-slate-950" : "text-cyan-400 animate-pulse"} />
+            <span className="hidden sm:inline">AI Copilot</span>
+            {isCopilotStaged && (
+              <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-ping" />
             )}
           </button>
         )}

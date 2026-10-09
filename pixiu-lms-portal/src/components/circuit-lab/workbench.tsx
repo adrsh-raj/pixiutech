@@ -43,6 +43,8 @@ import { ProjectManager } from "./project-manager"
 import { WelcomeOverlay } from "./welcome-overlay"
 import { CircuitDoctorHud } from "./circuit-doctor-hud"
 import { diagnoseCircuit } from "@/lib/circuit-doctor"
+import { CircuitCopilotChat } from "./circuit-copilot-chat"
+import { useCircuitCopilotAction } from "./use-circuit-copilot-action"
 import { buildInoSketch, triggerInoDownload } from "@/lib/sketch-exporter"
 import { awardCreationXp, awardTinkeringXp, syncXpWithServer, setActiveStudentId, setUserRole } from "@/lib/xp-engine"
 
@@ -246,6 +248,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
   const [schematicMode, setSchematicMode] = useState(false)
   const [isDoctorOpen, setIsDoctorOpen] = useState(false)
   const [highlightPartIds, setHighlightPartIds] = useState<string[]>([])
+  const [isCopilotOpen, setIsCopilotOpen] = useState(false)
 
   // Stepping debugger state & refs
   const [isPaused, setIsPaused] = useState(false)
@@ -683,6 +686,24 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
     setAiCameraCompact(false)
     setIsAiCameraOpen(false)
   }, [])
+
+  // PIXIU AI Circuit Copilot Action Controller (Phase 1 Ground-Truth Engine)
+  const copilotAction = useCircuitCopilotAction({
+    currentCircuit: state,
+    currentBlocklyXml: blocklyXml,
+    onApplyCircuit: useCallback(
+      (newCircuit: CircuitState, newBlocklyXml?: string) => {
+        stopProgram()
+        updateState(() => newCircuit)
+        if (typeof newBlocklyXml === "string") {
+          setBlocklyXml(newBlocklyXml)
+          setBlocklyDocumentVersion((v) => v + 1)
+        }
+        if (storageReady) setIsDirty(true)
+      },
+      [stopProgram, updateState, storageReady],
+    ),
+  })
 
   const handleToggleAiVision = useCallback(() => {
     if (isAiCameraOpen) {
@@ -1880,6 +1901,20 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
     <div className="circuit-lab-blue-theme flex h-screen flex-col bg-background text-foreground overflow-hidden select-none">
       <LabSupportWidget />
 
+      {/* PIXIU AI Circuit Copilot Chatbot Widget */}
+      <CircuitCopilotChat
+        currentCircuit={state}
+        currentBlocklyXml={blocklyXml}
+        running={running}
+        activeBoard={activeBoard}
+        runtime={runtime}
+        pinStates={pinStates}
+        copilotAction={copilotAction}
+        onHighlightParts={handleHighlightParts}
+        isOpen={isCopilotOpen}
+        onToggleOpen={() => setIsCopilotOpen((prev) => !prev)}
+      />
+
       <Toolbar
         view={view}
         onViewChange={setView}
@@ -1919,6 +1954,9 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
         onToggleDoctor={() => setIsDoctorOpen((prev) => !prev)}
         doctorScore={doctorReport.score}
         onDownloadIno={handleDownloadIno}
+        isCopilotOpen={isCopilotOpen}
+        onToggleCopilot={() => setIsCopilotOpen((prev) => !prev)}
+        isCopilotStaged={Boolean(copilotAction.stagedPreview)}
       />
 
       <WelcomeOverlay
@@ -2089,6 +2127,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
               onResetMcu={handleResetMcu}
               isScopeOpen={isScopeOpen}
               activeWireColor={activeWireColor}
+              stagedPreview={copilotAction.stagedPreview}
             />
 
             {running && (

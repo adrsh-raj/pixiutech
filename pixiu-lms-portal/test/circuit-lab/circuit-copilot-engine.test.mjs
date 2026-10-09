@@ -292,3 +292,64 @@ test("Circuit Diff: Computes added and removed components and wires accurately",
   assert.equal(diff.removedParts.length, 0)
   assert.equal(diff.removedWires.length, 0)
 })
+
+test("AI Proposals: LED Blink circuit proposal validates cleanly with 0 errors", () => {
+  const proposal = {
+    parts: [
+      { id: "uno", type: "arduino-uno", x: 60, y: 120, rotation: 0, props: {} },
+      { id: "r1", type: "resistor", x: 470, y: 140, rotation: 0, props: { resistance: 220 } },
+      { id: "led1", type: "led", x: 470, y: 230, rotation: 0, props: { color: "red" } },
+    ],
+    wires: [
+      { id: "w-d13-r", from: { partId: "uno", pinId: "d13" }, to: { partId: "r1", pinId: "a" }, color: "#38bdf8" },
+      { id: "w-r-led", from: { partId: "r1", pinId: "b" }, to: { partId: "led1", pinId: "anode" }, color: "#38bdf8" },
+      { id: "w-led-gnd", from: { partId: "led1", pinId: "cathode" }, to: { partId: "uno", pinId: "gnd" }, color: "#1e293b" },
+    ],
+  }
+  const result = validateProposedCircuit(proposal)
+  assert.equal(result.valid, true)
+  assert.equal(result.errors.length, 0)
+  assert.equal(result.metrics.shortCircuitsFound, 0)
+})
+
+test("AI Proposals: Servo + Potentiometer circuit proposal validates cleanly", () => {
+  const proposal = {
+    parts: [
+      { id: "uno", type: "arduino-uno", x: 60, y: 120, rotation: 0, props: {} },
+      { id: "pot1", type: "potentiometer", x: 460, y: 80, rotation: 0, props: { value: 512 } },
+      { id: "servo1", type: "servo", x: 460, y: 250, rotation: 0, props: { angle: 90 } },
+    ],
+    wires: [
+      { id: "w-5v-pot", from: { partId: "uno", pinId: "5v" }, to: { partId: "pot1", pinId: "t1" }, color: "#ef4444" },
+      { id: "w-gnd-pot", from: { partId: "uno", pinId: "gnd" }, to: { partId: "pot1", pinId: "t2" }, color: "#1e293b" },
+      { id: "w-pot-a0", from: { partId: "pot1", pinId: "wiper" }, to: { partId: "uno", pinId: "a0" }, color: "#3b82f6" },
+      { id: "w-5v-srv", from: { partId: "uno", pinId: "5v" }, to: { partId: "servo1", pinId: "vcc" }, color: "#ef4444" },
+      { id: "w-gnd-srv", from: { partId: "uno", pinId: "gnd" }, to: { partId: "servo1", pinId: "gnd" }, color: "#1e293b" },
+      { id: "w-d9-srv", from: { partId: "uno", pinId: "d9" }, to: { partId: "servo1", pinId: "sig" }, color: "#f97316" },
+    ],
+  }
+  const result = validateProposedCircuit(proposal)
+  assert.equal(result.valid, true)
+  assert.equal(result.errors.length, 0)
+})
+
+test("AI Proposals: Ultrasonic + Buzzer circuit proposal validates cleanly", () => {
+  const proposal = {
+    parts: [
+      { id: "uno", type: "arduino-uno", x: 60, y: 120, rotation: 0, props: {} },
+      { id: "sonar1", type: "ultrasonic", x: 470, y: 80, rotation: 0, props: { distance: 35 } },
+      { id: "buzzer1", type: "buzzer", x: 490, y: 250, rotation: 0, props: {} },
+    ],
+    wires: [
+      { id: "w-5v-sonar", from: { partId: "uno", pinId: "5v" }, to: { partId: "sonar1", pinId: "vcc" }, color: "#ef4444" },
+      { id: "w-gnd-sonar", from: { partId: "uno", pinId: "gnd" }, to: { partId: "sonar1", pinId: "gnd" }, color: "#1e293b" },
+      { id: "w-d9-trig", from: { partId: "uno", pinId: "d9" }, to: { partId: "sonar1", pinId: "trig" }, color: "#06b6d4" },
+      { id: "w-d10-echo", from: { partId: "uno", pinId: "d10" }, to: { partId: "sonar1", pinId: "echo" }, color: "#3b82f6" },
+      { id: "w-d8-buzzer", from: { partId: "uno", pinId: "d8" }, to: { partId: "buzzer1", pinId: "pos" }, color: "#a855f7" },
+      { id: "w-gnd-buzzer", from: { partId: "uno", pinId: "gnd" }, to: { partId: "buzzer1", pinId: "neg" }, color: "#1e293b" },
+    ],
+  }
+  const result = validateProposedCircuit(proposal)
+  assert.equal(result.valid, true)
+  assert.equal(result.errors.length, 0)
+})

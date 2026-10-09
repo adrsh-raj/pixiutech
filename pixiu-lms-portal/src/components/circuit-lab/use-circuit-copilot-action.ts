@@ -452,3 +452,5 @@ export function useCircuitCopilotAction({
     redoAction,
   }
 }
+
+export type UseCircuitCopilotActionResult = ReturnType<typeof useCircuitCopilotAction>

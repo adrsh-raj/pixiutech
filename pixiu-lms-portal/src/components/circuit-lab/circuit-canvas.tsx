@@ -8,10 +8,11 @@ import { getBoardDefinition } from "@/lib/board-registry"
 import { getPinRefPosition, wirePath } from "@/lib/geometry"
 import { PartArt, type PartRuntime } from "./part-art"
 import { SchematicPartArt } from "./schematic-art"
-import { Maximize2, Plus, Minus } from "lucide-react"
+import { Maximize2, Plus, Minus, Sparkles } from "lucide-react"
 import type { ContextMenuTarget } from "./context-menu"
 import type { WireCurrentState } from "@/lib/current-flow"
 import { decodeSevenSegment, resolveSevenSegmentSegments } from "@/lib/seven-segment"
+import type { StagedPreview } from "./use-circuit-copilot-action"
 
 interface View {
   scale: number
@@ -52,6 +53,7 @@ interface Props {
   onResetMcu?: () => void
   isScopeOpen?: boolean
   activeWireColor?: string
+  stagedPreview?: StagedPreview | null
 }
 
 function getPinDisplayInfo(type: PartType, pinId: string): { label: string; kind: PinKind; details?: string } {
@@ -120,6 +122,7 @@ export function CircuitCanvas(props: Props) {
     onResetMcu,
     isScopeOpen = false,
     activeWireColor = "#22c55e",
+    stagedPreview,
   } = props
 
   const svgRef = useRef<SVGSVGElement | null>(null)
@@ -1163,6 +1166,46 @@ export function CircuitCanvas(props: Props) {
             )
           })}
 
+          {/* AI Ghost Preview Layer for Staged Components */}
+          {stagedPreview?.diff.addedParts.map((part) => {
+            const def = CATALOG[part.type]
+            if (!def) return null
+            return (
+              <g
+                key={`ghost-${part.id}`}
+                transform={`translate(${part.x} ${part.y})`}
+                opacity={0.7}
+                className="pointer-events-none"
+              >
+                <g transform={`rotate(${part.rotation} ${def.width / 2} ${def.height / 2})`}>
+                  <rect
+                    x={-8}
+                    y={-8}
+                    width={def.width + 16}
+                    height={def.height + 16}
+                    rx={10}
+                    fill="rgba(6, 182, 212, 0.08)"
+                    stroke="#06b6d4"
+                    strokeWidth={2}
+                    strokeDasharray="6 4"
+                    className="animate-pulse"
+                  />
+                  <text
+                    x={0}
+                    y={-12}
+                    fill="#06b6d4"
+                    fontSize={10}
+                    fontWeight="bold"
+                    fontFamily="monospace"
+                  >
+                    AI PREVIEW: {def.name}
+                  </text>
+                  <PartArt part={part} runtime={undefined} />
+                </g>
+              </g>
+            )
+          })}
+
           {/* 2. Wires Layer (ON TOP OF COMPONENTS - NEVER COVERED BY BOARDS!) */}
           {wires.map((wire) => {
             const a = getPinRefPosition(wire.from, parts)
@@ -1251,6 +1294,28 @@ export function CircuitCanvas(props: Props) {
                 >
                   <title>Click to select wire (Delete key to remove)</title>
                 </path>
+              </g>
+            )
+          })}
+
+          {/* AI Ghost Preview Layer for Staged Wires */}
+          {stagedPreview?.diff.addedWires.map((wire) => {
+            const allPreviewParts = [...parts, ...stagedPreview.diff.addedParts]
+            const a = getPinRefPosition(wire.from, allPreviewParts)
+            const b = getPinRefPosition(wire.to, allPreviewParts)
+            if (!a || !b) return null
+            return (
+              <g key={`ghost-wire-${wire.id}`} className="pointer-events-none" opacity={0.85}>
+                <path
+                  d={wirePath(a, b)}
+                  fill="none"
+                  stroke="#06b6d4"
+                  strokeWidth={3.5}
+                  strokeDasharray="6 4"
+                  className="animate-pulse"
+                />
+                <circle cx={a.x} cy={a.y} r={4.5} fill="#06b6d4" />
+                <circle cx={b.x} cy={b.y} r={4.5} fill="#06b6d4" />
               </g>
             )
           })}
@@ -1497,6 +1562,17 @@ export function CircuitCanvas(props: Props) {
               <span className="text-amber-300 font-semibold ml-1">Connect a 220Ω resistor in series to protect the LED!</span>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* On-Canvas Staged Preview Floating Indicator */}
+      {stagedPreview && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2.5 rounded-full border border-cyan-400 bg-slate-950/90 px-4 py-2 text-xs font-semibold text-cyan-200 shadow-2xl shadow-cyan-500/30 backdrop-blur-md animate-in fade-in slide-in-from-top-2">
+          <Sparkles className="h-4 w-4 text-cyan-400 animate-pulse" />
+          <span>AI Preview: <strong className="text-white font-bold">{stagedPreview.proposal.title}</strong></span>
+          <span className="rounded bg-cyan-500/20 px-1.5 py-0.5 text-[10px] font-mono text-cyan-300 border border-cyan-400/40">
+            +{stagedPreview.diff.addedParts.length} parts, +{stagedPreview.diff.addedWires.length} wires
+          </span>
         </div>
       )}
 
