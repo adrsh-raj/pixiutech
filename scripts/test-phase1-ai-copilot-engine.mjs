@@ -19,12 +19,15 @@ import assert from "node:assert/strict"
 import { tmpdir } from "node:os"
 import { join, resolve, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
-import { build } from "esbuild"
+import { createRequire } from "node:module"
 import { readFileSync } from "node:fs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 const ROOT = resolve(__dirname, "..")
+// This script lives at repo root; resolve esbuild from the portal package that declares it.
+const portalRequire = createRequire(resolve(ROOT, "pixiu-lms-portal", "package.json"))
+const { build } = portalRequire("esbuild")
 
 console.log("================================================================================")
 console.log("🏛️  PIXIU TECH CYBERLAB — PHASE 1 AI COPILOT ENGINE VERIFICATION SUITE")
