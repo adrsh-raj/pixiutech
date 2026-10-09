@@ -42,6 +42,42 @@ class Phase7APITests(APITestCase):
         self.assertEqual(response.status_code, 201)
         self.assertTrue(response.data["success"])
         self.assertTrue(Lead.objects.filter(organization_name="Phase Seven Enquiry").exists())
+
+    def test_v1_lead_stages_use_crm_statuses_and_convert_to_school(self):
+        self.auth(self.admin)
+        school = School.objects.create(school_code="P7CRM", name="CRM Partner School")
+        response = self.client.post(
+            "/api/v1/leads",
+            {"name": "Pipeline Prospect", "contact_person": "Principal", "stage": "Demo Scheduled"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["stage"], "qualified")
+
+        lead_id = response.data["id"]
+        stage_response = self.client.put(
+            f"/api/v1/leads/{lead_id}/stage",
+            {"stage": "Closed (Won)"},
+            format="json",
+        )
+        self.assertEqual(stage_response.status_code, 200)
+        self.assertEqual(stage_response.data["stage"], "won")
+
+        second = self.client.post(
+            "/api/v1/leads",
+            {"name": "Conversion Prospect", "contact_person": "Director", "stage": "negotiation"},
+            format="json",
+        )
+        conversion_response = self.client.post(
+            f"/api/v1/leads/{second.data['id']}/convert",
+            {"school": str(school.id)},
+            format="json",
+        )
+        self.assertEqual(conversion_response.status_code, 200)
+        converted_lead = Lead.objects.get(pk=second.data["id"])
+        self.assertEqual(converted_lead.status, "won")
+        self.assertEqual(converted_lead.converted_school_id, school.id)
+
     def test_v1_login_contract_returns_access_refresh_and_user(self):
         response = self.client.post("/api/v1/auth/login/", {"username": "phase7-admin", "password": "StrongAdminPass!123", "role": "admin"}, format="json")
         self.assertEqual(response.status_code, 200)
@@ -89,4 +125,3 @@ class Phase7APITests(APITestCase):
         response = self.client.post("/api/v1/auth/refresh/", {"refresh": str(refresh)}, format="json")
         self.assertEqual(response.status_code, 200)
         self.assertIn("access", response.data)
-

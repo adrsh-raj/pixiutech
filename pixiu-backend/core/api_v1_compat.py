@@ -387,6 +387,18 @@ class ContractInventoryViewSet(LegacyShapeMixin, KitViewSet):
 
 
 class ContractLeadViewSet(LegacyShapeMixin, LeadViewSet):
+    @staticmethod
+    def normalize_status(value, default="new"):
+        status = str(value or default).strip().lower().replace(" ", "_")
+        aliases = {
+            "demo_scheduled": "qualified",
+            "closed_(won)": "won",
+            "closed_won": "won",
+            "closed_(lost)": "lost",
+            "closed_lost": "lost",
+        }
+        return aliases.get(status, status)
+
     def get_queryset(self):
         return super().get_queryset().prefetch_related("lab_attachments")
 
@@ -398,7 +410,7 @@ class ContractLeadViewSet(LegacyShapeMixin, LeadViewSet):
             "phone": _first(data, "phone", default=""),
             "source": str(_first(data, "source", default="other")).lower(),
             "enquiry_type": str(_first(data, "enquiry_type", "kind", default="sales")).lower(),
-            "status": str(_first(data, "status", "stage", default="new")).lower().replace(" ", "_"),
+            "status": self.normalize_status(_first(data, "status", "stage", default="new")),
             "expected_students": int(_first(data, "expected_students", default=0) or 0),
             "estimated_value": _first(data, "estimated_value", "expected_value", default=0),
             "next_follow_up": _first(data, "next_follow_up"),
@@ -466,7 +478,7 @@ class ContractLeadViewSet(LegacyShapeMixin, LeadViewSet):
     @action(detail=True, methods=["put"], url_path="stage")
     def stage(self, request, pk=None):
         lead = self.get_object()
-        desired = str(_first(request.data, "stage", "status", default=lead.status)).lower().replace(" ", "_")
+        desired = self.normalize_status(_first(request.data, "stage", "status", default=lead.status))
         if desired not in {choice[0] for choice in LeadStatus.choices}:
             raise ValidationError("Unsupported lead stage.")
         lead.status = desired
