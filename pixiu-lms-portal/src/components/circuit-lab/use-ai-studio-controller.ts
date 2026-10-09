@@ -651,12 +651,8 @@ const [tab, setTab] = useState<Tab>("try")
       }
     } else if (!isOpen) {
       stopAll()
-    } else if (!training) {
-      if (cameraActive || soundActive) {
-        stopInput()
-      }
     }
-  }, [runtimeEnabled, mode, isOpen, compact, cameraActive, soundActive])
+  }, [runtimeEnabled, mode, isOpen, compact])
 
   useEffect(() => {
     if (!store.model) {
