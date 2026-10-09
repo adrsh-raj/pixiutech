@@ -116,11 +116,6 @@ export function AiStudioPanel(props: AiStudioPanelProps) {
               <Icon size={13} />{title}
             </button>
           ))}
-          {status && (
-            <span className="ml-3 rounded-lg border border-violet-500/30 bg-violet-950/40 px-2 py-1 text-[9px] font-mono text-violet-300">
-              {status}
-            </span>
-          )}
           <span className="ml-auto hidden text-[9px] font-mono text-slate-600 sm:block">{store.samples.length} examples</span>
         </nav>
 

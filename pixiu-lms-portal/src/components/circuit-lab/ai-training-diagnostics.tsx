@@ -109,10 +109,6 @@ export function AiTrainingDiagnostics({
       </div>
       {!training && model && (
         <>
-          <div className="rounded-xl border border-cyan-400/20 bg-cyan-950/40 p-3 flex items-center justify-between">
-            <p className="text-xs font-black text-cyan-200">My AI learned {model.classes.length} concepts.</p>
-            <span className="text-[9px] font-mono text-cyan-300/80">{model.classes.join(" · ")}</span>
-          </div>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
             <div className="rounded-xl border border-slate-800 p-3"><p className="text-[8px] text-slate-600">Best epoch</p><p className="text-sm font-black">{model.bestEpoch ?? "—"}</p></div>
             <div className="rounded-xl border border-slate-800 p-3"><p className="text-[8px] text-slate-600">Parameters</p><p className="text-sm font-black">{(model.parameterCount ?? 0).toLocaleString()}</p></div>
