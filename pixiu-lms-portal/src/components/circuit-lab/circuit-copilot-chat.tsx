@@ -609,7 +609,7 @@ export function CircuitCopilotChat({
         type="button"
         onClick={togglePanel}
         className={
-          "fixed bottom-20 right-32 md:bottom-6 right-36 z-[70] inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-xs font-black shadow-xl backdrop-blur-md transition-all " +
+          "fixed bottom-20 right-24 md:bottom-6 md:right-36 z-[70] inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-xs font-black shadow-xl backdrop-blur-md transition-all " +
           (isPanelOpen
             ? "bg-gradient-to-r from-cyan-500 to-indigo-600 text-slate-950 shadow-cyan-500/40 border border-cyan-300 ring-2 ring-cyan-400/50"
             : "border border-cyan-400/40 bg-[#091122]/95 text-white shadow-cyan-900/40 hover:border-cyan-300 hover:scale-105 hover:shadow-cyan-500/30")

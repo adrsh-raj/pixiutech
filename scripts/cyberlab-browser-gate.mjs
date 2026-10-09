@@ -67,6 +67,17 @@ try {
 
   await page.goto(baseUrl + "/simulation", { waitUntil: "networkidle" })
   if (!(await page.title()).includes("PIXIU CYBERLAB")) throw new Error("Virtual Lab route did not load")
+  // The first-run welcome overlay must expose the Copilot. Its overlay
+  // intentionally layers above the floating trigger, so verify this explicit
+  // entry point and prove that it opens the actual chat panel.
+  const welcomeCopilot = page.getByRole("button", { name: "Open AI Copilot" })
+  await welcomeCopilot.waitFor({ state: "visible", timeout: 10_000 }).catch(() => {
+    throw new Error("First-run welcome screen does not expose the AI Copilot entry point")
+  })
+  await welcomeCopilot.click()
+  await page.getByRole("region", { name: "Pixiu AI Circuit Copilot Panel" }).waitFor()
+  await page.getByRole("button", { name: "Close AI Copilot" }).click()
+
   const welcomeClose = page.getByRole("button", { name: "Close welcome" })
   if (await welcomeClose.isVisible().catch(() => false)) {
     await welcomeClose.click()

@@ -30,9 +30,10 @@ interface Props {
   onOpenProjects: () => void
   onOpenLessons: () => void
   onOpenTemplates: () => void
+  onOpenCopilot: () => void
 }
 
-export function WelcomeOverlay({ onOpenProjects, onOpenLessons, onOpenTemplates }: Props) {
+export function WelcomeOverlay({ onOpenProjects, onOpenLessons, onOpenTemplates, onOpenCopilot }: Props) {
   const [show, setShow] = useState(false)
   const [tourOpen, setTourOpen] = useState(false)
   const [tourIndex, setTourIndex] = useState(0)
@@ -110,6 +111,16 @@ export function WelcomeOverlay({ onOpenProjects, onOpenLessons, onOpenTemplates 
                 className="flex items-center justify-center gap-2 rounded-xl border border-cyan-500/30 bg-cyan-950/40 px-4 py-3 text-xs font-bold text-cyan-100 transition hover:bg-cyan-900/60"
               >
                 <Boxes size={14} /> Try a starter circuit
+              </button>
+              <button
+                onClick={() => {
+                  dismiss()
+                  onOpenCopilot()
+                }}
+                aria-label="Open AI Copilot"
+                className="flex items-center justify-center gap-2 rounded-xl border border-cyan-300/60 bg-gradient-to-r from-cyan-500 to-blue-600 px-4 py-3 text-xs font-black text-slate-950 shadow-lg shadow-cyan-900/20 transition hover:brightness-110"
+              >
+                <Sparkles size={14} /> Open AI Copilot
               </button>
               <button
                 onClick={() => {
