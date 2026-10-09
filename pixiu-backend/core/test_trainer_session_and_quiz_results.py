@@ -20,9 +20,9 @@ class TrainerSessionAndQuizResultTests(APITestCase):
         self.student = Student.objects.create(account=self.student_user, school_class=self.school_class, student_id='VERIFY6A01', roll_number=1, name='Student')
         self.trainer = Trainer.objects.create(account=self.trainer_user, trainer_id='TR-VERIFY', name='Trainer')
         TrainerSchoolAssignment.objects.create(trainer=self.trainer, school=self.school, assigned_from=date.today(), status='active')
-        self.unit = CurriculumUnit.objects.create(grade='6', level='Level 1', unit_code='U1', title='Unit 1', week='Unit 1', topic='Robotics', objectives='Build', status='published', created_by=self.admin)
+        self.unit = CurriculumUnit.objects.create(grade='6', unit_code='U1', title='Unit 1', week='Unit 1', topic='Robotics', objectives='Build', status='published', created_by=self.admin)
         CurriculumClassAssignment.objects.create(curriculum_unit=self.unit, school_class=self.school_class, assigned_by=self.admin)
-        self.quiz = Quiz.objects.create(title='Robotics Quiz', grade='6', level='Level 1', unit_code='U1', duration_seconds=60, duration_minutes=1, status='active', created_by=self.admin)
+        self.quiz = Quiz.objects.create(title='Robotics Quiz', grade='6', unit_code='U1', duration_seconds=60, duration_minutes=1, status='active', created_by=self.admin)
         QuizQuestion.objects.create(quiz=self.quiz, question_order=1, question_text='Which is a robot?', option_a='Robot', option_b='Book', option_c='Chair', option_d='Bag', correct_option='A', points=1)
         QuizClassAssignment.objects.create(quiz=self.quiz, school_class=self.school_class, assigned_by=self.admin)
 

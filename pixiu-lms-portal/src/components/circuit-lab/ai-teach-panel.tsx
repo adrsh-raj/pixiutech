@@ -23,7 +23,7 @@ export function AiTeachPanel({ viewModel }: { viewModel: AiStudioViewModel }) {
     setCustomBatchSize, customPatience, setCustomPatience, customMinDelta, setCustomMinDelta,
     customLayers, addCustomLayer, updateCustomLayer, removeCustomLayer, moveCustomLayer,
     selectedTrainingConfig, estimatedTrainingLoad, progress, canTrain, train, resetStudio,
-    model, trainingHistory, setStatus, error,
+    model, trainingHistory, status, setStatus, error,
   } = viewModel
   return (
 <div className="mx-auto max-w-5xl space-y-4">
@@ -186,6 +186,12 @@ export function AiTeachPanel({ viewModel }: { viewModel: AiStudioViewModel }) {
                       {training ? (progress.stage || "Training…") : "Train My AI"}
                     </button>
                   </div>
+
+                  {status && (
+                    <div className="rounded-xl border border-violet-500/30 bg-violet-950/50 px-3 py-2 text-xs font-bold text-violet-200">
+                      {status}
+                    </div>
+                  )}
 
                   <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between"><div><p className="text-[10px] font-black uppercase tracking-[0.14em] text-violet-300">Training profile</p><p className="mt-1 text-[9px] text-slate-600">Grade 6–8 presets plus Advanced tuning.</p></div>

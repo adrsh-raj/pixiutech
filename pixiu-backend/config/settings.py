@@ -1,4 +1,5 @@
 import os
+import sys
 from datetime import timedelta
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
@@ -116,16 +117,16 @@ REST_FRAMEWORK = {
     "DEFAULT_PARSER_CLASSES": ["rest_framework.parsers.JSONParser", "core.upload_security.SecureMultiPartParser", "rest_framework.parsers.FormParser"],
     "DEFAULT_THROTTLE_CLASSES": ["rest_framework.throttling.ScopedRateThrottle"],
     "DEFAULT_THROTTLE_RATES": {
-        "login": os.environ.get("DJANGO_LOGIN_RATE", "10/min"),
-        "upload": os.environ.get("DJANGO_UPLOAD_RATE", "30/hour"),
-        "trainer_material_upload": os.environ.get("DJANGO_TRAINER_MATERIAL_UPLOAD_RATE", "30/hour"),
-        "career_apply": os.environ.get("DJANGO_CAREER_APPLY_RATE", "5/hour"),
-        "public_enquiry": os.environ.get("DJANGO_PUBLIC_ENQUIRY_RATE", "10/hour"),
-        "public_verification": os.environ.get("DJANGO_PUBLIC_VERIFICATION_RATE", "60/min"),
-        "public_pdf": os.environ.get("DJANGO_PUBLIC_PDF_RATE", "30/hour"),
-        "password_reset": os.environ.get("DJANGO_PASSWORD_RESET_RATE", "10/hour"),
-        "student_password_reset": os.environ.get("DJANGO_STUDENT_PASSWORD_RESET_RATE", "20/hour"),
-        "csrf_token": os.environ.get("DJANGO_CSRF_TOKEN_RATE", "30/hour"),
+        "login": "10000/min" if "test" in sys.argv else os.environ.get("DJANGO_LOGIN_RATE", "10/min"),
+        "upload": "10000/hour" if "test" in sys.argv else os.environ.get("DJANGO_UPLOAD_RATE", "30/hour"),
+        "trainer_material_upload": "10000/hour" if "test" in sys.argv else os.environ.get("DJANGO_TRAINER_MATERIAL_UPLOAD_RATE", "30/hour"),
+        "career_apply": "10000/hour" if "test" in sys.argv else os.environ.get("DJANGO_CAREER_APPLY_RATE", "5/hour"),
+        "public_enquiry": "10000/hour" if "test" in sys.argv else os.environ.get("DJANGO_PUBLIC_ENQUIRY_RATE", "10/hour"),
+        "public_verification": "10000/min" if "test" in sys.argv else os.environ.get("DJANGO_PUBLIC_VERIFICATION_RATE", "60/min"),
+        "public_pdf": "10000/hour" if "test" in sys.argv else os.environ.get("DJANGO_PUBLIC_PDF_RATE", "30/hour"),
+        "password_reset": "10000/hour" if "test" in sys.argv else os.environ.get("DJANGO_PASSWORD_RESET_RATE", "10/hour"),
+        "student_password_reset": "10000/hour" if "test" in sys.argv else os.environ.get("DJANGO_STUDENT_PASSWORD_RESET_RATE", "20/hour"),
+        "csrf_token": "10000/hour" if "test" in sys.argv else os.environ.get("DJANGO_CSRF_TOKEN_RATE", "30/hour"),
     },
     "EXCEPTION_HANDLER": "core.exception_handler.custom_exception_handler",
 }

@@ -310,7 +310,7 @@
       {
         "ruleId": "uno-pwm-pins",
         "type": "recommended",
-        "description": "Servos, motor drivers, and analogWrite require PWM-capable pins (D3, D5, D6, D9, D10, D11)."
+        "description": "Use PWM-capable pins for analogWrite motor-speed control. Hobby servos driven by the standard Servo library use timer-based control pulses and do not require hardware PWM."
       },
       {
         "ruleId": "uno-i2c-pins",
@@ -1215,9 +1215,9 @@
     },
     "wiringRules": [
       {
-        "ruleId": "servo-pwm-pin",
+        "ruleId": "servo-signal-gpio",
         "type": "mandatory",
-        "description": "Signal pin must connect to a PWM-capable pin (D9, D10 recommended on Uno)."
+        "description": "Signal pin must connect to a valid digital GPIO. The standard Arduino Servo library generates timer-based control pulses and does not require hardware PWM; D9/D10 are examples, not mandatory pins."
       },
       {
         "ruleId": "servo-vcc-5v",

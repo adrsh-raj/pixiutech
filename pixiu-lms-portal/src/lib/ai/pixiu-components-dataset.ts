@@ -123,7 +123,7 @@ export const PIXIU_COMPONENTS_DATASET: Record<string, ComponentSpec> = {
     },
     wiringRules: [
       { ruleId: "uno-gnd-required", type: "mandatory", description: "All active peripheral circuits must share a common GND connection with the Arduino board." },
-      { ruleId: "uno-pwm-pins", type: "recommended", description: "Servos, motor drivers, and analogWrite require PWM-capable pins (D3, D5, D6, D9, D10, D11)." },
+      { ruleId: "uno-pwm-pins", type: "recommended", description: "Use PWM-capable pins for analogWrite motor-speed control. Hobby servos driven by the standard Servo library use timer-based control pulses and do not require hardware PWM." },
       { ruleId: "uno-i2c-pins", type: "mandatory", description: "I2C displays (LCD 1602, OLED) must connect to A4 (SDA) and A5 (SCL)." },
     ],
     trainingKeywords: ["uno", "arduino", "atmega328p", "microcontroller", "main board", "controller"],
@@ -418,7 +418,7 @@ export const PIXIU_COMPONENTS_DATASET: Record<string, ComponentSpec> = {
       standardPinModes: { "sig": "OUTPUT" },
     },
     wiringRules: [
-      { ruleId: "servo-pwm-pin", type: "mandatory", description: "Signal pin must connect to a PWM-capable pin (D9, D10 recommended on Uno)." },
+      { ruleId: "servo-signal-gpio", type: "mandatory", description: "Signal pin must connect to a valid digital GPIO. The standard Arduino Servo library generates timer-based control pulses and does not require hardware PWM; D9/D10 are examples, not mandatory pins." },
       { ruleId: "servo-vcc-5v", type: "mandatory", description: "VCC must connect to 5V (not 3.3V) for sufficient motor torque." },
     ],
     trainingKeywords: ["servo", "motor", "robotic arm", "barrier gate", "lock", "vault", "steering", "angle"],

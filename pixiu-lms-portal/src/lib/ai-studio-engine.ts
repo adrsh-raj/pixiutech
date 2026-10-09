@@ -1028,6 +1028,7 @@ export async function trainAiModel(
   let validationXs: tf.Tensor2D | null = null
   let validationYs: tf.Tensor2D | null = null
   let model: tf.LayersModel | null = null
+  let bestWeights: tf.Tensor[] | null = null
 
   const previousActiveModel = activeModel
   activeModel = null
@@ -1115,7 +1116,7 @@ export async function trainAiModel(
     let bestMonitor = Number.POSITIVE_INFINITY
     let wait = 0
     let earlyStopped = false
-    let bestWeights: tf.Tensor[] | null = null
+    bestWeights = null
     const startedAt = performance.now()
 
     options.onStage?.("Training classifier")
@@ -1296,9 +1297,16 @@ export async function trainAiModel(
 
 
     options.onStage?.("Saving model locally")
-    await queueModelOperation(async () => {
-      await model!.save(`indexeddb://${MODEL_KEY}`)
-    })
+    try {
+      await queueModelOperation(async () => {
+        await Promise.race([
+          model!.save(`indexeddb://${MODEL_KEY}`),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("IndexedDB save timed out")), 4000)),
+        ])
+      })
+    } catch (saveError) {
+      console.warn("My AI IndexedDB model save failed; continuing with active model:", saveError)
+    }
 
     if (previousActiveModel && previousActiveModel !== model) {
       previousActiveModel.dispose()
@@ -1330,8 +1338,14 @@ export async function loadStoredAiModel(
   if (!isCompatibleModelSummary(summary)) return null
 
   try {
-    await modelStorageQueue
-    const model = await tf.loadLayersModel(`indexeddb://${MODEL_KEY}`)
+    await Promise.race([
+      modelStorageQueue,
+      new Promise<void>((resolve) => setTimeout(resolve, 3000)),
+    ])
+    const model = await Promise.race([
+      tf.loadLayersModel(`indexeddb://${MODEL_KEY}`),
+      new Promise<tf.LayersModel>((_, reject) => setTimeout(() => reject(new Error("IndexedDB load timed out")), 4000)),
+    ])
     const inputShape = model.inputs?.[0]?.shape
     const inputSize = Number(inputShape?.[inputShape.length - 1] ?? 0)
     const outputShape = model.outputs?.[0]?.shape
@@ -1547,6 +1561,9 @@ function loadImage(src: string) {
     image.onload = () => resolve(image)
     image.onerror = () => reject(new Error("Could not read that image."))
     image.src = src
+    if (image.complete && image.naturalWidth > 0) {
+      resolve(image)
+    }
   })
 }
 

@@ -93,7 +93,11 @@ class LoginView(APIView):
     def post(self, request):
         serializer = LoginSerializer(data=request.data, context={'request': request})
         if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_401_UNAUTHORIZED)
+            errors = dict(serializer.errors)
+            detail = errors.get("detail")
+            if isinstance(detail, list) and len(detail) == 1:
+                errors["detail"] = str(detail[0])
+            return Response(errors, status=status.HTTP_401_UNAUTHORIZED)
 
         user = serializer.validated_data['user']
         try:
@@ -133,7 +137,10 @@ class LoginView(APIView):
                 'school_id': None,
             }
 
-        response = Response({'success': True, 'access': serializer.validated_data['access'], 'user': user_data})
+        resp_data = {'success': True, 'access': serializer.validated_data['access'], 'user': user_data}
+        if not request.META.get('HTTP_X_CSRFTOKEN') and not request.COOKIES.get(getattr(settings, 'CSRF_COOKIE_NAME', 'csrftoken')):
+            resp_data['refresh'] = serializer.validated_data['refresh']
+        response = Response(resp_data)
         _set_refresh_cookie(response, serializer.validated_data['refresh'], user.role)
         return response
 
@@ -173,27 +180,37 @@ class RefreshView(APIView):
 
     def post(self, request):
         role = _request_refresh_role(request)
-        if not role:
-            return Response({'detail': 'Portal session role is required for refresh.'}, status=status.HTTP_400_BAD_REQUEST)
-        refresh_token = request.COOKIES.get(_refresh_cookie_name(role))
+        raw_refresh = None
+        try:
+            raw_refresh = request.data.get('refresh')
+        except Exception:
+            pass
+
+        refresh_token = raw_refresh or (request.COOKIES.get(_refresh_cookie_name(role)) if role else None)
         if not refresh_token:
+            if not role:
+                return Response({'detail': 'Portal session role is required for refresh.'}, status=status.HTTP_400_BAD_REQUEST)
             return Response({'detail': 'Refresh session is not available.'}, status=status.HTTP_401_UNAUTHORIZED)
 
         try:
             unverified = RefreshToken(refresh_token)
             token_role = str(unverified.get('role') or '').strip().lower()
-            if token_role and token_role != role:
-                return Response({'detail': 'Refresh session is invalid or expired.'}, status=status.HTTP_401_UNAUTHORIZED)
             token_user_id = unverified.get('user_id')
-            user = User.objects.filter(pk=token_user_id).only('auth_version', 'is_active', 'status').first()
+            user = User.objects.filter(pk=token_user_id).only('auth_version', 'is_active', 'status', 'role').first()
+            if not role:
+                role = token_role or (user.role if user else None)
+            if role and token_role and token_role != role:
+                return Response({'detail': 'Refresh session is invalid or expired.'}, status=status.HTTP_401_UNAUTHORIZED)
             token_version = int(unverified.get('auth_version', 0) or 0)
             if not user or not user.is_active or user.status != 'active' or token_version != int(user.auth_version or 0):
                 response = Response({'detail': 'Refresh session is invalid or expired.'}, status=status.HTTP_401_UNAUTHORIZED)
-                _clear_refresh_cookie(response, role)
+                if role:
+                    _clear_refresh_cookie(response, role)
                 return response
         except Exception:
             response = Response({'detail': 'Refresh session is invalid or expired.'}, status=status.HTTP_401_UNAUTHORIZED)
-            _clear_refresh_cookie(response, role)
+            if role:
+                _clear_refresh_cookie(response, role)
             return response
 
         serializer = TokenRefreshSerializer(data={'refresh': refresh_token})
@@ -201,12 +218,16 @@ class RefreshView(APIView):
             serializer.is_valid(raise_exception=True)
         except Exception:
             response = Response({'detail': 'Refresh session is invalid or expired.'}, status=status.HTTP_401_UNAUTHORIZED)
-            _clear_refresh_cookie(response, role)
+            if role:
+                _clear_refresh_cookie(response, role)
             return response
         data = serializer.validated_data
-        response = Response({'success': True, 'access': data['access']}, status=status.HTTP_200_OK)
+        resp_data = {'success': True, 'access': data['access']}
+        if raw_refresh:
+            resp_data['refresh'] = data.get('refresh', refresh_token)
+        response = Response(resp_data, status=status.HTTP_200_OK)
         rotated_refresh = data.get('refresh')
-        if rotated_refresh:
+        if rotated_refresh and role:
             _set_refresh_cookie(response, rotated_refresh, role)
         return response
 

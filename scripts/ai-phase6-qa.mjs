@@ -1,16 +1,67 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
+import { tmpdir } from "node:os"
 import { fileURLToPath } from "node:url"
-import {
-  DEFAULT_AI_CONFIDENCE_THRESHOLD,
-  SOUND_AI_CONFIDENCE_THRESHOLD,
-  TRAINED_AI_CONFIDENCE_THRESHOLD,
-  normalizeAiDecision,
-  normalizeAiVisionState,
-} from "../pixiu-lms-portal/src/lib/ai/ai-result-normalizer.ts"
-import { createAiVisionState } from "../pixiu-lms-portal/src/lib/ai/vision-state.ts"
-import { countExtendedFingers } from "../pixiu-lms-portal/src/lib/ai/hand-detector.ts"
-import { classifyExpression } from "../pixiu-lms-portal/src/lib/ai/face-detector.ts"
+
+let DEFAULT_AI_CONFIDENCE_THRESHOLD
+let SOUND_AI_CONFIDENCE_THRESHOLD
+let TRAINED_AI_CONFIDENCE_THRESHOLD
+let normalizeAiDecision
+let normalizeAiVisionState
+let createAiVisionState
+let countExtendedFingers
+let classifyExpression
+
+try {
+  const norm = await import("../pixiu-lms-portal/src/lib/ai/ai-result-normalizer.ts")
+  DEFAULT_AI_CONFIDENCE_THRESHOLD = norm.DEFAULT_AI_CONFIDENCE_THRESHOLD
+  SOUND_AI_CONFIDENCE_THRESHOLD = norm.SOUND_AI_CONFIDENCE_THRESHOLD
+  TRAINED_AI_CONFIDENCE_THRESHOLD = norm.TRAINED_AI_CONFIDENCE_THRESHOLD
+  normalizeAiDecision = norm.normalizeAiDecision
+  normalizeAiVisionState = norm.normalizeAiVisionState
+
+  const vs = await import("../pixiu-lms-portal/src/lib/ai/vision-state.ts")
+  createAiVisionState = vs.createAiVisionState
+
+  const hd = await import("../pixiu-lms-portal/src/lib/ai/hand-detector.ts")
+  countExtendedFingers = hd.countExtendedFingers
+
+  const fd = await import("../pixiu-lms-portal/src/lib/ai/face-detector.ts")
+  classifyExpression = fd.classifyExpression
+} catch {
+  const { buildSync } = await import("esbuild")
+  const outdir = join(tmpdir(), `ai-qa-transpiled-${Date.now()}`)
+  buildSync({
+    entryPoints: {
+      normalizer: join(fileURLToPath(new URL("..", import.meta.url)), "pixiu-lms-portal/src/lib/ai/ai-result-normalizer.ts"),
+      vision: join(fileURLToPath(new URL("..", import.meta.url)), "pixiu-lms-portal/src/lib/ai/vision-state.ts"),
+      hand: join(fileURLToPath(new URL("..", import.meta.url)), "pixiu-lms-portal/src/lib/ai/hand-detector.ts"),
+      face: join(fileURLToPath(new URL("..", import.meta.url)), "pixiu-lms-portal/src/lib/ai/face-detector.ts"),
+    },
+    bundle: true,
+    format: "esm",
+    outdir,
+    platform: "neutral",
+    alias: {
+      "@": join(fileURLToPath(new URL("..", import.meta.url)), "pixiu-lms-portal/src"),
+    },
+  })
+  const norm = await import(`file://${join(outdir, "normalizer.js")}`)
+  DEFAULT_AI_CONFIDENCE_THRESHOLD = norm.DEFAULT_AI_CONFIDENCE_THRESHOLD
+  SOUND_AI_CONFIDENCE_THRESHOLD = norm.SOUND_AI_CONFIDENCE_THRESHOLD
+  TRAINED_AI_CONFIDENCE_THRESHOLD = norm.TRAINED_AI_CONFIDENCE_THRESHOLD
+  normalizeAiDecision = norm.normalizeAiDecision
+  normalizeAiVisionState = norm.normalizeAiVisionState
+
+  const vs = await import(`file://${join(outdir, "vision.js")}`)
+  createAiVisionState = vs.createAiVisionState
+
+  const hd = await import(`file://${join(outdir, "hand.js")}`)
+  countExtendedFingers = hd.countExtendedFingers
+
+  const fd = await import(`file://${join(outdir, "face.js")}`)
+  classifyExpression = fd.classifyExpression
+}
 
 const root = fileURLToPath(new URL("..", import.meta.url))
 const read = (relativePath) =>

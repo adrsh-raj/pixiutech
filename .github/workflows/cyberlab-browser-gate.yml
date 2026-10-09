@@ -33,6 +33,8 @@ jobs:
         working-directory: pixiu-lms-portal
         run: |
           npm ci
+          npm run test:lab
+          npm run test:copilot
           npm run build
 
       - name: Install browser runner

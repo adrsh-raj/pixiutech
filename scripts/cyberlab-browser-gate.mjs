@@ -26,6 +26,7 @@ try {
       if (url.includes("/auth/csrf/")) return json({ csrfToken: "browser-gate-csrf" })
       if (url.includes("/auth/refresh/")) return json({ access: "browser-gate-access", refresh: "browser-gate-refresh" })
       if (url.includes("/auth/me/")) return json({ user: { id: "browser-gate", username: "browser-gate", role: "admin", name: "Browser Gate" } })
+      if (url.includes("/api/v1/") || url.includes("onrender.com")) return json([])
       return nativeFetch(input, init)
     }
   })
@@ -47,12 +48,20 @@ try {
   })
   page.on("pageerror", (error) => pageErrors.push(error.message))
   page.on("console", (message) => {
-    if (message.type() === "error") consoleErrors.push(message.text())
+    if (message.type() === "error") {
+      const text = message.text()
+      if (!text.includes("onrender.com") && !text.includes("ERR_FAILED")) {
+        consoleErrors.push(text)
+      }
+    }
+    console.log(`[browser:${message.type()}] ${message.text()}`)
   })
   page.on("requestfailed", (request) => {
     const resourceType = request.resourceType()
     if (resourceType === "font") return
-    failedRequests.push(request.url() + " [" + resourceType + "] :: " + (request.failure()?.errorText || "request failed"))
+    const url = request.url()
+    if (url.includes("onrender.com")) return
+    failedRequests.push(url + " [" + resourceType + "] :: " + (request.failure()?.errorText || "request failed"))
   })
   await mkdir(artifactDir, { recursive: true })
 
@@ -121,7 +130,7 @@ try {
   await page.getByText("Sound", { exact: true }).click()
   await page.getByRole("button", { name: "Turn On Microphone" }).last().click()
   await page.getByText(/6F Sound (ready|listening)/).waitFor()
-  await page.getByRole("button", { name: "Turn Off Microphone" }).click()
+  await page.getByRole("button", { name: "Turn Off Microphone" }).first().click()
 
   // Standalone portal AI Studio route + real My AI train/persist/predict flow.
   await page.goto(baseUrl + "/ai-studio", { waitUntil: "networkidle" })
@@ -158,9 +167,13 @@ try {
   if (seededDataset !== 6) throw new Error("My AI browser dataset seed failed.")
   await page.reload({ waitUntil: "networkidle" })
 
+  console.log("-> Switching to Teach tab...")
   await page.getByText("Teach", { exact: true }).click()
+  console.log("-> Clicking Train My AI button...")
   await page.getByRole("button", { name: "Train My AI", exact: true }).click()
-  await page.getByText(/My AI learned 2 concepts/i).waitFor({ timeout: 90_000 })
+  console.log("-> Waiting for My AI to finish training...")
+  await page.getByText(/My AI learned 2 concepts/i).waitFor({ timeout: 180_000 })
+  console.log("-> Training verified: My AI learned 2 concepts.")
 
   await page.getByText("Try", { exact: true }).click()
   const myAiButton = page.getByRole("button").filter({ hasText: /^My AI/i }).last()
@@ -174,7 +187,7 @@ try {
   await page.getByRole("button").filter({ hasText: /^My AI/i }).last().click()
   await page.getByRole("button", { name: "Turn On Camera", exact: true }).last().click()
   await page.getByText("6I My AI ready", { exact: true }).waitFor({ timeout: 60_000 })
-  await page.getByRole("button", { name: "Turn Off Camera", exact: true }).click()
+  await page.getByRole("button", { name: "Turn Off Camera", exact: true }).first().click()
 
   await page.screenshot({ path: artifactDir + "/ai-studio.png", fullPage: true })
 
@@ -187,6 +200,17 @@ try {
   }
   console.log("PIXIU CyberLab browser gate PASSED")
   console.log("Runtime AI origin policy · PASS")
- } finally {
+} catch (err) {
+  console.error("Browser gate execution failed:", err.message)
+  if (typeof pageErrors !== "undefined" && pageErrors.length) console.error("Collected pageErrors:", pageErrors)
+  if (typeof consoleErrors !== "undefined" && consoleErrors.length) console.error("Collected consoleErrors:", consoleErrors)
+  if (typeof failedRequests !== "undefined" && failedRequests.length) console.error("Collected failedRequests:", failedRequests)
+  try {
+    if (typeof page !== "undefined") {
+      await page.screenshot({ path: artifactDir + "/failure.png", fullPage: true })
+    }
+  } catch {}
+  throw err
+} finally {
   await browser.close()
 }

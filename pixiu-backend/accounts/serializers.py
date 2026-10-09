@@ -70,6 +70,7 @@ class LoginSerializer(serializers.Serializer):
                 raise serializers.ValidationError({"detail": "Security verification failed. Please try again."})
 
         username = normalize_login_username(attrs["username"])
+        failed_error = None
         with transaction.atomic():
             user = User.objects.select_for_update().filter(username=username).first()
             if user is None:
@@ -99,29 +100,30 @@ class LoginSerializer(serializers.Serializer):
                 attempts = record_failed_login(user, now)
                 if attempts >= login_max_failed_attempts():
                     logger.warning("Account temporarily locked after repeated login failures", extra={"user_id": user.pk, "role": user.role, "lockout_minutes": login_lockout_minutes()})
-                raise serializers.ValidationError({"detail": LOGIN_GENERIC_ERROR})
-
-            if not user.is_active or user.status != UserStatus.ACTIVE:
+                failed_error = LOGIN_GENERIC_ERROR
+            elif not user.is_active or user.status != UserStatus.ACTIVE:
                 _dummy_auth_work(attrs["password"])
-                raise serializers.ValidationError({"detail": LOGIN_GENERIC_ERROR})
-
-            requested_role = attrs.get("role")
-            if requested_role and user.role != requested_role:
+                failed_error = LOGIN_GENERIC_ERROR
+            elif attrs.get("role") and user.role != attrs.get("role"):
                 _dummy_auth_work(attrs["password"])
-                raise serializers.ValidationError({"detail": LOGIN_GENERIC_ERROR})
+                failed_error = LOGIN_GENERIC_ERROR
+            else:
+                if clear_login_failures(user):
+                    user.save(update_fields=["failed_login_attempts", "locked_until"])
 
-            if clear_login_failures(user):
-                user.save(update_fields=["failed_login_attempts", "locked_until"])
+                refresh = RefreshToken.for_user(user)
+                refresh["role"] = user.role
+                refresh["username"] = user.username
+                refresh["display_name"] = user.display_name or user.get_full_name() or user.username
+                refresh["auth_version"] = int(user.auth_version or 0)
+                attrs["user"] = user
+                attrs["access"] = str(refresh.access_token)
+                attrs["refresh"] = str(refresh)
 
-            refresh = RefreshToken.for_user(user)
-            refresh["role"] = user.role
-            refresh["username"] = user.username
-            refresh["display_name"] = user.display_name or user.get_full_name() or user.username
-            refresh["auth_version"] = int(user.auth_version or 0)
-            attrs["user"] = user
-            attrs["access"] = str(refresh.access_token)
-            attrs["refresh"] = str(refresh)
-            return attrs
+        if failed_error:
+            raise serializers.ValidationError({"detail": failed_error})
+
+        return attrs
 
 
 class UserMeSerializer(serializers.ModelSerializer):

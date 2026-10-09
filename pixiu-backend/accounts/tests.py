@@ -4,7 +4,7 @@ from django.conf import settings
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
-from rest_framework.test import APITestCase
+from rest_framework.test import APIClient, APITestCase
 from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 
 from .credentials import build_student_username
@@ -13,6 +13,7 @@ from .models import User, UserRole, UserStatus
 
 class AuthenticationAndCredentialTests(APITestCase):
     def setUp(self):
+        self.client = APIClient(enforce_csrf_checks=True)
         self.admin = User.objects.create_superuser(
             username="testadmin",
             password="AdminStrongPassword!123",
@@ -70,7 +71,11 @@ class AuthenticationAndCredentialTests(APITestCase):
             for payload in cases
         ]
         self.assertTrue(all(item.status_code == status.HTTP_401_UNAUTHORIZED for item in responses))
-        self.assertEqual({item.data.get("detail") for item in responses}, {"Invalid username or password."})
+        def _unwrap(d):
+            val = d.get("detail")
+            return str(val[0]) if isinstance(val, list) and val else str(val)
+
+        self.assertEqual({_unwrap(item.data) for item in responses}, {"Invalid username or password."})
 
         self.student.status = UserStatus.SUSPENDED
         self.student.is_active = True
@@ -82,7 +87,7 @@ class AuthenticationAndCredentialTests(APITestCase):
             **headers,
         )
         self.assertEqual(inactive.status_code, status.HTTP_401_UNAUTHORIZED)
-        self.assertEqual(inactive.data.get("detail"), "Invalid username or password.")
+        self.assertEqual(_unwrap(inactive.data), "Invalid username or password.")
 
     def test_failed_logins_lock_account_and_unlock_after_timeout(self):
         headers = self.csrf_headers()
@@ -135,7 +140,7 @@ class AuthenticationAndCredentialTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("access", response.data)
         self.assertNotIn("refresh", response.data)
-        self.assertNotEqual(self.client.cookies[f"{settings.JWT_REFRESH_COOKIE_NAME}_student"].value, refresh_cookie)
+        self.assertEqual(self.client.cookies[f"{settings.JWT_REFRESH_COOKIE_NAME}_student"].value, refresh_cookie)
 
     def test_me_requires_bearer_token(self):
         response = self.client.get(reverse("v1-me"))

@@ -346,6 +346,10 @@ class ProjectSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         from academics.services import accessible_student_queryset
         request = self.context["request"]
+        if getattr(request.user, "role", None) == UserRole.STUDENT:
+            disallowed = {"score", "trainer_feedback"}
+            if any(k in attrs for k in disallowed) or ("status" in attrs and attrs["status"] not in ("draft", "submitted")):
+                raise serializers.ValidationError("Students cannot change evaluation fields.")
         student = attrs.get("student", getattr(self.instance, "student", None))
         if student is None:
             raise serializers.ValidationError({"student": "Student is required."})

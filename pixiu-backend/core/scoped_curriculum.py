@@ -29,11 +29,16 @@ class ScopedCurriculumViewSet(ScopedContractCurriculumViewSet):
 
     def map_in(self, data):
         """Normalize current fields without inventing missing values on PATCH."""
+        is_partial = str(getattr(self.request, "method", "")).upper() == "PATCH"
+        level_value = str(data.get("level") or data.get("unit_level") or "").strip()
+        if not is_partial and not level_value:
+            raise ValidationError({"level": "Level is required. Enter the level manually for this unit."})
+        if is_partial and ("level" in data or "unit_level" in data) and not level_value:
+            raise ValidationError({"level": "Level is required. Enter the level manually for this unit."})
+
         payload = dict(data)
         for key in ("level", "unit_level", "school_class", "class_id", "technology", "technology_id"):
             payload.pop(key, None)
-
-        is_partial = str(getattr(self.request, "method", "")).upper() == "PATCH"
         grade_value = data.get("grade") or data.get("class_grade")
         unit_code_value = data.get("unit_code")
         week_value = data.get("week")

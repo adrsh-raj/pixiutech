@@ -36,7 +36,7 @@ import {
 // ============================================================================
 
 export type DiagnosticSeverity = "critical" | "warning" | "advisory"
-export type DiagnosticCategory = "schema" | "identity" | "pinout" | "safety" | "budget" | "protocol" | "syntax"
+export type DiagnosticCategory = "schema" | "identity" | "pinout" | "safety" | "budget" | "protocol" | "syntax" | "wiring"
 
 export interface DiagnosticNotice {
   ruleId: string
@@ -466,7 +466,7 @@ export function resolveCanonicalPin(partType: string, pinId: string): string {
       }
       // 2. Power pin normalization
       if (clean === "5v" || clean === "v5") return "5v"
-      if (clean === "3v3" || clean === "3.3v" || clean === "3v") {
+      if (clean === "v33" || clean === "3v3" || clean === "3.3v" || clean === "3v") {
         return board.powerPins.v33?.[0] ?? "3v3"
       }
       if (clean === "vin" || clean === "v_in") return "vin"
@@ -485,22 +485,46 @@ export function resolveCanonicalPin(partType: string, pinId: string): string {
     }
   }
 
-  // Fallback to lowercase
+  // Resolve declared aliases from the ground-truth component dataset. Only return
+  // aliases whose canonical ID actually exists in the rendered catalog.
+  const catalogDefinition = CATALOG[partType as PartType]
+  const componentPins = PIXIU_COMPONENTS_DATASET[partType]?.pins ?? []
+  const datasetPin = componentPins.find((pin) =>
+    pin.id.toLowerCase() === clean ||
+    pin.label.trim().toLowerCase() === clean ||
+    pin.aliases.some((alias) => alias.trim().toLowerCase() === clean),
+  )
+  if (datasetPin && catalogDefinition?.pins.some((pin) => pin.id.toLowerCase() === datasetPin.id.toLowerCase())) {
+    return datasetPin.id
+  }
+
+  const catalogPin = catalogDefinition?.pins.find(
+    (pin) => pin.id.toLowerCase() === clean || pin.label.trim().toLowerCase() === clean,
+  )
+  if (catalogPin) return catalogPin.id
+
+  // Leave unknown values untouched; the validator below will reject them.
   return clean
 }
 
+function isRegisteredPin(partType: string, pinId: string): boolean {
+  const definition = CATALOG[partType as PartType]
+  return Boolean(definition?.pins.some((pin) => pin.id.toLowerCase() === pinId.toLowerCase()))
+}
+
 // ============================================================================
-// Helper: Deterministic Revision Hash (Dual FNV-1a 64-bit Hex)
+// Helper: Deterministic non-cryptographic revision fingerprint (Dual 32-bit FNV-1a)
 // ============================================================================
 
-export function computeCircuitHash(circuit: CircuitState): string {
+export function computeCircuitHash(circuit: CircuitState, blocklyXml?: string): string {
   // 1. Sort parts by ID
   const sortedParts = [...circuit.parts].sort((a, b) => a.id.localeCompare(b.id)).map((p) => ({
     id: p.id,
     type: p.type,
-    x: Math.round(p.x),
-    y: Math.round(p.y),
-    rotation: Math.round(p.rotation || 0),
+    // Preserve sub-pixel edits; revision guards must not round away real mutations.
+    x: Object.is(p.x, -0) ? 0 : p.x,
+    y: Object.is(p.y, -0) ? 0 : p.y,
+    rotation: Object.is(p.rotation || 0, -0) ? 0 : (p.rotation || 0),
     props: Object.keys(p.props || {})
       .sort()
       .reduce((acc, k) => {
@@ -520,7 +544,14 @@ export function computeCircuitHash(circuit: CircuitState): string {
     color: w.color || "#38bdf8",
   }))
 
-  const canonicalStr = JSON.stringify({ parts: sortedParts, wires: sortedWires })
+  // Blockly edits are part of the user-authored lab state too. When supplied, XML
+  // participates in the revision fingerprint so circuit-only changes cannot mask
+  // a newer workspace edit.
+  const canonicalStr = JSON.stringify({
+    parts: sortedParts,
+    wires: sortedWires,
+    blocklyXml: blocklyXml ?? null,
+  })
 
   // 3. Dual 32-bit FNV-1a Hash
   let h1 = 0x811c9dc5
@@ -707,15 +738,16 @@ export function validateProposedCircuit(
       continue
     }
 
-    if (validPartIds.has(p.id)) {
+    const normalizedPartId = p.id.trim()
+    if (validPartIds.has(normalizedPartId)) {
       addNotice({
-        ruleId: `schema-duplicate-part-id-${p.id}`,
+        ruleId: `schema-duplicate-part-id-${normalizedPartId}`,
         severity: "critical",
         category: "schema",
         title: "Duplicate Part ID",
-        message: `Multiple components share the ID '${p.id}'. Part IDs must be strictly unique.`,
-        suggestion: `Rename one of the parts with ID '${p.id}' to a distinct identifier.`,
-        involvedPartIds: [p.id],
+        message: `Multiple components share the normalized ID '${normalizedPartId}'. Part IDs must be unique after trimming whitespace.`,
+        suggestion: `Rename one of the parts with ID '${normalizedPartId}' to a distinct identifier.`,
+        involvedPartIds: [normalizedPartId],
       })
       continue
     }
@@ -733,8 +765,37 @@ export function validateProposedCircuit(
       continue
     }
 
+    const coordinateFields = [
+      { field: "x", value: p.x },
+      { field: "y", value: p.y },
+      { field: "rotation", value: p.rotation },
+    ]
+    const malformedCoordinate = coordinateFields.find(
+      ({ value }) => value !== undefined && (typeof value !== "number" || !Number.isFinite(value)),
+    )
+    const coordinateOutOfBounds =
+      (typeof p.x === "number" && Math.abs(p.x) > 100_000) ||
+      (typeof p.y === "number" && Math.abs(p.y) > 100_000) ||
+      (typeof p.rotation === "number" && Math.abs(p.rotation) > 3_600)
+
+    if (malformedCoordinate || coordinateOutOfBounds) {
+      const field = malformedCoordinate?.field ?? "x/y/rotation"
+      addNotice({
+        ruleId: `schema-part-${normalizedPartId}-coordinate-invalid`,
+        severity: "critical",
+        category: "schema",
+        title: "Invalid Component Coordinates",
+        message: malformedCoordinate
+          ? `Component '${normalizedPartId}' has a non-finite or non-numeric '${field}' value.`
+          : `Component '${normalizedPartId}' exceeds the allowed canvas coordinate/rotation bounds.`,
+        suggestion: "Use finite numeric x/y/rotation values; x/y must be within ±100,000 canvas units and rotation within ±3,600 degrees.",
+        involvedPartIds: [normalizedPartId],
+      })
+      continue
+    }
+
     const placed: PlacedPart = {
-      id: p.id.trim(),
+      id: normalizedPartId,
       type: p.type.trim() as PartType,
       x: Number.isFinite(p.x) ? Number(p.x) : 100,
       y: Number.isFinite(p.y) ? Number(p.y) : 100,
@@ -859,6 +920,35 @@ export function validateProposedCircuit(
     const canonicalFromPin = resolveCanonicalPin(fromPart.type, fromPinRaw)
     const canonicalToPin = resolveCanonicalPin(toPart.type, toPinRaw)
 
+    let invalidPinEndpoint = false
+    if (!isRegisteredPin(fromPart.type, canonicalFromPin)) {
+      invalidPinEndpoint = true
+      addNotice({
+        ruleId: `identity-unknown-pin-${fromPartId}-${canonicalFromPin}`,
+        severity: "critical",
+        category: "identity",
+        title: "Unknown Component Pin",
+        message: `Pin '${fromPinRaw}' resolves to '${canonicalFromPin}', which is not registered on component '${fromPartId}' (${fromPart.type}).`,
+        suggestion: "Use a pin ID or alias defined in the CyberLab component catalog.",
+        involvedPartIds: [fromPartId],
+        involvedPinIds: [canonicalFromPin],
+      })
+    }
+    if (!isRegisteredPin(toPart.type, canonicalToPin)) {
+      invalidPinEndpoint = true
+      addNotice({
+        ruleId: `identity-unknown-pin-${toPartId}-${canonicalToPin}`,
+        severity: "critical",
+        category: "identity",
+        title: "Unknown Component Pin",
+        message: `Pin '${toPinRaw}' resolves to '${canonicalToPin}', which is not registered on component '${toPartId}' (${toPart.type}).`,
+        suggestion: "Use a pin ID or alias defined in the CyberLab component catalog.",
+        involvedPartIds: [toPartId],
+        involvedPinIds: [canonicalToPin],
+      })
+    }
+    if (invalidPinEndpoint) continue
+
     // Self-connecting wire check
     if (fromPartId === toPartId && canonicalFromPin === canonicalToPin) {
       addNotice({
@@ -898,7 +988,10 @@ export function validateProposedCircuit(
     wires: normalizedWires,
   }
 
-  const revHash = computeCircuitHash(normalizedCircuit)
+  const revHash = computeCircuitHash(
+    normalizedCircuit,
+    typeof rawCandidate.blocklyXml === "string" ? rawCandidate.blocklyXml : undefined,
+  )
 
   // --------------------------------------------------------------------------
   // LAYER 3: Board & Pin Capability Verification
@@ -1206,15 +1299,23 @@ export function validateProposedCircuit(
         const boardPinKey = pinKey(primaryBoardPart.id, pin.id)
         if (resistiveGraph.has(boardPinKey)) {
           const minResToOvervoltage = findMinResistance(boardPinKey, dangerousSources)
-          if (minResToOvervoltage < 500) {
+          if (Number.isFinite(minResToOvervoltage)) {
+            const referencePathResistance = findMinResistance(boardPinKey, [...gndPins, ...v33Pins])
+            // A single series resistor can limit current but does not, by itself, clamp a
+            // high-impedance GPIO input to a safe voltage. A modeled return/reference path
+            // may be a divider, but this topology-only validator cannot prove its ratio.
+            const seriesOnlyOrLowResistance =
+              minResToOvervoltage < 500 || !Number.isFinite(referencePathResistance)
             metrics.overvoltageRisks++
             addNotice({
               ruleId: `safety-overvoltage-gpio-${primaryBoardPart.id}-${pin.id}`,
-              severity: "critical",
+              severity: seriesOnlyOrLowResistance ? "critical" : "warning",
               category: "safety",
               title: `5V Overvoltage on 3.3V MCU Pin (${pin.label})`,
-              message: `Pin ${pin.label} on ${boardDef.name} operates at 3.3V logic and is NOT 5V tolerant. Connecting a 5V/9V rail directly (${minResToOvervoltage.toFixed(0)}Ω) will destroy the microcontroller's internal input stage.`,
-              suggestion: "Insert a voltage divider (e.g. 1kΩ / 2kΩ) or bidirectional logic level shifter.",
+              message: seriesOnlyOrLowResistance
+                ? `A ${minResToOvervoltage.toFixed(0)}Ω path connects a 5V/9V source to ${pin.label} on ${boardDef.name} without a modeled safe divider/reference return. A series resistor alone does not prove 3.3V-safe logic.`
+                : `A ${minResToOvervoltage.toFixed(0)}Ω path connects a 5V/9V source to ${pin.label} on ${boardDef.name}. A return/reference path exists, but this static validator cannot prove the resulting node voltage or divider ratio.`,
+              suggestion: "Use a verified resistor-divider topology or a suitable logic-level shifter; do not rely on a series resistor alone.",
               involvedPartIds: [primaryBoardPart.id],
               involvedPinIds: [pin.id],
             })
@@ -1294,48 +1395,61 @@ export function validateProposedCircuit(
     }
   }
 
-  // Check Servo PWM Capability on Uno
-  if (primaryBoardPart && boardDef?.id === "arduino-uno") {
-    const pwmPins = new Set(["d3", "d5", "d6", "d9", "d10", "d11", "3", "5", "6", "9", "10", "11"])
-    for (const part of normalizedParts) {
-      if (part.type === "servo") {
-        const sigPin = pinKey(part.id, "sig")
-        for (const bp of boardDef.pins) {
-          const bpKey = pinKey(primaryBoardPart.id, bp.id)
-          if (netlist.connected(sigPin, bpKey)) {
-            if (!pwmPins.has(bp.id.toLowerCase())) {
-              addNotice({
-                ruleId: `pinout-servo-non-pwm-${part.id}`,
-                severity: "advisory",
-                category: "pinout",
-                title: `Servo on Non-PWM Pin (${bp.label})`,
-                message: `Servo signal '${part.id}' is connected to Pin ${bp.label}. While Arduino Servo.h works on any digital pin via software timer pulses, hardware PWM pins provide jitter-free rotation.`,
-                suggestion: "Consider moving servo signal to Pin D9 or D10 for hardware PWM precision.",
-                involvedPartIds: [part.id, primaryBoardPart.id],
-                involvedPinIds: [bp.id],
-              })
-            }
-          }
-        }
-      }
-    }
-  }
+  // Do not require hardware PWM for hobby servos: the standard Arduino Servo library
+  // generates control pulses with timer interrupts and works on ordinary supported GPIOs.
 
   // --------------------------------------------------------------------------
   // LAYER 7: Blockly Code & Final Result Computation
   // --------------------------------------------------------------------------
-  if (typeof rawCandidate.blocklyXml === "string" && rawCandidate.blocklyXml.trim()) {
-    const xml = rawCandidate.blocklyXml.trim()
-    if (xml.includes("<script") || xml.includes("javascript:")) {
+  if (Object.prototype.hasOwnProperty.call(rawCandidate, "blocklyXml") && rawCandidate.blocklyXml !== undefined) {
+    if (typeof rawCandidate.blocklyXml !== "string") {
       addNotice({
-        ruleId: "syntax-script-injection-blocked",
+        ruleId: "syntax-blockly-xml-type-invalid",
         severity: "critical",
         category: "syntax",
-        title: "Malicious Code Injection Blocked",
-        message: "Blockly XML payload contains unauthorized script elements.",
-        suggestion: "Remove script tags from Blockly XML.",
+        title: "Invalid Blockly XML Payload",
+        message: "Blockly XML must be a string when supplied.",
+        suggestion: "Send a serialized Blockly workspace XML string or omit blocklyXml.",
         involvedPartIds: [],
       })
+    } else {
+      const xml = rawCandidate.blocklyXml.trim()
+      const hasXmlRoot =
+        /^(?:<\?xml\b[^?]*\?>\s*)?<xml(?:\s[^>]*)?>[\s\S]*<\/xml>\s*$/i.test(xml) ||
+        /^(?:<\?xml\b[^?]*\?>\s*)?<xml(?:\s[^>]*)?\/>\s*$/i.test(xml)
+      const unsafeXmlPattern = /<!DOCTYPE|<!ENTITY|<\s*script\b|<\s*(?:iframe|object|embed|foreignObject|html|body)\b|javascript\s*:|\bon[a-z]+\s*=/i
+
+      if (xml.length > 200_000) {
+        addNotice({
+          ruleId: "syntax-blockly-xml-size-limit",
+          severity: "critical",
+          category: "syntax",
+          title: "Blockly XML Payload Too Large",
+          message: "Blockly XML exceeds the 200,000-character safety limit.",
+          suggestion: "Reduce the workspace payload and submit a smaller Blockly program.",
+          involvedPartIds: [],
+        })
+      } else if (xml && !hasXmlRoot) {
+        addNotice({
+          ruleId: "syntax-blockly-xml-root-invalid",
+          severity: "critical",
+          category: "syntax",
+          title: "Malformed Blockly XML",
+          message: "Blockly workspace payload must have a single <xml> root element.",
+          suggestion: "Send XML exported from the Blockly workspace serializer.",
+          involvedPartIds: [],
+        })
+      } else if (unsafeXmlPattern.test(xml)) {
+        addNotice({
+          ruleId: "syntax-script-injection-blocked",
+          severity: "critical",
+          category: "syntax",
+          title: "Unsafe Blockly XML Blocked",
+          message: "Blockly XML contains a forbidden active-content, script, or event-handler pattern.",
+          suggestion: "Remove script/active-content markup and regenerate the workspace XML.",
+          involvedPartIds: [],
+        })
+      }
     }
   }
 

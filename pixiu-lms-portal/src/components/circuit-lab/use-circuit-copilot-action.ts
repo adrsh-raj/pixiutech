@@ -68,9 +68,43 @@ export interface StagedPreview {
 interface UndoSnapshot {
   circuit: CircuitState
   blocklyXml?: string
+  /** Fingerprint of the state saved in this snapshot. */
   revHash: string
+  /** Fingerprint that must be current before this snapshot may be restored. */
+  expectedCurrentHash: string
   timestamp: number
   description: string
+}
+
+/** Returns true only when history restoration cannot overwrite a newer canvas/workspace edit. */
+export function canRestoreAtRevision(expectedCurrentHash: string, currentHash: string): boolean {
+  return expectedCurrentHash === currentHash
+}
+
+function getProposalValidationCandidate(proposal: unknown): unknown {
+  if (!proposal || typeof proposal !== "object" || Array.isArray(proposal)) return proposal
+  const rawProposal = proposal as Record<string, unknown>
+  const rawCircuit = rawProposal.circuit
+  if (!rawCircuit || typeof rawCircuit !== "object" || Array.isArray(rawCircuit)) return rawCircuit
+  const circuit = rawCircuit as Record<string, unknown>
+  // Build a narrow object rather than spreading an untrusted payload into app state.
+  return {
+    parts: circuit.parts,
+    wires: circuit.wires,
+    blocklyXml: rawProposal.blocklyXml,
+  }
+}
+
+function historyConflictNotice(action: "undo" | "redo"): DiagnosticNotice {
+  return {
+    ruleId: `copilot-${action}-blocked-after-manual-edit`,
+    severity: "warning",
+    category: "schema",
+    title: `${action === "undo" ? "Undo" : "Redo"} Blocked to Preserve Newer Edits`,
+    message: `The circuit or Blockly workspace changed after this AI action. ${action === "undo" ? "Undoing" : "Redoing"} it now could overwrite manual work, so the action was not applied.`,
+    suggestion: "Keep the current edits, or restore the AI action only after reviewing/reconciling the current workspace.",
+    involvedPartIds: [],
+  }
 }
 
 export interface UseCircuitCopilotActionParams {
@@ -98,10 +132,11 @@ export function computeCircuitDiff(current: CircuitState, proposed: CircuitState
       addedParts.push(propPart)
     } else {
       // Check if modified
+      const typeChanged = cur.type !== propPart.type
       const posChanged = cur.x !== propPart.x || cur.y !== propPart.y
       const rotChanged = (cur.rotation || 0) !== (propPart.rotation || 0)
       const propsChanged = JSON.stringify(cur.props || {}) !== JSON.stringify(propPart.props || {})
-      if (posChanged || rotChanged || propsChanged) {
+      if (typeChanged || posChanged || rotChanged || propsChanged) {
         modifiedParts.push(propPart)
       }
     }
@@ -160,7 +195,10 @@ export function useCircuitCopilotAction({
   const [redoCount, setRedoCount] = useState(0)
 
   // Current canvas revision hash
-  const currentHash = useMemo(() => computeCircuitHash(currentCircuit), [currentCircuit])
+  const currentHash = useMemo(
+    () => computeCircuitHash(currentCircuit, currentBlocklyXml),
+    [currentCircuit, currentBlocklyXml],
+  )
 
   /**
    * Receive and validate an incoming proposal from AI model or template generator.
@@ -170,11 +208,15 @@ export function useCircuitCopilotAction({
       setState("validating")
       setActiveProposal(proposal)
 
-      // 1. Check for stale proposal
-      const isStale = proposal.baseRevisionHash !== currentHash
+      // 1. Check for stale proposal. Missing or malformed revision metadata is never trusted.
+      const isStale =
+        !proposal ||
+        typeof proposal !== "object" ||
+        typeof proposal.baseRevisionHash !== "string" ||
+        proposal.baseRevisionHash !== currentHash
 
-      // 2. Run deterministic 7-layer validation
-      const validation = validateProposedCircuit(proposal.circuit, {
+      // 2. Validate both circuit and optional Blockly XML as one untrusted proposal envelope.
+      const validation = validateProposedCircuit(getProposalValidationCandidate(proposal), {
         allowWarnings: true,
         baseCircuit: currentCircuit,
       })
@@ -216,7 +258,7 @@ export function useCircuitCopilotAction({
       const target = proposal || activeProposal
       if (!target) return false
 
-      const validation = validateProposedCircuit(target.circuit, { allowWarnings: true })
+      const validation = validateProposedCircuit(getProposalValidationCandidate(target), { allowWarnings: true })
       if (!validation.valid || !validation.normalizedCircuit) {
         setState("rejected")
         setRejectionReasons(validation.notices)
@@ -276,7 +318,7 @@ export function useCircuitCopilotAction({
       }
 
       // 2. Validate proposed circuit
-      const validation = validateProposedCircuit(target.circuit, { allowWarnings: true })
+      const validation = validateProposedCircuit(getProposalValidationCandidate(target), { allowWarnings: true })
       if (!validation.valid || !validation.normalizedCircuit) {
         setState("rejected")
         setRejectionReasons(validation.notices)
@@ -286,10 +328,13 @@ export function useCircuitCopilotAction({
       setState("applying")
 
       // 3. Save pre-mutation snapshot to circular undo buffer
+      const effectiveNextBlocklyXml =
+        typeof target.blocklyXml === "string" ? target.blocklyXml : currentBlocklyXml
       const snapshot: UndoSnapshot = {
         circuit: JSON.parse(JSON.stringify(currentCircuit)),
         blocklyXml: currentBlocklyXml,
         revHash: currentHash,
+        expectedCurrentHash: computeCircuitHash(validation.normalizedCircuit, effectiveNextBlocklyXml),
         timestamp: Date.now(),
         description: target.title || "AI Circuit Action",
       }
@@ -304,7 +349,7 @@ export function useCircuitCopilotAction({
       setRedoCount(0)
 
       // 4. Atomic application via callback
-      onApplyCircuit(validation.normalizedCircuit, target.blocklyXml)
+      onApplyCircuit(validation.normalizedCircuit, effectiveNextBlocklyXml)
 
       setStagedPreview(null)
       setState("applied")
@@ -327,21 +372,28 @@ export function useCircuitCopilotAction({
   const undoAction = useCallback((): boolean => {
     if (undoStackRef.current.length === 0) return false
 
+    const candidateSnapshot = undoStackRef.current[undoStackRef.current.length - 1]
+    if (!canRestoreAtRevision(candidateSnapshot.expectedCurrentHash, currentHash)) {
+      setState("rejected")
+      setRejectionReasons([historyConflictNotice("undo")])
+      return false
+    }
+
     const previousSnapshot = undoStackRef.current.pop()!
     setUndoCount(undoStackRef.current.length)
 
-    // Save present state into redo stack
+    // Save the applied state to redo history. Redo is allowed only from the restored revision.
     const presentSnapshot: UndoSnapshot = {
       circuit: JSON.parse(JSON.stringify(currentCircuit)),
       blocklyXml: currentBlocklyXml,
       revHash: currentHash,
+      expectedCurrentHash: previousSnapshot.revHash,
       timestamp: Date.now(),
       description: "Pre-Undo State",
     }
     redoStackRef.current.push(presentSnapshot)
     setRedoCount(redoStackRef.current.length)
 
-    // Restore previous state
     onApplyCircuit(previousSnapshot.circuit, previousSnapshot.blocklyXml)
     setState("undone")
     return true
@@ -353,25 +405,33 @@ export function useCircuitCopilotAction({
   const redoAction = useCallback((): boolean => {
     if (redoStackRef.current.length === 0) return false
 
+    const candidateSnapshot = redoStackRef.current[redoStackRef.current.length - 1]
+    if (!canRestoreAtRevision(candidateSnapshot.expectedCurrentHash, currentHash)) {
+      setState("rejected")
+      setRejectionReasons([historyConflictNotice("redo")])
+      return false
+    }
+
     const nextSnapshot = redoStackRef.current.pop()!
     setRedoCount(redoStackRef.current.length)
 
-    // Save present state into undo stack
+    // Save the pre-redo state. Undo is allowed only from the re-applied revision.
     const presentSnapshot: UndoSnapshot = {
       circuit: JSON.parse(JSON.stringify(currentCircuit)),
       blocklyXml: currentBlocklyXml,
       revHash: currentHash,
+      expectedCurrentHash: computeCircuitHash(nextSnapshot.circuit, nextSnapshot.blocklyXml),
       timestamp: Date.now(),
       description: "Pre-Redo State",
     }
     undoStackRef.current.push(presentSnapshot)
+    if (undoStackRef.current.length > maxUndoSnapshots) undoStackRef.current.shift()
     setUndoCount(undoStackRef.current.length)
 
-    // Restore next state
     onApplyCircuit(nextSnapshot.circuit, nextSnapshot.blocklyXml)
     setState("applied")
     return true
-  }, [currentCircuit, currentBlocklyXml, currentHash, onApplyCircuit])
+  }, [currentCircuit, currentBlocklyXml, currentHash, onApplyCircuit, maxUndoSnapshots])
 
   return {
     state,

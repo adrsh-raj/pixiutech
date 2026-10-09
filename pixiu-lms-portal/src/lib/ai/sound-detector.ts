@@ -159,11 +159,38 @@ async function loadScript(src: string): Promise<void> {
 async function ensureSpeechRuntime() {
   ensureBrowserAudio()
 
-  if (window.speechCommands) return
-
-  await loadScript(SPEECH_SCRIPT)
+  if (!window.speechCommands) {
+    await loadScript(SPEECH_SCRIPT)
+  }
   if (!window.speechCommands) {
     throw new Error("Local Speech Commands runtime loaded without its API.")
+  }
+
+  const sc = window.speechCommands as unknown as {
+    create: typeof window.speechCommands.create
+    __pixiuPatched?: boolean
+  }
+  if (!sc.__pixiuPatched && typeof sc.create === "function") {
+    const originalCreate = sc.create.bind(sc)
+    sc.create = (
+      inputType: string,
+      vocabulary?: string | null,
+      modelArtifactsOrURL?: string,
+      metadataOrURL?: string,
+    ) => {
+      const toAbsolute = (url?: string) => {
+        if (!url || typeof window === "undefined") return url
+        if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("file://")) return url
+        return new URL(url, window.location.href).href
+      }
+      return originalCreate(
+        inputType,
+        vocabulary,
+        toAbsolute(modelArtifactsOrURL),
+        toAbsolute(metadataOrURL),
+      )
+    }
+    sc.__pixiuPatched = true
   }
 }
 

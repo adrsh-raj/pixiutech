@@ -135,8 +135,14 @@ def accessible_trainer_queryset(user):
     qs = Trainer.objects.select_related("account")
     if user.role == UserRole.ADMIN: return qs
     if user.role == UserRole.TRAINER: return qs.filter(account_id=user.id)
-    if user.role == UserRole.SCHOOL: return qs.filter(school_assignments__school__account_id=user.id).distinct()
-    if user.role == UserRole.STUDENT: return qs.filter(school_assignments__school__classes__students__account_id=user.id, school_assignments__status="active").distinct()
+    today = timezone.localdate()
+    active_date_q = Q(school_assignments__status="active", school_assignments__assigned_from__lte=today) & (
+        Q(school_assignments__assigned_to__isnull=True) | Q(school_assignments__assigned_to__gte=today)
+    )
+    if user.role == UserRole.SCHOOL:
+        return qs.filter(Q(school_assignments__school__account_id=user.id) & active_date_q).distinct()
+    if user.role == UserRole.STUDENT:
+        return qs.filter(Q(school_assignments__school__classes__students__account_id=user.id) & active_date_q).distinct()
     return qs.none()
 
 
@@ -144,8 +150,14 @@ def accessible_assignment_queryset(user):
     qs = TrainerSchoolAssignment.objects.select_related("trainer", "school")
     if user.role == UserRole.ADMIN: return qs
     if user.role == UserRole.TRAINER: return qs.filter(trainer__account_id=user.id)
-    if user.role == UserRole.SCHOOL: return qs.filter(school__account_id=user.id)
-    if user.role == UserRole.STUDENT: return qs.filter(school__classes__students__account_id=user.id).distinct()
+    today = timezone.localdate()
+    active_date_q = Q(status="active", assigned_from__lte=today) & (
+        Q(assigned_to__isnull=True) | Q(assigned_to__gte=today)
+    )
+    if user.role == UserRole.SCHOOL:
+        return qs.filter(Q(school__account_id=user.id) & active_date_q).distinct()
+    if user.role == UserRole.STUDENT:
+        return qs.filter(Q(school__classes__students__account_id=user.id) & active_date_q).distinct()
     return qs.none()
 
 

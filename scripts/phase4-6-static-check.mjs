@@ -87,7 +87,9 @@ requireText(templates, 'part("bat","battery"', "Phase 5 motor supply")
 requireText(templates, 'wire("m","drv","out3","m2","pos"', "Phase 5 motor B output")
 requireText(templates, 'wire("n","drv","out4","m2","neg"', "Phase 5 motor B return")
 requireText(templates, 'serialPrintValue("joystick_x",{SENSOR:"joy"})', "Phase 5 joystick ID binding")
-requireText(templates, 'serialPrintValue("keypad_read",{SENSOR:"keypad"})', "Phase 5 keypad ID binding")
+if (!templates.includes('serialPrintValue("keypad_read",{SENSOR:"keypad"})') && !templates.includes('sensorBlock("keypad_read","keypad")')) {
+  failures.push("Phase 5 keypad ID binding: missing keypad_read binding")
+}
 requireText(workbench, "setBlocklyDocumentVersion((value) => value + 1)", "Phase 5 Blockly hydration")
 
 // Phase 6 — shared AI runtime + My AI + normalization boundary

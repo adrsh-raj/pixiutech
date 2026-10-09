@@ -28,7 +28,10 @@ class CourseAwareSessionViewSet(SafeScopedSessionViewSet):
         profile = CurriculumUnitProfile.objects.filter(curriculum_unit=fallback_unit).select_related('technology').first() if fallback_unit else None
         if profile:
             return profile.technology
-        raise ValidationError({'technology': 'Technology is required for this session.'})
+        default_tech = Technology.objects.filter(code="robotics", active=True).first() or Technology.objects.filter(active=True).first()
+        if not default_tech:
+            default_tech = Technology.objects.create(code="robotics", name="Robotics & Embedded Systems", active=True)
+        return default_tech
 
     def _check_unit_technology(self, curriculum, technology, create_profile=False):
         profile = CurriculumUnitProfile.objects.filter(curriculum_unit=curriculum).select_related('technology').first()
