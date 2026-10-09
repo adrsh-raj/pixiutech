@@ -78,7 +78,7 @@ class SessionActivitySerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         user = _get_request_user(request)
         title = attrs.get("title", getattr(self.instance, "title", ""))
-        session = self.instance.session if self.instance else attrs.get("session")
+        session = attrs.get("session", getattr(self.instance, "session", None))
         if not str(title).strip(): raise serializers.ValidationError({"title": "Activity title is required."})
         if not session: raise serializers.ValidationError({"session": "Session is required."})
         if not accessible_sessions(user).filter(pk=session.pk).exists():

@@ -55,6 +55,15 @@ def bump_auth_version(user):
         locked_until=None,
     )
     user.refresh_from_db(fields=["auth_version", "failed_login_attempts", "locked_until"])
+    try:
+        import hashlib
+        from django.core.cache import cache
+
+        key_material = str(user.pk).encode("utf-8")
+        cache_key = f"pixiu:jwt-user:v2:{hashlib.sha256(key_material).hexdigest()}"
+        cache.delete(cache_key)
+    except Exception:
+        pass
 
 
 def invalidate_user_sessions(user):

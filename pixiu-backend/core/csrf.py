@@ -36,11 +36,18 @@ def require_api_csrf(view_func):
     """
     middleware = CsrfViewMiddleware(lambda request: JsonResponse({"detail": "CSRF validation failed."}, status=403))
 
+    def _non_exempt_callback(req):
+        return None
+    _non_exempt_callback.csrf_exempt = False
+
     @wraps(view_func)
     def wrapped(request, *args, **kwargs):
-        rejection = middleware.process_view(request, view_func, args, kwargs)
+        raw_request = getattr(request, "_request", request)
+        if hasattr(raw_request, "csrf_processing_done"):
+            raw_request.csrf_processing_done = False
+        rejection = middleware.process_view(raw_request, _non_exempt_callback, args, kwargs)
         if rejection is not None:
-            return rejection
+            return JsonResponse({"detail": "CSRF validation failed."}, status=403)
         return view_func(request, *args, **kwargs)
 
     return wrapped

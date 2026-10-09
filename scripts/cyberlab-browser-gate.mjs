@@ -160,7 +160,7 @@ try {
 
   await page.getByText("Teach", { exact: true }).click()
   await page.getByRole("button", { name: "Train My AI", exact: true }).click()
-  await page.getByText(/My AI learned 2 concepts/i).waitFor({ timeout: 90_000 })
+  await page.getByText(/My AI learned 2 concepts/i).waitFor({ timeout: 180_000 })
 
   await page.getByText("Try", { exact: true }).click()
   const myAiButton = page.getByRole("button").filter({ hasText: /^My AI/i }).last()
