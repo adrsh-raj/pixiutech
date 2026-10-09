@@ -1,8 +1,26 @@
 import test from "node:test"
 import assert from "node:assert/strict"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { build } from "esbuild"
 
-import { countExtendedFingers } from "../../src/lib/ai/hand-detector.ts"
-import { normalizeAiDecision } from "../../src/lib/ai/ai-result-normalizer.ts"
+const bundleDir = join(tmpdir(), `ai-contract-test-${Date.now()}`)
+await build({
+  entryPoints: {
+    hand: new URL("../../src/lib/ai/hand-detector.ts", import.meta.url).pathname,
+    normalizer: new URL("../../src/lib/ai/ai-result-normalizer.ts", import.meta.url).pathname,
+  },
+  bundle: true,
+  format: "esm",
+  outdir: bundleDir,
+  platform: "neutral",
+  alias: {
+    "@": new URL("../../src", import.meta.url).pathname,
+  },
+})
+
+const { countExtendedFingers } = await import(`file://${join(bundleDir, "hand.js")}`)
+const { normalizeAiDecision } = await import(`file://${join(bundleDir, "normalizer.js")}`)
 
 test("hand contract counts an extended five-finger pose", () => {
   const points = Array.from({ length: 21 }, () => ({ x: 0, y: 0, z: 0 }))
