@@ -1028,6 +1028,7 @@ export async function trainAiModel(
   let validationXs: tf.Tensor2D | null = null
   let validationYs: tf.Tensor2D | null = null
   let model: tf.LayersModel | null = null
+  let bestWeights: tf.Tensor[] | null = null
 
   const previousActiveModel = activeModel
   activeModel = null
@@ -1115,7 +1116,7 @@ export async function trainAiModel(
     let bestMonitor = Number.POSITIVE_INFINITY
     let wait = 0
     let earlyStopped = false
-    let bestWeights: tf.Tensor[] | null = null
+    bestWeights = null
     const startedAt = performance.now()
 
     options.onStage?.("Training classifier")

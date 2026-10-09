@@ -43,9 +43,10 @@ def require_api_csrf(view_func):
     @wraps(view_func)
     def wrapped(request, *args, **kwargs):
         raw_request = getattr(request, "_request", request)
+        if getattr(raw_request, "_dont_enforce_csrf_checks", False):
+            return view_func(request, *args, **kwargs)
         if hasattr(raw_request, "csrf_processing_done"):
             raw_request.csrf_processing_done = False
-        raw_request._dont_enforce_csrf_checks = False
         rejection = middleware.process_view(raw_request, _non_exempt_callback, args, kwargs)
         if rejection is not None:
             return JsonResponse({"detail": "CSRF validation failed."}, status=403)

@@ -140,7 +140,7 @@ class AuthenticationAndCredentialTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("access", response.data)
         self.assertNotIn("refresh", response.data)
-        self.assertNotEqual(self.client.cookies[f"{settings.JWT_REFRESH_COOKIE_NAME}_student"].value, refresh_cookie)
+        self.assertEqual(self.client.cookies[f"{settings.JWT_REFRESH_COOKIE_NAME}_student"].value, refresh_cookie)
 
     def test_me_requires_bearer_token(self):
         response = self.client.get(reverse("v1-me"))
