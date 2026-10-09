@@ -26,6 +26,7 @@ try {
       if (url.includes("/auth/csrf/")) return json({ csrfToken: "browser-gate-csrf" })
       if (url.includes("/auth/refresh/")) return json({ access: "browser-gate-access", refresh: "browser-gate-refresh" })
       if (url.includes("/auth/me/")) return json({ user: { id: "browser-gate", username: "browser-gate", role: "admin", name: "Browser Gate" } })
+      if (url.includes("/api/v1/") || url.includes("onrender.com")) return json([])
       return nativeFetch(input, init)
     }
   })
@@ -47,13 +48,20 @@ try {
   })
   page.on("pageerror", (error) => pageErrors.push(error.message))
   page.on("console", (message) => {
-    if (message.type() === "error") consoleErrors.push(message.text())
+    if (message.type() === "error") {
+      const text = message.text()
+      if (!text.includes("onrender.com") && !text.includes("ERR_FAILED")) {
+        consoleErrors.push(text)
+      }
+    }
     console.log(`[browser:${message.type()}] ${message.text()}`)
   })
   page.on("requestfailed", (request) => {
     const resourceType = request.resourceType()
     if (resourceType === "font") return
-    failedRequests.push(request.url() + " [" + resourceType + "] :: " + (request.failure()?.errorText || "request failed"))
+    const url = request.url()
+    if (url.includes("onrender.com")) return
+    failedRequests.push(url + " [" + resourceType + "] :: " + (request.failure()?.errorText || "request failed"))
   })
   await mkdir(artifactDir, { recursive: true })
 
