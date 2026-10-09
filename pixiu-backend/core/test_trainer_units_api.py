@@ -27,7 +27,6 @@ class TrainerUnitsApiTests(TestCase):
         self.ai, _ = Technology.objects.get_or_create(code="ai", defaults={"name": "AI", "active": True})
         self.robotics_unit = CurriculumUnit.objects.create(
             grade="6",
-            level="Level 1",
             unit_code="ROBOTICS-U1",
             title="Robotics Basics",
             week="Unit 1",
@@ -37,7 +36,6 @@ class TrainerUnitsApiTests(TestCase):
         )
         self.ai_unit = CurriculumUnit.objects.create(
             grade="6",
-            level="Level 1",
             unit_code="AI-U1",
             title="AI Basics",
             week="Unit 1",

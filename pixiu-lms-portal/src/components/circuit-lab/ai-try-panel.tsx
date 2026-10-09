@@ -199,7 +199,12 @@ export function AiTryPanel({ viewModel }: { viewModel: AiStudioViewModel }) {
                   <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-800 bg-slate-950/60 px-3 py-2">
                     <div>
                       <p className="text-[8px] font-mono uppercase tracking-[0.16em] text-slate-600">{activeTitle}</p>
-                      <p className="mt-0.5 text-xs font-black">{aiState.detectedClass === "none" ? status : aiState.detectedClass}</p>
+                      <p className="mt-0.5 text-xs font-black">
+                        <span>{status}</span>
+                        {aiState.detectedClass !== "none" && (
+                          <span className="text-violet-300"> · {aiState.detectedClass}</span>
+                        )}
+                      </p>
                       <p className="mt-0.5 text-[8.5px] text-slate-600">{aiState.detail}</p>
                       {mode === "trained" && (
                         <div className="mt-2 flex flex-wrap gap-2">

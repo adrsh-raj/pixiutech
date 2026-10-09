@@ -7,7 +7,7 @@ from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
-from rest_framework.parsers import FormParser
+from rest_framework.parsers import FormParser, JSONParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
@@ -149,7 +149,7 @@ class PublicEnquiryView(APIView):
     permission_classes = [AllowAny]
     # JWT is optional for the public sales form, but required for authenticated Lab support.
     authentication_classes = [CachedJWTAuthentication]
-    parser_classes = [SecureMultiPartParser, FormParser]
+    parser_classes = [JSONParser, SecureMultiPartParser, FormParser]
     throttle_scope = "public_enquiry"
 
     def post(self, request):

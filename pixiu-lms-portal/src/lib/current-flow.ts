@@ -312,7 +312,9 @@ export function computeWireCurrents(
       traceComponentFlow(`${part.id}:vcc`, `${part.id}:gnd`, 20.0)
       traceComponentFlow(`${part.id}:din`, `${part.id}:gnd`, 6.0)
     } else if (part.type === "l298n") {
-      traceComponentFlow(`${part.id}:vs`, `${part.id}:gnd`, 25.0)
+      const loadInPin = `${part.id}:vs`
+      const loadOutPin = `${part.id}:gnd`
+      traceComponentFlow(loadInPin, loadOutPin, 25.0)
       traceComponentFlow(`${part.id}:vcc`, `${part.id}:gnd`, 15.0)
     }
   }

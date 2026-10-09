@@ -76,8 +76,11 @@ export function AiStudioPanel(props: AiStudioPanelProps) {
               <canvas ref={floatingOverlayRef} className="pointer-events-none absolute inset-0 h-full w-full" />
             </>
           )}
-          <div className="absolute bottom-2 left-2 max-w-[calc(100%-16px)] truncate rounded-md bg-slate-950/85 px-2 py-1 text-[9px] font-mono">
-            {aiState.detectedClass === "none" ? status : aiState.detectedClass + " · " + aiState.confidence + "%"}
+          <div className="absolute bottom-2 left-2 max-w-[calc(100%-16px)] truncate rounded-md bg-slate-950/85 px-2 py-1 text-[9px] font-mono flex items-center gap-1.5">
+            <span>{status}</span>
+            {aiState.detectedClass !== "none" && (
+              <span className="text-violet-300">· {aiState.detectedClass} ({aiState.confidence}%)</span>
+            )}
           </div>
         </div>
       </div>

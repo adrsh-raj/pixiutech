@@ -1,5 +1,6 @@
 from datetime import date
 
+from django.conf import settings
 from django.db import connection
 from django.test import TestCase
 from rest_framework.test import APITestCase
@@ -69,11 +70,12 @@ class Phase8AuthenticationTests(APITestCase):
         login = self.client.post("/api/v1/auth/login/", {"username": "phase8-auth", "password": "StrongAuthPass!123", "role": "admin"}, format="json")
         self.assertEqual(login.status_code, 200)
         self.assertTrue(login.data["access"])
-        self.assertTrue(login.data["refresh"])
+        cookie_name = f"{settings.JWT_REFRESH_COOKIE_NAME}_admin"
+        self.assertIn(cookie_name, login.cookies)
+        self.assertTrue(login.cookies[cookie_name].value)
         self.assertEqual(login.data["user"]["username"], "phase8-auth")
 
-        refresh = login.data["refresh"]
-        refreshed = self.client.post("/api/v1/auth/refresh/", {"refresh": refresh}, format="json")
+        refreshed = self.client.post("/api/v1/auth/refresh/", {"role": "admin"}, format="json")
         self.assertEqual(refreshed.status_code, 200)
         self.assertTrue(refreshed.data["access"])
 
@@ -82,8 +84,7 @@ class Phase8AuthenticationTests(APITestCase):
         self.assertEqual(me.status_code, 200)
         self.assertEqual(me.data["user"]["username"], "phase8-auth")
 
-        active_refresh = refreshed.data.get("refresh", refresh)
-        logout = self.client.post("/api/v1/auth/logout/", {"refresh": active_refresh}, format="json")
+        logout = self.client.post("/api/v1/auth/logout/", {"role": "admin"}, format="json")
         self.assertEqual(logout.status_code, 205)
 
 

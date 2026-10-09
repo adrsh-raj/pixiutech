@@ -108,6 +108,28 @@ def reset_student_to_temp_pin(student):
     return _set_student_temp_pin(student, revoke_tokens=True)
 
 
+@transaction.atomic
+def migrate_student_credentials():
+    students = (
+        Student.objects.select_related("school_class__school", "account")
+        .select_for_update(of=("self",))
+        .filter(status="active")
+        .order_by("school_class__school__school_code", "school_class__grade", "school_class__section", "roll_number", "id")
+    )
+    rows = []
+    for student in students:
+        pin = _set_student_temp_pin(student, revoke_tokens=True)
+        rows.append({
+            "student_id": student.student_id,
+            "name": student.name,
+            "school_code": student.school_class.school.school_code if student.school_class and student.school_class.school else "",
+            "class": student.school_class.display_name if student.school_class else "",
+            "username": student.account.username if student.account else student.student_id,
+            "temporary_pin": pin,
+        })
+    return rows
+
+
 def create_student_credential_batch(actor):
     students = (
         Student.objects.filter(status="active")
