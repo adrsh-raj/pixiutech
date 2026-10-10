@@ -31,7 +31,9 @@ import { fileURLToPath } from "node:url"
 import { compileRecordSchema } from "./copilot-dataset/record-schema-validator.mjs"
 import { evaluateFaultCalibration } from "./copilot-dataset/generate-fault-repair-pairs.mjs"
 import { getBundledModules, ROOT } from "./copilot-dataset/bundle-helper.mjs"
-import { sha256 } from "./copilot-dataset/normalize-record.mjs"
+import { sha256, stableStringify } from "./copilot-dataset/normalize-record.mjs"
+import { buildPhase25Audit } from "./copilot-dataset/phase25-task-audit.mjs"
+import { isHumanApprovedRecord } from "./copilot-dataset/review-policy.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -102,6 +104,8 @@ async function runPhase2DatasetQA() {
     "reports/leakage-audit.json",
     "reports/validation-report.json",
     "reports/release-summary.md",
+    "reports/diagnosis-blockly-audit.json",
+    "reports/review-queue.json",
   ]
 
   for (const rel of requiredFiles) {
@@ -113,7 +117,8 @@ async function runPhase2DatasetQA() {
   }
 
   // 2. Load dependencies & data
-  const { validator } = await getBundledModules()
+  const modules = await getBundledModules()
+  const { validator } = modules
   const validateProposedCircuit = validator.validateProposedCircuit
 
   const schemaPath = resolve(__dirname, "copilot-dataset/schema/record-v1.schema.json")
@@ -124,6 +129,8 @@ async function runPhase2DatasetQA() {
   const leakageAudit = JSON.parse(readFileSync(resolve(dataDir, "reports/leakage-audit.json"), "utf8"))
   const validationReport = JSON.parse(readFileSync(resolve(dataDir, "reports/validation-report.json"), "utf8"))
   const manifest = JSON.parse(readFileSync(resolve(dataDir, "manifest.json"), "utf8"))
+  const storedPhase25Audit = JSON.parse(readFileSync(resolve(dataDir, "reports/diagnosis-blockly-audit.json"), "utf8"))
+  const reviewQueue = JSON.parse(readFileSync(resolve(dataDir, "reports/review-queue.json"), "utf8"))
 
   const canonicalRecords = readFileSync(resolve(dataDir, "records/canonical.jsonl"), "utf8").trim().split("\n").filter(Boolean).map(JSON.parse)
   const requestRecords = readFileSync(resolve(dataDir, "records/requests.jsonl"), "utf8").trim().split("\n").filter(Boolean).map(JSON.parse)
@@ -137,6 +144,21 @@ async function runPhase2DatasetQA() {
 
   const allReleased = [...trainRecords, ...valRecords, ...testRecords]
   const total = allReleased.length
+
+  const recomputedPhase25Audit = buildPhase25Audit({
+    canonicalRecords,
+    diagnosisRecords,
+    blocklyRecords,
+    modules,
+  })
+  const phase25AuditMatchesStored = stableStringify(recomputedPhase25Audit) === stableStringify(storedPhase25Audit)
+  const humanReviewScope = [...canonicalRecords, ...allReleased]
+  const pendingHumanReviews = humanReviewScope.filter((record) => !isHumanApprovedRecord(record))
+  const queuedReviewIds = (reviewQueue.items || []).map((item) => item.record_id).sort()
+  const expectedPendingReviewIds = pendingHumanReviews.map((record) => record.record_id).sort()
+  const reviewQueueMatches = stableStringify(queuedReviewIds) === stableStringify(expectedPendingReviewIds) &&
+    reviewQueue.pending_review_count === expectedPendingReviewIds.length &&
+    reviewQueue.release_ready === (expectedPendingReviewIds.length === 0)
 
   // --- GATE EVALUATIONS ---
   const gates = []
@@ -197,12 +219,12 @@ async function runPhase2DatasetQA() {
         /all electrical conduction loops are closed|no short circuits or pin conflicts|all parts are within safe/i.test(explanation)) g3InvalidDiagnosisText++
     }
   }
-  const g3Passed = g3TotalPositive > 0 && g3InvalidPositive === 0 && g3InvalidBlocklyXml === 0 && g3InvalidDiagnosisText === 0
+  const g3Passed = g3TotalPositive > 0 && g3InvalidPositive === 0 && g3InvalidBlocklyXml === 0 && g3InvalidDiagnosisText === 0 && recomputedPhase25Audit.passed && phase25AuditMatchesStored
   gates.push({
     id: "G3",
-    name: "Positive Correctness",
-    threshold: "100% validator pass for positive gold targets",
-    metric: `${g3TotalPositive - g3InvalidPositive}/${g3TotalPositive} pass`,
+    name: "Positive Correctness & Phase 2.5 Evidence",
+    threshold: "Live validation plus current diagnosis evidence and board-aware Blockly checks",
+    metric: `${g3TotalPositive - g3InvalidPositive}/${g3TotalPositive} circuits; diagnosis ${recomputedPhase25Audit.metrics.diagnosis.records - recomputedPhase25Audit.metrics.diagnosis.failures}/${recomputedPhase25Audit.metrics.diagnosis.records}; Blockly ${recomputedPhase25Audit.metrics.blockly.records - recomputedPhase25Audit.metrics.blockly.failures}/${recomputedPhase25Audit.metrics.blockly.records}` ,
     passed: g3Passed,
   })
 
@@ -339,21 +361,14 @@ async function runPhase2DatasetQA() {
     passed: g8Passed,
   })
 
-  // G9: Review Status
-  let g9Unapproved = 0
-  for (const rec of allReleased) {
-    if (rec.review?.status !== "approved") {
-      g9Unapproved++
-    }
-  }
-  const invalidReviewMetadata = allReleased.filter((rec) => !String(rec.review?.reviewer || "").trim() ||
-    !Number.isFinite(Date.parse(rec.review?.reviewed_at)) || rec.permission?.review_status !== "approved").length
-  const g9Passed = g9Unapproved === 0 && invalidReviewMetadata === 0
+  // G9: generated approval metadata cannot substitute for a human reviewer.
+  const g9Unapproved = pendingHumanReviews.length
+  const g9Passed = g9Unapproved === 0 && reviewQueueMatches
   gates.push({
     id: "G9",
-    name: "Review Status",
-    threshold: "100% released records reviewed & approved",
-    metric: `${total - g9Unapproved}/${total} approved`,
+    name: "Independent Human Review",
+    threshold: "All canonical parents and released records human-approved; review queue is complete",
+    metric: (humanReviewScope.length - g9Unapproved) + "/" + humanReviewScope.length + " approved; " + g9Unapproved + " pending",
     passed: g9Passed,
   })
 

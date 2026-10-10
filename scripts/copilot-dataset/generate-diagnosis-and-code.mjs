@@ -3,8 +3,8 @@
 /**
  * PIXIU TECH CYBERLAB — PHASE 2 DIAGNOSIS & BLOCKLY CODE GENERATOR (WP 2.5)
  * 
- * Generates verified, telemetry-grounded diagnosis explanations (Group 3)
- * and executable Blockly XML code examples (Group 4).
+ * Generates evidence-grounded diagnosis candidates (Group 3) and source-matched
+ * Blockly XML candidates (Group 4). Compile/execution is explicitly not tested.
  * 
  * Produces:
  * - data/ai-copilot/phase2/records/diagnosis-explanations.jsonl (Target >= 50)
@@ -19,34 +19,11 @@ import { fileURLToPath } from "node:url"
 import { getBundledModules, ROOT } from "./bundle-helper.mjs"
 import { sha256 } from "./normalize-record.mjs"
 import { getBuildTimestamp } from "./build-metadata.mjs"
+import { buildPhase25Audit, isWellFormedBlocklyXml } from "./phase25-task-audit.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
-
-function isWellFormedBlocklyXml(xml) {
-  if (typeof xml !== "string" || !xml.trim() || xml.length > 200_000) return false
-  const body = xml.trim().replace(/^\s*<\?xml\b[^?]*\?>/i, "").replace(/<!--[\s\S]*?-->/g, "")
-  if (/<!DOCTYPE|<!ENTITY|<\s*script\b|<\s*(?:iframe|object|embed|foreignObject|html|body)\b|javascript\s*:|\bon[a-z]+\s*=/i.test(body)) return false
-  const tokenPattern = /<\/?([A-Za-z_][\w:.-]*(?:"[^"]*"|'[^']*'|[^'">])*)\s*\/?>/g
-  const stack = [], roots = []
-  let cursor = 0, match
-  while ((match = tokenPattern.exec(body)) !== null) {
-    if (body.slice(cursor, match.index).includes("<")) return false
-    const token = match[0]
-    const name = token.match(/^<\/?([A-Za-z_][\w:.-]*)/)?.[1]
-    if (!name) return false
-    if (/^<\//.test(token)) {
-      if (stack.pop() !== name) return false
-    } else {
-      if (stack.length === 0) roots.push(name)
-      if (!/\/\s*>$/.test(token)) stack.push(name)
-    }
-    cursor = match.index + token.length
-  }
-  if (body.slice(cursor).includes("<") || stack.length !== 0 || roots.length !== 1 || roots[0].toLowerCase() !== "xml") return false
-  return !/&(?!(?:amp|lt|gt|quot|apos|#\d+|#x[0-9a-f]+);)/i.test(body)
-}
 
 /**
  * Clean string for identifier use.
@@ -98,36 +75,38 @@ function buildDiagnosisExplanation(canonicalRecord, telemetry, healthReport, var
 /**
  * Generate Blockly code explanation.
  */
-function buildBlocklyExplanation(canonicalRecord, variantIndex) {
-  const board = canonicalRecord.context.target_board || "microcontroller"
-  const instruction = canonicalRecord.instruction.text
-
-  if (variantIndex === 0) {
-    return `Verified Blockly XML workspace program for '${instruction}' targeting ${board}. Configures initialization in the setup routine and periodic control logic in the continuous execution loop.`
-  } else {
-    return `Blockly visual logic implementation matching the schematic wiring for ${board}. Coordinates pin inputs and outputs according to circuit topology constraints.`
-  }
+function buildBlocklyExplanation(canonicalRecord) {
+  const board = canonicalRecord.context.target_board || "microcontroller";
+  const instruction = canonicalRecord.instruction.text;
+  return "Source-matched Blockly XML candidate for '" + instruction + "' targeting " + board +
+    ". XML shape, board pin references and circuit rules are audited; compile status not tested.";
 }
-
-export async function generateDiagnosisAndCode() {
-  const { telemetry, doctor, boards, validator } = await getBundledModules()
-  const canonicalPath = resolve(ROOT, "data/ai-copilot/phase2/records/canonical.jsonl")
-  const canonicalRecords = readFileSync(canonicalPath, "utf8")
+export async function generateDiagnosisAndCode({
+  writeArtifacts = false,
+  canonicalRecords: suppliedCanonicalRecords = null,
+  modules: suppliedModules = null,
+  reviewedAt = getBuildTimestamp(),
+} = {}) {
+  const modules = suppliedModules || await getBundledModules();
+  const { telemetry, doctor, validator } = modules;
+  const canonicalPath = resolve(ROOT, "data/ai-copilot/phase2/records/canonical.jsonl");
+  const canonicalRecords = suppliedCanonicalRecords || readFileSync(canonicalPath, "utf8")
     .trim()
     .split("\n")
     .filter(Boolean)
-    .map((line) => JSON.parse(line))
+    .map((line) => JSON.parse(line));
+  if (!Array.isArray(canonicalRecords) || canonicalRecords.length === 0) throw new Error("Canonical record source is empty.");
+  if (!Number.isFinite(Date.parse(reviewedAt))) throw new Error("reviewedAt must be a valid timestamp.");
 
-  console.log(`Loaded ${canonicalRecords.length} canonical records for WP 2.5 generation...`)
-
+  console.log("Loaded " + canonicalRecords.length + " canonical records for Phase 2.5 generation...");
   const diagnosisRecords = []
   const blocklyRecords = []
 
   for (const parent of canonicalRecords) {
     const circuit = parent.target.circuit
-    const rawTelemetry = telemetry.serializeCircuitTelemetry({ circuit })
     const healthReport = doctor.diagnoseCircuit(circuit)
-    const circuitValidation = validator.validateProposedCircuit(circuit, { allowWarnings: true })
+    const rawTelemetry = telemetry.serializeCircuitTelemetry({ circuit, healthReport })
+    const circuitValidation = validator.validateProposedCircuit(circuit, { allowWarnings: true, targetBoard: parent.context?.target_board })
 
     const cleanId = slugify(parent.source.source_id)
 
@@ -184,9 +163,9 @@ export async function generateDiagnosisAndCode() {
           compile: "not_tested",
         },
         review: {
-          status: "approved",
-          reviewer: "circuit-doctor-telemetry-verifier",
-          reviewed_at: getBuildTimestamp()
+          status: "in_review",
+          reviewer: "automated-circuit-doctor-audit",
+          reviewed_at: reviewedAt
         },
         variant: {
           kind: v === 0 ? "canonical" : "paraphrase",
@@ -209,8 +188,8 @@ export async function generateDiagnosisAndCode() {
       ]
 
       for (let v = 0; v < codeInstructions.length; v++) {
-        const explanation = buildBlocklyExplanation(parent, v)
-        const blocklyValidation = validator.validateProposedCircuit({ ...circuit, blocklyXml: parent.target.code }, { allowWarnings: true })
+        const explanation = buildBlocklyExplanation(parent)
+        const blocklyValidation = validator.validateProposedCircuit({ ...circuit, blocklyXml: parent.target.code }, { allowWarnings: true, targetBoard: parent.context?.target_board })
         if (!blocklyValidation.valid) throw new Error("Blockly XML failed validator checks for " + parent.record_id + ": " + blocklyValidation.errors.join("; "))
         const recordId = `pxai2-code-${cleanId}-${v}`
         const contentHash = sha256({
@@ -253,13 +232,13 @@ export async function generateDiagnosisAndCode() {
             warnings: blocklyValidation.warnings || [],
           },
           capabilities: {
-            simulation: "supported",
-            compile: "supported",
+            simulation: "not_tested",
+            compile: "not_tested",
           },
           review: {
-            status: "approved",
-            reviewer: "blockly-runtime-verifier",
-            reviewed_at: getBuildTimestamp()
+            status: "in_review",
+            reviewer: "automated-blockly-source-audit",
+            reviewed_at: reviewedAt
           },
           variant: {
             kind: v === 0 ? "canonical" : "paraphrase",
@@ -276,23 +255,30 @@ export async function generateDiagnosisAndCode() {
     }
   }
 
-  const diagOutPath = resolve(ROOT, "data/ai-copilot/phase2/records/diagnosis-explanations.jsonl")
-  const codeOutPath = resolve(ROOT, "data/ai-copilot/phase2/records/blockly-code.jsonl")
+  const taskAudit = buildPhase25Audit({ canonicalRecords, diagnosisRecords, blocklyRecords, modules });
+  if (!taskAudit.passed) {
+    throw new Error("Phase 2.5 diagnosis/Blockly audit failed; candidate records were not written: " +
+      JSON.stringify({ metrics: taskAudit.metrics, issues: taskAudit.issues.slice(0, 20) }, null, 2));
+  }
 
-  writeFileSync(diagOutPath, diagnosisRecords.map((r) => JSON.stringify(r)).join("\n") + "\n", "utf8")
-  writeFileSync(codeOutPath, blocklyRecords.map((r) => JSON.stringify(r)).join("\n") + "\n", "utf8")
-
-  console.log(`✅ Generated ${diagnosisRecords.length} diagnosis records into: ${diagOutPath}`)
-  console.log(`   - Target threshold met: ${diagnosisRecords.length} >= 50 (PASS)`)
-  console.log(`✅ Generated ${blocklyRecords.length} blockly_code records into: ${codeOutPath}`)
-  console.log(`   - Target threshold met: ${blocklyRecords.length} >= 50 (PASS)`)
-
-  return { diagnosisRecords, blocklyRecords }
+  if (writeArtifacts) {
+    const diagOutPath = resolve(ROOT, "data/ai-copilot/phase2/records/diagnosis-explanations.jsonl");
+    const codeOutPath = resolve(ROOT, "data/ai-copilot/phase2/records/blockly-code.jsonl");
+    writeFileSync(diagOutPath, diagnosisRecords.map((record) => JSON.stringify(record)).join("\n") + "\n", "utf8");
+    writeFileSync(codeOutPath, blocklyRecords.map((record) => JSON.stringify(record)).join("\n") + "\n", "utf8");
+    console.log("Wrote " + diagnosisRecords.length + " diagnosis and " + blocklyRecords.length + " Blockly candidate records.");
+    console.log("Generated records remain in_review until an independent human approves them.");
+  } else {
+    console.log("Read-only Phase 2.5 audit passed: " + diagnosisRecords.length + " diagnosis records, " +
+      blocklyRecords.length + " Blockly records; no files were written.");
+  }
+  console.log("Phase 2.5 audit metrics: " + JSON.stringify(taskAudit.metrics));
+  return { diagnosisRecords, blocklyRecords, taskAudit, wroteArtifacts: writeArtifacts };
 }
 
 // Allow direct CLI execution
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  generateDiagnosisAndCode().catch((err) => {
+  generateDiagnosisAndCode({ writeArtifacts: process.argv.includes("--write") }).catch((err) => {
     console.error("❌ Failed to generate diagnosis and blockly code records:", err)
     process.exit(1)
   })

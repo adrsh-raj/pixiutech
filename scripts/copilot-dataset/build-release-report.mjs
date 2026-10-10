@@ -18,6 +18,8 @@ import { getBundledModules, getCurrentCommitSha, ROOT } from "./bundle-helper.mj
 import { compileRecordSchema } from "./record-schema-validator.mjs"
 import { evaluateFaultCalibration } from "./generate-fault-repair-pairs.mjs"
 import { sha256 } from "./normalize-record.mjs"
+import { buildPhase25Audit } from "./phase25-task-audit.mjs"
+import { isHumanApprovedRecord } from "./review-policy.mjs"
 import { getBuildTimestamp } from "./build-metadata.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
@@ -25,7 +27,8 @@ const __dirname = dirname(__filename)
 export async function buildReleaseReport() {
   const commitSha = getCurrentCommitSha()
   const buildTimestamp = getBuildTimestamp()
-  const { validator } = await getBundledModules()
+  const modules = await getBundledModules()
+  const { validator } = modules
   const validateProposedCircuit = validator.validateProposedCircuit
 
   // Compile the checked-in Phase 2 schema using a dependency-free validator.
@@ -65,6 +68,41 @@ export async function buildReleaseReport() {
   // Load Leakage Audit
   const leakageAudit = JSON.parse(readFileSync(resolve(reportsDir, "leakage-audit.json"), "utf8"))
 
+  // Phase 2.5: audit diagnosis and Blockly targets against live board, circuit,
+  // telemetry, topology and provenance evidence. This does not compile code.
+  const phase25Audit = buildPhase25Audit({
+    canonicalRecords: recordFiles.canonical,
+    diagnosisRecords: recordFiles.diagnosisExplanations,
+    blocklyRecords: recordFiles.blocklyCode,
+    modules,
+  })
+  writeFileSync(resolve(reportsDir, "diagnosis-blockly-audit.json"), JSON.stringify(phase25Audit, null, 2), "utf8")
+
+  // Automation is not an independent human sign-off. Generate a transparent
+  // queue for every canonical parent and record present in the evaluation split.
+  const reviewRecords = [...recordFiles.canonical, ...allReleasedRecords]
+  const pendingReviews = reviewRecords.filter((record) => !isHumanApprovedRecord(record))
+  const reviewQueue = {
+    report_name: "Pixiu AI Copilot Independent Human Review Queue",
+    report_version: "1.0.0",
+    dataset_version: "2.0.0",
+    release_ready: pendingReviews.length === 0,
+    total_records_in_scope: reviewRecords.length,
+    human_approved_records: reviewRecords.length - pendingReviews.length,
+    pending_review_count: pendingReviews.length,
+    items: pendingReviews.map((record) => ({
+      record_id: record.record_id,
+      task_type: record.task_type,
+      project_family_id: record.project_family_id,
+      target_board: record.context?.target_board || null,
+      reviewer_metadata: record.review?.reviewer || null,
+      review_status: record.review?.status || "missing",
+      source_path: record.source?.source_path || null,
+      instruction_excerpt: String(record.instruction?.text || "").slice(0, 160),
+    })),
+  }
+  writeFileSync(resolve(reportsDir, "review-queue.json"), JSON.stringify(reviewQueue, null, 2), "utf8")
+
   console.log(`Evaluating 10 Release Acceptance Gates for ${totalReleased} records...`)
 
   // --- GATE EVALUATIONS ---
@@ -100,7 +138,7 @@ export async function buildReleaseReport() {
       }
     }
   }
-  const g3Passed = positivePassed === positiveEvaluated && positiveEvaluated > 0
+  const g3Passed = positivePassed === positiveEvaluated && positiveEvaluated > 0 && phase25Audit.passed
 
   // G4 - Negative Calibration
   let faultEvaluated = 0
@@ -160,8 +198,8 @@ export async function buildReleaseReport() {
   const g8Passed = uniqueRecordIds.size === totalReleased && allPayloadHashesMatch && canonicalHashesMatch
 
   // G9 - Review Status
-  const approvedCount = allReleasedRecords.filter((r) => r.review?.status === "approved").length
-  const g9Passed = approvedCount === totalReleased
+  const approvedCount = reviewRecords.filter((record) => isHumanApprovedRecord(record)).length
+  const g9Passed = approvedCount === reviewRecords.length
 
   // G10 - Product Metric Report
   const countsByTaskType = {}
@@ -183,13 +221,13 @@ export async function buildReleaseReport() {
   const gates = [
     { id: "G1", name: "Inventory Coverage", threshold: "100% inventoried; excluded get reasons", passed: g1Passed, score: `${totalInventoried}/${totalInventoried}` },
     { id: "G2", name: "Schema Integrity", threshold: "100% schema-valid against record-v1.json", passed: g2Passed, score: `${schemaValidCount}/${totalReleased}` },
-    { id: "G3", name: "Positive Correctness", threshold: "100% validator pass for positive gold targets", passed: g3Passed, score: `${positivePassed}/${positiveEvaluated}` },
+    { id: "G3", name: "Positive Correctness & Phase 2.5 Evidence", threshold: "Live validator pass plus diagnosis evidence and board-aware Blockly checks", passed: g3Passed, score: `${positivePassed}/${positiveEvaluated}; diagnosis ${phase25Audit.metrics.diagnosis.records - phase25Audit.metrics.diagnosis.failures}/${phase25Audit.metrics.diagnosis.records}; Blockly ${phase25Audit.metrics.blockly.records - phase25Audit.metrics.blockly.failures}/${phase25Audit.metrics.blockly.records}` },
     { id: "G4", name: "Negative Calibration", threshold: "100% expected-label match for fault suite (>=50)", passed: g4Passed, score: `${faultPassed}/${faultEvaluated}` },
     { id: "G5", name: "Provenance / Licence", threshold: "100% complete internal_owned approved", passed: g5Passed, score: `${provenanceCompleteCount}/${totalReleased}` },
     { id: "G6", name: "Paraphrase Preservation", threshold: "100% exact topology + board invariant match", passed: g6Passed, score: `${paraphrasesPreserved}/${paraphrasesEvaluated}` },
     { id: "G7", name: "Split Isolation", threshold: "0 cross-split family, record, or topology leaks", passed: g7Passed, score: "0 leaks" },
     { id: "G8", name: "Content Hash Integrity", threshold: "Recomputed task-specific hashes match released and canonical records", passed: g8Passed, score: "payload digests recomputed" },
-    { id: "G9", name: "Automated Review Metadata", threshold: "Approval metadata present; not a claim of human sign-off", passed: g9Passed, score: "metadata completeness checked" },
+    { id: "G9", name: "Independent Human Review", threshold: "Every canonical parent and released record has a named human approval", passed: g9Passed, score: `${approvedCount}/${reviewRecords.length}; ${pendingReviews.length} pending` },
     { id: "G10", name: "Product Metric Report", threshold: "Complete counts per task, board, and split", passed: g10Passed, score: "Generated" },
   ]
 
@@ -240,6 +278,8 @@ export async function buildReleaseReport() {
       getFileMeta("reports/source-inventory.json"),
       getFileMeta("reports/duplicate-audit.json"),
       getFileMeta("reports/leakage-audit.json"),
+      getFileMeta("reports/diagnosis-blockly-audit.json"),
+      getFileMeta("reports/review-queue.json"),
     ],
   }
 
@@ -250,7 +290,11 @@ export async function buildReleaseReport() {
     status: allGatesPassed ? "PASSED" : "FAILED",
     gates,
     metrics: {
-      schema_pass_rate: 1.0,
+      schema_pass_rate: totalReleased ? schemaValidCount / totalReleased : 0,
+      phase25_audit_passed: phase25Audit.passed,
+      phase25_diagnosis_records: phase25Audit.metrics.diagnosis.records,
+      phase25_blockly_records: phase25Audit.metrics.blockly.records,
+      pending_human_reviews: pendingReviews.length,
       positive_circuit_acceptance_rate: positivePassed / positiveEvaluated,
       negative_fault_rejection_rate: faultPassed / faultEvaluated,
       split_ratios: leakageAudit.metrics.splits,
@@ -274,12 +318,12 @@ export async function buildReleaseReport() {
 
 ## 1. Executive Summary
 
-Phase 2 builds the **Verified Dataset Pipeline & Evaluation Corpus** for the Pixiu CyberLab AI Copilot. The corpus establishes gold-standard ground truth across 4 core mission tasks:
+Phase 2 builds the **Verified Dataset Pipeline & Evaluation Corpus** for the Pixiu AI Copilot chatbot. The goal is student-friendly circuit guidance grounded in the current board profile, with accurate diagnoses and Blockly candidates that do not overclaim physical safety or compilation. The corpus establishes four task families:
 
-1. **\`request_to_circuit\`**: Direct, contextual, colloquial, and typo-tolerant student prompts mapped to verified hardware circuits.
+1. **\`request_to_circuit\`**: Direct, contextual, colloquial, and typo-tolerant student prompts mapped to targets that pass the configured circuit validator; this is not a physical hardware safety certification.
 2. **\`fault_repair\`**: Controlled hardware defect mutations paired with validated repair targets and diagnostic explanations.
 3. **\`diagnosis_explanation\`**: Evidence-bounded explanations of loop currents, power rails, and resistor protection.
-4. **\`blockly_code\`**: Executable visual logic programs in Blockly XML matching target microcontroller pinout.
+4. **\`blockly_code\`**: Source-matched Blockly XML candidates with board-pin checks; code compilation/execution is not claimed unless an actual compiler/runtime check is run.
 
 ---
 

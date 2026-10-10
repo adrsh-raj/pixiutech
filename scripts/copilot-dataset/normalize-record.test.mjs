@@ -35,6 +35,8 @@ test("SHA-256 uses stable canonical JSON key ordering", () => {
 test("canonical content hash matches the final stored target, including fallback text and null code", () => {
   const record = makeRecord("tmpl-hash-fallback");
   assert.equal(record.target.code, null);
+  assert.equal(record.capabilities.compile, "not_tested", "static circuit validation must not imply compilation");
+  assert.equal(record.review.status, "in_review", "canonical extraction creates candidates, not human-approved gold records");
   assert.equal(record.hashes.content_hash, sha256({
     circuit: record.target.circuit,
     explanation: record.target.explanation,
