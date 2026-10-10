@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import test from "node:test";
+import { ROOT } from "./bundle-helper.mjs";
 import { generateDiagnosisAndCode } from "./generate-diagnosis-and-code.mjs";
 import { computeCanonicalTopologyHash } from "./normalize-record.mjs";
 
@@ -59,6 +62,11 @@ function makeParents(count, modules) {
 }
 
 test("Phase 2.5 generator builds evidence-grounded candidate records without writing by default", async () => {
+  const artifactPaths = [
+    "data/ai-copilot/phase2/records/diagnosis-explanations.jsonl",
+    "data/ai-copilot/phase2/records/blockly-code.jsonl",
+  ];
+  const before = new Map(artifactPaths.map((path) => [path, readFileSync(resolve(ROOT, path), "utf8")]));
   const modules = makeModules();
   const parents = makeParents(25, modules);
   const result = await generateDiagnosisAndCode({
@@ -80,4 +88,7 @@ test("Phase 2.5 generator builds evidence-grounded candidate records without wri
     /compile status not tested/i.test(record.target.explanation) &&
     record.review.status === "in_review"
   ));
+  for (const [path, contents] of before) {
+    assert.equal(readFileSync(resolve(ROOT, path), "utf8"), contents, "read-only Phase 2.5 audit changed " + path);
+  }
 });
