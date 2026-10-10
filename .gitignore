@@ -6,3 +6,6 @@ dist
 .env.*
 !.env.example
 .vercel
+
+# Local review workbook; regenerate from the current local Phase 2 corpus.
+data/ai-copilot/phase2/reports/phase2-g9-human-review.xlsx
