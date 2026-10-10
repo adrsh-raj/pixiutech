@@ -18,9 +18,35 @@ import { resolve, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 import { getBundledModules, ROOT } from "./bundle-helper.mjs"
 import { sha256 } from "./normalize-record.mjs"
+import { getBuildTimestamp } from "./build-metadata.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
+
+
+function isWellFormedBlocklyXml(xml) {
+  if (typeof xml !== "string" || !xml.trim() || xml.length > 200_000) return false
+  const body = xml.trim().replace(/^\s*<\?xml\b[^?]*\?>/i, "").replace(/<!--[\s\S]*?-->/g, "")
+  if (/<!DOCTYPE|<!ENTITY|<\s*script\b|<\s*(?:iframe|object|embed|foreignObject|html|body)\b|javascript\s*:|\bon[a-z]+\s*=/i.test(body)) return false
+  const tokenPattern = /<\/?([A-Za-z_][\w:.-]*(?:"[^"]*"|'[^']*'|[^'">])*)\s*\/?>/g
+  const stack = [], roots = []
+  let cursor = 0, match
+  while ((match = tokenPattern.exec(body)) !== null) {
+    if (body.slice(cursor, match.index).includes("<")) return false
+    const token = match[0]
+    const name = token.match(/^<\/?([A-Za-z_][\w:.-]*)/)?.[1]
+    if (!name) return false
+    if (/^<\//.test(token)) {
+      if (stack.pop() !== name) return false
+    } else {
+      if (stack.length === 0) roots.push(name)
+      if (!/\/\s*>$/.test(token)) stack.push(name)
+    }
+    cursor = match.index + token.length
+  }
+  if (body.slice(cursor).includes("<") || stack.length !== 0 || roots.length !== 1 || roots[0].toLowerCase() !== "xml") return false
+  return !/&(?!(?:amp|lt|gt|quot|apos|#\d+|#x[0-9a-f]+);)/i.test(body)
+}
 
 /**
  * Clean string for identifier use.
@@ -33,41 +59,40 @@ function slugify(text) {
  * Format telemetry findings into an evidence-bounded diagnosis explanation.
  */
 function buildDiagnosisExplanation(canonicalRecord, telemetry, healthReport, variantIndex) {
-  const boardName = telemetry.board || canonicalRecord.context.target_board || "Microcontroller"
-  const powerRails = telemetry.powerRails || {}
-  const components = telemetry.components || []
-  const score = healthReport.score ?? 100
-  const status = healthReport.status ?? "healthy"
-
-  const railDescriptions = []
-  if (powerRails.rail5v) railDescriptions.push(`5V rail active (${powerRails.rail5v}V)`)
-  if (powerRails.rail3v3) railDescriptions.push(`3.3V rail active (${powerRails.rail3v3}V)`)
-  if (powerRails.battery9v) railDescriptions.push(`9V battery active (${powerRails.battery9v}V)`)
-  railDescriptions.push("GND return reference at 0.00V")
-
-  const componentSummaries = components.map((c) => {
-    return `${c.id} (${c.type}): ${c.state || "connected"} [${c.evidence || "simulated"}]`
+  const boardName = telemetry.board?.name || String(canonicalRecord.context.target_board || "Microcontroller")
+  const diagnostics = telemetry.diagnostics || {}
+  const rails = telemetry.powerRails || {}
+  const components = Array.isArray(telemetry.components) ? telemetry.components : []
+  const healthScore = diagnostics.healthScore ?? healthReport.score ?? 0
+  const healthStatus = diagnostics.healthStatus ?? healthReport.status ?? "unknown"
+  const railText = []
+  if (typeof rails.rail5v === "number") railText.push("5V=" + rails.rail5v + "V")
+  if (typeof rails.rail3v3 === "number") railText.push("3.3V=" + rails.rail3v3 + "V")
+  if (typeof rails.battery9v === "number") railText.push("battery=" + rails.battery9v + "V")
+  railText.push("GND reference=" + Number(rails.gnd ?? 0).toFixed(2) + "V")
+  const componentLines = components.map((component) => {
+    const details = Object.entries(component.details || {}).map(([key, value]) => key + "=" + String(value)).join(", ")
+    return "- " + component.partId + " (" + component.type + "): " + component.status +
+      " [truth=" + component.truth + "]" + (details ? " {" + details + "}" : "")
   })
-
-  if (variantIndex === 0) {
-    return [
-      `[Circuit Diagnostic Analysis for ${boardName}]`,
-      `• Health Score: ${score}/100 (${status}) [static-rule-inference]`,
-      `• Power Rails: ${railDescriptions.join(", ")} [simulated]`,
-      `• Component Telemetry:`,
-      componentSummaries.length > 0 ? componentSummaries.map((s) => `  - ${s}`).join("\n") : "  - No external loads connected",
-      `• Circuit Doctor Verification: All electrical conduction loops are closed, active parts are within safe operational limits, and no short circuits or pin conflicts were identified [simulated].`,
-    ].join("\n")
-  } else {
-    return [
-      `[Electrical Safety & Nodal Verification]`,
-      `Operating under ${boardName} voltage specifications with ground return path confirmed.`,
-      `Diagnostic verification confirms health status '${status}' with score ${score}/100.`,
-      `Power rails verified: ${railDescriptions.join("; ")}.`,
-      `Protected endpoints: ${components.filter((c) => c.type === "led" || c.type === "resistor").map((c) => c.id).join(", ") || "standard circuit loads"}.`,
-      `Simulation confirms stable nodal potentials and safe operational bias [simulated].`,
-    ].join("\n")
-  }
+  const issues = Array.isArray(healthReport.issues) ? healthReport.issues : []
+  const issueLines = issues.length
+    ? issues.slice(0, 10).map((issue) =>
+        "- " + issue.severity.toUpperCase() + ": " + issue.title + " — " + issue.message +
+        (issue.suggestion ? " Suggested action: " + issue.suggestion : "") + " [static-rule-inference]"
+      )
+    : ["- No issue was returned by the configured static checks. This is not a physical-hardware safety certification."]
+  return [
+    "[" + (variantIndex === 0 ? "Circuit Diagnostic Analysis" : "Electrical Safety and Nodal Review") + " for " + boardName + "]",
+    "Board logic reference: " + (telemetry.board && typeof telemetry.board.logicVoltage === "number" ? telemetry.board.logicVoltage + "V" : "not recorded") + " [static-rule-inference]",
+    "Circuit Doctor snapshot: " + healthScore + "/100 (" + healthStatus + ") [static-rule-inference]",
+    "Simulated rail snapshot: " + railText.join("; ") + " [simulated; not a physical measurement]",
+    "Component telemetry:",
+    componentLines.length ? componentLines.join("\n") : "- No component telemetry entries were returned.",
+    "Circuit Doctor findings (" + issues.length + "):",
+    issueLines.join("\n"),
+    "Scope: this describes a simulated/static snapshot. Re-run validation against the current circuit before acting; it does not certify physical hardware as safe.",
+  ].join("\n")
 }
 
 /**
@@ -85,7 +110,7 @@ function buildBlocklyExplanation(canonicalRecord, variantIndex) {
 }
 
 export async function generateDiagnosisAndCode() {
-  const { telemetry, doctor, boards } = await getBundledModules()
+  const { telemetry, doctor, boards, validator } = await getBundledModules()
   const canonicalPath = resolve(ROOT, "data/ai-copilot/phase2/records/canonical.jsonl")
   const canonicalRecords = readFileSync(canonicalPath, "utf8")
     .trim()
@@ -102,6 +127,7 @@ export async function generateDiagnosisAndCode() {
     const circuit = parent.target.circuit
     const rawTelemetry = telemetry.serializeCircuitTelemetry({ circuit })
     const healthReport = doctor.diagnoseCircuit(circuit)
+    const circuitValidation = validator.validateProposedCircuit(circuit, { allowWarnings: true })
 
     const cleanId = slugify(parent.source.source_id)
 
@@ -148,10 +174,10 @@ export async function generateDiagnosisAndCode() {
           code: null,
         },
         validation: {
-          status: "pass",
+          status: circuitValidation.valid ? "pass" : "reject",
           validator_version: "1.0.0",
-          errors: [],
-          warnings: parent.validation.warnings || [],
+          errors: circuitValidation.errors || [],
+          warnings: circuitValidation.warnings || [],
         },
         capabilities: {
           simulation: "supported",
@@ -160,7 +186,7 @@ export async function generateDiagnosisAndCode() {
         review: {
           status: "approved",
           reviewer: "circuit-doctor-telemetry-verifier",
-          reviewed_at: new Date().toISOString(),
+          reviewed_at: getBuildTimestamp()
         },
         variant: {
           kind: v === 0 ? "canonical" : "paraphrase",
@@ -176,7 +202,7 @@ export async function generateDiagnosisAndCode() {
     }
 
     // Generate 2 Blockly code variants per canonical record (if valid code exists)
-    if (parent.target.code && parent.target.code.includes("<xml")) {
+    if (parent.target.code && isWellFormedBlocklyXml(parent.target.code)) {
       const codeInstructions = [
         `Write a Blockly program for: ${parent.instruction.text}.`,
         `Generate visual logic blocks in Blockly to operate this ${parent.context.target_board || "microcontroller"} circuit.`,
@@ -184,6 +210,8 @@ export async function generateDiagnosisAndCode() {
 
       for (let v = 0; v < codeInstructions.length; v++) {
         const explanation = buildBlocklyExplanation(parent, v)
+        const blocklyValidation = validator.validateProposedCircuit({ ...circuit, blocklyXml: parent.target.code }, { allowWarnings: true })
+        if (!blocklyValidation.valid) throw new Error("Blockly XML failed validator checks for " + parent.record_id + ": " + blocklyValidation.errors.join("; "))
         const recordId = `pxai2-code-${cleanId}-${v}`
         const contentHash = sha256({
           circuit,
@@ -219,10 +247,10 @@ export async function generateDiagnosisAndCode() {
             code: parent.target.code,
           },
           validation: {
-            status: "pass",
+            status: blocklyValidation.valid ? "pass" : "reject",
             validator_version: "1.0.0",
-            errors: [],
-            warnings: parent.validation.warnings || [],
+            errors: blocklyValidation.errors || [],
+            warnings: blocklyValidation.warnings || [],
           },
           capabilities: {
             simulation: "supported",
@@ -231,7 +259,7 @@ export async function generateDiagnosisAndCode() {
           review: {
             status: "approved",
             reviewer: "blockly-runtime-verifier",
-            reviewed_at: new Date().toISOString(),
+            reviewed_at: getBuildTimestamp()
           },
           variant: {
             kind: v === 0 ? "canonical" : "paraphrase",

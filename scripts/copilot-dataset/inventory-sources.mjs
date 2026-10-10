@@ -18,6 +18,7 @@ import { writeFileSync, mkdirSync } from "node:fs"
 import { resolve, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 import { getBundledModules, getCurrentCommitSha, ROOT } from "./bundle-helper.mjs"
+import { getBuildTimestamp } from "./build-metadata.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -132,7 +133,7 @@ export async function buildSourceInventory() {
 
   const report = {
     schema_version: "1.0.0",
-    generated_at: new Date().toISOString(),
+    generated_at: getBuildTimestamp()
     commit_sha: commitSha,
     summary: {
       total_sources_inventoried: inventory.length,

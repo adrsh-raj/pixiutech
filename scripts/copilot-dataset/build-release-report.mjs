@@ -17,6 +17,7 @@ import { fileURLToPath } from "node:url"
 import { createRequire } from "node:module"
 import { getBundledModules, getCurrentCommitSha, ROOT } from "./bundle-helper.mjs"
 import { sha256 } from "./normalize-record.mjs"
+import { getBuildTimestamp } from "./build-metadata.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -24,6 +25,7 @@ const require = createRequire(import.meta.url)
 
 export async function buildReleaseReport() {
   const commitSha = getCurrentCommitSha()
+  const buildTimestamp = getBuildTimestamp()
   const { validator } = await getBundledModules()
   const validateProposedCircuit = validator.validateProposedCircuit
 
@@ -106,12 +108,18 @@ export async function buildReleaseReport() {
   let faultPassed = 0
   for (const rec of recordFiles.faultRepairs) {
     faultEvaluated++
-    const faultCircuit = rec.fault.input_circuit
-    const res = validateProposedCircuit(faultCircuit, { allowWarnings: false })
-    const isExpectedStatus = !res.valid || res.warnings?.length > 0
-    if (isExpectedStatus) {
-      faultPassed++
-    }
+    const fault = rec.fault || {}
+    const res = validateProposedCircuit(fault.input_circuit, { allowWarnings: true })
+    const expectedIds = Array.isArray(fault.expected_rule_ids) ? fault.expected_rule_ids : []
+    const ruleMatch = expectedIds.length > 0 && expectedIds.every((expectedId) => res.notices.some((notice) => notice.ruleId === expectedId))
+    const statusMatch = fault.expected_validator_status === "reject"
+      ? res.notices.some((notice) => notice.severity === "critical")
+      : fault.expected_validator_status === "warning"
+        ? res.notices.some((notice) => notice.severity === "warning")
+        : fault.expected_validator_status === "warning_or_reject"
+          ? res.notices.some((notice) => notice.severity === "critical" || notice.severity === "warning")
+          : false
+    if (ruleMatch && statusMatch) faultPassed++
   }
   const g4Passed = faultPassed === faultEvaluated && faultEvaluated >= 50
 
@@ -144,9 +152,18 @@ export async function buildReleaseReport() {
   // G7 - Split Isolation
   const g7Passed = leakageAudit.passed === true
 
-  // G8 - Reproducibility (deterministic IDs and non-empty content hashes)
+  // G8 - recompute each task's content digest; a 64-character string is not proof.
   const uniqueRecordIds = new Set(allReleasedRecords.map((r) => r.record_id))
-  const g8Passed = uniqueRecordIds.size === totalReleased && allReleasedRecords.every((r) => r.hashes?.content_hash?.length === 64)
+  const expectedContentHash = (rec) => {
+    if (rec.task_type === "request_to_circuit") return sha256({ text: rec.instruction.text, target: rec.target })
+    if (rec.task_type === "fault_repair") return sha256({ fault: rec.fault.input_circuit, target: { circuit: rec.target.corrected_circuit, explanation: rec.target.explanation, code: rec.target.code }, mutation_id: rec.fault.mutation_id })
+    if (rec.task_type === "diagnosis_explanation") return sha256({ circuit: rec.target.circuit, explanation: rec.target.explanation, instruction: rec.instruction.text, task: "diagnosis_explanation" })
+    if (rec.task_type === "blockly_code") return sha256({ circuit: rec.target.circuit, code: rec.target.code, instruction: rec.instruction.text, task: "blockly_code" })
+    return null
+  }
+  const allPayloadHashesMatch = allReleasedRecords.every((rec) => expectedContentHash(rec) !== null && expectedContentHash(rec) === rec.hashes?.content_hash)
+  const canonicalHashesMatch = recordFiles.canonical.every((rec) => sha256({ circuit: rec.target.circuit, explanation: rec.target.explanation, code: rec.target.code }) === rec.hashes?.content_hash)
+  const g8Passed = uniqueRecordIds.size === totalReleased && allPayloadHashesMatch && canonicalHashesMatch
 
   // G9 - Review Status
   const approvedCount = allReleasedRecords.filter((r) => r.review?.status === "approved").length
@@ -177,8 +194,8 @@ export async function buildReleaseReport() {
     { id: "G5", name: "Provenance / Licence", threshold: "100% complete internal_owned approved", passed: g5Passed, score: `${provenanceCompleteCount}/${totalReleased}` },
     { id: "G6", name: "Paraphrase Preservation", threshold: "100% exact topology + board invariant match", passed: g6Passed, score: `${paraphrasesPreserved}/${paraphrasesEvaluated}` },
     { id: "G7", name: "Split Isolation", threshold: "0 cross-split family, record, or topology leaks", passed: g7Passed, score: "0 leaks" },
-    { id: "G8", name: "Reproducibility", threshold: "Deterministic content hashes across 100% records", passed: g8Passed, score: `${totalReleased}/${totalReleased}` },
-    { id: "G9", name: "Review Status", threshold: "100% released records reviewed & approved", passed: g9Passed, score: `${approvedCount}/${totalReleased}` },
+    { id: "G8", name: "Content Hash Integrity", threshold: "Recomputed task-specific hashes match released and canonical records", passed: g8Passed, score: "payload digests recomputed" },
+    { id: "G9", name: "Automated Review Metadata", threshold: "Approval metadata present; not a claim of human sign-off", passed: g9Passed, score: "metadata completeness checked" },
     { id: "G10", name: "Product Metric Report", threshold: "Complete counts per task, board, and split", passed: g10Passed, score: "Generated" },
   ]
 
@@ -199,7 +216,7 @@ export async function buildReleaseReport() {
     dataset_name: "pixiu-ai-copilot-evaluation-corpus",
     version: "2.0.0",
     commit_sha: commitSha,
-    generated_at: new Date().toISOString(),
+    generated_at: buildTimestamp,
     record_schema_version: "1.0.0",
     pilot_target_satisfied: totalReleased >= 250,
     overall_status: allGatesPassed ? "PASSED" : "FAILED",
@@ -234,7 +251,7 @@ export async function buildReleaseReport() {
 
   const validationReport = {
     report_name: "Phase 2 Validation & Quality Gate Verification",
-    timestamp: new Date().toISOString(),
+    timestamp: buildTimestamp,
     commit_sha: commitSha,
     status: allGatesPassed ? "PASSED" : "FAILED",
     gates,
@@ -256,7 +273,7 @@ export async function buildReleaseReport() {
 
 **Corpus Version:** 2.0.0  
 **Commit SHA:** \`${commitSha}\`  
-**Generated At:** ${new Date().toISOString()}  
+**Generated At:** ${buildTimestamp}  
 **Overall Quality Gate Status:** ${allGatesPassed ? "✅ **ALL 10 GATES PASSED (G1–G10)**" : "❌ **FAILED**"}
 
 ---
@@ -295,9 +312,9 @@ ${gates.map((g) => `| **${g.id}** | ${g.name} | ${g.threshold} | \`${g.score}\` 
 ${Object.entries(countsByBoard).map(([board, count]) => `- **\`${board}\`:** ${count} records (${((count / totalReleased) * 100).toFixed(1)}%)`).join("\n")}
 
 ### By Evaluation Partition (Split Isolation)
-- **Train (65.2%):** ${splits.train.length} records across ${leakageAudit.metrics.splits.train.families} families
-- **Validation (17.7%):** ${splits.validation.length} records across ${leakageAudit.metrics.splits.validation.families} families
-- **Test (17.1%):** ${splits.test.length} records across ${leakageAudit.metrics.splits.test.families} families
+- **Train (${((splits.train.length / totalReleased) * 100).toFixed(1)}%):** ${splits.train.length} records across ${leakageAudit.metrics.splits.train.families} families
+- **Validation (${((splits.validation.length / totalReleased) * 100).toFixed(1)}%):** ${splits.validation.length} records across ${leakageAudit.metrics.splits.validation.families} families
+- **Test (${((splits.test.length / totalReleased) * 100).toFixed(1)}%):** ${splits.test.length} records across ${leakageAudit.metrics.splits.test.families} families
 - **Cross-Split Data Leakage:** **0 records, 0 families, 0 topology overlaps.**
 
 ---
@@ -306,7 +323,8 @@ ${Object.entries(countsByBoard).map(([board, count]) => `- **\`${board}\`:** ${c
 - **Licence Status:** 100% \`internal_owned\` (Pixiu CyberLab proprietary templates & curriculum).
 - **External Unreviewed Rights:** \`0\`.
 - **Schema Compliance:** 100% compliant with \`record-v1.schema.json\`.
-- **Live Circuit Validator Acceptance:** 100% of gold targets pass \`validateProposedCircuit\`.
+- **Circuit Validation:** positive targets are checked by \`validateProposedCircuit\`.
+- **Review semantics:** approval metadata is programmatic and is not a substitute for independent human review.
 `
 
   writeFileSync(resolve(reportsDir, "release-summary.md"), releaseSummaryMd, "utf8")
@@ -324,14 +342,14 @@ data/ai-copilot/phase2/
 ├── manifest.json           # Cryptographic release manifest with SHA-256 hashes
 ├── records/
 │   ├── canonical.jsonl     # Extracted canonical ground-truth circuits
-│   ├── requests.jsonl      # Task Group 1: Student request paraphrases (355 records)
-│   ├── fault-repairs.jsonl # Task Group 2: Controlled fault/repair pairs (175 records)
-│   ├── diagnosis-explanations.jsonl # Task Group 3: Telemetry-grounded diagnostics (142 records)
-│   └── blockly-code.jsonl  # Task Group 4: Verified Blockly XML programs (142 records)
+│   ├── requests.jsonl      # Task Group 1: Student request paraphrases (${recordFiles.requests.length} records)
+│   ├── fault-repairs.jsonl # Task Group 2: Controlled fault/repair pairs (${recordFiles.faultRepairs.length} records)
+│   ├── diagnosis-explanations.jsonl # Task Group 3: Telemetry-grounded diagnostics (${recordFiles.diagnosisExplanations.length} records)
+│   └── blockly-code.jsonl  # Task Group 4: Well-formed Blockly XML programs (${recordFiles.blocklyCode.length} records)
 ├── splits/
-│   ├── train.jsonl         # Training partition (531 records, 44 families)
-│   ├── validation.jsonl    # Validation partition (144 records, 11 families)
-│   └── test.jsonl          # Held-out evaluation partition (139 records, 11 families)
+│   ├── train.jsonl         # Training partition (${splits.train.length} records, ${leakageAudit.metrics.splits.train.families} families)
+│   ├── validation.jsonl    # Validation partition (${splits.validation.length} records, ${leakageAudit.metrics.splits.validation.families} families)
+│   └── test.jsonl          # Held-out evaluation partition (${splits.test.length} records, ${leakageAudit.metrics.splits.test.families} families)
 └── reports/
     ├── source-inventory.json   # Full inventory of scanned templates and missions
     ├── duplicate-audit.json    # Deduplication and topology equivalence report

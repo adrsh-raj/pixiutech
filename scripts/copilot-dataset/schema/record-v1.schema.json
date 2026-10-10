@@ -45,7 +45,12 @@
     },
     "source": {
       "type": "object",
-      "required": ["source_type", "source_path", "source_id", "source_revision"],
+      "required": [
+        "source_type",
+        "source_path",
+        "source_id",
+        "source_revision"
+      ],
       "properties": {
         "source_type": {
           "type": "string",
@@ -56,42 +61,71 @@
             "synthetic_mutation"
           ]
         },
-        "source_path": { "type": "string" },
-        "source_id": { "type": "string" },
-        "source_revision": { "type": "string" }
+        "source_path": {
+          "type": "string"
+        },
+        "source_id": {
+          "type": "string"
+        },
+        "source_revision": {
+          "type": "string"
+        }
       }
     },
     "permission": {
       "type": "object",
-      "required": ["status", "review_status"],
+      "required": [
+        "status",
+        "review_status"
+      ],
       "properties": {
         "status": {
           "type": "string",
-          "enum": ["internal_owned", "external_reviewed"]
+          "enum": [
+            "internal_owned",
+            "external_reviewed"
+          ]
         },
         "review_status": {
           "type": "string",
-          "enum": ["approved", "in_review", "rejected"]
+          "enum": [
+            "approved",
+            "in_review",
+            "rejected"
+          ]
         }
       }
     },
     "context": {
       "type": "object",
-      "required": ["target_board"],
+      "required": [
+        "target_board"
+      ],
       "properties": {
         "target_board": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "grade_band": {
-          "type": ["integer", "null"]
+          "type": [
+            "integer",
+            "null"
+          ]
         }
       }
     },
     "instruction": {
       "type": "object",
-      "required": ["text"],
+      "required": [
+        "text"
+      ],
       "properties": {
-        "text": { "type": "string", "minLength": 3 }
+        "text": {
+          "type": "string",
+          "minLength": 3
+        }
       }
     },
     "target": {
@@ -100,92 +134,174 @@
         "circuit": {
           "type": "object",
           "properties": {
-            "parts": { "type": "array" },
-            "wires": { "type": "array" }
+            "parts": {
+              "type": "array"
+            },
+            "wires": {
+              "type": "array"
+            }
           }
         },
         "corrected_circuit": {
           "type": "object",
           "properties": {
-            "parts": { "type": "array" },
-            "wires": { "type": "array" }
+            "parts": {
+              "type": "array"
+            },
+            "wires": {
+              "type": "array"
+            }
           }
         },
-        "explanation": { "type": ["string", "null"] },
-        "code": { "type": ["string", "null"] }
+        "explanation": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "code": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
       }
     },
     "fault": {
       "type": "object",
-      "required": ["mutation_id", "input_circuit", "expected_validator_status", "expected_rule_ids"],
+      "required": [
+        "mutation_id",
+        "input_circuit",
+        "expected_validator_status",
+        "expected_rule_ids"
+      ],
       "properties": {
-        "mutation_id": { "type": "string" },
+        "mutation_id": {
+          "type": "string"
+        },
         "input_circuit": {
           "type": "object",
-          "required": ["parts", "wires"],
+          "required": [
+            "parts",
+            "wires"
+          ],
           "properties": {
-            "parts": { "type": "array" },
-            "wires": { "type": "array" }
+            "parts": {
+              "type": "array"
+            },
+            "wires": {
+              "type": "array"
+            }
           }
         },
         "expected_validator_status": {
           "type": "string",
-          "enum": ["warning_or_reject", "reject", "warning"]
+          "enum": [
+            "warning_or_reject",
+            "reject",
+            "warning"
+          ]
         },
         "expected_rule_ids": {
           "type": "array",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
     "validation": {
       "type": "object",
-      "required": ["status", "validator_version", "errors", "warnings"],
+      "required": [
+        "status",
+        "validator_version",
+        "errors",
+        "warnings"
+      ],
       "properties": {
         "status": {
           "type": "string",
-          "enum": ["pass", "warning", "reject"]
+          "enum": [
+            "pass",
+            "warning",
+            "reject"
+          ]
         },
-        "validator_version": { "type": "string" },
+        "validator_version": {
+          "type": "string"
+        },
         "errors": {
           "type": "array",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         },
         "warnings": {
           "type": "array",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
     "capabilities": {
       "type": "object",
-      "required": ["simulation", "compile"],
+      "required": [
+        "simulation",
+        "compile"
+      ],
       "properties": {
         "simulation": {
           "type": "string",
-          "enum": ["supported", "partial", "unsupported", "not_tested"]
+          "enum": [
+            "supported",
+            "partial",
+            "unsupported",
+            "not_tested"
+          ]
         },
         "compile": {
           "type": "string",
-          "enum": ["supported", "partial", "unsupported", "not_tested"]
+          "enum": [
+            "supported",
+            "partial",
+            "unsupported",
+            "not_tested"
+          ]
         }
       }
     },
     "review": {
       "type": "object",
-      "required": ["status", "reviewer", "reviewed_at"],
+      "required": [
+        "status",
+        "reviewer",
+        "reviewed_at"
+      ],
       "properties": {
         "status": {
           "type": "string",
-          "enum": ["approved", "draft", "in_review", "rejected"]
+          "enum": [
+            "approved",
+            "draft",
+            "in_review",
+            "rejected"
+          ]
         },
-        "reviewer": { "type": "string" },
-        "reviewed_at": { "type": "string" }
+        "reviewer": {
+          "type": "string"
+        },
+        "reviewed_at": {
+          "type": "string"
+        }
       }
     },
     "variant": {
       "type": "object",
-      "required": ["kind", "parent_record_id"],
+      "required": [
+        "kind",
+        "parent_record_id"
+      ],
       "properties": {
         "kind": {
           "type": "string",
@@ -199,21 +315,48 @@
             "repair"
           ]
         },
-        "parent_record_id": { "type": ["string", "null"] }
+        "parent_record_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "request_style": {
+          "type": "string",
+          "enum": [
+            "direct",
+            "goal_oriented",
+            "contextual",
+            "colloquial",
+            "typo"
+          ]
+        }
       }
     },
     "hashes": {
       "type": "object",
-      "required": ["source_hash", "topology_hash", "content_hash"],
+      "required": [
+        "source_hash",
+        "topology_hash",
+        "content_hash"
+      ],
       "properties": {
-        "source_hash": { "type": "string" },
-        "topology_hash": { "type": "string" },
-        "content_hash": { "type": "string" }
+        "source_hash": {
+          "type": "string"
+        },
+        "topology_hash": {
+          "type": "string"
+        },
+        "content_hash": {
+          "type": "string"
+        }
       }
     },
     "limitations": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
     }
   },
   "additionalProperties": false

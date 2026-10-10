@@ -8,6 +8,7 @@
  */
 
 import { createHash } from "node:crypto"
+import { getBuildTimestamp } from "./build-metadata.mjs"
 
 /**
  * Compute deterministic SHA-256 of any JSON-serializable object.
@@ -138,7 +139,7 @@ export function createCanonicalRecord({
     review: {
       status: "approved",
       reviewer,
-      reviewed_at: new Date().toISOString(),
+      reviewed_at: getBuildTimestamp()
     },
     variant: {
       kind: "canonical",

@@ -15,6 +15,7 @@ import { readFileSync, writeFileSync } from "node:fs"
 import { resolve, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 import { ROOT } from "./bundle-helper.mjs"
+import { getBuildTimestamp } from "./build-metadata.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -64,7 +65,7 @@ export async function deduplicateAndGroup() {
 
   const report = {
     report_name: "Phase 2 Deduplication & Group Assignment Audit",
-    timestamp: new Date().toISOString(),
+    timestamp: getBuildTimestamp()
     total_canonical_records: canonicalRecords.length,
     unique_content_hashes: contentMap.size,
     unique_topology_hashes: topologyMap.size,

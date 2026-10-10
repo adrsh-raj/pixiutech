@@ -24,6 +24,7 @@ import { readFileSync, writeFileSync } from "node:fs"
 import { resolve, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 import { sha256 } from "./normalize-record.mjs"
+import { getBuildTimestamp } from "./build-metadata.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -58,53 +59,67 @@ export async function splitByFamily() {
 
   console.log(`Loaded ${allRecords.length} total candidate records across 4 task groups.`)
 
-  // Group by project_family_id
+  // Group records by family, then union families with identical topology
+  // fingerprints so exact topology duplicates never cross split boundaries.
   const familyToRecords = new Map()
   for (const rec of allRecords) {
-    const fam = rec.project_family_id
-    if (!familyToRecords.has(fam)) {
-      familyToRecords.set(fam, [])
-    }
-    familyToRecords.get(fam).push(rec)
+    if (!familyToRecords.has(rec.project_family_id)) familyToRecords.set(rec.project_family_id, [])
+    familyToRecords.get(rec.project_family_id).push(rec)
   }
-
   const uniqueFamilies = Array.from(familyToRecords.keys())
-  console.log(`Identified ${uniqueFamilies.length} unique project families.`)
-
-  // Stratify by board to ensure all target boards are represented in all splits
-  const boardToFamilies = new Map()
-  for (const [fam, records] of familyToRecords.entries()) {
-    const board = records[0].context.target_board || "generic"
-    if (!boardToFamilies.has(board)) {
-      boardToFamilies.set(board, [])
+  console.log("Identified " + uniqueFamilies.length + " unique project families.")
+  const parent = new Map(uniqueFamilies.map((family) => [family, family]))
+  const findRoot = (family) => {
+    let root = family
+    while (parent.get(root) !== root) root = parent.get(root)
+    let current = family
+    while (parent.get(current) !== current) {
+      const next = parent.get(current)
+      parent.set(current, root)
+      current = next
     }
-    boardToFamilies.get(board).push(fam)
+    return root
   }
-
+  const union = (left, right) => {
+    const a = findRoot(left), b = findRoot(right)
+    if (a === b) return
+    const ordered = [a, b].sort()
+    parent.set(ordered[1], ordered[0])
+  }
+  const topologyFamilies = new Map()
+  for (const rec of allRecords) {
+    const topology = rec.hashes?.topology_hash
+    if (!topology) throw new Error("Missing topology hash for " + rec.record_id)
+    if (!topologyFamilies.has(topology)) topologyFamilies.set(topology, new Set())
+    topologyFamilies.get(topology).add(rec.project_family_id)
+  }
+  for (const families of topologyFamilies.values()) {
+    const list = Array.from(families)
+    for (let i = 1; i < list.length; i++) union(list[0], list[i])
+  }
+  const clustersByRoot = new Map()
+  for (const family of uniqueFamilies) {
+    const root = findRoot(family)
+    if (!clustersByRoot.has(root)) clustersByRoot.set(root, [])
+    clustersByRoot.get(root).push(family)
+  }
+  const clusters = Array.from(clustersByRoot.entries()).map(([root, families]) => ({
+    root, families: families.slice().sort(),
+    records: families.flatMap((family) => familyToRecords.get(family)),
+    key: families.slice().sort().join("|"),
+  })).sort((a, b) => b.records.length - a.records.length || a.key.localeCompare(b.key))
+  if (clusters.length < 3) throw new Error("At least three independent topology clusters are required for train/validation/test.")
+  const targets = { train: allRecords.length * 0.652, validation: allRecords.length * 0.177, test: allRecords.length * 0.171 }
+  const counts = { train: 0, validation: 0, test: 0 }
   const familySplitAssignment = new Map()
-
-  for (const [board, families] of boardToFamilies.entries()) {
-    // Deterministic sort by SHA-256 of family ID to avoid any run-to-run drift
-    const sorted = [...families].sort((a, b) => sha256(a).localeCompare(sha256(b)))
-
-    const n = sorted.length
-    // Target 70% train, 15% validation, 15% test
-    const nVal = Math.max(1, Math.round(n * 0.15))
-    const nTest = Math.max(1, Math.round(n * 0.15))
-    const nTrain = n - nVal - nTest
-
-    for (let i = 0; i < n; i++) {
-      const fam = sorted[i]
-      if (i < nTrain) {
-        familySplitAssignment.set(fam, "train")
-      } else if (i < nTrain + nVal) {
-        familySplitAssignment.set(fam, "validation")
-      } else {
-        familySplitAssignment.set(fam, "test")
-      }
-    }
-  }
-
+  const initial = ["train", "validation", "test"]
+  clusters.forEach((cluster, index) => {
+    const selected = index < 3 ? initial[index] : Object.keys(targets).sort((a, b) =>
+      counts[a] / targets[a] - counts[b] / targets[b] || a.localeCompare(b)
+    )[0]
+    counts[selected] += cluster.records.length
+    for (const family of cluster.families) familySplitAssignment.set(family, selected)
+  })
   const splits = {
     train: [],
     validation: [],
@@ -154,41 +169,37 @@ export async function splitByFamily() {
   const totalFamilyOverlap = familyOverlapTrainVal + familyOverlapTrainTest + familyOverlapValTest
 
   // 3. Paraphrase whose parent is in a different split
+  const canonicalRecords = readFileSync(resolve(ROOT, "data/ai-copilot/phase2/records/canonical.jsonl"), "utf8").trim().split("\n").filter(Boolean).map(JSON.parse)
+  const canonicalById = new Map(canonicalRecords.map((record) => [record.record_id, record]))
   let crossSplitParaphraseLeaks = 0
   for (const [splitKey, records] of Object.entries(splits)) {
-    const currentSplitIds = new Set(records.map((r) => r.record_id))
     for (const rec of records) {
-      if (rec.variant?.parent_record_id) {
-        const parentId = rec.variant.parent_record_id
-        const parentRecord = recordMap.get(parentId)
-        if (parentRecord) {
-          const parentSplit = familySplitAssignment.get(parentRecord.project_family_id)
-          if (parentSplit !== splitKey) {
-            crossSplitParaphraseLeaks++
-          }
-        }
-      }
+      const parentId = rec.variant?.parent_record_id
+      if (!parentId) continue
+      const parentRecord = canonicalById.get(parentId) || recordMap.get(parentId)
+      if (!parentRecord || parentRecord.project_family_id !== rec.project_family_id ||
+        familySplitAssignment.get(parentRecord.project_family_id) !== splitKey) crossSplitParaphraseLeaks++
     }
   }
-
-  // 4. Identical or near-identical topology hash across train and test
-  const trainTopologies = new Set(splits.train.map((r) => r.hashes.topology_hash))
-  const valTopologies = new Set(splits.validation.map((r) => r.hashes.topology_hash))
-  const testTopologies = new Set(splits.test.map((r) => r.hashes.topology_hash))
-
-  const topologyOverlapTrainVal = Array.from(trainTopologies).filter((t) => valTopologies.has(t)).length
-  const topologyOverlapTrainTest = Array.from(trainTopologies).filter((t) => testTopologies.has(t)).length
-  const totalTopologyOverlap = topologyOverlapTrainVal + topologyOverlapTrainTest
-
-  // 5. External examples with unknown rights in released splits
-  const unknownRightsCount = allRecords.filter((r) => r.permission?.review_status !== "approved").length
+  const topologySets = Object.fromEntries(Object.entries(splits).map(([name, records]) =>
+    [name, new Set(records.map((record) => record.hashes.topology_hash))]
+  ))
+  const overlapCount = (left, right) => Array.from(topologySets[left]).filter((hash) => topologySets[right].has(hash)).length
+  const topologyOverlapTrainVal = overlapCount("train", "validation")
+  const topologyOverlapTrainTest = overlapCount("train", "test")
+  const topologyOverlapValTest = overlapCount("validation", "test")
+  const totalTopologyOverlap = topologyOverlapTrainVal + topologyOverlapTrainTest + topologyOverlapValTest
+  const unknownRightsCount = allRecords.filter((record) =>
+    !["internal_owned", "external_reviewed"].includes(record.permission?.status) ||
+    record.permission?.review_status !== "approved"
+  ).length
 
   // 6. Unapproved / unreviewed records in released splits
   const unapprovedCount = allRecords.filter((r) => r.review?.status !== "approved").length
 
   const auditReport = {
     audit_name: "Phase 2 Split Isolation and Data Leakage Audit",
-    timestamp: new Date().toISOString(),
+    timestamp: getBuildTimestamp()
     gate: "G7",
     passed:
       totalRecordOverlap === 0 &&
@@ -238,13 +249,14 @@ export async function splitByFamily() {
         status: crossSplitParaphraseLeaks === 0 ? "pass" : "fail",
       },
       {
-        check: "Near-identical topology hash across train and test",
+        check: "Exact topology fingerprint overlap across all split pairs",
         expected: 0,
         actual: totalTopologyOverlap,
+        breakdown: { train_validation: topologyOverlapTrainVal, train_test: topologyOverlapTrainTest, validation_test: topologyOverlapValTest },
         status: totalTopologyOverlap === 0 ? "pass" : "fail",
       },
       {
-        check: "External examples with unknown rights in released splits",
+        check: "Unknown/unapproved source-rights metadata in released splits",
         expected: 0,
         actual: unknownRightsCount,
         status: unknownRightsCount === 0 ? "pass" : "fail",

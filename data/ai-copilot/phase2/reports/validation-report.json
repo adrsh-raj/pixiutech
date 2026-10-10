@@ -1,99 +1,96 @@
 {
   "report_name": "Phase 2 Validation & Quality Gate Verification",
-  "timestamp": "2026-10-10T05:27:47.399Z",
-  "commit_sha": "767221cb6d93a8d71af7c37664153ec9126200fe",
-  "status": "PASSED",
+  "timestamp": "2026-10-10T05:28:04.000Z",
+  "commit_sha": "e4be8e42f4ee0964b355ff59213f42f8aa1ad148",
+  "status": "PENDING_CI_VERIFICATION",
   "gates": [
     {
       "id": "G1",
       "name": "Inventory Coverage",
-      "threshold": "100% inventoried; excluded get reasons",
-      "passed": true,
-      "score": "86/86"
+      "threshold": "Must pass strict CI checks on committed artifacts.",
+      "metric": "pending CI verification",
+      "passed": false
     },
     {
       "id": "G2",
       "name": "Schema Integrity",
-      "threshold": "100% schema-valid against record-v1.json",
-      "passed": true,
-      "score": "814/814"
+      "threshold": "Must pass strict CI checks on committed artifacts.",
+      "metric": "pending CI verification",
+      "passed": false
     },
     {
       "id": "G3",
-      "name": "Positive Correctness",
-      "threshold": "100% validator pass for positive gold targets",
-      "passed": true,
-      "score": "814/814"
+      "name": "Positive Correctness & Payload Safety",
+      "threshold": "Must pass strict CI checks on committed artifacts.",
+      "metric": "pending CI verification",
+      "passed": false
     },
     {
       "id": "G4",
       "name": "Negative Calibration",
-      "threshold": "100% expected-label match for fault suite (>=50)",
-      "passed": true,
-      "score": "175/175"
+      "threshold": "Must pass strict CI checks on committed artifacts.",
+      "metric": "pending CI verification",
+      "passed": false
     },
     {
       "id": "G5",
-      "name": "Provenance / Licence",
-      "threshold": "100% complete internal_owned approved",
-      "passed": true,
-      "score": "814/814"
+      "name": "Provenance & Licensing",
+      "threshold": "Must pass strict CI checks on committed artifacts.",
+      "metric": "pending CI verification",
+      "passed": false
     },
     {
       "id": "G6",
-      "name": "Paraphrase Preservation",
-      "threshold": "100% exact topology + board invariant match",
-      "passed": true,
-      "score": "355/355"
+      "name": "Paraphrase Invariants & Style Coverage",
+      "threshold": "Must pass strict CI checks on committed artifacts.",
+      "metric": "pending CI verification",
+      "passed": false
     },
     {
       "id": "G7",
       "name": "Split Isolation",
-      "threshold": "0 cross-split family, record, or topology leaks",
-      "passed": true,
-      "score": "0 leaks"
+      "threshold": "Must pass strict CI checks on committed artifacts.",
+      "metric": "pending CI verification",
+      "passed": false
     },
     {
       "id": "G8",
-      "name": "Reproducibility",
-      "threshold": "Deterministic content hashes across 100% records",
-      "passed": true,
-      "score": "814/814"
+      "name": "Content & Manifest Integrity",
+      "threshold": "Must pass strict CI checks on committed artifacts.",
+      "metric": "pending CI verification",
+      "passed": false
     },
     {
       "id": "G9",
-      "name": "Review Status",
-      "threshold": "100% released records reviewed & approved",
-      "passed": true,
-      "score": "814/814"
+      "name": "Automated Review Metadata",
+      "threshold": "Must pass strict CI checks on committed artifacts.",
+      "metric": "pending CI verification",
+      "passed": false
     },
     {
       "id": "G10",
-      "name": "Product Metric Report",
-      "threshold": "Complete counts per task, board, and split",
-      "passed": true,
-      "score": "Generated"
+      "name": "Release Summary Consistency",
+      "threshold": "Must pass strict CI checks on committed artifacts.",
+      "metric": "pending CI verification",
+      "passed": false
     }
   ],
   "metrics": {
-    "schema_pass_rate": 1,
-    "positive_circuit_acceptance_rate": 1,
-    "negative_fault_rejection_rate": 1,
     "split_ratios": {
       "train": {
-        "records": 531,
-        "families": 44,
-        "ratio": 0.6523
+        "records": 516,
+        "families": 43,
+        "ratio": 0.6482
       },
       "validation": {
-        "records": 144,
-        "families": 11,
-        "ratio": 0.1769
+        "records": 146,
+        "families": 12,
+        "ratio": 0.1834
       },
       "test": {
-        "records": 139,
+        "records": 134,
         "families": 11,
-        "ratio": 0.1708
+        "ratio": 0.1683
       }
     }
   },

@@ -1,26 +1,26 @@
 {
   "audit_name": "Phase 2 Split Isolation and Data Leakage Audit",
-  "timestamp": "2026-10-10T05:26:51.125Z",
+  "timestamp": "2026-10-10T00:00:00.000Z",
   "gate": "G7",
   "passed": true,
   "metrics": {
-    "total_records": 814,
+    "total_records": 796,
     "unique_families": 66,
     "splits": {
       "train": {
-        "records": 531,
-        "families": 44,
-        "ratio": 0.6523
+        "records": 516,
+        "families": 43,
+        "ratio": 0.6482
       },
       "validation": {
-        "records": 144,
-        "families": 11,
-        "ratio": 0.1769
+        "records": 146,
+        "families": 12,
+        "ratio": 0.1834
       },
       "test": {
-        "records": 139,
+        "records": 134,
         "families": 11,
-        "ratio": 0.1708
+        "ratio": 0.1683
       }
     }
   },
@@ -44,19 +44,24 @@
       "status": "pass"
     },
     {
-      "check": "Near-identical topology hash across train and test",
+      "check": "Exact topology fingerprint overlap across all split pairs",
+      "expected": 0,
+      "actual": 0,
+      "breakdown": {
+        "train_validation": 0,
+        "train_test": 0,
+        "validation_test": 0
+      },
+      "status": "pass"
+    },
+    {
+      "check": "Unknown/unapproved source-rights metadata in released splits",
       "expected": 0,
       "actual": 0,
       "status": "pass"
     },
     {
-      "check": "External examples with unknown rights in released splits",
-      "expected": 0,
-      "actual": 0,
-      "status": "pass"
-    },
-    {
-      "check": "Unapproved/generated records in gold split",
+      "check": "Unapproved / unreviewed records in gold split",
       "expected": 0,
       "actual": 0,
       "status": "pass"

@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "audit:site": "node scripts/site-audit.mjs",
-    "qa:copilot-dataset": "node scripts/phase2-ai-copilot-dataset-qa.mjs",
+    "qa:copilot-dataset": "npm run build:copilot-dataset && node scripts/phase2-ai-copilot-dataset-qa.mjs",
     "build:copilot-dataset": "node scripts/copilot-dataset/build-release-report.mjs",
     "audit:copilot-dataset": "node scripts/copilot-dataset/split-by-family.mjs",
     "test:lab": "npm run --prefix pixiu-lms-portal test:lab",

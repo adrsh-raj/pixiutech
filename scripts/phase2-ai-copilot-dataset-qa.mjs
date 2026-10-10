@@ -25,15 +25,57 @@
  * Copyright (c) 2026 Pixiu Tech. All rights reserved.
  */
 
-import { existsSync, readFileSync } from "node:fs"
+import { existsSync, readFileSync, statSync } from "node:fs"
 import { resolve, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 import { createRequire } from "node:module"
 import { getBundledModules, ROOT } from "./copilot-dataset/bundle-helper.mjs"
+import { sha256 } from "./copilot-dataset/normalize-record.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 const require = createRequire(import.meta.url)
+
+
+function expectedContentHash(rec) {
+  if (rec.task_type === "request_to_circuit") return sha256({ text: rec.instruction.text, target: rec.target })
+  if (rec.task_type === "fault_repair") return sha256({ fault: rec.fault.input_circuit, target: { circuit: rec.target.corrected_circuit, explanation: rec.target.explanation, code: rec.target.code }, mutation_id: rec.fault.mutation_id })
+  if (rec.task_type === "diagnosis_explanation") return sha256({ circuit: rec.target.circuit, explanation: rec.target.explanation, instruction: rec.instruction.text, task: "diagnosis_explanation" })
+  if (rec.task_type === "blockly_code") return sha256({ circuit: rec.target.circuit, code: rec.target.code, instruction: rec.instruction.text, task: "blockly_code" })
+  return null
+}
+function isWellFormedBlocklyXml(xml) {
+  if (typeof xml !== "string" || !xml.trim() || xml.length > 200_000) return false
+  const body = xml.trim().replace(/^\s*<\?xml\b[^?]*\?>/i, "").replace(/<!--[\s\S]*?-->/g, "")
+  if (/<!DOCTYPE|<!ENTITY|<\s*script\b|<\s*(?:iframe|object|embed|foreignObject|html|body)\b|javascript\s*:|\bon[a-z]+\s*=/i.test(body)) return false
+  const tokenPattern = /<\/?([A-Za-z_][\w:.-]*(?:"[^"]*"|'[^']*'|[^'">])*)\s*\/?>/g
+  const stack = [], roots = []
+  let cursor = 0, match
+  while ((match = tokenPattern.exec(body)) !== null) {
+    if (body.slice(cursor, match.index).includes("<")) return false
+    const token = match[0]
+    const name = token.match(/^<\/?([A-Za-z_][\w:.-]*)/)?.[1]
+    if (!name) return false
+    if (/^<\//.test(token)) {
+      if (stack.pop() !== name) return false
+    } else {
+      if (stack.length === 0) roots.push(name)
+      if (!/\/\s*>$/.test(token)) stack.push(name)
+    }
+    cursor = match.index + token.length
+  }
+  if (body.slice(cursor).includes("<") || stack.length || roots.length !== 1 || roots[0].toLowerCase() !== "xml") return false
+  return !/&(?!(?:amp|lt|gt|quot|apos|#\d+|#x[0-9a-f]+);)/i.test(body)
+}
+function countTopologyOverlaps(train, validation, test) {
+  const sets = {
+    train: new Set(train.map((r) => r.hashes?.topology_hash).filter(Boolean)),
+    validation: new Set(validation.map((r) => r.hashes?.topology_hash).filter(Boolean)),
+    test: new Set(test.map((r) => r.hashes?.topology_hash).filter(Boolean)),
+  }
+  const overlap = (a, b) => Array.from(sets[a]).filter((value) => sets[b].has(value)).length
+  return { train_validation: overlap("train", "validation"), train_test: overlap("train", "test"), validation_test: overlap("validation", "test") }
+}
 
 async function runPhase2DatasetQA() {
   console.log("================================================================================")
@@ -101,10 +143,18 @@ async function runPhase2DatasetQA() {
   const gates = []
 
   // G1: Inventory Coverage
+  const inventoryItems = Array.isArray(sourceInventory.items) ? sourceInventory.items : []
   const totalInv = sourceInventory.summary.total_sources_inventoried
-  const eligibleInv = sourceInventory.summary.eligible_candidates
-  const excludedInv = sourceInventory.summary.excluded_candidates
-  const g1Passed = totalInv > 0 && eligibleInv + excludedInv === totalInv
+  const eligibleInv = inventoryItems.filter((item) => item.disposition === "eligible").length
+  const excludedItems = inventoryItems.filter((item) => item.disposition === "excluded")
+  const excludedInv = excludedItems.length
+  const uniqueInventoryIds = new Set(inventoryItems.map((item) => item.source_id))
+  const g1Passed = totalInv > 0 && totalInv === inventoryItems.length &&
+    sourceInventory.summary.eligible_candidates === eligibleInv &&
+    sourceInventory.summary.excluded_candidates === excludedInv &&
+    uniqueInventoryIds.size === inventoryItems.length &&
+    inventoryItems.every((item) => ["eligible", "excluded"].includes(item.disposition) &&
+      (item.disposition !== "excluded" || Boolean(item.exclusion_reason)))
   gates.push({
     id: "G1",
     name: "Inventory Coverage",
@@ -130,19 +180,25 @@ async function runPhase2DatasetQA() {
   })
 
   // G3: Positive Correctness
-  let g3InvalidPositive = 0
-  let g3TotalPositive = 0
+  let g3InvalidPositive = 0, g3TotalPositive = 0, g3InvalidBlocklyXml = 0, g3InvalidDiagnosisText = 0
+  const boardNames = { "arduino-uno": "Arduino Uno R3", "esp32-devkit": "ESP32 DevKit V1", "rpi-pico": "Raspberry Pi Pico", "microbit-v2": "BBC micro:bit v2" }
   for (const rec of allReleased) {
     const circuit = rec.target?.circuit || rec.target?.corrected_circuit
     if (circuit) {
       g3TotalPositive++
-      const res = validateProposedCircuit(circuit, { allowWarnings: true })
-      if (!res.valid) {
-        g3InvalidPositive++
-      }
+      const candidate = rec.task_type === "blockly_code" ? { ...circuit, blocklyXml: rec.target.code } : circuit
+      const res = validateProposedCircuit(candidate, { allowWarnings: true })
+      if (!res.valid) g3InvalidPositive++
+      if (rec.task_type === "blockly_code" && !isWellFormedBlocklyXml(rec.target.code)) g3InvalidBlocklyXml++
+    }
+    if (rec.task_type === "diagnosis_explanation") {
+      const explanation = String(rec.target?.explanation || "")
+      const expectedBoard = boardNames[rec.context?.target_board] || String(rec.context?.target_board || "Microcontroller")
+      if (!explanation || /\[object Object\]|\bundefined\b|\bNaN\b/i.test(explanation) || !explanation.includes(expectedBoard) ||
+        /all electrical conduction loops are closed|no short circuits or pin conflicts|all parts are within safe/i.test(explanation)) g3InvalidDiagnosisText++
     }
   }
-  const g3Passed = g3TotalPositive > 0 && g3InvalidPositive === 0
+  const g3Passed = g3TotalPositive > 0 && g3InvalidPositive === 0 && g3InvalidBlocklyXml === 0 && g3InvalidDiagnosisText === 0
   gates.push({
     id: "G3",
     name: "Positive Correctness",
@@ -151,14 +207,24 @@ async function runPhase2DatasetQA() {
     passed: g3Passed,
   })
 
-  // G4: Negative Calibration
+  // G4: every seeded fault must match its declared diagnostic rule and severity.
   let g4UnmatchedFaults = 0
+  const g4Failures = []
   for (const rec of faultRecords) {
-    const faultCircuit = rec.fault?.input_circuit
-    const res = validateProposedCircuit(faultCircuit, { allowWarnings: false })
-    const flagged = !res.valid || (res.warnings && res.warnings.length > 0)
-    if (!flagged) {
+    const fault = rec.fault || {}
+    const res = validateProposedCircuit(fault.input_circuit, { allowWarnings: true })
+    const expectedIds = Array.isArray(fault.expected_rule_ids) ? fault.expected_rule_ids : []
+    const ruleMatch = expectedIds.length > 0 && expectedIds.every((expectedId) => res.notices.some((notice) => notice.ruleId === expectedId))
+    const statusMatch = fault.expected_validator_status === "reject"
+      ? res.notices.some((notice) => notice.severity === "critical")
+      : fault.expected_validator_status === "warning"
+        ? res.notices.some((notice) => notice.severity === "warning")
+        : fault.expected_validator_status === "warning_or_reject"
+          ? res.notices.some((notice) => notice.severity === "critical" || notice.severity === "warning")
+          : false
+    if (!ruleMatch || !statusMatch) {
       g4UnmatchedFaults++
+      if (g4Failures.length < 8) g4Failures.push({ record_id: rec.record_id, mutation_id: fault.mutation_id, expected_rule_ids: expectedIds, actual_rule_ids: res.notices.map((notice) => notice.ruleId), expected_status: fault.expected_validator_status })
     }
   }
   const g4Passed = faultRecords.length >= 50 && g4UnmatchedFaults === 0
@@ -170,14 +236,16 @@ async function runPhase2DatasetQA() {
     passed: g4Passed,
   })
 
-  // G5: Provenance & Licensing
+  // G5: resolve each record back to the eligible inventoried source revision.
+  const inventoryById = new Map(inventoryItems.map((item) => [item.source_id, item]))
   let g5MissingProvenance = 0
   for (const rec of allReleased) {
-    const hasSource = rec.source?.source_type && rec.source?.source_id && rec.source?.source_revision
+    const sourceId = String(rec.source?.source_id || "").split("#")[0]
+    const source = inventoryById.get(sourceId)
+    const exactMatch = source && source.disposition === "eligible" && source.source_path === rec.source?.source_path &&
+      source.source_revision === rec.source?.source_revision
     const isApproved = rec.permission?.status === "internal_owned" && rec.permission?.review_status === "approved"
-    if (!hasSource || !isApproved) {
-      g5MissingProvenance++
-    }
+    if (!rec.source?.source_type || !exactMatch || !isApproved) g5MissingProvenance++
   }
   const g5Passed = g5MissingProvenance === 0
   gates.push({
@@ -206,7 +274,10 @@ async function runPhase2DatasetQA() {
       }
     }
   }
-  const g6Passed = g6Evaluated > 0 && g6Preserved === g6Evaluated
+  const requiredStyles = ["direct", "goal_oriented", "contextual", "colloquial", "typo"]
+  const observedStyles = new Set(requestRecords.map((rec) => rec.variant?.request_style).filter(Boolean))
+  const styleCoverage = requiredStyles.every((style) => observedStyles.has(style))
+  const g6Passed = g6Evaluated > 0 && g6Preserved === g6Evaluated && styleCoverage
   gates.push({
     id: "G6",
     name: "Paraphrase Preservation",
@@ -215,8 +286,28 @@ async function runPhase2DatasetQA() {
     passed: g6Passed,
   })
 
-  // G7: Split Isolation
-  const g7Passed = leakageAudit.passed === true && leakageAudit.checks.every((c) => c.status === "pass")
+  // G7: independently recompute record/family/parent/topology isolation.
+  const splitGroups = { train: trainRecords, validation: valRecords, test: testRecords }
+  const recordSets = Object.fromEntries(Object.entries(splitGroups).map(([key, list]) => [key, new Set(list.map((rec) => rec.record_id))]))
+  const familySets = Object.fromEntries(Object.entries(splitGroups).map(([key, list]) => [key, new Set(list.map((rec) => rec.project_family_id))]))
+  const pairNames = [["train","validation"],["train","test"],["validation","test"]]
+  let recordLeakCount = 0, familyLeakCount = 0
+  for (const [left,right] of pairNames) {
+    recordLeakCount += Array.from(recordSets[left]).filter((id) => recordSets[right].has(id)).length
+    familyLeakCount += Array.from(familySets[left]).filter((id) => familySets[right].has(id)).length
+  }
+  const canonicalById = new Map(canonicalRecords.map((rec) => [rec.record_id, rec]))
+  let parentLeakCount = 0
+  for (const [splitName, list] of Object.entries(splitGroups)) for (const rec of list) {
+    const parentId = rec.variant?.parent_record_id
+    if (!parentId) continue
+    const parentRecord = canonicalById.get(parentId)
+    if (!parentRecord || parentRecord.project_family_id !== rec.project_family_id || !familySets[splitName].has(parentRecord.project_family_id)) parentLeakCount++
+  }
+  const topologyOverlaps = countTopologyOverlaps(trainRecords, valRecords, testRecords)
+  const topologyLeakCount = topologyOverlaps.train_validation + topologyOverlaps.train_test + topologyOverlaps.validation_test
+  const leakageReportPass = leakageAudit.passed === true && Array.isArray(leakageAudit.checks) && leakageAudit.checks.every((check) => check.status === "pass")
+  const g7Passed = recordLeakCount === 0 && familyLeakCount === 0 && parentLeakCount === 0 && topologyLeakCount === 0 && leakageReportPass
   gates.push({
     id: "G7",
     name: "Split Isolation",
@@ -225,9 +316,19 @@ async function runPhase2DatasetQA() {
     passed: g7Passed,
   })
 
-  // G8: Reproducibility
+  // G8: recompute each task digest and each manifest artifact hash from disk.
   const idSet = new Set(allReleased.map((r) => r.record_id))
-  const g8Passed = idSet.size === total && allReleased.every((r) => r.hashes?.content_hash?.length === 64)
+  const recordContentHashesValid = allReleased.every((rec) => expectedContentHash(rec) && expectedContentHash(rec) === rec.hashes?.content_hash)
+  const canonicalContentHashesValid = canonicalRecords.every((rec) => sha256({ circuit: rec.target.circuit, explanation: rec.target.explanation, code: rec.target.code }) === rec.hashes?.content_hash)
+  let manifestArtifactFailures = 0
+  for (const artifact of manifest.artifacts || []) {
+    const fullPath = resolve(dataDir, artifact.path)
+    if (!existsSync(fullPath)) { manifestArtifactFailures++; continue }
+    const content = readFileSync(fullPath, "utf8")
+    if (sha256(content) !== artifact.sha256 || statSync(fullPath).size !== artifact.size_bytes) manifestArtifactFailures++
+  }
+  const g8Passed = idSet.size === total && recordContentHashesValid && canonicalContentHashesValid &&
+    Array.isArray(manifest.artifacts) && manifest.artifacts.length > 0 && manifestArtifactFailures === 0
   gates.push({
     id: "G8",
     name: "Reproducibility",
@@ -243,7 +344,9 @@ async function runPhase2DatasetQA() {
       g9Unapproved++
     }
   }
-  const g9Passed = g9Unapproved === 0
+  const invalidReviewMetadata = allReleased.filter((rec) => !String(rec.review?.reviewer || "").trim() ||
+    !Number.isFinite(Date.parse(rec.review?.reviewed_at)) || rec.permission?.review_status !== "approved").length
+  const g9Passed = g9Unapproved === 0 && invalidReviewMetadata === 0
   gates.push({
     id: "G9",
     name: "Review Status",
@@ -252,11 +355,22 @@ async function runPhase2DatasetQA() {
     passed: g9Passed,
   })
 
-  // G10: Product Metric Report
-  const hasTaskTypes = Object.keys(manifest.summary?.counts_by_task_type || {}).length === 4
-  const hasBoards = Object.keys(manifest.summary?.counts_by_board || {}).length >= 4
-  const hasSplits = Object.keys(manifest.summary?.counts_by_split || {}).length === 3
-  const g10Passed = hasTaskTypes && hasBoards && hasSplits
+  // G10: recompute counts and compare them with the manifest and release report.
+  const actualTaskCounts = {}, actualBoardCounts = {}
+  for (const rec of allReleased) {
+    actualTaskCounts[rec.task_type] = (actualTaskCounts[rec.task_type] || 0) + 1
+    const board = rec.context?.target_board || "unspecified"
+    actualBoardCounts[board] = (actualBoardCounts[board] || 0) + 1
+  }
+  const actualSplitCounts = { train: trainRecords.length, validation: valRecords.length, test: testRecords.length }
+  const sameCounts = (left, right) => JSON.stringify(Object.fromEntries(Object.entries(left || {}).sort())) === JSON.stringify(Object.fromEntries(Object.entries(right || {}).sort()))
+  const reportGates = new Map((validationReport.gates || []).map((gate) => [gate.id || gate.gate_id, gate]))
+  const earlierGateStatusesMatch = gates.every((gate) => reportGates.has(gate.id) && reportGates.get(gate.id).passed === gate.passed)
+  const g10Passed = manifest.summary?.total_records === total &&
+    sameCounts(actualTaskCounts, manifest.summary?.counts_by_task_type) &&
+    sameCounts(actualBoardCounts, manifest.summary?.counts_by_board) &&
+    sameCounts(actualSplitCounts, manifest.summary?.counts_by_split) &&
+    validationReport.status === "PASSED" && earlierGateStatusesMatch
   gates.push({
     id: "G10",
     name: "Product Metric Report",
@@ -306,6 +420,7 @@ async function runPhase2DatasetQA() {
   console.log(`  Validation Split: ${valRecords.length} records (${(manifest.summary.counts_by_split.validation / total * 100).toFixed(1)}%)`)
   console.log(`  Test Split:       ${testRecords.length} records (${(manifest.summary.counts_by_split.test / total * 100).toFixed(1)}%)`)
 
+  if (g4Failures.length) console.error("\nFirst exact-rule fault mismatches: " + JSON.stringify(g4Failures.slice(0, 8), null, 2))
   const allPassed = gates.every((g) => g.passed) && thresholdChecks.every((t) => t.passed)
 
   if (!allPassed) {
@@ -314,7 +429,8 @@ async function runPhase2DatasetQA() {
   }
 
   console.log("\n================================================================================")
-  console.log("  🎉 ALL 10 RELEASE GATES (G1–G10) PASSED — PHASE 2 CORPUS VERIFIED & SEALED")
+  console.log("  ALL 10 RELEASE GATES PASSED — PHASE 2 CORPUS INTEGRITY VERIFIED")
+  console.log("  Automated approval metadata is not a substitute for a human spot review.")
   console.log("================================================================================\n")
   return true
 }

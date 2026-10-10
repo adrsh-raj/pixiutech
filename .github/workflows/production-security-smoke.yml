@@ -3,6 +3,8 @@ name: PIXIU Production Security Smoke
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
     inputs:
       frontend_url:
@@ -34,9 +36,10 @@ jobs:
       - name: Public frontend availability
         run: |
           set -euo pipefail
-          curl -fsSL --retry 3 --retry-delay 2 --max-time 30 "$FRONTEND_URL/careers" -o /tmp/frontend.html
+          curl -fsSL --retry 3 --retry-all-errors --retry-delay 2 --max-time 30 "$FRONTEND_URL/careers" -o /tmp/frontend.html
           grep -qi '<html' /tmp/frontend.html
-          grep -qi 'Careers' /tmp/frontend.html
+          grep -qi '<title>Pixiu Tech' /tmp/frontend.html
+          grep -Eq '<script[^>]+src="/assets/[^"]+\.js"' /tmp/frontend.html
 
       - name: Core public pages
         run: |

@@ -18,6 +18,7 @@ import { resolve, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 import { ROOT } from "./bundle-helper.mjs"
 import { sha256 } from "./normalize-record.mjs"
+import { getBuildTimestamp } from "./build-metadata.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -33,37 +34,26 @@ function createPromptVariations(canonicalRecord) {
 
   const variants = []
 
-  // 1. Direct / Concise Variant
-  variants.push({
-    kind: "paraphrase",
-    text: `Build a ${cleanTitle} circuit using ${boardName}.`,
-  })
+  variants.push({ kind: "paraphrase", request_style: "direct", text: `Build a ${cleanTitle} circuit using ${boardName}.` })
+  variants.push({ kind: "paraphrase", request_style: "goal_oriented", text: `How do I set up and wire the ${cleanTitle} on my ${boardName}?` })
 
-  // 2. Goal-Oriented Variant
-  variants.push({
-    kind: "paraphrase",
-    text: `How do I set up and wire the ${cleanTitle} on my ${boardName}?`,
-  })
-
-  // 3. Contextual Variant
   const grade = canonicalRecord.context.grade_band || 7
-  variants.push({
-    kind: "paraphrase",
-    text: `I am in Grade ${grade} robotics class. Can you help me assemble the ${cleanTitle}?`,
-  })
+  variants.push({ kind: "paraphrase", request_style: "contextual", text: `I am in Grade ${grade} robotics class. Can you help me assemble the ${cleanTitle}?` })
+  variants.push({ kind: "colloquial", request_style: "colloquial", text: `${boardName} me ${cleanTitle} kaise connect aur wire karein?` })
 
-  // 4. Colloquial / Hinglish Variant
-  variants.push({
-    kind: "colloquial",
-    text: `${boardName} me ${cleanTitle} kaise connect aur wire karein?`,
-  })
-
-  // 5. Typo / Quick Search Query
-  const typoTitle = cleanTitle.toLowerCase().replace(/circuit/g, "cirkut").replace(/sensor/g, "sensr")
-  variants.push({
-    kind: "typo",
-    text: `${boardName.toLowerCase()} ${typoTitle} wiring`,
-  })
+  let typoTitle = cleanTitle.toLowerCase().replace(/circuit/g, "cirkut").replace(/sensor/g, "sensr")
+  if (typoTitle === cleanTitle.toLowerCase()) {
+    const words = typoTitle.split(/(\s+)/)
+    const candidateIndex = words.findIndex((word) => /^[a-z]{6,}$/i.test(word) && !/^(arduino|raspberry|microbit)$/i.test(word))
+    if (candidateIndex >= 0) {
+      const word = words[candidateIndex]
+      words[candidateIndex] = word.slice(0, 2) + word.slice(3)
+      typoTitle = words.join("")
+    } else {
+      typoTitle += "x"
+    }
+  }
+  variants.push({ kind: "typo", request_style: "typo", text: `${boardName.toLowerCase()} ${typoTitle} wiring` })
 
   return variants
 }
@@ -117,10 +107,11 @@ export async function generateRequestVariants() {
         review: {
           status: "approved",
           reviewer: "linguistic-variant-generator",
-          reviewed_at: new Date().toISOString(),
+          reviewed_at: getBuildTimestamp()
         },
         variant: {
           kind: v.kind,
+          request_style: v.request_style,
           parent_record_id: parent.record_id,
         },
         hashes: {

@@ -137,6 +137,7 @@ jobs:
           npm run build
           node ../tools/frontend_bundle_report.mjs dist/assets
           node ../scripts/verify-portal-security-build.mjs
+          npm run --prefix .. qa:copilot-dataset
       - name: Run live launch smoke checks
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         env:
