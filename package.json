@@ -10,6 +10,7 @@
     "audit:site": "node scripts/site-audit.mjs",
     "qa:copilot-dataset": "npm run test:copilot-schema && npm run build:copilot-dataset && node scripts/phase2-ai-copilot-dataset-qa.mjs",
     "qa:copilot-phase25": "npm run test:copilot-schema && node scripts/copilot-dataset/generate-diagnosis-and-code.mjs",
+    "sync:copilot-phase25": "node scripts/copilot-dataset/sync-phase25-artifacts.mjs",
     "build:copilot-dataset": "node scripts/copilot-dataset/build-release-report.mjs",
     "audit:copilot-dataset": "node scripts/copilot-dataset/split-by-family.mjs",
     "test:lab": "npm run --prefix pixiu-lms-portal test:lab",
