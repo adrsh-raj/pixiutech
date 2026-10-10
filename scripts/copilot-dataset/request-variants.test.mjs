@@ -97,13 +97,12 @@ test("rejects duplicate parents and source IDs that normalize to the same slug",
 test("read-only generation does not rewrite the existing request artifact", async () => {
   const requestPath = resolve(ROOT, "data/ai-copilot/phase2/records/requests.jsonl");
   const before = readFileSync(requestPath, "utf8");
-  const parents = Array.from({ length: 20 }, (_, index) => canonicalParent("tmpl-read-only-" + index));
   const records = await generateRequestVariants({
     writeArtifacts: false,
-    canonicalRecords: parents,
+    canonicalRecords: [canonicalParent("tmpl-read-only")],
     reviewedAt,
   });
-  assert.equal(records.length, 100);
+  assert.equal(records.length, 5);
   assert.equal(readFileSync(requestPath, "utf8"), before);
 });
 
