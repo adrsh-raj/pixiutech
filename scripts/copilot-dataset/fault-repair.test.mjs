@@ -5,6 +5,7 @@ import test from "node:test";
 import { getBundledModules, ROOT } from "./bundle-helper.mjs";
 import { sha256, stableStringify } from "./normalize-record.mjs";
 import {
+  buildFaultRepairRecords,
   evaluateFaultCalibration,
   generateFaultRepairPairs,
 } from "./generate-fault-repair-pairs.mjs";
@@ -85,11 +86,13 @@ test("read-only fault generation is deterministic, calibrated, and preserves the
   assert.equal(readFileSync(canonicalPath, "utf8"), beforeCanonical);
 });
 
-test("generator rejects invalid minimum-target options before producing output", async () => {
-  const modules = await getBundledModules();
-  assert.throws(() => {
-    // Validation is exercised by the exported evaluator in a small deterministic
-    // contract test; integration threshold behavior is tested by the dry-run above.
-    if (!modules.validator.validateProposedCircuit) throw new Error("Live validator export missing");
-  }, /impossible sentinel/);
+test("fault builder rejects invalid minimum-target options before processing parents", async () => {
+  const { boards, validator } = await getBundledModules();
+  assert.throws(() => buildFaultRepairRecords([{}], {
+    boards,
+    validateProposedCircuit: validator.validateProposedCircuit,
+    resolveCanonicalPin: validator.resolveCanonicalPin,
+    reviewedAt,
+    minRecords: -1,
+  }), /minRecords must be a non-negative integer/);
 });
