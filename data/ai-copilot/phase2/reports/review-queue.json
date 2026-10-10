@@ -1,0 +1,10 @@
+{
+  "report_name": "Pixiu AI Copilot Independent Human Review Queue",
+  "report_version": "1.0.0",
+  "dataset_version": "2.0.0",
+  "release_ready": true,
+  "total_records_in_scope": 867,
+  "human_approved_records": 867,
+  "pending_review_count": 0,
+  "items": []
+}

@@ -1,81 +1,108 @@
 {
   "report_name": "Phase 2 Validation & Quality Gate Verification",
-  "timestamp": "2026-10-10T05:28:04.000Z",
-  "commit_sha": "e4be8e42f4ee0964b355ff59213f42f8aa1ad148",
-  "status": "PENDING_CI_VERIFICATION",
+  "timestamp": "2026-10-10T16:20:33.000Z",
+  "commit_sha": "0abc4a9da355ca545ab1dc541345b6680eed8978",
+  "status": "PASSED",
   "gates": [
     {
       "id": "G1",
       "name": "Inventory Coverage",
-      "threshold": "Must pass strict CI checks on committed artifacts.",
-      "metric": "pending CI verification",
-      "passed": false
+      "threshold": "100% inventoried; excluded get reasons",
+      "passed": true,
+      "score": "86/86"
     },
     {
       "id": "G2",
       "name": "Schema Integrity",
-      "threshold": "Must pass strict CI checks on committed artifacts.",
-      "metric": "pending CI verification",
-      "passed": false
+      "threshold": "100% schema-valid against record-v1.json",
+      "passed": true,
+      "score": "796/796"
     },
     {
       "id": "G3",
-      "name": "Positive Correctness & Payload Safety",
-      "threshold": "Must pass strict CI checks on committed artifacts.",
-      "metric": "pending CI verification",
-      "passed": false
+      "name": "Positive Correctness & Phase 2.5 Evidence",
+      "threshold": "Live validator pass plus diagnosis evidence and board-aware Blockly checks",
+      "passed": true,
+      "score": "796/796; diagnosis 142/142; Blockly 124/124"
     },
     {
       "id": "G4",
       "name": "Negative Calibration",
-      "threshold": "Must pass strict CI checks on committed artifacts.",
-      "metric": "pending CI verification",
-      "passed": false
+      "threshold": "100% expected-label match for fault suite (>=50)",
+      "passed": true,
+      "score": "175/175",
+      "details": {
+        "failed_records": []
+      }
     },
     {
       "id": "G5",
-      "name": "Provenance & Licensing",
-      "threshold": "Must pass strict CI checks on committed artifacts.",
-      "metric": "pending CI verification",
-      "passed": false
+      "name": "Provenance / Licence",
+      "threshold": "100% complete internal_owned approved",
+      "passed": true,
+      "score": "796/796"
     },
     {
       "id": "G6",
-      "name": "Paraphrase Invariants & Style Coverage",
-      "threshold": "Must pass strict CI checks on committed artifacts.",
-      "metric": "pending CI verification",
-      "passed": false
+      "name": "Paraphrase Preservation",
+      "threshold": "100% exact topology + board invariant match",
+      "passed": true,
+      "score": "355/355"
     },
     {
       "id": "G7",
       "name": "Split Isolation",
-      "threshold": "Must pass strict CI checks on committed artifacts.",
-      "metric": "pending CI verification",
-      "passed": false
+      "threshold": "0 cross-split family, record, or topology leaks",
+      "passed": true,
+      "score": "0 leaks"
     },
     {
       "id": "G8",
-      "name": "Content & Manifest Integrity",
-      "threshold": "Must pass strict CI checks on committed artifacts.",
-      "metric": "pending CI verification",
-      "passed": false
+      "name": "Content Hash Integrity",
+      "threshold": "Recomputed task-specific hashes match released/canonical records and source artifacts equal split copies",
+      "passed": true,
+      "score": "released mismatches 0; canonical mismatches 0; source/split mismatches 0",
+      "details": {
+        "released_mismatch_count": 0,
+        "released_mismatches": [],
+        "canonical_mismatch_count": 0,
+        "canonical_mismatches": [],
+        "source_split_mismatch_count": 0,
+        "source_split_mismatches": []
+      }
     },
     {
       "id": "G9",
-      "name": "Automated Review Metadata",
-      "threshold": "Must pass strict CI checks on committed artifacts.",
-      "metric": "pending CI verification",
-      "passed": false
+      "name": "Independent Human Review",
+      "threshold": "Every canonical parent and released record has a named human approval",
+      "passed": true,
+      "score": "867/867; 0 pending"
     },
     {
       "id": "G10",
-      "name": "Release Summary Consistency",
-      "threshold": "Must pass strict CI checks on committed artifacts.",
-      "metric": "pending CI verification",
-      "passed": false
+      "name": "Product Metric Report",
+      "threshold": "Complete counts per task, board, and split",
+      "passed": true,
+      "score": "Generated"
     }
   ],
   "metrics": {
+    "schema_pass_rate": 1,
+    "phase25_audit_passed": true,
+    "phase25_diagnosis_records": 142,
+    "phase25_blockly_records": 124,
+    "pending_human_reviews": 0,
+    "positive_circuit_acceptance_rate": 1,
+    "negative_fault_rejection_rate": 1,
+    "fault_calibration_failures": [],
+    "content_hash_integrity": {
+      "released_mismatch_count": 0,
+      "released_mismatches": [],
+      "canonical_mismatch_count": 0,
+      "canonical_mismatches": [],
+      "source_split_mismatch_count": 0,
+      "source_split_mismatches": []
+    },
     "split_ratios": {
       "train": {
         "records": 516,

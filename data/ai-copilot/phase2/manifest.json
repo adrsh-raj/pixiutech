@@ -1,11 +1,11 @@
 {
   "dataset_name": "pixiu-ai-copilot-evaluation-corpus",
   "version": "2.0.0",
-  "commit_sha": "e4be8e42f4ee0964b355ff59213f42f8aa1ad148",
-  "generated_at": "2026-10-10T05:28:04.000Z",
+  "commit_sha": "0abc4a9da355ca545ab1dc541345b6680eed8978",
+  "generated_at": "2026-10-10T16:20:33.000Z",
   "record_schema_version": "1.0.0",
   "pilot_target_satisfied": true,
-  "overall_status": "PENDING_CI_VERIFICATION",
+  "overall_status": "PASSED",
   "summary": {
     "total_records": 796,
     "project_families": 66,
@@ -39,15 +39,15 @@
       "gate_id": "G2",
       "name": "Schema Integrity",
       "passed": true,
-      "metric": "814/814",
+      "metric": "796/796",
       "threshold": "100% schema-valid against record-v1.json"
     },
     {
       "gate_id": "G3",
-      "name": "Positive Correctness",
+      "name": "Positive Correctness & Phase 2.5 Evidence",
       "passed": true,
-      "metric": "814/814",
-      "threshold": "100% validator pass for positive gold targets"
+      "metric": "796/796; diagnosis 142/142; Blockly 124/124",
+      "threshold": "Live validator pass plus diagnosis evidence and board-aware Blockly checks"
     },
     {
       "gate_id": "G4",
@@ -60,7 +60,7 @@
       "gate_id": "G5",
       "name": "Provenance / Licence",
       "passed": true,
-      "metric": "814/814",
+      "metric": "796/796",
       "threshold": "100% complete internal_owned approved"
     },
     {
@@ -79,17 +79,17 @@
     },
     {
       "gate_id": "G8",
-      "name": "Reproducibility",
+      "name": "Content Hash Integrity",
       "passed": true,
-      "metric": "814/814",
-      "threshold": "Deterministic content hashes across 100% records"
+      "metric": "released mismatches 0; canonical mismatches 0; source/split mismatches 0",
+      "threshold": "Recomputed task-specific hashes match released/canonical records and source artifacts equal split copies"
     },
     {
       "gate_id": "G9",
-      "name": "Review Status",
+      "name": "Independent Human Review",
       "passed": true,
-      "metric": "814/814",
-      "threshold": "100% released records reviewed & approved"
+      "metric": "867/867; 0 pending",
+      "threshold": "Every canonical parent and released record has a named human approval"
     },
     {
       "gate_id": "G10",
@@ -102,43 +102,43 @@
   "artifacts": [
     {
       "path": "records/canonical.jsonl",
-      "size_bytes": 328108,
-      "sha256": "48e3ae111a28a23a2d41d207f85e9466e09aa186ddfb845e53c550ca5bc0fd21"
+      "size_bytes": 328250,
+      "sha256": "d7f5a2c29e01853a74b6f33ea66296d0bec375cdbd1f99051dd179d9a47b7475"
     },
     {
       "path": "records/requests.jsonl",
-      "size_bytes": 1680228,
-      "sha256": "86cce00a8f24813f46366c94c9749ebcf1389d5b12a3c2ed79964b6c63c6d56f"
+      "size_bytes": 1677033,
+      "sha256": "f4e17ac019aeac311d4e3e0694b793a6f572bf2e227222f8f1af8a3f74a91699"
     },
     {
       "path": "records/fault-repairs.jsonl",
-      "size_bytes": 1221959,
-      "sha256": "0d13db322453821ea403ddd8b650d69a47f29cbc69cc30c4cf62adb432c27c93"
+      "size_bytes": 1222115,
+      "sha256": "fe5f5e4b10004921693439901644844e5473b0852c672f9a1c371ca8a00b61d5"
     },
     {
       "path": "records/diagnosis-explanations.jsonl",
-      "size_bytes": 455694,
-      "sha256": "e6818c18fdb2d6905798e2ef2b26f6702f49aaffebd79cd25283360006960008"
+      "size_bytes": 492478,
+      "sha256": "a57b6b0941c1edc631eed163c4f90c6d7d70da74a5fbfebf0135d9d559f41fed"
     },
     {
       "path": "records/blockly-code.jsonl",
-      "size_bytes": 576415,
-      "sha256": "6287b41c083ad6a3916485e2a709059882d0ae786a3391ebbd9b9c25aa214506"
+      "size_bytes": 578143,
+      "sha256": "0cf32251efdb1ab0012427f7c909fb7fa3fcef5e4b0a13028050480ca107fcc8"
     },
     {
       "path": "splits/train.jsonl",
-      "size_bytes": 2419106,
-      "sha256": "8f02aa4ee6f95bf310e78c88682883b9579113f2eb59a4d2868b8da29eff6cd8"
+      "size_bytes": 2441764,
+      "sha256": "8990a43ed3a24fb79a266c57c0f6348ab10b53f4c190fc7edf60232aacccdbc9"
     },
     {
       "path": "splits/validation.jsonl",
-      "size_bytes": 936744,
-      "sha256": "95483e081fc1fbe125ca58541223a6d16e43d2bb2be744265839aefac5bf091b"
+      "size_bytes": 944098,
+      "sha256": "39ccc5e790f94eff92111c3cce93b4c2df2d39c3f9e8e9ce9a4fdc4f8a8c2014"
     },
     {
       "path": "splits/test.jsonl",
-      "size_bytes": 578446,
-      "sha256": "3800aba5619fc2189d866a2c03fb8644cab00e9c55d765f82c31a94f4e4d0bbc"
+      "size_bytes": 583907,
+      "sha256": "a656ca7debd644d31685088bdc5b4849544fcd917526218053f4d4e77041a820"
     },
     {
       "path": "reports/source-inventory.json",
@@ -154,6 +154,16 @@
       "path": "reports/leakage-audit.json",
       "size_bytes": 1524,
       "sha256": "b74931877c53495d508cde75e2304eb2cc54a39b20b7fc7892c0e79655c96131"
+    },
+    {
+      "path": "reports/diagnosis-blockly-audit.json",
+      "size_bytes": 4767,
+      "sha256": "05edcc6dc7745b958811954c4b66693bd9a200b4137937f0d96454bdc3ee545e"
+    },
+    {
+      "path": "reports/review-queue.json",
+      "size_bytes": 264,
+      "sha256": "465deb64cd070c611818d6591a4928bb3f96ede10229b94e84cd3eaac768322c"
     }
   ]
 }

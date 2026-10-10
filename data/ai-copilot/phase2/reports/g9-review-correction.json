@@ -1,0 +1,91 @@
+{
+  "correction_type": "retract_synthetic_g9_human_review_metadata",
+  "created_at": "2026-10-10T16:21:11.666Z",
+  "checkpoint_sha": "8f2a4a600b2fb3fefd4f06fd5481786d83e24ec3",
+  "backup_root": "/home/kali/pixiu-g9-recovery-20261010-213710",
+  "pre_recovery_snapshot": "/home/kali/pixiu-g9-recovery-20261010-213710/pre-review-remediation-2026-10-10T16-21-10-210Z",
+  "scope": {
+    "canonical_parents": 71,
+    "released_records": 796,
+    "unique_records": 867
+  },
+  "action": "Restored each JSONL record review object from the pinned checkpoint; all non-review fields were preserved. Regenerated release reports and a blank-decision workbook.",
+  "reason": "The untracked fill-g9-human-review.mjs script programmatically populated every decision as Approved, used one fixed reviewer/timestamp, and generated templated evidence notes. Those values do not demonstrate independent human inspection.",
+  "gate_results": {
+    "G8": {
+      "passed": true,
+      "score": "released mismatches 0; canonical mismatches 0; source/split mismatches 0"
+    },
+    "G9": {
+      "passed": false,
+      "score": "0/867; 867 pending"
+    },
+    "all_gates": [
+      {
+        "id": "G1",
+        "name": "Inventory Coverage",
+        "passed": true,
+        "score": "86/86"
+      },
+      {
+        "id": "G2",
+        "name": "Schema Integrity",
+        "passed": true,
+        "score": "796/796"
+      },
+      {
+        "id": "G3",
+        "name": "Positive Correctness & Phase 2.5 Evidence",
+        "passed": true,
+        "score": "796/796; diagnosis 142/142; Blockly 124/124"
+      },
+      {
+        "id": "G4",
+        "name": "Negative Calibration",
+        "passed": true,
+        "score": "175/175"
+      },
+      {
+        "id": "G5",
+        "name": "Provenance / Licence",
+        "passed": true,
+        "score": "796/796"
+      },
+      {
+        "id": "G6",
+        "name": "Paraphrase Preservation",
+        "passed": true,
+        "score": "355/355"
+      },
+      {
+        "id": "G7",
+        "name": "Split Isolation",
+        "passed": true,
+        "score": "0 leaks"
+      },
+      {
+        "id": "G8",
+        "name": "Content Hash Integrity",
+        "passed": true,
+        "score": "released mismatches 0; canonical mismatches 0; source/split mismatches 0"
+      },
+      {
+        "id": "G9",
+        "name": "Independent Human Review",
+        "passed": false,
+        "score": "0/867; 867 pending"
+      },
+      {
+        "id": "G10",
+        "name": "Product Metric Report",
+        "passed": true,
+        "score": "Generated"
+      }
+    ]
+  },
+  "audit_log": {
+    "path": "reports/human-review-audit.jsonl",
+    "lines_preserved_unchanged": 1734,
+    "note": "The prior append-only entries are retained as a record of the imports; they are not evidence that independent human reviews occurred."
+  }
+}
