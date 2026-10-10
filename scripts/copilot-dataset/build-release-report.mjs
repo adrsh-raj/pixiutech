@@ -16,6 +16,7 @@ import { resolve, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 import { getBundledModules, getCurrentCommitSha, ROOT } from "./bundle-helper.mjs"
 import { compileRecordSchema } from "./record-schema-validator.mjs"
+import { evaluateFaultCalibration } from "./generate-fault-repair-pairs.mjs"
 import { sha256 } from "./normalize-record.mjs"
 import { getBuildTimestamp } from "./build-metadata.mjs"
 
@@ -107,17 +108,12 @@ export async function buildReleaseReport() {
   for (const rec of recordFiles.faultRepairs) {
     faultEvaluated++
     const fault = rec.fault || {}
-    const res = validateProposedCircuit(fault.input_circuit, { allowWarnings: true })
-    const expectedIds = Array.isArray(fault.expected_rule_ids) ? fault.expected_rule_ids : []
-    const ruleMatch = expectedIds.length > 0 && expectedIds.every((expectedId) => res.notices.some((notice) => notice.ruleId === expectedId))
-    const statusMatch = fault.expected_validator_status === "reject"
-      ? res.notices.some((notice) => notice.severity === "critical")
-      : fault.expected_validator_status === "warning"
-        ? res.notices.some((notice) => notice.severity === "warning")
-        : fault.expected_validator_status === "warning_or_reject"
-          ? res.notices.some((notice) => notice.severity === "critical" || notice.severity === "warning")
-          : false
-    if (ruleMatch && statusMatch) faultPassed++
+    const res = validateProposedCircuit(fault.input_circuit, {
+      allowWarnings: true,
+      targetBoard: rec.context?.target_board,
+    })
+    const calibration = evaluateFaultCalibration(fault, res)
+    if (calibration.passed) faultPassed++
   }
   const g4Passed = faultPassed === faultEvaluated && faultEvaluated >= 50
 

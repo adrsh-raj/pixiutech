@@ -29,6 +29,7 @@ import { existsSync, readFileSync, statSync } from "node:fs"
 import { resolve, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 import { compileRecordSchema } from "./copilot-dataset/record-schema-validator.mjs"
+import { evaluateFaultCalibration } from "./copilot-dataset/generate-fault-repair-pairs.mjs"
 import { getBundledModules, ROOT } from "./copilot-dataset/bundle-helper.mjs"
 import { sha256 } from "./copilot-dataset/normalize-record.mjs"
 
@@ -210,19 +211,22 @@ async function runPhase2DatasetQA() {
   const g4Failures = []
   for (const rec of faultRecords) {
     const fault = rec.fault || {}
-    const res = validateProposedCircuit(fault.input_circuit, { allowWarnings: true })
-    const expectedIds = Array.isArray(fault.expected_rule_ids) ? fault.expected_rule_ids : []
-    const ruleMatch = expectedIds.length > 0 && expectedIds.every((expectedId) => res.notices.some((notice) => notice.ruleId === expectedId))
-    const statusMatch = fault.expected_validator_status === "reject"
-      ? res.notices.some((notice) => notice.severity === "critical")
-      : fault.expected_validator_status === "warning"
-        ? res.notices.some((notice) => notice.severity === "warning")
-        : fault.expected_validator_status === "warning_or_reject"
-          ? res.notices.some((notice) => notice.severity === "critical" || notice.severity === "warning")
-          : false
-    if (!ruleMatch || !statusMatch) {
+    const res = validateProposedCircuit(fault.input_circuit, {
+      allowWarnings: true,
+      targetBoard: rec.context?.target_board,
+    })
+    const calibration = evaluateFaultCalibration(fault, res)
+    if (!calibration.passed) {
       g4UnmatchedFaults++
-      if (g4Failures.length < 8) g4Failures.push({ record_id: rec.record_id, mutation_id: fault.mutation_id, expected_rule_ids: expectedIds, actual_rule_ids: res.notices.map((notice) => notice.ruleId), expected_status: fault.expected_validator_status })
+      if (g4Failures.length < 8) g4Failures.push({
+        record_id: rec.record_id,
+        mutation_id: fault.mutation_id,
+        expected_rule_ids: fault.expected_rule_ids,
+        actual_rule_ids: calibration.actualRuleIds,
+        actual_severities: calibration.actualSeverities,
+        expected_status: fault.expected_validator_status,
+        calibration,
+      })
     }
   }
   const g4Passed = faultRecords.length >= 50 && g4UnmatchedFaults === 0
