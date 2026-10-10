@@ -23,7 +23,8 @@
     "qa:phase2-3": "npm run --prefix pixiu-lms-portal qa:phase2-3",
     "qa:phase4-9": "npm run --prefix pixiu-lms-portal qa:phase4-9",
     "qa:part4": "npm run --prefix pixiu-lms-portal qa:part4",
-    "test:copilot-schema": "node --test scripts/copilot-dataset/*.test.mjs"
+    "test:copilot-schema": "node --test scripts/copilot-dataset/*.test.mjs",
+    "repair:copilot-phase2-integrity": "npm run test:copilot-schema && node scripts/copilot-dataset/repair-phase2-integrity.mjs"
   },
   "dependencies": {
     "@tensorflow-models/coco-ssd": "^2.2.3",

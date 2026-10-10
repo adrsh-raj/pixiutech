@@ -17,13 +17,20 @@ import { fileURLToPath } from "node:url"
 import { getBundledModules, getCurrentCommitSha, ROOT } from "./bundle-helper.mjs"
 import { compileRecordSchema } from "./record-schema-validator.mjs"
 import { evaluateFaultCalibration } from "./generate-fault-repair-pairs.mjs"
-import { sha256 } from "./normalize-record.mjs"
+import { sha256, stableStringify } from "./normalize-record.mjs"
+import { expectedContentHash, expectedCanonicalContentHash } from "./content-hash.mjs"
 import { buildPhase25Audit } from "./phase25-task-audit.mjs"
 import { isHumanApprovedRecord } from "./review-policy.mjs"
 import { getBuildTimestamp } from "./build-metadata.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
+
+function withoutContentHash(record) {
+  const copy = JSON.parse(JSON.stringify(record))
+  if (copy.hashes && typeof copy.hashes === "object") delete copy.hashes.content_hash
+  return copy
+}
 export async function buildReleaseReport() {
   const commitSha = getCurrentCommitSha()
   const buildTimestamp = getBuildTimestamp()
@@ -140,9 +147,10 @@ export async function buildReleaseReport() {
   }
   const g3Passed = positivePassed === positiveEvaluated && positiveEvaluated > 0 && phase25Audit.passed
 
-  // G4 - Negative Calibration
+  // G4 - Negative Calibration; retain precise failures for deterministic diagnosis.
   let faultEvaluated = 0
   let faultPassed = 0
+  const faultCalibrationFailures = []
   for (const rec of recordFiles.faultRepairs) {
     faultEvaluated++
     const fault = rec.fault || {}
@@ -151,7 +159,24 @@ export async function buildReleaseReport() {
       targetBoard: rec.context?.target_board,
     })
     const calibration = evaluateFaultCalibration(fault, res)
-    if (calibration.passed) faultPassed++
+    if (calibration.passed) {
+      faultPassed++
+    } else {
+      faultCalibrationFailures.push({
+        record_id: rec.record_id,
+        parent_record_id: rec.variant?.parent_record_id || null,
+        mutation_id: fault.mutation_id || null,
+        expected_rule_ids: fault.expected_rule_ids || [],
+        expected_validator_status: fault.expected_validator_status || null,
+        actual_rule_ids: calibration.actualRuleIds || [],
+        actual_severities: calibration.actualSeverities || [],
+        rejection_reasons: [
+          ...(!calibration.ruleMatch ? ["expected diagnostic rule not found"] : []),
+          ...(!calibration.expectedNoticeSeveritiesMatch ? ["expected rule severity mismatch"] : []),
+          ...(!calibration.resultStatusMatches ? ["validator result status mismatch"] : []),
+        ],
+      })
+    }
   }
   const g4Passed = faultPassed === faultEvaluated && faultEvaluated >= 50
 
@@ -184,18 +209,46 @@ export async function buildReleaseReport() {
   // G7 - Split Isolation
   const g7Passed = leakageAudit.passed === true
 
-  // G8 - recompute each task's content digest; a 64-character string is not proof.
+  // G8 - verify shared task-specific digest contract and source/split-copy integrity.
   const uniqueRecordIds = new Set(allReleasedRecords.map((r) => r.record_id))
-  const expectedContentHash = (rec) => {
-    if (rec.task_type === "request_to_circuit") return sha256({ text: rec.instruction.text, target: rec.target })
-    if (rec.task_type === "fault_repair") return sha256({ fault: rec.fault.input_circuit, target: { circuit: rec.target.corrected_circuit, explanation: rec.target.explanation, code: rec.target.code }, mutation_id: rec.fault.mutation_id })
-    if (rec.task_type === "diagnosis_explanation") return sha256({ circuit: rec.target.circuit, explanation: rec.target.explanation, instruction: rec.instruction.text, task: "diagnosis_explanation" })
-    if (rec.task_type === "blockly_code") return sha256({ circuit: rec.target.circuit, code: rec.target.code, instruction: rec.instruction.text, task: "blockly_code" })
-    return null
+  const releasedHashMismatches = allReleasedRecords
+    .filter((rec) => expectedContentHash(rec) === null || expectedContentHash(rec) !== rec.hashes?.content_hash)
+    .map((rec) => ({ record_id: rec.record_id, task_type: rec.task_type,
+      stored_hash: rec.hashes?.content_hash || null, computed_hash: expectedContentHash(rec) }))
+  const canonicalHashMismatches = recordFiles.canonical
+    .filter((rec) => expectedCanonicalContentHash(rec) === null || expectedCanonicalContentHash(rec) !== rec.hashes?.content_hash)
+    .map((rec) => ({ record_id: rec.record_id, stored_hash: rec.hashes?.content_hash || null,
+      computed_hash: expectedCanonicalContentHash(rec) }))
+
+  const sourceTaskRecords = [
+    ...recordFiles.requests, ...recordFiles.faultRepairs,
+    ...recordFiles.diagnosisExplanations, ...recordFiles.blocklyCode,
+  ]
+  const sourceById = new Map()
+  const duplicateSourceIds = []
+  for (const rec of sourceTaskRecords) {
+    if (sourceById.has(rec.record_id)) duplicateSourceIds.push(rec.record_id)
+    sourceById.set(rec.record_id, rec)
   }
-  const allPayloadHashesMatch = allReleasedRecords.every((rec) => expectedContentHash(rec) !== null && expectedContentHash(rec) === rec.hashes?.content_hash)
-  const canonicalHashesMatch = recordFiles.canonical.every((rec) => sha256({ circuit: rec.target.circuit, explanation: rec.target.explanation, code: rec.target.code }) === rec.hashes?.content_hash)
-  const g8Passed = uniqueRecordIds.size === totalReleased && allPayloadHashesMatch && canonicalHashesMatch
+  const artifactSplitMismatches = []
+  for (const rec of allReleasedRecords) {
+    const sourceRecord = sourceById.get(rec.record_id)
+    if (!sourceRecord) artifactSplitMismatches.push({ record_id: rec.record_id, reason: "missing_task_artifact" })
+    else if (stableStringify(withoutContentHash(sourceRecord)) !== stableStringify(withoutContentHash(rec))) {
+      artifactSplitMismatches.push({ record_id: rec.record_id, reason: "source_split_payload_differs" })
+    }
+  }
+  const releasedIdSet = new Set(allReleasedRecords.map((rec) => rec.record_id))
+  for (const rec of sourceTaskRecords) {
+    if (!releasedIdSet.has(rec.record_id)) artifactSplitMismatches.push({ record_id: rec.record_id, reason: "task_artifact_missing_from_splits" })
+  }
+  for (const recordId of duplicateSourceIds) artifactSplitMismatches.push({ record_id: recordId, reason: "duplicate_task_artifact_id" })
+
+  const allPayloadHashesMatch = releasedHashMismatches.length === 0
+  const canonicalHashesMatch = canonicalHashMismatches.length === 0
+  const sourceSplitIntegrityPasses = artifactSplitMismatches.length === 0
+  const g8Passed = uniqueRecordIds.size === totalReleased &&
+    allPayloadHashesMatch && canonicalHashesMatch && sourceSplitIntegrityPasses
 
   // G9 - Review Status
   const approvedCount = reviewRecords.filter((record) => isHumanApprovedRecord(record)).length
@@ -222,11 +275,11 @@ export async function buildReleaseReport() {
     { id: "G1", name: "Inventory Coverage", threshold: "100% inventoried; excluded get reasons", passed: g1Passed, score: `${totalInventoried}/${totalInventoried}` },
     { id: "G2", name: "Schema Integrity", threshold: "100% schema-valid against record-v1.json", passed: g2Passed, score: `${schemaValidCount}/${totalReleased}` },
     { id: "G3", name: "Positive Correctness & Phase 2.5 Evidence", threshold: "Live validator pass plus diagnosis evidence and board-aware Blockly checks", passed: g3Passed, score: `${positivePassed}/${positiveEvaluated}; diagnosis ${phase25Audit.metrics.diagnosis.records - phase25Audit.metrics.diagnosis.failures}/${phase25Audit.metrics.diagnosis.records}; Blockly ${phase25Audit.metrics.blockly.records - phase25Audit.metrics.blockly.failures}/${phase25Audit.metrics.blockly.records}` },
-    { id: "G4", name: "Negative Calibration", threshold: "100% expected-label match for fault suite (>=50)", passed: g4Passed, score: `${faultPassed}/${faultEvaluated}` },
+    { id: "G4", name: "Negative Calibration", threshold: "100% expected-label match for fault suite (>=50)", passed: g4Passed, score: String(faultPassed) + "/" + String(faultEvaluated), details: { failed_records: faultCalibrationFailures } },
     { id: "G5", name: "Provenance / Licence", threshold: "100% complete internal_owned approved", passed: g5Passed, score: `${provenanceCompleteCount}/${totalReleased}` },
     { id: "G6", name: "Paraphrase Preservation", threshold: "100% exact topology + board invariant match", passed: g6Passed, score: `${paraphrasesPreserved}/${paraphrasesEvaluated}` },
     { id: "G7", name: "Split Isolation", threshold: "0 cross-split family, record, or topology leaks", passed: g7Passed, score: "0 leaks" },
-    { id: "G8", name: "Content Hash Integrity", threshold: "Recomputed task-specific hashes match released and canonical records", passed: g8Passed, score: "payload digests recomputed" },
+    { id: "G8", name: "Content Hash Integrity", threshold: "Recomputed task-specific hashes match released/canonical records and source artifacts equal split copies", passed: g8Passed, score: "released mismatches " + releasedHashMismatches.length + "; canonical mismatches " + canonicalHashMismatches.length + "; source/split mismatches " + artifactSplitMismatches.length, details: { released_mismatch_count: releasedHashMismatches.length, released_mismatches: releasedHashMismatches.slice(0, 50), canonical_mismatch_count: canonicalHashMismatches.length, canonical_mismatches: canonicalHashMismatches.slice(0, 50), source_split_mismatch_count: artifactSplitMismatches.length, source_split_mismatches: artifactSplitMismatches.slice(0, 50) } },
     { id: "G9", name: "Independent Human Review", threshold: "Every canonical parent and released record has a named human approval", passed: g9Passed, score: `${approvedCount}/${reviewRecords.length}; ${pendingReviews.length} pending` },
     { id: "G10", name: "Product Metric Report", threshold: "Complete counts per task, board, and split", passed: g10Passed, score: "Generated" },
   ]
@@ -297,6 +350,15 @@ export async function buildReleaseReport() {
       pending_human_reviews: pendingReviews.length,
       positive_circuit_acceptance_rate: positivePassed / positiveEvaluated,
       negative_fault_rejection_rate: faultPassed / faultEvaluated,
+      fault_calibration_failures: faultCalibrationFailures,
+      content_hash_integrity: {
+        released_mismatch_count: releasedHashMismatches.length,
+        released_mismatches: releasedHashMismatches.slice(0, 50),
+        canonical_mismatch_count: canonicalHashMismatches.length,
+        canonical_mismatches: canonicalHashMismatches.slice(0, 50),
+        source_split_mismatch_count: artifactSplitMismatches.length,
+        source_split_mismatches: artifactSplitMismatches.slice(0, 50),
+      },
       split_ratios: leakageAudit.metrics.splits,
     },
     schema_errors: schemaErrors,
