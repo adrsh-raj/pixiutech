@@ -1,0 +1,49 @@
+{
+  "experiment_name": "pixiu_copilot_phase3_baseline",
+  "version": "1.0.0",
+  "phase": "Phase 3: Baseline Model Integration & Bounded Workflows",
+  "created_at": "2026-10-10T19:18:59.976Z",
+  "phase2_data_readiness": {
+    "status": "RELEASE_SEALED",
+    "phase2_commit_sha": "daa1fbf368a17ec4e1363c4830d51b58fc254435",
+    "dataset_version": "2.0.0",
+    "manifest_path": "data/ai-copilot/phase2/manifest.json",
+    "manifest_sha256": "f6777c07b60e3dcc2404b3fecf901a8d691b44a788a66de5e617c71c4495b21b",
+    "locked_split_counts": {
+      "train": 516,
+      "validation": 146,
+      "test": 134,
+      "total_released": 796,
+      "canonical_parents": 71,
+      "review_scope": 867
+    },
+    "gates_status": {
+      "G1_G10": "PASS",
+      "G9_human_review": "PASS (867/867 approved)"
+    }
+  },
+  "model_configuration": {
+    "candidate_architecture": "Qwen2.5-Coder / Qwen3-4B",
+    "active_adapter": "deterministic-stub",
+    "adapter_version": "1.0.0",
+    "proposal_schema_version": "pixiu-copilot-proposal-v1",
+    "validator_version": "1.0.0",
+    "supported_tasks": [
+      "led_control",
+      "ldr_lighting",
+      "ultrasonic_alert",
+      "servo_control"
+    ],
+    "supported_boards": [
+      "arduino-uno",
+      "esp32-devkit",
+      "microbit-v2",
+      "rpi-pico"
+    ],
+    "parameters": {
+      "temperature": 0.1,
+      "max_tokens": 1024,
+      "timeout_ms": 10000
+    }
+  }
+}
