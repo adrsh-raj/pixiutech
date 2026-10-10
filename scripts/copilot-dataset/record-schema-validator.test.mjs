@@ -93,3 +93,18 @@ test("board resolver labels implicit fallback instead of claiming explicit conte
   assert.equal(result.resolution.explicit, false)
   assert.equal(result.resolution.used_fallback, true)
 })
+
+test("lesson-engine exports the Arduino-only source list separately from aggregate LESSONS", async () => {
+  const modules = await getBundledModules()
+  const { lessons, esp32, pico, microbit } = modules
+  assert.ok(Array.isArray(lessons.UNO_LESSONS))
+  assert.ok(lessons.UNO_LESSONS.length > 0)
+
+  const specialisedIds = new Set([
+    ...(esp32.ESP32_LESSONS || []).map((lesson) => lesson.id),
+    ...(pico.PICO_LESSONS || []).map((lesson) => lesson.id),
+    ...(microbit.MICROBIT_LESSONS || []).map((lesson) => lesson.id),
+  ])
+  assert.ok(lessons.UNO_LESSONS.every((lesson) => !specialisedIds.has(lesson.id)))
+  assert.ok((lessons.LESSONS || []).length >= lessons.UNO_LESSONS.length)
+})

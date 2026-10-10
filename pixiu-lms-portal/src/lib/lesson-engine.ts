@@ -863,7 +863,7 @@ const AI_SERVO_CIRCUIT: CircuitState = {
   ],
 }
 
-const UNO_LESSONS: Lesson[] = [
+export const UNO_LESSONS: Lesson[] = [
   // --- TIER 1: BEGINNER (Foundations & Multi-component I/O) ---
   {
     id: "lesson-led-basics",
