@@ -3,7 +3,7 @@
  * 
  * Provider-neutral interface for baseline model adapters.
  * Implements deterministic stubbing for offline CI/testing and structured
- * metadata normalization (duration, token counts, error taxonomy).
+ * metadata normalization across all 4 supported boards and 4 task families.
  * 
  * Invariant: The model adapter is an UNTRUSTED PROPOSER. It never mutates
  * application state or canvas directly.
@@ -59,7 +59,11 @@ export interface ModelAdapter {
 
 /**
  * Deterministic Stub Adapter for offline CI and reproducible unit testing.
- * Emits schema-compliant, board-specific proposals for the 4 supported task families.
+ * Emits schema-compliant, board-specific proposals for all 4 supported boards:
+ *   - arduino-uno
+ *   - esp32-devkit
+ *   - rpi-pico
+ *   - microbit-v2
  */
 export class DeterministicStubAdapter implements ModelAdapter {
   private readonly defaultTimeoutMs: number
@@ -191,9 +195,9 @@ export class DeterministicStubAdapter implements ModelAdapter {
       }
     }
 
-    // Standard Success Scenario: generate proposal based on task family inferred from prompt
+    // Standard Success Scenario: generate proposal based on task family and board
     const promptLower = request.prompt.toLowerCase()
-    const board = request.context.targetBoard || "arduino-uno"
+    const board = (request.context.targetBoard || "arduino-uno").toLowerCase()
 
     let payload: Record<string, unknown>
 
@@ -204,7 +208,6 @@ export class DeterministicStubAdapter implements ModelAdapter {
     } else if (promptLower.includes("servo") || promptLower.includes("barrier") || promptLower.includes("motor") || promptLower.includes("angle")) {
       payload = this.buildServoProposal(board)
     } else {
-      // Default to LED control
       payload = this.buildLedProposal(board)
     }
 
@@ -227,7 +230,75 @@ export class DeterministicStubAdapter implements ModelAdapter {
     }
   }
 
-  private buildLedProposal(board: string) {
+  public buildLedProposal(board: string) {
+    if (board === "esp32-devkit") {
+      return {
+        schema_version: "pixiu-copilot-proposal-v1",
+        task_type: "led_control",
+        summary: "LED blink on ESP32 DevKit GPIO 2 with 220Ω series resistor",
+        assumptions: [
+          "GPIO Pin D2 used as output pin",
+          "220Ω resistor protects LED on 3.3V power rail",
+        ],
+        needs_clarification: [],
+        proposal: {
+          circuit: {
+            parts: [
+              { id: "esp32", type: "esp32-devkit", x: 60, y: 100, rotation: 0, props: {} },
+              { id: "r1", type: "resistor", x: 300, y: 100, rotation: 0, props: { resistance: 220 } },
+              { id: "led1", type: "led", x: 420, y: 100, rotation: 0, props: { color: "blue" } },
+            ],
+            wires: [
+              { id: "w1", from: { partId: "esp32", pinId: "d2" }, to: { partId: "r1", pinId: "a" }, color: "#ef4444" },
+              { id: "w2", from: { partId: "r1", pinId: "b" }, to: { partId: "led1", pinId: "anode" }, color: "#ef4444" },
+              { id: "w3", from: { partId: "led1", pinId: "cathode" }, to: { partId: "esp32", pinId: "gnd_r" }, color: "#1e293b" },
+            ],
+          },
+          code: null,
+          explanation: "Connected an indicator LED to ESP32 Pin D2 via a 220Ω resistor to GND_R on the 3.3V logic rail.",
+        },
+        capabilities: {
+          simulation: "supported",
+          compilation: "not_tested",
+          physical_hardware: "not_verified",
+        },
+      }
+    }
+
+    if (board === "rpi-pico") {
+      return {
+        schema_version: "pixiu-copilot-proposal-v1",
+        task_type: "led_control",
+        summary: "LED blink on Raspberry Pi Pico GPIO 15 with 220Ω resistor",
+        assumptions: [
+          "GP15 digital pin used for pulse signal",
+          "220Ω resistor drops 3.3V logic to safe forward voltage",
+        ],
+        needs_clarification: [],
+        proposal: {
+          circuit: {
+            parts: [
+              { id: "pico", type: "rpi-pico", x: 60, y: 100, rotation: 0, props: {} },
+              { id: "r1", type: "resistor", x: 300, y: 100, rotation: 0, props: { resistance: 220 } },
+              { id: "led1", type: "led", x: 420, y: 100, rotation: 0, props: { color: "green" } },
+            ],
+            wires: [
+              { id: "w1", from: { partId: "pico", pinId: "gp15" }, to: { partId: "r1", pinId: "a" }, color: "#ef4444" },
+              { id: "w2", from: { partId: "r1", pinId: "b" }, to: { partId: "led1", pinId: "anode" }, color: "#ef4444" },
+              { id: "w3", from: { partId: "led1", pinId: "cathode" }, to: { partId: "pico", pinId: "gnd_1" }, color: "#1e293b" },
+            ],
+          },
+          code: null,
+          explanation: "Connected Green LED to Raspberry Pi Pico Pin GP15 with 220Ω resistor to GND_1.",
+        },
+        capabilities: {
+          simulation: "supported",
+          compilation: "not_tested",
+          physical_hardware: "not_verified",
+        },
+      }
+    }
+
     if (board === "microbit-v2") {
       return {
         schema_version: "pixiu-copilot-proposal-v1",
@@ -296,7 +367,128 @@ export class DeterministicStubAdapter implements ModelAdapter {
     }
   }
 
-  private buildLdrProposal(board: string) {
+  public buildLdrProposal(board: string) {
+    if (board === "esp32-devkit") {
+      return {
+        schema_version: "pixiu-copilot-proposal-v1",
+        task_type: "ldr_lighting",
+        summary: "LDR voltage divider on ESP32 ADC Pin D34 with indicator LED on D2",
+        assumptions: [
+          "10kΩ resistor forms voltage divider with LDR",
+          "ADC Pin D34 reads analog light level",
+        ],
+        needs_clarification: [],
+        proposal: {
+          circuit: {
+            parts: [
+              { id: "esp32", type: "esp32-devkit", x: 60, y: 100, rotation: 0, props: {} },
+              { id: "ldr1", type: "ldr", x: 300, y: 100, rotation: 0, props: {} },
+              { id: "r_div", type: "resistor", x: 300, y: 200, rotation: 0, props: { resistance: 10000 } },
+              { id: "led1", type: "led", x: 450, y: 100, rotation: 0, props: { color: "green" } },
+              { id: "r_led", type: "resistor", x: 450, y: 200, rotation: 0, props: { resistance: 220 } },
+            ],
+            wires: [
+              { id: "w1", from: { partId: "esp32", pinId: "3v3" }, to: { partId: "ldr1", pinId: "a" }, color: "#ef4444" },
+              { id: "w2", from: { partId: "ldr1", pinId: "b" }, to: { partId: "r_div", pinId: "a" }, color: "#eab308" },
+              { id: "w3", from: { partId: "ldr1", pinId: "b" }, to: { partId: "esp32", pinId: "d34" }, color: "#eab308" },
+              { id: "w4", from: { partId: "r_div", pinId: "b" }, to: { partId: "esp32", pinId: "gnd_r" }, color: "#1e293b" },
+              { id: "w5", from: { partId: "esp32", pinId: "d2" }, to: { partId: "r_led", pinId: "a" }, color: "#22c55e" },
+              { id: "w6", from: { partId: "r_led", pinId: "b" }, to: { partId: "led1", pinId: "anode" }, color: "#22c55e" },
+              { id: "w7", from: { partId: "led1", pinId: "cathode" }, to: { partId: "esp32", pinId: "gnd_l" }, color: "#1e293b" },
+            ],
+          },
+          code: null,
+          explanation: "Formed an LDR voltage divider on ESP32 3.3V rail with Pin D34 reading light levels.",
+        },
+        capabilities: {
+          simulation: "supported",
+          compilation: "not_tested",
+          physical_hardware: "not_verified",
+        },
+      }
+    }
+
+    if (board === "rpi-pico") {
+      return {
+        schema_version: "pixiu-copilot-proposal-v1",
+        task_type: "ldr_lighting",
+        summary: "LDR voltage divider on Raspberry Pi Pico ADC0 (GP26)",
+        assumptions: [
+          "10kΩ pull-down resistor on ADC Pin GP26",
+          "GP14 digital pin controls indicator LED",
+        ],
+        needs_clarification: [],
+        proposal: {
+          circuit: {
+            parts: [
+              { id: "pico", type: "rpi-pico", x: 60, y: 100, rotation: 0, props: {} },
+              { id: "ldr1", type: "ldr", x: 300, y: 100, rotation: 0, props: {} },
+              { id: "r_div", type: "resistor", x: 300, y: 200, rotation: 0, props: { resistance: 10000 } },
+              { id: "led1", type: "led", x: 450, y: 100, rotation: 0, props: { color: "green" } },
+              { id: "r_led", type: "resistor", x: 450, y: 200, rotation: 0, props: { resistance: 220 } },
+            ],
+            wires: [
+              { id: "w1", from: { partId: "pico", pinId: "3v3" }, to: { partId: "ldr1", pinId: "a" }, color: "#ef4444" },
+              { id: "w2", from: { partId: "ldr1", pinId: "b" }, to: { partId: "r_div", pinId: "a" }, color: "#eab308" },
+              { id: "w3", from: { partId: "ldr1", pinId: "b" }, to: { partId: "pico", pinId: "gp26" }, color: "#eab308" },
+              { id: "w4", from: { partId: "r_div", pinId: "b" }, to: { partId: "pico", pinId: "gnd_1" }, color: "#1e293b" },
+              { id: "w5", from: { partId: "pico", pinId: "gp14" }, to: { partId: "r_led", pinId: "a" }, color: "#22c55e" },
+              { id: "w6", from: { partId: "r_led", pinId: "b" }, to: { partId: "led1", pinId: "anode" }, color: "#22c55e" },
+              { id: "w7", from: { partId: "led1", pinId: "cathode" }, to: { partId: "pico", pinId: "gnd_2" }, color: "#1e293b" },
+            ],
+          },
+          code: null,
+          explanation: "Constructed an LDR voltage divider on Raspberry Pi Pico ADC Pin GP26.",
+        },
+        capabilities: {
+          simulation: "supported",
+          compilation: "not_tested",
+          physical_hardware: "not_verified",
+        },
+      }
+    }
+
+    if (board === "microbit-v2") {
+      return {
+        schema_version: "pixiu-copilot-proposal-v1",
+        task_type: "ldr_lighting",
+        summary: "LDR voltage divider on micro:bit Pin P0 with external LED on Pin P1",
+        assumptions: [
+          "10kΩ divider resistor on analog pin P0",
+          "Digital pin P1 drives external LED",
+        ],
+        needs_clarification: [],
+        proposal: {
+          circuit: {
+            parts: [
+              { id: "mb", type: "microbit-v2", x: 60, y: 100, rotation: 0, props: {} },
+              { id: "ldr1", type: "ldr", x: 300, y: 100, rotation: 0, props: {} },
+              { id: "r_div", type: "resistor", x: 300, y: 200, rotation: 0, props: { resistance: 10000 } },
+              { id: "led1", type: "led", x: 450, y: 100, rotation: 0, props: { color: "green" } },
+              { id: "r_led", type: "resistor", x: 450, y: 200, rotation: 0, props: { resistance: 220 } },
+            ],
+            wires: [
+              { id: "w1", from: { partId: "mb", pinId: "3v" }, to: { partId: "ldr1", pinId: "a" }, color: "#ef4444" },
+              { id: "w2", from: { partId: "ldr1", pinId: "b" }, to: { partId: "r_div", pinId: "a" }, color: "#eab308" },
+              { id: "w3", from: { partId: "ldr1", pinId: "b" }, to: { partId: "mb", pinId: "p0" }, color: "#eab308" },
+              { id: "w4", from: { partId: "r_div", pinId: "b" }, to: { partId: "mb", pinId: "gnd" }, color: "#1e293b" },
+              { id: "w5", from: { partId: "mb", pinId: "p1" }, to: { partId: "r_led", pinId: "a" }, color: "#22c55e" },
+              { id: "w6", from: { partId: "r_led", pinId: "b" }, to: { partId: "led1", pinId: "anode" }, color: "#22c55e" },
+              { id: "w7", from: { partId: "led1", pinId: "cathode" }, to: { partId: "mb", pinId: "gnd" }, color: "#1e293b" },
+            ],
+          },
+          code: null,
+          explanation: "Configured an LDR divider on micro:bit Pin P0 with output alert on Pin P1.",
+        },
+        capabilities: {
+          simulation: "supported",
+          compilation: "not_tested",
+          physical_hardware: "not_verified",
+        },
+      }
+    }
+
+    // Default: Arduino Uno
     return {
       schema_version: "pixiu-copilot-proposal-v1",
       task_type: "ldr_lighting",
@@ -336,7 +528,119 @@ export class DeterministicStubAdapter implements ModelAdapter {
     }
   }
 
-  private buildUltrasonicProposal(board: string) {
+  public buildUltrasonicProposal(board: string) {
+    if (board === "esp32-devkit") {
+      return {
+        schema_version: "pixiu-copilot-proposal-v1",
+        task_type: "ultrasonic_alert",
+        summary: "Ultrasonic Distance Alert on ESP32 DevKit with buzzer alert",
+        assumptions: [
+          "Trigger on Pin D5, Echo on Pin D18",
+          "Warning buzzer on Pin D23",
+        ],
+        needs_clarification: [],
+        proposal: {
+          circuit: {
+            parts: [
+              { id: "esp32", type: "esp32-devkit", x: 60, y: 100, rotation: 0, props: {} },
+              { id: "sonar", type: "ultrasonic", x: 380, y: 70, rotation: 0, props: { distance: 30 } },
+              { id: "bz", type: "buzzer", x: 420, y: 220, rotation: 0, props: {} },
+            ],
+            wires: [
+              { id: "w_vcc", from: { partId: "esp32", pinId: "3v3" }, to: { partId: "sonar", pinId: "vcc" }, color: "#ef4444" },
+              { id: "w_gnd1", from: { partId: "esp32", pinId: "gnd_l" }, to: { partId: "sonar", pinId: "gnd" }, color: "#1e293b" },
+              { id: "w_trig", from: { partId: "esp32", pinId: "d5" }, to: { partId: "sonar", pinId: "trig" }, color: "#3b82f6" },
+              { id: "w_echo", from: { partId: "esp32", pinId: "d18" }, to: { partId: "sonar", pinId: "echo" }, color: "#06b6d4" },
+              { id: "w_bz_pos", from: { partId: "esp32", pinId: "d23" }, to: { partId: "bz", pinId: "pos" }, color: "#f59e0b" },
+              { id: "w_bz_gnd", from: { partId: "bz", pinId: "neg" }, to: { partId: "esp32", pinId: "gnd_r" }, color: "#1e293b" },
+            ],
+          },
+          code: null,
+          explanation: "Ultrasonic sensor on ESP32 with Trigger on D5 and Echo on D18, with buzzer on D23.",
+        },
+        capabilities: {
+          simulation: "supported",
+          compilation: "not_tested",
+          physical_hardware: "not_verified",
+        },
+      }
+    }
+
+    if (board === "rpi-pico") {
+      return {
+        schema_version: "pixiu-copilot-proposal-v1",
+        task_type: "ultrasonic_alert",
+        summary: "Ultrasonic Distance Alert on Raspberry Pi Pico",
+        assumptions: [
+          "Trigger on GP14, Echo on GP15",
+          "Buzzer on GP13",
+        ],
+        needs_clarification: [],
+        proposal: {
+          circuit: {
+            parts: [
+              { id: "pico", type: "rpi-pico", x: 60, y: 100, rotation: 0, props: {} },
+              { id: "sonar", type: "ultrasonic", x: 380, y: 70, rotation: 0, props: { distance: 30 } },
+              { id: "bz", type: "buzzer", x: 420, y: 220, rotation: 0, props: {} },
+            ],
+            wires: [
+              { id: "w_vcc", from: { partId: "pico", pinId: "3v3" }, to: { partId: "sonar", pinId: "vcc" }, color: "#ef4444" },
+              { id: "w_gnd1", from: { partId: "pico", pinId: "gnd_2" }, to: { partId: "sonar", pinId: "gnd" }, color: "#1e293b" },
+              { id: "w_trig", from: { partId: "pico", pinId: "gp14" }, to: { partId: "sonar", pinId: "trig" }, color: "#3b82f6" },
+              { id: "w_echo", from: { partId: "pico", pinId: "gp15" }, to: { partId: "sonar", pinId: "echo" }, color: "#06b6d4" },
+              { id: "w_bz_pos", from: { partId: "pico", pinId: "gp13" }, to: { partId: "bz", pinId: "pos" }, color: "#f59e0b" },
+              { id: "w_bz_gnd", from: { partId: "bz", pinId: "neg" }, to: { partId: "pico", pinId: "gnd_3" }, color: "#1e293b" },
+            ],
+          },
+          code: null,
+          explanation: "Ultrasonic sensor on Raspberry Pi Pico Trigger GP14, Echo GP15, with buzzer on GP13.",
+        },
+        capabilities: {
+          simulation: "supported",
+          compilation: "not_tested",
+          physical_hardware: "not_verified",
+        },
+      }
+    }
+
+    if (board === "microbit-v2") {
+      return {
+        schema_version: "pixiu-copilot-proposal-v1",
+        task_type: "ultrasonic_alert",
+        summary: "Ultrasonic Distance Alert on micro:bit V2",
+        assumptions: [
+          "Trigger on Pin P0, Echo on Pin P1",
+          "Buzzer on Pin P2",
+        ],
+        needs_clarification: [],
+        proposal: {
+          circuit: {
+            parts: [
+              { id: "mb", type: "microbit-v2", x: 60, y: 100, rotation: 0, props: {} },
+              { id: "sonar", type: "ultrasonic", x: 380, y: 70, rotation: 0, props: { distance: 30 } },
+              { id: "bz", type: "buzzer", x: 420, y: 220, rotation: 0, props: {} },
+            ],
+            wires: [
+              { id: "w_vcc", from: { partId: "mb", pinId: "3v" }, to: { partId: "sonar", pinId: "vcc" }, color: "#ef4444" },
+              { id: "w_gnd1", from: { partId: "mb", pinId: "gnd" }, to: { partId: "sonar", pinId: "gnd" }, color: "#1e293b" },
+              { id: "w_trig", from: { partId: "mb", pinId: "p0" }, to: { partId: "sonar", pinId: "trig" }, color: "#3b82f6" },
+              { id: "w_echo", from: { partId: "mb", pinId: "p1" }, to: { partId: "sonar", pinId: "echo" }, color: "#06b6d4" },
+              { id: "w_bz_pos", from: { partId: "mb", pinId: "p2" }, to: { partId: "bz", pinId: "pos" }, color: "#f59e0b" },
+              { id: "w_bz_gnd", from: { partId: "bz", pinId: "neg" }, to: { partId: "mb", pinId: "gnd" }, color: "#1e293b" },
+            ],
+          },
+          code: null,
+          explanation: "Ultrasonic sensor on micro:bit with Trigger on P0, Echo on P1, and buzzer on P2.",
+        },
+        capabilities: {
+          simulation: "supported",
+          compilation: "not_tested",
+          physical_hardware: "not_verified",
+        },
+      }
+    }
+
+    // Default: Arduino Uno
     return {
       schema_version: "pixiu-copilot-proposal-v1",
       task_type: "ultrasonic_alert",
@@ -373,7 +677,107 @@ export class DeterministicStubAdapter implements ModelAdapter {
     }
   }
 
-  private buildServoProposal(board: string) {
+  public buildServoProposal(board: string) {
+    if (board === "esp32-devkit") {
+      return {
+        schema_version: "pixiu-copilot-proposal-v1",
+        task_type: "servo_control",
+        summary: "Servo motor angle controller on ESP32 PWM Pin D13",
+        assumptions: [
+          "Servo signal connected to PWM Pin D13",
+          "Servo VCC connected to 3.3V power rail with shared ground",
+        ],
+        needs_clarification: [],
+        proposal: {
+          circuit: {
+            parts: [
+              { id: "esp32", type: "esp32-devkit", x: 60, y: 100, rotation: 0, props: {} },
+              { id: "servo1", type: "servo", x: 400, y: 120, rotation: 0, props: { angle: 90 } },
+            ],
+            wires: [
+              { id: "w_vcc", from: { partId: "esp32", pinId: "3v3" }, to: { partId: "servo1", pinId: "vcc" }, color: "#ef4444" },
+              { id: "w_gnd", from: { partId: "esp32", pinId: "gnd_r" }, to: { partId: "servo1", pinId: "gnd" }, color: "#1e293b" },
+              { id: "w_sig", from: { partId: "esp32", pinId: "d13" }, to: { partId: "servo1", pinId: "sig" }, color: "#f97316" },
+            ],
+          },
+          code: null,
+          explanation: "Servo motor attached to ESP32 Pin D13 for angle positioning.",
+        },
+        capabilities: {
+          simulation: "supported",
+          compilation: "not_tested",
+          physical_hardware: "not_verified",
+        },
+      }
+    }
+
+    if (board === "rpi-pico") {
+      return {
+        schema_version: "pixiu-copilot-proposal-v1",
+        task_type: "servo_control",
+        summary: "Servo motor angle controller on Raspberry Pi Pico GP16",
+        assumptions: [
+          "Servo signal connected to PWM GP16",
+          "Servo VCC connected to 3.3V rail with shared ground",
+        ],
+        needs_clarification: [],
+        proposal: {
+          circuit: {
+            parts: [
+              { id: "pico", type: "rpi-pico", x: 60, y: 100, rotation: 0, props: {} },
+              { id: "servo1", type: "servo", x: 400, y: 120, rotation: 0, props: { angle: 90 } },
+            ],
+            wires: [
+              { id: "w_vcc", from: { partId: "pico", pinId: "3v3" }, to: { partId: "servo1", pinId: "vcc" }, color: "#ef4444" },
+              { id: "w_gnd", from: { partId: "pico", pinId: "gnd_1" }, to: { partId: "servo1", pinId: "gnd" }, color: "#1e293b" },
+              { id: "w_sig", from: { partId: "pico", pinId: "gp16" }, to: { partId: "servo1", pinId: "sig" }, color: "#f97316" },
+            ],
+          },
+          code: null,
+          explanation: "Servo motor connected to Raspberry Pi Pico GP16 for servo angle positioning.",
+        },
+        capabilities: {
+          simulation: "supported",
+          compilation: "not_tested",
+          physical_hardware: "not_verified",
+        },
+      }
+    }
+
+    if (board === "microbit-v2") {
+      return {
+        schema_version: "pixiu-copilot-proposal-v1",
+        task_type: "servo_control",
+        summary: "Servo motor angle controller on micro:bit Pin P0",
+        assumptions: [
+          "Servo signal on analog/PWM pin P0",
+          "Servo power on 3V with shared ground",
+        ],
+        needs_clarification: [],
+        proposal: {
+          circuit: {
+            parts: [
+              { id: "mb", type: "microbit-v2", x: 60, y: 100, rotation: 0, props: {} },
+              { id: "servo1", type: "servo", x: 400, y: 120, rotation: 0, props: { angle: 90 } },
+            ],
+            wires: [
+              { id: "w_vcc", from: { partId: "mb", pinId: "3v" }, to: { partId: "servo1", pinId: "vcc" }, color: "#ef4444" },
+              { id: "w_gnd", from: { partId: "mb", pinId: "gnd" }, to: { partId: "servo1", pinId: "gnd" }, color: "#1e293b" },
+              { id: "w_sig", from: { partId: "mb", pinId: "p0" }, to: { partId: "servo1", pinId: "sig" }, color: "#f97316" },
+            ],
+          },
+          code: null,
+          explanation: "Servo motor connected to micro:bit Pin P0 for angle positioning.",
+        },
+        capabilities: {
+          simulation: "supported",
+          compilation: "not_tested",
+          physical_hardware: "not_verified",
+        },
+      }
+    }
+
+    // Default: Arduino Uno
     return {
       schema_version: "pixiu-copilot-proposal-v1",
       task_type: "servo_control",

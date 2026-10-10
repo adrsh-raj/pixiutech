@@ -4,8 +4,10 @@
   "phase": "Phase 3: Baseline Model Integration & Bounded Workflows",
   "created_at": "2026-10-10T19:18:59.976Z",
   "phase2_data_readiness": {
-    "status": "RELEASE_SEALED",
-    "phase2_commit_sha": "daa1fbf368a17ec4e1363c4830d51b58fc254435",
+    "status": "PROVISIONAL_INTERNAL_BASELINE",
+    "provenance_note": "Phase 2 dataset passed all 10 technical gates (G1-G10) with internal lead-reviewer approvals for baseline prototyping. Official external held-out release sign-off remains PROVISIONAL per Phase 3 Blueprint Section 5 (Page 6).",
+    "manifest_commit_sha": "0abc4a9da355ca545ab1dc541345b6680eed8978",
+    "recovery_checkpoint_sha": "daa1fbf368a17ec4e1363c4830d51b58fc254435",
     "dataset_version": "2.0.0",
     "manifest_path": "data/ai-copilot/phase2/manifest.json",
     "manifest_sha256": "f6777c07b60e3dcc2404b3fecf901a8d691b44a788a66de5e617c71c4495b21b",
@@ -18,8 +20,9 @@
       "review_scope": 867
     },
     "gates_status": {
-      "G1_G10": "PASS",
-      "G9_human_review": "PASS (867/867 approved)"
+      "G1_G10_technical": "PASS",
+      "G9_internal_review": "PASS (867/867 approved by adrsh-lead-reviewer)",
+      "external_held_out_status": "PROVISIONAL"
     }
   },
   "model_configuration": {
