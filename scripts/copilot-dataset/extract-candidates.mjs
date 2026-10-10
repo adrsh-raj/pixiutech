@@ -69,6 +69,9 @@ export async function extractCanonicalCandidates({ writeArtifacts = true } = {})
     .sort((a, b) => a.source_id.localeCompare(b.source_id));
   const seenInventoryIds = new Set();
   for (const item of inventoryReport.items) {
+    if (item.source_revision !== commitSha) {
+      throw new Error("Inventory item has stale source_revision: " + item.source_id);
+    }
     if (!item.source_id || seenInventoryIds.has(item.source_id)) {
       throw new Error("Source inventory contains a missing or duplicate source_id: " + item.source_id);
     }

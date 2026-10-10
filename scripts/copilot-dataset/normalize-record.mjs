@@ -15,7 +15,11 @@ export function stableStringify(value) {
   const encode = (current) => {
     if (current === null) return "null";
     if (Array.isArray(current)) {
-      return "[" + current.map((item) => item === undefined ? "null" : encode(item)).join(",") + "]";
+      if (ancestors.has(current)) throw new TypeError("Cannot hash a cyclic array");
+      ancestors.add(current);
+      const result = "[" + current.map((item) => item === undefined ? "null" : encode(item)).join(",") + "]";
+      ancestors.delete(current);
+      return result;
     }
     if (current instanceof Date) return JSON.stringify(current.toJSON());
     if (typeof current === "object") {
@@ -194,7 +198,7 @@ export function computeCanonicalTopologyHash(circuit, resolveCanonicalPinFn, opt
 export function cleanInstructionText(title, description) {
   const rawTitle = typeof title === "string" ? title : "";
   const cleaned = rawTitle.replace(/^[0-9]+[.:)]\s*/, "").trim();
-  return cleaned || (typeof description === "string" && description.trim() ? description.trim() : "Build circuit");
+  return cleaned || "Build circuit";
 }
 
 /** Construct a Canonical Record conforming to record-v1.schema.json. */
