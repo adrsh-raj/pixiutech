@@ -1,0 +1,176 @@
+#!/usr/bin/env node
+
+/**
+ * PIXIU TECH CYBERLAB — PHASE 2 SOURCE INVENTORY BUILDER (WP 2.1)
+ * 
+ * Audits and inventories all available internal candidate sources:
+ * - Starter Templates from templates.ts
+ * - Curriculum Missions from esp32, pico, microbit, and lesson-engine
+ * - Diagnostic rules from circuit-doctor.ts
+ * - Hardware components from pixiu-components-dataset.json
+ * 
+ * Produces: data/ai-copilot/phase2/reports/source-inventory.json
+ * 
+ * Copyright (c) 2026 Pixiu Tech. All rights reserved.
+ */
+
+import { writeFileSync, mkdirSync } from "node:fs"
+import { resolve, dirname } from "node:path"
+import { fileURLToPath } from "node:url"
+import { getBundledModules, getCurrentCommitSha, ROOT } from "./bundle-helper.mjs"
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+
+export async function buildSourceInventory() {
+  const commitSha = getCurrentCommitSha()
+  const modules = await getBundledModules()
+  const { templates, esp32, pico, microbit, lessons, doctor, boards } = modules
+  const { validateProposedCircuit } = modules.validator
+
+  const inventory = []
+  const seenIds = new Set()
+
+  // 1. Audit Starter Templates
+  const templateList = templates.TEMPLATES || []
+  for (const tmpl of templateList) {
+    const boardPart = tmpl.circuit.parts.find((p) => boards.isBoardPart(p.type))
+    const targetBoard = boardPart ? boardPart.type : "arduino-uno"
+    const validation = validateProposedCircuit(tmpl.circuit, { allowWarnings: true })
+
+    const eligible = Boolean(tmpl.circuit && tmpl.circuit.parts && tmpl.circuit.parts.length > 0 && validation.valid)
+    const exclusionReason = !tmpl.circuit || tmpl.circuit.parts.length === 0
+      ? "empty_circuit"
+      : !validation.valid
+      ? `validation_failed: ${validation.errors.join("; ")}`
+      : null
+
+    const entry = {
+      source_id: `tmpl-${tmpl.id}`,
+      original_id: tmpl.id,
+      source_type: "pixiu_template",
+      source_path: "pixiu-lms-portal/src/lib/templates.ts",
+      source_revision: commitSha,
+      title: tmpl.title,
+      target_board: targetBoard,
+      grade_band: tmpl.gradeBand || null,
+      difficulty: tmpl.difficulty || "Intermediate",
+      tags: tmpl.tags || [],
+      part_count: tmpl.circuit?.parts?.length || 0,
+      wire_count: tmpl.circuit?.wires?.length || 0,
+      has_blockly: Boolean(tmpl.blocklyXml && tmpl.blocklyXml.trim().length > 0),
+      disposition: eligible ? "eligible" : "excluded",
+      exclusion_reason: exclusionReason,
+    }
+
+    seenIds.add(entry.source_id)
+    inventory.push(entry)
+  }
+
+  // 2. Audit Curriculum Missions across all boards
+  const curriculumSources = [
+    { name: "esp32", list: esp32.ESP32_LESSONS || [], path: "pixiu-lms-portal/src/lib/curriculum/esp32-curriculum.ts", defaultBoard: "esp32-devkit" },
+    { name: "pico", list: pico.PICO_LESSONS || [], path: "pixiu-lms-portal/src/lib/curriculum/pico-curriculum.ts", defaultBoard: "rpi-pico" },
+    { name: "microbit", list: microbit.MICROBIT_LESSONS || [], path: "pixiu-lms-portal/src/lib/curriculum/microbit-curriculum.ts", defaultBoard: "microbit-v2" },
+    { name: "uno", list: lessons.UNO_LESSONS || lessons.LESSONS || [], path: "pixiu-lms-portal/src/lib/lesson-engine.ts", defaultBoard: "arduino-uno" },
+  ]
+
+  for (const src of curriculumSources) {
+    for (const lsn of src.list) {
+      const sourceId = `mission-${lsn.id}`
+      if (seenIds.has(sourceId)) continue
+      seenIds.add(sourceId)
+
+      const seedCircuit = lsn.seedCircuit || (lsn.stages && lsn.stages[0]?.seedCircuit) || null
+      let targetBoard = lsn.board || src.defaultBoard
+      if (seedCircuit) {
+        const boardPart = seedCircuit.parts.find((p) => boards.isBoardPart(p.type))
+        if (boardPart) targetBoard = boardPart.type
+      }
+
+      let eligible = false
+      let exclusionReason = null
+
+      if (!seedCircuit || !seedCircuit.parts || seedCircuit.parts.length === 0) {
+        eligible = false
+        exclusionReason = "no_seed_circuit"
+      } else {
+        const validation = validateProposedCircuit(seedCircuit, { allowWarnings: true })
+        if (validation.valid) {
+          eligible = true
+        } else {
+          eligible = false
+          exclusionReason = `validation_failed: ${validation.errors.join("; ")}`
+        }
+      }
+
+      const entry = {
+        source_id: sourceId,
+        original_id: lsn.id,
+        source_type: "pixiu_mission",
+        source_path: src.path,
+        source_revision: commitSha,
+        title: lsn.title || lsn.shortTitle || lsn.id,
+        target_board: targetBoard,
+        grade_band: lsn.grade || null,
+        difficulty: lsn.difficulty || "Beginner",
+        tags: lsn.tags || [src.name],
+        part_count: seedCircuit?.parts?.length || 0,
+        wire_count: seedCircuit?.wires?.length || 0,
+        has_blockly: Boolean(lsn.seedBlocklyXml && lsn.seedBlocklyXml.trim().length > 0),
+        disposition: eligible ? "eligible" : "excluded",
+        exclusion_reason: exclusionReason,
+      }
+
+      inventory.push(entry)
+    }
+  }
+
+  // Summary Metrics
+  const eligibleItems = inventory.filter((i) => i.disposition === "eligible")
+  const excludedItems = inventory.filter((i) => i.disposition === "excluded")
+
+  const report = {
+    schema_version: "1.0.0",
+    generated_at: new Date().toISOString(),
+    commit_sha: commitSha,
+    summary: {
+      total_sources_inventoried: inventory.length,
+      eligible_candidates: eligibleItems.length,
+      excluded_candidates: excludedItems.length,
+      breakdown_by_type: {
+        templates: inventory.filter((i) => i.source_type === "pixiu_template").length,
+        templates_eligible: inventory.filter((i) => i.source_type === "pixiu_template" && i.disposition === "eligible").length,
+        missions: inventory.filter((i) => i.source_type === "pixiu_mission").length,
+        missions_eligible: inventory.filter((i) => i.source_type === "pixiu_mission" && i.disposition === "eligible").length,
+      },
+      breakdown_by_board: inventory.reduce((acc, i) => {
+        if (i.disposition === "eligible") {
+          acc[i.target_board] = (acc[i.target_board] || 0) + 1
+        }
+        return acc
+      }, {}),
+    },
+    items: inventory,
+  }
+
+  const outDir = resolve(ROOT, "data/ai-copilot/phase2/reports")
+  mkdirSync(outDir, { recursive: true })
+  const outPath = resolve(outDir, "source-inventory.json")
+  writeFileSync(outPath, JSON.stringify(report, null, 2), "utf8")
+
+  console.log(`✅ Source inventory generated at: ${outPath}`)
+  console.log(`   - Total inventoried: ${report.summary.total_sources_inventoried}`)
+  console.log(`   - Eligible candidates: ${report.summary.eligible_candidates}`)
+  console.log(`   - Excluded candidates: ${report.summary.excluded_candidates}`)
+
+  return report
+}
+
+// Allow direct CLI execution
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  buildSourceInventory().catch((err) => {
+    console.error("❌ Failed to build source inventory:", err)
+    process.exit(1)
+  })
+}

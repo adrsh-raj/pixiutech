@@ -1,0 +1,159 @@
+{
+  "dataset_name": "pixiu-ai-copilot-evaluation-corpus",
+  "version": "2.0.0",
+  "commit_sha": "767221cb6d93a8d71af7c37664153ec9126200fe",
+  "generated_at": "2026-10-10T05:27:47.365Z",
+  "record_schema_version": "1.0.0",
+  "pilot_target_satisfied": true,
+  "overall_status": "PASSED",
+  "summary": {
+    "total_records": 814,
+    "project_families": 66,
+    "counts_by_task_type": {
+      "blockly_code": 142,
+      "diagnosis_explanation": 142,
+      "fault_repair": 175,
+      "request_to_circuit": 355
+    },
+    "counts_by_board": {
+      "arduino-uno": 457,
+      "esp32-devkit": 126,
+      "microbit-v2": 115,
+      "rpi-pico": 116
+    },
+    "counts_by_split": {
+      "train": 531,
+      "validation": 144,
+      "test": 139
+    }
+  },
+  "gates": [
+    {
+      "gate_id": "G1",
+      "name": "Inventory Coverage",
+      "passed": true,
+      "metric": "86/86",
+      "threshold": "100% inventoried; excluded get reasons"
+    },
+    {
+      "gate_id": "G2",
+      "name": "Schema Integrity",
+      "passed": true,
+      "metric": "814/814",
+      "threshold": "100% schema-valid against record-v1.json"
+    },
+    {
+      "gate_id": "G3",
+      "name": "Positive Correctness",
+      "passed": true,
+      "metric": "814/814",
+      "threshold": "100% validator pass for positive gold targets"
+    },
+    {
+      "gate_id": "G4",
+      "name": "Negative Calibration",
+      "passed": true,
+      "metric": "175/175",
+      "threshold": "100% expected-label match for fault suite (>=50)"
+    },
+    {
+      "gate_id": "G5",
+      "name": "Provenance / Licence",
+      "passed": true,
+      "metric": "814/814",
+      "threshold": "100% complete internal_owned approved"
+    },
+    {
+      "gate_id": "G6",
+      "name": "Paraphrase Preservation",
+      "passed": true,
+      "metric": "355/355",
+      "threshold": "100% exact topology + board invariant match"
+    },
+    {
+      "gate_id": "G7",
+      "name": "Split Isolation",
+      "passed": true,
+      "metric": "0 leaks",
+      "threshold": "0 cross-split family, record, or topology leaks"
+    },
+    {
+      "gate_id": "G8",
+      "name": "Reproducibility",
+      "passed": true,
+      "metric": "814/814",
+      "threshold": "Deterministic content hashes across 100% records"
+    },
+    {
+      "gate_id": "G9",
+      "name": "Review Status",
+      "passed": true,
+      "metric": "814/814",
+      "threshold": "100% released records reviewed & approved"
+    },
+    {
+      "gate_id": "G10",
+      "name": "Product Metric Report",
+      "passed": true,
+      "metric": "Generated",
+      "threshold": "Complete counts per task, board, and split"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "records/canonical.jsonl",
+      "size_bytes": 328108,
+      "sha256": "48e3ae111a28a23a2d41d207f85e9466e09aa186ddfb845e53c550ca5bc0fd21"
+    },
+    {
+      "path": "records/requests.jsonl",
+      "size_bytes": 1670497,
+      "sha256": "8679d92cbbdb619d8011489c871847c4ad9a8e8fd66b9e1ae7f178caea586b21"
+    },
+    {
+      "path": "records/fault-repairs.jsonl",
+      "size_bytes": 1215694,
+      "sha256": "e1ada483e603b116fe06d8e5f6a1b72b1eccd19e737ebb2e970158dfc111e009"
+    },
+    {
+      "path": "records/diagnosis-explanations.jsonl",
+      "size_bytes": 432308,
+      "sha256": "399c08fe45d1f47cc53ba36c954f0a5952d79c2c292a025e4ed21beba91b4329"
+    },
+    {
+      "path": "records/blockly-code.jsonl",
+      "size_bytes": 664354,
+      "sha256": "6bd4d21736ce9992c58a15abe229455eff40dd469ec48e92eca15219eda63f82"
+    },
+    {
+      "path": "splits/train.jsonl",
+      "size_bytes": 2781686,
+      "sha256": "0efd19789a89eb253d97537da4c88c925de2f10f688322145f5e47ede4109351"
+    },
+    {
+      "path": "splits/validation.jsonl",
+      "size_bytes": 551771,
+      "sha256": "9297fe1f3ad57e17ff3f88ca853440e099b9504de23cfbc9422a1b52a2c38a2f"
+    },
+    {
+      "path": "splits/test.jsonl",
+      "size_bytes": 649396,
+      "sha256": "0c1b310d7d26ea50603309c2b9940beee5156919e0065241e4dcedad8db9589f"
+    },
+    {
+      "path": "reports/source-inventory.json",
+      "size_bytes": 57592,
+      "sha256": "0b9fbeded078023e024d503b9eabca190bafcdcf459b7171f78a1bb2bd60c7f2"
+    },
+    {
+      "path": "reports/duplicate-audit.json",
+      "size_bytes": 12900,
+      "sha256": "01eb814a50877218b2b6a48a3f3bf5a2b698afeb7458eabdbeee3af85969c434"
+    },
+    {
+      "path": "reports/leakage-audit.json",
+      "size_bytes": 1394,
+      "sha256": "2e7f23f2844352cbc7c60aa07c479cbaac3082321d80240513ca253d58d5d4f4"
+    }
+  ]
+}

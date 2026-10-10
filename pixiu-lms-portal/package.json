@@ -20,7 +20,10 @@
     "test:ai": "node --test test/ai/*.test.mjs",
     "qa:part4": "node ../scripts/part4-professional-hardening-static-check.mjs",
     "test:lab": "node --test test/circuit-lab/*.test.mjs",
-    "test:copilot": "node ../scripts/test-phase1-ai-copilot-engine.mjs"
+    "test:copilot": "node ../scripts/test-phase1-ai-copilot-engine.mjs",
+    "qa:copilot-dataset": "node ../scripts/phase2-ai-copilot-dataset-qa.mjs",
+    "build:copilot-dataset": "node ../scripts/copilot-dataset/build-release-report.mjs",
+    "audit:copilot-dataset": "node ../scripts/copilot-dataset/split-by-family.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",

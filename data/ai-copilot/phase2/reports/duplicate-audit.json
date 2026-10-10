@@ -1,0 +1,500 @@
+{
+  "report_name": "Phase 2 Deduplication & Group Assignment Audit",
+  "timestamp": "2026-10-10T05:26:12.983Z",
+  "total_canonical_records": 71,
+  "unique_content_hashes": 71,
+  "unique_topology_hashes": 66,
+  "unique_project_families": 66,
+  "exact_duplicates": [],
+  "topology_clusters": {
+    "b3e0c8dfcff409f6775bbdcba3d0f5bfef58c2dd21bb3c7d50288df862eac7be": [
+      "pxai2-canon-tmpl-esp32-iot-smart-light",
+      "pxai2-canon-mission-lesson-esp32-web-server-phone"
+    ],
+    "4116f863f6c1c7eac404c7cd3376323f00146065bf2983c2df3c6f9abdc482d3": [
+      "pxai2-canon-mission-lesson-esp32-builtin-led",
+      "pxai2-canon-mission-lesson-esp32-wifi-connect"
+    ],
+    "23b3e4c8237217522f3d2d0c23ba8f840ce5d0e99c10e79edee64e265325b8bc": [
+      "pxai2-canon-mission-lesson-microbit-heartbeat",
+      "pxai2-canon-mission-lesson-microbit-buttons"
+    ],
+    "4d91d7173d47b515b7a85fbe170a607979f408d020b91e2809bde16aac479ec8": [
+      "pxai2-canon-mission-lesson-ai-confidence-alarm",
+      "pxai2-canon-mission-lesson-ai-smart-presence"
+    ],
+    "8a19d6c31ea27951238e8f036ba3ce6a2e59fa2e90703b7e7d5af3952689bd1a": [
+      "pxai2-canon-mission-lesson-ai-finger-servo",
+      "pxai2-canon-mission-lesson-ai-smart-doorbell"
+    ]
+  },
+  "family_distribution": [
+    {
+      "family_id": "family-tmpl-ai-smart-barrier",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-tmpl-ai-smart-barrier"
+      ]
+    },
+    {
+      "family_id": "family-tmpl-esp32-iot-smart-light",
+      "record_count": 2,
+      "records": [
+        "pxai2-canon-tmpl-esp32-iot-smart-light",
+        "pxai2-canon-mission-lesson-esp32-web-server-phone"
+      ]
+    },
+    {
+      "family_id": "family-tmpl-microbit-emotion-bot",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-tmpl-microbit-emotion-bot"
+      ]
+    },
+    {
+      "family_id": "family-tmpl-pico-oled-arcade",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-tmpl-pico-oled-arcade"
+      ]
+    },
+    {
+      "family_id": "family-tmpl-esp32-weather-telemetry",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-tmpl-esp32-weather-telemetry"
+      ]
+    },
+    {
+      "family_id": "family-tmpl-ultrasonic-radar-scanner",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-tmpl-ultrasonic-radar-scanner"
+      ]
+    },
+    {
+      "family_id": "family-tmpl-neopixel-disco-visualizer",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-tmpl-neopixel-disco-visualizer"
+      ]
+    },
+    {
+      "family_id": "family-tmpl-mq2-gas-safety-hub",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-tmpl-mq2-gas-safety-hub"
+      ]
+    },
+    {
+      "family_id": "family-tmpl-traffic-light",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-tmpl-traffic-light"
+      ]
+    },
+    {
+      "family_id": "family-tmpl-blink-led",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-tmpl-blink-led"
+      ]
+    },
+    {
+      "family_id": "family-tmpl-servo-sweep",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-tmpl-servo-sweep"
+      ]
+    },
+    {
+      "family_id": "family-tmpl-ultrasonic-radar",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-tmpl-ultrasonic-radar"
+      ]
+    },
+    {
+      "family_id": "family-tmpl-g6-pushbutton-led",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-tmpl-g6-pushbutton-led"
+      ]
+    },
+    {
+      "family_id": "family-tmpl-g6-pot-brightness",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-tmpl-g6-pot-brightness"
+      ]
+    },
+    {
+      "family_id": "family-tmpl-g6-rgb-mood-lamp",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-tmpl-g6-rgb-mood-lamp"
+      ]
+    },
+    {
+      "family_id": "family-tmpl-g6-buzzer-doorbell",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-tmpl-g6-buzzer-doorbell"
+      ]
+    },
+    {
+      "family_id": "family-tmpl-g6-seven-segment",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-tmpl-g6-seven-segment"
+      ]
+    },
+    {
+      "family_id": "family-tmpl-g6-ldr-night-lamp",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-tmpl-g6-ldr-night-lamp"
+      ]
+    },
+    {
+      "family_id": "family-tmpl-g7-pir-security",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-tmpl-g7-pir-security"
+      ]
+    },
+    {
+      "family_id": "family-tmpl-g7-tmp36-alert",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-tmpl-g7-tmp36-alert"
+      ]
+    },
+    {
+      "family_id": "family-tmpl-g7-dht-weather",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-tmpl-g7-dht-weather"
+      ]
+    },
+    {
+      "family_id": "family-tmpl-g7-soil-smart-farm",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-tmpl-g7-soil-smart-farm"
+      ]
+    },
+    {
+      "family_id": "family-tmpl-g7-ir-obstacle",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-tmpl-g7-ir-obstacle"
+      ]
+    },
+    {
+      "family_id": "family-tmpl-g7-encoder-menu",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-tmpl-g7-encoder-menu"
+      ]
+    },
+    {
+      "family_id": "family-tmpl-g7-servo-door",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-tmpl-g7-servo-door"
+      ]
+    },
+    {
+      "family_id": "family-tmpl-g8-lcd-weather",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-tmpl-g8-lcd-weather"
+      ]
+    },
+    {
+      "family_id": "family-tmpl-g8-oled-dashboard",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-tmpl-g8-oled-dashboard"
+      ]
+    },
+    {
+      "family_id": "family-tmpl-g8-motor-driver",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-tmpl-g8-motor-driver"
+      ]
+    },
+    {
+      "family_id": "family-tmpl-g8-joystick-rover",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-tmpl-g8-joystick-rover"
+      ]
+    },
+    {
+      "family_id": "family-tmpl-g8-keypad-lock",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-tmpl-g8-keypad-lock"
+      ]
+    },
+    {
+      "family_id": "family-tmpl-g8-relay-home",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-tmpl-g8-relay-home"
+      ]
+    },
+    {
+      "family_id": "family-mission-lesson-esp32-builtin-led",
+      "record_count": 2,
+      "records": [
+        "pxai2-canon-mission-lesson-esp32-builtin-led",
+        "pxai2-canon-mission-lesson-esp32-wifi-connect"
+      ]
+    },
+    {
+      "family_id": "family-mission-lesson-esp32-pushbutton",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-mission-lesson-esp32-pushbutton"
+      ]
+    },
+    {
+      "family_id": "family-mission-lesson-esp32-pot-12bit",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-mission-lesson-esp32-pot-12bit"
+      ]
+    },
+    {
+      "family_id": "family-mission-lesson-esp32-rgb-mood",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-mission-lesson-esp32-rgb-mood"
+      ]
+    },
+    {
+      "family_id": "family-mission-lesson-esp32-dac-tone",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-mission-lesson-esp32-dac-tone"
+      ]
+    },
+    {
+      "family_id": "family-mission-lesson-esp32-servo-pwm",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-mission-lesson-esp32-servo-pwm"
+      ]
+    },
+    {
+      "family_id": "family-mission-lesson-esp32-dht11-env",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-mission-lesson-esp32-dht11-env"
+      ]
+    },
+    {
+      "family_id": "family-mission-lesson-esp32-oled-i2c",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-mission-lesson-esp32-oled-i2c"
+      ]
+    },
+    {
+      "family_id": "family-mission-lesson-pico-gp25-blink",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-mission-lesson-pico-gp25-blink"
+      ]
+    },
+    {
+      "family_id": "family-mission-lesson-pico-external-led",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-mission-lesson-pico-external-led"
+      ]
+    },
+    {
+      "family_id": "family-mission-lesson-pico-tactile-button",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-mission-lesson-pico-tactile-button"
+      ]
+    },
+    {
+      "family_id": "family-mission-lesson-pico-pot-adc",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-mission-lesson-pico-pot-adc"
+      ]
+    },
+    {
+      "family_id": "family-mission-lesson-pico-rgb-fader",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-mission-lesson-pico-rgb-fader"
+      ]
+    },
+    {
+      "family_id": "family-mission-lesson-pico-buzzer-melody",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-mission-lesson-pico-buzzer-melody"
+      ]
+    },
+    {
+      "family_id": "family-mission-lesson-pico-ultrasonic-radar",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-mission-lesson-pico-ultrasonic-radar"
+      ]
+    },
+    {
+      "family_id": "family-mission-lesson-pico-servo-motion",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-mission-lesson-pico-servo-motion"
+      ]
+    },
+    {
+      "family_id": "family-mission-lesson-pico-i2c-lcd",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-mission-lesson-pico-i2c-lcd"
+      ]
+    },
+    {
+      "family_id": "family-mission-lesson-pico-soil-irrigation",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-mission-lesson-pico-soil-irrigation"
+      ]
+    },
+    {
+      "family_id": "family-mission-lesson-microbit-heartbeat",
+      "record_count": 2,
+      "records": [
+        "pxai2-canon-mission-lesson-microbit-heartbeat",
+        "pxai2-canon-mission-lesson-microbit-buttons"
+      ]
+    },
+    {
+      "family_id": "family-mission-lesson-microbit-external-led",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-mission-lesson-microbit-external-led"
+      ]
+    },
+    {
+      "family_id": "family-mission-lesson-microbit-analog-pot",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-mission-lesson-microbit-analog-pot"
+      ]
+    },
+    {
+      "family_id": "family-mission-lesson-microbit-piezo-melody",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-mission-lesson-microbit-piezo-melody"
+      ]
+    },
+    {
+      "family_id": "family-mission-lesson-microbit-optical-nightlight",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-mission-lesson-microbit-optical-nightlight"
+      ]
+    },
+    {
+      "family_id": "family-mission-lesson-microbit-climate-temp",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-mission-lesson-microbit-climate-temp"
+      ]
+    },
+    {
+      "family_id": "family-mission-lesson-microbit-servo-sweep",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-mission-lesson-microbit-servo-sweep"
+      ]
+    },
+    {
+      "family_id": "family-mission-lesson-microbit-neopixel-rainbow",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-mission-lesson-microbit-neopixel-rainbow"
+      ]
+    },
+    {
+      "family_id": "family-mission-lesson-microbit-intruder-alarm",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-mission-lesson-microbit-intruder-alarm"
+      ]
+    },
+    {
+      "family_id": "family-mission-lesson-mq2-gas",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-mission-lesson-mq2-gas"
+      ]
+    },
+    {
+      "family_id": "family-mission-lesson-dht11",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-mission-lesson-dht11"
+      ]
+    },
+    {
+      "family_id": "family-mission-lesson-neopixel-ring",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-mission-lesson-neopixel-ring"
+      ]
+    },
+    {
+      "family_id": "family-mission-lesson-ai-gesture-controller",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-mission-lesson-ai-gesture-controller"
+      ]
+    },
+    {
+      "family_id": "family-mission-lesson-ai-object-counter",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-mission-lesson-ai-object-counter"
+      ]
+    },
+    {
+      "family_id": "family-mission-lesson-ai-confidence-alarm",
+      "record_count": 2,
+      "records": [
+        "pxai2-canon-mission-lesson-ai-confidence-alarm",
+        "pxai2-canon-mission-lesson-ai-smart-presence"
+      ]
+    },
+    {
+      "family_id": "family-mission-lesson-ai-gesture-signal",
+      "record_count": 1,
+      "records": [
+        "pxai2-canon-mission-lesson-ai-gesture-signal"
+      ]
+    },
+    {
+      "family_id": "family-mission-lesson-ai-finger-servo",
+      "record_count": 2,
+      "records": [
+        "pxai2-canon-mission-lesson-ai-finger-servo",
+        "pxai2-canon-mission-lesson-ai-smart-doorbell"
+      ]
+    }
+  ]
+}
