@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "audit:site": "node scripts/site-audit.mjs",
-    "qa:copilot-dataset": "npm run build:copilot-dataset && node scripts/phase2-ai-copilot-dataset-qa.mjs",
+    "qa:copilot-dataset": "npm run test:copilot-schema && npm run build:copilot-dataset && node scripts/phase2-ai-copilot-dataset-qa.mjs",
     "build:copilot-dataset": "node scripts/copilot-dataset/build-release-report.mjs",
     "audit:copilot-dataset": "node scripts/copilot-dataset/split-by-family.mjs",
     "test:lab": "npm run --prefix pixiu-lms-portal test:lab",
@@ -20,7 +20,8 @@
     "qa:phase-a1": "npm run --prefix pixiu-lms-portal qa:phase-a1",
     "qa:phase2-3": "npm run --prefix pixiu-lms-portal qa:phase2-3",
     "qa:phase4-9": "npm run --prefix pixiu-lms-portal qa:phase4-9",
-    "qa:part4": "npm run --prefix pixiu-lms-portal qa:part4"
+    "qa:part4": "npm run --prefix pixiu-lms-portal qa:part4",
+    "test:copilot-schema": "node --test scripts/copilot-dataset/record-schema-validator.test.mjs"
   },
   "dependencies": {
     "@tensorflow-models/coco-ssd": "^2.2.3",

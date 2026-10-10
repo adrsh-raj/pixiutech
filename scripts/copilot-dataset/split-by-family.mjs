@@ -199,7 +199,7 @@ export async function splitByFamily() {
 
   const auditReport = {
     audit_name: "Phase 2 Split Isolation and Data Leakage Audit",
-    timestamp: getBuildTimestamp()
+    timestamp: getBuildTimestamp(),
     gate: "G7",
     passed:
       totalRecordOverlap === 0 &&

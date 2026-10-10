@@ -14,27 +14,25 @@
 import { readFileSync, writeFileSync, statSync } from "node:fs"
 import { resolve, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
-import { createRequire } from "node:module"
 import { getBundledModules, getCurrentCommitSha, ROOT } from "./bundle-helper.mjs"
+import { compileRecordSchema } from "./record-schema-validator.mjs"
 import { sha256 } from "./normalize-record.mjs"
 import { getBuildTimestamp } from "./build-metadata.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
-const require = createRequire(import.meta.url)
-
 export async function buildReleaseReport() {
   const commitSha = getCurrentCommitSha()
   const buildTimestamp = getBuildTimestamp()
   const { validator } = await getBundledModules()
   const validateProposedCircuit = validator.validateProposedCircuit
 
-  // Setup Ajv2020 for schema checks
-  const Ajv2020 = require("ajv/dist/2020")
-  const ajv = new Ajv2020()
+  // Compile the checked-in Phase 2 schema using a dependency-free validator.
+  // It supports the keywords currently present in this schema and fails fast if
+  // a new unsupported keyword appears, so validation cannot silently weaken.
   const schemaPath = resolve(__dirname, "schema/record-v1.schema.json")
   const schema = JSON.parse(readFileSync(schemaPath, "utf8"))
-  const validateSchema = ajv.compile(schema)
+  const validateSchema = compileRecordSchema(schema)
 
   const dataDir = resolve(ROOT, "data/ai-copilot/phase2")
   const recordsDir = resolve(dataDir, "records")

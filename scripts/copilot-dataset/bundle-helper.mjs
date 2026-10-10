@@ -38,6 +38,7 @@ export async function getBundledModules() {
       doctor: resolve(ROOT, "pixiu-lms-portal/src/lib/circuit-doctor.ts"),
       catalog: resolve(ROOT, "pixiu-lms-portal/src/lib/components-catalog.ts"),
       boards: resolve(ROOT, "pixiu-lms-portal/src/lib/board-registry.ts"),
+      componentDataset: resolve(ROOT, "pixiu-lms-portal/src/lib/ai/pixiu-components-dataset.ts"),
     },
     bundle: true,
     format: "esm",
@@ -59,6 +60,7 @@ export async function getBundledModules() {
     doctor,
     catalog,
     boards,
+    componentDataset,
   ] = await Promise.all([
     import(`file://${join(outdir, "validator.js")}`),
     import(`file://${join(outdir, "telemetry.js")}`),
@@ -70,6 +72,7 @@ export async function getBundledModules() {
     import(`file://${join(outdir, "doctor.js")}`),
     import(`file://${join(outdir, "catalog.js")}`),
     import(`file://${join(outdir, "boards.js")}`),
+    import(`file://${join(outdir, "componentDataset.js")}`),
   ])
 
   bundleCache = {
@@ -83,6 +86,7 @@ export async function getBundledModules() {
     doctor,
     catalog,
     boards,
+    componentDataset,
   }
 
   return bundleCache

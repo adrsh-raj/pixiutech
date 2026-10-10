@@ -14,7 +14,7 @@
  * Copyright (c) 2026 Pixiu Tech. All rights reserved.
  */
 
-import { writeFileSync, mkdirSync } from "node:fs"
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs"
 import { resolve, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 import { getBundledModules, getCurrentCommitSha, ROOT } from "./bundle-helper.mjs"
@@ -26,7 +26,7 @@ const __dirname = dirname(__filename)
 export async function buildSourceInventory() {
   const commitSha = getCurrentCommitSha()
   const modules = await getBundledModules()
-  const { templates, esp32, pico, microbit, lessons, doctor, boards } = modules
+  const { templates, esp32, pico, microbit, lessons, doctor, boards, componentDataset } = modules
   const { validateProposedCircuit } = modules.validator
 
   const inventory = []
@@ -35,12 +35,16 @@ export async function buildSourceInventory() {
   // 1. Audit Starter Templates
   const templateList = templates.TEMPLATES || []
   for (const tmpl of templateList) {
-    const boardPart = tmpl.circuit.parts.find((p) => boards.isBoardPart(p.type))
+    const templateCircuit = tmpl.circuit || { parts: [], wires: [] }
+    const boardPart = templateCircuit.parts.find((p) => boards.isBoardPart(p.type))
     const targetBoard = boardPart ? boardPart.type : "arduino-uno"
-    const validation = validateProposedCircuit(tmpl.circuit, { allowWarnings: true })
+    const boardResolution = boardPart
+      ? { board_id: targetBoard, source: "circuit_board_component", explicit: true, used_fallback: false }
+      : { board_id: targetBoard, source: "arduino_uno_default", explicit: false, used_fallback: true }
+    const validation = validateProposedCircuit(templateCircuit, { allowWarnings: true })
 
-    const eligible = Boolean(tmpl.circuit && tmpl.circuit.parts && tmpl.circuit.parts.length > 0 && validation.valid)
-    const exclusionReason = !tmpl.circuit || tmpl.circuit.parts.length === 0
+    const eligible = Boolean(templateCircuit.parts.length > 0 && validation.valid)
+    const exclusionReason = templateCircuit.parts.length === 0
       ? "empty_circuit"
       : !validation.valid
       ? `validation_failed: ${validation.errors.join("; ")}`
@@ -54,11 +58,12 @@ export async function buildSourceInventory() {
       source_revision: commitSha,
       title: tmpl.title,
       target_board: targetBoard,
+      board_resolution: boardResolution,
       grade_band: tmpl.gradeBand || null,
       difficulty: tmpl.difficulty || "Intermediate",
       tags: tmpl.tags || [],
-      part_count: tmpl.circuit?.parts?.length || 0,
-      wire_count: tmpl.circuit?.wires?.length || 0,
+      part_count: templateCircuit.parts.length,
+      wire_count: templateCircuit.wires?.length || 0,
       has_blockly: Boolean(tmpl.blocklyXml && tmpl.blocklyXml.trim().length > 0),
       disposition: eligible ? "eligible" : "excluded",
       exclusion_reason: exclusionReason,
@@ -83,16 +88,24 @@ export async function buildSourceInventory() {
       seenIds.add(sourceId)
 
       const seedCircuit = lsn.seedCircuit || (lsn.stages && lsn.stages[0]?.seedCircuit) || null
-      let targetBoard = lsn.board || src.defaultBoard
-      if (seedCircuit) {
-        const boardPart = seedCircuit.parts.find((p) => boards.isBoardPart(p.type))
-        if (boardPart) targetBoard = boardPart.type
-      }
+      const declaredBoard = lsn.board || null
+      const boardPart = seedCircuit?.parts?.find((p) => boards.isBoardPart(p.type))
+      const circuitBoard = boardPart?.type || null
+      const targetBoard = circuitBoard || declaredBoard || src.defaultBoard
+      const boardConflict = Boolean(circuitBoard && declaredBoard && circuitBoard !== declaredBoard)
+      const boardResolution = circuitBoard
+        ? { board_id: circuitBoard, source: "seed_circuit_board_component", explicit: true, used_fallback: false, declared_board: declaredBoard }
+        : declaredBoard
+          ? { board_id: declaredBoard, source: "lesson_metadata", explicit: true, used_fallback: false }
+          : { board_id: src.defaultBoard, source: "curriculum_default", explicit: false, used_fallback: true }
 
       let eligible = false
       let exclusionReason = null
 
-      if (!seedCircuit || !seedCircuit.parts || seedCircuit.parts.length === 0) {
+      if (boardConflict) {
+        eligible = false
+        exclusionReason = `board_context_conflict: lesson declares ${declaredBoard}, seed circuit contains ${circuitBoard}`
+      } else if (!seedCircuit || !seedCircuit.parts || seedCircuit.parts.length === 0) {
         eligible = false
         exclusionReason = "no_seed_circuit"
       } else {
@@ -113,6 +126,7 @@ export async function buildSourceInventory() {
         source_revision: commitSha,
         title: lsn.title || lsn.shortTitle || lsn.id,
         target_board: targetBoard,
+        board_resolution: boardResolution,
         grade_band: lsn.grade || null,
         difficulty: lsn.difficulty || "Beginner",
         tags: lsn.tags || [src.name],
@@ -127,13 +141,66 @@ export async function buildSourceInventory() {
     }
   }
 
+  // Reference sources are tracked separately from candidate circuits. They inform validation
+  // and provenance but are not counted as standalone positive training examples.
+  const componentJsonPath = resolve(ROOT, "pixiu-lms-portal/src/lib/ai/pixiu-components-dataset.json")
+  const componentJson = JSON.parse(readFileSync(componentJsonPath, "utf8"))
+  const typedComponents = componentDataset.PIXIU_COMPONENTS_DATASET || {}
+  const jsonComponentIds = Object.keys(componentJson).sort()
+  const typedComponentIds = Object.keys(typedComponents).sort()
+  const missingFromTypedRegistry = jsonComponentIds.filter((id) => !typedComponentIds.includes(id))
+  const missingFromJsonRegistry = typedComponentIds.filter((id) => !jsonComponentIds.includes(id))
+  const registryAligned = missingFromTypedRegistry.length === 0 &&
+    missingFromJsonRegistry.length === 0 && jsonComponentIds.length === typedComponentIds.length
+  if (!registryAligned) {
+    throw new Error("Component registry JSON/TypeScript mismatch: " + JSON.stringify({
+      missingFromTypedRegistry, missingFromJsonRegistry,
+    }))
+  }
+
+  const componentReferenceSources = jsonComponentIds.map((componentId) => {
+    const component = componentJson[componentId]
+    return {
+      source_id: "component-" + componentId,
+      source_type: "pixiu_component_reference",
+      source_path: "pixiu-lms-portal/src/lib/ai/pixiu-components-dataset.json",
+      source_revision: commitSha,
+      disposition: "reference_only",
+      component_type: componentId,
+      title: component.name || componentId,
+      wiring_rule_ids: Array.isArray(component.wiringRules) ? component.wiringRules.map((rule) => rule.ruleId) : [],
+    }
+  })
+  const diagnosticReferenceSources = [
+    {
+      source_id: "diagnostics-validate-proposed-circuit",
+      source_type: "pixiu_diagnostic_reference",
+      source_path: "pixiu-lms-portal/src/lib/circuit-validator.ts",
+      source_revision: commitSha,
+      disposition: "reference_only",
+      exported_contract: "validateProposedCircuit",
+      inventory_method: "rule IDs are emitted dynamically in validator notices; enumerate through tested fixtures",
+    },
+    {
+      source_id: "diagnostics-circuit-doctor",
+      source_type: "pixiu_diagnostic_reference",
+      source_path: "pixiu-lms-portal/src/lib/circuit-doctor.ts",
+      source_revision: commitSha,
+      disposition: "reference_only",
+      exported_contract: "diagnoseCircuit",
+      inventory_method: "issue IDs are returned at runtime; enumerate through tested fixtures",
+    },
+  ]
+  const referenceSources = [...componentReferenceSources, ...diagnosticReferenceSources]
+  const componentWiringRuleCount = componentReferenceSources.reduce((sum, entry) => sum + entry.wiring_rule_ids.length, 0)
+
   // Summary Metrics
   const eligibleItems = inventory.filter((i) => i.disposition === "eligible")
   const excludedItems = inventory.filter((i) => i.disposition === "excluded")
 
   const report = {
     schema_version: "1.0.0",
-    generated_at: getBuildTimestamp()
+    generated_at: getBuildTimestamp(),
     commit_sha: commitSha,
     summary: {
       total_sources_inventoried: inventory.length,
@@ -151,8 +218,20 @@ export async function buildSourceInventory() {
         }
         return acc
       }, {}),
+      reference_source_count: referenceSources.length,
+      component_definition_count: componentReferenceSources.length,
+      component_wiring_rule_count: componentWiringRuleCount,
+      diagnostic_contract_count: diagnosticReferenceSources.length,
+      component_registry_alignment: {
+        status: registryAligned ? "pass" : "fail",
+        json_component_count: jsonComponentIds.length,
+        typed_component_count: typedComponentIds.length,
+        missing_from_typed_registry: missingFromTypedRegistry,
+        missing_from_json_registry: missingFromJsonRegistry,
+      },
     },
     items: inventory,
+    reference_sources: referenceSources,
   }
 
   const outDir = resolve(ROOT, "data/ai-copilot/phase2/reports")
