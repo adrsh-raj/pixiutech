@@ -116,3 +116,28 @@ test("Phase 2.5 audit fails when Blockly references a pin absent from the board 
   assert.equal(failed.passed, false);
   assert.ok(failed.issues.some((issue) => issue.code === "blockly_pin_not_in_board_profile"));
 });
+
+test("board profile built-in GPIO is accepted even when it is not an external header pin", () => {
+  const pico = {
+    id: "rpi-pico",
+    builtInLedPin: "gp25",
+    pins: [{ id: "gp4", label: "GP4", kind: "digital", capabilities: { pwm: true }, alternateNames: ["4"] }],
+  };
+  assert.equal(resolveBlocklyBoardPin("25", "rpi-pico", "io_digitalwrite", pico)?.id, "gp25");
+  assert.equal(resolveBlocklyBoardPin("99", "rpi-pico", "io_digitalwrite", pico), null);
+});
+
+test("Phase 2.5 reports legacy stored topology hashes without rewriting or failing otherwise-grounded candidates", () => {
+  const f = fixture();
+  const parent = { ...f.parent, hashes: { ...f.parent.hashes, topology_hash: "legacy-v1-hash" } };
+  const diagnosis = { ...f.diagnostic, hashes: { ...f.diagnostic.hashes, topology_hash: "legacy-v1-hash" } };
+  const blockly = { ...f.blockly, hashes: { ...f.blockly.hashes, topology_hash: "legacy-v1-hash" } };
+  const audit = buildPhase25Audit({
+    canonicalRecords: [parent], diagnosisRecords: [diagnosis], blocklyRecords: [blockly],
+    modules: f.modules, minimumPerTask: 1,
+  });
+  assert.equal(audit.passed, true, JSON.stringify(audit.issues));
+  assert.equal(audit.metrics.legacy_canonical_topology_hash_mismatches, 1);
+  assert.equal(audit.warnings[0]?.code, "legacy_stored_topology_hash_mismatch");
+  assert.deepEqual(parent.hashes.topology_hash, "legacy-v1-hash");
+});

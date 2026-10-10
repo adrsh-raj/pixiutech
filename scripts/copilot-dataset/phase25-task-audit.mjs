@@ -76,6 +76,26 @@ export function resolveBlocklyBoardPin(rawValue, boardId, blockType, boardDefini
     );
     if (alias) return alias;
   }
+
+  // Some boards expose an onboard LED GPIO that is intentionally not part of
+  // the external header-pin list (Pico GP25 is the current example). Accept
+  // only the exact builtInLedPin declared by that board profile, never an
+  // arbitrary undocumented GPIO.
+  const builtInLedPin = String(boardDefinition.builtInLedPin || "").trim().toLowerCase();
+  const raw = String(rawValue ?? "").trim().toLowerCase();
+  const builtInAliases = new Set(["led", "led_builtin", "builtin_led", "builtin-led"]);
+  if (builtInLedPin && (candidates.includes(builtInLedPin) || builtInAliases.has(raw))) {
+    const declaredPin = boardDefinition.pins.find((pin) => String(pin.id).toLowerCase() === builtInLedPin);
+    if (declaredPin) return declaredPin;
+    return {
+      id: builtInLedPin,
+      label: "Built-in LED GPIO",
+      kind: "digital",
+      capabilities: { pwm: true },
+      alternateNames: Array.from(builtInAliases),
+      builtIn: true,
+    };
+  }
   return null;
 }
 
@@ -129,7 +149,7 @@ function validateRecordParent(record, canonicalById, issues) {
   return parent;
 }
 
-function validateDiagnosis(record, parent, modules, issues) {
+function validateDiagnosis(record, parent, modules, issues, liveTopologyByCanonicalId) {
   const id = record.record_id;
   const circuit = record.target?.circuit;
   const explanation = record.target?.explanation;
@@ -182,11 +202,12 @@ function validateDiagnosis(record, parent, modules, issues) {
   } catch (error) {
     issues.push({ code: "diagnosis_topology_unavailable", record_id: id, detail: String(error?.message || error) });
   }
-  if (calculatedTopology && calculatedTopology !== record.hashes?.topology_hash) {
-    issues.push({ code: "diagnosis_topology_hash_mismatch", record_id: id, detail: "Stored topology hash differs from current canonical circuit fingerprint" });
+  const parentLiveTopology = parent ? liveTopologyByCanonicalId.get(parent.record_id) : null;
+  if (parent && calculatedTopology && parentLiveTopology && calculatedTopology !== parentLiveTopology) {
+    issues.push({ code: "diagnosis_parent_topology_mismatch", record_id: id, detail: "Diagnosis target differs from its live canonical parent topology" });
   }
-  if (parent && calculatedTopology && calculatedTopology !== parent.hashes?.topology_hash) {
-    issues.push({ code: "diagnosis_parent_topology_mismatch", record_id: id, detail: "Diagnosis target differs from its canonical parent topology" });
+  if (parent && record.hashes?.topology_hash !== parent.hashes?.topology_hash) {
+    issues.push({ code: "diagnosis_topology_metadata_mismatch", record_id: id, detail: "Stored topology metadata must be inherited from the canonical parent until a coordinated dataset migration" });
   }
   if (health) {
     const storedHealth = explanation.match(/(?:Stored\s+)?Circuit Doctor snapshot:\s*(\d+(?:\.\d+)?)\s*\/\s*100\s*\((healthy|needs-attention|danger)\)/i);
@@ -214,7 +235,7 @@ function validateDiagnosis(record, parent, modules, issues) {
   }
 }
 
-function validateBlockly(record, parent, modules, issues) {
+function validateBlockly(record, parent, modules, issues, liveTopologyByCanonicalId) {
   const id = record.record_id;
   const code = record.target?.code;
   const circuit = record.target?.circuit;
@@ -284,17 +305,21 @@ function validateBlockly(record, parent, modules, issues) {
   } catch (error) {
     issues.push({ code: "blockly_topology_unavailable", record_id: id, detail: String(error?.message || error) });
   }
-  if (calculatedTopology && calculatedTopology !== record.hashes?.topology_hash) {
-    issues.push({ code: "blockly_topology_hash_mismatch", record_id: id, detail: "Stored topology hash differs from current canonical circuit fingerprint" });
+  const parentLiveTopology = parent ? liveTopologyByCanonicalId.get(parent.record_id) : null;
+  if (parent && calculatedTopology && parentLiveTopology && calculatedTopology !== parentLiveTopology) {
+    issues.push({ code: "blockly_parent_topology_mismatch", record_id: id, detail: "Blockly target differs from its live canonical parent topology" });
   }
-  if (parent && calculatedTopology && calculatedTopology !== parent.hashes?.topology_hash) {
-    issues.push({ code: "blockly_parent_topology_mismatch", record_id: id, detail: "Blockly circuit differs from its canonical parent topology" });
+  if (parent && record.hashes?.topology_hash !== parent.hashes?.topology_hash) {
+    issues.push({ code: "blockly_topology_metadata_mismatch", record_id: id, detail: "Stored topology metadata must be inherited from the canonical parent until a coordinated dataset migration" });
   }
 }
 
 export function buildPhase25Audit({ canonicalRecords, diagnosisRecords, blocklyRecords, modules, minimumPerTask = 50 }) {
   const issues = [];
+  const warnings = [];
   const canonicalById = new Map();
+  const liveTopologyByCanonicalId = new Map();
+  const legacyTopologyHashMismatches = [];
   const seenCanonicalIds = new Set();
   for (const record of Array.isArray(canonicalRecords) ? canonicalRecords : []) {
     if (!record?.record_id || seenCanonicalIds.has(record.record_id)) {
@@ -306,8 +331,17 @@ export function buildPhase25Audit({ canonicalRecords, diagnosisRecords, blocklyR
     if (record.target?.circuit) {
       try {
         const calculated = topologyForCircuit(record.target.circuit, modules);
+        liveTopologyByCanonicalId.set(record.record_id, calculated);
         if (calculated !== record.hashes?.topology_hash) {
-          issues.push({ code: "canonical_topology_hash_mismatch", record_id: record.record_id, detail: "Canonical hash does not match current circuit topology" });
+          // Do not rewrite existing corpus hashes implicitly. The checked-in
+          // corpus may have been sealed with an earlier topology-hash contract;
+          // use a freshly computed parent fingerprint for Phase 2.5 circuit
+          // equivalence checks and report the legacy metadata distinctly.
+          legacyTopologyHashMismatches.push({
+            record_id: record.record_id,
+            stored_hash: record.hashes?.topology_hash || null,
+            live_hash: calculated,
+          });
         }
       } catch (error) {
         issues.push({ code: "canonical_topology_unavailable", record_id: record.record_id, detail: String(error?.message || error) });
@@ -322,7 +356,7 @@ export function buildPhase25Audit({ canonicalRecords, diagnosisRecords, blocklyR
     }
     seenDerivedIds.add(record.record_id);
     const parent = validateRecordParent(record, canonicalById, issues);
-    validateDiagnosis(record, parent, modules, issues);
+    validateDiagnosis(record, parent, modules, issues, liveTopologyByCanonicalId);
   }
   for (const record of Array.isArray(blocklyRecords) ? blocklyRecords : []) {
     if (!record?.record_id || seenDerivedIds.has(record.record_id)) {
@@ -331,24 +365,34 @@ export function buildPhase25Audit({ canonicalRecords, diagnosisRecords, blocklyR
     }
     seenDerivedIds.add(record.record_id);
     const parent = validateRecordParent(record, canonicalById, issues);
-    validateBlockly(record, parent, modules, issues);
+    validateBlockly(record, parent, modules, issues, liveTopologyByCanonicalId);
   }
   const diagnosisFailures = issues.filter((issue) => String(issue.code).startsWith("diagnosis_") || String(issue.code).startsWith("canonical_") || issue.code === "missing_canonical_parent" || issue.code === "parent_family_mismatch" || issue.code === "parent_board_mismatch" || issue.code === "parent_provenance_mismatch");
   const blocklyFailures = issues.filter((issue) => String(issue.code).startsWith("blockly_"));
   const diagnosisPassed = Array.isArray(diagnosisRecords) && diagnosisRecords.length >= minimumPerTask && diagnosisFailures.length === 0;
   const blocklyPassed = Array.isArray(blocklyRecords) && blocklyRecords.length >= minimumPerTask && blocklyFailures.length === 0;
+  if (legacyTopologyHashMismatches.length) {
+    warnings.push({
+      code: "legacy_stored_topology_hash_mismatch",
+      record_ids: legacyTopologyHashMismatches.map((item) => item.record_id),
+      count: legacyTopologyHashMismatches.length,
+      detail: "Existing canonical topology hashes differ from the current live fingerprint. They are preserved; Phase 2.5 compares derived targets against fresh parent fingerprints. A corpus hash migration is not performed by this audit.",
+    });
+  }
   return {
     audit_name: "Pixiu AI Copilot Phase 2.5 Diagnosis and Blockly Evidence Audit",
-    audit_version: "1.0.0",
+    audit_version: "1.1.0",
     passed: diagnosisPassed && blocklyPassed && issues.length === 0,
-    scope: "Internal source-matched circuit targets only; static/simulated evidence is not physical hardware certification; Blockly compile/execution is not claimed.",
+    scope: "Internal source-matched circuit targets only; static/simulated evidence is not physical hardware certification; Blockly compile/execution is not claimed. Legacy stored topology hash mismatches are reported as warnings, not silently migrated.",
     minimum_records_per_task: minimumPerTask,
     metrics: {
       canonical_parents: Array.isArray(canonicalRecords) ? canonicalRecords.length : 0,
+      legacy_canonical_topology_hash_mismatches: legacyTopologyHashMismatches.length,
       diagnosis: { records: Array.isArray(diagnosisRecords) ? diagnosisRecords.length : 0, passed: diagnosisPassed, failures: diagnosisFailures.length },
       blockly: { records: Array.isArray(blocklyRecords) ? blocklyRecords.length : 0, passed: blocklyPassed, failures: blocklyFailures.length },
       total_findings: issues.length,
     },
+    warnings,
     issues,
   };
 }

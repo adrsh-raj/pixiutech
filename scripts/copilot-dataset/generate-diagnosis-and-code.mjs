@@ -257,8 +257,16 @@ export async function generateDiagnosisAndCode({
 
   const taskAudit = buildPhase25Audit({ canonicalRecords, diagnosisRecords, blocklyRecords, modules });
   if (!taskAudit.passed) {
+    const issueCounts = taskAudit.issues.reduce((counts, issue) => {
+      counts[issue.code] = (counts[issue.code] || 0) + 1;
+      return counts;
+    }, {});
     throw new Error("Phase 2.5 diagnosis/Blockly audit failed; candidate records were not written: " +
-      JSON.stringify({ metrics: taskAudit.metrics, issues: taskAudit.issues.slice(0, 20) }, null, 2));
+      JSON.stringify({
+        metrics: taskAudit.metrics,
+        issue_counts: Object.fromEntries(Object.entries(issueCounts).sort(([a], [b]) => a.localeCompare(b))),
+        issues: taskAudit.issues.slice(0, 20),
+      }, null, 2));
   }
 
   if (writeArtifacts) {
