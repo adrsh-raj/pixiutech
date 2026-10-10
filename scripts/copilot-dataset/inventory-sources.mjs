@@ -44,7 +44,7 @@ export function resolveBoardContext({
   return { boardId, circuitBoard, conflict, resolution }
 }
 
-export async function buildSourceInventory() {
+export async function buildSourceInventory({ writeArtifact = true } = {}) {
   const commitSha = getCurrentCommitSha()
   const modules = await getBundledModules()
   const { templates, esp32, pico, microbit, lessons, doctor, boards, componentDataset } = modules
@@ -56,6 +56,8 @@ export async function buildSourceInventory() {
   // 1. Audit Starter Templates
   const templateList = templates.TEMPLATES || []
   for (const tmpl of templateList) {
+    const candidateSourceId = "tmpl-" + tmpl.id
+    if (seenIds.has(candidateSourceId)) throw new Error("Duplicate template source_id: " + candidateSourceId)
     const templateCircuit = tmpl.circuit || { parts: [], wires: [] }
     const boardContext = resolveBoardContext({
       circuit: templateCircuit,
@@ -109,7 +111,7 @@ export async function buildSourceInventory() {
   for (const src of curriculumSources) {
     for (const lsn of src.list) {
       const sourceId = `mission-${lsn.id}`
-      if (seenIds.has(sourceId)) continue
+      if (seenIds.has(sourceId)) throw new Error("Duplicate source_id across curriculum sources: " + sourceId)
       seenIds.add(sourceId)
 
       const seedCircuit = lsn.seedCircuit || (lsn.stages && lsn.stages[0]?.seedCircuit) || null
@@ -263,15 +265,17 @@ export async function buildSourceInventory() {
     reference_sources: referenceSources,
   }
 
-  const outDir = resolve(ROOT, "data/ai-copilot/phase2/reports")
-  mkdirSync(outDir, { recursive: true })
-  const outPath = resolve(outDir, "source-inventory.json")
-  writeFileSync(outPath, JSON.stringify(report, null, 2), "utf8")
+  if (writeArtifact) {
+    const outDir = resolve(ROOT, "data/ai-copilot/phase2/reports")
+    mkdirSync(outDir, { recursive: true })
+    const outPath = resolve(outDir, "source-inventory.json")
+    writeFileSync(outPath, JSON.stringify(report, null, 2), "utf8")
 
-  console.log(`✅ Source inventory generated at: ${outPath}`)
-  console.log(`   - Total inventoried: ${report.summary.total_sources_inventoried}`)
-  console.log(`   - Eligible candidates: ${report.summary.eligible_candidates}`)
-  console.log(`   - Excluded candidates: ${report.summary.excluded_candidates}`)
+    console.log("✅ Source inventory generated at: " + outPath)
+    console.log("   - Total inventoried: " + report.summary.total_sources_inventoried)
+    console.log("   - Eligible candidates: " + report.summary.eligible_candidates)
+    console.log("   - Excluded candidates: " + report.summary.excluded_candidates)
+  }
 
   return report
 }

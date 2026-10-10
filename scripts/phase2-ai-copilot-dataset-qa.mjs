@@ -28,13 +28,13 @@
 import { existsSync, readFileSync, statSync } from "node:fs"
 import { resolve, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
-import { createRequire } from "node:module"
+import { compileRecordSchema } from "./copilot-dataset/record-schema-validator.mjs"
 import { getBundledModules, ROOT } from "./copilot-dataset/bundle-helper.mjs"
 import { sha256 } from "./copilot-dataset/normalize-record.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
-const require = createRequire(import.meta.url)
+
 
 
 function expectedContentHash(rec) {
@@ -115,11 +115,9 @@ async function runPhase2DatasetQA() {
   const { validator } = await getBundledModules()
   const validateProposedCircuit = validator.validateProposedCircuit
 
-  const Ajv2020 = require("ajv/dist/2020")
-  const ajv = new Ajv2020()
   const schemaPath = resolve(__dirname, "copilot-dataset/schema/record-v1.schema.json")
   const schema = JSON.parse(readFileSync(schemaPath, "utf8"))
-  const validateSchema = ajv.compile(schema)
+  const validateSchema = compileRecordSchema(schema)
 
   const sourceInventory = JSON.parse(readFileSync(resolve(dataDir, "reports/source-inventory.json"), "utf8"))
   const leakageAudit = JSON.parse(readFileSync(resolve(dataDir, "reports/leakage-audit.json"), "utf8"))
