@@ -7,7 +7,17 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "audit:site": "node scripts/site-audit.mjs"
+    "audit:site": "node scripts/site-audit.mjs",
+    "test:lab": "npm run --prefix pixiu-lms-portal test:lab",
+    "test:copilot": "npm run --prefix pixiu-lms-portal test:copilot",
+    "portal:dev": "npm run --prefix pixiu-lms-portal dev",
+    "portal:build": "npm run --prefix pixiu-lms-portal build",
+    "qa:phase4-6": "npm run --prefix pixiu-lms-portal qa:phase4-6",
+    "qa:brand": "npm run --prefix pixiu-lms-portal qa:brand",
+    "qa:phase-a1": "npm run --prefix pixiu-lms-portal qa:phase-a1",
+    "qa:phase2-3": "npm run --prefix pixiu-lms-portal qa:phase2-3",
+    "qa:phase4-9": "npm run --prefix pixiu-lms-portal qa:phase4-9",
+    "qa:part4": "npm run --prefix pixiu-lms-portal qa:part4"
   },
   "dependencies": {
     "@tensorflow-models/coco-ssd": "^2.2.3",
