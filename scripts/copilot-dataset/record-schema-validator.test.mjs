@@ -5,6 +5,7 @@ import { resolve } from "node:path"
 import test from "node:test"
 import { compileRecordSchema } from "./record-schema-validator.mjs"
 import { getBundledModules, ROOT } from "./bundle-helper.mjs"
+import { resolveBoardContext } from "./inventory-sources.mjs"
 
 const schema = JSON.parse(readFileSync(resolve(ROOT, "scripts/copilot-dataset/schema/record-v1.schema.json"), "utf8"))
 const validateRecord = compileRecordSchema(schema)
@@ -54,4 +55,41 @@ test("Phase 2 generator entrypoints are syntactically valid", () => {
   ]) {
     execFileSync(process.execPath, ["--check", resolve(ROOT, path)], { cwd: ROOT, stdio: "pipe" })
   }
+})
+
+test("board resolver marks a seed/lesson board conflict instead of silently accepting it", () => {
+  const result = resolveBoardContext({
+    circuit: { parts: [{ id: "board", type: "esp32-devkit" }] },
+    declaredBoard: "arduino-uno",
+    defaultBoard: "arduino-uno",
+    isBoardPart: (type) => ["arduino-uno", "esp32-devkit", "rpi-pico", "microbit-v2"].includes(type),
+    circuitSource: "seed_circuit_board_component",
+  })
+  assert.equal(result.boardId, "esp32-devkit")
+  assert.equal(result.conflict, true)
+  assert.equal(result.resolution.explicit, true)
+})
+
+test("board resolver preserves explicit lesson metadata when no board is in the seed", () => {
+  const result = resolveBoardContext({
+    circuit: { parts: [{ id: "led", type: "led" }] },
+    declaredBoard: "rpi-pico",
+    defaultBoard: "arduino-uno",
+    isBoardPart: (type) => ["arduino-uno", "esp32-devkit", "rpi-pico", "microbit-v2"].includes(type),
+  })
+  assert.equal(result.boardId, "rpi-pico")
+  assert.equal(result.conflict, false)
+  assert.equal(result.resolution.source, "lesson_metadata")
+  assert.equal(result.resolution.used_fallback, false)
+})
+
+test("board resolver labels implicit fallback instead of claiming explicit context", () => {
+  const result = resolveBoardContext({
+    circuit: { parts: [{ id: "led", type: "led" }] },
+    defaultBoard: "arduino-uno",
+    isBoardPart: (type) => ["arduino-uno", "esp32-devkit", "rpi-pico", "microbit-v2"].includes(type),
+  })
+  assert.equal(result.boardId, "arduino-uno")
+  assert.equal(result.resolution.explicit, false)
+  assert.equal(result.resolution.used_fallback, true)
 })

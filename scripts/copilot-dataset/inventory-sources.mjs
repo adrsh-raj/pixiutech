@@ -23,6 +23,27 @@ import { getBuildTimestamp } from "./build-metadata.mjs"
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
+export function resolveBoardContext({
+  circuit,
+  declaredBoard = null,
+  defaultBoard,
+  isBoardPart,
+  circuitSource = "circuit_board_component",
+  metadataSource = "lesson_metadata",
+  defaultSource = "source_default",
+}) {
+  const boardPart = Array.isArray(circuit?.parts) ? circuit.parts.find((part) => isBoardPart(part.type)) : null
+  const circuitBoard = boardPart?.type || null
+  const boardId = circuitBoard || declaredBoard || defaultBoard
+  const conflict = Boolean(circuitBoard && declaredBoard && circuitBoard !== declaredBoard)
+  const resolution = circuitBoard
+    ? { board_id: circuitBoard, source: circuitSource, explicit: true, used_fallback: false, declared_board: declaredBoard }
+    : declaredBoard
+      ? { board_id: declaredBoard, source: metadataSource, explicit: true, used_fallback: false }
+      : { board_id: defaultBoard, source: defaultSource, explicit: false, used_fallback: true }
+  return { boardId, circuitBoard, conflict, resolution }
+}
+
 export async function buildSourceInventory() {
   const commitSha = getCurrentCommitSha()
   const modules = await getBundledModules()
@@ -36,11 +57,15 @@ export async function buildSourceInventory() {
   const templateList = templates.TEMPLATES || []
   for (const tmpl of templateList) {
     const templateCircuit = tmpl.circuit || { parts: [], wires: [] }
-    const boardPart = templateCircuit.parts.find((p) => boards.isBoardPart(p.type))
-    const targetBoard = boardPart ? boardPart.type : "arduino-uno"
-    const boardResolution = boardPart
-      ? { board_id: targetBoard, source: "circuit_board_component", explicit: true, used_fallback: false }
-      : { board_id: targetBoard, source: "arduino_uno_default", explicit: false, used_fallback: true }
+    const boardContext = resolveBoardContext({
+      circuit: templateCircuit,
+      defaultBoard: "arduino-uno",
+      isBoardPart: boards.isBoardPart,
+      circuitSource: "circuit_board_component",
+      defaultSource: "arduino_uno_default",
+    })
+    const targetBoard = boardContext.boardId
+    const boardResolution = boardContext.resolution
     const validation = validateProposedCircuit(templateCircuit, { allowWarnings: true })
 
     const eligible = Boolean(templateCircuit.parts.length > 0 && validation.valid)
@@ -89,15 +114,19 @@ export async function buildSourceInventory() {
 
       const seedCircuit = lsn.seedCircuit || (lsn.stages && lsn.stages[0]?.seedCircuit) || null
       const declaredBoard = lsn.board || null
-      const boardPart = seedCircuit?.parts?.find((p) => boards.isBoardPart(p.type))
-      const circuitBoard = boardPart?.type || null
-      const targetBoard = circuitBoard || declaredBoard || src.defaultBoard
-      const boardConflict = Boolean(circuitBoard && declaredBoard && circuitBoard !== declaredBoard)
-      const boardResolution = circuitBoard
-        ? { board_id: circuitBoard, source: "seed_circuit_board_component", explicit: true, used_fallback: false, declared_board: declaredBoard }
-        : declaredBoard
-          ? { board_id: declaredBoard, source: "lesson_metadata", explicit: true, used_fallback: false }
-          : { board_id: src.defaultBoard, source: "curriculum_default", explicit: false, used_fallback: true }
+      const boardContext = resolveBoardContext({
+        circuit: seedCircuit,
+        declaredBoard,
+        defaultBoard: src.defaultBoard,
+        isBoardPart: boards.isBoardPart,
+        circuitSource: "seed_circuit_board_component",
+        metadataSource: "lesson_metadata",
+        defaultSource: "curriculum_default",
+      })
+      const circuitBoard = boardContext.circuitBoard
+      const targetBoard = boardContext.boardId
+      const boardConflict = boardContext.conflict
+      const boardResolution = boardContext.resolution
 
       let eligible = false
       let exclusionReason = null
