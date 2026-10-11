@@ -31,7 +31,7 @@ const routerMod = await import(`file://${join(bundleDir, "router.js")}`)
 const gateMod = await import(`file://${join(bundleDir, "gate.js")}`)
 const validatorMod = await import(`file://${join(bundleDir, "validator.js")}`)
 
-const { DeterministicStubAdapter } = adapterMod
+const { DeterministicStubAdapter, HttpBaselineModelAdapter, createBaselineModelAdapter } = adapterMod
 const { parseProposalPayload, extractCleanJsonString, SUPPORTED_TASK_FAMILIES } = schemaMod
 const { routeUserRequest, SUPPORTED_BOARDS } = routerMod
 const { evaluateProposalGate } = gateMod
@@ -41,7 +41,7 @@ const { validateProposedCircuit } = validatorMod
 // SUBPHASE 3.0: Data Readiness & Experiment Lock
 // ============================================================================
 
-test("P3-0: Phase 3 experiment manifest locks Phase 2 checksum and provisional baseline status", () => {
+test("P3-0: Phase 3 experiment manifest accurately records G9 unresolved status and locks Phase 2 checksum", () => {
   const root = resolve(new URL("../../..", import.meta.url).pathname)
   const expPath = resolve(root, "data/ai-copilot/phase3/experiment.json")
   assert.ok(existsSync(expPath), "data/ai-copilot/phase3/experiment.json must exist")
@@ -49,6 +49,9 @@ test("P3-0: Phase 3 experiment manifest locks Phase 2 checksum and provisional b
   const exp = JSON.parse(readFileSync(expPath, "utf8"))
   assert.equal(exp.phase2_data_readiness.dataset_version, "2.0.0")
   assert.equal(exp.phase2_data_readiness.status, "PROVISIONAL_INTERNAL_BASELINE")
+  assert.equal(exp.phase2_data_readiness.gates_status.external_release_signoff, "BLOCKED")
+  assert.ok(exp.phase2_data_readiness.gates_status.G9_independent_human_review.includes("UNRESOLVED_PENDING"))
+
   assert.equal(exp.phase2_data_readiness.locked_split_counts.train, 516)
   assert.equal(exp.phase2_data_readiness.locked_split_counts.validation, 146)
   assert.equal(exp.phase2_data_readiness.locked_split_counts.test, 134)
@@ -74,7 +77,7 @@ test("P3-1: Live circuit validator is reusable without duplicate schema", () => 
 })
 
 // ============================================================================
-// SUBPHASE 3.2: Multi-Board Baseline Model Adapter
+// SUBPHASE 3.2: Multi-Board Baseline Model Adapter & HTTP Client
 // ============================================================================
 
 test("P3-2: Adapter generates valid proposals across ALL 4 supported boards", async () => {
@@ -132,7 +135,33 @@ test("P3-2: Adapter generates valid proposals across ALL 4 supported boards", as
   }
 })
 
-test("P3-2: Adapter handles timeout, rate limit, provider error and malformed scenarios", async () => {
+test("P3-2: HttpBaselineModelAdapter handles abort signal and timeouts cleanly", async () => {
+  const httpAdapter = new HttpBaselineModelAdapter({
+    baseUrl: "http://127.0.0.1:54321/v1", // Non-existent mock endpoint
+    defaultTimeoutMs: 50,
+  })
+
+  // Test already-aborted signal
+  const abortedController = new AbortController()
+  abortedController.abort()
+  const abortRes = await httpAdapter.generateProposal(
+    { requestId: "req-abort-early", prompt: "LED", context: { targetBoard: "arduino-uno" } },
+    { signal: abortedController.signal }
+  )
+  assert.equal(abortRes.success, false)
+  assert.equal(abortRes.error?.code, "CANCELLED")
+  assert.equal(abortRes.metadata.finishReason, "cancelled")
+
+  // Test network failure or timeout normalization
+  const failRes = await httpAdapter.generateProposal(
+    { requestId: "req-net-fail", prompt: "LED", context: { targetBoard: "arduino-uno" } },
+    { timeoutMs: 30 }
+  )
+  assert.equal(failRes.success, false)
+  assert.ok(["TIMEOUT", "PROVIDER_ERROR"].includes(failRes.error?.code || ""))
+})
+
+test("P3-2: DeterministicStubAdapter handles simulated failure scenarios", async () => {
   const adapter = new DeterministicStubAdapter()
 
   // Timeout
@@ -282,11 +311,10 @@ test("P3-4: Strict parser systematically rejects extra keys and invalid enums", 
 })
 
 // ============================================================================
-// SUBPHASE 3.5: Deterministic Validation & Deep Wiring Policy Gates
+// SUBPHASE 3.5: Deterministic Validation & Destination-Aware Policy Gates
 // ============================================================================
 
 test("P3-5: Gate blocks floating/disconnected resistor in LED circuit", () => {
-  // LED present and resistor present, but resistor is NOT in series with LED
   const floatingResistorLed = {
     schema_version: "pixiu-copilot-proposal-v1",
     task_type: "led_control",
@@ -301,7 +329,6 @@ test("P3-5: Gate blocks floating/disconnected resistor in LED circuit", () => {
           { id: "r1", type: "resistor", x: 200, y: 0, rotation: 0, props: { resistance: 220 } },
         ],
         wires: [
-          // LED connected directly without resistor
           { id: "w1", from: { partId: "uno", pinId: "d13" }, to: { partId: "led1", pinId: "anode" } },
           { id: "w2", from: { partId: "led1", pinId: "cathode" }, to: { partId: "uno", pinId: "gnd" } },
           // Resistor is floating!
@@ -323,11 +350,83 @@ test("P3-5: Gate blocks floating/disconnected resistor in LED circuit", () => {
   assert.ok(gateResult.diagnosticCodes.includes("POLICY_DISCONNECTED_LED_RESISTOR"))
 })
 
-test("P3-5: Gate blocks LDR circuit with disconnected voltage divider", () => {
-  const disconnectedDividerLdr = {
+test("P3-5: Gate blocks ultrasonic sensor connected to wrong destinations (VCC on GPIO or GND on Power)", () => {
+  // Ultrasonic VCC wired to digital pin D2 instead of power rail!
+  const badPowerSonar = {
+    schema_version: "pixiu-copilot-proposal-v1",
+    task_type: "ultrasonic_alert",
+    summary: "Wrong Destination VCC Sonar",
+    assumptions: [],
+    needs_clarification: [],
+    proposal: {
+      circuit: {
+        parts: [
+          { id: "uno", type: "arduino-uno", x: 0, y: 0, rotation: 0, props: {} },
+          { id: "sonar", type: "ultrasonic", x: 100, y: 0, rotation: 0, props: {} },
+        ],
+        wires: [
+          { id: "w1", from: { partId: "uno", pinId: "d2" }, to: { partId: "sonar", pinId: "vcc" } }, // WRONG DESTINATION!
+          { id: "w2", from: { partId: "uno", pinId: "gnd" }, to: { partId: "sonar", pinId: "gnd" } },
+          { id: "w3", from: { partId: "uno", pinId: "d9" }, to: { partId: "sonar", pinId: "trig" } },
+          { id: "w4", from: { partId: "uno", pinId: "d10" }, to: { partId: "sonar", pinId: "echo" } },
+        ],
+      },
+      code: null,
+      explanation: "VCC connected to GPIO D2 instead of 5V rail",
+    },
+    capabilities: {
+      simulation: "supported",
+      compilation: "not_tested",
+      physical_hardware: "not_verified",
+    },
+  }
+
+  const gateResult = evaluateProposalGate(badPowerSonar, { currentBoard: "arduino-uno" })
+  assert.equal(gateResult.passed, false)
+  assert.equal(gateResult.canApply, false)
+  assert.ok(gateResult.diagnosticCodes.includes("POLICY_ULTRASONIC_INVALID_POWER_DESTINATION"))
+})
+
+test("P3-5: Gate blocks servo with Signal wired to GND instead of digital/PWM GPIO", () => {
+  const badSigServo = {
+    schema_version: "pixiu-copilot-proposal-v1",
+    task_type: "servo_control",
+    summary: "Wrong Destination Signal Servo",
+    assumptions: [],
+    needs_clarification: [],
+    proposal: {
+      circuit: {
+        parts: [
+          { id: "uno", type: "arduino-uno", x: 0, y: 0, rotation: 0, props: {} },
+          { id: "servo1", type: "servo", x: 100, y: 0, rotation: 0, props: {} },
+        ],
+        wires: [
+          { id: "w1", from: { partId: "uno", pinId: "5v" }, to: { partId: "servo1", pinId: "vcc" } },
+          { id: "w2", from: { partId: "uno", pinId: "gnd" }, to: { partId: "servo1", pinId: "gnd" } },
+          { id: "w3", from: { partId: "uno", pinId: "gnd" }, to: { partId: "servo1", pinId: "sig" } }, // WRONG DESTINATION!
+        ],
+      },
+      code: null,
+      explanation: "Servo signal grounded",
+    },
+    capabilities: {
+      simulation: "supported",
+      compilation: "not_tested",
+      physical_hardware: "not_verified",
+    },
+  }
+
+  const gateResult = evaluateProposalGate(badSigServo, { currentBoard: "arduino-uno" })
+  assert.equal(gateResult.passed, false)
+  assert.equal(gateResult.canApply, false)
+  assert.ok(gateResult.diagnosticCodes.includes("POLICY_SERVO_INVALID_SIGNAL_DESTINATION"))
+})
+
+test("P3-5: Gate blocks LDR divider connected between GND and GND (missing power rail)", () => {
+  const noPowerLdr = {
     schema_version: "pixiu-copilot-proposal-v1",
     task_type: "ldr_lighting",
-    summary: "Disconnected Divider Defect",
+    summary: "Unpowered LDR Divider Defect",
     assumptions: [],
     needs_clarification: [],
     proposal: {
@@ -338,14 +437,14 @@ test("P3-5: Gate blocks LDR circuit with disconnected voltage divider", () => {
           { id: "r1", type: "resistor", x: 200, y: 0, rotation: 0, props: { resistance: 10000 } },
         ],
         wires: [
-          // LDR connected between 5V and GND without forming midpoint with resistor
-          { id: "w1", from: { partId: "uno", pinId: "5v" }, to: { partId: "ldr1", pinId: "a" } },
-          { id: "w2", from: { partId: "ldr1", pinId: "b" }, to: { partId: "uno", pinId: "gnd" } },
-          // Resistor is floating!
+          { id: "w1", from: { partId: "uno", pinId: "gnd" }, to: { partId: "ldr1", pinId: "a" } }, // GND instead of 5V!
+          { id: "w2", from: { partId: "ldr1", pinId: "b" }, to: { partId: "r1", pinId: "a" } },
+          { id: "w3", from: { partId: "ldr1", pinId: "b" }, to: { partId: "uno", pinId: "a0" } },
+          { id: "w4", from: { partId: "r1", pinId: "b" }, to: { partId: "uno", pinId: "gnd" } },
         ],
       },
       code: null,
-      explanation: "LDR without divider",
+      explanation: "LDR divider connected to GND on both sides",
     },
     capabilities: {
       simulation: "supported",
@@ -354,79 +453,10 @@ test("P3-5: Gate blocks LDR circuit with disconnected voltage divider", () => {
     },
   }
 
-  const gateResult = evaluateProposalGate(disconnectedDividerLdr, { currentBoard: "arduino-uno" })
+  const gateResult = evaluateProposalGate(noPowerLdr, { currentBoard: "arduino-uno" })
   assert.equal(gateResult.passed, false)
   assert.equal(gateResult.canApply, false)
-  assert.ok(gateResult.diagnosticCodes.includes("POLICY_DISCONNECTED_DIVIDER"))
-})
-
-test("P3-5: Gate blocks ultrasonic sensor with missing/unconnected pins", () => {
-  const missingPinsSonar = {
-    schema_version: "pixiu-copilot-proposal-v1",
-    task_type: "ultrasonic_alert",
-    summary: "Unconnected Ultrasonic Pins Defect",
-    assumptions: [],
-    needs_clarification: [],
-    proposal: {
-      circuit: {
-        parts: [
-          { id: "uno", type: "arduino-uno", x: 0, y: 0, rotation: 0, props: {} },
-          { id: "sonar", type: "ultrasonic", x: 100, y: 0, rotation: 0, props: {} },
-        ],
-        wires: [
-          // Only VCC and GND wired; Trig and Echo left unconnected!
-          { id: "w1", from: { partId: "uno", pinId: "5v" }, to: { partId: "sonar", pinId: "vcc" } },
-          { id: "w2", from: { partId: "uno", pinId: "gnd" }, to: { partId: "sonar", pinId: "gnd" } },
-        ],
-      },
-      code: null,
-      explanation: "Sonar missing trigger and echo wires",
-    },
-    capabilities: {
-      simulation: "supported",
-      compilation: "not_tested",
-      physical_hardware: "not_verified",
-    },
-  }
-
-  const gateResult = evaluateProposalGate(missingPinsSonar, { currentBoard: "arduino-uno" })
-  assert.equal(gateResult.passed, false)
-  assert.equal(gateResult.canApply, false)
-  assert.ok(gateResult.diagnosticCodes.includes("POLICY_UNCONNECTED_ULTRASONIC_PIN"))
-})
-
-test("P3-5: Gate blocks servo with unconnected control or power terminals", () => {
-  const unconnectedServo = {
-    schema_version: "pixiu-copilot-proposal-v1",
-    task_type: "servo_control",
-    summary: "Unconnected Servo Defect",
-    assumptions: [],
-    needs_clarification: [],
-    proposal: {
-      circuit: {
-        parts: [
-          { id: "uno", type: "arduino-uno", x: 0, y: 0, rotation: 0, props: {} },
-          { id: "servo1", type: "servo", x: 100, y: 0, rotation: 0, props: {} },
-        ],
-        wires: [
-          // Only VCC wired; signal and ground missing!
-          { id: "w1", from: { partId: "uno", pinId: "5v" }, to: { partId: "servo1", pinId: "vcc" } },
-        ],
-      },
-      code: null,
-      explanation: "Servo missing wires",
-    },
-    capabilities: {
-      simulation: "supported",
-      compilation: "not_tested",
-      physical_hardware: "not_verified",
-    },
-  }
-
-  const gateResult = evaluateProposalGate(unconnectedServo, { currentBoard: "arduino-uno" })
-  assert.equal(gateResult.passed, false)
-  assert.equal(gateResult.canApply, false)
-  assert.ok(gateResult.diagnosticCodes.includes("POLICY_UNCONNECTED_SERVO_PIN"))
+  assert.ok(gateResult.diagnosticCodes.includes("POLICY_LDR_INVALID_DIVIDER_DESTINATION"))
 })
 
 test("P3-5: Critical Safety Invariant — Direct 5V-to-GND dead short CANNOT pass Apply gate", () => {

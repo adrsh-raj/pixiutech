@@ -5,7 +5,7 @@
   "created_at": "2026-10-10T19:18:59.976Z",
   "phase2_data_readiness": {
     "status": "PROVISIONAL_INTERNAL_BASELINE",
-    "provenance_note": "Phase 2 dataset passed all 10 technical gates (G1-G10) with internal lead-reviewer approvals for baseline prototyping. Official external held-out release sign-off remains PROVISIONAL per Phase 3 Blueprint Section 5 (Page 6).",
+    "provenance_note": "Phase 2 dataset passed all technical gates (G1-G8, G10). G9 review metadata was populated programmatically via fill-g9-human-review.mjs for internal baseline prototype development; as recorded in g9-review-correction.json, programmatic approvals do not constitute independent human inspection. Official external held-out release sign-off remains UNRESOLVED and PROVISIONAL per Phase 3 Blueprint Section 5 (Page 6).",
     "manifest_commit_sha": "0abc4a9da355ca545ab1dc541345b6680eed8978",
     "recovery_checkpoint_sha": "daa1fbf368a17ec4e1363c4830d51b58fc254435",
     "dataset_version": "2.0.0",
@@ -20,15 +20,20 @@
       "review_scope": 867
     },
     "gates_status": {
-      "G1_G10_technical": "PASS",
-      "G9_internal_review": "PASS (867/867 approved by adrsh-lead-reviewer)",
-      "external_held_out_status": "PROVISIONAL"
+      "G1_G8_G10_technical": "PASS",
+      "G9_independent_human_review": "UNRESOLVED_PENDING (0/867 verified by external human; synthetic lead-reviewer metadata for prototype only)",
+      "external_release_signoff": "BLOCKED",
+      "phase3_usage_mode": "PROVISIONAL_INTERNAL_PROTOTYPE_ONLY"
     }
   },
   "model_configuration": {
     "candidate_architecture": "Qwen2.5-Coder / Qwen3-4B",
-    "active_adapter": "deterministic-stub",
-    "adapter_version": "1.0.0",
+    "active_adapters": [
+      "deterministic-stub",
+      "http-openai-compatible"
+    ],
+    "default_adapter": "deterministic-stub",
+    "adapter_version": "1.1.0",
     "proposal_schema_version": "pixiu-copilot-proposal-v1",
     "validator_version": "1.0.0",
     "supported_tasks": [

@@ -2,8 +2,10 @@
  * PIXIU TECH CYBERLAB — AI COPILOT PHASE 3 BASELINE MODEL ADAPTER
  * 
  * Provider-neutral interface for baseline model adapters.
- * Implements deterministic stubbing for offline CI/testing and structured
- * metadata normalization across all 4 supported boards and 4 task families.
+ * Implements:
+ * 1. `DeterministicStubAdapter` for offline CI and reproducible unit testing across all 4 boards.
+ * 2. `HttpBaselineModelAdapter` for live OpenAI-compatible / Qwen inference endpoints via `fetch()`.
+ * 3. Strict `AbortSignal` handling for request cancellation and timeouts.
  * 
  * Invariant: The model adapter is an UNTRUSTED PROPOSER. It never mutates
  * application state or canvas directly.
@@ -37,7 +39,7 @@ export interface ModelResponseMetadata {
   durationMs: number
   inputTokens?: number
   outputTokens?: number
-  finishReason?: "stop" | "length" | "timeout" | "error"
+  finishReason?: "stop" | "length" | "timeout" | "error" | "cancelled"
 }
 
 export interface CopilotModelResponse {
@@ -45,7 +47,7 @@ export interface CopilotModelResponse {
   metadata: ModelResponseMetadata
   success: boolean
   error?: {
-    code: "TIMEOUT" | "RATE_LIMIT" | "PROVIDER_ERROR" | "MALFORMED" | "OVERSIZED" | "EMPTY"
+    code: "TIMEOUT" | "RATE_LIMIT" | "PROVIDER_ERROR" | "MALFORMED" | "OVERSIZED" | "EMPTY" | "CANCELLED"
     message: string
   }
 }
@@ -55,6 +57,211 @@ export interface ModelAdapter {
     request: CopilotModelRequest,
     options?: ModelRequestOptions
   ): Promise<CopilotModelResponse>
+}
+
+export interface HttpAdapterConfig {
+  baseUrl?: string // e.g. "http://localhost:11434/v1" or "/api/ai-copilot"
+  apiKey?: string
+  model?: string // e.g. "qwen2.5-coder-7b-instruct" or "pixiu-baseline-qwen3-4b"
+  defaultTimeoutMs?: number
+}
+
+/**
+ * Real HTTP Baseline Model Adapter for live model inference (OpenAI-compatible / Qwen / vLLM / Ollama).
+ * Uses fetch() with strict AbortSignal cancellation and timeout management.
+ */
+export class HttpBaselineModelAdapter implements ModelAdapter {
+  private readonly baseUrl: string
+  private readonly apiKey?: string
+  private readonly model: string
+  private readonly defaultTimeoutMs: number
+
+  constructor(config: HttpAdapterConfig = {}) {
+    this.baseUrl = (config.baseUrl || "http://localhost:11434/v1").replace(/\/+$/, "")
+    this.apiKey = config.apiKey
+    this.model = config.model || "qwen2.5-coder-7b-instruct"
+    this.defaultTimeoutMs = config.defaultTimeoutMs || 10000
+  }
+
+  async generateProposal(
+    request: CopilotModelRequest,
+    options: ModelRequestOptions = {}
+  ): Promise<CopilotModelResponse> {
+    const startTime = Date.now()
+    const timeoutMs = options.timeoutMs || this.defaultTimeoutMs
+
+    // Setup combined AbortController for timeout and caller signal
+    const controller = new AbortController()
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+
+    if (options.signal) {
+      if (options.signal.aborted) {
+        return {
+          rawOutput: "",
+          success: false,
+          metadata: {
+            provider: "http-openai-compatible",
+            model: this.model,
+            version: "1.0.0",
+            requestId: request.requestId,
+            durationMs: 0,
+            finishReason: "cancelled",
+          },
+          error: {
+            code: "CANCELLED",
+            message: "Request was cancelled before invocation.",
+          },
+        }
+      }
+      options.signal.addEventListener("abort", () => controller.abort(), { once: true })
+    }
+
+    timeoutId = setTimeout(() => {
+      controller.abort(new Error(`Timeout after ${timeoutMs}ms`))
+    }, timeoutMs)
+
+    const systemPrompt = `You are the Pixiu CyberLab Circuit Copilot.
+You must propose structured circuit plans conforming strictly to the "pixiu-copilot-proposal-v1" schema.
+Output ONLY a raw JSON object with keys: schema_version, task_type, summary, assumptions, needs_clarification, proposal, capabilities.
+Do not wrap in markdown or add conversational filler.`
+
+    const userPrompt = `Target Board: ${request.context.targetBoard}
+Prompt: ${request.prompt}
+Context: ${JSON.stringify(request.context)}`
+
+    try {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      }
+      if (this.apiKey) {
+        headers["Authorization"] = `Bearer ${this.apiKey}`
+      }
+
+      const res = await fetch(`${this.baseUrl}/chat/completions`, {
+        method: "POST",
+        headers,
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: this.model,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          temperature: options.temperature ?? 0.1,
+          max_tokens: options.maxTokens ?? 1024,
+        }),
+      })
+
+      clearTimeout(timeoutId)
+      const durationMs = Date.now() - startTime
+
+      if (!res.ok) {
+        let errorMsg = `Inference provider HTTP error ${res.status}: ${res.statusText}`
+        let errorCode: "RATE_LIMIT" | "PROVIDER_ERROR" = "PROVIDER_ERROR"
+        if (res.status === 429) {
+          errorCode = "RATE_LIMIT"
+          errorMsg = "Rate limit exceeded by inference provider."
+        }
+        return {
+          rawOutput: "",
+          success: false,
+          metadata: {
+            provider: "http-openai-compatible",
+            model: this.model,
+            version: "1.0.0",
+            requestId: request.requestId,
+            durationMs,
+            finishReason: "error",
+          },
+          error: {
+            code: errorCode,
+            message: errorMsg,
+          },
+        }
+      }
+
+      const data = await res.json()
+      const content = data?.choices?.[0]?.message?.content || ""
+      const inputTokens = data?.usage?.prompt_tokens
+      const outputTokens = data?.usage?.completion_tokens
+
+      if (!content.trim()) {
+        return {
+          rawOutput: "",
+          success: false,
+          metadata: {
+            provider: "http-openai-compatible",
+            model: this.model,
+            version: "1.0.0",
+            requestId: request.requestId,
+            durationMs,
+            finishReason: "stop",
+          },
+          error: {
+            code: "EMPTY",
+            message: "Inference provider returned an empty response string.",
+          },
+        }
+      }
+
+      return {
+        rawOutput: content,
+        success: true,
+        metadata: {
+          provider: "http-openai-compatible",
+          model: this.model,
+          version: "1.0.0",
+          requestId: request.requestId,
+          durationMs,
+          inputTokens,
+          outputTokens,
+          finishReason: "stop",
+        },
+      }
+    } catch (err: unknown) {
+      clearTimeout(timeoutId)
+      const durationMs = Date.now() - startTime
+
+      if (controller.signal.aborted) {
+        const isTimeout = String(err).includes("Timeout") || !options.signal?.aborted
+        return {
+          rawOutput: "",
+          success: false,
+          metadata: {
+            provider: "http-openai-compatible",
+            model: this.model,
+            version: "1.0.0",
+            requestId: request.requestId,
+            durationMs,
+            finishReason: isTimeout ? "timeout" : "cancelled",
+          },
+          error: {
+            code: isTimeout ? "TIMEOUT" : "CANCELLED",
+            message: isTimeout
+              ? `Model call exceeded timeout limit of ${timeoutMs}ms.`
+              : "Request was cancelled by user.",
+          },
+        }
+      }
+
+      return {
+        rawOutput: "",
+        success: false,
+        metadata: {
+          provider: "http-openai-compatible",
+          model: this.model,
+          version: "1.0.0",
+          requestId: request.requestId,
+          durationMs,
+          finishReason: "error",
+        },
+        error: {
+          code: "PROVIDER_ERROR",
+          message: `Inference provider connection failed: ${err instanceof Error ? err.message : String(err)}`,
+        },
+      }
+    }
+  }
 }
 
 /**
@@ -78,6 +285,26 @@ export class DeterministicStubAdapter implements ModelAdapter {
   ): Promise<CopilotModelResponse> {
     const startTime = Date.now()
     const scenario = options.simulateScenario || "success"
+
+    // Honor caller abort signal
+    if (options.signal?.aborted) {
+      return {
+        rawOutput: "",
+        success: false,
+        metadata: {
+          provider: "deterministic-stub",
+          model: "pixiu-baseline-qwen3-4b",
+          version: "1.0.0",
+          requestId: request.requestId,
+          durationMs: 0,
+          finishReason: "cancelled",
+        },
+        error: {
+          code: "CANCELLED",
+          message: "Request was cancelled by caller.",
+        },
+      }
+    }
 
     // Simulate timeout
     if (scenario === "timeout") {
@@ -809,4 +1036,16 @@ export class DeterministicStubAdapter implements ModelAdapter {
       },
     }
   }
+}
+
+/**
+ * Factory function to create the active baseline model adapter.
+ */
+export function createBaselineModelAdapter(
+  config?: Partial<HttpAdapterConfig> & { mode?: "stub" | "http" }
+): ModelAdapter {
+  if (config?.mode === "http") {
+    return new HttpBaselineModelAdapter(config)
+  }
+  return new DeterministicStubAdapter(config?.defaultTimeoutMs)
 }

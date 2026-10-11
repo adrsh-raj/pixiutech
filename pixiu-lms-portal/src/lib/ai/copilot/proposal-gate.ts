@@ -4,11 +4,11 @@
  * Enforces the primary safety boundary:
  * 1. Reuses live `validateProposedCircuit` as the sole authority on circuit correctness.
  * 2. Never allows direct model writes.
- * 3. Enforces deep task-specific wiring connectivity checks:
- *    - LED series current-limiting resistor & complete control loop
- *    - LDR voltage divider midpoint connection to analog/ADC pin
- *    - Ultrasonic 4-pin completeness (VCC, GND, distinct Trig & Echo)
- *    - Servo 3-pin completeness (VCC, GND, PWM Sig)
+ * 3. Enforces deep task-specific wiring connectivity and destination checks:
+ *    - LED series resistor & complete control loop (GPIO to GND)
+ *    - LDR voltage divider top to Power, bottom to GND, midpoint tap to Analog/ADC
+ *    - Ultrasonic 4-pin destination completeness (VCC to Power, GND to Ground, distinct GPIOs for Trig/Echo)
+ *    - Servo 3-pin destination completeness (VCC to Power, GND to Ground, Sig to digital/PWM pin)
  * 4. Invariant: `canPreview = false` and `canApply = false` if any error or policy failure is found.
  */
 
@@ -34,9 +34,9 @@ export interface GateEvaluationOptions {
   expectedRevisionHash?: string
 }
 
-const POWER_PINS = new Set(["5v", "3v3", "3v", "vin", "vsys", "vbus"])
-const GND_PINS = new Set(["gnd", "gnd_pwr", "gnd_l", "gnd_r", "gnd_1", "gnd_2", "gnd_3", "gnd_4", "gnd_5", "gnd_6", "gnd_7", "gnd_8"])
-const ANALOG_PINS = new Set([
+export const POWER_PINS = new Set(["5v", "3v3", "3v", "vin", "vsys", "vbus", "3v3_en"])
+export const GND_PINS = new Set(["gnd", "gnd_pwr", "gnd_l", "gnd_r", "gnd_1", "gnd_2", "gnd_3", "gnd_4", "gnd_5", "gnd_6", "gnd_7", "gnd_8"])
+export const ANALOG_PINS = new Set([
   "a0", "a1", "a2", "a3", "a4", "a5",
   "d34", "d35", "d32", "d33", "vp", "vn",
   "gp26", "gp27", "gp28",
@@ -119,7 +119,7 @@ export function evaluateProposalGate(
     }
   }
 
-  // 5. Deep Task-Specific Electrical & Wiring Policy Checks
+  // 5. Deep Task-Specific Wiring and Destination Policy Checks
   if (boardPart) {
     runTaskWiringPolicyChecks(
       proposal.task_type,
@@ -173,7 +173,16 @@ function getConnectedPins(partId: string, pinId: string, wires: Wire[]): Array<{
 }
 
 /**
- * Deep task-specific wiring policy checks.
+ * Finds all board pins connected to a specific component pin.
+ */
+function getBoardPinsFor(partId: string, pinId: string, boardId: string, wires: Wire[]): string[] {
+  return getConnectedPins(partId, pinId, wires)
+    .filter((n) => n.partId === boardId)
+    .map((n) => n.pinId.toLowerCase())
+}
+
+/**
+ * Deep task-specific wiring policy and destination checks.
  */
 function runTaskWiringPolicyChecks(
   taskType: SupportedTaskFamily,
@@ -205,7 +214,6 @@ function runTaskWiringPolicyChecks(
       return
     }
 
-    // Verify each LED is connected in series with a resistor
     for (const led of leds) {
       const anodeConnected = isPinConnected(led.id, "anode", wires)
       const cathodeConnected = isPinConnected(led.id, "cathode", wires)
@@ -213,18 +221,37 @@ function runTaskWiringPolicyChecks(
       if (!anodeConnected || !cathodeConnected) {
         errors.push(`LED '${led.id}' is disconnected or missing complete loop connection.`)
         diagnosticCodes.push("POLICY_INCOMPLETE_LED_LOOP")
+        continue
       }
 
       // Check series connection: either anode or cathode must connect to a resistor pin
       const anodeNeighbors = getConnectedPins(led.id, "anode", wires)
       const cathodeNeighbors = getConnectedPins(led.id, "cathode", wires)
-      const hasResistorConnection = [...anodeNeighbors, ...cathodeNeighbors].some((n) =>
-        resistors.some((r) => r.id === n.partId)
+
+      const seriesResistor = resistors.find((r) =>
+        [...anodeNeighbors, ...cathodeNeighbors].some((n) => n.partId === r.id)
       )
 
-      if (!hasResistorConnection) {
+      if (!seriesResistor) {
         errors.push(`Resistor is not connected in series with LED '${led.id}' (floating or bypassed).`)
         diagnosticCodes.push("POLICY_DISCONNECTED_LED_RESISTOR")
+        continue
+      }
+
+      // Check outer destinations: LED branch must connect to a digital GPIO on one end, and GND on the other end
+      const allBranchPins = [
+        ...getBoardPinsFor(led.id, "anode", boardId, wires),
+        ...getBoardPinsFor(led.id, "cathode", boardId, wires),
+        ...getBoardPinsFor(seriesResistor.id, "a", boardId, wires),
+        ...getBoardPinsFor(seriesResistor.id, "b", boardId, wires),
+      ]
+
+      const hasGnd = allBranchPins.some((p) => GND_PINS.has(p))
+      const hasGpio = allBranchPins.some((p) => !GND_PINS.has(p) && !POWER_PINS.has(p))
+
+      if (!hasGnd || !hasGpio) {
+        errors.push(`LED circuit loop must connect to a digital control pin on one end and GND on the other end.`)
+        diagnosticCodes.push("POLICY_LED_INVALID_LOOP_DESTINATION")
       }
     }
   }
@@ -255,24 +282,47 @@ function runTaskWiringPolicyChecks(
       if (!pinAConnected || !pinBConnected) {
         errors.push(`LDR '${ldr.id}' has disconnected terminals.`)
         diagnosticCodes.push("POLICY_INCOMPLETE_LDR_DIVIDER")
+        continue
       }
 
       // Check for divider midpoint: LDR pin connected to resistor pin AND an analog board pin
       const aNeighbors = getConnectedPins(ldr.id, "a", wires)
       const bNeighbors = getConnectedPins(ldr.id, "b", wires)
 
-      const dividerMidpointFound = [
-        { ldrPin: "a", neighbors: aNeighbors },
-        { ldrPin: "b", neighbors: bNeighbors },
-      ].some(({ neighbors }) => {
-        const connectsToResistor = neighbors.some((n) => resistors.some((r) => r.id === n.partId))
-        const connectsToAnalog = neighbors.some((n) => n.partId === boardId && ANALOG_PINS.has(n.pinId.toLowerCase()))
-        return connectsToResistor && connectsToAnalog
-      })
+      let midpointFound = false
+      let dividerResistorId = ""
 
-      if (!dividerMidpointFound) {
+      for (const { neighbors } of [{ neighbors: aNeighbors }, { neighbors: bNeighbors }]) {
+        const resistorNeighbor = neighbors.find((n) => resistors.some((r) => r.id === n.partId))
+        const analogNeighbor = neighbors.find((n) => n.partId === boardId && ANALOG_PINS.has(n.pinId.toLowerCase()))
+
+        if (resistorNeighbor && analogNeighbor) {
+          midpointFound = true
+          dividerResistorId = resistorNeighbor.partId
+          break
+        }
+      }
+
+      if (!midpointFound) {
         errors.push("LDR and resistor do not form a valid voltage divider tapped into an analog/ADC pin.")
         diagnosticCodes.push("POLICY_DISCONNECTED_DIVIDER")
+        continue
+      }
+
+      // Check power and ground destination rails for the divider
+      const allDividerBoardPins = [
+        ...getBoardPinsFor(ldr.id, "a", boardId, wires),
+        ...getBoardPinsFor(ldr.id, "b", boardId, wires),
+        ...getBoardPinsFor(dividerResistorId, "a", boardId, wires),
+        ...getBoardPinsFor(dividerResistorId, "b", boardId, wires),
+      ]
+
+      const hasPower = allDividerBoardPins.some((p) => POWER_PINS.has(p))
+      const hasGnd = allDividerBoardPins.some((p) => GND_PINS.has(p))
+
+      if (!hasPower || !hasGnd) {
+        errors.push("LDR voltage divider must be powered across a board power rail and ground.")
+        diagnosticCodes.push("POLICY_LDR_INVALID_DIVIDER_DESTINATION")
       }
     }
   }
@@ -289,27 +339,48 @@ function runTaskWiringPolicyChecks(
     }
 
     for (const sonar of sonars) {
-      const vccOk = isPinConnected(sonar.id, "vcc", wires)
-      const gndOk = isPinConnected(sonar.id, "gnd", wires)
-      const trigOk = isPinConnected(sonar.id, "trig", wires)
-      const echoOk = isPinConnected(sonar.id, "echo", wires)
+      const vccBoardPins = getBoardPinsFor(sonar.id, "vcc", boardId, wires)
+      const gndBoardPins = getBoardPinsFor(sonar.id, "gnd", boardId, wires)
+      const trigBoardPins = getBoardPinsFor(sonar.id, "trig", boardId, wires)
+      const echoBoardPins = getBoardPinsFor(sonar.id, "echo", boardId, wires)
 
-      if (!vccOk || !gndOk || !trigOk || !echoOk) {
-        errors.push(`Ultrasonic sensor '${sonar.id}' has unconnected pins (all 4 pins VCC, GND, Trig, Echo must be wired).`)
+      // 1. Missing pin connections
+      if (vccBoardPins.length === 0 || gndBoardPins.length === 0 || trigBoardPins.length === 0 || echoBoardPins.length === 0) {
+        errors.push(`Ultrasonic sensor '${sonar.id}' has unconnected pins (all 4 pins VCC, GND, Trig, Echo must be wired to board).`)
         diagnosticCodes.push("POLICY_UNCONNECTED_ULTRASONIC_PIN")
+        continue
       }
 
-      // Verify distinct trigger and echo board pins
-      const trigNeighbors = getConnectedPins(sonar.id, "trig", wires).filter((n) => n.partId === boardId)
-      const echoNeighbors = getConnectedPins(sonar.id, "echo", wires).filter((n) => n.partId === boardId)
+      // 2. Destination correctness: VCC must be power, GND must be ground
+      const vccIsPower = vccBoardPins.some((p) => POWER_PINS.has(p))
+      if (!vccIsPower) {
+        errors.push(`Ultrasonic VCC must connect to a board power rail, got: '${vccBoardPins.join(", ")}'.`)
+        diagnosticCodes.push("POLICY_ULTRASONIC_INVALID_POWER_DESTINATION")
+      }
 
-      if (trigNeighbors.length > 0 && echoNeighbors.length > 0) {
-        const trigPin = trigNeighbors[0].pinId.toLowerCase()
-        const echoPin = echoNeighbors[0].pinId.toLowerCase()
-        if (trigPin === echoPin) {
-          errors.push(`Ultrasonic trigger and echo cannot share the same pin ('${trigPin}').`)
-          diagnosticCodes.push("POLICY_ULTRASONIC_PIN_CONFLICT")
-        }
+      const gndIsGnd = gndBoardPins.some((p) => GND_PINS.has(p))
+      if (!gndIsGnd) {
+        errors.push(`Ultrasonic GND must connect to a board ground pin, got: '${gndBoardPins.join(", ")}'.`)
+        diagnosticCodes.push("POLICY_ULTRASONIC_INVALID_GROUND_DESTINATION")
+      }
+
+      // 3. Destination correctness: Trig and Echo must be digital pins (not power, not ground)
+      const trigIsGpio = trigBoardPins.every((p) => !POWER_PINS.has(p) && !GND_PINS.has(p))
+      if (!trigIsGpio) {
+        errors.push(`Ultrasonic Trig must connect to a digital GPIO pin, got: '${trigBoardPins.join(", ")}'.`)
+        diagnosticCodes.push("POLICY_ULTRASONIC_INVALID_TRIG_DESTINATION")
+      }
+
+      const echoIsGpio = echoBoardPins.every((p) => !POWER_PINS.has(p) && !GND_PINS.has(p))
+      if (!echoIsGpio) {
+        errors.push(`Ultrasonic Echo must connect to a digital GPIO pin, got: '${echoBoardPins.join(", ")}'.`)
+        diagnosticCodes.push("POLICY_ULTRASONIC_INVALID_ECHO_DESTINATION")
+      }
+
+      // 4. Pin conflict: Trig and Echo cannot share the same pin
+      if (trigBoardPins[0] === echoBoardPins[0]) {
+        errors.push(`Ultrasonic trigger and echo cannot share the same pin ('${trigBoardPins[0]}').`)
+        diagnosticCodes.push("POLICY_ULTRASONIC_PIN_CONFLICT")
       }
     }
   }
@@ -326,13 +397,33 @@ function runTaskWiringPolicyChecks(
     }
 
     for (const servo of servos) {
-      const vccOk = isPinConnected(servo.id, "vcc", wires)
-      const gndOk = isPinConnected(servo.id, "gnd", wires)
-      const sigOk = isPinConnected(servo.id, "sig", wires)
+      const vccBoardPins = getBoardPinsFor(servo.id, "vcc", boardId, wires)
+      const gndBoardPins = getBoardPinsFor(servo.id, "gnd", boardId, wires)
+      const sigBoardPins = getBoardPinsFor(servo.id, "sig", boardId, wires)
 
-      if (!vccOk || !gndOk || !sigOk) {
-        errors.push(`Servo motor '${servo.id}' has unconnected terminals (VCC, GND, and Sig must all be wired).`)
+      if (vccBoardPins.length === 0 || gndBoardPins.length === 0 || sigBoardPins.length === 0) {
+        errors.push(`Servo motor '${servo.id}' has unconnected terminals (VCC, GND, and Sig must all be wired to board).`)
         diagnosticCodes.push("POLICY_UNCONNECTED_SERVO_PIN")
+        continue
+      }
+
+      // Destination correctness: VCC must be power, GND must be ground, Sig must be digital/PWM
+      const vccIsPower = vccBoardPins.some((p) => POWER_PINS.has(p))
+      if (!vccIsPower) {
+        errors.push(`Servo VCC must connect to a board power rail, got: '${vccBoardPins.join(", ")}'.`)
+        diagnosticCodes.push("POLICY_SERVO_INVALID_POWER_DESTINATION")
+      }
+
+      const gndIsGnd = gndBoardPins.some((p) => GND_PINS.has(p))
+      if (!gndIsGnd) {
+        errors.push(`Servo GND must connect to a board ground pin, got: '${gndBoardPins.join(", ")}'.`)
+        diagnosticCodes.push("POLICY_SERVO_INVALID_GROUND_DESTINATION")
+      }
+
+      const sigIsGpio = sigBoardPins.every((p) => !POWER_PINS.has(p) && !GND_PINS.has(p))
+      if (!sigIsGpio) {
+        errors.push(`Servo signal must connect to a digital/PWM pin, got: '${sigBoardPins.join(", ")}'.`)
+        diagnosticCodes.push("POLICY_SERVO_INVALID_SIGNAL_DESTINATION")
       }
     }
   }
