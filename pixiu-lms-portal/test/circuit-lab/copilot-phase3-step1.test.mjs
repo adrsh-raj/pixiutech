@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
+import http from "node:http"
 import { readFileSync, existsSync } from "node:fs"
 import { createHash } from "node:crypto"
 import { tmpdir } from "node:os"
@@ -159,6 +160,136 @@ test("P3-2: HttpBaselineModelAdapter handles abort signal and timeouts cleanly",
   )
   assert.equal(failRes.success, false)
   assert.ok(["TIMEOUT", "PROVIDER_ERROR"].includes(failRes.error?.code || ""))
+})
+
+test("P3-2: HttpBaselineModelAdapter live lifecycle — HTTP 200 success, malformed JSON body, in-flight abort, and body-streaming timeout", async () => {
+  let mode = "success"
+
+  const server = http.createServer((req, res) => {
+    if (mode === "success") {
+      res.writeHead(200, { "Content-Type": "application/json" })
+      res.end(JSON.stringify({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                schema_version: "pixiu-copilot-proposal-v1",
+                task_type: "led_control",
+                summary: "Mock Live LED Proposal",
+                assumptions: [],
+                needs_clarification: [],
+                proposal: { circuit: { parts: [], wires: [] }, code: null, explanation: "live test ok" },
+                capabilities: { simulation: "supported", compilation: "not_tested", physical_hardware: "not_verified" }
+              })
+            }
+          }
+        ],
+        usage: { prompt_tokens: 24, completion_tokens: 72 }
+      }))
+    } else if (mode === "malformed") {
+      res.writeHead(200, { "Content-Type": "application/json" })
+      res.end("{\n  invalid_json: unterminated string payload...")
+    } else if (mode === "hang_before_response") {
+      // Don't respond immediately — let caller abort in-flight
+      setTimeout(() => {
+        if (!res.writableEnded) {
+          res.writeHead(200, { "Content-Type": "application/json" })
+          res.end(JSON.stringify({ choices: [{ message: { content: "{}" } }] }))
+        }
+      }, 500)
+    } else if (mode === "hang_during_body") {
+      // Send 200 headers, send partial body chunk, then never close — tests timeout during res.json()!
+      res.writeHead(200, { "Content-Type": "application/json", "Transfer-Encoding": "chunked" })
+      res.write("{\"choices\": [")
+    } else if (mode === "rate_limit") {
+      res.writeHead(429, { "Content-Type": "application/json" })
+      res.end(JSON.stringify({ error: { message: "Rate limit exceeded" } }))
+    } else if (mode === "server_error") {
+      res.writeHead(500, { "Content-Type": "application/json" })
+      res.end("Internal Server Error")
+    }
+  })
+
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve))
+  const port = server.address().port
+  const baseUrl = `http://127.0.0.1:${port}`
+
+  try {
+    const adapter = new HttpBaselineModelAdapter({
+      baseUrl,
+      apiKey: "test-live-key",
+      defaultTimeoutMs: 300,
+    })
+
+    // 1. Successful HTTP 200 response with valid JSON payload & token tracking
+    mode = "success"
+    const successRes = await adapter.generateProposal({
+      requestId: "req-live-ok",
+      prompt: "Blink LED on D13",
+      context: { targetBoard: "arduino-uno" },
+    })
+    assert.equal(successRes.success, true)
+    assert.equal(successRes.metadata.finishReason, "stop")
+    assert.equal(successRes.metadata.inputTokens, 24)
+    assert.equal(successRes.metadata.outputTokens, 72)
+    assert.ok(successRes.rawOutput.includes("pixiu-copilot-proposal-v1"))
+
+    // 2. Malformed JSON HTTP response body
+    mode = "malformed"
+    const malformedRes = await adapter.generateProposal({
+      requestId: "req-live-malformed",
+      prompt: "Blink LED",
+      context: { targetBoard: "arduino-uno" },
+    })
+    assert.equal(malformedRes.success, false)
+    assert.equal(malformedRes.error?.code, "PROVIDER_ERROR")
+    assert.ok(malformedRes.error?.message.includes("Failed to parse JSON response"))
+    assert.equal(malformedRes.metadata.finishReason, "error")
+
+    // 3. In-flight abort while HTTP request is waiting
+    mode = "hang_before_response"
+    const flightController = new AbortController()
+    setTimeout(() => flightController.abort(), 20)
+    const abortFlightRes = await adapter.generateProposal(
+      { requestId: "req-live-abort-flight", prompt: "Blink LED", context: { targetBoard: "arduino-uno" } },
+      { signal: flightController.signal, timeoutMs: 1500 }
+    )
+    assert.equal(abortFlightRes.success, false)
+    assert.equal(abortFlightRes.error?.code, "CANCELLED")
+    assert.equal(abortFlightRes.metadata.finishReason, "cancelled")
+
+    // 4. Timeout while reading/streaming response body
+    mode = "hang_during_body"
+    const timeoutBodyRes = await adapter.generateProposal(
+      { requestId: "req-live-timeout-body", prompt: "Blink LED", context: { targetBoard: "arduino-uno" } },
+      { timeoutMs: 50 }
+    )
+    assert.equal(timeoutBodyRes.success, false)
+    assert.equal(timeoutBodyRes.error?.code, "TIMEOUT")
+    assert.equal(timeoutBodyRes.metadata.finishReason, "timeout")
+
+    // 5. Rate limit HTTP 429
+    mode = "rate_limit"
+    const rateRes = await adapter.generateProposal({
+      requestId: "req-live-429",
+      prompt: "Blink LED",
+      context: { targetBoard: "arduino-uno" },
+    })
+    assert.equal(rateRes.success, false)
+    assert.equal(rateRes.error?.code, "RATE_LIMIT")
+
+    // 6. Server error HTTP 500
+    mode = "server_error"
+    const errRes = await adapter.generateProposal({
+      requestId: "req-live-500",
+      prompt: "Blink LED",
+      context: { targetBoard: "arduino-uno" },
+    })
+    assert.equal(errRes.success, false)
+    assert.equal(errRes.error?.code, "PROVIDER_ERROR")
+  } finally {
+    await new Promise((resolve) => server.close(resolve))
+  }
 })
 
 test("P3-2: DeterministicStubAdapter handles simulated failure scenarios", async () => {
@@ -488,4 +619,352 @@ test("P3-5: Critical Safety Invariant — Direct 5V-to-GND dead short CANNOT pas
   assert.equal(gateResult.canPreview, false)
   assert.equal(gateResult.canApply, false)
   assert.ok(gateResult.diagnosticCodes.includes("ELECTRICAL_SHORT_CIRCUIT"))
+})
+
+test("P3-5: Negative test — Gate strictly rejects Ultrasonic VCC wired to 5V AND D2 simultaneously (mixed power/GPIO)", () => {
+  const mixedVccProposal = {
+    schema_version: "pixiu-copilot-proposal-v1",
+    task_type: "ultrasonic_alert",
+    summary: "Mixed VCC Defect",
+    assumptions: [],
+    needs_clarification: [],
+    proposal: {
+      circuit: {
+        parts: [
+          { id: "uno", type: "arduino-uno", x: 0, y: 0, rotation: 0, props: {} },
+          { id: "sonar", type: "ultrasonic", x: 100, y: 0, rotation: 0, props: {} },
+        ],
+        wires: [
+          { id: "w1_power", from: { partId: "uno", pinId: "5v" }, to: { partId: "sonar", pinId: "vcc" } },
+          { id: "w1_gpio", from: { partId: "uno", pinId: "d2" }, to: { partId: "sonar", pinId: "vcc" } }, // Conflicting connection to GPIO!
+          { id: "w2", from: { partId: "uno", pinId: "gnd" }, to: { partId: "sonar", pinId: "gnd" } },
+          { id: "w3", from: { partId: "uno", pinId: "d9" }, to: { partId: "sonar", pinId: "trig" } },
+          { id: "w4", from: { partId: "uno", pinId: "d10" }, to: { partId: "sonar", pinId: "echo" } },
+        ],
+      },
+      code: null,
+      explanation: "VCC connected to both 5V and D2 simultaneously",
+    },
+    capabilities: {
+      simulation: "supported",
+      compilation: "not_tested",
+      physical_hardware: "not_verified",
+    },
+  }
+
+  const gateResult = evaluateProposalGate(mixedVccProposal, { currentBoard: "arduino-uno" })
+  assert.equal(gateResult.passed, false)
+  assert.equal(gateResult.canApply, false)
+  assert.ok(
+    gateResult.diagnosticCodes.includes("POLICY_ULTRASONIC_INVALID_POWER_DESTINATION") ||
+    gateResult.diagnosticCodes.includes("POLICY_CONFLICTING_PIN_CONNECTIONS"),
+    "Must reject mixed VCC connection"
+  )
+})
+
+test("P3-5: Negative test — Gate strictly rejects Ultrasonic GND wired to GND AND GPIO D3 simultaneously", () => {
+  const mixedGndProposal = {
+    schema_version: "pixiu-copilot-proposal-v1",
+    task_type: "ultrasonic_alert",
+    summary: "Mixed GND Defect",
+    assumptions: [],
+    needs_clarification: [],
+    proposal: {
+      circuit: {
+        parts: [
+          { id: "uno", type: "arduino-uno", x: 0, y: 0, rotation: 0, props: {} },
+          { id: "sonar", type: "ultrasonic", x: 100, y: 0, rotation: 0, props: {} },
+        ],
+        wires: [
+          { id: "w1", from: { partId: "uno", pinId: "5v" }, to: { partId: "sonar", pinId: "vcc" } },
+          { id: "w2_gnd", from: { partId: "uno", pinId: "gnd" }, to: { partId: "sonar", pinId: "gnd" } },
+          { id: "w2_gpio", from: { partId: "uno", pinId: "d3" }, to: { partId: "sonar", pinId: "gnd" } }, // Conflicting connection to GPIO!
+          { id: "w3", from: { partId: "uno", pinId: "d9" }, to: { partId: "sonar", pinId: "trig" } },
+          { id: "w4", from: { partId: "uno", pinId: "d10" }, to: { partId: "sonar", pinId: "echo" } },
+        ],
+      },
+      code: null,
+      explanation: "GND connected to both GND and D3 simultaneously",
+    },
+    capabilities: {
+      simulation: "supported",
+      compilation: "not_tested",
+      physical_hardware: "not_verified",
+    },
+  }
+
+  const gateResult = evaluateProposalGate(mixedGndProposal, { currentBoard: "arduino-uno" })
+  assert.equal(gateResult.passed, false)
+  assert.equal(gateResult.canApply, false)
+  assert.ok(
+    gateResult.diagnosticCodes.includes("POLICY_ULTRASONIC_INVALID_GROUND_DESTINATION") ||
+    gateResult.diagnosticCodes.includes("POLICY_CONFLICTING_PIN_CONNECTIONS"),
+    "Must reject mixed GND connection"
+  )
+})
+
+test("P3-5: Negative test — Gate strictly rejects Ultrasonic Trig wired to multiple GPIOs (D9 and D11)", () => {
+  const multiTrigProposal = {
+    schema_version: "pixiu-copilot-proposal-v1",
+    task_type: "ultrasonic_alert",
+    summary: "Multi-GPIO Trig Defect",
+    assumptions: [],
+    needs_clarification: [],
+    proposal: {
+      circuit: {
+        parts: [
+          { id: "uno", type: "arduino-uno", x: 0, y: 0, rotation: 0, props: {} },
+          { id: "sonar", type: "ultrasonic", x: 100, y: 0, rotation: 0, props: {} },
+        ],
+        wires: [
+          { id: "w1", from: { partId: "uno", pinId: "5v" }, to: { partId: "sonar", pinId: "vcc" } },
+          { id: "w2", from: { partId: "uno", pinId: "gnd" }, to: { partId: "sonar", pinId: "gnd" } },
+          { id: "w3_a", from: { partId: "uno", pinId: "d9" }, to: { partId: "sonar", pinId: "trig" } },
+          { id: "w3_b", from: { partId: "uno", pinId: "d11" }, to: { partId: "sonar", pinId: "trig" } }, // Conflicting multiple GPIOs!
+          { id: "w4", from: { partId: "uno", pinId: "d10" }, to: { partId: "sonar", pinId: "echo" } },
+        ],
+      },
+      code: null,
+      explanation: "Trig connected to both D9 and D11",
+    },
+    capabilities: {
+      simulation: "supported",
+      compilation: "not_tested",
+      physical_hardware: "not_verified",
+    },
+  }
+
+  const gateResult = evaluateProposalGate(multiTrigProposal, { currentBoard: "arduino-uno" })
+  assert.equal(gateResult.passed, false)
+  assert.equal(gateResult.canApply, false)
+  assert.ok(gateResult.diagnosticCodes.includes("POLICY_CONFLICTING_PIN_CONNECTIONS"))
+})
+
+test("P3-5: Negative test — Gate strictly rejects Ultrasonic Trig and Echo sharing the same pin", () => {
+  const sharedTrigEchoProposal = {
+    schema_version: "pixiu-copilot-proposal-v1",
+    task_type: "ultrasonic_alert",
+    summary: "Shared Trig Echo Defect",
+    assumptions: [],
+    needs_clarification: [],
+    proposal: {
+      circuit: {
+        parts: [
+          { id: "uno", type: "arduino-uno", x: 0, y: 0, rotation: 0, props: {} },
+          { id: "sonar", type: "ultrasonic", x: 100, y: 0, rotation: 0, props: {} },
+        ],
+        wires: [
+          { id: "w1", from: { partId: "uno", pinId: "5v" }, to: { partId: "sonar", pinId: "vcc" } },
+          { id: "w2", from: { partId: "uno", pinId: "gnd" }, to: { partId: "sonar", pinId: "gnd" } },
+          { id: "w3", from: { partId: "uno", pinId: "d9" }, to: { partId: "sonar", pinId: "trig" } },
+          { id: "w4", from: { partId: "uno", pinId: "d9" }, to: { partId: "sonar", pinId: "echo" } }, // Shared pin!
+        ],
+      },
+      code: null,
+      explanation: "Trig and Echo shorted to same pin D9",
+    },
+    capabilities: {
+      simulation: "supported",
+      compilation: "not_tested",
+      physical_hardware: "not_verified",
+    },
+  }
+
+  const gateResult = evaluateProposalGate(sharedTrigEchoProposal, { currentBoard: "arduino-uno" })
+  assert.equal(gateResult.passed, false)
+  assert.equal(gateResult.canApply, false)
+  assert.ok(
+    gateResult.diagnosticCodes.includes("POLICY_ULTRASONIC_PIN_CONFLICT") ||
+    gateResult.diagnosticCodes.includes("POLICY_CONFLICTING_PIN_CONNECTIONS")
+  )
+})
+
+test("P3-5: Negative test — Gate strictly rejects Servo Signal wired to D9 AND 5V simultaneously", () => {
+  const mixedSigServo = {
+    schema_version: "pixiu-copilot-proposal-v1",
+    task_type: "servo_control",
+    summary: "Mixed Signal Defect",
+    assumptions: [],
+    needs_clarification: [],
+    proposal: {
+      circuit: {
+        parts: [
+          { id: "uno", type: "arduino-uno", x: 0, y: 0, rotation: 0, props: {} },
+          { id: "servo1", type: "servo", x: 100, y: 0, rotation: 0, props: {} },
+        ],
+        wires: [
+          { id: "w1", from: { partId: "uno", pinId: "5v" }, to: { partId: "servo1", pinId: "vcc" } },
+          { id: "w2", from: { partId: "uno", pinId: "gnd" }, to: { partId: "servo1", pinId: "gnd" } },
+          { id: "w3_sig", from: { partId: "uno", pinId: "d9" }, to: { partId: "servo1", pinId: "sig" } },
+          { id: "w3_pwr", from: { partId: "uno", pinId: "5v" }, to: { partId: "servo1", pinId: "sig" } }, // Conflicting connection to power rail!
+        ],
+      },
+      code: null,
+      explanation: "Servo signal tied to both D9 and 5V",
+    },
+    capabilities: {
+      simulation: "supported",
+      compilation: "not_tested",
+      physical_hardware: "not_verified",
+    },
+  }
+
+  const gateResult = evaluateProposalGate(mixedSigServo, { currentBoard: "arduino-uno" })
+  assert.equal(gateResult.passed, false)
+  assert.equal(gateResult.canApply, false)
+  assert.ok(
+    gateResult.diagnosticCodes.includes("POLICY_SERVO_INVALID_SIGNAL_DESTINATION") ||
+    gateResult.diagnosticCodes.includes("POLICY_CONFLICTING_PIN_CONNECTIONS")
+  )
+})
+
+test("P3-5: Negative test — Gate strictly rejects Servo Signal wired to multiple GPIOs (D9 and D10)", () => {
+  const multiSigServo = {
+    schema_version: "pixiu-copilot-proposal-v1",
+    task_type: "servo_control",
+    summary: "Multi-GPIO Servo Signal Defect",
+    assumptions: [],
+    needs_clarification: [],
+    proposal: {
+      circuit: {
+        parts: [
+          { id: "uno", type: "arduino-uno", x: 0, y: 0, rotation: 0, props: {} },
+          { id: "servo1", type: "servo", x: 100, y: 0, rotation: 0, props: {} },
+        ],
+        wires: [
+          { id: "w1", from: { partId: "uno", pinId: "5v" }, to: { partId: "servo1", pinId: "vcc" } },
+          { id: "w2", from: { partId: "uno", pinId: "gnd" }, to: { partId: "servo1", pinId: "gnd" } },
+          { id: "w3_a", from: { partId: "uno", pinId: "d9" }, to: { partId: "servo1", pinId: "sig" } },
+          { id: "w3_b", from: { partId: "uno", pinId: "d10" }, to: { partId: "servo1", pinId: "sig" } }, // Conflicting multiple GPIOs!
+        ],
+      },
+      code: null,
+      explanation: "Servo signal tied to both D9 and D10",
+    },
+    capabilities: {
+      simulation: "supported",
+      compilation: "not_tested",
+      physical_hardware: "not_verified",
+    },
+  }
+
+  const gateResult = evaluateProposalGate(multiSigServo, { currentBoard: "arduino-uno" })
+  assert.equal(gateResult.passed, false)
+  assert.equal(gateResult.canApply, false)
+  assert.ok(gateResult.diagnosticCodes.includes("POLICY_CONFLICTING_PIN_CONNECTIONS"))
+})
+
+test("P3-5: Negative test — Gate strictly rejects Servo VCC connected to 5V AND D2 simultaneously", () => {
+  const mixedServoVcc = {
+    schema_version: "pixiu-copilot-proposal-v1",
+    task_type: "servo_control",
+    summary: "Mixed Servo VCC Defect",
+    assumptions: [],
+    needs_clarification: [],
+    proposal: {
+      circuit: {
+        parts: [
+          { id: "uno", type: "arduino-uno", x: 0, y: 0, rotation: 0, props: {} },
+          { id: "servo1", type: "servo", x: 100, y: 0, rotation: 0, props: {} },
+        ],
+        wires: [
+          { id: "w1_pwr", from: { partId: "uno", pinId: "5v" }, to: { partId: "servo1", pinId: "vcc" } },
+          { id: "w1_gpio", from: { partId: "uno", pinId: "d2" }, to: { partId: "servo1", pinId: "vcc" } }, // Conflicting connection!
+          { id: "w2", from: { partId: "uno", pinId: "gnd" }, to: { partId: "servo1", pinId: "gnd" } },
+          { id: "w3", from: { partId: "uno", pinId: "d9" }, to: { partId: "servo1", pinId: "sig" } },
+        ],
+      },
+      code: null,
+      explanation: "Servo VCC tied to 5V and D2",
+    },
+    capabilities: {
+      simulation: "supported",
+      compilation: "not_tested",
+      physical_hardware: "not_verified",
+    },
+  }
+
+  const gateResult = evaluateProposalGate(mixedServoVcc, { currentBoard: "arduino-uno" })
+  assert.equal(gateResult.passed, false)
+  assert.equal(gateResult.canApply, false)
+  assert.ok(
+    gateResult.diagnosticCodes.includes("POLICY_SERVO_INVALID_POWER_DESTINATION") ||
+    gateResult.diagnosticCodes.includes("POLICY_CONFLICTING_PIN_CONNECTIONS")
+  )
+})
+
+test("P3-5: Negative test — Gate strictly rejects LED anode connected to conflicting multiple board pins (D13 and D12)", () => {
+  const multiPinLed = {
+    schema_version: "pixiu-copilot-proposal-v1",
+    task_type: "led_control",
+    summary: "Conflicting LED Pin Connections",
+    assumptions: [],
+    needs_clarification: [],
+    proposal: {
+      circuit: {
+        parts: [
+          { id: "uno", type: "arduino-uno", x: 0, y: 0, rotation: 0, props: {} },
+          { id: "led1", type: "led", x: 100, y: 0, rotation: 0, props: {} },
+          { id: "r1", type: "resistor", x: 200, y: 0, rotation: 0, props: { resistance: 220 } },
+        ],
+        wires: [
+          { id: "w1_a", from: { partId: "uno", pinId: "d13" }, to: { partId: "led1", pinId: "anode" } },
+          { id: "w1_b", from: { partId: "uno", pinId: "d12" }, to: { partId: "led1", pinId: "anode" } }, // Conflicting connection!
+          { id: "w2", from: { partId: "led1", pinId: "cathode" }, to: { partId: "r1", pinId: "a" } },
+          { id: "w3", from: { partId: "r1", pinId: "b" }, to: { partId: "uno", pinId: "gnd" } },
+        ],
+      },
+      code: null,
+      explanation: "LED anode tied to both D13 and D12",
+    },
+    capabilities: {
+      simulation: "supported",
+      compilation: "not_tested",
+      physical_hardware: "not_verified",
+    },
+  }
+
+  const gateResult = evaluateProposalGate(multiPinLed, { currentBoard: "arduino-uno" })
+  assert.equal(gateResult.passed, false)
+  assert.equal(gateResult.canApply, false)
+  assert.ok(gateResult.diagnosticCodes.includes("POLICY_CONFLICTING_PIN_CONNECTIONS"))
+})
+
+test("P3-5: Negative test — Gate strictly rejects LED loop powered directly from 5V rail without GPIO control", () => {
+  const directPowerLed = {
+    schema_version: "pixiu-copilot-proposal-v1",
+    task_type: "led_control",
+    summary: "Direct Power LED Defect",
+    assumptions: [],
+    needs_clarification: [],
+    proposal: {
+      circuit: {
+        parts: [
+          { id: "uno", type: "arduino-uno", x: 0, y: 0, rotation: 0, props: {} },
+          { id: "led1", type: "led", x: 100, y: 0, rotation: 0, props: {} },
+          { id: "r1", type: "resistor", x: 200, y: 0, rotation: 0, props: { resistance: 220 } },
+        ],
+        wires: [
+          { id: "w1", from: { partId: "uno", pinId: "5v" }, to: { partId: "led1", pinId: "anode" } }, // Direct 5V instead of GPIO!
+          { id: "w2", from: { partId: "led1", pinId: "cathode" }, to: { partId: "r1", pinId: "a" } },
+          { id: "w3", from: { partId: "r1", pinId: "b" }, to: { partId: "uno", pinId: "gnd" } },
+        ],
+      },
+      code: null,
+      explanation: "LED connected to 5V rail directly without microcontroller control",
+    },
+    capabilities: {
+      simulation: "supported",
+      compilation: "not_tested",
+      physical_hardware: "not_verified",
+    },
+  }
+
+  const gateResult = evaluateProposalGate(directPowerLed, { currentBoard: "arduino-uno" })
+  assert.equal(gateResult.passed, false)
+  assert.equal(gateResult.canApply, false)
+  assert.ok(
+    gateResult.diagnosticCodes.includes("POLICY_LED_INVALID_POWER_DESTINATION") ||
+    gateResult.diagnosticCodes.includes("POLICY_LED_INVALID_LOOP_DESTINATION")
+  )
 })

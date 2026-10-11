@@ -238,13 +238,38 @@ function runTaskWiringPolicyChecks(
         continue
       }
 
+      // Check for conflicting multiple board pin connections on each LED / resistor terminal
+      const anodePins = getBoardPinsFor(led.id, "anode", boardId, wires)
+      const cathodePins = getBoardPinsFor(led.id, "cathode", boardId, wires)
+      const resAPins = getBoardPinsFor(seriesResistor.id, "a", boardId, wires)
+      const resBPins = getBoardPinsFor(seriesResistor.id, "b", boardId, wires)
+
+      for (const [termName, pins] of [
+        ["LED anode", anodePins],
+        ["LED cathode", cathodePins],
+        ["Resistor pin A", resAPins],
+        ["Resistor pin B", resBPins],
+      ] as const) {
+        const unique = [...new Set(pins)]
+        if (unique.length > 1) {
+          errors.push(`${termName} has multiple conflicting board pin connections: '${unique.join(", ")}'.`)
+          diagnosticCodes.push("POLICY_CONFLICTING_PIN_CONNECTIONS")
+        }
+      }
+
       // Check outer destinations: LED branch must connect to a digital GPIO on one end, and GND on the other end
       const allBranchPins = [
-        ...getBoardPinsFor(led.id, "anode", boardId, wires),
-        ...getBoardPinsFor(led.id, "cathode", boardId, wires),
-        ...getBoardPinsFor(seriesResistor.id, "a", boardId, wires),
-        ...getBoardPinsFor(seriesResistor.id, "b", boardId, wires),
+        ...anodePins,
+        ...cathodePins,
+        ...resAPins,
+        ...resBPins,
       ]
+
+      // LED loop must not connect directly to power rails (must be GPIO controlled)
+      if (allBranchPins.some((p) => POWER_PINS.has(p))) {
+        errors.push("LED control task requires microcontroller GPIO control, but is wired directly to a power rail.")
+        diagnosticCodes.push("POLICY_LED_INVALID_POWER_DESTINATION")
+      }
 
       const hasGnd = allBranchPins.some((p) => GND_PINS.has(p))
       const hasGpio = allBranchPins.some((p) => !GND_PINS.has(p) && !POWER_PINS.has(p))
@@ -309,12 +334,31 @@ function runTaskWiringPolicyChecks(
         continue
       }
 
+      // Check for conflicting multiple board pin connections on LDR / divider terminals
+      const ldrAPins = getBoardPinsFor(ldr.id, "a", boardId, wires)
+      const ldrBPins = getBoardPinsFor(ldr.id, "b", boardId, wires)
+      const divResAPins = getBoardPinsFor(dividerResistorId, "a", boardId, wires)
+      const divResBPins = getBoardPinsFor(dividerResistorId, "b", boardId, wires)
+
+      for (const [termName, pins] of [
+        ["LDR terminal A", ldrAPins],
+        ["LDR terminal B", ldrBPins],
+        ["Divider resistor terminal A", divResAPins],
+        ["Divider resistor terminal B", divResBPins],
+      ] as const) {
+        const unique = [...new Set(pins)]
+        if (unique.length > 1) {
+          errors.push(`${termName} has multiple conflicting board pin connections: '${unique.join(", ")}'.`)
+          diagnosticCodes.push("POLICY_CONFLICTING_PIN_CONNECTIONS")
+        }
+      }
+
       // Check power and ground destination rails for the divider
       const allDividerBoardPins = [
-        ...getBoardPinsFor(ldr.id, "a", boardId, wires),
-        ...getBoardPinsFor(ldr.id, "b", boardId, wires),
-        ...getBoardPinsFor(dividerResistorId, "a", boardId, wires),
-        ...getBoardPinsFor(dividerResistorId, "b", boardId, wires),
+        ...ldrAPins,
+        ...ldrBPins,
+        ...divResAPins,
+        ...divResBPins,
       ]
 
       const hasPower = allDividerBoardPins.some((p) => POWER_PINS.has(p))
@@ -351,36 +395,78 @@ function runTaskWiringPolicyChecks(
         continue
       }
 
-      // 2. Destination correctness: VCC must be power, GND must be ground
-      const vccIsPower = vccBoardPins.some((p) => POWER_PINS.has(p))
-      if (!vccIsPower) {
+      // 2. Destination correctness: VCC must strictly and exclusively connect to board power rail(s)
+      const vccAllPower = vccBoardPins.every((p) => POWER_PINS.has(p))
+      if (!vccAllPower) {
         errors.push(`Ultrasonic VCC must connect to a board power rail, got: '${vccBoardPins.join(", ")}'.`)
         diagnosticCodes.push("POLICY_ULTRASONIC_INVALID_POWER_DESTINATION")
       }
+      const uniqueVcc = [...new Set(vccBoardPins)]
+      if (uniqueVcc.length > 1) {
+        errors.push(`Ultrasonic VCC has multiple conflicting board pin connections: '${uniqueVcc.join(", ")}'.`)
+        diagnosticCodes.push("POLICY_CONFLICTING_PIN_CONNECTIONS")
+      }
 
-      const gndIsGnd = gndBoardPins.some((p) => GND_PINS.has(p))
-      if (!gndIsGnd) {
+      // 3. Destination correctness: GND must strictly and exclusively connect to board ground pin(s)
+      const gndAllGnd = gndBoardPins.every((p) => GND_PINS.has(p))
+      if (!gndAllGnd) {
         errors.push(`Ultrasonic GND must connect to a board ground pin, got: '${gndBoardPins.join(", ")}'.`)
         diagnosticCodes.push("POLICY_ULTRASONIC_INVALID_GROUND_DESTINATION")
       }
+      const uniqueGnd = [...new Set(gndBoardPins)]
+      if (uniqueGnd.length > 1) {
+        errors.push(`Ultrasonic GND has multiple conflicting board pin connections: '${uniqueGnd.join(", ")}'.`)
+        diagnosticCodes.push("POLICY_CONFLICTING_PIN_CONNECTIONS")
+      }
 
-      // 3. Destination correctness: Trig and Echo must be digital pins (not power, not ground)
-      const trigIsGpio = trigBoardPins.every((p) => !POWER_PINS.has(p) && !GND_PINS.has(p))
-      if (!trigIsGpio) {
+      // 4. Destination correctness: Trig and Echo must be digital pins (not power, not ground)
+      const trigAllGpio = trigBoardPins.every((p) => !POWER_PINS.has(p) && !GND_PINS.has(p))
+      if (!trigAllGpio) {
         errors.push(`Ultrasonic Trig must connect to a digital GPIO pin, got: '${trigBoardPins.join(", ")}'.`)
         diagnosticCodes.push("POLICY_ULTRASONIC_INVALID_TRIG_DESTINATION")
       }
+      const uniqueTrig = [...new Set(trigBoardPins)]
+      if (uniqueTrig.length > 1) {
+        errors.push(`Ultrasonic Trig has multiple conflicting board pin connections: '${uniqueTrig.join(", ")}'.`)
+        diagnosticCodes.push("POLICY_CONFLICTING_PIN_CONNECTIONS")
+      }
 
-      const echoIsGpio = echoBoardPins.every((p) => !POWER_PINS.has(p) && !GND_PINS.has(p))
-      if (!echoIsGpio) {
+      const echoAllGpio = echoBoardPins.every((p) => !POWER_PINS.has(p) && !GND_PINS.has(p))
+      if (!echoAllGpio) {
         errors.push(`Ultrasonic Echo must connect to a digital GPIO pin, got: '${echoBoardPins.join(", ")}'.`)
         diagnosticCodes.push("POLICY_ULTRASONIC_INVALID_ECHO_DESTINATION")
       }
+      const uniqueEcho = [...new Set(echoBoardPins)]
+      if (uniqueEcho.length > 1) {
+        errors.push(`Ultrasonic Echo has multiple conflicting board pin connections: '${uniqueEcho.join(", ")}'.`)
+        diagnosticCodes.push("POLICY_CONFLICTING_PIN_CONNECTIONS")
+      }
 
-      // 4. Pin conflict: Trig and Echo cannot share the same pin
-      if (trigBoardPins[0] === echoBoardPins[0]) {
-        errors.push(`Ultrasonic trigger and echo cannot share the same pin ('${trigBoardPins[0]}').`)
+      // 5. Pin conflict: Trig and Echo cannot share the same pin
+      const sharedTrigEcho = uniqueTrig.filter((p) => uniqueEcho.includes(p))
+      if (sharedTrigEcho.length > 0) {
+        errors.push(`Ultrasonic trigger and echo cannot share the same pin ('${sharedTrigEcho.join(", ")}').`)
         diagnosticCodes.push("POLICY_ULTRASONIC_PIN_CONFLICT")
+      }
+
+      // 6. Cross-terminal short circuit detection across sensor pins
+      const allSonarPins = [
+        ...uniqueVcc.map((p) => ({ pin: p, role: "VCC" })),
+        ...uniqueGnd.map((p) => ({ pin: p, role: "GND" })),
+        ...uniqueTrig.map((p) => ({ pin: p, role: "Trig" })),
+        ...uniqueEcho.map((p) => ({ pin: p, role: "Echo" })),
+      ]
+      const seenSonarPins = new Map<string, string>()
+      for (const entry of allSonarPins) {
+        if (seenSonarPins.has(entry.pin)) {
+          const prevRole = seenSonarPins.get(entry.pin)!
+          if (prevRole !== entry.role) {
+            errors.push(`Ultrasonic ${prevRole} and ${entry.role} shorted to the same board pin ('${entry.pin}').`)
+            diagnosticCodes.push("POLICY_CONFLICTING_PIN_CONNECTIONS")
+          }
+        } else {
+          seenSonarPins.set(entry.pin, entry.role)
+        }
       }
     }
   }
@@ -407,23 +493,59 @@ function runTaskWiringPolicyChecks(
         continue
       }
 
-      // Destination correctness: VCC must be power, GND must be ground, Sig must be digital/PWM
-      const vccIsPower = vccBoardPins.some((p) => POWER_PINS.has(p))
-      if (!vccIsPower) {
+      // 1. Destination correctness: VCC must strictly and exclusively connect to board power rail(s)
+      const vccAllPower = vccBoardPins.every((p) => POWER_PINS.has(p))
+      if (!vccAllPower) {
         errors.push(`Servo VCC must connect to a board power rail, got: '${vccBoardPins.join(", ")}'.`)
         diagnosticCodes.push("POLICY_SERVO_INVALID_POWER_DESTINATION")
       }
+      const uniqueVcc = [...new Set(vccBoardPins)]
+      if (uniqueVcc.length > 1) {
+        errors.push(`Servo VCC has multiple conflicting board pin connections: '${uniqueVcc.join(", ")}'.`)
+        diagnosticCodes.push("POLICY_CONFLICTING_PIN_CONNECTIONS")
+      }
 
-      const gndIsGnd = gndBoardPins.some((p) => GND_PINS.has(p))
-      if (!gndIsGnd) {
+      // 2. Destination correctness: GND must strictly and exclusively connect to board ground pin(s)
+      const gndAllGnd = gndBoardPins.every((p) => GND_PINS.has(p))
+      if (!gndAllGnd) {
         errors.push(`Servo GND must connect to a board ground pin, got: '${gndBoardPins.join(", ")}'.`)
         diagnosticCodes.push("POLICY_SERVO_INVALID_GROUND_DESTINATION")
       }
+      const uniqueGnd = [...new Set(gndBoardPins)]
+      if (uniqueGnd.length > 1) {
+        errors.push(`Servo GND has multiple conflicting board pin connections: '${uniqueGnd.join(", ")}'.`)
+        diagnosticCodes.push("POLICY_CONFLICTING_PIN_CONNECTIONS")
+      }
 
-      const sigIsGpio = sigBoardPins.every((p) => !POWER_PINS.has(p) && !GND_PINS.has(p))
-      if (!sigIsGpio) {
+      // 3. Destination correctness: Signal must connect to a digital/PWM pin (not power, not ground)
+      const sigAllGpio = sigBoardPins.every((p) => !POWER_PINS.has(p) && !GND_PINS.has(p))
+      if (!sigAllGpio) {
         errors.push(`Servo signal must connect to a digital/PWM pin, got: '${sigBoardPins.join(", ")}'.`)
         diagnosticCodes.push("POLICY_SERVO_INVALID_SIGNAL_DESTINATION")
+      }
+      const uniqueSig = [...new Set(sigBoardPins)]
+      if (uniqueSig.length > 1) {
+        errors.push(`Servo signal has multiple conflicting board pin connections: '${uniqueSig.join(", ")}'.`)
+        diagnosticCodes.push("POLICY_CONFLICTING_PIN_CONNECTIONS")
+      }
+
+      // 4. Cross-terminal short circuit detection across servo terminals
+      const allServoPins = [
+        ...uniqueVcc.map((p) => ({ pin: p, role: "VCC" })),
+        ...uniqueGnd.map((p) => ({ pin: p, role: "GND" })),
+        ...uniqueSig.map((p) => ({ pin: p, role: "Signal" })),
+      ]
+      const seenServoPins = new Map<string, string>()
+      for (const entry of allServoPins) {
+        if (seenServoPins.has(entry.pin)) {
+          const prevRole = seenServoPins.get(entry.pin)!
+          if (prevRole !== entry.role) {
+            errors.push(`Servo ${prevRole} and ${entry.role} shorted to the same board pin ('${entry.pin}').`)
+            diagnosticCodes.push("POLICY_CONFLICTING_PIN_CONNECTIONS")
+          }
+        } else {
+          seenServoPins.set(entry.pin, entry.role)
+        }
       }
     }
   }

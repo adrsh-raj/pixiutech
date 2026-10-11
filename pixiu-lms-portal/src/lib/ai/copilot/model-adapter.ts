@@ -152,7 +152,6 @@ Context: ${JSON.stringify(request.context)}`
         }),
       })
 
-      clearTimeout(timeoutId)
       const durationMs = Date.now() - startTime
 
       if (!res.ok) {
@@ -180,7 +179,31 @@ Context: ${JSON.stringify(request.context)}`
         }
       }
 
-      const data = await res.json()
+      let data: any
+      try {
+        data = await res.json()
+      } catch (jsonErr) {
+        if (controller.signal.aborted) {
+          throw jsonErr
+        }
+        return {
+          rawOutput: "",
+          success: false,
+          metadata: {
+            provider: "http-openai-compatible",
+            model: this.model,
+            version: "1.0.0",
+            requestId: request.requestId,
+            durationMs: Date.now() - startTime,
+            finishReason: "error",
+          },
+          error: {
+            code: "PROVIDER_ERROR",
+            message: `Failed to parse JSON response from inference provider: ${jsonErr instanceof Error ? jsonErr.message : String(jsonErr)}`,
+          },
+        }
+      }
+
       const content = data?.choices?.[0]?.message?.content || ""
       const inputTokens = data?.usage?.prompt_tokens
       const outputTokens = data?.usage?.completion_tokens
@@ -194,7 +217,7 @@ Context: ${JSON.stringify(request.context)}`
             model: this.model,
             version: "1.0.0",
             requestId: request.requestId,
-            durationMs,
+            durationMs: Date.now() - startTime,
             finishReason: "stop",
           },
           error: {
@@ -212,14 +235,13 @@ Context: ${JSON.stringify(request.context)}`
           model: this.model,
           version: "1.0.0",
           requestId: request.requestId,
-          durationMs,
+          durationMs: Date.now() - startTime,
           inputTokens,
           outputTokens,
           finishReason: "stop",
         },
       }
     } catch (err: unknown) {
-      clearTimeout(timeoutId)
       const durationMs = Date.now() - startTime
 
       if (controller.signal.aborted) {
@@ -259,6 +281,10 @@ Context: ${JSON.stringify(request.context)}`
           code: "PROVIDER_ERROR",
           message: `Inference provider connection failed: ${err instanceof Error ? err.message : String(err)}`,
         },
+      }
+    } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId)
       }
     }
   }
