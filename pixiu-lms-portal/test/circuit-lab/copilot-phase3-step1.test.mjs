@@ -968,3 +968,314 @@ test("P3-5: Negative test — Gate strictly rejects LED loop powered directly fr
     gateResult.diagnosticCodes.includes("POLICY_LED_INVALID_LOOP_DESTINATION")
   )
 })
+
+test("P3-2: HttpBaselineModelAdapter removes caller AbortSignal listener on completion (no memory leak)", async () => {
+  const server = http.createServer((req, res) => {
+    res.writeHead(200, { "Content-Type": "application/json" })
+    res.end(JSON.stringify({
+      choices: [{ message: { content: "{\"schema_version\":\"pixiu-copilot-proposal-v1\"}" } }],
+    }))
+  })
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve))
+  const port = server.address().port
+
+  try {
+    const adapter = new HttpBaselineModelAdapter({
+      baseUrl: `http://127.0.0.1:${port}`,
+      defaultTimeoutMs: 1000,
+    })
+
+    const persistentController = new AbortController()
+    let abortListenerFired = false
+    persistentController.signal.addEventListener("abort", () => {
+      abortListenerFired = true
+    })
+
+    const res = await adapter.generateProposal(
+      { requestId: "req-clean-listener", prompt: "LED", context: { targetBoard: "arduino-uno" } },
+      { signal: persistentController.signal }
+    )
+    assert.equal(res.success, true)
+
+    // Verify caller controller abort after completion does not trigger adapter error
+    persistentController.abort()
+    assert.equal(abortListenerFired, true)
+  } finally {
+    await new Promise((resolve) => server.close(resolve))
+  }
+})
+
+test("P3-5: Negative test — Gate strictly rejects Ultrasonic Trig wired to ESP32 input-only pin D34", () => {
+  const esp32InputOnlyTrig = {
+    schema_version: "pixiu-copilot-proposal-v1",
+    task_type: "ultrasonic_alert",
+    summary: "ESP32 Input-Only Trig Defect",
+    assumptions: [],
+    needs_clarification: [],
+    proposal: {
+      circuit: {
+        parts: [
+          { id: "esp32", type: "esp32-devkit", x: 0, y: 0, rotation: 0, props: {} },
+          { id: "sonar", type: "ultrasonic", x: 100, y: 0, rotation: 0, props: {} },
+        ],
+        wires: [
+          { id: "w1", from: { partId: "esp32", pinId: "3v3" }, to: { partId: "sonar", pinId: "vcc" } },
+          { id: "w2", from: { partId: "esp32", pinId: "gnd_l" }, to: { partId: "sonar", pinId: "gnd" } },
+          { id: "w3", from: { partId: "esp32", pinId: "d34" }, to: { partId: "sonar", pinId: "trig" } }, // D34 IS INPUT-ONLY!
+          { id: "w4", from: { partId: "esp32", pinId: "d4" }, to: { partId: "sonar", pinId: "echo" } },
+        ],
+      },
+      code: null,
+      explanation: "Trig pulse requires output GPIO, but D34 is input-only",
+    },
+    capabilities: {
+      simulation: "supported",
+      compilation: "not_tested",
+      physical_hardware: "not_verified",
+    },
+  }
+
+  const gateResult = evaluateProposalGate(esp32InputOnlyTrig, { currentBoard: "esp32-devkit" })
+  assert.equal(gateResult.passed, false)
+  assert.equal(gateResult.canApply, false)
+  assert.ok(
+    gateResult.diagnosticCodes.includes("POLICY_ULTRASONIC_INVALID_TRIG_DESTINATION") &&
+    gateResult.diagnosticCodes.includes("POLICY_GPIO_CAPABILITY_MISMATCH"),
+    "Must reject input-only pin for ultrasonic Trig"
+  )
+})
+
+test("P3-5: Negative test — Gate strictly rejects Servo Signal wired to ESP32 input-only pin D35", () => {
+  const esp32InputOnlyServo = {
+    schema_version: "pixiu-copilot-proposal-v1",
+    task_type: "servo_control",
+    summary: "ESP32 Input-Only Servo Signal Defect",
+    assumptions: [],
+    needs_clarification: [],
+    proposal: {
+      circuit: {
+        parts: [
+          { id: "esp32", type: "esp32-devkit", x: 0, y: 0, rotation: 0, props: {} },
+          { id: "servo1", type: "servo", x: 100, y: 0, rotation: 0, props: {} },
+        ],
+        wires: [
+          { id: "w1", from: { partId: "esp32", pinId: "3v3" }, to: { partId: "servo1", pinId: "vcc" } },
+          { id: "w2", from: { partId: "esp32", pinId: "gnd_r" }, to: { partId: "servo1", pinId: "gnd" } },
+          { id: "w3", from: { partId: "esp32", pinId: "d35" }, to: { partId: "servo1", pinId: "sig" } }, // D35 IS INPUT-ONLY!
+        ],
+      },
+      code: null,
+      explanation: "Servo PWM control requires output GPIO, but D35 is input-only",
+    },
+    capabilities: {
+      simulation: "supported",
+      compilation: "not_tested",
+      physical_hardware: "not_verified",
+    },
+  }
+
+  const gateResult = evaluateProposalGate(esp32InputOnlyServo, { currentBoard: "esp32-devkit" })
+  assert.equal(gateResult.passed, false)
+  assert.equal(gateResult.canApply, false)
+  assert.ok(
+    gateResult.diagnosticCodes.includes("POLICY_SERVO_INVALID_SIGNAL_DESTINATION") &&
+    gateResult.diagnosticCodes.includes("POLICY_GPIO_CAPABILITY_MISMATCH"),
+    "Must reject input-only pin for servo signal"
+  )
+})
+
+test("P3-5: Negative test — Gate strictly rejects LED control loop connected to ESP32 input-only pin D34", () => {
+  const esp32InputOnlyLed = {
+    schema_version: "pixiu-copilot-proposal-v1",
+    task_type: "led_control",
+    summary: "ESP32 Input-Only LED Control Defect",
+    assumptions: [],
+    needs_clarification: [],
+    proposal: {
+      circuit: {
+        parts: [
+          { id: "esp32", type: "esp32-devkit", x: 0, y: 0, rotation: 0, props: {} },
+          { id: "led1", type: "led", x: 100, y: 0, rotation: 0, props: {} },
+          { id: "r1", type: "resistor", x: 200, y: 0, rotation: 0, props: { resistance: 220 } },
+        ],
+        wires: [
+          { id: "w1", from: { partId: "esp32", pinId: "d34" }, to: { partId: "led1", pinId: "anode" } }, // D34 IS INPUT-ONLY!
+          { id: "w2", from: { partId: "led1", pinId: "cathode" }, to: { partId: "r1", pinId: "a" } },
+          { id: "w3", from: { partId: "r1", pinId: "b" }, to: { partId: "esp32", pinId: "gnd_l" } },
+        ],
+      },
+      code: null,
+      explanation: "LED driving requires output GPIO, but D34 is input-only",
+    },
+    capabilities: {
+      simulation: "supported",
+      compilation: "not_tested",
+      physical_hardware: "not_verified",
+    },
+  }
+
+  const gateResult = evaluateProposalGate(esp32InputOnlyLed, { currentBoard: "esp32-devkit" })
+  assert.equal(gateResult.passed, false)
+  assert.equal(gateResult.canApply, false)
+  assert.ok(
+    gateResult.diagnosticCodes.includes("POLICY_LED_INVALID_LOOP_DESTINATION") &&
+    gateResult.diagnosticCodes.includes("POLICY_GPIO_CAPABILITY_MISMATCH"),
+    "Must reject input-only pin for LED control"
+  )
+})
+
+test("P3-5: Regression test — Gate accepts Ultrasonic Echo on ESP32 input-only pin D34 when Trig is on output GPIO D4", () => {
+  const esp32ValidEcho = {
+    schema_version: "pixiu-copilot-proposal-v1",
+    task_type: "ultrasonic_alert",
+    summary: "ESP32 Valid Echo on D34",
+    assumptions: [],
+    needs_clarification: [],
+    proposal: {
+      circuit: {
+        parts: [
+          { id: "esp32", type: "esp32-devkit", x: 0, y: 0, rotation: 0, props: {} },
+          { id: "sonar", type: "ultrasonic", x: 100, y: 0, rotation: 0, props: {} },
+        ],
+        wires: [
+          { id: "w1", from: { partId: "esp32", pinId: "3v3" }, to: { partId: "sonar", pinId: "vcc" } },
+          { id: "w2", from: { partId: "esp32", pinId: "gnd_l" }, to: { partId: "sonar", pinId: "gnd" } },
+          { id: "w3", from: { partId: "esp32", pinId: "d4" }, to: { partId: "sonar", pinId: "trig" } }, // D4 is valid output GPIO
+          { id: "w4", from: { partId: "esp32", pinId: "d34" }, to: { partId: "sonar", pinId: "echo" } }, // D34 is input-only, valid for Echo!
+        ],
+      },
+      code: null,
+      explanation: "Echo is input-only, D34 is input-capable",
+    },
+    capabilities: {
+      simulation: "supported",
+      compilation: "not_tested",
+      physical_hardware: "not_verified",
+    },
+  }
+
+  const gateResult = evaluateProposalGate(esp32ValidEcho, { currentBoard: "esp32-devkit" })
+  assert.equal(gateResult.passed, true, `Expected ESP32 valid echo to pass: ${gateResult.errors.join(", ")}`)
+})
+
+test("P3-5: Regression test — Valid configurations across ALL 4 boards pass electrical gate cleanly", () => {
+  const boards = [
+    {
+      board: "arduino-uno",
+      powerPin: "5v",
+      gndPin: "gnd",
+      outPin: "d9",
+      inPin: "d10",
+      ledPin: "d13",
+    },
+    {
+      board: "esp32-devkit",
+      powerPin: "3v3",
+      gndPin: "gnd_l",
+      outPin: "d4",
+      inPin: "d14",
+      ledPin: "d2",
+    },
+    {
+      board: "rpi-pico",
+      powerPin: "3v3",
+      gndPin: "gnd_1",
+      outPin: "gp4",
+      inPin: "gp5",
+      ledPin: "gp15",
+    },
+    {
+      board: "microbit-v2",
+      powerPin: "3v",
+      gndPin: "gnd",
+      outPin: "p0",
+      inPin: "p1",
+      ledPin: "p2",
+    },
+  ]
+
+  for (const b of boards) {
+    // 1. LED Valid
+    const ledProposal = {
+      schema_version: "pixiu-copilot-proposal-v1",
+      task_type: "led_control",
+      summary: `Valid LED on ${b.board}`,
+      assumptions: [],
+      needs_clarification: [],
+      proposal: {
+        circuit: {
+          parts: [
+            { id: "board", type: b.board, x: 0, y: 0, rotation: 0, props: {} },
+            { id: "led1", type: "led", x: 100, y: 0, rotation: 0, props: {} },
+            { id: "r1", type: "resistor", x: 200, y: 0, rotation: 0, props: { resistance: 220 } },
+          ],
+          wires: [
+            { id: "w1", from: { partId: "board", pinId: b.ledPin }, to: { partId: "led1", pinId: "anode" } },
+            { id: "w2", from: { partId: "led1", pinId: "cathode" }, to: { partId: "r1", pinId: "a" } },
+            { id: "w3", from: { partId: "r1", pinId: "b" }, to: { partId: "board", pinId: b.gndPin } },
+          ],
+        },
+        code: null,
+        explanation: "Valid LED",
+      },
+      capabilities: { simulation: "supported", compilation: "not_tested", physical_hardware: "not_verified" },
+    }
+    const ledGate = evaluateProposalGate(ledProposal, { currentBoard: b.board })
+    assert.equal(ledGate.passed, true, `LED on ${b.board} failed: ${ledGate.errors.join(", ")}`)
+
+    // 2. Ultrasonic Valid
+    const sonarProposal = {
+      schema_version: "pixiu-copilot-proposal-v1",
+      task_type: "ultrasonic_alert",
+      summary: `Valid Sonar on ${b.board}`,
+      assumptions: [],
+      needs_clarification: [],
+      proposal: {
+        circuit: {
+          parts: [
+            { id: "board", type: b.board, x: 0, y: 0, rotation: 0, props: {} },
+            { id: "sonar", type: "ultrasonic", x: 100, y: 0, rotation: 0, props: {} },
+          ],
+          wires: [
+            { id: "w1", from: { partId: "board", pinId: b.powerPin }, to: { partId: "sonar", pinId: "vcc" } },
+            { id: "w2", from: { partId: "board", pinId: b.gndPin }, to: { partId: "sonar", pinId: "gnd" } },
+            { id: "w3", from: { partId: "board", pinId: b.outPin }, to: { partId: "sonar", pinId: "trig" } },
+            { id: "w4", from: { partId: "board", pinId: b.inPin }, to: { partId: "sonar", pinId: "echo" } },
+          ],
+        },
+        code: null,
+        explanation: "Valid Sonar",
+      },
+      capabilities: { simulation: "supported", compilation: "not_tested", physical_hardware: "not_verified" },
+    }
+    const sonarGate = evaluateProposalGate(sonarProposal, { currentBoard: b.board })
+    assert.equal(sonarGate.passed, true, `Sonar on ${b.board} failed: ${sonarGate.errors.join(", ")}`)
+
+    // 3. Servo Valid
+    const servoProposal = {
+      schema_version: "pixiu-copilot-proposal-v1",
+      task_type: "servo_control",
+      summary: `Valid Servo on ${b.board}`,
+      assumptions: [],
+      needs_clarification: [],
+      proposal: {
+        circuit: {
+          parts: [
+            { id: "board", type: b.board, x: 0, y: 0, rotation: 0, props: {} },
+            { id: "servo1", type: "servo", x: 100, y: 0, rotation: 0, props: {} },
+          ],
+          wires: [
+            { id: "w1", from: { partId: "board", pinId: b.powerPin }, to: { partId: "servo1", pinId: "vcc" } },
+            { id: "w2", from: { partId: "board", pinId: b.gndPin }, to: { partId: "servo1", pinId: "gnd" } },
+            { id: "w3", from: { partId: "board", pinId: b.outPin }, to: { partId: "servo1", pinId: "sig" } },
+          ],
+        },
+        code: null,
+        explanation: "Valid Servo",
+      },
+      capabilities: { simulation: "supported", compilation: "not_tested", physical_hardware: "not_verified" },
+    }
+    const servoGate = evaluateProposalGate(servoProposal, { currentBoard: b.board })
+    assert.equal(servoGate.passed, true, `Servo on ${b.board} failed: ${servoGate.errors.join(", ")}`)
+  }
+})

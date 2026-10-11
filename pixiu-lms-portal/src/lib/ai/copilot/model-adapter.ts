@@ -93,6 +93,7 @@ export class HttpBaselineModelAdapter implements ModelAdapter {
     // Setup combined AbortController for timeout and caller signal
     const controller = new AbortController()
     let timeoutId: ReturnType<typeof setTimeout> | undefined
+    let abortListener: (() => void) | undefined
 
     if (options.signal) {
       if (options.signal.aborted) {
@@ -113,7 +114,8 @@ export class HttpBaselineModelAdapter implements ModelAdapter {
           },
         }
       }
-      options.signal.addEventListener("abort", () => controller.abort(), { once: true })
+      abortListener = () => controller.abort()
+      options.signal.addEventListener("abort", abortListener, { once: true })
     }
 
     timeoutId = setTimeout(() => {
@@ -285,6 +287,9 @@ Context: ${JSON.stringify(request.context)}`
     } finally {
       if (timeoutId) {
         clearTimeout(timeoutId)
+      }
+      if (options.signal && abortListener) {
+        options.signal.removeEventListener("abort", abortListener)
       }
     }
   }

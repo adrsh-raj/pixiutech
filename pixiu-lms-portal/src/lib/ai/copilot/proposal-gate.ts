@@ -13,6 +13,7 @@
  */
 
 import type { CircuitState, PlacedPart, Wire } from "../../circuit-types"
+import { getBoardDefinition, type BoardDefinition, type BoardPin } from "../../board-registry"
 import { validateProposedCircuit, type CircuitValidationResult } from "../../circuit-validator"
 import type { CopilotProposalPayload, SupportedTaskFamily } from "./proposal-schema"
 
@@ -121,10 +122,12 @@ export function evaluateProposalGate(
 
   // 5. Deep Task-Specific Wiring and Destination Policy Checks
   if (boardPart) {
+    const boardDef = getBoardDefinition(boardPart.type) || getBoardDefinition(targetBoard)
     runTaskWiringPolicyChecks(
       proposal.task_type,
       candidateCircuit,
       boardPart.id,
+      boardDef,
       errors,
       warnings,
       diagnosticCodes
@@ -182,12 +185,91 @@ function getBoardPinsFor(partId: string, pinId: string, boardId: string, wires: 
 }
 
 /**
+ * Resolves a pin on a target board definition by id, label, or alternate names.
+ */
+export function resolveBoardPinDef(boardDef: BoardDefinition | undefined, pinId: string): BoardPin | undefined {
+  if (!boardDef) return undefined
+  const lower = pinId.toLowerCase()
+  return boardDef.pins.find(
+    (p) =>
+      p.id.toLowerCase() === lower ||
+      p.label.toLowerCase() === lower ||
+      p.alternateNames?.some((alt) => alt.toLowerCase() === lower)
+  )
+}
+
+/**
+ * Validates whether a board pin is capable of driving digital output.
+ * Rejects:
+ * - Power/GND rails
+ * - Non-existent board pins
+ * - inputOnly pins (e.g., ESP32 D34, D35, VP, VN)
+ * - Dedicated control/reset pins (e.g., EN, RUN, RST)
+ */
+export function isOutputCapableGpio(boardDef: BoardDefinition | undefined, pinId: string): { valid: boolean; reason?: string } {
+  const lower = pinId.toLowerCase()
+  if (POWER_PINS.has(lower)) {
+    return { valid: false, reason: "Pin is a power rail and cannot drive output" }
+  }
+  if (GND_PINS.has(lower)) {
+    return { valid: false, reason: "Pin is a ground rail and cannot drive output" }
+  }
+  if (boardDef) {
+    const pinDef = resolveBoardPinDef(boardDef, pinId)
+    if (!pinDef) {
+      return { valid: false, reason: `Pin '${pinId}' does not exist on board '${boardDef.name}'` }
+    }
+    if (pinDef.kind === "power" || pinDef.kind === "ground") {
+      return { valid: false, reason: `Pin '${pinId}' is a ${pinDef.kind} rail` }
+    }
+    if (pinDef.capabilities?.inputOnly) {
+      return { valid: false, reason: `Pin '${pinId}' is an input-only pin on ${boardDef.name}` }
+    }
+    if (["en", "run", "rst", "reset", "3v3_en", "adc_vref"].includes(pinDef.id.toLowerCase())) {
+      return { valid: false, reason: `Pin '${pinId}' is a dedicated system control pin` }
+    }
+  }
+  return { valid: true }
+}
+
+/**
+ * Validates whether a board pin is capable of receiving digital input.
+ * Rejects:
+ * - Power/GND rails
+ * - Non-existent board pins
+ * - Dedicated control/reset pins (e.g., EN, RUN, RST)
+ */
+export function isInputCapableGpio(boardDef: BoardDefinition | undefined, pinId: string): { valid: boolean; reason?: string } {
+  const lower = pinId.toLowerCase()
+  if (POWER_PINS.has(lower)) {
+    return { valid: false, reason: "Pin is a power rail and cannot receive GPIO input" }
+  }
+  if (GND_PINS.has(lower)) {
+    return { valid: false, reason: "Pin is a ground rail and cannot receive GPIO input" }
+  }
+  if (boardDef) {
+    const pinDef = resolveBoardPinDef(boardDef, pinId)
+    if (!pinDef) {
+      return { valid: false, reason: `Pin '${pinId}' does not exist on board '${boardDef.name}'` }
+    }
+    if (pinDef.kind === "power" || pinDef.kind === "ground") {
+      return { valid: false, reason: `Pin '${pinId}' is a ${pinDef.kind} rail` }
+    }
+    if (["en", "run", "rst", "reset", "3v3_en", "adc_vref"].includes(pinDef.id.toLowerCase())) {
+      return { valid: false, reason: `Pin '${pinId}' is a dedicated system control pin` }
+    }
+  }
+  return { valid: true }
+}
+
+/**
  * Deep task-specific wiring policy and destination checks.
  */
 function runTaskWiringPolicyChecks(
   taskType: SupportedTaskFamily,
   circuit: CircuitState,
   boardId: string,
+  boardDef: BoardDefinition | undefined,
   errors: string[],
   warnings: string[],
   diagnosticCodes: string[]
@@ -277,6 +359,17 @@ function runTaskWiringPolicyChecks(
       if (!hasGnd || !hasGpio) {
         errors.push(`LED circuit loop must connect to a digital control pin on one end and GND on the other end.`)
         diagnosticCodes.push("POLICY_LED_INVALID_LOOP_DESTINATION")
+      }
+
+      // Check GPIO output capability (rejects input-only pins like ESP32 D34/D35)
+      const gpioPins = allBranchPins.filter((p) => !GND_PINS.has(p) && !POWER_PINS.has(p))
+      for (const p of gpioPins) {
+        const outCheck = isOutputCapableGpio(boardDef, p)
+        if (!outCheck.valid) {
+          errors.push(`LED control pin '${p}' cannot drive output: ${outCheck.reason}.`)
+          diagnosticCodes.push("POLICY_LED_INVALID_LOOP_DESTINATION")
+          diagnosticCodes.push("POLICY_GPIO_CAPABILITY_MISMATCH")
+        }
       }
     }
   }
@@ -419,24 +512,31 @@ function runTaskWiringPolicyChecks(
         diagnosticCodes.push("POLICY_CONFLICTING_PIN_CONNECTIONS")
       }
 
-      // 4. Destination correctness: Trig and Echo must be digital pins (not power, not ground)
-      const trigAllGpio = trigBoardPins.every((p) => !POWER_PINS.has(p) && !GND_PINS.has(p))
-      if (!trigAllGpio) {
-        errors.push(`Ultrasonic Trig must connect to a digital GPIO pin, got: '${trigBoardPins.join(", ")}'.`)
-        diagnosticCodes.push("POLICY_ULTRASONIC_INVALID_TRIG_DESTINATION")
-      }
+      // 4. Destination correctness: Trig must be an output-capable digital pin (not power, not ground, not input-only)
       const uniqueTrig = [...new Set(trigBoardPins)]
+      for (const p of uniqueTrig) {
+        const outCheck = isOutputCapableGpio(boardDef, p)
+        if (!outCheck.valid) {
+          errors.push(`Ultrasonic Trig must connect to an output-capable digital GPIO pin, got: '${p}': ${outCheck.reason}.`)
+          diagnosticCodes.push("POLICY_ULTRASONIC_INVALID_TRIG_DESTINATION")
+          diagnosticCodes.push("POLICY_GPIO_CAPABILITY_MISMATCH")
+        }
+      }
       if (uniqueTrig.length > 1) {
         errors.push(`Ultrasonic Trig has multiple conflicting board pin connections: '${uniqueTrig.join(", ")}'.`)
         diagnosticCodes.push("POLICY_CONFLICTING_PIN_CONNECTIONS")
       }
 
-      const echoAllGpio = echoBoardPins.every((p) => !POWER_PINS.has(p) && !GND_PINS.has(p))
-      if (!echoAllGpio) {
-        errors.push(`Ultrasonic Echo must connect to a digital GPIO pin, got: '${echoBoardPins.join(", ")}'.`)
-        diagnosticCodes.push("POLICY_ULTRASONIC_INVALID_ECHO_DESTINATION")
-      }
+      // Echo must be an input-capable digital pin (not power, not ground)
       const uniqueEcho = [...new Set(echoBoardPins)]
+      for (const p of uniqueEcho) {
+        const inCheck = isInputCapableGpio(boardDef, p)
+        if (!inCheck.valid) {
+          errors.push(`Ultrasonic Echo must connect to an input-capable digital GPIO pin, got: '${p}': ${inCheck.reason}.`)
+          diagnosticCodes.push("POLICY_ULTRASONIC_INVALID_ECHO_DESTINATION")
+          diagnosticCodes.push("POLICY_GPIO_CAPABILITY_MISMATCH")
+        }
+      }
       if (uniqueEcho.length > 1) {
         errors.push(`Ultrasonic Echo has multiple conflicting board pin connections: '${uniqueEcho.join(", ")}'.`)
         diagnosticCodes.push("POLICY_CONFLICTING_PIN_CONNECTIONS")
@@ -517,13 +617,16 @@ function runTaskWiringPolicyChecks(
         diagnosticCodes.push("POLICY_CONFLICTING_PIN_CONNECTIONS")
       }
 
-      // 3. Destination correctness: Signal must connect to a digital/PWM pin (not power, not ground)
-      const sigAllGpio = sigBoardPins.every((p) => !POWER_PINS.has(p) && !GND_PINS.has(p))
-      if (!sigAllGpio) {
-        errors.push(`Servo signal must connect to a digital/PWM pin, got: '${sigBoardPins.join(", ")}'.`)
-        diagnosticCodes.push("POLICY_SERVO_INVALID_SIGNAL_DESTINATION")
-      }
+      // 3. Destination correctness: Signal must connect to an output-capable digital/PWM pin (not power, not ground, not input-only)
       const uniqueSig = [...new Set(sigBoardPins)]
+      for (const p of uniqueSig) {
+        const outCheck = isOutputCapableGpio(boardDef, p)
+        if (!outCheck.valid) {
+          errors.push(`Servo signal must connect to an output-capable digital/PWM pin, got '${p}': ${outCheck.reason}.`)
+          diagnosticCodes.push("POLICY_SERVO_INVALID_SIGNAL_DESTINATION")
+          diagnosticCodes.push("POLICY_GPIO_CAPABILITY_MISMATCH")
+        }
+      }
       if (uniqueSig.length > 1) {
         errors.push(`Servo signal has multiple conflicting board pin connections: '${uniqueSig.join(", ")}'.`)
         diagnosticCodes.push("POLICY_CONFLICTING_PIN_CONNECTIONS")
