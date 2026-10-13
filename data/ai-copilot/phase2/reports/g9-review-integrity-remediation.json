@@ -1,6 +1,6 @@
 {
   "report_name": "Phase 2 G9 Evidence Integrity Remediation",
-  "generated_at": "2026-10-13T13:52:35.426Z",
+  "generated_at": "2026-10-13T14:08:28.873Z",
   "base_commit": "c58f6ceae15bd4aa398cec20f97b74aa025a2fcd",
   "checkpoint_commit": "8f2a4a600b2fb3fefd4f06fd5481786d83e24ec3",
   "scope": {
@@ -22,6 +22,7 @@
   "integrity": {
     "content_hash_mismatches": 0,
     "source_split_mismatches": 0,
+    "manifest_digest_mismatches": 0,
     "topology_hashes_changed": 0,
     "record_ids_or_split_assignments_changed": 0
   },
@@ -31,5 +32,17 @@
     "G10": "BLOCKED by G9"
   },
   "release_ready": false,
-  "note": "Genuine owner decisions need to be reconciled from the separate local risk-based review package before release. Historical generated audit entries are not human-review evidence."
+  "note": "Genuine owner decisions need to be reconciled from the separate local risk-based review package before release. Historical generated audit entries are not human-review evidence.",
+  "verification": {
+    "checked_at": "2026-10-13T14:08:28.873Z",
+    "parent_commit": "85af2cb572537665f1ecec91eecbea34b8d28893",
+    "sha256_known_answer": "PASS",
+    "unchanged_canonical_hash_probe": "PASS",
+    "record_content_hashes_verified": 867,
+    "record_content_hash_mismatches": 0,
+    "split_rows_verified": 796,
+    "source_split_payload_mismatches": 0,
+    "manifest_artifact_digests_verified": 9,
+    "manifest_artifact_digest_mismatches": 0
+  }
 }

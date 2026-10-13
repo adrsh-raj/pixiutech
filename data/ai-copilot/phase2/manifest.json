@@ -1,8 +1,8 @@
 {
   "dataset_name": "pixiu-ai-copilot-evaluation-corpus",
   "version": "2.0.0",
-  "commit_sha": "c58f6ceae15bd4aa398cec20f97b74aa025a2fcd",
-  "generated_at": "2026-10-13T13:53:37.163Z",
+  "commit_sha": "85af2cb572537665f1ecec91eecbea34b8d28893",
+  "generated_at": "2026-10-13T14:06:31.760Z",
   "record_schema_version": "1.0.0",
   "pilot_target_satisfied": true,
   "overall_status": "FAILED",
@@ -96,49 +96,49 @@
       "name": "Product Metric Report",
       "passed": false,
       "metric": "Blocked by G9 human sign-off",
-      "threshold": "Complete counts per task, board, and split"
+      "threshold": "Complete counts per task, board, and split; upstream G9 human sign-off passed"
     }
   ],
   "artifacts": [
     {
       "path": "records/canonical.jsonl",
       "size_bytes": 330089,
-      "sha256": "c8ee1184d009f842a685ee77a13cd1ea4348eccf97a7d967b634a40e9730b6dd"
+      "sha256": "1e9085cf0741226649823ec1590a14e282e4fe7a05991b19839142dc3fc4ca55"
     },
     {
       "path": "records/requests.jsonl",
       "size_bytes": 1690133,
-      "sha256": "93a5167d57dd16e77c5fecc72ed9c86736c5ac37a9da4b38fcc8c433bfd0e57e"
+      "sha256": "9b3a1f5d718f94ee0ffd01a17677a8a37daffa7c79fb3b58d44fd7192a209717"
     },
     {
       "path": "records/fault-repairs.jsonl",
       "size_bytes": 1230455,
-      "sha256": "e86716c799447a789b7d7c31ac9aa9bd89d1f7d80febbc6130e41e49950a4680"
+      "sha256": "037038856cf7f883047a1884de26897b8a9adc27a1b95bb25ebf37aa3544982d"
     },
     {
       "path": "records/diagnosis-explanations.jsonl",
       "size_bytes": 498428,
-      "sha256": "b566647dbb24bb0c42b227e5167e85eb372400f6eed407f130f08688c968857e"
+      "sha256": "b4c2a3541c9e8e023dd9ba8eec9cce8ed927a3c943065d0f5fa2dc2dc514755f"
     },
     {
       "path": "records/blockly-code.jsonl",
       "size_bytes": 582725,
-      "sha256": "c077e3847679d8382d3d63ed949f09872897739de4bf63d77a8229daf4cc7b66"
+      "sha256": "a424a1c3e13b5e93d5345854ec4b04934a0af73df061aab11c66fd0abd12d386"
     },
     {
       "path": "splits/train.jsonl",
       "size_bytes": 2456028,
-      "sha256": "09cc5f448d9696ec17e9fc37b0299c1b0d234ee115141c936b8db3138bb7b33f"
+      "sha256": "df996a4ced5647ec889d6e91e9dc7b98facf0087bd5061da4f183761cbbd738b"
     },
     {
       "path": "splits/validation.jsonl",
       "size_bytes": 953075,
-      "sha256": "dc1bef9a5b4e85f80480f4071d069b16dca65766bd1c898f815384ebc05dc628"
+      "sha256": "f2f4fc580bbc516b78e2e87e82b57ad6cc29dc70bc8d7596755bb9f664f5b128"
     },
     {
       "path": "splits/test.jsonl",
       "size_bytes": 592638,
-      "sha256": "398342c4fd95caee81df5f9a47dbf12b61683d6a57473465d20f74d1ba00cf0c"
+      "sha256": "62e6b116a8c30c7df985ee3c9fcddf6145a2ef920aa3a901faf1b33498fcc7bb"
     },
     {
       "path": "reports/source-inventory.json",
