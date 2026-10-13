@@ -87,5 +87,20 @@
     "path": "reports/human-review-audit.jsonl",
     "lines_preserved_unchanged": 1734,
     "note": "The prior append-only entries are retained as a record of the imports; they are not evidence that independent human reviews occurred."
+  },
+  "shared_branch_follow_up": {
+    "verified_at": "2026-10-13T13:52:35.426Z",
+    "finding": "A later commit reintroduced historical adrsh-lead-reviewer bulk-fill approvals after the earlier correction report.",
+    "action": "Restored review objects from the pinned pre-fill checkpoint, preserved the append-only audit log, synced fan/pump/NeoPixel safety advisories, and recalculated content hashes.",
+    "scope": {
+      "canonical_parents": 71,
+      "released_records": 796,
+      "unique_records": 867
+    },
+    "audit_log_entries_preserved": 2601,
+    "independent_human_approvals_counted": 0,
+    "G9": "BLOCKED — 0/867 approved; 867 pending",
+    "G10": "BLOCKED by G9",
+    "release_ready": false
   }
 }

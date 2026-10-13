@@ -269,7 +269,7 @@ export async function buildReleaseReport() {
     countsByBoard[b] = (countsByBoard[b] || 0) + 1
   }
 
-  const g10Passed = Object.keys(countsByTaskType).length === 4 && Object.keys(countsByBoard).length >= 4
+  const g10Passed = Object.keys(countsByTaskType).length === 4 && Object.keys(countsByBoard).length >= 4 && g9Passed
 
   const gates = [
     { id: "G1", name: "Inventory Coverage", threshold: "100% inventoried; excluded get reasons", passed: g1Passed, score: `${totalInventoried}/${totalInventoried}` },
@@ -281,7 +281,7 @@ export async function buildReleaseReport() {
     { id: "G7", name: "Split Isolation", threshold: "0 cross-split family, record, or topology leaks", passed: g7Passed, score: "0 leaks" },
     { id: "G8", name: "Content Hash Integrity", threshold: "Recomputed task-specific hashes match released/canonical records and source artifacts equal split copies", passed: g8Passed, score: "released mismatches " + releasedHashMismatches.length + "; canonical mismatches " + canonicalHashMismatches.length + "; source/split mismatches " + artifactSplitMismatches.length, details: { released_mismatch_count: releasedHashMismatches.length, released_mismatches: releasedHashMismatches.slice(0, 50), canonical_mismatch_count: canonicalHashMismatches.length, canonical_mismatches: canonicalHashMismatches.slice(0, 50), source_split_mismatch_count: artifactSplitMismatches.length, source_split_mismatches: artifactSplitMismatches.slice(0, 50) } },
     { id: "G9", name: "Independent Human Review", threshold: "Every canonical parent and released record has a named human approval", passed: g9Passed, score: `${approvedCount}/${reviewRecords.length}; ${pendingReviews.length} pending` },
-    { id: "G10", name: "Product Metric Report", threshold: "Complete counts per task, board, and split", passed: g10Passed, score: "Generated" },
+    { id: "G10", name: "Product Metric Report", threshold: "Complete counts per task, board, and split; upstream G9 human sign-off passed", passed: g10Passed, score: g10Passed ? "Generated" : "Blocked by G9 human sign-off" },
   ]
 
   const allGatesPassed = gates.every((g) => g.passed)

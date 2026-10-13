@@ -1,11 +1,11 @@
 {
   "dataset_name": "pixiu-ai-copilot-evaluation-corpus",
   "version": "2.0.0",
-  "commit_sha": "0abc4a9da355ca545ab1dc541345b6680eed8978",
-  "generated_at": "2026-10-10T16:20:33.000Z",
+  "commit_sha": "c58f6ceae15bd4aa398cec20f97b74aa025a2fcd",
+  "generated_at": "2026-10-13T13:53:37.163Z",
   "record_schema_version": "1.0.0",
   "pilot_target_satisfied": true,
-  "overall_status": "PASSED",
+  "overall_status": "FAILED",
   "summary": {
     "total_records": 796,
     "project_families": 66,
@@ -87,58 +87,58 @@
     {
       "gate_id": "G9",
       "name": "Independent Human Review",
-      "passed": true,
-      "metric": "867/867; 0 pending",
+      "passed": false,
+      "metric": "0/867; 867 pending",
       "threshold": "Every canonical parent and released record has a named human approval"
     },
     {
       "gate_id": "G10",
       "name": "Product Metric Report",
-      "passed": true,
-      "metric": "Generated",
+      "passed": false,
+      "metric": "Blocked by G9 human sign-off",
       "threshold": "Complete counts per task, board, and split"
     }
   ],
   "artifacts": [
     {
       "path": "records/canonical.jsonl",
-      "size_bytes": 328250,
-      "sha256": "d7f5a2c29e01853a74b6f33ea66296d0bec375cdbd1f99051dd179d9a47b7475"
+      "size_bytes": 330089,
+      "sha256": "c8ee1184d009f842a685ee77a13cd1ea4348eccf97a7d967b634a40e9730b6dd"
     },
     {
       "path": "records/requests.jsonl",
-      "size_bytes": 1677033,
-      "sha256": "f4e17ac019aeac311d4e3e0694b793a6f572bf2e227222f8f1af8a3f74a91699"
+      "size_bytes": 1690133,
+      "sha256": "93a5167d57dd16e77c5fecc72ed9c86736c5ac37a9da4b38fcc8c433bfd0e57e"
     },
     {
       "path": "records/fault-repairs.jsonl",
-      "size_bytes": 1222115,
-      "sha256": "fe5f5e4b10004921693439901644844e5473b0852c672f9a1c371ca8a00b61d5"
+      "size_bytes": 1230455,
+      "sha256": "e86716c799447a789b7d7c31ac9aa9bd89d1f7d80febbc6130e41e49950a4680"
     },
     {
       "path": "records/diagnosis-explanations.jsonl",
-      "size_bytes": 492478,
-      "sha256": "a57b6b0941c1edc631eed163c4f90c6d7d70da74a5fbfebf0135d9d559f41fed"
+      "size_bytes": 498428,
+      "sha256": "b566647dbb24bb0c42b227e5167e85eb372400f6eed407f130f08688c968857e"
     },
     {
       "path": "records/blockly-code.jsonl",
-      "size_bytes": 578143,
-      "sha256": "0cf32251efdb1ab0012427f7c909fb7fa3fcef5e4b0a13028050480ca107fcc8"
+      "size_bytes": 582725,
+      "sha256": "c077e3847679d8382d3d63ed949f09872897739de4bf63d77a8229daf4cc7b66"
     },
     {
       "path": "splits/train.jsonl",
-      "size_bytes": 2441764,
-      "sha256": "8990a43ed3a24fb79a266c57c0f6348ab10b53f4c190fc7edf60232aacccdbc9"
+      "size_bytes": 2456028,
+      "sha256": "09cc5f448d9696ec17e9fc37b0299c1b0d234ee115141c936b8db3138bb7b33f"
     },
     {
       "path": "splits/validation.jsonl",
-      "size_bytes": 944098,
-      "sha256": "39ccc5e790f94eff92111c3cce93b4c2df2d39c3f9e8e9ce9a4fdc4f8a8c2014"
+      "size_bytes": 953075,
+      "sha256": "dc1bef9a5b4e85f80480f4071d069b16dca65766bd1c898f815384ebc05dc628"
     },
     {
       "path": "splits/test.jsonl",
-      "size_bytes": 583907,
-      "sha256": "a656ca7debd644d31685088bdc5b4849544fcd917526218053f4d4e77041a820"
+      "size_bytes": 592638,
+      "sha256": "398342c4fd95caee81df5f9a47dbf12b61683d6a57473465d20f74d1ba00cf0c"
     },
     {
       "path": "reports/source-inventory.json",
@@ -162,8 +162,8 @@
     },
     {
       "path": "reports/review-queue.json",
-      "size_bytes": 264,
-      "sha256": "465deb64cd070c611818d6591a4928bb3f96ede10229b94e84cd3eaac768322c"
+      "size_bytes": 507378,
+      "sha256": "6b088502d8c455c90ed2564936f2b07cfc0133ba0b8add51154ec2f22a827980"
     }
   ]
 }

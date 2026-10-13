@@ -1680,19 +1680,20 @@ export const UNO_LESSONS: Lesson[] = [
     id: "lesson-neopixel-ring",
     title: "Mission 14 · NeoPixel Cyber Ring",
     shortTitle: "NeoPixel Ring",
-    description: "Control addressable WS2812 RGB LEDs in a circular ring with single-pin high-speed data.",
+    description: "Control addressable WS2812 RGB LEDs in a circular ring with single-pin high-speed data. ⚠️ Hardware power advisory: eight WS2812B pixels can draw about 480 mA at full-white. On Arduino USB 5V, cap physical firmware brightness at 64 and verify total USB load; for brighter operation use a regulated external 5V supply rated at least 1A with common ground. The simulated 5V→VCC connection is not proof that USB power is sufficient.",
     difficulty: "Intermediate",
     estimatedMinutes: 15,
     concepts: ["WS2812", "Addressable LEDs", "NeoPixel Ring", "High-speed Serial Data"],
     prerequisites: ["lesson-rgb-mood-lamp"],
     seedCircuit: NEOPIXEL_CIRCUIT,
     seedBlocklyXml: NEOPIXEL_XML,
-    finalGoal: "🎯 What You Will Build: An 8-pixel WS2812B addressable NeoPixel cyber ring displaying flowing rainbow color animations and patterns controlled over a single high-speed digital data pin (D6).",
+    finalGoal: "🎯 What You Will Build: An 8-pixel WS2812B addressable NeoPixel cyber ring displaying animations over D6. Physical builds must cap brightness at 64 when USB-powered or use a regulated external 5V supply rated at least 1A with common ground.",
     codingHints: [
       "Target the NeoPixel Ring component (Pin D6, 8 pixels).",
       "Use the NeoPixel Set Color block to set pixel indices (0 to 7) to your desired color.",
       "Call the NeoPixel Show block to push color data buffer out to the WS2812 hardware LEDs.",
       "Add a Time Delay block to create sequential rainbow or chase animations.",
+      "⚠️ Physical hardware: eight WS2812B pixels can draw about 480 mA at full-white. Cap brightness at 64 on USB 5V and verify total load, or use a regulated external 5V supply rated ≥1A with common ground; physical firmware must enforce the limit.",
     ],
     steps: [
       {
@@ -1709,7 +1710,7 @@ export const UNO_LESSONS: Lesson[] = [
       {
         id: "wiring",
         title: "Wire single-pin data line",
-        instructions: "Connect 5V → VCC, GND → GND, and D6 → DIN.",
+        instructions: "Simulation wiring: connect 5V→VCC, GND→GND and D6→DIN. This is a simulator abstraction. For physical hardware, cap brightness at 64 when using Arduino USB 5V and check total load, or use regulated external 5V ≥1A and connect external GND to Arduino GND.",
         kind: "build",
         checks: [{ kind: "connections", requirements: [
           { from: { partType: "arduino-uno", pinId: "5v" }, to: { partType: "neopixel-ring", pinId: "vcc" } },

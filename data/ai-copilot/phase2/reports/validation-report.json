@@ -1,8 +1,8 @@
 {
   "report_name": "Phase 2 Validation & Quality Gate Verification",
-  "timestamp": "2026-10-10T16:20:33.000Z",
-  "commit_sha": "0abc4a9da355ca545ab1dc541345b6680eed8978",
-  "status": "PASSED",
+  "timestamp": "2026-10-13T13:52:00.645Z",
+  "commit_sha": "c58f6ceae15bd4aa398cec20f97b74aa025a2fcd",
+  "status": "FAILED",
   "gates": [
     {
       "id": "G1",
@@ -75,15 +75,15 @@
       "id": "G9",
       "name": "Independent Human Review",
       "threshold": "Every canonical parent and released record has a named human approval",
-      "passed": true,
-      "score": "867/867; 0 pending"
+      "passed": false,
+      "score": "0/867; 867 pending"
     },
     {
       "id": "G10",
       "name": "Product Metric Report",
-      "threshold": "Complete counts per task, board, and split",
-      "passed": true,
-      "score": "Generated"
+      "threshold": "Complete counts per task, board, and split; upstream G9 human sign-off passed",
+      "passed": false,
+      "score": "Blocked by G9 human sign-off"
     }
   ],
   "metrics": {
@@ -91,7 +91,7 @@
     "phase25_audit_passed": true,
     "phase25_diagnosis_records": 142,
     "phase25_blockly_records": 124,
-    "pending_human_reviews": 0,
+    "pending_human_reviews": 867,
     "positive_circuit_acceptance_rate": 1,
     "negative_fault_rejection_rate": 1,
     "fault_calibration_failures": [],

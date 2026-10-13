@@ -43,3 +43,8 @@ node scripts/copilot-dataset/generate-diagnosis-and-code.mjs
 node scripts/copilot-dataset/split-by-family.mjs
 node scripts/copilot-dataset/build-release-report.mjs
 ```
+
+
+## Release status update (2026-10-13)
+
+**Release is blocked.** Historical bulk-filled G9 approvals do not count as independent human sign-off. The original append-only audit log is preserved; review metadata was restored from the pinned pre-fill checkpoint. The review queue now has 867 pending items. Do not release until genuine owner decisions are imported and QA passes.

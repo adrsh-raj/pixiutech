@@ -3,7 +3,7 @@
 **Corpus Version:** 2.0.0  
 **Commit SHA:** `0abc4a9da355ca545ab1dc541345b6680eed8978`  
 **Generated At:** 2026-10-10T16:20:33.000Z  
-**Overall Quality Gate Status:** ✅ **ALL 10 GATES PASSED (G1–G10)**
+**Overall Quality Gate Status:** ❌ **FAILED — G9 independent human review is pending**
 
 ---
 
@@ -30,8 +30,8 @@ Phase 2 builds the **Verified Dataset Pipeline & Evaluation Corpus** for the Pix
 | **G6** | Paraphrase Preservation | 100% exact topology + board invariant match | `355/355` | ✅ PASS |
 | **G7** | Split Isolation | 0 cross-split family, record, or topology leaks | `0 leaks` | ✅ PASS |
 | **G8** | Content Hash Integrity | Recomputed task-specific hashes match released/canonical records and source artifacts equal split copies | `released mismatches 0; canonical mismatches 0; source/split mismatches 0` | ✅ PASS |
-| **G9** | Independent Human Review | Every canonical parent and released record has a named human approval | `867/867; 0 pending` | ✅ PASS |
-| **G10** | Product Metric Report | Complete counts per task, board, and split | `Generated` | ✅ PASS |
+| **G9** | Independent Human Review | Every canonical parent and released record has a named human approval | `0/867; 867 pending` | ❌ FAIL |
+| **G10** | Product Metric Report | Complete counts per task, board, split; upstream G9 human sign-off passed | `Blocked by G9 human sign-off` | ❌ FAIL |
 
 ---
 

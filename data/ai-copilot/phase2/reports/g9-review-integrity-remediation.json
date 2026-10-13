@@ -1,0 +1,35 @@
+{
+  "report_name": "Phase 2 G9 Evidence Integrity Remediation",
+  "generated_at": "2026-10-13T13:52:35.426Z",
+  "base_commit": "c58f6ceae15bd4aa398cec20f97b74aa025a2fcd",
+  "checkpoint_commit": "8f2a4a600b2fb3fefd4f06fd5481786d83e24ec3",
+  "scope": {
+    "canonical_parents": 71,
+    "released_records": 796,
+    "total_unique_records": 867
+  },
+  "human_review": {
+    "verified_human_approvals": 0,
+    "pending": 867,
+    "bulk_fill_metadata_retracted": true,
+    "append_only_audit_log_modified": false
+  },
+  "safety": {
+    "dc_fan": "Simulator-only warning synchronized across canonical and derived records; direct GPIO physical wiring prohibited",
+    "dc_pump": "Simulator-only warning synchronized across canonical and derived records; driver/supply/common-ground/flyback guidance added",
+    "neopixel_ring": "8-pixel full-white current advisory and brightness/external-supply guidance added"
+  },
+  "integrity": {
+    "content_hash_mismatches": 0,
+    "source_split_mismatches": 0,
+    "topology_hashes_changed": 0,
+    "record_ids_or_split_assignments_changed": 0
+  },
+  "gates": {
+    "G8": "PASS",
+    "G9": "BLOCKED",
+    "G10": "BLOCKED by G9"
+  },
+  "release_ready": false,
+  "note": "Genuine owner decisions need to be reconciled from the separate local risk-based review package before release. Historical generated audit entries are not human-review evidence."
+}
