@@ -101,4 +101,3 @@ For production, use the Render configuration in `render.yaml` rather than Django
 The GitHub Actions workflow runs Django deployment checks, migration-drift checks, the Django test suite against PostgreSQL 16, Python compilation, static collection, and both Vite production builds.
 
 Deployment smoke checks are available in `scripts/e2e-smoke.mjs`. See `PHASE_8_DEPLOYMENT.md` for the Render/Vercel setup and end-to-end verification flow.
-# PixiuAI
