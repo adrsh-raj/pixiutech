@@ -17,7 +17,7 @@ if not DEBUG and DJANGO_ADMIN_ENABLED and (not DJANGO_ADMIN_PATH or DJANGO_ADMIN
 if not ALLOWED_HOSTS and os.environ.get("RENDER_EXTERNAL_HOSTNAME"):
     ALLOWED_HOSTS = [os.environ["RENDER_EXTERNAL_HOSTNAME"]]
 elif not ALLOWED_HOSTS and DEBUG:
-    ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
+    ALLOWED_HOSTS = ["127.0.0.1", "localhost", "testserver"]
 
 PERF_DIAGNOSTICS = os.environ.get("PERF_DIAGNOSTICS", "False").lower() == "true"
 
@@ -147,18 +147,50 @@ SIMPLE_JWT = {
 _cors_env = [x.strip() for x in os.environ.get("DJANGO_CORS_ALLOWED_ORIGINS", "").split(",") if x.strip()]
 if "*" in _cors_env:
     raise RuntimeError("Wildcard CORS is forbidden for the credentialed Pixiu API.")
-CORS_ALLOWED_ORIGINS = list(dict.fromkeys(_cors_env + [
+_cors_defaults = [
     "https://pixiutech.com",
     "https://www.pixiutech.com",
     "https://portal.pixiutech.com",
-]))
+]
+if DEBUG:
+    _cors_defaults.extend([
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:4173",
+        "http://127.0.0.1:4173",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+    ])
+CORS_ALLOWED_ORIGINS = list(dict.fromkeys(_cors_env + _cors_defaults))
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://[\w-]+\.pixiutech\.com$",
+    r"^https://[\w-]+\.onrender\.com$",
+    r"^https://[\w-]+\.vercel\.app$",
+]
 CORS_ALLOW_CREDENTIALS = True
 _csrf_env = [x.strip() for x in os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",") if x.strip()]
-CSRF_TRUSTED_ORIGINS = list(dict.fromkeys(_csrf_env + [
+_csrf_defaults = [
     "https://pixiutech.com",
     "https://www.pixiutech.com",
     "https://portal.pixiutech.com",
-]))
+    "https://*.pixiutech.com",
+    "https://*.onrender.com",
+    "https://*.vercel.app",
+]
+if DEBUG:
+    _csrf_defaults.extend([
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:4173",
+        "http://127.0.0.1:4173",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+    ])
+CSRF_TRUSTED_ORIGINS = list(dict.fromkeys(_csrf_env + _csrf_defaults))
 AUTH_PASSWORD_VALIDATORS = [{"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"}, {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"}, {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"}, {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"}]
 LANGUAGE_CODE = "en-us"; TIME_ZONE = "Asia/Kolkata"; USE_I18N = True; USE_TZ = True
 STATIC_URL = "static/"; STATIC_ROOT = BASE_DIR / "staticfiles"; MEDIA_URL = "media/"; MEDIA_ROOT = BASE_DIR / "media"; DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
@@ -212,6 +244,7 @@ CSRF_COOKIE_SECURE = os.environ.get("DJANGO_CSRF_COOKIE_SECURE", "False" if DEBU
 CSRF_COOKIE_HTTPONLY = False
 CSRF_COOKIE_SAMESITE = os.environ.get("DJANGO_CSRF_COOKIE_SAMESITE", "Lax" if DEBUG else "None")
 CSRF_COOKIE_NAME = os.environ.get("DJANGO_CSRF_COOKIE_NAME", "pixiu_csrf")
+CSRF_COOKIE_DOMAIN = os.environ.get("DJANGO_CSRF_COOKIE_DOMAIN", None) or None
 # Send the role-specific refresh cookie to all auth endpoints so refresh and
 # logout can both see and manage the same HttpOnly session.
 JWT_REFRESH_COOKIE_PATH = "/api/v1/auth/"

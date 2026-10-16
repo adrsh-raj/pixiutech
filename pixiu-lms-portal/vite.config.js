@@ -50,6 +50,15 @@ function sriAttributePlugin() {
 }
 
 export default defineConfig({
+  server: {
+    proxy: {
+      "/api": {
+        target: process.env.VITE_PROXY_TARGET || "https://pixiu-django-api.onrender.com",
+        changeOrigin: true,
+        secure: false,
+      },
+    },
+  },
   plugins: [
     tailwindcss(),
     react(),

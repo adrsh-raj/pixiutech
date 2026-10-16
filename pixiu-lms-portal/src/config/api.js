@@ -8,6 +8,17 @@ const defaultApiBase = 'https://pixiu-django-api.onrender.com/api/v1';
 function normalizeApiBase(value) {
   const candidate = String(value || defaultApiBase).trim();
 
+  if (candidate.startsWith('/')) {
+    let pathname = candidate.replace(/\/+$/, '');
+    if (!pathname || pathname === '/') pathname = '/api/v1';
+    else if (pathname === '/api') pathname = '/api/v1';
+    else if (pathname.endsWith('/api/v1')) pathname = pathname;
+    else if (pathname.endsWith('/api/v1/')) pathname = pathname.slice(0, -1);
+    else if (pathname.endsWith('/api')) pathname = `${pathname}/v1`;
+    else pathname = `${pathname}/api/v1`;
+    return pathname;
+  }
+
   try {
     const url = new URL(candidate);
     if (!['https:', 'http:'].includes(url.protocol)) throw new Error('Unsupported API URL protocol.');
