@@ -170,6 +170,7 @@ class SafeScopedContentViewSet(ScopedContractContentViewSet):
             serializer.validated_data["is_watermarked"] = False
             return upload
 
+        validate_uploaded_file(upload, scan=True)
         enabled_raw = self.request.data.get("is_watermarked", "true")
         enabled = str(enabled_raw).strip().lower() not in {"false", "0", "no", "off"}
         target_role = serializer.validated_data.get("target_role", "student")

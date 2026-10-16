@@ -6,6 +6,8 @@ from rest_framework import serializers
 
 from .models import School, SchoolClass, Student, Trainer, TrainerSchoolAssignment
 from .services import accessible_class_queryset, provision_student
+from accounts.credentials import build_student_username, invalidate_user_sessions
+from accounts.models import UserStatus
 
 
 PHONE_RE = r"^[0-9]{10}$"
@@ -145,11 +147,29 @@ class StudentCreateSerializer(serializers.ModelSerializer):
         request = self.context["request"]; school_class = attrs["school_class"]
         if not accessible_class_queryset(request.user).filter(pk=school_class.pk).exists(): raise serializers.ValidationError("You cannot create a student in this class.")
         if Student.objects.filter(school_class=school_class, roll_number=attrs["roll_number"]).exists(): raise serializers.ValidationError("That roll number is already used in this class.")
+        student_id = build_student_username(
+            school_class.school.school_code,
+            school_class.grade,
+            school_class.section,
+            attrs["roll_number"],
+        )
+        if Student.objects.filter(student_id=student_id).exists():
+            raise serializers.ValidationError("Generated student ID already exists. Choose a different class/roll number.")
         return attrs
     def validate_phone(self, value): return validate_indian_phone(value, "Student phone")
     def validate_guardian_phone(self, value): return validate_indian_phone(value, "Guardian phone")
     def create(self, validated_data):
-        with transaction.atomic(): student = Student.objects.create(**validated_data); student, password = provision_student(student=student)
+        school_class = validated_data["school_class"]
+        student_id = build_student_username(
+            school_class.school.school_code,
+            school_class.grade,
+            school_class.section,
+            validated_data["roll_number"],
+        )
+        with transaction.atomic():
+            validated_data["student_id"] = student_id
+            student = Student.objects.create(**validated_data)
+            student, password = provision_student(student=student)
         self.generated_password = password; return student
 
 
@@ -163,5 +183,18 @@ class StudentUpdateSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         result = super().update(instance, validated_data)
         if result.account_id:
-            result.account.display_name = result.name; result.account.email = result.email; result.account.save(update_fields=["display_name", "email"])
+            account = result.account
+            account.display_name = result.name
+            account.email = result.email
+            update_fields = ["display_name", "email"]
+            if result.status == "inactive":
+                account.status = UserStatus.INACTIVE
+                account.is_active = False
+                update_fields.extend(["status", "is_active"])
+                invalidate_user_sessions(account)
+            elif result.status == "active" and account.status == UserStatus.INACTIVE:
+                account.status = UserStatus.ACTIVE
+                account.is_active = True
+                update_fields.extend(["status", "is_active"])
+            account.save(update_fields=update_fields)
         return result

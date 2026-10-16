@@ -128,6 +128,7 @@ REST_FRAMEWORK = {
         "student_password_reset": "10000/hour" if "test" in sys.argv else os.environ.get("DJANGO_STUDENT_PASSWORD_RESET_RATE", "20/hour"),
         "csrf_token": "10000/hour" if "test" in sys.argv else os.environ.get("DJANGO_CSRF_TOKEN_RATE", "30/hour"),
     },
+    "NUM_PROXIES": int(os.environ.get("DJANGO_NUM_PROXIES", "1")),
     "EXCEPTION_HANDLER": "core.exception_handler.custom_exception_handler",
 }
 
@@ -166,9 +167,12 @@ if DEBUG:
 CORS_ALLOWED_ORIGINS = list(dict.fromkeys(_cors_env + _cors_defaults))
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^https://[\w-]+\.pixiutech\.com$",
-    r"^https://[\w-]+\.onrender\.com$",
-    r"^https://[\w-]+\.vercel\.app$",
 ]
+if DEBUG:
+    CORS_ALLOWED_ORIGIN_REGEXES.extend([
+        r"^https://[\w-]+\.onrender\.com$",
+        r"^https://[\w-]+\.vercel\.app$",
+    ])
 CORS_ALLOW_CREDENTIALS = True
 _csrf_env = [x.strip() for x in os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",") if x.strip()]
 _csrf_defaults = [
@@ -176,11 +180,11 @@ _csrf_defaults = [
     "https://www.pixiutech.com",
     "https://portal.pixiutech.com",
     "https://*.pixiutech.com",
-    "https://*.onrender.com",
-    "https://*.vercel.app",
 ]
 if DEBUG:
     _csrf_defaults.extend([
+        "https://*.onrender.com",
+        "https://*.vercel.app",
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://localhost:3000",

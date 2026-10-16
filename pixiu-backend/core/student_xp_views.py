@@ -1,6 +1,7 @@
 import json
 from datetime import timezone as datetime_timezone
 from decimal import Decimal, ROUND_HALF_UP
+from django.db import transaction
 from django.db.models import Count, Sum
 from django.utils import timezone
 from rest_framework.permissions import IsAuthenticated
@@ -91,6 +92,7 @@ class StudentXpView(APIView):
             "last_synced_at": ledger_project.updated_at.isoformat() if ledger_project else None,
         })
 
+    @transaction.atomic
     def post(self, request):
         user = request.user
         if user.role != UserRole.STUDENT:
@@ -105,22 +107,33 @@ class StudentXpView(APIView):
         if not isinstance(incoming_events, list):
             return Response({"detail": "events must be an array."}, status=400)
 
-        # Find or create cloud ledger project
-        ledger_project, _ = Project.objects.get_or_create(
-            student=student,
-            title=LEDGER_PROJECT_TITLE,
-            defaults={
-                "status": "completed",
-                "score": 0,
-                "description": json.dumps({
-                    "version": 2,
-                    "events": [],
-                    "lastActiveDate": timezone.now().strftime("%Y-%m-%d"),
-                    "streakDays": 1,
-                    "salt": "pixiu_cloud_backup",
-                }),
-            },
+        # Find or create cloud ledger project with row lock to serialize concurrent updates
+        ledger_project = (
+            Project.objects.select_for_update()
+            .filter(student=student, title=LEDGER_PROJECT_TITLE)
+            .first()
         )
+        if ledger_project is None:
+            ledger_project, _ = Project.objects.get_or_create(
+                student=student,
+                title=LEDGER_PROJECT_TITLE,
+                defaults={
+                    "status": "completed",
+                    "score": 0,
+                    "description": json.dumps({
+                        "version": 2,
+                        "events": [],
+                        "lastActiveDate": timezone.now().strftime("%Y-%m-%d"),
+                        "streakDays": 1,
+                        "salt": "pixiu_cloud_backup",
+                    }),
+                },
+            )
+            ledger_project = (
+                Project.objects.select_for_update()
+                .filter(pk=ledger_project.pk)
+                .first()
+            )
 
         existing_ledger = _parse_ledger(ledger_project.description)
         event_map = {

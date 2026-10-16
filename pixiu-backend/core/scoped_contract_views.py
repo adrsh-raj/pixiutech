@@ -21,6 +21,7 @@ from learning.models import ContentClassAssignment, CurriculumClassAssignment, Q
 from learning.views import ProjectEvidenceViewSet, QuizAssignmentViewSet, SessionActivityViewSet
 from learning.serializers import QuizSerializer
 from learning.watermarking import prepare_uploaded_file
+from core.upload_security import validate_uploaded_file
 from .learning_contract_overrides import StableQuizQuestionViewSet
 from academics.services import accessible_class_queryset
 
@@ -46,6 +47,7 @@ class ScopedContractContentViewSet(ScopedDetailMixin, ContractContentViewSet):
         upload = serializer.validated_data.get("file")
         if upload is None:
             return
+        validate_uploaded_file(upload, scan=True)
         enabled_raw = self.request.data.get("is_watermarked", "true")
         enabled = str(enabled_raw).strip().lower() not in {"false", "0", "no", "off"}
         target_role = serializer.validated_data.get("target_role", "student")

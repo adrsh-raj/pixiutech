@@ -19,7 +19,7 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, Tabl
 from rest_framework.exceptions import ValidationError
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 
-from accounts.credentials import build_student_username, generate_student_temp_pin
+from accounts.credentials import build_student_username, bump_auth_version, generate_student_temp_pin
 from accounts.models import StudentCredentialBatch, User, UserRole, UserStatus
 from academics.models import Student
 
@@ -157,6 +157,7 @@ def process_student_credential_batch(batch):
         affected_user_ids = []
         for student, account, _, _ in prepared:
             account.save()
+            bump_auth_version(account)
             student.account_id = account.pk
             student.save(update_fields=["student_id", "account", "updated_at"])
             affected_user_ids.append(account.pk)

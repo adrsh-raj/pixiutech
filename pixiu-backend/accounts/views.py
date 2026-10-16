@@ -13,7 +13,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from audit.services import record_audit
 from core.csrf import require_api_csrf
-from .credentials import create_or_reset_managed_account, invalidate_user_sessions, set_managed_password
+from .credentials import bump_auth_version, create_or_reset_managed_account, invalidate_user_sessions, set_managed_password
 from .models import User, UserRole
 from .permissions import IsAdminRole, IsActiveAccount
 from .serializers import ChangeOwnPasswordSerializer, LoginSerializer, ManagedAccountSerializer, ResetManagedPasswordSerializer, UserMeSerializer
@@ -158,14 +158,39 @@ class LogoutView(APIView):
     authentication_classes = []
 
     def post(self, request):
+        user_to_bump = None
+        user = getattr(request, "user", None)
+        if user and user.is_authenticated:
+            user_to_bump = user
+        else:
+            try:
+                from rest_framework_simplejwt.authentication import JWTAuthentication
+                auth_result = JWTAuthentication().authenticate(request)
+                if auth_result is not None:
+                    user_to_bump = auth_result[0]
+            except Exception:
+                pass
+
         role = _request_refresh_role(request)
         if role:
-            refresh_token = request.COOKIES.get(_refresh_cookie_name(role))
+            refresh_token = request.COOKIES.get(_refresh_cookie_name(role)) or request.data.get('refresh')
             if refresh_token:
                 try:
-                    RefreshToken(refresh_token).blacklist()
+                    token = RefreshToken(refresh_token)
+                    if not user_to_bump:
+                        user_id = token.payload.get('user_id')
+                        if user_id:
+                            user_to_bump = User.objects.filter(pk=user_id).first()
+                    token.blacklist()
                 except Exception:
                     pass
+
+        if user_to_bump:
+            try:
+                bump_auth_version(user_to_bump)
+            except Exception:
+                pass
+
         response = Response({'success': True}, status=status.HTTP_205_RESET_CONTENT)
         if role:
             _clear_refresh_cookie(response, role)

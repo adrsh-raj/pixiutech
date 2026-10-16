@@ -347,6 +347,12 @@ class ProjectEvidenceSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"project": "Evidence cannot be moved between projects."})
         if not file_value and not str(external_url or "").strip():
             raise serializers.ValidationError("Evidence must include a file or an external URL.")
+        if file_value and not getattr(file_value, "_committed", False):
+            from core.upload_security import validate_uploaded_file, SecureUploadError
+            try:
+                validate_uploaded_file(file_value)
+            except SecureUploadError as exc:
+                raise serializers.ValidationError({"file": exc.messages}) from exc
         return attrs
 
 class ProjectSerializer(serializers.ModelSerializer):

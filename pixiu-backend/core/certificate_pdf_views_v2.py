@@ -48,6 +48,7 @@ class CertificatePdfViewV2(APIView):
 class PublicCertificatePdfViewV2(APIView):
     """Public A4 certificate PDF. The certificate ID is the only lookup key."""
     permission_classes = [AllowAny]
+    throttle_scope = "public_pdf"
 
     def get(self, request, certificate_id):
         certificate = Certificate.objects.filter(

@@ -59,12 +59,14 @@ class InvoiceViewSet(BillingScopedMixin, viewsets.ModelViewSet):
         obj = serializer.save(invoice_number=f"INV-{__import__('uuid').uuid4().hex[:10].upper()}", created_by=self.request.user)
         record_audit(actor=self.request.user, action="create", entity_type="Invoice", entity_id=obj.id, summary=f"Created invoice {obj.invoice_number}", request=self.request)
 
+    @transaction.atomic
     def perform_update(self, serializer):
         self.role_only(UserRole.ADMIN)
         invoice = serializer.instance
         if invoice.status not in {BillingStatus.DRAFT, BillingStatus.ISSUED}:
             raise ValidationError("Only draft or issued invoices can be edited.")
         obj = serializer.save()
+        recalculate_invoice(obj)
         record_audit(actor=self.request.user, action="update", entity_type="Invoice", entity_id=obj.id, summary=f"Updated invoice {obj.invoice_number}", request=self.request)
 
     def perform_destroy(self, instance):
