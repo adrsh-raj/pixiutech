@@ -3,6 +3,8 @@
 import logging
 from functools import wraps
 
+from urllib.parse import urlsplit
+
 from django.conf import settings
 from django.http import JsonResponse
 from django.middleware.csrf import (
@@ -13,6 +15,7 @@ from django.middleware.csrf import (
     _unmask_cipher_token,
     get_token,
 )
+from django.utils.http import is_same_domain
 from rest_framework.permissions import AllowAny
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
@@ -82,17 +85,32 @@ def require_api_csrf(view_func):
             raw_request.csrf_processing_done = False
 
         cookie_name = getattr(settings, "CSRF_COOKIE_NAME", "pixiu_csrf")
-        # If the incoming cookie was dropped by cross-site/third-party browser privacy controls,
-        # recover the secret from the client-supplied header token.
-        if not raw_request.COOKIES.get(cookie_name):
-            header_name = getattr(settings, "CSRF_HEADER_NAME", "HTTP_X_CSRFTOKEN")
-            header_token = raw_request.META.get(header_name)
-            if header_token and len(header_token) == CSRF_TOKEN_LENGTH:
+        header_name = getattr(settings, "CSRF_HEADER_NAME", "HTTP_X_CSRFTOKEN")
+        header_token = raw_request.META.get(header_name)
+
+        # 1. Unconditionally synchronize the cookie secret with the valid client header token.
+        # This guarantees that stale/residual cookies in Safari do not cause cryptographic mismatches.
+        if header_token and len(header_token) == CSRF_TOKEN_LENGTH:
+            try:
+                _check_token_format(header_token)
+                raw_request.COOKIES[cookie_name] = _unmask_cipher_token(header_token)
+            except InvalidTokenFormat:
+                pass
+
+        # 2. Normalize origin for mobile Safari / PWA WebClips / in-app WebViews where Origin can be
+        # "null" or omitted along with Referer.
+        origin = raw_request.META.get("HTTP_ORIGIN")
+        referer = raw_request.META.get("HTTP_REFERER")
+        if origin == "null" or (not origin and not referer):
+            if referer:
                 try:
-                    _check_token_format(header_token)
-                    raw_request.COOKIES[cookie_name] = _unmask_cipher_token(header_token)
-                except InvalidTokenFormat:
+                    parsed_ref = urlsplit(referer)
+                    if any(is_same_domain(parsed_ref.netloc, host) for host in middleware.csrf_trusted_origins_hosts):
+                        raw_request.META["HTTP_ORIGIN"] = f"{parsed_ref.scheme}://{parsed_ref.netloc}"
+                except Exception:
                     pass
+            elif header_token and len(header_token) == CSRF_TOKEN_LENGTH:
+                raw_request.META["HTTP_ORIGIN"] = "https://portal.pixiutech.com"
 
         rejection = middleware.process_view(raw_request, _non_exempt_callback, args, kwargs)
         if rejection is not None:

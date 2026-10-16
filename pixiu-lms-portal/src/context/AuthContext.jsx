@@ -18,6 +18,7 @@ const API_READ_CACHE_MAX_ENTRIES = 250;
 let accessTokenMemory = null;
 let refreshPromise = null;
 let csrfTokenMemory = null;
+let csrfTokenExpiresAt = 0;
 let csrfTokenPromise = null;
 const apiReadCache = new Map();
 
@@ -109,7 +110,8 @@ async function fetchWithRetry(url, options = {}) {
   throw lastError || new Error('Request failed.');
 }
 export async function getCsrfToken(force = false) {
-  if (csrfTokenMemory && !force) return csrfTokenMemory;
+  const now = Date.now();
+  if (csrfTokenMemory && now < csrfTokenExpiresAt && !force) return csrfTokenMemory;
   if (csrfTokenPromise && !force) return csrfTokenPromise;
 
   csrfTokenPromise = (async () => {
@@ -123,6 +125,7 @@ export async function getCsrfToken(force = false) {
       const data = await readJson(response);
       if (!response.ok || !data.csrfToken) throw new Error('Unable to initialize the security token.');
       csrfTokenMemory = String(data.csrfToken);
+      csrfTokenExpiresAt = Date.now() + 5 * 60 * 1000;
       return csrfTokenMemory;
     } finally {
       csrfTokenPromise = null;
@@ -243,11 +246,21 @@ export function AuthProvider({ children }) {
       setSessionRole(null);
       setSessionStudentId(null);
     };
+    const handlePageShow = event => {
+      if (event.persisted) {
+        csrfTokenMemory = null;
+        csrfTokenExpiresAt = 0;
+        csrfTokenPromise = null;
+        void getCsrfToken(true).catch(() => {});
+      }
+    };
     window.addEventListener(AUTH_EVENT, syncAuthState);
     window.addEventListener('storage', syncCrossTabLogout);
+    window.addEventListener('pageshow', handlePageShow);
     return () => {
       window.removeEventListener(AUTH_EVENT, syncAuthState);
       window.removeEventListener('storage', syncCrossTabLogout);
+      window.removeEventListener('pageshow', handlePageShow);
     };
   }, []);
   useEffect(() => {
