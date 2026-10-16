@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom"
 import { useEffect, useRef, useState } from "react"
-import { CircuitBoard, Play, Square, Trash2, ArrowLeft, Undo2, Redo2, FolderOpen, BookOpen, Terminal, Volume2, VolumeX, Sparkles, Camera, Sliders, Pause, StepForward, FastForward, MoreHorizontal, HelpCircle, ShieldAlert, Download, Cpu } from "lucide-react"
+import { CircuitBoard, Play, Square, Trash2, ArrowLeft, Undo2, Redo2, FolderOpen, BookOpen, Terminal, Volume2, VolumeX, Sparkles, Camera, Sliders, Pause, StepForward, FastForward, MoreHorizontal, HelpCircle, ShieldAlert, Download, Cpu, Lock } from "lucide-react"
 import { XpBadgeButton } from "./xp-badge-modal"
 import "./pixiu-brand.css"
 
@@ -277,24 +277,22 @@ export function Toolbar({
           </button>
         )}
 
-        {/* PIXIU AI Copilot Toolbar Button */}
+        {/* PIXIU AI Copilot Toolbar Button - In Production 1.0v */}
         {onToggleCopilot && (
           <button
             onClick={onToggleCopilot}
             className={`flex items-center gap-1.5 rounded-lg border px-2 sm:px-2.5 py-1.5 text-xs font-bold transition cursor-pointer shadow-sm ${
               isCopilotOpen
-                ? "border-cyan-400 bg-gradient-to-r from-cyan-500 to-indigo-600 text-slate-950 font-black shadow-cyan-500/25"
-                : isCopilotStaged
-                ? "border-cyan-400/80 bg-cyan-950/60 text-cyan-200 animate-pulse"
-                : "border-cyan-500/30 bg-slate-900/80 text-cyan-300 hover:border-cyan-400 hover:bg-slate-800"
+                ? "border-amber-400 bg-amber-500/20 text-amber-200 shadow-amber-500/20"
+                : "border-slate-800 bg-slate-900/80 text-slate-300 hover:border-amber-500/40 hover:bg-slate-800"
             }`}
-            title="Open PIXIU AI Copilot Chatbot"
+            title="PixiuAI 1.0v (In Production - Restricted Access)"
           >
-            <Sparkles size={14} className={isCopilotOpen ? "text-slate-950" : "text-cyan-400 animate-pulse"} />
-            <span className="hidden sm:inline">AI Copilot</span>
-            {isCopilotStaged && (
-              <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-ping" />
-            )}
+            <Lock size={13} className="text-amber-400" />
+            <span className="hidden sm:inline">PixiuAI 1.0v</span>
+            <span className="rounded bg-amber-500/20 px-1 py-0.5 text-[9px] font-mono font-bold text-amber-300 border border-amber-500/30">
+              In Production
+            </span>
           </button>
         )}
 

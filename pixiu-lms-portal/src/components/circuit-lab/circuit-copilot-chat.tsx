@@ -26,6 +26,7 @@ import {
   Play,
   Flame,
   Radio,
+  Lock,
 } from "lucide-react"
 
 import type { CircuitState, PlacedPart, Wire, PartType } from "@/lib/circuit-types"
@@ -51,6 +52,8 @@ import {
 } from "@/lib/circuit-doctor"
 import { PIXIU_COMPONENTS_DATASET } from "@/lib/ai/pixiu-components-dataset"
 import { TEMPLATES } from "@/lib/templates"
+import { handleScienceTutorQuery, isPhase2fScienceTutorEnabled } from "@/lib/ai/copilot/science-tutor"
+import { isPixiuAiCopilotEnabled } from "@/lib/feature-flags"
 
 // ============================================================================
 // Types & Interfaces
@@ -339,14 +342,14 @@ function createLdrLampProposal(baseRevisionHash: string): CircuitCopilotProposal
 // Natural Language Intent Matcher
 // ============================================================================
 
-interface ParsedAiIntent {
+export interface ParsedAiIntent {
   kind: "circuit_proposal" | "doctor_audit" | "explain_telemetry" | "undo" | "clear" | "component_info" | "chat"
   proposal?: CircuitCopilotProposal
   componentType?: string
   replyText: string
 }
 
-function parseUserIntent(
+export function parseUserIntent(
   query: string,
   baseRevisionHash: string,
   currentCircuit: CircuitState,
@@ -380,7 +383,26 @@ function parseUserIntent(
     }
   }
 
-  // 4. Telemetry / Live Explanation Intent
+  // 4. Phase 2F Science Concept Inquiry (gated: strictly disabled by default in production)
+  if (isPhase2fScienceTutorEnabled()) {
+    const scienceResult = handleScienceTutorQuery(query)
+    if (scienceResult.handled) {
+      if (!scienceResult.tutorResponse) {
+        return {
+          kind: "chat",
+          replyText: "I matched a science question, but don't have a reviewed answer variant for this language and depth. Try asking in English or Hinglish at the standard level.",
+        }
+      }
+      const resp = scienceResult.tutorResponse
+      const title = resp.science_concept?.title || "Science Concept"
+      return {
+        kind: "chat",
+        replyText: `🔬 **Science Tutor (Phase 2F Draft)**: **${title}**\n\n${resp.direct_answer}\n\n*Note: This is an exploratory Phase 2F draft candidate (status: draft; rights: proposed). No circuit actions are offered or applied.*`,
+      }
+    }
+  }
+
+  // 5. Telemetry / Live Explanation Intent
   if (/\b(explain|telemetry|kya ho raha|voltage|current|status|samjhao|nodal|potentials|pins)\b/i.test(q)) {
     return {
       kind: "explain_telemetry",
@@ -388,7 +410,7 @@ function parseUserIntent(
     }
   }
 
-  // 5. LED Blink Circuit
+  // 6. LED Blink Circuit
   if (/\b(led|blink|jalao|light|flashing|bulb)\b/i.test(q) && !/\b(rgb|ldr)\b/i.test(q)) {
     const prop = createLedBlinkProposal(baseRevisionHash)
     return {
@@ -603,7 +625,7 @@ export function CircuitCopilotChat({
   return (
     <>
       {/* ==================================================================== */}
-      {/* 1. Floating AI Copilot Corner Trigger Button                         */}
+      {/* 1. Floating AI Copilot Corner Trigger Button - In Production 1.0v     */}
       {/* ==================================================================== */}
       <button
         type="button"
@@ -611,82 +633,113 @@ export function CircuitCopilotChat({
         className={
           "fixed bottom-20 right-24 md:bottom-6 md:right-36 z-[70] inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-xs font-black shadow-xl backdrop-blur-md transition-all " +
           (isPanelOpen
-            ? "bg-gradient-to-r from-cyan-500 to-indigo-600 text-slate-950 shadow-cyan-500/40 border border-cyan-300 ring-2 ring-cyan-400/50"
-            : "border border-cyan-400/40 bg-[#091122]/95 text-white shadow-cyan-900/40 hover:border-cyan-300 hover:scale-105 hover:shadow-cyan-500/30")
+            ? "bg-gradient-to-r from-amber-500 to-orange-600 text-slate-950 shadow-amber-500/40 border border-amber-300 ring-2 ring-amber-400/50"
+            : "border border-amber-400/40 bg-[#091122]/95 text-white shadow-amber-900/40 hover:border-amber-300 hover:scale-105 hover:shadow-amber-500/30")
         }
-        aria-label="Toggle Pixiu AI Copilot"
-        title="Open PIXIU AI Circuit Copilot Chatbot"
+        aria-label="Toggle PixiuAI 1.0v Status"
+        title="PixiuAI 1.0v (In Production - Restricted Access)"
       >
         <div className="relative flex items-center justify-center">
-          <Sparkles size={16} className={isPanelOpen ? "text-slate-950" : "text-cyan-400 animate-pulse"} />
-          {isPreviewStaged && (
-            <span className="absolute -top-1 -right-1 flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
-            </span>
-          )}
+          <Lock size={15} className="text-amber-400" />
         </div>
         <span className="tracking-wider font-extrabold uppercase text-[11px]">
-          {isPanelOpen ? "Close AI" : "AI Copilot"}
+          PixiuAI 1.0v
         </span>
-        {isPreviewStaged && !isPanelOpen && (
-          <span className="rounded-full bg-cyan-400/20 px-1.5 py-0.5 text-[9px] font-mono text-cyan-300 border border-cyan-400/40 animate-pulse">
-            Staged
-          </span>
-        )}
+        <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[9px] font-mono font-bold text-amber-300 border border-amber-500/40">
+          In Production
+        </span>
       </button>
 
       {/* ==================================================================== */}
-      {/* 2. Sleek Floating Drawer / Chat Panel                                */}
+      {/* 2. Sleek Floating Drawer / Status Panel - In Production 1.0v         */}
       {/* ==================================================================== */}
       {isPanelOpen && (
         <section
-          aria-label="Pixiu AI Circuit Copilot Panel"
-          className="fixed bottom-32 right-4 md:bottom-20 right-4 z-[75] w-[min(94vw,440px)] h-[min(80vh,660px)] flex flex-col overflow-hidden rounded-2xl border border-cyan-500/30 bg-[#070e1c]/95 text-slate-100 shadow-2xl shadow-black/80 backdrop-blur-xl ring-1 ring-cyan-500/20 animate-in fade-in zoom-in-95 duration-150"
+          aria-label="PixiuAI 1.0v Status Panel"
+          className="fixed bottom-32 right-4 md:bottom-20 right-4 z-[75] w-[min(94vw,420px)] flex flex-col overflow-hidden rounded-2xl border border-amber-500/40 bg-[#070e1c]/98 text-slate-100 shadow-2xl shadow-black/90 backdrop-blur-xl ring-1 ring-amber-500/20 animate-in fade-in zoom-in-95 duration-150"
         >
           {/* Header */}
-          <header className="border-b border-slate-800 bg-gradient-to-r from-[#0b1528] via-[#0f213d] to-[#0b1528] px-4 py-3 shrink-0">
+          <header className="border-b border-slate-800 bg-gradient-to-r from-[#0b1528] via-[#1a170b] to-[#0b1528] px-4 py-3 shrink-0">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2.5">
-                <div className="relative flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-tr from-cyan-500 to-indigo-600 text-slate-950 shadow-md shadow-cyan-500/30 font-black">
+                <div className="relative flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-tr from-amber-500 to-orange-600 text-slate-950 shadow-md shadow-amber-500/30 font-black">
                   <Bot size={18} />
-                  <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-[#070e1c]" />
+                  <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-amber-400 ring-2 ring-[#070e1c] animate-pulse" />
                 </div>
                 <div>
                   <div className="flex items-center gap-1.5">
-                    <h2 className="text-sm font-black tracking-wide text-white">PIXIU AI Copilot</h2>
-                    <span className="rounded bg-cyan-500/20 px-1 py-0.5 text-[9px] font-mono font-bold text-cyan-300 border border-cyan-500/30">
-                      PHASE 1
+                    <h2 className="text-sm font-black tracking-wide text-white">PixiuAI 1.0v</h2>
+                    <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[9px] font-mono font-bold text-amber-300 border border-amber-500/30">
+                      IN PRODUCTION
                     </span>
                   </div>
-                  <p className="text-[10px] text-slate-400">CyberLab Assistant • Ground-Truth Physics</p>
+                  <p className="text-[10px] text-slate-400">CyberLab Assistant • Calibration in Progress</p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-1">
-                {copilotAction.canUndo && (
-                  <button
-                    type="button"
-                    onClick={() => copilotAction.undoAction()}
-                    title="Undo AI Circuit Action"
-                    className="flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-900/80 px-2 py-1 text-[10px] font-bold text-slate-300 transition hover:border-cyan-400 hover:text-white"
-                  >
-                    <Undo2 size={12} /> Undo
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={togglePanel}
-                  aria-label="Close AI Copilot"
-                  className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition"
-                >
-                  <X size={16} />
-                </button>
+              <button
+                type="button"
+                onClick={togglePanel}
+                aria-label="Close PixiuAI Status Panel"
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          </header>
+
+          {/* Locked Production Banner Body */}
+          <div className="p-6 text-center space-y-4">
+            <div className="relative inline-flex mx-auto">
+              <div className="absolute -inset-2 rounded-full bg-amber-500/20 blur-xl animate-pulse" />
+              <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-amber-500/40 bg-gradient-to-br from-amber-950/80 to-slate-900 text-amber-400 shadow-xl shadow-amber-950/50">
+                <Lock size={30} className="text-amber-400" />
               </div>
             </div>
 
-            {/* Mode Switcher Tabs */}
-            <div className="mt-3 grid grid-cols-4 gap-1 rounded-xl bg-slate-950/70 p-1 border border-slate-800 text-[10px] font-bold">
+            <div className="space-y-1.5">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-[10px] font-mono font-bold uppercase tracking-wider text-amber-300">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-ping" />
+                Restricted Access
+              </span>
+              <h3 className="text-base font-black text-white pt-1">
+                PixiuAI 1.0v is In Production
+              </h3>
+              <p className="text-xs text-slate-400 max-w-xs leading-relaxed mx-auto">
+                Model training, curriculum calibration, and safety validation gates are currently in progress. Access is locked for all users until production rollout is complete.
+              </p>
+            </div>
+
+            <div className="w-full max-w-xs space-y-2 rounded-xl border border-slate-800/80 bg-slate-950/60 p-3 text-left text-xs mx-auto">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-slate-400">Hardware Simulation:</span>
+                <span className="font-semibold text-emerald-400">Active & Ready</span>
+              </div>
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-slate-400">Blockly & MicroPython:</span>
+                <span className="font-semibold text-emerald-400">Active & Ready</span>
+              </div>
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-slate-400">AI Circuit Copilot:</span>
+                <span className="font-semibold text-amber-400 font-mono">In Production (1.0v)</span>
+              </div>
+            </div>
+
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={togglePanel}
+                className="rounded-xl border border-slate-700 bg-slate-900 px-5 py-2 text-xs font-bold text-slate-300 hover:bg-slate-800 hover:text-white transition cursor-pointer"
+              >
+                Return to Workbench
+              </button>
+            </div>
+          </div>
+
+          {isPixiuAiCopilotEnabled() && (
+            <>
+              {/* Mode Switcher Tabs */}
+              <div className="mt-3 grid grid-cols-4 gap-1 rounded-xl bg-slate-950/70 p-1 border border-slate-800 text-[10px] font-bold">
               <button
                 type="button"
                 onClick={() => setActiveTab("chat")}
@@ -737,7 +790,6 @@ export function CircuitCopilotChat({
                 <Layers size={11} /> 32 Parts
               </button>
             </div>
-          </header>
 
           {/* ================================================================ */}
           {/* TAB 1: Chat & Circuit Generation Mode                            */}
@@ -1142,6 +1194,8 @@ export function CircuitCopilotChat({
                   ))}
               </div>
             </div>
+          )}
+            </>
           )}
         </section>
       )}
