@@ -1,0 +1,254 @@
+{
+  "dataset_name": "Pixiu Tech Class 6 Science Synthetic Dataset",
+  "version": "1.0",
+  "grade": 6,
+  "subject": "Science",
+  "curriculum_framework": "NCERT / CBSE (Science & Curiosity)",
+  "total_topics": 16,
+  "total_records": 1600,
+  "records_per_topic": 100,
+  "split_distribution": {
+    "Train": 1120,
+    "Validation": 240,
+    "Test": 240
+  },
+  "category_distribution_per_topic": {
+    "Concept understanding": 15,
+    "Real-life application": 15,
+    "Misconceptions and corrective teaching": 20,
+    "Step-by-step reasoning / problem solving": 15,
+    "Diagram, graph, or virtual-lab reasoning": 15,
+    "Follow-up / understanding checks": 10,
+    "Challenge / edge cases": 10
+  },
+  "qa_status": "Automated pass",
+  "reviewer_decision": "Pending",
+  "license": "CC BY-NC-SA 4.0 / Educational Synthetic",
+  "generated_timestamp": "2026-10-17T02:53:38.109525Z",
+  "topics": [
+    {
+      "topic_id": "G6-SCI-001",
+      "topic_name": "Food: Where Does It Come From?",
+      "ncert_classic_chapter": "Chapter 1: Food: Where Does It Come From?",
+      "curiosity_edition_chapter": "Curiosity Ch 1: The Wonderful World of Science & Food",
+      "records_count": 100,
+      "splits": {
+        "Train": 70,
+        "Validation": 15,
+        "Test": 15
+      },
+      "status": "Completed - Validated",
+      "source_provenance": "Original synthetic | Pixiu Tech Class 6 Science Dataset Generator v1.0"
+    },
+    {
+      "topic_id": "G6-SCI-002",
+      "topic_name": "Components of Food",
+      "ncert_classic_chapter": "Chapter 2: Components of Food",
+      "curiosity_edition_chapter": "Curiosity Ch 2: Diversity in the Living World & Nutrition",
+      "records_count": 100,
+      "splits": {
+        "Train": 70,
+        "Validation": 15,
+        "Test": 15
+      },
+      "status": "Completed - Validated",
+      "source_provenance": "Original synthetic | Pixiu Tech Class 6 Science Dataset Generator v1.0"
+    },
+    {
+      "topic_id": "G6-SCI-003",
+      "topic_name": "Fibre to Fabric",
+      "ncert_classic_chapter": "Chapter 3: Fibre to Fabric",
+      "curiosity_edition_chapter": "Curiosity Ch 3: Mindful Eating / Materials Around Us",
+      "records_count": 100,
+      "splits": {
+        "Train": 70,
+        "Validation": 15,
+        "Test": 15
+      },
+      "status": "Completed - Validated",
+      "source_provenance": "Original synthetic | Pixiu Tech Class 6 Science Dataset Generator v1.0"
+    },
+    {
+      "topic_id": "G6-SCI-004",
+      "topic_name": "Sorting Materials into Groups",
+      "ncert_classic_chapter": "Chapter 4: Sorting Materials into Groups",
+      "curiosity_edition_chapter": "Curiosity Ch 6: Materials Around Us",
+      "records_count": 100,
+      "splits": {
+        "Train": 70,
+        "Validation": 15,
+        "Test": 15
+      },
+      "status": "Completed - Validated",
+      "source_provenance": "Original synthetic | Pixiu Tech Class 6 Science Dataset Generator v1.0"
+    },
+    {
+      "topic_id": "G6-SCI-005",
+      "topic_name": "Separation of Substances",
+      "ncert_classic_chapter": "Chapter 5: Separation of Substances",
+      "curiosity_edition_chapter": "Curiosity Ch 9: Methods of Separation in Everyday Life",
+      "records_count": 100,
+      "splits": {
+        "Train": 70,
+        "Validation": 15,
+        "Test": 15
+      },
+      "status": "Completed - Validated",
+      "source_provenance": "Original synthetic | Pixiu Tech Class 6 Science Dataset Generator v1.0"
+    },
+    {
+      "topic_id": "G6-SCI-006",
+      "topic_name": "Changes Around Us",
+      "ncert_classic_chapter": "Chapter 6: Changes Around Us",
+      "curiosity_edition_chapter": "Curiosity Ch 7: Temperature and its Measurement / Physical Changes",
+      "records_count": 100,
+      "splits": {
+        "Train": 70,
+        "Validation": 15,
+        "Test": 15
+      },
+      "status": "Completed - Validated",
+      "source_provenance": "Original synthetic | Pixiu Tech Class 6 Science Dataset Generator v1.0"
+    },
+    {
+      "topic_id": "G6-SCI-007",
+      "topic_name": "Getting to Know Plants",
+      "ncert_classic_chapter": "Chapter 7: Getting to Know Plants",
+      "curiosity_edition_chapter": "Curiosity Ch 2: Diversity in the Living World",
+      "records_count": 100,
+      "splits": {
+        "Train": 70,
+        "Validation": 15,
+        "Test": 15
+      },
+      "status": "Completed - Validated",
+      "source_provenance": "Original synthetic | Pixiu Tech Class 6 Science Dataset Generator v1.0"
+    },
+    {
+      "topic_id": "G6-SCI-008",
+      "topic_name": "Body Movements",
+      "ncert_classic_chapter": "Chapter 8: Body Movements",
+      "curiosity_edition_chapter": "Curiosity Ch 4: Exploring the Living World & Locomotion",
+      "records_count": 100,
+      "splits": {
+        "Train": 70,
+        "Validation": 15,
+        "Test": 15
+      },
+      "status": "Completed - Validated",
+      "source_provenance": "Original synthetic | Pixiu Tech Class 6 Science Dataset Generator v1.0"
+    },
+    {
+      "topic_id": "G6-SCI-009",
+      "topic_name": "The Living Organisms and Their Surroundings",
+      "ncert_classic_chapter": "Chapter 9: The Living Organisms and Their Surroundings",
+      "curiosity_edition_chapter": "Curiosity Ch 4: Exploring the Living World & Ecosystems",
+      "records_count": 100,
+      "splits": {
+        "Train": 70,
+        "Validation": 15,
+        "Test": 15
+      },
+      "status": "Completed - Validated",
+      "source_provenance": "Original synthetic | Pixiu Tech Class 6 Science Dataset Generator v1.0"
+    },
+    {
+      "topic_id": "G6-SCI-010",
+      "topic_name": "Motion and Measurement of Distances",
+      "ncert_classic_chapter": "Chapter 10: Motion and Measurement of Distances",
+      "curiosity_edition_chapter": "Curiosity Ch 5: Measurement of Length and Motion",
+      "records_count": 100,
+      "splits": {
+        "Train": 70,
+        "Validation": 15,
+        "Test": 15
+      },
+      "status": "Completed - Validated",
+      "source_provenance": "Original synthetic | Pixiu Tech Class 6 Science Dataset Generator v1.0"
+    },
+    {
+      "topic_id": "G6-SCI-011",
+      "topic_name": "Light, Shadows and Reflections",
+      "ncert_classic_chapter": "Chapter 11: Light, Shadows and Reflections",
+      "curiosity_edition_chapter": "Curiosity Ch 10: Living in Harmony with Nature / Light Optics",
+      "records_count": 100,
+      "splits": {
+        "Train": 70,
+        "Validation": 15,
+        "Test": 15
+      },
+      "status": "Completed - Validated",
+      "source_provenance": "Original synthetic | Pixiu Tech Class 6 Science Dataset Generator v1.0"
+    },
+    {
+      "topic_id": "G6-SCI-012",
+      "topic_name": "Electricity and Circuits",
+      "ncert_classic_chapter": "Chapter 12: Electricity and Circuits",
+      "curiosity_edition_chapter": "Curiosity Ch 10: Circuit Design and Electrical Energy",
+      "records_count": 100,
+      "splits": {
+        "Train": 70,
+        "Validation": 15,
+        "Test": 15
+      },
+      "status": "Completed - Validated",
+      "source_provenance": "Original synthetic | Pixiu Tech Class 6 Science Dataset Generator v1.0"
+    },
+    {
+      "topic_id": "G6-SCI-013",
+      "topic_name": "Fun with Magnets",
+      "ncert_classic_chapter": "Chapter 13: Fun with Magnets",
+      "curiosity_edition_chapter": "Curiosity Ch 10: Magnetic Fields and Applications",
+      "records_count": 100,
+      "splits": {
+        "Train": 70,
+        "Validation": 15,
+        "Test": 15
+      },
+      "status": "Completed - Validated",
+      "source_provenance": "Original synthetic | Pixiu Tech Class 6 Science Dataset Generator v1.0"
+    },
+    {
+      "topic_id": "G6-SCI-014",
+      "topic_name": "Water",
+      "ncert_classic_chapter": "Chapter 14: Water",
+      "curiosity_edition_chapter": "Curiosity Ch 8 & Ch 11: Nature's Treasures & Water Cycle",
+      "records_count": 100,
+      "splits": {
+        "Train": 70,
+        "Validation": 15,
+        "Test": 15
+      },
+      "status": "Completed - Validated",
+      "source_provenance": "Original synthetic | Pixiu Tech Class 6 Science Dataset Generator v1.0"
+    },
+    {
+      "topic_id": "G6-SCI-015",
+      "topic_name": "Air Around Us",
+      "ncert_classic_chapter": "Chapter 15: Air Around Us",
+      "curiosity_edition_chapter": "Curiosity Ch 8: Air and Atmospheric Resources",
+      "records_count": 100,
+      "splits": {
+        "Train": 70,
+        "Validation": 15,
+        "Test": 15
+      },
+      "status": "Completed - Validated",
+      "source_provenance": "Original synthetic | Pixiu Tech Class 6 Science Dataset Generator v1.0"
+    },
+    {
+      "topic_id": "G6-SCI-016",
+      "topic_name": "Garbage In, Garbage Out",
+      "ncert_classic_chapter": "Chapter 16: Garbage In, Garbage Out",
+      "curiosity_edition_chapter": "Curiosity Ch 12: Beyond Earth / Sustainable Waste Management",
+      "records_count": 100,
+      "splits": {
+        "Train": 70,
+        "Validation": 15,
+        "Test": 15
+      },
+      "status": "Completed - Validated",
+      "source_provenance": "Original synthetic | Pixiu Tech Class 6 Science Dataset Generator v1.0"
+    }
+  ]
+}

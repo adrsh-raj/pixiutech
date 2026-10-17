@@ -9,3 +9,8 @@ dist
 
 # Local review workbook; regenerate from the current local Phase 2 corpus.
 data/ai-copilot/phase2/reports/phase2-g9-human-review.xlsx
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class

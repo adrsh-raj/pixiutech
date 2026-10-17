@@ -1,0 +1,378 @@
+{
+  "report_metadata": {
+    "title": "Pixiu Tech Class 6 Science 10-Gate Validation Report",
+    "version": "1.0",
+    "date": "2026-10-17T02:53:38.110493Z",
+    "auditor": "Quality Gatekeeper (Agent D)",
+    "overall_status": "ALL 10 GATES PASSED",
+    "total_records": 1600,
+    "total_topics": 16
+  },
+  "summary_statistics": {
+    "total_records": 1600,
+    "grade": 6,
+    "subject": "Science",
+    "splits": {
+      "Train": 1120,
+      "Validation": 240,
+      "Test": 240
+    },
+    "category_distribution": {
+      "Concept understanding": 240,
+      "Real-life application": 240,
+      "Misconceptions and corrective teaching": 320,
+      "Step-by-step reasoning / problem solving": 240,
+      "Diagram, graph, or virtual-lab reasoning": 240,
+      "Follow-up / understanding checks": 160,
+      "Challenge / edge cases": 160
+    },
+    "reviewer_decision_counts": {
+      "Pending": 1600
+    },
+    "qa_status_counts": {
+      "Automated pass": 1600
+    }
+  },
+  "quality_gates": {
+    "Gate 1: Total Record Count": {
+      "expected": "1,600 records (16 topics × 100 records)",
+      "actual": "1,600 records",
+      "status": "PASS"
+    },
+    "Gate 2: Topic Coverage": {
+      "expected": "16 topics, exactly 100 records each (G6-SCI-001 through G6-SCI-016)",
+      "actual": "16 topics present, all exactly 100 records: {'G6-SCI-001': 100, 'G6-SCI-002': 100, 'G6-SCI-003': 100, 'G6-SCI-004': 100, 'G6-SCI-005': 100, 'G6-SCI-006': 100, 'G6-SCI-007': 100, 'G6-SCI-008': 100, 'G6-SCI-009': 100, 'G6-SCI-010': 100, 'G6-SCI-011': 100, 'G6-SCI-012': 100, 'G6-SCI-013': 100, 'G6-SCI-014': 100, 'G6-SCI-015': 100, 'G6-SCI-016': 100}",
+      "status": "PASS"
+    },
+    "Gate 3: Example ID Uniqueness": {
+      "expected": "1,600 unique IDs adhering to pattern G6-SCI-XXX-EYYY",
+      "actual": "1600 unique IDs, 0 duplicates",
+      "status": "PASS"
+    },
+    "Gate 4: JSON Line Serialization": {
+      "expected": "100% valid JSON per line without corruption or unescaped control chars",
+      "actual": "0 serialization/parsing errors across 1600 lines",
+      "status": "PASS"
+    },
+    "Gate 5: Schema Completeness (21 Fields)": {
+      "expected": "All 21 schema fields non-empty and non-null across all 1,600 records (33,600 field checks)",
+      "actual": "0 schema violations across 33,600 checked values",
+      "status": "PASS"
+    },
+    "Gate 6: Master Workbook Alignment": {
+      "expected": "Exact match with Pixiu_Classes_6_to_12_Topic_Batch_Master.xlsx (rows 18-33)",
+      "actual": "0 alignment discrepancies across 16 NCERT topics",
+      "status": "PASS"
+    },
+    "Gate 7: Duplicate Question Check": {
+      "expected": "0 exact or case-insensitive duplicate questions across all 1,600 records",
+      "actual": "0 duplicate questions found (1600 unique questions)",
+      "status": "PASS"
+    },
+    "Gate 8: Scientific & Pedagogical Verification": {
+      "expected": "Substantive, multi-step pedagogical explanations and verified scientific solutions",
+      "actual": "0 brevity flags; independent scientific audit completed with 0 errors",
+      "status": "PASS"
+    },
+    "Gate 9: Category Distribution Balance": {
+      "expected": "Per topic: Concept (15), Real-life (15), Misconception (20), Step (15), Diagram (15), Follow-up (10), Challenge (10)",
+      "actual": "0 category distribution mismatches across 16 topics",
+      "status": "PASS"
+    },
+    "Gate 10: Split Integrity & Zero Leakage": {
+      "expected": "Train=1,120 (70%), Val=240 (15%), Test=240 (15%) with 0% data leakage",
+      "actual": "Train=1120, Val=240, Test=240; Overlapping questions: 0",
+      "status": "PASS"
+    }
+  },
+  "per_topic_breakdown": {
+    "G6-SCI-001": {
+      "topic_name": "Food: Where Does It Come From?",
+      "records_count": 100,
+      "splits": {
+        "Train": 70,
+        "Validation": 15,
+        "Test": 15
+      },
+      "categories": {
+        "Concept understanding": 15,
+        "Real-life application": 15,
+        "Misconceptions and corrective teaching": 20,
+        "Step-by-step reasoning / problem solving": 15,
+        "Diagram, graph, or virtual-lab reasoning": 15,
+        "Follow-up / understanding checks": 10,
+        "Challenge / edge cases": 10
+      }
+    },
+    "G6-SCI-002": {
+      "topic_name": "Components of Food",
+      "records_count": 100,
+      "splits": {
+        "Train": 70,
+        "Validation": 15,
+        "Test": 15
+      },
+      "categories": {
+        "Concept understanding": 15,
+        "Real-life application": 15,
+        "Misconceptions and corrective teaching": 20,
+        "Step-by-step reasoning / problem solving": 15,
+        "Diagram, graph, or virtual-lab reasoning": 15,
+        "Follow-up / understanding checks": 10,
+        "Challenge / edge cases": 10
+      }
+    },
+    "G6-SCI-003": {
+      "topic_name": "Fibre to Fabric",
+      "records_count": 100,
+      "splits": {
+        "Train": 70,
+        "Validation": 15,
+        "Test": 15
+      },
+      "categories": {
+        "Concept understanding": 15,
+        "Real-life application": 15,
+        "Misconceptions and corrective teaching": 20,
+        "Step-by-step reasoning / problem solving": 15,
+        "Diagram, graph, or virtual-lab reasoning": 15,
+        "Follow-up / understanding checks": 10,
+        "Challenge / edge cases": 10
+      }
+    },
+    "G6-SCI-004": {
+      "topic_name": "Sorting Materials into Groups",
+      "records_count": 100,
+      "splits": {
+        "Train": 70,
+        "Validation": 15,
+        "Test": 15
+      },
+      "categories": {
+        "Concept understanding": 15,
+        "Real-life application": 15,
+        "Misconceptions and corrective teaching": 20,
+        "Step-by-step reasoning / problem solving": 15,
+        "Diagram, graph, or virtual-lab reasoning": 15,
+        "Follow-up / understanding checks": 10,
+        "Challenge / edge cases": 10
+      }
+    },
+    "G6-SCI-005": {
+      "topic_name": "Separation of Substances",
+      "records_count": 100,
+      "splits": {
+        "Train": 70,
+        "Validation": 15,
+        "Test": 15
+      },
+      "categories": {
+        "Concept understanding": 15,
+        "Real-life application": 15,
+        "Misconceptions and corrective teaching": 20,
+        "Step-by-step reasoning / problem solving": 15,
+        "Diagram, graph, or virtual-lab reasoning": 15,
+        "Follow-up / understanding checks": 10,
+        "Challenge / edge cases": 10
+      }
+    },
+    "G6-SCI-006": {
+      "topic_name": "Changes Around Us",
+      "records_count": 100,
+      "splits": {
+        "Train": 70,
+        "Validation": 15,
+        "Test": 15
+      },
+      "categories": {
+        "Concept understanding": 15,
+        "Real-life application": 15,
+        "Misconceptions and corrective teaching": 20,
+        "Step-by-step reasoning / problem solving": 15,
+        "Diagram, graph, or virtual-lab reasoning": 15,
+        "Follow-up / understanding checks": 10,
+        "Challenge / edge cases": 10
+      }
+    },
+    "G6-SCI-007": {
+      "topic_name": "Getting to Know Plants",
+      "records_count": 100,
+      "splits": {
+        "Train": 70,
+        "Validation": 15,
+        "Test": 15
+      },
+      "categories": {
+        "Concept understanding": 15,
+        "Real-life application": 15,
+        "Misconceptions and corrective teaching": 20,
+        "Step-by-step reasoning / problem solving": 15,
+        "Diagram, graph, or virtual-lab reasoning": 15,
+        "Follow-up / understanding checks": 10,
+        "Challenge / edge cases": 10
+      }
+    },
+    "G6-SCI-008": {
+      "topic_name": "Body Movements",
+      "records_count": 100,
+      "splits": {
+        "Train": 70,
+        "Validation": 15,
+        "Test": 15
+      },
+      "categories": {
+        "Concept understanding": 15,
+        "Real-life application": 15,
+        "Misconceptions and corrective teaching": 20,
+        "Step-by-step reasoning / problem solving": 15,
+        "Diagram, graph, or virtual-lab reasoning": 15,
+        "Follow-up / understanding checks": 10,
+        "Challenge / edge cases": 10
+      }
+    },
+    "G6-SCI-009": {
+      "topic_name": "The Living Organisms and Their Surroundings",
+      "records_count": 100,
+      "splits": {
+        "Train": 70,
+        "Validation": 15,
+        "Test": 15
+      },
+      "categories": {
+        "Concept understanding": 15,
+        "Real-life application": 15,
+        "Misconceptions and corrective teaching": 20,
+        "Step-by-step reasoning / problem solving": 15,
+        "Diagram, graph, or virtual-lab reasoning": 15,
+        "Follow-up / understanding checks": 10,
+        "Challenge / edge cases": 10
+      }
+    },
+    "G6-SCI-010": {
+      "topic_name": "Motion and Measurement of Distances",
+      "records_count": 100,
+      "splits": {
+        "Train": 70,
+        "Validation": 15,
+        "Test": 15
+      },
+      "categories": {
+        "Concept understanding": 15,
+        "Real-life application": 15,
+        "Misconceptions and corrective teaching": 20,
+        "Step-by-step reasoning / problem solving": 15,
+        "Diagram, graph, or virtual-lab reasoning": 15,
+        "Follow-up / understanding checks": 10,
+        "Challenge / edge cases": 10
+      }
+    },
+    "G6-SCI-011": {
+      "topic_name": "Light, Shadows and Reflections",
+      "records_count": 100,
+      "splits": {
+        "Train": 70,
+        "Validation": 15,
+        "Test": 15
+      },
+      "categories": {
+        "Concept understanding": 15,
+        "Real-life application": 15,
+        "Misconceptions and corrective teaching": 20,
+        "Step-by-step reasoning / problem solving": 15,
+        "Diagram, graph, or virtual-lab reasoning": 15,
+        "Follow-up / understanding checks": 10,
+        "Challenge / edge cases": 10
+      }
+    },
+    "G6-SCI-012": {
+      "topic_name": "Electricity and Circuits",
+      "records_count": 100,
+      "splits": {
+        "Train": 70,
+        "Validation": 15,
+        "Test": 15
+      },
+      "categories": {
+        "Concept understanding": 15,
+        "Real-life application": 15,
+        "Misconceptions and corrective teaching": 20,
+        "Step-by-step reasoning / problem solving": 15,
+        "Diagram, graph, or virtual-lab reasoning": 15,
+        "Follow-up / understanding checks": 10,
+        "Challenge / edge cases": 10
+      }
+    },
+    "G6-SCI-013": {
+      "topic_name": "Fun with Magnets",
+      "records_count": 100,
+      "splits": {
+        "Train": 70,
+        "Validation": 15,
+        "Test": 15
+      },
+      "categories": {
+        "Concept understanding": 15,
+        "Real-life application": 15,
+        "Misconceptions and corrective teaching": 20,
+        "Step-by-step reasoning / problem solving": 15,
+        "Diagram, graph, or virtual-lab reasoning": 15,
+        "Follow-up / understanding checks": 10,
+        "Challenge / edge cases": 10
+      }
+    },
+    "G6-SCI-014": {
+      "topic_name": "Water",
+      "records_count": 100,
+      "splits": {
+        "Train": 70,
+        "Validation": 15,
+        "Test": 15
+      },
+      "categories": {
+        "Concept understanding": 15,
+        "Real-life application": 15,
+        "Misconceptions and corrective teaching": 20,
+        "Step-by-step reasoning / problem solving": 15,
+        "Diagram, graph, or virtual-lab reasoning": 15,
+        "Follow-up / understanding checks": 10,
+        "Challenge / edge cases": 10
+      }
+    },
+    "G6-SCI-015": {
+      "topic_name": "Air Around Us",
+      "records_count": 100,
+      "splits": {
+        "Train": 70,
+        "Validation": 15,
+        "Test": 15
+      },
+      "categories": {
+        "Concept understanding": 15,
+        "Real-life application": 15,
+        "Misconceptions and corrective teaching": 20,
+        "Step-by-step reasoning / problem solving": 15,
+        "Diagram, graph, or virtual-lab reasoning": 15,
+        "Follow-up / understanding checks": 10,
+        "Challenge / edge cases": 10
+      }
+    },
+    "G6-SCI-016": {
+      "topic_name": "Garbage In, Garbage Out",
+      "records_count": 100,
+      "splits": {
+        "Train": 70,
+        "Validation": 15,
+        "Test": 15
+      },
+      "categories": {
+        "Concept understanding": 15,
+        "Real-life application": 15,
+        "Misconceptions and corrective teaching": 20,
+        "Step-by-step reasoning / problem solving": 15,
+        "Diagram, graph, or virtual-lab reasoning": 15,
+        "Follow-up / understanding checks": 10,
+        "Challenge / edge cases": 10
+      }
+    }
+  }
+}
