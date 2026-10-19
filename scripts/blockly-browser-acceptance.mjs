@@ -238,6 +238,12 @@ await runCase("5/7 toolbar Undo/Redo restores circuit and Blockly as one documen
     return Boolean(s && s.circuit.parts.some((part) => part.id === "e2e-led-history") &&
       s.blocklyXml.includes('name="STATE">LOW') && s.blocklyXml.includes('name="NUM">1500'))
   })
+  // Parent React history updates before the Blockly editor finishes its scheduled
+  // external XML hydration. Assert the actual live workspace after that sync settles.
+  await page.waitForFunction(() => {
+    const ws = window.__PIXIU_BLOCKLY_E2E__?.workspaceSnapshot()
+    return Boolean(ws?.blocks.some((block) => block.type === "io_digitalwrite" && block.fields.STATE === "LOW"))
+  })
   assert.ok((await api(page, "workspaceSnapshot")).blocks.some((block) => block.type === "io_digitalwrite" && block.fields.STATE === "LOW"))
 })
 
