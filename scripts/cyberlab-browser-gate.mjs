@@ -94,7 +94,7 @@ try {
   await page.screenshot({ path: artifactDir + "/simulation-template.png", fullPage: true })
 
   // AI template → AI Blockly → automatic Pixiu runtime HUD
-  await page.getByRole("button", { name: "Circuit" }).click()
+  await page.getByRole("button", { name: "Circuit", exact: true }).click()
   await page.getByRole("button", { name: "Tools" }).click()
   await page.getByRole("menuitem", { name: /Templates/ }).click()
   await page.locator("h3").filter({ hasText: "AI Vision Smart Boom Barrier Gate" }).click()
@@ -104,7 +104,7 @@ try {
     throw new Error("AI template Blockly did not hydrate")
   }
 
-  await page.getByRole("button", { name: "Circuit" }).click()
+  await page.getByRole("button", { name: "Circuit", exact: true }).click()
   await page.getByRole("button", { name: "Run" }).click()
   await page.getByText("PIXIU VISION CORE", { exact: true }).waitFor()
   if ((await page.locator("video").count()) < 1) throw new Error("AI camera video element did not mount")

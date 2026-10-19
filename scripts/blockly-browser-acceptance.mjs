@@ -172,7 +172,7 @@ await runCase("3/7 project save/reload preserves exact Blockly XML round-trip", 
   await page.getByTitle("Projects: save, load, import and export").click()
   const dialog = page.getByRole("dialog", { name: "Project manager" })
   await dialog.waitFor({ state: "visible" })
-  await dialog.getByLabel("Project name").fill(projectName)
+  await dialog.getByText("Project name", { exact: true }).locator("xpath=following-sibling::input").fill(projectName)
   await dialog.getByRole("button", { name: "Save", exact: true }).click()
   await dialog.getByText(projectName, { exact: true }).waitFor()
   await dialog.getByRole("button", { name: "Done", exact: true }).click()
