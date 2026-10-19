@@ -44,9 +44,44 @@ import { WelcomeOverlay } from "./welcome-overlay"
 import { CircuitDoctorHud } from "./circuit-doctor-hud"
 import { diagnoseCircuit } from "@/lib/circuit-doctor"
 import { CircuitCopilotChat } from "./circuit-copilot-chat"
-import { useCircuitCopilotAction } from "./use-circuit-copilot-action"
+import { useCircuitCopilotAction, type CircuitCopilotProposal } from "./use-circuit-copilot-action"
 import { buildInoSketch, triggerInoDownload } from "@/lib/sketch-exporter"
 import { awardCreationXp, awardTinkeringXp, syncXpWithServer, setActiveStudentId, setUserRole } from "@/lib/xp-engine"
+
+declare global {
+  interface Window {
+    __PIXIU_BLOCKLY_E2E__?: {
+      snapshot: () => {
+        circuit: CircuitState
+        blocklyXml: string
+        canUndo: boolean
+        canRedo: boolean
+        copilotState: string
+      }
+      workspaceSnapshot: () => null | {
+        xml: string
+        blockCount: number
+        topLevelCount: number
+        blocks: Array<{
+          id: string
+          type: string
+          parentId: string | null
+          parentType: string | null
+          svgId: string | null
+          dataId: string | null
+          hasPrevious: boolean
+          hasNext: boolean
+          fields: Record<string, string | null>
+        }>
+      }
+      connectionPoint: (blockId: string, connectionName: string) => { x: number; y: number } | null
+      setXml: (xml: string) => void
+      captureProposal: (xml: string, circuit?: CircuitState) => string | null
+      stageCapturedProposal: () => { valid: boolean; stale: boolean; staged: boolean }
+      applyCapturedProposal: () => boolean
+    }
+  }
+}
 
 function PixiuModuleLoading({ title, subtitle }: { title: string; subtitle: string }) {
   return (
@@ -794,6 +829,94 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
       [stopProgram, updateState, storageReady],
     ),
   })
+
+  // Browser-test bridge is compiled only into the dedicated CI verification build.
+  // It exposes real component state/actions, never ships in normal production builds.
+  const e2eProposalRef = useRef<CircuitCopilotProposal | null>(null)
+  useEffect(() => {
+    if (import.meta.env.VITE_CYBERLAB_E2E !== "1") return
+
+    const api: NonNullable<Window["__PIXIU_BLOCKLY_E2E__"]> = {
+      snapshot: () => ({
+        circuit: JSON.parse(JSON.stringify(state)) as CircuitState,
+        blocklyXml,
+        canUndo: canUndo(history),
+        canRedo: canRedo(history),
+        copilotState: copilotAction.state,
+      }),
+      workspaceSnapshot: () => {
+        const workspace = visualWorkspaceRef.current
+        if (!workspace) return null
+        const blocks = workspace.getAllBlocks(false)
+        return {
+          xml: Blockly.utils.xml.domToText(Blockly.Xml.workspaceToDom(workspace)),
+          blockCount: blocks.length,
+          topLevelCount: workspace.getTopBlocks(true).length,
+          blocks: blocks.map((block) => {
+            const root = block.getSvgRoot()
+            const fields: Record<string, string | null> = {}
+            for (const fieldName of ["PIN", "STATE", "NUM", "MS", "ANGLE"]) {
+              try {
+                const value = block.getFieldValue(fieldName)
+                if (value !== null && value !== undefined) fields[fieldName] = String(value)
+              } catch {}
+            }
+            return {
+              id: block.id,
+              type: block.type,
+              parentId: block.getParent()?.id ?? null,
+              parentType: block.getParent()?.type ?? null,
+              svgId: root?.id || null,
+              dataId: root?.getAttribute("data-id") || null,
+              hasPrevious: Boolean(block.previousConnection),
+              hasNext: Boolean(block.nextConnection),
+              fields,
+            }
+          }),
+        }
+      },
+      connectionPoint: (blockId, connectionName) => {
+        const workspace = visualWorkspaceRef.current
+        const block = workspace?.getBlockById(blockId)
+        const connection = block ? (block as unknown as Record<string, any>)[connectionName] : null
+        const canvas = workspace?.getCanvas() as unknown as SVGGraphicsElement | undefined
+        const matrix = canvas?.getScreenCTM()
+        if (!block || !connection || !matrix || typeof connection.getOffsetInBlock !== "function") return null
+        const xy = block.getRelativeToSurfaceXY()
+        const offset = connection.getOffsetInBlock()
+        const point = new DOMPoint(xy.x + offset.x, xy.y + offset.y).matrixTransform(matrix)
+        return { x: point.x, y: point.y }
+      },
+      setXml: (xml) => updateBlocklyDocumentXml(xml, "push"),
+      captureProposal: (xml, circuit) => {
+        e2eProposalRef.current = {
+          id: "blockly-e2e-" + Date.now(),
+          title: "Blockly browser acceptance proposal",
+          rationale: "Deterministic browser acceptance test.",
+          baseRevisionHash: copilotAction.currentHash,
+          circuit: JSON.parse(JSON.stringify(circuit ?? state)) as CircuitState,
+          blocklyXml: xml,
+          codeLanguage: "blockly",
+        }
+        return e2eProposalRef.current.baseRevisionHash
+      },
+      stageCapturedProposal: () => {
+        const proposal = e2eProposalRef.current
+        if (!proposal) return { valid: false, stale: false, staged: false }
+        const validation = copilotAction.proposeAction(proposal)
+        const staged = validation.valid && !validation.stale && copilotAction.stageProposal(proposal)
+        return { valid: validation.valid, stale: validation.stale, staged: Boolean(staged) }
+      },
+      applyCapturedProposal: () => {
+        const proposal = e2eProposalRef.current
+        return proposal ? copilotAction.applyProposal(proposal) : false
+      },
+    }
+    window.__PIXIU_BLOCKLY_E2E__ = api
+    return () => {
+      if (window.__PIXIU_BLOCKLY_E2E__ === api) delete window.__PIXIU_BLOCKLY_E2E__
+    }
+  }, [state, blocklyXml, history, copilotAction, updateBlocklyDocumentXml])
 
   const handleToggleAiVision = useCallback(() => {
     if (isAiCameraOpen) {
