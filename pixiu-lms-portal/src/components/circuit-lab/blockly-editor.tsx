@@ -4,13 +4,28 @@ import { useEffect, useRef, useState } from "react"
 import * as Blockly from "blockly"
 import type { CircuitState } from "@/lib/circuit-types"
 import { defineArduinoBlocks, setPinContext, arduino, normalizeBlocklyXml } from "@/lib/arduino-blocks"
+import { parseBlocklyXmlDocument } from "@/lib/blockly-xml"
 import { Copy, Check, Terminal, Code2, ZoomIn, ZoomOut, Maximize2, Sparkles } from "lucide-react"
+
+type BlocklyXmlChangeMetadata = { source: "workspace" | "external" | "recovery" }
 
 interface Props {
   circuit: CircuitState
   xml?: string
-  onXmlChange?: (xml: string) => void
+  onXmlChange?: (xml: string, metadata?: BlocklyXmlChangeMetadata) => void
   onWorkspaceReady?: (workspace: Blockly.WorkspaceSvg) => void
+}
+
+const DEFAULT_STARTER_XML = `<xml xmlns="https://developers.google.com/blockly/xml">
+  <block type="arduino_program" x="40" y="40">
+  </block>
+</xml>`
+
+function parseWorkspaceXml(xml: string): Element {
+  // Let Blockly itself validate registered block types during hydration; that
+  // registry varies with the bundled standard/custom block packs. On failure,
+  // the editor's rollback path preserves the previous live workspace.
+  return parseBlocklyXmlDocument(normalizeBlocklyXml(xml))
 }
 
 const TOOLBOX = {
@@ -201,9 +216,16 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
   const lastParentXmlRef = useRef<string | null>(null)
   const pendingExternalXmlRef = useRef<string | null>(null)
   const externalLoadVersionRef = useRef(0)
+  const onXmlChangeRef = useRef(onXmlChange)
+
+  useEffect(() => {
+    onXmlChangeRef.current = onXmlChange
+  }, [onXmlChange])
   const [cppCode, setCppCode] = useState("")
   const [copied, setCopied] = useState(false)
   const [mobileTab, setMobileTab] = useState<"blocks" | "cpp">("blocks")
+  const [xmlError, setXmlError] = useState<string | null>(null)
+  const lastRecoveredXmlRef = useRef<string | null>(null)
 
   useEffect(() => {
     defineArduinoBlocks()
@@ -234,59 +256,42 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
     workspaceRef.current = workspace
     onWorkspaceReady?.(workspace)
 
-    // Load initial Arduino Program block
-    const initialXml = xml || `<xml xmlns="https://developers.google.com/blockly/xml">
-      <block type="arduino_program" x="40" y="40">
-        <statement name="LOOP">
-          <block type="io_digitalwrite">
-            <field name="PIN">13</field>
-            <field name="STATE">HIGH</field>
-            <next>
-              <block type="time_delay">
-                <value name="MS">
-                  <shadow type="math_number">
-                    <field name="NUM">1000</field>
-                  </shadow>
-                </value>
-                <next>
-                  <block type="io_digitalwrite">
-                    <field name="PIN">13</field>
-                    <field name="STATE">LOW</field>
-                    <next>
-                      <block type="time_delay">
-                        <value name="MS">
-                          <shadow type="math_number">
-                            <field name="NUM">1000</field>
-                          </shadow>
-                        </value>
-                      </block>
-                    </next>
-                  </block>
-                </next>
-              </block>
-            </next>
-          </block>
-        </statement>
-      </block>
-    </xml>`
+    // Keep the editor recoverable even if persisted/imported XML is malformed.
+    const initialXml = xml || DEFAULT_STARTER_XML
+    let recoveringInitialXml = false
+    let initialRecoveryXml: string | null = null
 
     lastWorkspaceXmlRef.current = initialXml
     lastParentXmlRef.current = initialXml
 
     try {
-      const dom = Blockly.utils.xml.textToDom(normalizeBlocklyXml(initialXml))
+      const dom = parseWorkspaceXml(initialXml)
       Blockly.Xml.domToWorkspace(dom, workspace)
-      setTimeout(() => {
-        Blockly.svgResize(workspace)
-        if (typeof (workspace as any).scrollCenter === "function") {
-          (workspace as any).scrollCenter()
-        }
-      }, 100)
     } catch (err) {
-      console.error("Failed to load initial XML:", err)
+      recoveringInitialXml = true
+      const detail = err instanceof Error ? err.message : String(err)
+      setXmlError(`Blockly XML could not be loaded: ${detail} A safe empty Arduino Program was loaded instead.`)
+      console.error("Failed to load initial Blockly XML; falling back safely:", err)
+      try {
+        workspace.clear()
+        Blockly.Xml.domToWorkspace(parseWorkspaceXml(DEFAULT_STARTER_XML), workspace)
+        initialRecoveryXml = Blockly.utils.xml.domToText(Blockly.Xml.workspaceToDom(workspace))
+        lastRecoveredXmlRef.current = initialRecoveryXml
+        pendingExternalXmlRef.current = initialXml
+      } catch (fallbackError) {
+        setXmlError("Blockly could not create the safe fallback workspace. Reopen the lab or load a valid project.")
+        console.error("Failed to load safe Blockly fallback:", fallbackError)
+      }
     }
 
-    const updateCode = () => {
+    window.setTimeout(() => {
+      Blockly.svgResize(workspace)
+      if (typeof (workspace as any).scrollCenter === "function") {
+        (workspace as any).scrollCenter()
+      }
+    }, 100)
+
+    const updateCode = (event?: { isUiEvent?: boolean }) => {
       try {
         const code = arduino.workspaceToCode(workspace)
         setCppCode(code)
@@ -294,13 +299,19 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
         const dom = Blockly.Xml.workspaceToDom(workspace)
         const text = Blockly.utils.xml.domToText(dom)
         lastWorkspaceXmlRef.current = text
-        lastParentXmlRef.current = text
+        if (!recoveringInitialXml) lastParentXmlRef.current = text
 
-        // This XML was authored by the live Blockly workspace. Do not let the
-        // parent prop immediately rehydrate the workspace while a drag/drop is
-        // in progress; that causes blocks to appear "stuck" to the cursor.
-        if (onXmlChange && !pendingExternalXmlRef.current) {
-          onXmlChange(text)
+        // Initial hydration canonicalizes the parent value without creating a
+        // history entry. UI-only events (selection/viewport) are not edits.
+        if (!event && !recoveringInitialXml && onXmlChangeRef.current && !pendingExternalXmlRef.current) {
+          onXmlChangeRef.current?.(text, { source: "external" })
+        }
+        if (event && !event.isUiEvent) {
+          setXmlError(null)
+          lastRecoveredXmlRef.current = null
+          if (onXmlChangeRef.current && !pendingExternalXmlRef.current) {
+            onXmlChangeRef.current(text, { source: "workspace" })
+          }
         }
       } catch (err) {
         console.error(err)
@@ -309,6 +320,11 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
 
     updateCode()
     workspace.addChangeListener(updateCode)
+    if (initialRecoveryXml) {
+      pendingExternalXmlRef.current = null
+      onXmlChangeRef.current?.(initialRecoveryXml, { source: "recovery" })
+      recoveringInitialXml = false
+    }
 
     const handleResize = () => {
       Blockly.svgResize(workspace)
@@ -321,9 +337,8 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
     }
   }, [])
 
-  // Sync genuine external loads (starter/project/lesson/template changes).
-  // Internal Blockly edits are echoed through onXmlChange and are never
-  // mistaken for external loads.
+  // Apply only validated external documents. Parse before clearing the live
+  // workspace, and roll back to the last valid XML if Blockly rejects hydration.
   useEffect(() => {
     const workspace = workspaceRef.current
     if (!workspace || !xml || xml === lastParentXmlRef.current) return
@@ -339,31 +354,54 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
       const isDragging = typeof (activeWorkspace as any).isDragging === "function"
         ? Boolean((activeWorkspace as any).isDragging())
         : false
-
       if (isDragging) {
         window.setTimeout(applyExternalXml, 80)
         return
       }
 
-      const currentXml = Blockly.utils.xml.domToText(Blockly.Xml.workspaceToDom(activeWorkspace))
-      if (currentXml === expectedExternalXml) {
-        lastWorkspaceXmlRef.current = currentXml
-        lastParentXmlRef.current = currentXml
+      let parsedDom: Element
+      try {
+        parsedDom = parseWorkspaceXml(expectedExternalXml)
+      } catch (err) {
         pendingExternalXmlRef.current = null
+        const detail = err instanceof Error ? err.message : String(err)
+        setXmlError(`Blockly XML change was rejected: ${detail} The previous workspace was preserved.`)
+        try {
+          const preservedXml = Blockly.utils.xml.domToText(Blockly.Xml.workspaceToDom(activeWorkspace))
+          lastWorkspaceXmlRef.current = preservedXml
+          lastParentXmlRef.current = expectedExternalXml
+          lastRecoveredXmlRef.current = preservedXml
+          onXmlChangeRef.current?.(preservedXml, { source: "recovery" })
+        } catch (serializeError) {
+          console.error("Could not preserve the last valid Blockly workspace:", serializeError)
+        }
         return
       }
 
+      const requestedCanonicalXml = Blockly.utils.xml.domToText(parsedDom)
+      const currentXml = Blockly.utils.xml.domToText(Blockly.Xml.workspaceToDom(activeWorkspace))
+      if (currentXml === requestedCanonicalXml) {
+        lastWorkspaceXmlRef.current = currentXml
+        lastParentXmlRef.current = currentXml
+        pendingExternalXmlRef.current = null
+        // Keep a recovery alert visible until the student edits or dismisses it.
+        if (lastRecoveredXmlRef.current !== currentXml) setXmlError(null)
+        return
+      }
+
+      // Snapshot before mutation so an exception cannot leave the workspace empty.
+      const previousXml = currentXml
       try {
         activeWorkspace.clear()
-        const dom = Blockly.utils.xml.textToDom(normalizeBlocklyXml(expectedExternalXml))
-        Blockly.Xml.domToWorkspace(dom, activeWorkspace)
-
-        lastWorkspaceXmlRef.current = expectedExternalXml
-        lastParentXmlRef.current = expectedExternalXml
+        Blockly.Xml.domToWorkspace(parsedDom, activeWorkspace)
+        const loadedXml = Blockly.utils.xml.domToText(Blockly.Xml.workspaceToDom(activeWorkspace))
+        lastWorkspaceXmlRef.current = loadedXml
+        lastParentXmlRef.current = loadedXml
         pendingExternalXmlRef.current = null
-
+        lastRecoveredXmlRef.current = null
         setCppCode(arduino.workspaceToCode(activeWorkspace))
-        onXmlChange?.(expectedExternalXml)
+        setXmlError(null)
+        onXmlChangeRef.current?.(loadedXml, { source: "external" })
 
         window.setTimeout(() => {
           if (workspaceRef.current && externalLoadVersionRef.current === version) {
@@ -374,8 +412,23 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
           }
         }, 80)
       } catch (err) {
-        pendingExternalXmlRef.current = null
-        console.error("Failed to sync external Blockly XML:", err)
+        console.error("Failed to sync external Blockly XML; restoring prior workspace:", err)
+        try {
+          activeWorkspace.clear()
+          Blockly.Xml.domToWorkspace(parseWorkspaceXml(previousXml), activeWorkspace)
+          const restoredXml = Blockly.utils.xml.domToText(Blockly.Xml.workspaceToDom(activeWorkspace))
+          lastWorkspaceXmlRef.current = restoredXml
+          lastParentXmlRef.current = expectedExternalXml
+          lastRecoveredXmlRef.current = restoredXml
+          setCppCode(arduino.workspaceToCode(activeWorkspace))
+          onXmlChangeRef.current?.(restoredXml, { source: "recovery" })
+          setXmlError("Blockly could not apply that document. Your previous blocks were restored.")
+        } catch (rollbackError) {
+          console.error("Blockly rollback failed:", rollbackError)
+          setXmlError("Blockly could not restore the prior blocks. Reload the lab and open a valid project.")
+        } finally {
+          pendingExternalXmlRef.current = null
+        }
       }
     }
 
@@ -493,6 +546,22 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
           mobileTab === "blocks" ? "flex" : "hidden lg:flex"
         }`}
       >
+        {xmlError && (
+          <div
+            role="alert"
+            className="absolute left-3 right-3 top-3 z-50 flex items-start justify-between gap-3 rounded-xl border border-amber-400/50 bg-slate-950/95 px-4 py-3 text-xs leading-5 text-amber-100 shadow-xl"
+          >
+            <span>{xmlError}</span>
+            <button
+              type="button"
+              aria-label="Dismiss Blockly XML error"
+              className="shrink-0 rounded-md px-2 py-1 font-semibold text-amber-200 hover:bg-white/10"
+              onClick={() => setXmlError(null)}
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
         <div ref={blocklyDiv} className="pixiu-blockly-host absolute inset-0 w-full h-full" />
 
         {/* Floating Zoom & Canvas Controls */}

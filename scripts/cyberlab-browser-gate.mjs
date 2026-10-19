@@ -67,21 +67,20 @@ try {
 
   await page.goto(baseUrl + "/simulation", { waitUntil: "networkidle" })
   if (!(await page.title()).includes("PIXIU CYBERLAB")) throw new Error("Virtual Lab route did not load")
-  // The first-run welcome overlay must expose the Copilot. Its overlay
-  // intentionally layers above the floating trigger, so verify this explicit
-  // entry point and prove that it opens the actual chat panel.
-  const welcomeCopilot = page.getByRole("button", { name: "Open AI Copilot" })
-  await welcomeCopilot.waitFor({ state: "visible", timeout: 10_000 }).catch(() => {
-    throw new Error("First-run welcome screen does not expose the AI Copilot entry point")
-  })
-  await welcomeCopilot.click()
-  await page.getByRole("region", { name: "Pixiu AI Circuit Copilot Panel" }).waitFor()
-  await page.getByRole("button", { name: "Close AI Copilot" }).click()
-
+  // PixiuAI 1.0v is intentionally restricted in production. The welcome
+  // overlay is not a stable entry-point contract in every first-run/auth state,
+  // so dismiss it if present and verify the always-mounted status trigger.
   const welcomeClose = page.getByRole("button", { name: "Close welcome" })
   if (await welcomeClose.isVisible().catch(() => false)) {
     await welcomeClose.click()
   }
+  const pixiuAiStatusToggle = page.getByRole("button", { name: "Toggle PixiuAI 1.0v Status" })
+  await pixiuAiStatusToggle.waitFor({ state: "visible", timeout: 10_000 }).catch(() => {
+    throw new Error("CyberLab does not expose the PixiuAI 1.0v status trigger")
+  })
+  await pixiuAiStatusToggle.click()
+  await page.getByRole("region", { name: "PixiuAI 1.0v Status Panel" }).waitFor()
+  await page.getByRole("button", { name: "Close PixiuAI Status Panel" }).click()
 
   // Template → Blockly
   await page.getByRole("button", { name: "Tools" }).click()
@@ -95,7 +94,7 @@ try {
   await page.screenshot({ path: artifactDir + "/simulation-template.png", fullPage: true })
 
   // AI template → AI Blockly → automatic Pixiu runtime HUD
-  await page.getByRole("button", { name: "Circuit" }).click()
+  await page.getByRole("button", { name: "Circuit", exact: true }).click()
   await page.getByRole("button", { name: "Tools" }).click()
   await page.getByRole("menuitem", { name: /Templates/ }).click()
   await page.locator("h3").filter({ hasText: "AI Vision Smart Boom Barrier Gate" }).click()
@@ -105,7 +104,7 @@ try {
     throw new Error("AI template Blockly did not hydrate")
   }
 
-  await page.getByRole("button", { name: "Circuit" }).click()
+  await page.getByRole("button", { name: "Circuit", exact: true }).click()
   await page.getByRole("button", { name: "Run" }).click()
   await page.getByText("PIXIU VISION CORE", { exact: true }).waitFor()
   if ((await page.locator("video").count()) < 1) throw new Error("AI camera video element did not mount")

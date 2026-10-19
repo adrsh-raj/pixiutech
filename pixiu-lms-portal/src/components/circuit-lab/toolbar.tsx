@@ -171,6 +171,22 @@ export function Toolbar({
           </button>
         </div>
 
+        {/* Paired-document history controls: circuit and Blockly move together. */}
+        {onUndo && (
+          <button type="button" onClick={onUndo} disabled={!canUndo}
+            aria-label="Undo circuit and Blockly" title="Undo circuit and Blockly together (Ctrl/Cmd+Z)"
+            className="flex items-center justify-center rounded-lg border border-border bg-background px-2 py-1.5 text-muted-foreground transition hover:bg-secondary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-35">
+            <Undo2 size={15} />
+          </button>
+        )}
+        {onRedo && (
+          <button type="button" onClick={onRedo} disabled={!canRedo}
+            aria-label="Redo circuit and Blockly" title="Redo circuit and Blockly together (Ctrl/Cmd+Y)"
+            className="flex items-center justify-center rounded-lg border border-border bg-background px-2 py-1.5 text-muted-foreground transition hover:bg-secondary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-35">
+            <Redo2 size={15} />
+          </button>
+        )}
+
         {/* Physical Breadboard ↔ Professional IEEE Schematic Toggle */}
         {view === "circuit" && onToggleSchematic && (
           <button

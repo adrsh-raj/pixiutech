@@ -31,6 +31,8 @@ jobs:
 
       - name: Build Virtual Lab
         working-directory: pixiu-lms-portal
+        env:
+          VITE_CYBERLAB_E2E: "1"
         run: |
           npm ci
           npm run test:lab
@@ -43,6 +45,7 @@ jobs:
           npx playwright install --with-deps chromium
 
       - name: Start preview
+        id: preview
         working-directory: pixiu-lms-portal
         run: |
           nohup npm run preview -- --host 127.0.0.1 --port 4173 >/tmp/pixiu-cyberlab.log 2>&1 &
@@ -58,6 +61,12 @@ jobs:
           CYBERLAB_BASE_URL: "http://127.0.0.1:4173"
           CYBERLAB_ARTIFACT_DIR: "artifacts/cyberlab-browser"
         run: node scripts/cyberlab-browser-gate.mjs
+
+      - name: Run dedicated Blockly browser acceptance (7 scenarios)
+        if: always() && steps.preview.outcome == 'success'
+        env:
+          CYBERLAB_BASE_URL: "http://127.0.0.1:4173"
+        run: node scripts/blockly-browser-acceptance.mjs
 
       - name: Upload browser evidence
         if: always()

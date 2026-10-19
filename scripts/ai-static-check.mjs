@@ -257,14 +257,24 @@ for (const marker of [
   "cocoSsd.load",
   'base: "lite_mobilenet_v2"',
 ]) requireText(objectAdapter, marker, "Integrated AI Vision model loader")
+const blocklyEditorSource = read("pixiu-lms-portal/src/components/circuit-lab/blockly-editor.tsx")
 for (const marker of [
   "lastParentXmlRef",
   "pendingExternalXmlRef",
   "externalLoadVersionRef",
-  "genuine external loads",
   "lastParentXmlRef.current = expectedExternalXml",
-  "onXmlChange?.(expectedExternalXml)",
-]) requireText(read("pixiu-lms-portal/src/components/circuit-lab/blockly-editor.tsx"), marker, "Blockly external XML hydration")
+  "parseWorkspaceXml(expectedExternalXml)",
+  'onXmlChangeRef.current?.(loadedXml, { source: "external" })',
+  "parseWorkspaceXml(previousXml)",
+  "The previous workspace was preserved",
+]) requireText(blocklyEditorSource, marker, "Blockly external XML hydration")
+const externalLoadStart = blocklyEditorSource.indexOf("// Apply only validated external documents.")
+const externalParseIndex = blocklyEditorSource.indexOf("parsedDom = parseWorkspaceXml(expectedExternalXml)")
+const externalClearIndex = blocklyEditorSource.indexOf("activeWorkspace.clear()", externalParseIndex)
+assert(
+  externalLoadStart >= 0 && externalParseIndex > externalLoadStart && externalClearIndex > externalParseIndex,
+  "Blockly external XML hydration must validate the incoming XML before clearing the live workspace",
+)
 
 for (const marker of [
   "setAiRuntimeEnabled(false)",

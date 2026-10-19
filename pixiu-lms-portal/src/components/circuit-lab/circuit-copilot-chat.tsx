@@ -52,7 +52,7 @@ import {
 } from "@/lib/circuit-doctor"
 import { PIXIU_COMPONENTS_DATASET } from "@/lib/ai/pixiu-components-dataset"
 import { TEMPLATES } from "@/lib/templates"
-import { handleScienceTutorQuery, isPhase2fScienceTutorEnabled } from "@/lib/ai/copilot/science-tutor"
+import { isPhase2fScienceTutorEnabled } from "@/lib/feature-flags"
 import { isPixiuAiCopilotEnabled } from "@/lib/feature-flags"
 
 // ============================================================================
@@ -383,24 +383,8 @@ export function parseUserIntent(
     }
   }
 
-  // 4. Phase 2F Science Concept Inquiry (gated: strictly disabled by default in production)
-  if (isPhase2fScienceTutorEnabled()) {
-    const scienceResult = handleScienceTutorQuery(query)
-    if (scienceResult.handled) {
-      if (!scienceResult.tutorResponse) {
-        return {
-          kind: "chat",
-          replyText: "I matched a science question, but don't have a reviewed answer variant for this language and depth. Try asking in English or Hinglish at the standard level.",
-        }
-      }
-      const resp = scienceResult.tutorResponse
-      const title = resp.science_concept?.title || "Science Concept"
-      return {
-        kind: "chat",
-        replyText: `🔬 **Science Tutor (Phase 2F Draft)**: **${title}**\n\n${resp.direct_answer}\n\n*Note: This is an exploratory Phase 2F draft candidate (status: draft; rights: proposed). No circuit actions are offered or applied.*`,
-      }
-    }
-  }
+  // 4. Phase 2F science tutor remains disabled until its module, reviewed data,
+  // and explicit release gate are available. Do not silently enable it here.
 
   // 5. Telemetry / Live Explanation Intent
   if (/\b(explain|telemetry|kya ho raha|voltage|current|status|samjhao|nodal|potentials|pins)\b/i.test(q)) {
