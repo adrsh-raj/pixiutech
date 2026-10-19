@@ -72,6 +72,12 @@ const DEFAULT_XML = `<xml xmlns="https://developers.google.com/blockly/xml">
   </block>
 </xml>`
 
+type WorkbenchDocument = {
+  circuit: CircuitState
+  blocklyXml: string
+}
+type BlocklyXmlChangeMetadata = { source: "workspace" | "external" | "recovery" }
+
 const INITIAL_STATE: CircuitState = {
   parts: [],
   wires: [],
@@ -177,8 +183,11 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
       setActiveStudentId(userRole.toLowerCase() === "student" ? pixiuId || null : null)
     }
   }, [pixiuId, userRole])
-  const [history, setHistory] = useState<HistoryState<CircuitState>>(() => createHistory(INITIAL_STATE))
-  const state = history.present
+  const [history, setHistory] = useState<HistoryState<WorkbenchDocument>>(() =>
+    createHistory({ circuit: INITIAL_STATE, blocklyXml: DEFAULT_XML }),
+  )
+  const state = history.present.circuit
+  const blocklyXml = history.present.blocklyXml
   // The Copilot accepts the selected board ID, not the full board descriptor.
   // Keep this in component scope so the widget mount cannot reference an
   // undeclared local and crash the entire CyberLab route.
@@ -197,7 +206,6 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
   useEffect(() => {
     pinStatesRef.current = pinStates
   }, [pinStates])
-  const [blocklyXml, setBlocklyXml] = useState<string>(DEFAULT_XML)
   const [blocklyDocumentVersion, setBlocklyDocumentVersion] = useState(0)
   const [serialLines, setSerialLines] = useState<SerialLine[]>([])
   const [isSerialOpen, setIsSerialOpen] = useState(false)
@@ -264,6 +272,77 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
   const stepResolverRef = useRef<(() => void) | null>(null)
   const visualWorkspaceRef = useRef<Blockly.WorkspaceSvg | null>(null)
   const saveNowRef = useRef<() => void>(() => {})
+  const blocklyXmlRef = useRef<string>(DEFAULT_XML)
+  const blocklyEditGroupOpenRef = useRef(false)
+  const blocklyEditTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const closeBlocklyEditGroup = useCallback(() => {
+    if (blocklyEditTimerRef.current !== null) {
+      window.clearTimeout(blocklyEditTimerRef.current)
+      blocklyEditTimerRef.current = null
+    }
+    blocklyEditGroupOpenRef.current = false
+  }, [])
+
+  const resetWorkbenchDocument = useCallback((circuit: CircuitState, nextBlocklyXml: string) => {
+    closeBlocklyEditGroup()
+    blocklyXmlRef.current = nextBlocklyXml
+    setHistory(createHistory({ circuit, blocklyXml: nextBlocklyXml }))
+  }, [closeBlocklyEditGroup])
+
+  const updateBlocklyDocumentXml = useCallback((nextBlocklyXml: string, mode: "push" | "replace" = "push") => {
+    closeBlocklyEditGroup()
+    blocklyXmlRef.current = nextBlocklyXml
+    setHistory((current) => {
+      if (current.present.blocklyXml === nextBlocklyXml) return current
+      const next = { ...current.present, blocklyXml: nextBlocklyXml }
+      return mode === "replace"
+        ? { ...current, present: next, future: [] }
+        : pushState(current, next)
+    })
+    if (storageReady) setIsDirty(true)
+  }, [closeBlocklyEditGroup, storageReady])
+
+  const handleBlocklyXmlChange = useCallback((nextBlocklyXml: string, metadata?: BlocklyXmlChangeMetadata) => {
+    if (typeof nextBlocklyXml !== "string") return
+    blocklyXmlRef.current = nextBlocklyXml
+
+    if (metadata?.source === "workspace") {
+      if (!blocklyEditGroupOpenRef.current) {
+        blocklyEditGroupOpenRef.current = true
+        setHistory((current) => current.present.blocklyXml === nextBlocklyXml
+          ? current
+          : pushState(current, { ...current.present, blocklyXml: nextBlocklyXml }))
+      } else {
+        setHistory((current) => current.present.blocklyXml === nextBlocklyXml
+          ? current
+          : { ...current, present: { ...current.present, blocklyXml: nextBlocklyXml }, future: [] })
+      }
+      if (blocklyEditTimerRef.current !== null) window.clearTimeout(blocklyEditTimerRef.current)
+      blocklyEditTimerRef.current = window.setTimeout(() => {
+        blocklyEditGroupOpenRef.current = false
+        blocklyEditTimerRef.current = null
+      }, 350)
+    } else {
+      closeBlocklyEditGroup()
+      setHistory((current) => {
+        if (current.present.blocklyXml === nextBlocklyXml) return current
+        const next = { ...current.present, blocklyXml: nextBlocklyXml }
+        // A successful external load can normalize XML; preserve redo after undo.
+        // Recovery invalidates redo so the rejected document cannot be restored.
+        return metadata?.source === "external"
+          ? { ...current, present: next }
+          : { ...current, present: next, future: [] }
+      })
+    }
+    if (storageReady || metadata?.source === "recovery") setIsDirty(true)
+  }, [closeBlocklyEditGroup, storageReady])
+
+  useEffect(() => {
+    blocklyXmlRef.current = blocklyXml
+  }, [blocklyXml])
+
+  useEffect(() => () => closeBlocklyEditGroup(), [closeBlocklyEditGroup])
 
   useEffect(() => {
     isPausedRef.current = isPaused
@@ -309,10 +388,10 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
       blocklyXml.includes('<block type="arduino_program" x="40" y="40">\r\n  </block>')
 
     if (isBlank && seed.blocklyXml !== blocklyXml) {
-      setBlocklyXml(seed.blocklyXml)
+      updateBlocklyDocumentXml(seed.blocklyXml, "push")
       setBlocklyDocumentVersion((v) => v + 1)
     }
-  }, [activeLessonId, blocklyXml])
+  }, [activeLessonId, blocklyXml, updateBlocklyDocumentXml])
 
   const handleProbeClip = useCallback((ref: PinRef) => {
     if (activeProbeToPlace === "red") {
@@ -496,24 +575,32 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
     }
   }, [])
 
-  // Helper to commit state changes to history
-  const updateState = useCallback((updater: (prev: CircuitState) => CircuitState) => {
+  // Circuit and Blockly program are one undoable document. Workspace edits are
+  // grouped into short transactions so one drag does not flood the history.
+  const updateState = useCallback((updater: (prev: CircuitState) => CircuitState, nextBlocklyXml?: string) => {
+    closeBlocklyEditGroup()
+    if (typeof nextBlocklyXml === "string") blocklyXmlRef.current = nextBlocklyXml
     setHistory((h) => {
-      const next = updater(h.present)
-      return pushState(h, next)
+      const nextCircuit = updater(h.present.circuit)
+      return pushState(h, {
+        circuit: nextCircuit,
+        blocklyXml: typeof nextBlocklyXml === "string" ? nextBlocklyXml : h.present.blocklyXml,
+      })
     })
     if (storageReady) setIsDirty(true)
-  }, [storageReady])
+  }, [closeBlocklyEditGroup, storageReady])
 
   const handleUndo = useCallback(() => {
+    closeBlocklyEditGroup()
     setHistory((h) => historyUndo(h))
     if (storageReady) setIsDirty(true)
-  }, [storageReady])
+  }, [closeBlocklyEditGroup, storageReady])
 
   const handleRedo = useCallback(() => {
+    closeBlocklyEditGroup()
     setHistory((h) => historyRedo(h))
     if (storageReady) setIsDirty(true)
-  }, [storageReady])
+  }, [closeBlocklyEditGroup, storageReady])
 
   const newId = () =>
     typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `id-${Math.random().toString(36).substring(2, 9)}`
@@ -698,9 +785,8 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
     onApplyCircuit: useCallback(
       (newCircuit: CircuitState, newBlocklyXml?: string) => {
         stopProgram()
-        updateState(() => newCircuit)
+        updateState(() => newCircuit, typeof newBlocklyXml === "string" ? newBlocklyXml : undefined)
         if (typeof newBlocklyXml === "string") {
-          setBlocklyXml(newBlocklyXml)
           setBlocklyDocumentVersion((v) => v + 1)
         }
         if (storageReady) setIsDirty(true)
@@ -1504,7 +1590,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
 
   const clearAll = useCallback(() => {
     stopProgram()
-    updateState(() => ({ parts: [], wires: [] }))
+    updateState(() => ({ parts: [], wires: [] }), DEFAULT_XML)
     setSelectedId(null)
     setSelectedWireId(null)
     setWiring(null)
@@ -1515,7 +1601,6 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
     setPressed(new Set())
     pressedRef.current = new Set()
     setSerialLines([])
-    setBlocklyXml(DEFAULT_XML)
     setBlocklyDocumentVersion((value) => value + 1)
     stopAiRuntime()
     setProbeRed(null)
@@ -1619,6 +1704,10 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
       }
 
       const activeEl = document.activeElement
+      const eventTarget = e.target instanceof Element ? e.target : null
+      // Let Blockly own undo/redo/delete while its SVG workspace is focused.
+      if (eventTarget?.closest(".pixiu-blockly-host") || activeEl?.closest(".pixiu-blockly-host")) return
+
       const isInput =
         activeEl?.tagName === "INPUT" ||
         activeEl?.tagName === "TEXTAREA" ||
@@ -1778,8 +1867,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
     stopProgram()
 
     const saved = await saveCircuit(imported.name, imported.state, imported.blocklyXml || DEFAULT_XML, projectStorageScope)
-    setHistory(createHistory(saved.state))
-    setBlocklyXml(saved.blocklyXml || DEFAULT_XML)
+    resetWorkbenchDocument(saved.state, saved.blocklyXml || DEFAULT_XML)
     setBlocklyDocumentVersion((value) => value + 1)
     setCurrentProjectName(saved.name)
     setSelectedId(null)
@@ -1791,13 +1879,12 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
     setIsScopeOpen(false)
     setLastSaved(saved.savedAt)
     setIsDirty(false)
-  }, [projectStorageScope, stopProgram, stopAiRuntime])
+  }, [projectStorageScope, stopProgram, stopAiRuntime, resetWorkbenchDocument])
 
   const handleLoadProject = useCallback(async (project: SavedCircuit): Promise<void> => {
     stopProgram()
     await saveCurrentCircuit(project, projectStorageScope)
-    setHistory(createHistory(project.state))
-    setBlocklyXml(project.blocklyXml || DEFAULT_XML)
+    resetWorkbenchDocument(project.state, project.blocklyXml || DEFAULT_XML)
     setBlocklyDocumentVersion((value) => value + 1)
     setCurrentProjectName(project.name)
     setSelectedId(null)
@@ -1811,13 +1898,12 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
     setIsDirty(false)
     setActiveLessonId(null)
     setActiveTemplateId(null)
-  }, [projectStorageScope, stopProgram, stopAiRuntime])
+  }, [projectStorageScope, stopProgram, stopAiRuntime, resetWorkbenchDocument])
 
   const handleNewProject = useCallback(async (): Promise<void> => {
     stopProgram()
     await clearCurrentCircuit(projectStorageScope)
-    setHistory(createHistory(INITIAL_STATE))
-    setBlocklyXml(DEFAULT_XML)
+    resetWorkbenchDocument(INITIAL_STATE, DEFAULT_XML)
     setBlocklyDocumentVersion((value) => value + 1)
     setCurrentProjectName("Untitled Circuit")
     setLastSaved(null)
@@ -1831,7 +1917,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
     setIsScopeOpen(false)
     setActiveLessonId(null)
     setActiveTemplateId(null)
-  }, [projectStorageScope, stopProgram, stopAiRuntime])
+  }, [projectStorageScope, stopProgram, stopAiRuntime, resetWorkbenchDocument])
 
   const handleSelectLesson = useCallback((lesson: Lesson) => {
     setActiveLessonId(lesson.id)
@@ -1839,18 +1925,17 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
     if (lesson.difficulty === "Beginner") {
       const seed = getLessonSeed(lesson)
       if (seed.blocklyXml) {
-        setBlocklyXml(seed.blocklyXml)
+        updateBlocklyDocumentXml(seed.blocklyXml, "push")
         setBlocklyDocumentVersion((value) => value + 1)
       }
     }
-  }, [])
+  }, [updateBlocklyDocumentXml])
 
   const handleLoadLesson = useCallback(
     (lesson: Lesson) => {
       const seed = getLessonSeed(lesson)
       stopProgram()
-      updateState(() => seed.state)
-      setBlocklyXml(seed.blocklyXml)
+      updateState(() => seed.state, seed.blocklyXml)
       setBlocklyDocumentVersion((value) => value + 1)
       setCurrentProjectName(`Mission · ${lesson.shortTitle}`)
       setLastSaved(null)
@@ -1872,10 +1957,9 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
   const handleSelectTemplate = useCallback(
     (tmpl: ProjectTemplate) => {
       stopProgram()
-      updateState(() => tmpl.circuit)
+      updateState(() => tmpl.circuit, tmpl.blocklyXml)
       setActiveLessonId(null)
       setActiveTemplateId(tmpl.id)
-      setBlocklyXml(tmpl.blocklyXml)
       setBlocklyDocumentVersion((value) => value + 1)
       if (storageReady) setIsDirty(true)
       setSelectedId(null)
@@ -2037,9 +2121,8 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
           key={blocklyDocumentVersion}
           circuit={state}
           xml={blocklyXml}
-          onXmlChange={(xml) => {
-            setBlocklyXml(xml)
-            if (storageReady) setIsDirty(true)
+          onXmlChange={(xml, metadata) => {
+            handleBlocklyXmlChange(xml, metadata)
           }}
           onWorkspaceReady={(ws) => {
             visualWorkspaceRef.current = ws

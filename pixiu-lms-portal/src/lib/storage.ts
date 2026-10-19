@@ -1,5 +1,6 @@
 import type { CircuitState, PartType, PinRef } from "./circuit-types"
 import { CATALOG } from "./components-catalog"
+import { validateBlocklyXmlEnvelope } from "./blockly-xml"
 import { decodePixiuProtocol, encodePixiuProtocol } from "./pixiu-file-protocol"
 
 export const PIXIU_FILE_FORMAT = "pixiu-circuit"
@@ -156,6 +157,7 @@ function normalizeSavedCircuit(input: unknown): SavedCircuit {
   if (typeof rawXml !== "string" || getByteLength(rawXml) > MAX_BLOCKLY_XML_BYTES) {
     throw new Error("Circuit file contains invalid Blockly data")
   }
+  validateBlocklyXmlEnvelope(rawXml)
 
   const name = normalizeProjectName(typeof input.name === "string" ? input.name : "Untitled Circuit")
   const savedAt = typeof input.savedAt === "string" && !Number.isNaN(Date.parse(input.savedAt))
@@ -304,6 +306,7 @@ export async function saveCircuit(name: string, state: CircuitState, blocklyXml:
   if (typeof blocklyXml !== "string" || getByteLength(blocklyXml) > MAX_BLOCKLY_XML_BYTES) {
     throw new Error("Blockly data is too large to save")
   }
+  validateBlocklyXmlEnvelope(blocklyXml)
 
   const normalizedName = normalizeProjectName(name)
   const now = new Date().toISOString()
@@ -454,6 +457,7 @@ export async function exportAsJSON(
   if (typeof blocklyXml !== "string" || getByteLength(blocklyXml) > MAX_BLOCKLY_XML_BYTES) {
     throw new Error("Blockly data is too large to export")
   }
+  validateBlocklyXmlEnvelope(blocklyXml)
 
   const circuit: SavedCircuit = {
     format: PIXIU_FILE_FORMAT,
