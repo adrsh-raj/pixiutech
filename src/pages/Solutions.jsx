@@ -19,7 +19,7 @@ function SolutionsOrbit() {
         <circle cx="195" cy="57" r="4" /><circle cx="425" cy="57" r="4" />
         <circle cx="195" cy="423" r="4" /><circle cx="425" cy="423" r="4" />
       </svg>
-      <div className="solutions-orbit__core"><span className="solutions-orbit__core-mark">P</span><strong>PIXIU TECH</strong><small>HANDS-ON LEARNING</small></div>
+      <div className="solutions-orbit__core"><img src="/img/logo.png" alt="Pixiu Tech" width="100" height="56" /><small>HANDS-ON LEARNING</small></div>
       {SOLUTIONS.map((solution, index) => (
         <a className={`solutions-orbit__node solutions-orbit__node--${index + 1}`} key={solution.id} href={`#${solution.id}`}>
           <span className="solutions-orbit__node-dot" />{solution.title.replace(' Lab', '').replace(' & Machine Learning', ' & ML').replace('Computational Design & 3D', 'Design & 3D').replace(' Technology', '')}

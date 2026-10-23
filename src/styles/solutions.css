@@ -26,8 +26,7 @@
 .solutions-orbit__core{position:absolute;z-index:1;width:142px;aspect-ratio:1;border:1px solid rgba(104,226,202,.44);border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 40%,rgba(30,90,109,.9),rgba(8,30,48,.98) 70%);box-shadow:0 0 0 14px rgba(103,222,196,.035),0 0 45px rgba(72,205,186,.16);text-align:center}
 .solutions-orbit__core::before,.solutions-orbit__core::after{content:"";position:absolute;inset:-16px;border:1px solid rgba(104,226,202,.16);border-radius:50%;animation:solution-core-pulse 4.2s ease-out infinite}
 .solutions-orbit__core::after{animation-delay:2.1s}
-.solutions-orbit__core-mark{display:grid;place-items:center;width:35px;height:35px;margin-bottom:6px;border-radius:11px;background:#6ce3c7;color:#092338;font:800 21px var(--f-display);box-shadow:0 0 22px rgba(108,227,199,.28)}
-.solutions-orbit__core strong{font:600 10px var(--f-mono);letter-spacing:.14em;color:#effffa}
+.solutions-orbit__core img{display:block;width:100px;height:auto;margin-bottom:5px;padding:4px 7px;border-radius:7px;background:#fff}
 .solutions-orbit__core small{margin-top:5px;color:#86a8b8;font:8px var(--f-mono);letter-spacing:.1em}
 .solutions-orbit__node{position:absolute;z-index:2;display:flex;align-items:center;gap:8px;max-width:165px;padding:10px 12px;border:1px solid rgba(121,174,194,.23);border-radius:999px;background:rgba(7,25,41,.88);box-shadow:0 10px 30px rgba(0,0,0,.16);backdrop-filter:blur(12px);color:#d7e8ee;font:10px var(--f-mono);letter-spacing:.025em;white-space:nowrap;transition:transform .22s ease,border-color .22s ease,color .22s ease}
 .solutions-orbit__node:hover{transform:translateY(-4px) scale(1.035);border-color:rgba(99,223,194,.68);color:#fff}
@@ -61,7 +60,7 @@
 .solutions-detail-number{display:grid;place-items:center;min-width:25px;height:25px;padding-inline:5px;border:1px solid #cbe7e1;border-radius:6px;color:#078d73;font-size:9px;letter-spacing:0}
 .solutions-detail-section .h-sect{letter-spacing:-.035em}
 .solutions-detail-section .lede{line-height:1.7}
-.solutions-detail-section .check-list li{padding-left:4px;color:#354b5b}
+.solutions-detail-section .check-list li{padding-left:28px;color:#354b5b}
 .solutions-detail-section .btn{margin-top:4px}
 .solutions-training .sol-detail__img{border:1px solid rgba(143,206,211,.22);box-shadow:0 20px 52px rgba(0,0,0,.26)}
 .solutions-training .eyebrow{color:#7de8cd}
