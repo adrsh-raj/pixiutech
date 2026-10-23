@@ -3,7 +3,7 @@
 export const NAV = [
   { to: '/', label: 'Home' },
   { to: '/solutions', label: 'Solutions' },
-  { to: '/#virtual-lab-ai', label: 'Virtual Lab & AI' },
+  { to: '/virtual-lab-ai', label: 'Virtual Lab & AI' },
   { to: '/verify', label: 'Verify' },
   { to: '/faq', label: 'FAQ' },
   { to: '/careers', label: 'Careers' },
@@ -98,24 +98,6 @@ export const REAL_LAB_SHOWCASE = {
       badge: 'Structured Curriculum',
       meta: 'Trainer Delivery',
     },
-  ],
-}
-
-export const PORTAL_SHOWCASE = {
-  badge: 'Virtual Lab + AI Learning',
-  title: 'Virtual Lab & AI Learning',
-  desc: 'A browser-based space where students can practise circuits and practical projects without physical hardware for every session, with integrated AI to explain concepts and guide problem-solving. Teachers can follow learning progress through the school portal.',
-  studentFeatures: [
-    { title: 'Interactive Guided Missions', desc: 'Step-by-step schematics and coding prompts walking students from basic LED blinking to autonomous robotics.' },
-    { title: 'Integrated Virtual Circuit Simulator', desc: 'Practice wiring and coding Arduino, ESP32, and sensors in the browser before using physical hardware.' },
-    { title: 'Instant Circuit Doctor Diagnostics', desc: 'Real-time error checks detect missing grounds, misplaced resistors, or invalid pin assignments immediately.' },
-    { title: 'Mission XP & Verifiable Certificates', desc: 'Earn verified experience points, complete streak challenges, and unlock digital completion certificates.' },
-  ],
-  schoolFeatures: [
-    { title: 'Class Roster & Attendance Tracking', desc: 'Manage batches across sections and grades with attendance records and student lab logins.' },
-    { title: 'Automated Evaluation Gradebook', desc: 'Track mission completion percentages, circuit check scores, and submission timelines per student.' },
-    { title: 'Anti-Cheat & Plagiarism Audit', desc: 'Built-in code structure analysis ensures students build genuine problem-solving skills.' },
-    { title: 'Curriculum Standards Alignment', desc: 'Aligned with CBSE Skill Education standards, Atal Tinkering Lab (ATL) guidelines, and ICSE robotics outcomes.' },
   ],
 }
 

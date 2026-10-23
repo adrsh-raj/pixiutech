@@ -1,5 +1,4 @@
-import { Link, useLocation } from 'react-router-dom'
-import { useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import Reveal from '../components/Reveal.jsx'
 import CTAStrip from '../components/CTAStrip.jsx'
 import CountUp from '../components/CountUp.jsx'
@@ -9,20 +8,9 @@ import {
   PROCESS,
   WHY,
   REAL_LAB_SHOWCASE,
-  PORTAL_SHOWCASE,
 } from '../data/site.js'
 
 export default function Home() {
-  const { hash } = useLocation()
-
-  useEffect(() => {
-    if (!hash) return
-    const timer = window.setTimeout(() => {
-      document.querySelector(hash)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }, 100)
-    return () => window.clearTimeout(timer)
-  }, [hash])
-
   return (
     <>
       {/* ============================= HERO ============================= */}
@@ -112,55 +100,14 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ================= SECTION: DEDICATED LMS & VIRTUAL LAB ================= */}
-      <section className="band band--gray" id="virtual-lab-ai">
-        <span id="school-portal" className="anchor-alias" aria-hidden="true" />
-        <div className="shell">
-          <Reveal>
-            <p className="eyebrow">{PORTAL_SHOWCASE.badge}</p>
-            <h2 className="h-sect">{PORTAL_SHOWCASE.title}</h2>
-            <p className="lede">{PORTAL_SHOWCASE.desc}</p>
-          </Reveal>
-
-          <Reveal delay={80}>
-            <div className="portal-showcase-grid">
-              <div className="portal-card">
-                <div className="portal-card__role">Student Mission Hub</div>
-                <h3 className="portal-card__title">Guided Missions & Virtual Circuit Simulator</h3>
-                <div className="portal-card__features">
-                  {PORTAL_SHOWCASE.studentFeatures.map((f) => (
-                    <div className="portal-feature" key={f.title}>
-                      <strong>{f.title}</strong>
-                      <p>{f.desc}</p>
-                    </div>
-                  ))}
-                </div>
-                <div>
-                  <Link className="btn btn--outline" to="/portal">
-                    Access Student Portal <span className="arw">→</span>
-                  </Link>
-                </div>
-              </div>
-
-              <div className="portal-card">
-                <div className="portal-card__role">School Management</div>
-                <h3 className="portal-card__title">Teacher Dashboards & Academic Analytics</h3>
-                <div className="portal-card__features">
-                  {PORTAL_SHOWCASE.schoolFeatures.map((f) => (
-                    <div className="portal-feature" key={f.title}>
-                      <strong>{f.title}</strong>
-                      <p>{f.desc}</p>
-                    </div>
-                  ))}
-                </div>
-                <div>
-                  <Link className="btn btn--primary" to="/portal">
-                    School Management Suite <span className="arw">→</span>
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </Reveal>
+      <section className="virtual-lab-teaser" aria-labelledby="virtual-lab-teaser-title">
+        <div className="shell virtual-lab-teaser__in">
+          <div>
+            <p className="eyebrow">Virtual Lab + AI</p>
+            <h2 id="virtual-lab-teaser-title">Practise circuits online. Learn with AI beside you.</h2>
+            <p>Discover Pixiu Tech’s browser-based practical learning space for students.</p>
+          </div>
+          <Link className="btn btn--primary" to="/virtual-lab-ai">Explore Virtual Lab & AI <span className="arw">→</span></Link>
         </div>
       </section>
 

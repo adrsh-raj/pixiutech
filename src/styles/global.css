@@ -146,8 +146,6 @@ a{color:inherit;text-decoration:none}
 .nav__links a.on{color:#17201E;border-bottom-color:var(--blue)}
 .nav__right{display:flex;align-items:center;gap:14px}
 .nav__login{white-space:nowrap}
-.anchor-alias{display:block;height:0;scroll-margin-top:90px;visibility:hidden}
-#virtual-lab-ai{scroll-margin-top:90px}
 .burger{
   display:none;background:none;border:1px solid #e5e7eb;
   width:42px;height:42px;border-radius:4px;cursor:pointer;
@@ -174,6 +172,13 @@ a{color:inherit;text-decoration:none}
   .drawer.open{display:block}
 }
 @media(max-width:480px){.nav__right .btn{display:none}}
+
+.virtual-lab-teaser{padding-block:clamp(36px,5vw,64px);background:linear-gradient(110deg,#f2f8ff,#f8fbff 54%,#effcf8);border-block:1px solid #dbeafe}
+.virtual-lab-teaser__in{display:flex;align-items:center;justify-content:space-between;gap:32px}
+.virtual-lab-teaser .eyebrow{margin-bottom:12px}
+.virtual-lab-teaser h2{font-size:clamp(24px,3vw,36px);max-width:25ch;line-height:1.12;color:#0f172a}
+.virtual-lab-teaser p:not(.eyebrow){margin-top:10px;color:#475569}
+@media(max-width:900px){.virtual-lab-teaser__in{align-items:flex-start;flex-direction:column;gap:22px}}
 
 /* ======================== HERO V2 ======================== */
 .hero-v2{

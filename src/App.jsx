@@ -9,6 +9,7 @@ import CookieConsent from './components/CookieConsent.jsx'
 
 const Home = lazy(() => import('./pages/Home.jsx'))
 const Solutions = lazy(() => import('./pages/Solutions.jsx'))
+const VirtualLabAI = lazy(() => import('./pages/VirtualLabAI.jsx'))
 const Careers = lazy(() => import('./pages/Careers.jsx'))
 const FAQ = lazy(() => import('./pages/FAQ.jsx'))
 const PortalBridge = lazy(() => import('./pages/PortalBridge.jsx'))
@@ -40,6 +41,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/solutions" element={<Solutions />} />
+          <Route path="/virtual-lab-ai" element={<VirtualLabAI />} />
           <Route path="/careers" element={<Careers />} />
           <Route path="/faq" element={<FAQ />} />
           <Route path="/portal" element={<PortalBridge />} />

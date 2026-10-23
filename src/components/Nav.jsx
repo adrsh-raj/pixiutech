@@ -48,11 +48,8 @@ export default function Nav() {
             <NavLink
               key={n.to}
               to={n.to}
-              className={({ isActive }) => {
-                const isVirtualLab = n.to === '/#virtual-lab-ai' && pathname === '/' && hash === '#virtual-lab-ai'
-                return isActive && n.to !== '/#virtual-lab-ai' || isVirtualLab ? 'on' : ''
-              }}
-              end={n.to === '/' || n.to === '/#virtual-lab-ai'}
+              className={({ isActive }) => (isActive ? 'on' : '')}
+              end={n.to === '/'}
             >
               {n.label}
             </NavLink>
