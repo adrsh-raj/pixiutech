@@ -41,7 +41,7 @@
     },
     {
       "source": "/(.*)",
-      "destination": "/index.html"
+      "destination": "/"
     }
   ],
   "ignoreCommand": "git diff --quiet HEAD^ HEAD -- ."

@@ -3,7 +3,7 @@
 export const NAV = [
   { to: '/', label: 'Home' },
   { to: '/solutions', label: 'Solutions' },
-  { to: '/portal', label: 'Portal' },
+  { to: '/#virtual-lab-ai', label: 'Virtual Lab & AI' },
   { to: '/verify', label: 'Verify' },
   { to: '/faq', label: 'FAQ' },
   { to: '/careers', label: 'Careers' },
@@ -102,9 +102,9 @@ export const REAL_LAB_SHOWCASE = {
 }
 
 export const PORTAL_SHOWCASE = {
-  badge: 'Student & School LMS',
-  title: 'Dedicated Learning Portal for Students & Educators',
-  desc: 'Every Pixiu Tech lab is powered by our online learning portal at portal.pixiutech.com. Students log in to access step-by-step missions and the integrated virtual circuit simulator, while teachers track student progress and attendance.',
+  badge: 'Virtual Lab + AI Learning',
+  title: 'Virtual Lab & AI Learning',
+  desc: 'A browser-based space where students can practise circuits and practical projects without physical hardware for every session, with integrated AI to explain concepts and guide problem-solving. Teachers can follow learning progress through the school portal.',
   studentFeatures: [
     { title: 'Interactive Guided Missions', desc: 'Step-by-step schematics and coding prompts walking students from basic LED blinking to autonomous robotics.' },
     { title: 'Integrated Virtual Circuit Simulator', desc: 'Practice wiring and coding Arduino, ESP32, and sensors in the browser before using physical hardware.' },

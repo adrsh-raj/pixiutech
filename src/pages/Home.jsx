@@ -1,4 +1,5 @@
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
+import { useEffect } from 'react'
 import Reveal from '../components/Reveal.jsx'
 import CTAStrip from '../components/CTAStrip.jsx'
 import CountUp from '../components/CountUp.jsx'
@@ -12,6 +13,16 @@ import {
 } from '../data/site.js'
 
 export default function Home() {
+  const { hash } = useLocation()
+
+  useEffect(() => {
+    if (!hash) return
+    const timer = window.setTimeout(() => {
+      document.querySelector(hash)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 100)
+    return () => window.clearTimeout(timer)
+  }, [hash])
+
   return (
     <>
       {/* ============================= HERO ============================= */}
@@ -102,7 +113,8 @@ export default function Home() {
       </section>
 
       {/* ================= SECTION: DEDICATED LMS & VIRTUAL LAB ================= */}
-      <section className="band band--gray" id="school-portal">
+      <section className="band band--gray" id="virtual-lab-ai">
+        <span id="school-portal" className="anchor-alias" aria-hidden="true" />
         <div className="shell">
           <Reveal>
             <p className="eyebrow">{PORTAL_SHOWCASE.badge}</p>
