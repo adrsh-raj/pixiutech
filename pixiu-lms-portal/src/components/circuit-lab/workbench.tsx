@@ -1920,6 +1920,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
       />
 
       <Toolbar
+        userRole={userRole}
         view={view}
         onViewChange={setView}
         running={running}

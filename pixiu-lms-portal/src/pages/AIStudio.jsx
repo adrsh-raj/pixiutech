@@ -60,10 +60,7 @@ export default function AIStudio() {
         isSimRunning={false}
         runtimeEnabled={false}
         compact={false}
-        onGoToSimulation={() => {
-          const token = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('pixiu_lab_access_token') : null;
-          navigate(token ? `/simulation?access=${token}` : '/simulation');
-        }}
+        onGoToSimulation={() => navigate('/simulation')}
       />
     </Suspense>
   );

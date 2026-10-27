@@ -50,6 +50,7 @@ interface Props {
   isCopilotOpen?: boolean
   onToggleCopilot?: () => void
   isCopilotStaged?: boolean
+  userRole?: string
 }
 
 const VIEWS: { id: WorkbenchView; label: string; soon?: boolean }[] = [
@@ -100,6 +101,7 @@ export function Toolbar({
   isCopilotOpen = false,
   onToggleCopilot,
   isCopilotStaged = false,
+  userRole,
 }: Props) {
   const [toolsOpen, setToolsOpen] = useState(false)
   const toolsRef = useRef<HTMLDivElement | null>(null)
@@ -112,18 +114,49 @@ export function Toolbar({
     return () => document.removeEventListener("mousedown", close)
   }, [])
 
+  const backTarget = userRole === 'student'
+    ? '/student-portal'
+    : userRole === 'school'
+      ? '/school-portal'
+      : userRole === 'trainer'
+        ? '/trainers'
+        : userRole === 'admin' || userRole === 'superadmin'
+          ? '/'
+          : 'https://www.pixiutech.com'
+
+  const backLabel = userRole === 'student'
+    ? 'My Portal'
+    : userRole === 'school'
+      ? 'School'
+      : userRole === 'trainer'
+        ? 'Workspace'
+        : userRole === 'admin' || userRole === 'superadmin'
+          ? 'Dashboard'
+          : 'Website'
+
   return (
     <header className="pixiu-toolbar flex h-12 md:h-14 shrink-0 items-center justify-between border-b border-border bg-card px-2.5 sm:px-4 gap-1.5 sm:gap-2">
       {/* LEFT: Back + CyberLab Logo */}
       <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-        <Link
-          to="/"
-          className="flex items-center gap-1 p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg border border-border bg-background hover:bg-secondary text-xs font-bold text-muted-foreground hover:text-foreground transition-all"
-          title="Back to Portal"
-        >
-          <ArrowLeft size={14} />
-          <span className="hidden md:inline">Portal</span>
-        </Link>
+        {backTarget.startsWith('http') ? (
+          <a
+            href={backTarget}
+            className="flex items-center gap-1 p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg border border-border bg-background hover:bg-secondary text-xs font-bold text-muted-foreground hover:text-foreground transition-all"
+            title={`Back to ${backLabel}`}
+          >
+            <ArrowLeft size={14} />
+            <span className="hidden md:inline">{backLabel}</span>
+          </a>
+        ) : (
+          <Link
+            to={backTarget}
+            className="flex items-center gap-1 p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg border border-border bg-background hover:bg-secondary text-xs font-bold text-muted-foreground hover:text-foreground transition-all"
+            title={`Back to ${backLabel}`}
+          >
+            <ArrowLeft size={14} />
+            <span className="hidden md:inline">{backLabel}</span>
+          </Link>
+        )}
         <div className="flex items-center gap-1.5 sm:gap-2">
           <div className="grid h-7 w-7 sm:h-8 sm:w-8 place-items-center rounded-lg bg-[#1D6EFF] text-white shadow-sm shrink-0">
             <CircuitBoard className="h-4 w-4 sm:h-5 sm:w-5" />
