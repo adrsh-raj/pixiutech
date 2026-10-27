@@ -46,10 +46,10 @@ export function isPhase2fScienceTutorEnabled(): boolean {
 
 /**
  * Returns whether PixiuAI Copilot is enabled.
- * Strictly locked (false) in production for all users ("PixiuAI 1.0v In Production").
+ * Enabled for CyberLab Virtual Lab with AI features unlocked.
  */
 export function isPixiuAiCopilotEnabled(): boolean {
-  return false
+  return true
 }
 
 /**

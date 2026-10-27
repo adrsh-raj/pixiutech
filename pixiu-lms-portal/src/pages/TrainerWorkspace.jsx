@@ -6,6 +6,8 @@ import {
   ChevronRight,
   Clock3,
   Cpu,
+  BookOpen,
+  Sparkles,
   Lock,
   Play,
   Save,
@@ -270,10 +272,10 @@ export default function TrainerWorkspace() {
               </p>
             </div>
             <Link
-              to="/simulation"
+              to="/trainer-materials"
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 border border-white/10 text-xs font-black"
             >
-              <Cpu size={14} /> Virtual Arduino Lab
+              <BookOpen size={14} /> Teaching Materials
             </Link>
           </div>
         </section>
@@ -593,10 +595,10 @@ export default function TrainerWorkspace() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Link
-            to="/simulation"
+            to="/ai-studio"
             className="px-3 py-2 rounded-xl bg-blue-600 text-white text-xs font-black inline-flex items-center gap-1.5"
           >
-            <Cpu size={14} /> Virtual Lab
+            <Sparkles size={14} /> PIXIU AI Studio
           </Link>
           <Link
             to="/trainer-materials"

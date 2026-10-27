@@ -12,7 +12,7 @@ export const PORTAL_NAVIGATION={
   {title:'MY PERFORMANCE',links:[{name:'Attendance',key:'attendance',icon:CalendarDays},{name:'My Progress',href:'/student-progress',icon:BarChart3},{name:'Certificates',href:'/student-progress?tab=certificates',icon:Trophy}]},
   {title:'COMMUNICATION',links:[{name:'Announcements',key:'announcements',icon:Megaphone},{name:'Notifications',href:'/notifications',icon:ReceiptText}]},
   {title:'ACCOUNT',links:[{name:'Password & Security',href:'/student-password',icon:KeyRound}]},
-  {title:'EXPLORE',links:[{name:'Virtual Arduino Lab',href:'/simulation',icon:Cpu},{name:'PIXIU AI Studio',href:'/ai-studio',icon:Sparkles},{name:'Learning Materials',href:'/content',icon:PlaySquare},{name:'Hardware & Kits',href:'/inventory',icon:Box}]},
+  {title:'EXPLORE',links:[{name:'PIXIU AI Studio',href:'/ai-studio',icon:Sparkles},{name:'Learning Materials',href:'/content',icon:PlaySquare},{name:'Hardware & Kits',href:'/inventory',icon:Box}]},
  ],
  school:[
   {title:'MY SCHOOL',links:[{name:'Overview',key:'overview',icon:LayoutDashboard},{name:'Students',key:'students',icon:Users},{name:'Trainers',key:'trainers',icon:GraduationCap}]},
@@ -20,14 +20,14 @@ export const PORTAL_NAVIGATION={
   {title:'PERFORMANCE',links:[{name:'Progress Reports',href:'/school-progress-reports',icon:BarChart3},{name:'School Performance',href:'/school-performance',icon:BarChart3}]},
   {title:'FINANCE',links:[{name:'Billing',href:'/billing',icon:WalletCards}]},
   {title:'COMMUNICATION',links:[{name:'Announcements',key:'announcements',icon:Megaphone},{name:'Notifications',href:'/notifications',icon:ReceiptText}]},
-  {title:'LAB',links:[{name:'Virtual Arduino Lab',href:'/simulation',icon:Cpu},{name:'PIXIU AI Studio',href:'/ai-studio',icon:Sparkles},{name:'Hardware & Kits',href:'/inventory',icon:Box}]},
+  {title:'LAB',links:[{name:'PIXIU AI Studio',href:'/ai-studio',icon:Sparkles},{name:'Hardware & Kits',href:'/inventory',icon:Box}]},
  ],
  trainer:[
   {title:'MY WORK',links:[{name:'Workspace',key:'overview',icon:LayoutDashboard},{name:'My Classes',href:'/trainer-classes',icon:School},{name:'My Students',href:'/students',icon:Users},{name:'Sessions & Schedule',href:'/sessions',icon:CalendarDays}]},
   {title:'ACADEMIC',links:[{name:'Curriculum',href:'/curriculum',icon:BookOpen},{name:'Teaching Materials',href:'/content',icon:PlaySquare},{name:'Course Completion',href:'/course-completion',icon:ClipboardList},{name:'Quizzes',href:'/quizzes',icon:ClipboardCheck},{name:'Projects',href:'/projects',icon:FolderKanban}]},
   {title:'STUDENT PERFORMANCE',links:[{name:'Attendance',href:'/attendance',icon:CalendarDays},{name:'Class Performance',href:'/trainer-ranking',icon:Trophy},{name:'Class Ranking',href:'/trainer-ranking',icon:Trophy},{name:'Student Assessments',href:'/trainer-reviews',icon:Award},{name:'Trainer Performance',href:'/trainer-performance',icon:BarChart3},{name:'Student Password Reset',href:'/trainer-student-passwords',icon:KeyRound}]},
   {title:'COMMUNICATION',links:[{name:'Announcements',href:'/notifications',icon:Megaphone},{name:'Notifications',href:'/notifications',icon:ReceiptText}]},
-  {title:'LAB TOOLS',links:[{name:'Virtual Arduino Lab',href:'/simulation',icon:Cpu},{name:'PIXIU AI Studio',href:'/ai-studio',icon:Sparkles},{name:'Hardware & Kits',href:'/inventory',icon:Box}]},
+  {title:'LAB TOOLS',links:[{name:'PIXIU AI Studio',href:'/ai-studio',icon:Sparkles},{name:'Hardware & Kits',href:'/inventory',icon:Box}]},
  ],
 };
 export const PORTAL_ROLE_LABELS={admin:{name:'Admin',subtitle:'Command Center',icon:ShieldCheck},student:{name:'Student',subtitle:'Learning Portal',icon:GraduationCap},school:{name:'School',subtitle:'School Operations',icon:School},trainer:{name:'Trainer',subtitle:'Teaching Workspace',icon:Video}};

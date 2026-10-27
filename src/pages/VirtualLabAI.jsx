@@ -32,7 +32,7 @@ function CircuitArtwork() {
         <circle className="vlai-particle" cx="184" cy="162" r="4" />
         <circle className="vlai-particle vlai-particle--delay" cx="436" cy="320" r="4" />
       </svg>
-      <div className="vlai-ai-pill"><span className="vlai-ai-pill__spark">✦</span><span>AI learning support</span><span className="vlai-ai-pill__live">LIVE</span></div>
+      <div className="vlai-ai-pill"><span className="vlai-ai-pill__spark">*</span><span>AI learning support</span><span className="vlai-ai-pill__live">LIVE</span></div>
       <div className="vlai-art-caption"><span className="vlai-art-caption__dot" /> Learn by building, wherever you are</div>
     </div>
   )
@@ -47,13 +47,13 @@ export default function VirtualLabAI() {
           <div className="vlai-hero__copy">
             <p className="vlai-kicker"><span /> PIXIU TECH · DIGITAL PRACTICALS</p>
             <h1>Build it.<br /><span>Test it.</span><br />Understand it.</h1>
-            <p className="vlai-hero__intro">A virtual lab for students to practise circuits and design projects online—with AI learning support built in.</p>
+            <p className="vlai-hero__intro">A virtual lab for students to practise circuits and design projects online, with AI learning support built in.</p>
             <p className="vlai-hero__support">Keep learning moving, even when physical hardware is not in reach.</p>
             <div className="vlai-hero__actions">
               <a className="btn btn--primary btn--lg" href={LMS_LOGIN_URL}>Go to Student Login <span className="arw">→</span></a>
               <Link className="btn btn--ghost-light" to="/contact#demo-form">For Schools</Link>
             </div>
-            <div className="vlai-hero__note"><span className="vlai-note-check">✓</span> Browser-based practice <span className="vlai-note-divider" /> No kit needed for every practice session</div>
+            <div className="vlai-hero__note"><span className="vlai-note-check" /> Browser-based practice <span className="vlai-note-divider" /> No kit needed for every practice session</div>
           </div>
           <CircuitArtwork />
         </div>
@@ -68,7 +68,7 @@ export default function VirtualLabAI() {
           </div>
           <div className="vlai-intro__body">
             <p className="lede">The Virtual Lab gives students an online space to build and test circuit ideas for practical learning. They can practise without needing physical hardware for every activity.</p>
-            <p className="vlai-intro__ai"><span className="vlai-ai-star">✦</span><span><strong>AI is part of the learning system.</strong> It can explain concepts, offer hints, and help students reason through circuit problems as they learn.</span></p>
+            <p className="vlai-intro__ai"><span className="vlai-ai-star">*</span><span><strong>AI is part of the learning system.</strong> It can explain concepts, offer hints, and help students reason through circuit problems as they learn.</span></p>
           </div>
         </div>
       </section>
@@ -94,7 +94,7 @@ export default function VirtualLabAI() {
             <div className="vlai-flow__connector" aria-hidden="true"><span /></div>
             <article className="vlai-step">
               <span className="vlai-step__number">03</span>
-              <span className="vlai-step__icon vlai-step__icon--violet" aria-hidden="true">✦</span>
+              <span className="vlai-step__icon vlai-step__icon--violet" aria-hidden="true">*</span>
               <h3>Understand</h3>
               <p>Use AI explanations and hints to make sense of each result.</p>
             </article>

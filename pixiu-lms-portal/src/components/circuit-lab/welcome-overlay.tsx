@@ -117,10 +117,10 @@ export function WelcomeOverlay({ onOpenProjects, onOpenLessons, onOpenTemplates,
                   dismiss()
                   onOpenCopilot()
                 }}
-                aria-label="PixiuAI 1.0v Status"
-                className="flex items-center justify-center gap-2 rounded-xl border border-amber-500/40 bg-gradient-to-r from-amber-600/30 to-slate-900 px-4 py-3 text-xs font-bold text-amber-200 shadow-lg shadow-amber-950/20 transition hover:border-amber-400"
+                aria-label="Open AI Copilot"
+                className="flex items-center justify-center gap-2 rounded-xl border border-cyan-300/60 bg-gradient-to-r from-cyan-500 to-blue-600 px-4 py-3 text-xs font-black text-slate-950 shadow-lg shadow-cyan-900/20 transition hover:brightness-110"
               >
-                <Lock size={14} className="text-amber-400" /> PixiuAI 1.0v (In Production)
+                <Sparkles size={14} /> Open AI Copilot
               </button>
               <button
                 onClick={() => {

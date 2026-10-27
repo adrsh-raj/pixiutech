@@ -51,7 +51,7 @@ export default function Solutions() {
           <div className="solutions-hero__copy">
             <p className="solutions-kicker"><span /> PIXIU TECH · SCHOOL SOLUTIONS</p>
             <h1>One learning ecosystem.<br /><span>Six paths to discovery.</span></h1>
-            <p className="solutions-hero__intro">We help schools turn STEM curiosity into practical skills—with the labs, curriculum, instructors, and support to make learning happen.</p>
+            <p className="solutions-hero__intro">We help schools turn STEM curiosity into practical skills, with the labs, curriculum, instructors, and support to make learning happen.</p>
             <div className="solutions-hero__actions">
               <a className="btn btn--primary btn--lg" href="#solution-pathways">Explore the domains <span className="arw">↓</span></a>
               <Link className="btn btn--ghost-light" to="/contact#demo-form">Plan a school lab</Link>
