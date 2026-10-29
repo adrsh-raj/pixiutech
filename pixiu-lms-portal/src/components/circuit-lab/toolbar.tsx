@@ -137,7 +137,7 @@ export function Toolbar({
   return (
     <header className="pixiu-toolbar flex h-12 md:h-14 shrink-0 items-center justify-between border-b border-border bg-card px-2.5 sm:px-4 gap-1.5 sm:gap-2">
       {/* LEFT: Back + CyberLab Logo */}
-      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+      <div className="pixiu-toolbar-brand flex items-center gap-1.5 sm:gap-2 shrink-0">
         {backTarget.startsWith('http') ? (
           <a
             href={backTarget}
@@ -173,7 +173,7 @@ export function Toolbar({
       </div>
 
       {/* CENTER: View Switcher & Primary Execution/Stepping Controller */}
-      <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+      <div className="pixiu-toolbar-center flex items-center gap-1.5 sm:gap-2.5 shrink-0">
         {/* Mode Toggle: Circuit / Code */}
         <div className="pixiu-toolbar-views flex items-center gap-1 rounded-lg border border-border bg-background p-0.5 sm:p-1 shrink-0 shadow-xs">
           <button
@@ -284,12 +284,12 @@ export function Toolbar({
       </div>
 
       {/* RIGHT: compact grouped tools */}
-      <div className="flex items-center gap-1.5 shrink-0" ref={toolsRef}>
+      <div className="pixiu-toolbar-actions flex items-center gap-1.5 shrink-0" ref={toolsRef}>
         {/* AI Circuit Doctor Live Button */}
         {onToggleDoctor && (
           <button
             onClick={onToggleDoctor}
-            className={`flex items-center gap-1.5 rounded-lg border px-2 sm:px-2.5 py-1.5 text-xs font-bold transition cursor-pointer shadow-sm ${
+            className={`pixiu-toolbar-action-doctor flex items-center gap-1.5 rounded-lg border px-2 sm:px-2.5 py-1.5 text-xs font-bold transition cursor-pointer shadow-sm ${
               isDoctorOpen
                 ? "border-cyan-400 bg-cyan-500/20 text-cyan-200"
                 : doctorScore !== undefined && doctorScore < 90
@@ -314,7 +314,7 @@ export function Toolbar({
         {onToggleCopilot && (
           <button
             onClick={onToggleCopilot}
-            className={`flex items-center gap-1.5 rounded-lg border px-2 sm:px-2.5 py-1.5 text-xs font-bold transition cursor-pointer shadow-sm ${
+            className={`pixiu-toolbar-action-copilot flex items-center gap-1.5 rounded-lg border px-2 sm:px-2.5 py-1.5 text-xs font-bold transition cursor-pointer shadow-sm ${
               isCopilotOpen
                 ? "border-cyan-400 bg-gradient-to-r from-cyan-500 to-indigo-600 text-slate-950 font-black shadow-cyan-500/25"
                 : isCopilotStaged
@@ -332,12 +332,12 @@ export function Toolbar({
         )}
 
         {/* Creator XP & Level Badge Button */}
-        <XpBadgeButton />
+        <div className="pixiu-toolbar-xp"><XpBadgeButton /></div>
 
         {onOpenProjects && (
           <button
             onClick={onOpenProjects}
-            className="flex items-center gap-1.5 rounded-lg border border-blue-400/30 bg-blue-500/10 px-2.5 py-1.5 text-xs font-bold text-blue-100 transition hover:bg-blue-500/15 cursor-pointer"
+            className="pixiu-toolbar-action-projects flex items-center gap-1.5 rounded-lg border border-blue-400/30 bg-blue-500/10 px-2.5 py-1.5 text-xs font-bold text-blue-100 transition hover:bg-blue-500/15 cursor-pointer"
             title="Projects: save, load, import and export"
           >
             <FolderOpen size={14} />
@@ -474,6 +474,36 @@ export function Toolbar({
                   role="menuitem"
                 >
                   <Trash2 size={14} />Clear canvas
+                </button>
+              )}
+
+              {onOpenProjects && (
+                <button
+                  onClick={() => { setToolsOpen(false); onOpenProjects() }}
+                  className="pixiu-toolbar-tool flex w-full items-center gap-2 rounded-xl border px-2.5 py-2 text-left text-xs font-semibold text-blue-100 hover:bg-slate-800"
+                  role="menuitem"
+                >
+                  <FolderOpen size={14} className="text-blue-300" />Projects
+                </button>
+              )}
+
+              {onToggleDoctor && (
+                <button
+                  onClick={() => { setToolsOpen(false); onToggleDoctor() }}
+                  className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-xs font-semibold text-slate-200 hover:bg-slate-800"
+                  role="menuitem"
+                >
+                  <ShieldAlert size={14} className="text-cyan-300" />Circuit Doctor
+                </button>
+              )}
+
+              {onToggleCopilot && (
+                <button
+                  onClick={() => { setToolsOpen(false); onToggleCopilot() }}
+                  className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-xs font-semibold text-slate-200 hover:bg-slate-800"
+                  role="menuitem"
+                >
+                  <Sparkles size={14} className="text-cyan-300" />AI Copilot
                 </button>
               )}
             </div>

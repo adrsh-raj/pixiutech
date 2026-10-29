@@ -225,6 +225,7 @@ export function IotWebPortal({ isOpen, onClose }: Props) {
   const [statusCode, setStatusCode] = useState(200)
   const [deviceMode, setDeviceMode] = useState<"phone" | "desktop" | "network">("phone")
   const [minimized, setMinimized] = useState(false)
+  const [deviceTime, setDeviceTime] = useState(() => new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }))
 
   // Dragging support (movable on canvas just like Multimeter & Oscilloscope)
   const panelRef = useRef<HTMLDivElement | null>(null)
@@ -245,6 +246,12 @@ export function IotWebPortal({ isOpen, onClose }: Props) {
       }
     })
   }, [currentPath])
+
+  useEffect(() => {
+    const updateClock = () => setDeviceTime(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }))
+    const interval = window.setInterval(updateClock, 60_000)
+    return () => window.clearInterval(interval)
+  }, [])
 
   const navigateTo = async (path: string) => {
     let clean = (path || "/").trim()
@@ -344,8 +351,7 @@ export function IotWebPortal({ isOpen, onClose }: Props) {
   return (
     <div
       ref={panelRef}
-      style={{ right: "20px", top: "68px" }}
-      className="fixed z-40 pointer-events-auto select-none touch-none shadow-2xl animate-in fade-in zoom-in-95 duration-100"
+      className="fixed right-3 top-16 z-40 max-h-[calc(100dvh-5rem)] max-w-[calc(100vw-1.5rem)] overflow-y-auto pointer-events-auto select-none touch-none shadow-2xl animate-in fade-in zoom-in-95 duration-100"
     >
       {/* ============================================================== */}
       {/* MINIMIZED STATE PILL                                           */}
@@ -479,7 +485,7 @@ export function IotWebPortal({ isOpen, onClose }: Props) {
           {/* VIEW 1: SMARTPHONE VIEW                                       */}
           {/* ============================================================== */}
           {deviceMode === "phone" && (
-            <div className="relative w-[320px] h-[500px] bg-slate-900 border-[5px] border-slate-700/90 rounded-[48px] shadow-2xl p-2 flex flex-col select-none ring-1 ring-cyan-500/20">
+            <div className="relative flex h-[min(500px,calc(100dvh-8rem))] min-h-[240px] w-[min(320px,calc(100vw-2rem))] flex-col rounded-[40px] border-[5px] border-slate-700/90 bg-slate-900 p-2 shadow-2xl select-none ring-1 ring-cyan-500/20">
               {/* Left Hardware Volume buttons */}
               <div className="absolute -left-[7px] top-20 w-[3px] h-7 bg-slate-600 rounded-l-sm" />
               <div className="absolute -left-[7px] top-30 w-[3px] h-7 bg-slate-600 rounded-l-sm" />
@@ -494,10 +500,10 @@ export function IotWebPortal({ isOpen, onClose }: Props) {
 
               {/* iOS Mobile Status Bar */}
               <div className="flex items-center justify-between px-3 py-0.5 text-[10px] font-semibold text-slate-300 shrink-0 font-sans">
-                <span>9:41</span>
+                <span>{deviceTime}</span>
                 <div className="flex items-center gap-1">
                   <Wifi size={10} className={wifiState.status === "connected" ? "text-cyan-400" : "text-slate-600"} />
-                  <span className="text-[9px] text-slate-400">5G</span>
+                  <span className="text-[9px] text-slate-400">{wifiState.status === "connected" ? "Wi-Fi" : "Offline"}</span>
                   <Battery size={11} className="text-emerald-400" />
                 </div>
               </div>
@@ -505,7 +511,7 @@ export function IotWebPortal({ isOpen, onClose }: Props) {
               {/* Mobile Safari Address Bar */}
               <div className="mx-1.5 mb-1.5 bg-slate-950/90 border border-slate-800 rounded-full px-2.5 py-1 flex items-center gap-1.5 text-xs text-slate-300 shadow-inner shrink-0">
                 <Lock size={9} className="text-slate-400 shrink-0" />
-                <span className="text-slate-500 font-mono text-[10px] shrink-0">192.168.1.105</span>
+                <span className="max-w-24 truncate text-slate-500 font-mono text-[10px] shrink-0" title={wifiState.ipAddress}>{wifiState.ipAddress}</span>
                 <input
                   type="text"
                   value={currentPath}
@@ -559,7 +565,7 @@ export function IotWebPortal({ isOpen, onClose }: Props) {
           {/* VIEW 2: DESKTOP BROWSER VIEW                                   */}
           {/* ============================================================== */}
           {deviceMode === "desktop" && (
-            <div className="w-[340px] sm:w-[420px] rounded-b-2xl border border-slate-700 bg-slate-900 shadow-2xl overflow-hidden flex flex-col h-[460px] ring-1 ring-cyan-500/20">
+            <div className="flex h-[min(460px,calc(100dvh-7rem))] min-h-0 w-[min(420px,calc(100vw-1.5rem))] flex-col rounded-b-2xl border border-slate-700 bg-slate-900 shadow-2xl overflow-hidden ring-1 ring-cyan-500/20">
               {/* Desktop URL Bar */}
               <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/90 border-b border-slate-800 text-xs">
                 <div className="flex items-center gap-1 text-slate-400">
@@ -642,7 +648,7 @@ export function IotWebPortal({ isOpen, onClose }: Props) {
           {/* VIEW 3: NETWORK TRAFFIC INSPECTOR                              */}
           {/* ============================================================== */}
           {deviceMode === "network" && (
-            <div className="w-[340px] sm:w-[420px] rounded-b-2xl border border-slate-700 bg-slate-900 shadow-2xl overflow-hidden flex flex-col h-[460px] ring-1 ring-cyan-500/20">
+            <div className="flex h-[min(460px,calc(100dvh-7rem))] min-h-0 w-[min(420px,calc(100vw-1.5rem))] flex-col rounded-b-2xl border border-slate-700 bg-slate-900 shadow-2xl overflow-hidden ring-1 ring-cyan-500/20">
               <div className="flex items-center justify-between px-3 py-1.5 bg-slate-950 border-b border-slate-800 text-xs font-mono text-slate-300">
                 <span>HTTP Traffic Log</span>
                 <span className="text-[10px] text-slate-400">Total: {wifiState.requests.length} requests</span>

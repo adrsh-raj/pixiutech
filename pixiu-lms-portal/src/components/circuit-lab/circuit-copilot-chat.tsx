@@ -636,7 +636,7 @@ export function CircuitCopilotChat({
       {isPanelOpen && (
         <section
           aria-label="Pixiu AI Circuit Copilot Panel"
-          className="fixed bottom-36 right-6 md:bottom-20 md:right-10 z-[75] flex flex-col w-[94vw] max-w-[440px] max-h-[80vh] h-[640px] rounded-3xl border border-cyan-500/30 bg-[#070c18]/95 backdrop-blur-2xl text-white shadow-2xl shadow-cyan-950/60 overflow-hidden ring-1 ring-cyan-400/20"
+          className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-3 md:bottom-20 md:right-10 z-[75] flex h-[min(640px,calc(100dvh-6rem))] max-h-[calc(100dvh-6rem)] w-[min(440px,calc(100vw-1.5rem))] flex-col rounded-3xl border border-cyan-500/30 bg-[#070c18]/95 backdrop-blur-2xl text-white shadow-2xl shadow-cyan-950/60 overflow-hidden ring-1 ring-cyan-400/20"
         >
           {/* Header */}
           <header className="flex-shrink-0 border-b border-slate-800/80 bg-slate-950/80 p-4">

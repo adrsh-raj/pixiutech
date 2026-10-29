@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { ArrowLeft, ArrowRight, BookOpen, Boxes, CheckCircle2, CircuitBoard, MousePointer2, Sparkles, Zap, X, Lock } from "lucide-react"
+import { ArrowLeft, ArrowRight, BookOpen, Boxes, CheckCircle2, CircuitBoard, MousePointer2, Sparkles, Zap, X } from "lucide-react"
 
 const STORAGE_KEY = "pixiu-circuit-studio-welcome-v1"
 
@@ -72,8 +72,8 @@ export function WelcomeOverlay({ onOpenProjects, onOpenLessons, onOpenTemplates,
   const Icon = current.icon
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
-      <div className="relative w-full max-w-2xl overflow-hidden rounded-3xl border border-blue-400/20 bg-[#0b1220] text-white shadow-2xl shadow-black/50">
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
+      <div className="relative max-h-[calc(100dvh-2rem)] w-full max-w-2xl overflow-y-auto overscroll-contain rounded-3xl border border-blue-400/20 bg-[#0b1220] text-white shadow-2xl shadow-black/50">
         <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-blue-500 via-cyan-400 to-violet-500" />
         <button
           onClick={() => dismiss()}

@@ -124,8 +124,8 @@ export function LessonBrowser({
   }
 
   return (
-    <div className="fixed inset-0 z-[75] flex items-center justify-center bg-slate-950/75 p-3 backdrop-blur-sm sm:p-5">
-      <div className="flex h-[min(88vh,820px)] w-full max-w-6xl overflow-hidden rounded-3xl border border-cyan-400/15 bg-[#08111f] text-white shadow-2xl shadow-black/60">
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/75 p-3 backdrop-blur-sm sm:p-5">
+      <div className="flex h-[min(88dvh,820px)] max-h-[calc(100dvh-2rem)] w-full max-w-6xl overflow-hidden rounded-3xl border border-cyan-400/15 bg-[#08111f] text-white shadow-2xl shadow-black/60">
         <aside className="hidden w-[340px] shrink-0 border-r border-slate-800 bg-slate-950/50 md:flex md:flex-col">
           <div className="border-b border-slate-800 p-4 space-y-3">
             <div className="flex items-center justify-between">
@@ -150,8 +150,8 @@ export function LessonBrowser({
 
             {/* Board Architecture filter tabs */}
             <div>
-              <div className="mb-1 text-[8px] font-mono uppercase tracking-wider text-slate-500">Board Architecture</div>
-              <div className="grid grid-cols-5 gap-1 rounded-xl bg-slate-900/80 p-1 text-[8px] font-bold">
+              <div className="mb-1 text-[9px] font-mono uppercase tracking-wider text-slate-400">Board Architecture</div>
+              <div className="grid grid-cols-5 gap-1 rounded-xl bg-slate-900/80 p-1 text-[9px] font-bold">
                 <button
                   onClick={() => setBoardFilter("all")}
                   className={`rounded-lg py-1 transition ${boardFilter === "all" ? "bg-cyan-500 text-slate-950 shadow" : "text-slate-400 hover:text-white"}`}
@@ -187,7 +187,7 @@ export function LessonBrowser({
 
             {/* Category filter tabs */}
             <div>
-              <div className="mb-1 text-[8px] font-mono uppercase tracking-wider text-slate-500">Difficulty Tier</div>
+              <div className="mb-1 text-[9px] font-mono uppercase tracking-wider text-slate-400">Difficulty Tier</div>
               <div className="grid grid-cols-4 gap-1 rounded-xl bg-slate-900/60 p-1 text-[9px] font-bold">
                 <button
                   onClick={() => setCategoryFilter("all")}
@@ -253,13 +253,13 @@ export function LessonBrowser({
                             </span>
                           </div>
                         </div>
-                        <p className="mt-1 line-clamp-2 text-[9px] leading-4 text-slate-400 font-medium">
+                        <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-slate-300 font-medium">
                           {lesson.finalGoal ? lesson.finalGoal.replace(/^🎯\s*/, "") : lesson.description}
                         </p>
                         <div className="mt-2 h-1 overflow-hidden rounded-full bg-slate-800">
                           <div className="h-full rounded-full bg-cyan-400 transition-all" style={{ width: `${percent}%` }} />
                         </div>
-                        <div className="mt-1 flex items-center justify-between text-[8px] font-mono text-slate-600">
+                        <div className="mt-1 flex items-center justify-between text-[9px] font-mono text-slate-400">
                           <span>{percent}% complete</span>
                           <span>{lesson.estimatedMinutes} min</span>
                         </div>

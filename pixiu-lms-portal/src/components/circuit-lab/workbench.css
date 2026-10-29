@@ -135,6 +135,90 @@
 :root .circuit-lab-blue-theme .border-slate-800,
 :root .circuit-lab-blue-theme [class*="border-slate-800/"] { border-color: #1E293B !important; }
 
+/* The toolbar has three independent groups. Let them use a second row before
+   the primary controls or project actions can be clipped on laptop widths. */
+@media (max-width: 1350px) {
+  .circuit-lab-blue-theme .pixiu-toolbar {
+    height: auto !important;
+    min-height: 3.5rem;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    row-gap: 0.35rem;
+    padding-block: 0.35rem;
+  }
+
+  .circuit-lab-blue-theme .pixiu-toolbar-brand {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .circuit-lab-blue-theme .pixiu-toolbar-center {
+    order: 3;
+    flex: 1 0 100%;
+    justify-content: center;
+  }
+
+  .circuit-lab-blue-theme .pixiu-toolbar-actions {
+    min-width: 0;
+    margin-left: auto;
+  }
+}
+
+@media (max-width: 680px) {
+  .circuit-lab-blue-theme .pixiu-toolbar {
+    column-gap: 0.4rem;
+    padding-inline: 0.55rem;
+  }
+
+  .circuit-lab-blue-theme .pixiu-toolbar-brand {
+    flex: 1 1 auto;
+  }
+
+  .circuit-lab-blue-theme .pixiu-toolbar-center {
+    flex-basis: 100%;
+    justify-content: flex-start;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    padding-bottom: 0.1rem;
+  }
+
+  .circuit-lab-blue-theme .pixiu-toolbar-actions {
+    gap: 0.3rem;
+  }
+
+  .circuit-lab-blue-theme .pixiu-toolbar-action-doctor,
+  .circuit-lab-blue-theme .pixiu-toolbar-action-copilot,
+  .circuit-lab-blue-theme .pixiu-toolbar-action-projects {
+    display: none;
+  }
+
+  .circuit-lab-blue-theme .pixiu-toolbar-xp > button {
+    min-width: 2.25rem;
+    padding-inline: 0.45rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .circuit-lab-blue-theme .pixiu-toolbar-brand > a {
+    display: none;
+  }
+
+  .circuit-lab-blue-theme .pixiu-toolbar-brand > div > div:last-child {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .circuit-lab-blue-theme *,
+  .circuit-lab-blue-theme *::before,
+  .circuit-lab-blue-theme *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }

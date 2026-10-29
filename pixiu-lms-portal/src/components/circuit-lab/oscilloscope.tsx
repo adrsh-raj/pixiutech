@@ -335,7 +335,7 @@ export const Oscilloscope = memo(function Oscilloscope({
         </div>
       ) : (
         /* Full Instrument Body */
-        <div className="w-[390px] sm:w-[440px] rounded-2xl border border-slate-700/80 bg-slate-950/95 backdrop-blur-xl shadow-2xl text-slate-200 overflow-hidden flex flex-col ring-1 ring-cyan-500/20">
+        <div className="w-[min(440px,calc(100vw-24px))] max-h-[calc(100dvh-5rem)] rounded-2xl border border-slate-700/80 bg-slate-950/95 backdrop-blur-xl shadow-2xl text-slate-200 overflow-auto flex flex-col ring-1 ring-cyan-500/20">
           {/* Header Bar */}
           <div
             onPointerDown={handlePointerDown}

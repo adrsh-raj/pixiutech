@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react"
 import { X, Sparkles, Layers, Cpu, ArrowRight } from "lucide-react"
 import { TEMPLATES, type ProjectTemplate } from "@/lib/templates"
+import { BOARD_REGISTRY, type BoardId } from "@/lib/board-registry"
 
 interface Props {
   isOpen: boolean
@@ -11,11 +12,11 @@ interface Props {
 type DifficultyFilter = "all" | "Beginner" | "Intermediate" | "Advanced"
 type BoardFilter = "all" | "arduino-uno" | "esp32-devkit" | "rpi-pico" | "microbit-v2"
 
-const BOARD_LABELS: Record<string, { label: string; color: string }> = {
-  "arduino-uno": { label: "Arduino Uno", color: "bg-blue-500/10 text-blue-400 border-blue-500/30" },
-  "esp32-devkit": { label: "ESP32 DevKit", color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" },
-  "rpi-pico": { label: "Raspberry Pi Pico", color: "bg-purple-500/10 text-purple-400 border-purple-500/30" },
-  "microbit-v2": { label: "micro:bit v2", color: "bg-amber-500/10 text-amber-400 border-amber-500/30" },
+const BOARD_STYLES: Record<BoardId, string> = {
+  "arduino-uno": "bg-blue-500/10 text-blue-400 border-blue-500/30",
+  "esp32-devkit": "bg-emerald-500/10 text-emerald-400 border-emerald-500/30",
+  "rpi-pico": "bg-purple-500/10 text-purple-400 border-purple-500/30",
+  "microbit-v2": "bg-amber-500/10 text-amber-400 border-amber-500/30",
 }
 
 const getTemplateBoard = (tmpl: ProjectTemplate): string => {
@@ -41,7 +42,7 @@ export const TemplateBrowser: React.FC<Props> = ({ isOpen, onClose, onSelectTemp
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in">
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in">
       <div className="relative w-full max-w-4xl rounded-2xl border border-slate-700/80 bg-slate-900 text-white shadow-2xl overflow-hidden flex flex-col max-h-[88vh]">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4">
@@ -122,7 +123,11 @@ export const TemplateBrowser: React.FC<Props> = ({ isOpen, onClose, onSelectTemp
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-6 overflow-y-auto">
           {filteredTemplates.map((tmpl) => {
             const boardKey = getTemplateBoard(tmpl)
-            const boardMeta = BOARD_LABELS[boardKey] ?? { label: boardKey, color: "bg-slate-800 text-slate-300 border-slate-700" }
+            const boardId = boardKey as BoardId
+            const boardMeta = {
+              label: BOARD_REGISTRY[boardId]?.name ?? boardKey,
+              color: BOARD_STYLES[boardId] ?? "bg-slate-800 text-slate-300 border-slate-700",
+            }
             return (
               <div
                 key={tmpl.id}

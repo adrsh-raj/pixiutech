@@ -330,7 +330,7 @@ export function AiCameraPanel({
 
   return (
     <div
-      className={`pixiu-ai-floating fixed bottom-12 right-6 z-40 flex flex-col rounded-2xl border bg-slate-950/95 shadow-2xl backdrop-blur-md text-white overflow-hidden transition-all duration-300 ${minimized ? "w-64" : "w-80 sm:w-96"}`}
+      className={`pixiu-ai-floating fixed bottom-12 right-3 z-40 flex max-h-[calc(100dvh-5rem)] flex-col rounded-2xl border bg-slate-950/95 shadow-2xl backdrop-blur-md text-white overflow-auto transition-all duration-300 ${minimized ? "w-[min(16rem,calc(100vw-1.5rem))]" : "w-[min(24rem,calc(100vw-1.5rem))]"}`}
       style={{ boxShadow: "0 10px 35px -5px rgba(168, 85, 247, 0.35)" }}
     >
       <div className="pixiu-ai-floating-header flex items-center justify-between px-3.5 py-2.5 bg-slate-950 border-b">

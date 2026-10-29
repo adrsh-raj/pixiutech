@@ -52,8 +52,8 @@ export function CircuitDoctorHud({
   }
 
   return (
-    <div className="fixed inset-y-14 right-4 z-50 w-96 flex flex-col pointer-events-auto">
-      <div className="bg-slate-950/95 border border-cyan-500/40 shadow-2xl rounded-2xl flex flex-col max-h-[85vh] overflow-hidden backdrop-blur-xl ring-1 ring-cyan-500/20 text-slate-100">
+    <div className="fixed inset-y-14 bottom-4 right-4 z-50 flex w-[min(24rem,calc(100vw-2rem))] flex-col pointer-events-auto">
+      <div className="bg-slate-950/95 border border-cyan-500/40 shadow-2xl rounded-2xl flex min-h-0 flex-col max-h-[85dvh] overflow-hidden backdrop-blur-xl ring-1 ring-cyan-500/20 text-slate-100">
         {/* Header */}
         <div className="p-4 border-b border-slate-800/80 bg-gradient-to-r from-slate-900 via-cyan-950/30 to-slate-900 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -67,7 +67,7 @@ export function CircuitDoctorHud({
                   LIVE V2
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400">Electrical safety & wiring intelligence</p>
+              <p className="text-[11px] leading-4 text-slate-400">Electrical safety & wiring intelligence</p>
             </div>
           </div>
           <button
@@ -166,7 +166,7 @@ export function CircuitDoctorHud({
                         <span className="font-semibold text-xs text-white truncate">{issue.title}</span>
                         {getSeverityBadge(issue.severity)}
                       </div>
-                      <p className="text-[11px] text-slate-300 leading-relaxed">{issue.message}</p>
+                      <p className="break-words text-[11px] text-slate-300 leading-relaxed">{issue.message}</p>
                     </div>
                   </div>
 

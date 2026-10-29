@@ -124,15 +124,8 @@ function IotThumb() {
 
 const CATEGORIES = [
   { id: "all", label: "All" },
-  { id: "controller", label: "Boards" },
-  { id: "basic", label: "Build" },
-  { id: "input", label: "Input" },
-  { id: "sensor", label: "Sensors" },
-  { id: "output", label: "Output" },
-  { id: "display", label: "Displays" },
-  { id: "motor", label: "Motion" },
-  { id: "driver", label: "Drivers" },
-] as const
+  ...COMPONENT_GROUPS.map(({ id, label }) => ({ id, label })),
+]
 
 interface Props {
   onQuickAdd: (type: PartType) => void
@@ -258,7 +251,7 @@ export function Palette({
               <button
                 key={cat.id}
                 onClick={() => setActiveCategory(cat.id)}
-                className={`rounded-md px-2 py-1 text-[10px] font-semibold transition shrink-0 cursor-pointer ${
+                className={`rounded-md px-2 py-1 text-[11px] font-semibold transition shrink-0 cursor-pointer ${
                   activeCategory === cat.id
                     ? "bg-primary text-primary-foreground"
                     : "bg-background text-muted-foreground hover:bg-secondary hover:text-foreground"
@@ -376,7 +369,7 @@ export function Palette({
                   </span>
                 </span>
                 <span className="block text-[10px] text-muted-foreground line-clamp-2 leading-tight mt-0.5">
-                  Virtual 192.168.1.105 web browser & HTTP traffic inspector for ESP32 IoT projects.
+                  Virtual ESP32 web browser & HTTP traffic inspector for IoT projects.
                 </span>
               </span>
             </div>
@@ -456,10 +449,10 @@ export function Palette({
                               <Thumb type={type} />
                             </span>
                             <span className="min-w-0 flex-1">
-                              <span className="block truncate font-bold text-[11px] text-foreground group-hover:text-primary transition">
+                              <span className="block break-words font-bold text-xs leading-4 text-foreground group-hover:text-primary transition">
                                 {def.name}
                               </span>
-                              <span className="block text-[9px] text-muted-foreground line-clamp-2 leading-tight mt-0.5">
+                              <span className="block text-[11px] text-muted-foreground line-clamp-2 leading-4 mt-0.5">
                                 {def.blurb}
                               </span>
                             </span>

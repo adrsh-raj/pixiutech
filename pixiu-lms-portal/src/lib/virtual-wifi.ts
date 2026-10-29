@@ -36,6 +36,8 @@ export interface VirtualWifiState {
   requests: VirtualHttpRequest[]
 }
 
+export const DEFAULT_VIRTUAL_IP = "192.168.1.105"
+
 type Listener = (state: VirtualWifiState) => void
 
 class VirtualWifiManager {
@@ -99,7 +101,7 @@ class VirtualWifiManager {
 
     // Deterministic mock connection
     this.state.status = "connected"
-    this.state.ipAddress = "192.168.1.105"
+    this.state.ipAddress = DEFAULT_VIRTUAL_IP
     this.state.rssi = -54 // Good indoor signal
     this.notify()
   }
@@ -130,13 +132,14 @@ class VirtualWifiManager {
   public startServer(port: number = 80): void {
     this.state.serverRunning = true
     this.state.port = port
+    const currentIp = this.state.ipAddress
     // Ensure default root route exists if not registered
     if (!this.state.routes["/"]) {
       this.state.routes["/"] = {
         path: "/",
         statusCode: 200,
         contentType: "text/html",
-        responseBody: `<!DOCTYPE html><html><head><title>Pixiu ESP32 IoT Server</title><meta name='viewport' content='width=device-width, initial-scale=1'></head><body style='font-family:sans-serif;text-align:center;padding:20px;background:#090d16;color:#f8fafc'><h1>🌐 ESP32 IoT Node</h1><p>Status: Online (192.168.1.105)</p><div style='margin-top:20px;'><a href='/led/on' data-href='/led/on' style='display:inline-block;padding:10px 20px;background:#22c55e;color:#000;border-radius:8px;text-decoration:none;font-weight:bold;margin:6px;'>Turn ON LED</a><a href='/led/off' data-href='/led/off' style='display:inline-block;padding:10px 20px;background:#ef4444;color:#fff;border-radius:8px;text-decoration:none;font-weight:bold;margin:6px;'>Turn OFF LED</a></div></body></html>`,
+        responseBody: `<!DOCTYPE html><html><head><title>Pixiu ESP32 IoT Server</title><meta name='viewport' content='width=device-width, initial-scale=1'></head><body style='font-family:sans-serif;text-align:center;padding:20px;background:#090d16;color:#f8fafc'><h1>🌐 ESP32 IoT Node</h1><p>Status: Online (${currentIp})</p><div style='margin-top:20px;'><a href='/led/on' data-href='/led/on' style='display:inline-block;padding:10px 20px;background:#22c55e;color:#000;border-radius:8px;text-decoration:none;font-weight:bold;margin:6px;'>Turn ON LED</a><a href='/led/off' data-href='/led/off' style='display:inline-block;padding:10px 20px;background:#ef4444;color:#fff;border-radius:8px;text-decoration:none;font-weight:bold;margin:6px;'>Turn OFF LED</a></div></body></html>`,
       }
     }
     if (!this.state.routes["/led/on"]) {

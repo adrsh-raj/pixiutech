@@ -95,7 +95,7 @@ export function ProjectManager({
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [storageScope])
 
   useEffect(() => {
     if (!isOpen) return
@@ -203,7 +203,7 @@ export function ProjectManager({
         if (event.target === event.currentTarget) onClose()
       }}
     >
-      <div className="w-full max-w-4xl overflow-hidden rounded-2xl border border-blue-400/20 bg-[#0b1220] text-slate-100 shadow-2xl shadow-black/50">
+      <div className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-blue-400/20 bg-[#0b1220] text-slate-100 shadow-2xl shadow-black/50">
         <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3 sm:px-5">
           <div className="flex min-w-0 items-center gap-3">
             <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-blue-500/15 text-blue-300 ring-1 ring-blue-400/20">
@@ -223,7 +223,7 @@ export function ProjectManager({
           </button>
         </div>
 
-        <div className="grid max-h-[78vh] overflow-y-auto md:grid-cols-[minmax(280px,0.95fr)_minmax(340px,1.25fr)]">
+        <div className="grid min-h-0 flex-1 overflow-y-auto overscroll-contain md:grid-cols-[minmax(280px,0.95fr)_minmax(340px,1.25fr)]">
           <section className="border-b border-slate-800 p-4 sm:p-5 md:border-b-0 md:border-r">
             <BackendHealth />
             <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-4">

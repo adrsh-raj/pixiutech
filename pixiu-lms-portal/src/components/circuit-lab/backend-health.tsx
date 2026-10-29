@@ -78,7 +78,7 @@ export function BackendHealth() {
               ? databaseReportedHealthy ? "Backend API + database connected" : "Backend API connected · database unverified"
               : status === "offline" ? "Backend API unreachable" : "Checking backend connection"}
           </p>
-          <p className="truncate text-[10px] text-slate-500">{description}</p>
+          <p className="break-words text-[10px] leading-4 text-slate-400">{description}</p>
         </div>
       </div>
       <button
