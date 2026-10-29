@@ -33,7 +33,7 @@ export interface ExecutionEnvironment {
   // Virtual Wi-Fi & Web Server hooks
   wifiConnect?: (ssid: string, pass: string) => void
   wifiIsConnected?: () => boolean
-  wifiGetIp?: () => string
+  wifiGetIp?: () => string | null
   wifiServerBegin?: (port: number) => void
   wifiServerOn?: (route: string, branch: Blockly.Block | null) => void
   wifiServerSend?: (code: number, contentType: string, body: string) => void
@@ -60,8 +60,20 @@ export interface ExecutionEnvironment {
   onBlockEnter?: (info: BlockStepInfo) => void
 }
 
-let lcdCursorCol = 0
-let lcdCursorRow = 0
+interface LcdCursor {
+  col: number
+  row: number
+}
+
+const lcdCursors = new WeakMap<AbortSignal, LcdCursor>()
+function getLcdCursor(signal: AbortSignal): LcdCursor {
+  let cursor = lcdCursors.get(signal)
+  if (!cursor) {
+    cursor = { col: 0, row: 0 }
+    lcdCursors.set(signal, cursor)
+  }
+  return cursor
+}
 const MAX_BLOCK_LOOP_ITERATIONS = 10_000
 
 // AI blocks are data/control inputs only. They do not mutate virtual hardware;
@@ -290,7 +302,7 @@ function evaluateValueInput(block: Blockly.Block, inputName: string, env?: Execu
     return env?.getAiGesture ? env.getAiGesture() : "none"
   }
   if (target.type === "wifi_local_ip") {
-    return env?.wifiGetIp ? env.wifiGetIp() : "192.168.1.105"
+    return env?.wifiGetIp?.() ?? "0.0.0.0"
   }
   return defaultValue
 }
@@ -571,20 +583,23 @@ async function executeSingleBlock(block: Blockly.Block, env: ExecutionEnvironmen
 
     case "lcd_print": {
       const text = evaluateValueInput(block, "TEXT", env, "")
-      env.setLcdText?.(lcdCursorCol, lcdCursorRow, text)
-      lcdCursorCol += text.length
+      const cursor = getLcdCursor(signal)
+      env.setLcdText?.(cursor.col, cursor.row, text)
+      cursor.col += text.length
       break
     }
 
     case "lcd_set_cursor": {
-      lcdCursorCol = Number(block.getFieldValue("COL") ?? 0)
-      lcdCursorRow = Number(block.getFieldValue("ROW") ?? 0)
+      const cursor = getLcdCursor(signal)
+      cursor.col = Number(block.getFieldValue("COL") ?? 0)
+      cursor.row = Number(block.getFieldValue("ROW") ?? 0)
       break
     }
 
     case "lcd_clear": {
-      lcdCursorCol = 0
-      lcdCursorRow = 0
+      const cursor = getLcdCursor(signal)
+      cursor.col = 0
+      cursor.row = 0
       env.clearLcd?.()
       break
     }
@@ -761,8 +776,7 @@ export async function runBlocklyProgram(workspace: Blockly.Workspace, env: Execu
   const root = workspace.getTopBlocks(true).find((b) => b.type === "arduino_program")
   if (!root) return
 
-  lcdCursorCol = 0
-  lcdCursorRow = 0
+  lcdCursors.set(signal, { col: 0, row: 0 })
 
   try {
     // 1. Execute SETUP statement
@@ -782,5 +796,6 @@ export async function runBlocklyProgram(workspace: Blockly.Workspace, env: Execu
     }
   } finally {
     env.highlightBlock?.(null)
+    lcdCursors.delete(signal)
   }
 }

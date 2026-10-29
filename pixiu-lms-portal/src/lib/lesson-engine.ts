@@ -4,6 +4,7 @@ import { TEMPLATES, type ProjectTemplate } from "./templates"
 import { ESP32_LESSONS } from "./curriculum/esp32-curriculum"
 import { PICO_LESSONS } from "./curriculum/pico-curriculum"
 import { MICROBIT_LESSONS } from "./curriculum/microbit-curriculum"
+import { BREADBOARD_COLUMNS } from "./components-catalog"
 
 export type LessonDifficulty = "Beginner" | "Intermediate" | "Advanced"
 export type LessonStepKind = "build" | "code" | "run" | "experiment"
@@ -302,14 +303,14 @@ function addBreadboardEdges(
     graph.get(v)!.add(u)
   }
 
-  for (let column = 1; column <= 20; column++) {
+  for (let column = 1; column <= BREADBOARD_COLUMNS; column++) {
     ;(["a", "b", "c", "d", "e"] as const).forEach((row, index, rows) => {
       if (index < rows.length - 1) link(`${row}_${column}`, `${rows[index + 1]}_${column}`)
     })
     ;(["f", "g", "h", "i", "j"] as const).forEach((row, index, rows) => {
       if (index < rows.length - 1) link(`${row}_${column}`, `${rows[index + 1]}_${column}`)
     })
-    if (column < 20) {
+    if (column < BREADBOARD_COLUMNS) {
       link(`pos_t_${column}`, `pos_t_${column + 1}`)
       link(`neg_t_${column}`, `neg_t_${column + 1}`)
       link(`pos_b_${column}`, `pos_b_${column + 1}`)

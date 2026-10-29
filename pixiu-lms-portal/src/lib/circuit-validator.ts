@@ -22,7 +22,8 @@
 
 import type { CircuitState, PlacedPart, Wire, PartType } from "./circuit-types"
 import { PIXIU_COMPONENTS_DATASET } from "./ai/pixiu-components-dataset"
-import { CATALOG } from "./components-catalog"
+import { BREADBOARD_COLUMNS, CATALOG } from "./components-catalog"
+import { getLegacyBreadboardPinMappings } from "./breadboard-pins"
 import {
   getBoardDefinition,
   isBoardPart,
@@ -1029,7 +1030,7 @@ export function validateProposedCircuit(
   for (const part of normalizedParts) {
     if (part.type === "breadboard") {
       // Connect vertical tie columns
-      for (let c = 1; c <= 20; c++) {
+      for (let c = 1; c <= BREADBOARD_COLUMNS; c++) {
         const topRow = ["a", "b", "c", "d", "e"]
         for (let r = 0; r < topRow.length - 1; r++) {
           netlist.union(pinKey(part.id, `${topRow[r]}_${c}`), pinKey(part.id, `${topRow[r + 1]}_${c}`))
@@ -1040,27 +1041,15 @@ export function validateProposedCircuit(
         }
       }
       // Power rails continuous across columns
-      for (let c = 1; c < 20; c++) {
+      for (let c = 1; c < BREADBOARD_COLUMNS; c++) {
         netlist.union(pinKey(part.id, `pos_t_${c}`), pinKey(part.id, `pos_t_${c + 1}`))
         netlist.union(pinKey(part.id, `neg_t_${c}`), pinKey(part.id, `neg_t_${c + 1}`))
         netlist.union(pinKey(part.id, `pos_b_${c}`), pinKey(part.id, `pos_b_${c + 1}`))
         netlist.union(pinKey(part.id, `neg_b_${c}`), pinKey(part.id, `neg_b_${c + 1}`))
       }
-      // Legacy breadboard pin aliases bridged to row 1
-      netlist.union(pinKey(part.id, "pos_top"), pinKey(part.id, "pos_t_1"))
-      netlist.union(pinKey(part.id, "neg_top"), pinKey(part.id, "neg_t_1"))
-      netlist.union(pinKey(part.id, "pos_bot"), pinKey(part.id, "pos_b_1"))
-      netlist.union(pinKey(part.id, "neg_bot"), pinKey(part.id, "neg_b_1"))
-      netlist.union(pinKey(part.id, "a1"), pinKey(part.id, "a_3"))
-      netlist.union(pinKey(part.id, "b1"), pinKey(part.id, "b_3"))
-      netlist.union(pinKey(part.id, "c1"), pinKey(part.id, "c_3"))
-      netlist.union(pinKey(part.id, "d1"), pinKey(part.id, "d_3"))
-      netlist.union(pinKey(part.id, "e1"), pinKey(part.id, "e_3"))
-      netlist.union(pinKey(part.id, "a2"), pinKey(part.id, "f_3"))
-      netlist.union(pinKey(part.id, "b2"), pinKey(part.id, "g_3"))
-      netlist.union(pinKey(part.id, "c2"), pinKey(part.id, "h_3"))
-      netlist.union(pinKey(part.id, "d2"), pinKey(part.id, "i_3"))
-      netlist.union(pinKey(part.id, "e2"), pinKey(part.id, "j_3"))
+      for (const [legacy, canonical] of getLegacyBreadboardPinMappings()) {
+        netlist.union(pinKey(part.id, legacy), pinKey(part.id, canonical))
+      }
     } else if (part.type === "pushbutton") {
       // Tactile pushbutton internally bridges 1a-1b and 2a-2b
       netlist.union(pinKey(part.id, "p1a"), pinKey(part.id, "p1b"))

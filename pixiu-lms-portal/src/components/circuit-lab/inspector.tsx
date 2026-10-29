@@ -155,7 +155,7 @@ export function Inspector({ part, runtime, running = false, partCount, wireCount
                         {board.clockSpeedMhz} MHz
                       </div>
                       <div className="text-[8.5px] text-muted-foreground/80 mt-0.5">
-                        {board.architecture === "xtensa-lx6" ? "Dual 32-bit" : board.architecture === "avr" ? "8-bit AVR" : "ARM Cortex"}
+                        {board.family === "xtensa" ? "Dual 32-bit" : board.family === "avr" ? "8-bit AVR" : "ARM Cortex"}
                       </div>
                     </div>
 

@@ -56,8 +56,7 @@ function aiClassDropdown(): [string, string][] {
 }
 
 export function defineArduinoBlocks() {
-  if (defined) return
-  defined = true
+  if (defined && Blockly.Blocks["arduino_program"]) return
 
   Blockly.defineBlocksWithJsonArray([
     {
@@ -853,6 +852,7 @@ export function defineArduinoBlocks() {
       this.setTooltip('Check whether tactile button A or B on the micro:bit is pressed.')
     },
   }
+  defined = true
 }
 
 /* ------------------------------------------------------------------ */

@@ -1,12 +1,23 @@
 import type { CircuitState } from "./circuit-types"
-import { CATALOG } from "./components-catalog"
+import { BREADBOARD_COLUMNS } from "./components-catalog"
 import type { PartRuntime } from "@/components/circuit-lab/part-art"
 import { getBoardForPart, isBoardPart, lookupBoardPinState } from "./board-registry"
+import { MinPriorityQueue } from "./min-priority-queue"
+import { normalizeBreadboardPinId } from "./breadboard-pins"
 
 export interface ArduinoPinState {
   state: "HIGH" | "LOW"
   value?: number
   angle?: number
+  toneHz?: number
+}
+
+export interface DisplayOutputState {
+  lcd_line1?: string
+  lcd_line2?: string
+  oled_line1?: string
+  oled_line2?: string
+  oled_line3?: string
 }
 
 const key = (partId: string, pinId: string) => `${partId}:${pinId}`
@@ -28,8 +39,12 @@ export function computeRuntime(
   state: CircuitState,
   pressed: Set<string>,
   pinStates: Record<string, ArduinoPinState> = {},
+  displayOutputs: DisplayOutputState = {},
 ): Record<string, PartRuntime> {
   const graph = new Map<string, GraphEdge[]>()
+  const breadboardIds = new Set(state.parts.filter((part) => part.type === "breadboard").map((part) => part.id))
+  const wireKey = (partId: string, pinId: string) =>
+    key(partId, breadboardIds.has(partId) ? normalizeBreadboardPinId(pinId) : pinId)
 
   function addEdge(u: string, v: string, r: number) {
     if (!graph.has(u)) graph.set(u, [])
@@ -40,7 +55,7 @@ export function computeRuntime(
 
   // 1. Add all jumper wires (copper wire resistance ~ 0.05 ohms)
   for (const w of state.wires) {
-    addEdge(key(w.from.partId, w.from.pinId), key(w.to.partId, w.to.pinId), 0.05)
+    addEdge(wireKey(w.from.partId, w.from.pinId), wireKey(w.to.partId, w.to.pinId), 0.05)
   }
 
   // 2. Add internal component connectivity & resistances
@@ -55,7 +70,7 @@ export function computeRuntime(
 
       case "breadboard": {
         // Vertical tie-points for all 20 columns: rows a-e (top half) and f-j (bottom half)
-        for (let c = 1; c <= 20; c++) {
+        for (let c = 1; c <= BREADBOARD_COLUMNS; c++) {
           addEdge(k(`a_${c}`), k(`b_${c}`), 0.01)
           addEdge(k(`b_${c}`), k(`c_${c}`), 0.01)
           addEdge(k(`c_${c}`), k(`d_${c}`), 0.01)
@@ -68,28 +83,13 @@ export function computeRuntime(
         }
 
         // Power rails continuous across entire breadboard
-        for (let c = 1; c < 20; c++) {
+        for (let c = 1; c < BREADBOARD_COLUMNS; c++) {
           addEdge(k(`pos_t_${c}`), k(`pos_t_${c + 1}`), 0.01)
           addEdge(k(`neg_t_${c}`), k(`neg_t_${c + 1}`), 0.01)
           addEdge(k(`pos_b_${c}`), k(`pos_b_${c + 1}`), 0.01)
           addEdge(k(`neg_b_${c}`), k(`neg_b_${c + 1}`), 0.01)
         }
 
-        // Legacy pin aliases
-        addEdge(k("pos_top"), k("pos_t_1"), 0.01)
-        addEdge(k("neg_top"), k("neg_t_1"), 0.01)
-        addEdge(k("pos_bot"), k("pos_b_1"), 0.01)
-        addEdge(k("neg_bot"), k("neg_b_1"), 0.01)
-        addEdge(k("a1"), k("a_3"), 0.01)
-        addEdge(k("b1"), k("b_3"), 0.01)
-        addEdge(k("c1"), k("c_3"), 0.01)
-        addEdge(k("d1"), k("d_3"), 0.01)
-        addEdge(k("e1"), k("e_3"), 0.01)
-        addEdge(k("a2"), k("f_3"), 0.01)
-        addEdge(k("b2"), k("g_3"), 0.01)
-        addEdge(k("c2"), k("h_3"), 0.01)
-        addEdge(k("d2"), k("i_3"), 0.01)
-        addEdge(k("e2"), k("j_3"), 0.01)
         break
       }
 
@@ -104,7 +104,7 @@ export function computeRuntime(
 
       case "potentiometer": {
         const val = Math.max(0, Math.min(1023, Number(part.props.value ?? 512)))
-        const rTotal = 10000
+        const rTotal = Math.max(1, Number(part.props.resistance ?? 10000))
         const r1 = Math.max(0.1, (val / 1023) * rTotal)
         const r2 = Math.max(0.1, ((1023 - val) / 1023) * rTotal)
         addEdge(k("t1"), k("wiper"), r1)
@@ -212,7 +212,7 @@ export function computeRuntime(
         }
       }
     } else if (part.type === "battery") {
-      activeSources.push({ key: k("pos"), voltage: 9.0 })
+      activeSources.push({ key: k("pos"), voltage: Math.max(0, Number(part.props.voltage ?? 9)) })
       groundSinks.push(k("neg"))
     }
   }
@@ -226,7 +226,7 @@ export function computeRuntime(
     const voltageMap = new Map<string, number>()
     const visited = new Set<string>()
 
-    const pq: { node: string; d: number }[] = []
+    const pq = new MinPriorityQueue<{ node: string; d: number }>((a, b) => a.d - b.d)
 
     for (const s of starts) {
       dist.set(s.key, 0)
@@ -234,9 +234,8 @@ export function computeRuntime(
       pq.push({ node: s.key, d: 0 })
     }
 
-    while (pq.length > 0) {
-      pq.sort((a, b) => a.d - b.d)
-      const { node, d } = pq.shift()!
+    while (pq.size > 0) {
+      const { node, d } = pq.pop()!
 
       if (node === target) {
         return { resistance: d, voltage: voltageMap.get(node) ?? 5.0 }
@@ -405,7 +404,8 @@ export function computeRuntime(
       if (pathSourceToAnode && pathCathodeToGround) {
         const totalResistance = pathSourceToAnode.resistance + pathCathodeToGround.resistance
         const vSupply = pathSourceToAnode.voltage
-        const vForward = 2.0 // Typical 5mm red/green/yellow LED forward voltage
+      const color = String(part.props.color ?? "red").toLowerCase()
+      const vForward = color.includes("white") ? 3.3 : color.includes("blue") ? 3.2 : color.includes("green") ? 2.1 : color.includes("yellow") ? 2.0 : 1.9
         const vResistor = Math.max(0, vSupply - vForward)
         const currentAmps = vResistor / (totalResistance + 0.1)
         const currentMa = currentAmps * 1000
@@ -414,16 +414,16 @@ export function computeRuntime(
         // Safe LED current: 10 mA - 25 mA (ideal 220 - 330 ohm resistor)
         // Overcurrent: Without a resistor, resistance is near 0 ohms (< 60 ohms),
         // causing massive current (> 50 mA up to 1000 mA) which instantly burns the diode!
-        if (totalResistance < 60) {
+        if (currentMa > 30) {
           runtime[part.id] = {
             burnt: true,
             level: 0,
             currentMa: Math.round(currentMa),
             resistorOhms: Math.round(totalResistance),
-            warning: `💥 OVERCURRENT BURNOUT! Current was ${Math.round(currentMa)} mA (Max safe: 20 mA). Connect a 220Ω resistor in series!`,
+            warning: `💥 OVERCURRENT BURNOUT! Current was ${Math.round(currentMa)} mA (model limit: 30 mA). Connect a series resistor!`,
           }
-        } else if (totalResistance > 4700) {
-          // Starved of current (e.g. 10k resistor): too dim to glow
+        } else if (currentMa < 1 || totalResistance > 4700) {
+          // Below 1mA the LED is effectively dark in this visual model.
           runtime[part.id] = {
             burnt: false,
             level: 0,
@@ -468,8 +468,10 @@ export function computeRuntime(
           const path = shortestResistance(activeSources, pk)
           if (!path) return 0
           const totalR = path.resistance + toGnd.resistance
-          if (totalR < 60) return 0 // burnt without resistor
-          const current = (Math.max(0, path.voltage - 2.0) / (totalR + 0.1)) * 1000
+          const color = String(part.props.color ?? "red").toLowerCase()
+          const forwardVoltage = color.includes("white") ? 3.3 : color.includes("blue") ? 3.2 : color.includes("green") ? 2.1 : color.includes("yellow") ? 2.0 : 1.9
+          const current = (Math.max(0, path.voltage - forwardVoltage) / (totalR + 0.1)) * 1000
+          if (current > 30) return 0
           return Math.min(1.0, Math.max(0, current / 15.0))
         }
         runtime[part.id] = {
@@ -532,7 +534,24 @@ export function computeRuntime(
       const toPos = shortestResistance(activeSources, posKey)
       const toNeg = shortestResistance(groundSinks.map((g) => ({ key: g })), negKey)
       const active = Boolean(toPos && toNeg)
-      runtime[part.id] = { level: active ? 1 : 0 }
+      let toneFrequency: number | undefined
+      if (active) {
+        for (const boardPart of boardParts) {
+          const boardDefinition = getBoardForPart(boardPart)
+          if (!boardDefinition) continue
+          for (const pin of boardDefinition.pins) {
+            if (pin.kind !== "digital" && pin.kind !== "analog") continue
+            if (!shortestResistance([{ key: key(boardPart.id, pin.id) }], posKey)) continue
+            const pinState = lookupBoardPinState(pinStates, pin.id, boardDefinition)
+            if (pinState?.toneHz && Number.isFinite(pinState.toneHz)) {
+              toneFrequency = Math.max(20, Math.min(20_000, pinState.toneHz))
+              break
+            }
+          }
+          if (toneFrequency) break
+        }
+      }
+      runtime[part.id] = { level: active ? 1 : 0, toneFrequency }
     } else if (part.type === "servo") {
       const sigKey = k("sig")
       let drivenAngle: number | undefined
@@ -590,15 +609,15 @@ export function computeRuntime(
       const powered = hasExternalPower(part.id, "vcc", "gnd")
       runtime[part.id] = {
         lcdBacklight: powered,
-        lcdLine1: powered ? String(pinStates["lcd_line1"] ?? part.props.line1 ?? "") : "",
-        lcdLine2: powered ? String(pinStates["lcd_line2"] ?? part.props.line2 ?? "") : "",
+        lcdLine1: powered ? String(displayOutputs.lcd_line1 ?? part.props.line1 ?? "") : "",
+        lcdLine2: powered ? String(displayOutputs.lcd_line2 ?? part.props.line2 ?? "") : "",
       }
     } else if (part.type === "oled-i2c") {
       const powered = hasExternalPower(part.id, "vcc", "gnd")
       runtime[part.id] = {
         lcdBacklight: powered,
-        lcdLine1: powered ? String(pinStates["oled_line1"] ?? part.props.line1 ?? "") : "",
-        lcdLine2: powered ? String(pinStates["oled_line2"] ?? part.props.line2 ?? "") : "",
+        lcdLine1: powered ? String(displayOutputs.oled_line1 ?? part.props.line1 ?? "") : "",
+        lcdLine2: powered ? String(displayOutputs.oled_line2 ?? part.props.line2 ?? "") : "",
       }
     } else if (part.type === "ultrasonic") {
       const powered = hasExternalPower(part.id, "vcc", "gnd")
@@ -702,7 +721,6 @@ export function computeRuntime(
         }
         return null
       }
-      const findArduinoPinState = findBoardPinState
       const readDrive = (pin: string) => {
         const stateForPin = findBoardPinState(k(pin))
         if (!stateForPin) {

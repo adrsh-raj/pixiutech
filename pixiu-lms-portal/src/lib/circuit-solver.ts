@@ -1,6 +1,9 @@
 import type { CircuitState, PinRef } from "./circuit-types"
 import type { ArduinoPinState } from "./simulation"
 import { getBoardForPart, lookupBoardPinState } from "./board-registry"
+import { MinPriorityQueue } from "./min-priority-queue"
+import { normalizeBreadboardPinId } from "./breadboard-pins"
+import { BREADBOARD_COLUMNS } from "./components-catalog"
 
 export interface PinPotentialInfo {
   voltage: number
@@ -9,6 +12,7 @@ export interface PinPotentialInfo {
   isDriven: boolean
   isGnd: boolean
   isDigitalLow?: boolean
+  isFloating?: boolean
   digitalPinName?: string
 }
 
@@ -115,6 +119,9 @@ export function solveCircuitNodalPotentials(
 ): NodalSolution {
   // 1. Gather all pins across all placed components
   const allPins = new Set<string>()
+  const breadboardIds = new Set(state.parts.filter((part) => part.type === "breadboard").map((part) => part.id))
+  const wirePinKey = (partId: string, pinId: string) =>
+    pinKey(partId, breadboardIds.has(partId) ? normalizeBreadboardPinId(pinId) : pinId)
   for (const part of state.parts) {
     const board = getBoardForPart(part)
     if (board) {
@@ -203,7 +210,7 @@ export function solveCircuitNodalPotentials(
         for (const pin of ["r1", "r2", "r3", "r4", "c1", "c2", "c3", "c4"]) allPins.add(pinKey(part.id, pin))
         break
       case "breadboard": {
-        for (let c = 1; c <= 20; c++) {
+        for (let c = 1; c <= BREADBOARD_COLUMNS; c++) {
           for (const r of ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"]) {
             allPins.add(pinKey(part.id, `${r}_${c}`))
           }
@@ -226,8 +233,8 @@ export function solveCircuitNodalPotentials(
   }
 
   for (const w of state.wires) {
-    allPins.add(pinKey(w.from.partId, w.from.pinId))
-    allPins.add(pinKey(w.to.partId, w.to.pinId))
+    allPins.add(wirePinKey(w.from.partId, w.from.pinId))
+    allPins.add(wirePinKey(w.to.partId, w.to.pinId))
   }
 
   // 2. Disjoint Set Union (DSU) to group directly wired pins into equipotential Nets
@@ -248,13 +255,13 @@ export function solveCircuitNodalPotentials(
   }
 
   for (const w of state.wires) {
-    union(pinKey(w.from.partId, w.from.pinId), pinKey(w.to.partId, w.to.pinId))
+    union(wirePinKey(w.from.partId, w.from.pinId), wirePinKey(w.to.partId, w.to.pinId))
   }
 
   for (const part of state.parts) {
     if (part.type === "breadboard") {
       const k = (pin: string) => pinKey(part.id, pin)
-      for (let c = 1; c <= 20; c++) {
+      for (let c = 1; c <= BREADBOARD_COLUMNS; c++) {
         const top = ["a", "b", "c", "d", "e"]
         for (let i = 0; i < top.length - 1; i++) {
           union(k(`${top[i]}_${c}`), k(`${top[i + 1]}_${c}`))
@@ -264,7 +271,7 @@ export function solveCircuitNodalPotentials(
           union(k(`${bot[i]}_${c}`), k(`${bot[i + 1]}_${c}`))
         }
       }
-      for (let c = 1; c < 20; c++) {
+      for (let c = 1; c < BREADBOARD_COLUMNS; c++) {
         union(k(`pos_t_${c}`), k(`pos_t_${c + 1}`))
         union(k(`neg_t_${c}`), k(`neg_t_${c + 1}`))
         union(k(`pos_b_${c}`), k(`pos_b_${c + 1}`))
@@ -274,6 +281,12 @@ export function solveCircuitNodalPotentials(
       union(k("neg_top"), k("neg_t_1"))
       union(k("pos_bot"), k("pos_b_1"))
       union(k("neg_bot"), k("neg_b_1"))
+      for (const [index, row] of ["a", "b", "c", "d", "e"].entries()) {
+        const column = (index + 1) * 3
+        union(k(`${row}1`), k(`${row}_${column}`))
+        const bottomRow = String.fromCharCode(row.charCodeAt(0) + 5)
+        union(k(`${row}2`), k(`${bottomRow}_${column}`))
+      }
     } else if (part.type === "pushbutton") {
       const k = (pin: string) => pinKey(part.id, pin)
       union(k("p1a"), k("p1b"))
@@ -402,7 +415,8 @@ export function solveCircuitNodalPotentials(
       }
     } else if (part.type === "battery") {
       const netPos = pinToNetId(part.id, "pos")
-      fixedNets.set(netPos, { voltage: 9.0, label: "9V Battery (+)" })
+      const voltage = Math.max(0, Number(part.props.voltage ?? 9))
+      fixedNets.set(netPos, { voltage, label: `${voltage}V Battery (+)` })
       const netNeg = pinToNetId(part.id, "neg")
       fixedNets.set(netNeg, { voltage: 0.0, label: "Battery Ground (0V)" })
     }
@@ -484,7 +498,7 @@ export function solveCircuitNodalPotentials(
         const netWiper = pinToNetId(part.id, "wiper")
         const netT2 = pinToNetId(part.id, "t2")
         const val = Math.max(0, Math.min(1023, Number(part.props.value ?? 512)))
-        const rTotal = 10000
+        const rTotal = Math.max(1, Number(part.props.resistance ?? 10000))
         const r1 = Math.max(0.5, (val / 1023) * rTotal)
         const r2 = Math.max(0.5, ((1023 - val) / 1023) * rTotal)
         branches.push({ netA: netT1, netB: netWiper, conductance: 1 / r1 })
@@ -494,8 +508,8 @@ export function solveCircuitNodalPotentials(
       case "led": {
         const netA = pinToNetId(part.id, "anode")
         const netC = pinToNetId(part.id, "cathode")
-        const color = String(part.props.color || "red")
-        const vf = color === "blue" || color === "white" ? 3.0 : 2.0
+        const color = String(part.props.color ?? "red").toLowerCase()
+        const vf = color.includes("white") ? 3.3 : color.includes("blue") ? 3.2 : color.includes("green") ? 2.1 : color.includes("yellow") ? 2.0 : 1.9
         branches.push({ netA, netB: netC, conductance: 1 / 10, isDiode: true, vForward: vf })
         break
       }
@@ -512,6 +526,29 @@ export function solveCircuitNodalPotentials(
         break
       }
     }
+  }
+
+  // Identify electrically floating networks before numerical regularization.
+  // The tiny diagonal term below stabilizes the matrix, but must not make an
+  // open circuit look like a real 0V measurement.
+  const sourceReachable = new Set(fixedNets.keys())
+  const branchAdjacency = new Map<number, number[]>()
+  for (const branch of branches) {
+    if (branch.netA === branch.netB) continue
+    branchAdjacency.set(branch.netA, [...(branchAdjacency.get(branch.netA) ?? []), branch.netB])
+    branchAdjacency.set(branch.netB, [...(branchAdjacency.get(branch.netB) ?? []), branch.netA])
+  }
+  const reachableQueue = [...sourceReachable]
+  for (let index = 0; index < reachableQueue.length; index++) {
+    for (const neighbor of branchAdjacency.get(reachableQueue[index]) ?? []) {
+      if (sourceReachable.has(neighbor)) continue
+      sourceReachable.add(neighbor)
+      reachableQueue.push(neighbor)
+    }
+  }
+  const floatingNets = new Set<number>()
+  for (let id = 0; id < nextNetId; id++) {
+    if (!sourceReachable.has(id)) floatingNets.add(id)
   }
 
   // 6. Modified Nodal Analysis (MNA)
@@ -605,12 +642,13 @@ export function solveCircuitNodalPotentials(
     const voltage = netVoltages.get(netId) ?? 0
 
     pinPotentials.set(pin, {
-      voltage: Number(voltage.toFixed(2)),
+      voltage: floatingNets.has(netId) ? 0 : Number(voltage.toFixed(2)),
       netId,
-      sourceLabel: fixedInfo?.label,
+      sourceLabel: fixedInfo?.label ?? (floatingNets.has(netId) ? "Floating / open circuit" : undefined),
       isDriven: fixedInfo !== undefined && fixedInfo.voltage > 0,
       isGnd: fixedInfo !== undefined && fixedInfo.voltage === 0 && !fixedInfo.isDigitalLow,
       isDigitalLow: fixedInfo?.isDigitalLow,
+      isFloating: floatingNets.has(netId),
       digitalPinName: fixedInfo?.digitalPinName,
     })
   }
@@ -692,8 +730,9 @@ export function solveCircuitNodalPotentials(
         const w = pinToNetId(part.id, "wiper")
         const v = pinToNetId(part.id, "t2")
         const val = Math.max(0, Math.min(1023, Number(part.props.value ?? 512)))
-        const r1 = Math.max(0.5, (val / 1023) * 10000)
-        const r2 = Math.max(0.5, ((1023 - val) / 1023) * 10000)
+        const rTotal = Math.max(1, Number(part.props.resistance ?? 10000))
+        const r1 = Math.max(0.5, (val / 1023) * rTotal)
+        const r2 = Math.max(0.5, ((1023 - val) / 1023) * rTotal)
         addR(u, w, r1, "Potentiometer T1-Wiper")
         addR(w, v, r2, "Potentiometer Wiper-T2")
       }
@@ -703,15 +742,15 @@ export function solveCircuitNodalPotentials(
 
     const dist = new Map<number, number>()
     const visited = new Set<number>()
-    const pq: { net: number; d: number; parts: string[] }[] = [{ net: netA, d: 0, parts: [] }]
+    const pq = new MinPriorityQueue<{ net: number; d: number; parts: string[] }>((a, b) => a.d - b.d)
+    pq.push({ net: netA, d: 0, parts: [] })
     dist.set(netA, 0)
 
     let bestR = Infinity
     let bestParts: string[] = []
 
-    while (pq.length > 0) {
-      pq.sort((a, b) => a.d - b.d)
-      const { net, d, parts } = pq.shift()!
+    while (pq.size > 0) {
+      const { net, d, parts } = pq.pop()!
 
       if (net === netB) {
         bestR = d
@@ -796,6 +835,17 @@ export function solveCircuitNodalPotentials(
       const vRed = infoRed.voltage
       const label = formatPinLabel(red)
 
+      if (infoRed.isFloating) {
+        return {
+          diff: 0,
+          vRed: 0,
+          vBlack: 0,
+          explanation: `${label} is an open circuit — no defined voltage`,
+          subtext: "Connect this pin to a powered circuit to measure its potential.",
+          isWarning: true,
+        }
+      }
+
       if (infoRed.isDigitalLow) {
         return {
           diff: 0,
@@ -822,6 +872,17 @@ export function solveCircuitNodalPotentials(
       const vBlack = infoBlack.voltage
       const label = formatPinLabel(black)
 
+      if (infoBlack.isFloating) {
+        return {
+          diff: 0,
+          vRed: 0,
+          vBlack: 0,
+          explanation: `${label} is an open circuit — no defined voltage`,
+          subtext: "Connect this pin to a powered circuit to measure its potential.",
+          isWarning: true,
+        }
+      }
+
       return {
         diff: Number((-vBlack).toFixed(2)),
         vRed: 0,
@@ -836,6 +897,17 @@ export function solveCircuitNodalPotentials(
     const infoBlack = getPinInfo(black)
     const vRed = infoRed.voltage
     const vBlack = infoBlack.voltage
+    if (infoRed.isFloating || infoBlack.isFloating) {
+      const openPin = infoRed.isFloating ? red : black
+      return {
+        diff: 0,
+        vRed: 0,
+        vBlack: 0,
+        explanation: `${formatPinLabel(openPin)} is an open circuit — no defined voltage`,
+        subtext: "Connect both probe points into a powered circuit to measure voltage.",
+        isWarning: true,
+      }
+    }
     const diff = Number((vRed - vBlack).toFixed(2))
 
     // Check if probing directly across a resistor

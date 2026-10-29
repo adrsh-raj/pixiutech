@@ -1,12 +1,12 @@
 /**
  * PIXIU XP & Gamification Engine
  * 
- * Provides an event-sourced, tamper-resilient, cross-surface XP & Leveling system
+ * Provides an event-sourced, locally validated, cross-surface XP & Leveling system
  * for students across the Simulation CyberLab and Student Portal.
  * 
  * Features:
  * - 4-Pillar XP Model (Curriculum Missions, Custom Creation, Daily Consistency, Multimodal/AI Bonus)
- * - Cryptographic FNV-1a checksum signatures to prevent localStorage manipulation
+ * - Lightweight checksums to detect accidental local ledger corruption (not security)
  * - Cloud-Backed Synchronization with Pixiu backend (Zero data loss if localStorage is cleared)
  * - Role-Aware Isolation: Students earn XP; Admins & Trainers operate in Sandbox Mode (XP Disabled)
  * - Per-student scoped ledgers + guest offline persistence
@@ -245,7 +245,9 @@ export function loadXpLedger(studentId?: string | null): XpLedger {
       return defaultLedger
     }
 
-    // Validate signatures to detect any manual localStorage tampering
+    // Detect malformed or accidentally corrupted local data. This client-side
+    // checksum is not an anti-tamper control; authoritative XP must be checked
+    // by the server because browser storage and bundled code are user-controlled.
     const validEvents = parsed.events.filter((evt) => {
       if (!evt || typeof evt.id !== "string" || typeof evt.xp !== "number") return false
       const expected = generateSignature(evt, parsed.salt || salt)
@@ -803,7 +805,7 @@ export async function syncXpWithServer(
       const existingIds = new Set(localLedger.events.map((e) => e.id))
       for (const remoteEvt of remoteLedger.events) {
         if (remoteEvt?.id && !existingIds.has(remoteEvt.id)) {
-          // Re-sign with current device salt for tamper resilience
+          // Re-sign the locally cached copy; server validation remains authoritative.
           const evtWithoutSig = {
             id: remoteEvt.id,
             category: remoteEvt.category || "tinkering",

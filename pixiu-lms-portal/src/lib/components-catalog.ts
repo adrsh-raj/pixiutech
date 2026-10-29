@@ -17,6 +17,7 @@ function distribute(labels: { label: string; kind: PinKind }[], left: number, ri
 
 const ARDUINO_W = 320
 const ARDUINO_H = 200
+export const BREADBOARD_COLUMNS = 20
 
 const topPins = distribute(
   [
@@ -105,7 +106,7 @@ export const CATALOG: Record<PartType, PartDef> = {
     height: 214,
     pins: (() => {
       const pins: PinDef[] = []
-      for (let c = 1; c <= 20; c++) {
+      for (let c = 1; c <= BREADBOARD_COLUMNS; c++) {
         const x = 40 + (c - 1) * 20
         pins.push({ id: `pos_t_${c}`, label: `+ rail (col ${c})`, x, y: 16, kind: "power" })
         pins.push({ id: `neg_t_${c}`, label: `- rail (col ${c})`, x, y: 28, kind: "ground" })
@@ -178,7 +179,7 @@ export const CATALOG: Record<PartType, PartDef> = {
   },
   battery: {
     type: "battery",
-    name: "9V Battery",
+    name: "Battery",
     blurb: "DC power source",
     width: 62,
     height: 92,
@@ -186,6 +187,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "pos", label: "+", x: 20, y: 88, kind: "power" },
       { id: "neg", label: "-", x: 42, y: 88, kind: "ground" },
     ],
+    defaults: { voltage: 9 },
   },
   potentiometer: {
     type: "potentiometer",
@@ -198,7 +200,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "wiper", label: "Wiper", x: 32, y: 60, kind: "passive" },
       { id: "t2", label: "Terminal 2", x: 52, y: 60, kind: "passive" },
     ],
-    defaults: { value: 512 },
+    defaults: { value: 512, resistance: 10000 },
   },
   servo: {
     type: "servo",

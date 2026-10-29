@@ -314,8 +314,13 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
       Blockly.svgResize(workspace)
     }
     window.addEventListener("resize", handleResize)
+    const containerObserver = typeof ResizeObserver !== "undefined"
+      ? new ResizeObserver(handleResize)
+      : null
+    containerObserver?.observe(blocklyDiv.current)
 
     return () => {
+      containerObserver?.disconnect()
       window.removeEventListener("resize", handleResize)
       workspace.dispose()
     }

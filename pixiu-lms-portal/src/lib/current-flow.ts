@@ -3,6 +3,8 @@ import type { PartRuntime } from "@/components/circuit-lab/part-art"
 import type { ArduinoPinState } from "./simulation"
 import { solveCircuitNodalPotentials } from "./circuit-solver"
 import { getBoardForPart } from "./board-registry"
+import { BREADBOARD_COLUMNS } from "./components-catalog"
+import { getLegacyBreadboardPinMappings } from "./breadboard-pins"
 
 export interface WireCurrentState {
   currentMa: number
@@ -88,7 +90,7 @@ export function computeWireCurrents(
   for (const part of state.parts) {
     const k = (pin: string) => `${part.id}:${pin}`
     if (part.type === "breadboard") {
-      for (let c = 1; c <= 20; c++) {
+      for (let c = 1; c <= BREADBOARD_COLUMNS; c++) {
         const topRows = ["a", "b", "c", "d", "e"]
         for (let i = 0; i < topRows.length - 1; i++) {
           linkInternal(k(`${topRows[i]}_${c}`), k(`${topRows[i + 1]}_${c}`))
@@ -98,7 +100,7 @@ export function computeWireCurrents(
           linkInternal(k(`${botRows[i]}_${c}`), k(`${botRows[i + 1]}_${c}`))
         }
       }
-      for (let c = 1; c < 20; c++) {
+      for (let c = 1; c < BREADBOARD_COLUMNS; c++) {
         linkInternal(k(`pos_t_${c}`), k(`pos_t_${c + 1}`))
         linkInternal(k(`neg_t_${c}`), k(`neg_t_${c + 1}`))
         linkInternal(k(`pos_b_${c}`), k(`pos_b_${c + 1}`))
@@ -108,6 +110,9 @@ export function computeWireCurrents(
       linkInternal(k("neg_top"), k("neg_t_1"))
       linkInternal(k("pos_bot"), k("pos_b_1"))
       linkInternal(k("neg_bot"), k("neg_b_1"))
+      for (const [legacy, canonical] of getLegacyBreadboardPinMappings()) {
+        linkInternal(k(legacy), k(canonical))
+      }
     } else if (part.type === "resistor") {
       linkInternal(k("a"), k("b"))
     } else if (part.type === "pushbutton") {

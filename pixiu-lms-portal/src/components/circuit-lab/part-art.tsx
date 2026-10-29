@@ -1,5 +1,6 @@
 import type { PlacedPart } from "@/lib/circuit-types"
 import { decodeSevenSegment, resolveSevenSegmentSegments } from "@/lib/seven-segment"
+import { BREADBOARD_COLUMNS } from "@/lib/components-catalog"
 
 export interface PartRuntime {
   /** 0..1 brightness for LEDs / on-off for others */
@@ -749,7 +750,7 @@ export function PartArt({ part, runtime }: { part: PlacedPart; runtime?: PartRun
           <rect x={16} y={105} width={428} height={6} fill="#d8d3c5" rx={1} />
 
           {/* Column number labels (1, 5, 10, 15, 20) */}
-          {[1, 5, 10, 15, 20].map((c) => {
+          {[1, 5, 10, 15, BREADBOARD_COLUMNS].map((c) => {
             const x = 40 + (c - 1) * 20
             return (
               <g key={`num-${c}`}>
@@ -891,7 +892,7 @@ export function PartArt({ part, runtime }: { part: PlacedPart; runtime?: PartRun
           <rect x={16} y={0} width={12} height={8} rx={2} fill="#d33" />
           <rect x={34} y={0} width={12} height={8} rx={2} fill="#374151" />
           <text x={31} y={40} textAnchor="middle" fontSize={16} fill="#e5e7eb" fontFamily="monospace" fontWeight={700}>
-            9V
+            {Number(part.props.voltage ?? 9)}V
           </text>
           <text x={20} y={62} textAnchor="middle" fontSize={14} fill="#d33">
             +

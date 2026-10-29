@@ -25,10 +25,6 @@ export interface CircuitHealthReport {
   tipCount: number
 }
 
-const PWM_PINS = new Set(["d3", "d5", "d6", "d9", "d10", "d11", "3", "5", "6", "9", "10", "11"])
-const SERIAL_PINS = new Set(["d0", "d1", "0", "1"])
-const I2C_PINS = new Set(["a4", "a5", "sda", "scl"])
-
 export function diagnoseCircuit(
   state: CircuitState,
   runtime: Record<string, PartRuntime> = {},
@@ -239,7 +235,7 @@ export function diagnoseCircuit(
         const [nPartId, nPinId] = n.split(":")
         if (nPartId === boardPart.id) {
           const pin = boardDef.pins.find((p) => p.id === nPinId.toLowerCase() || p.alternateNames?.includes(nPinId.toLowerCase()))
-          const isPwm = pin?.capabilities?.pwm ?? PWM_PINS.has(nPinId.toLowerCase())
+          const isPwm = pin?.capabilities?.pwm === true
           if (!isPwm) {
             issues.push({
               id: `servo-non-pwm-${part.id}`,

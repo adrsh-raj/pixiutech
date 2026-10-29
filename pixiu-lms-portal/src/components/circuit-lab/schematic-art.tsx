@@ -1,11 +1,6 @@
 import type { PlacedPart } from "@/lib/circuit-types"
 import type { PartRuntime } from "./part-art"
 
-interface SchematicPartArtProps {
-  part: PlacedPart
-  runtime?: PartRuntime
-}
-
 export function SchematicPartArt({ part, runtime }: { part: PlacedPart; runtime?: PartRuntime }) {
   switch (part.type) {
     case "resistor": {
@@ -104,7 +99,7 @@ export function SchematicPartArt({ part, runtime }: { part: PlacedPart; runtime?
           <line x1={27} y1={36} x2={27} y2={22} stroke="#38bdf8" strokeWidth={2} />
           <polygon points="27,18 24,24 30,24" fill="#38bdf8" />
           <text x={27} y={4} textAnchor="middle" fontSize={9} fill="#94a3b8" fontFamily="monospace">
-            10kΩ POT
+            {Number(part.props.resistance ?? 10000)}Ω POT
           </text>
         </g>
       )
@@ -124,7 +119,7 @@ export function SchematicPartArt({ part, runtime }: { part: PlacedPart; runtime?
           <text x={10} y={12} fontSize={10} fill="#ef4444" fontWeight="bold">+</text>
           <text x={32} y={12} fontSize={12} fill="#3b82f6" fontWeight="bold">−</text>
           <text x={22} y={46} textAnchor="middle" fontSize={9} fill="#94a3b8" fontFamily="monospace">
-            9V DC
+            {Number(part.props.voltage ?? 9)}V DC
           </text>
         </g>
       )

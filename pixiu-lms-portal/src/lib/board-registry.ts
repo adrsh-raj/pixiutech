@@ -633,6 +633,7 @@ export interface GenericPinState {
   state?: "HIGH" | "LOW" | string
   value?: number
   angle?: number
+  toneHz?: number
 }
 
 /**
@@ -644,10 +645,10 @@ export function lookupBoardPinState(
   pinStates: Record<string, GenericPinState | any> = {},
   pinQuery: string,
   board?: BoardDefinition | null
-): { state: "HIGH" | "LOW"; value?: number; angle?: number } | undefined {
+): { state: "HIGH" | "LOW"; value?: number; angle?: number; toneHz?: number } | undefined {
   if (!pinStates || !pinQuery) return undefined
 
-  const normalizeEntry = (entry: any): { state: "HIGH" | "LOW"; value?: number; angle?: number } | undefined => {
+  const normalizeEntry = (entry: any): { state: "HIGH" | "LOW"; value?: number; angle?: number; toneHz?: number } | undefined => {
     if (!entry) return undefined
     if (typeof entry === "string") {
       return { state: entry.toUpperCase() === "HIGH" ? "HIGH" : "LOW" }
@@ -661,6 +662,7 @@ export function lookupBoardPinState(
         state,
         value: entry.value,
         angle: entry.angle,
+        toneHz: entry.toneHz,
       }
     }
     return undefined

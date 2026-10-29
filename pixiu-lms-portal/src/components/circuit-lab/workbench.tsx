@@ -3,9 +3,10 @@ import "./workbench.css"
 
 import { lazy, Suspense, useCallback, useMemo, useRef, useState, useEffect } from "react"
 import type { CircuitState, PartType, PinRef, PlacedPart } from "@/lib/circuit-types"
-import { CATALOG } from "@/lib/components-catalog"
+import { BREADBOARD_COLUMNS, CATALOG } from "@/lib/components-catalog"
+import { getLegacyBreadboardPinMappings } from "@/lib/breadboard-pins"
 import { samePin } from "@/lib/geometry"
-import { computeRuntime, type ArduinoPinState } from "@/lib/simulation"
+import { computeRuntime, type ArduinoPinState, type DisplayOutputState } from "@/lib/simulation"
 import { defineArduinoBlocks, setAiClassContext, arduino, normalizeBlocklyXml } from "@/lib/arduino-blocks"
 import { runBlocklyProgram, executeStatement, type ExecutionEnvironment, type BlockStepInfo } from "@/lib/blockly-runner"
 import { virtualWifiManager, type VirtualWifiState } from "@/lib/virtual-wifi"
@@ -28,7 +29,6 @@ import { Palette } from "./palette"
 import { Toolbar, type WorkbenchView } from "./toolbar"
 import { BlocklyEditor } from "./blockly-editor"
 import { SerialMonitor, type SerialLine } from "./serial-monitor"
-import { StatusBar } from "./status-bar"
 import { TemplateBrowser } from "./template-browser"
 const AiCameraPanel = lazy(() => import("./ai-camera-panel").then((module) => ({ default: module.AiCameraPanel })))
 import { LessonBrowser } from "./lesson-browser"
@@ -101,7 +101,7 @@ function findCircuitLedPinMappings(currentState: CircuitState, activeBoard: Retu
     if (pt.type === "resistor") {
       addEdge(`${pt.id}:a`, `${pt.id}:b`)
     } else if (pt.type === "breadboard") {
-      for (let c = 1; c <= 20; c++) {
+      for (let c = 1; c <= BREADBOARD_COLUMNS; c++) {
         const top = ["a", "b", "c", "d", "e"]
         for (let i = 0; i < top.length - 1; i++) {
           addEdge(`${pt.id}:${top[i]}_${c}`, `${pt.id}:${top[i + 1]}_${c}`)
@@ -110,6 +110,9 @@ function findCircuitLedPinMappings(currentState: CircuitState, activeBoard: Retu
         for (let i = 0; i < bot.length - 1; i++) {
           addEdge(`${pt.id}:${bot[i]}_${c}`, `${pt.id}:${bot[i + 1]}_${c}`)
         }
+      }
+      for (const [legacy, canonical] of getLegacyBreadboardPinMappings()) {
+        addEdge(`${pt.id}:${legacy}`, `${pt.id}:${canonical}`)
       }
     }
   }
@@ -193,6 +196,11 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
   const pressedRef = useRef<Set<string>>(new Set())
   const [view, setView] = useState<WorkbenchView>("circuit")
   const [pinStates, setPinStates] = useState<Record<string, ArduinoPinState>>({})
+  const [displayOutputs, setDisplayOutputs] = useState<DisplayOutputState>({})
+  const displayOutputsRef = useRef<DisplayOutputState>({})
+  useEffect(() => {
+    displayOutputsRef.current = displayOutputs
+  }, [displayOutputs])
   const pinStatesRef = useRef<Record<string, ArduinoPinState>>({})
   useEffect(() => {
     pinStatesRef.current = pinStates
@@ -280,18 +288,6 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
     debugSpeedRef.current = debugSpeed
   }, [debugSpeed])
 
-  // Resize Blockly workspace whenever user switches to "code" view
-  useEffect(() => {
-    if (view === "code" && visualWorkspaceRef.current) {
-      const timer = setTimeout(() => {
-        if (visualWorkspaceRef.current) {
-          Blockly.svgResize(visualWorkspaceRef.current)
-        }
-      }, 50)
-      return () => clearTimeout(timer)
-    }
-  }, [view])
-
   // Ensure that whenever a Beginner mission is active, its Blockly code is automatically loaded
   useEffect(() => {
     if (!activeLessonId) return
@@ -362,6 +358,42 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
   const addCounter = useRef(0)
   const partsRef = useRef(state.parts)
   const stateRef = useRef(state)
+  const runtimeCacheRef = useRef<{
+    state: CircuitState
+    pressed: Set<string>
+    pins: Record<string, ArduinoPinState>
+    display: DisplayOutputState
+    value: ReturnType<typeof computeRuntime>
+  } | null>(null)
+  const nodalCacheRef = useRef<{
+    state: CircuitState
+    pressed: Set<string>
+    pins: Record<string, ArduinoPinState>
+    value: ReturnType<typeof solveCircuitNodalPotentials>
+  } | null>(null)
+
+  const getLiveRuntime = useCallback((currentState: CircuitState) => {
+    const pressedNow = pressedRef.current
+    const pinsNow = pinStatesRef.current
+    const displayNow = displayOutputsRef.current
+    const cached = runtimeCacheRef.current
+    if (cached?.state === currentState && cached.pressed === pressedNow && cached.pins === pinsNow && cached.display === displayNow) {
+      return cached.value
+    }
+    const value = computeRuntime(currentState, pressedNow, pinsNow, displayNow)
+    runtimeCacheRef.current = { state: currentState, pressed: pressedNow, pins: pinsNow, display: displayNow, value }
+    return value
+  }, [])
+
+  const getLiveNodalSolution = useCallback((currentState: CircuitState) => {
+    const pressedNow = pressedRef.current
+    const pinsNow = pinStatesRef.current
+    const cached = nodalCacheRef.current
+    if (cached?.state === currentState && cached.pressed === pressedNow && cached.pins === pinsNow) return cached.value
+    const value = solveCircuitNodalPotentials(currentState, pressedNow, pinsNow, true)
+    nodalCacheRef.current = { state: currentState, pressed: pressedNow, pins: pinsNow, value }
+    return value
+  }, [])
 
   useEffect(() => {
     partsRef.current = state.parts
@@ -420,7 +452,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
 
   const runtime = useMemo(() => {
     if (!running) return {}
-    const baseRuntime = computeRuntime(state, pressed, pinStates)
+    const baseRuntime = computeRuntime(state, pressed, pinStates, displayOutputs)
     const microbitPart = state.parts.find((p) => p.type === "microbit-v2")
     if (microbitPart) {
       const btnA = pressed.has(`${microbitPart.id}_a`) || pressed.has("microbit_a")
@@ -433,20 +465,17 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
       }
     }
     return baseRuntime
-  }, [running, state, pressed, pinStates, microbitMatrix])
+  }, [running, state, pressed, pinStates, displayOutputs, microbitMatrix])
 
   const oscilloscopeSimulationRef = useRef({ state, pinStates, running, pressed })
-  oscilloscopeSimulationRef.current = { state, pinStates, running, pressed }
+  useEffect(() => {
+    oscilloscopeSimulationRef.current = { state, pinStates, running, pressed }
+  }, [state, pinStates, running, pressed])
 
   const wireCurrents = useMemo(
     () => (running ? computeWireCurrents(state, runtime, pinStates, pressed) : {}),
     [running, state, runtime, pinStates, pressed],
   )
-
-  // Calculate total mA consumption across components
-  const totalCurrentMa = useMemo(() => {
-    return Object.values(runtime).reduce((acc, r) => acc + (r?.currentMa ?? 0), 0)
-  }, [runtime])
 
   // Run timer effect (pauses when debugger is paused)
   useEffect(() => {
@@ -471,6 +500,10 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
     ),
     [runtime, state.parts],
   )
+  const buzzerFrequency = useMemo(() => {
+    const activeBuzzer = state.parts.find((part) => part.type === "buzzer" && (runtime[part.id]?.level ?? 0) > 0)
+    return activeBuzzer ? Number(runtime[activeBuzzer.id]?.toneFrequency ?? 850) : 850
+  }, [runtime, state.parts])
   const buzzerActiveRef = useRef(false)
 
   useEffect(() => {
@@ -478,13 +511,13 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
 
     if (shouldBeep && !buzzerActiveRef.current) {
       audioEngine.unlockAudio()
-      audioEngine.playTone(850, 180)
+      audioEngine.playTone(buzzerFrequency, 180)
       buzzerActiveRef.current = true
     } else if (!shouldBeep && buzzerActiveRef.current) {
       audioEngine.stopTone()
       buzzerActiveRef.current = false
     }
-  }, [running, isMuted, anyBuzzerActive])
+  }, [running, isMuted, anyBuzzerActive, buzzerFrequency])
 
   // Hard cleanup only when Workbench unmounts.
   useEffect(() => {
@@ -658,6 +691,15 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
     })
   }, [])
 
+  // The runner can request camera/microphone resources through AI blocks, so
+  // stopping or replacing a program must release that session too.
+  const stopAiRuntime = useCallback(() => {
+    setAiRequestedMode(null)
+    setAiRuntimeEnabled(false)
+    setAiCameraCompact(false)
+    setIsAiCameraOpen(false)
+  }, [])
+
   const stopProgram = useCallback(() => {
     runningRef.current = false
     runnerAbortRef.current?.abort()
@@ -674,22 +716,15 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
     }
     audioEngine.stopTone()
     setPinStates({})
+    setDisplayOutputs({})
     setIsPaused(false)
     isPausedRef.current = false
     setActiveStepBlock(null)
     virtualWifiManager.reset()
     setMicrobitMatrix(createEmptyMatrix())
     currentHttpRouteRef.current = "/"
-  }, [])
-
-  // AI runtime lifecycle is deliberately separate from the Arduino runner.
-  // AI Vision Canvas and PIXIU AI Studio are separate interfaces.
-  const stopAiRuntime = useCallback(() => {
-    setAiRequestedMode(null)
-    setAiRuntimeEnabled(false)
-    setAiCameraCompact(false)
-    setIsAiCameraOpen(false)
-  }, [])
+    stopAiRuntime()
+  }, [stopAiRuntime])
 
   // PIXIU AI Circuit Copilot Action Controller (Phase 1 Ground-Truth Engine)
   const copilotAction = useCircuitCopilotAction({
@@ -759,6 +794,15 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
       runningRef.current = false
       setRunning(false)
       stopAiRuntime()
+      setSerialLines((prev) => [
+        ...prev,
+        {
+          text: "Add an Arduino, ESP32, Pico, or micro:bit board before running Blockly code.",
+          timestamp: Date.now(),
+          type: "system",
+        },
+      ])
+      setIsSerialOpen(true)
       return
     }
 
@@ -886,13 +930,14 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
           const raw = String(pin).trim()
           const digits = raw.replace(/^(gpio|gp|d|p)/i, "")
           const state = freq ? "HIGH" : "LOW"
-          const value = freq ?? 0
+          const value = freq ? 255 : 0
+          const toneHz = freq ?? undefined
           setPinStates((prev) => {
-            const next = { ...prev, [raw]: { ...prev[raw], state, value } }
+            const next = { ...prev, [raw]: { ...prev[raw], state, value, toneHz } }
             if (digits) {
-              next[digits] = { ...next[digits], state, value }
-              next[`d${digits}`] = { ...next[`d${digits}`], state, value }
-              next[`gpio${digits}`] = { ...next[`gpio${digits}`], state, value }
+              next[digits] = { ...next[digits], state, value, toneHz }
+              next[`d${digits}`] = { ...next[`d${digits}`], state, value, toneHz }
+              next[`gpio${digits}`] = { ...next[`gpio${digits}`], state, value, toneHz }
             }
             return next
           })
@@ -909,7 +954,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
           setSerialLines((prev) => [...prev, { text, timestamp: Date.now(), type: "output" }])
         },
         setLcdText: (col, row, text) => {
-          setPinStates((prev) => {
+          setDisplayOutputs((prev) => {
             const key = row === 0 ? "lcd_line1" : "lcd_line2"
             const current = String(prev[key] ?? "").padEnd(16, " ")
             const c = Math.max(0, Math.min(15, Number(col) || 0))
@@ -917,29 +962,29 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
             const updated = (current.slice(0, c) + str + current.slice(c + str.length)).slice(0, 16)
             return {
               ...prev,
-              [key]: updated as any,
+              [key]: updated,
             }
           })
         },
         clearLcd: () => {
-          setPinStates((prev) => ({
+          setDisplayOutputs((prev) => ({
             ...prev,
-            lcd_line1: "" as any,
-            lcd_line2: "" as any,
+            lcd_line1: "",
+            lcd_line2: "",
           }))
         },
         setOledText: (line, text) => {
-          setPinStates((prev) => ({
+          setDisplayOutputs((prev) => ({
             ...prev,
-            [line === 1 ? "oled_line1" : line === 2 ? "oled_line2" : "oled_line3"]: text as any,
+            [line === 1 ? "oled_line1" : line === 2 ? "oled_line2" : "oled_line3"]: text,
           }))
         },
         clearOled: () => {
-          setPinStates((prev) => ({
+          setDisplayOutputs((prev) => ({
             ...prev,
-            oled_line1: "" as any,
-            oled_line2: "" as any,
-            oled_line3: "" as any,
+            oled_line1: "",
+            oled_line2: "",
+            oled_line3: "",
           }))
         },
         clearKeypadPin: () => {
@@ -997,7 +1042,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
           const partType = aliases[type] ?? type
           const p = directPart ?? partsRef.current.find((pt) => pt.type === partType)
           const liveRuntime = runningRef.current
-            ? computeRuntime(state, pressedRef.current, pinStatesRef.current)[p?.id ?? ""]
+            ? getLiveRuntime(state)[p?.id ?? ""]
             : undefined
 
           if (type === "pushbutton") return p ? (pressedRef.current.has(p.id) ? 1 : 0) : 0
@@ -1071,7 +1116,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
               )
 
               if (targetBoardPin) {
-                const nodal = solveCircuitNodalPotentials(currentState, pressedRef.current, pinStatesRef.current, true)
+                const nodal = getLiveNodalSolution(currentState)
                 const vPin = nodal.getPinVoltage({ partId: boardPart.id, pinId: targetBoardPin.id })
                 const isWired = currentState.wires.some(
                   (w) =>
@@ -1118,7 +1163,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
             )
 
             if (targetBoardPin) {
-              const nodal = solveCircuitNodalPotentials(currentState, pressedRef.current, pinStatesRef.current, true)
+              const nodal = getLiveNodalSolution(currentState)
               const vPin = nodal.getPinVoltage({ partId: boardPart.id, pinId: targetBoardPin.id })
               if (vPin >= activeBoard.logicVoltage * 0.45) {
                 return true
@@ -1180,14 +1225,18 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
         // Virtual Wi-Fi & Web Server hooks
         wifiConnect: (ssid: string, pass: string) => {
           virtualWifiManager.connect(ssid, pass)
+          const wifiState = virtualWifiManager.getState()
           setSerialLines((prev) => [
             ...prev,
             { text: `[WiFi] Connecting to "${ssid}"...`, timestamp: Date.now(), type: "info" },
-            { text: `[WiFi] Connected! IP: ${virtualWifiManager.getState().ipAddress} (RSSI: -54 dBm)`, timestamp: Date.now(), type: "info" },
+            { text: `[WiFi] Connected! IP: ${wifiState.ipAddress} (RSSI: ${wifiState.rssi} dBm)`, timestamp: Date.now(), type: "info" },
           ])
         },
         wifiIsConnected: () => virtualWifiManager.getState().status === "connected",
-        wifiGetIp: () => virtualWifiManager.getState().ipAddress,
+        wifiGetIp: () => {
+          const wifiState = virtualWifiManager.getState()
+          return wifiState.status === "connected" ? wifiState.ipAddress : null
+        },
         wifiServerBegin: (port: number) => {
           virtualWifiManager.startServer(port)
           const currentState = stateRef.current
@@ -1460,7 +1509,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
         }])
       }
     }
-  }, [blocklyXml, state.parts, stopProgram, stopAiRuntime])
+  }, [blocklyXml, state.parts, stopProgram, stopAiRuntime, updateState, getLiveRuntime, getLiveNodalSolution])
 
   const handlePause = useCallback(() => {
     setIsPaused(true)
@@ -1867,7 +1916,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
       setActiveTemplateId(null)
       setView("circuit")
     },
-    [stopProgram, stopAiRuntime, updateState],
+    [stopProgram, updateState, stopAiRuntime],
   )
 
   const handleSelectTemplate = useCallback(
@@ -1891,7 +1940,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
       setAiCameraCompact(false)
       setIsAiCameraOpen(false)
     },
-    [stopProgram, stopAiRuntime, updateState],
+    [stopProgram, updateState, storageReady],
   )
 
   const toggleMute = useCallback(() => {
