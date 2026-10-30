@@ -528,12 +528,47 @@ export function solveCircuitNodalPotentials(
     }
   }
 
+  // A diode's piecewise-linear forward drop is a model of a conducting diode,
+  // not an independent voltage source. Decide whether it can conduct from the
+  // open-diode network first. This prevents an unpowered LED branch from
+  // self-biasing to Vf (for example, showing 1.9V after the MCU output is reset).
+  const passiveAdjacency = new Map<number, number[]>()
+  for (const branch of branches) {
+    if (branch.isDiode || branch.netA === branch.netB) continue
+    passiveAdjacency.set(branch.netA, [...(passiveAdjacency.get(branch.netA) ?? []), branch.netB])
+    passiveAdjacency.set(branch.netB, [...(passiveAdjacency.get(branch.netB) ?? []), branch.netA])
+  }
+  const reachableSourceVoltages = (startNet: number) => {
+    const seen = new Set<number>([startNet])
+    const queue = [startNet]
+    const voltages: number[] = []
+    for (let index = 0; index < queue.length; index += 1) {
+      const netId = queue[index]
+      const fixed = fixedNets.get(netId)
+      if (fixed) voltages.push(fixed.voltage)
+      for (const neighbor of passiveAdjacency.get(netId) ?? []) {
+        if (seen.has(neighbor)) continue
+        seen.add(neighbor)
+        queue.push(neighbor)
+      }
+    }
+    return voltages
+  }
+  const activeBranches = branches.filter((branch) => {
+    if (!branch.isDiode || !branch.vForward) return true
+    const anodeSources = reachableSourceVoltages(branch.netA)
+    const cathodeSources = reachableSourceVoltages(branch.netB)
+    return anodeSources.some((anodeV) =>
+      cathodeSources.some((cathodeV) => anodeV - cathodeV >= branch.vForward! - 0.1),
+    )
+  })
+
   // Identify electrically floating networks before numerical regularization.
   // The tiny diagonal term below stabilizes the matrix, but must not make an
   // open circuit look like a real 0V measurement.
   const sourceReachable = new Set(fixedNets.keys())
   const branchAdjacency = new Map<number, number[]>()
-  for (const branch of branches) {
+  for (const branch of activeBranches) {
     if (branch.netA === branch.netB) continue
     branchAdjacency.set(branch.netA, [...(branchAdjacency.get(branch.netA) ?? []), branch.netB])
     branchAdjacency.set(branch.netB, [...(branchAdjacency.get(branch.netB) ?? []), branch.netA])
@@ -569,13 +604,13 @@ export function solveCircuitNodalPotentials(
   const M = unknownNets.length
 
   if (M > 0) {
-    let activeBranches = branches.slice()
+    let solvedBranches = activeBranches.slice()
 
     for (let pass = 0; pass < 2; pass++) {
       const A: number[][] = Array.from({ length: M }, () => new Array(M).fill(0))
       const B: number[] = new Array(M).fill(0)
 
-      for (const br of activeBranches) {
+      for (const br of solvedBranches) {
         if (br.netA === br.netB) continue
 
         const G = br.conductance
@@ -622,7 +657,7 @@ export function solveCircuitNodalPotentials(
       }
 
       let recheckNeeded = false
-      activeBranches = activeBranches.filter((br) => {
+      solvedBranches = solvedBranches.filter((br) => {
         if (br.isDiode && br.vForward) {
           const vA = netVoltages.get(br.netA) ?? 0
           const vC = netVoltages.get(br.netB) ?? 0

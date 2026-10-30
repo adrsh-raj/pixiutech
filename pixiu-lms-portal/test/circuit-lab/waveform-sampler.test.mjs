@@ -61,6 +61,30 @@ test("Oscilloscope sampler preserves PWM transitions at the board's configured f
   assert.equal(samplePinVoltage(probe, state, pinStates, 1.1), 0)
 })
 
+test("Oscilloscope does not show an LED forward voltage when its MCU output is off", () => {
+  const state = {
+    parts: [
+      { id: "uno", type: "arduino-uno", x: 0, y: 0, rotation: 0, props: {} },
+      { id: "r1", type: "resistor", x: 100, y: 0, rotation: 0, props: { resistance: 220 } },
+      { id: "led1", type: "led", x: 200, y: 0, rotation: 0, props: { color: "red" } },
+    ],
+    wires: [
+      { id: "w1", from: { partId: "uno", pinId: "d13" }, to: { partId: "r1", pinId: "a" }, color: "red" },
+      { id: "w2", from: { partId: "r1", pinId: "b" }, to: { partId: "led1", pinId: "anode" }, color: "red" },
+      { id: "w3", from: { partId: "led1", pinId: "cathode" }, to: { partId: "uno", pinId: "gnd" }, color: "black" },
+    ],
+  }
+  const pinStates = {}
+  const probeA = { partId: "r1", pinId: "a" }
+  const probeB = { partId: "r1", pinId: "b" }
+  const voltageA = samplePinVoltage(probeA, state, pinStates, 0)
+  const voltageB = samplePinVoltage(probeB, state, pinStates, 0)
+
+  assert.equal(voltageA, 0)
+  assert.equal(voltageB, 0)
+  assert.equal(voltageA - voltageB, 0)
+})
+
 test("Channel metrics calculate Vpp and frequency from sampled data", () => {
   const history = [
     { t: 0, v1: 0, v2: 1 },

@@ -118,3 +118,27 @@ for (const resistance of [220, 330, 10000]) {
     )
   })
 }
+
+test("DMM: stopping an unpowered MCU output does not create a phantom LED forward voltage", () => {
+  const circuitState = {
+    parts: [
+      { id: "uno", type: "arduino-uno", x: 40, y: 110, rotation: 0, props: {} },
+      { id: "r1", type: "resistor", x: 260, y: 110, rotation: 0, props: { resistance: 220 } },
+      { id: "led1", type: "led", x: 420, y: 110, rotation: 0, props: { color: "red" } },
+    ],
+    wires: [
+      { id: "w1", from: { partId: "uno", pinId: "d13" }, to: { partId: "r1", pinId: "a" }, color: "red" },
+      { id: "w2", from: { partId: "r1", pinId: "b" }, to: { partId: "led1", pinId: "anode" }, color: "red" },
+      { id: "w3", from: { partId: "led1", pinId: "cathode" }, to: { partId: "uno", pinId: "gnd" }, color: "black" },
+    ],
+  }
+  const solution = solveCircuitNodalPotentials(circuitState, new Set(), {}, false)
+  const resistorA = { partId: "r1", pinId: "a" }
+  const resistorB = { partId: "r1", pinId: "b" }
+  const reading = solution.getPotentialDifference(resistorA, resistorB, circuitState, {})
+
+  assert.equal(reading.diff, 0)
+  assert.equal(solution.getPinVoltage(resistorA), 0)
+  assert.equal(solution.getPinVoltage(resistorB), 0)
+  assert.equal(solution.getPinInfo(resistorA).isFloating, true)
+})
