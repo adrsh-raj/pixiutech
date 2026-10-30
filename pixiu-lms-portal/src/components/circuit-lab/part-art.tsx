@@ -582,60 +582,120 @@ export function PartArt({ part, runtime }: { part: PlacedPart; runtime?: PartRun
     }
 
     case "rpi-pico": {
+      const leftPinLabels = ["GP0", "GP1", "GND", "GP2", "GP3", "GP4", "GP5", "GND", "GP6", "GP7", "GP8", "GP9", "GND", "GP10", "GP11", "GP12", "GP13", "GND", "GP14", "GP15"]
+      const rightPinLabels = ["VBUS", "VSYS", "GND", "3V3_EN", "3V3", "VREF", "GP28", "GND", "GP27", "GP26", "RUN", "GP22", "GND", "GP21", "GP20", "GP19", "GP18", "GND", "GP17", "GP16"]
       return (
         <g className="select-none">
-          <rect x={0} y={0} width={220} height={380} rx={10} fill="#059669" stroke="#047857" strokeWidth={2.5} />
-          <rect x={16} y={20} width={188} height={340} rx={6} fill="#047857" opacity={0.6} />
+          {/* Raspberry Pi Pico-shaped PCB with solder mask, routed traces and plated holes */}
+          <rect x={0} y={0} width={220} height={380} rx={10} fill="#087f55" stroke="#064e3b" strokeWidth={2.5} />
+          <rect x={8} y={8} width={204} height={364} rx={7} fill="#07804f" stroke="#22a06b" strokeWidth={0.8} />
+          <path d="M30 85 H58 V112 H74 M30 222 H64 V250 H82 M190 88 H166 V112 H146 M190 235 H165 V258 H145" fill="none" stroke="#34d399" strokeWidth={1.2} opacity={0.62} />
+          <path d="M38 110 H55 V142 H80 M180 112 H160 V143 H140 M45 270 H77 V292 H105 M175 277 H147 V300 H124" fill="none" stroke="#065f46" strokeWidth={2} opacity={0.75} />
+          <path d="M42 114 H59 V141 M178 114 H161 V141" fill="none" stroke="#d6a84f" strokeWidth={0.8} opacity={0.7} />
+          {/* Four plated mounting holes */}
+          {[
+            { cx: 14, cy: 14 }, { cx: 206, cy: 14 }, { cx: 14, cy: 366 }, { cx: 206, cy: 366 },
+          ].map((hole) => (
+            <g key={`${hole.cx}-${hole.cy}`}>
+              <circle cx={hole.cx} cy={hole.cy} r={5.2} fill="#d6a84f" stroke="#92400e" strokeWidth={0.8} />
+              <circle cx={hole.cx} cy={hole.cy} r={2.7} fill="#052e24" />
+            </g>
+          ))}
 
-          {/* RP2040 chip */}
-          <rect x={82} y={150} width={56} height={56} rx={3} fill="#1e293b" stroke="#0f172a" strokeWidth={1.5} />
-          <text x={110} y={182} textAnchor="middle" fontSize={9} fill="#f1f5f9" fontFamily="monospace" fontWeight={700}>
-            RP2040
-          </text>
-
-          {/* USB Port at top */}
-          <rect x={86} y={-4} width={48} height={28} rx={3} fill="#cbd5e1" stroke="#475569" strokeWidth={1.5} />
+          {/* Micro-USB connector and its metal shell */}
+          <path d="M80 3 Q80 -3 87 -3 H133 Q140 -3 140 3 V24 H80Z" fill="#94a3b8" stroke="#475569" strokeWidth={1.5} />
+          <rect x={86} y={1} width={48} height={17} rx={3} fill="#cbd5e1" stroke="#64748b" strokeWidth={0.8} />
+          <rect x={95} y={5} width={30} height={8} rx={2} fill="#1e293b" />
+          <path d="M99 7 H121" stroke="#e2e8f0" strokeWidth={0.7} />
+          <text x={110} y={30} textAnchor="middle" fontSize={4.4} fill="#d1fae5" fontFamily="monospace" fontWeight={700}>USB</text>
 
           {/* GP25 Onboard Green User LED */}
           <g>
-            <rect x={52} y={34} width={12} height={8} rx={1.5} fill="#1e293b" stroke="#0f172a" strokeWidth={0.8} />
+            <rect x={48} y={39} width={18} height={12} rx={2} fill="#1e293b" stroke="#0f172a" strokeWidth={0.8} />
             <circle
-              cx={58}
-              cy={38}
-              r={2.5}
+              cx={57}
+              cy={45}
+              r={3}
               fill={runtime?.pin25High ? "#22c55e" : "#14532d"}
               stroke={runtime?.pin25High ? "#86efac" : "#052e16"}
               strokeWidth={0.6}
             />
-            {runtime?.pin25High && <circle cx={58} cy={38} r={6} fill="#22c55e" opacity={0.4} />}
-            <text x={58} y={50} textAnchor="middle" fontSize={5} fill={runtime?.pin25High ? "#86efac" : "#6ee7b7"} fontFamily="monospace" fontWeight={700}>
+            {runtime?.pin25High && <circle cx={57} cy={45} r={7} fill="#22c55e" opacity={0.4} />}
+            <text x={57} y={58} textAnchor="middle" fontSize={4.6} fill={runtime?.pin25High ? "#86efac" : "#6ee7b7"} fontFamily="monospace" fontWeight={700}>
               GP25
             </text>
           </g>
 
           {/* BOOTSEL Button */}
-          <rect x={148} y={55} width={18} height={18} rx={2} fill="#334155" />
-          <circle cx={157} cy={64} r={5} fill="#f8fafc" />
-          <text x={157} y={80} textAnchor="middle" fontSize={5} fill="#cbd5e1" fontFamily="monospace">
+          <rect x={146} y={48} width={24} height={23} rx={3} fill="#374151" stroke="#1f2937" strokeWidth={1} />
+          <circle cx={158} cy={59} r={6} fill="#d1d5db" stroke="#6b7280" strokeWidth={1} />
+          <circle cx={158} cy={59} r={2.2} fill="#9ca3af" />
+          <text x={158} y={77} textAnchor="middle" fontSize={4.7} fill="#d1fae5" fontFamily="monospace" fontWeight={700}>
             BOOTSEL
           </text>
+
+          {/* Crystal, QSPI flash, regulator and support ICs */}
+          <rect x={83} y={126} width={22} height={12} rx={4} fill="#cbd5e1" stroke="#64748b" strokeWidth={0.9} />
+          <text x={94} y={134} textAnchor="middle" fontSize={4.4} fill="#334155" fontFamily="monospace" fontWeight={700}>12MHz</text>
+          <rect x={145} y={143} width={28} height={20} rx={2} fill="#111827" stroke="#020617" strokeWidth={1} />
+          <text x={159} y={155} textAnchor="middle" fontSize={4.6} fill="#cbd5e1" fontFamily="monospace" fontWeight={700}>FLASH</text>
+          <text x={159} y={160} textAnchor="middle" fontSize={3.7} fill="#94a3b8" fontFamily="monospace">W25Q16</text>
+          <rect x={49} y={279} width={27} height={18} rx={2} fill="#111827" stroke="#020617" strokeWidth={0.9} />
+          <text x={62.5} y={290} textAnchor="middle" fontSize={4.1} fill="#cbd5e1" fontFamily="monospace" fontWeight={700}>RT6150</text>
+          <rect x={143} y={277} width={23} height={16} rx={1.5} fill="#1f2937" stroke="#111827" strokeWidth={0.8} />
+          <text x={154.5} y={287} textAnchor="middle" fontSize={3.8} fill="#d1d5db" fontFamily="monospace">USB PHY</text>
+          <circle cx={81} cy={112} r={2.2} fill="#d6a84f" /><circle cx={138} cy={112} r={2.2} fill="#d6a84f" />
 
           {/* Header Pins Left & Right */}
           {Array.from({ length: 20 }).map((_, i) => (
             <g key={i}>
-              <circle cx={12} cy={25 + i * 17.5} r={3.8} fill="#eab308" stroke="#ca8a04" strokeWidth={0.6} />
-              <circle cx={12} cy={25 + i * 17.5} r={2} fill="#020617" />
-              <circle cx={208} cy={25 + i * 17.5} r={3.8} fill="#eab308" stroke="#ca8a04" strokeWidth={0.6} />
-              <circle cx={208} cy={25 + i * 17.5} r={2} fill="#020617" />
+              {[
+                { x: 12, label: leftPinLabels[i], anchor: "start" as const, tx: 22 },
+                { x: 208, label: rightPinLabels[i], anchor: "end" as const, tx: 198 },
+              ].map((pin) => {
+                const y = 25 + i * 17.5
+                const isGround = pin.label === "GND"
+                const isPower = ["VBUS", "VSYS", "3V3", "3V3_EN", "VREF"].includes(pin.label)
+                const pinColor = isGround ? "#e5e7eb" : isPower ? "#fca5a5" : "#a7f3d0"
+                return (
+                  <g key={`${pin.x}-${pin.label}`}>
+                    <circle cx={pin.x} cy={y} r={4.2} fill="#d6a84f" stroke="#92400e" strokeWidth={0.8} />
+                    <circle cx={pin.x} cy={y} r={2.5} fill="#020617" />
+                    <circle cx={pin.x} cy={y} r={1} fill="#475569" />
+                    <text x={pin.tx} y={y + 2.2} textAnchor={pin.anchor} fontSize={5.2} fill={pinColor} fontFamily="monospace" fontWeight={700}>{pin.label}</text>
+                  </g>
+                )
+              })}
             </g>
           ))}
 
-          <text x={110} y={240} textAnchor="middle" fontSize={9} fill="#ecfdf5" fontFamily="monospace" fontWeight={700}>
-            Raspberry Pi Pico
+          {/* Main RP2040 package and pin-one marker */}
+          <rect x={79} y={151} width={62} height={62} rx={3} fill="#111827" stroke="#020617" strokeWidth={1.5} />
+          {Array.from({ length: 8 }, (_, i) => 85 + i * 7).map((x) => (
+            <g key={x}>
+              <rect x={x} y={146} width={3} height={5} fill="#cbd5e1" />
+              <rect x={x} y={213} width={3} height={5} fill="#cbd5e1" />
+            </g>
+          ))}
+          {Array.from({ length: 8 }, (_, i) => 157 + i * 7).map((y) => (
+            <g key={y}>
+              <rect x={74} y={y} width={5} height={3} fill="#cbd5e1" />
+              <rect x={141} y={y} width={5} height={3} fill="#cbd5e1" />
+            </g>
+          ))}
+          <circle cx={86} cy={158} r={2} fill="#f8fafc" />
+          <text x={110} y={179} textAnchor="middle" fontSize={9} fill="#f1f5f9" fontFamily="monospace" fontWeight={800}>RP2040</text>
+          <text x={110} y={190} textAnchor="middle" fontSize={4.5} fill="#94a3b8" fontFamily="monospace">DUAL-CORE MCU</text>
+          <text x={110} y={233} textAnchor="middle" fontSize={8} fill="#ecfdf5" fontFamily="monospace" fontWeight={800}>
+            RASPBERRY PI PICO
           </text>
-          <text x={110} y={254} textAnchor="middle" fontSize={7} fill="#a7f3d0" fontFamily="sans-serif">
-            RP2040 Dual ARM Cortex-M0+
+          <text x={110} y={246} textAnchor="middle" fontSize={5.8} fill="#a7f3d0" fontFamily="monospace" fontWeight={700}>
+            RP2040 · ARM CORTEX-M0+
           </text>
+          <text x={110} y={256} textAnchor="middle" fontSize={5} fill="#6ee7b7" fontFamily="monospace">2MB FLASH · 264KB RAM</text>
+          <path d="M48 311 H172" stroke="#34d399" strokeWidth={0.7} opacity={0.5} />
+          <text x={110} y={323} textAnchor="middle" fontSize={5.5} fill="#d1fae5" fontFamily="monospace" fontWeight={700}>40 GPIO · 3.3V LOGIC</text>
+          <text x={110} y={335} textAnchor="middle" fontSize={4.7} fill="#a7f3d0" fontFamily="monospace">DESIGNED BY RASPBERRY PI</text>
         </g>
       )
     }
@@ -921,44 +981,53 @@ export function PartArt({ part, runtime }: { part: PlacedPart; runtime?: PartRun
       const angle = runtime?.angle ?? Number(part.props.angle ?? 90)
       const isBarrier = part.props.arm === "barrier"
       return (
-        <g>
-          {/* Servo body chassis */}
-          <rect x={16} y={10} width={56} height={40} rx={3} fill="#1e3a8a" stroke="#0b1d52" />
-          <circle cx={44} cy={18} r={10} fill="#93c5fd" />
-
-          {/* Rotating horn or boom barrier arm */}
-          <g transform={`rotate(${angle - 90} 44 18)`}>
+        <g className="select-none">
+          {/* SG90-style micro-servo case with mounting ears and molded seams */}
+          <path d="M15 15 Q15 11 20 11 H80 Q85 11 85 16 V55 Q85 60 80 60 H20 Q15 60 15 55Z" fill="#123a9b" stroke="#081f63" strokeWidth={1.8} />
+          <path d="M10 19 Q10 15 15 15 H20 V56 H15 Q10 56 10 52Z M80 15 H85 Q90 15 90 19 V52 Q90 56 85 56 H80Z" fill="#2563eb" stroke="#1e40af" strokeWidth={1.5} />
+          <path d="M18 17 H82 V23 H18Z" fill="#3b82f6" opacity={0.65} />
+          <path d="M18 49 H82 V56 H18Z" fill="#0b286f" opacity={0.7} />
+          <path d="M18 27 H82 M18 46 H82" stroke="#60a5fa" strokeWidth={0.8} opacity={0.6} />
+          {/* Mounting ears with through-holes */}
+          {[{ x: 15, y: 35 }, { x: 85, y: 35 }].map((ear) => (
+            <g key={ear.x}>
+              <circle cx={ear.x} cy={ear.y} r={4.2} fill="#0b1e57" stroke="#60a5fa" strokeWidth={1} />
+              <circle cx={ear.x} cy={ear.y} r={1.8} fill="#020617" />
+            </g>
+          ))}
+          {/* Output gear and horn */}
+          <circle cx={52} cy={34} r={14} fill="#0b1e57" stroke="#93c5fd" strokeWidth={1.5} />
+          <circle cx={52} cy={34} r={10} fill="#1d4ed8" stroke="#bfdbfe" strokeWidth={1} />
+          <g transform={`rotate(${angle - 90} 52 34)`}>
             {isBarrier ? (
               <g>
-                {/* Long Boom Barrier arm (115px) */}
-                <rect x={40} y={-110} width={8} height={124} rx={2} fill="#ffffff" stroke="#94a3b8" strokeWidth={0.6} />
-                {/* Diagonal red safety warning stripes */}
-                {[-100, -80, -60, -40, -20, 0].map((sy) => (
-                  <polygon
-                    key={sy}
-                    points={`40,${sy} 48,${sy - 8} 48,${sy} 40,${sy + 8}`}
-                    fill="#ef4444"
-                  />
+                <rect x={48} y={-62} width={8} height={92} rx={2} fill="#f8fafc" stroke="#94a3b8" strokeWidth={0.8} />
+                {[-52, -36, -20, -4, 12].map((sy) => (
+                  <path key={sy} d={`M48 ${sy + 8} L56 ${sy} V${sy + 8} L48 ${sy + 16}Z`} fill="#ef4444" />
                 ))}
-                {/* Flashing warning lamp at tip of barrier */}
-                <circle cx={44} cy={-107} r={4} fill="#ef4444" />
-                <circle cx={44} cy={-107} r={8} fill="#ef4444" opacity={0.3} />
-                {/* Heavy pivot counterweight hub */}
-                <circle cx={44} cy={18} r={8} fill="#f59e0b" stroke="#b45309" strokeWidth={1} />
-                <circle cx={44} cy={18} r={3} fill="#1e293b" />
+                <circle cx={52} cy={-58} r={4} fill="#ef4444" />
+                <circle cx={52} cy={-58} r={7} fill="#ef4444" opacity={0.25} />
               </g>
             ) : (
               <g>
-                <rect x={42} y={0} width={4} height={20} rx={2} fill="#f8fafc" />
-                <circle cx={44} cy={2} r={3} fill="#f8fafc" />
+                <path d="M49 34 V5 Q49 2 52 2 Q55 2 55 5 V34Z" fill="#f8fafc" stroke="#cbd5e1" strokeWidth={0.8} />
+                <path d="M28 32 H76 Q79 32 79 35 Q79 38 76 38 H28Z" fill="#e2e8f0" stroke="#94a3b8" strokeWidth={0.8} />
+                <circle cx={52} cy={34} r={4.5} fill="#f8fafc" stroke="#64748b" strokeWidth={1} />
+                <circle cx={52} cy={34} r={1.5} fill="#334155" />
               </g>
             )}
           </g>
-
-          {/* 3-wire lead */}
-          <line x1={4} y1={16} x2={16} y2={22} stroke="#f97316" strokeWidth={2} />
-          <line x1={4} y1={30} x2={16} y2={30} stroke="#dc2626" strokeWidth={2} />
-          <line x1={4} y1={44} x2={16} y2={38} stroke="#111827" strokeWidth={2} />
+          {/* Output spline and screw cap */}
+          <circle cx={52} cy={34} r={2.4} fill="#f8fafc" stroke="#64748b" strokeWidth={0.8} />
+          <path d="M50.5 34 H53.5 M52 32.5 V35.5" stroke="#475569" strokeWidth={0.7} />
+          {/* Three-wire pigtail: signal, +5V and ground */}
+          <path d="M4 18 H10 Q13 18 16 22" fill="none" stroke="#f97316" strokeWidth={2.8} strokeLinecap="round" />
+          <path d="M4 35 H12 Q14 35 16 35" fill="none" stroke="#dc2626" strokeWidth={2.8} strokeLinecap="round" />
+          <path d="M4 52 H10 Q13 52 16 48" fill="none" stroke="#111827" strokeWidth={2.8} strokeLinecap="round" />
+          <circle cx={4} cy={18} r={2.3} fill="#fdba74" stroke="#7c2d12" strokeWidth={0.8} />
+          <circle cx={4} cy={35} r={2.3} fill="#fca5a5" stroke="#7f1d1d" strokeWidth={0.8} />
+          <circle cx={4} cy={52} r={2.3} fill="#cbd5e1" stroke="#334155" strokeWidth={0.8} />
+          <text x={52} y={57} textAnchor="middle" fontSize={5.5} fill="#dbeafe" fontFamily="monospace" fontWeight={800}>SG90 · 9g</text>
         </g>
       )
     }
@@ -1264,39 +1333,51 @@ export function PartArt({ part, runtime }: { part: PlacedPart; runtime?: PartRun
       const isCcw = runtime?.motorDirection === "ccw"
       const duration = Math.max(0.08, 60 / (rpm || 120))
       return (
-        <g>
-          {/* Motor cylinder body */}
-          <ellipse cx={30} cy={30} rx={24} ry={24} fill="#71717a" stroke="#52525b" strokeWidth={2} />
-          <ellipse cx={30} cy={30} rx={18} ry={18} fill="#a1a1aa" />
-          {/* Center shaft */}
-          <circle cx={30} cy={30} r={4} fill="#52525b" stroke="#3f3f46" />
-          {/* Shaft marker for rotation */}
+        <g className="select-none">
+          {/* Brushed 130-size DC motor: can, rolled seam, end bell and mounting tabs */}
+          <path d="M24 17 Q24 12 30 12 H82 Q89 12 92 19 V48 Q89 55 82 55 H30 Q24 55 24 49Z" fill="#9ca3af" stroke="#475569" strokeWidth={1.5} />
+          <path d="M33 14 H79 Q86 14 88 20 V47 Q86 53 79 53 H33Z" fill="#cbd5e1" />
+          <path d="M36 16 H77 Q83 16 85 21 V25 H34Z" fill="#f1f5f9" opacity={0.65} />
+          <path d="M37 17 V51 M79 16 V52" stroke="#64748b" strokeWidth={1} opacity={0.65} />
+          {/* Rear cap and vents */}
+          <path d="M82 16 Q92 17 94 25 V43 Q92 51 82 52Z" fill="#52525b" stroke="#27272a" strokeWidth={1.2} />
+          {[25, 31, 37, 43].map((y) => <path key={y} d={`M86 ${y} H92`} stroke="#a1a1aa" strokeWidth={1} opacity={0.8} />)}
+          {/* Front end plate and projecting steel shaft */}
+          <path d="M24 18 Q14 20 14 27 V41 Q14 49 24 52Z" fill="#71717a" stroke="#3f3f46" strokeWidth={1.2} />
+          <ellipse cx={18} cy={34} rx={4} ry={11} fill="#d4d4d8" stroke="#52525b" strokeWidth={1} />
+          <path d="M17 31 H5 Q2 31 2 34 Q2 37 5 37 H17Z" fill="#e5e7eb" stroke="#64748b" strokeWidth={1} />
+          <path d="M5 32.5 V35.5" stroke="#94a3b8" strokeWidth={0.7} />
+          {/* Can label and ventilation detail */}
+          <rect x={39} y={26} width={30} height={18} rx={2} fill="#f8fafc" stroke="#94a3b8" strokeWidth={0.6} />
+          <text x={54} y={33} textAnchor="middle" fontSize={5.4} fill="#334155" fontFamily="monospace" fontWeight={800}>DC MOTOR</text>
+          <text x={54} y={40} textAnchor="middle" fontSize={5} fill="#64748b" fontFamily="monospace">3-6V · 130</text>
+          {[31, 37, 43].map((y) => <circle key={y} cx={72} cy={y} r={1} fill="#475569" />)}
+          {/* Mounting feet and solder tabs */}
+          <path d="M35 53 V60 H42 V55 M69 53 V60 H76 V55" fill="#71717a" stroke="#52525b" strokeWidth={1} />
+          <path d="M34 60 V67" stroke="#b45309" strokeWidth={3} strokeLinecap="round" />
+          <path d="M76 60 V67" stroke="#334155" strokeWidth={3} strokeLinecap="round" />
+          <circle cx={34} cy={68} r={2.5} fill="#ef4444" stroke="#7f1d1d" strokeWidth={0.8} />
+          <circle cx={76} cy={68} r={2.5} fill="#e2e8f0" stroke="#475569" strokeWidth={0.8} />
+          {/* Rotating shaft marker */}
           <g
             style={
               spinning
                 ? {
-                    transformOrigin: "30px 30px",
+                    transformOrigin: "10px 34px",
                     animation: `${isCcw ? "spin-reverse" : "spin"} ${duration}s linear infinite`,
                   }
                 : {}
             }
           >
-            <line x1={30} y1={30} x2={30} y2={14} stroke="#27272a" strokeWidth={3} strokeLinecap="round" />
-            <circle cx={30} cy={14} r={2} fill="#ef4444" />
+            <line x1={10} y1={34} x2={10} y2={25} stroke="#ef4444" strokeWidth={2} strokeLinecap="round" />
+            <circle cx={10} cy={25} r={1.5} fill="#7f1d1d" />
           </g>
-          {/* Terminal tabs */}
-          <rect x={10} y={50} width={10} height={8} rx={1} fill="#ef4444" />
-          <text x={15} y={57} textAnchor="middle" fontSize={7} fill="#fff" fontWeight={700}>+</text>
-          <rect x={40} y={50} width={10} height={8} rx={1} fill="#27272a" />
-          <text x={45} y={57} textAnchor="middle" fontSize={7} fill="#fff" fontWeight={700}>−</text>
-          {/* RPM readout */}
+          {/* Dynamic shaft speed readout */}
           {spinning && (
-            <text x={30} y={-4} textAnchor="middle" fontSize={8} fill="#a3e635" fontFamily="monospace" fontWeight={700}>
+            <text x={52} y={8} textAnchor="middle" fontSize={7} fill="#a3e635" fontFamily="monospace" fontWeight={700}>
               {rpm} RPM {isCcw ? "CCW" : "CW"}
             </text>
           )}
-          {/* Label */}
-          <text x={30} y={33} textAnchor="middle" fontSize={7} fill="#3f3f46" fontFamily="sans-serif" fontWeight={700}>M</text>
         </g>
       )
     }
@@ -1329,27 +1410,49 @@ export function PartArt({ part, runtime }: { part: PlacedPart; runtime?: PartRun
     case "relay": {
       const active = runtime?.relayActive ?? false
       return (
-        <g>
-          {/* PCB Board */}
-          <rect x={0} y={0} width={80} height={66} rx={3} fill="#1e3a8a" stroke="#1e40af" />
-          {/* Relay body (blue cube) */}
-          <rect x={10} y={10} width={40} height={32} rx={2} fill={active ? "#2563eb" : "#1d4ed8"} stroke="#1e40af" />
-          {/* Coil indicator */}
-          <path d="M18 22 Q22 18 26 22 Q30 26 34 22 Q38 18 42 22" fill="none" stroke="#93c5fd" strokeWidth={1.5} />
-          {/* LED indicator */}
-          <circle cx={60} cy={20} r={5} fill={active ? "#4ade80" : "#27272a"} />
-          {active && <circle cx={60} cy={20} r={8} fill="#4ade80" opacity={0.3} />}
-          {/* Relay state label */}
-          <text x={40} y={48} textAnchor="middle" fontSize={7} fill="#93c5fd" fontFamily="mono">
-            {active ? "ON" : "OFF"}
-          </text>
-          {/* Terminal screw connectors (top) */}
-          <rect x={8} y={-2} width={12} height={8} rx={1} fill="#60a5fa" />
-          <text x={14} y={5} textAnchor="middle" fontSize={6} fill="#fff" fontFamily="mono">COM</text>
-          <rect x={34} y={-2} width={12} height={8} rx={1} fill="#4ade80" />
-          <text x={40} y={5} textAnchor="middle" fontSize={6} fill="#fff" fontFamily="mono">NO</text>
-          <rect x={60} y={-2} width={12} height={8} rx={1} fill="#ef4444" />
-          <text x={66} y={5} textAnchor="middle" fontSize={6} fill="#fff" fontFamily="mono">NC</text>
+        <g className="select-none">
+          {/* Single-channel relay module PCB */}
+          <rect x={3} y={9} width={106} height={66} rx={5} fill="#087f5b" stroke="#064e3b" strokeWidth={1.5} />
+          <path d="M8 15 H64 V19 H8 M8 56 H66 V61 H8 M61 20 V55" fill="none" stroke="#34d399" strokeWidth={1} opacity={0.6} />
+          {[{ x: 8, y: 14 }, { x: 104, y: 14 }, { x: 8, y: 70 }, { x: 104, y: 70 }].map((pad) => (
+            <g key={`${pad.x}-${pad.y}`}><circle cx={pad.x} cy={pad.y} r={2.5} fill="#d6a84f" /><circle cx={pad.x} cy={pad.y} r={1} fill="#064e3b" /></g>
+          ))}
+          {/* Blue Songle relay cube */}
+          <rect x={12} y={18} width={48} height={35} rx={3} fill="#1557bd" stroke="#0b347a" strokeWidth={1.5} />
+          <path d="M16 21 H56 V25 H16Z" fill="#3b82f6" opacity={0.7} />
+          <path d="M17 28 H55" stroke="#93c5fd" strokeWidth={0.7} opacity={0.65} />
+          <text x={36} y={33} textAnchor="middle" fontSize={5.4} fill="#eff6ff" fontFamily="monospace" fontWeight={800}>SONGLE</text>
+          <text x={36} y={40} textAnchor="middle" fontSize={5.2} fill="#dbeafe" fontFamily="monospace">SRD-05VDC</text>
+          <text x={36} y={47} textAnchor="middle" fontSize={4.5} fill="#bfdbfe" fontFamily="monospace">10A 250VAC</text>
+          {/* Three-way screw terminal block */}
+          <rect x={68} y={17} width={35} height={33} rx={3} fill="#166534" stroke="#052e16" strokeWidth={1.3} />
+          <path d="M70 21 H101 V27 H70Z" fill="#15803d" />
+          {[72, 86, 100].map((x) => (
+            <g key={x}>
+              <circle cx={x} cy={22} r={4.1} fill="#0f172a" stroke="#a3a3a3" strokeWidth={1} />
+              <path d={`M${x - 2} 22 H${x + 2} M${x} 20 V24`} stroke="#e2e8f0" strokeWidth={0.8} />
+              <text x={x} y={38} textAnchor="middle" fontSize={4.3} fill="#f0fdf4" fontFamily="monospace" fontWeight={700}>{x === 72 ? "COM" : x === 86 ? "NO" : "NC"}</text>
+            </g>
+          ))}
+          <path d="M72 4 V17 M86 4 V17 M100 4 V17" stroke="#d6a84f" strokeWidth={1.4} />
+          <text x={86} y={46} textAnchor="middle" fontSize={4.2} fill="#bbf7d0" fontFamily="monospace">CONTACTS</text>
+          {/* Driver transistor, optocoupler, resistor and status LED */}
+          <rect x={13} y={59} width={18} height={10} rx={1.5} fill="#111827" stroke="#334155" strokeWidth={0.8} />
+          <text x={22} y={66} textAnchor="middle" fontSize={4} fill="#cbd5e1" fontFamily="monospace">PC817</text>
+          <path d="M37 60 H47 V63 H37Z M37 66 H47 V69 H37Z" fill="#d6b47a" stroke="#78350f" strokeWidth={0.5} />
+          <rect x={52} y={59} width={10} height={10} rx={1} fill="#111827" stroke="#334155" strokeWidth={0.7} />
+          <text x={57} y={66} textAnchor="middle" fontSize={3.8} fill="#e2e8f0" fontFamily="monospace">Q1</text>
+          <circle cx={67} cy={63} r={2.7} fill={active ? "#4ade80" : "#14532d"} stroke={active ? "#bbf7d0" : "#052e16"} strokeWidth={0.8} />
+          {active && <circle cx={67} cy={63} r={6} fill="#4ade80" opacity={0.28} />}
+          <text x={67} y={72} textAnchor="middle" fontSize={4} fill="#dcfce7" fontFamily="monospace">{active ? "ON" : "IN"}</text>
+          {/* Bottom 3-pin input header and labels */}
+          <rect x={17} y={71} width={82} height={9} rx={2} fill="#111827" stroke="#334155" strokeWidth={0.8} />
+          {[28, 56, 84].map((x, i) => (
+            <g key={x}>
+              <rect x={x - 3} y={72} width={6} height={9} rx={1} fill="#d1d5db" stroke="#6b7280" strokeWidth={0.6} />
+              <text x={x} y={69} textAnchor="middle" fontSize={4.2} fill="#ecfdf5" fontFamily="monospace" fontWeight={700}>{["VCC", "GND", "IN"][i]}</text>
+            </g>
+          ))}
         </g>
       )
     }
@@ -1453,16 +1556,65 @@ export function PartArt({ part, runtime }: { part: PlacedPart; runtime?: PartRun
       const dirShortA = directionA === "stopped" ? "OFF" : directionA.toUpperCase()
       const dirShortB = directionB === "stopped" ? "OFF" : directionB.toUpperCase()
       return (
-        <g>
-          <rect x="2" y="4" width="116" height="88" rx="7" fill="#153e75" stroke="#1d4ed8" strokeWidth="2" />
-          <rect x="46" y="14" width="28" height="34" rx="2" fill="#0f172a" stroke="#334155" />
-          <text x="60" y="34" textAnchor="middle" fontSize="8" fill="#cbd5e1" fontFamily="monospace" fontWeight="700">L298N</text>
-          <text x="12" y="58" fontSize="6.5" fill="#93c5fd" fontFamily="monospace" fontWeight="600">MOT A: {speedA} ({dirShortA})</text>
-          <text x="12" y="67" fontSize="6.5" fill="#38bdf8" fontFamily="monospace" fontWeight="600">MOT B: {speedB} ({dirShortB})</text>
-          <rect x="12" y="72" width="96" height="5" rx="2.5" fill="#0f172a" />
-          <rect x="12" y="72" width={Math.max(0, 96 * (speedA / 255))} height="5" rx="2.5" fill="#22c55e" />
-          <rect x="12" y="80" width="96" height="4" rx="2" fill="#0f172a" />
-          <rect x="12" y="80" width={Math.max(0, 96 * (speedB / 255))} height="4" rx="2" fill="#38bdf8" />
+        <g className="select-none">
+          {/* L298N dual H-bridge module, with screw terminals and heat sink */}
+          <rect x={5} y={7} width={140} height={98} rx={5} fill="#b91c1c" stroke="#7f1d1d" strokeWidth={1.6} />
+          <path d="M9 11 H141 V18 H9Z" fill="#dc2626" opacity={0.6} />
+          {/* PCB traces and copper pads */}
+          <path d="M38 29 H56 V48 M94 28 H111 V43 M38 73 H54 V60 M94 73 H111 V61 M26 51 H48" fill="none" stroke="#f59e0b" strokeWidth={1.1} opacity={0.68} />
+          {[{ x: 11, y: 13 }, { x: 139, y: 13 }, { x: 11, y: 99 }, { x: 139, y: 99 }].map((pad) => (
+            <g key={`${pad.x}-${pad.y}`}><circle cx={pad.x} cy={pad.y} r={2.6} fill="#d6a84f" /><circle cx={pad.x} cy={pad.y} r={1.2} fill="#7f1d1d" /></g>
+          ))}
+          {/* Motor supply header: VMotor, ground and logic 5V */}
+          <rect x={13} y={6} width={70} height={13} rx={2} fill="#111827" stroke="#334155" strokeWidth={0.8} />
+          {[
+            { x: 24, label: "VS" }, { x: 48, label: "GND" }, { x: 72, label: "5V" },
+          ].map(({ x, label }) => (
+            <g key={label}>
+              <circle cx={x} cy={11} r={3.2} fill="#d1d5db" stroke="#6b7280" strokeWidth={0.6} />
+              <circle cx={x} cy={11} r={1.4} fill="#334155" />
+              <text x={x} y={25} textAnchor="middle" fontSize={4} fill="#fee2e2" fontFamily="monospace" fontWeight={700}>{label}</text>
+            </g>
+          ))}
+          {/* Four blue screw terminals for the two motors */}
+          {[{ x: 8, y: 30, label: "OUT1" }, { x: 8, y: 57, label: "OUT2" }, { x: 115, y: 30, label: "OUT3" }, { x: 115, y: 57, label: "OUT4" }].map((terminal) => (
+            <g key={terminal.label}>
+              <rect x={terminal.x} y={terminal.y} width={27} height={18} rx={2} fill="#1e40af" stroke="#172554" strokeWidth={1} />
+              <rect x={terminal.x + 2} y={terminal.y + 2} width={23} height={4} rx={1} fill="#3b82f6" />
+              <circle cx={terminal.x + 13.5} cy={terminal.y + 10} r={3.7} fill="#0f172a" stroke="#d1d5db" strokeWidth={1} />
+              <path d={`M${terminal.x + 11} ${terminal.y + 10} H${terminal.x + 16}`} stroke="#e5e7eb" strokeWidth={0.8} />
+              <text x={terminal.x + 13.5} y={terminal.y + 17} textAnchor="middle" fontSize={3.8} fill="#dbeafe" fontFamily="monospace">{terminal.label}</text>
+            </g>
+          ))}
+          {/* L298N power stage IC and finned aluminum heat sink */}
+          <rect x={49} y={24} width={48} height={42} rx={3} fill="#1f2937" stroke="#030712" strokeWidth={1.4} />
+          <rect x={55} y={28} width={36} height={34} rx={2} fill="#090d16" stroke="#475569" strokeWidth={0.8} />
+          {Array.from({ length: 7 }, (_, i) => 54 + i * 6).map((x) => (
+            <path key={x} d={`M${x} 25 V14 Q${x} 12 ${x + 2} 12 H${x + 3} Q${x + 5} 12 ${x + 5} 15 V25`} fill="#cbd5e1" stroke="#64748b" strokeWidth={0.8} />
+          ))}
+          <text x={73} y={45} textAnchor="middle" fontSize={7} fill="#f8fafc" fontFamily="monospace" fontWeight={800}>L298N</text>
+          <text x={73} y={54} textAnchor="middle" fontSize={4.3} fill="#94a3b8" fontFamily="monospace">DUAL H-BRIDGE</text>
+          {/* Power capacitors and 5V regulator */}
+          <ellipse cx={40} cy={41} rx={5} ry={8} fill="#111827" stroke="#64748b" strokeWidth={1} />
+          <ellipse cx={40} cy={34} rx={5} ry={2} fill="#d1d5db" stroke="#64748b" strokeWidth={0.7} />
+          <text x={40} y={43} textAnchor="middle" fontSize={3.5} fill="#e2e8f0" fontFamily="monospace">100uF</text>
+          <rect x={101} y={35} width={10} height={16} rx={1} fill="#111827" stroke="#374151" strokeWidth={0.8} />
+          <text x={106} y={45} textAnchor="middle" fontSize={3.5} fill="#cbd5e1" fontFamily="monospace">78M05</text>
+          <circle cx={107} cy={60} r={2.4} fill={speedA > 0 || speedB > 0 ? "#4ade80" : "#14532d"} stroke="#052e16" strokeWidth={0.8} />
+          {/* Input header, channel labels and live motor meters */}
+          <rect x={24} y={75} width={89} height={12} rx={2} fill="#111827" stroke="#334155" strokeWidth={0.8} />
+          {[
+            { x: 30, pin: "ENA" }, { x: 46, pin: "IN1" }, { x: 62, pin: "IN2" },
+            { x: 78, pin: "IN3" }, { x: 94, pin: "IN4" }, { x: 110, pin: "ENB" },
+          ].map(({ x, pin }) => (
+            <g key={pin}>
+              <rect x={x - 2.5} y={77} width={5} height={9} rx={1} fill="#d1d5db" stroke="#6b7280" strokeWidth={0.5} />
+              <text x={x} y={95} textAnchor="middle" fontSize={4.2} fill="#fee2e2" fontFamily="monospace" fontWeight={700}>{pin}</text>
+            </g>
+          ))}
+          <text x={73} y={101} textAnchor="middle" fontSize={4.5} fill="#fca5a5" fontFamily="monospace" fontWeight={700}>
+            A {speedA} {dirShortA}   ·   B {speedB} {dirShortB}
+          </text>
         </g>
       )
     }
