@@ -599,8 +599,14 @@ export function solveCircuitNodalPotentials(
 
         if (br.isDiode && br.vForward) {
           const iEq = G * br.vForward
-          if (u !== undefined) B[u] -= iEq
-          if (v !== undefined) B[v] += iEq
+          // Model a forward diode as I = G * (Va - Vc - Vf). In the
+          // nodal equation, the forward-voltage source contributes +G*Vf
+          // to the anode RHS and -G*Vf to the cathode RHS. The old signs
+          // drove a valid LED series node below ground, then the diode was
+          // removed as reverse-biased; that made both resistor terminals
+          // appear to be at the same supply voltage in the DMM.
+          if (u !== undefined) B[u] += iEq
+          if (v !== undefined) B[v] -= iEq
         }
       }
 
