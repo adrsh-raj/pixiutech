@@ -84,28 +84,37 @@ test("DMM: Reversed Polarity detection with clear guidance", () => {
   assert.match(pd.subtext, /Swap Probes/i, "Subtext must guide user to swap probes")
 })
 
-test("DMM: 220Ω resistor in a driven LED loop reports a real voltage drop", () => {
-  const circuitState = {
-    parts: [
-      { id: "uno", type: "arduino-uno", x: 40, y: 110, rotation: 0, props: {} },
-      { id: "r1", type: "resistor", x: 260, y: 110, rotation: 0, props: { resistance: 220 } },
-      { id: "led1", type: "led", x: 420, y: 110, rotation: 0, props: { color: "red" } },
-    ],
-    wires: [
-      { id: "w1", from: { partId: "uno", pinId: "d13" }, to: { partId: "r1", pinId: "a" }, color: "#ef4444" },
-      { id: "w2", from: { partId: "r1", pinId: "b" }, to: { partId: "led1", pinId: "anode" }, color: "#ef4444" },
-      { id: "w3", from: { partId: "led1", pinId: "cathode" }, to: { partId: "uno", pinId: "gnd" }, color: "#1e293b" },
-    ],
-  }
-  const pinStates = { "13": { state: "HIGH" } }
-  const solution = solveCircuitNodalPotentials(circuitState, new Set(), pinStates, true)
-  const pd = solution.getPotentialDifference(
-    { partId: "r1", pinId: "a" },
-    { partId: "r1", pinId: "b" },
-    circuitState,
-    pinStates,
-  )
+for (const resistance of [220, 330, 10000]) {
+  test(`DMM: ${resistance}Ω resistor in a driven LED loop uses its configured value`, () => {
+    const circuitState = {
+      parts: [
+        { id: "uno", type: "arduino-uno", x: 40, y: 110, rotation: 0, props: {} },
+        { id: "r1", type: "resistor", x: 260, y: 110, rotation: 0, props: { resistance } },
+        { id: "led1", type: "led", x: 420, y: 110, rotation: 0, props: { color: "red" } },
+      ],
+      wires: [
+        { id: "w1", from: { partId: "uno", pinId: "d13" }, to: { partId: "r1", pinId: "a" }, color: "#ef4444" },
+        { id: "w2", from: { partId: "r1", pinId: "b" }, to: { partId: "led1", pinId: "anode" }, color: "#ef4444" },
+        { id: "w3", from: { partId: "led1", pinId: "cathode" }, to: { partId: "uno", pinId: "gnd" }, color: "#1e293b" },
+      ],
+    }
+    const pinStates = { "13": { state: "HIGH" } }
+    const solution = solveCircuitNodalPotentials(circuitState, new Set(), pinStates, true)
+    const probeRed = { partId: "r1", pinId: "a" }
+    const probeBlack = { partId: "r1", pinId: "b" }
+    const pd = solution.getPotentialDifference(probeRed, probeBlack, circuitState, pinStates)
+    const current = solution.computeCurrentBetweenPins(probeRed, probeBlack, {})
+    const expectedCurrentMa = ((5 - 1.9) / (resistance + 10)) * 1000
+    const expectedDrop = (expectedCurrentMa / 1000) * resistance
 
-  assert.ok(pd.diff > 2.5 && pd.diff < 3.5, `Expected ~3V across the resistor, got ${pd.diff}V`)
-  assert.match(pd.explanation, /Voltage Drop across 220Ω Resistor/i)
-})
+    assert.ok(
+      Math.abs(pd.diff - expectedDrop) < 0.02,
+      `Expected ${expectedDrop.toFixed(2)}V across ${resistance}Ω, got ${pd.diff}V`,
+    )
+    assert.match(pd.explanation, new RegExp(`Voltage Drop across ${resistance}Ω Resistor`, "i"))
+    assert.ok(
+      Math.abs(current.currentMa - expectedCurrentMa) < 0.11,
+      `Expected ${expectedCurrentMa.toFixed(2)}mA through ${resistance}Ω, got ${current.currentMa}mA`,
+    )
+  })
+}
