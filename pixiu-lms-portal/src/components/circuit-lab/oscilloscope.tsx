@@ -92,8 +92,8 @@ export const Oscilloscope = memo(function Oscilloscope({
       const snapshot = simulationRef.current
       const isSimRunning = snapshot.running
 
-      // When stopped, sample resting DC potential every 100ms (every 4th tick) to conserve CPU
-      if (!isSimRunning && frameCounter % 4 !== 0) {
+      // When stopped, sample resting DC potential every 100ms to conserve CPU.
+      if (!isSimRunning && frameCounter % 100 !== 0) {
         frameCounter += 1
         return
       }
@@ -140,15 +140,17 @@ export const Oscilloscope = memo(function Oscilloscope({
         if (firstVisible > 0) historyRef.current = buf.slice(firstVisible)
       }
 
-      if (historyRef.current.length > 600) {
-        historyRef.current = historyRef.current.slice(-500)
+      if (historyRef.current.length > 12000) {
+        historyRef.current = historyRef.current.slice(-10000)
       }
 
       frameCounter += 1
-      if (frameCounter % 3 === 0) {
+      if (!isSimRunning || frameCounter % 20 === 0) {
         setRenderTick((prev) => prev + 1)
       }
-    }, 25)
+    // A 25 ms poll aliases common Arduino PWM (490 Hz) into a false DC/low
+    // frequency trace. Sample at 1 ms so common PWM edges are visible.
+    }, 1)
 
     return () => window.clearInterval(interval)
   }, [activeWindowMs, isHold, isOpen, probeCH1, probeCH2, simulationRef, pressed])
@@ -247,7 +249,21 @@ export const Oscilloscope = memo(function Oscilloscope({
   // Calculate SVG Screen Path
   const screenWidth = 380
   const screenHeight = 160
-  const vMaxScale = 5.5 // 0V to 5.5V full scale
+  const visibleHistory = historyRef.current.filter(
+    (point) => point.t >= historyRef.current[historyRef.current.length - 1]?.t - activeWindowMs,
+  )
+  const visibleVoltages = visibleHistory.flatMap((point) => [
+    ...(probeCH1 ? [point.v1] : []),
+    ...(probeCH2 ? [point.v2] : []),
+  ])
+  const observedMin = visibleVoltages.length ? Math.min(...visibleVoltages) : 0
+  const observedMax = visibleVoltages.length ? Math.max(...visibleVoltages) : 1
+  const observedSpan = Math.max(1, observedMax - observedMin)
+  const scalePadding = observedSpan * 0.12
+  const voltageMin = observedMin - scalePadding
+  const voltageMax = observedMax + scalePadding
+  const voltageSpan = voltageMax - voltageMin
+  const voltageAt = (fraction: number) => voltageMax - voltageSpan * fraction
 
   const generatePath = (channel: "v1" | "v2") => {
     const history = historyRef.current
@@ -268,8 +284,7 @@ export const Oscilloscope = memo(function Oscilloscope({
     for (let i = firstVisible; i < history.length; i += stride) {
       const point = history[i]
       const x = Math.max(0, Math.min(screenWidth, ((point.t - startT) / activeWindowMs) * screenWidth))
-      const voltage = Math.max(0, Math.min(vMaxScale, point[channel]))
-      const y = screenHeight - (voltage / vMaxScale) * screenHeight
+      const y = ((voltageMax - point[channel]) / voltageSpan) * screenHeight
 
       if (pointsWritten === 0) {
         path = x > 0.5
@@ -284,8 +299,7 @@ export const Oscilloscope = memo(function Oscilloscope({
     const last = history[history.length - 1]
     if (pointsWritten > 0 && (history.length - 1 - firstVisible) % stride !== 0) {
       const x = Math.max(0, Math.min(screenWidth, ((last.t - startT) / activeWindowMs) * screenWidth))
-      const voltage = Math.max(0, Math.min(vMaxScale, last[channel]))
-      const y = screenHeight - (voltage / vMaxScale) * screenHeight
+      const y = ((voltageMax - last[channel]) / voltageSpan) * screenHeight
       path += ` L ${x.toFixed(1)} ${y.toFixed(1)}`
     }
 
@@ -294,6 +308,9 @@ export const Oscilloscope = memo(function Oscilloscope({
 
   const pathCH1 = generatePath("v1")
   const pathCH2 = generatePath("v2")
+  const differentialVoltage = probeCH1 && probeCH2
+    ? metricsCH1.currentV - metricsCH2.currentV
+    : null
 
   return (
     <div
@@ -404,10 +421,10 @@ export const Oscilloscope = memo(function Oscilloscope({
                 <line x1={0} y1={screenHeight / 2} x2={screenWidth} y2={screenHeight / 2} stroke="#1e3a5f" strokeWidth="1" strokeDasharray="4 2" />
                 <line x1={screenWidth / 2} y1={0} x2={screenWidth / 2} y2={screenHeight} stroke="#1e3a5f" strokeWidth="1" strokeDasharray="4 2" />
 
-                {/* Voltage reference levels */}
-                <text x="5" y="14" fill="#64748b" fontSize="8" fontFamily="monospace">5V</text>
-                <text x="5" y={screenHeight / 2 + 3} fill="#64748b" fontSize="8" fontFamily="monospace">2.5V</text>
-                <text x="5" y={screenHeight - 4} fill="#64748b" fontSize="8" fontFamily="monospace">0V ⏚</text>
+                {/* Voltage scale follows both live traces, including negative voltages. */}
+                <text x="5" y="10" fill="#94a3b8" fontSize="8" fontFamily="monospace">{voltageAt(0).toFixed(1)}V</text>
+                <text x="5" y={screenHeight / 2 + 3} fill="#94a3b8" fontSize="8" fontFamily="monospace">{voltageAt(0.5).toFixed(1)}V</text>
+                <text x="5" y={screenHeight - 3} fill="#94a3b8" fontSize="8" fontFamily="monospace">{voltageAt(1).toFixed(1)}V</text>
 
                 {/* CH2 Signal Path (Cyan) */}
                 {probeCH2 && pathCH2 && (
@@ -478,6 +495,15 @@ export const Oscilloscope = memo(function Oscilloscope({
                 )}
               </div>
             </div>
+
+            {differentialVoltage !== null && (
+              <div className="mt-2 rounded-lg border border-slate-700/80 bg-slate-900/80 px-2.5 py-1.5 flex items-center justify-between text-[10px] font-mono">
+                <span className="text-slate-400">CH1 − CH2 · voltage between probe points</span>
+                <span className={differentialVoltage < 0 ? "text-cyan-300 font-bold" : "text-yellow-300 font-bold"}>
+                  {differentialVoltage >= 0 ? "+" : ""}{differentialVoltage.toFixed(2)} V
+                </span>
+              </div>
+            )}
 
             {/* Scope Timebase & Run Controls */}
             <div className="flex items-center justify-between mt-2.5 px-0.5 text-xs">

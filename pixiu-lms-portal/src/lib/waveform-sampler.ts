@@ -77,7 +77,10 @@ export function samplePinVoltage(
 
   // 2. Pure nodal potential solver for rest of circuit
   const nodal = cachedNodalSolution ?? solveCircuitNodalPotentials(state, new Set(), pinStates, true)
-  return Math.max(0, Math.min(12.0, nodal.getPinVoltage(ref)))
+  // Keep the solver's signed voltage. Scope probes can be below ground, and
+  // clipping here silently turned every negative reading into 0 V.
+  const voltage = nodal.getPinVoltage(ref)
+  return Number.isFinite(voltage) ? voltage : 0
 }
 
 export function computeChannelMetrics(
