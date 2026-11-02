@@ -39,13 +39,13 @@ function InfinityDots() {
       // Assign every 2nd dot a slot on the lemniscate (infinity curve).
       const pick = dots.filter((_, i) => i % 2 === 0)
       const cx = w / 2
-      const cy = h / 2
-      const a = Math.min(w * 0.36, h * 0.7)
-      pick.sort(() => Math.random() - 0.5).forEach((d, i) => {
-        const t = (i / pick.length) * Math.PI * 2
+      const cy = h * 0.5
+      const a = Math.min(w * 0.2, h * 0.32)
+      pick.forEach((d, i) => {
+        const t = ((i * 0.618034) % 1) * Math.PI * 2
         const s = Math.sin(t)
         const k = 1 + s * s
-        const jitter = (Math.random() - 0.5) * 10
+        const jitter = (Math.random() - 0.5) * 2.5
         d.ix = cx + (a * Math.cos(t)) / k + jitter
         d.iy = cy + (a * s * Math.cos(t)) / k + jitter
         d.inf = true
@@ -69,10 +69,10 @@ function InfinityDots() {
         d.x += (d.tx - d.x) * (goInf ? 0.06 : 0.12)
         d.y += (d.ty - d.y) * (goInf ? 0.06 : 0.12)
         const glow = goInf ? 1 : Math.max(0.18, 1 - dist / 220)
-        const r = goInf ? 1.9 : 1.2 + (glow > 0.3 ? glow : 0)
+        const r = goInf ? 1.4 : 1.2 + (glow > 0.3 ? glow : 0)
         ctx.fillStyle = goInf
-          ? `hsla(${180 + d.hue * 60}, 100%, 65%, 0.95)`
-          : `hsla(${200 + d.hue * 30}, 90%, 70%, ${glow * (morph ? 0.25 : 0.7)})`
+          ? `hsla(${180 + d.hue * 60}, 100%, 68%, 0.4)`
+          : `hsla(${200 + d.hue * 30}, 90%, 70%, ${glow * (morph ? 0.18 : 0.6)})`
         ctx.beginPath()
         ctx.arc(d.x, d.y, r, 0, Math.PI * 2)
         ctx.fill()
@@ -122,14 +122,21 @@ function Logo({ className = '' }) {
 }
 
 const LAB_FEATURES = [
-  { t: 'Circuit Canvas', d: 'Drag parts, wire live circuits and simulate them right in the browser.' },
-  { t: 'Block Coding', d: 'Program boards with Blockly blocks, then step up to real code.' },
-  { t: 'Multimeter & Oscilloscope', d: 'Measure voltage, current and waveforms like in a real lab.' },
-  { t: 'Serial Monitor & IoT Portal', d: 'See board output and build connected, Wi-Fi style projects.' },
-  { t: 'AI Studio', d: 'Teach, try and understand AI models with camera and dataset tools.' },
-  { t: 'Circuit Copilot & Doctor', d: 'A tutor chat and a live checker that spots wiring mistakes.' },
-  { t: 'Lessons & Templates', d: 'Guided lessons and ready project templates to start fast.' },
-  { t: 'XP & Badges', d: 'Students earn XP and badges as they complete builds.' },
+  { t: 'Real-time Circuit Solver', d: 'Every wire you place is solved live using Kirchhoff\u2019s current and voltage laws, so node voltages and branch currents behave like real hardware.' },
+  { t: 'Instrument-grade Measurement', d: 'A virtual multimeter and oscilloscope sample signals over time, so students read RMS values, frequency, duty cycle and noise, not just on/off.' },
+  { t: 'Embedded Firmware Runtime', d: 'Block code and text code run on a simulated microcontroller with timers, PWM, ADC and interrupts, exposing how firmware actually drives hardware.' },
+  { t: 'Sensors, Signals & IoT', d: 'Model analog sensors, debounce inputs, filter noisy readings and push data over a virtual network to a live web dashboard.' },
+  { t: 'AI Studio', d: 'Collect a dataset from the camera, train a model, then inspect accuracy, confidence and misclassifications to understand how machines learn.' },
+  { t: 'Circuit Doctor', d: 'Continuously checks for shorts, floating inputs, reverse polarity and overcurrent, and explains the physics of why a design fails.' },
+  { t: 'Guided Engineering Lessons', d: 'Structured lessons and project templates progress from fundamentals to complete systems such as automation, robotics and smart devices.' },
+  { t: 'Progress, XP & Badges', d: 'Every build, measurement and fix is recorded, giving students momentum and trainers a clear picture of mastery.' },
+]
+
+const SCIENCE = [
+  { q: 'Why does this motor stall at startup?', a: 'Explains stall current, back-EMF and why a driver transistor and flyback diode are needed, then shows the current spike on the oscilloscope.' },
+  { q: 'Why is my sensor reading jumping around?', a: 'Walks through ADC resolution, sampling rate and electrical noise, and helps the student design a moving-average or RC filter.' },
+  { q: 'How does PWM control brightness or speed?', a: 'Connects duty cycle to average voltage and power, and lets the student measure the waveform to prove it.' },
+  { q: 'Why did my AI model confuse two objects?', a: 'Uses the confusion matrix and dataset balance to show bias, overfitting and how better data improves results.' },
 ]
 
 export default function EightSquareAI() {
@@ -140,8 +147,8 @@ export default function EightSquareAI() {
         <div className="shell esq-hero__copy">
           <span className="esq-chip"><span className="esq-chip__pulse" /> Launching soon</span>
           <Logo className="esq-logo--hero" />
-          <h1>Infinite ways to <span>learn, build &amp; teach.</span></h1>
-          <p className="esq-lede">8 Square is Pixiu Tech&apos;s AI for the Virtual Lab — a learning partner for students and a teaching assistant for trainers.</p>
+          <h1>Engineering, <span>understood.</span></h1>
+          <p className="esq-lede">8 Square is an engineering intelligence designed and developed in-house by the Pixiu Tech team. It sits inside our Virtual Lab and helps students understand the science behind every circuit, while giving trainers real-time insight into how each learner thinks.</p>
           <div className="esq-actions">
             <Link className="btn btn--primary btn--lg" to="/virtual-lab">Explore the Virtual Lab <span className="arw">→</span></Link>
             <Link className="btn btn--ghost-light" to="/contact#demo-form">Get early access</Link>
@@ -158,19 +165,21 @@ export default function EightSquareAI() {
             <article className="esq-card">
               <h3>For Students</h3>
               <ul>
-                <li>Step-by-step hints while building a circuit — not just answers.</li>
-                <li>Explains why an LED didn&apos;t glow or a sensor misread.</li>
-                <li>Suggests the next challenge to grow creativity and skill.</li>
-                <li>Practise anytime, even without a physical kit.</li>
+                <li>Socratic, step-by-step guidance that builds reasoning instead of handing out answers.</li>
+                <li>Explains the science behind each result: Ohm&apos;s law, power, signals, timing and data.</li>
+                <li>Connects classroom theory to real engineering decisions and trade-offs.</li>
+                <li>Recommends the next challenge to stretch creativity and problem-solving.</li>
+                <li>Practise anytime, anywhere, without waiting for a physical kit.</li>
               </ul>
             </article>
             <article className="esq-card">
               <h3>For Trainers</h3>
               <ul>
-                <li>See where each student is stuck at a glance.</li>
-                <li>Ready lesson ideas, quizzes and project prompts.</li>
-                <li>Less time debugging wiring, more time teaching.</li>
-                <li>Track progress through XP, badges and completed builds.</li>
+                <li>Live view of where each learner is stuck and the concept behind it.</li>
+                <li>Auto-generated lesson plans, viva questions and project briefs.</li>
+                <li>Common design errors flagged before they waste lab time.</li>
+                <li>Mastery reports built from real builds, measurements and fixes.</li>
+                <li>More time mentoring, less time debugging wiring.</li>
               </ul>
             </article>
           </div>
@@ -178,9 +187,42 @@ export default function EightSquareAI() {
       </section>
 
       <section className="esq-band esq-band--alt">
+        <div className="shell esq-about">
+          <div>
+            <p className="esq-eyebrow">Built by Pixiu Tech</p>
+            <h2 className="esq-h2">Designed in-house, for Indian classrooms.</h2>
+          </div>
+          <div className="esq-about__body">
+            <p>8 Square has been dedicatedly developed by the Pixiu Tech engineering and curriculum team, the same people who set up school innovation labs and teach weekly sessions on the ground. Every capability comes from real classroom questions our trainers hear every day.</p>
+            <p>It is trained around our own Robotics, AI, IoT and electronics curriculum, aligned to CBSE, ICSE and State boards, and tightly integrated with the Pixiu Virtual Lab and Learning Portal, so guidance is always grounded in what the student is actually building.</p>
+            <div className="esq-stats">
+              <div><strong>In-house</strong><span>Engineering &amp; AI</span></div>
+              <div><strong>Curriculum</strong><span>Mapped to boards</span></div>
+              <div><strong>Lab-native</strong><span>Sees the live circuit</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="esq-band">
+        <div className="shell">
+          <p className="esq-eyebrow">The science behind the build</p>
+          <h2 className="esq-h2">Questions real engineers ask. Answered with reasoning.</h2>
+          <div className="esq-qa">
+            {SCIENCE.map((x) => (
+              <article className="esq-card" key={x.q}>
+                <h3>{x.q}</h3>
+                <p>{x.a}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="esq-band esq-band--alt">
         <div className="shell">
           <p className="esq-eyebrow">Inside the Virtual Lab</p>
-          <h2 className="esq-h2">Everything 8 Square works with.</h2>
+          <h2 className="esq-h2">A complete engineering lab, with 8 Square inside.</h2>
           <div className="esq-grid">
             {LAB_FEATURES.map((f) => (
               <article className="esq-feature" key={f.t}>

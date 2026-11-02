@@ -63,3 +63,13 @@
 .esq-cta { text-align: center; background: radial-gradient(ellipse at 50% 0%, rgba(55, 245, 176, 0.12), transparent 60%), var(--esq-bg); }
 .esq-cta__inner .esq-logo { margin-bottom: 24px; }
 @media (prefers-reduced-motion: reduce) { .esq-chip__pulse { animation: none; } }
+.esq-hero__copy h1, .esq-lede { text-shadow: 0 2px 24px rgba(5, 9, 19, 0.9); }
+.esq-card p { margin: 0; color: var(--esq-mute); line-height: 1.7; }
+.esq-qa { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.esq-about { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 48px; align-items: start; }
+.esq-about__body p { color: var(--esq-mute); line-height: 1.8; margin: 0 0 16px; }
+.esq-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 24px; }
+.esq-stats div { border: 1px solid var(--esq-line); border-radius: 14px; padding: 16px; }
+.esq-stats strong { display: block; color: var(--esq-cyan); font-size: 1.1rem; }
+.esq-stats span { color: var(--esq-mute); font-size: 0.85rem; }
+@media (max-width: 800px) { .esq-about { grid-template-columns: 1fr; gap: 16px; } .esq-stats { grid-template-columns: 1fr; } }
