@@ -27,6 +27,7 @@ import '../styles/eight-square-aconst PREVIEW_CASES = {
     status: ['Reading the measurements…', 'Choosing the equation…', 'Checking the units…'],
     answer: 'Assuming uniform acceleration, use s = ut + ½at². Since u = 0, a = 2s/t² = 2 × 0.80 m / (0.80 s)² = 2.50 m/s². Then v = u + at = 2.00 m/s. Check: average velocity is 1.00 m/s, so 1.00 × 0.80 s = 0.80 m. If acceleration varies, start and end measurements alone cannot prove this value.',
     formula: 's = ut + ½at²\nu = 0 m/s,  s = 0.80 m,  t = 0.80 s\na = 2s/t² = 2.50 m/s²',
+    reference: { label: 'OpenStax · constant acceleration', url: 'https://openstax.org/books/university-physics-volume-1/pages/3-4-motion-with-constant-acceleration' },
     observation: 'Model assumption: acceleration stays constant during the run.',
     readouts: [
       { label: 'Displacement', value: '0.80 m' },
@@ -44,7 +45,17 @@ import '../styles/eight-square-aconst PREVIEW_CASES = {
     status: ['Reading the sketch…', 'Checking PWM timing…', 'Calculating LED current…'],
     answer: 'No: D9 switches between LOW and HIGH; it does not hold a steady 2.5 V. On an Uno R3, analogWrite uses a 0–255 duty value and D9 runs at about 490 Hz. At 128, the duty is 128/255 = 50.2% (about 1.02 ms HIGH in each 2.04 ms cycle). With a red LED assumed to drop 2.0 V and a 220 Ω resistor, the ON current is about 13.6 mA and the time-averaged current about 6.8 mA. Wire D9 → resistor → LED anode; cathode → GND. A motor needs a driver and flyback protection, not a direct pin connection.',
     formula: 'Duty = 128/255 = 50.2%\nI_ON ≈ (5.0 − 2.0) V / 220 Ω = 13.6 mA\nI_AVG ≈ 0.502 × 13.6 mA = 6.8 mA',
-    code: 'const byte ledPin = 9;\\n\\nvoid setup() {\\n  pinMode(ledPin, OUTPUT);\\n}\\n\\nvoid loop() {\\n  analogWrite(ledPin, 128);\\n}',
+    code: [
+      'const byte ledPin = 9;',
+      '',
+      'void setup() {',
+      '  pinMode(ledPin, OUTPUT);',
+      '}',
+      '',
+      'void loop() {',
+      '  analogWrite(ledPin, 128);',
+      '}',
+    ].join('\n'),,
     observation: 'D9 carries PWM pulses. The 220 Ω resistor limits LED current.',
     readouts: [
       { label: 'PWM pin', value: 'D9 · ~490 Hz' },
@@ -348,6 +359,12 @@ function CircuitChatPreview() {
               </div>
             )}
             {phase === 'done' && <div className="esq-chat__observation"><span />{activeCase.observation}</div>}
+            {phase === 'done' && activeCase.reference && (
+              <div className="esq-chat__reference">
+                <span>REFERENCE</span>
+                <a href={activeCase.reference.url} target="_blank" rel="noreferrer">{activeCase.reference.label}</a>
+              </div>
+            )}
           </div>
         </div>
       </div>
