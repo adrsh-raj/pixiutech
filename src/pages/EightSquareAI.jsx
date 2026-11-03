@@ -1,117 +1,121 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { LMS_LOGIN_URL } from '../config/runtime.js'
 import '../styles/eight-square-ai.css'
 
-// 8 Square signature visual: a 3D particle ribbon tracing an infinity (∞) loop.
-// Particles drift as a loose cloud and lock into a crisp, flowing ∞ on hover.
-function InfinityDots() {
-  const canvasRef = useRef(null)
+const PREVIEW_ANSWER = 'The LED is reversed in this sample build: its cathode is facing the +5 V side. Flip the LED so its anode connects to +5 V through R1 (220 Ω), and its cathode returns to ground. Then run the circuit again and compare.'
+const PREVIEW_STEPS = ['Read circuit', 'Check physics', 'Prepare a hint']
 
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    const host = canvas.parentElement
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    const N = window.innerWidth < 700 ? 900 : 1600
-    const parts = Array.from({ length: N }, () => ({
-      t: Math.random() * Math.PI * 2,
-      phi: Math.random() * Math.PI * 2,
-      rr: Math.pow(Math.random(), 0.6),
-      sp: 0.0016 + Math.random() * 0.0024,
-      cx: (Math.random() - 0.5) * 2.4,
-      cy: (Math.random() - 0.5) * 1.4,
-      cz: (Math.random() - 0.5) * 1.6,
-      x: 0, y: 0, z: 0, init: false,
-    }))
-    let w = 0, h = 0, raf = 0, focus = 0, focusTarget = 0.6
-    const rot = { x: -0.35, y: 0, tx: -0.35, ty: 0 }
-    let time = 0
-
-    const size = () => {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2)
-      w = host.clientWidth; h = host.clientHeight
-      canvas.width = w * dpr; canvas.height = h * dpr
-      canvas.style.width = `${w}px`; canvas.style.height = `${h}px`
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-    }
-
-    const frame = () => {
-      time += 1
-      focus += (focusTarget - focus) * 0.04
-      rot.x += (rot.tx - rot.x) * 0.05
-      rot.y += (rot.ty + Math.sin(time * 0.004) * 0.35 - rot.y) * 0.05
-      ctx.clearRect(0, 0, w, h)
-      const S = Math.min(w * 0.42, h * 0.62)
-      const cyx = Math.cos(rot.y), syx = Math.sin(rot.y)
-      const cxr = Math.cos(rot.x), sxr = Math.sin(rot.x)
-      const tube = 0.09 + (1 - focus) * 0.12
-      for (const p of parts) {
-        p.t += p.sp * (0.6 + focus * 1.4)
-        const s = Math.sin(p.t), c = Math.cos(p.t), k = 1 + s * s
-        // Lemniscate of Bernoulli + gentle depth twist
-        let lx = c / k, ly = (s * c) / k, lz = Math.sin(p.t * 2) * 0.12
-        const o = p.rr * tube
-        lx += Math.cos(p.phi) * o * 0.4
-        ly += Math.sin(p.phi) * o
-        lz += Math.cos(p.phi + p.t) * o
-        // blend between loose cloud and the ∞ form
-        const f = focus
-        const gx = lx * f + p.cx * 0.6 * (1 - f)
-        const gy = ly * f + p.cy * 0.6 * (1 - f)
-        const gz = lz * f + p.cz * 0.6 * (1 - f)
-        if (!p.init) { p.x = gx; p.y = gy; p.z = gz; p.init = true }
-        p.x += (gx - p.x) * 0.08; p.y += (gy - p.y) * 0.08; p.z += (gz - p.z) * 0.08
-        // rotate Y then X
-        const x1 = p.x * cyx + p.z * syx
-        const z1 = -p.x * syx + p.z * cyx
-        const y1 = p.y * cxr - z1 * sxr
-        const z2 = p.y * sxr + z1 * cxr
-        const persp = 2.6 / (2.6 + z2)
-        const sx = w / 2 + x1 * S * persp
-        const sy = h / 2 + y1 * S * persp
-        const depth = Math.min(1, Math.max(0, (1 - z2) / 2))
-        const a = (0.3 + depth * 0.7) * (0.5 + f * 0.5)
-        const r = (0.7 + depth * 1.3) * persp
-        ctx.fillStyle = depth > 0.62
-          ? `rgba(236,244,255,${a})`
-          : `rgba(110,190,255,${a * 0.85})`
-        ctx.fillRect(sx - r / 2, sy - r / 2, r, r)
-      }
-      raf = requestAnimationFrame(frame)
-    }
-
-    const onMove = (e) => {
-      const rect = host.getBoundingClientRect()
-      const nx = (e.clientX - rect.left) / rect.width - 0.5
-      const ny = (e.clientY - rect.top) / rect.height - 0.5
-      rot.ty = nx * 0.9
-      rot.tx = -0.35 + ny * 0.6
-    }
-    const onEnter = () => { focusTarget = 1 }
-    const onLeave = () => { focusTarget = 0.6; rot.tx = -0.35; rot.ty = 0 }
-
-    size()
-    if (reduce) { focus = focusTarget = 1; frame(); cancelAnimationFrame(raf) } else frame()
-    window.addEventListener('resize', size)
-    host.addEventListener('pointermove', onMove)
-    host.addEventListener('pointerenter', onEnter)
-    host.addEventListener('pointerleave', onLeave)
-    host.addEventListener('touchstart', onEnter, { passive: true })
-    return () => {
-      cancelAnimationFrame(raf)
-      window.removeEventListener('resize', size)
-      host.removeEventListener('pointermove', onMove)
-      host.removeEventListener('pointerenter', onEnter)
-      host.removeEventListener('pointerleave', onLeave)
-      host.removeEventListener('touchstart', onEnter)
-    }
-  }, [])
-
-  return <canvas ref={canvasRef} className="esq-dots" aria-hidden="true" />
+function SquareMark({ small = false }) {
+  return (
+    <span className={small ? 'esq-mark esq-mark--small' : 'esq-mark'} aria-hidden="true">
+      {Array.from({ length: 8 }, (_, index) => <i key={index} />)}
+    </span>
+  )
 }
 
+function CircuitChatPreview() {
+  const [phase, setPhase] = useState('reading')
+  const [answer, setAnswer] = useState('')
+  const [run, setRun] = useState(0)
+
+  useEffect(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setPhase('done')
+      setAnswer(PREVIEW_ANSWER)
+      return undefined
+    }
+    setPhase('reading')
+    setAnswer('')
+    const timers = []
+    timers.push(window.setTimeout(() => setPhase('checking'), 1100))
+    timers.push(window.setTimeout(() => setPhase('preparing'), 2250))
+    timers.push(window.setTimeout(() => {
+      setPhase('typing')
+      let index = 0
+      const interval = window.setInterval(() => {
+        index = Math.min(index + 4, PREVIEW_ANSWER.length)
+        setAnswer(PREVIEW_ANSWER.slice(0, index))
+        if (index >= PREVIEW_ANSWER.length) {
+          window.clearInterval(interval)
+          setPhase('done')
+        }
+      }, 24)
+      timers.push(interval)
+    }, 3150))
+    return () => timers.forEach((timer) => {
+      window.clearTimeout(timer)
+      window.clearInterval(timer)
+    })
+  }, [run])
+
+  const stageIndex = phase === 'reading' ? 0 : phase === 'checking' ? 1 : phase === 'done' ? 3 : 2
+  const phaseLabel = {
+    reading: 'Reading your circuit…',
+    checking: 'Checking the physics…',
+    preparing: 'Preparing a step-by-step hint…',
+    typing: 'Writing the explanation…',
+    done: 'Explanation ready',
+  }[phase]
+
+  return (
+    <section className="esq-demo" aria-label="Guided 8 Square AI preview">
+      <header className="esq-demo__top">
+        <div className="esq-demo__brand"><SquareMark small /><div><strong>8 Square</strong><span>AI learning guide</span></div></div>
+        <span className="esq-demo__badge"><i /> Guided preview</span>
+      </header>
+      <div className="esq-demo__columns">
+        <div className="esq-circuit">
+          <div className="esq-demo__section-head"><span>LAB SNAPSHOT</span><strong>LED circuit</strong></div>
+          <div className="esq-circuit__board">
+            <svg className="esq-circuit__svg" viewBox="0 0 260 150" role="img" aria-labelledby="esq-circuit-title">
+              <title id="esq-circuit-title">Sample circuit with a 5 volt supply, a 220 ohm resistor, and an LED</title>
+              <path className="esq-circuit__wire" d="M32 74H69M127 74H151M195 74H227V126H32V91" />
+              <path className="esq-circuit__wire esq-circuit__wire--up" d="M32 74V46" />
+              <path className="esq-circuit__wire esq-circuit__wire--return" d="M32 91V126" />
+              <line className="esq-circuit__battery" x1="22" y1="56" x2="42" y2="56" />
+              <line className="esq-circuit__battery esq-circuit__battery--short" x1="26" y1="70" x2="38" y2="70" />
+              <rect className="esq-circuit__resistor" x="69" y="61" width="58" height="26" rx="6" />
+              <text className="esq-circuit__label" x="98" y="78" textAnchor="middle">220 Ω</text>
+              <circle className="esq-circuit__led-ring" cx="173" cy="74" r="22" />
+              <circle className="esq-circuit__led-core" cx="173" cy="74" r="8" />
+              <path className="esq-circuit__led-bar" d="M163 61L183 87" />
+              <text className="esq-circuit__micro" x="32" y="38" textAnchor="middle">5 V</text>
+              <text className="esq-circuit__micro" x="173" y="112" textAnchor="middle">LED</text>
+              <text className="esq-circuit__ground" x="227" y="140" textAnchor="middle">GND</text>
+              <circle className="esq-circuit__node" cx="32" cy="74" r="3" />
+              <circle className="esq-circuit__node" cx="227" cy="126" r="3" />
+            </svg>
+          </div>
+          <div className="esq-readouts">
+            <div><span>Supply</span><strong>5.0 V</strong></div>
+            <div><span>Series resistor</span><strong>220 Ω</strong></div>
+            <div className={stageIndex >= 1 ? 'esq-readouts__alert is-active' : 'esq-readouts__alert'}><span>LED polarity</span><strong>Reversed</strong></div>
+          </div>
+        </div>
+        <div className="esq-chat">
+          <p className="esq-chat__context">STUDENT QUESTION</p>
+          <div className="esq-chat__question">Why isn’t my LED turning on?</div>
+          <div className="esq-chat__assistant">
+            <div className="esq-chat__assistant-head"><SquareMark small /><strong>8 Square</strong><span>•</span><span>Lab guide</span></div>
+            <div className="esq-progress">
+              <p className="esq-progress__status" role="status" aria-live="polite">{phaseLabel}</p>
+              <div className="esq-progress__steps" aria-hidden="true">
+                {PREVIEW_STEPS.map((step, index) => <span className={index < stageIndex ? 'is-complete' : index === stageIndex ? 'is-current' : ''} key={step} />)}
+              </div>
+            </div>
+            <p className="esq-chat__answer">{answer}{phase === 'typing' && <span className="esq-chat__cursor" aria-hidden="true" />}</p>
+            {phase === 'done' && <div className="esq-chat__observation"><span /> Observation from this sample: LED polarity is reversed</div>}
+          </div>
+        </div>
+      </div>
+      <footer className="esq-demo__footer">
+        <span>Illustrative preview · Live access is by early access</span>
+        <button type="button" onClick={() => setRun((value) => value + 1)}><span aria-hidden="true">↻</span> Replay preview</button>
+      </footer>
+    </section>
+  )
+}
 function Logo({ className = '' }) {
   return (
     <img className={`esq-logo ${className}`} src="/img/8square-logo.svg" alt="8 Square AI" width="320" height="96" />
@@ -142,22 +146,32 @@ export default function EightSquareAI() {
       <section className="esq-hero">
         <div className="shell esq-hero__grid">
           <div className="esq-hero__copy">
-            <span className="esq-chip"><span className="esq-chip__pulse" /> 8 Square AI · Launching soon</span>
-            <h1>Engineering intelligence,<br /><span>built for how students learn.</span></h1>
-            <p className="esq-lede">8 Square is an AI model designed and developed in-house by the Pixiu Tech team. Native to the Pixiu Virtual Lab, it reads the live circuit, reasons about the physics behind it and guides every learner, while giving trainers a real-time view of understanding.</p>
+            <Logo className="esq-logo--hero" />
+            <span className="esq-chip"><span className="esq-chip__pulse" /> Private preview · Built by Pixiu Tech</span>
+            <h1>Build with 8 Square AI.<br /><span>Understand every step.</span></h1>
+            <p className="esq-lede">An AI learning companion inside the Pixiu Virtual Lab. Students can explore circuits, ask why something happened, and get step-by-step hints grounded in the build they are working on.</p>
             <div className="esq-actions">
               <Link className="btn btn--primary btn--lg" to="/contact#demo-form">Request early access <span className="arw">→</span></Link>
               <Link className="btn btn--ghost-light" to="/virtual-lab">Explore the Virtual Lab</Link>
             </div>
             <dl className="esq-meta">
-              <div><dt>Model</dt><dd>8 Square · v1</dd></div>
+              <div><dt>Designed for</dt><dd>Hands-on learning</dd></div>
               <div><dt>Built by</dt><dd>Pixiu Tech</dd></div>
-              <div><dt>Status</dt><dd>Private preview</dd></div>
+              <div><dt>Access</dt><dd>Private preview</dd></div>
             </dl>
           </div>
-          <div className="esq-visual">
-            <InfinityDots />
-            <span className="esq-visual__label">Move your cursor here</span>
+          <CircuitChatPreview />
+        </div>
+      </section>
+
+      <section className="esq-loop">
+        <div className="shell">
+          <p className="esq-eyebrow">A learning loop that works</p>
+          <h2 className="esq-loop__title">From first build to a better next question.</h2>
+          <div className="esq-loop__grid">
+            <article><span>01</span><h3>Build</h3><p>Start with a lesson or bring a circuit idea into the browser-based Virtual Lab.</p></article>
+            <article><span>02</span><h3>Ask 8 Square</h3><p>Ask what happened. Get a hint connected to the circuit and the concept behind it.</p></article>
+            <article><span>03</span><h3>Try again</h3><p>Make a change, run the circuit, and see how your next experiment behaves.</p></article>
           </div>
         </div>
       </section>
@@ -198,8 +212,8 @@ export default function EightSquareAI() {
             <h2 className="esq-h2">Designed in-house, for Indian classrooms.</h2>
           </div>
           <div className="esq-about__body">
-            <p>8 Square has been dedicatedly developed by the Pixiu Tech engineering and curriculum team, the same people who set up school innovation labs and teach weekly sessions on the ground. Every capability comes from real classroom questions our trainers hear every day.</p>
-            <p>It is trained around our own Robotics, AI, IoT and electronics curriculum, aligned to CBSE, ICSE and State boards, and tightly integrated with the Pixiu Virtual Lab and Learning Portal, so guidance is always grounded in what the student is actually building.</p>
+            <p>8 Square is developed by Pixiu Tech’s engineering and curriculum team—the same people who set up school innovation labs and teach weekly sessions. Its guidance is shaped by the questions students and trainers encounter while building.</p>
+            <p>It is being developed around Pixiu Tech’s Robotics, AI, IoT and electronics curriculum, aligned to CBSE, ICSE and State boards, and integrated with the Pixiu Virtual Lab and Learning Portal. The goal is to keep each explanation connected to the activity a student is working on.</p>
             <div className="esq-stats">
               <div><strong>In-house</strong><span>Engineering &amp; AI</span></div>
               <div><strong>Curriculum</strong><span>Mapped to boards</span></div>
