@@ -110,12 +110,14 @@
 .esq-circuit__svg{width:100%;max-width:260px;height:auto;overflow:visible}
 .esq-circuit__wire{fill:none;stroke:#426b88;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:5 6;animation:esq-wire 2.7s linear infinite}
 .esq-circuit__wire--up,.esq-circuit__wire--return{stroke:#557b98}
-.esq-circuit__battery{stroke:#81a7c1;stroke-width:2;stroke-linecap:round}
-.esq-circuit__battery--short{stroke:#b6c8d6}
+.esq-circuit__supply{fill:#102638;stroke:#4d8eaa;stroke-width:1.4}
+.esq-circuit__terminal{fill:#a6c2d4;font:11px var(--f-mono)}
 .esq-circuit__resistor{fill:#102b3c;stroke:#4d8eaa;stroke-width:1.4}
 .esq-circuit__label{fill:#c5e6ec;font:10px var(--f-mono)}
-.esq-circuit__led-ring{fill:rgba(108,224,189,.08);stroke:#5b8799;stroke-width:1.5}
-.esq-circuit__led-core{fill:#3c6673}
+.esq-circuit__led-ring{fill:rgba(108,224,189,.08);stroke:#5b8799;stroke-width:1.5;transition:fill .25s,stroke .25s}
+.esq-circuit__led-ring.is-checked{fill:rgba(244,186,100,.1);stroke:#d2a167}
+.esq-circuit__led-core{fill:#3c6673;transition:fill .25s}
+.esq-circuit__led-core.is-checked{fill:#8b6640}
 .esq-circuit__led-bar{stroke:#98aab7;stroke-width:2;stroke-linecap:round}
 .esq-circuit__micro,.esq-circuit__ground{fill:#8fa9bd;font:8px var(--f-mono);letter-spacing:.08em}
 .esq-circuit__ground{font-size:7px}
