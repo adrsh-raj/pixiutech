@@ -18,6 +18,7 @@ export interface LessonEndpoint {
   partType: PartType
   pinId: string
   partId?: string
+  partProps?: Record<string, string | number | boolean>
 }
 
 export interface LessonConnectionRequirement {
@@ -284,6 +285,12 @@ function endpointMatches(state: CircuitState, endpoint: LessonEndpoint, actual: 
     const namedPartExists = state.parts.some((item) => item.id === endpoint.partId && item.type === endpoint.partType)
     if (namedPartExists && endpoint.partId !== actual.partId) return false
   }
+  if (endpoint.partProps && !Object.entries(endpoint.partProps).every(([key, expected]) => {
+    const actualValue = part.props?.[key]
+    return typeof expected === "number"
+      ? Number(actualValue) === expected
+      : String(actualValue ?? "") === String(expected)
+  })) return false
   return pinMatches(part.type, endpoint.pinId, actual.pinId)
 }
 
@@ -1113,63 +1120,152 @@ export const UNO_LESSONS: Lesson[] = [
   },
   {
     id: "lesson-ldr-night-lamp",
-    title: "Mission 5 · Automatic Night Lamp",
-    shortTitle: "LDR Night Lamp",
-    description: "Build an automatic street lamp that senses ambient light using an LDR and turns on automatically when dark.",
+    title: "Featured Mission · Automatic Night Lamp",
+    shortTitle: "Automatic Night Lamp",
+    description: "Use a photoresistor voltage divider and an Arduino analog input to control a lamp with a brightness threshold.",
     difficulty: "Beginner",
-    estimatedMinutes: 14,
-    concepts: ["Photoresistor", "Analog Sensing", "Light Thresholds", "Automation"],
-    prerequisites: ["lesson-led-basics"],
-    templateId: "g6-ldr-night-lamp",
-    finalGoal: "🎯 What You Will Build: An autonomous solar dusk-to-dawn street lamp that senses ambient light levels with an LDR photoresistor and automatically switches illumination ON when darkness falls.",
+    estimatedMinutes: 18,
+    concepts: ["Photoresistor (LDR)", "Voltage Divider", "10-bit ADC", "Threshold Logic"],
+    prerequisites: [],
+    seedBlocklyXml: `<xml xmlns="https://developers.google.com/blockly/xml">
+  <block type="arduino_program" x="40" y="40">
+    <statement name="SETUP">
+      <block type="io_pinmode">
+        <field name="PIN">13</field>
+        <field name="MODE">OUTPUT</field>
+        <next><block type="serial_begin"><field name="BAUD">9600</field></block></next>
+      </block>
+    </statement>
+    <statement name="LOOP">
+      <block type="serial_println">
+        <value name="TEXT"><block type="ldr_read"><field name="SENSOR">ldr</field></block></value>
+        <next>
+          <block type="controls_if">
+            <mutation else="1"></mutation>
+            <value name="IF0">
+              <block type="logic_compare">
+                <field name="OP">LT</field>
+                <value name="A"><block type="ldr_read"><field name="SENSOR">ldr</field></block></value>
+                <value name="B"><block type="math_number"><field name="NUM">400</field></block></value>
+              </block>
+            </value>
+            <statement name="DO0">
+              <block type="io_digitalwrite"><field name="PIN">13</field><field name="STATE">HIGH</field></block>
+            </statement>
+            <statement name="ELSE">
+              <block type="io_digitalwrite"><field name="PIN">13</field><field name="STATE">LOW</field></block>
+            </statement>
+            <next>
+              <block type="time_delay">
+                <value name="MS"><shadow type="math_number"><field name="NUM">250</field></shadow></value>
+              </block>
+            </next>
+          </block>
+        </next>
+      </block>
+    </statement>
+  </block>
+</xml>`,
+    finalGoal: "Build a small automatic lamp: the Arduino reads the LDR's simulated 0–1023 light value and switches the LED on below a chosen threshold.",
     steps: [
       {
         id: "parts",
-        title: "Gather light sensor components",
-        instructions: "Place one Arduino Uno, one LDR (Photoresistor), one LED, and one resistor on the bench.",
+        title: "Gather the lamp components",
+        instructions: "Place one Arduino Uno, one photoresistor (LDR), one LED, and two resistors: a 10kΩ resistor for the LDR voltage divider and a 220Ω resistor to limit LED current.",
         kind: "build",
         checks: [{ kind: "parts", requirements: [
           { type: "arduino-uno", count: 1 },
           { type: "ldr", count: 1 },
           { type: "led", count: 1 },
-          { type: "resistor", count: 1 },
+          { type: "resistor", count: 2 },
         ] }],
-        success: "Light sensor and night lamp parts are ready.",
+        success: "The Uno, LDR, LED, 10kΩ divider resistor and 220Ω current limiter are on the bench.",
       },
       {
         id: "wiring",
-        title: "Wire LDR and lamp",
-        instructions: "Connect 5V → LDR T1, LDR T2 → A0, D13 → Resistor A, Resistor B → LED anode, and cathode → GND.",
+        title: "Wire the sensor divider and lamp",
+        instructions: "For the sensor, connect 5V → LDR T1, LDR T2 → A0, A0 → the 10kΩ resistor, and the other side of that resistor → GND. For the lamp, connect D13 → the 220Ω resistor → LED anode, and LED cathode → GND. Select each resistor in the Inspector and set its value.",
         kind: "build",
         checks: [{ kind: "connections", requirements: [
           { from: { partType: "arduino-uno", pinId: "5v" }, to: { partType: "ldr", pinId: "t1" } },
           { from: { partType: "ldr", pinId: "t2" }, to: { partType: "arduino-uno", pinId: "a0" } },
-          { from: { partType: "arduino-uno", pinId: "d13" }, to: { partType: "resistor", pinId: "a" } },
-          { from: { partType: "resistor", pinId: "b" }, to: { partType: "led", pinId: "anode" } },
+          { from: { partType: "arduino-uno", pinId: "a0" }, to: { partType: "resistor", pinId: "a", partProps: { resistance: 10000 } } },
+          { from: { partType: "resistor", pinId: "b", partProps: { resistance: 10000 } }, to: { partType: "arduino-uno", pinId: "gnd" } },
+          { from: { partType: "arduino-uno", pinId: "d13" }, to: { partType: "resistor", pinId: "a", partProps: { resistance: 220 } } },
+          { from: { partType: "resistor", pinId: "b", partProps: { resistance: 220 } }, to: { partType: "led", pinId: "anode" } },
           { from: { partType: "led", pinId: "cathode" }, to: { partType: "arduino-uno", pinId: "gnd" } },
         ] }],
-        success: "LDR sensor circuit and lamp are wired.",
+        success: "The LDR divider is connected to A0 and the protected LED output is connected to D13.",
       },
       {
         id: "code",
-        title: "Program threshold automation",
-        instructions: "Read LDR analog value on A0. If light is below 400 (darkness), turn D13 HIGH; otherwise LOW.",
+        title: "Read the sensor and compare the threshold",
+        instructions: "The beginner starter program is loaded in Blockly. Check that D13 is set as OUTPUT, Serial is set to 9600 baud, the LDR value is printed, and the lamp turns on when the reading is below 400. The number 400 is an example ADC threshold, not a lux value.",
         kind: "code",
         checks: [{ kind: "blocks", requirements: [
-          { type: "ldr_read", count: 1 },
-          { type: "controls_if", count: 1 },
+          { type: "io_pinmode", count: 1, fields: { PIN: "13", MODE: "OUTPUT" } },
+          { type: "serial_begin", count: 1 },
+          { type: "serial_println", count: 1, inputs: { TEXT: "ldr_read" } },
+          { type: "ldr_read", count: 2 },
+          { type: "logic_compare", count: 1, fields: { OP: "LT" }, inputs: { B: 400 } },
           { type: "io_digitalwrite", count: 1, fields: { PIN: "13", STATE: "HIGH" } },
           { type: "io_digitalwrite", count: 1, fields: { PIN: "13", STATE: "LOW" } },
+          { type: "time_delay", count: 1 },
         ] }],
-        success: "Threshold automation logic is programmed.",
+        success: "The program reports the sensor reading and switches the lamp at the 400 threshold.",
       },
       {
         id: "run",
-        title: "Simulate day and night",
-        instructions: "Press Run. Select the LDR and move the light slider in the Inspector to simulate darkness.",
+        title: "Run the first test",
+        instructions: "Press Run, then open the Serial Monitor. Select the LDR and move its Light slider; the serial reading should follow the slider while the program controls D13.",
         kind: "run",
         checks: [{ kind: "running" }],
-        success: "Night lamp system is running.",
+        success: "The circuit and starter program are running.",
+      },
+      {
+        id: "daylight",
+        title: "Test a bright room",
+        instructions: "Set the LDR Light slider to 700 or higher. Watch the Serial Monitor and LED: the reading is above 400, so the lamp should stay off. Then check this step.",
+        kind: "experiment",
+        checks: [
+          { kind: "running" },
+          { kind: "part-property", partType: "ldr", property: "light", min: 700 },
+          { kind: "runtime", requirements: [
+            { partType: "ldr", field: "sensorValue", min: 700 },
+            { partType: "led", field: "level", max: 0.05 },
+          ] },
+        ],
+        success: "At a bright reading above the threshold, the lamp stays off.",
+      },
+      {
+        id: "darkness",
+        title: "Test a dark room",
+        instructions: "Move the LDR Light slider to 300 or lower. Confirm that the reading falls below 400 and the LED turns on. Compare this with the bright-room reading before you check the step.",
+        kind: "experiment",
+        checks: [
+          { kind: "running" },
+          { kind: "part-property", partType: "ldr", property: "light", max: 300 },
+          { kind: "runtime", requirements: [
+            { partType: "ldr", field: "sensorValue", max: 300 },
+            { partType: "led", field: "level", min: 0.1 },
+          ] },
+        ],
+        success: "At a dark reading below the threshold, the lamp turns on.",
+      },
+      {
+        id: "threshold",
+        title: "Investigate the threshold",
+        instructions: "Stop the simulation first. In Code, change the comparison value from 400 to 300, then press Run again. Set the LDR to 350: the lamp should stay off; at 250 it should turn on. Before checking, explain why changing the threshold moved the switch point. Then restore 400 if you want the original behavior. The 0–1023 slider is a simplified ADC input; it is not calibrated lux, and the simulator does not calculate an LDR's physical resistance from room illumination.",
+        kind: "experiment",
+        checks: [
+          { kind: "running" },
+          { kind: "part-property", partType: "ldr", property: "light", equals: 350 },
+          { kind: "runtime", requirements: [
+            { partType: "ldr", field: "sensorValue", equals: 350 },
+            { partType: "led", field: "level", max: 0.05 },
+          ] },
+        ],
+        success: "With the threshold at 300, an ADC reading of 350 keeps the lamp off.",
       },
     ],
   },

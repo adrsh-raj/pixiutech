@@ -2019,6 +2019,48 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
         onOpenLessons={() => setIsLessonsOpen(true)}
         onOpenTemplates={() => setIsTemplatesOpen(true)}
         onOpenCopilot={() => setIsCopilotOpen(true)}
+        onStartFeaturedMission={() => {
+          const featuredMission = getLessonById("lesson-ldr-night-lamp")
+          if (!featuredMission) {
+            setIsLessonsOpen(true)
+            return
+          }
+
+          const hasWorkspaceContent =
+            state.parts.length > 0 ||
+            state.wires.length > 0 ||
+            blocklyXml.trim() !== DEFAULT_XML.trim() ||
+            currentProjectName !== "Untitled Circuit"
+          if (hasWorkspaceContent) {
+            const shouldReplace = window.confirm(
+              "Starting Automatic Night Lamp replaces the current circuit and code. Save or continue your current project first if you need it."
+            )
+            if (!shouldReplace) {
+              window.dispatchEvent(new Event("pixiu-open-guide"))
+              return
+            }
+          }
+
+          handleLoadLesson(featuredMission)
+          setIsLessonsOpen(true)
+        }}
+        onStartFreeBuild={() => {
+          const hasWorkspaceContent =
+            state.parts.length > 0 ||
+            state.wires.length > 0 ||
+            blocklyXml.trim() !== DEFAULT_XML.trim() ||
+            currentProjectName !== "Untitled Circuit"
+          if (hasWorkspaceContent) {
+            const shouldClear = window.confirm(
+              "Starting a free build clears the current circuit and code. Save or continue your current project first if you need it."
+            )
+            if (!shouldClear) {
+              window.dispatchEvent(new Event("pixiu-open-guide"))
+              return
+            }
+          }
+          void handleNewProject()
+        }}
       />
 
       <ProjectManager

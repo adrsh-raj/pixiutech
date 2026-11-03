@@ -338,7 +338,7 @@ export function LessonBrowser({
               <div className="max-w-md">
                 <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-cyan-500/10 text-cyan-300 ring-1 ring-cyan-400/20"><BookOpen size={24} /></div>
                 <h3 className="mt-4 text-lg font-black">Choose your first mission</h3>
-                <p className="mt-2 text-xs leading-5 text-slate-500">Complete lessons in order. Each lesson gives you a starter circuit, guided steps and automatic checks for wiring, Blockly blocks and live simulation.</p>
+                <p className="mt-2 text-xs leading-5 text-slate-500">Choose a mission that fits your level. Beginner missions include starter code; every mission guides you through building, running and checking the result.</p>
                 <div className="mt-4 flex flex-wrap justify-center gap-1.5">
                   {LESSONS.filter((l) => l.prerequisites.length === 0).map((lesson) => {
                     const badge = boardBadge(lesson.board)
@@ -376,14 +376,14 @@ export function LessonBrowser({
                     }}
                     title={
                       activeLesson.difficulty === "Beginner"
-                        ? "Start this mission with a clean wiring canvas (Blockly code is loaded automatically for Beginners)"
+                        ? "Start this mission on a clean wiring canvas. Beginner starter code is loaded automatically; you will use it as part of the experiment."
                         : "Start this mission with a clean blank canvas (gather parts, wire manually, and build code)"
                     }
                     className="inline-flex items-center gap-1.5 rounded-xl bg-cyan-500 px-3.5 py-2 text-[10px] font-black text-slate-950 hover:bg-cyan-400 transition cursor-pointer shadow-sm"
                   >
                     <Play size={12} fill="currentColor" />{" "}
                     {activeLesson.difficulty === "Beginner"
-                      ? "Start Mission (Auto-Code · Wiring Only)"
+                      ? "Start Mission (Starter Code Ready)"
                       : "Start Mission (Blank Canvas)"}
                   </button>
                 </div>
@@ -393,7 +393,7 @@ export function LessonBrowser({
                   <div className="mt-3 flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-950/20 px-3 py-2 text-[11px] text-emerald-300 font-medium">
                     <Sparkles size={14} className="text-emerald-400 shrink-0" />
                     <span>
-                      <strong>Beginner Mission:</strong> Code is automatically loaded into Blockly! You only need to place components and complete the wiring.
+                      <strong>Beginner mission:</strong> Starter code is loaded into Blockly. Build the circuit first, then run it and use the mission steps to investigate the result.
                     </span>
                   </div>
                 )}
