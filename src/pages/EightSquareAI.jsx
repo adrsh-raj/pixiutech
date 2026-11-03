@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom'
 import { LMS_LOGIN_URL } from '../config/runtime.js'
 import '../styles/eight-square-ai.css'
 
-// Dots field: on hover, dots flow into an infinity (∞) shape — the "8" of 8 Square.
+// 8 Square signature visual: a 3D particle ribbon tracing an infinity (∞) loop.
+// Particles drift as a loose cloud and lock into a crisp, flowing ∞ on hover.
 function InfinityDots() {
   const canvasRef = useRef(null)
 
@@ -13,98 +14,94 @@ function InfinityDots() {
     const ctx = canvas.getContext('2d')
     const host = canvas.parentElement
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    let dots = []
-    let w = 0
-    let h = 0
-    let raf = 0
-    let morph = false
-    const pointer = { x: -9999, y: -9999 }
+    const N = window.innerWidth < 700 ? 900 : 1600
+    const parts = Array.from({ length: N }, () => ({
+      t: Math.random() * Math.PI * 2,
+      phi: Math.random() * Math.PI * 2,
+      rr: Math.pow(Math.random(), 0.6),
+      sp: 0.0016 + Math.random() * 0.0024,
+      cx: (Math.random() - 0.5) * 2.4,
+      cy: (Math.random() - 0.5) * 1.4,
+      cz: (Math.random() - 0.5) * 1.6,
+      x: 0, y: 0, z: 0, init: false,
+    }))
+    let w = 0, h = 0, raf = 0, focus = 0, focusTarget = 0.6
+    const rot = { x: -0.35, y: 0, tx: -0.35, ty: 0 }
+    let time = 0
 
-    const build = () => {
+    const size = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, 2)
-      w = host.clientWidth
-      h = host.clientHeight
-      canvas.width = w * dpr
-      canvas.height = h * dpr
-      canvas.style.width = `${w}px`
-      canvas.style.height = `${h}px`
+      w = host.clientWidth; h = host.clientHeight
+      canvas.width = w * dpr; canvas.height = h * dpr
+      canvas.style.width = `${w}px`; canvas.style.height = `${h}px`
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-      const gap = w < 640 ? 20 : 24
-      dots = []
-      for (let y = gap / 2; y < h; y += gap) {
-        for (let x = gap / 2; x < w; x += gap) {
-          dots.push({ hx: x, hy: y, x, y, tx: x, ty: y, inf: false, hue: Math.random() })
-        }
-      }
-      // Assign every 2nd dot a slot on the lemniscate (infinity curve).
-      const pick = dots.filter((_, i) => i % 2 === 0)
-      const cx = w / 2
-      const cy = h * 0.5
-      const a = Math.min(w * 0.2, h * 0.32)
-      pick.forEach((d, i) => {
-        const t = ((i * 0.618034) % 1) * Math.PI * 2
-        const s = Math.sin(t)
-        const k = 1 + s * s
-        const jitter = (Math.random() - 0.5) * 2.5
-        d.ix = cx + (a * Math.cos(t)) / k + jitter
-        d.iy = cy + (a * s * Math.cos(t)) / k + jitter
-        d.inf = true
-      })
     }
 
     const frame = () => {
+      time += 1
+      focus += (focusTarget - focus) * 0.04
+      rot.x += (rot.tx - rot.x) * 0.05
+      rot.y += (rot.ty + Math.sin(time * 0.004) * 0.35 - rot.y) * 0.05
       ctx.clearRect(0, 0, w, h)
-      for (const d of dots) {
-        const goInf = morph && d.inf
-        d.tx = goInf ? d.ix : d.hx
-        d.ty = goInf ? d.iy : d.hy
-        const dx = d.x - pointer.x
-        const dy = d.y - pointer.y
-        const dist = Math.hypot(dx, dy)
-        if (!goInf && dist < 90) {
-          const f = (90 - dist) / 90
-          d.tx += (dx / (dist || 1)) * f * 18
-          d.ty += (dy / (dist || 1)) * f * 18
-        }
-        d.x += (d.tx - d.x) * (goInf ? 0.06 : 0.12)
-        d.y += (d.ty - d.y) * (goInf ? 0.06 : 0.12)
-        const glow = goInf ? 1 : Math.max(0.18, 1 - dist / 220)
-        const r = goInf ? 1.4 : 1.2 + (glow > 0.3 ? glow : 0)
-        ctx.fillStyle = goInf
-          ? `hsla(${180 + d.hue * 60}, 100%, 68%, 0.4)`
-          : `hsla(${200 + d.hue * 30}, 90%, 70%, ${glow * (morph ? 0.18 : 0.6)})`
-        ctx.beginPath()
-        ctx.arc(d.x, d.y, r, 0, Math.PI * 2)
-        ctx.fill()
+      const S = Math.min(w * 0.42, h * 0.62)
+      const cyx = Math.cos(rot.y), syx = Math.sin(rot.y)
+      const cxr = Math.cos(rot.x), sxr = Math.sin(rot.x)
+      const tube = 0.09 + (1 - focus) * 0.12
+      for (const p of parts) {
+        p.t += p.sp * (0.6 + focus * 1.4)
+        const s = Math.sin(p.t), c = Math.cos(p.t), k = 1 + s * s
+        // Lemniscate of Bernoulli + gentle depth twist
+        let lx = c / k, ly = (s * c) / k, lz = Math.sin(p.t * 2) * 0.12
+        const o = p.rr * tube
+        lx += Math.cos(p.phi) * o * 0.4
+        ly += Math.sin(p.phi) * o
+        lz += Math.cos(p.phi + p.t) * o
+        // blend between loose cloud and the ∞ form
+        const f = focus
+        const gx = lx * f + p.cx * 0.6 * (1 - f)
+        const gy = ly * f + p.cy * 0.6 * (1 - f)
+        const gz = lz * f + p.cz * 0.6 * (1 - f)
+        if (!p.init) { p.x = gx; p.y = gy; p.z = gz; p.init = true }
+        p.x += (gx - p.x) * 0.08; p.y += (gy - p.y) * 0.08; p.z += (gz - p.z) * 0.08
+        // rotate Y then X
+        const x1 = p.x * cyx + p.z * syx
+        const z1 = -p.x * syx + p.z * cyx
+        const y1 = p.y * cxr - z1 * sxr
+        const z2 = p.y * sxr + z1 * cxr
+        const persp = 2.6 / (2.6 + z2)
+        const sx = w / 2 + x1 * S * persp
+        const sy = h / 2 + y1 * S * persp
+        const depth = Math.min(1, Math.max(0, (1 - z2) / 2))
+        const a = (0.3 + depth * 0.7) * (0.5 + f * 0.5)
+        const r = (0.7 + depth * 1.3) * persp
+        ctx.fillStyle = depth > 0.62
+          ? `rgba(236,244,255,${a})`
+          : `rgba(110,190,255,${a * 0.85})`
+        ctx.fillRect(sx - r / 2, sy - r / 2, r, r)
       }
       raf = requestAnimationFrame(frame)
     }
 
     const onMove = (e) => {
-      const rect = canvas.getBoundingClientRect()
-      pointer.x = e.clientX - rect.left
-      pointer.y = e.clientY - rect.top
+      const rect = host.getBoundingClientRect()
+      const nx = (e.clientX - rect.left) / rect.width - 0.5
+      const ny = (e.clientY - rect.top) / rect.height - 0.5
+      rot.ty = nx * 0.9
+      rot.tx = -0.35 + ny * 0.6
     }
-    const onEnter = () => { morph = true }
-    const onLeave = () => { morph = false; pointer.x = -9999; pointer.y = -9999 }
+    const onEnter = () => { focusTarget = 1 }
+    const onLeave = () => { focusTarget = 0.6; rot.tx = -0.35; rot.ty = 0 }
 
-    build()
-    if (reduce) {
-      morph = true
-      dots.forEach((d) => { if (d.inf) { d.x = d.ix; d.y = d.iy } })
-      frame()
-      cancelAnimationFrame(raf)
-    } else {
-      frame()
-    }
-    window.addEventListener('resize', build)
+    size()
+    if (reduce) { focus = focusTarget = 1; frame(); cancelAnimationFrame(raf) } else frame()
+    window.addEventListener('resize', size)
     host.addEventListener('pointermove', onMove)
     host.addEventListener('pointerenter', onEnter)
     host.addEventListener('pointerleave', onLeave)
     host.addEventListener('touchstart', onEnter, { passive: true })
     return () => {
       cancelAnimationFrame(raf)
-      window.removeEventListener('resize', build)
+      window.removeEventListener('resize', size)
       host.removeEventListener('pointermove', onMove)
       host.removeEventListener('pointerenter', onEnter)
       host.removeEventListener('pointerleave', onLeave)
@@ -143,17 +140,25 @@ export default function EightSquareAI() {
   return (
     <div className="esq-page">
       <section className="esq-hero">
-        <InfinityDots />
-        <div className="shell esq-hero__copy">
-          <span className="esq-chip"><span className="esq-chip__pulse" /> Launching soon</span>
-          <Logo className="esq-logo--hero" />
-          <h1>Engineering, <span>understood.</span></h1>
-          <p className="esq-lede">8 Square is an engineering intelligence designed and developed in-house by the Pixiu Tech team. It sits inside our Virtual Lab and helps students understand the science behind every circuit, while giving trainers real-time insight into how each learner thinks.</p>
-          <div className="esq-actions">
-            <Link className="btn btn--primary btn--lg" to="/virtual-lab">Explore the Virtual Lab <span className="arw">→</span></Link>
-            <Link className="btn btn--ghost-light" to="/contact#demo-form">Get early access</Link>
+        <div className="shell esq-hero__grid">
+          <div className="esq-hero__copy">
+            <span className="esq-chip"><span className="esq-chip__pulse" /> 8 Square AI · Launching soon</span>
+            <h1>Engineering intelligence,<br /><span>built for how students learn.</span></h1>
+            <p className="esq-lede">8 Square is an AI model designed and developed in-house by the Pixiu Tech team. Native to the Pixiu Virtual Lab, it reads the live circuit, reasons about the physics behind it and guides every learner, while giving trainers a real-time view of understanding.</p>
+            <div className="esq-actions">
+              <Link className="btn btn--primary btn--lg" to="/contact#demo-form">Request early access <span className="arw">→</span></Link>
+              <Link className="btn btn--ghost-light" to="/virtual-lab">Explore the Virtual Lab</Link>
+            </div>
+            <dl className="esq-meta">
+              <div><dt>Model</dt><dd>8 Square · v1</dd></div>
+              <div><dt>Built by</dt><dd>Pixiu Tech</dd></div>
+              <div><dt>Status</dt><dd>Private preview</dd></div>
+            </dl>
           </div>
-          <p className="esq-hint">Hover the dots ∞</p>
+          <div className="esq-visual">
+            <InfinityDots />
+            <span className="esq-visual__label">Move your cursor here</span>
+          </div>
         </div>
       </section>
 
