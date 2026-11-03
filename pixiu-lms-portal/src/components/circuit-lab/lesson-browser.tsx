@@ -155,6 +155,7 @@ export function LessonBrowser({
   const [progress, setProgress] = useState<Record<string, LessonProgress>>({})
   const progressRef = useRef(progress)
   const [progressReady, setProgressReady] = useState(false)
+  const [loadedProgressScope, setLoadedProgressScope] = useState<string | null>(null)
   const xpAwardedRef = useRef<Set<string>>(new Set())
   const updateProgress = useCallback((
     updater: Record<string, LessonProgress> | ((current: Record<string, LessonProgress>) => Record<string, LessonProgress>),
