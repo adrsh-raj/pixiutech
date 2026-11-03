@@ -55,7 +55,7 @@ import '../styles/eight-square-aconst PREVIEW_CASES = {
       'void loop() {',
       '  analogWrite(ledPin, 128);',
       '}',
-    ].join('\n'),,
+    ].join('\n'),
     observation: 'D9 carries PWM pulses. The 220 Ω resistor limits LED current.',
     readouts: [
       { label: 'PWM pin', value: 'D9 · ~490 Hz' },
