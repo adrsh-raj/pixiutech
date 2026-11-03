@@ -70,20 +70,19 @@ function CircuitChatPreview() {
           <div className="esq-circuit__board">
             <svg className="esq-circuit__svg" viewBox="0 0 260 150" role="img" aria-labelledby="esq-circuit-title">
               <title id="esq-circuit-title">Sample circuit with a 5 volt supply, a 220 ohm resistor, and an LED</title>
-              <path className="esq-circuit__wire" d="M32 74H69M127 74H151M195 74H227V126H32V91" />
-              <path className="esq-circuit__wire esq-circuit__wire--up" d="M32 74V46" />
-              <path className="esq-circuit__wire esq-circuit__wire--return" d="M32 91V126" />
-              <line className="esq-circuit__battery" x1="22" y1="56" x2="42" y2="56" />
-              <line className="esq-circuit__battery esq-circuit__battery--short" x1="26" y1="70" x2="38" y2="70" />
-              <rect className="esq-circuit__resistor" x="69" y="61" width="58" height="26" rx="6" />
-              <text className="esq-circuit__label" x="98" y="78" textAnchor="middle">220 Ω</text>
-              <circle className="esq-circuit__led-ring" cx="173" cy="74" r="22" />
-              <circle className="esq-circuit__led-core" cx="173" cy="74" r="8" />
-              <path className="esq-circuit__led-bar" d="M163 61L183 87" />
-              <text className="esq-circuit__micro" x="32" y="38" textAnchor="middle">5 V</text>
-              <text className="esq-circuit__micro" x="173" y="112" textAnchor="middle">LED</text>
+              <path className="esq-circuit__wire" d="M57 60H69M127 60H151M195 60H227V126H57V94" />
+              <rect className="esq-circuit__supply" x="13" y="43" width="44" height="52" rx="8" />
+              <text className="esq-circuit__label" x="35" y="63" textAnchor="middle">5 V</text>
+              <text className="esq-circuit__micro" x="35" y="78" textAnchor="middle">SUPPLY</text>
+              <text className="esq-circuit__terminal" x="57" y="52" textAnchor="middle">+</text>
+              <text className="esq-circuit__terminal" x="57" y="108" textAnchor="middle">−</text>
+              <rect className="esq-circuit__resistor" x="69" y="47" width="58" height="26" rx="6" />
+              <text className="esq-circuit__label" x="98" y="64" textAnchor="middle">220 Ω</text>
+              <circle className={stageIndex >= 1 ? 'esq-circuit__led-ring is-checked' : 'esq-circuit__led-ring'} cx="173" cy="60" r="18" />
+              <circle className={stageIndex >= 1 ? 'esq-circuit__led-core is-checked' : 'esq-circuit__led-core'} cx="173" cy="60" r="7" />
+              <text className="esq-circuit__micro" x="173" y="98" textAnchor="middle">LED</text>
               <text className="esq-circuit__ground" x="227" y="140" textAnchor="middle">GND</text>
-              <circle className="esq-circuit__node" cx="32" cy="74" r="3" />
+              <circle className="esq-circuit__node" cx="57" cy="60" r="3" />
               <circle className="esq-circuit__node" cx="227" cy="126" r="3" />
             </svg>
           </div>
@@ -110,7 +109,7 @@ function CircuitChatPreview() {
         </div>
       </div>
       <footer className="esq-demo__footer">
-        <span>Illustrative preview · Live access is by early access</span>
+        <span>Guided sample · Request early access to the live experience</span>
         <button type="button" onClick={() => setRun((value) => value + 1)}><span aria-hidden="true">↻</span> Replay preview</button>
       </footer>
     </section>
@@ -212,8 +211,8 @@ export default function EightSquareAI() {
             <h2 className="esq-h2">Designed in-house, for Indian classrooms.</h2>
           </div>
           <div className="esq-about__body">
-            <p>8 Square is developed by Pixiu Tech’s engineering and curriculum team—the same people who set up school innovation labs and teach weekly sessions. Its guidance is shaped by the questions students and trainers encounter while building.</p>
-            <p>It is being developed around Pixiu Tech’s Robotics, AI, IoT and electronics curriculum, aligned to CBSE, ICSE and State boards, and integrated with the Pixiu Virtual Lab and Learning Portal. The goal is to keep each explanation connected to the activity a student is working on.</p>
+            <p>8 Square has been developed by Pixiu Tech’s engineering and curriculum team, the same people who set up school innovation labs and teach weekly sessions. Its capabilities are shaped by real classroom questions our trainers hear every day.</p>
+            <p>It is trained around Pixiu Tech’s Robotics, AI, IoT and electronics curriculum, aligned with CBSE, ICSE and State boards, and integrated with the Pixiu Virtual Lab and Learning Portal, so guidance stays connected to what the student is building.</p>
             <div className="esq-stats">
               <div><strong>In-house</strong><span>Engineering &amp; AI</span></div>
               <div><strong>Curriculum</strong><span>Mapped to boards</span></div>
