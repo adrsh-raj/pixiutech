@@ -29,7 +29,6 @@ const PREVIEW_CASES = {
     status: ['Reading the measurements…', 'Choosing the equation…', 'Checking the units…'],
     answer: 'Assuming uniform acceleration, use s = ut + ½at². Since u = 0, a = 2s/t² = 2 × 0.80 m / (0.80 s)² = 2.50 m/s². Then v = u + at = 2.00 m/s. Check: average velocity is 1.00 m/s, so 1.00 × 0.80 s = 0.80 m. If acceleration varies, start and end measurements alone cannot prove this value.',
     formula: 's = ut + ½at²\nu = 0 m/s,  s = 0.80 m,  t = 0.80 s\na = 2s/t² = 2.50 m/s²',
-    reference: { label: 'OpenStax · constant acceleration', url: 'https://openstax.org/books/university-physics-volume-1/pages/3-4-motion-with-constant-acceleration' },
     observation: 'Model assumption: acceleration stays constant during the run.',
     readouts: [
       { label: 'Displacement', value: '0.80 m' },
