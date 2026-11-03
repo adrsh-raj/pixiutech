@@ -15,8 +15,8 @@
   overflow: hidden;
   padding: 140px 0 96px;
   background:
-    radial-gradient(circle at 1px 1px, rgba(160, 190, 255, 0.10) 1px, transparent 0) 0 0 / 22px 22px,
-    radial-gradient(ellipse at 75% 40%, rgba(79, 124, 255, 0.14), transparent 55%),
+    radial-gradient(ellipse at 76% 38%, rgba(79, 124, 255, 0.17), transparent 54%),
+    radial-gradient(ellipse at 22% 82%, rgba(44, 110, 155, 0.08), transparent 42%),
     var(--esq-bg);
 }
 .esq-hero::after { content: ""; position: absolute; inset: auto 0 0 0; height: 160px; background: linear-gradient(transparent, var(--esq-bg)); pointer-events: none; }
@@ -162,3 +162,28 @@
 @media(max-width:700px){.esq-hero{padding-block:54px 60px}.esq-logo--hero{width:205px;margin-bottom:22px}.esq-hero h1{font-size:clamp(2.45rem,10vw,3.7rem)}.esq-meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 18px;margin-top:26px}.esq-demo__columns{grid-template-columns:1fr;gap:12px;padding:12px}.esq-circuit{padding:12px}.esq-chat__answer{min-height:96px}.esq-loop__grid{grid-template-columns:1fr;gap:10px}.esq-loop__grid article{min-height:unset;padding:18px}.esq-loop__grid h3{margin-top:11px}.esq-about{grid-template-columns:1fr;gap:14px}.esq-stats{grid-template-columns:1fr}.esq-band{padding-block:58px}.esq-h2{margin-bottom:26px}}
 @media(max-width:420px){.esq-demo__top{align-items:flex-start;padding:14px}.esq-demo__footer{align-items:flex-start;flex-direction:column}.esq-meta{grid-template-columns:1fr 1fr}}
 @media(prefers-reduced-motion:reduce){.esq-page *, .esq-page *::before, .esq-page *::after{animation:none!important;scroll-behavior:auto!important;transition:none!important}}
+
+.esq-dot-field{position:absolute;inset:0;z-index:0;width:100%;height:100%;pointer-events:none;opacity:.82}
+.esq-demo__samples{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;padding:12px 18px 0}
+.esq-demo__sample{display:flex;min-width:0;align-items:center;justify-content:center;gap:7px;padding:9px 8px;border:1px solid rgba(143,177,218,.14);border-radius:8px;background:rgba(4,12,23,.44);color:#9aadc2;font-size:10px;line-height:1.2;cursor:pointer;transition:color .2s,border-color .2s,background .2s}
+.esq-demo__sample>span{color:#6f849a;font:9px var(--f-mono)}
+.esq-demo__sample:hover{border-color:rgba(101,216,238,.38);color:#e4eef8}
+.esq-demo__sample.is-active{border-color:rgba(89,191,225,.44);background:linear-gradient(135deg,rgba(54,126,174,.18),rgba(52,79,131,.14));color:#eaf4ff;box-shadow:inset 0 0 18px rgba(56,143,190,.06)}
+.esq-demo__sample.is-active>span{color:#7bd9e8}
+.esq-demo__sample:focus-visible{outline:2px solid var(--esq-cyan);outline-offset:2px}
+.esq-physics__grid{fill:none;stroke:rgba(137,173,202,.18);stroke-width:1}
+.esq-physics__curve{fill:none;stroke:#71c6ef;stroke-width:2.6;stroke-linecap:round}
+.esq-physics__point{fill:#b6ecff;stroke:#0a1928;stroke-width:2}
+.esq-arduino__trace{fill:none;stroke:#6fe2c3;stroke-width:3;stroke-linejoin:round;stroke-linecap:round;filter:drop-shadow(0 0 4px rgba(111,226,195,.3))}
+.esq-arduino__measure{fill:none;stroke:rgba(125,188,214,.38);stroke-width:1;stroke-dasharray:2 4}
+.esq-readouts__alert{transition:background .25s,border-color .25s}
+.esq-readouts__alert.is-active strong{color:#ffd18e}
+.esq-chat__answer{white-space:pre-wrap}
+.esq-chat__equation{margin-top:11px;padding:9px 10px;border:1px solid rgba(91,160,205,.18);border-radius:8px;background:rgba(50,108,153,.08)}
+.esq-chat__equation>span{display:block;margin-bottom:5px;color:#7f9ab4;font:8px/1.4 var(--f-mono);letter-spacing:.12em}
+.esq-chat__equation code{display:block;white-space:pre-wrap;color:#bfe4f6;font:9px/1.55 var(--f-mono)}
+.esq-chat__code{margin-top:10px;overflow:hidden;border:1px solid rgba(126,160,194,.16);border-radius:8px;background:#08121f}
+.esq-chat__code>div{display:flex;justify-content:space-between;gap:8px;padding:7px 9px;border-bottom:1px solid rgba(126,160,194,.12);color:#849bb2;font:8px/1.3 var(--f-mono);letter-spacing:.08em;text-transform:uppercase}
+.esq-chat__code pre{margin:0;padding:9px;overflow-x:auto;color:#b9eadc;font:9px/1.5 var(--f-mono);tab-size:2}
+@media(max-width:700px){.esq-dot-field{opacity:.56}.esq-demo__samples{gap:5px;padding:10px 12px 0}.esq-demo__sample{gap:5px;padding:9px 4px;font-size:9px}.esq-demo__columns{padding-top:12px}}
+@media(max-width:420px){.esq-demo__samples{grid-template-columns:1fr}.esq-demo__sample{justify-content:flex-start;padding:9px 10px}.esq-chat__code pre{font-size:8px}}
