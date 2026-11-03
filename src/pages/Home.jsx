@@ -107,7 +107,7 @@ export default function Home() {
             <h2 id="virtual-lab-teaser-title">Practise circuits online. Learn with AI beside you.</h2>
             <p>Discover Pixiu Tech’s browser-based practical learning space for students.</p>
           </div>
-          <Link className="btn btn--primary" to="/virtual-lab-ai">Explore Virtual Lab & AI <span className="arw">→</span></Link>
+          <Link className="btn btn--primary" to="/8square-ai">Explore Virtual Lab & AI <span className="arw">→</span></Link>
         </div>
       </section>
 
