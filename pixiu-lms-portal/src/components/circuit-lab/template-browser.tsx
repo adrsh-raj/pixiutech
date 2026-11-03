@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from "react"
-import { X, Sparkles, Layers, Cpu, ArrowRight } from "lucide-react"
+import React, { useEffect, useMemo, useState } from "react"
+import { ArrowRight, Cpu, Layers, Search, X } from "lucide-react"
 import { TEMPLATES, type ProjectTemplate } from "@/lib/templates"
 import { BOARD_REGISTRY, type BoardId } from "@/lib/board-registry"
 
@@ -11,196 +11,176 @@ interface Props {
 
 type DifficultyFilter = "all" | "Beginner" | "Intermediate" | "Advanced"
 type BoardFilter = "all" | "arduino-uno" | "esp32-devkit" | "rpi-pico" | "microbit-v2"
+type CategoryFilter = "all" | "AI & vision" | "Connected systems" | "Robotics" | "Sensors" | "Displays" | "Prototypes"
 
 const BOARD_STYLES: Record<BoardId, string> = {
-  "arduino-uno": "bg-blue-500/10 text-blue-400 border-blue-500/30",
-  "esp32-devkit": "bg-emerald-500/10 text-emerald-400 border-emerald-500/30",
-  "rpi-pico": "bg-purple-500/10 text-purple-400 border-purple-500/30",
-  "microbit-v2": "bg-amber-500/10 text-amber-400 border-amber-500/30",
+  "arduino-uno": "bg-blue-500/10 text-blue-300 border-blue-500/25",
+  "esp32-devkit": "bg-emerald-500/10 text-emerald-300 border-emerald-500/25",
+  "rpi-pico": "bg-violet-500/10 text-violet-300 border-violet-500/25",
+  "microbit-v2": "bg-amber-500/10 text-amber-300 border-amber-500/25",
 }
 
-const getTemplateBoard = (tmpl: ProjectTemplate): string => {
-  const p = tmpl.circuit.parts.find((part) =>
-    ["arduino-uno", "esp32-devkit", "rpi-pico", "microbit-v2"].includes(part.type),
+const cleanTitle = (value: string) => {
+  const withoutIcons = Array.from(value).filter((character) => {
+    const point = character.codePointAt(0) || 0
+    return !((point >= 0x1f300 && point <= 0x1faff) || (point >= 0x2600 && point <= 0x27bf) || point === 0xfe0f || point === 0x200d)
+  }).join("")
+  return withoutIcons.replace(/^\s*\d+\s*[.)-]\s*/, "").replace(/\s+/g, " ").trim()
+}
+
+const getTemplateBoard = (template: ProjectTemplate): string => {
+  const part = template.circuit.parts.find((item) =>
+    ["arduino-uno", "esp32-devkit", "rpi-pico", "microbit-v2"].includes(item.type),
   )
-  return p?.type ?? "arduino-uno"
+  return part?.type ?? "arduino-uno"
+}
+
+const getCategory = (template: ProjectTemplate): CategoryFilter => {
+  const text = (cleanTitle(template.title) + " " + template.tags.join(" ") + " " + template.description).toLowerCase()
+  if (/(ai|vision|camera|gesture|machine learning|image)/.test(text)) return "AI & vision"
+  if (/(servo|robot|motor|radar|barrier|arm|rover)/.test(text)) return "Robotics"
+  if (/(wifi|web server|iot|telemetry|wireless|smart home|cloud)/.test(text)) return "Connected systems"
+  if (/(sensor|dht|ldr|ultrasonic|temperature|gas|weather|soil|light|distance|fire)/.test(text)) return "Sensors"
+  if (/(display|oled|matrix|lcd|arcade|pixel|button|keypad|sound|audio|led)/.test(text)) return "Displays"
+  return "Prototypes"
 }
 
 export const TemplateBrowser: React.FC<Props> = ({ isOpen, onClose, onSelectTemplate }) => {
   const [difficultyFilter, setDifficultyFilter] = useState<DifficultyFilter>("all")
   const [boardFilter, setBoardFilter] = useState<BoardFilter>("all")
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all")
+  const [search, setSearch] = useState("")
+
+  useEffect(() => {
+    if (!isOpen) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose()
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [isOpen, onClose])
 
   const filteredTemplates = useMemo(() => {
+    const query = search.trim().toLowerCase()
     return TEMPLATES.filter((template) => {
-      const matchesDifficulty = difficultyFilter === "all" || template.difficulty === difficultyFilter
+      if (difficultyFilter !== "all" && template.difficulty !== difficultyFilter) return false
       const board = getTemplateBoard(template)
-      const matchesBoard = boardFilter === "all" || board === boardFilter
-      return matchesDifficulty && matchesBoard
+      if (boardFilter !== "all" && board !== boardFilter) return false
+      if (categoryFilter !== "all" && getCategory(template) !== categoryFilter) return false
+      if (!query) return true
+      const haystack = [cleanTitle(template.title), template.description, template.tags.join(" "), BOARD_REGISTRY[board as BoardId]?.name ?? board, getCategory(template)].join(" ").toLowerCase()
+      return haystack.includes(query)
     })
-  }, [difficultyFilter, boardFilter])
+  }, [boardFilter, categoryFilter, difficultyFilter, search])
 
   if (!isOpen) return null
 
+  const filters = [
+    { id: "all", label: "All projects" },
+    { id: "AI & vision", label: "AI & vision" },
+    { id: "Connected systems", label: "Connected systems" },
+    { id: "Robotics", label: "Robotics" },
+    { id: "Sensors", label: "Sensors" },
+    { id: "Displays", label: "Displays" },
+    { id: "Prototypes", label: "Prototypes" },
+  ]
+
   return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in">
-      <div className="relative w-full max-w-4xl rounded-2xl border border-slate-700/80 bg-slate-900 text-white shadow-2xl overflow-hidden flex flex-col max-h-[88vh]">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-md shadow-blue-500/20">
-              <Sparkles className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold text-white">Starter Project Templates</h2>
-              <p className="text-xs text-slate-400">Choose a curriculum project to load components and code instantly</p>
-            </div>
+    <div
+      className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/80 p-3 backdrop-blur-sm sm:p-5"
+      onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}
+    >
+      <section role="dialog" aria-modal="true" aria-labelledby="template-browser-title" className="flex h-[min(90dvh,900px)] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-slate-700/80 bg-[#0d1523] text-white shadow-2xl shadow-black/60">
+        <header className="flex items-center justify-between border-b border-slate-800 px-5 py-4 sm:px-7">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-cyan-300">Virtual Lab / Project library</p>
+            <h2 id="template-browser-title" className="mt-1 text-lg font-semibold tracking-tight sm:text-xl">Project templates</h2>
+            <p className="mt-1 text-xs text-slate-400">Choose a starting point, inspect the parts, then adapt the circuit and code.</p>
           </div>
-          <button
-            onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition"
-          >
-            <X size={18} />
+          <button type="button" onClick={onClose} aria-label="Close project library" className="rounded-lg border border-slate-700 p-2 text-slate-400 transition hover:border-slate-500 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
+            <X size={17} />
           </button>
-        </div>
+        </header>
 
-        {/* Filter Controls: Difficulty & Controller only */}
-        <div className="border-b border-slate-800 px-6 py-3 flex flex-wrap items-center justify-between gap-3 bg-slate-950/60">
-          <div className="flex items-center gap-4 flex-wrap">
-            {/* Level / Difficulty filter */}
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">Level:</span>
-              {[
-                { id: "all", label: "All Levels" },
-                { id: "Beginner", label: "Beginner" },
-                { id: "Intermediate", label: "Intermediate" },
-                { id: "Advanced", label: "Advanced" },
-              ].map((lvl) => (
-                <button
-                  key={lvl.id}
-                  onClick={() => setDifficultyFilter(lvl.id as DifficultyFilter)}
-                  className={`rounded-full px-3 py-1 text-[11px] font-bold transition-all ${
-                    difficultyFilter === lvl.id
-                      ? "bg-blue-600 text-white shadow-sm shadow-blue-500/25"
-                      : "bg-slate-800/90 text-slate-300 hover:bg-slate-700 hover:text-white"
-                  }`}
-                >
-                  {lvl.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Controller filter */}
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">Controller:</span>
-              {[
-                { id: "all", label: "All Boards" },
-                { id: "arduino-uno", label: "Uno" },
-                { id: "esp32-devkit", label: "ESP32" },
-                { id: "rpi-pico", label: "Pico" },
-                { id: "microbit-v2", label: "micro:bit" },
-              ].map((b) => (
-                <button
-                  key={b.id}
-                  onClick={() => setBoardFilter(b.id as BoardFilter)}
-                  className={`rounded-full px-3 py-1 text-[11px] font-bold transition-all ${
-                    boardFilter === b.id
-                      ? "bg-indigo-600 text-white shadow-sm shadow-indigo-500/25"
-                      : "bg-slate-800/90 text-slate-300 hover:bg-slate-700 hover:text-white"
-                  }`}
-                >
-                  {b.label}
-                </button>
-              ))}
+        <div className="space-y-4 border-b border-slate-800 bg-slate-950/35 px-5 py-4 sm:px-7">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+            <label className="relative block min-w-0 flex-1">
+              <Search size={15} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+              <span className="sr-only">Search project templates</span>
+              <input value={search} onChange={(event) => setSearch(event.target.value)} type="search" placeholder="Search projects, components, or concepts" className="w-full rounded-lg border border-slate-700 bg-slate-900 py-2.5 pl-9 pr-3 text-sm text-slate-100 placeholder:text-slate-500 focus:border-cyan-400/70 focus:outline-none focus:ring-2 focus:ring-cyan-400/10" />
+            </label>
+            <div className="flex flex-wrap gap-1.5" aria-label="Filter by experience level">
+              {(["all", "Beginner", "Intermediate", "Advanced"] as DifficultyFilter[]).map((level) => {
+                const label = level === "all" ? "All levels" : level
+                const selected = difficultyFilter === level
+                return <button key={level} type="button" aria-pressed={selected} onClick={() => setDifficultyFilter(level)} className={"rounded-full border px-3 py-1.5 text-[11px] font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 " + (selected ? "border-cyan-400/50 bg-cyan-400/10 text-cyan-200" : "border-slate-700 bg-slate-900 text-slate-400 hover:text-white")}>{label}</button>
+              })}
             </div>
           </div>
 
-          <span className="text-[11px] font-mono text-slate-400 ml-auto font-medium">
-            {filteredTemplates.length} templates
-          </span>
+          <div className="flex flex-col justify-between gap-3 xl:flex-row xl:items-center">
+            <div className="flex flex-wrap gap-1.5" aria-label="Filter by project category">
+              {filters.map((filter) => {
+                const selected = categoryFilter === filter.id
+                return <button key={filter.id} type="button" aria-pressed={selected} onClick={() => setCategoryFilter(filter.id as CategoryFilter)} className={"rounded-md px-2.5 py-1.5 text-[11px] font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 " + (selected ? "bg-slate-700 text-white" : "text-slate-500 hover:bg-slate-800 hover:text-slate-200")}>{filter.label}</button>
+              })}
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+              <span>{filteredTemplates.length} of {TEMPLATES.length} projects</span>
+              <span className="hidden text-slate-700 sm:inline">|</span>
+              <label className="flex items-center gap-1.5">
+                <span className="sr-only">Filter by board</span>
+                <select value={boardFilter} onChange={(event) => setBoardFilter(event.target.value as BoardFilter)} className="rounded-md border border-slate-700 bg-slate-900 px-2 py-1.5 text-slate-300 focus:border-cyan-400/70 focus:outline-none">
+                  <option value="all">All boards</option>
+                  <option value="arduino-uno">Arduino Uno</option>
+                  <option value="esp32-devkit">ESP32</option>
+                  <option value="rpi-pico">Raspberry Pi Pico</option>
+                  <option value="microbit-v2">BBC micro:bit</option>
+                </select>
+              </label>
+              <button type="button" onClick={() => { setSearch(""); setCategoryFilter("all"); setDifficultyFilter("all"); setBoardFilter("all") }} className="text-cyan-300 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">Clear filters</button>
+            </div>
+          </div>
         </div>
 
-        {/* Templates Grid: Clean, modern cards without wall of text */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-6 overflow-y-auto">
-          {filteredTemplates.map((tmpl) => {
-            const boardKey = getTemplateBoard(tmpl)
-            const boardId = boardKey as BoardId
-            const boardMeta = {
-              label: BOARD_REGISTRY[boardId]?.name ?? boardKey,
-              color: BOARD_STYLES[boardId] ?? "bg-slate-800 text-slate-300 border-slate-700",
-            }
-            return (
-              <div
-                key={tmpl.id}
-                onClick={() => {
-                  onClose()
-                  onSelectTemplate(tmpl)
-                }}
-                className="group relative flex flex-col justify-between rounded-xl border border-slate-800 bg-slate-950/70 p-4 transition-all duration-200 hover:border-blue-500/60 hover:bg-slate-850 hover:shadow-xl hover:shadow-blue-500/5 cursor-pointer"
-              >
-                <div>
-                  {/* Badges: Difficulty, Controller, Parts */}
-                  <div className="flex items-center justify-between gap-2 mb-2.5">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span
-                        className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                          tmpl.difficulty === "Beginner"
-                            ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
-                            : tmpl.difficulty === "Intermediate"
-                              ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
-                              : "bg-purple-500/15 text-purple-400 border border-purple-500/30"
-                        }`}
-                      >
-                        {tmpl.difficulty}
-                      </span>
-                      <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-semibold border ${boardMeta.color}`}>
-                        <Cpu size={11} />
-                        {boardMeta.label}
-                      </span>
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+          {filteredTemplates.length === 0 ? (
+            <div className="grid min-h-64 place-items-center rounded-xl border border-dashed border-slate-700 px-6 text-center">
+              <div><p className="text-sm font-medium text-slate-200">No matching projects</p><p className="mt-1 text-xs text-slate-500">Clear a filter or try another search term.</p></div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+              {filteredTemplates.map((template) => {
+                const boardKey = getTemplateBoard(template)
+                const boardId = boardKey as BoardId
+                const boardMeta = { label: BOARD_REGISTRY[boardId]?.name ?? boardKey, color: BOARD_STYLES[boardId] ?? "border-slate-700 bg-slate-900 text-slate-300" }
+                const clean = cleanTitle(template.title)
+                return (
+                  <button key={template.id} type="button" onClick={() => { onClose(); onSelectTemplate({ ...template, title: clean }) }} aria-label={"Load project template: " + clean} className="group flex min-h-[190px] w-full flex-col justify-between rounded-xl border border-slate-800 bg-slate-950/50 p-4 text-left transition hover:border-cyan-400/35 hover:bg-slate-900/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
+                    <div className="w-full">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={"rounded-md border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide " + (template.difficulty === "Beginner" ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-300" : template.difficulty === "Intermediate" ? "border-amber-500/25 bg-amber-500/10 text-amber-300" : "border-violet-500/25 bg-violet-500/10 text-violet-300")}>{template.difficulty}</span>
+                        <span className={"inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[10px] font-medium " + boardMeta.color}><Cpu size={12} aria-hidden="true" />{boardMeta.label}</span>
+                        <span className="ml-auto inline-flex items-center gap-1.5 text-[10px] text-slate-500"><Layers size={12} aria-hidden="true" />{template.circuit.parts.length} parts</span>
+                      </div>
+                      <p className="mt-2 text-[10px] font-medium uppercase tracking-[0.14em] text-slate-500">{getCategory(template)}</p>
+                      <h3 className="mt-1 text-sm font-semibold leading-5 text-slate-100 group-hover:text-cyan-200 line-clamp-2">{clean}</h3>
+                      <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-400">{template.description}</p>
                     </div>
-                    <div className="flex items-center gap-1 text-[11px] text-slate-400 shrink-0">
-                      <Layers size={12} className="text-slate-400" />
-                      <span>{tmpl.circuit.parts.length} parts</span>
+                    <div className="mt-4 flex w-full items-end justify-between gap-3 border-t border-slate-800 pt-3">
+                      <div className="flex min-w-0 flex-wrap gap-1.5">
+                        {template.tags.slice(0, 3).map((tag) => <span key={tag} className="rounded bg-slate-800/70 px-1.5 py-1 text-[9px] text-slate-400">{tag}</span>)}
+                        {template.tags.length > 3 && <span className="rounded bg-slate-800/50 px-1.5 py-1 text-[9px] text-slate-500">+{template.tags.length - 3}</span>}
+                      </div>
+                      <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-semibold text-cyan-300">Open project <ArrowRight size={13} aria-hidden="true" /></span>
                     </div>
-                  </div>
-
-                  {/* Title */}
-                  <h3 className="text-sm font-bold text-white group-hover:text-blue-400 transition-colors line-clamp-1 mb-1.5">
-                    {tmpl.title}
-                  </h3>
-
-                  {/* Clean 2-line description */}
-                  <p className="text-xs text-slate-400 leading-relaxed font-normal line-clamp-2 mb-3">
-                    {tmpl.description}
-                  </p>
-                </div>
-
-                {/* Footer with tags and Load action */}
-                <div className="flex items-center justify-between pt-2.5 border-t border-slate-800/80 mt-auto">
-                  <div className="flex flex-wrap gap-1">
-                    {tmpl.tags.slice(0, 3).map((tag) => (
-                      <span
-                        key={tag}
-                        className="rounded bg-slate-800/80 px-1.5 py-0.5 text-[10px] font-mono text-slate-400"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                    {tmpl.tags.length > 3 && (
-                      <span className="rounded bg-slate-800/50 px-1 py-0.5 text-[9px] font-mono text-slate-500">
-                        +{tmpl.tags.length - 3}
-                      </span>
-                    )}
-                  </div>
-                  <span className="flex items-center gap-1 text-xs font-semibold text-blue-400 group-hover:text-blue-300 group-hover:translate-x-0.5 transition-all shrink-0">
-                    <span>Load Project</span>
-                    <ArrowRight size={13} />
-                  </span>
-                </div>
-              </div>
-            )
-          })}
+                  </button>
+                )
+              })}
+            </div>
+          )}
         </div>
-      </div>
+      </section>
     </div>
   )
 }

@@ -35,6 +35,7 @@ from notifications.views import NotificationPortalViewSet
 from learning.quiz_portal import QuizSingleAttemptView, QuizStartView, QuizReviewView
 from .scoped_curriculum import ScopedCurriculumViewSet
 from .strict_learning_scope_views import SafeScopedAttendanceViewSet, SafeScopedClassViewSet, SafeScopedContentViewSet, SafeScopedEvidenceViewSet, SafeScopedProjectViewSet, SafeScopedQuizAssignmentViewSet, SafeScopedQuizAttemptViewSet, SafeScopedQuizQuestionViewSet, SafeScopedQuizViewSet, SafeScopedSessionActivityViewSet, SafeScopedTrainerSchoolAssignmentViewSet, SafeScopedSchoolViewSet, SafeScopedTrainerViewSet
+from learning.virtual_lab_views import VirtualLabAssignmentsView, VirtualLabProgressView
 
 router = DefaultRouter(trailing_slash=False)
 router.register('schools', SafeScopedSchoolViewSet, basename='v1-school')
@@ -73,6 +74,8 @@ router.register('careers/applications', CareerApplicationViewSet, basename='v1-c
 router.register('logs', AuditLogViewSet, basename='v1-audit-log')
 
 urlpatterns = [
+    path("virtual-lab/assignments", VirtualLabAssignmentsView.as_view(), name="v1-virtual-lab-assignments"),
+    path("virtual-lab/assignments/<uuid:assignment_id>/<str:action>", VirtualLabProgressView.as_view(), name="v1-virtual-lab-progress-action"),
     path('health/', health, name='v1-health'), path('upload/', SecureUploadView.as_view(), name='v1-upload'),
     path('auth/csrf/', csrf_token_view, name='v1-csrf-token'), path('auth/login/', LoginView.as_view(), name='v1-login'), path('auth/refresh/', RefreshView.as_view(), name='v1-refresh'),
     path('auth/logout/', LogoutView.as_view(), name='v1-logout'), path('auth/me/', MeView.as_view(), name='v1-me'), path('auth/password/change/', ChangeOwnPasswordView.as_view(), name='v1-password-change'),

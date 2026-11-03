@@ -108,11 +108,15 @@ export interface LessonProgress {
 
 const PROGRESS_KEY = "pixiu-lesson-progress-v1"
 
-export function loadLessonProgress(): Record<string, LessonProgress> {
+function progressStorageKey(scope?: string) {
+  return scope ? PROGRESS_KEY + ":" + encodeURIComponent(scope) : PROGRESS_KEY
+}
+
+export function loadLessonProgress(scope?: string): Record<string, LessonProgress> {
   if (typeof window === "undefined") return {}
 
   try {
-    const parsed: unknown = JSON.parse(window.localStorage.getItem(PROGRESS_KEY) || "{}")
+    const parsed: unknown = JSON.parse(window.localStorage.getItem(progressStorageKey(scope)) || "{}")
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {}
 
     const normalized: Record<string, LessonProgress> = {}
@@ -138,10 +142,10 @@ export function loadLessonProgress(): Record<string, LessonProgress> {
   }
 }
 
-export function saveLessonProgress(progress: Record<string, LessonProgress>) {
+export function saveLessonProgress(progress: Record<string, LessonProgress>, scope?: string) {
   if (typeof window === "undefined") return
   try {
-    window.localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress))
+    window.localStorage.setItem(progressStorageKey(scope), JSON.stringify(progress))
   } catch {
     // Local-first progress is best-effort.
   }
@@ -151,6 +155,7 @@ export function markStepComplete(
   progress: Record<string, LessonProgress>,
   lesson: Lesson,
   stepId: string,
+  scope?: string,
 ): Record<string, LessonProgress> {
   const current = progress[lesson.id] ?? { completedStepIds: [] }
   const completed = new Set(current.completedStepIds)
@@ -162,17 +167,18 @@ export function markStepComplete(
   }
   if (completed.size >= lesson.steps.length) next.completedAt = current.completedAt ?? new Date().toISOString()
   const merged = { ...progress, [lesson.id]: next }
-  saveLessonProgress(merged)
+  saveLessonProgress(merged, scope)
   return merged
 }
 
 export function resetLessonProgress(
   progress: Record<string, LessonProgress>,
   lessonId: string,
+  scope?: string,
 ): Record<string, LessonProgress> {
   const merged = { ...progress }
   delete merged[lessonId]
-  saveLessonProgress(merged)
+  saveLessonProgress(merged, scope)
   return merged
 }
 

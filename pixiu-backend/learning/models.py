@@ -342,3 +342,51 @@ class ProjectEvidence(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+
+
+class VirtualLabAssignment(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    school_class = models.ForeignKey(SchoolClass, on_delete=models.CASCADE, related_name="virtual_lab_assignments")
+    lesson_id = models.CharField(max_length=120)
+    title = models.CharField(max_length=200)
+    due_date = models.DateField(null=True, blank=True)
+    published = models.BooleanField(default=True)
+    assigned_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="virtual_lab_assignments")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["school_class", "published", "created_at"], name="vl_assign_class_pub_idx"),
+        ]
+
+
+class VirtualLabProgress(models.Model):
+    class Status(models.TextChoices):
+        IN_PROGRESS = "in_progress", "In progress"
+        SUBMITTED = "submitted", "Submitted"
+        REVIEWED = "reviewed", "Reviewed"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    assignment = models.ForeignKey(VirtualLabAssignment, on_delete=models.CASCADE, related_name="progress_records")
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name="virtual_lab_progress")
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.IN_PROGRESS)
+    completed_step_ids = models.JSONField(default=list, blank=True)
+    snapshot = models.JSONField(default=dict, blank=True)
+    result_summary = models.JSONField(default=dict, blank=True)
+    reflection = models.CharField(max_length=1000, blank=True)
+    feedback = models.CharField(max_length=1000, blank=True)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="reviewed_virtual_lab_progress")
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+        constraints = [
+            models.UniqueConstraint(fields=["assignment", "student"], name="uniq_vl_progress_student"),
+        ]
+        indexes = [
+            models.Index(fields=["assignment", "status"], name="vl_progress_status_idx"),
+        ]

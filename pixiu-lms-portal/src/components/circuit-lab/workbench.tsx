@@ -77,6 +77,26 @@ const INITIAL_STATE: CircuitState = {
   wires: [],
 }
 
+function isRestorableCircuitSnapshot(value: unknown): value is CircuitState {
+  if (!value || typeof value !== "object") return false
+  const candidate = value as Partial<CircuitState>
+  if (!Array.isArray(candidate.parts) || candidate.parts.length > 200 || !Array.isArray(candidate.wires) || candidate.wires.length > 500) return false
+  const partIds = new Set<string>()
+  for (const part of candidate.parts) {
+    if (!part || typeof part.id !== "string" || part.id.length > 120 || partIds.has(part.id)) return false
+    if (!CATALOG.some((definition) => definition.type === part.type)) return false
+    if (!Number.isFinite(part.x) || !Number.isFinite(part.y) || !Number.isFinite(part.rotation)) return false
+    if (!part.props || typeof part.props !== "object" || Array.isArray(part.props)) return false
+    if (Object.values(part.props).some((property) => typeof property !== "string" && (typeof property !== "number" || !Number.isFinite(property)))) return false
+    partIds.add(part.id)
+  }
+  for (const wire of candidate.wires) {
+    if (!wire || !wire.from || !wire.to || typeof wire.from.partId !== "string" || typeof wire.from.pinId !== "string" || typeof wire.to.partId !== "string" || typeof wire.to.pinId !== "string") return false
+    if (!partIds.has(wire.from.partId) || !partIds.has(wire.to.partId)) return false
+  }
+  return true
+}
+
 function findCircuitLedPinMappings(currentState: CircuitState, activeBoard: ReturnType<typeof getActiveBoard>) {
   const boardPart = currentState.parts.find((pt) => isBoardPart(pt.type))
   const builtIn = activeBoard?.builtInLedPin ?? (activeBoard?.id === "esp32-devkit" ? "d2" : activeBoard?.id === "arduino-uno" ? "d13" : "gp25")
@@ -1896,11 +1916,13 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
   }, [])
 
   const handleLoadLesson = useCallback(
-    (lesson: Lesson) => {
+    (lesson: Lesson, snapshot?: { circuit?: CircuitState; blocklyXml?: string }) => {
       const seed = getLessonSeed(lesson)
+      const restoredCircuit = isRestorableCircuitSnapshot(snapshot?.circuit) ? snapshot.circuit : seed.state
+      const restoredBlocklyXml = typeof snapshot?.blocklyXml === "string" && snapshot.blocklyXml.length <= 50000 && snapshot.blocklyXml.includes("<xml") ? snapshot.blocklyXml : seed.blocklyXml
       stopProgram()
-      updateState(() => seed.state)
-      setBlocklyXml(seed.blocklyXml)
+      updateState(() => restoredCircuit)
+      setBlocklyXml(restoredBlocklyXml)
       setBlocklyDocumentVersion((value) => value + 1)
       setCurrentProjectName(`Mission · ${lesson.shortTitle}`)
       setLastSaved(null)
@@ -2018,7 +2040,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
         onOpenProjects={() => setIsProjectManagerOpen(true)}
         onOpenLessons={() => setIsLessonsOpen(true)}
         onOpenTemplates={() => setIsTemplatesOpen(true)}
-        onOpenCopilot={() => setIsCopilotOpen(true)}
+        onOpenCopilot={() => { setIsLessonsOpen(false); setIsCopilotOpen(true) }}
         onStartFeaturedMission={() => {
           const featuredMission = getLessonById("lesson-ldr-night-lamp")
           if (!featuredMission) {
@@ -2087,6 +2109,11 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
         onSelectLesson={handleSelectLesson}
         onLoadLesson={handleLoadLesson}
         context={{ state, blocklyXml, running, runtime }}
+        userRole={userRole}
+        userKey={pixiuId || String(accountId || "")}
+        copilotAction={copilotAction}
+        onHighlightParts={handleHighlightParts}
+        onOpenCopilot={() => setIsCopilotOpen(true)}
       />
 
       <TemplateBrowser
