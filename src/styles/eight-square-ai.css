@@ -187,3 +187,8 @@
 .esq-chat__code pre{margin:0;padding:9px;overflow-x:auto;color:#b9eadc;font:9px/1.5 var(--f-mono);tab-size:2}
 @media(max-width:700px){.esq-dot-field{opacity:.56}.esq-demo__samples{gap:5px;padding:10px 12px 0}.esq-demo__sample{gap:5px;padding:9px 4px;font-size:9px}.esq-demo__columns{padding-top:12px}}
 @media(max-width:420px){.esq-demo__samples{grid-template-columns:1fr}.esq-demo__sample{justify-content:flex-start;padding:9px 10px}.esq-chat__code pre{font-size:8px}}
+.esq-chat__reference{display:flex;align-items:baseline;flex-wrap:wrap;gap:7px;margin-top:9px;padding-top:8px;border-top:1px solid rgba(143,169,195,.12);font-size:9px;line-height:1.45}
+.esq-chat__reference>span{color:#7f94ad;font:8px var(--f-mono);letter-spacing:.1em}
+.esq-chat__reference a{color:#91d7e8;text-decoration:none}
+.esq-chat__reference a:hover{text-decoration:underline}
+.esq-chat__reference a:focus-visible{outline:2px solid var(--esq-cyan);outline-offset:2px;border-radius:2px}
