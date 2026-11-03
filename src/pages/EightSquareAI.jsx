@@ -375,9 +375,6 @@ function CircuitChatPreview() {
     </section>
   )
 }
->
-  )
-}
 function Logo({ className = '' }) {
   return (
     <img className={`esq-logo ${className}`} src="/img/8square-logo.svg" alt="8 Square AI" width="320" height="96" />
