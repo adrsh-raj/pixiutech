@@ -308,7 +308,10 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
     }
 
     updateCode()
-    workspace.addChangeListener(updateCode)
+    workspace.addChangeListener((event) => {
+      if (event.isUiEvent) return
+      updateCode()
+    })
 
     const handleResize = () => {
       Blockly.svgResize(workspace)

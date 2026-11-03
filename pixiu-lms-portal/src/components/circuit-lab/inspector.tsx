@@ -37,8 +37,8 @@ export function Inspector({ part, runtime, running = false, partCount, wireCount
   return (
     <aside
       className={`
-        ${!part ? "hidden md:flex" : "fixed inset-x-0 bottom-0 z-40 max-h-[60vh] md:max-h-full rounded-t-2xl md:rounded-none shadow-2xl md:shadow-none border-t md:border-t-0 flex"}
-        md:static md:flex h-auto md:h-full w-full md:w-72 shrink-0 flex-col md:border-l border-border bg-sidebar transition-all duration-200
+        ${!part ? "hidden lg:flex" : "fixed inset-x-0 bottom-0 z-40 max-h-[60vh] lg:max-h-full rounded-t-2xl lg:rounded-none shadow-2xl lg:shadow-none border-t lg:border-t-0 flex"}
+        lg:static lg:flex h-auto lg:h-full w-full lg:w-72 shrink-0 flex-col lg:border-l border-border bg-sidebar transition-all duration-200
       `}
     >
       <div className="border-b border-border px-4 py-2.5 sm:py-3 flex items-center justify-between">

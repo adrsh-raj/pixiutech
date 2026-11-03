@@ -77,6 +77,49 @@ const INITIAL_STATE: CircuitState = {
   wires: [],
 }
 
+function getPlacedBounds(part: Pick<PlacedPart, "type" | "x" | "y" | "rotation">) {
+  const def = CATALOG[part.type]
+  const angle = (part.rotation * Math.PI) / 180
+  const width = Math.abs(def.width * Math.cos(angle)) + Math.abs(def.height * Math.sin(angle))
+  const height = Math.abs(def.height * Math.cos(angle)) + Math.abs(def.width * Math.sin(angle))
+  const centerX = part.x + def.width / 2
+  const centerY = part.y + def.height / 2
+  return {
+    left: centerX - width / 2,
+    top: centerY - height / 2,
+    right: centerX + width / 2,
+    bottom: centerY + height / 2,
+  }
+}
+
+function findOpenPartPosition(parts: PlacedPart[], type: PartType) {
+  const def = CATALOG[type]
+  const stepX = Math.max(72, Math.min(300, Math.round(def.width * 0.68) + 32))
+  const stepY = Math.max(64, Math.min(220, Math.round(def.height * 0.68) + 28))
+  const columns = 8
+  const gap = 28
+  const maxAttempts = Math.max(256, parts.length * 32)
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const x = 120 + (attempt % columns) * stepX
+    const y = 100 + Math.floor(attempt / columns) * stepY
+    const candidate = getPlacedBounds({ type, x, y, rotation: 0 })
+    const isOpen = parts.every((part) => {
+      const existing = getPlacedBounds(part)
+      return !(
+        candidate.left < existing.right + gap &&
+        candidate.right > existing.left - gap &&
+        candidate.top < existing.bottom + gap &&
+        candidate.bottom > existing.top - gap
+      )
+    })
+    if (isOpen) return { x, y }
+  }
+
+  const row = Math.ceil(parts.length / columns)
+  return { x: 120, y: 100 + row * stepY }
+}
+
 function isRestorableCircuitSnapshot(value: unknown): value is CircuitState {
   if (!value || typeof value !== "object") return false
   const candidate = value as Partial<CircuitState>
@@ -215,6 +258,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
   const [pressed, setPressed] = useState<Set<string>>(new Set())
   const pressedRef = useRef<Set<string>>(new Set())
   const [view, setView] = useState<WorkbenchView>("circuit")
+  const [canvasFitVersion, setCanvasFitVersion] = useState(0)
   const [pinStates, setPinStates] = useState<Record<string, ArduinoPinState>>({})
   const [displayOutputs, setDisplayOutputs] = useState<DisplayOutputState>({})
   const displayOutputsRef = useRef<DisplayOutputState>({})
@@ -240,6 +284,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
   const [isTemplatesOpen, setIsTemplatesOpen] = useState(false)
   const [isLessonsOpen, setIsLessonsOpen] = useState(false)
   const [activeLessonId, setActiveLessonId] = useState<string | null>(null)
+  const [activeLessonSessionId, setActiveLessonSessionId] = useState<string | null>(null)
   const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null)
   const [isAiCameraOpen, setIsAiCameraOpen] = useState(false)
   const [isAiStudioOpen, setIsAiStudioOpen] = useState(false)
@@ -375,7 +420,6 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
 
   const runnerAbortRef = useRef<AbortController | null>(null)
   const runningRef = useRef(false)
-  const addCounter = useRef(0)
   const partsRef = useRef(state.parts)
   const stateRef = useRef(state)
   const runtimeCacheRef = useRef<{
@@ -574,36 +618,39 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
   const addPart = useCallback((type: PartType, x?: number, y?: number) => {
     const def = CATALOG[type]
     if (!def) return
-    const n = addCounter.current++
-    const part: PlacedPart = {
-      id: newId(),
+    const id = newId()
+    const basePart = {
+      id,
       type,
-      x: x ?? 160 + (n % 4) * 190,
-      y: y ?? 120 + (Math.floor(n / 4) % 3) * 150,
       rotation: 0,
       props: { ...(def.defaults ?? {}) },
     }
     updateState((s) => {
-      // Auto-replace unused controller board if student drops a new board
+      // Auto-replace an unused controller board while keeping its on-canvas position.
       if (isBoardPart(type)) {
         const unusedBoard = s.parts.find(
-          (p) => isBoardPart(p.type) && !s.wires.some((w) => w.from.partId === p.id || w.to.partId === p.id)
+          (part) => isBoardPart(part.type) && !s.wires.some((wire) => wire.from.partId === part.id || wire.to.partId === part.id)
         )
         if (unusedBoard) {
-          const replacedPart: PlacedPart = {
-            ...part,
+          const replacement: PlacedPart = {
+            ...basePart,
             x: x ?? unusedBoard.x,
             y: y ?? unusedBoard.y,
           }
           return {
             ...s,
-            parts: s.parts.map((p) => (p.id === unusedBoard.id ? replacedPart : p)),
+            parts: s.parts.map((part) => (part.id === unusedBoard.id ? replacement : part)),
           }
         }
       }
+
+      const position = x !== undefined && y !== undefined
+        ? { x, y }
+        : findOpenPartPosition(s.parts, type)
+      const part: PlacedPart = { ...basePart, ...position }
       return { ...s, parts: [...s.parts, part] }
     })
-    setSelectedId(part.id)
+    setSelectedId(id)
     setSelectedWireId(null)
   }, [updateState])
 
@@ -1575,6 +1622,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
   const clearAll = useCallback(() => {
     stopProgram()
     updateState(() => ({ parts: [], wires: [] }))
+    setCanvasFitVersion((version) => version + 1)
     setSelectedId(null)
     setSelectedWireId(null)
     setWiring(null)
@@ -1849,8 +1897,13 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
 
     const saved = await saveCircuit(imported.name, imported.state, imported.blocklyXml || DEFAULT_XML, projectStorageScope)
     setHistory(createHistory(saved.state))
+    setCanvasFitVersion((version) => version + 1)
+    setView("circuit")
     setBlocklyXml(saved.blocklyXml || DEFAULT_XML)
     setBlocklyDocumentVersion((value) => value + 1)
+    setActiveLessonId(null)
+    setActiveLessonSessionId(null)
+    setActiveTemplateId(null)
     setCurrentProjectName(saved.name)
     setSelectedId(null)
     setSelectedWireId(null)
@@ -1867,6 +1920,8 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
     stopProgram()
     await saveCurrentCircuit(project, projectStorageScope)
     setHistory(createHistory(project.state))
+    setCanvasFitVersion((version) => version + 1)
+    setView("circuit")
     setBlocklyXml(project.blocklyXml || DEFAULT_XML)
     setBlocklyDocumentVersion((value) => value + 1)
     setCurrentProjectName(project.name)
@@ -1880,6 +1935,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
     setLastSaved(project.savedAt)
     setIsDirty(false)
     setActiveLessonId(null)
+    setActiveLessonSessionId(null)
     setActiveTemplateId(null)
   }, [projectStorageScope, stopProgram, stopAiRuntime])
 
@@ -1887,6 +1943,8 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
     stopProgram()
     await clearCurrentCircuit(projectStorageScope)
     setHistory(createHistory(INITIAL_STATE))
+    setCanvasFitVersion((version) => version + 1)
+    setView("circuit")
     setBlocklyXml(DEFAULT_XML)
     setBlocklyDocumentVersion((value) => value + 1)
     setCurrentProjectName("Untitled Circuit")
@@ -1900,11 +1958,13 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
     setIsDmmOpen(false)
     setIsScopeOpen(false)
     setActiveLessonId(null)
+    setActiveLessonSessionId(null)
     setActiveTemplateId(null)
   }, [projectStorageScope, stopProgram, stopAiRuntime])
 
   const handleSelectLesson = useCallback((lesson: Lesson) => {
     setActiveLessonId(lesson.id)
+    setActiveLessonSessionId((current) => current === lesson.id ? current : null)
     setActiveTemplateId(null)
     if (lesson.difficulty === "Beginner") {
       const seed = getLessonSeed(lesson)
@@ -1922,6 +1982,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
       const restoredBlocklyXml = typeof snapshot?.blocklyXml === "string" && snapshot.blocklyXml.length <= 50000 && snapshot.blocklyXml.includes("<xml") ? snapshot.blocklyXml : seed.blocklyXml
       stopProgram()
       updateState(() => restoredCircuit)
+      setCanvasFitVersion((version) => version + 1)
       setBlocklyXml(restoredBlocklyXml)
       setBlocklyDocumentVersion((value) => value + 1)
       setCurrentProjectName(`Mission · ${lesson.shortTitle}`)
@@ -1935,6 +1996,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
       setIsScopeOpen(false)
       stopAiRuntime()
       setActiveLessonId(lesson.id)
+      setActiveLessonSessionId(lesson.id)
       setActiveTemplateId(null)
       setView("circuit")
     },
@@ -1946,7 +2008,10 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
       stopProgram()
       updateState(() => tmpl.circuit)
       setActiveLessonId(null)
+      setActiveLessonSessionId(null)
       setActiveTemplateId(tmpl.id)
+      setCanvasFitVersion((version) => version + 1)
+      setView("circuit")
       setBlocklyXml(tmpl.blocklyXml)
       setBlocklyDocumentVersion((value) => value + 1)
       if (storageReady) setIsDirty(true)
@@ -2004,6 +2069,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
         onRedo={handleRedo}
          onOpenProjects={() => setIsProjectManagerOpen(true)}
         onOpenLessons={() => setIsLessonsOpen(true)}
+        isLessonsOpen={isLessonsOpen}
         onOpenGuide={() => window.dispatchEvent(new Event("pixiu-open-guide"))}
         isSerialOpen={isSerialOpen}
         onToggleSerial={() => setIsSerialOpen((prev) => !prev)}
@@ -2031,9 +2097,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
         onToggleDoctor={() => setIsDoctorOpen((prev) => !prev)}
         doctorScore={doctorReport.score}
         onDownloadIno={handleDownloadIno}
-        isCopilotOpen={isCopilotOpen}
         onToggleCopilot={() => setIsCopilotOpen((prev) => !prev)}
-        isCopilotStaged={Boolean(copilotAction.stagedPreview)}
       />
 
       <WelcomeOverlay
@@ -2106,6 +2170,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
         isOpen={isLessonsOpen}
         onClose={() => setIsLessonsOpen(false)}
         activeLessonId={activeLessonId}
+         missionLoaded={Boolean(activeLessonId && activeLessonSessionId === activeLessonId)}
         onSelectLesson={handleSelectLesson}
         onLoadLesson={handleLoadLesson}
         context={{ state, blocklyXml, running, runtime }}
@@ -2186,12 +2251,12 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
           activeWireColor={selectedWire ? selectedWire.color : activeWireColor}
           onSelectWireColor={handleSelectWireColor}
         />
-        <main className="relative min-w-0 flex-1 flex flex-col overflow-hidden pb-16 md:pb-0">
+        <main className="relative min-w-0 flex-1 flex flex-col overflow-hidden pb-16 lg:pb-0">
           <div className="flex-1 relative">
             {/* Mobile Quick-Add Components Trigger */}
             <button
               onClick={() => setMobilePaletteOpen(true)}
-              className="md:hidden absolute top-3 left-3 z-20 flex items-center gap-1.5 rounded-xl bg-card/90 backdrop-blur-sm border border-border px-3 py-1.5 text-xs font-bold shadow-md text-foreground hover:bg-secondary cursor-pointer"
+              className="lg:hidden absolute top-3 left-3 z-20 flex items-center gap-1.5 rounded-xl bg-card/90 backdrop-blur-sm border border-border px-3 py-1.5 text-xs font-bold shadow-md text-foreground hover:bg-secondary cursor-pointer"
               title="Open Components Palette"
             >
               <span className="text-primary text-sm font-black">+</span>
@@ -2253,6 +2318,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
               isScopeOpen={isScopeOpen}
               activeWireColor={activeWireColor}
               stagedPreview={copilotAction.stagedPreview}
+              fitRequestKey={canvasFitVersion}
             />
 
             {running && (
@@ -2305,7 +2371,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
           />
 
           {/* Mobile Bottom Dock Bar */}
-          <div className="md:hidden fixed bottom-3 inset-x-3 z-30 flex items-center justify-around rounded-2xl border border-slate-700/80 bg-slate-950/95 backdrop-blur-lg shadow-2xl py-2 px-2 text-xs font-semibold text-white">
+          <div className="lg:hidden fixed bottom-3 inset-x-3 z-30 flex items-center justify-around rounded-2xl border border-slate-700/80 bg-slate-950/95 backdrop-blur-lg shadow-2xl py-2 px-2 text-xs font-semibold text-white">
             <button
               onClick={() => setMobilePaletteOpen(true)}
               className="flex flex-col items-center gap-0.5 p-1 text-foreground hover:text-primary transition active:scale-95"
@@ -2396,7 +2462,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
 
           {/* Universal Quick Selection Action HUD (Touch-friendly & Desktop-friendly) */}
           {(selected || selectedWire) && (
-            <div className="fixed bottom-16 md:bottom-6 left-1/2 -translate-x-1/2 z-35 flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 rounded-2xl border border-slate-700/90 bg-slate-900/95 shadow-2xl backdrop-blur-md text-white select-none animate-in slide-in-from-bottom-2 duration-150">
+            <div className="fixed bottom-16 lg:bottom-6 left-1/2 -translate-x-1/2 z-35 flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 rounded-2xl border border-slate-700/90 bg-slate-900/95 shadow-2xl backdrop-blur-md text-white select-none animate-in slide-in-from-bottom-2 duration-150">
               {selected && (
                 <>
                   <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-slate-800 text-[11px] font-mono border border-slate-700/60 mr-1 max-w-[120px] sm:max-w-[180px] truncate">

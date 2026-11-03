@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
-import { Activity, BookOpen, Check, Circle, Cloud, Lightbulb, Lock, Play, RotateCcw, Search, Send, ShieldCheck, Sparkles, Target, Wrench, X, Zap } from "lucide-react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Activity, BookOpen, Check, Circle, Cloud, Lightbulb, Lock, Play, RotateCcw, Search, Send, ShieldCheck, Sparkles, Target, Wrench, X } from "lucide-react"
 import type { CircuitState } from "@/lib/circuit-types"
 import type { Lesson, LessonContext, LessonProgress } from "@/lib/lesson-engine"
 import { diagnoseCircuit } from "@/lib/circuit-doctor"
@@ -59,6 +59,7 @@ interface Props {
   copilotAction?: UseCircuitCopilotActionResult
   onHighlightParts?: (partIds: string[]) => void
   onOpenCopilot?: () => void
+  missionLoaded?: boolean
 }
 
 async function virtualLabRequest<T = Record<string, unknown>>(path: string, method = "GET", body?: unknown): Promise<T> {
@@ -93,16 +94,16 @@ function missionHint(lesson: Lesson, step: Lesson["steps"][number], level: numbe
   const firstFailure = failed?.results.find((item) => !item.passed)
   if (level === 1) return "For " + cleanDisplayText(lesson.shortTitle) + ", start with the evidence this checkpoint asks for. Compare the circuit or program on the canvas with the stated goal before changing anything."
   if (level === 2) {
-    if (firstFailure) return "The current check reports: " + firstFailure.label + " — " + firstFailure.detail + ". Focus on that one requirement, then check again."
+    if (firstFailure) return "The current check reports: " + firstFailure.label + " — " + firstFailure.detail + ". Focus on that one requirement; the checkpoint updates when you change the circuit or code."
     return "For this " + step.kind + " step, use the live circuit status and the values shown by the simulator. Change one thing at a time so you can see what caused the result."
   }
   const firstCheck = step.checks[0]
-  if (firstCheck?.kind === "parts") return "Count the required parts on the canvas. Add the missing component from the parts palette, then run Check step again."
-  if (firstCheck?.kind === "connections") return "Trace the named pins in the connection check from source to load and back to ground. Rewire one connection, then check the circuit."
-  if (firstCheck?.kind === "blocks") return "In Blockly, place the required block inside the Arduino program and verify its field values. Then run the program and recheck this step."
-  if (firstCheck?.kind === "running") return "Start the simulator after checking power, ground, and the required connections. The step passes only when the program is running."
+  if (firstCheck?.kind === "parts") return "Count the required parts on the canvas. Add the missing component from the parts palette, and the checkpoint rechecks automatically."
+  if (firstCheck?.kind === "connections") return "Trace the named pins in the connection check from source to load and back to ground. Rewire one connection; the checkpoint rechecks automatically."
+  if (firstCheck?.kind === "blocks") return "In Blockly, place the required block inside the Arduino program and verify its field values. The checkpoint rechecks as the code changes."
+  if (firstCheck?.kind === "running") return "Start the simulator after checking power, ground, and the required connections. The checkpoint passes once the program is running."
   if (firstCheck?.kind === "runtime" || firstCheck?.kind === "runtime-any") return "Run the circuit and compare its displayed reading with the target in the instructions. Adjust one component value or input at a time."
-  return "Review the failed requirement above, make the smallest change that addresses it, and verify the result again."
+  return "Review the failed requirement, make the smallest change, and the checkpoint will recheck automatically."
 }
 
 function cleanDisplayText(value: string) {
@@ -144,6 +145,7 @@ export function LessonBrowser({
   copilotAction,
   onHighlightParts,
   onOpenCopilot,
+  missionLoaded = false,
 }: Props) {
   const normalizedRole = String(userRole || "").toLowerCase()
   const isStudent = normalizedRole === "student"
@@ -151,6 +153,16 @@ export function LessonBrowser({
   const canReviewAssignments = normalizedRole === "admin" || normalizedRole === "trainer"
   const progressScope = userKey ? normalizedRole + ":" + userKey : undefined
   const [progress, setProgress] = useState<Record<string, LessonProgress>>({})
+  const progressRef = useRef(progress)
+  const [progressReady, setProgressReady] = useState(false)
+  const xpAwardedRef = useRef<Set<string>>(new Set())
+  const updateProgress = useCallback((
+    updater: Record<string, LessonProgress> | ((current: Record<string, LessonProgress>) => Record<string, LessonProgress>),
+  ) => {
+    const next = typeof updater === "function" ? updater(progressRef.current) : updater
+    progressRef.current = next
+    setProgress(next)
+  }, [])
   const [lastResults, setLastResults] = useState<Record<string, ReturnType<typeof evaluateLessonStep>>>({})
   const [boardFilter, setBoardFilter] = useState<"all" | "arduino-uno" | "esp32-devkit" | "rpi-pico" | "microbit-v2">("all")
   const [categoryFilter, setCategoryFilter] = useState<"all" | "Beginner" | "Intermediate" | "Advanced">("all")
@@ -174,7 +186,12 @@ export function LessonBrowser({
   const syncTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
-    if (isOpen) setProgress(loadLessonProgress(progressScope))
+    if (!isOpen) return
+    const loaded = loadLessonProgress(progressScope)
+    progressRef.current = loaded
+    setProgress(loaded)
+    setLoadedProgressScope(progressScope ?? null)
+    setProgressReady(true)
   }, [isOpen, progressScope])
 
   useEffect(() => {
@@ -197,7 +214,7 @@ export function LessonBrowser({
       if (canManageAssignments) {
         setClasses(listFromPayload<RemoteClass>(classPayload, "classes").filter((item) => (item as RemoteClass & { status?: string }).status !== "inactive"))
       } else {
-        setProgress((current) => {
+        updateProgress((current) => {
           const next = { ...current }
           const latestAssignmentByLesson = new Set<string>()
           for (const assignment of nextAssignments) {
@@ -233,6 +250,7 @@ export function LessonBrowser({
       : progress[activeLesson.id]
     : undefined
   const activePercent = activeLesson ? getLessonProgressPercent(activeLesson, activeProgress) : 0
+  const missionComplete = Boolean(activeLesson && activePercent >= 100)
   const nextStep = activeLesson ? activeLesson.steps.find((step) => !activeProgress?.completedStepIds.includes(step.id)) ?? activeLesson.steps[activeLesson.steps.length - 1] ?? null : null
   const nextStepKey = activeLesson && nextStep ? activeLesson.id + ":" + nextStep.id : ""
   const nextStepResult = activeLesson && nextStep ? lastResults[nextStepKey] : undefined
@@ -306,28 +324,62 @@ export function LessonBrowser({
     }
   }, [isStudent, activeAssignment?.id, activeLesson?.id, missionStarted, assignmentLocked, activeProgress, activePercent, context.state, context.blocklyXml, reflection])
 
-  if (!isOpen) return null
-
-  const checkStep = (lesson: Lesson, stepId: string) => {
+  const checkStep = useCallback((lesson: Lesson, stepId: string) => {
     const step = lesson.steps.find((item) => item.id === stepId)
     if (!step) return
     const result = evaluateLessonStep(lesson, step, context)
-    setLastResults((current) => ({ ...current, [`${lesson.id}:${step.id}`]: result }))
+    const resultKey = `${lesson.id}:${step.id}`
+    setLastResults((current) => {
+      const previous = current[resultKey]
+      if (
+        previous?.passed === result.passed &&
+        previous.summary === result.summary &&
+        previous.results.length === result.results.length &&
+        previous.results.every((item, index) =>
+          item.passed === result.results[index]?.passed &&
+          item.label === result.results[index]?.label &&
+          item.detail === result.results[index]?.detail
+        )
+      ) return current
+      return { ...current, [resultKey]: result }
+    })
     if (result.passed) {
-      const wasCompleted = (progress[lesson.id]?.completedStepIds?.length ?? 0) >= lesson.steps.length
-      const nextProgress = markStepComplete(progress, lesson, step.id, progressScope)
-      setProgress(nextProgress)
+      const previousProgress = progressRef.current
+      const nextProgress = markStepComplete(previousProgress, lesson, step.id, progressScope)
+      updateProgress(nextProgress)
+      const wasCompleted = (previousProgress[lesson.id]?.completedStepIds?.length ?? 0) >= lesson.steps.length
       const isCompleted = (nextProgress[lesson.id]?.completedStepIds?.length ?? 0) >= lesson.steps.length
-      if (!wasCompleted && isCompleted) {
+      if (!wasCompleted && isCompleted && !xpAwardedRef.current.has(lesson.id)) {
+        xpAwardedRef.current.add(lesson.id)
         awardMissionXp(lesson.id, lesson.difficulty, lesson.shortTitle || lesson.title)
       }
     }
-  }
+  }, [context.state, context.blocklyXml, context.running, context.runtime, progressScope])
+
+  useEffect(() => {
+    if (!progressReady || loadedProgressScope !== (progressScope ?? null) || !missionLoaded || !activeLesson || !nextStep) return
+    if (activeProgress?.completedStepIds.includes(nextStep.id)) return
+    if (isStudent && activeAssignment && (!missionStarted || assignmentLocked)) return
+    checkStep(activeLesson, nextStep.id)
+  }, [
+    progressReady,
+    loadedProgressScope,
+    progressScope,
+    missionLoaded,
+    activeLesson,
+    nextStep,
+    activeProgress?.completedStepIds,
+    isStudent,
+    activeAssignment?.id,
+    missionStarted,
+    assignmentLocked,
+    checkStep,
+  ])
 
   const resetLesson = (lesson: Lesson) => {
     if (assignmentLocked) return
     setMissionStarted(false)
-    setProgress((current) => resetLessonProgress(current, lesson.id, progressScope))
+    updateProgress((current) => resetLessonProgress(current, lesson.id, progressScope))
     setLastResults((current) => {
       const next = { ...current }
       lesson.steps.forEach((step) => delete next[`${lesson.id}:${step.id}`])
@@ -435,17 +487,19 @@ export function LessonBrowser({
         ...progress,
         [activeLesson.id]: { ...(progress[activeLesson.id] || { completedStepIds: [] }), completedStepIds: savedSteps },
       }
-      setProgress(nextProgress)
+      updateProgress(nextProgress)
       saveLessonProgress(nextProgress, progressScope)
     }
     onLoadLesson(activeLesson, hasSavedSnapshot ? myAssignmentProgress?.snapshot : undefined)
     setMissionStarted(true)
   }
 
+  if (!isOpen) return null
+
   return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/75 p-3 backdrop-blur-sm sm:p-5">
-      <div className="flex h-[min(88dvh,820px)] max-h-[calc(100dvh-2rem)] w-full max-w-6xl overflow-hidden rounded-3xl border border-cyan-400/15 bg-[#08111f] text-white shadow-2xl shadow-black/60">
-        <aside className="hidden w-[340px] shrink-0 border-r border-slate-800 bg-slate-950/50 md:flex md:flex-col">
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/75 p-0 backdrop-blur-sm sm:p-3 lg:p-5">
+      <div className="flex h-[100dvh] max-h-[100dvh] w-full max-w-none min-w-0 overflow-hidden rounded-none border border-cyan-400/15 bg-[#08111f] text-white shadow-2xl shadow-black/60 sm:h-[min(92dvh,900px)] sm:max-h-[calc(100dvh-1.5rem)] sm:rounded-3xl lg:max-w-7xl">
+        <aside className="hidden w-[280px] shrink-0 border-r border-slate-800 bg-slate-950/50 lg:flex lg:w-[320px] lg:flex-col">
           <div className="border-b border-slate-800 p-4 space-y-3">
             <div className="flex items-center justify-between">
               <div>
@@ -625,11 +679,11 @@ export function LessonBrowser({
                   <RotateCcw size={15} />
                 </button>
               )}
-              <button onClick={onClose} className="rounded-xl p-2 text-slate-500 hover:bg-slate-800 hover:text-white md:hidden"><X size={17} /></button>
+              <button onClick={onClose} className="rounded-xl p-2 text-slate-500 hover:bg-slate-800 hover:text-white lg:hidden"><X size={17} /></button>
             </div>
           </div>
 
-          <div className="md:hidden border-b border-slate-800 bg-slate-950/35 p-3 space-y-2">
+          <div className="lg:hidden max-h-[32dvh] shrink-0 overflow-y-auto border-b border-slate-800 bg-slate-950/35 p-3 space-y-2">
             {isStudent && assignments.length > 0 && <div className="max-h-32 space-y-1 overflow-y-auto">
               <p className="px-1 text-[9px] font-semibold uppercase tracking-wide text-slate-500">Assigned missions</p>
               {assignments.map((assignment) => {
@@ -703,7 +757,7 @@ export function LessonBrowser({
             </div>
           ) : (
             <>
-              <div className="border-b border-slate-800 bg-slate-950/25 px-4 py-3 sm:px-6">
+              <div className="shrink-0 border-b border-slate-800 bg-slate-950/25 px-3 py-3 sm:px-6">
                 <div className="flex flex-wrap items-center gap-1.5">
                   {activeLesson.concepts.map((concept) => <span key={concept} className="rounded-full bg-slate-900 px-2 py-1 text-[9px] font-mono text-slate-400 ring-1 ring-slate-800">{concept}</span>)}
                 </div>
@@ -726,7 +780,7 @@ export function LessonBrowser({
                   <div className="mt-3 flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-950/20 px-3 py-2 text-[11px] text-emerald-300 font-medium">
                     <Sparkles size={14} className="text-emerald-400 shrink-0" />
                     <span>
-                      <strong>Beginner mission:</strong> Starter code is loaded into Blockly. Build the circuit first, then run it and use the mission steps to investigate the result.
+                      <strong>Beginner mission:</strong> Starter code is loaded into Blockly. Build the circuit and run it; checkpoints update automatically as you work.
                     </span>
                   </div>
                 )}
@@ -779,22 +833,22 @@ export function LessonBrowser({
                         <h3 id="eight-square-guide-title" className="mt-1 text-sm font-semibold text-white">8 Square Guide</h3>
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        <button type="button" onClick={() => { setShowCircuitCheck(true); checkStep(activeLesson, nextStep.id) }} disabled={isStudent && Boolean(activeAssignment) && (!missionStarted || assignmentLocked)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-[10px] font-semibold text-slate-200 transition hover:border-cyan-400/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"><Activity size={13} />Check live circuit</button>
+                        <button type="button" onClick={() => setShowCircuitCheck((visible) => !visible)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-[10px] font-semibold text-slate-200 transition hover:border-cyan-400/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"><Activity size={13} />{showCircuitCheck ? "Hide diagnosis" : "Circuit diagnosis"}</button>
                         {onOpenCopilot && <button type="button" onClick={onOpenCopilot} className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-400/20 px-3 py-2 text-[10px] font-semibold text-cyan-200 transition hover:bg-cyan-400/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">Ask 8 Square</button>}
-                        <button type="button" onClick={() => setHintLevels((current) => ({ ...current, [nextStepKey]: Math.min(3, (current[nextStepKey] || 0) + 1) }))} disabled={guideLevel >= 3} className="inline-flex items-center gap-1.5 rounded-lg bg-cyan-400/10 px-3 py-2 text-[10px] font-semibold text-cyan-200 transition hover:bg-cyan-400/15 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"><Lightbulb size={13} />{guideLevel === 0 ? "Get a hint" : guideLevel < 3 ? "Next hint" : "All hints shown"}</button>
+                         {!missionComplete && <button type="button" onClick={() => setHintLevels((current) => ({ ...current, [nextStepKey]: Math.min(3, (current[nextStepKey] || 0) + 1) }))} disabled={guideLevel >= 3} className="inline-flex items-center gap-1.5 rounded-lg bg-cyan-400/10 px-3 py-2 text-[10px] font-semibold text-cyan-200 transition hover:bg-cyan-400/15 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"><Lightbulb size={13} />{guideLevel === 0 ? "Get a hint" : guideLevel < 3 ? "Next hint" : "All hints shown"}</button>}
                       </div>
                     </div>
                     <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(230px,0.8fr)]">
                       <div>
-                        <p className="text-[9px] font-mono uppercase tracking-[0.16em] text-slate-500">Next checkpoint · {nextStep.kind}</p>
-                        <p className="mt-1 text-xs font-semibold text-slate-100">{cleanDisplayText(nextStep.title)}</p>
-                        <p className="mt-1.5 text-[11px] leading-5 text-slate-400">{cleanDisplayText(nextStep.instructions)}</p>
-                        {nextStepResult && <div role="status" className={"mt-3 rounded-lg border px-3 py-2 text-[10px] " + (nextStepResult.passed ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-200" : "border-amber-500/20 bg-amber-500/5 text-amber-200")}>{cleanDisplayText(nextStepResult.summary)}</div>}
-                        {guideLevel > 0 && <div className="mt-3 rounded-lg border border-cyan-400/15 bg-cyan-400/[0.04] px-3 py-2.5"><p className="text-[9px] font-semibold uppercase tracking-wide text-cyan-300">Hint {guideLevel} of 3</p><p className="mt-1 text-[11px] leading-5 text-slate-300">{missionHint(activeLesson, nextStep, guideLevel, nextStepResult)}</p></div>}
+                        <p className="text-[9px] font-mono uppercase tracking-[0.16em] text-slate-500">{missionComplete ? "Mission complete" : `Next checkpoint · ${nextStep.kind}`}</p>
+                        <p className="mt-1 text-xs font-semibold text-slate-100">{missionComplete ? "Every checkpoint has passed." : cleanDisplayText(nextStep.title)}</p>
+                         {!missionComplete && <p className="mt-1.5 text-[11px] leading-5 text-slate-400">{cleanDisplayText(nextStep.instructions)}</p>}
+                        {!missionComplete && nextStepResult && <div role="status" className={"mt-3 rounded-lg border px-3 py-2 text-[10px] " + (nextStepResult.passed ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-200" : "border-amber-500/20 bg-amber-500/5 text-amber-200")}>{cleanDisplayText(nextStepResult.summary)}</div>}
+                        {!missionComplete && guideLevel > 0 && <div className="mt-3 rounded-lg border border-cyan-400/15 bg-cyan-400/[0.04] px-3 py-2.5"><p className="text-[9px] font-semibold uppercase tracking-wide text-cyan-300">Hint {guideLevel} of 3</p><p className="mt-1 text-[11px] leading-5 text-slate-300">{missionHint(activeLesson, nextStep, guideLevel, nextStepResult)}</p></div>}
                       </div>
                       <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
                         <div className="flex items-center justify-between gap-2">
-                          <p className="text-[9px] font-semibold uppercase tracking-[0.15em] text-slate-500">Circuit check</p>
+                          <p className="text-[9px] font-semibold uppercase tracking-[0.15em] text-slate-500">Circuit diagnosis</p>
                           <span className={"rounded-full px-2 py-1 text-[9px] font-semibold " + (circuitReport.status === "healthy" ? "bg-emerald-500/10 text-emerald-300" : circuitReport.status === "danger" ? "bg-rose-500/10 text-rose-300" : "bg-amber-500/10 text-amber-300")}>{circuitReport.status === "healthy" ? "No known issue" : circuitReport.status === "danger" ? "Safety issue" : "Needs attention"}</span>
                         </div>
                         <p className="mt-1 text-[10px] text-slate-500">Model checks: {circuitReport.criticalCount} critical, {circuitReport.warningCount} warnings, {circuitReport.tipCount} notes.</p>
@@ -895,13 +949,9 @@ export function LessonBrowser({
                                 <p className="text-xs font-bold text-white">{step.title}</p>
                                 <p className="mt-1 text-[10px] uppercase tracking-wider text-slate-600">{step.kind}</p>
                               </div>
-                              <button
-                                onClick={() => checkStep(activeLesson, step.id)}
-                                disabled={locked || done || (isStudent && Boolean(activeAssignment) && (!missionStarted || assignmentLocked))}
-                                className="inline-flex items-center gap-1.5 rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-2.5 py-1.5 text-[10px] font-bold text-cyan-200 disabled:cursor-not-allowed disabled:opacity-30"
-                              >
-                                <Zap size={12} /> Check step
-                              </button>
+                              <span role="status" className={"inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-[10px] font-bold " + (done ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-200" : locked ? "border-slate-700 bg-slate-900 text-slate-500" : missionLoaded ? "border-cyan-400/20 bg-cyan-500/10 text-cyan-200" : "border-slate-700 bg-slate-900 text-slate-400")}>
+                                {done ? <><Check size={12} />Passed</> : locked ? <><Lock size={12} />Locked</> : missionLoaded ? <><Activity size={12} />Auto-checking</> : <><Play size={12} />Start mission</>}
+                              </span>
                             </div>
                             <p className="mt-2 text-xs leading-5 text-slate-400">{step.instructions}</p>
                             {result && (

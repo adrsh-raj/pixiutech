@@ -1,6 +1,7 @@
 import type { CircuitState } from "./circuit-types"
 import { CATALOG } from "./components-catalog"
 import { getBoardForPart, getDefaultBoard, isBoardPart, getActiveBoard } from "./board-registry"
+import { getBreadboardPinNetKey, normalizeBreadboardPinId } from "./breadboard-pins"
 
 export interface PinOption {
   /** numeric/label pin as used in code, e.g. "13" or "A0" */
@@ -14,11 +15,19 @@ export interface PinOption {
 /** Union-find over every pin connected by wires, so we can trace nets. */
 function buildNets(circuit: CircuitState) {
   const parent = new Map<string, string>()
-  const key = (partId: string, pinId: string) => `${partId}:${pinId}`
+  const breadboardIds = new Set(circuit.parts.filter((part) => part.type === "breadboard").map((part) => part.id))
+  const key = (partId: string, pinId: string) =>
+    `${partId}:${breadboardIds.has(partId) ? normalizeBreadboardPinId(pinId) : pinId}`
   const find = (x: string): string => {
     if (!parent.has(x)) parent.set(x, x)
     let root = x
     while (parent.get(root) !== root) root = parent.get(root)!
+    let current = x
+    while (parent.get(current) !== root) {
+      const next = parent.get(current)!
+      parent.set(current, root)
+      current = next
+    }
     return root
   }
   const union = (a: string, b: string) => {
@@ -26,8 +35,21 @@ function buildNets(circuit: CircuitState) {
     const rb = find(b)
     if (ra !== rb) parent.set(ra, rb)
   }
-  for (const w of circuit.wires) {
-    union(key(w.from.partId, w.from.pinId), key(w.to.partId, w.to.pinId))
+
+  // Each breadboard hole group and power rail is a real internal net.
+  for (const board of circuit.parts.filter((part) => part.type === "breadboard")) {
+    const groups = new Map<string, string>()
+    for (const pin of CATALOG.breadboard.pins) {
+      const ref = key(board.id, pin.id)
+      const group = getBreadboardPinNetKey(pin.id)
+      const first = groups.get(group)
+      if (first) union(first, ref)
+      else groups.set(group, ref)
+    }
+  }
+
+  for (const wire of circuit.wires) {
+    union(key(wire.from.partId, wire.from.pinId), key(wire.to.partId, wire.to.pinId))
   }
   return { find, key }
 }
@@ -73,7 +95,7 @@ export function getPinOptions(circuit: CircuitState): PinOption[] {
   // Map net-root -> descriptors of connected non-board parts.
   const netParts = new Map<string, Set<string>>()
   for (const part of circuit.parts) {
-    if (isBoardPart(part.type)) continue
+    if (isBoardPart(part.type) || part.type === "breadboard") continue
     const def = CATALOG[part.type]
     const desc = partDescriptor(circuit, part.id)
     if (!desc || !def) continue

@@ -36,3 +36,16 @@ export function getLegacyBreadboardPinMappings(): Array<[legacy: string, canonic
   }
   return mappings
 }
+
+
+/** Electrical net identity for one physical breadboard hole or rail segment. */
+export function getBreadboardPinNetKey(pinId: string): string {
+  const pin = normalizeBreadboardPinId(pinId).trim().toLowerCase()
+  const row = /^([a-j])_(\d+)$/.exec(pin)
+  if (row) return `row:${row[1]}:${row[2]}`
+
+  const rail = /^(pos|neg)_([tb])_(\d+)$/.exec(pin)
+  if (rail) return `rail:${rail[1]}:${rail[2]}`
+
+  return `pin:${pin}`
+}

@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import type { PartType, PinRef, PlacedPart, Wire, PinKind } from "@/lib/circuit-types"
 import { CATALOG, PIN_KIND_COLOR } from "@/lib/components-catalog"
 import { getBoardDefinition } from "@/lib/board-registry"
-import { getPinRefPosition, wirePath } from "@/lib/geometry"
+import { getPinRefPosition, rotatePoint, wirePath } from "@/lib/geometry"
 import { PartArt, type PartRuntime } from "./part-art"
 import { SchematicPartArt } from "./schematic-art"
 import { Maximize2, Plus, Minus, Sparkles } from "lucide-react"
@@ -54,6 +54,7 @@ interface Props {
   isScopeOpen?: boolean
   activeWireColor?: string
   stagedPreview?: StagedPreview | null
+  fitRequestKey?: string | number
 }
 
 function getPinDisplayInfo(type: PartType, pinId: string): { label: string; kind: PinKind; details?: string } {
@@ -123,12 +124,14 @@ export function CircuitCanvas(props: Props) {
     isScopeOpen = false,
     activeWireColor = "#22c55e",
     stagedPreview,
+    fitRequestKey,
   } = props
 
   const svgRef = useRef<SVGSVGElement | null>(null)
   const [view, setView] = useState<View>({ scale: 1, tx: 120, ty: 90 })
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null)
   const [hoverPin, setHoverPin] = useState<string | null>(null)
+  const fitRequestKeyRef = useRef(fitRequestKey)
 
   const dragRef = useRef<{ id: string; offX: number; offY: number } | null>(null)
   const panRef = useRef<{ sx: number; sy: number; tx: number; ty: number } | null>(null)
@@ -152,7 +155,7 @@ export function CircuitCanvas(props: Props) {
     const my = e.clientY - rect.top
     setView((v) => {
       const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1
-      const scale = Math.min(2.5, Math.max(0.3, v.scale * factor))
+      const scale = Math.min(2.5, Math.max(0.05, v.scale * factor))
       const k = scale / v.scale
       return {
         scale,
@@ -167,36 +170,93 @@ export function CircuitCanvas(props: Props) {
     const rect = svgRef.current.getBoundingClientRect()
     if (!rect.width || !rect.height) return
 
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-    for (const p of parts) {
-      const def = CATALOG[p.type]
-      const w = def?.width || 100
-      const h = def?.height || 100
-      minX = Math.min(minX, p.x)
-      minY = Math.min(minY, p.y)
-      maxX = Math.max(maxX, p.x + w)
-      maxY = Math.max(maxY, p.y + h)
+    const points: Array<{ x: number; y: number }> = []
+    const include = (point: { x: number; y: number }) => points.push(point)
+
+    for (const part of parts) {
+      const def = CATALOG[part.type]
+      if (!def) continue
+      const center = { x: def.width / 2, y: def.height / 2 }
+      for (const corner of [
+        { x: 0, y: 0 },
+        { x: def.width, y: 0 },
+        { x: def.width, y: def.height },
+        { x: 0, y: def.height },
+      ]) {
+        const rotated = rotatePoint(corner.x, corner.y, center.x, center.y, part.rotation)
+        include({ x: part.x + rotated.x, y: part.y + rotated.y })
+      }
     }
-    const padding = 28
-    const boundsW = Math.max(100, maxX - minX + padding * 2)
-    const boundsH = Math.max(100, maxY - minY + padding * 2)
-    const scale = Math.min(rect.width / boundsW, rect.height / boundsH)
-    const finalScale = Math.max(0.3, Math.min(scale, 1.0))
-    const tx = (rect.width - (maxX - minX) * finalScale) / 2 - minX * finalScale
-    const ty = (rect.height - (maxY - minY) * finalScale) / 2 - minY * finalScale
+
+    // Include Bézier control points as well as pins so fitted views keep the full
+    // jumper curves inside the viewport.
+    for (const wire of wires) {
+      const a = getPinRefPosition(wire.from, parts)
+      const b = getPinRefPosition(wire.to, parts)
+      if (!a || !b) continue
+      const dx = b.x - a.x
+      const dy = b.y - a.y
+      const bend = Math.min(Math.max(Math.abs(dx) * 0.5, 35), 140)
+      include(a)
+      include(b)
+      include({ x: a.x + Math.sign(dx || 1) * bend, y: a.y + dy * 0.12 })
+      include({ x: b.x - Math.sign(dx || 1) * bend, y: b.y - dy * 0.12 })
+    }
+
+    if (points.length === 0) return
+    const minX = Math.min(...points.map((point) => point.x))
+    const minY = Math.min(...points.map((point) => point.y))
+    const maxX = Math.max(...points.map((point) => point.x))
+    const maxY = Math.max(...points.map((point) => point.y))
+    const contentW = Math.max(100, maxX - minX)
+    const contentH = Math.max(100, maxY - minY)
+    const padding = 40
+    const scale = Math.min(
+      (rect.width - padding * 2) / contentW,
+      (rect.height - padding * 2) / contentH,
+      1,
+    )
+    const finalScale = Math.max(0.05, scale)
+    const tx = (rect.width - contentW * finalScale) / 2 - minX * finalScale
+    const ty = (rect.height - contentH * finalScale) / 2 - minY * finalScale
     setView({ scale: finalScale, tx, ty })
-  }, [parts])
+  }, [parts, wires])
+
+  const zoomAtCenter = useCallback((factor: number) => {
+    const rect = svgRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const mx = rect.width / 2
+    const my = rect.height / 2
+    setView((current) => {
+      const scale = Math.min(2.5, Math.max(0.05, current.scale * factor))
+      const ratio = scale / current.scale
+      return {
+        scale,
+        tx: mx - (mx - current.tx) * ratio,
+        ty: my - (my - current.ty) * ratio,
+      }
+    })
+  }, [])
 
   const initialFitDone = useRef(false)
+
   useEffect(() => {
+    if (fitRequestKeyRef.current !== fitRequestKey) {
+      fitRequestKeyRef.current = fitRequestKey
+      initialFitDone.current = false
+      if (!parts.length) {
+        setView({ scale: 1, tx: 120, ty: 90 })
+      }
+    }
+
     if (!initialFitDone.current && parts.length > 0) {
-      const timer = setTimeout(() => {
+      const timer = window.setTimeout(() => {
         fitToScreen()
         initialFitDone.current = true
-      }, 60)
-      return () => clearTimeout(timer)
+      }, 80)
+      return () => window.clearTimeout(timer)
     }
-  }, [parts.length, fitToScreen])
+  }, [fitRequestKey, parts.length, fitToScreen])
 
   useEffect(() => {
     const handleFit = () => fitToScreen()
@@ -1580,7 +1640,7 @@ export function CircuitCanvas(props: Props) {
       <div className="absolute right-3 top-3 md:top-auto md:bottom-6 z-20 flex flex-col overflow-hidden rounded-xl border border-border bg-card/90 backdrop-blur-md shadow-lg">
         <button
           className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary transition active:scale-90 flex items-center justify-center cursor-pointer"
-          onClick={() => setView((v) => ({ ...v, scale: Math.min(2.5, v.scale * 1.2) }))}
+          onClick={() => zoomAtCenter(1.2)}
           title="Zoom In"
           aria-label="Zoom in"
         >
@@ -1596,7 +1656,7 @@ export function CircuitCanvas(props: Props) {
         </button>
         <button
           className="border-t border-border p-2 text-muted-foreground hover:text-foreground hover:bg-secondary transition active:scale-90 flex items-center justify-center cursor-pointer"
-          onClick={() => setView((v) => ({ ...v, scale: Math.max(0.25, v.scale / 1.2) }))}
+          onClick={() => zoomAtCenter(1 / 1.2)}
           title="Zoom Out"
           aria-label="Zoom out"
         >

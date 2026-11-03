@@ -18,6 +18,7 @@ interface Props {
   onRedo?: () => void
   onOpenProjects?: () => void
   onOpenLessons?: () => void
+  isLessonsOpen?: boolean
   onOpenGuide?: () => void
   isSerialOpen?: boolean
   onToggleSerial?: () => void
@@ -47,9 +48,7 @@ interface Props {
   onToggleDoctor?: () => void
   doctorScore?: number
   onDownloadIno?: () => void
-  isCopilotOpen?: boolean
   onToggleCopilot?: () => void
-  isCopilotStaged?: boolean
   userRole?: string
 }
 
@@ -71,6 +70,7 @@ export function Toolbar({
   onRedo,
   onOpenProjects,
   onOpenLessons,
+  isLessonsOpen = false,
   onOpenGuide,
   isSerialOpen = false,
   onToggleSerial,
@@ -98,9 +98,7 @@ export function Toolbar({
   onToggleDoctor,
   doctorScore,
   onDownloadIno,
-  isCopilotOpen = false,
   onToggleCopilot,
-  isCopilotStaged = false,
   userRole,
 }: Props) {
   const [toolsOpen, setToolsOpen] = useState(false)
@@ -310,24 +308,22 @@ export function Toolbar({
           </button>
         )}
 
-        {/* PIXIU AI Copilot Toolbar Button */}
-        {onToggleCopilot && (
+        {/* Guided lesson shortcut stays visible on compact screens. */}
+        {onOpenLessons && (
           <button
-            onClick={onToggleCopilot}
-            className={`pixiu-toolbar-action-copilot flex items-center gap-1.5 rounded-lg border px-2 sm:px-2.5 py-1.5 text-xs font-bold transition cursor-pointer shadow-sm ${
-              isCopilotOpen
-                ? "border-cyan-400 bg-gradient-to-r from-cyan-500 to-indigo-600 text-slate-950 font-black shadow-cyan-500/25"
-                : isCopilotStaged
-                ? "border-cyan-400/80 bg-cyan-950/60 text-cyan-200 animate-pulse"
+            onClick={onOpenLessons}
+            aria-label="Open lessons"
+            aria-haspopup="dialog"
+            aria-expanded={isLessonsOpen}
+            className={`pixiu-toolbar-action-lessons flex min-h-9 items-center gap-1.5 rounded-lg border px-2 sm:min-h-0 sm:px-2.5 py-1.5 text-xs font-bold transition cursor-pointer shadow-sm ${
+              isLessonsOpen
+                ? "border-cyan-400 bg-cyan-500/15 text-cyan-100"
                 : "border-cyan-500/30 bg-slate-900/80 text-cyan-300 hover:border-cyan-400 hover:bg-slate-800"
             }`}
-            title="Open PIXIU AI Copilot Chatbot"
+            title="Open guided lessons"
           >
-            <Sparkles size={14} className={isCopilotOpen ? "text-slate-950" : "text-cyan-400 animate-pulse"} />
-            <span className="hidden sm:inline">AI Copilot</span>
-            {isCopilotStaged && (
-              <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-ping" />
-            )}
+            <BookOpen size={14} />
+            <span className="hidden sm:inline">Lessons</span>
           </button>
         )}
 
@@ -363,17 +359,6 @@ export function Toolbar({
               className="absolute right-0 top-[calc(100%+7px)] z-[70] w-64 overflow-hidden rounded-2xl border border-border bg-slate-950/95 p-1.5 shadow-2xl backdrop-blur-xl"
             >
               <div className="px-2 py-1.5 text-[9px] font-mono uppercase tracking-[0.18em] text-slate-500">Lab tools</div>
-
-              {onOpenLessons && (
-                <button
-                  onClick={() => { setToolsOpen(false); onOpenLessons() }}
-                  className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-xs font-semibold text-slate-200 hover:bg-slate-800"
-                  role="menuitem"
-                >
-                  <BookOpen size={14} className="text-cyan-300" />
-                  <span><span className="block">Lessons</span><span className="text-[9px] font-normal text-slate-500">Guided projects with auto-checks</span></span>
-                </button>
-              )}
 
               {onOpenGuide && (
                 <button

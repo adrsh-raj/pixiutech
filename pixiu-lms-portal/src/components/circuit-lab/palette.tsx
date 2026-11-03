@@ -207,13 +207,13 @@ export function Palette({
       {isOpen && (
         <div
           onClick={onClose}
-          className="fixed inset-0 bg-background/80 backdrop-blur-xs z-30 md:hidden animate-in fade-in"
+          className="fixed inset-0 bg-background/80 backdrop-blur-xs z-30 lg:hidden animate-in fade-in"
         />
       )}
 
       <aside
-        className={`fixed md:static inset-y-0 left-0 z-40 md:z-10 flex h-full w-72 shrink-0 flex-col border-r border-border bg-sidebar transition-transform duration-200 ease-in-out ${
-          isOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full md:translate-x-0"
+        className={`fixed lg:static inset-y-0 left-0 z-40 lg:z-10 flex h-full w-72 shrink-0 flex-col border-r border-border bg-sidebar transition-transform duration-200 ease-in-out ${
+          isOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full lg:translate-x-0"
         }`}
       >
         {/* Header & Search */}
@@ -225,7 +225,7 @@ export function Palette({
             {onClose && (
               <button
                 onClick={onClose}
-                className="md:hidden p-1 text-muted-foreground hover:text-foreground rounded hover:bg-secondary cursor-pointer"
+                className="lg:hidden p-1 text-muted-foreground hover:text-foreground rounded hover:bg-secondary cursor-pointer"
                 title="Close Components"
               >
                 <X size={16} />

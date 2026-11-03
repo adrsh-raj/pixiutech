@@ -5,6 +5,7 @@ import { ESP32_LESSONS } from "./curriculum/esp32-curriculum"
 import { PICO_LESSONS } from "./curriculum/pico-curriculum"
 import { MICROBIT_LESSONS } from "./curriculum/microbit-curriculum"
 import { BREADBOARD_COLUMNS } from "./components-catalog"
+import { normalizeBreadboardPinId } from "./breadboard-pins"
 
 export type LessonDifficulty = "Beginner" | "Intermediate" | "Advanced"
 export type LessonStepKind = "build" | "code" | "run" | "experiment"
@@ -300,55 +301,51 @@ function endpointMatches(state: CircuitState, endpoint: LessonEndpoint, actual: 
   return pinMatches(part.type, endpoint.pinId, actual.pinId)
 }
 
-function addBreadboardEdges(
-  state: CircuitState,
-  graph: Map<string, Set<string>>,
-  breadboard: Extract<PartType, "breadboard">,
-) {
-  const part = state.parts.find((item) => item.type === breadboard)
-  if (!part) return
-  const link = (a: string, b: string) => {
-    const u = `${part.id}:${a}`
-    const v = `${part.id}:${b}`
-    if (!graph.has(u)) graph.set(u, new Set())
-    if (!graph.has(v)) graph.set(v, new Set())
-    graph.get(u)!.add(v)
-    graph.get(v)!.add(u)
-  }
+function addBreadboardEdges(state: CircuitState, graph: Map<string, Set<string>>) {
+  for (const part of state.parts.filter((item) => item.type === "breadboard")) {
+    const link = (a: string, b: string) => {
+      const u = endpointKey(state, { partId: part.id, pinId: a })
+      const v = endpointKey(state, { partId: part.id, pinId: b })
+      if (!graph.has(u)) graph.set(u, new Set())
+      if (!graph.has(v)) graph.set(v, new Set())
+      graph.get(u)!.add(v)
+      graph.get(v)!.add(u)
+    }
 
-  for (let column = 1; column <= BREADBOARD_COLUMNS; column++) {
-    ;(["a", "b", "c", "d", "e"] as const).forEach((row, index, rows) => {
-      if (index < rows.length - 1) link(`${row}_${column}`, `${rows[index + 1]}_${column}`)
-    })
-    ;(["f", "g", "h", "i", "j"] as const).forEach((row, index, rows) => {
-      if (index < rows.length - 1) link(`${row}_${column}`, `${rows[index + 1]}_${column}`)
-    })
-    if (column < BREADBOARD_COLUMNS) {
-      link(`pos_t_${column}`, `pos_t_${column + 1}`)
-      link(`neg_t_${column}`, `neg_t_${column + 1}`)
-      link(`pos_b_${column}`, `pos_b_${column + 1}`)
-      link(`neg_b_${column}`, `neg_b_${column + 1}`)
+    for (let column = 1; column <= BREADBOARD_COLUMNS; column++) {
+      ;(["a", "b", "c", "d", "e"] as const).forEach((row, index, rows) => {
+        if (index < rows.length - 1) link(`${row}_${column}`, `${rows[index + 1]}_${column}`)
+      })
+      ;(["f", "g", "h", "i", "j"] as const).forEach((row, index, rows) => {
+        if (index < rows.length - 1) link(`${row}_${column}`, `${rows[index + 1]}_${column}`)
+      })
+      if (column < BREADBOARD_COLUMNS) {
+        link(`pos_t_${column}`, `pos_t_${column + 1}`)
+        link(`neg_t_${column}`, `neg_t_${column + 1}`)
+        link(`pos_b_${column}`, `pos_b_${column + 1}`)
+        link(`neg_b_${column}`, `neg_b_${column + 1}`)
+      }
+    }
+
+    for (const [legacy, canonical] of [
+      ["pos_top", "pos_t_1"], ["neg_top", "neg_t_1"], ["pos_bot", "pos_b_1"], ["neg_bot", "neg_b_1"],
+      ...(["a", "b", "c", "d", "e"] as const).flatMap((row) => {
+        const column = (row.charCodeAt(0) - "a".charCodeAt(0) + 1) * 3
+        return [
+          [`${row}1`, `${row}_${column}`],
+          [`${row}2`, `${String.fromCharCode(row.charCodeAt(0) + 5)}_${column}`],
+        ]
+      }),
+    ] as Array<[string, string]>) {
+      link(legacy, canonical)
     }
   }
-
-  link("pos_top", "pos_t_1")
-  link("neg_top", "neg_t_1")
-  link("pos_bot", "pos_b_1")
-  link("neg_bot", "neg_b_1")
-  link("a1", "a_3")
-  link("b1", "b_3")
-  link("c1", "c_3")
-  link("d1", "d_3")
-  link("e1", "e_3")
-  link("a2", "f_3")
-  link("b2", "g_3")
-  link("c2", "h_3")
-  link("d2", "i_3")
-  link("e2", "j_3")
 }
 
-function endpointKey(ref: PinRef) {
-  return `${ref.partId}:${ref.pinId}`
+function endpointKey(state: CircuitState, ref: PinRef) {
+  const part = state.parts.find((item) => item.id === ref.partId)
+  const pinId = part?.type === "breadboard" ? normalizeBreadboardPinId(ref.pinId) : ref.pinId
+  return `${ref.partId}:${pinId}`
 }
 
 function areOnSameNet(state: CircuitState, a: LessonEndpoint, b: LessonEndpoint) {
@@ -361,23 +358,18 @@ function areOnSameNet(state: CircuitState, a: LessonEndpoint, b: LessonEndpoint)
   }
 
   for (const wire of state.wires) {
-    link(endpointKey(wire.from), endpointKey(wire.to))
+    link(endpointKey(state, wire.from), endpointKey(state, wire.to))
   }
 
-  for (const part of state.parts) {
-    if (part.type === "breadboard") {
-      addBreadboardEdges(state, graph, "breadboard")
-      break
-    }
-  }
+  addBreadboardEdges(state, graph)
 
   const aKeys = state.wires.flatMap((wire) => [wire.from, wire.to]).filter((ref) => endpointMatches(state, a, ref))
   const bKeys = state.wires.flatMap((wire) => [wire.from, wire.to]).filter((ref) => endpointMatches(state, b, ref))
-  const queue = aKeys.map(endpointKey)
+  const queue = aKeys.map((ref) => endpointKey(state, ref))
   const visited = new Set(queue)
   while (queue.length) {
     const current = queue.shift()!
-    if (bKeys.some((ref) => endpointKey(ref) === current)) return true
+    if (bKeys.some((ref) => endpointKey(state, ref) === current)) return true
     for (const next of graph.get(current) ?? []) {
       if (!visited.has(next)) {
         visited.add(next)
@@ -387,6 +379,56 @@ function areOnSameNet(state: CircuitState, a: LessonEndpoint, b: LessonEndpoint)
   }
   return false
 }
+function formatLessonProperty(key: string, value: string | number | boolean): string {
+  if (key === "resistance") {
+    const ohms = Number(value)
+    if (Number.isFinite(ohms)) {
+      return ohms >= 1000
+        ? `${Number((ohms / 1000).toFixed(2))} kΩ`
+        : `${ohms} Ω`
+    }
+  }
+  return `${key.replace(/([A-Z])/g, " $1").toLowerCase()} ${String(value)}`
+}
+
+function describeLessonEndpoint(endpoint: LessonEndpoint): string {
+  const properties = Object.entries(endpoint.partProps ?? {})
+    .map(([key, value]) => formatLessonProperty(key, value))
+    .join(", ")
+  return `${endpoint.partType}${properties ? ` (${properties})` : ""}.${endpoint.pinId}`
+}
+
+function describeConnectionFailure(state: CircuitState, req: LessonConnectionRequirement): string {
+  for (const endpoint of [req.from, req.to]) {
+    const required = Object.entries(endpoint.partProps ?? {})
+    if (required.length === 0) continue
+
+    const candidates = state.parts.filter((part) => part.type === endpoint.partType)
+    const matches = candidates.filter((part) =>
+      required.every(([key, value]) => {
+        const actual = part.props?.[key]
+        return typeof value === "number"
+          ? Number(actual) === value
+          : String(actual ?? "") === String(value)
+      }),
+    )
+    const expected = required.map(([key, value]) => formatLessonProperty(key, value)).join(", ")
+    if (matches.length === 0) {
+      if (candidates.length === 0) {
+        return `Place a ${endpoint.partType} with ${expected}, then connect it to the required pins.`
+      }
+      const found = candidates
+        .map((part) => required.map(([key]) => formatLessonProperty(key, part.props?.[key] ?? "unset")).join(", "))
+        .join("; ")
+      return `Needs ${endpoint.partType} with ${expected}; found ${found}. Set the correct value in the Inspector.`
+    }
+
+    return `The ${endpoint.partType} with ${expected} is present. Check its ${endpoint.pinId} terminal and the wire to the other pin.`
+  }
+
+  return "No wire or shared breadboard row/rail connects these pins. Check the wire endpoints."
+}
+
 function hasConnection(state: CircuitState, req: LessonConnectionRequirement) {
   const directMatches = (a: LessonConnectionRequirement["from"], b: LessonConnectionRequirement["to"]) =>
     state.wires.some((wire) =>
@@ -542,8 +584,8 @@ export function evaluateLessonStep(lesson: Lesson, step: LessonStep, context: Le
         const passed = hasConnection(context.state, req)
         results.push({
           passed,
-          label: `${req.from.partType}.${req.from.pinId} → ${req.to.partType}.${req.to.pinId}`,
-          detail: passed ? "Connected" : "Connection not found",
+          label: `${describeLessonEndpoint(req.from)} → ${describeLessonEndpoint(req.to)}`,
+          detail: passed ? "Connected" : describeConnectionFailure(context.state, req),
         })
       }
     }
@@ -661,7 +703,7 @@ export function evaluateLessonStep(lesson: Lesson, step: LessonStep, context: Le
     results,
     summary: passed
       ? step.success
-      : failed[0]?.detail || "Complete the step and check again.",
+      : failed[0]?.detail || "Complete the step; it updates automatically.",
   }
 }
 
