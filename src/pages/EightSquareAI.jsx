@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { LMS_LOGIN_URL } from '../config/runtime.js'
-import '../styles/eight-square-aconst PREVIEW_CASES = {
+import '../styles/eight-square-ai.css'
+
+const PREVIEW_CASES = {
   led: {
     id: 'led',
     tabLabel: 'Circuit fault',
