@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom"
 import { useEffect, useRef, useState } from "react"
-import { CircuitBoard, Play, Square, Trash2, ArrowLeft, Undo2, Redo2, FolderOpen, BookOpen, Terminal, Volume2, VolumeX, Sparkles, Camera, Sliders, Pause, StepForward, FastForward, MoreHorizontal, HelpCircle, ShieldAlert, Download, Cpu, Lock } from "lucide-react"
+import { CircuitBoard, Play, Square, Trash2, ArrowLeft, Undo2, Redo2, FolderOpen, BookOpen, Terminal, Volume2, VolumeX, Sparkles, Camera, Sliders, Pause, StepForward, FastForward, MoreHorizontal, HelpCircle, ShieldAlert, Download, Cpu, Lock, Activity } from "lucide-react"
 import { XpBadgeButton } from "./xp-badge-modal"
 import "./pixiu-brand.css"
 
@@ -22,6 +22,8 @@ interface Props {
   onOpenGuide?: () => void
   isSerialOpen?: boolean
   onToggleSerial?: () => void
+  isLogicAnalyzerOpen?: boolean
+  onToggleLogicAnalyzer?: () => void
   isAiCameraOpen?: boolean
   onToggleAiCamera?: () => void
   isAiStudioOpen?: boolean
@@ -74,6 +76,8 @@ export function Toolbar({
   onOpenGuide,
   isSerialOpen = false,
   onToggleSerial,
+  isLogicAnalyzerOpen = false,
+  onToggleLogicAnalyzer,
   isAiCameraOpen = false,
   onToggleAiCamera,
   isAiStudioOpen = false,
@@ -436,6 +440,18 @@ export function Toolbar({
                 >
                   <span className="flex items-center gap-2"><Terminal size={14} />Serial monitor</span>
                   <span className="text-[9px] text-slate-500">{isSerialOpen ? "OPEN" : "CLOSED"}</span>
+                </button>
+              )}
+
+              {onToggleLogicAnalyzer && (
+                <button
+                  onClick={() => { setToolsOpen(false); onToggleLogicAnalyzer() }}
+                  className="flex w-full items-center justify-between gap-2 rounded-xl px-2.5 py-2 text-left text-xs font-semibold text-slate-200 hover:bg-slate-800"
+                  role="menuitem"
+                  aria-pressed={isLogicAnalyzerOpen}
+                >
+                  <span className="flex items-center gap-2"><Activity size={14} className="text-cyan-300" />Logic Analyzer</span>
+                  <span className="text-[9px] text-slate-500">{isLogicAnalyzerOpen ? "OPEN" : "READY"}</span>
                 </button>
               )}
 

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, KeyboardEvent } from 'react';
-import { Terminal, Trash2, Clock, ChevronDown, ChevronUp, SendHorizontal, X } from 'lucide-react';
+import { Activity, Terminal, Trash2, Clock, ChevronDown, ChevronUp, SendHorizontal, X } from 'lucide-react';
+import { SerialPlotter } from './serial-plotter';
 
 export interface SerialLine {
   text: string;
@@ -23,6 +24,7 @@ export const SerialMonitor: React.FC<Props> = ({
   onSend,
 }) => {
   const [showTimestamps, setShowTimestamps] = useState(true);
+  const [activeView, setActiveView] = useState<'monitor' | 'plotter'>('monitor');
   const [inputValue, setInputValue] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -114,8 +116,27 @@ export const SerialMonitor: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* Content */}
+      {/* Instrument views */}
       {isOpen && (
+        <div role="tablist" aria-label="Serial tools" className="flex h-8 min-h-8 items-center gap-1 border-b border-slate-800 bg-slate-900 px-2">
+          <button type="button" role="tab" aria-selected={activeView === 'monitor'} onClick={() => setActiveView('monitor')} className={`rounded-md px-3 py-1 text-[10px] font-semibold transition ${activeView === 'monitor' ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-200'}`}>
+            Monitor
+          </button>
+          <button type="button" role="tab" aria-selected={activeView === 'plotter'} onClick={() => setActiveView('plotter')} className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-[10px] font-semibold transition ${activeView === 'plotter' ? 'bg-cyan-500/15 text-cyan-200' : 'text-slate-500 hover:text-slate-200'}`}>
+            <Activity size={12} /> Plotter
+          </button>
+          {activeView === 'plotter' && <span className="ml-auto text-[9px] text-slate-500">Live numeric output</span>}
+        </div>
+      )}
+
+      {/* Content */}
+      {isOpen && activeView === 'plotter' && (
+        <div role="tabpanel" className="min-h-0 flex-1 p-2 sm:p-3">
+          <SerialPlotter lines={lines} />
+        </div>
+      )}
+
+      {isOpen && activeView === 'monitor' && (
         <>
           {/* Scrollable log area */}
           <div

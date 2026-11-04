@@ -23,6 +23,7 @@ import { isBoardPart, getActiveBoard, scaleAdcReading, lookupBoardPinState } fro
 import { solveCircuitNodalPotentials } from "@/lib/circuit-solver"
 import { Multimeter } from "./multimeter"
 import { Oscilloscope } from "./oscilloscope"
+import { LogicAnalyzer } from "./logic-analyzer"
 import { CircuitCanvas } from "./circuit-canvas"
 import { Inspector } from "./inspector"
 import { Palette } from "./palette"
@@ -305,6 +306,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
   const [activeProbeToPlace, setActiveProbeToPlace] = useState<"red" | "black" | null>(null)
 
   const [isScopeOpen, setIsScopeOpen] = useState(false)
+  const [isLogicAnalyzerOpen, setIsLogicAnalyzerOpen] = useState(false)
   const [scopeProbeCH1, setScopeProbeCH1] = useState<PinRef | null>(null)
   const [scopeProbeCH2, setScopeProbeCH2] = useState<PinRef | null>(null)
   const [activeScopeProbeToPlace, setActiveScopeProbeToPlace] = useState<"ch1" | "ch2" | null>(null)
@@ -2073,6 +2075,8 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
         onOpenGuide={() => window.dispatchEvent(new Event("pixiu-open-guide"))}
         isSerialOpen={isSerialOpen}
         onToggleSerial={() => setIsSerialOpen((prev) => !prev)}
+        isLogicAnalyzerOpen={isLogicAnalyzerOpen}
+        onToggleLogicAnalyzer={() => setIsLogicAnalyzerOpen((prev) => !prev)}
         isAiCameraOpen={isAiCameraOpen}
         onToggleAiCamera={handleToggleAiVision}
         isAiStudioOpen={isAiStudioOpen}
@@ -2648,7 +2652,14 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
         onSetActiveProbeToPlace={setActiveScopeProbeToPlace}
       />
 
-      {/* AI Circuit Doctor Diagnostics Drawer */}
+      <LogicAnalyzer
+        isOpen={isLogicAnalyzerOpen && view === "circuit"}
+        onClose={() => setIsLogicAnalyzerOpen(false)}
+        state={state}
+        simulationRef={oscilloscopeSimulationRef}
+      />
+
+      {/* AI Circuit Doctor Diagnostics Drawer */>
       <CircuitDoctorHud
         report={doctorReport}
         isOpen={isDoctorOpen && view === "circuit"}

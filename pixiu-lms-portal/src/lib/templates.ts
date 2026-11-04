@@ -13,6 +13,12 @@ export interface ProjectTemplate {
   gradeBand?: TemplateGrade
   unit?: string
   tutorial?: string[]
+  experiment?: {
+    goal: string
+    expected: string
+    verify: string
+    challenge: string
+  }
 }
 
 const BASE_TEMPLATES: ProjectTemplate[] = [
@@ -1014,14 +1020,15 @@ function delay(ms: number) { return block("time_delay", {}, { MS: numberBlock(ms
 function serialBegin() { return block("serial_begin", { BAUD: "9600" }) }
 function serialPrint(value: string) { return block("serial_print", {}, { TEXT: textBlock(value) }) }
 function serialPrintln(value: string) { return block("serial_println", {}, { TEXT: textBlock(value) }) }
+function serialPlotValue(label: string, value: string) { return block("serial_plot_value", { LABEL: label }, { VALUE: value }) }
 function serialPrintValue(type: string, fields: Record<string, string> = {}) { return block("serial_println", {}, { TEXT: block(type, fields) }) }
 
 function program(setup: string[], loop: string[]) {
   return "<xml xmlns=\"https://developers.google.com/blockly/xml\"><block type=\"arduino_program\" x=\"40\" y=\"40\"><statement name=\"SETUP\">" + chain(setup) + "</statement><statement name=\"LOOP\">" + chain(loop) + "</statement></block></xml>"
 }
 
-function starter(id: string, title: string, description: string, gradeBand: TemplateGrade, unit: string, difficulty: ProjectTemplate["difficulty"], tags: string[], circuit: CircuitState, blocklyXml: string, tutorial: string[]): ProjectTemplate {
-  return { id, title, description, gradeBand, unit, difficulty, tags, circuit, blocklyXml, tutorial }
+function starter(id: string, title: string, description: string, gradeBand: TemplateGrade, unit: string, difficulty: ProjectTemplate["difficulty"], tags: string[], circuit: CircuitState, blocklyXml: string, tutorial: string[], experiment?: ProjectTemplate["experiment"]): ProjectTemplate {
+  return { id, title, description, gradeBand, unit, difficulty, tags, circuit, blocklyXml, tutorial, experiment }
 }
 
 const EXTRA_TEMPLATES: ProjectTemplate[] = [
@@ -1522,6 +1529,26 @@ const EXTRA_TEMPLATES: ProjectTemplate[] = [
       "3. ▶️ Simulation Execution & Interaction Controls: Click Run to arm room automation. In the Inspector panel, toggle the PIR motion trigger to simulate an occupant entering the room.",
       "4. 📊 Outcomes & Real-Time Observations: The relay contacts close with a mechanical click, the ceiling fan spins up rapidly to 1800 RPM, and the room lamp illuminates brightly.",
     ]),
+  starter("lab-ohms-law-led", "Ohm’s Law: Measure LED Current", "A short measurement exercise with a real series resistor. Drive a red LED from Uno D13, measure the voltage drop across its 220 Ω resistor, then use I = V / R to estimate current.", 8, "Measurements & Signals", "Beginner", ["Ohm’s law", "DMM", "LED", "220 Ω"],
+    { parts: [part("uno", "arduino-uno", 60, 110), part("r1", "resistor", 390, 110, { resistance: 220 }), part("led1", "led", 570, 90, { color: "red" })], wires: [wire("w1", "uno", "d13", "r1", "a", "#ef4444"), wire("w2", "r1", "b", "led1", "anode", "#ef4444"), wire("w3", "led1", "cathode", "uno", "gnd", "#1e293b")] },
+    program([pinMode("13", "OUTPUT")], [digitalWrite("13", "HIGH"), delay(1000)]),
+    ["1. Load the circuit and run it. D13 drives the LED through its 220 Ω series resistor.", "2. Open Tools → Digital Multimeter, choose DC voltage, then place the probes across the resistor terminals.", "3. Calculate current with I = V / R. A red LED should leave roughly 2.8–3.1 V across 220 Ω, or about 13–14 mA.", "4. Change the resistor to 330 Ω and repeat. The LED current should fall while the circuit remains protected."],
+    { goal: "Estimate LED current from the measured resistor voltage using I = V / R.", expected: "About 2.8–3.1 V across 220 Ω, which is roughly 13–14 mA.", verify: "Use DC voltage mode and place the meter probes on opposite resistor terminals.", challenge: "Change the resistor to 330 Ω and compare the calculated current." }),
+  starter("lab-digital-timing", "Digital Timing: 1 Hz Blink", "Build a protected D13 LED output and inspect its HIGH/LOW timing. The Blockly loop uses a 500 ms on interval and a 500 ms off interval, producing one full cycle per second.", 7, "Measurements & Signals", "Beginner", ["Logic Analyzer", "Digital output", "Timing", "1 Hz"],
+    { parts: [part("uno", "arduino-uno", 60, 110), part("r1", "resistor", 390, 110, { resistance: 220 }), part("led1", "led", 570, 90, { color: "green" })], wires: [wire("w1", "uno", "d13", "r1", "a", "#22c55e"), wire("w2", "r1", "b", "led1", "anode", "#22c55e"), wire("w3", "led1", "cathode", "uno", "gnd", "#1e293b")] },
+    program([pinMode("13", "OUTPUT")], [digitalWrite("13", "HIGH"), delay(500), digitalWrite("13", "LOW"), delay(500)]),
+    ["1. Run the Blockly program; the LED should alternate between on and off.", "2. Open Tools → Logic Analyzer. CH1 defaults to the Uno built-in LED pin, D13.", "3. Set the capture window to 1 second and keep Auto trigger. The trace should show about one complete HIGH/LOW cycle.", "4. The period is about 1 s, so frequency is 1 Hz and the duty cycle is about 50%."],
+    { goal: "Relate the program’s two delays to the signal’s period and frequency.", expected: "One 1 s cycle, approximately 1 Hz, with HIGH near 50% of the cycle.", verify: "Capture D13 for 1 second in the Logic Analyzer while the sketch is running.", challenge: "Change only the HIGH delay to 250 ms; predict the new period and duty cycle before capturing." }),
+  starter("lab-pwm-duty-cycle", "PWM Output: Brightness and Duty Cycle", "Use an Uno PWM pin and a current-limiting resistor to drive an LED. Inspect D9’s pulse train and connect the 8-bit analogWrite value to the measured duty cycle.", 8, "Measurements & Signals", "Intermediate", ["Logic Analyzer", "Oscilloscope", "PWM", "Arduino Uno"],
+    { parts: [part("uno", "arduino-uno", 60, 110), part("r1", "resistor", 390, 110, { resistance: 220 }), part("led1", "led", 570, 90, { color: "blue" })], wires: [wire("w1", "uno", "d9", "r1", "a", "#8b5cf6"), wire("w2", "r1", "b", "led1", "anode", "#8b5cf6"), wire("w3", "led1", "cathode", "uno", "gnd", "#1e293b")] },
+    program([pinMode("9", "OUTPUT")], [analogWrite("9", 128), delay(20)]),
+    ["1. Run the program. It holds Uno D9 at analogWrite value 128 (out of 255).", "2. Open Tools → Logic Analyzer and select D9. Use a 20 ms window to inspect the PWM pulse train.", "3. On the Uno model, the PWM frequency is about 490 Hz and duty is about 50.2% (128 / 255).", "4. Compare with the Oscilloscope, then change 128 to 64 and 192 to compare pulse width."],
+    { goal: "Compare an 8-bit PWM command with its duty cycle and frequency.", expected: "D9 is near 490 Hz; value 128 gives about 50.2% HIGH time.", verify: "Capture D9 in Tools → Logic Analyzer; cross-check voltage shape in the Oscilloscope.", challenge: "Try values 64 and 192. Frequency should stay the same while duty changes." }),
+  starter("lab-ldr-serial-plot", "LDR Night Lamp: Plot and Switch", "A proper 10 kΩ voltage divider converts the photoresistor’s changing resistance into an A0 voltage. Blockly prints labeled ADC readings for the Serial Plotter and turns a protected D13 lamp on above a darkness threshold.", 8, "Measurements & Signals", "Intermediate", ["Serial Plotter", "LDR", "Voltage divider", "ADC"],
+    { parts: [part("uno", "arduino-uno", 60, 110), part("rdiv", "resistor", 350, 155, { resistance: 10000 }), part("ldr1", "ldr", 535, 160, { light: 40 }), part("rled", "resistor", 730, 95, { resistance: 220 }), part("led1", "led", 900, 75, { color: "yellow" })], wires: [wire("w1", "uno", "5v", "rdiv", "a", "#ef4444"), wire("w2", "rdiv", "b", "uno", "a0", "#eab308"), wire("w3", "rdiv", "b", "ldr1", "t1", "#eab308"), wire("w4", "ldr1", "t2", "uno", "gnd", "#1e293b"), wire("w5", "uno", "d13", "rled", "a", "#facc15"), wire("w6", "rled", "b", "led1", "anode", "#facc15"), wire("w7", "led1", "cathode", "uno", "gnd", "#1e293b")] },
+    program([serialBegin(), pinMode("13", "OUTPUT")], [serialPlotValue("Light ADC", block("io_analogread", { PIN: "A0" })), ifElseBlock(compareBlock("GT", block("io_analogread", { PIN: "A0" }), numberBlock(400)), [digitalWrite("13", "HIGH")], [digitalWrite("13", "LOW")]), delay(100)]),
+    ["1. The 10 kΩ resistor and LDR form a divider: 5 V → resistor → A0/LDR junction → LDR → GND.", "2. Run the program, open Serial Monitor, then choose Plotter. The labeled Light ADC series should update about ten times per second.", "3. Select the LDR and adjust its Light property. Lower light raises the divider voltage; the LED turns on when ADC is above 400.", "4. Switch to Monitor to inspect the numeric lines. The generated Arduino sketch uses Serial.print with a label and numeric reading."],
+    { goal: "Observe how an LDR divider converts light into an ADC reading and controls a lamp.", expected: "With this divider orientation, darker light raises A0; the lamp turns on above ADC 400.", verify: "Open Serial → Plotter and change the LDR Light value in the Inspector; both the graph and lamp should respond.", challenge: "Move the threshold from 400 to 600 and measure the light level where the lamp changes state." }),
 ]
 
 export const TEMPLATES: ProjectTemplate[] = BASE_TEMPLATES.map((template) => {

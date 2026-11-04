@@ -84,6 +84,7 @@ const TOOLBOX = {
         { kind: 'block', type: 'serial_begin' },
         { kind: 'block', type: 'serial_print' },
         { kind: 'block', type: 'serial_println' },
+        { kind: 'block', type: 'serial_plot_value' },
         { kind: 'block', type: 'text_string' },
       ],
     },

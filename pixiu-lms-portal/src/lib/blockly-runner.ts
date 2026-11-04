@@ -370,6 +370,11 @@ function getBlockDescription(block: Blockly.Block, env: ExecutionEnvironment): s
       const speed = evaluateNumberInput(block, "SPEED", env, 180)
       return `Motor driver ${block.getFieldValue("CHANNEL") ?? "A"} speed ${speed}`
     }
+    case "serial_plot_value": {
+      const label = block.getFieldValue("LABEL") ?? "Value"
+      const value = evaluateNumberInput(block, "VALUE", env, 0)
+      return "Serial plot · " + label + ": " + value
+    }
     case "serial_begin": {
       const baud = block.getFieldValue("BAUD") ?? "9600"
       return `Serial.begin(${baud})`
@@ -560,6 +565,13 @@ async function executeSingleBlock(block: Blockly.Block, env: ExecutionEnvironmen
         env.setDigitalPin(in1, direction === "CW" ? "HIGH" : "LOW")
         env.setDigitalPin(in2, direction === "CW" ? "LOW" : "HIGH")
       }
+      break
+    }
+
+    case "serial_plot_value": {
+      const label = String(block.getFieldValue("LABEL") ?? "Value")
+      const value = evaluateNumberInput(block, "VALUE", env, 0)
+      env.serialPrintln?.(label + ": " + value)
       break
     }
 

@@ -11,7 +11,7 @@ interface Props {
 
 type DifficultyFilter = "all" | "Beginner" | "Intermediate" | "Advanced"
 type BoardFilter = "all" | "arduino-uno" | "esp32-devkit" | "rpi-pico" | "microbit-v2"
-type CategoryFilter = "all" | "AI & vision" | "Connected systems" | "Robotics" | "Sensors" | "Displays" | "Prototypes"
+type CategoryFilter = "all" | "Measurements & Signals" | "AI & vision" | "Connected systems" | "Robotics" | "Sensors" | "Displays" | "Prototypes"
 
 const BOARD_STYLES: Record<BoardId, string> = {
   "arduino-uno": "bg-blue-500/10 text-blue-300 border-blue-500/25",
@@ -37,6 +37,7 @@ const getTemplateBoard = (template: ProjectTemplate): string => {
 
 const getCategory = (template: ProjectTemplate): CategoryFilter => {
   const text = (cleanTitle(template.title) + " " + template.tags.join(" ") + " " + template.description).toLowerCase()
+  if (/(measurement|logic analyzer|serial plotter|ohm.?s law|pwm|oscilloscope|multimeter|signal|timing)/.test(text)) return "Measurements & Signals"
   if (/(ai|vision|camera|gesture|machine learning|image)/.test(text)) return "AI & vision"
   if (/(servo|robot|motor|radar|barrier|arm|rover)/.test(text)) return "Robotics"
   if (/(wifi|web server|iot|telemetry|wireless|smart home|cloud)/.test(text)) return "Connected systems"
@@ -77,6 +78,7 @@ export const TemplateBrowser: React.FC<Props> = ({ isOpen, onClose, onSelectTemp
 
   const filters = [
     { id: "all", label: "All projects" },
+    { id: "Measurements & Signals", label: "Measurements & Signals" },
     { id: "AI & vision", label: "AI & vision" },
     { id: "Connected systems", label: "Connected systems" },
     { id: "Robotics", label: "Robotics" },
@@ -166,6 +168,14 @@ export const TemplateBrowser: React.FC<Props> = ({ isOpen, onClose, onSelectTemp
                       <p className="mt-2 text-[10px] font-medium uppercase tracking-[0.14em] text-slate-500">{getCategory(template)}</p>
                       <h3 className="mt-1 text-sm font-semibold leading-5 text-slate-100 group-hover:text-cyan-200 line-clamp-2">{clean}</h3>
                       <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-400">{template.description}</p>
+                      {template.experiment && (
+                        <div className="mt-3 space-y-1 rounded-lg border border-cyan-950/70 bg-cyan-950/20 px-3 py-2.5">
+                          <p className="line-clamp-2 text-[10px] leading-4 text-slate-300"><span className="font-semibold text-cyan-200">Goal</span> · {template.experiment.goal}</p>
+                          <p className="line-clamp-2 text-[10px] leading-4 text-slate-400"><span className="font-semibold text-slate-300">Expected</span> · {template.experiment.expected}</p>
+                          <p className="line-clamp-2 text-[10px] leading-4 text-slate-400"><span className="font-semibold text-slate-300">Check</span> · {template.experiment.verify}</p>
+                          <p className="line-clamp-2 text-[10px] leading-4 text-slate-500"><span className="font-semibold text-slate-400">Try</span> · {template.experiment.challenge}</p>
+                        </div>
+                      )}
                     </div>
                     <div className="mt-4 flex w-full items-end justify-between gap-3 border-t border-slate-800 pt-3">
                       <div className="flex min-w-0 flex-wrap gap-1.5">

@@ -219,6 +219,17 @@ export function defineArduinoBlocks() {
     }
   }
 
+  Blockly.Blocks['serial_plot_value'] = {
+    init() {
+      this.appendDummyInput().appendField('plot').appendField(new Blockly.FieldTextInput('Value'), 'LABEL')
+      this.appendValueInput('VALUE').setCheck('Number').appendField('value')
+      this.setPreviousStatement(true)
+      this.setNextStatement(true)
+      this.setColour(160)
+      this.setTooltip('Print a labeled numeric reading for the Serial Plotter')
+    }
+  }
+
   Blockly.Blocks['text_string'] = {
     init() {
       this.appendDummyInput().appendField('"').appendField(new Blockly.FieldTextInput('Hello'), 'TEXT').appendField('"')
@@ -1075,6 +1086,12 @@ arduino.forBlock['serial_print'] = (block, gen) => {
 arduino.forBlock['serial_println'] = (block, gen) => {
   const text = gen.valueToCode(block, 'TEXT', ORDER.NONE) || '""'
   return 'Serial.println(' + text + ');\n'
+}
+
+arduino.forBlock['serial_plot_value'] = (block, gen) => {
+  const label = JSON.stringify(String(block.getFieldValue('LABEL') ?? 'Value'))
+  const value = gen.valueToCode(block, 'VALUE', ORDER.NONE) || '0'
+  return 'Serial.print(' + label + '); Serial.print(": "); Serial.println(' + value + ');\n'
 }
 
 arduino.forBlock['text_string'] = (block) => [
