@@ -35,6 +35,7 @@ interface Props {
 }
 
 const CHANNEL_COLORS = ["#34d399", "#22d3ee", "#fbbf24", "#c084fc", "#fb7185", "#60a5fa", "#a3e635", "#f97316"]
+const SELECT_OPTION_STYLE = { backgroundColor: "#0f172a", color: "#e2e8f0" }
 
 function buildChannelPath(
   samples: LogicSample[],
@@ -218,6 +219,7 @@ export function LogicAnalyzer({ isOpen, onClose, state, simulationRef }: Props) 
                 <label key={index} className="flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900 px-2 py-1.5 text-[10px] text-slate-400">
                   <span className="font-mono font-bold" style={{ color: CHANNEL_COLORS[index % CHANNEL_COLORS.length] }}>CH{index + 1}</span>
                   <select
+                    style={{ colorScheme: "dark" }}
                     aria-label={"Logic Analyzer channel " + (index + 1) + " pin"}
                     value={pinId}
                     onChange={(event) => {
@@ -228,7 +230,7 @@ export function LogicAnalyzer({ isOpen, onClose, state, simulationRef }: Props) 
                   }}
                     className="max-w-24 bg-transparent font-mono text-[10px] text-slate-200 outline-none"
                   >
-                    {pinOptions.map((pin) => <option key={pin.id} value={pin.id}>{pin.label}</option>)}
+                    {pinOptions.map((pin) => <option key={pin.id} value={pin.id} style={SELECT_OPTION_STYLE}>{pin.label}</option>)}
                   </select>
                   {channelPins.length > 1 && (
                     <button
@@ -269,21 +271,23 @@ export function LogicAnalyzer({ isOpen, onClose, state, simulationRef }: Props) 
               <label className="flex items-center gap-1.5 text-[10px] text-slate-400">
                 Window
                 <select
-                  aria-label="Logic Analyzer capture window"
+                  style={{ colorScheme: "dark" }}
+                    aria-label="Logic Analyzer capture window"
                   value={windowMs}
                   onChange={(event) => setWindowMs(Number(event.target.value))}
                   className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-[10px] text-slate-200"
                 >
-                  <option value={20}>20 ms</option>
-                  <option value={100}>100 ms</option>
-                  <option value={500}>500 ms</option>
-                  <option value={1000}>1 second</option>
+                  <option value={20} style={SELECT_OPTION_STYLE}>20 ms</option>
+                  <option value={100} style={SELECT_OPTION_STYLE}>100 ms</option>
+                  <option value={500} style={SELECT_OPTION_STYLE}>500 ms</option>
+                  <option value={1000} style={SELECT_OPTION_STYLE}>1 second</option>
                 </select>
               </label>
               <label className="flex items-center gap-1.5 text-[10px] text-slate-400">
                 Trigger
                 <select
-                  aria-label="Logic Analyzer trigger"
+                  style={{ colorScheme: "dark" }}
+                    aria-label="Logic Analyzer trigger"
                   value={triggerMode}
                   onChange={(event) => {
                     const mode = event.target.value as TriggerMode
@@ -294,9 +298,9 @@ export function LogicAnalyzer({ isOpen, onClose, state, simulationRef }: Props) 
                   }}
                   className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-[10px] text-slate-200"
                 >
-                  <option value="auto">Auto</option>
-                  <option value="rising">CH1 rising</option>
-                  <option value="falling">CH1 falling</option>
+                  <option value="auto" style={SELECT_OPTION_STYLE}>Auto</option>
+                  <option value="rising" style={SELECT_OPTION_STYLE}>CH1 rising</option>
+                  <option value="falling" style={SELECT_OPTION_STYLE}>CH1 falling</option>
                 </select>
               </label>
               <button
