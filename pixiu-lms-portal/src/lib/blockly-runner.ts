@@ -283,7 +283,8 @@ function evaluateValueInput(block: Blockly.Block, inputName: string, env?: Execu
   }
   if ([
     "math_arithmetic","math_modulo","math_single","arduino_map","ai_confidence",
-    "ai_get_finger_count","ai_get_object_count","ldr_read","tmp36_temperature","potentiometer_read"
+    "ai_get_finger_count","ai_get_object_count","ldr_read","tmp36_temperature","potentiometer_read",
+    "dht_temperature","dht_humidity","joystick_x","joystick_y","soil_moisture_read","encoder_read","mq2_gas_read","io_analogread"
   ].includes(target.type)) {
     return String(evaluateNumber(target, env, Number(defaultValue) || 0))
   }

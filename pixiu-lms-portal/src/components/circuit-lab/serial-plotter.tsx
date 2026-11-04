@@ -67,6 +67,7 @@ export function SerialPlotter({ lines }: Props) {
       .slice(0, 6)
   }, [lines])
 
+  const hasLdrAdc = series.some((item) => /light\s*adc/i.test(item.name))
   const latestTimestamp = series.reduce(
     (latest, item) => Math.max(latest, item.points[item.points.length - 1]?.timestamp ?? 0),
     0,
@@ -90,7 +91,9 @@ export function SerialPlotter({ lines }: Props) {
     <div className="flex h-full min-h-0 flex-col gap-2 text-slate-200">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-[10px] text-slate-400">
-          Numeric Serial output becomes a time-series graph. Labeled lines such as Light: 512 keep their own series.
+          {hasLdrAdc
+            ? "Light is the simulated illumination setting; Light ADC is the A0 divider reading (0–1023 counts), not lux. With the 10 kΩ pull-up and LDR-to-ground divider, brighter light lowers the ADC reading."
+            : "Numeric Serial output becomes a time-series graph. Labeled lines such as Light: 512 keep their own series."}
         </p>
         <label className="flex items-center gap-1.5 text-[10px] text-slate-400">
           Window
@@ -99,10 +102,11 @@ export function SerialPlotter({ lines }: Props) {
             value={windowMs}
             onChange={(event) => setWindowMs(Number(event.target.value))}
             className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-[10px] text-slate-200"
+            style={{ colorScheme: "dark" }}
           >
-            <option value={2000}>2 seconds</option>
-            <option value={10000}>10 seconds</option>
-            <option value={30000}>30 seconds</option>
+            <option value={2000} style={{ backgroundColor: "#0f172a", color: "#e2e8f0" }}>2 seconds</option>
+            <option value={10000} style={{ backgroundColor: "#0f172a", color: "#e2e8f0" }}>10 seconds</option>
+            <option value={30000} style={{ backgroundColor: "#0f172a", color: "#e2e8f0" }}>30 seconds</option>
           </select>
         </label>
       </div>

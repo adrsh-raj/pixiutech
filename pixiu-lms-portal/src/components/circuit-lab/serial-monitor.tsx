@@ -26,7 +26,48 @@ export const SerialMonitor: React.FC<Props> = ({
   const [showTimestamps, setShowTimestamps] = useState(true);
   const [activeView, setActiveView] = useState<'monitor' | 'plotter'>('monitor');
   const [inputValue, setInputValue] = useState('');
+  const [panelHeight, setPanelHeight] = useState<number | null>(null);
+  const [maxPanelHeight, setMaxPanelHeight] = useState(0);
+  const [isResizing, setIsResizing] = useState(false);
+  const resizeStartRef = useRef<{ startY: number; startHeight: number } | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const updateMaxHeight = () => {
+      const nextMax = Math.max(180, Math.min(window.innerHeight - 88, Math.floor(window.innerHeight * 0.82)));
+      setMaxPanelHeight(nextMax);
+      setPanelHeight((current) => current === null ? null : Math.min(current, nextMax));
+    };
+    updateMaxHeight();
+    window.addEventListener("resize", updateMaxHeight);
+    return () => window.removeEventListener("resize", updateMaxHeight);
+  }, []);
+
+  const getDefaultPanelHeight = () => (typeof window !== "undefined" && window.innerWidth >= 768 ? 240 : 280);
+  const stopResize = () => {
+    resizeStartRef.current = null;
+    setIsResizing(false);
+  };
+  const handleResizeKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Home") {
+      event.preventDefault();
+      setPanelHeight(null);
+      return;
+    }
+    if (event.key === "End") {
+      event.preventDefault();
+      setPanelHeight(maxPanelHeight || Math.floor(window.innerHeight * 0.82));
+      return;
+    }
+    if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+      event.preventDefault();
+      const currentHeight = panelHeight ?? getDefaultPanelHeight();
+      const direction = event.key === "ArrowUp" ? 1 : -1;
+      const maxHeight = maxPanelHeight || Math.floor(window.innerHeight * 0.82);
+      setPanelHeight(Math.max(180, Math.min(maxHeight, currentHeight + direction * (event.shiftKey ? 80 : 24))));
+    }
+  };
 
   // Auto-scroll to bottom on new lines
   useEffect(() => {
@@ -56,12 +97,49 @@ export const SerialMonitor: React.FC<Props> = ({
 
   return (
     <div
+      ref={panelRef}
+      style={isOpen ? { ...(panelHeight !== null ? { height: panelHeight + "px" } : {}), maxHeight: maxPanelHeight ? maxPanelHeight + "px" : undefined } : undefined}
       className={`
         ${!isOpen ? 'hidden md:flex' : 'fixed inset-x-0 bottom-0 md:bottom-[24px] z-50 md:z-40'}
-        left-0 right-0 bg-slate-900 border-t border-slate-800 transition-all duration-300 ease-in-out flex flex-col shadow-2xl md:shadow-none
+        left-0 right-0 max-h-[82vh] bg-slate-900 border-t border-slate-800 transition-all duration-300 ease-in-out flex flex-col shadow-2xl md:shadow-none
+        ${isResizing ? '!transition-none' : ''}
         ${isOpen ? 'h-[280px] md:h-[240px] rounded-t-2xl md:rounded-none' : 'h-0 md:h-[36px]'}
       `}
     >
+      {isOpen && (
+        <div
+          role="separator"
+          aria-label="Resize Serial Monitor"
+          aria-orientation="horizontal"
+          aria-valuemin={180}
+          aria-valuemax={maxPanelHeight || undefined}
+          aria-valuenow={Math.round(panelRef.current?.getBoundingClientRect().height ?? panelHeight ?? getDefaultPanelHeight())}
+          tabIndex={0}
+          className="group relative z-10 flex h-3 min-h-3 cursor-row-resize touch-none items-center justify-center bg-slate-900 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-400"
+          onPointerDown={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            const height = panelRef.current?.getBoundingClientRect().height ?? getDefaultPanelHeight();
+            resizeStartRef.current = { startY: event.clientY, startHeight: height };
+            setIsResizing(true);
+            event.currentTarget.setPointerCapture(event.pointerId);
+          }}
+          onPointerMove={(event) => {
+            const start = resizeStartRef.current;
+            if (!start) return;
+            const maxHeight = maxPanelHeight || Math.floor(window.innerHeight * 0.82);
+            setPanelHeight(Math.max(180, Math.min(maxHeight, start.startHeight + start.startY - event.clientY)));
+          }}
+          onPointerUp={stopResize}
+          onPointerCancel={stopResize}
+          onLostPointerCapture={stopResize}
+          onKeyDown={handleResizeKeyDown}
+          title="Drag upward to enlarge; use arrow keys, Home to restore, or End to expand"
+        >
+          <span className="h-1 w-10 rounded-full bg-slate-600 transition-colors group-hover:bg-cyan-400 group-focus-visible:bg-cyan-400" />
+        </div>
+      )}
+
       {/* Header */}
       <div
         className="h-[36px] min-h-[36px] bg-slate-800/80 border-b border-slate-700/50 flex items-center justify-between px-4 cursor-pointer select-none"
@@ -89,6 +167,20 @@ export const SerialMonitor: React.FC<Props> = ({
                 title="Toggle timestamps"
               >
                 <Clock size={14} />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const defaultHeight = getDefaultPanelHeight();
+                  const currentHeight = panelRef.current?.getBoundingClientRect().height ?? panelHeight ?? defaultHeight;
+                  const maxHeight = maxPanelHeight || Math.floor(window.innerHeight * 0.82);
+                  setPanelHeight(currentHeight >= maxHeight - 32 ? null : maxHeight);
+                }}
+                className="p-1.5 rounded-md hover:bg-slate-700/50 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+                title={panelHeight !== null && panelHeight > getDefaultPanelHeight() ? "Restore default panel height" : "Expand Serial Monitor"}
+                aria-label={panelHeight !== null && panelHeight > getDefaultPanelHeight() ? "Restore default Serial Monitor height" : "Expand Serial Monitor"}
+              >
+                {panelHeight !== null && panelHeight > getDefaultPanelHeight() ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
               </button>
               <button
                 onClick={(e) => {

@@ -449,6 +449,8 @@ export function solveCircuitNodalPotentials(
       setOutputIfFree("vrx", Math.max(0, Math.min(vSupply, (Number(part.props.x ?? 512) / 1023) * vSupply)), "Joystick " + part.id + " VRx")
       setOutputIfFree("vry", Math.max(0, Math.min(vSupply, (Number(part.props.y ?? 512) / 1023) * vSupply)), "Joystick " + part.id + " VRy")
       setOutputIfFree("sw", String(part.props.pressed ?? "false") === "true" ? vSupply : 0, "Joystick " + part.id + " SW")
+    } else if (part.type === "rotary-encoder") {
+      setOutputIfFree("sw", String(part.props.pressed ?? "false") === "true" ? vSupply : 0, "Rotary encoder " + part.id + " SW")
     } else if (part.type === "soil-moisture") {
       setOutputIfFree("ao", Math.max(0, Math.min(vSupply, (Number(part.props.moisture ?? 620) / 1023) * vSupply)), "Soil moisture " + part.id + " AO")
     } else if (part.type === "ldr") {

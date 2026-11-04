@@ -1,26 +1,3 @@
-import type { CircuitState, PartType } from "./circuit-types"
-
-export type TemplateGrade = 6 | 7 | 8
-
-export interface ProjectTemplate {
-  id: string
-  title: string
-  description: string
-  difficulty: "Beginner" | "Intermediate" | "Advanced"
-  tags: string[]
-  circuit: CircuitState
-  blocklyXml: string
-  gradeBand?: TemplateGrade
-  unit?: string
-  tutorial?: string[]
-  experiment?: {
-    goal: string
-    expected: string
-    verify: string
-    challenge: string
-  }
-}
-
 const BASE_TEMPLATES: ProjectTemplate[] = [
   {
     id: "ai-smart-barrier",
@@ -190,7 +167,7 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
                 </next></block>
               </next></block>
             </next></block>
-          </block>
+          
           </next></block>
         </next></block>
       </next></block></next></block></next></block>
@@ -232,9 +209,9 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
     <statement name="LOOP">
       <block type="microbit_show_icon"><field name="ICON">heart</field><next>
       <block type="servo_write"><field name="PIN">0</field><value name="ANGLE"><shadow type="math_number"><field name="NUM">135</field></shadow></value><next>
-      <block type="io_digitalwrite"><field name="PIN">1</field><field name="STATE">HIGH</field><next>
+      <block type="tone_play"><field name="PIN">1</field><value name="FREQ"><shadow type="math_number"><field name="NUM">850</field></shadow></value><next>
       <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">200</field></shadow></value><next>
-      <block type="io_digitalwrite"><field name="PIN">1</field><field name="STATE">LOW</field><next>
+      <block type="tone_stop"><field name="PIN">1</field><next>
       <block type="microbit_show_icon"><field name="ICON">smile</field><next>
       <block type="servo_write"><field name="PIN">0</field><value name="ANGLE"><shadow type="math_number"><field name="NUM">45</field></shadow></value><next>
       <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">500</field></shadow></value><next>
@@ -293,9 +270,9 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
         <statement name="DO0">
           <block type="oled_print"><value name="TEXT"><block type="text_string"><field name="TEXT">&gt;&gt; LASER FIRED! &lt;&lt;</field></block></value><next>
           <block type="io_digitalwrite"><field name="PIN">16</field><field name="STATE">HIGH</field><next>
-          <block type="io_digitalwrite"><field name="PIN">15</field><field name="STATE">HIGH</field><next>
+          <block type="tone_play"><field name="PIN">15</field><value name="FREQ"><shadow type="math_number"><field name="NUM">850</field></shadow></value><next>
           <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">120</field></shadow></value><next>
-          <block type="io_digitalwrite"><field name="PIN">15</field><field name="STATE">LOW</field><next>
+          <block type="tone_stop"><field name="PIN">15</field><next>
           <block type="io_digitalwrite"><field name="PIN">16</field><field name="STATE">LOW</field>
           </block></next></block></next></block></next></block></next></block></next></block>
         </statement>
@@ -440,9 +417,9 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
           <block type="io_digitalwrite"><field name="PIN">12</field><field name="STATE">HIGH</field><next>
           <block type="io_digitalwrite"><field name="PIN">7</field><field name="STATE">LOW</field><next>
           <block type="io_digitalwrite"><field name="PIN">6</field><field name="STATE">LOW</field><next>
-          <block type="io_digitalwrite"><field name="PIN">8</field><field name="STATE">HIGH</field><next>
+          <block type="tone_play"><field name="PIN">8</field><value name="FREQ"><shadow type="math_number"><field name="NUM">850</field></shadow></value><next>
           <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">150</field></shadow></value><next>
-          <block type="io_digitalwrite"><field name="PIN">8</field><field name="STATE">LOW</field></block>
+          <block type="tone_stop"><field name="PIN">8</field></block>
           </next></block></next></block></next></block></next></block></next></block>
         </statement>
         <statement name="ELSE">
@@ -498,9 +475,9 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
       <block type="neopixel_set_color"><field name="SENSOR">neo</field><value name="PIXEL"><block type="math_number"><field name="NUM">0</field></block></value><value name="COLOR"><block type="text_string"><field name="TEXT">#ef4444</field></block></value><next>
       <block type="neopixel_set_color"><field name="SENSOR">neo</field><value name="PIXEL"><block type="math_number"><field name="NUM">1</field></block></value><value name="COLOR"><block type="text_string"><field name="TEXT">#38bdf8</field></block></value><next>
       <block type="neopixel_show"><field name="SENSOR">neo</field><next>
-      <block type="io_digitalwrite"><field name="PIN">8</field><field name="STATE">HIGH</field><next>
+      <block type="tone_play"><field name="PIN">8</field><value name="FREQ"><shadow type="math_number"><field name="NUM">850</field></shadow></value><next>
       <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">150</field></shadow></value><next>
-      <block type="io_digitalwrite"><field name="PIN">8</field><field name="STATE">LOW</field><next>
+      <block type="tone_stop"><field name="PIN">8</field><next>
       <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">300</field></shadow></value>
       </block></next></block></next></block></next></block></next></block></next></block></next></block>
     </statement>
@@ -565,14 +542,14 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
           <block type="lcd_print"><value name="TEXT"><block type="text_string"><field name="TEXT">HAZARD DETECTED!</field></block></value><next>
           <block type="servo_write"><field name="PIN">9</field><value name="ANGLE"><shadow type="math_number"><field name="NUM">90</field></shadow></value><next>
           <block type="io_digitalwrite"><field name="PIN">12</field><field name="STATE">HIGH</field><next>
-          <block type="io_digitalwrite"><field name="PIN">8</field><field name="STATE">HIGH</field><next>
+          <block type="tone_play"><field name="PIN">8</field><value name="FREQ"><shadow type="math_number"><field name="NUM">850</field></shadow></value><next>
           <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">400</field></shadow></value>
           </block></next></block></next></block></next></block></next></block></next></block>
         </statement>
         <statement name="ELSE">
           <block type="servo_write"><field name="PIN">9</field><value name="ANGLE"><shadow type="math_number"><field name="NUM">0</field></shadow></value><next>
           <block type="io_digitalwrite"><field name="PIN">12</field><field name="STATE">LOW</field><next>
-          <block type="io_digitalwrite"><field name="PIN">8</field><field name="STATE">LOW</field><next>
+          <block type="tone_stop"><field name="PIN">8</field><next>
           <block type="lcd_clear"><next>
           <block type="lcd_print"><value name="TEXT"><block type="text_string"><field name="TEXT">AIR QUALITY: OK</field></block></value><next>
           <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">300</field></shadow></value>
@@ -586,7 +563,7 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
   {
     id: "traffic-light",
     title: "9. 🚦 City Traffic Intersection with Acoustic Pedestrian Crosswalk",
-    description: "Synchronized municipal traffic intersection with acoustic pedestrian crosswalk guidance! The Arduino executes a state machine controlling Red (D12), Yellow (D11), and Green (D10) signal lamps, plus a Pedestrian Walk Blue lamp (D9) and pedestrian call button (D2). During the Green pedestrian phase, D8 activates an acoustic pulsing chime from the buzzer to assist visually impaired pedestrians, following strict real-world timing transitions.",
+    description: "The controller cycles green, yellow, and red safely. Press the D2 pedestrian request button during red to light the blue walk indicator and play a short 850 Hz crossing chime while vehicle traffic remains stopped.",
     difficulty: "Beginner",
     tags: ["Traffic", "LEDs", "Pedestrian Crosswalk", "Buzzer", "Sequencing"],
     circuit: {
@@ -622,41 +599,25 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
         { id: "w16", from: { partId: "walk_btn", pinId: "p2a" }, to: { partId: "uno", pinId: "d2" }, color: "#22c55e" },
       ],
     },
-    blocklyXml: `<xml xmlns="https://developers.google.com/blockly/xml">
-  <block type="arduino_program" x="40" y="40">
-    <statement name="SETUP">
-      <block type="io_pinmode"><field name="PIN">12</field><field name="MODE">OUTPUT</field><next>
-      <block type="io_pinmode"><field name="PIN">11</field><field name="MODE">OUTPUT</field><next>
-      <block type="io_pinmode"><field name="PIN">10</field><field name="MODE">OUTPUT</field><next>
-      <block type="io_pinmode"><field name="PIN">9</field><field name="MODE">OUTPUT</field><next>
-      <block type="io_pinmode"><field name="PIN">8</field><field name="MODE">OUTPUT</field><next>
-      <block type="io_pinmode"><field name="PIN">2</field><field name="MODE">INPUT</field></block>
-      </next></block></next></block></next></block></next></block></next></block>
-    </statement>
-    <statement name="LOOP">
-      <block type="io_digitalwrite"><field name="PIN">12</field><field name="STATE">HIGH</field><next>
-      <block type="io_digitalwrite"><field name="PIN">11</field><field name="STATE">LOW</field><next>
-      <block type="io_digitalwrite"><field name="PIN">10</field><field name="STATE">LOW</field><next>
-      <block type="io_digitalwrite"><field name="PIN">9</field><field name="STATE">LOW</field><next>
-      <block type="io_digitalwrite"><field name="PIN">8</field><field name="STATE">LOW</field><next>
-      <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">2500</field></shadow></value><next>
-      <block type="io_digitalwrite"><field name="PIN">12</field><field name="STATE">LOW</field><next>
-      <block type="io_digitalwrite"><field name="PIN">11</field><field name="STATE">HIGH</field><next>
-      <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">1000</field></shadow></value><next>
-      <block type="io_digitalwrite"><field name="PIN">11</field><field name="STATE">LOW</field><next>
-      <block type="io_digitalwrite"><field name="PIN">10</field><field name="STATE">HIGH</field><next>
-      <block type="io_digitalwrite"><field name="PIN">9</field><field name="STATE">HIGH</field><next>
-      <block type="io_digitalwrite"><field name="PIN">8</field><field name="STATE">HIGH</field><next>
-      <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">2000</field></shadow></value></block>
-      </next></block></next></block></next></block></next></block></next></block></next></block></next></block></next></block></next></block></next></block></next></block></next></block>
-    </statement>
-  </block>
-</xml>`,
+    blocklyXml: program(
+      [pinMode("12","OUTPUT"),pinMode("11","OUTPUT"),pinMode("10","OUTPUT"),pinMode("9","OUTPUT"),pinMode("8","OUTPUT"),pinMode("2","INPUT")],
+      [
+        digitalWrite("12","LOW"),digitalWrite("11","LOW"),digitalWrite("10","HIGH"),digitalWrite("9","LOW"),toneOff("8"),delay(2500),
+        digitalWrite("10","LOW"),digitalWrite("11","HIGH"),delay(800),
+        digitalWrite("11","LOW"),digitalWrite("12","HIGH"),
+        ifElseBlock(
+          block("io_digitalread",{PIN:"2"}),
+          [digitalWrite("9","HIGH"),toneOn("8",850),delay(1200),toneOff("8"),digitalWrite("9","LOW")],
+          [delay(1200)],
+        ),
+        digitalWrite("12","LOW"),delay(80),
+      ],
+    ),
   },
   {
     id: "blink-led",
     title: "10. 🚨 Dual Alternating Police Strobe (Red & Blue LEDs + Siren Buzzer)",
-    description: "Emergency vehicle alternating dual police strobe with acoustic piezo siren and mode switch! The Arduino alternates digital logic HIGH and LOW states between Red LED (pin D13) and Blue LED (pin D12) with synchronized audio chirps from buzzer D8 and push-button mode trigger on D2.",
+    description: "Hold the D2 pushbutton to run an alternating red/blue police strobe with a piezo siren on D8. Releasing the button safely turns both LEDs and the siren off.",
     difficulty: "Beginner",
     tags: ["LED", "Dual Strobe", "Resistor", "Digital Output", "Buzzer", "Siren"],
     circuit: {
@@ -691,24 +652,24 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
       <block type="io_pinmode"><field name="PIN">2</field><field name="MODE">INPUT</field></block>
       </next></block></next></block></next></block>
     </statement>
-    <statement name="LOOP">
+    <statement name="LOOP"><block type="controls_if"><mutation else="1"></mutation><value name="IF0"><block type="io_digitalread"><field name="PIN">2</field></block></value><statement name="DO0">
       <block type="io_digitalwrite"><field name="PIN">13</field><field name="STATE">HIGH</field><next>
       <block type="io_digitalwrite"><field name="PIN">12</field><field name="STATE">LOW</field><next>
-      <block type="io_digitalwrite"><field name="PIN">8</field><field name="STATE">HIGH</field><next>
+      <block type="tone_play"><field name="PIN">8</field><value name="FREQ"><shadow type="math_number"><field name="NUM">850</field></shadow></value><next>
       <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">300</field></shadow></value><next>
       <block type="io_digitalwrite"><field name="PIN">13</field><field name="STATE">LOW</field><next>
       <block type="io_digitalwrite"><field name="PIN">12</field><field name="STATE">HIGH</field><next>
-      <block type="io_digitalwrite"><field name="PIN">8</field><field name="STATE">LOW</field><next>
+      <block type="tone_stop"><field name="PIN">8</field><next>
       <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">300</field></shadow></value>
       </block></next></block></next></block></next></block></next></block></next></block></next></block></next></block>
-    </statement>
+    </statement><statement name="ELSE"><block type="io_digitalwrite"><field name="PIN">13</field><field name="STATE">LOW</field><next><block type="io_digitalwrite"><field name="PIN">12</field><field name="STATE">LOW</field><next><block type="tone_stop"><field name="PIN">8</field><next><block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">60</field></shadow></value></block></next></block></next></block></next></block></statement></block></statement>
   </block>
 </xml>`,
   },
   {
     id: "servo-sweep",
     title: "11. 🦾 Robotic Servo Turret with Auto-Scan & Audio Feedback",
-    description: "Interactive robotic servo positioning turret with audio clicks and strobe indicator! The Arduino generates precision 50Hz PWM signals on D9 to sweep the servo arm between 0°, 90°, and 180°. Pressing the on-canvas trigger button on D2 engages high-speed scanning, an audio clicker on D8 sounds at each position, and a green status LED on D13 tracks movement.",
+    description: "Press and hold the D2 trigger to scan the servo turret through 0°, 90°, and 180°. The buzzer clicks at each position and the green LED marks active scanning; releasing the trigger parks the servo at 90°.",
     difficulty: "Intermediate",
     tags: ["Servo", "Robotics", "PWM", "Pushbutton", "Buzzer", "Actuator"],
     circuit: {
@@ -741,26 +702,26 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
       <block type="io_pinmode"><field name="PIN">13</field><field name="MODE">OUTPUT</field>
       </block></next></block></next></block>
     </statement>
-    <statement name="LOOP">
+    <statement name="LOOP"><block type="controls_if"><mutation else="1"></mutation><value name="IF0"><block type="io_digitalread"><field name="PIN">2</field></block></value><statement name="DO0">
       <block type="io_digitalwrite"><field name="PIN">13</field><field name="STATE">HIGH</field><next>
-      <block type="io_digitalwrite"><field name="PIN">8</field><field name="STATE">HIGH</field><next>
+      <block type="tone_play"><field name="PIN">8</field><value name="FREQ"><shadow type="math_number"><field name="NUM">850</field></shadow></value><next>
       <block type="servo_write"><field name="PIN">9</field><value name="ANGLE"><shadow type="math_number"><field name="NUM">0</field></shadow></value><next>
       <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">60</field></shadow></value><next>
-      <block type="io_digitalwrite"><field name="PIN">8</field><field name="STATE">LOW</field><next>
+      <block type="tone_stop"><field name="PIN">8</field><next>
       <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">600</field></shadow></value><next>
-      <block type="io_digitalwrite"><field name="PIN">8</field><field name="STATE">HIGH</field><next>
+      <block type="tone_play"><field name="PIN">8</field><value name="FREQ"><shadow type="math_number"><field name="NUM">850</field></shadow></value><next>
       <block type="servo_write"><field name="PIN">9</field><value name="ANGLE"><shadow type="math_number"><field name="NUM">90</field></shadow></value><next>
       <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">60</field></shadow></value><next>
-      <block type="io_digitalwrite"><field name="PIN">8</field><field name="STATE">LOW</field><next>
+      <block type="tone_stop"><field name="PIN">8</field><next>
       <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">600</field></shadow></value><next>
-      <block type="io_digitalwrite"><field name="PIN">8</field><field name="STATE">HIGH</field><next>
+      <block type="tone_play"><field name="PIN">8</field><value name="FREQ"><shadow type="math_number"><field name="NUM">850</field></shadow></value><next>
       <block type="servo_write"><field name="PIN">9</field><value name="ANGLE"><shadow type="math_number"><field name="NUM">180</field></shadow></value><next>
       <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">60</field></shadow></value><next>
-      <block type="io_digitalwrite"><field name="PIN">8</field><field name="STATE">LOW</field><next>
+      <block type="tone_stop"><field name="PIN">8</field><next>
       <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">600</field></shadow></value><next>
       <block type="io_digitalwrite"><field name="PIN">13</field><field name="STATE">LOW</field>
       </block></next></block></next></block></next></block></next></block></next></block></next></block></next></block></next></block></next></block></next></block></next></block></next></block></next></block></next></block></next></block>
-    </statement>
+    </next></block></statement><statement name="ELSE"><block type="servo_write"><field name="PIN">9</field><value name="ANGLE"><shadow type="math_number"><field name="NUM">90</field></shadow></value><next><block type="io_digitalwrite"><field name="PIN">13</field><field name="STATE">LOW</field><next><block type="tone_stop"><field name="PIN">8</field><next><block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">80</field></shadow></value></block></next></block></next></block></next></block></statement></block></statement>
   </block>
 </xml>`,
   },
@@ -832,7 +793,7 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
           <block type="io_digitalwrite"><field name="PIN">11</field><field name="STATE">HIGH</field><next>
           <block type="io_digitalwrite"><field name="PIN">12</field><field name="STATE">LOW</field><next>
           <block type="io_digitalwrite"><field name="PIN">13</field><field name="STATE">LOW</field><next>
-          <block type="io_digitalwrite"><field name="PIN">8</field><field name="STATE">HIGH</field></block>
+          <block type="tone_play"><field name="PIN">8</field><value name="FREQ"><shadow type="math_number"><field name="NUM">850</field></shadow></value></block>
           </next></block></next></block></next></block>
           </next></block>
         </statement>
@@ -840,7 +801,7 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
           <block type="io_digitalwrite"><field name="PIN">11</field><field name="STATE">LOW</field><next>
           <block type="io_digitalwrite"><field name="PIN">12</field><field name="STATE">LOW</field><next>
           <block type="io_digitalwrite"><field name="PIN">13</field><field name="STATE">HIGH</field><next>
-          <block type="io_digitalwrite"><field name="PIN">8</field><field name="STATE">LOW</field></block>
+          <block type="tone_stop"><field name="PIN">8</field></block>
           </next></block></next></block></next></block>
         </statement>
         <next>
@@ -1015,7 +976,10 @@ function sensorBlock(type: string, sensor: string) {
 function textBlock(value: string) { return block("text_string", { TEXT: value }) }
 function pinMode(pin: string, mode: string) { return block("io_pinmode", { PIN: pin, MODE: mode }) }
 function digitalWrite(pin: string, state: "HIGH" | "LOW") { return block("io_digitalwrite", { PIN: pin, STATE: state }) }
+function toneOn(pin: string, frequency = 850) { return block("tone_play", { PIN: pin }, { FREQ: numberBlock(frequency) }) }
+function toneOff(pin: string) { return block("tone_stop", { PIN: pin }) }
 function analogWrite(pin: string, value: number) { return block("io_analogwrite", { PIN: pin }, { VALUE: numberBlock(value) }) }
+function analogMapWrite(pin: string, sensor: string, maxValue = 255) { return block("io_analogwrite", { PIN: pin }, { VALUE: block("arduino_map", {}, { VALUE: sensorBlock("potentiometer_read", sensor), FROM_LOW: numberBlock(0), FROM_HIGH: numberBlock(1023), TO_LOW: numberBlock(0), TO_HIGH: numberBlock(maxValue) }) }) }
 function delay(ms: number) { return block("time_delay", {}, { MS: numberBlock(ms) }) }
 function serialBegin() { return block("serial_begin", { BAUD: "9600" }) }
 function serialPrint(value: string) { return block("serial_print", {}, { TEXT: textBlock(value) }) }
@@ -1036,9 +1000,9 @@ const EXTRA_TEMPLATES: ProjectTemplate[] = [
     { parts: [part("uno","arduino-uno",60,110),part("btn","pushbutton",310,90),part("bz","buzzer",310,210),part("led1","led",520,70,{color:"green"}),part("r1","resistor",520,150,{resistance:220}),part("led2","led",640,70,{color:"yellow"}),part("r2","resistor",640,150,{resistance:220})], wires: [wire("p1","uno","d2","btn","p1a"),wire("p2","btn","p2a","uno","5v","#ef4444"),wire("p3","uno","d13","r1","a","#22c55e"),wire("p4","r1","b","led1","anode","#22c55e"),wire("p5","led1","cathode","uno","gnd","#1e293b"),wire("p6","uno","d12","r2","a","#facc15"),wire("p7","r2","b","led2","anode","#facc15"),wire("p8","led2","cathode","uno","gnd","#1e293b"),wire("p9","uno","d8","bz","pos","#eab308"),wire("p10","bz","neg","uno","gnd","#1e293b")] },
     program([pinMode("2","INPUT"),pinMode("13","OUTPUT"),pinMode("12","OUTPUT"),pinMode("8","OUTPUT")],[
       ifElseBlock(
-        sensorBlock("pushbutton_read", "btn"),
-        [digitalWrite("13","HIGH"),digitalWrite("12","LOW"),digitalWrite("8","HIGH"),delay(60),digitalWrite("8","LOW")],
-        [digitalWrite("13","LOW"),digitalWrite("12","HIGH"),digitalWrite("8","LOW")],
+        block("io_digitalread",{PIN:"2"}),
+        [digitalWrite("13","HIGH"),digitalWrite("12","LOW"),toneOn("8",850),delay(60),toneOff("8")],
+        [digitalWrite("13","LOW"),digitalWrite("12","HIGH"),toneOff("8")],
       ),
       delay(50),
     ]),
@@ -1056,8 +1020,8 @@ const EXTRA_TEMPLATES: ProjectTemplate[] = [
       }),
       ifElseBlock(
         compareBlock("GT", sensorBlock("potentiometer_read", "pot"), numberBlock(512)),
-        [digitalWrite("10","HIGH"),digitalWrite("8","HIGH"),delay(25),digitalWrite("8","LOW")],
-        [digitalWrite("10","LOW"),digitalWrite("8","LOW")],
+        [digitalWrite("10","HIGH"),toneOn("8",850),delay(25),toneOff("8")],
+        [digitalWrite("10","LOW"),toneOff("8")],
       ),
       delay(80),
     ]),
@@ -1067,34 +1031,34 @@ const EXTRA_TEMPLATES: ProjectTemplate[] = [
       "3. ▶️ Simulation Execution & Interaction Controls: Click Run, then drag the rotary potentiometer knob on the canvas from 0% to 100%.",
       "4. 📊 Outcomes & Real-Time Observations: The blue lamp dims smoothly while the green indicator and buzzer trip as the knob crosses midpoint.",
     ]),
-  starter("g6-rgb-mood-lamp", "🌈 RGB Mood Lamp & Interactive Color Strobe Station", "Multi-channel pulse-width modulation RGB color blending with interactive mode controls! The Arduino drives RGB color channels on PWM pins D9, D10, and D11, while monitoring an on-canvas Pushbutton on D2 and Potentiometer on A0 with acoustic chime on D8.", 6, "Multi-Output", "Beginner", ["RGB LED", "Colour", "GPIO", "Pushbutton", "Buzzer"],
+  starter("g6-rgb-mood-lamp", "🌈 RGB Mood Lamp & Interactive Color Strobe Station", "Multi-channel pulse-width modulation RGB color blending with interactive mode controls! The Arduino drives RGB color channels on PWM pins D9, D10, and D11, while reading a D2 mode button and A0 brightness control. Hold the button for a cyan strobe with an 850 Hz piezo chime on D8.", 6, "Multi-Output", "Beginner", ["RGB LED", "Colour", "GPIO", "Pushbutton", "Buzzer"],
     { parts: [part("uno","arduino-uno",60,110),part("btn","pushbutton",260,90),part("bz","buzzer",260,200),part("rgb","rgb-led",460,90,{}),part("pot","potentiometer",370,200,{value:512})], wires: [wire("r","uno","d9","rgb","red","#ef4444"),wire("g","uno","d10","rgb","green","#22c55e"),wire("b","uno","d11","rgb","blue","#3b82f6"),wire("gnd","uno","gnd","rgb","gnd","#1e293b"),wire("w_btn_vcc","uno","5v","btn","p1a","#ef4444"),wire("w_btn_sig","btn","p2a","uno","d2","#22c55e"),wire("w_bzpos","uno","d8","bz","pos","#eab308"),wire("w_bzgnd","bz","neg","uno","gnd","#1e293b"),wire("w_pot_vcc","uno","5v","pot","t1","#ef4444"),wire("w_pot_gnd","uno","gnd","pot","t2","#1e293b"),wire("w_pot_w","pot","wiper","uno","a0","#eab308")] },
     program([pinMode("9","OUTPUT"),pinMode("10","OUTPUT"),pinMode("11","OUTPUT"),pinMode("8","OUTPUT"),pinMode("2","INPUT")],[
-      analogWrite("9",255),analogWrite("10",90),analogWrite("11",180),
+      analogMapWrite("9","pot",255),analogMapWrite("10","pot",150),analogMapWrite("11","pot",210),
       ifElseBlock(
-        sensorBlock("pushbutton_read", "btn"),
-        [digitalWrite("8","HIGH"),analogWrite("9",0),analogWrite("10",255),analogWrite("11",255),delay(200),digitalWrite("8","LOW")],
-        [digitalWrite("8","LOW")],
+        block("io_digitalread",{PIN:"2"}),
+        [toneOn("8",850),analogWrite("9",0),analogWrite("10",255),analogWrite("11",255),delay(200),toneOff("8")],
+        [toneOff("8")],
       ),
       delay(400),
     ]),
     [
       "1. 🔌 Circuit Wiring & Hardware Setup: Connect RGB LED common cathode to GND, R to D9, G to D10, B to D11. Connect mode pushbutton to D2 and buzzer to D8.",
-      "2. ⚙️ Code Architecture & Logic: Outputs blended PWM color hues. When pushbutton is pressed, activates party strobe and plays chime on D8.",
-      "3. ▶️ Simulation Execution & Interaction Controls: Click Run to start illumination. Click the pushbutton on canvas to trigger party color shifts.",
+      "2. ⚙️ Code Architecture & Logic: Maps the A0 potentiometer to the three RGB brightness channels. Holding the D2 button switches to a cyan strobe and plays a short chime on D8.",
+      "3. ▶️ Simulation Execution & Interaction Controls: Click Run, turn the A0 potentiometer to change lamp brightness, then hold the D2 pushbutton to trigger the cyan strobe.",
       "4. 📊 Outcomes & Real-Time Observations: Ambient violet mood glow transforms into vivid cyan flash accompanied by chime tones.",
     ]),
   starter("g6-buzzer-doorbell", "🔔 Smart Motion-Activated Video Doorbell (PIR + Chime + Welcome Light)", "Audible annunciator and motion security system! Detects visitor arrival via either tactile pushbutton (D2) or PIR infrared motion sensor (D7). The Arduino activates an acoustic 2-tone melodic chime on D8 and illuminates the welcoming LED porch light on D13.", 6, "Digital Inputs + Outputs", "Beginner", ["Pushbutton", "Buzzer", "PIR Motion", "Welcome Lamp"],
     { parts: [part("uno","arduino-uno",60,110),part("btn","pushbutton",270,90),part("pir","pir-sensor",430,60,{motion:"false"}),part("bz","buzzer",270,210),part("led1","led",590,80,{color:"green"}),part("r1","resistor",590,160,{resistance:220})], wires: [wire("a","uno","d2","btn","p1a"),wire("b","btn","p2a","uno","5v","#ef4444"),wire("c","uno","d8","bz","pos","#facc15"),wire("d","bz","neg","uno","gnd","#1e293b"),wire("w_pvcc","uno","5v","pir","vcc","#ef4444"),wire("w_pgnd","uno","gnd","pir","gnd","#1e293b"),wire("w_pout","uno","d7","pir","out","#60a5fa"),wire("w_la","uno","d13","r1","a","#22c55e"),wire("w_lb","r1","b","led1","anode","#22c55e"),wire("w_lgnd","led1","cathode","uno","gnd","#1e293b")] },
     program([pinMode("2","INPUT"),pinMode("7","INPUT"),pinMode("8","OUTPUT"),pinMode("13","OUTPUT")],[
       ifElseBlock(
-        sensorBlock("pushbutton_read", "btn"),
-        [digitalWrite("13","HIGH"),digitalWrite("8","HIGH"),delay(250),digitalWrite("8","LOW"),delay(150),digitalWrite("8","HIGH"),delay(250),digitalWrite("8","LOW"),digitalWrite("13","LOW")],
+        block("io_digitalread",{PIN:"2"}),
+        [digitalWrite("13","HIGH"),toneOn("8",850),delay(250),toneOff("8"),delay(100),toneOn("8",1200),delay(250),toneOff("8"),digitalWrite("13","LOW")],
         [
           ifElseBlock(
             sensorBlock("pir_motion", "pir"),
-            [digitalWrite("13","HIGH"),digitalWrite("8","HIGH"),delay(150),digitalWrite("8","LOW"),delay(300),digitalWrite("13","LOW")],
-            [digitalWrite("13","LOW"),digitalWrite("8","LOW")],
+            [digitalWrite("13","HIGH"),toneOn("8",850),delay(150),toneOff("8"),delay(300),digitalWrite("13","LOW")],
+            [digitalWrite("13","LOW"),toneOff("8")],
           ),
         ],
       ),
@@ -1106,12 +1070,11 @@ const EXTRA_TEMPLATES: ProjectTemplate[] = [
       "3. ▶️ Simulation Execution & Interaction Controls: Click Run, then click the pushbutton or toggle motion on the PIR sensor in the canvas inspector.",
       "4. 📊 Outcomes & Real-Time Observations: The system sounds a realistic entry chime while illuminating the visitor welcome lamp.",
     ]),
-  starter("g6-seven-segment", "🔢 7-Segment Digital Decade Counter (0-9 Display + Pushbutton + Chime)", "Interactive digital decade counter! The Arduino Uno drives all seven segment bars (a-g on pins D2-D8) through common GND to render digits 0 through 9 with glowing LED precision. Each count transition triggers an audio chime on pin D10 and flashes the pulse LED on D13, while an on-canvas Pushbutton on D9 allows manual step increments.", 6, "Displays", "Beginner", ["7-Segment", "Counter", "Pushbutton", "Buzzer", "Numbers"],
+  starter("g6-seven-segment", "🔢 7-Segment Digital Decade Counter (0–9 Display + Chime)", "Automatic digital decade counter. The Arduino Uno drives the seven segment bars (a–g on D2–D8) through common GND to display digits 0 through 9. Each count lights the D10 piezo chime and briefly flashes the D13 pulse LED.", 6, "Displays", "Beginner", ["7-Segment", "Counter", "Buzzer", "Numbers"],
     {
       parts: [
         part("uno", "arduino-uno", 50, 110),
         part("seg", "seven-segment", 420, 75, { digit: 0 }),
-        part("btn", "pushbutton", 250, 95),
         part("buzzer", "buzzer", 250, 210),
         part("led", "led", 570, 75, { color: "green" }),
         part("r1", "resistor", 570, 150, { resistance: 220 }),
@@ -1125,8 +1088,6 @@ const EXTRA_TEMPLATES: ProjectTemplate[] = [
         wire("w_f", "uno", "d7", "seg", "f", "#8b5cf6"),
         wire("w_g", "uno", "d8", "seg", "g", "#ec4899"),
         wire("w_com", "uno", "gnd", "seg", "com", "#1e293b"),
-        wire("w_bpwr", "uno", "5v", "btn", "p1a", "#ef4444"),
-        wire("w_bsig", "btn", "p2a", "uno", "d9", "#22c55e"),
         wire("w_bzpos", "uno", "d10", "buzzer", "pos", "#eab308"),
         wire("w_bzgnd", "buzzer", "neg", "uno", "gnd", "#1e293b"),
         wire("w_lr", "uno", "d13", "r1", "a", "#22c55e"),
@@ -1137,43 +1098,43 @@ const EXTRA_TEMPLATES: ProjectTemplate[] = [
     program([
       pinMode("2","OUTPUT"),pinMode("3","OUTPUT"),pinMode("4","OUTPUT"),pinMode("5","OUTPUT"),
       pinMode("6","OUTPUT"),pinMode("7","OUTPUT"),pinMode("8","OUTPUT"),
-      pinMode("9","INPUT"),pinMode("10","OUTPUT"),pinMode("13","OUTPUT")
+      pinMode("10","OUTPUT"),pinMode("13","OUTPUT")
     ],[
       // Digit 0: a,b,c,d,e,f ON, g OFF
       digitalWrite("2","HIGH"),digitalWrite("3","HIGH"),digitalWrite("4","HIGH"),digitalWrite("5","HIGH"),digitalWrite("6","HIGH"),digitalWrite("7","HIGH"),digitalWrite("8","LOW"),
-      digitalWrite("10","HIGH"),digitalWrite("13","HIGH"),delay(50),digitalWrite("10","LOW"),digitalWrite("13","LOW"),delay(650),
+      toneOn("10",850),digitalWrite("13","HIGH"),delay(100),toneOff("10"),digitalWrite("13","LOW"),delay(600),
       // Digit 1: b,c ON
       digitalWrite("2","LOW"),digitalWrite("3","HIGH"),digitalWrite("4","HIGH"),digitalWrite("5","LOW"),digitalWrite("6","LOW"),digitalWrite("7","LOW"),digitalWrite("8","LOW"),
-      digitalWrite("10","HIGH"),digitalWrite("13","HIGH"),delay(50),digitalWrite("10","LOW"),digitalWrite("13","LOW"),delay(650),
+      toneOn("10",850),digitalWrite("13","HIGH"),delay(100),toneOff("10"),digitalWrite("13","LOW"),delay(600),
       // Digit 2: a,b,d,e,g ON
       digitalWrite("2","HIGH"),digitalWrite("3","HIGH"),digitalWrite("4","LOW"),digitalWrite("5","HIGH"),digitalWrite("6","HIGH"),digitalWrite("7","LOW"),digitalWrite("8","HIGH"),
-      digitalWrite("10","HIGH"),digitalWrite("13","HIGH"),delay(50),digitalWrite("10","LOW"),digitalWrite("13","LOW"),delay(650),
+      toneOn("10",850),digitalWrite("13","HIGH"),delay(100),toneOff("10"),digitalWrite("13","LOW"),delay(600),
       // Digit 3: a,b,c,d,g ON
       digitalWrite("2","HIGH"),digitalWrite("3","HIGH"),digitalWrite("4","HIGH"),digitalWrite("5","HIGH"),digitalWrite("6","LOW"),digitalWrite("7","LOW"),digitalWrite("8","HIGH"),
-      digitalWrite("10","HIGH"),digitalWrite("13","HIGH"),delay(50),digitalWrite("10","LOW"),digitalWrite("13","LOW"),delay(650),
+      toneOn("10",850),digitalWrite("13","HIGH"),delay(100),toneOff("10"),digitalWrite("13","LOW"),delay(600),
       // Digit 4: b,c,f,g ON
       digitalWrite("2","LOW"),digitalWrite("3","HIGH"),digitalWrite("4","HIGH"),digitalWrite("5","LOW"),digitalWrite("6","LOW"),digitalWrite("7","HIGH"),digitalWrite("8","HIGH"),
-      digitalWrite("10","HIGH"),digitalWrite("13","HIGH"),delay(50),digitalWrite("10","LOW"),digitalWrite("13","LOW"),delay(650),
+      toneOn("10",850),digitalWrite("13","HIGH"),delay(100),toneOff("10"),digitalWrite("13","LOW"),delay(600),
       // Digit 5: a,c,d,f,g ON
       digitalWrite("2","HIGH"),digitalWrite("3","LOW"),digitalWrite("4","HIGH"),digitalWrite("5","HIGH"),digitalWrite("6","LOW"),digitalWrite("7","HIGH"),digitalWrite("8","HIGH"),
-      digitalWrite("10","HIGH"),digitalWrite("13","HIGH"),delay(50),digitalWrite("10","LOW"),digitalWrite("13","LOW"),delay(650),
+      toneOn("10",850),digitalWrite("13","HIGH"),delay(100),toneOff("10"),digitalWrite("13","LOW"),delay(600),
       // Digit 6: a,c,d,e,f,g ON
       digitalWrite("2","HIGH"),digitalWrite("3","LOW"),digitalWrite("4","HIGH"),digitalWrite("5","HIGH"),digitalWrite("6","HIGH"),digitalWrite("7","HIGH"),digitalWrite("8","HIGH"),
-      digitalWrite("10","HIGH"),digitalWrite("13","HIGH"),delay(50),digitalWrite("10","LOW"),digitalWrite("13","LOW"),delay(650),
+      toneOn("10",850),digitalWrite("13","HIGH"),delay(100),toneOff("10"),digitalWrite("13","LOW"),delay(600),
       // Digit 7: a,b,c ON
       digitalWrite("2","HIGH"),digitalWrite("3","HIGH"),digitalWrite("4","HIGH"),digitalWrite("5","LOW"),digitalWrite("6","LOW"),digitalWrite("7","LOW"),digitalWrite("8","LOW"),
-      digitalWrite("10","HIGH"),digitalWrite("13","HIGH"),delay(50),digitalWrite("10","LOW"),digitalWrite("13","LOW"),delay(650),
+      toneOn("10",850),digitalWrite("13","HIGH"),delay(100),toneOff("10"),digitalWrite("13","LOW"),delay(600),
       // Digit 8: ALL ON
       digitalWrite("2","HIGH"),digitalWrite("3","HIGH"),digitalWrite("4","HIGH"),digitalWrite("5","HIGH"),digitalWrite("6","HIGH"),digitalWrite("7","HIGH"),digitalWrite("8","HIGH"),
-      digitalWrite("10","HIGH"),digitalWrite("13","HIGH"),delay(50),digitalWrite("10","LOW"),digitalWrite("13","LOW"),delay(650),
+      toneOn("10",850),digitalWrite("13","HIGH"),delay(100),toneOff("10"),digitalWrite("13","LOW"),delay(600),
       // Digit 9: a,b,c,d,f,g ON
       digitalWrite("2","HIGH"),digitalWrite("3","HIGH"),digitalWrite("4","HIGH"),digitalWrite("5","HIGH"),digitalWrite("6","LOW"),digitalWrite("7","HIGH"),digitalWrite("8","HIGH"),
-      digitalWrite("10","HIGH"),digitalWrite("13","HIGH"),delay(50),digitalWrite("10","LOW"),digitalWrite("13","LOW"),delay(650),
+      toneOn("10",850),digitalWrite("13","HIGH"),delay(100),toneOff("10"),digitalWrite("13","LOW"),delay(600),
     ]),
     [
-      "1. 🔌 Circuit Wiring: All 7 segments a-g wire to Arduino pins D2-D8, common COM to GND. Connect Pushbutton to D9, Buzzer to D10, and Pulse LED to D13.",
+      "1. 🔌 Circuit Wiring: Wire segments a–g to Arduino D2–D8 and common COM to GND. Connect the piezo buzzer to D10 and the pulse LED to D13 through a 220Ω resistor.",
       "2. ⚙️ Code Architecture: Program cycles through numeric segment patterns 0 to 9, emitting a click sound and LED strobe on each count.",
-      "3. ▶️ Interaction: Press Run to watch the automatic counter. Use the on-canvas quick digit buttons to jump directly to any number.",
+      "3. ▶️ Interaction: Press Run and watch the circuit cycle through digits 0–9 automatically.",
       "4. 📊 Output: Crisp red numeric digits illuminate smoothly across the 7-segment display with audio-visual synchronization.",
     ]),
   starter("g6-ldr-night-lamp", "💡 Smart Night Lamp & Perimeter Security (LDR + PIR Motion + Siren)", "Photosensitive ambient light controller and motion security system! A Light Dependent Resistor (LDR) monitors ambient illumination on analog pin A0. In daylight, lamps remain OFF; when darkness falls (<400), Arduino lights the Yellow Lamp on D13 and Blue Ambient LED on D12. If the PIR sensor on D7 trips motion at night, the security siren on D8 chirps an intruder warning.", 6, "Sensors", "Intermediate", ["LDR", "Analog", "PIR Motion", "Dual LED", "Buzzer"],
@@ -1185,11 +1146,11 @@ const EXTRA_TEMPLATES: ProjectTemplate[] = [
           digitalWrite("13","HIGH"),digitalWrite("12","HIGH"),
           ifElseBlock(
             sensorBlock("pir_motion", "pir"),
-            [digitalWrite("8","HIGH"),delay(150),digitalWrite("8","LOW")],
-            [digitalWrite("8","LOW")],
+            [toneOn("8",850),delay(150),toneOff("8")],
+            [toneOff("8")],
           ),
         ],
-        [digitalWrite("13","LOW"),digitalWrite("12","LOW"),digitalWrite("8","LOW")],
+        [digitalWrite("13","LOW"),digitalWrite("12","LOW"),toneOff("8")],
       ),
       delay(100),
     ]),
@@ -1199,21 +1160,21 @@ const EXTRA_TEMPLATES: ProjectTemplate[] = [
       "3. ▶️ Simulation Execution & Interaction Controls: Click Run to start illumination monitoring. Use the LDR slider to simulate night, then toggle the PIR motion trigger.",
       "4. 📊 Outcomes & Real-Time Observations: Dual lamps illuminate automatically in darkness, and intruder motion trips the audio security siren.",
     ]),
-  starter("g7-pir-security", "🚨 Smart Intrusion Defense Grid (PIR + Siren + Dual Alert LEDs + Armed Key)", "Passive Infrared intrusion defense grid with dual status indicators and acoustic siren! The PIR sensor monitors motion on D7. When movement occurs, Arduino triggers the high-decibel Piezo Siren on D8 and strobes the high-intensity Red Alarm LED on D13, while Green LED on D12 displays system armed state.", 7, "Sensors + Automation", "Intermediate", ["PIR", "Motion", "Security", "Siren", "Dual LED"],
-    { parts: [part("uno","arduino-uno",60,110),part("pir","pir-sensor",320,60,{motion:"false"}),part("btn","pushbutton",200,210),part("bz","buzzer",320,210),part("led1","led",540,70,{color:"red"}),part("r1","resistor",540,150,{resistance:220}),part("led2","led",650,70,{color:"green"}),part("r2","resistor",650,150,{resistance:220})], wires: [wire("a","uno","5v","pir","vcc","#ef4444"),wire("b","uno","gnd","pir","gnd","#1e293b"),wire("c","uno","d7","pir","out","#60a5fa"),wire("d","uno","d13","r1","a","#ef4444"),wire("e","r1","b","led1","anode","#ef4444"),wire("f","led1","cathode","uno","gnd","#1e293b"),wire("w_btn_vcc","uno","5v","btn","p1a","#ef4444"),wire("w_btn_sig","btn","p2a","uno","d2","#22c55e"),wire("w_bzpos","uno","d8","bz","pos","#eab308"),wire("w_bzgnd","bz","neg","uno","gnd","#1e293b"),wire("w_l2a","uno","d12","r2","a","#22c55e"),wire("w_l2b","r2","b","led2","anode","#22c55e"),wire("w_l2gnd","led2","cathode","uno","gnd","#1e293b")] },
-    program([pinMode("7","INPUT"),pinMode("2","INPUT"),pinMode("13","OUTPUT"),pinMode("12","OUTPUT"),pinMode("8","OUTPUT")],[
+  starter("g7-pir-security", "🚨 Smart Intrusion Defense Grid (PIR + Siren + Dual Alert LEDs)", "Passive Infrared intrusion defense grid with dual status indicators and acoustic siren! The PIR sensor monitors motion on D7. When movement occurs, Arduino triggers the high-decibel Piezo Siren on D8 and strobes the high-intensity Red Alarm LED on D13, while Green LED on D12 displays system armed state.", 7, "Sensors + Automation", "Intermediate", ["PIR", "Motion", "Security", "Siren", "Dual LED"],
+    { parts: [part("uno","arduino-uno",60,110),part("pir","pir-sensor",320,60,{motion:"false"}),part("bz","buzzer",320,210),part("led1","led",540,70,{color:"red"}),part("r1","resistor",540,150,{resistance:220}),part("led2","led",650,70,{color:"green"}),part("r2","resistor",650,150,{resistance:220})], wires: [wire("a","uno","5v","pir","vcc","#ef4444"),wire("b","uno","gnd","pir","gnd","#1e293b"),wire("c","uno","d7","pir","out","#60a5fa"),wire("d","uno","d13","r1","a","#ef4444"),wire("e","r1","b","led1","anode","#ef4444"),wire("f","led1","cathode","uno","gnd","#1e293b"),wire("w_bzpos","uno","d8","bz","pos","#eab308"),wire("w_bzgnd","bz","neg","uno","gnd","#1e293b"),wire("w_l2a","uno","d12","r2","a","#22c55e"),wire("w_l2b","r2","b","led2","anode","#22c55e"),wire("w_l2gnd","led2","cathode","uno","gnd","#1e293b")] },
+    program([pinMode("7","INPUT"),pinMode("13","OUTPUT"),pinMode("12","OUTPUT"),pinMode("8","OUTPUT")],[
       digitalWrite("12","HIGH"),
       ifElseBlock(
         sensorBlock("pir_motion", "pir"),
-        [digitalWrite("13","HIGH"),digitalWrite("8","HIGH"),delay(250),digitalWrite("8","LOW"),delay(100)],
-        [digitalWrite("13","LOW"),digitalWrite("8","LOW")],
+        [digitalWrite("13","HIGH"),toneOn("8",850),delay(250),toneOff("8"),delay(100)],
+        [digitalWrite("13","LOW"),toneOff("8")],
       ),
       delay(80),
     ]),
     [
-      "1. 🔌 Circuit Wiring & Hardware Setup: Connect PIR OUT to D7. Wire red alarm LED to D13 and green armed LED to D12 via 220Ω resistors. Connect piezo siren to D8 and arm key to D2.",
+      "1. 🔌 Circuit Wiring & Hardware Setup: Connect PIR OUT to D7. Wire red alarm LED to D13 and green armed-status LED to D12 through 220Ω resistors. Connect the piezo siren to D8.",
       "2. ⚙️ Code Architecture & Logic: Keeps green armed indicator active. When pir_motion detects an intruder, strobes red LED on D13 and sounds the D8 siren.",
-      "3. ▶️ Simulation Execution & Interaction Controls: Click Run to arm perimeter security, then toggle the PIR motion trigger in the canvas inspector.",
+      "3. ▶️ Simulation Execution & Interaction Controls: Click Run, select the PIR sensor, and switch its motion control on in the Inspector.",
       "4. 📊 Outcomes & Real-Time Observations: The green armed light stays solid; upon intruder detection, red strobe flashes and the siren blares urgently.",
     ]),
   starter("g7-tmp36-alert", "🌡️ Climate Overheat Protection System (TMP36 + DC Cooling Fan + Dual LEDs + Siren)", "Analog thermal monitoring with automated cooling fan and dual status warnings! The TMP36 outputs linear voltage on A0. When temperature exceeds safe thresholds (30°C), Arduino activates the DC Motor Cooling Fan on D5, sounds the emergency audio siren on D8, and flips from Normal Green LED (D12) to Overheat Red LED (D13).", 7, "Analog Sensors", "Intermediate", ["TMP36", "Temperature", "DC Motor", "Fan", "Alarm"],
@@ -1222,8 +1183,8 @@ const EXTRA_TEMPLATES: ProjectTemplate[] = [
       serialPrintValue("tmp36_temperature", { SENSOR: "tmp" }),
       ifElseBlock(
         compareBlock("GT", sensorBlock("tmp36_temperature", "tmp"), numberBlock(30)),
-        [digitalWrite("13","HIGH"),digitalWrite("12","LOW"),digitalWrite("5","HIGH"),digitalWrite("8","HIGH"),delay(250),digitalWrite("8","LOW")],
-        [digitalWrite("13","LOW"),digitalWrite("12","HIGH"),digitalWrite("5","LOW"),digitalWrite("8","LOW")],
+        [digitalWrite("13","HIGH"),digitalWrite("12","LOW"),digitalWrite("5","HIGH"),toneOn("8",850),delay(250),toneOff("8")],
+        [digitalWrite("13","LOW"),digitalWrite("12","HIGH"),digitalWrite("5","LOW"),toneOff("8")],
       ),
       delay(500),
     ]),
@@ -1233,33 +1194,22 @@ const EXTRA_TEMPLATES: ProjectTemplate[] = [
       "3. ▶️ Simulation Execution & Interaction Controls: Click Run and open the Serial Monitor. Select TMP36 in the canvas inspector and slide temperature past 30°C.",
       "4. 📊 Outcomes & Real-Time Observations: The cooling fan spins up to full speed, the red overheat LED lights, and the buzzer sounds an emergency alarm.",
     ]),
-  starter("g7-dht-weather", "⛅ Digital Environmental Station (DHT11 + I2C LCD + Pulse LED + Chime)", "Digital single-bus environmental telemetry with alphanumeric LCD display! Measures ambient temperature and humidity on pin D4, streams formatted metrics to Serial Monitor, outputs live values to a 16×2 I2C LCD screen, and flashes a heartbeat activity pulse on D13 with confirmation chime on D8.", 7, "Environmental Sensors", "Intermediate", ["DHT11", "Temperature", "Humidity", "LCD", "I2C"],
+  starter("g7-dht-weather", "⛅ Digital Environmental Station (DHT11 + I2C LCD + Pulse LED + Chime)", "Digital single-bus environmental telemetry with alphanumeric LCD display! Measures ambient temperature and humidity on pin D4, streams formatted metrics to Serial Monitor, outputs live values to a 16×2 I2C LCD screen, and flashes D13. If temperature rises above 30°C, the D8 piezo gives a short 950 Hz over-temperature alert.", 7, "Environmental Sensors", "Intermediate", ["DHT11", "Temperature", "Humidity", "LCD", "I2C"],
     { parts: [part("uno","arduino-uno",60,120),part("dht","dht11",280,90,{temperature:25,humidity:55}),part("lcd","lcd-i2c",480,60,{line1:"TEMP: 25C",line2:"HUMIDITY: 55%"}),part("led1","led",720,70,{color:"green"}),part("r1","resistor",720,150,{resistance:220}),part("bz","buzzer",280,210)], wires: [wire("a","uno","5v","dht","vcc","#ef4444"),wire("b","uno","gnd","dht","gnd","#1e293b"),wire("c","uno","d4","dht","data","#60a5fa"),wire("w_lvcc","uno","5v","lcd","vcc","#ef4444"),wire("w_lgnd","uno","gnd","lcd","gnd","#1e293b"),wire("w_lsda","uno","a4","lcd","sda","#60a5fa"),wire("w_lscl","uno","a5","lcd","scl","#3b82f6"),wire("w_la","uno","d13","r1","a","#22c55e"),wire("w_lb","r1","b","led1","anode","#22c55e"),wire("w_lg","led1","cathode","uno","gnd","#1e293b"),wire("w_bzpos","uno","d8","bz","pos","#eab308"),wire("w_bzgnd","bz","neg","uno","gnd","#1e293b")] },
-    program([serialBegin(),pinMode("4","INPUT"),pinMode("13","OUTPUT"),pinMode("8","OUTPUT")],[
-      digitalWrite("13","HIGH"),
-      block("lcd_clear"),
-      block("lcd_set_cursor",{COL:"0",ROW:"0"}),
-      block("lcd_print",{},{TEXT:textBlock("WEATHER STATION")}),
-      block("lcd_set_cursor",{COL:"0",ROW:"1"}),
-      block("lcd_print",{},{TEXT:textBlock("T: 25C | H: 55%")}),
-      serialPrint("Temperature: "),serialPrintValue("dht_temperature"),
-      serialPrint("Humidity: "),serialPrintValue("dht_humidity"),
-      digitalWrite("13","LOW"),
-      delay(1000),
-    ]),
+    program([serialBegin(),pinMode("4","INPUT"),pinMode("13","OUTPUT"),pinMode("8","OUTPUT")],[digitalWrite("13","HIGH"),block("lcd_clear"),block("lcd_set_cursor",{COL:"0",ROW:"0"}),block("lcd_print",{},{TEXT:textBlock("TEMP C: ")}),block("lcd_print",{},{TEXT:sensorBlock("dht_temperature","dht")}),block("lcd_set_cursor",{COL:"0",ROW:"1"}),block("lcd_print",{},{TEXT:textBlock("HUM %: ")}),block("lcd_print",{},{TEXT:sensorBlock("dht_humidity","dht")}),serialPrint("Temperature: "),serialPrintValue("dht_temperature",{SENSOR:"dht"}),serialPrint("Humidity: "),serialPrintValue("dht_humidity",{SENSOR:"dht"}),ifElseBlock(compareBlock("GT",sensorBlock("dht_temperature","dht"),numberBlock(30)),[toneOn("8",950),delay(150),toneOff("8")],[toneOff("8")]),digitalWrite("13","LOW"),delay(1000)]),
     [
       "1. 🔌 Circuit Wiring & Hardware Setup: Connect DHT11 to D4, I2C LCD to A4/A5, telemetry pulse LED to D13 with 220Ω resistor, and audio buzzer to D8.",
-      "2. ⚙️ Code Architecture & Logic: Queries DHT11 temperature and humidity, outputs real-time readings to the LCD, pulses D13 LED, and streams data over Serial.",
+      "2. ⚙️ Code Architecture & Logic: Queries DHT11 temperature and humidity, outputs real-time readings to the LCD, pulses D13, streams data over Serial, and sounds D8 only when temperature exceeds 30°C.",
       "3. ▶️ Simulation Execution & Interaction Controls: Click Run, select DHT11 in the inspector, and adjust temperature or humidity sliders.",
-      "4. 📊 Outcomes & Real-Time Observations: The LCD display updates with crisp alphanumeric readings synchronized with heartbeat LED pulses.",
+      "4. 📊 Outcomes & Real-Time Observations: LCD and Serial values follow the DHT11 temperature/humidity settings; the LED pulses; the D8 alarm sounds only if temperature rises above 30°C.",
     ]),
   starter("g7-soil-smart-farm", "🌱 Automated Smart Agriculture Irrigation System (Soil Probe + DC Pump + Siren + Dual LEDs)", "Automated precision agriculture soil hydration monitor with DC irrigation pump! Conductive soil probes measure electrical impedance on A0. When soil drops below 600, Arduino illuminates the Red Drought LED on D12, triggers the DC Motor Irrigation Pump on D5 to deliver water, and chirps an alert buzzer on D8.", 7, "Smart Farming", "Intermediate", ["Soil Moisture", "Analog", "IoT", "DC Motor", "Pump"],
     { parts: [part("uno","arduino-uno",60,110),part("soil","soil-moisture",300,80,{moisture:620}),part("pump","dc-motor",490,60),part("bz","buzzer",300,210),part("led1","led",630,70,{color:"green"}),part("r1","resistor",630,150,{resistance:220}),part("led2","led",740,70,{color:"red"}),part("r2","resistor",740,150,{resistance:220})], wires: [wire("a","uno","5v","soil","vcc","#ef4444"),wire("b","soil","ao","uno","a0","#eab308"),wire("c","soil","gnd","uno","gnd","#1e293b"),wire("d","uno","d13","r1","a","#22c55e"),wire("e","r1","b","led1","anode","#22c55e"),wire("f","led1","cathode","uno","gnd","#1e293b"),wire("w_pump_pos","uno","d5","pump","pos","#60a5fa"),wire("w_pump_neg","pump","neg","uno","gnd","#1e293b"),wire("w_l2a","uno","d12","r2","a","#ef4444"),wire("w_l2b","r2","b","led2","anode","#ef4444"),wire("w_l2gnd","led2","cathode","uno","gnd","#1e293b"),wire("w_bzpos","uno","d8","bz","pos","#eab308"),wire("w_bzgnd","bz","neg","uno","gnd","#1e293b")] },
     program([pinMode("13","OUTPUT"),pinMode("12","OUTPUT"),pinMode("5","OUTPUT"),pinMode("8","OUTPUT")],[
       ifElseBlock(
         compareBlock("GT", sensorBlock("soil_moisture_read", "soil"), numberBlock(600)),
-        [digitalWrite("13","HIGH"),digitalWrite("12","LOW"),digitalWrite("5","LOW"),digitalWrite("8","LOW")],
-        [digitalWrite("13","LOW"),digitalWrite("12","HIGH"),digitalWrite("5","HIGH"),digitalWrite("8","HIGH"),delay(250),digitalWrite("8","LOW")],
+        [digitalWrite("13","HIGH"),digitalWrite("12","LOW"),digitalWrite("5","LOW"),toneOff("8")],
+        [digitalWrite("13","LOW"),digitalWrite("12","HIGH"),digitalWrite("5","HIGH"),toneOn("8",850),delay(250),toneOff("8")],
       ),
       delay(100),
     ]),
@@ -1277,12 +1227,12 @@ const EXTRA_TEMPLATES: ProjectTemplate[] = [
         [
           digitalWrite("13","HIGH"),digitalWrite("12","LOW"),
           block("servo_write",{PIN:"9"},{ANGLE:numberBlock(90)}),
-          digitalWrite("8","HIGH"),delay(150),digitalWrite("8","LOW"),
+          toneOn("8",850),delay(150),toneOff("8"),
         ],
         [
           digitalWrite("13","LOW"),digitalWrite("12","HIGH"),
           block("servo_write",{PIN:"9"},{ANGLE:numberBlock(0)}),
-          digitalWrite("8","LOW"),
+          toneOff("8"),
         ],
       ),
       delay(80),
@@ -1293,90 +1243,50 @@ const EXTRA_TEMPLATES: ProjectTemplate[] = [
       "3. ▶️ Simulation Execution & Interaction Controls: Click Run, then select the IR sensor on canvas and toggle its detected obstacle checkbox.",
       "4. 📊 Outcomes & Real-Time Observations: The servo gate swings 90° with crisp buzzer confirmation, demonstrating automated industrial package routing.",
     ]),
-  starter("g7-encoder-menu", "🎛️ Rotary Encoder Digital Cockpit Dial (16x2 LCD + Click Buzzer + Action LED)", "Incremental quadrature user interface dial with alphanumeric LCD readout! Rotating the encoder dial steps through software menu selections on the 16×2 I2C LCD, the piezo buzzer produces mechanical tactile click tones, and pressing the integrated encoder switch pulses the Green action LED on D13.", 7, "Human Interface", "Intermediate", ["Rotary Encoder", "Input", "Counter", "LCD", "I2C"],
+  starter("g7-encoder-menu", "🎛️ Rotary Encoder Digital Cockpit Dial (16x2 LCD + Click Buzzer + Action LED)", "Turn the encoder to update the count on the LCD and Serial Monitor. Press the integrated switch (D4) to flash the green LED and play a short piezo click on D8.", 7, "Human Interface", "Intermediate", ["Rotary Encoder", "Input", "Counter", "LCD", "I2C"],
     { parts: [part("uno","arduino-uno",60,110),part("enc","rotary-encoder",280,90,{value:0,pressed:"false"}),part("lcd","lcd-i2c",470,60,{line1:"DIAL POSITION",line2:"STEPS: 0"}),part("led1","led",710,70,{color:"green"}),part("r1","resistor",710,150,{resistance:220}),part("bz","buzzer",280,210)], wires: [wire("a","uno","5v","enc","vcc","#ef4444"),wire("b","uno","gnd","enc","gnd","#1e293b"),wire("c","uno","d2","enc","clk","#60a5fa"),wire("d","uno","d3","enc","dt","#3b82f6"),wire("e","uno","d4","enc","sw","#a855f7"),wire("w_lvcc","uno","5v","lcd","vcc","#ef4444"),wire("w_lgnd","uno","gnd","lcd","gnd","#1e293b"),wire("w_lsda","uno","a4","lcd","sda","#60a5fa"),wire("w_lscl","uno","a5","lcd","scl","#3b82f6"),wire("w_la","uno","d13","r1","a","#22c55e"),wire("w_lb","r1","b","led1","anode","#22c55e"),wire("w_lg","led1","cathode","uno","gnd","#1e293b"),wire("w_bzpos","uno","d8","bz","pos","#eab308"),wire("w_bzgnd","bz","neg","uno","gnd","#1e293b")] },
-    program([serialBegin(),pinMode("2","INPUT"),pinMode("3","INPUT"),pinMode("4","INPUT"),pinMode("13","OUTPUT"),pinMode("8","OUTPUT")],[
-      serialPrintValue("encoder_read", { SENSOR: "enc" }),
-      digitalWrite("13","HIGH"),digitalWrite("8","HIGH"),delay(30),digitalWrite("8","LOW"),digitalWrite("13","LOW"),
-      delay(250),
-    ]),
+    program([serialBegin(),pinMode("2","INPUT"),pinMode("3","INPUT"),pinMode("4","INPUT"),pinMode("13","OUTPUT"),pinMode("8","OUTPUT")],[block("lcd_clear"),block("lcd_print_line",{LINE:"1"},{TEXT:textBlock("DIAL POSITION")}),block("lcd_print_line",{LINE:"2"},{TEXT:sensorBlock("encoder_read","enc")}),serialPrint("Encoder count: "),serialPrintValue("encoder_read",{SENSOR:"enc"}),ifElseBlock(block("io_digitalread",{PIN:"4"}),[digitalWrite("13","HIGH"),toneOn("8",1200),delay(90),toneOff("8")],[digitalWrite("13","LOW"),toneOff("8")]),delay(100)]),
     [
       "1. 🔌 Circuit Wiring & Hardware Setup: Connect encoder CLK to D2, DT to D3, SW to D4. Wire I2C LCD to A4/A5, buzzer to D8, and action LED to D13 with 220Ω resistor.",
-      "2. ⚙️ Code Architecture & Logic: Evaluates encoder quadrature rotation, updates live values to LCD and Serial, chirps buzzer D8 for audio click, and flashes D13.",
-      "3. ▶️ Simulation Execution & Interaction Controls: Click Run, click the rotary encoder on canvas, and rotate its dial clockwise and counterclockwise.",
+      "2. ⚙️ Code Architecture & Logic: Reads the encoder count into the LCD and Serial Monitor. The integrated switch on D4 triggers the LED and piezo click.",
+      "3. ▶️ Simulation Execution & Interaction Controls: Click Run, change the encoder value in the Inspector, and set Pressed to true to test the switch.",
       "4. 📊 Outcomes & Real-Time Observations: The Serial console and LCD log positive and negative dial steps accompanied by tactile audio click chirps.",
     ]),
-  starter("g7-servo-door", "🚧 Automatic Ultrasonic Boom Barrier Gate (Sonar + Servo + Stop/Go LEDs + Chime)", "Automated smart parking boom barrier gate with ultrasonic radar sensing! The HC-SR04 sonar measures vehicle distance on D10/D11. As vehicles arrive, the Red Stop LED (D12) flips to Green Go (D13), the Gate Chime on D8 sounds an entry tone, and the barrier servo swings open to 90°.", 7, "Robotics", "Intermediate", ["Servo", "Automation", "Ultrasonic", "Boom Barrier", "Buzzer"],
+  starter("g7-servo-door", "🚧 Automatic Ultrasonic Boom Barrier Gate (Sonar + Servo + Stop/Go LEDs + Chime)", "The HC-SR04 measures vehicle distance on D10/D11 and opens the barrier below 30 cm. Press and hold the D2 override to keep the barrier closed. Red/green LEDs show stop/go, and a piezo tone confirms opening.", 7, "Robotics", "Intermediate", ["Servo", "Automation", "Ultrasonic", "Boom Barrier", "Buzzer"],
     { parts: [part("uno","arduino-uno",60,110),part("sonar","ultrasonic",300,60,{distance:45}),part("servo","servo",510,60,{angle:0}),part("btn","pushbutton",200,200),part("bz","buzzer",320,200),part("led_stop","led",670,60,{color:"red"}),part("r1","resistor",670,140,{resistance:220}),part("led_go","led",770,60,{color:"green"}),part("r2","resistor",770,140,{resistance:220})], wires: [wire("a","uno","5v","servo","vcc","#ef4444"),wire("b","uno","gnd","servo","gnd","#1e293b"),wire("c","uno","d9","servo","sig","#fb923c"),wire("w_sonar_vcc","uno","5v","sonar","vcc","#ef4444"),wire("w_sonar_gnd","uno","gnd","sonar","gnd","#1e293b"),wire("w_sonar_trig","uno","d10","sonar","trig","#60a5fa"),wire("w_sonar_echo","uno","d11","sonar","echo","#38bdf8"),wire("w_btn_vcc","uno","5v","btn","p1a","#ef4444"),wire("w_btn_sig","btn","p2a","uno","d2","#22c55e"),wire("w_bzpos","uno","d8","bz","pos","#eab308"),wire("w_bzgnd","bz","neg","uno","gnd","#1e293b"),wire("w_l1a","uno","d12","r1","a","#ef4444"),wire("w_l1b","r1","b","led_stop","anode","#ef4444"),wire("w_l1g","led_stop","cathode","uno","gnd","#1e293b"),wire("w_l2a","uno","d13","r2","a","#22c55e"),wire("w_l2b","r2","b","led_go","anode","#22c55e"),wire("w_l2g","led_go","cathode","uno","gnd","#1e293b")] },
-    program([pinMode("9","OUTPUT"),pinMode("8","OUTPUT"),pinMode("12","OUTPUT"),pinMode("13","OUTPUT"),pinMode("2","INPUT")],[
-      block("servo_write",{PIN:"9"},{ANGLE:numberBlock(0)}),
-      digitalWrite("12","HIGH"),digitalWrite("13","LOW"),
-      delay(800),
-      block("servo_write",{PIN:"9"},{ANGLE:numberBlock(90)}),
-      digitalWrite("12","LOW"),digitalWrite("13","HIGH"),
-      digitalWrite("8","HIGH"),delay(150),digitalWrite("8","LOW"),
-      delay(1200),
-    ]),
+    program([pinMode("9","OUTPUT"),pinMode("8","OUTPUT"),pinMode("12","OUTPUT"),pinMode("13","OUTPUT"),pinMode("2","INPUT")],[ifElseBlock(block("io_digitalread",{PIN:"2"}),[block("servo_write",{PIN:"9"},{ANGLE:numberBlock(0)}),digitalWrite("12","HIGH"),digitalWrite("13","LOW"),toneOff("8"),delay(80)],[ifElseBlock(compareBlock("LT",block("ultrasonic_read",{TRIG:"10",ECHO:"11"}),numberBlock(30)),[block("servo_write",{PIN:"9"},{ANGLE:numberBlock(90)}),digitalWrite("12","LOW"),digitalWrite("13","HIGH"),toneOn("8",980),delay(100),toneOff("8")],[block("servo_write",{PIN:"9"},{ANGLE:numberBlock(0)}),digitalWrite("12","HIGH"),digitalWrite("13","LOW"),toneOff("8"),delay(100)])])]),
     [
       "1. 🔌 Circuit Wiring & Hardware Setup: Connect barrier servo to D9, ultrasonic sonar to D10/D11, emergency button to D2, stop/go LEDs to D12/D13, and chime buzzer to D8.",
-      "2. ⚙️ Code Architecture & Logic: Commands barrier servo to close (0°) with Red Stop lamp, then raises barrier arm (90°) with Green Go lamp and welcome chime.",
-      "3. ▶️ Simulation Execution & Interaction Controls: Click Run, then select the ultrasonic sensor or manual emergency button on canvas to trigger gate actuation.",
+      "2. ⚙️ Code Architecture & Logic: Opens the barrier and chirps when a vehicle is within 30 cm. Holding the D2 override closes it regardless of distance.",
+      "3. ▶️ Simulation Execution & Interaction Controls: Click Run and move the ultrasonic distance control below 30 cm. Press the D2 button to force the barrier closed.",
       "4. 📊 Outcomes & Real-Time Observations: The boom barrier lifts gracefully to 90° with green traffic signal illumination and audio chime.",
     ]),
-  starter("g8-lcd-weather", "📟 I2C Alphanumeric Climate Readout (LCD + DHT11 + Pulse LED + Chime)", "Two-wire I2C alphanumeric visual readout with integrated climate sensing! The 16×2 Liquid Crystal Display communicates with the Arduino over I2C bus lines SDA (A4) and SCL (A5), while DHT11 on D4 streams real-time environmental metrics, D13 flashes telemetry pulses, and D8 chirps audio confirmation.", 8, "Displays + I2C", "Intermediate", ["LCD", "I2C", "DHT11", "Climate", "Sensors"],
+  starter("g8-lcd-weather", "📟 I2C Climate Monitor (LCD + DHT11 + Heat Alert)", "Two-wire I2C alphanumeric visual readout with integrated climate sensing! The 16×2 Liquid Crystal Display communicates with the Arduino over I2C bus lines SDA (A4) and SCL (A5), while DHT11 on D4 streams real-time environmental metrics, D13 provides a sample pulse; D8 sounds a short 950 Hz alert only above 30°C.", 8, "Displays + I2C", "Intermediate", ["LCD", "I2C", "DHT11", "Climate", "Sensors"],
     { parts: [part("uno","arduino-uno",60,110),part("dht","dht11",280,80,{temperature:24,humidity:60}),part("lcd","lcd-i2c",480,60,{line1:"PIXIU WEATHER",line2:"T: 24C | H: 60%"}),part("led1","led",720,70,{color:"green"}),part("r1","resistor",720,150,{resistance:220}),part("bz","buzzer",280,210)], wires: [wire("a","uno","5v","lcd","vcc","#ef4444"),wire("b","uno","gnd","lcd","gnd","#1e293b"),wire("c","uno","a4","lcd","sda","#60a5fa"),wire("d","uno","a5","lcd","scl","#3b82f6"),wire("w_dvcc","uno","5v","dht","vcc","#ef4444"),wire("w_dgnd","uno","gnd","dht","gnd","#1e293b"),wire("w_data","uno","d4","dht","data","#60a5fa"),wire("w_la","uno","d13","r1","a","#22c55e"),wire("w_lb","r1","b","led1","anode","#22c55e"),wire("w_lg","led1","cathode","uno","gnd","#1e293b"),wire("w_bzpos","uno","d8","bz","pos","#eab308"),wire("w_bzgnd","bz","neg","uno","gnd","#1e293b")] },
-    program([serialBegin(),pinMode("13","OUTPUT"),pinMode("8","OUTPUT"),pinMode("4","INPUT")],[
-      digitalWrite("13","HIGH"),
-      block("lcd_clear"),
-      block("lcd_set_cursor",{COL:"0",ROW:"0"}),
-      block("lcd_print",{},{TEXT:textBlock("PIXIU WEATHER")}),
-      block("lcd_set_cursor",{COL:"0",ROW:"1"}),
-      block("lcd_print",{},{TEXT:textBlock("T: 24C | H: 60%")}),
-      digitalWrite("13","LOW"),
-      delay(800),
-      block("lcd_clear"),
-      delay(300),
-    ]),
+    program([serialBegin(),pinMode("13","OUTPUT"),pinMode("8","OUTPUT"),pinMode("4","INPUT")],[digitalWrite("13","HIGH"),block("lcd_clear"),block("lcd_set_cursor",{COL:"0",ROW:"0"}),block("lcd_print",{},{TEXT:textBlock("TEMP C: ")}),block("lcd_print",{},{TEXT:sensorBlock("dht_temperature","dht")}),block("lcd_set_cursor",{COL:"0",ROW:"1"}),block("lcd_print",{},{TEXT:textBlock("HUM %: ")}),block("lcd_print",{},{TEXT:sensorBlock("dht_humidity","dht")}),serialPrint("Temperature: "),serialPrintValue("dht_temperature",{SENSOR:"dht"}),serialPrint("Humidity: "),serialPrintValue("dht_humidity",{SENSOR:"dht"}),ifElseBlock(compareBlock("GT",sensorBlock("dht_temperature","dht"),numberBlock(30)),[toneOn("8",950),delay(150),toneOff("8")],[toneOff("8")]),digitalWrite("13","LOW"),delay(1000)]),
     [
       "1. 🔌 Circuit Wiring & Hardware Setup: Connect LCD to 5V, GND, SDA (A4), and SCL (A5). Wire DHT11 sensor to D4, pulse indicator LED to D13 with 220Ω resistor, and buzzer to D8.",
-      "2. ⚙️ Code Architecture & Logic: Initializes I2C LCD communication, queries DHT11 sensor data, writes formatted climate strings to LCD rows, and pulses D13 LED.",
+      "2. ⚙️ Code Architecture & Logic: Reads the DHT11 and updates both LCD rows and Serial output with live temperature and humidity. D13 pulses and D8 sounds only on temperatures above 30°C.",
       "3. ▶️ Simulation Execution & Interaction Controls: Click Run to start telemetry. Select DHT11 in the canvas inspector to tweak temperature and humidity levels.",
-      "4. 📊 Outcomes & Real-Time Observations: The backlit LCD screen lights up with high-contrast text displaying live atmospheric parameters streamed over I2C.",
+      "4. 📊 Outcomes & Real-Time Observations: Change the DHT11 values in the Inspector; both LCD rows and Serial readings update on the next sample.",
     ]),
-  starter("g8-oled-dashboard", "🚀 Spacecraft Cockpit HUD (SSD1306 OLED + 2-Axis Joystick + Warp Sound & LED)", "High-resolution graphic dashboard with SSD1306 OLED and analog joystick flight control! Utilizing I2C pins A4 (SDA) and A5 (SCL), this 128×64 OLED draws spacecraft flight instruments, while 2-Axis joystick on A0/A1 steers telemetry and push-switch on D2 engages warp drive with sound from buzzer D8.", 8, "Displays + I2C", "Intermediate", ["OLED", "Dashboard", "I2C", "Joystick", "HUD"],
+  starter("g8-oled-dashboard", "🚀 Spacecraft Cockpit HUD (SSD1306 OLED + 2-Axis Joystick + Warp Sound & LED)", "The two-axis joystick sends X/Y readings to Serial. Hold its D2 switch to engage the warp state on the OLED, light D13, and play a short D8 piezo tone.", 8, "Displays + I2C", "Intermediate", ["OLED", "Dashboard", "I2C", "Joystick", "HUD"],
     { parts: [part("uno","arduino-uno",60,110),part("joy","joystick",270,80,{x:512,y:512,pressed:"false"}),part("oled","oled-i2c",480,60,{line1:"COCKPIT HUD",line2:"THRUST: NOMINAL",line3:"SPEED: WARP 1"}),part("led1","led",720,70,{color:"blue"}),part("r1","resistor",720,150,{resistance:220}),part("bz","buzzer",270,210)], wires: [wire("a","uno","5v","oled","vcc","#ef4444"),wire("b","uno","gnd","oled","gnd","#1e293b"),wire("c","uno","a4","oled","sda","#60a5fa"),wire("d","uno","a5","oled","scl","#3b82f6"),wire("w_jvcc","uno","5v","joy","vcc","#ef4444"),wire("w_jgnd","uno","gnd","joy","gnd","#1e293b"),wire("w_jvrx","uno","a0","joy","vrx","#eab308"),wire("w_jvry","uno","a1","joy","vry","#22c55e"),wire("w_jsw","uno","d2","joy","sw","#a855f7"),wire("w_la","uno","d13","r1","a","#3b82f6"),wire("w_lb","r1","b","led1","anode","#3b82f6"),wire("w_lg","led1","cathode","uno","gnd","#1e293b"),wire("w_bzpos","uno","d8","bz","pos","#eab308"),wire("w_bzgnd","bz","neg","uno","gnd","#1e293b")] },
-    program([serialBegin(),pinMode("13","OUTPUT"),pinMode("8","OUTPUT"),pinMode("2","INPUT")],[
-      digitalWrite("13","HIGH"),
-      block("oled_print",{},{TEXT:textBlock("PIXIU COCKPIT")}),
-      digitalWrite("8","HIGH"),delay(40),digitalWrite("8","LOW"),
-      digitalWrite("13","LOW"),
-      delay(600),
-      block("oled_clear"),
-      delay(300),
-    ]),
+    program([serialBegin(),pinMode("13","OUTPUT"),pinMode("8","OUTPUT"),pinMode("2","INPUT")],[serialPrint("Joystick X: "),serialPrintValue("joystick_x",{SENSOR:"joy"}),serialPrint("Joystick Y: "),serialPrintValue("joystick_y",{SENSOR:"joy"}),ifElseBlock(block("io_digitalread",{PIN:"2"}),[block("oled_clear"),block("oled_print",{},{TEXT:textBlock("WARP ENGAGED")}),digitalWrite("13","HIGH"),toneOn("8",1400),delay(100),toneOff("8")],[block("oled_clear"),block("oled_print",{},{TEXT:textBlock("WARP STANDBY")}),digitalWrite("13","LOW"),toneOff("8")]),delay(100)]),
     [
       "1. 🔌 Circuit Wiring & Hardware Setup: Connect OLED VCC to 5V, GND to GND, SDA to A4, SCL to A5. Connect joystick VRx to A0, VRy to A1, SW to D2. Connect warp LED to D13 and buzzer to D8.",
       "2. ⚙️ Code Architecture & Logic: Boots graphic OLED display, renders flight computer HUD graphics, sounds thruster audio on D8, and flashes warp LED D13.",
-      "3. ▶️ Simulation Execution & Interaction Controls: Click Run to boot HUD. Click and drag the joystick thumbstick on canvas to steer simulated flight vectors.",
+      "3. ▶️ Simulation Execution & Interaction Controls: Click Run, move the joystick axes, and press its switch in the Inspector to engage warp mode.",
       "4. 📊 Outcomes & Real-Time Observations: The 128×64 OLED glows with sharp graphics, sound bursts, and warp drive visual pulses.",
     ]),
-  starter("g8-motor-driver", "⚡ High-Power Dual DC Motor Drive & Speed Throttle Station (L298N + Potentiometer + RPM Pulse LED + Chime)", "High-power dual DC motor H-Bridge drive base with analog speed throttle control! The L298N motor driver isolates Arduino logic from high current 9V battery motor power. Arduino pins D5/D6 (ENA/ENB PWM) and D7-D10 (IN1-IN4) control dual motor speed and rotation, with potentiometer speed modulation and RPM pulse indicator.", 8, "Motor Control", "Advanced", ["L298N", "DC Motor", "Robotics", "Potentiometer", "PWM"],
+  starter("g8-motor-driver", "⚡ High-Power Dual DC Motor Drive & Speed Throttle Station (L298N + Potentiometer + Run Status LED + Chime)", "High-power dual DC motor H-Bridge drive base with analog speed throttle control! The L298N motor driver isolates Arduino logic from high current 9V battery motor power. Arduino pins D5/D6 (ENA/ENB PWM) and D7-D10 (IN1-IN4) control dual motor speed and rotation, with potentiometer speed modulation and a green run-status LED.", 8, "Motor Control", "Advanced", ["L298N", "DC Motor", "Robotics", "Potentiometer", "PWM"],
     { parts: [part("uno","arduino-uno",60,110),part("pot","potentiometer",60,310,{value:512}),part("drv","l298n",360,95,{speedA:160,speedB:160}),part("bat","battery",230,310,{voltage:9}),part("m1","dc-motor",600,55),part("m2","dc-motor",600,205),part("led1","led",780,100,{color:"green"}),part("r1","resistor",780,170,{resistance:220}),part("bz","buzzer",360,230)], wires: [wire("a","uno","5v","drv","5v","#ef4444"),wire("b","uno","gnd","drv","gnd","#1e293b"),wire("c","bat","pos","drv","vs","#ef4444"),wire("d","bat","neg","uno","gnd","#1e293b"),wire("e","uno","d5","drv","ena","#60a5fa"),wire("f","uno","d7","drv","in1","#60a5fa"),wire("g","uno","d8","drv","in2","#60a5fa"),wire("h","uno","d6","drv","enb","#3b82f6"),wire("i","uno","d9","drv","in3","#3b82f6"),wire("j","uno","d10","drv","in4","#3b82f6"),wire("k","drv","out1","m1","pos","#f97316"),wire("l","drv","out2","m1","neg","#f97316"),wire("m","drv","out3","m2","pos","#f97316"),wire("n","drv","out4","m2","neg","#f97316"),wire("w_pot_vcc","uno","5v","pot","t1","#ef4444"),wire("w_pot_gnd","uno","gnd","pot","t2","#1e293b"),wire("w_pot_w","pot","wiper","uno","a0","#eab308"),wire("w_la","uno","d13","r1","a","#22c55e"),wire("w_lb","r1","b","led1","anode","#22c55e"),wire("w_lg","led1","cathode","uno","gnd","#1e293b"),wire("w_bzpos","uno","d11","bz","pos","#eab308"),wire("w_bzgnd","bz","neg","uno","gnd","#1e293b")] },
-    program([pinMode("5","OUTPUT"),pinMode("6","OUTPUT"),pinMode("7","OUTPUT"),pinMode("8","OUTPUT"),pinMode("9","OUTPUT"),pinMode("10","OUTPUT"),pinMode("13","OUTPUT"),pinMode("11","OUTPUT")],[
-      digitalWrite("13","HIGH"),
-      block("motor_driver_write",{CHANNEL:"A",DIRECTION:"CW",ENA:"5",ENB:"6",IN1:"7",IN2:"8",IN3:"9",IN4:"10"},{SPEED:numberBlock(180)}),
-      block("motor_driver_write",{CHANNEL:"B",DIRECTION:"CW",ENA:"5",ENB:"6",IN1:"7",IN2:"8",IN3:"9",IN4:"10"},{SPEED:numberBlock(180)}),
-      delay(1000),
-      digitalWrite("13","LOW"),
-      block("motor_driver_write",{CHANNEL:"A",DIRECTION:"STOP",ENA:"5",ENB:"6",IN1:"7",IN2:"8",IN3:"9",IN4:"10"},{SPEED:numberBlock(0)}),
-      block("motor_driver_write",{CHANNEL:"B",DIRECTION:"STOP",ENA:"5",ENB:"6",IN1:"7",IN2:"8",IN3:"9",IN4:"10"},{SPEED:numberBlock(0)}),
-      delay(500),
-    ]),
+    program([pinMode("5","OUTPUT"),pinMode("6","OUTPUT"),pinMode("7","OUTPUT"),pinMode("8","OUTPUT"),pinMode("9","OUTPUT"),pinMode("10","OUTPUT"),pinMode("13","OUTPUT"),pinMode("11","OUTPUT")],[digitalWrite("13","HIGH"),toneOn("11",1100),delay(100),toneOff("11"),block("motor_driver_write",{CHANNEL:"A",DIRECTION:"CW",ENA:"5",ENB:"6",IN1:"7",IN2:"8",IN3:"9",IN4:"10"},{SPEED:block("arduino_map",{},{VALUE:sensorBlock("potentiometer_read","pot"),FROM_LOW:numberBlock(0),FROM_HIGH:numberBlock(1023),TO_LOW:numberBlock(0),TO_HIGH:numberBlock(255)})}),block("motor_driver_write",{CHANNEL:"B",DIRECTION:"CW",ENA:"5",ENB:"6",IN1:"7",IN2:"8",IN3:"9",IN4:"10"},{SPEED:block("arduino_map",{},{VALUE:sensorBlock("potentiometer_read","pot"),FROM_LOW:numberBlock(0),FROM_HIGH:numberBlock(1023),TO_LOW:numberBlock(0),TO_HIGH:numberBlock(255)})}),delay(1000),digitalWrite("13","LOW"),block("motor_driver_write",{CHANNEL:"A",DIRECTION:"STOP",ENA:"5",ENB:"6",IN1:"7",IN2:"8",IN3:"9",IN4:"10"},{SPEED:numberBlock(0)}),block("motor_driver_write",{CHANNEL:"B",DIRECTION:"STOP",ENA:"5",ENB:"6",IN1:"7",IN2:"8",IN3:"9",IN4:"10"},{SPEED:numberBlock(0)}),toneOn("11",650),delay(100),toneOff("11"),delay(400)]),
     [
-      "1. 🔌 Circuit Wiring & Hardware Setup: Connect 9V battery to L298N VS and GND. Wire ENA to D5, IN1 to D7, IN2 to D8, ENB to D6, IN3 to D9, IN4 to D10, and DC motors to OUT1-4. Wire throttle pot to A0, pulse LED to D13, buzzer to D11.",
-      "2. ⚙️ Code Architecture & Logic: Configures all 8 drive and telemetry pins. Loop engages dual motors CW at speed 180, pulses D13 tachometer LED, and halts with braking.",
+      "1. 🔌 Circuit Wiring & Hardware Setup: Connect 9V battery to L298N VS and GND. Wire ENA to D5, IN1 to D7, IN2 to D8, ENB to D6, IN3 to D9, IN4 to D10, and DC motors to OUT1-4. Wire throttle pot to A0, run-status LED to D13, buzzer to D11.",
+      "2. ⚙️ Code Architecture & Logic: Maps the A0 potentiometer to 0–255 motor PWM, drives both motors, and sounds short start/stop chimes on D11.",
       "3. ▶️ Simulation Execution & Interaction Controls: Click Run, then rotate the potentiometer on canvas to simulate throttle modulation.",
-      "4. 📊 Outcomes & Real-Time Observations: Motors M1 and M2 spin smoothly at high RPM with synchronized tachometer pulse and buzzer alerts.",
+      "4. 📊 Outcomes & Real-Time Observations: Motors M1 and M2 spin smoothly at high RPM with synchronized run-status light and buzzer alerts.",
     ]),
   starter("g8-joystick-rover", "🎮 Dual-Motor RC Rover (Joystick Steering)", "Agile two-wheel robotic rover with differential joystick steering! An analog 2-axis joystick feeds VRX to A0 and VRY to A1. Pushing forward (Y > 600) drives both L298N H-Bridge channels forward at 210 PWM. Pulling back (Y < 400) reverses both wheels. Pushing left/right (X thresholds) differential-steers the rover by counter-rotating motors at 190 PWM, while live X/Y telemetry logs to Serial.", 8, "Robotics + Inputs", "Advanced", ["Joystick", "Rover", "L298N", "DC Motor", "Robotics"],
     { parts: [part("joy","joystick",40,80,{x:512,y:512,pressed:"false"}),part("uno","arduino-uno",160,110),part("drv","l298n",510,70,{speedA:0,speedB:0}),part("bat","battery",510,240,{voltage:9}),part("m1","dc-motor",730,40),part("m2","dc-motor",730,190)], wires: [wire("a","uno","5v","joy","vcc","#ef4444"),wire("b","uno","gnd","joy","gnd","#1e293b"),wire("c","uno","a0","joy","vrx","#eab308"),wire("d","uno","a1","joy","vry","#22c55e"),wire("e","uno","d2","joy","sw","#a855f7"),wire("f","uno","5v","drv","5v","#ef4444"),wire("g","uno","gnd","drv","gnd","#1e293b"),wire("h","bat","pos","drv","vs","#ef4444"),wire("i","bat","neg","uno","gnd","#1e293b"),wire("j","uno","d5","drv","ena","#60a5fa"),wire("k","uno","d7","drv","in1","#60a5fa"),wire("l","uno","d8","drv","in2","#60a5fa"),wire("m_en","uno","d6","drv","enb","#3b82f6"),wire("o","uno","d9","drv","in3","#3b82f6"),wire("p","uno","d10","drv","in4","#3b82f6"),wire("q","drv","out1","m1","pos","#f97316"),wire("r","drv","out2","m1","neg","#f97316"),wire("s","drv","out3","m2","pos","#f97316"),wire("t","drv","out4","m2","neg","#f97316")] },
@@ -1440,7 +1350,7 @@ const EXTRA_TEMPLATES: ProjectTemplate[] = [
       pinMode("10","OUTPUT"),pinMode("11","OUTPUT"),pinMode("13","OUTPUT"),
       block("servo_write",{PIN:"10"},{ANGLE:numberBlock(0)}),
       digitalWrite("13","LOW"),
-      digitalWrite("11","LOW"),
+      toneOff("11"),
       block("lcd_clear"),
       block("lcd_set_cursor",{COL:"0",ROW:"0"}),
       block("lcd_print",{},{TEXT:textBlock("ENTER PASSWORD")}),
@@ -1457,10 +1367,10 @@ const EXTRA_TEMPLATES: ProjectTemplate[] = [
           block("lcd_set_cursor",{COL:"0",ROW:"1"}),
           block("lcd_print",{},{TEXT:textBlock("VAULT UNLOCKED")}),
           digitalWrite("13","HIGH"),
-          digitalWrite("11","HIGH"),
+          toneOn("11",850),
           block("servo_write",{PIN:"10"},{ANGLE:numberBlock(90)}),
           delay(250),
-          digitalWrite("11","LOW"),
+          toneOff("11"),
           delay(2000),
           block("servo_write",{PIN:"10"},{ANGLE:numberBlock(0)}),
           digitalWrite("13","LOW"),
@@ -1481,9 +1391,9 @@ const EXTRA_TEMPLATES: ProjectTemplate[] = [
               block("lcd_print",{},{TEXT:textBlock("WRONG PASSWORD!")}),
               block("lcd_set_cursor",{COL:"0",ROW:"1"}),
               block("lcd_print",{},{TEXT:textBlock("ACCESS DENIED")}),
-              digitalWrite("11","HIGH"),
+              toneOn("11",850),
               delay(350),
-              digitalWrite("11","LOW"),
+              toneOff("11"),
               delay(1200),
               block("lcd_clear"),
               block("lcd_set_cursor",{COL:"0",ROW:"0"}),
