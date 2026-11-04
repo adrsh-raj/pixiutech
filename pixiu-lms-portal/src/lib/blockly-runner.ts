@@ -310,10 +310,6 @@ function evaluateValueInput(block: Blockly.Block, inputName: string, env?: Execu
 
 function getBlockDescription(block: Blockly.Block, env: ExecutionEnvironment): string {
   switch (block.type) {
-    case "reaction_game": {
-      await executeReactionGame(block, env, signal)
-      break
-    }
     case "io_digitalwrite": {
       const pin = block.getFieldValue("PIN") ?? "13"
       const state = block.getFieldValue("STATE") ?? "HIGH"
@@ -570,6 +566,10 @@ async function executeSingleBlock(block: Blockly.Block, env: ExecutionEnvironmen
   if (signal.aborted || !env.isRunning()) return
 
   switch (block.type) {
+    case "reaction_game": {
+      await executeReactionGame(block, env, signal)
+      break
+    }
     case "io_digitalwrite": {
       const pin = String(block.getFieldValue("PIN") ?? "13")
       const state = (block.getFieldValue("STATE") ?? "HIGH") as "HIGH" | "LOW"
