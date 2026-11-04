@@ -2659,7 +2659,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
         simulationRef={oscilloscopeSimulationRef}
       />
 
-      {/* AI Circuit Doctor Diagnostics Drawer */>
+      {/* AI Circuit Doctor Diagnostics Drawer */}
       <CircuitDoctorHud
         report={doctorReport}
         isOpen={isDoctorOpen && view === "circuit"}
