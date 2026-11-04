@@ -3,6 +3,8 @@ export class AudioEngine {
   private oscillator: OscillatorNode | null = null
   private gainNode: GainNode | null = null
   private muted: boolean = false
+  private playRequest = 0
+  private baseGain = 0
 
   /**
    * Lazily initializes the AudioContext.
@@ -36,36 +38,39 @@ export class AudioEngine {
    */
   playTone(frequency: number, volume: number = 255): void {
     this.initContext()
-    if (!this.ctx) return
-    
-    // Resume context if suspended due to autoplay policies
-    if (this.ctx.state === 'suspended') {
-      this.ctx.resume().catch(() => {})
+    const context = this.ctx
+    if (!context) return
+
+    const request = ++this.playRequest
+    const maxGain = 0.3
+    this.baseGain = (Math.max(0, Math.min(255, volume)) / 255) * maxGain
+
+    const startTone = () => {
+      if (request !== this.playRequest || context !== this.ctx || context.state === 'closed') return
+      this.stopNodes()
+
+      this.oscillator = context.createOscillator()
+      this.oscillator.type = 'square'
+      this.oscillator.frequency.value = Math.max(20, Math.min(20_000, frequency))
+
+      this.gainNode = context.createGain()
+      this.gainNode.gain.value = this.muted ? 0 : this.baseGain
+
+      this.oscillator.connect(this.gainNode)
+      this.gainNode.connect(context.destination)
+      this.oscillator.start()
     }
 
-    this.stopTone()
-
-    // Map PWM 0-255 to 0.0 - 0.3 gain, ensure max 0.3
-    const maxGain = 0.3
-    const targetGain = this.muted ? 0 : (Math.max(0, Math.min(255, volume)) / 255) * maxGain
-
-    this.oscillator = this.ctx.createOscillator()
-    this.oscillator.type = 'square'
-    this.oscillator.frequency.value = frequency
-
-    this.gainNode = this.ctx.createGain()
-    this.gainNode.gain.value = targetGain
-
-    this.oscillator.connect(this.gainNode)
-    this.gainNode.connect(this.ctx.destination)
-
-    this.oscillator.start()
+    // Wait for resume to complete before creating the oscillator. A stop or
+    // newer pitch request invalidates this callback so stale tones cannot return.
+    if (context.state === 'suspended') {
+      context.resume().then(startTone).catch(() => {})
+    } else {
+      startTone()
+    }
   }
 
-  /**
-   * Stops the currently playing tone.
-   */
-  stopTone(): void {
+  private stopNodes(): void {
     if (this.oscillator) {
       try {
         this.oscillator.stop()
@@ -86,12 +91,20 @@ export class AudioEngine {
   }
 
   /**
+   * Stops the currently playing tone and invalidates any pending audio resume.
+   */
+  stopTone(): void {
+    this.playRequest += 1
+    this.stopNodes()
+  }
+
+  /**
    * Sets the mute state of the engine.
    */
   setMuted(muted: boolean): void {
     this.muted = muted
     if (this.gainNode) {
-      this.gainNode.gain.value = muted ? 0 : 0.3
+      this.gainNode.gain.value = muted ? 0 : this.baseGain
     }
   }
 

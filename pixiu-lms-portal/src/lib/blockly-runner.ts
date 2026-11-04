@@ -310,6 +310,10 @@ function evaluateValueInput(block: Blockly.Block, inputName: string, env?: Execu
 
 function getBlockDescription(block: Blockly.Block, env: ExecutionEnvironment): string {
   switch (block.type) {
+    case "reaction_game": {
+      await executeReactionGame(block, env, signal)
+      break
+    }
     case "io_digitalwrite": {
       const pin = block.getFieldValue("PIN") ?? "13"
       const state = block.getFieldValue("STATE") ?? "HIGH"
@@ -432,6 +436,8 @@ function getBlockDescription(block: Blockly.Block, env: ExecutionEnvironment): s
       return "AI fingers → current count"
     case "ai_is_gesture":
       return "AI gesture predicate"
+    case "reaction_game":
+      return "Reaction game: wait, detect early press, measure response time"
     case "controls_if":
       return "if (condition)"
     case "controls_repeat_ext": {
@@ -478,6 +484,83 @@ async function beforeExecuteBlock(block: Blockly.Block, env: ExecutionEnvironmen
   } else if (speed === "slow") {
     await env.sleep(500)
   }
+}
+
+async function executeReactionGame(block: Blockly.Block, env: ExecutionEnvironment, signal: AbortSignal) {
+  const buttonPin = String(block.getFieldValue("BUTTON_PIN") ?? "14")
+  const ledPin = String(block.getFieldValue("LED_PIN") ?? "16")
+  const buzzerPin = String(block.getFieldValue("BUZZER_PIN") ?? "15")
+  const isRunning = () => !signal.aborted && env.isRunning()
+  const isPressed = () => env.getDigitalPin?.(buttonPin) === true
+  const show = (lines: string[]) => {
+    env.clearOled?.()
+    lines.forEach((line, index) => env.setOledText?.(index + 1, line))
+  }
+  const waitFor = async (durationMs: number) => {
+    const startedAt = Date.now()
+    while (isRunning() && Date.now() - startedAt < durationMs) {
+      await env.sleep(Math.min(20, Math.max(1, durationMs - (Date.now() - startedAt))))
+    }
+  }
+  const beep = async (frequency: number, durationMs: number) => {
+    env.setTone(buzzerPin, frequency)
+    try {
+      await waitFor(durationMs)
+    } finally {
+      env.setTone(buzzerPin, null)
+    }
+  }
+  const waitForRelease = async (timeoutMs: number) => {
+    const startedAt = Date.now()
+    while (isRunning() && isPressed() && Date.now() - startedAt < timeoutMs) {
+      await env.sleep(20)
+    }
+  }
+
+  env.setDigitalPin(ledPin, "LOW")
+  env.setTone(buzzerPin, null)
+  show(["REACTION TEST", "Wait for GO...", "Do not press early"])
+
+  const randomWaitMs = 1800 + Math.floor(Math.random() * 2701)
+  const waitStartedAt = Date.now()
+  while (isRunning() && Date.now() - waitStartedAt < randomWaitMs) {
+    if (isPressed()) {
+      show(["FALSE START", "Wait for the signal", "Try the next round"])
+      await beep(260, 120)
+      await waitForRelease(1500)
+      await waitFor(800)
+      return
+    }
+    await env.sleep(20)
+  }
+  if (!isRunning()) return
+
+  show(["GO! PRESS NOW", "Tap the button", ""])
+  env.setDigitalPin(ledPin, "HIGH")
+  const reactionStartedAt = Date.now()
+  let responseMs: number | null = null
+  while (isRunning() && Date.now() - reactionStartedAt < 3000) {
+    if (isPressed()) {
+      responseMs = Date.now() - reactionStartedAt
+      break
+    }
+    await env.sleep(10)
+  }
+  env.setDigitalPin(ledPin, "LOW")
+  if (!isRunning()) return
+
+  if (responseMs !== null) {
+    const score = Math.max(0, 1000 - responseMs)
+    show(["Reaction: " + responseMs + " ms", "Score: " + score, "Release to retry"])
+    env.serialPrintln?.("Reaction time: " + responseMs + " ms | Score: " + score)
+    await beep(1200, 80)
+  } else {
+    show(["TIME OUT", "No press in 3 sec", "Try again"])
+    env.serialPrintln?.("Reaction round timed out.")
+  }
+
+  await waitForRelease(1500)
+  await waitFor(1200)
 }
 
 async function executeSingleBlock(block: Blockly.Block, env: ExecutionEnvironment, signal: AbortSignal) {

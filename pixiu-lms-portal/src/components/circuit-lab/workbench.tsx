@@ -570,27 +570,31 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
     const activeBuzzer = state.parts.find((part) => part.type === "buzzer" && (runtime[part.id]?.level ?? 0) > 0)
     return activeBuzzer ? Number(runtime[activeBuzzer.id]?.toneFrequency ?? 850) : 850
   }, [runtime, state.parts])
-  const buzzerActiveRef = useRef(false)
+  const buzzerPlaybackRef = useRef<{ active: boolean; frequency: number }>({
+    active: false,
+    frequency: 0,
+  })
 
   useEffect(() => {
     const shouldBeep = running && !isMuted && anyBuzzerActive
+    const previous = buzzerPlaybackRef.current
 
-    if (shouldBeep && !buzzerActiveRef.current) {
+    if (shouldBeep && (!previous.active || previous.frequency !== buzzerFrequency)) {
       audioEngine.unlockAudio()
       audioEngine.playTone(buzzerFrequency, 180)
-      buzzerActiveRef.current = true
-    } else if (!shouldBeep && buzzerActiveRef.current) {
+      buzzerPlaybackRef.current = { active: true, frequency: buzzerFrequency }
+    } else if (!shouldBeep && previous.active) {
       audioEngine.stopTone()
-      buzzerActiveRef.current = false
+      buzzerPlaybackRef.current = { active: false, frequency: 0 }
     }
   }, [running, isMuted, anyBuzzerActive, buzzerFrequency])
 
   // Hard cleanup only when Workbench unmounts.
   useEffect(() => {
     return () => {
-      if (buzzerActiveRef.current) {
+      if (buzzerPlaybackRef.current.active) {
         audioEngine.stopTone()
-        buzzerActiveRef.current = false
+        buzzerPlaybackRef.current = { active: false, frequency: 0 }
       }
     }
   }, [])
@@ -1010,11 +1014,6 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
             }
             return next
           })
-          if (freq) {
-            audioEngine.playTone(freq)
-          } else {
-            audioEngine.stopTone()
-          }
         },
         serialPrint: (text) => {
           setSerialLines((prev) => [...prev, { text, timestamp: Date.now(), type: "output" }])

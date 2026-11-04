@@ -74,6 +74,19 @@ export function defineArduinoBlocks() {
       deletable: false,
     },
     {
+      type: "reaction_game",
+      message0: "reaction game · button %1 · signal LED %2 · buzzer %3",
+      args0: [
+        { type: "field_dropdown", name: "BUTTON_PIN", options: pinDropdown },
+        { type: "field_dropdown", name: "LED_PIN", options: pinDropdown },
+        { type: "field_dropdown", name: "BUZZER_PIN", options: pinDropdown },
+      ],
+      previousStatement: null,
+      nextStatement: null,
+      colour: 18,
+      tooltip: "Wait for a random go signal, reject early presses, and measure the actual response time.",
+    },
+    {
       type: "io_pinmode",
       message0: "set pin %1 as %2",
       args0: [
@@ -911,6 +924,74 @@ arduino.forBlock["arduino_program"] = function (block, generator) {
   const setup = generator.statementToCode(block, "SETUP")
   const loop = generator.statementToCode(block, "LOOP")
   return `void setup() {\n${setup}}\n\nvoid loop() {\n${loop}}\n`
+}
+
+arduino.forBlock["reaction_game"] = function (block) {
+  const buttonPin = block.getFieldValue("BUTTON_PIN") || "14"
+  const ledPin = block.getFieldValue("LED_PIN") || "16"
+  const buzzerPin = block.getFieldValue("BUZZER_PIN") || "15"
+  const gg = arduino as ArduinoGen
+  gg.definitions_["wire_include"] = "#include <Wire.h>"
+  gg.definitions_["adafruit_gfx"] = "#include <Adafruit_GFX.h>"
+  gg.definitions_["adafruit_ssd1306"] = "#include <Adafruit_SSD1306.h>"
+  gg.definitions_["oled_decl"] = "Adafruit_SSD1306 oled(128, 64, &Wire, -1);"
+  gg.definitions_["reaction_game_helper"] = [
+    "static void pixiuReactionGame(int buttonPin, int ledPin, int buzzerPin) {",
+    "  static bool oledReady = false;",
+    "  static bool randomSeeded = false;",
+    "  if (!oledReady) {",
+    "    oled.begin(SSD1306_SWITCHCAPVCC, 0x3C);",
+    "    oled.setTextColor(SSD1306_WHITE);",
+    "    oled.setTextSize(1);",
+    "    oledReady = true;",
+    "  }",
+    "  if (!randomSeeded) { randomSeed(micros()); randomSeeded = true; }",
+    "  noTone(buzzerPin);",
+    "  digitalWrite(ledPin, LOW);",
+    "  oled.clearDisplay(); oled.setCursor(0, 0);",
+    "  oled.println(\"REACTION TEST\");",
+    "  oled.println(\"Wait for GO...\");",
+    "  oled.println(\"Do not press early\");",
+    "  oled.display();",
+    "  const unsigned long waitDuration = random(1800, 4501);",
+    "  const unsigned long waitStarted = millis();",
+    "  while (millis() - waitStarted < waitDuration) {",
+    "    if (digitalRead(buttonPin) == HIGH) {",
+    "      oled.clearDisplay(); oled.setCursor(0, 0);",
+    "      oled.println(\"FALSE START\"); oled.println(\"Wait for the signal\"); oled.display();",
+    "      tone(buzzerPin, 260); delay(120); noTone(buzzerPin);",
+    "      const unsigned long releaseStarted = millis();",
+    "      while (digitalRead(buttonPin) == HIGH && millis() - releaseStarted < 1500) delay(10);",
+    "      delay(800); return;",
+    "    }",
+    "    delay(10);",
+    "  }",
+    "  oled.clearDisplay(); oled.setCursor(0, 0);",
+    "  oled.println(\"GO! PRESS NOW\"); oled.display();",
+    "  digitalWrite(ledPin, HIGH);",
+    "  const unsigned long reactionStarted = millis();",
+    "  while (digitalRead(buttonPin) == LOW && millis() - reactionStarted < 3000) delay(1);",
+    "  const unsigned long responseMs = millis() - reactionStarted;",
+    "  digitalWrite(ledPin, LOW);",
+    "  if (digitalRead(buttonPin) == HIGH) {",
+    "    const unsigned long score = responseMs < 1000 ? 1000 - responseMs : 0;",
+    "    oled.clearDisplay(); oled.setCursor(0, 0);",
+    "    oled.println(\"Reaction:\"); oled.print(responseMs); oled.println(\" ms\");",
+    "    oled.print(\"Score: \"); oled.println(score); oled.display();",
+    "    Serial.print(\"Reaction time: \"); Serial.print(responseMs);",
+    "    Serial.print(\" ms | Score: \"); Serial.println(score);",
+    "    tone(buzzerPin, 1200); delay(80); noTone(buzzerPin);",
+    "  } else {",
+    "    oled.clearDisplay(); oled.setCursor(0, 0);",
+    "    oled.println(\"TIME OUT\"); oled.println(\"No press in 3 sec\"); oled.display();",
+    "    Serial.println(\"Reaction round timed out.\");",
+    "  }",
+    "  const unsigned long releaseStarted = millis();",
+    "  while (digitalRead(buttonPin) == HIGH && millis() - releaseStarted < 1500) delay(10);",
+    "  delay(1200);",
+    "}",
+  ].join("\n")
+  return "pixiuReactionGame(" + buttonPin + ", " + ledPin + ", " + buzzerPin + ");\n"
 }
 
 arduino.forBlock["io_pinmode"] = (block) => {

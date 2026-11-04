@@ -224,18 +224,19 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
   },
   {
     id: "pico-oled-arcade",
-    title: "4. 🕹️ Raspberry Pi Pico Retro OLED Arcade Console",
-    description: "Retro handheld gaming console built on the RP2040 Raspberry Pi Pico! The system initializes a 128×64 SSD1306 OLED over I2C (GP4 SDA / GP5 SCL) displaying game scores. Polling tactile button GP14 detects player fire inputs, instantly updating the OLED with a laser animation, strobing the green blaster LED on GP16, and emitting high-frequency pulse-width audio on GP15 buzzer.",
+    title: "4. Raspberry Pi Pico Reaction Time Arcade",
+    description: "A reaction-time game for the Raspberry Pi Pico. Wait through a randomized 1.8–4.5 second interval, then press GP14 only when the GP16 indicator turns on. Early presses are false starts; valid presses show the measured response time and a score calculated from it. A 10 kΩ pull-down keeps the button input stable.",
     difficulty: "Intermediate",
-    tags: ["Raspberry Pi Pico", "OLED", "Gaming", "Buzzer", "Pushbutton"],
+    tags: ["Raspberry Pi Pico", "OLED", "Reaction Time", "Buzzer", "Pushbutton"],
     circuit: {
       parts: [
         { id: "pico", type: "rpi-pico", x: 50, y: 80, rotation: 0, props: {} },
-        { id: "oled", type: "oled-i2c", x: 390, y: 60, rotation: 0, props: { line1: "🎮 PICO ARCADE", line2: "HI-SCORE: 9850", line3: "READY TO PLAY" } },
+        { id: "oled", type: "oled-i2c", x: 390, y: 60, rotation: 0, props: { line1: "REACTION TEST", line2: "WAIT FOR GO", line3: "Tap on green light" } },
         { id: "btn", type: "pushbutton", x: 390, y: 200, rotation: 0, props: {} },
         { id: "bz", type: "buzzer", x: 560, y: 200, rotation: 0, props: {} },
         { id: "led1", type: "led", x: 580, y: 60, rotation: 0, props: { color: "green" } },
         { id: "r1", type: "resistor", x: 580, y: 130, rotation: 0, props: { resistance: 220 } },
+        { id: "r_btn", type: "resistor", x: 560, y: 275, rotation: 0, props: { resistance: 10000 } },
       ],
       wires: [
         { id: "w_ovcc", from: { partId: "pico", pinId: "3v3" }, to: { partId: "oled", pinId: "vcc" }, color: "#ef4444" },
@@ -244,6 +245,8 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
         { id: "w_oscl", from: { partId: "pico", pinId: "gp5" }, to: { partId: "oled", pinId: "scl" }, color: "#3b82f6" },
         { id: "w_bpwr", from: { partId: "pico", pinId: "3v3" }, to: { partId: "btn", pinId: "p1a" }, color: "#ef4444" },
         { id: "w_bsig", from: { partId: "btn", pinId: "p2a" }, to: { partId: "pico", pinId: "gp14" }, color: "#22c55e" },
+        { id: "w_bpulldown", from: { partId: "pico", pinId: "gp14" }, to: { partId: "r_btn", pinId: "a" }, color: "#a78bfa" },
+        { id: "w_bground", from: { partId: "r_btn", pinId: "b" }, to: { partId: "pico", pinId: "gnd_3" }, color: "#1e293b" },
         { id: "w_bzpos", from: { partId: "pico", pinId: "gp15" }, to: { partId: "bz", pinId: "pos" }, color: "#eab308" },
         { id: "w_bzgnd", from: { partId: "bz", pinId: "neg" }, to: { partId: "pico", pinId: "gnd_3" }, color: "#1e293b" },
         { id: "w_lr", from: { partId: "pico", pinId: "gp16" }, to: { partId: "r1", pinId: "a" }, color: "#22c55e" },
@@ -256,31 +259,15 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
     <statement name="SETUP">
       <block type="serial_begin"><field name="BAUD">115200</field><next>
       <block type="io_pinmode"><field name="PIN">14</field><field name="MODE">INPUT</field><next>
-      <block type="io_pinmode"><field name="PIN">15</field><field name="MODE">OUTPUT</field><next>
       <block type="io_pinmode"><field name="PIN">16</field><field name="MODE">OUTPUT</field><next>
-      <block type="oled_print"><value name="TEXT"><block type="text_string"><field name="TEXT">🎮 PICO ARCADE</field></block></value></block>
-      </next></block></next></block></next></block></next></block>
+      <block type="io_pinmode"><field name="PIN">15</field><field name="MODE">OUTPUT</field></block>
+      </next></block></next></block></next></block>
     </statement>
     <statement name="LOOP">
-      <block type="controls_if">
-        <mutation else="1"></mutation>
-        <value name="IF0">
-          <block type="io_digitalread"><field name="PIN">14</field></block>
-        </value>
-        <statement name="DO0">
-          <block type="oled_print"><value name="TEXT"><block type="text_string"><field name="TEXT">&gt;&gt; LASER FIRED! &lt;&lt;</field></block></value><next>
-          <block type="io_digitalwrite"><field name="PIN">16</field><field name="STATE">HIGH</field><next>
-          <block type="tone_play"><field name="PIN">15</field><value name="FREQ"><shadow type="math_number"><field name="NUM">850</field></shadow></value><next>
-          <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">120</field></shadow></value><next>
-          <block type="tone_stop"><field name="PIN">15</field><next>
-          <block type="io_digitalwrite"><field name="PIN">16</field><field name="STATE">LOW</field>
-          </block></next></block></next></block></next></block></next></block></next></block>
-        </statement>
-        <statement name="ELSE">
-          <block type="oled_print"><value name="TEXT"><block type="text_string"><field name="TEXT">HI-SCORE: 9850</field></block></value><next>
-          <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">200</field></shadow></value>
-          </block></next></block>
-        </statement>
+      <block type="reaction_game">
+        <field name="BUTTON_PIN">14</field>
+        <field name="LED_PIN">16</field>
+        <field name="BUZZER_PIN">15</field>
       </block>
     </statement>
   </block>
