@@ -341,6 +341,161 @@ Context: ${JSON.stringify(request.context)}`
 }
 
 /**
+ * Backend Proxy Adapter for secure browser-to-server inference routing.
+ * Proxies copilot proposals through the trusted LMS Django backend (/api/v1/copilot/propose)
+ * with session cookie / JWT authentication, ensuring zero client-side exposure of GPU credentials.
+ */
+export class BackendProxyModelAdapter implements ModelAdapter {
+  private readonly proxyUrl: string
+  private readonly defaultTimeoutMs: number
+
+  constructor(proxyUrl = "/api/v1/copilot/propose", defaultTimeoutMs = 30000) {
+    this.proxyUrl = proxyUrl
+    this.defaultTimeoutMs = defaultTimeoutMs
+  }
+
+  async generateProposal(
+    request: CopilotModelRequest,
+    options: ModelRequestOptions = {}
+  ): Promise<CopilotModelResponse> {
+    const startTime = Date.now()
+    const timeoutMs = options.timeoutMs || this.defaultTimeoutMs
+
+    const controller = new AbortController()
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+    let abortListener: (() => void) | undefined
+
+    if (options.signal) {
+      if (options.signal.aborted) {
+        return {
+          rawOutput: "",
+          success: false,
+          metadata: {
+            provider: "lms-backend-proxy",
+            model: "pixiumind-14b-checkpoint-400",
+            version: "1.0.0",
+            requestId: request.requestId,
+            durationMs: 0,
+            finishReason: "cancelled",
+          },
+          error: {
+            code: "CANCELLED",
+            message: "Request was cancelled by caller before execution.",
+          },
+        }
+      }
+      abortListener = () => controller.abort()
+      options.signal.addEventListener("abort", abortListener)
+    }
+
+    timeoutId = setTimeout(() => {
+      controller.abort()
+    }, timeoutMs)
+
+    try {
+      const response = await fetch(this.proxyUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        credentials: "include",
+        signal: controller.signal,
+        body: JSON.stringify({
+          task: request.prompt,
+          context: {
+            board: request.context.targetBoard,
+            gradeBand: request.context.gradeBand,
+            availableComponents: request.context.availableComponents,
+          },
+          temperature: options.temperature ?? 0.1,
+          max_tokens: options.maxTokens ?? 1024,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        return {
+          rawOutput: "",
+          success: false,
+          metadata: {
+            provider: "lms-backend-proxy",
+            model: "pixiumind-14b-checkpoint-400",
+            version: "1.0.0",
+            requestId: request.requestId,
+            durationMs: Date.now() - startTime,
+            finishReason: "error",
+          },
+          error: {
+            code: "PROVIDER_ERROR",
+            message: errorData?.error || `Backend proxy HTTP ${response.status}`,
+          },
+        }
+      }
+
+      const data = await response.json()
+      const proposalText = data?.proposal || ""
+
+      return {
+        rawOutput: proposalText,
+        success: true,
+        metadata: {
+          provider: "lms-backend-proxy",
+          model: data?.model || "pixiumind-14b-checkpoint-400",
+          version: "1.0.0",
+          requestId: request.requestId,
+          durationMs: Date.now() - startTime,
+          finishReason: "stop",
+        },
+      }
+    } catch (err: unknown) {
+      const durationMs = Date.now() - startTime
+      if (controller.signal.aborted) {
+        const isTimeout = !options.signal?.aborted
+        return {
+          rawOutput: "",
+          success: false,
+          metadata: {
+            provider: "lms-backend-proxy",
+            model: "pixiumind-14b-checkpoint-400",
+            version: "1.0.0",
+            requestId: request.requestId,
+            durationMs,
+            finishReason: isTimeout ? "timeout" : "cancelled",
+          },
+          error: {
+            code: isTimeout ? "TIMEOUT" : "CANCELLED",
+            message: isTimeout ? `Proxy request timed out after ${timeoutMs}ms.` : "Request was cancelled.",
+          },
+        }
+      }
+
+      return {
+        rawOutput: "",
+        success: false,
+        metadata: {
+          provider: "lms-backend-proxy",
+          model: "pixiumind-14b-checkpoint-400",
+          version: "1.0.0",
+          requestId: request.requestId,
+          durationMs,
+          finishReason: "error",
+        },
+        error: {
+          code: "PROVIDER_ERROR",
+          message: `Backend proxy connection failed: ${err instanceof Error ? err.message : String(err)}`,
+        },
+      }
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId)
+      if (options.signal && abortListener) {
+        options.signal.removeEventListener("abort", abortListener)
+      }
+    }
+  }
+}
+
+/**
  * Deterministic Stub Adapter for offline CI and reproducible unit testing.
  * Emits schema-compliant, board-specific proposals for all 4 supported boards:
  *   - arduino-uno
@@ -1122,10 +1277,13 @@ export class DeterministicStubAdapter implements ModelAdapter {
  * Checkpoint-400 inference endpoint. DeterministicStubAdapter is restricted strictly to tests.
  */
 export function createBaselineModelAdapter(
-  config?: Partial<HttpAdapterConfig> & { mode?: "stub" | "http" }
+  config?: Partial<HttpAdapterConfig> & { mode?: "stub" | "http" | "proxy"; proxyUrl?: string }
 ): ModelAdapter {
   if (config?.mode === "stub") {
     return new DeterministicStubAdapter(config?.defaultTimeoutMs)
+  }
+  if (config?.mode === "proxy") {
+    return new BackendProxyModelAdapter(config?.proxyUrl, config?.defaultTimeoutMs)
   }
   return new HttpBaselineModelAdapter({
     baseUrl: config?.baseUrl ?? (typeof process !== "undefined" ? process.env.PIXIUMIND_ENDPOINT_URL : undefined),

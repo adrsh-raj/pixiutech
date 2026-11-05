@@ -265,3 +265,11 @@ SESSION_COOKIE_SAMESITE = os.environ.get("DJANGO_SESSION_COOKIE_SAMESITE", "Lax"
 if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     SECURE_SSL_REDIRECT = os.environ.get("DJANGO_SECURE_SSL_REDIRECT", "True").lower() == "true"; SESSION_COOKIE_SECURE = True; CSRF_COOKIE_SECURE = True; SECURE_HSTS_SECONDS = int(os.environ.get("DJANGO_HSTS_SECONDS", "31536000")); SECURE_HSTS_INCLUDE_SUBDOMAINS = True; SECURE_HSTS_PRELOAD = True
+
+# PixiuMind GPU Inference Server Proxy Settings
+# Keep GPU endpoints and keys strictly on the server side - never leak to client browser
+PIXIUMIND_ENDPOINT_URL = os.environ.get("PIXIUMIND_ENDPOINT_URL", "").strip()
+PIXIUMIND_API_KEY = os.environ.get("PIXIUMIND_API_KEY", "").strip()
+PIXIUMIND_MODEL_ID = os.environ.get("PIXIUMIND_MODEL_ID", "pixiumind-14b-checkpoint-400").strip()
+PIXIUMIND_TIMEOUT_SECONDS = int(os.environ.get("PIXIUMIND_TIMEOUT_SECONDS", "30"))
+
