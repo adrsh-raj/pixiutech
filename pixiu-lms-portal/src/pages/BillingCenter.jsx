@@ -505,7 +505,7 @@ export default function BillingCenter() {
       </body></html>`);
     popup.document.close();
     popup.focus();
-    window.setTimeout(() => { if (!popup.closed) popup.print(); }, 350);
+    window.setTimeout(() => { if (!popup.closed) popup.print(); }, 900);
   };
 
   if (authLoading) {
