@@ -109,6 +109,17 @@ class Payment(models.Model):
     notes = models.TextField(blank=True)
     recorded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="recorded_payments")
     created_at = models.DateTimeField(auto_now_add=True)
+    # Reversals retain the original payment and receipt while removing the
+    # amount from the active ledger. The immutable receipt snapshot is untouched.
+    reversal_reason = models.TextField(blank=True, default="")
+    reversed_at = models.DateTimeField(null=True, blank=True)
+    reversed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="reversed_payments",
+    )
     class Meta:
         ordering=["-payment_date","-created_at"]
         constraints=[
