@@ -79,9 +79,10 @@ export class HttpBaselineModelAdapter implements ModelAdapter {
   private readonly defaultTimeoutMs: number
 
   constructor(config: HttpAdapterConfig = {}) {
-    this.baseUrl = (config.baseUrl || "http://localhost:11434/v1").replace(/\/+$/, "")
-    this.apiKey = config.apiKey
-    this.model = config.model || "qwen2.5-coder-7b-instruct"
+    const rawUrl = config.baseUrl ?? (typeof process !== "undefined" ? process.env.PIXIUMIND_ENDPOINT_URL : undefined) ?? ""
+    this.baseUrl = rawUrl.trim().replace(/\/+$/, "")
+    this.apiKey = config.apiKey ?? (typeof process !== "undefined" ? process.env.PIXIUMIND_API_KEY : undefined)
+    this.model = config.model ?? (typeof process !== "undefined" ? process.env.PIXIUMIND_MODEL_ID : undefined) ?? "pixiumind-14b-checkpoint-400"
     this.defaultTimeoutMs = config.defaultTimeoutMs || 10000
   }
 
@@ -91,6 +92,26 @@ export class HttpBaselineModelAdapter implements ModelAdapter {
   ): Promise<CopilotModelResponse> {
     const startTime = Date.now()
     const timeoutMs = options.timeoutMs || this.defaultTimeoutMs
+
+    // Fail closed immediately if no remote inference endpoint is configured
+    if (!this.baseUrl) {
+      return {
+        rawOutput: "",
+        success: false,
+        metadata: {
+          provider: "http-openai-compatible",
+          model: this.model,
+          version: "1.0.0",
+          requestId: request.requestId,
+          durationMs: 0,
+          finishReason: "error",
+        },
+        error: {
+          code: "PROVIDER_ERROR",
+          message: "PIXIUMIND_ENDPOINT_URL is not configured. No active GPU inference service is reachable.",
+        },
+      }
+    }
 
     // Setup combined AbortController for timeout and caller signal
     const controller = new AbortController()
@@ -1107,9 +1128,9 @@ export function createBaselineModelAdapter(
     return new DeterministicStubAdapter(config?.defaultTimeoutMs)
   }
   return new HttpBaselineModelAdapter({
-    baseUrl: config?.baseUrl || process.env.PIXIUMIND_ENDPOINT_URL || "http://localhost:8000/v1",
-    model: config?.model || process.env.PIXIUMIND_MODEL_ID || "pixiumind-14b-checkpoint-400",
-    apiKey: config?.apiKey,
+    baseUrl: config?.baseUrl ?? (typeof process !== "undefined" ? process.env.PIXIUMIND_ENDPOINT_URL : undefined),
+    model: config?.model ?? (typeof process !== "undefined" ? process.env.PIXIUMIND_MODEL_ID : undefined) ?? "pixiumind-14b-checkpoint-400",
+    apiKey: config?.apiKey ?? (typeof process !== "undefined" ? process.env.PIXIUMIND_API_KEY : undefined),
     defaultTimeoutMs: config?.defaultTimeoutMs,
   })
 }
