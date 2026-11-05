@@ -191,9 +191,13 @@ export function wrapCopilotPrompt(
     )
   }
 
-  if (options.domain === "circuit" || options.hasInductiveLoad) {
+  if (options.hasInductiveLoad) {
     parts.push(
       "[HARDWARE SAFETY GUARDRAIL: ATmega328P pins cannot supply motor/pump/relay current (>20mA). All inductive loads must use an external driver (transistor/MOSFET/relay) and a 1N4007 flyback protection diode across the coil.]"
+    )
+  } else if (options.domain === "circuit") {
+    parts.push(
+      "[CIRCUIT GUARDRAIL: Ensure ATmega328P pin continuous currents do not exceed 20mA.]"
     )
   }
 

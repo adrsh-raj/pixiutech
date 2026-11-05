@@ -11,6 +11,8 @@
  * application state or canvas directly.
  */
 
+import { wrapCopilotPrompt, repairBlocklyXml } from "./blockly-repair-middleware"
+
 export interface ModelRequestOptions {
   timeoutMs?: number
   temperature?: number
@@ -127,8 +129,13 @@ You must propose structured circuit plans conforming strictly to the "pixiu-copi
 Output ONLY a raw JSON object with keys: schema_version, task_type, summary, assumptions, needs_clarification, proposal, capabilities.
 Do not wrap in markdown or add conversational filler.`
 
+    const wrappedPrompt = wrapCopilotPrompt(request.prompt, {
+      domain: "circuit",
+      hasInductiveLoad: /motor|servo|fan|relay|pump|solenoid/i.test(request.prompt),
+    })
+
     const userPrompt = `Target Board: ${request.context.targetBoard}
-Prompt: ${request.prompt}
+Prompt: ${wrappedPrompt}
 Context: ${JSON.stringify(request.context)}`
 
     try {
@@ -229,8 +236,25 @@ Context: ${JSON.stringify(request.context)}`
         }
       }
 
+      let normalizedContent = content
+      try {
+        const jsonMatch = content.match(/\{[\s\S]*\}/)
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0])
+          if (parsed?.proposal?.code && typeof parsed.proposal.code === "string") {
+            const repair = repairBlocklyXml(parsed.proposal.code)
+            if (repair.repairedXml && (repair.isHealed || repair.actions.length > 0)) {
+              parsed.proposal.code = repair.repairedXml
+              normalizedContent = JSON.stringify(parsed, null, 2)
+            }
+          }
+        }
+      } catch {
+        // preserve original content if json parsing fails
+      }
+
       return {
-        rawOutput: content,
+        rawOutput: normalizedContent,
         success: true,
         metadata: {
           provider: "http-openai-compatible",
@@ -454,16 +478,18 @@ export class DeterministicStubAdapter implements ModelAdapter {
     }
 
     // Standard Success Scenario: generate proposal based on task family and board
-    const promptLower = request.prompt.toLowerCase()
+    const cleanPrompt = request.prompt.replace(/\[(?:PEDAGOGICAL|HARDWARE|CIRCUIT)[^\]]*\]/g, "").toLowerCase()
     const board = (request.context.targetBoard || "arduino-uno").toLowerCase()
 
     let payload: Record<string, unknown>
 
-    if (promptLower.includes("ldr") || promptLower.includes("light") || promptLower.includes("nightlight")) {
+    if (cleanPrompt.includes("led") || cleanPrompt.includes("blink")) {
+      payload = this.buildLedProposal(board)
+    } else if (cleanPrompt.includes("ldr") || cleanPrompt.includes("light") || cleanPrompt.includes("nightlight")) {
       payload = this.buildLdrProposal(board)
-    } else if (promptLower.includes("ultrasonic") || promptLower.includes("sonar") || promptLower.includes("distance") || promptLower.includes("buzzer")) {
+    } else if (cleanPrompt.includes("ultrasonic") || cleanPrompt.includes("sonar") || cleanPrompt.includes("distance") || cleanPrompt.includes("buzzer")) {
       payload = this.buildUltrasonicProposal(board)
-    } else if (promptLower.includes("servo") || promptLower.includes("barrier") || promptLower.includes("motor") || promptLower.includes("angle")) {
+    } else if (cleanPrompt.includes("servo") || cleanPrompt.includes("barrier") || cleanPrompt.includes("motor") || cleanPrompt.includes("angle")) {
       payload = this.buildServoProposal(board)
     } else {
       payload = this.buildLedProposal(board)

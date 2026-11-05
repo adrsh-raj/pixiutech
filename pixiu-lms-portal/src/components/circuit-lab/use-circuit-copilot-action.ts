@@ -21,6 +21,7 @@ import {
   type CircuitValidationResult,
   type DiagnosticNotice,
 } from "@/lib/circuit-validator"
+import { repairBlocklyXml } from "@/lib/ai/copilot/blockly-repair-middleware"
 
 // ============================================================================
 // Types & Contracts
@@ -85,13 +86,22 @@ function getProposalValidationCandidate(proposal: unknown): unknown {
   if (!proposal || typeof proposal !== "object" || Array.isArray(proposal)) return proposal
   const rawProposal = proposal as Record<string, unknown>
   const rawCircuit = rawProposal.circuit
-  if (!rawCircuit || typeof rawCircuit !== "object" || Array.isArray(rawCircuit)) return rawCircuit
+  let xml = typeof rawProposal.blocklyXml === "string" ? rawProposal.blocklyXml : undefined
+  if (xml) {
+    const repair = repairBlocklyXml(xml)
+    if (repair.success && repair.repairedXml) {
+      xml = repair.repairedXml
+    }
+  }
+  if (!rawCircuit || typeof rawCircuit !== "object" || Array.isArray(rawCircuit)) {
+    return { parts: [], wires: [], blocklyXml: xml }
+  }
   const circuit = rawCircuit as Record<string, unknown>
   // Build a narrow object rather than spreading an untrusted payload into app state.
   return {
     parts: circuit.parts,
     wires: circuit.wires,
-    blocklyXml: rawProposal.blocklyXml,
+    blocklyXml: xml,
   }
 }
 
@@ -206,17 +216,51 @@ export function useCircuitCopilotAction({
   const proposeAction = useCallback(
     (proposal: CircuitCopilotProposal): { valid: boolean; stale: boolean; result: CircuitValidationResult } => {
       setState("validating")
-      setActiveProposal(proposal)
+
+      let activeProp = proposal
+      if (typeof activeProp?.blocklyXml === "string") {
+        const repair = repairBlocklyXml(activeProp.blocklyXml)
+        if (!repair.success) {
+          setState("rejected")
+          const unsupportedNotice: DiagnosticNotice = {
+            ruleId: "copilot-unsupported-blockly-hardware",
+            severity: "critical",
+            category: "syntax",
+            title: "Unsupported Hardware Blocks Rejected",
+            message: repair.error || "The proposal contains unsupported hardware blocks.",
+            suggestion: "Use standard supported components from the CyberLab toolbox.",
+            involvedPartIds: [],
+          }
+          setRejectionReasons([unsupportedNotice])
+          setStagedPreview(null)
+          return {
+            valid: false,
+            stale: false,
+            result: {
+              valid: false,
+              errors: [repair.error || "Unsupported hardware blocks detected"],
+              warnings: [],
+              notices: [unsupportedNotice],
+              metrics: { totalParts: 0, totalWires: 0, shortCircuitsFound: 0, highCurrentLoadsFound: 0, floatingPinsCount: 0 },
+              revHash: currentHash,
+            },
+          }
+        }
+        if (repair.repairedXml && (repair.isHealed || repair.actions.length > 0)) {
+          activeProp = { ...activeProp, blocklyXml: repair.repairedXml }
+        }
+      }
+      setActiveProposal(activeProp)
 
       // 1. Check for stale proposal. Missing or malformed revision metadata is never trusted.
       const isStale =
-        !proposal ||
-        typeof proposal !== "object" ||
-        typeof proposal.baseRevisionHash !== "string" ||
-        proposal.baseRevisionHash !== currentHash
+        !activeProp ||
+        typeof activeProp !== "object" ||
+        typeof activeProp.baseRevisionHash !== "string" ||
+        activeProp.baseRevisionHash !== currentHash
 
       // 2. Validate both circuit and optional Blockly XML as one untrusted proposal envelope.
-      const validation = validateProposedCircuit(getProposalValidationCandidate(proposal), {
+      const validation = validateProposedCircuit(getProposalValidationCandidate(activeProp), {
         allowWarnings: true,
         baseCircuit: currentCircuit,
       })
@@ -328,8 +372,14 @@ export function useCircuitCopilotAction({
       setState("applying")
 
       // 3. Save pre-mutation snapshot to circular undo buffer
-      const effectiveNextBlocklyXml =
+      let effectiveNextBlocklyXml =
         typeof target.blocklyXml === "string" ? target.blocklyXml : currentBlocklyXml
+      if (typeof effectiveNextBlocklyXml === "string") {
+        const repair = repairBlocklyXml(effectiveNextBlocklyXml)
+        if (repair.success && repair.repairedXml) {
+          effectiveNextBlocklyXml = repair.repairedXml
+        }
+      }
       const snapshot: UndoSnapshot = {
         circuit: JSON.parse(JSON.stringify(currentCircuit)),
         blocklyXml: currentBlocklyXml,
