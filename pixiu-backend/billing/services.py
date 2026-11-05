@@ -508,11 +508,9 @@ def reverse_payment(*, payment: Payment, reversed_by, reversal_status: str, reas
         else invoice.invoice_number if invoice
         else "payment"
     )
-    action = (
-        "payment_voided"
-        if reversal_status == PaymentStatus.VOID
-        else "payment_refunded"
-    )
+    # Keep audit actions within the canonical AuditAction choices; the
+    # changes payload records the precise void/refund subtype and reason.
+    action = "void" if reversal_status == PaymentStatus.VOID else "payment"
     record_audit(
         actor=reversed_by,
         action=action,
