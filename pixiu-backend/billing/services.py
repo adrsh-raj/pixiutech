@@ -454,3 +454,95 @@ def verify_pending_payment(*, payment: Payment, verified_by):
         changes={"receipt_number": receipt.receipt_number},
     )
     return locked_payment, receipt
+
+@transaction.atomic
+def reverse_payment(*, payment: Payment, reversed_by, reversal_status: str, reason: str, request=None) -> Payment:
+    """Void a mistaken entry or record a real refund without deleting its receipt.
+
+    The receipt's immutable issuance snapshot is deliberately preserved. Ledger
+    aggregates count only SUCCESS payments, so changing the status removes the
+    amount from current contract/invoice balances while retaining the evidence.
+    """
+    if reversal_status not in {PaymentStatus.VOID, PaymentStatus.REFUNDED}:
+        raise ValidationError("Reversal type must be void or refunded.")
+
+    normalized_reason = (reason or "").strip()
+    if len(normalized_reason) < 8:
+        raise ValidationError({"reason": "Enter a clear reversal reason (at least 8 characters)."})
+
+    locked_payment = Payment.objects.select_for_update().get(pk=payment.pk)
+    if locked_payment.status != PaymentStatus.SUCCESS:
+        raise ValidationError("Only a successful, verified payment can be voided or refunded.")
+
+    invoice = None
+    contract = None
+    school = None
+    if locked_payment.invoice_id:
+        invoice = Invoice.objects.select_for_update().get(pk=locked_payment.invoice_id)
+        school = invoice.school
+        if invoice.contract_id:
+            contract = SchoolContract.objects.select_for_update().get(pk=invoice.contract_id)
+    else:
+        contract = SchoolContract.objects.select_for_update().select_related(
+            "school"
+        ).get(pk=locked_payment.contract_id)
+        school = contract.school
+
+    receipt_number = Receipt.objects.filter(payment=locked_payment).values_list(
+        "receipt_number", flat=True
+    ).first()
+    previous_status = locked_payment.status
+    locked_payment.status = reversal_status
+    locked_payment.reversal_reason = normalized_reason
+    locked_payment.reversed_at = timezone.now()
+    locked_payment.reversed_by = reversed_by
+    locked_payment.save(update_fields=[
+        "status", "reversal_reason", "reversed_at", "reversed_by"
+    ])
+
+    if invoice:
+        recalculate_invoice(invoice)
+
+    target_label = (
+        contract.contract_number if contract
+        else invoice.invoice_number if invoice
+        else "payment"
+    )
+    # Keep audit actions within the canonical AuditAction choices; the
+    # changes payload records the precise void/refund subtype and reason.
+    action = "void" if reversal_status == PaymentStatus.VOID else "payment"
+    record_audit(
+        actor=reversed_by,
+        action=action,
+        entity_type="Payment",
+        entity_id=locked_payment.id,
+        summary=f"{'Voided' if reversal_status == PaymentStatus.VOID else 'Refunded'} payment for {target_label}",
+        changes={
+            "previous_status": previous_status,
+            "status": reversal_status,
+            "amount": str(locked_payment.amount),
+            "reason": normalized_reason,
+            "receipt_number": receipt_number,
+            "invoice": invoice.invoice_number if invoice else None,
+            "contract": contract.contract_number if contract else None,
+        },
+        request=request,
+    )
+    notify_school(
+        school,
+        title=f"Payment {'voided' if reversal_status == PaymentStatus.VOID else 'refunded'} — {target_label}",
+        message=(
+            f"The payment entry of ₹{locked_payment.amount:.2f} has been "
+            f"{'voided' if reversal_status == PaymentStatus.VOID else 'marked refunded'} by Pixiu Tech. "
+            "Your current contract / invoice balance has been recalculated. "
+            "The original receipt remains retained and is marked as invalid."
+        ),
+        event_key=f"payment-reversed:{locked_payment.id}",
+        metadata={
+            "payment_id": str(locked_payment.id),
+            "receipt_number": receipt_number,
+            "status": reversal_status,
+            "amount": str(locked_payment.amount),
+        },
+    )
+    return locked_payment

@@ -12,12 +12,12 @@ from accounts.permissions import HasActionPermission, IsActiveAccount
 from audit.services import record_audit
 from .models import BillingStatus, Invoice, InvoiceLineItem, Payment, PaymentStatus, Receipt
 from .serializers import InvoiceLineItemSerializer, InvoiceLineItemWriteSerializer, InvoiceSerializer, PaymentRecordSerializer, PaymentSerializer, ReceiptSerializer
-from .services import add_invoice_line, notify_admins, notify_school, record_payment, recalculate_invoice, update_invoice_line, verify_pending_payment, issue_invoice
+from .services import add_invoice_line, notify_admins, notify_school, record_payment, recalculate_invoice, update_invoice_line, verify_pending_payment, issue_invoice, reverse_payment
 
 
 class BillingScopedMixin:
     def initial(self, request, *args, **kwargs):
-        mapping = {"list": "VIEW", "retrieve": "VIEW", "create": "CREATE", "update": "EDIT", "partial_update": "EDIT", "destroy": "DELETE", "issue": "EDIT", "void": "EDIT", "record": "CREATE", "verify": "EDIT", "reject": "EDIT"}
+        mapping = {"list": "VIEW", "retrieve": "VIEW", "create": "CREATE", "update": "EDIT", "partial_update": "EDIT", "destroy": "DELETE", "issue": "EDIT", "void": "EDIT", "refund": "EDIT", "record": "CREATE", "verify": "EDIT", "reject": "EDIT"}
         self.required_action = mapping.get(self.action, "VIEW")
         super().initial(request, *args, **kwargs)
 
@@ -250,6 +250,29 @@ class PaymentViewSet(BillingScopedMixin, viewsets.ReadOnlyModelViewSet):
             },
         )
         return Response({"payment": PaymentSerializer(payment).data, "receipt": ReceiptSerializer(receipt).data})
+
+    def _reverse_confirmed_payment(self, request, payment, reversal_status):
+        self.role_only(UserRole.ADMIN)
+        payment = reverse_payment(
+            payment=payment,
+            reversed_by=request.user,
+            reversal_status=reversal_status,
+            reason=request.data.get("reason", ""),
+            request=request,
+        )
+        return Response(PaymentSerializer(payment).data)
+
+    @action(detail=True, methods=["post"])
+    def void(self, request, pk=None):
+        """Void a mistaken payment entry while retaining its receipt and audit trail."""
+        payment = self.get_object()
+        return self._reverse_confirmed_payment(request, payment, PaymentStatus.VOID)
+
+    @action(detail=True, methods=["post"])
+    def refund(self, request, pk=None):
+        """Record that received funds were actually returned to the payer."""
+        payment = self.get_object()
+        return self._reverse_confirmed_payment(request, payment, PaymentStatus.REFUNDED)
 
     @action(detail=True, methods=["post"])
     def reject(self, request, pk=None):
