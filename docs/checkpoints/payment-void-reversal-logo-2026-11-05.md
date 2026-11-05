@@ -5,109 +5,118 @@ Updated: 2026-11-05 (Asia/Kolkata)
 ## Repository state
 
 - Repository: adrsh-raj/pixiutech
-- Base main at branch creation: bd16e835bce7b5beb4f0ff9cfc9231990407ba04
+- PR #80: merged — https://github.com/adrsh-raj/pixiutech/pull/80
 - Feature branch: feat/payment-void-reversal-and-receipt-logo-20261105
-- Intended PR: open after checkpoint.
-- Production payment records have not been modified.
+- Squash merge commit on main: 37d81cff3988c694411cb3d5b906af099c50f02e
+- Main was verified identical to the merge commit immediately after merge.
+- Source changes are in billing backend, BillingCenter, Payments, public logo asset and this checkpoint.
+- Production payment records have not been changed.
 
 ## User request
 
 - Put the supplied Pixiu Tech logo on downloaded receipt PDFs.
 - Show Payment ID and receipt/contract information on the PDF.
-- Provide an actual admin-visible Void / Reverse option for mistaken payment entries; allow Refund only when funds were received and then returned.
-- Preserve financial audit history; avoid silently zeroing or deleting payment and receipt rows.
+- Provide admin-visible Void / Reverse controls for mistaken payment entries; allow Refund only when money was received and then returned.
+- Preserve financial audit history; do not silently zero or delete payment and receipt rows.
 
-## Uploaded logo source
+## Logo
 
-- Used the supplied transparent Pixiu Tech logo PNG (not the white-background JPEG).
-- Optimized it to a compact transparent PNG and embedded it into:
-  pixiu-lms-portal/public/pixiu-tech-logo.svg
-- Both the school Billing PDF and admin Payments PDF reference the static portal asset at /pixiu-tech-logo.svg.
-- Receipt headers now include the actual mark beside the Pixiu Tech LLP text.
-- PDF print is delayed long enough for the same-origin logo asset to load.
-- Original payment ID and receipt number are both included.
+- Used the uploaded transparent Pixiu Tech logo PNG, not the white-background JPEG.
+- Added compact branded asset: pixiu-lms-portal/public/pixiu-tech-logo.svg
+- Both school Billing and admin Payments PDF templates reference /pixiu-tech-logo.svg.
+- Both headers include the logo beside PIXIU TECH LLP text.
+- Both PDFs include Payment ID and receipt number.
+- Browser print invocation allows extra time for the same-origin logo asset to load.
 
 ## Payment correction implementation
 
-### Data model and migration
+### Model and migration
 
-- Payment gains:
-  - reversal_reason
-  - reversed_at
-  - reversed_by
-- Migration:
-  pixiu-backend/billing/migrations/0005_payment_reversal_metadata.py
-- Existing Receipt rows are not deleted or rewritten. Original issue-time snapshot values remain immutable.
+Payment adds:
+- reversal_reason
+- reversed_at
+- reversed_by
 
-### Backend endpoints
+Migration: pixiu-backend/billing/migrations/0005_payment_reversal_metadata.py
+
+Original Receipt rows and issue-time snapshot fields are not rewritten or deleted.
+
+### Admin API actions
 
 - POST /api/v1/payments/{id}/void
   - Admin-only.
   - Only successful/verified payments may be voided.
-  - Reason required (minimum 8 characters).
-  - Intended for a mistaken/duplicate entry where funds were not actually received.
+  - Requires a clear reason (minimum 8 characters).
+  - Use for a mistaken/duplicate entry where funds were not actually received.
 - POST /api/v1/payments/{id}/refund
   - Admin-only.
   - Only successful/verified payments may be marked refunded.
-  - Reason required (minimum 8 characters).
+  - Requires a clear reason (minimum 8 characters).
   - Use only when funds were actually received and then returned to the payer.
-- Service: billing.services.reverse_payment
-  - Locks payment, invoice and related contract rows.
-  - Changes payment status to void/refunded. Only SUCCESS payments count in current paid/collected aggregations, so active contract and invoice balances recalculate.
-  - Keeps original Receipt row and receipt snapshot intact.
-  - Stores actor, timestamp and reason on the payment.
-  - Adds append-only audit event with canonical AuditAction values and request IP/user-agent metadata.
-  - Notifies the school that the entry was voided/refunded and balance recalculated.
-  - Repeat reversal attempts and non-success payments are rejected.
-- Receipt serializer includes payment_status, reversal_reason and reversed_at.
-- Payment serializer includes reversal fields.
 
-### Portal UX
+Both operations call billing.services.reverse_payment:
+- Locks the Payment row and the linked Invoice / Contract rows.
+- Changes status away from SUCCESS, so current contract and invoice paid totals are recomputed without this entry.
+- Recalculates linked invoice amount_paid and status.
+- Retains original payment, receipt number and issue-time receipt snapshot.
+- Stores reason, timestamp and reversing admin.
+- Writes append-only audit event with actor and request IP/user-agent.
+- Notifies the school.
+- Rejects pending, already reversed or non-successful payment records.
 
-- School/admin BillingCenter payment history retains the receipt row for success, void and refunded records.
-- Admin sees a Void / Reverse button beside successful receipt entries.
+### Portal
+
+- School/admin BillingCenter history retains success, void and refunded receipt entries.
+- Admin sees **Void / Reverse** beside each successful receipt.
 - Dialog distinguishes:
-  - Void mistaken / duplicate entry — funds were not received.
-  - Refund / reversal — funds were received, then returned.
-- Reason is mandatory; cancel is available.
-- Reversed rows display VOIDED / REFUNDED and the saved reason.
-- The original receipt remains downloadable. PDF visibly stamps it:
+  - Void mistaken / duplicate entry (funds were not received)
+  - Refund / reversal (funds were received and then returned)
+- A reason is mandatory.
+- Reversed rows show status and saved reason.
+- Reversed receipt PDFs show:
   - VOID — NOT VALID FOR COLLECTION
   - REFUNDED — NOT VALID FOR COLLECTION
-- Current contract/invoice ledger recalculates independently; historical issue-time snapshots are never rewritten.
-- Admin Payments page receipt PDF also has logo, invalid stamp and reversal reason; status filter includes voided/refunded. Finance metrics separate reversed amounts from failed submissions.
+- Original receipt remains downloadable and clearly invalidated; snapshot is preserved for audit. Current contract/invoice balance is recalculated separately.
+- Admin Payments view includes reversal status filtering, reversal reason, and separate Reversed amount metric.
 
-## Regression tests added
+## Validation completed
 
-- Void of mistaken successful direct contract payment restores active outstanding balance to contract value, keeps the original receipt and its old snapshot, and records the audit event.
-- Refund of a successful payment removes it from active collection total and records the refund audit event.
-- School user cannot void a successful payment.
-- Void of linked-invoice payment recalculates invoice amount_paid/status and the contract balance.
-- Void without reason is rejected and leaves payment status unchanged.
+- PR #80 merged via normal GitHub squash merge.
+- Django backend verification: 180 tests passed.
+- makemigrations --check --dry-run: No changes detected.
+- billing.0005_payment_reversal_metadata applied successfully.
+- Portal lint: passed.
+- Portal production build: passed.
+- Production security smoke: passed.
+- Full production-verification workflow stopped after backend stage at existing unrelated public-site audit:
+  - src/pages/EightSquareAI.jsx — interactive cursor/scroll reveal pattern detected.
+- Other unrelated existing gates:
+  - CyberLab browser gate: first-run welcome screen does not expose AI Copilot entry point.
+  - Phase 4–6 static gate: missing findArduinoPinState and computeRuntime(state, pressedRef.current, pinStatesRef.current); Phase 9 / Part 4 aggregate gates inherit this.
+- These failures are outside the billing source changed in this PR. Repository-wide CI is not fully green.
+- Live production deployment, logo loading on production domain, and actual school-account print preview have not yet been independently confirmed.
 
-## Financial safety rules
+## Financial data safety — no production action performed
 
-- No successful payment is silently deleted.
-- No receipt is silently deleted.
-- Void and Refund are distinct; a refund means the funds were actually sent back.
-- A reason and actor/time metadata are retained.
-- Receipt snapshots are historical issuance-time facts and must not be changed when the current ledger changes.
-- No real payment has been voided/refunded as part of this code work. Production data remains untouched.
-- Do not act on the user's previously mentioned ₹1,000 / ₹10,000 records until the actual payment IDs, receipt numbers and school identity are verified from the live account/database.
+- No production payment, receipt, invoice, contract or balance was zeroed, deleted, voided or refunded by this code work.
+- The previously mentioned ₹1,000 / ₹10,000 entries still need their exact live Payment IDs and Receipt numbers inspected before selecting an action.
+- Use Void only if a marked payment was never actually received.
+- Use Refund only if the money was received and was actually sent back.
+- Do not use Refund as a synonym for a mistaken entry.
+- The system retains the original Payment and Receipt as audit evidence after either action. Only the current ledger excludes the reversed payment.
 
-## Validation status at checkpoint
+## Manual acceptance still required
 
-- Static source checks confirm model fields, migration, API actions, UI buttons/dialog, reason validation, logo references and reversal receipt stamps are present.
-- Full regression suite, Django migration consistency, portal lint/build and browser checks are pending PR CI. Do not claim them passed before Actions completes.
-- Manual production print preview and deployment are not yet confirmed.
+1. Open admin Billing and confirm each successful receipt has **Void / Reverse**.
+2. Void a test-fixture direct contract payment. Verify contract paid total decreases, outstanding increases, receipt is retained and stamped VOID.
+3. Refund a test-fixture payment. Verify REFUNDED status, audit details and balance recalculation.
+4. Repeat with a contract-linked invoice. Verify invoice amount_paid/status and contract balance recalculate.
+5. Open school Billing and admin Payments receipt PDFs. Confirm the uploaded Pixiu logo is visible, Payment ID and receipt number are legible, and Save as PDF works.
+6. Verify school account cannot invoke void/refund.
 
 ## Resume procedure
 
-1. Verify branch SHA and PR CI.
-2. Fix any backend, migration, portal lint or build issues and rerun.
-3. Confirm the full Django billing suite passes, including new void/refund tests.
-4. Verify PDF preview includes the Pixiu logo and Payment ID in both school Billing and admin Payments.
-5. Exercise void/refund only in test fixtures; confirm original receipt remains and current balances recalculate.
-6. Merge with a normal squash PR only after relevant tests pass; do not bypass checks.
-7. Keep unrelated repository baseline failures separate and document them accurately.
-8. For production correction, inspect payment IDs and statements first; do not mutate production records automatically.
+1. Verify main SHA before any new write.
+2. Do not operate on live payment rows without checking exact payment IDs, receipt numbers, school identity, transaction references and bank evidence.
+3. Preserve all original receipt snapshots and audit logs.
+4. Keep known baseline CI failures separate from billing-specific results.
