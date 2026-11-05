@@ -132,9 +132,9 @@ class Receipt(models.Model):
     school_name_snapshot = models.CharField(max_length=200, blank=True, default="")
     invoice_number_snapshot = models.CharField(max_length=40, blank=True, default="")
     contract_number_snapshot = models.CharField(max_length=50, blank=True, default="")
-    total_amount_snapshot = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
-    amount_paid_snapshot = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
-    balance_due_snapshot = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
+    total_amount_snapshot = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    amount_paid_snapshot = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    balance_due_snapshot = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
     issued_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="issued_receipts")
     class Meta: ordering=["-issued_at"]
 

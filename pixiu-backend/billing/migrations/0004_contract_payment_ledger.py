@@ -49,17 +49,17 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="receipt",
             name="total_amount_snapshot",
-            field=models.DecimalField(decimal_places=2, default=Decimal("0.00"), max_digits=14),
+            field=models.DecimalField(blank=True, decimal_places=2, max_digits=14, null=True),
         ),
         migrations.AddField(
             model_name="receipt",
             name="amount_paid_snapshot",
-            field=models.DecimalField(decimal_places=2, default=Decimal("0.00"), max_digits=14),
+            field=models.DecimalField(blank=True, decimal_places=2, max_digits=14, null=True),
         ),
         migrations.AddField(
             model_name="receipt",
             name="balance_due_snapshot",
-            field=models.DecimalField(decimal_places=2, default=Decimal("0.00"), max_digits=14),
+            field=models.DecimalField(blank=True, decimal_places=2, max_digits=14, null=True),
         ),
         migrations.AddConstraint(
             model_name="payment",
