@@ -76,6 +76,9 @@ export default function BillingCenter() {
   const [showContractForm, setShowContractForm] = useState(false);
   const [paymentInvoice, setPaymentInvoice] = useState(null);
   const [paymentContract, setPaymentContract] = useState(null);
+  const [reversalPayment, setReversalPayment] = useState(null);
+  const [reversalType, setReversalType] = useState('void');
+  const [reversalReason, setReversalReason] = useState('');
 
   const [billForm, setBillForm] = useState({
     description: '',
@@ -228,7 +231,7 @@ export default function BillingCenter() {
     return Array.from(map.values());
   }, [payments, invoices]);
 
-  const verifiedPayments = payments.filter(payment => payment.status === 'success').slice(0, 8);
+  const verifiedPayments = payments.filter(payment => ['success', 'void', 'refunded'].includes(payment.status)).slice(0, 20);
 
   const resetBill = () => setBillForm({
     description: '',
@@ -383,6 +386,32 @@ export default function BillingCenter() {
     setBusy(false);
   };
 
+  const openReversal = payment => {
+    setReversalPayment(payment);
+    setReversalType('void');
+    setReversalReason('');
+    setError('');
+  };
+
+  const submitReversal = async event => {
+    event.preventDefault();
+    if (!reversalPayment) return;
+    if (reversalReason.trim().length < 8) {
+      setError('Enter a clear reason of at least 8 characters.');
+      return;
+    }
+    setBusy(true);
+    await runAction(async () => {
+      await request(`/payments/${encodeURIComponent(reversalPayment.id)}/${reversalType}`, 'POST', {
+        reason: reversalReason.trim(),
+      });
+      setReversalPayment(null);
+      setReversalReason('');
+      await Promise.all([load(), refreshAll()]);
+    });
+    setBusy(false);
+  };
+
   const printReceipt = payment => {
     const popup = window.open('', '_blank', 'width=820,height=900');
     if (!popup) {
@@ -404,6 +433,11 @@ export default function BillingCenter() {
     const paid = Number(paidRaw || 0);
     const balance = Number(balanceRaw || 0);
     const state = balance <= 0 ? 'PAID IN FULL' : paid > 0 ? 'PARTIALLY PAID' : 'UNPAID';
+    const reversed = ['void', 'refunded'].includes(payment.status);
+    const reversalLabel = payment.status === 'refunded' ? 'REFUNDED — NOT VALID FOR COLLECTION' : 'VOID — NOT VALID FOR COLLECTION';
+    const reversalBanner = reversed
+      ? `<div class="reversal-banner"><strong>${reversalLabel}</strong><div>${safe(payment.reversal_reason || 'Payment entry reversed')}</div><small>Reversed on ${safe(payment.reversed_at || 'date not available')} · Original receipt retained for audit.</small></div>`
+      : '';
     const snapshotRows = hasSnapshot
       ? `<div class="summary">
           <div class="summary-title">${isContract ? 'Contract' : 'Invoice'} ledger at receipt time</div>
@@ -427,8 +461,14 @@ export default function BillingCenter() {
         body{font-family:Arial,sans-serif;padding:32px;max-width:780px;margin:0 auto;color:#172033;background:#fff}
         h1{font-size:25px;letter-spacing:.04em;margin:0 0 5px}
         .muted{color:#64748b;font-size:12px;line-height:1.55}
-        .top{display:flex;justify-content:space-between;gap:20px;padding-bottom:18px;border-bottom:2px solid #172033}
+        .top{display:flex;justify-content:space-between;align-items:center;gap:20px;padding-bottom:18px;border-bottom:2px solid #172033}
+        .brand{display:flex;align-items:center;gap:14px}
+        .brand-logo{display:block;width:145px;height:auto;max-height:74px;object-fit:contain}
         .receipt-label{text-align:right;font-size:12px;color:#64748b}
+        .reversal-banner{border:2px solid #b91c1c;color:#991b1b;background:#fff7f7;border-radius:8px;padding:14px;margin:18px 0}
+        .reversal-banner strong{display:block;font-size:16px;letter-spacing:.06em}
+        .reversal-banner div{margin-top:5px;font-size:13px}
+        .reversal-banner small{display:block;margin-top:5px;color:#7f1d1d}
         .receipt-label strong{display:block;color:#172033;font-size:17px;margin-top:5px}
         .box{border:1px solid #dbe3ed;border-radius:10px;padding:18px;margin:20px 0}
         .section-title,.summary-title{font-size:11px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#475569;margin:0 0 8px}
@@ -446,9 +486,10 @@ export default function BillingCenter() {
         @media print{body{padding:0;max-width:none}.toolbar{display:none!important}.box,.summary{break-inside:avoid}}
       </style></head><body>
       <div class="toolbar"><button onclick="window.print()">Download / Save as PDF</button></div>
-      <div class="top"><div><h1>PIXIU TECH LLP</h1><div class="muted">Robotics • AI • IoT • STEM Education</div><div class="muted" style="margin-top:8px">Official payment receipt</div></div>
+      <div class="top"><div class="brand"><img class="brand-logo" src="${window.location.origin}/pixiu-tech-logo.svg" alt="Pixiu Tech logo"><div><h1>PIXIU TECH LLP</h1><div class="muted">Robotics • AI • IoT • STEM Education</div><div class="muted" style="margin-top:8px">Official payment receipt</div></div></div>
         <div class="receipt-label">RECEIPT<strong>${safe(receiptNumber)}</strong><div style="margin-top:7px">${safe(payment.payment_date)}</div></div>
       </div>
+      ${reversalBanner}
       <div class="box">
         <div class="section-title">Receipt Details</div>
         <div class="row"><b>School</b><span>${safe(payment.school_name || billingSchool?.name)}</span></div>
@@ -460,7 +501,7 @@ export default function BillingCenter() {
         ${snapshotRows}
         <div class="row payment-total"><b>Amount Received on This Receipt</b><strong>${money(payment.amount)}</strong></div>
       </div>
-      <div class="footer muted">This receipt confirms one verified payment. Paid and outstanding figures are the immutable ledger balances immediately after this payment was recorded. Pending submissions are not included.</div>
+      <div class="footer muted">${reversed ? 'This receipt has been marked invalid because the payment was reversed. Its original snapshot is preserved for audit; the current contract balance has been recalculated separately.' : 'This receipt confirms one verified payment. Paid and outstanding figures are the immutable ledger balances immediately after this payment was recorded. Pending submissions are not included.'}</div>
       </body></html>`);
     popup.document.close();
     popup.focus();
@@ -726,26 +767,32 @@ export default function BillingCenter() {
           </section>
 
           <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-            <SectionTitle eyebrow="Receipts" title="Payment history" description="Successful payments automatically create a receipt. Nothing needs to be created manually." />
+            <SectionTitle eyebrow="Receipts" title="Payment history" description="Every verified receipt stays in the audit history. Admins can void a mistaken entry or record a genuine refund." />
             {!verifiedPayments.length ? (
-              <div className="p-7"><EmptyState compact title="No successful payments yet" description="Verified payments will appear here with their receipt number." /></div>
+              <div className="p-7"><EmptyState compact title="No payment receipts yet" description="Verified payments will appear here with their receipt number." /></div>
             ) : (
               <div className="divide-y divide-slate-100">
                 {verifiedPayments.map(payment => (
                   <div key={payment.id} className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center">
                     <div className="min-w-0 flex-1">
-                      <p className="font-black text-slate-800">{payment.contract_number || payment.invoice_number || payment.contract || payment.invoice}</p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-black text-slate-800">{payment.contract_number || payment.invoice_number || payment.contract || payment.invoice}</p>
+                        {payment.status === 'void' && <span className="rounded-lg bg-rose-50 px-2 py-1 text-[9px] font-black uppercase text-rose-700">Voided</span>}
+                        {payment.status === 'refunded' && <span className="rounded-lg bg-amber-50 px-2 py-1 text-[9px] font-black uppercase text-amber-700">Refunded</span>}
+                      </div>
                       <p className="mt-1 text-xs text-slate-500">{payment.payment_date ? String(payment.payment_date).slice(0, 10) : '—'} · {payment.method} · {payment.transaction_reference || 'No reference'}</p>
+                      {payment.reversal_reason && <p className="mt-1 text-[10px] text-rose-700">Reversal reason: {payment.reversal_reason}</p>}
                     </div>
                     <div className="flex flex-wrap items-center justify-end gap-3">
                       <div className="text-right">
                         <p className="font-black">{money(payment.amount)}</p>
                         {payment.receipt_number && <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-[9px] font-black uppercase text-emerald-700">{payment.receipt_number}</span>}
-                        {payment.receipt_total_amount_snapshot !== null && payment.receipt_total_amount_snapshot !== undefined && <p className="mt-1 text-[10px] text-slate-500">Contract value: {money(payment.receipt_total_amount_snapshot)}</p>}
+                        {payment.receipt_total_amount_snapshot !== null && payment.receipt_total_amount_snapshot !== undefined && <p className="mt-1 text-[10px] text-slate-500">{payment.contract_number ? 'Contract' : 'Invoice'} value: {money(payment.receipt_total_amount_snapshot)}</p>}
                         {payment.receipt_amount_paid_snapshot !== null && payment.receipt_amount_paid_snapshot !== undefined && <p className="text-[10px] text-slate-500">Total paid: {money(payment.receipt_amount_paid_snapshot)}</p>}
                         {payment.receipt_balance_due_snapshot !== null && payment.receipt_balance_due_snapshot !== undefined && <p className="text-[10px] font-semibold text-slate-600">Outstanding: {money(payment.receipt_balance_due_snapshot)}</p>}
                       </div>
                       {payment.receipt_number && <button type="button" onClick={() => printReceipt(payment)} title="Download or print this receipt as PDF" className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-2.5 text-[10px] font-black text-white hover:bg-slate-700"><Download size={13} /> Download PDF</button>}
+                      {isAdmin && payment.status === 'success' && <button type="button" onClick={() => openReversal(payment)} disabled={busy} className="rounded-xl border border-rose-200 bg-white px-3 py-2.5 text-[10px] font-black text-rose-700 hover:bg-rose-50 disabled:opacity-50">Void / Reverse</button>}
                     </div>
                   </div>
                 ))}
@@ -753,6 +800,42 @@ export default function BillingCenter() {
             )}
           </section>
         </>
+      )}
+
+      {isAdmin && reversalPayment && (
+        <div className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/60 p-3 sm:items-center sm:p-5">
+          <form onSubmit={submitReversal} className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl sm:p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[.16em] text-rose-700">Finance correction</p>
+                <h2 className="mt-1 text-xl font-black text-slate-900">Void / Reverse payment</h2>
+                <p className="mt-1 text-xs text-slate-500">{reversalPayment.receipt_number || reversalPayment.id} · {money(reversalPayment.amount)} · {reversalPayment.contract_number || reversalPayment.invoice_number}</p>
+              </div>
+              <button type="button" onClick={() => setReversalPayment(null)} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100" aria-label="Close reversal dialog"><X size={16} /></button>
+            </div>
+            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
+              This will remove the amount from the active paid total and recalculate the contract / invoice balance. The original payment, receipt and audit history will be retained; nothing is deleted.
+            </div>
+            <div className="mt-4 space-y-3">
+              <label className="block">
+                <span className="mb-1.5 block text-[9px] font-black uppercase tracking-wide text-slate-400">Correction type</span>
+                <select className={fieldClass} value={reversalType} onChange={event => setReversalType(event.target.value)}>
+                  <option value="void">Void mistaken / duplicate entry (funds were not received)</option>
+                  <option value="refund">Refund / reversal (funds were received, then returned)</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-[9px] font-black uppercase tracking-wide text-slate-400">Reason (required)</span>
+                <textarea className={`${fieldClass} min-h-24 py-3`} value={reversalReason} onChange={event => setReversalReason(event.target.value)} minLength={8} required placeholder="Explain why this payment must be voided or refunded." />
+              </label>
+              <p className="text-[10px] leading-relaxed text-slate-500">A VOID receipt will remain visible with a red invalid stamp. A refunded receipt will remain visible as refunded. Neither will count as received in the current ledger.</p>
+              <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
+                <button type="button" onClick={() => setReversalPayment(null)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-black text-slate-600">Cancel</button>
+                <button disabled={busy || reversalReason.trim().length < 8} className="rounded-xl bg-rose-700 px-5 py-2.5 text-xs font-black text-white disabled:opacity-50">{busy ? 'Saving correction…' : reversalType === 'void' ? 'Confirm void payment' : 'Confirm refund'}</button>
+              </div>
+            </div>
+          </form>
+        </div>
       )}
 
       {paymentContract && (
