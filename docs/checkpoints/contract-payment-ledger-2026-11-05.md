@@ -8,8 +8,10 @@ Updated: 2026-11-05 (Asia/Kolkata)
 - Work branch: `feat/contract-payment-receipt-ledger-20261105`
 - Pull request: #77 — Add backend-connected school contract payment ledger and receipts
 - PR target: `main`
-- Latest branch commit when this checkpoint was written: `55363d66560dcd8ce5d2278998bb0b7445cd9ff8`
-- Merge state: open / not merged. `main` has not been changed by this task.
+- Pull request #77: [merged](https://github.com/adrsh-raj/pixiutech/pull/77) on 2026-11-05.
+- Squash merge commit on `main`: `636a30e1351b296ed9cf98e1b4bfc8a5456d7121`.
+- Verified `main` currently points to that merge commit.
+- Work branch: `feat/contract-payment-receipt-ledger-20261105` (historical implementation branch; source of merged PR).
 
 ## Intended acceptance case
 
@@ -46,7 +48,7 @@ Only successful/verified payments count as received. Pending school submissions 
 - Linked invoice payment updates the contract-level received/outstanding figures.
 - A pending payment blocks another payment submission for the same contract/invoice until verified or rejected.
 - Amount must be positive and cannot exceed the remaining due.
-- Existing signed contract details cannot be changed after payment history exists.
+- Contract terms cannot be changed after payment history exists or after a linked invoice is issued.
 - Historical receipt snapshots remain null where no snapshot was captured at the time.
 
 ### Portal
@@ -57,15 +59,25 @@ Only successful/verified payments count as received. Pending school submissions 
 - `billing/test_contract_payment_ledger.py` tests partial payment + immutable receipt, pending verification, overpayment / pending duplicate rejection, invoice-linked roll-up and protection of contract terms.
 - Test helper retrieves the contract detail endpoint rather than relying on list pagination.
 
+## Merge and verification status (2026-11-05)
+
+- PR #77 merged by squash; merge commit: `636a30e1351b296ed9cf98e1b4bfc8a5456d7121`.
+- Post-merge Cloudflare Workers build for `pixiu-portal`: **success** (build ID `c46f60f9-4310-43ed-a73d-77a548e66c50`).
+- Post-merge production security smoke jobs: **success**.
+- Full Django/backend verification on the same implementation before merge: **175 tests passed**; migration consistency check reported `No changes detected`; migration `billing.0004_contract_payment_ledger` applied successfully.
+- The production verification job also performs public-site audit after the backend stage. That site audit has an existing failure in `src/pages/EightSquareAI.jsx` (interactive cursor/scroll reveal pattern). The exact same site-audit failure was observed on the original `main` baseline before this PR.
+- Separate non-billing gates still fail on existing AI/CyberLab code:
+  - Phase 4–6 static checker: missing `findArduinoPinState` and `computeRuntime(state, pressedRef.current, pinStatesRef.current)`.
+  - CyberLab browser gate: first-run welcome screen does not expose AI Copilot entry point. The same browser failure was observed on the original `main` baseline.
+- These failed gates are outside the billing files changed in this PR. Do not mask them or describe the full repository CI as green.
+- Post-merge verification workflow IDs included production verification `42018681570`, browser gate `42018681879`, and Cloudflare build `c46f60f9-4310-43ed-a73d-77a548e66c50`.
+
 ## Recent CI findings and fixes
 
-1. Earlier portal pipeline caught invalid escaped template literals and a duplicated summary-card `.map(...)`; these were corrected. The latest observed portal lint run had zero errors and Cloudflare Workers build succeeded.
-2. Backend PostgreSQL tests caught row-lock errors caused by `select_for_update()` with nullable `select_related()` joins, and PATCH date validation comparing `None`; fixed in the branch. A duplicate transaction-reference check was also added inside the atomic service operation.
-3. Earlier separate repository gates reported:
-   - Phase 4–6 static checker missing `findArduinoPinState` and `computeRuntime(state, pressedRef.current, pinStatesRef.current)` in the circuit-lab code.
-   - CyberLab browser check reported that the first-run welcome screen did not expose its AI Copilot entry point.
-   These are outside the files changed for the billing ledger; do not mask or silently skip them. Check whether they are still failing on the latest commit and compare with `main` before attributing them to this PR.
-4. At the time of this checkpoint, fresh checks for commit `55363d66560dcd8ce5d2278998bb0b7445cd9ff8` had been queued/running. The final result must be read from GitHub, not inferred from earlier commits.
+1. Earlier portal pipeline caught invalid escaped template literals and a duplicated summary-card `.map(...)`; these were corrected. Latest portal lint had zero errors and the Cloudflare Workers production build succeeded.
+2. Backend PostgreSQL tests caught row-lock errors caused by `select_for_update()` with nullable `select_related()` joins, and PATCH date validation comparing `None`; both were fixed. Duplicate UTR protection was added inside the atomic payment operation.
+3. The first duplicate-UTR regression assertion checked the wrong error envelope; it was corrected to inspect `response.data["fields"]`.
+4. A further lifecycle check now locks contract terms as soon as a linked invoice is issued, before any payment is received.
 
 ## Resume procedure after connection interruption
 
