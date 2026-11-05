@@ -243,9 +243,9 @@ def record_payment(
         )
     else:
         pending_query = pending_query.filter(invoice=locked_invoice)
-    if payment_status == PaymentStatus.PENDING and pending_query.exists():
+    if pending_query.exists():
         raise ValidationError({
-            "payment": "A payment is already awaiting verification for this contract or invoice."
+            "payment": "A payment is already awaiting verification for this contract or invoice. Verify or reject it before recording another payment."
         })
 
     payment = Payment.objects.create(

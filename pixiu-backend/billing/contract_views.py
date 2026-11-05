@@ -60,6 +60,25 @@ class SchoolContractSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"school": "You cannot manage contracts for this school."})
         if attrs.get("start_date", getattr(self.instance, "start_date", None)) and attrs.get("end_date", getattr(self.instance, "end_date", None)) and attrs.get("end_date") < attrs.get("start_date"):
             raise serializers.ValidationError("Contract end date cannot be before start date.")
+        if self.instance:
+            has_transactions = Payment.objects.filter(
+                Q(contract=self.instance) | Q(invoice__contract=self.instance)
+            ).exists()
+            if has_transactions:
+                protected_fields = ("school", "contract_number", "total_value", "start_date", "end_date")
+                changed_fields = [
+                    field for field in protected_fields
+                    if field in attrs and attrs[field] != getattr(self.instance, field)
+                ]
+                if changed_fields:
+                    raise serializers.ValidationError({
+                        field: "Signed contract details cannot be changed after a payment transaction exists."
+                        for field in changed_fields
+                    })
+                if attrs.get("status") == ContractStatus.DRAFT:
+                    raise serializers.ValidationError({
+                        "status": "A contract with payment history cannot be moved back to draft."
+                    })
         return attrs
 
 
@@ -116,8 +135,23 @@ def billing_summary(request):
     if school:
         value = str(school).strip()
         contracts = contracts.filter(Q(school__school_code=value.upper()) | Q(school_id=value))
-    contract_value = contracts.exclude(status=ContractStatus.TERMINATED).aggregate(total=Sum("total_value"))["total"] or Decimal("0")
-    return Response({"contract_value": contract_value, "invoiced": invoiced, "collected": collected, "pending": max(invoiced - collected, Decimal("0")), "invoice_count": active.count(), "void_invoice_count": qs.filter(status=BillingStatus.VOID).count()})
+    active_contracts = contracts.exclude(status=ContractStatus.TERMINATED)
+    contract_value = active_contracts.aggregate(total=Sum("total_value"))["total"] or Decimal("0")
+    contract_collected = Payment.objects.filter(
+        Q(contract__in=active_contracts) | Q(invoice__contract__in=active_contracts),
+        status=PaymentStatus.SUCCESS,
+    ).aggregate(total=Sum("amount"))["total"] or Decimal("0")
+    contract_pending = max(contract_value - contract_collected, Decimal("0"))
+    return Response({
+        "contract_value": contract_value,
+        "contract_collected": contract_collected,
+        "contract_pending": contract_pending,
+        "invoiced": invoiced,
+        "collected": collected,
+        "pending": max(invoiced - collected, Decimal("0")),
+        "invoice_count": active.count(),
+        "void_invoice_count": qs.filter(status=BillingStatus.VOID).count(),
+    })
 
 
 @api_view(["GET"])
