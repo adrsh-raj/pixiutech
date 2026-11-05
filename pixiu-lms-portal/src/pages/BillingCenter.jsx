@@ -75,6 +75,7 @@ export default function BillingCenter() {
   const [showBillForm, setShowBillForm] = useState(false);
   const [showContractForm, setShowContractForm] = useState(false);
   const [paymentInvoice, setPaymentInvoice] = useState(null);
+  const [paymentContract, setPaymentContract] = useState(null);
 
   const [billForm, setBillForm] = useState({
     description: '',
@@ -89,6 +90,7 @@ export default function BillingCenter() {
     start_date: today(),
     end_date: '',
     total_value: '',
+    status: 'active',
     notes: '',
   });
   const [paymentForm, setPaymentForm] = useState({
@@ -161,9 +163,9 @@ export default function BillingCenter() {
         request(`/payments${scope}`),
         request(`/billing-summary${scope}`),
         request(billingProfilePath),
+        request(`/contracts${scope}`),
       ];
-      if (isAdmin) requests.push(request(`/contracts${scope}`));
-      const [invoicePayload, paymentPayload, summaryPayload, profilePayload, contractPayload = []] = await Promise.all(requests);
+      const [invoicePayload, paymentPayload, summaryPayload, profilePayload, contractPayload] = await Promise.all(requests);
       setInvoices(rows(invoicePayload));
       setPayments(rows(paymentPayload));
       setSummary(summaryPayload || null);
@@ -203,6 +205,16 @@ export default function BillingCenter() {
     });
     return map;
   }, [payments, invoices]);
+
+  const paymentByContract = useMemo(() => {
+    const map = new Map();
+    payments.forEach(payment => {
+      if (payment.status === 'pending' && payment.contract_id) {
+        map.set(String(payment.contract_id), payment);
+      }
+    });
+    return map;
+  }, [payments]);
 
   const pendingPayments = useMemo(() => {
     const map = new Map();
@@ -244,6 +256,7 @@ export default function BillingCenter() {
         due_date: billForm.due_date,
         tax_amount: tax,
         notes: billForm.notes.trim(),
+        ...(billForm.contract ? { contract: billForm.contract } : {}),
         lines: [{ description: billForm.description.trim(), quantity: 1, unit_price: amount }],
       });
       resetBill();
@@ -258,7 +271,7 @@ export default function BillingCenter() {
     if (!school) return;
     if (!contractForm.contract_number.trim() || !contractForm.end_date) return setError('Contract number and end date are required.');
     const value = Number(contractForm.total_value);
-    if (!Number.isFinite(value) || value < 0) return setError('Enter a valid contract value.');
+    if (!Number.isFinite(value) || value <= 0) return setError('Contract value must be greater than zero.');
     setBusy(true);
     await runAction(async () => {
       await request('/contracts', 'POST', {
@@ -267,7 +280,7 @@ export default function BillingCenter() {
         contract_number: contractForm.contract_number.trim(),
         total_value: value,
       });
-      setContractForm({ contract_number: '', start_date: today(), end_date: '', total_value: '', notes: '' });
+      setContractForm({ contract_number: '', start_date: today(), end_date: '', total_value: '', status: 'active', notes: '' });
       setShowContractForm(false);
       await Promise.all([load(), refreshAll()]);
     });
@@ -287,6 +300,48 @@ export default function BillingCenter() {
       notes: '',
     });
     setError('');
+  };
+
+  const openContractPayment = contract => {
+    const outstanding = Math.max(Number(contract.balance_due || 0), 0);
+    if (!outstanding) return;
+    setPaymentInvoice(null);
+    setPaymentContract(contract);
+    setPaymentForm({
+      amount: outstanding.toFixed(2),
+      method: 'bank_transfer',
+      payment_date: today(),
+      transaction_reference: '',
+      notes: '',
+    });
+    setError('');
+  };
+
+  const submitContractPayment = async event => {
+    event.preventDefault();
+    if (!paymentContract) return;
+    const amount = Number(paymentForm.amount);
+    const outstanding = Math.max(Number(paymentContract.balance_due || 0), 0);
+    if (!Number.isFinite(amount) || amount <= 0 || amount > outstanding) {
+      return setError(`Payment must be greater than 0 and no more than ${money(outstanding)}.`);
+    }
+    if (!isAdmin && !paymentForm.transaction_reference.trim()) {
+      return setError('Enter the UTR / transaction reference so Pixiu Tech can verify the payment.');
+    }
+    setBusy(true);
+    await runAction(async () => {
+      await request('/payments/record', 'POST', {
+        contract: paymentContract.id,
+        amount,
+        method: paymentForm.method,
+        payment_date: paymentForm.payment_date,
+        transaction_reference: paymentForm.transaction_reference.trim(),
+        notes: paymentForm.notes.trim(),
+      });
+      setPaymentContract(null);
+      await Promise.all([load(), refreshAll()]);
+    });
+    setBusy(false);
   };
 
   const submitPayment = async event => {
@@ -373,9 +428,9 @@ export default function BillingCenter() {
         <>
           <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             {[
-              ['Total billed', summary?.invoiced],
-              ['Paid', summary?.collected],
-              ['Outstanding', summary?.pending],
+              [contracts.length ? 'Contract value' : 'Total billed', contracts.length ? summary?.contract_value : summary?.invoiced],
+              [contracts.length ? 'Received' : 'Paid', contracts.length ? summary?.contract_collected : summary?.collected],
+              ['Outstanding', contracts.length ? summary?.contract_pending : summary?.pending],
               ['Invoices', summary?.invoice_count],
             ].map(([label, value]) => (
               <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -427,6 +482,7 @@ export default function BillingCenter() {
                   <label className="block lg:col-span-2"><span className="mb-1.5 block text-[9px] font-black uppercase tracking-wide text-slate-400">What are you billing for?</span><input className={fieldClass} value={billForm.description} onChange={e => setBillForm(v => ({ ...v, description: e.target.value }))} placeholder="e.g. Robotics programme, July–September" required /></label>
                   <label className="block"><span className="mb-1.5 block text-[9px] font-black uppercase tracking-wide text-slate-400">Amount</span><input className={fieldClass} type="number" min="0.01" step="0.01" value={billForm.amount} onChange={e => setBillForm(v => ({ ...v, amount: e.target.value }))} placeholder="0.00" required /></label>
                   <label className="block"><span className="mb-1.5 block text-[9px] font-black uppercase tracking-wide text-slate-400">Due date</span><input className={fieldClass} type="date" value={billForm.due_date} onChange={e => setBillForm(v => ({ ...v, due_date: e.target.value }))} required /></label>
+                  <label className="block"><span className="mb-1.5 block text-[9px] font-black uppercase tracking-wide text-slate-400">Link to contract (optional)</span><select className={fieldClass} value={billForm.contract} onChange={e => setBillForm(v => ({ ...v, contract: e.target.value }))}><option value="">No contract link</option>{contracts.map(contract => <option key={contract.id} value={contract.id}>{contract.contract_number} · {money(contract.balance_due)} due</option>)}</select></label>
                   <label className="block"><span className="mb-1.5 block text-[9px] font-black uppercase tracking-wide text-slate-400">Tax (optional)</span><input className={fieldClass} type="number" min="0" step="0.01" value={billForm.tax_amount} onChange={e => setBillForm(v => ({ ...v, tax_amount: e.target.value }))} placeholder="0.00" /></label>
                   <label className="block lg:col-span-2"><span className="mb-1.5 block text-[9px] font-black uppercase tracking-wide text-slate-400">Notes (optional)</span><textarea className={`${fieldClass} min-h-20 py-3`} value={billForm.notes} onChange={e => setBillForm(v => ({ ...v, notes: e.target.value }))} placeholder="Payment or billing note for the school" /></label>
                   <div className="lg:col-span-2 flex flex-col gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between"><p className="text-[11px] text-slate-500">This creates the invoice and issues it immediately. The school is notified automatically.</p><button disabled={busy} className="rounded-xl bg-slate-900 px-5 py-2.5 text-xs font-black text-white disabled:opacity-50">{busy ? 'Creating…' : 'Create & send bill'}</button></div>
@@ -440,7 +496,11 @@ export default function BillingCenter() {
                   <input className={fieldClass} placeholder="Contract number" value={contractForm.contract_number} onChange={e => setContractForm(v => ({ ...v, contract_number: e.target.value }))} required />
                   <input className={fieldClass} type="date" value={contractForm.start_date} onChange={e => setContractForm(v => ({ ...v, start_date: e.target.value }))} required />
                   <input className={fieldClass} type="date" value={contractForm.end_date} onChange={e => setContractForm(v => ({ ...v, end_date: e.target.value }))} required />
-                  <input className={fieldClass} type="number" min="0" step="0.01" placeholder="Contract value" value={contractForm.total_value} onChange={e => setContractForm(v => ({ ...v, total_value: e.target.value }))} required />
+                  <input className={fieldClass} type="number" min="0.01" step="0.01" placeholder="Contract value" value={contractForm.total_value} onChange={e => setContractForm(v => ({ ...v, total_value: e.target.value }))} required />
+                  <select className={fieldClass} value={contractForm.status} onChange={e => setContractForm(v => ({ ...v, status: e.target.value }))}>
+                    <option value="active">Signed / Active</option>
+                    <option value="draft">Draft / Not signed</option>
+                  </select>
                   <textarea className={`${fieldClass} min-h-16 py-3 lg:col-span-3`} placeholder="Notes" value={contractForm.notes} onChange={e => setContractForm(v => ({ ...v, notes: e.target.value }))} />
                   <button disabled={busy} className="rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-black text-white disabled:opacity-50">{busy ? 'Saving…' : 'Save contract'}</button>
                 </form>
@@ -448,28 +508,66 @@ export default function BillingCenter() {
             </section>
           )}
 
-          {isAdmin && contracts.length > 0 && (
+          {contracts.length > 0 && (
             <section className="rounded-2xl border border-slate-200 bg-white">
-              <SectionTitle eyebrow="Contract records" title="Existing contracts" description="Contracts are records only. To charge a school, create a bill. Use a contract below to prefill a bill when needed." />
+              <SectionTitle
+                eyebrow="Signed contract ledger"
+                title={isAdmin ? `Contracts for ${school.name}` : 'Your contract & payment status'}
+                description="Verified payments update this contract balance automatically. Every receipt stores the contract value, total received and outstanding balance at the time it was issued."
+              />
               <div className="divide-y divide-slate-100">
-                {contracts.map(contract => (
-                  <div key={contract.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
-                    <div className="min-w-0 flex-1">
-                      <p className="font-black text-slate-900">{contract.contract_number}</p>
-                      <p className="mt-1 text-xs text-slate-500">{contract.start_date} to {contract.end_date} · {money(contract.total_value)} · {String(contract.status || '').toUpperCase()}</p>
-                    </div>
-                    <button type="button" onClick={() => {
-                      setBillForm(v => ({
-                        ...v,
-                        description: `Contract ${contract.contract_number}`,
-                        amount: String(contract.total_value || ''),
-                      }));
-                      setShowBillForm(true);
-                    }} className="rounded-xl border border-[#236F69] px-3.5 py-2 text-[10px] font-black text-[#236F69]">
-                      Use for new bill
-                    </button>
-                  </div>
-                ))}
+                {contracts.map(contract => {
+                  const pending = paymentByContract.get(String(contract.id));
+                  const balance = Math.max(Number(contract.balance_due || 0), 0);
+                  const payable = ['active', 'expired'].includes(contract.status);
+                  const paymentStatus = contract.payment_status || 'unpaid';
+                  return (
+                    <article key={contract.id} className="space-y-3 p-4 sm:p-5">
+                      <div className="flex flex-col gap-3 xl:flex-row xl:items-start">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-black text-slate-900">{contract.contract_number}</p>
+                            <span className={`rounded-lg px-2.5 py-1 text-[9px] font-black uppercase ${paymentStatus === 'paid' ? 'bg-emerald-50 text-emerald-700' : paymentStatus === 'partially_paid' ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>
+                              {paymentStatus === 'paid' ? 'Fully paid' : paymentStatus === 'partially_paid' ? 'Partially paid' : 'Unpaid'}
+                            </span>
+                            <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-[9px] font-black uppercase text-slate-600">{contract.status}</span>
+                          </div>
+                          <p className="mt-1 text-xs text-slate-500">{contract.start_date} to {contract.end_date}</p>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 xl:min-w-[420px]">
+                          <LedgerAmount label="Contract value" value={contract.total_value} />
+                          <LedgerAmount label="Received" value={contract.amount_paid} />
+                          <LedgerAmount label="Outstanding" value={contract.balance_due} emphasis />
+                        </div>
+                      </div>
+                      {pending && (
+                        <p className="rounded-xl bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-800">
+                          A payment of {money(pending.amount)} is awaiting Pixiu Tech verification. It is not included in the received total until verified.
+                        </p>
+                      )}
+                      {Number(contract.open_invoice_count || 0) > 0 && balance > 0 && (
+                        <p className="rounded-xl bg-slate-50 px-3 py-2 text-[11px] text-slate-600">
+                          This contract has {contract.open_invoice_count} open invoice(s). Record payments against the invoice below so the invoice and contract balances remain aligned.
+                        </p>
+                      )}
+                      <div className="flex flex-wrap gap-2">
+                        {balance > 0 && payable && !pending && Number(contract.open_invoice_count || 0) === 0 && (
+                          <button type="button" onClick={() => openContractPayment(contract)} disabled={busy} className="rounded-xl bg-[#236F69] px-3.5 py-2 text-[10px] font-black text-white disabled:opacity-50">
+                            {isAdmin ? 'Record payment & issue receipt' : "I've paid"}
+                          </button>
+                        )}
+                        {isAdmin && contract.status === 'draft' && (
+                          <button type="button" onClick={() => runAction(async () => {
+                            await request(`/contracts/${encodeURIComponent(contract.id)}`, 'PATCH', { status: 'active' });
+                            await load();
+                          })} disabled={busy} className="rounded-xl border border-emerald-200 px-3.5 py-2 text-[10px] font-black text-emerald-700 disabled:opacity-50">
+                            Mark signed & activate
+                          </button>
+                        )}
+                      </div>
+                    </article>
+                  );
+                })}
               </div>
             </section>
           )}
@@ -552,12 +650,15 @@ export default function BillingCenter() {
                 {verifiedPayments.map(payment => (
                   <div key={payment.id} className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center">
                     <div className="min-w-0 flex-1">
-                      <p className="font-black text-slate-800">{payment.invoice_number || payment.invoice}</p>
+                      <p className="font-black text-slate-800">{payment.contract_number || payment.invoice_number || payment.contract || payment.invoice}</p>
                       <p className="mt-1 text-xs text-slate-500">{payment.payment_date ? String(payment.payment_date).slice(0, 10) : '—'} · {payment.method} · {payment.transaction_reference || 'No reference'}</p>
                     </div>
                     <div className="flex items-center gap-3">
-                      <p className="font-black">{money(payment.amount)}</p>
-                      {payment.receipt_number && <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-[9px] font-black uppercase text-emerald-700">{payment.receipt_number}</span>}
+                      <div className="text-right">
+                        <p className="font-black">{money(payment.amount)}</p>
+                        {payment.receipt_number && <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-[9px] font-black uppercase text-emerald-700">{payment.receipt_number}</span>}
+                        {payment.receipt_balance_due_snapshot !== null && payment.receipt_balance_due_snapshot !== undefined && <p className="mt-1 text-[10px] text-slate-500">Balance after receipt: {money(payment.receipt_balance_due_snapshot)}</p>}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -565,6 +666,35 @@ export default function BillingCenter() {
             )}
           </section>
         </>
+      )}
+
+      {paymentContract && (
+        <div className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/55 p-3 sm:items-center sm:p-5">
+          <form onSubmit={submitContractPayment} className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl sm:p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[.16em] text-[#236F69]">Contract payment</p>
+                <h2 className="mt-1 text-xl font-black text-slate-900">{paymentContract.contract_number}</h2>
+                <p className="mt-1 text-xs leading-relaxed text-slate-500">Contract value {money(paymentContract.total_value)} · Received {money(paymentContract.amount_paid)} · Outstanding {money(paymentContract.balance_due)}.</p>
+                <p className="mt-1 text-xs text-slate-500">{isAdmin ? 'The payment will be recorded immediately and a receipt will be issued.' : 'Your submission remains under review until Pixiu Tech verifies the transaction.'}</p>
+              </div>
+              <button type="button" onClick={() => setPaymentContract(null)} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100" aria-label="Close contract payment form"><X size={16} /></button>
+            </div>
+            <div className="mt-5 space-y-3">
+              <label className="block"><span className="mb-1.5 block text-[9px] font-black uppercase tracking-wide text-slate-400">Amount paid</span><input className={fieldClass} type="number" min="0.01" max={paymentContract.balance_due} step="0.01" value={paymentForm.amount} onChange={e => setPaymentForm(v => ({ ...v, amount: e.target.value }))} required /></label>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block"><span className="mb-1.5 block text-[9px] font-black uppercase tracking-wide text-slate-400">Method</span><select className={fieldClass} value={paymentForm.method} onChange={e => setPaymentForm(v => ({ ...v, method: e.target.value }))}><option value="bank_transfer">Bank transfer</option><option value="upi">UPI</option><option value="card">Card</option><option value="cash">Cash</option><option value="other">Other</option></select></label>
+                <label className="block"><span className="mb-1.5 block text-[9px] font-black uppercase tracking-wide text-slate-400">Payment date</span><input className={fieldClass} type="date" value={paymentForm.payment_date} onChange={e => setPaymentForm(v => ({ ...v, payment_date: e.target.value }))} required /></label>
+              </div>
+              <label className="block"><span className="mb-1.5 block text-[9px] font-black uppercase tracking-wide text-slate-400">UTR / transaction reference {isAdmin ? '(optional)' : '(required)'}</span><input className={fieldClass} value={paymentForm.transaction_reference} onChange={e => setPaymentForm(v => ({ ...v, transaction_reference: e.target.value }))} placeholder="Enter UTR / bank reference" required={!isAdmin} /></label>
+              <label className="block"><span className="mb-1.5 block text-[9px] font-black uppercase tracking-wide text-slate-400">Note (optional)</span><textarea className={`${fieldClass} min-h-20 py-3`} value={paymentForm.notes} onChange={e => setPaymentForm(v => ({ ...v, notes: e.target.value }))} /></label>
+              <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
+                <button type="button" onClick={() => setPaymentContract(null)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-black text-slate-600">Cancel</button>
+                <button disabled={busy} className="rounded-xl bg-[#236F69] px-5 py-2.5 text-xs font-black text-white disabled:opacity-50">{busy ? 'Saving…' : isAdmin ? 'Record payment & issue receipt' : 'Submit for verification'}</button>
+              </div>
+            </div>
+          </form>
+        </div>
       )}
 
       {paymentInvoice && (
@@ -594,6 +724,15 @@ export default function BillingCenter() {
           </form>
         </div>
       )}
+    </div>
+  );
+}
+
+function LedgerAmount({ label, value, emphasis = false }) {
+  return (
+    <div className={`rounded-xl border p-3 ${emphasis ? 'border-amber-200 bg-amber-50' : 'border-slate-100 bg-slate-50'}`}>
+      <p className="text-[9px] font-black uppercase tracking-[.08em] text-slate-400">{label}</p>
+      <p className={`mt-1 text-sm font-black ${emphasis ? 'text-amber-800' : 'text-slate-800'}`}>{money(value)}</p>
     </div>
   );
 }

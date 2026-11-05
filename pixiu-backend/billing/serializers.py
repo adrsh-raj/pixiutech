@@ -2,7 +2,9 @@ from rest_framework import serializers
 
 from academics.services import accessible_school_queryset
 from django.conf import settings
-from .models import Invoice, InvoiceLineItem, Payment, Receipt
+from decimal import Decimal
+
+from .models import Invoice, InvoiceLineItem, Payment, PaymentMethod, Receipt, SchoolContract
 
 
 class InvoiceLineItemSerializer(serializers.ModelSerializer):
@@ -97,24 +99,127 @@ class InvoiceLineItemWriteSerializer(serializers.ModelSerializer):
         read_only_fields = ["id"]
 
 
-class PaymentRecordSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Payment
-        fields = ["invoice", "amount", "method", "payment_date", "transaction_reference", "notes"]
+class PaymentRecordSerializer(serializers.Serializer):
+    invoice = serializers.PrimaryKeyRelatedField(queryset=Invoice.objects.all(), required=False, allow_null=True)
+    contract = serializers.PrimaryKeyRelatedField(queryset=SchoolContract.objects.all(), required=False, allow_null=True)
+    amount = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal("0.01"))
+    method = serializers.ChoiceField(choices=PaymentMethod.choices)
+    payment_date = serializers.DateTimeField()
+    transaction_reference = serializers.CharField(max_length=120, required=False, allow_blank=True, trim_whitespace=True)
+    notes = serializers.CharField(required=False, allow_blank=True, trim_whitespace=True)
+
+    def validate(self, attrs):
+        invoice = attrs.get("invoice")
+        contract = attrs.get("contract")
+        if (invoice is None) == (contract is None):
+            raise serializers.ValidationError("Provide exactly one of invoice or contract.")
+        reference = attrs.get("transaction_reference", "").strip()
+        if reference and Payment.objects.filter(
+            method=attrs["method"],
+            transaction_reference__iexact=reference,
+        ).exists():
+            raise serializers.ValidationError({
+                "transaction_reference": "This transaction reference has already been recorded."
+            })
+        return attrs
 
 
 class PaymentSerializer(serializers.ModelSerializer):
-    receipt_number = serializers.CharField(source="receipt.receipt_number", read_only=True)
-    invoice_number = serializers.CharField(source="invoice.invoice_number", read_only=True)
-    school_code = serializers.CharField(source="invoice.school.school_code", read_only=True)
+    invoice_number = serializers.SerializerMethodField()
+    contract_id = serializers.SerializerMethodField()
+    contract_number = serializers.SerializerMethodField()
+    school_id = serializers.SerializerMethodField()
+    school_code = serializers.SerializerMethodField()
+    school_name = serializers.SerializerMethodField()
+    receipt_number = serializers.SerializerMethodField()
+    receipt_total_amount_snapshot = serializers.SerializerMethodField()
+    receipt_amount_paid_snapshot = serializers.SerializerMethodField()
+    receipt_balance_due_snapshot = serializers.SerializerMethodField()
+
     class Meta:
         model = Payment
-        fields = ["id", "invoice", "invoice_number", "school_code", "amount", "method", "status", "transaction_reference", "payment_date", "notes", "recorded_by", "created_at", "receipt_number"]
-        read_only_fields = ["id", "status", "recorded_by", "created_at", "receipt_number", "invoice_number", "school_code"]
+        fields = [
+            "id", "invoice", "invoice_number", "contract", "contract_id", "contract_number",
+            "school_id", "school_code", "school_name", "amount", "method", "status",
+            "transaction_reference", "payment_date", "notes", "recorded_by", "created_at",
+            "receipt_number", "receipt_total_amount_snapshot", "receipt_amount_paid_snapshot",
+            "receipt_balance_due_snapshot",
+        ]
+        read_only_fields = fields
+
+    @staticmethod
+    def _receipt(obj):
+        try:
+            return obj.receipt
+        except Receipt.DoesNotExist:
+            return None
+
+    @staticmethod
+    def _school(obj):
+        if obj.invoice_id:
+            return obj.invoice.school
+        if obj.contract_id:
+            return obj.contract.school
+        return None
+
+    def get_invoice_number(self, obj):
+        return obj.invoice.invoice_number if obj.invoice_id else None
+
+    def get_contract_id(self, obj):
+        if obj.contract_id:
+            return str(obj.contract_id)
+        if obj.invoice_id and obj.invoice.contract_id:
+            return str(obj.invoice.contract_id)
+        return None
+
+    def get_contract_number(self, obj):
+        if obj.contract_id:
+            return obj.contract.contract_number
+        if obj.invoice_id and obj.invoice.contract_id:
+            return obj.invoice.contract.contract_number
+        return None
+
+    def get_school_id(self, obj):
+        school = self._school(obj)
+        return str(school.id) if school else None
+
+    def get_school_code(self, obj):
+        school = self._school(obj)
+        return school.school_code if school else None
+
+    def get_school_name(self, obj):
+        school = self._school(obj)
+        return school.name if school else None
+
+    def get_receipt_number(self, obj):
+        receipt = self._receipt(obj)
+        return receipt.receipt_number if receipt else None
+
+    def get_receipt_total_amount_snapshot(self, obj):
+        receipt = self._receipt(obj)
+        return receipt.total_amount_snapshot if receipt else None
+
+    def get_receipt_amount_paid_snapshot(self, obj):
+        receipt = self._receipt(obj)
+        return receipt.amount_paid_snapshot if receipt else None
+
+    def get_receipt_balance_due_snapshot(self, obj):
+        receipt = self._receipt(obj)
+        return receipt.balance_due_snapshot if receipt else None
 
 
 class ReceiptSerializer(serializers.ModelSerializer):
+    payment_amount = serializers.DecimalField(source="payment.amount", max_digits=12, decimal_places=2, read_only=True)
+    payment_method = serializers.CharField(source="payment.method", read_only=True)
+    payment_date = serializers.DateTimeField(source="payment.payment_date", read_only=True)
+    transaction_reference = serializers.CharField(source="payment.transaction_reference", read_only=True)
+
     class Meta:
         model = Receipt
-        fields = ["id", "receipt_number", "payment", "issued_at", "issued_by"]
+        fields = [
+            "id", "receipt_number", "payment", "issued_at", "issued_by",
+            "school_name_snapshot", "invoice_number_snapshot", "contract_number_snapshot",
+            "total_amount_snapshot", "amount_paid_snapshot", "balance_due_snapshot",
+            "payment_amount", "payment_method", "payment_date", "transaction_reference",
+        ]
         read_only_fields = fields
