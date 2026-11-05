@@ -44,10 +44,9 @@ class ContractPaymentLedgerApiTests(APITestCase):
         )
 
     def get_contract(self):
-        response = self.client.get("/api/v1/contracts")
+        response = self.client.get(f"/api/v1/contracts/{self.contract.pk}")
         self.assertEqual(response.status_code, 200, response.data)
-        rows = response.data if isinstance(response.data, list) else response.data["results"]
-        return next(row for row in rows if row["id"] == str(self.contract.pk))
+        return response.data
 
     def test_partial_payment_generates_receipt_and_preserves_historical_balance(self):
         self.client.force_authenticate(self.admin)

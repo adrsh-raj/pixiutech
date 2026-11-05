@@ -220,9 +220,10 @@ def record_payment(
     school = None
 
     if invoice is not None:
-        locked_invoice = Invoice.objects.select_for_update().select_related(
-            "school", "contract__school"
-        ).get(pk=invoice.pk)
+        # Avoid SELECT FOR UPDATE across nullable select_related joins (PostgreSQL
+        # rejects locking the nullable side of an outer join). Lock the invoice row
+        # only; lock its contract explicitly below when one is linked.
+        locked_invoice = Invoice.objects.select_for_update().get(pk=invoice.pk)
         if locked_invoice.status == BillingStatus.VOID:
             raise ValidationError("A void invoice cannot receive a payment.")
         recalculate_invoice(locked_invoice)
@@ -349,9 +350,10 @@ def record_payment(
 
 @transaction.atomic
 def verify_pending_payment(*, payment: Payment, verified_by):
-    locked_payment = Payment.objects.select_for_update().select_related(
-        "invoice__school", "invoice__contract__school", "contract__school"
-    ).get(pk=payment.pk)
+    # The invoice and contract FKs are nullable, so do not combine them with
+    # SELECT FOR UPDATE joins. Lock the payment row, then lock the actual target
+    # rows explicitly in the branches below.
+    locked_payment = Payment.objects.select_for_update().get(pk=payment.pk)
     if locked_payment.status != PaymentStatus.PENDING:
         raise ValidationError("Only pending payments can be verified.")
 
@@ -361,9 +363,7 @@ def verify_pending_payment(*, payment: Payment, verified_by):
     outstanding = Decimal("0.00")
 
     if locked_payment.invoice_id:
-        invoice = Invoice.objects.select_for_update().select_related(
-            "school", "contract__school"
-        ).get(pk=locked_payment.invoice_id)
+        invoice = Invoice.objects.select_for_update().get(pk=locked_payment.invoice_id)
         if invoice.status == BillingStatus.VOID:
             raise ValidationError("A void invoice payment cannot be verified.")
         recalculate_invoice(invoice)

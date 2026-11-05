@@ -67,7 +67,9 @@ class SchoolContractSerializer(serializers.ModelSerializer):
         school = attrs.get("school", getattr(self.instance, "school", None))
         if not school or not accessible_school_queryset(user).filter(pk=school.pk).exists():
             raise serializers.ValidationError({"school": "You cannot manage contracts for this school."})
-        if attrs.get("start_date", getattr(self.instance, "start_date", None)) and attrs.get("end_date", getattr(self.instance, "end_date", None)) and attrs.get("end_date") < attrs.get("start_date"):
+        effective_start = attrs.get("start_date", getattr(self.instance, "start_date", None))
+        effective_end = attrs.get("end_date", getattr(self.instance, "end_date", None))
+        if effective_start and effective_end and effective_end < effective_start:
             raise serializers.ValidationError("Contract end date cannot be before start date.")
         if self.instance:
             has_transactions = Payment.objects.filter(
