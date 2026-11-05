@@ -6,9 +6,7 @@ const VERIFIED_BLOCK_ALIASES = Object.freeze({
   // io_tone -> tone_play
   io_tone: "tone_play",
   // io_notone -> tone_stop
-  io_notone: "tone_stop",
-  // lcd_setup -> lcd_clear (both inject Wire.h, LiquidCrystal_I2C.h, lcd.init(), lcd.backlight() in setup)
-  lcd_setup: "lcd_clear"
+  io_notone: "tone_stop"
 });
 const UNKNOWN_UNSUPPORTED_BLOCKS = /* @__PURE__ */ new Set([
   "max6675_read",
@@ -67,6 +65,14 @@ ${rootBlockMatch[1].trim()}
     isHealed = true;
     actions.push("HEALED_TRUNCATED_TAGS");
     xml = xml.replace(/<[^>]*$/, "").trim();
+    let stripped = true;
+    while (stripped) {
+      const prev = xml;
+      xml = xml.replace(/<next>\s*$/i, "");
+      xml = xml.replace(/<(?:value|statement)[^>]*>\s*$/i, "");
+      stripped = xml !== prev;
+    }
+    xml = xml.trim();
     const tagMatches = xml.match(/<(\/?[a-zA-Z0-9_-]+)[^>]*>/g) || [];
     const openStack = [];
     const voidTags = /* @__PURE__ */ new Set(["shadow"]);
@@ -91,6 +97,46 @@ ${rootBlockMatch[1].trim()}
     if (!xml.endsWith("</xml>")) {
       xml += "</xml>";
     }
+  }
+  let parseValid = true;
+  let parseErrorMsg = "";
+  try {
+    const openTags = [];
+    const tags = xml.match(/<(\/?[a-zA-Z0-9_-]+)[^>]*>/g) || [];
+    for (const t of tags) {
+      const m = t.match(/<(\/?)([a-zA-Z0-9_-]+)/);
+      if (!m) continue;
+      const isClose = m[1] === "/";
+      const name = m[2].toLowerCase();
+      if (t.endsWith("/>")) continue;
+      if (isClose) {
+        const popped = openTags.pop();
+        if (popped !== name) {
+          parseValid = false;
+          parseErrorMsg = `Mismatched tag: expected </${popped}>, found </${name}>`;
+          break;
+        }
+      } else {
+        openTags.push(name);
+      }
+    }
+    if (openTags.length > 0) {
+      parseValid = false;
+      parseErrorMsg = `Unclosed tags remaining: ${openTags.join(", ")}`;
+    }
+  } catch (err) {
+    parseValid = false;
+    parseErrorMsg = err instanceof Error ? err.message : String(err);
+  }
+  if (!parseValid) {
+    return {
+      repairedXml: null,
+      success: false,
+      isHealed,
+      actions,
+      unsupportedBlocks: [],
+      error: `XML healing failed: ${parseErrorMsg}`
+    };
   }
   if (!xml.includes('xmlns="https://developers.google.com/blockly/xml"')) {
     xml = xml.replace(/<xml(?:\s+[^>]*)?>/i, '<xml xmlns="https://developers.google.com/blockly/xml">');
@@ -132,11 +178,11 @@ function wrapCopilotPrompt(prompt, options = {}) {
   }
   if (options.hasInductiveLoad) {
     parts.push(
-      "[HARDWARE SAFETY GUARDRAIL: ATmega328P pins cannot supply motor/pump/relay current (>20mA). All inductive loads must use an external driver (transistor/MOSFET/relay) and a 1N4007 flyback protection diode across the coil.]"
+      "[HARDWARE SAFETY GUARDRAIL: Inductive Load Protection (ATmega328P Datasheet Sec. 32): MCU pins cannot supply coil current (>20mA recommended continuous, 40mA absolute maximum). An external driver (BJT/MOSFET/relay module) is mandatory. Select flyback protection based on load switching frequency:\n1) Low-frequency switching (<100Hz, DC relay coils): Standard silicon rectifier (1N4007, 1A/1000V, trr \u2248 30\xB5s) is acceptable.\n2) High-frequency PWM motor/fan control (Uno PWM 490/980Hz): Use a fast-recovery or Schottky diode (1N5819 / SS14 / 1N5822, trr < 10ns, VF \u2264 0.45V) to eliminate reverse-recovery heating, shoot-through spikes, and driver stress.\n3) Micro servos (SG90): Internal H-bridge; control line draws <1mA logic pulses; provide external 5V/GND rail to prevent MCU brownout when stall current exceeds 20mA.]"
     );
   } else if (options.domain === "circuit") {
     parts.push(
-      "[CIRCUIT GUARDRAIL: Ensure ATmega328P pin continuous currents do not exceed 20mA.]"
+      "[CIRCUIT GUARDRAIL: ATmega328P continuous DC current limit is 20mA per I/O pin (200mA total VCC/GND limit). Use series current-limiting resistors for all LEDs.]"
     );
   }
   parts.push(prompt.trim());

@@ -90,13 +90,18 @@ export async function handleCopilotRequest(
     }
   }
 
-  // 2. Wrap prompt with pedagogical & hardware safety guardrails
+  // 2. Derive domain dynamically from task route and prompt
+  const domain: "math" | "circuit" | "general" =
+    route.route === "math_teaching" ? "math" : "circuit"
+  const hasInductiveLoad =
+    domain === "circuit" && /\b(motor|fan|relay|pump|solenoid|coil)\b/i.test(input.prompt)
+
   const wrappedPrompt = wrapCopilotPrompt(input.prompt, {
-    domain: "circuit",
-    hasInductiveLoad: /motor|servo|fan|relay|pump|solenoid/i.test(input.prompt),
+    domain,
+    hasInductiveLoad,
   })
 
-  // 3. Inference execution via ModelAdapter
+  // 3. Inference execution via ModelAdapter (defaults to Checkpoint-400 HTTP endpoint)
   const adapter = input.modelAdapter || createBaselineModelAdapter()
   const modelReq: CopilotModelRequest = {
     requestId: input.requestId,
@@ -121,12 +126,27 @@ export async function handleCopilotRequest(
       repairResult: null,
       gateResult: null,
       proposal: null,
-      replyText: `Inference error: ${modelRes.error?.message || "Unknown error"}`,
+      replyText: `Inference endpoint error (${adapter.constructor.name}): ${modelRes.error?.message || "Unknown error"}`,
       error: modelRes.error?.code || "INFERENCE_FAILED",
     }
   }
 
-  // 4. Strict Schema Parsing
+  // 4. Handle Math Teaching Pedagogy Route
+  if (route.route === "math_teaching") {
+    return {
+      requestId: input.requestId,
+      success: true,
+      route,
+      modelResponse: modelRes,
+      parseResult: { valid: true, payload: null, errors: [], rawTrimmed: modelRes.rawOutput.slice(0, 200) },
+      repairResult: null,
+      gateResult: null,
+      proposal: null,
+      replyText: modelRes.rawOutput,
+    }
+  }
+
+  // 5. Strict Schema Parsing for Circuit Proposals
   const parsed = parseProposalPayload(modelRes.rawOutput)
   if (!parsed.valid || !parsed.payload) {
     return {

@@ -50,6 +50,7 @@ import {
   diagnoseCircuit,
   type CircuitHealthReport,
 } from "@/lib/circuit-doctor"
+import { handleCopilotRequest } from "@/lib/ai/copilot/request-handler"
 import { PIXIU_COMPONENTS_DATASET } from "@/lib/ai/pixiu-components-dataset"
 import { TEMPLATES } from "@/lib/templates"
 import { isPixiuAiCopilotEnabled } from "@/lib/feature-flags"
@@ -534,69 +535,62 @@ export function CircuitCopilotChat({
       setMessages((prev) => [...prev, userMsg])
       if (!customText) setInputValue("")
 
-      // Process intent
-      setTimeout(() => {
-        const intent = parseUserIntent(
-          text,
-          copilotAction.currentHash,
-          currentCircuit,
-          pinStates,
-          runtime,
-        )
-
-        if (intent.kind === "circuit_proposal" && intent.proposal) {
-          // Propose and stage proposal
-          copilotAction.proposeAction(intent.proposal)
-          copilotAction.stageProposal(intent.proposal)
-
-          const aiMsg: ChatMessage = {
-            id: `msg-ai-${Date.now()}`,
-            sender: "ai",
-            text: intent.replyText,
-            timestamp: Date.now(),
-            proposal: intent.proposal,
-            isStaged: true,
-          }
-          setMessages((prev) => [...prev, aiMsg])
-        } else if (intent.kind === "undo") {
-          copilotAction.undoAction()
-          const aiMsg: ChatMessage = {
-            id: `msg-ai-${Date.now()}`,
-            sender: "ai",
-            text: intent.replyText,
-            timestamp: Date.now(),
-          }
-          setMessages((prev) => [...prev, aiMsg])
-        } else if (intent.kind === "doctor_audit") {
-          const aiMsg: ChatMessage = {
-            id: `msg-ai-${Date.now()}`,
-            sender: "ai",
-            text: intent.replyText,
-            timestamp: Date.now(),
-            doctorReport,
-          }
-          setMessages((prev) => [...prev, aiMsg])
-        } else if (intent.kind === "explain_telemetry") {
-          const aiMsg: ChatMessage = {
-            id: `msg-ai-${Date.now()}`,
-            sender: "ai",
-            text: `${intent.replyText}\n\`\`\`\n${telemetry.compactPromptString}\n\`\`\``,
-            timestamp: Date.now(),
-            telemetrySummary: telemetry.compactPromptString,
-          }
-          setMessages((prev) => [...prev, aiMsg])
-        } else {
-          const aiMsg: ChatMessage = {
-            id: `msg-ai-${Date.now()}`,
-            sender: "ai",
-            text: intent.replyText,
-            timestamp: Date.now(),
-          }
-          setMessages((prev) => [...prev, aiMsg])
+      // Local undo command
+      if (text.toLowerCase() === "undo") {
+        copilotAction.undoAction()
+        const aiMsg: ChatMessage = {
+          id: `msg-ai-${Date.now()}`,
+          sender: "ai",
+          text: "↩️ Undone last AI action and restored previous canvas state.",
+          timestamp: Date.now(),
         }
-      }, 250)
+        setMessages((prev) => [...prev, aiMsg])
+        return
+      }
+
+      // Live Application Call Chain: Dispatch directly to handleCopilotRequest
+      handleCopilotRequest({
+        requestId: `req-ui-${Date.now()}`,
+        prompt: text,
+        targetBoard: activeBoard || "arduino-uno",
+        currentRevisionHash: copilotAction.currentHash,
+        currentCircuit,
+        currentBlocklyXml,
+      })
+        .then((copilotRes) => {
+          if (copilotRes.success && copilotRes.proposal) {
+            copilotAction.proposeAction(copilotRes.proposal)
+            copilotAction.stageProposal(copilotRes.proposal)
+            const aiMsg: ChatMessage = {
+              id: `msg-ai-${Date.now()}`,
+              sender: "ai",
+              text: copilotRes.replyText,
+              timestamp: Date.now(),
+              proposal: copilotRes.proposal,
+              isStaged: true,
+            }
+            setMessages((prev) => [...prev, aiMsg])
+          } else {
+            const aiMsg: ChatMessage = {
+              id: `msg-ai-${Date.now()}`,
+              sender: "ai",
+              text: copilotRes.replyText || `Request rejected: ${copilotRes.error || "Unknown error"}`,
+              timestamp: Date.now(),
+            }
+            setMessages((prev) => [...prev, aiMsg])
+          }
+        })
+        .catch((err) => {
+          const aiMsg: ChatMessage = {
+            id: `msg-ai-${Date.now()}`,
+            sender: "ai",
+            text: `⚠️ **Inference Provider Error:** ${err instanceof Error ? err.message : String(err)}`,
+            timestamp: Date.now(),
+          }
+          setMessages((prev) => [...prev, aiMsg])
+        })
     },
-    [inputValue, copilotAction, currentCircuit, pinStates, runtime, doctorReport, telemetry],
+    [inputValue, copilotAction, currentCircuit, activeBoard, currentBlocklyXml],
   )
 
   // Staged Preview Status

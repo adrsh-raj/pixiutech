@@ -1097,12 +1097,19 @@ export class DeterministicStubAdapter implements ModelAdapter {
 
 /**
  * Factory function to create the active baseline model adapter.
+ * Staging Invariant: Defaults to HttpBaselineModelAdapter configured for the real
+ * Checkpoint-400 inference endpoint. DeterministicStubAdapter is restricted strictly to tests.
  */
 export function createBaselineModelAdapter(
   config?: Partial<HttpAdapterConfig> & { mode?: "stub" | "http" }
 ): ModelAdapter {
-  if (config?.mode === "http") {
-    return new HttpBaselineModelAdapter(config)
+  if (config?.mode === "stub") {
+    return new DeterministicStubAdapter(config?.defaultTimeoutMs)
   }
-  return new DeterministicStubAdapter(config?.defaultTimeoutMs)
+  return new HttpBaselineModelAdapter({
+    baseUrl: config?.baseUrl || process.env.PIXIUMIND_ENDPOINT_URL || "http://localhost:8000/v1",
+    model: config?.model || process.env.PIXIUMIND_MODEL_ID || "pixiumind-14b-checkpoint-400",
+    apiKey: config?.apiKey,
+    defaultTimeoutMs: config?.defaultTimeoutMs,
+  })
 }

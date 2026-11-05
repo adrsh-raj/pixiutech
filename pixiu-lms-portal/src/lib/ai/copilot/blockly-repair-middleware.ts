@@ -30,8 +30,6 @@ export const VERIFIED_BLOCK_ALIASES: Readonly<Record<string, string>> = Object.f
   io_tone: "tone_play",
   // io_notone -> tone_stop
   io_notone: "tone_stop",
-  // lcd_setup -> lcd_clear (both inject Wire.h, LiquidCrystal_I2C.h, lcd.init(), lcd.backlight() in setup)
-  lcd_setup: "lcd_clear",
 })
 
 // Unsupported peripherals that MUST be rejected safely rather than corrupted
@@ -103,6 +101,16 @@ export function repairBlocklyXml(rawText: string): RepairResult {
     // Strip trailing incomplete tag fragment (e.g., `<block type="io_d`)
     xml = xml.replace(/<[^>]*$/, "").trim()
 
+    // Strip trailing empty container tags that require block children
+    let stripped = true
+    while (stripped) {
+      const prev = xml
+      xml = xml.replace(/<next>\s*$/i, "")
+      xml = xml.replace(/<(?:value|statement)[^>]*>\s*$/i, "")
+      stripped = xml !== prev
+    }
+    xml = xml.trim()
+
     // Match all tag tokens
     const tagMatches = xml.match(/<(\/?[a-zA-Z0-9_-]+)[^>]*>/g) || []
     const openStack: string[] = []
@@ -125,12 +133,55 @@ export function repairBlocklyXml(rawText: string): RepairResult {
       }
     }
 
-    // Close remaining open tags in reverse
+    // Close remaining open tags in reverse LIFO order
     for (let i = openStack.length - 1; i >= 0; i--) {
       xml += `</${openStack[i]}>`
     }
     if (!xml.endsWith("</xml>")) {
       xml += "</xml>"
+    }
+  }
+
+  // Verify XML well-formedness
+  let parseValid = true
+  let parseErrorMsg = ""
+  try {
+    const openTags: string[] = []
+    const tags = xml.match(/<(\/?[a-zA-Z0-9_-]+)[^>]*>/g) || []
+    for (const t of tags) {
+      const m = t.match(/<(\/?)([a-zA-Z0-9_-]+)/)
+      if (!m) continue
+      const isClose = m[1] === "/"
+      const name = m[2].toLowerCase()
+      if (t.endsWith("/>")) continue
+      if (isClose) {
+        const popped = openTags.pop()
+        if (popped !== name) {
+          parseValid = false
+          parseErrorMsg = `Mismatched tag: expected </${popped}>, found </${name}>`
+          break
+        }
+      } else {
+        openTags.push(name)
+      }
+    }
+    if (openTags.length > 0) {
+      parseValid = false
+      parseErrorMsg = `Unclosed tags remaining: ${openTags.join(", ")}`
+    }
+  } catch (err) {
+    parseValid = false
+    parseErrorMsg = err instanceof Error ? err.message : String(err)
+  }
+
+  if (!parseValid) {
+    return {
+      repairedXml: null,
+      success: false,
+      isHealed,
+      actions,
+      unsupportedBlocks: [],
+      error: `XML healing failed: ${parseErrorMsg}`,
     }
   }
 
@@ -193,11 +244,14 @@ export function wrapCopilotPrompt(
 
   if (options.hasInductiveLoad) {
     parts.push(
-      "[HARDWARE SAFETY GUARDRAIL: ATmega328P pins cannot supply motor/pump/relay current (>20mA). All inductive loads must use an external driver (transistor/MOSFET/relay) and a 1N4007 flyback protection diode across the coil.]"
+      "[HARDWARE SAFETY GUARDRAIL: Inductive Load Protection (ATmega328P Datasheet Sec. 32): MCU pins cannot supply coil current (>20mA recommended continuous, 40mA absolute maximum). An external driver (BJT/MOSFET/relay module) is mandatory. Select flyback protection based on load switching frequency:\n" +
+      "1) Low-frequency switching (<100Hz, DC relay coils): Standard silicon rectifier (1N4007, 1A/1000V, trr ≈ 30µs) is acceptable.\n" +
+      "2) High-frequency PWM motor/fan control (Uno PWM 490/980Hz): Use a fast-recovery or Schottky diode (1N5819 / SS14 / 1N5822, trr < 10ns, VF ≤ 0.45V) to eliminate reverse-recovery heating, shoot-through spikes, and driver stress.\n" +
+      "3) Micro servos (SG90): Internal H-bridge; control line draws <1mA logic pulses; provide external 5V/GND rail to prevent MCU brownout when stall current exceeds 20mA.]"
     )
   } else if (options.domain === "circuit") {
     parts.push(
-      "[CIRCUIT GUARDRAIL: Ensure ATmega328P pin continuous currents do not exceed 20mA.]"
+      "[CIRCUIT GUARDRAIL: ATmega328P continuous DC current limit is 20mA per I/O pin (200mA total VCC/GND limit). Use series current-limiting resistors for all LEDs.]"
     )
   }
 

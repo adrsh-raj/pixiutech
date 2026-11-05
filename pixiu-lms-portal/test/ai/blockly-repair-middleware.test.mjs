@@ -46,21 +46,23 @@ test('Blockly Repair Middleware Suite', async (t) => {
     assert.ok(res.actions.includes('INJECTED_GOOGLE_XML_NAMESPACE'))
   })
 
-  await t.test('Case 4: Normalizes verified block aliases', () => {
+  await t.test('Case 4: Normalizes verified block aliases and retains native lcd_setup', () => {
     const withAliases = `<xml xmlns="https://developers.google.com/blockly/xml">
   <block type="arduino_program">
     <statement name="LOOP">
       <block type="pir_motion_detected"><field name="PIN">7</field></block>
-      <block type="lcd_setup"><field name="ADDR">0x27</field></block>
+      <block type="io_tone"><field name="PIN">8</field></block>
       <block type="actuator_servo_write"><field name="PIN">9</field></block>
+      <block type="lcd_setup"></block>
     </statement>
   </block>
 </xml>`
     const res = repairBlocklyXml(withAliases)
     assert.equal(res.success, true)
     assert.ok(res.repairedXml.includes('type="pir_motion"'))
-    assert.ok(res.repairedXml.includes('type="lcd_clear"'))
+    assert.ok(res.repairedXml.includes('type="tone_play"'))
     assert.ok(res.repairedXml.includes('type="servo_write"'))
+    assert.ok(res.repairedXml.includes('type="lcd_setup"'), 'lcd_setup must remain native and NOT be aliased to lcd_clear')
   })
 
   await t.test('Case 5: Safely rejects unsupported peripherals', () => {
@@ -91,6 +93,8 @@ test('Blockly Repair Middleware Suite', async (t) => {
 
     const motorPrompt = wrapCopilotPrompt('Drive DC motor at pin 9', { domain: 'circuit', hasInductiveLoad: true })
     assert.ok(motorPrompt.includes('HARDWARE SAFETY GUARDRAIL'))
-    assert.ok(motorPrompt.includes('1N4007 flyback protection diode'))
+    assert.ok(motorPrompt.includes('ATmega328P Datasheet Sec. 32'))
+    assert.ok(motorPrompt.includes('1N5819'))
+    assert.ok(motorPrompt.includes('1N4007'))
   })
 })

@@ -13,7 +13,7 @@
 
 import type { SupportedTaskFamily } from "./proposal-schema"
 
-export type RouteDecision = SupportedTaskFamily | "unsupported" | "needs_clarification"
+export type RouteDecision = SupportedTaskFamily | "math_teaching" | "unsupported" | "needs_clarification"
 
 export interface TaskRouteResult {
   route: RouteDecision
@@ -196,7 +196,24 @@ export function routeUserRequest(
     }
   }
 
-  // 4. If prompt is too vague (e.g., "help", "circuit bana do", "make a project")
+  // 4. Match Mathematics Tutoring & Scaffolding
+  const mathMatches = [
+    /\b(math|algebra|equation|solve|calculate|theorem|fraction|pythagor|quadratic|triangle|geometry|derivation)\b/i,
+  ]
+  const isMath = mathMatches.some((re) => re.test(norm))
+  if (isMath && !isLed && !isLdr && !isServo && !isUltrasonic) {
+    return {
+      route: "math_teaching",
+      taskType: "math_teaching" as any,
+      confidence: 0.95,
+      normalizedGoal: "Mathematics tutoring and concept scaffolding",
+      targetBoard,
+      missingContext: [],
+      riskFlags: [],
+    }
+  }
+
+  // 5. If prompt is too vague (e.g., "help", "circuit bana do", "make a project")
   if (norm.length < 15 || /^(help|circuit|bana do|project|make something|hi|hello)$/i.test(norm)) {
     return {
       route: "needs_clarification",

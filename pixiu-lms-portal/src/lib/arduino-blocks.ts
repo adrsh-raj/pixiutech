@@ -252,6 +252,16 @@ export function defineArduinoBlocks() {
     }
   }
 
+  Blockly.Blocks['lcd_setup'] = {
+    init() {
+      this.appendDummyInput().appendField('LCD setup (init & backlight)')
+      this.setPreviousStatement(true)
+      this.setNextStatement(true)
+      this.setColour(120)
+      this.setTooltip('Initialize I2C LCD display (0x27, 16x2) and turn on backlight.')
+    }
+  }
+
   Blockly.Blocks['lcd_clear'] = {
     init() {
       this.appendDummyInput().appendField('LCD clear')
@@ -1102,13 +1112,29 @@ arduino.forBlock['lcd_print_line'] = function (block, generator) {
   return `lcd.setCursor(0, ${row});\nlcd.print(${text});\n`
 }
 
-arduino.forBlock['lcd_set_cursor'] = function (block) {
+arduino.forBlock['lcd_setup'] = function (block, generator) {
+  const gg = generator as ArduinoGen
+  gg.definitions_['wire_include'] = '#include <Wire.h>'
+  gg.definitions_['lcd_include'] = '#include <LiquidCrystal_I2C.h>'
+  gg.definitions_['lcd_decl'] = 'LiquidCrystal_I2C lcd(0x27, 16, 2);'
+  return 'lcd.init();\nlcd.backlight();\n'
+}
+
+arduino.forBlock['lcd_set_cursor'] = function (block, generator) {
+  const gg = generator as ArduinoGen
+  gg.definitions_['wire_include'] = '#include <Wire.h>'
+  gg.definitions_['lcd_include'] = '#include <LiquidCrystal_I2C.h>'
+  gg.definitions_['lcd_decl'] = 'LiquidCrystal_I2C lcd(0x27, 16, 2);'
   const col = block.getFieldValue('COL') ?? '0'
   const row = block.getFieldValue('ROW') ?? '0'
   return `lcd.setCursor(${col}, ${row});\n`
 }
 
-arduino.forBlock['lcd_clear'] = function () {
+arduino.forBlock['lcd_clear'] = function (block, generator) {
+  const gg = generator as ArduinoGen
+  gg.definitions_['wire_include'] = '#include <Wire.h>'
+  gg.definitions_['lcd_include'] = '#include <LiquidCrystal_I2C.h>'
+  gg.definitions_['lcd_decl'] = 'LiquidCrystal_I2C lcd(0x27, 16, 2);'
   return 'lcd.clear();\n'
 }
 
@@ -1125,14 +1151,18 @@ arduino.forBlock['ir_read'] = (block) => [
   'false /* PIXIU simulated IR obstacle sensor: ' + String(block.getFieldValue('SENSOR') || '') + ' */',
   ORDER.ATOMIC,
 ]
-arduino.forBlock['dht_temperature'] = (block) => [
-  '0 /* PIXIU simulated DHT11 temperature: ' + String(block.getFieldValue('SENSOR') || 'dht') + ' */',
-  ORDER.ATOMIC,
-]
-arduino.forBlock['dht_humidity'] = (block) => [
-  '0 /* PIXIU simulated DHT11 humidity: ' + String(block.getFieldValue('SENSOR') || 'dht') + ' */',
-  ORDER.ATOMIC,
-]
+arduino.forBlock['dht_temperature'] = function (block, generator) {
+  const gg = generator as ArduinoGen
+  gg.definitions_['dht_include'] = '#include <DHT.h>'
+  gg.definitions_['dht_decl'] = '#define DHTPIN 2\n#define DHTTYPE DHT22\nDHT dht(DHTPIN, DHTTYPE);'
+  return ['dht.readTemperature()', ORDER.ATOMIC]
+}
+arduino.forBlock['dht_humidity'] = function (block, generator) {
+  const gg = generator as ArduinoGen
+  gg.definitions_['dht_include'] = '#include <DHT.h>'
+  gg.definitions_['dht_decl'] = '#define DHTPIN 2\n#define DHTTYPE DHT22\nDHT dht(DHTPIN, DHTTYPE);'
+  return ['dht.readHumidity()', ORDER.ATOMIC]
+}
 arduino.forBlock['joystick_x'] = (block) => [
   '512 /* PIXIU simulated joystick X: ' + String(block.getFieldValue('SENSOR') || '') + ' */',
   ORDER.ATOMIC,
