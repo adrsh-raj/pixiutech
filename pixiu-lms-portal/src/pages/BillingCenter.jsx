@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { X } from 'lucide-react';
+import { Download, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch, useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
@@ -383,6 +383,90 @@ export default function BillingCenter() {
     setBusy(false);
   };
 
+  const printReceipt = payment => {
+    const popup = window.open('', '_blank', 'width=820,height=900');
+    if (!popup) {
+      setError('Receipt could not open. Allow pop-ups for portal.pixiutech.com and try again.');
+      return;
+    }
+    const safe = value => String(value ?? '—').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+    const contractNumber = payment.contract_number || '';
+    const invoiceNumber = payment.invoice_number || '';
+    const isContract = Boolean(contractNumber);
+    const valueLabel = isContract ? 'Contract Value' : 'Invoice Value';
+    const totalRaw = payment.receipt_total_amount_snapshot;
+    const paidRaw = payment.receipt_amount_paid_snapshot;
+    const balanceRaw = payment.receipt_balance_due_snapshot;
+    const hasSnapshot = totalRaw !== null && totalRaw !== undefined
+      && paidRaw !== null && paidRaw !== undefined
+      && balanceRaw !== null && balanceRaw !== undefined;
+    const total = Number(totalRaw || 0);
+    const paid = Number(paidRaw || 0);
+    const balance = Number(balanceRaw || 0);
+    const state = balance <= 0 ? 'PAID IN FULL' : paid > 0 ? 'PARTIALLY PAID' : 'UNPAID';
+    const snapshotRows = hasSnapshot
+      ? `<div class="summary">
+          <div class="summary-title">${isContract ? 'Contract' : 'Invoice'} ledger at receipt time</div>
+          <div class="row"><b>${valueLabel}</b><strong>${money(total)}</strong></div>
+          <div class="row"><b>Total Paid (including this receipt)</b><strong>${money(paid)}</strong></div>
+          <div class="row outstanding"><b>Unpaid / Outstanding Balance</b><strong>${money(balance)}</strong></div>
+          <div class="row"><b>Payment Status</b><strong>${state}</strong></div>
+        </div>`
+      : `<div class="summary">
+          <div class="summary-title">Original ledger values</div>
+          <div class="row"><b>${valueLabel}</b><strong>Not recorded</strong></div>
+          <div class="row"><b>Total Paid (including this receipt)</b><strong>Not recorded</strong></div>
+          <div class="row"><b>Unpaid / Outstanding Balance</b><strong>Not recorded</strong></div>
+          <p class="muted">The original receipt did not save a balance snapshot. These historical amounts cannot be reconstructed reliably.</p>
+        </div>`;
+    const targetRows = `${contractNumber ? `<div class="row"><b>Contract Number</b><span>${safe(contractNumber)}</span></div>` : ''}${invoiceNumber ? `<div class="row"><b>Invoice Number</b><span>${safe(invoiceNumber)}</span></div>` : ''}`;
+    const receiptNumber = payment.receipt_number || 'Receipt';
+    popup.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Receipt-${safe(receiptNumber)}</title>
+      <style>
+        *{box-sizing:border-box}
+        body{font-family:Arial,sans-serif;padding:32px;max-width:780px;margin:0 auto;color:#172033;background:#fff}
+        h1{font-size:25px;letter-spacing:.04em;margin:0 0 5px}
+        .muted{color:#64748b;font-size:12px;line-height:1.55}
+        .top{display:flex;justify-content:space-between;gap:20px;padding-bottom:18px;border-bottom:2px solid #172033}
+        .receipt-label{text-align:right;font-size:12px;color:#64748b}
+        .receipt-label strong{display:block;color:#172033;font-size:17px;margin-top:5px}
+        .box{border:1px solid #dbe3ed;border-radius:10px;padding:18px;margin:20px 0}
+        .section-title,.summary-title{font-size:11px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#475569;margin:0 0 8px}
+        .row{display:flex;justify-content:space-between;gap:18px;padding:10px 0;border-bottom:1px solid #edf1f5;font-size:13px}
+        .row:last-child{border-bottom:0}
+        .row strong{text-align:right;font-weight:800}
+        .summary{border:1px solid #cbd5e1;border-radius:10px;padding:16px;margin-top:18px;background:#f8fafc}
+        .summary .row{font-size:14px}
+        .summary .outstanding{font-size:16px;color:#9a3412;border-top:1px solid #cbd5e1;margin-top:4px;padding-top:14px}
+        .payment-total{font-size:19px;font-weight:800;border-top:2px solid #172033;margin-top:14px;padding-top:14px}
+        .footer{margin-top:22px;padding-top:14px;border-top:1px solid #e2e8f0}
+        .toolbar{display:flex;justify-content:flex-end;margin-bottom:18px}
+        button{border:0;border-radius:7px;background:#172033;color:#fff;padding:10px 15px;font-weight:700;cursor:pointer}
+        @page{size:A4;margin:16mm}
+        @media print{body{padding:0;max-width:none}.toolbar{display:none!important}.box,.summary{break-inside:avoid}}
+      </style></head><body>
+      <div class="toolbar"><button onclick="window.print()">Download / Save as PDF</button></div>
+      <div class="top"><div><h1>PIXIU TECH LLP</h1><div class="muted">Robotics • AI • IoT • STEM Education</div><div class="muted" style="margin-top:8px">Official payment receipt</div></div>
+        <div class="receipt-label">RECEIPT<strong>${safe(receiptNumber)}</strong><div style="margin-top:7px">${safe(payment.payment_date)}</div></div>
+      </div>
+      <div class="box">
+        <div class="section-title">Receipt Details</div>
+        <div class="row"><b>School</b><span>${safe(payment.school_name || billingSchool?.name)}</span></div>
+        ${targetRows}
+        <div class="row"><b>Payment ID</b><span>${safe(payment.id)}</span></div>
+        <div class="row"><b>Payment Date</b><span>${safe(payment.payment_date)}</span></div>
+        <div class="row"><b>Payment Method</b><span>${safe(payment.method)}</span></div>
+        <div class="row"><b>Transaction Reference</b><span>${safe(payment.transaction_reference)}</span></div>
+        ${snapshotRows}
+        <div class="row payment-total"><b>Amount Received on This Receipt</b><strong>${money(payment.amount)}</strong></div>
+      </div>
+      <div class="footer muted">This receipt confirms one verified payment. Paid and outstanding figures are the immutable ledger balances immediately after this payment was recorded. Pending submissions are not included.</div>
+      </body></html>`);
+    popup.document.close();
+    popup.focus();
+    window.setTimeout(() => { if (!popup.closed) popup.print(); }, 350);
+  };
+
   if (authLoading) {
     return <div className="space-y-5"><PageHeader eyebrow="Finance" title="Billing" description="Loading your secure financial session…" /><div className="rounded-2xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-400">Authenticating…</div></div>;
   }
@@ -653,12 +737,15 @@ export default function BillingCenter() {
                       <p className="font-black text-slate-800">{payment.contract_number || payment.invoice_number || payment.contract || payment.invoice}</p>
                       <p className="mt-1 text-xs text-slate-500">{payment.payment_date ? String(payment.payment_date).slice(0, 10) : '—'} · {payment.method} · {payment.transaction_reference || 'No reference'}</p>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center justify-end gap-3">
                       <div className="text-right">
                         <p className="font-black">{money(payment.amount)}</p>
                         {payment.receipt_number && <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-[9px] font-black uppercase text-emerald-700">{payment.receipt_number}</span>}
-                        {payment.receipt_balance_due_snapshot !== null && payment.receipt_balance_due_snapshot !== undefined && <p className="mt-1 text-[10px] text-slate-500">Balance after receipt: {money(payment.receipt_balance_due_snapshot)}</p>}
+                        {payment.receipt_total_amount_snapshot !== null && payment.receipt_total_amount_snapshot !== undefined && <p className="mt-1 text-[10px] text-slate-500">Contract value: {money(payment.receipt_total_amount_snapshot)}</p>}
+                        {payment.receipt_amount_paid_snapshot !== null && payment.receipt_amount_paid_snapshot !== undefined && <p className="text-[10px] text-slate-500">Total paid: {money(payment.receipt_amount_paid_snapshot)}</p>}
+                        {payment.receipt_balance_due_snapshot !== null && payment.receipt_balance_due_snapshot !== undefined && <p className="text-[10px] font-semibold text-slate-600">Outstanding: {money(payment.receipt_balance_due_snapshot)}</p>}
                       </div>
+                      {payment.receipt_number && <button type="button" onClick={() => printReceipt(payment)} title="Download or print this receipt as PDF" className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-2.5 text-[10px] font-black text-white hover:bg-slate-700"><Download size={13} /> Download PDF</button>}
                     </div>
                   </div>
                 ))}
