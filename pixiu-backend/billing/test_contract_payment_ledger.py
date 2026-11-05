@@ -181,6 +181,134 @@ class ContractPaymentLedgerApiTests(APITestCase):
         self.assertEqual(Decimal(str(contract["balance_due"])), Decimal("40000.00"))
         self.assertEqual(contract["open_invoice_count"], 1)
 
+    def test_admin_can_void_mistaken_successful_payment_without_deleting_receipt(self):
+        self.client.force_authenticate(self.admin)
+        created = self.post_contract_payment("10000.00", "LEDGER-VOID-UTR-001")
+        self.assertEqual(created.status_code, 201, created.data)
+        receipt_id = created.data["receipt"]["id"]
+        payment_id = created.data["payment"]["id"]
+
+        voided = self.client.post(
+            f"/api/v1/payments/{payment_id}/void",
+            {"reason": "Duplicate entry; funds were not received."},
+            format="json",
+        )
+        self.assertEqual(voided.status_code, 200, voided.data)
+        self.assertEqual(voided.data["status"], PaymentStatus.VOID)
+        self.assertEqual(voided.data["reversal_reason"], "Duplicate entry; funds were not received.")
+        self.assertTrue(voided.data["reversed_at"])
+        self.assertEqual(str(voided.data["reversed_by"]), str(self.admin.pk))
+
+        contract = self.get_contract()
+        self.assertEqual(Decimal(str(contract["amount_paid"])), Decimal("0.00"))
+        self.assertEqual(Decimal(str(contract["balance_due"])), Decimal("50000.00"))
+        self.assertEqual(contract["payment_status"], "unpaid")
+
+        receipt = self.client.get(f"/api/v1/receipts/{receipt_id}")
+        self.assertEqual(receipt.status_code, 200, receipt.data)
+        self.assertEqual(receipt.data["payment_status"], PaymentStatus.VOID)
+        self.assertEqual(receipt.data["reversal_reason"], "Duplicate entry; funds were not received.")
+        # The original issue-time snapshot remains immutable and is not rewritten.
+        self.assertEqual(receipt.data["amount_paid_snapshot"], "10000.00")
+        self.assertEqual(receipt.data["balance_due_snapshot"], "40000.00")
+        self.assertEqual(Receipt.objects.filter(pk=receipt_id).count(), 1)
+
+        duplicate_void = self.client.post(
+            f"/api/v1/payments/{payment_id}/void",
+            {"reason": "Trying to void a second time."},
+            format="json",
+        )
+        self.assertEqual(duplicate_void.status_code, 400, duplicate_void.data)
+
+    def test_admin_can_mark_received_money_as_refunded(self):
+        self.client.force_authenticate(self.admin)
+        created = self.post_contract_payment("10000.00", "LEDGER-REFUND-UTR-001")
+        payment_id = created.data["payment"]["id"]
+
+        refunded = self.client.post(
+            f"/api/v1/payments/{payment_id}/refund",
+            {"reason": "Funds returned to school by bank transfer."},
+            format="json",
+        )
+        self.assertEqual(refunded.status_code, 200, refunded.data)
+        self.assertEqual(refunded.data["status"], PaymentStatus.REFUNDED)
+        contract = self.get_contract()
+        self.assertEqual(Decimal(str(contract["amount_paid"])), Decimal("0.00"))
+        self.assertEqual(Decimal(str(contract["balance_due"])), Decimal("50000.00"))
+
+    def test_school_user_cannot_void_a_successful_payment(self):
+        self.client.force_authenticate(self.admin)
+        created = self.post_contract_payment("10000.00", "LEDGER-SCHOOL-CANNOT-VOID")
+        payment_id = created.data["payment"]["id"]
+
+        self.client.force_authenticate(self.school_user)
+        response = self.client.post(
+            f"/api/v1/payments/{payment_id}/void",
+            {"reason": "I should not have finance access."},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 403, response.data)
+        self.assertEqual(Payment.objects.get(pk=payment_id).status, PaymentStatus.SUCCESS)
+
+    def test_voiding_linked_invoice_payment_recalculates_invoice_and_contract(self):
+        self.client.force_authenticate(self.admin)
+        today = date.today()
+        created_invoice = self.client.post(
+            "/api/v1/invoices/create-with-lines",
+            {
+                "school": str(self.school.pk),
+                "contract": str(self.contract.pk),
+                "issue_date": today.isoformat(),
+                "due_date": (today + timedelta(days=30)).isoformat(),
+                "tax_amount": "0.00",
+                "notes": "Invoice for reversal test",
+                "lines": [{"description": "Programme", "quantity": 1, "unit_price": "50000.00"}],
+            },
+            format="json",
+        )
+        self.assertEqual(created_invoice.status_code, 201, created_invoice.data)
+        paid = self.client.post(
+            "/api/v1/payments/record",
+            {
+                "invoice": created_invoice.data["id"],
+                "amount": "10000.00",
+                "method": "bank_transfer",
+                "payment_date": today.isoformat(),
+                "transaction_reference": "LEDGER-INVOICE-VOID-UTR",
+                "notes": "Invoice payment",
+            },
+            format="json",
+        )
+        self.assertEqual(paid.status_code, 201, paid.data)
+        payment_id = paid.data["payment"]["id"]
+
+        voided = self.client.post(
+            f"/api/v1/payments/{payment_id}/void",
+            {"reason": "Mistaken invoice payment entry."},
+            format="json",
+        )
+        self.assertEqual(voided.status_code, 200, voided.data)
+
+        invoice = self.client.get(f"/api/v1/invoices/{created_invoice.data['id']}")
+        self.assertEqual(invoice.status_code, 200, invoice.data)
+        self.assertEqual(Decimal(str(invoice.data["amount_paid"])), Decimal("0.00"))
+        self.assertEqual(invoice.data["status"], "issued")
+        contract = self.get_contract()
+        self.assertEqual(Decimal(str(contract["amount_paid"])), Decimal("0.00"))
+        self.assertEqual(Decimal(str(contract["balance_due"])), Decimal("50000.00"))
+
+    def test_void_requires_reason(self):
+        self.client.force_authenticate(self.admin)
+        created = self.post_contract_payment("10000.00", "LEDGER-VOID-NO-REASON")
+        payment_id = created.data["payment"]["id"]
+        response = self.client.post(
+            f"/api/v1/payments/{payment_id}/void",
+            {"reason": " "},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertEqual(Payment.objects.get(pk=payment_id).status, PaymentStatus.SUCCESS)
+
     def test_issued_invoice_locks_contract_value_before_first_payment(self):
         self.client.force_authenticate(self.admin)
         today = date.today()
