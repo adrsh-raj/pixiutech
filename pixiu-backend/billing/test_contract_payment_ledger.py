@@ -4,6 +4,7 @@ from decimal import Decimal
 from rest_framework.test import APITestCase
 
 from accounts.models import User, UserRole
+from audit.models import AuditLog
 from academics.models import School
 from billing.models import ContractStatus, Payment, PaymentStatus, Receipt, SchoolContract
 
@@ -212,6 +213,12 @@ class ContractPaymentLedgerApiTests(APITestCase):
         self.assertEqual(receipt.data["amount_paid_snapshot"], "10000.00")
         self.assertEqual(receipt.data["balance_due_snapshot"], "40000.00")
         self.assertEqual(Receipt.objects.filter(pk=receipt_id).count(), 1)
+        self.assertTrue(AuditLog.objects.filter(
+            entity_type="Payment",
+            entity_id=payment_id,
+            action="void",
+            changes__reason="Duplicate entry; funds were not received.",
+        ).exists())
 
         duplicate_void = self.client.post(
             f"/api/v1/payments/{payment_id}/void",
@@ -235,6 +242,12 @@ class ContractPaymentLedgerApiTests(APITestCase):
         contract = self.get_contract()
         self.assertEqual(Decimal(str(contract["amount_paid"])), Decimal("0.00"))
         self.assertEqual(Decimal(str(contract["balance_due"])), Decimal("50000.00"))
+        self.assertTrue(AuditLog.objects.filter(
+            entity_type="Payment",
+            entity_id=payment_id,
+            action="payment",
+            changes__status=PaymentStatus.REFUNDED,
+        ).exists())
 
     def test_school_user_cannot_void_a_successful_payment(self):
         self.client.force_authenticate(self.admin)
