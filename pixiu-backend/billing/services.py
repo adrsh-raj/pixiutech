@@ -3,7 +3,7 @@ from uuid import uuid4
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Q, Sum
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
@@ -260,6 +260,15 @@ def record_payment(
         ).quantize(TWOPLACES)
 
     amount = Decimal(amount).quantize(TWOPLACES)
+    normalized_reference = (transaction_reference or "").strip()
+    if normalized_reference and Payment.objects.filter(
+        method=method,
+        transaction_reference__iexact=normalized_reference,
+    ).exists():
+        raise ValidationError({
+            "transaction_reference": "This transaction reference has already been recorded."
+        })
+
     if amount <= 0:
         raise ValidationError({"amount": "Payment amount must be positive."})
     if outstanding <= 0:
@@ -281,17 +290,30 @@ def record_payment(
             "payment": "A payment is already awaiting verification for this contract or invoice. Verify or reject it before recording another payment."
         })
 
-    payment = Payment.objects.create(
-        invoice=locked_invoice,
-        contract=locked_contract if locked_invoice is None else None,
-        amount=amount,
-        method=method,
-        status=payment_status,
-        payment_date=payment_date,
-        transaction_reference=transaction_reference.strip(),
-        notes=notes.strip(),
-        recorded_by=recorded_by,
-    )
+    try:
+        # Nested savepoint allows us to translate a concurrent duplicate-reference
+        # uniqueness violation without leaving the outer financial transaction broken.
+        with transaction.atomic():
+            payment = Payment.objects.create(
+                invoice=locked_invoice,
+                contract=locked_contract if locked_invoice is None else None,
+                amount=amount,
+                method=method,
+                status=payment_status,
+                payment_date=payment_date,
+                transaction_reference=normalized_reference,
+                notes=notes.strip(),
+                recorded_by=recorded_by,
+            )
+    except IntegrityError:
+        if normalized_reference and Payment.objects.filter(
+            method=method,
+            transaction_reference__iexact=normalized_reference,
+        ).exists():
+            raise ValidationError({
+                "transaction_reference": "This transaction reference has already been recorded."
+            })
+        raise
     receipt = None
     target_label = (
         locked_contract.contract_number if locked_contract

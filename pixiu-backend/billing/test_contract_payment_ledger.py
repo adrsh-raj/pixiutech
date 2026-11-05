@@ -61,6 +61,10 @@ class ContractPaymentLedgerApiTests(APITestCase):
         self.assertEqual(first_receipt["amount_paid_snapshot"], "10000.00")
         self.assertEqual(first_receipt["balance_due_snapshot"], "40000.00")
 
+        duplicate = self.post_contract_payment("1000.00", "ledger-utr-001")
+        self.assertEqual(duplicate.status_code, 400, duplicate.data)
+        self.assertIn("transaction_reference", duplicate.data)
+
         contract = self.get_contract()
         self.assertEqual(contract["total_value"], "50000.00")
         self.assertEqual(Decimal(str(contract["amount_paid"])), Decimal("10000.00"))
