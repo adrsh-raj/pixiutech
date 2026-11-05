@@ -143,7 +143,7 @@ class PaymentSerializer(serializers.ModelSerializer):
             "school_id", "school_code", "school_name", "amount", "method", "status",
             "transaction_reference", "payment_date", "notes", "recorded_by", "created_at",
             "receipt_number", "receipt_total_amount_snapshot", "receipt_amount_paid_snapshot",
-            "receipt_balance_due_snapshot",
+            "receipt_balance_due_snapshot", "reversal_reason", "reversed_at", "reversed_by",
         ]
         read_only_fields = fields
 
@@ -213,6 +213,9 @@ class ReceiptSerializer(serializers.ModelSerializer):
     payment_method = serializers.CharField(source="payment.method", read_only=True)
     payment_date = serializers.DateTimeField(source="payment.payment_date", read_only=True)
     transaction_reference = serializers.CharField(source="payment.transaction_reference", read_only=True)
+    payment_status = serializers.CharField(source="payment.status", read_only=True)
+    reversal_reason = serializers.CharField(source="payment.reversal_reason", read_only=True)
+    reversed_at = serializers.DateTimeField(source="payment.reversed_at", read_only=True)
 
     class Meta:
         model = Receipt
@@ -221,5 +224,6 @@ class ReceiptSerializer(serializers.ModelSerializer):
             "school_name_snapshot", "invoice_number_snapshot", "contract_number_snapshot",
             "total_amount_snapshot", "amount_paid_snapshot", "balance_due_snapshot",
             "payment_amount", "payment_method", "payment_date", "transaction_reference",
+            "payment_status", "reversal_reason", "reversed_at",
         ]
         read_only_fields = fields
