@@ -323,7 +323,7 @@ export default function BillingCenter() {
     const amount = Number(paymentForm.amount);
     const outstanding = Math.max(Number(paymentContract.balance_due || 0), 0);
     if (!Number.isFinite(amount) || amount <= 0 || amount > outstanding) {
-      return setError(\`Payment must be greater than 0 and no more than \${money(outstanding)}.\`);
+      return setError(`Payment must be greater than 0 and no more than ${money(outstanding)}.`);
     }
     if (!isAdmin && !paymentForm.transaction_reference.trim()) {
       return setError('Enter the UTR / transaction reference so Pixiu Tech can verify the payment.');
@@ -512,7 +512,7 @@ export default function BillingCenter() {
             <section className="rounded-2xl border border-slate-200 bg-white">
               <SectionTitle
                 eyebrow="Signed contract ledger"
-                title={isAdmin ? \`Contracts for \${school.name}\` : 'Your contract & payment status'}
+                title={isAdmin ? `Contracts for ${school.name}` : 'Your contract & payment status'}
                 description="Verified payments update this contract balance automatically. Every receipt stores the contract value, total received and outstanding balance at the time it was issued."
               />
               <div className="divide-y divide-slate-100">
@@ -527,7 +527,7 @@ export default function BillingCenter() {
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="font-black text-slate-900">{contract.contract_number}</p>
-                            <span className={\`rounded-lg px-2.5 py-1 text-[9px] font-black uppercase \${paymentStatus === 'paid' ? 'bg-emerald-50 text-emerald-700' : paymentStatus === 'partially_paid' ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-600'}\`}>
+                            <span className={`rounded-lg px-2.5 py-1 text-[9px] font-black uppercase ${paymentStatus === 'paid' ? 'bg-emerald-50 text-emerald-700' : paymentStatus === 'partially_paid' ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>
                               {paymentStatus === 'paid' ? 'Fully paid' : paymentStatus === 'partially_paid' ? 'Partially paid' : 'Unpaid'}
                             </span>
                             <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-[9px] font-black uppercase text-slate-600">{contract.status}</span>
@@ -545,15 +545,20 @@ export default function BillingCenter() {
                           A payment of {money(pending.amount)} is awaiting Pixiu Tech verification. It is not included in the received total until verified.
                         </p>
                       )}
+                      {Number(contract.open_invoice_count || 0) > 0 && balance > 0 && (
+                        <p className="rounded-xl bg-slate-50 px-3 py-2 text-[11px] text-slate-600">
+                          This contract has {contract.open_invoice_count} open invoice(s). Record payments against the invoice below so the invoice and contract balances remain aligned.
+                        </p>
+                      )}
                       <div className="flex flex-wrap gap-2">
-                        {balance > 0 && payable && !pending && (
+                        {balance > 0 && payable && !pending && Number(contract.open_invoice_count || 0) === 0 && (
                           <button type="button" onClick={() => openContractPayment(contract)} disabled={busy} className="rounded-xl bg-[#236F69] px-3.5 py-2 text-[10px] font-black text-white disabled:opacity-50">
                             {isAdmin ? 'Record payment & issue receipt' : "I've paid"}
                           </button>
                         )}
                         {isAdmin && contract.status === 'draft' && (
                           <button type="button" onClick={() => runAction(async () => {
-                            await request(\`/contracts/\${encodeURIComponent(contract.id)}\`, 'PATCH', { status: 'active' });
+                            await request(`/contracts/${encodeURIComponent(contract.id)}`, 'PATCH', { status: 'active' });
                             await load();
                           })} disabled={busy} className="rounded-xl border border-emerald-200 px-3.5 py-2 text-[10px] font-black text-emerald-700 disabled:opacity-50">
                             Mark signed & activate
@@ -682,7 +687,7 @@ export default function BillingCenter() {
                 <label className="block"><span className="mb-1.5 block text-[9px] font-black uppercase tracking-wide text-slate-400">Payment date</span><input className={fieldClass} type="date" value={paymentForm.payment_date} onChange={e => setPaymentForm(v => ({ ...v, payment_date: e.target.value }))} required /></label>
               </div>
               <label className="block"><span className="mb-1.5 block text-[9px] font-black uppercase tracking-wide text-slate-400">UTR / transaction reference {isAdmin ? '(optional)' : '(required)'}</span><input className={fieldClass} value={paymentForm.transaction_reference} onChange={e => setPaymentForm(v => ({ ...v, transaction_reference: e.target.value }))} placeholder="Enter UTR / bank reference" required={!isAdmin} /></label>
-              <label className="block"><span className="mb-1.5 block text-[9px] font-black uppercase tracking-wide text-slate-400">Note (optional)</span><textarea className={\`\${fieldClass} min-h-20 py-3\`} value={paymentForm.notes} onChange={e => setPaymentForm(v => ({ ...v, notes: e.target.value }))} /></label>
+              <label className="block"><span className="mb-1.5 block text-[9px] font-black uppercase tracking-wide text-slate-400">Note (optional)</span><textarea className={`${fieldClass} min-h-20 py-3`} value={paymentForm.notes} onChange={e => setPaymentForm(v => ({ ...v, notes: e.target.value }))} /></label>
               <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
                 <button type="button" onClick={() => setPaymentContract(null)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-black text-slate-600">Cancel</button>
                 <button disabled={busy} className="rounded-xl bg-[#236F69] px-5 py-2.5 text-xs font-black text-white disabled:opacity-50">{busy ? 'Saving…' : isAdmin ? 'Record payment & issue receipt' : 'Submit for verification'}</button>
@@ -725,9 +730,9 @@ export default function BillingCenter() {
 
 function LedgerAmount({ label, value, emphasis = false }) {
   return (
-    <div className={\`rounded-xl border p-3 \${emphasis ? 'border-amber-200 bg-amber-50' : 'border-slate-100 bg-slate-50'}\`}>
+    <div className={`rounded-xl border p-3 ${emphasis ? 'border-amber-200 bg-amber-50' : 'border-slate-100 bg-slate-50'}`}>
       <p className="text-[9px] font-black uppercase tracking-[.08em] text-slate-400">{label}</p>
-      <p className={\`mt-1 text-sm font-black \${emphasis ? 'text-amber-800' : 'text-slate-800'}\`}>{money(value)}</p>
+      <p className={`mt-1 text-sm font-black ${emphasis ? 'text-amber-800' : 'text-slate-800'}`}>{money(value)}</p>
     </div>
   );
 }

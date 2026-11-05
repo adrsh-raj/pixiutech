@@ -64,8 +64,8 @@ class ContractPaymentLedgerApiTests(APITestCase):
 
         contract = self.get_contract()
         self.assertEqual(contract["total_value"], "50000.00")
-        self.assertEqual(contract["amount_paid"], "10000.00")
-        self.assertEqual(contract["balance_due"], "40000.00")
+        self.assertEqual(Decimal(str(contract["amount_paid"])), Decimal("10000.00"))
+        self.assertEqual(Decimal(str(contract["balance_due"])), Decimal("40000.00"))
         self.assertEqual(contract["payment_status"], "partially_paid")
 
         second = self.post_contract_payment("5000.00", "LEDGER-UTR-002")
@@ -81,9 +81,9 @@ class ContractPaymentLedgerApiTests(APITestCase):
 
         summary = self.client.get("/api/v1/billing-summary")
         self.assertEqual(summary.status_code, 200, summary.data)
-        self.assertEqual(summary.data["contract_value"], "50000.00")
-        self.assertEqual(summary.data["contract_collected"], "15000.00")
-        self.assertEqual(summary.data["contract_pending"], "35000.00")
+        self.assertEqual(Decimal(str(summary.data["contract_value"])), Decimal("50000.00"))
+        self.assertEqual(Decimal(str(summary.data["contract_collected"])), Decimal("15000.00"))
+        self.assertEqual(Decimal(str(summary.data["contract_pending"])), Decimal("35000.00"))
 
     def test_school_payment_stays_pending_until_admin_verifies_it(self):
         self.client.force_authenticate(self.school_user)
@@ -93,8 +93,8 @@ class ContractPaymentLedgerApiTests(APITestCase):
         self.assertIsNone(submit.data["receipt"])
 
         contract = self.get_contract()
-        self.assertEqual(contract["amount_paid"], "0.00")
-        self.assertEqual(contract["balance_due"], "50000.00")
+        self.assertEqual(Decimal(str(contract["amount_paid"])), Decimal("0.00"))
+        self.assertEqual(Decimal(str(contract["balance_due"])), Decimal("50000.00"))
         self.assertEqual(contract["payment_status"], "unpaid")
 
         payment_id = submit.data["payment"]["id"]

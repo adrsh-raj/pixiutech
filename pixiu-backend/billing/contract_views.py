@@ -24,6 +24,7 @@ class SchoolContractSerializer(serializers.ModelSerializer):
     amount_paid = serializers.SerializerMethodField()
     balance_due = serializers.SerializerMethodField()
     payment_status = serializers.SerializerMethodField()
+    open_invoice_count = serializers.SerializerMethodField()
 
     def _amount_paid(self, obj):
         if not hasattr(obj, "_ledger_amount_paid"):
@@ -48,9 +49,17 @@ class SchoolContractSerializer(serializers.ModelSerializer):
             return "partially_paid"
         return "unpaid"
 
+    def get_open_invoice_count(self, obj):
+        annotated = getattr(obj, "_open_invoice_count", None)
+        if annotated is not None:
+            return annotated
+        return obj.invoices.filter(
+            status__in=[BillingStatus.ISSUED, BillingStatus.PARTIALLY_PAID, BillingStatus.OVERDUE]
+        ).count()
+
     class Meta:
         model = SchoolContract
-        fields = ["id", "contract_number", "school", "school_code", "school_name", "start_date", "end_date", "total_value", "amount_paid", "balance_due", "payment_status", "status", "notes", "created_by", "created_at", "updated_at"]
+        fields = ["id", "contract_number", "school", "school_code", "school_name", "start_date", "end_date", "total_value", "amount_paid", "balance_due", "payment_status", "open_invoice_count", "status", "notes", "created_by", "created_at", "updated_at"]
         read_only_fields = ["id", "created_by", "created_at", "updated_at"]
 
     def validate(self, attrs):
@@ -83,7 +92,7 @@ class SchoolContractSerializer(serializers.ModelSerializer):
 
 
 class ContractViewSet(viewsets.ModelViewSet):
-    queryset = SchoolContract.objects.select_related("school", "created_by").prefetch_related("payments")
+    queryset = SchoolContract.objects.select_related("school", "created_by").prefetch_related("payments", "invoices")
     serializer_class = SchoolContractSerializer
     permission_classes = [IsAuthenticated, IsActiveAccount, HasActionPermission]
 

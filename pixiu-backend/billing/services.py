@@ -221,6 +221,12 @@ def record_payment(
         ).get(pk=contract.pk)
         if locked_contract.status not in {ContractStatus.ACTIVE, ContractStatus.EXPIRED}:
             raise ValidationError("Only active or expired signed contracts can receive payments.")
+        if locked_contract.invoices.filter(
+            status__in=[BillingStatus.ISSUED, BillingStatus.PARTIALLY_PAID, BillingStatus.OVERDUE]
+        ).exists():
+            raise ValidationError({
+                "contract": "This contract has an open invoice. Record the payment against that invoice so both balances stay aligned."
+            })
         school = locked_contract.school
         outstanding = (
             locked_contract.total_value - contract_amount_paid(locked_contract)
@@ -351,6 +357,12 @@ def verify_pending_payment(*, payment: Payment, verified_by):
         ).get(pk=locked_payment.contract_id)
         if contract.status not in {ContractStatus.ACTIVE, ContractStatus.EXPIRED}:
             raise ValidationError("Only active or expired signed contracts can receive payments.")
+        if contract.invoices.filter(
+            status__in=[BillingStatus.ISSUED, BillingStatus.PARTIALLY_PAID, BillingStatus.OVERDUE]
+        ).exists():
+            raise ValidationError({
+                "contract": "This contract has an open invoice. Verify the payment against the invoice instead."
+            })
         school = contract.school
         outstanding = (
             contract.total_value - contract_amount_paid(contract)
