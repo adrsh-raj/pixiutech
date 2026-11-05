@@ -456,7 +456,7 @@ def verify_pending_payment(*, payment: Payment, verified_by):
     return locked_payment, receipt
 
 @transaction.atomic
-def reverse_payment(*, payment: Payment, reversed_by, reversal_status: str, reason: str) -> Payment:
+def reverse_payment(*, payment: Payment, reversed_by, reversal_status: str, reason: str, request=None) -> Payment:
     """Void a mistaken entry or record a real refund without deleting its receipt.
 
     The receipt's immutable issuance snapshot is deliberately preserved. Ledger
@@ -526,6 +526,7 @@ def reverse_payment(*, payment: Payment, reversed_by, reversal_status: str, reas
             "invoice": invoice.invoice_number if invoice else None,
             "contract": contract.contract_number if contract else None,
         },
+        request=request,
     )
     notify_school(
         school,
