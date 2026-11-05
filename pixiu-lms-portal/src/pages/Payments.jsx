@@ -76,28 +76,101 @@ export default function Payments() {
 
   const printReceipt = payment => {
     const receipt = receiptByPayment.get(String(payment.id));
-    const popup = window.open('', '_blank', 'width=820,height=700');
-    if (!popup) return;
+    const popup = window.open('', '_blank', 'width=820,height=900');
+    if (!popup) {
+      setError('Receipt PDF could not open. Allow pop-ups for this portal and try again.');
+      return;
+    }
     const safe = value => String(value ?? '—').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
     const contractNumber = receipt?.contract_number_snapshot || payment.contract_number || '';
     const invoiceNumber = receipt?.invoice_number_snapshot || payment.invoice_number || '';
-    const obligation = contractNumber ? `Contract ${contractNumber}` : invoiceNumber ? `Invoice ${invoiceNumber}` : 'School payment';
-    const totalSnapshot = Number(receipt?.total_amount_snapshot || 0);
-    const paidSnapshot = Number(receipt?.amount_paid_snapshot || 0);
-    const balanceSnapshot = Number(receipt?.balance_due_snapshot || 0);
-    const hasSnapshot = totalSnapshot > 0;
+    const isContract = Boolean(contractNumber);
+    const valueLabel = isContract ? 'Contract Value' : 'Invoice Value';
+    const totalSnapshot = Number(receipt?.total_amount_snapshot ?? 0);
+    const paidSnapshot = Number(receipt?.amount_paid_snapshot ?? 0);
+    const balanceSnapshot = Number(receipt?.balance_due_snapshot ?? 0);
+    const hasSnapshot = receipt?.total_amount_snapshot != null
+      && receipt?.amount_paid_snapshot != null
+      && receipt?.balance_due_snapshot != null;
+    const paymentState = balanceSnapshot <= 0
+      ? 'PAID IN FULL'
+      : paidSnapshot > 0
+        ? 'PARTIALLY PAID'
+        : 'UNPAID';
     const snapshotRows = hasSnapshot
-      ? `<div class="row"><b>Contract / invoice value</b><span>${money(totalSnapshot)}</span></div><div class="row"><b>Total received after this payment</b><span>${money(paidSnapshot)}</span></div><div class="row"><b>Outstanding after this payment</b><span><strong>${money(balanceSnapshot)}</strong></span></div><div class="row"><b>Payment status</b><span>${balanceSnapshot <= 0 ? 'FULLY PAID' : 'PARTIALLY PAID'}</span></div>`
-      : '<p class="muted">Historical receipt: the original outstanding balance was not captured and cannot be reconstructed reliably.</p>';
-    popup.document.write(`<!doctype html><html><head><title>Receipt ${safe(receipt?.receipt_number || payment.id)}</title><style>body{font-family:Arial,sans-serif;padding:40px;max-width:760px;margin:auto;color:#172033}.muted{color:#64748b;font-size:13px}.box{border:1px solid #e2e8f0;border-radius:12px;padding:20px;margin:24px 0}.row{display:flex;justify-content:space-between;gap:18px;padding:10px 0;border-bottom:1px solid #f1f5f9}.total{font-size:22px;font-weight:800;border:0}@media print{button{display:none}}</style></head><body><h1>PIXIU TECH LLP</h1><div class="muted">Official payment receipt</div><div class="box"><div class="row"><b>Receipt No.</b><span>${safe(receipt?.receipt_number)}</span></div><div class="row"><b>School</b><span>${safe(receipt?.school_name_snapshot || payment.school_name)}</span></div><div class="row"><b>Reference</b><span>${safe(obligation)}</span></div><div class="row"><b>Payment ID</b><span>${safe(payment.id)}</span></div><div class="row"><b>Payment Date</b><span>${safe(payment.payment_date)}</span></div><div class="row"><b>Method</b><span>${safe(payment.method)}</span></div><div class="row"><b>Transaction Reference</b><span>${safe(payment.transaction_reference)}</span></div>${snapshotRows}<div class="row total"><b>Amount received on this receipt</b><span>${money(payment.amount)}</span></div></div><p class="muted">This receipt records one verified payment. The outstanding balance shown above is the balance immediately after this payment was recorded.</p><button onclick="window.print()">Print / Save PDF</button></body></html>`);
+      ? `<div class="summary">
+          <div class="summary-title">${isContract ? 'Contract' : 'Invoice'} Payment Summary</div>
+          <div class="row"><b>${valueLabel}</b><strong>${money(totalSnapshot)}</strong></div>
+          <div class="row"><b>Total Paid (including this receipt)</b><strong>${money(paidSnapshot)}</strong></div>
+          <div class="row outstanding"><b>Unpaid / Outstanding Balance</b><strong>${money(balanceSnapshot)}</strong></div>
+          <div class="row"><b>Payment Status</b><strong>${paymentState}</strong></div>
+        </div>`
+      : `<div class="summary">
+          <div class="summary-title">${isContract ? 'Contract' : 'Invoice'} Payment Summary</div>
+          <div class="row"><b>${valueLabel}</b><strong>Not recorded</strong></div>
+          <div class="row"><b>Total Paid (including this receipt)</b><strong>Not recorded</strong></div>
+          <div class="row"><b>Unpaid / Outstanding Balance</b><strong>Not recorded</strong></div>
+          <p class="muted">This is a historical receipt created before balance snapshots were stored. The original paid and unpaid amounts cannot be reconstructed reliably, so no figures have been estimated.</p>
+        </div>`;
+    const contractRow = contractNumber ? `<div class="row"><b>Contract Number</b><span>${safe(contractNumber)}</span></div>` : '';
+    const invoiceRow = invoiceNumber ? `<div class="row"><b>Invoice Number</b><span>${safe(invoiceNumber)}</span></div>` : '';
+    const receiptNumber = receipt?.receipt_number || payment.receipt_number || payment.id;
+
+    popup.document.write(`<!doctype html>
+      <html><head><meta charset="utf-8"><title>Receipt-${safe(receiptNumber)}</title>
+      <style>
+        *{box-sizing:border-box}
+        body{font-family:Arial,sans-serif;padding:32px;max-width:780px;margin:0 auto;color:#172033;background:#fff}
+        h1{font-size:25px;letter-spacing:.04em;margin:0 0 5px}
+        .muted{color:#64748b;font-size:12px;line-height:1.55}
+        .top{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;padding-bottom:18px;border-bottom:2px solid #172033}
+        .receipt-label{text-align:right;font-size:12px;color:#64748b}
+        .receipt-label strong{display:block;color:#172033;font-size:17px;margin-top:5px}
+        .box{border:1px solid #dbe3ed;border-radius:10px;padding:18px;margin:20px 0}
+        .section-title,.summary-title{font-size:11px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#475569;margin:0 0 8px}
+        .row{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;padding:10px 0;border-bottom:1px solid #edf1f5;font-size:13px}
+        .row:last-child{border-bottom:0}
+        .row strong{font-weight:800;text-align:right}
+        .summary{border:1px solid #cbd5e1;border-radius:10px;padding:16px;margin-top:18px;background:#f8fafc}
+        .summary .row{font-size:14px}
+        .summary .outstanding{font-size:16px;color:#9a3412;border-top:1px solid #cbd5e1;margin-top:4px;padding-top:14px}
+        .payment-total{font-size:19px;font-weight:800;border-top:2px solid #172033;margin-top:14px;padding-top:14px}
+        .footer{margin-top:22px;padding-top:14px;border-top:1px solid #e2e8f0}
+        .toolbar{display:flex;justify-content:flex-end;gap:8px;margin:0 0 18px}
+        button{border:0;border-radius:7px;background:#172033;color:#fff;padding:10px 15px;font-weight:700;cursor:pointer}
+        @page{size:A4;margin:16mm}
+        @media print{body{padding:0;max-width:none}.toolbar{display:none!important}.box,.summary{break-inside:avoid}}
+      </style></head><body>
+      <div class="toolbar"><button onclick="window.print()">Download / Save as PDF</button></div>
+      <div class="top"><div><h1>PIXIU TECH LLP</h1><div class="muted">Robotics • AI • IoT • STEM Education</div><div class="muted" style="margin-top:8px">Official payment receipt</div></div>
+        <div class="receipt-label">RECEIPT<strong>${safe(receiptNumber)}</strong><div style="margin-top:7px">${safe(receipt?.issued_at || payment.payment_date)}</div></div>
+      </div>
+      <div class="box">
+        <div class="section-title">Receipt Details</div>
+        <div class="row"><b>School</b><span>${safe(receipt?.school_name_snapshot || payment.school_name)}</span></div>
+        ${contractRow}${invoiceRow}
+        <div class="row"><b>Payment ID</b><span>${safe(payment.id)}</span></div>
+        <div class="row"><b>Payment Date</b><span>${safe(payment.payment_date)}</span></div>
+        <div class="row"><b>Payment Method</b><span>${safe(payment.method)}</span></div>
+        <div class="row"><b>Transaction Reference</b><span>${safe(payment.transaction_reference)}</span></div>
+        ${snapshotRows}
+        <div class="row payment-total"><b>Amount Received on This Receipt</b><strong>${money(payment.amount)}</strong></div>
+      </div>
+      <div class="footer muted">This receipt confirms one verified payment. The paid and unpaid figures above are the immutable contract/invoice ledger balances immediately after this receipt was recorded. Pending submissions are not treated as received.</div>
+      <p class="muted">To download, choose “Save as PDF” in the browser print dialog.</p>
+      </body></html>`);
     popup.document.close();
+    popup.focus();
+    window.setTimeout(() => {
+      if (!popup.closed) popup.print();
+    }, 350);
   };
 
   return <div className="space-y-6 pb-12">
     <PageHeader eyebrow="Finance" title="Payments & Receipts" description="Canonical payment and receipt records from Django/PostgreSQL." actions={<RefreshButton onRefresh={async () => { await Promise.all([refreshAll(), load()]); }} loading={loading || loadingPayments || !!busyId} />} />
     {error && <ErrorState title="Payments action failed" description={error} onRetry={load} />}
     <section className="grid grid-cols-1 sm:grid-cols-4 gap-4"><Metric icon={CheckCircle2} label="Collected" value={money(totals.collected)} meta="verified payment records"/><Metric icon={Clock3} label="Pending" value={money(totals.pending)} meta="awaiting admin verification"/><Metric icon={ReceiptText} label="Payments" value={payments.length} meta={`${receipts.length} receipts issued`}/><Metric icon={XCircle} label="Failed" value={money(totals.failed)} meta="rejected or failed submissions"/></section>
-    <section className="bg-white border border-slate-200 rounded-2xl overflow-hidden"><div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row gap-3 justify-between"><div className="relative flex-1 max-w-xl"><Search size={16} className="absolute left-3 top-3 text-slate-400"/><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search payment, invoice, receipt or transaction" className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-blue-400"/></div><select value={status} onChange={e => setStatus(e.target.value)} className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm bg-white"><option value="all">All statuses</option><option value="success">Success</option><option value="pending">Pending</option><option value="failed">Failed</option><option value="refunded">Refunded</option></select></div><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-50"><tr>{['Payment','Contract / Invoice','Receipt','Method','Date','Amount','Status','Action'].map(head => <th key={head} className="p-4 text-left text-[10px] uppercase tracking-wider text-slate-500 font-black">{head}</th>)}</tr></thead><tbody className="divide-y divide-slate-100">{filtered.map(payment => { const receipt = receiptByPayment.get(String(payment.id)); const paymentStatus = lower(payment.status); const printable = !!receipt; const busy = busyId === String(payment.id); return <tr key={payment.id}><td className="p-4"><p className="font-mono text-xs font-bold text-slate-800">{payment.school_name || 'School payment'} · {payment.id}</p><p className="text-[10px] text-slate-400 mt-1">{payment.transaction_reference || 'No transaction reference'}</p></td><td className="p-4 font-mono text-xs">{payment.contract_number || payment.invoice_number || payment.contract || payment.invoice || '—'}</td><td className="p-4 font-mono text-xs">{receipt?.receipt_number || payment.receipt_number || '—'}</td><td className="p-4 capitalize">{payment.method || '—'}</td><td className="p-4 text-slate-500">{payment.payment_date ? String(payment.payment_date).slice(0,10) : '—'}</td><td className="p-4 font-black">{money(payment.amount)}</td><td className="p-4"><span className={`inline-flex px-2 py-1 rounded-lg text-[9px] font-black uppercase ${paymentStatus === 'success' ? 'bg-emerald-50 text-emerald-700' : paymentStatus === 'pending' ? 'bg-amber-50 text-amber-700' : 'bg-rose-50 text-rose-700'}`}>{payment.status || 'unknown'}</span></td><td className="p-4"><div className="flex flex-wrap gap-2">{paymentStatus === 'pending' && <><button type="button" disabled={busy} onClick={() => verifyPayment(payment.id, 'verify')} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-600 text-white text-xs font-bold disabled:opacity-50"><CheckCircle2 size={13}/>{busy ? 'Working…' : 'Verify & mark paid'}</button><button type="button" disabled={busy} onClick={() => verifyPayment(payment.id, 'reject')} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-rose-200 bg-white text-rose-600 text-xs font-bold disabled:opacity-50"><XCircle size={13}/>Reject</button></>}{printable && <button type="button" onClick={() => printReceipt(payment)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-900 text-white text-xs font-bold"><Download size={13}/> Receipt</button>}</div></td></tr>; })}</tbody></table></div>{!filtered.length && <EmptyState title="No payment records" description={loadingPayments ? 'Loading payment records…' : 'No canonical payment records match your filters.'}/>}</section>
+    <section className="bg-white border border-slate-200 rounded-2xl overflow-hidden"><div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row gap-3 justify-between"><div className="relative flex-1 max-w-xl"><Search size={16} className="absolute left-3 top-3 text-slate-400"/><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search payment, invoice, receipt or transaction" className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-blue-400"/></div><select value={status} onChange={e => setStatus(e.target.value)} className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm bg-white"><option value="all">All statuses</option><option value="success">Success</option><option value="pending">Pending</option><option value="failed">Failed</option><option value="refunded">Refunded</option></select></div><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-50"><tr>{['Payment','Contract / Invoice','Receipt','Method','Date','Amount','Status','Action'].map(head => <th key={head} className="p-4 text-left text-[10px] uppercase tracking-wider text-slate-500 font-black">{head}</th>)}</tr></thead><tbody className="divide-y divide-slate-100">{filtered.map(payment => { const receipt = receiptByPayment.get(String(payment.id)); const paymentStatus = lower(payment.status); const printable = !!receipt; const busy = busyId === String(payment.id); return <tr key={payment.id}><td className="p-4"><p className="font-mono text-xs font-bold text-slate-800">{payment.school_name || 'School payment'} · {payment.id}</p><p className="text-[10px] text-slate-400 mt-1">{payment.transaction_reference || 'No transaction reference'}</p></td><td className="p-4 font-mono text-xs">{payment.contract_number || payment.invoice_number || payment.contract || payment.invoice || '—'}</td><td className="p-4 font-mono text-xs">{receipt?.receipt_number || payment.receipt_number || '—'}</td><td className="p-4 capitalize">{payment.method || '—'}</td><td className="p-4 text-slate-500">{payment.payment_date ? String(payment.payment_date).slice(0,10) : '—'}</td><td className="p-4 font-black">{money(payment.amount)}</td><td className="p-4"><span className={`inline-flex px-2 py-1 rounded-lg text-[9px] font-black uppercase ${paymentStatus === 'success' ? 'bg-emerald-50 text-emerald-700' : paymentStatus === 'pending' ? 'bg-amber-50 text-amber-700' : 'bg-rose-50 text-rose-700'}`}>{payment.status || 'unknown'}</span></td><td className="p-4"><div className="flex flex-wrap gap-2">{paymentStatus === 'pending' && <><button type="button" disabled={busy} onClick={() => verifyPayment(payment.id, 'verify')} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-600 text-white text-xs font-bold disabled:opacity-50"><CheckCircle2 size={13}/>{busy ? 'Working…' : 'Verify & mark paid'}</button><button type="button" disabled={busy} onClick={() => verifyPayment(payment.id, 'reject')} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-rose-200 bg-white text-rose-600 text-xs font-bold disabled:opacity-50"><XCircle size={13}/>Reject</button></>}{printable && <button type="button" title="Open the receipt and save it as a PDF" onClick={() => printReceipt(payment)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-900 text-white text-xs font-bold"><Download size={13}/> Download PDF</button>}</div></td></tr>; })}</tbody></table></div>{!filtered.length && <EmptyState title="No payment records" description={loadingPayments ? 'Loading payment records…' : 'No canonical payment records match your filters.'}/>}</section>
   </div>;
 }
 
