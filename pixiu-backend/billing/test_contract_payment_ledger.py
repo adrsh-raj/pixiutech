@@ -129,6 +129,55 @@ class ContractPaymentLedgerApiTests(APITestCase):
         self.assertEqual(Payment.objects.filter(contract=self.contract).count(), 1)
         self.assertEqual(Receipt.objects.filter(payment__contract=self.contract).count(), 0)
 
+
+    def test_linked_invoice_payments_roll_up_to_contract_and_prevent_separate_contract_payments(self):
+        self.client.force_authenticate(self.admin)
+        today = date.today()
+        created = self.client.post(
+            "/api/v1/invoices/create-with-lines",
+            {
+                "school": str(self.school.pk),
+                "contract": str(self.contract.pk),
+                "issue_date": today.isoformat(),
+                "due_date": (today + timedelta(days=30)).isoformat(),
+                "tax_amount": "0.00",
+                "notes": "Contract-linked invoice",
+                "lines": [{"description": "School programme", "quantity": 1, "unit_price": "50000.00"}],
+            },
+            format="json",
+        )
+        self.assertEqual(created.status_code, 201, created.data)
+        invoice_id = created.data["id"]
+
+        contract = self.get_contract()
+        self.assertEqual(contract["open_invoice_count"], 1)
+
+        direct = self.post_contract_payment("10000.00", "LEDGER-DIRECT-WHILE-INVOICE-OPEN")
+        self.assertEqual(direct.status_code, 400, direct.data)
+        self.assertEqual(Payment.objects.filter(contract=self.contract).count(), 0)
+
+        paid = self.client.post(
+            "/api/v1/payments/record",
+            {
+                "invoice": invoice_id,
+                "amount": "10000.00",
+                "method": "bank_transfer",
+                "payment_date": today.isoformat(),
+                "transaction_reference": "LEDGER-INVOICE-UTR-001",
+                "notes": "Invoice-linked contract payment",
+            },
+            format="json",
+        )
+        self.assertEqual(paid.status_code, 201, paid.data)
+        self.assertEqual(paid.data["receipt"]["contract_number_snapshot"], self.contract.contract_number)
+        self.assertEqual(paid.data["receipt"]["amount_paid_snapshot"], "10000.00")
+        self.assertEqual(paid.data["receipt"]["balance_due_snapshot"], "40000.00")
+
+        contract = self.get_contract()
+        self.assertEqual(Decimal(str(contract["amount_paid"])), Decimal("10000.00"))
+        self.assertEqual(Decimal(str(contract["balance_due"])), Decimal("40000.00"))
+        self.assertEqual(contract["open_invoice_count"], 1)
+
     def test_contract_terms_cannot_be_rewritten_after_a_payment(self):
         self.client.force_authenticate(self.admin)
         payment = self.post_contract_payment("10000.00", "LEDGER-LOCK-UTR-001")

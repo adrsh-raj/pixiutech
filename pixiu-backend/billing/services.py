@@ -76,6 +76,30 @@ def issue_invoice(*, invoice: Invoice, issued_by) -> Invoice:
     recalculate_invoice(locked_invoice)
     if locked_invoice.total_amount <= 0:
         raise ValidationError("An invoice must have a positive total before it can be issued.")
+    if locked_invoice.contract_id:
+        contract = SchoolContract.objects.select_for_update().get(pk=locked_invoice.contract_id)
+        if contract.status not in {ContractStatus.ACTIVE, ContractStatus.EXPIRED}:
+            raise ValidationError("Only active or expired signed contracts can be invoiced.")
+        if Payment.objects.filter(contract=contract, status=PaymentStatus.PENDING).exists():
+            raise ValidationError("Resolve the pending direct contract payment before issuing a linked invoice.")
+        open_invoices = contract.invoices.filter(
+            status__in=[BillingStatus.ISSUED, BillingStatus.PARTIALLY_PAID, BillingStatus.OVERDUE]
+        ).exclude(pk=locked_invoice.pk)
+        already_billed_due = sum(
+            (
+                max(Decimal(item.total_amount) - Decimal(item.amount_paid), Decimal("0.00"))
+                for item in open_invoices
+            ),
+            Decimal("0.00"),
+        )
+        available_to_invoice = max(
+            Decimal(contract.total_value) - contract_amount_paid(contract) - already_billed_due,
+            Decimal("0.00"),
+        )
+        if locked_invoice.total_amount > available_to_invoice:
+            raise ValidationError({
+                "contract": f"This invoice exceeds the remaining unbilled contract value of ₹{available_to_invoice:.2f}."
+            })
     locked_invoice.status = BillingStatus.ISSUED
     locked_invoice.save(update_fields=["status", "updated_at"])
     notify_school(
