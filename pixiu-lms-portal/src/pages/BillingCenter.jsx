@@ -432,7 +432,7 @@ export default function BillingCenter() {
               [contracts.length ? 'Received' : 'Paid', contracts.length ? summary?.contract_collected : summary?.collected],
               ['Outstanding', contracts.length ? summary?.contract_pending : summary?.pending],
               ['Invoices', summary?.invoice_count],
-            ].map(([label, value]) => (            ].map(([label, value]) => (
+            ].map(([label, value]) => (
               <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4">
                 <p className="text-[9px] font-black uppercase tracking-[.12em] text-slate-400">{label}</p>
                 <p className="mt-2 text-xl font-black text-slate-900">{label === 'Invoices' ? Number(value || 0) : money(value)}</p>

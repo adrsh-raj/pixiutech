@@ -235,6 +235,8 @@ def record_payment(
             locked_contract = SchoolContract.objects.select_for_update().select_related(
                 "school"
             ).get(pk=locked_invoice.contract_id)
+            if locked_contract.status not in {ContractStatus.ACTIVE, ContractStatus.EXPIRED}:
+                raise ValidationError("The linked contract is not eligible to receive payment.")
             contract_outstanding = (
                 locked_contract.total_value - contract_amount_paid(locked_contract)
             ).quantize(TWOPLACES)
