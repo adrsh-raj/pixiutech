@@ -258,6 +258,7 @@ class PaymentViewSet(BillingScopedMixin, viewsets.ReadOnlyModelViewSet):
             reversed_by=request.user,
             reversal_status=reversal_status,
             reason=request.data.get("reason", ""),
+            request=request,
         )
         return Response(PaymentSerializer(payment).data)
 
