@@ -14,16 +14,43 @@ from accounts.permissions import HasActionPermission, IsActiveAccount
 from academics.services import accessible_school_queryset
 from audit.services import record_audit
 from .services import ensure_school_billing_profile
-from .models import SchoolContract, ContractStatus, Invoice, BillingStatus
+from .models import SchoolContract, ContractStatus, Invoice, BillingStatus, Payment, PaymentStatus
 
 
 class SchoolContractSerializer(serializers.ModelSerializer):
+    total_value = serializers.DecimalField(max_digits=14, decimal_places=2, min_value=Decimal("0.01"))
     school_code = serializers.CharField(source="school.school_code", read_only=True)
     school_name = serializers.CharField(source="school.name", read_only=True)
+    amount_paid = serializers.SerializerMethodField()
+    balance_due = serializers.SerializerMethodField()
+    payment_status = serializers.SerializerMethodField()
+
+    def _amount_paid(self, obj):
+        if not hasattr(obj, "_ledger_amount_paid"):
+            total = Payment.objects.filter(
+                Q(contract=obj) | Q(invoice__contract=obj),
+                status=PaymentStatus.SUCCESS,
+            ).aggregate(total=Sum("amount"))["total"]
+            obj._ledger_amount_paid = total or Decimal("0.00")
+        return obj._ledger_amount_paid
+
+    def get_amount_paid(self, obj):
+        return self._amount_paid(obj)
+
+    def get_balance_due(self, obj):
+        return max(Decimal(obj.total_value) - self._amount_paid(obj), Decimal("0.00"))
+
+    def get_payment_status(self, obj):
+        paid = self._amount_paid(obj)
+        if paid >= obj.total_value and obj.total_value > 0:
+            return "paid"
+        if paid > 0:
+            return "partially_paid"
+        return "unpaid"
 
     class Meta:
         model = SchoolContract
-        fields = ["id", "contract_number", "school", "school_code", "school_name", "start_date", "end_date", "total_value", "status", "notes", "created_by", "created_at", "updated_at"]
+        fields = ["id", "contract_number", "school", "school_code", "school_name", "start_date", "end_date", "total_value", "amount_paid", "balance_due", "payment_status", "status", "notes", "created_by", "created_at", "updated_at"]
         read_only_fields = ["id", "created_by", "created_at", "updated_at"]
 
     def validate(self, attrs):
@@ -37,7 +64,7 @@ class SchoolContractSerializer(serializers.ModelSerializer):
 
 
 class ContractViewSet(viewsets.ModelViewSet):
-    queryset = SchoolContract.objects.select_related("school", "created_by")
+    queryset = SchoolContract.objects.select_related("school", "created_by").prefetch_related("payments")
     serializer_class = SchoolContractSerializer
     permission_classes = [IsAuthenticated, IsActiveAccount, HasActionPermission]
 

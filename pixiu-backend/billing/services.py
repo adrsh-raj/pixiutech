@@ -4,12 +4,16 @@ from uuid import uuid4
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.db.models import Q, Sum
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from audit.services import record_audit
 from notifications.models import Notification, NotificationType
-from .models import BillingProfile, Invoice, InvoiceLineItem, Payment, PaymentStatus, Receipt, BillingStatus
+from .models import (
+    BillingProfile, BillingStatus, ContractStatus, Invoice, InvoiceLineItem,
+    Payment, PaymentStatus, Receipt, SchoolContract,
+)
 
 User = get_user_model()
 TWOPLACES = Decimal("0.01")
@@ -134,48 +138,259 @@ def update_invoice_line(*, line: InvoiceLineItem, description: str, quantity, un
     return locked_line
 
 
+def contract_amount_paid(contract: SchoolContract) -> Decimal:
+    """Successful payments allocated directly to a contract or to its linked invoices."""
+    total = Payment.objects.filter(
+        Q(contract=contract) | Q(invoice__contract=contract),
+        status=PaymentStatus.SUCCESS,
+    ).aggregate(total=Sum("amount"))["total"]
+    return (total or Decimal("0.00")).quantize(TWOPLACES)
+
+
+def _issue_payment_receipt(*, payment: Payment, issued_by, school, invoice=None, contract=None) -> Receipt:
+    """Create an immutable receipt snapshot after the payment is confirmed."""
+    if invoice and invoice.contract_id:
+        contract = contract or invoice.contract
+    if contract:
+        total = Decimal(contract.total_value).quantize(TWOPLACES)
+        paid = contract_amount_paid(contract)
+        contract_number = contract.contract_number
+    else:
+        total = Decimal(invoice.total_amount).quantize(TWOPLACES)
+        paid = Decimal(invoice.amount_paid).quantize(TWOPLACES)
+        contract_number = ""
+    balance = max(total - paid, Decimal("0.00")).quantize(TWOPLACES)
+    obligation_label = contract_number or (invoice.invoice_number if invoice else "contract")
+    return Receipt.objects.create(
+        receipt_number=f"RCT-{timezone.localdate():%Y}-{uuid4().hex[:10].upper()}",
+        payment=payment,
+        issued_at=timezone.now(),
+        issued_by=issued_by,
+        school_name_snapshot=school.name,
+        invoice_number_snapshot=invoice.invoice_number if invoice else "",
+        contract_number_snapshot=contract_number,
+        total_amount_snapshot=total,
+        amount_paid_snapshot=paid,
+        balance_due_snapshot=balance,
+    )
+
+
 @transaction.atomic
-def record_payment(*, invoice: Invoice, amount, method: str, payment_date, recorded_by, transaction_reference="", notes="", payment_status=PaymentStatus.SUCCESS):
-    locked_invoice = Invoice.objects.select_for_update().get(pk=invoice.pk)
-    if locked_invoice.status == BillingStatus.VOID:
-        raise ValidationError("A void invoice cannot receive a payment.")
+def record_payment(
+    *,
+    invoice: Invoice = None,
+    contract: SchoolContract = None,
+    amount,
+    method: str,
+    payment_date,
+    recorded_by,
+    transaction_reference="",
+    notes="",
+    payment_status=PaymentStatus.SUCCESS,
+):
+    if (invoice is None) == (contract is None):
+        raise ValidationError("Provide exactly one of invoice or contract.")
+
+    locked_invoice = None
+    locked_contract = None
+    school = None
+
+    if invoice is not None:
+        locked_invoice = Invoice.objects.select_for_update().select_related(
+            "school", "contract__school"
+        ).get(pk=invoice.pk)
+        if locked_invoice.status == BillingStatus.VOID:
+            raise ValidationError("A void invoice cannot receive a payment.")
+        recalculate_invoice(locked_invoice)
+        school = locked_invoice.school
+        invoice_outstanding = (
+            locked_invoice.total_amount - locked_invoice.amount_paid
+        ).quantize(TWOPLACES)
+        outstanding = invoice_outstanding
+        if locked_invoice.contract_id:
+            locked_contract = SchoolContract.objects.select_for_update().select_related(
+                "school"
+            ).get(pk=locked_invoice.contract_id)
+            contract_outstanding = (
+                locked_contract.total_value - contract_amount_paid(locked_contract)
+            ).quantize(TWOPLACES)
+            outstanding = min(invoice_outstanding, contract_outstanding)
+    else:
+        locked_contract = SchoolContract.objects.select_for_update().select_related(
+            "school"
+        ).get(pk=contract.pk)
+        if locked_contract.status not in {ContractStatus.ACTIVE, ContractStatus.EXPIRED}:
+            raise ValidationError("Only active or expired signed contracts can receive payments.")
+        school = locked_contract.school
+        outstanding = (
+            locked_contract.total_value - contract_amount_paid(locked_contract)
+        ).quantize(TWOPLACES)
+
     amount = Decimal(amount).quantize(TWOPLACES)
     if amount <= 0:
         raise ValidationError({"amount": "Payment amount must be positive."})
-    recalculate_invoice(locked_invoice)
-    outstanding = (locked_invoice.total_amount - locked_invoice.amount_paid).quantize(TWOPLACES)
+    if outstanding <= 0:
+        raise ValidationError({"amount": "There is no outstanding balance for this record."})
     if amount > outstanding:
-        raise ValidationError({"amount": "Payment exceeds the outstanding invoice balance."})
-    if payment_status == PaymentStatus.PENDING and Payment.objects.filter(invoice=locked_invoice, status=PaymentStatus.PENDING).exists():
-        raise ValidationError({"invoice": "A payment is already pending verification for this invoice."})
-    payment = Payment.objects.create(invoice=locked_invoice, amount=amount, method=method, status=payment_status, payment_date=payment_date, transaction_reference=transaction_reference.strip(), notes=notes.strip(), recorded_by=recorded_by)
-    receipt = None
-    if payment_status == PaymentStatus.SUCCESS:
-        recalculate_invoice(locked_invoice)
-        receipt = Receipt.objects.create(receipt_number=f"RCT-{timezone.now():%Y}-{uuid4().hex[:10].upper()}", payment=payment, issued_at=timezone.now(), issued_by=recorded_by)
-        record_audit(actor=recorded_by, action="payment", entity_type="Payment", entity_id=payment.id, summary=f"Payment recorded for {locked_invoice.invoice_number}", changes={"amount": str(amount), "method": method, "invoice": locked_invoice.invoice_number})
-        record_audit(actor=recorded_by, action="create", entity_type="Receipt", entity_id=receipt.id, summary=f"Receipt issued for {locked_invoice.invoice_number}", changes={"receipt_number": receipt.receipt_number})
+        raise ValidationError({
+            "amount": f"Payment exceeds the outstanding balance of ₹{outstanding:.2f}."
+        })
+
+    pending_query = Payment.objects.filter(status=PaymentStatus.PENDING)
+    if locked_contract:
+        pending_query = pending_query.filter(
+            Q(contract=locked_contract) | Q(invoice__contract=locked_contract)
+        )
     else:
-        record_audit(actor=recorded_by, action="payment_pending", entity_type="Payment", entity_id=payment.id, summary=f"Payment submitted for verification for {locked_invoice.invoice_number}", changes={"amount": str(amount), "method": method, "invoice": locked_invoice.invoice_number})
+        pending_query = pending_query.filter(invoice=locked_invoice)
+    if payment_status == PaymentStatus.PENDING and pending_query.exists():
+        raise ValidationError({
+            "payment": "A payment is already awaiting verification for this contract or invoice."
+        })
+
+    payment = Payment.objects.create(
+        invoice=locked_invoice,
+        contract=locked_contract if locked_invoice is None else None,
+        amount=amount,
+        method=method,
+        status=payment_status,
+        payment_date=payment_date,
+        transaction_reference=transaction_reference.strip(),
+        notes=notes.strip(),
+        recorded_by=recorded_by,
+    )
+    receipt = None
+    target_label = (
+        locked_contract.contract_number if locked_contract
+        else locked_invoice.invoice_number
+    )
+
+    if payment_status == PaymentStatus.SUCCESS:
+        if locked_invoice:
+            recalculate_invoice(locked_invoice)
+        receipt = _issue_payment_receipt(
+            payment=payment,
+            issued_by=recorded_by,
+            school=school,
+            invoice=locked_invoice,
+            contract=locked_contract,
+        )
+        record_audit(
+            actor=recorded_by,
+            action="payment",
+            entity_type="Payment",
+            entity_id=payment.id,
+            summary=f"Payment recorded for {target_label}",
+            changes={
+                "amount": str(amount),
+                "method": method,
+                "invoice": locked_invoice.invoice_number if locked_invoice else None,
+                "contract": locked_contract.contract_number if locked_contract else None,
+            },
+        )
+        record_audit(
+            actor=recorded_by,
+            action="create",
+            entity_type="Receipt",
+            entity_id=receipt.id,
+            summary=f"Receipt issued for {target_label}",
+            changes={"receipt_number": receipt.receipt_number},
+        )
+    else:
+        record_audit(
+            actor=recorded_by,
+            action="payment_pending",
+            entity_type="Payment",
+            entity_id=payment.id,
+            summary=f"Payment submitted for verification for {target_label}",
+            changes={
+                "amount": str(amount),
+                "method": method,
+                "invoice": locked_invoice.invoice_number if locked_invoice else None,
+                "contract": locked_contract.contract_number if locked_invoice is None else (
+                    locked_contract.contract_number if locked_contract else None
+                ),
+            },
+        )
     return payment, receipt
 
 
 @transaction.atomic
 def verify_pending_payment(*, payment: Payment, verified_by):
-    locked_payment = Payment.objects.select_for_update().select_related("invoice__school").get(pk=payment.pk)
+    locked_payment = Payment.objects.select_for_update().select_related(
+        "invoice__school", "invoice__contract__school", "contract__school"
+    ).get(pk=payment.pk)
     if locked_payment.status != PaymentStatus.PENDING:
         raise ValidationError("Only pending payments can be verified.")
-    invoice = Invoice.objects.select_for_update().get(pk=locked_payment.invoice_id)
-    if invoice.status == BillingStatus.VOID:
-        raise ValidationError("A void invoice payment cannot be verified.")
-    recalculate_invoice(invoice)
-    outstanding = (invoice.total_amount - invoice.amount_paid).quantize(TWOPLACES)
-    if locked_payment.amount > outstanding:
-        raise ValidationError("This payment would exceed the invoice outstanding balance.")
+
+    invoice = None
+    contract = None
+    school = None
+    outstanding = Decimal("0.00")
+
+    if locked_payment.invoice_id:
+        invoice = Invoice.objects.select_for_update().select_related(
+            "school", "contract__school"
+        ).get(pk=locked_payment.invoice_id)
+        if invoice.status == BillingStatus.VOID:
+            raise ValidationError("A void invoice payment cannot be verified.")
+        recalculate_invoice(invoice)
+        outstanding = (invoice.total_amount - invoice.amount_paid).quantize(TWOPLACES)
+        school = invoice.school
+        if invoice.contract_id:
+            contract = SchoolContract.objects.select_for_update().get(pk=invoice.contract_id)
+            if contract.status not in {ContractStatus.ACTIVE, ContractStatus.EXPIRED}:
+                raise ValidationError("The linked contract is not eligible to receive payment.")
+            contract_outstanding = (
+                contract.total_value - contract_amount_paid(contract)
+            ).quantize(TWOPLACES)
+            outstanding = min(outstanding, contract_outstanding)
+    else:
+        contract = SchoolContract.objects.select_for_update().select_related(
+            "school"
+        ).get(pk=locked_payment.contract_id)
+        if contract.status not in {ContractStatus.ACTIVE, ContractStatus.EXPIRED}:
+            raise ValidationError("Only active or expired signed contracts can receive payments.")
+        school = contract.school
+        outstanding = (
+            contract.total_value - contract_amount_paid(contract)
+        ).quantize(TWOPLACES)
+
+    if locked_payment.amount > outstanding or outstanding <= 0:
+        raise ValidationError("This payment would exceed the outstanding balance.")
+
     locked_payment.status = PaymentStatus.SUCCESS
     locked_payment.save(update_fields=["status"])
-    recalculate_invoice(invoice)
-    receipt = Receipt.objects.create(receipt_number=f"RCT-{timezone.now():%Y}-{uuid4().hex[:10].upper()}", payment=locked_payment, issued_at=timezone.now(), issued_by=verified_by)
-    record_audit(actor=verified_by, action="payment_verified", entity_type="Payment", entity_id=locked_payment.id, summary=f"Verified payment for {invoice.invoice_number}", changes={"status": "success", "amount": str(locked_payment.amount), "invoice": invoice.invoice_number})
-    record_audit(actor=verified_by, action="create", entity_type="Receipt", entity_id=receipt.id, summary=f"Receipt issued for {invoice.invoice_number}", changes={"receipt_number": receipt.receipt_number})
+    if invoice:
+        recalculate_invoice(invoice)
+
+    receipt = _issue_payment_receipt(
+        payment=locked_payment,
+        issued_by=verified_by,
+        school=school,
+        invoice=invoice,
+        contract=contract,
+    )
+    target_label = contract.contract_number if contract else invoice.invoice_number
+    record_audit(
+        actor=verified_by,
+        action="payment_verified",
+        entity_type="Payment",
+        entity_id=locked_payment.id,
+        summary=f"Verified payment for {target_label}",
+        changes={
+            "status": "success",
+            "amount": str(locked_payment.amount),
+            "invoice": invoice.invoice_number if invoice else None,
+            "contract": contract.contract_number if contract else None,
+        },
+    )
+    record_audit(
+        actor=verified_by,
+        action="create",
+        entity_type="Receipt",
+        entity_id=receipt.id,
+        summary=f"Receipt issued for {target_label}",
+        changes={"receipt_number": receipt.receipt_number},
+    )
     return locked_payment, receipt

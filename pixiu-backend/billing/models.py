@@ -99,7 +99,8 @@ class InvoiceLineItem(models.Model):
 
 class Payment(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    invoice = models.ForeignKey(Invoice, on_delete=models.PROTECT, related_name="payments")
+    invoice = models.ForeignKey(Invoice, on_delete=models.PROTECT, null=True, blank=True, related_name="payments")
+    contract = models.ForeignKey(SchoolContract, on_delete=models.PROTECT, null=True, blank=True, related_name="payments")
     amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))])
     method = models.CharField(max_length=30, choices=PaymentMethod.choices)
     status = models.CharField(max_length=20, choices=PaymentStatus.choices, default=PaymentStatus.PENDING)
@@ -110,7 +111,16 @@ class Payment(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     class Meta:
         ordering=["-payment_date","-created_at"]
-        constraints=[models.UniqueConstraint(fields=["method","transaction_reference"],condition=~Q(transaction_reference=""),name="uniq_payment_reference_per_method")]
+        constraints=[
+            models.UniqueConstraint(fields=["method", "transaction_reference"], condition=~Q(transaction_reference=""), name="uniq_payment_reference_per_method"),
+            models.CheckConstraint(
+                condition=(
+                    Q(invoice__isnull=False, contract__isnull=True)
+                    | Q(invoice__isnull=True, contract__isnull=False)
+                ),
+                name="payment_exactly_one_target",
+            ),
+        ]
 
 
 class Receipt(models.Model):
@@ -118,6 +128,13 @@ class Receipt(models.Model):
     receipt_number = models.CharField(max_length=40, unique=True)
     payment = models.OneToOneField(Payment, on_delete=models.PROTECT, related_name="receipt")
     issued_at = models.DateTimeField()
+    # Immutable point-in-time values: a later payment must never rewrite an old receipt.
+    school_name_snapshot = models.CharField(max_length=200, blank=True, default="")
+    invoice_number_snapshot = models.CharField(max_length=40, blank=True, default="")
+    contract_number_snapshot = models.CharField(max_length=50, blank=True, default="")
+    total_amount_snapshot = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
+    amount_paid_snapshot = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
+    balance_due_snapshot = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
     issued_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="issued_receipts")
     class Meta: ordering=["-issued_at"]
 

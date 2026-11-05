@@ -1,4 +1,5 @@
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -30,10 +31,14 @@ def _school_filter(qs, request, field="school"):
     if not school or field not in {"school", "invoice__school"}:
         return qs
     value = str(school).strip()
-    from django.db.models import Q
     if field == "school":
         return qs.filter(Q(school__school_code=value.upper()) | Q(school_id=value))
-    return qs.filter(Q(invoice__school__school_code=value.upper()) | Q(invoice__school_id=value))
+    return qs.filter(
+        Q(invoice__school__school_code=value.upper())
+        | Q(invoice__school_id=value)
+        | Q(contract__school__school_code=value.upper())
+        | Q(contract__school_id=value)
+    )
 
 
 class InvoiceViewSet(BillingScopedMixin, viewsets.ModelViewSet):
@@ -134,7 +139,9 @@ class InvoiceLineItemViewSet(BillingScopedMixin, viewsets.ModelViewSet):
 
 class PaymentViewSet(BillingScopedMixin, viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated, IsActiveAccount, HasActionPermission]
-    queryset = Payment.objects.select_related("invoice__school", "recorded_by", "receipt")
+    queryset = Payment.objects.select_related(
+        "invoice__school", "invoice__contract", "contract__school", "recorded_by", "receipt"
+    )
     serializer_class = PaymentSerializer
 
     def get_queryset(self):
@@ -143,7 +150,10 @@ class PaymentViewSet(BillingScopedMixin, viewsets.ReadOnlyModelViewSet):
         if u.role == UserRole.ADMIN:
             pass
         elif u.role == UserRole.SCHOOL:
-            qs = qs.filter(invoice__school__account_id=u.id)
+            qs = qs.filter(
+                Q(invoice__school__account_id=u.id)
+                | Q(contract__school__account_id=u.id)
+            )
         else:
             return qs.none()
         return _school_filter(qs, self.request, "invoice__school")
@@ -153,26 +163,92 @@ class PaymentViewSet(BillingScopedMixin, viewsets.ReadOnlyModelViewSet):
         self.role_only(UserRole.ADMIN, UserRole.SCHOOL)
         serializer = PaymentRecordSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        invoice = serializer.validated_data["invoice"]
-        if request.user.role == UserRole.SCHOOL and invoice.school.account_id != request.user.id:
-            raise PermissionDenied("You cannot record payment for this invoice.")
-        if invoice.status not in {BillingStatus.ISSUED, BillingStatus.PARTIALLY_PAID, BillingStatus.OVERDUE}:
+        invoice = serializer.validated_data.get("invoice")
+        contract = serializer.validated_data.get("contract")
+        school = invoice.school if invoice else contract.school
+
+        if request.user.role == UserRole.SCHOOL and school.account_id != request.user.id:
+            raise PermissionDenied("You cannot record payment for this school.")
+        if request.user.role == UserRole.SCHOOL and not serializer.validated_data.get("transaction_reference", "").strip():
+            raise ValidationError({"transaction_reference": "A UTR / transaction reference is required for school payment submission."})
+        if invoice and invoice.status not in {
+            BillingStatus.ISSUED, BillingStatus.PARTIALLY_PAID, BillingStatus.OVERDUE
+        }:
             raise ValidationError("Only issued invoices can receive payments.")
-        payment_status = PaymentStatus.PENDING if request.user.role == UserRole.SCHOOL else PaymentStatus.SUCCESS
-        payment, receipt = record_payment(recorded_by=request.user, payment_status=payment_status, **serializer.validated_data)
+
+        payment_status = (
+            PaymentStatus.PENDING if request.user.role == UserRole.SCHOOL
+            else PaymentStatus.SUCCESS
+        )
+        payment, receipt = record_payment(
+            invoice=invoice,
+            contract=contract,
+            amount=serializer.validated_data["amount"],
+            method=serializer.validated_data["method"],
+            payment_date=serializer.validated_data["payment_date"],
+            transaction_reference=serializer.validated_data.get("transaction_reference", ""),
+            notes=serializer.validated_data.get("notes", ""),
+            recorded_by=request.user,
+            payment_status=payment_status,
+        )
+        target_number = contract.contract_number if contract else (
+            invoice.contract.contract_number if invoice.contract_id else invoice.invoice_number
+        )
+        metadata = {
+            "payment_id": str(payment.id),
+            "invoice_id": str(invoice.id) if invoice else None,
+            "contract_id": str(contract.id) if contract else (
+                str(invoice.contract_id) if invoice and invoice.contract_id else None
+            ),
+            "school_id": str(school.id),
+            "amount": str(payment.amount),
+        }
         if payment_status == PaymentStatus.PENDING:
-            notify_admins(title=f"Payment verification required — {invoice.school.name}", message=f"{invoice.school.name} submitted ₹{payment.amount:.2f} for invoice {invoice.invoice_number}. Kindly verify the payment.", event_key=f"payment-pending:{payment.id}", metadata={"payment_id": str(payment.id), "invoice_id": str(invoice.id), "school_id": str(invoice.school_id), "amount": str(payment.amount)})
+            notify_admins(
+                title=f"Payment verification required — {school.name}",
+                message=f"{school.name} submitted ₹{payment.amount:.2f} against {target_number}. Kindly verify the transaction.",
+                event_key=f"payment-pending:{payment.id}",
+                metadata=metadata,
+            )
         else:
-            notify_school(invoice.school, title=f"Payment recorded — {invoice.invoice_number}", message=f"₹{payment.amount:.2f} has been recorded against your invoice and the invoice status is now {invoice.status}.", event_key=f"payment-recorded:{payment.id}", metadata={"payment_id": str(payment.id), "invoice_id": str(invoice.id), "status": invoice.status})
-        return Response({"payment": PaymentSerializer(payment).data, "receipt": ReceiptSerializer(receipt).data if receipt else None}, status=status.HTTP_201_CREATED)
+            notify_school(
+                school,
+                title=f"Payment recorded — {target_number}",
+                message=f"₹{payment.amount:.2f} has been recorded. The remaining balance is shown on the contract / invoice ledger.",
+                event_key=f"payment-recorded:{payment.id}",
+                metadata={**metadata, "receipt_number": receipt.receipt_number},
+            )
+        return Response(
+            {
+                "payment": PaymentSerializer(payment).data,
+                "receipt": ReceiptSerializer(receipt).data if receipt else None,
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
     @action(detail=True, methods=["post"])
     def verify(self, request, pk=None):
         self.role_only(UserRole.ADMIN)
         payment = self.get_object()
         payment, receipt = verify_pending_payment(payment=payment, verified_by=request.user)
-        invoice = payment.invoice
-        notify_school(invoice.school, title=f"Payment verified — {invoice.invoice_number}", message=f"Pixiu Tech verified your payment of ₹{payment.amount:.2f}. Your invoice is now {invoice.status}.", event_key=f"payment-verified:{payment.id}", metadata={"payment_id": str(payment.id), "invoice_id": str(invoice.id), "status": invoice.status, "receipt_number": receipt.receipt_number})
+        school = payment.invoice.school if payment.invoice_id else payment.contract.school
+        target_number = payment.contract.contract_number if payment.contract_id else (
+            payment.invoice.contract.contract_number if payment.invoice.contract_id else payment.invoice.invoice_number
+        )
+        notify_school(
+            school,
+            title=f"Payment verified — {target_number}",
+            message=f"Pixiu Tech verified your payment of ₹{payment.amount:.2f}. Your receipt {receipt.receipt_number} is ready.",
+            event_key=f"payment-verified:{payment.id}",
+            metadata={
+                "payment_id": str(payment.id),
+                "invoice_id": str(payment.invoice_id) if payment.invoice_id else None,
+                "contract_id": str(payment.contract_id) if payment.contract_id else (
+                    str(payment.invoice.contract_id) if payment.invoice.contract_id else None
+                ),
+                "receipt_number": receipt.receipt_number,
+            },
+        )
         return Response({"payment": PaymentSerializer(payment).data, "receipt": ReceiptSerializer(receipt).data})
 
     @action(detail=True, methods=["post"])
@@ -183,15 +259,35 @@ class PaymentViewSet(BillingScopedMixin, viewsets.ReadOnlyModelViewSet):
             raise ValidationError("Only pending payments can be rejected.")
         payment.status = PaymentStatus.FAILED
         payment.save(update_fields=["status"])
-        payment.invoice.refresh_from_db()
-        notify_school(payment.invoice.school, title=f"Payment needs review — {payment.invoice.invoice_number}", message=f"The submitted payment of ₹{payment.amount:.2f} was not verified. Please review the invoice and submit payment again with the correct reference.", event_key=f"payment-rejected:{payment.id}", metadata={"payment_id": str(payment.id), "invoice_id": str(payment.invoice_id), "status": "failed"})
-        record_audit(actor=request.user, action="payment_rejected", entity_type="Payment", entity_id=payment.id, summary=f"Rejected payment for {payment.invoice.invoice_number}", changes={"status": "failed"}, request=request)
+        if payment.invoice_id:
+            payment.invoice.refresh_from_db()
+            school = payment.invoice.school
+            target_number = payment.invoice.contract.contract_number if payment.invoice.contract_id else payment.invoice.invoice_number
+        else:
+            school = payment.contract.school
+            target_number = payment.contract.contract_number
+        notify_school(
+            school,
+            title=f"Payment needs review — {target_number}",
+            message=f"The submitted payment of ₹{payment.amount:.2f} was not verified. Please review the transaction details and submit it again with the correct reference.",
+            event_key=f"payment-rejected:{payment.id}",
+            metadata={
+                "payment_id": str(payment.id),
+                "invoice_id": str(payment.invoice_id) if payment.invoice_id else None,
+                "contract_id": str(payment.contract_id) if payment.contract_id else None,
+                "status": "failed",
+            },
+        )
+        record_audit(actor=request.user, action="payment_rejected", entity_type="Payment", entity_id=payment.id, summary=f"Rejected payment for {target_number}", changes={"status": "failed"}, request=request)
         return Response(PaymentSerializer(payment).data)
 
 
 class ReceiptViewSet(BillingScopedMixin, viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated, IsActiveAccount, HasActionPermission]
-    queryset = Receipt.objects.select_related("payment__invoice__school", "issued_by")
+    queryset = Receipt.objects.select_related(
+        "payment__invoice__school", "payment__invoice__contract",
+        "payment__contract__school", "payment__recorded_by", "issued_by",
+    )
     serializer_class = ReceiptSerializer
 
     def get_queryset(self):
@@ -200,7 +296,19 @@ class ReceiptViewSet(BillingScopedMixin, viewsets.ReadOnlyModelViewSet):
         if u.role == UserRole.ADMIN:
             pass
         elif u.role == UserRole.SCHOOL:
-            qs = qs.filter(payment__invoice__school__account_id=u.id)
+            qs = qs.filter(
+                Q(payment__invoice__school__account_id=u.id)
+                | Q(payment__contract__school__account_id=u.id)
+            )
         else:
             return qs.none()
-        return _school_filter(qs, self.request, "invoice__school")
+        school = self.request.query_params.get("school")
+        if school:
+            value = str(school).strip()
+            qs = qs.filter(
+                Q(payment__invoice__school__school_code=value.upper())
+                | Q(payment__invoice__school_id=value)
+                | Q(payment__contract__school__school_code=value.upper())
+                | Q(payment__contract__school_id=value)
+            )
+        return qs
