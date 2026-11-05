@@ -10,7 +10,8 @@ Updated: 2026-11-05 (Asia/Kolkata)
 - PR target: `main`
 - Pull request #77: [merged](https://github.com/adrsh-raj/pixiutech/pull/77) on 2026-11-05.
 - Squash merge commit on `main`: `636a30e1351b296ed9cf98e1b4bfc8a5456d7121`.
-- Verified `main` currently points to that merge commit.
+- The feature merge commit is `636a30e1351b296ed9cf98e1b4bfc8a5456d7121`.
+- A documentation-only checkpoint update was then committed directly to `main` as `84fb008fc05ff62b704f83286d15f8f6116e39c9`.
 - Work branch: `feat/contract-payment-receipt-ledger-20261105` (historical implementation branch; source of merged PR).
 
 ## Intended acceptance case
