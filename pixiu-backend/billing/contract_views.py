@@ -75,7 +75,10 @@ class SchoolContractSerializer(serializers.ModelSerializer):
             has_transactions = Payment.objects.filter(
                 Q(contract=self.instance) | Q(invoice__contract=self.instance)
             ).exists()
-            if has_transactions:
+            has_issued_invoice = self.instance.invoices.exclude(
+                status__in=[BillingStatus.DRAFT, BillingStatus.VOID]
+            ).exists()
+            if has_transactions or has_issued_invoice:
                 protected_fields = ("school", "contract_number", "total_value", "start_date", "end_date")
                 changed_fields = [
                     field for field in protected_fields

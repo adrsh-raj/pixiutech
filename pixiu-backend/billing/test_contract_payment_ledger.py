@@ -181,6 +181,33 @@ class ContractPaymentLedgerApiTests(APITestCase):
         self.assertEqual(Decimal(str(contract["balance_due"])), Decimal("40000.00"))
         self.assertEqual(contract["open_invoice_count"], 1)
 
+    def test_issued_invoice_locks_contract_value_before_first_payment(self):
+        self.client.force_authenticate(self.admin)
+        today = date.today()
+        invoice = self.client.post(
+            "/api/v1/invoices/create-with-lines",
+            {
+                "school": str(self.school.pk),
+                "contract": str(self.contract.pk),
+                "issue_date": today.isoformat(),
+                "due_date": (today + timedelta(days=30)).isoformat(),
+                "tax_amount": "0.00",
+                "notes": "Issued contract invoice",
+                "lines": [{"description": "Programme", "quantity": 1, "unit_price": "50000.00"}],
+            },
+            format="json",
+        )
+        self.assertEqual(invoice.status_code, 201, invoice.data)
+
+        edit = self.client.patch(
+            f"/api/v1/contracts/{self.contract.pk}",
+            {"total_value": "40000.00"},
+            format="json",
+        )
+        self.assertEqual(edit.status_code, 400, edit.data)
+        self.contract.refresh_from_db()
+        self.assertEqual(self.contract.total_value, Decimal("50000.00"))
+
     def test_contract_terms_cannot_be_rewritten_after_a_payment(self):
         self.client.force_authenticate(self.admin)
         payment = self.post_contract_payment("10000.00", "LEDGER-LOCK-UTR-001")
