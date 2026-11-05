@@ -126,8 +126,8 @@ class ContractPaymentLedgerApiTests(APITestCase):
 
         overpayment = self.post_contract_payment("50000.01", "LEDGER-OVER-UTR-001")
         self.assertEqual(overpayment.status_code, 400, overpayment.data)
-        self.assertEqual(Payment.objects.filter(contract=self.contract).count(), 2)
-        self.assertEqual(Receipt.objects.filter(payment__contract=self.contract).count(), 1)
+        self.assertEqual(Payment.objects.filter(contract=self.contract).count(), 1)
+        self.assertEqual(Receipt.objects.filter(payment__contract=self.contract).count(), 0)
 
     def test_contract_terms_cannot_be_rewritten_after_a_payment(self):
         self.client.force_authenticate(self.admin)

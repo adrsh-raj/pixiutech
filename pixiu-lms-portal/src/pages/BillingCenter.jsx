@@ -645,7 +645,7 @@ export default function BillingCenter() {
                 {verifiedPayments.map(payment => (
                   <div key={payment.id} className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center">
                     <div className="min-w-0 flex-1">
-                      <p className="font-black text-slate-800">{payment.invoice_number || payment.invoice}</p>
+                      <p className="font-black text-slate-800">{payment.contract_number || payment.invoice_number || payment.contract || payment.invoice}</p>
                       <p className="mt-1 text-xs text-slate-500">{payment.payment_date ? String(payment.payment_date).slice(0, 10) : '—'} · {payment.method} · {payment.transaction_reference || 'No reference'}</p>
                     </div>
                     <div className="flex items-center gap-3">
