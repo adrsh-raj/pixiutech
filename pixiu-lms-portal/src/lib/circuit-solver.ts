@@ -398,15 +398,41 @@ export function solveCircuitNodalPotentials(
           const netD = pinToNetId(part.id, pinId)
           const pState = lookupBoardPinState(pinStates, pinId, board)
 
-          if (pState?.state === "HIGH") {
+          const legacyPwmState =
+            pState?.outputMode === undefined &&
+            pState?.state === "HIGH" &&
+            pState.value !== undefined &&
+            pState.value > 1
+          if (pState?.outputMode === "pwm" || legacyPwmState) {
+            // A multimeter reports the DC average of a PWM signal; the
+            // waveform sampler reports instantaneous HIGH/LOW pulses.
+            const duty = Math.max(0, Math.min(1, (pState.value ?? 0) / 255))
+            const vOut = Number((board.logicVoltage * duty).toFixed(3))
+            fixedNets.set(netD, {
+              voltage: vOut,
+              label: `${board.shortName} Pin ${pin.label} (PWM average ${pState.value}/255 = ${vOut}V)`,
+            })
+          } else if (pState?.outputMode === "tone") {
+            const vOut = Number((board.logicVoltage * 0.5).toFixed(3))
+            fixedNets.set(netD, {
+              voltage: vOut,
+              label: `${board.shortName} Pin ${pin.label} (Tone waveform average = ${vOut}V)`,
+            })
+          } else if (pState?.outputMode === "servo") {
+            const duty = (1 + Math.max(0, Math.min(180, pState.angle ?? 90)) / 180) / 20
+            const vOut = Number((board.logicVoltage * duty).toFixed(3))
+            fixedNets.set(netD, {
+              voltage: vOut,
+              label: `${board.shortName} Pin ${pin.label} (Servo pulse average = ${vOut}V)`,
+            })
+          } else if (pState?.state === "HIGH") {
             fixedNets.set(netD, { voltage: board.logicVoltage, label: `${board.shortName} Pin ${pin.label} (HIGH = ${board.logicVoltage}V)` })
-          } else if (pState?.value !== undefined && pState.value > 0) {
-            const isDac = pin.capabilities?.dac === true
-            const vOut = Number((board.logicVoltage * (pState.value / 255)).toFixed(2))
-            const label = isDac
-              ? `${board.shortName} DAC Output ${pin.label} (${pState.value}/255 = ${vOut}V DC)`
-              : `${board.shortName} Pin ${pin.label} (PWM ${pState.value}/255 = ${vOut}V)`
-            fixedNets.set(netD, { voltage: vOut, label })
+          } else if (pState?.value !== undefined && pState.value > 0 && pin.capabilities?.dac) {
+            const vOut = Number((board.logicVoltage * (pState.value / 255)).toFixed(3))
+            fixedNets.set(netD, {
+              voltage: vOut,
+              label: `${board.shortName} DAC Output ${pin.label} (${pState.value}/255 = ${vOut}V DC)`,
+            })
           } else if (pState?.state === "LOW") {
             fixedNets.set(netD, {
               voltage: 0.0,
