@@ -2263,8 +2263,8 @@ export const UNO_LESSONS: Lesson[] = [
           <value name="A"><block type="ai_confidence"></block></value>
           <value name="B"><shadow type="math_number"><field name="NUM">75</field></shadow></value>
         </block></value>
-        <statement name="DO0"><block type="io_digitalwrite"><field name="PIN">13</field><field name="STATE">HIGH</field></statement>
-        <statement name="ELSE"><block type="io_digitalwrite"><field name="PIN">13</field><field name="STATE">LOW</field></statement>
+        <statement name="DO0"><block type="io_digitalwrite"><field name="PIN">13</field><field name="STATE">HIGH</field></block></statement>
+        <statement name="ELSE"><block type="io_digitalwrite"><field name="PIN">13</field><field name="STATE">LOW</field></block></statement>
       </block>
     </statement>
   </block>
@@ -2327,8 +2327,8 @@ export const UNO_LESSONS: Lesson[] = [
     <statement name="SETUP">
       <block type="ai_camera_enable"><field name="STATE">ON</field><next>
       <block type="io_pinmode"><field name="PIN">12</field><field name="MODE">OUTPUT</field><next>
-      <block type="io_pinmode"><field name="PIN">13</field><field name="MODE">OUTPUT</field></next>
-      </block></next></block>
+      <block type="io_pinmode"><field name="PIN">13</field><field name="MODE">OUTPUT</field></block>
+      </next></block></next></block>
     </statement>
     <statement name="LOOP">
       <block type="controls_if">
