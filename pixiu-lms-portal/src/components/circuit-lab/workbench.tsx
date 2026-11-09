@@ -952,20 +952,24 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
 
       const env: ExecutionEnvironment = {
         setDigitalPin: (pin, state) => {
-          setPinStates((prev) => writePinStateAliases(prev, pin, { state }))
+          setPinStates((prev) => writePinStateAliases(prev, pin, { state, outputMode: "digital" }))
         },
         setAnalogPin: (pin, value) => {
           const state = value > 0 ? "HIGH" : "LOW"
-          setPinStates((prev) => writePinStateAliases(prev, pin, { state, value }))
+          setPinStates((prev) => writePinStateAliases(prev, pin, { state, value, outputMode: "pwm" }))
         },
         setServoAngle: (pin, angle) => {
-          setPinStates((prev) => writePinStateAliases(prev, pin, { state: "LOW", angle }))
+          setPinStates((prev) => {
+            const duty = (1 + Math.max(0, Math.min(180, angle)) / 180) / 20
+            const value = Math.round(duty * 255)
+            return writePinStateAliases(prev, pin, { state: "HIGH", value, angle, outputMode: "servo" })
+          })
         },
         setTone: (pin, freq) => {
           const state = freq ? "HIGH" : "LOW"
           const value = freq ? 255 : 0
           const toneHz = freq ?? undefined
-          setPinStates((prev) => writePinStateAliases(prev, pin, { state, value, toneHz }))
+          setPinStates((prev) => writePinStateAliases(prev, pin, { state, value, toneHz, outputMode: "tone" }))
         },
         serialPrint: (text) => {
           setSerialLines((prev) => [...prev, { text, timestamp: Date.now(), type: "output" }])
