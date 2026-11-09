@@ -180,23 +180,23 @@ export function computeRuntime(
     const board = getBoardForPart(part)
     if (board) {
       if (board.powerPins.v5) {
-        for (const p of board.powerPins.v5) activeSources.push({ key: k(p), voltage: 5.0 })
-        activeSources.push({ key: k("5v"), voltage: 5.0 })
-        activeSources.push({ key: k("v5"), voltage: 5.0 })
+        for (const p of board.powerPins.v5) addPowerSource({ key: k(p), voltage: 5.0 })
+        addPowerSource({ key: k("5v"), voltage: 5.0 })
+        addPowerSource({ key: k("v5"), voltage: 5.0 })
       }
       if (board.powerPins.v33) {
-        for (const p of board.powerPins.v33) activeSources.push({ key: k(p), voltage: 3.3 })
-        activeSources.push({ key: k("3v3"), voltage: 3.3 })
-        activeSources.push({ key: k("3.3v"), voltage: 3.3 })
+        for (const p of board.powerPins.v33) addPowerSource({ key: k(p), voltage: 3.3 })
+        addPowerSource({ key: k("3v3"), voltage: 3.3 })
+        addPowerSource({ key: k("3.3v"), voltage: 3.3 })
       }
       if (board.powerPins.vin) {
-        for (const p of board.powerPins.vin) activeSources.push({ key: k(p), voltage: 5.0 })
+        for (const p of board.powerPins.vin) addPowerSource({ key: k(p), voltage: 5.0 })
       }
       for (const g of board.powerPins.gnd) {
-        groundSinks.push(k(g))
+        addPowerGroundSink(k(g))
       }
-      groundSinks.push(k("gnd"))
-      groundSinks.push(k("ground"))
+      addPowerGroundSink(k("gnd"))
+      addPowerGroundSink(k("ground"))
 
       // Check digital and analog pins
       for (const pin of board.pins) {
@@ -223,8 +223,8 @@ export function computeRuntime(
         }
       }
     } else if (part.type === "battery") {
-      activeSources.push({ key: k("pos"), voltage: Math.max(0, Number(part.props.voltage ?? 9)) })
-      groundSinks.push(k("neg"))
+      addPowerSource({ key: k("pos"), voltage: Math.max(0, Number(part.props.voltage ?? 9)) })
+      addPowerGroundSink(k("neg"))
     }
   }
 
@@ -272,9 +272,9 @@ export function computeRuntime(
   }
 
   function hasExternalPower(partId: string, vccPin = "vcc", gndPin = "gnd"): boolean {
-    const vccPath = shortestResistance(activeSources, key(partId, vccPin))
+    const vccPath = shortestResistance(powerSources, key(partId, vccPin))
     const gndPath = shortestResistance(
-      groundSinks.map((g) => ({ key: g })),
+      powerGroundSinks.map((g) => ({ key: g })),
       key(partId, gndPin),
     )
     return Boolean(vccPath && gndPath)
