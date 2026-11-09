@@ -17,7 +17,7 @@ await build({
 const { LESSONS, getLessonSeed } = await import(`file://${join(outdir, "lesson-engine.js")}`)
 
 function blockTypes(xml) {
-  return [...xml.matchAll(/<block\\s+type=["']([^"']+)["']/g)].map((match) => match[1])
+  return [...xml.matchAll(/<block\s+type=["']([^"']+)["']/g)].map((match) => match[1])
 }
 
 function hasField(xml, blockType, fieldName, fieldValue) {
@@ -32,11 +32,11 @@ function hasField(xml, blockType, fieldName, fieldValue) {
 
 function assertWellFormedXml(xml, label) {
   const stack = []
-  const tokens = xml.match(/<\\/?[A-Za-z][^>]*>/g) ?? []
+  const tokens = xml.match(/<\/?[A-Za-z][^>]*>/g) ?? []
   for (const token of tokens) {
     const closing = token.startsWith("</")
     const selfClosing = token.endsWith("/>")
-    const tag = token.match(/^<\\/?([A-Za-z][\\w:-]*)/)?.[1]
+    const tag = token.match(/^<\/?([A-Za-z][\w:-]*)/)?.[1]
     assert.ok(tag, `${label}: malformed XML token ${token}`)
     if (closing) {
       assert.equal(stack.pop(), tag, `${label}: unexpected closing tag ${token}`)
