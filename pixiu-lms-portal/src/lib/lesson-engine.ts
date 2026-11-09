@@ -799,7 +799,7 @@ const NEOPIXEL_CIRCUIT: CircuitState = {
   wires: [
     { id: "ring-vcc", from: { partId: "uno", pinId: "5v" }, to: { partId: "ring", pinId: "vcc" }, color: "#ef4444" },
     { id: "ring-gnd", from: { partId: "ring", pinId: "gnd" }, to: { partId: "uno", pinId: "gnd" }, color: "#1e293b" },
-    { id: "ring-din", from: { partId: "uno", pinId: "d6" }, to: { partId: "ring", pinId: "din" }, color: "#38bdf8" },
+    { id: "ring-din", from: { partId: "uno", pinId: "d6" }, to: { partId: "ring", pinId: "di" }, color: "#38bdf8" },
   ],
 }
 
@@ -908,6 +908,21 @@ const AI_SERVO_CIRCUIT: CircuitState = {
     { id: "servo-vcc", from: { partId: "uno", pinId: "5v" }, to: { partId: "servo", pinId: "vcc" }, color: "#ef4444" },
     { id: "servo-gnd", from: { partId: "servo", pinId: "gnd" }, to: { partId: "uno", pinId: "gnd" }, color: "#1e293b" },
     { id: "servo-sig", from: { partId: "uno", pinId: "d9" }, to: { partId: "servo", pinId: "sig" }, color: "#f97316" },
+  ],
+}
+
+const AI_DOORBELL_CIRCUIT: CircuitState = {
+  parts: [
+    { id: "uno", type: "arduino-uno", x: 60, y: 110, rotation: 0, props: {} },
+    { id: "servo", type: "servo", x: 450, y: 90, rotation: 0, props: { angle: 0 } },
+    { id: "buzzer", type: "buzzer", x: 450, y: 220, rotation: 0, props: {} },
+  ],
+  wires: [
+    { id: "servo-vcc", from: { partId: "uno", pinId: "5v" }, to: { partId: "servo", pinId: "vcc" }, color: "#ef4444" },
+    { id: "servo-gnd", from: { partId: "servo", pinId: "gnd" }, to: { partId: "uno", pinId: "gnd" }, color: "#1e293b" },
+    { id: "servo-sig", from: { partId: "uno", pinId: "d9" }, to: { partId: "servo", pinId: "sig" }, color: "#f97316" },
+    { id: "doorbell-positive", from: { partId: "uno", pinId: "d8" }, to: { partId: "buzzer", pinId: "pos" }, color: "#eab308" },
+    { id: "doorbell-ground", from: { partId: "buzzer", pinId: "neg" }, to: { partId: "uno", pinId: "gnd" }, color: "#1e293b" },
   ],
 }
 
@@ -1849,12 +1864,12 @@ export const UNO_LESSONS: Lesson[] = [
       {
         id: "wiring",
         title: "Wire single-pin data line",
-        instructions: "Connect 5V → VCC, GND → GND, and D6 → DIN.",
+        instructions: "Connect 5V → VCC, GND → GND, and D6 → DI.",
         kind: "build",
         checks: [{ kind: "connections", requirements: [
           { from: { partType: "arduino-uno", pinId: "5v" }, to: { partType: "neopixel-ring", pinId: "vcc" } },
           { from: { partType: "neopixel-ring", pinId: "gnd" }, to: { partType: "arduino-uno", pinId: "gnd" } },
-          { from: { partType: "arduino-uno", pinId: "d6" }, to: { partType: "neopixel-ring", pinId: "din" } },
+          { from: { partType: "arduino-uno", pinId: "d6" }, to: { partType: "neopixel-ring", pinId: "di" } },
         ] }],
         success: "NeoPixel data in line is wired to D6.",
       },
@@ -2406,7 +2421,7 @@ export const UNO_LESSONS: Lesson[] = [
     estimatedMinutes: 20,
     concepts: ["Person Detection", "Servo Automation", "Buzzer", "Smart Home AI"],
     prerequisites: ["lesson-ai-finger-servo"],
-    seedCircuit: AI_SERVO_CIRCUIT,
+    seedCircuit: AI_DOORBELL_CIRCUIT,
     seedBlocklyXml: `<xml xmlns="https://developers.google.com/blockly/xml">
   <block type="arduino_program" x="40" y="40">
     <statement name="SETUP">
@@ -2436,7 +2451,21 @@ export const UNO_LESSONS: Lesson[] = [
     finalGoal: "🎯 What You Will Build: An AI smart-door system that recognizes a person, opens a servo mechanism and rings a virtual doorbell.",
     codingHints: ["Enable AI camera input.", "Check for the person class.", "Open the servo to 90° and play an 880 Hz tone.", "When no person is detected, close the servo and stop the tone."],
     steps: [
-      { id: "parts", title: "Place the door mechanism", instructions: "Place one Arduino Uno and one Servo.", kind: "build", checks: [{ kind: "parts", requirements: [{ type: "arduino-uno", count: 1 }, { type: "servo", count: 1 }] }], success: "Smart door mechanism is placed." },
+      { id: "parts", title: "Place the door mechanism", instructions: "Place one Arduino Uno, one Servo, and one piezo buzzer.", kind: "build", checks: [{ kind: "parts", requirements: [{ type: "arduino-uno", count: 1 }, { type: "servo", count: 1 }, { type: "buzzer", count: 1 }] }], success: "Smart door mechanism and doorbell buzzer are placed." },
+      {
+        id: "wiring",
+        title: "Wire servo and doorbell buzzer",
+        instructions: "Connect Uno 5V to Servo VCC, GND to Servo GND, D9 to Servo SIG, D8 to Buzzer POS, and Buzzer NEG to GND.",
+        kind: "build",
+        checks: [{ kind: "connections", requirements: [
+          { from: { partType: "arduino-uno", pinId: "5v" }, to: { partType: "servo", pinId: "vcc" } },
+          { from: { partType: "arduino-uno", pinId: "gnd" }, to: { partType: "servo", pinId: "gnd" } },
+          { from: { partType: "arduino-uno", pinId: "d9" }, to: { partType: "servo", pinId: "sig" } },
+          { from: { partType: "arduino-uno", pinId: "d8" }, to: { partType: "buzzer", pinId: "pos" } },
+          { from: { partType: "buzzer", pinId: "neg" }, to: { partType: "arduino-uno", pinId: "gnd" } },
+        ] }],
+        success: "Servo and buzzer power, ground, and signal connections are wired.",
+      },
       { id: "code", title: "Program AI doorbell logic", instructions: "Detect a person, open the servo and trigger the buzzer.", kind: "code", checks: [{ kind: "blocks", requirements: [{ type: "ai_is_detected", count: 1 }, { type: "servo_write", count: 2 }, { type: "tone_play", count: 1 }, { type: "tone_stop", count: 1 }] }], success: "AI doorbell logic is programmed." },
       { id: "run", title: "Test the smart doorbell", instructions: "Press Run and move into the AI camera view.", kind: "run", checks: [{ kind: "running" }], success: "AI smart doorbell is live." }
     ],
