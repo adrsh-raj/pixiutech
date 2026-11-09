@@ -179,30 +179,36 @@ function assertWellFormedXml(xml, label) {
   assert.deepEqual(stack, [], `${label}: unclosed XML elements`)
 }
 
-const REQUIRED_PINS = {
-  led: ["anode", "cathode"],
-  resistor: ["a", "b"],
-  potentiometer: ["t1", "wiper", "t2"],
-  battery: ["pos", "neg"],
-  servo: ["sig", "vcc", "gnd"],
-  buzzer: ["pos", "neg"],
-  "rgb-led": ["red", "green", "blue", "gnd"],
-  // Decimal point is optional; a–g and COM are required for numeric display.
-  "seven-segment": ["a", "b", "c", "d", "e", "f", "g", "com"],
-  "lcd-i2c": ["vcc", "gnd", "sda", "scl"],
-  ultrasonic: ["vcc", "trig", "echo", "gnd"],
-  "pir-sensor": ["vcc", "out", "gnd"],
-  "ir-sensor": ["vcc", "out", "gnd"],
-  dht11: ["vcc", "data", "gnd"],
-  "oled-i2c": ["vcc", "gnd", "sda", "scl"],
-  joystick: ["vcc", "gnd", "vrx", "vry", "sw"],
-  "soil-moisture": ["vcc", "ao", "gnd"],
-  "tmp36": ["vcc", "out", "gnd"],
-  // DO is optional when the circuit reads the analog output (AO).
-  "mq2-gas": ["vcc", "gnd", "ao"],
-  "neopixel-ring": ["vcc", "gnd", "di"],
-  "rotary-encoder": ["vcc", "gnd", "clk", "dt", "sw"],
-  "keypad-4x4": ["r1", "r2", "r3", "r4", "c1", "c2", "c3", "c4"],
+function pathUsingOnlyWires(adjacency, start, targets) {
+  const targetSet = new Set(targets)
+  const queue = [start]
+  const visited = new Set([start])
+  while (queue.length) {
+    const node = queue.shift()
+    if (targetSet.has(node)) return true
+    for (const edge of adjacency.get(node) ?? []) {
+      // Fixed/variable passive devices have resistorId; this search intentionally
+      // walks only wire, board-alias, breadboard, and internal switch continuity.
+      if (edge.resistorId || visited.has(edge.node)) continue
+      visited.add(edge.node)
+      queue.push(edge.node)
+    }
+  }
+  return false
+}
+
+function hasGroundPullResistor(circuit, graph, signalNode, grounds) {
+  for (const part of circuit.parts.filter((item) => item.type === "resistor")) {
+    const a = graph.normalizeNode(part.id, "a")
+    const b = graph.normalizeNode(part.id, "b")
+    const resistance = Number(part.props.resistance ?? 220)
+    if (!Number.isFinite(resistance) || resistance < 1000 || resistance > 100000) continue
+    const signalOnA = pathUsingOnlyWires(graph.adjacency, signalNode, [a])
+    const signalOnB = pathUsingOnlyWires(graph.adjacency, signalNode, [b])
+    if (signalOnA && pathUsingOnlyWires(graph.adjacency, b, grounds)) return true
+    if (signalOnB && pathUsingOnlyWires(graph.adjacency, a, grounds)) return true
+  }
+  return false
 }
 
 function auditCircuit(label, circuit, xml, { strictLedProtection = true } = {}) {
@@ -260,14 +266,51 @@ function auditCircuit(label, circuit, xml, { strictLedProtection = true } = {}) 
   }
   const byType = new Map(circuit.parts.map((part) => [part.id, part.type]))
   for (const part of circuit.parts) {
-    for (const pinId of REQUIRED_PINS[part.type] ?? []) {
-      if (!connected.has(graph.normalizeNode(part.id, pinId))) {
-        errors.push(`${label}: ${part.id} (${part.type}) has required pin ${pinId} unconnected`)
+    const pinGroups = CATALOG[part.type]?.requiredPinGroups ?? []
+    for (const group of pinGroups) {
+      const groupConnected = group.some((pinId) => connected.has(graph.normalizeNode(part.id, pinId)))
+      if (!groupConnected) {
+        errors.push(`${label}: ${part.id} (${part.type}) has no connection for required pin group [${group.join(" / ")}]`)
       }
     }
   }
 
   const { sources, grounds } = electricalNodes(circuit, graph)
+
+  // A tactile switch between a board supply rail and a digital/analog input
+  // needs a defined idle state: either an explicit INPUT_PULLUP or a physical
+  // pull-down resistor. A floating input must never be silently treated as LOW.
+  for (const button of circuit.parts.filter((part) => part.type === "pushbutton")) {
+    const signalPins = new Map()
+    let hasSupplySide = false
+    for (const wire of circuit.wires) {
+      const refs = [
+        wire.from.partId === button.id ? wire.to : wire.to.partId === button.id ? wire.from : null,
+      ].filter(Boolean)
+      for (const ref of refs) {
+        const board = graph.boardMap.get(ref.partId)
+        if (!board) continue
+        const pin = resolveBoardPin(board, ref.pinId)
+        if (!pin) continue
+        if (pin.kind === "power") hasSupplySide = true
+        if (pin.kind === "digital" || pin.kind === "analog") {
+          signalPins.set(graph.normalizeNode(ref.partId, pin.id), { partId: ref.partId, pinId: pin.id, board })
+        }
+      }
+    }
+    if (!hasSupplySide || signalPins.size === 0) continue
+    for (const [signalNode, signal] of signalPins) {
+      const pinMode = blockInventory(xml ?? "").find((block) =>
+        block.type === "io_pinmode" &&
+        normalize(block.fields.PIN).replace(/^(gpio|gp|d|p)/, "") === normalize(signal.pinId).replace(/^(gpio|gp|d|p)/, ""),
+      )?.fields.MODE?.toUpperCase()
+      if (pinMode === "INPUT_PULLUP") continue
+      if (!hasGroundPullResistor(circuit, graph, signalNode, grounds)) {
+        errors.push(`${label}: pushbutton ${button.id} leaves ${signal.board.shortName} ${signal.pinId} floating; add a 1kΩ–100kΩ pull-down to GND or enable INPUT_PULLUP`)
+      }
+    }
+  }
+
   for (const part of circuit.parts) {
     if (part.type === "seven-segment") {
       for (const segment of ["a", "b", "c", "d", "e", "f", "g"]) {
