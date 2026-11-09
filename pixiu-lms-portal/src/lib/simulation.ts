@@ -485,6 +485,20 @@ export function computeRuntime(
             resistorOhms: Math.round(totalResistance),
           }
         }
+      } else if (
+        isDefinedPotential &&
+        pathSourceToAnode &&
+        pathCathodeToGround &&
+        diodeVoltage >= -0.1
+      ) {
+        // The circuit is wired in the forward direction but the source cannot
+        // reach the LED's specified forward voltage (e.g. 3V into a 3.3V LED).
+        runtime[part.id] = {
+          burnt: false,
+          level: 0,
+          currentMa: 0,
+          resistorOhms: Math.round(pathSourceToAnode.resistance + pathCathodeToGround.resistance),
+        }
       } else if (isDefinedPotential && diodeVoltage < -0.1) {
         // Reverse polarity is a signed node-potential relationship, not the
         // existence of any path through a potentiometer or another passive
