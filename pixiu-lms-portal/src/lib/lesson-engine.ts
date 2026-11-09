@@ -1106,12 +1106,12 @@ export const UNO_LESSONS: Lesson[] = [
     id: "lesson-buzzer-doorbell",
     title: "Mission 4 · Smart Doorbell Alert",
     shortTitle: "Smart Doorbell",
-    description: "Combine a pushbutton trigger with an acoustic piezo buzzer to engineer an audible smart doorbell.",
+    description: "Combine a pushbutton trigger with an acoustic piezo buzzer to engineer a one-chime-per-press smart doorbell.",
     difficulty: "Beginner",
     estimatedMinutes: 10,
     concepts: ["Piezo Buzzer", "Sound Alert", "Digital Trigger", "Audio Transducers"],
     prerequisites: ["lesson-pushbutton-led"],
-    seedBlocklyXml: "<xml xmlns=\"https://developers.google.com/blockly/xml\">\n  <block type=\"arduino_program\" x=\"40\" y=\"40\">\n    <statement name=\"SETUP\">\n      <block type=\"io_pinmode\"><field name=\"PIN\">2</field><field name=\"MODE\">INPUT</field></block>\n    </statement>\n    <statement name=\"LOOP\">\n      <block type=\"controls_if\"><mutation else=\"1\"></mutation>\n        <value name=\"IF0\"><block type=\"io_digitalread\"><field name=\"PIN\">2</field></block></value>\n        <statement name=\"DO0\">\n          <block type=\"tone_play\"><field name=\"PIN\">8</field><value name=\"FREQ\"><shadow type=\"math_number\"><field name=\"NUM\">880</field></shadow></value><next>\n            <block type=\"time_delay\"><value name=\"MS\"><shadow type=\"math_number\"><field name=\"NUM\">250</field></shadow></value><next>\n              <block type=\"tone_stop\"><field name=\"PIN\">8</field></block>\n            </next></block>\n          </next></block>\n        </statement>\n        <statement name=\"ELSE\"><block type=\"tone_stop\"><field name=\"PIN\">8</field></block></statement>\n      </block>\n    </statement>\n  </block>\n</xml>",
+    seedBlocklyXml: "<xml xmlns=\"https://developers.google.com/blockly/xml\">\n  <block type=\"arduino_program\" x=\"40\" y=\"40\">\n    <statement name=\"SETUP\">\n      <block type=\"io_pinmode\"><field name=\"PIN\">2</field><field name=\"MODE\">INPUT</field></block>\n    </statement>\n    <statement name=\"LOOP\">\n      <block type=\"controls_if\"><mutation else=\"1\"></mutation>\n        <value name=\"IF0\"><block type=\"io_digitalread\"><field name=\"PIN\">2</field></block></value>\n        <statement name=\"DO0\">\n          <block type=\"tone_play\"><field name=\"PIN\">8</field><value name=\"FREQ\"><shadow type=\"math_number\"><field name=\"NUM\">880</field></shadow></value><next>\n            <block type=\"time_delay\"><value name=\"MS\"><shadow type=\"math_number\"><field name=\"NUM\">250</field></shadow></value><next>\n              <block type=\"tone_stop\"><field name=\"PIN\">8</field><next>\n                <block type=\"controls_whileUntil\">\n                  <field name=\"MODE\">WHILE</field>\n                  <value name=\"BOOL\"><block type=\"io_digitalread\"><field name=\"PIN\">2</field></block></value>\n                  <statement name=\"DO\">\n                    <block type=\"time_delay\"><value name=\"MS\"><shadow type=\"math_number\"><field name=\"NUM\">10</field></shadow></value></block>\n                  </statement>\n                </block>\n              </next></block>\n            </next></block>\n          </next></block>\n        </statement>\n        <statement name=\"ELSE\"><block type=\"tone_stop\"><field name=\"PIN\">8</field></block></statement>\n      </block>\n    </statement>\n  </block>\n</xml>",
     finalGoal: "🎯 What You Will Build: A smart acoustic entryway doorbell that produces a crisp 250ms melodic chime tone on a piezo buzzer whenever a visitor rings the front pushbutton.",
     steps: [
       {
@@ -1145,12 +1145,13 @@ export const UNO_LESSONS: Lesson[] = [
       {
         id: "code",
         title: "Program chime response",
-        instructions: "Read the pushbutton on D2. When it is pressed, play an 880 Hz tone on D8 for 250 ms, then stop the tone; keep the buzzer silent when released.",
+        instructions: "Read the pushbutton on D2. When pressed, play one 880 Hz, 250 ms chime on D8, then wait for the button to be released before accepting another press.",
         kind: "code",
         checks: [{ kind: "blocks", requirements: [
           { type: "io_digitalread", count: 1, fields: { PIN: "2" } },
           { type: "tone_play", count: 1, fields: { PIN: "8" } },
           { type: "tone_stop", count: 1, fields: { PIN: "8" } },
+          { type: "controls_whileUntil", count: 1 },
         ] }],
         success: "Audible doorbell logic is programmed.",
       },
