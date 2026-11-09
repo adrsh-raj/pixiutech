@@ -159,75 +159,83 @@ export function computeRuntime(
     }
   }
 
-  // 3. Catalog active Voltage Sources and Ground Sinks
+  // 3. Catalog active voltage sources, logic signals, and paired power domains.
   const activeSources: { key: string; voltage: number }[] = []
   const groundSinks: string[] = []
-  // GPIO logic levels are not component supply rails.
-  const powerSources: { key: string; voltage: number }[] = []
-  const powerGroundSinks: string[] = []
-  const addPowerSource = (source: { key: string; voltage: number }) => {
-    activeSources.push(source)
-    powerSources.push(source)
-  }
-  const addPowerGroundSink = (pinKey: string) => {
-    groundSinks.push(pinKey)
-    powerGroundSinks.push(pinKey)
-  }
+  // A power domain couples its positive rail(s) to their own ground return.
+  // GPIO HIGH/LOW states remain signal sources/sinks only.
+  const powerDomains: Array<{ sources: { key: string; voltage: number }[]; grounds: string[] }> = []
 
   for (const part of state.parts) {
     const k = (pin: string) => key(part.id, pin)
 
     const board = getBoardForPart(part)
     if (board) {
+      const boardSources: { key: string; voltage: number }[] = []
+      const boardGrounds: string[] = []
+      const addBoardSource = (pin: string, voltage: number) => {
+        const source = { key: k(pin), voltage }
+        activeSources.push(source)
+        boardSources.push(source)
+      }
+      const addBoardGround = (pin: string) => {
+        const pinKey = k(pin)
+        groundSinks.push(pinKey)
+        boardGrounds.push(pinKey)
+      }
+
       if (board.powerPins.v5) {
-        for (const p of board.powerPins.v5) addPowerSource({ key: k(p), voltage: 5.0 })
-        addPowerSource({ key: k("5v"), voltage: 5.0 })
-        addPowerSource({ key: k("v5"), voltage: 5.0 })
+        for (const p of board.powerPins.v5) addBoardSource(p, 5.0)
+        addBoardSource("5v", 5.0)
+        addBoardSource("v5", 5.0)
       }
       if (board.powerPins.v33) {
-        for (const p of board.powerPins.v33) addPowerSource({ key: k(p), voltage: 3.3 })
-        addPowerSource({ key: k("3v3"), voltage: 3.3 })
-        addPowerSource({ key: k("3.3v"), voltage: 3.3 })
+        for (const p of board.powerPins.v33) addBoardSource(p, 3.3)
+        addBoardSource("3v3", 3.3)
+        addBoardSource("3.3v", 3.3)
       }
       if (board.powerPins.vin) {
-        for (const p of board.powerPins.vin) addPowerSource({ key: k(p), voltage: 5.0 })
+        for (const p of board.powerPins.vin) addBoardSource(p, 5.0)
       }
-      for (const g of board.powerPins.gnd) {
-        addPowerGroundSink(k(g))
-      }
-      addPowerGroundSink(k("gnd"))
-      addPowerGroundSink(k("ground"))
+      for (const g of board.powerPins.gnd) addBoardGround(g)
+      addBoardGround("gnd")
+      addBoardGround("ground")
 
-      // Check digital and analog pins
+      if (boardSources.length > 0 && boardGrounds.length > 0) {
+        powerDomains.push({ sources: boardSources, grounds: boardGrounds })
+      }
+
+      // Digital and analog output levels are signal references, not supply rails.
       for (const pin of board.pins) {
-        if (pin.kind === "digital" || pin.kind === "analog") {
-          const pinId = pin.id
-          const stripped = pinId.replace(/^(gpio|gp|d|p)/i, "")
-          const pState = lookupBoardPinState(pinStates, pinId, board)
-          if (pState?.state === "HIGH" || (pState?.value ?? 0) > 0) {
-            const duty = pState.value !== undefined ? pState.value / 255 : 1.0
-            const v = board.logicVoltage * duty
-            activeSources.push({ key: k(pinId), voltage: v })
-            if (stripped) activeSources.push({ key: k(stripped), voltage: v })
-            for (const alt of pin.alternateNames ?? []) {
-              activeSources.push({ key: k(alt.toLowerCase()), voltage: v })
-            }
-          } else {
-            // LOW digital pin acts as Ground sink
-            groundSinks.push(k(pinId))
-            if (stripped) groundSinks.push(k(stripped))
-            for (const alt of pin.alternateNames ?? []) {
-              groundSinks.push(k(alt.toLowerCase()))
-            }
+        if (pin.kind !== "digital" && pin.kind !== "analog") continue
+        const pinId = pin.id
+        const stripped = pinId.replace(/^(gpio|gp|d|p)/i, "")
+        const pState = lookupBoardPinState(pinStates, pinId, board)
+        if (pState?.state === "HIGH" || (pState?.value ?? 0) > 0) {
+          const duty = pState.value !== undefined ? pState.value / 255 : 1.0
+          const v = board.logicVoltage * duty
+          activeSources.push({ key: k(pinId), voltage: v })
+          if (stripped) activeSources.push({ key: k(stripped), voltage: v })
+          for (const alt of pin.alternateNames ?? []) {
+            activeSources.push({ key: k(alt.toLowerCase()), voltage: v })
+          }
+        } else {
+          // A LOW GPIO may sink signal current, but it is not a component power return.
+          groundSinks.push(k(pinId))
+          if (stripped) groundSinks.push(k(stripped))
+          for (const alt of pin.alternateNames ?? []) {
+            groundSinks.push(k(alt.toLowerCase()))
           }
         }
       }
     } else if (part.type === "battery") {
-      addPowerSource({ key: k("pos"), voltage: Math.max(0, Number(part.props.voltage ?? 9)) })
-      addPowerGroundSink(k("neg"))
+      const source = { key: k("pos"), voltage: Math.max(0, Number(part.props.voltage ?? 9)) }
+      const ground = k("neg")
+      activeSources.push(source)
+      groundSinks.push(ground)
+      powerDomains.push({ sources: [source], grounds: [ground] })
     }
   }
-
   // Helper: Dijkstra shortest resistance path from a list of start nodes to a target
   function shortestResistance(
     starts: { key: string; voltage?: number }[],
@@ -272,12 +280,14 @@ export function computeRuntime(
   }
 
   function hasExternalPower(partId: string, vccPin = "vcc", gndPin = "gnd"): boolean {
-    const vccPath = shortestResistance(powerSources, key(partId, vccPin))
-    const gndPath = shortestResistance(
-      powerGroundSinks.map((g) => ({ key: g })),
-      key(partId, gndPin),
-    )
-    return Boolean(vccPath && gndPath)
+    return powerDomains.some((domain) => {
+      const vccPath = shortestResistance(domain.sources, key(partId, vccPin))
+      const gndPath = shortestResistance(
+        domain.grounds.map((g) => ({ key: g })),
+        key(partId, gndPin),
+      )
+      return Boolean(vccPath && gndPath)
+    })
   }
 
   // 4. Prepare dynamic topology before solving any component runtime.
