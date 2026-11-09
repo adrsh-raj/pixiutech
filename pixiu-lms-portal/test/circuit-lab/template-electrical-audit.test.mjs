@@ -80,6 +80,12 @@ function circuitGraph(circuit) {
       add(`${part.id}:p1a`, `${part.id}:p1b`)
       add(`${part.id}:p2a`, `${part.id}:p2b`)
     }
+    if (part.type === "relay") {
+      // Topology audit considers both possible contact states. Runtime chooses
+      // NO or NC from the relay coil state.
+      add(`${part.id}:com`, `${part.id}:no`)
+      add(`${part.id}:com`, `${part.id}:nc`)
+    }
     if (isBoardPart(part.type)) {
       const board = getBoardForPart(part)
       for (const group of [board.powerPins.v5 ?? [], board.powerPins.v33 ?? [], board.powerPins.vin ?? [], board.powerPins.gnd ?? []]) {
@@ -179,7 +185,8 @@ const REQUIRED_PINS = {
   servo: ["sig", "vcc", "gnd"],
   buzzer: ["pos", "neg"],
   "rgb-led": ["red", "green", "blue", "gnd"],
-  "seven-segment": ["a", "b", "c", "d", "e", "f", "g", "dp", "com"],
+  // Decimal point is optional; a–g and COM are required for numeric display.
+  "seven-segment": ["a", "b", "c", "d", "e", "f", "g", "com"],
   "lcd-i2c": ["vcc", "gnd", "sda", "scl"],
   ultrasonic: ["vcc", "trig", "echo", "gnd"],
   "pir-sensor": ["vcc", "out", "gnd"],
@@ -189,7 +196,8 @@ const REQUIRED_PINS = {
   joystick: ["vcc", "gnd", "vrx", "vry", "sw"],
   "soil-moisture": ["vcc", "ao", "gnd"],
   "tmp36": ["vcc", "out", "gnd"],
-  "mq2-gas": ["vcc", "gnd", "ao", "do"],
+  // DO is optional when the circuit reads the analog output (AO).
+  "mq2-gas": ["vcc", "gnd", "ao"],
   "neopixel-ring": ["vcc", "gnd", "di"],
   "rotary-encoder": ["vcc", "gnd", "clk", "dt", "sw"],
   "keypad-4x4": ["r1", "r2", "r3", "r4", "c1", "c2", "c3", "c4"],
@@ -227,7 +235,8 @@ function auditCircuit(label, circuit, xml, { strictLedProtection = true } = {}) 
       const board = graph.boardMap.get(part.id)
       if (board) {
         if (!resolveBoardPin(board, ref.pinId) &&
-            !Object.values(board.powerPins).flat().some((pin) => normalize(pin) === normalize(ref.pinId))) {
+            !Object.values(board.powerPins).flat().some((pin) => normalize(pin) === normalize(ref.pinId)) &&
+            normalize(board.builtInLedPin) !== normalize(ref.pinId)) {
           errors.push(`${label}: wire ${wire.id} uses unknown ${part.type} pin ${ref.pinId}`)
         }
       } else if (!(CATALOG[part.type]?.pins ?? []).some((pin) => normalize(pin.id) === normalize(ref.pinId))) {
@@ -258,6 +267,20 @@ function auditCircuit(label, circuit, xml, { strictLedProtection = true } = {}) 
 
   const { sources, grounds } = electricalNodes(circuit, graph)
   for (const part of circuit.parts) {
+    if (part.type === "seven-segment") {
+      for (const segment of ["a", "b", "c", "d", "e", "f", "g"]) {
+        const pin = graph.normalizeNode(part.id, segment)
+        const protectedSegment = pathToAny(graph.adjacency, pin, sources, { requireResistor: true }).found
+        if (!protectedSegment) errors.push(`${label}: seven-segment ${part.id} segment ${segment} lacks a series resistor`)
+      }
+    }
+    if (part.type === "rgb-led") {
+      for (const channel of ["red", "green", "blue"]) {
+        const pin = graph.normalizeNode(part.id, channel)
+        const protectedChannel = pathToAny(graph.adjacency, pin, sources, { requireResistor: true }).found
+        if (!protectedChannel) errors.push(`${label}: RGB LED ${part.id} channel ${channel} lacks a series resistor`)
+      }
+    }
     if (part.type !== "led") continue
     const anode = graph.normalizeNode(part.id, "anode")
     const cathode = graph.normalizeNode(part.id, "cathode")
@@ -298,14 +321,18 @@ function auditCircuit(label, circuit, xml, { strictLedProtection = true } = {}) 
       const pin = block.fields.PIN
       if (pin !== undefined && board) {
         const def = resolveBoardPin(board, pin)
-        if (!def) errors.push(`${label}: Blockly ${block.type} uses invalid board pin ${pin}`)
-        else {
-          if (block.type === "io_analogwrite" && !def.capabilities?.pwm) errors.push(`${label}: Blockly analogWrite pin ${pin} is not PWM-capable on ${board.shortName}`)
-          if (block.type === "io_analogread" && !def.capabilities?.adc) errors.push(`${label}: Blockly analogRead pin ${pin} is not ADC-capable on ${board.shortName}`)
-          if (def.capabilities?.inputOnly && ["io_digitalwrite", "io_analogwrite", "servo_write", "tone_play"].includes(block.type)) {
+        const builtInLedPin = normalize(board.builtInLedPin) === normalize(pin)
+        if (!def && !builtInLedPin) {
+          errors.push(`${label}: Blockly ${block.type} uses invalid board pin ${pin}`)
+        } else {
+          const pwmCapable = builtInLedPin || def?.capabilities?.pwm === true
+          const adcCapable = def?.capabilities?.adc === true
+          if (block.type === "io_analogwrite" && !pwmCapable) errors.push(`${label}: Blockly analogWrite pin ${pin} is not PWM-capable on ${board.shortName}`)
+          if (block.type === "io_analogread" && !adcCapable) errors.push(`${label}: Blockly analogRead pin ${pin} is not ADC-capable on ${board.shortName}`)
+          if (def?.capabilities?.inputOnly && ["io_digitalwrite", "io_analogwrite", "servo_write", "tone_play"].includes(block.type)) {
             errors.push(`${label}: Blockly ${block.type} drives input-only pin ${pin}`)
           }
-          if (["io_digitalwrite", "io_analogwrite", "io_digitalread", "io_analogread", "servo_write", "tone_play", "tone_stop"].includes(block.type) && !wirePins.has(normalize(def.id)) && !def.capabilities?.builtInLed) {
+          if (["io_digitalwrite", "io_analogwrite", "io_digitalread", "io_analogread", "servo_write", "tone_play", "tone_stop"].includes(block.type) && !builtInLedPin && !wirePins.has(normalize(def.id))) {
             errors.push(`${label}: Blockly ${block.type} uses unconnected board pin ${pin}`)
           }
         }
