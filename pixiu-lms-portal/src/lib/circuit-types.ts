@@ -75,6 +75,12 @@ export interface PartDef {
   defaults?: Record<string, string | number>
   /** Board/component electrical parameters consumed by shared solvers. */
   electrical?: PartElectricalMeta
+  /**
+   * Logical groups of component pins that must have at least one external
+   * connection. Pins in a group may be internal aliases or alternative
+   * terminals (e.g. either NO or NC on a relay).
+   */
+  requiredPinGroups?: string[][]
   /** Registry metadata used by palette, simulator and Blockly integrations. */
   category?: "controller" | "input" | "sensor" | "output" | "display" | "motor" | "driver" | "logic"
   electricalModel?: string
