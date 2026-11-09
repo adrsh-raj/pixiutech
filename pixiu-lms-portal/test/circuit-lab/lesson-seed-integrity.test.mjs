@@ -147,7 +147,7 @@ test("all pre-seeded component references resolve to a component in that lesson'
 
   for (const lesson of lessonsWithCircuit) {
     const partIds = new Set(lesson.seedCircuit.parts.map((part) => part.id))
-    const references = [...lesson.seedBlocklyXml.matchAll(/<field name="SENSOR">([^<]*)<\\/field>/g)]
+    const references = [...lesson.seedBlocklyXml.matchAll(/<field name="SENSOR">([^<]*)<\/field>/g)]
       .map((match) => match[1])
       .filter(Boolean)
     for (const id of references) {
