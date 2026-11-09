@@ -80,6 +80,17 @@ test("every Beginner lesson loads its own non-empty, well-formed Blockly program
   }
 })
 
+test("every stored lesson Blockly seed is well-formed, even when it is not auto-loaded", () => {
+  const storedSeeds = LESSONS.filter((lesson) => typeof lesson.seedBlocklyXml === "string" && lesson.seedBlocklyXml.trim())
+  assert.ok(storedSeeds.length >= 43, "expected explicit seed XML across all four board curricula and Arduino AI missions")
+
+  for (const lesson of storedSeeds) {
+    assertWellFormedXml(lesson.seedBlocklyXml, `${lesson.id} stored seed`)
+    assert.ok(blockTypes(lesson.seedBlocklyXml).length > 1, `${lesson.id}: stored seed must contain executable blocks`)
+    assert.ok(lesson.seedBlocklyXml.includes('<block type="arduino_program"'), `${lesson.id}: stored seed must have a program root`)
+  }
+})
+
 test("Intermediate and Advanced missions always start with a clean Blockly workspace", () => {
   const lessons = LESSONS.filter((lesson) => lesson.difficulty !== "Beginner")
   assert.equal(lessons.length, 36)
