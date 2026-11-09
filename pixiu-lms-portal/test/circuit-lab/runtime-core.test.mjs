@@ -12,6 +12,7 @@ await build({
     new URL("../../src/lib/blockly-runner.ts", import.meta.url).pathname,
     new URL("../../src/lib/circuit-doctor.ts", import.meta.url).pathname,
     new URL("../../src/lib/breadboard-pins.ts", import.meta.url).pathname,
+    new URL("../../src/lib/waveform-sampler.ts", import.meta.url).pathname,
     new URL("../../src/lib/pin-state.ts", import.meta.url).pathname,
   ],
   bundle: true,
@@ -26,6 +27,7 @@ const { solveCircuitNodalPotentials } = await import(`file://${join(outdir, "cir
 const { runBlocklyProgram } = await import(`file://${join(outdir, "blockly-runner.js")}`)
 const { diagnoseCircuit } = await import(`file://${join(outdir, "circuit-doctor.js")}`)
 const { normalizeBreadboardPinId } = await import(`file://${join(outdir, "breadboard-pins.js")}`)
+const { samplePinVoltage } = await import(`file://${join(outdir, "waveform-sampler.js")}`)
 const { writePinStateAliases } = await import(`file://${join(outdir, "pin-state.js")}`)
 
 const part = (id, type, props = {}) => ({ id, type, x: 0, y: 0, rotation: 0, props })
@@ -422,4 +424,43 @@ test("pin output mode changes replace stale PWM, tone, and servo state across al
   assert.equal(servo["9"].angle, 90)
   assert.equal(servo["9"].toneHz, undefined, "servoWrite must clear prior tone state")
   assert.equal(servo["9"].value, undefined)
+})
+
+
+test("PWM pin has full pulse voltage but nodal/DC meter reads average voltage", () => {
+  const circuit = { parts: [part("uno", "arduino-uno")], wires: [] }
+  const pwm = { "9": { state: "HIGH", value: 128, outputMode: "pwm" } }
+  const nodal = solveCircuitNodalPotentials(circuit, new Set(), pwm)
+  const average = nodal.getPinVoltage({ partId: "uno", pinId: "d9" })
+  assert.ok(Math.abs(average - (5 * 128 / 255)) < 0.02, "DMM/nodal DC view should report average PWM voltage")
+  const board = (await import(`file://${join(outdir, "board-registry.js")}`)).getBoardForPart
+  const definition = board(part("uno", "arduino-uno"))
+  const period = 1000 / definition.pwmFrequencyDefaultHz
+  assert.equal(samplePinVoltage({ partId: "uno", pinId: "d9" }, circuit, pwm, period * 0.25), 5)
+  assert.equal(samplePinVoltage({ partId: "uno", pinId: "d9" }, circuit, pwm, period * 0.75), 0)
+})
+
+test("true DAC output stays continuous DC while analogWrite on a DAC-capable pin remains PWM", () => {
+  const circuit = { parts: [part("esp", "esp32-devkit")], wires: [] }
+  const dac = { "25": { state: "HIGH", value: 128, outputMode: "dac" } }
+  const pwm = { "25": { state: "HIGH", value: 128, outputMode: "pwm" } }
+  const dacVoltage = samplePinVoltage({ partId: "esp", pinId: "d25" }, circuit, dac, 0.75)
+  assert.ok(Math.abs(dacVoltage - (3.3 * 128 / 255)) < 0.02)
+  const board = (await import(`file://${join(outdir, "board-registry.js")}`)).getBoardForPart
+  const definition = board(part("esp", "esp32-devkit"))
+  const period = 1000 / definition.pwmFrequencyDefaultHz
+  assert.equal(samplePinVoltage({ partId: "esp", pinId: "d25" }, circuit, pwm, period * 0.25), 3.3)
+  assert.equal(samplePinVoltage({ partId: "esp", pinId: "d25" }, circuit, pwm, period * 0.75), 0)
+})
+
+test("tone and servo outputs are sampled as their own timed pulse waveforms", () => {
+  const circuit = { parts: [part("uno", "arduino-uno")], wires: [] }
+  const tone = { "8": { state: "HIGH", value: 255, toneHz: 440, outputMode: "tone" } }
+  const tonePeriod = 1000 / 440
+  assert.equal(samplePinVoltage({ partId: "uno", pinId: "d8" }, circuit, tone, tonePeriod * 0.25), 5)
+  assert.equal(samplePinVoltage({ partId: "uno", pinId: "d8" }, circuit, tone, tonePeriod * 0.75), 0)
+
+  const servo = { "9": { state: "HIGH", value: 19, angle: 90, outputMode: "servo" } }
+  assert.equal(samplePinVoltage({ partId: "uno", pinId: "d9" }, circuit, servo, 0.75), 5)
+  assert.equal(samplePinVoltage({ partId: "uno", pinId: "d9" }, circuit, servo, 3), 0)
 })
