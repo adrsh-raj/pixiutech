@@ -73,8 +73,10 @@ function circuitGraph(circuit) {
   for (const part of circuit.parts) {
     if (part.type === "resistor") add(`${part.id}:a`, `${part.id}:b`, part.id)
     if (part.type === "potentiometer") {
-      add(`${part.id}:t1`, `${part.id}:wiper`, part.id)
-      add(`${part.id}:wiper`, `${part.id}:t2`, part.id)
+      // A potentiometer is an adjustable divider, not a fixed current-limiting
+      // resistor. Never let it satisfy the LED series-protection audit.
+      add(`${part.id}:t1`, `${part.id}:wiper`)
+      add(`${part.id}:wiper`, `${part.id}:t2`)
     }
     if (part.type === "pushbutton") {
       add(`${part.id}:p1a`, `${part.id}:p1b`)
