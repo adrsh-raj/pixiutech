@@ -187,6 +187,21 @@ test("external pushbutton lessons include stable 10kΩ pull-down networks", () =
   }
 })
 
+test("ESP32 phone controller starter implements every dashboard route and both LED outputs", () => {
+  const lesson = LESSONS.find((item) => item.id === "lesson-esp32-web-server-phone")
+  assert.ok(lesson)
+  const xml = lesson.seedBlocklyXml
+  for (const route of ["/", "/red/on", "/red/off", "/blue/on", "/blue/off"]) {
+    assert.ok(xml.includes(`<field name="PATH">${route}</field>`), "missing HTTP route " + route)
+  }
+  assert.equal((xml.match(/<block type="wifi_server_on"/g) ?? []).length, 5)
+  assert.equal((xml.match(/<block type="wifi_server_send"/g) ?? []).length, 5)
+  assert.equal((xml.match(/<block type="io_digitalwrite"/g) ?? []).length, 4)
+  assert.ok(lesson.steps.find((step) => step.id === "code").checks.some((check) =>
+    check.kind === "blocks" && check.requirements.some((requirement) => requirement.type === "wifi_server_on" && requirement.count === 5),
+  ))
+})
+
 test("all pre-seeded component references resolve to a component in that lesson's seed circuit", () => {
   const lessonsWithCircuit = LESSONS.filter((lesson) => lesson.seedCircuit && lesson.seedBlocklyXml)
   assert.equal(lessonsWithCircuit.length, 40)
