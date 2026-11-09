@@ -191,7 +191,7 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
         { id: "bz", type: "buzzer", x: 430, y: 200, rotation: 0, props: {} },
       ],
       wires: [
-        { id: "w_pwr", from: { partId: "mb", pinId: "v33" }, to: { partId: "srv", pinId: "vcc" }, color: "#ef4444" },
+        { id: "w_pwr", from: { partId: "mb", pinId: "3v" }, to: { partId: "srv", pinId: "vcc" }, color: "#ef4444" },
         { id: "w_gnd", from: { partId: "mb", pinId: "gnd" }, to: { partId: "srv", pinId: "gnd" }, color: "#1e293b" },
         { id: "w_sig", from: { partId: "mb", pinId: "p0" }, to: { partId: "srv", pinId: "sig" }, color: "#f97316" },
         { id: "w_bz_pos", from: { partId: "mb", pinId: "p1" }, to: { partId: "bz", pinId: "pos" }, color: "#eab308" },
