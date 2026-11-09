@@ -10,7 +10,7 @@ import { getLedElectricalModel, getPwmDutyCycle } from "./electrical-model"
 export interface ArduinoPinState {
   state: "HIGH" | "LOW"
   /** Explicit signal semantics so PWM/tone/servo states are not mistaken for DC. */
-  outputMode?: "digital" | "pwm" | "tone" | "servo"
+  outputMode?: "digital" | "pwm" | "tone" | "servo" | "dac"
   value?: number
   angle?: number
   toneHz?: number
