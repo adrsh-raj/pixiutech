@@ -19,6 +19,7 @@ import { saveCircuit, saveCurrentCircuit, clearCurrentCircuit, importFromJSON, e
 import * as Blockly from "blockly"
 import { Boxes, Camera, Sparkles, Terminal, Trash2, Gauge, Sliders, ShieldAlert, RotateCw, Copy, X, Smartphone } from "lucide-react"
 import { computeWireCurrents } from "@/lib/current-flow"
+import { writePinStateAliases } from "@/lib/pin-state"
 import { isBoardPart, getActiveBoard, scaleAdcReading, lookupBoardPinState } from "@/lib/board-registry"
 import { solveCircuitNodalPotentials } from "@/lib/circuit-solver"
 import { Multimeter } from "./multimeter"
@@ -951,69 +952,20 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
 
       const env: ExecutionEnvironment = {
         setDigitalPin: (pin, state) => {
-          const raw = String(pin).trim()
-          const digits = raw.replace(/^(gpio|gp|d|p)/i, "")
-          setPinStates((prev) => {
-            const next = { ...prev, [raw]: { state } }
-            if (raw.toLowerCase() !== raw) next[raw.toLowerCase()] = { state }
-            if (digits) {
-              next[digits] = { state }
-              next[`d${digits}`] = { state }
-              next[`gpio${digits}`] = { state }
-              next[`gp${digits}`] = { state }
-              next[`p${digits}`] = { state }
-            }
-            return next
-          })
+          setPinStates((prev) => writePinStateAliases(prev, pin, { state }))
         },
         setAnalogPin: (pin, value) => {
-          const raw = String(pin).trim()
-          const digits = raw.replace(/^(gpio|gp|d|p)/i, "")
           const state = value > 0 ? "HIGH" : "LOW"
-          setPinStates((prev) => {
-            const next = { ...prev, [raw]: { state, value } }
-            if (raw.toLowerCase() !== raw) next[raw.toLowerCase()] = { state, value }
-            if (digits) {
-              next[digits] = { state, value }
-              next[`d${digits}`] = { state, value }
-              next[`gpio${digits}`] = { state, value }
-              next[`gp${digits}`] = { state, value }
-              next[`p${digits}`] = { state, value }
-            }
-            return next
-          })
+          setPinStates((prev) => writePinStateAliases(prev, pin, { state, value }))
         },
         setServoAngle: (pin, angle) => {
-          const raw = String(pin).trim()
-          const digits = raw.replace(/^(gpio|gp|d|p)/i, "")
-          setPinStates((prev) => {
-            const next = { ...prev, [raw]: { angle } }
-            if (raw.toLowerCase() !== raw) next[raw.toLowerCase()] = { angle }
-            if (digits) {
-              next[digits] = { angle }
-              next[`d${digits}`] = { angle }
-              next[`gpio${digits}`] = { angle }
-              next[`gp${digits}`] = { angle }
-              next[`p${digits}`] = { angle }
-            }
-            return next
-          })
+          setPinStates((prev) => writePinStateAliases(prev, pin, { state: "LOW", angle }))
         },
         setTone: (pin, freq) => {
-          const raw = String(pin).trim()
-          const digits = raw.replace(/^(gpio|gp|d|p)/i, "")
           const state = freq ? "HIGH" : "LOW"
           const value = freq ? 255 : 0
           const toneHz = freq ?? undefined
-          setPinStates((prev) => {
-            const next = { ...prev, [raw]: { state, value, toneHz } }
-            if (digits) {
-              next[digits] = { state, value, toneHz }
-              next[`d${digits}`] = { state, value, toneHz }
-              next[`gpio${digits}`] = { state, value, toneHz }
-            }
-            return next
-          })
+          setPinStates((prev) => writePinStateAliases(prev, pin, { state, value, toneHz }))
         },
         serialPrint: (text) => {
           setSerialLines((prev) => [...prev, { text, timestamp: Date.now(), type: "output" }])
