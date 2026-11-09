@@ -13,6 +13,7 @@ await build({
     new URL("../../src/lib/circuit-doctor.ts", import.meta.url).pathname,
     new URL("../../src/lib/breadboard-pins.ts", import.meta.url).pathname,
     new URL("../../src/lib/waveform-sampler.ts", import.meta.url).pathname,
+    new URL("../../src/lib/board-registry.ts", import.meta.url).pathname,
     new URL("../../src/lib/pin-state.ts", import.meta.url).pathname,
   ],
   bundle: true,
@@ -28,6 +29,7 @@ const { runBlocklyProgram } = await import(`file://${join(outdir, "blockly-runne
 const { diagnoseCircuit } = await import(`file://${join(outdir, "circuit-doctor.js")}`)
 const { normalizeBreadboardPinId } = await import(`file://${join(outdir, "breadboard-pins.js")}`)
 const { samplePinVoltage } = await import(`file://${join(outdir, "waveform-sampler.js")}`)
+const { getBoardForPart } = await import(`file://${join(outdir, "board-registry.js")}`)
 const { writePinStateAliases } = await import(`file://${join(outdir, "pin-state.js")}`)
 
 const part = (id, type, props = {}) => ({ id, type, x: 0, y: 0, rotation: 0, props })
@@ -433,8 +435,7 @@ test("PWM pin has full pulse voltage but nodal/DC meter reads average voltage", 
   const nodal = solveCircuitNodalPotentials(circuit, new Set(), pwm)
   const average = nodal.getPinVoltage({ partId: "uno", pinId: "d9" })
   assert.ok(Math.abs(average - (5 * 128 / 255)) < 0.02, "DMM/nodal DC view should report average PWM voltage")
-  const board = (await import(`file://${join(outdir, "board-registry.js")}`)).getBoardForPart
-  const definition = board(part("uno", "arduino-uno"))
+  const definition = getBoardForPart(part("uno", "arduino-uno"))
   const period = 1000 / definition.pwmFrequencyDefaultHz
   assert.equal(samplePinVoltage({ partId: "uno", pinId: "d9" }, circuit, pwm, period * 0.25), 5)
   assert.equal(samplePinVoltage({ partId: "uno", pinId: "d9" }, circuit, pwm, period * 0.75), 0)
@@ -446,8 +447,7 @@ test("true DAC output stays continuous DC while analogWrite on a DAC-capable pin
   const pwm = { "25": { state: "HIGH", value: 128, outputMode: "pwm" } }
   const dacVoltage = samplePinVoltage({ partId: "esp", pinId: "d25" }, circuit, dac, 0.75)
   assert.ok(Math.abs(dacVoltage - (3.3 * 128 / 255)) < 0.02)
-  const board = (await import(`file://${join(outdir, "board-registry.js")}`)).getBoardForPart
-  const definition = board(part("esp", "esp32-devkit"))
+  const definition = getBoardForPart(part("esp", "esp32-devkit"))
   const period = 1000 / definition.pwmFrequencyDefaultHz
   assert.equal(samplePinVoltage({ partId: "esp", pinId: "d25" }, circuit, pwm, period * 0.25), 3.3)
   assert.equal(samplePinVoltage({ partId: "esp", pinId: "d25" }, circuit, pwm, period * 0.75), 0)
