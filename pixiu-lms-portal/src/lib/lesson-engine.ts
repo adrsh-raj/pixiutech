@@ -703,10 +703,6 @@ export function evaluateLessonStep(lesson: Lesson, step: LessonStep, context: Le
   }
 }
 
-function findTemplate(id: string): ProjectTemplate | undefined {
-  return TEMPLATES.find((template) => template.id === id)
-}
-
 const DHT11_CIRCUIT: CircuitState = {
   parts: [
     { id: "uno", type: "arduino-uno", x: 60, y: 120, rotation: 0, props: {} },
@@ -1144,7 +1140,7 @@ export const UNO_LESSONS: Lesson[] = [
       {
         id: "code",
         title: "Program chime response",
-        instructions: "Configure D8 as OUTPUT and write HIGH when the pushbutton is pressed, followed by a short delay and LOW.",
+        instructions: "Read the pushbutton on D2. When it is pressed, play an 880 Hz tone on D8 for 250 ms, then stop the tone; keep the buzzer silent when released.",
         kind: "code",
         checks: [{ kind: "blocks", requirements: [
           { type: "io_digitalread", count: 1, fields: { PIN: "2" } },
