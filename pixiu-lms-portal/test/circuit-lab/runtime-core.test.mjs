@@ -29,7 +29,7 @@ const { runBlocklyProgram } = await import(`file://${join(outdir, "blockly-runne
 const { diagnoseCircuit } = await import(`file://${join(outdir, "circuit-doctor.js")}`)
 const { normalizeBreadboardPinId } = await import(`file://${join(outdir, "breadboard-pins.js")}`)
 const { samplePinVoltage } = await import(`file://${join(outdir, "waveform-sampler.js")}`)
-const { getBoardForPart } = await import(`file://${join(outdir, "board-registry.js")}`)
+const { getBoardForPart, lookupBoardPinState } = await import(`file://${join(outdir, "board-registry.js")}`)
 const { writePinStateAliases } = await import(`file://${join(outdir, "pin-state.js")}`)
 
 const part = (id, type, props = {}) => ({ id, type, x: 0, y: 0, rotation: 0, props })
@@ -463,4 +463,20 @@ test("tone and servo outputs are sampled as their own timed pulse waveforms", ()
   const servo = { "9": { state: "HIGH", value: 19, angle: 90, outputMode: "servo" } }
   assert.equal(samplePinVoltage({ partId: "uno", pinId: "d9" }, circuit, servo, 0.75), 5)
   assert.equal(samplePinVoltage({ partId: "uno", pinId: "d9" }, circuit, servo, 3), 0)
+})
+
+
+test("board pin aliases preserve explicit digital PWM tone servo and DAC signal modes", () => {
+  const board = getBoardForPart(part("esp", "esp32-devkit"))
+  const modes = [
+    ["GPIO25", { state: "HIGH", value: 128, outputMode: "pwm" }, "pwm"],
+    ["25", { state: "HIGH", value: 128, outputMode: "dac" }, "dac"],
+    ["gpio2", { state: "HIGH", value: 255, toneHz: 440, outputMode: "tone" }, "tone"],
+    ["d4", { state: "HIGH", value: 19, angle: 90, outputMode: "servo" }, "servo"],
+    ["D15", { state: "HIGH", outputMode: "digital" }, "digital"],
+  ]
+  for (const [alias, pinState, expected] of modes) {
+    const resolved = lookupBoardPinState({ [alias]: pinState }, alias, board)
+    assert.equal(resolved.outputMode, expected, `pin alias ${alias} should preserve ${expected} mode`)
+  }
 })
