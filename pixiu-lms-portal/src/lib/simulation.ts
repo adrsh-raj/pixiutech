@@ -162,6 +162,17 @@ export function computeRuntime(
   // 3. Catalog active Voltage Sources and Ground Sinks
   const activeSources: { key: string; voltage: number }[] = []
   const groundSinks: string[] = []
+  // GPIO logic levels are not component supply rails.
+  const powerSources: { key: string; voltage: number }[] = []
+  const powerGroundSinks: string[] = []
+  const addPowerSource = (source: { key: string; voltage: number }) => {
+    activeSources.push(source)
+    powerSources.push(source)
+  }
+  const addPowerGroundSink = (pinKey: string) => {
+    groundSinks.push(pinKey)
+    powerGroundSinks.push(pinKey)
+  }
 
   for (const part of state.parts) {
     const k = (pin: string) => key(part.id, pin)
