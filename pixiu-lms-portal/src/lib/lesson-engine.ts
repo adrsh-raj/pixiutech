@@ -728,7 +728,7 @@ const DHT11_XML = `<xml xmlns="https://developers.google.com/blockly/xml">
       <block type="serial_print"><value name="TEXT"><block type="text_string"><field name="TEXT">Humidity: </field></block></value><next>
       <block type="serial_println"><value name="TEXT"><block type="dht_humidity"></block></value><next>
       <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">1000</field></shadow></value></block>
-      </next></block></next></block></next></block>
+      </next></block></next></block></next></block></next></block>
     </statement>
   </block>
 </xml>`
