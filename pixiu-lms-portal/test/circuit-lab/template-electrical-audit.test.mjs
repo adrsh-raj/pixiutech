@@ -1,0 +1,370 @@
+import assert from "node:assert/strict"
+import test from "node:test"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { build } from "esbuild"
+
+const outdir = join(tmpdir(), `pixiu-template-electrical-audit-${Date.now()}`)
+await build({
+  entryPoints: [
+    new URL("../../src/lib/templates.ts", import.meta.url).pathname,
+    new URL("../../src/lib/components-catalog.ts", import.meta.url).pathname,
+    new URL("../../src/lib/board-registry.ts", import.meta.url).pathname,
+    new URL("../../src/lib/lesson-engine.ts", import.meta.url).pathname,
+  ],
+  bundle: true,
+  format: "esm",
+  outdir,
+  platform: "node",
+  alias: { "@": new URL("../../src", import.meta.url).pathname },
+})
+
+const [{ TEMPLATES }, { CATALOG }, boardModule, { LESSONS }] = await Promise.all([
+  import(`file://${join(outdir, "templates.js")}`),
+  import(`file://${join(outdir, "components-catalog.js")}`),
+  import(`file://${join(outdir, "board-registry.js")}`),
+  import(`file://${join(outdir, "lesson-engine.js")}`),
+])
+const { getBoardForPart, isBoardPart } = boardModule
+
+function normalize(value) {
+  return String(value ?? "").trim().toLowerCase()
+}
+
+function resolveBoardPin(board, rawPin) {
+  const raw = normalize(rawPin)
+  if (!board || !raw) return null
+  return board.pins.find((pin) =>
+    normalize(pin.id) === raw ||
+    normalize(pin.label) === raw ||
+    (pin.alternateNames ?? []).some((alias) => normalize(alias) === raw),
+  ) ?? null
+}
+
+function circuitGraph(circuit) {
+  const partMap = new Map(circuit.parts.map((part) => [part.id, part]))
+  const boardMap = new Map(circuit.parts.filter((part) => isBoardPart(part.type)).map((part) => [part.id, getBoardForPart(part)]))
+  const normalizeNode = (partId, pinId) => {
+    const board = boardMap.get(partId)
+    if (board) {
+      const pin = resolveBoardPin(board, pinId)
+      if (pin) return `${partId}:${pin.id}`
+      const raw = normalize(pinId)
+      for (const rail of ["v5", "v33", "vin", "gnd"]) {
+        if ((board.powerPins[rail] ?? []).some((item) => normalize(item) === raw)) return `${partId}:${raw}`
+      }
+    }
+    return `${partId}:${normalize(pinId)}`
+  }
+  const adjacency = new Map()
+  const add = (a, b, resistorId = null) => {
+    if (!adjacency.has(a)) adjacency.set(a, [])
+    if (!adjacency.has(b)) adjacency.set(b, [])
+    adjacency.get(a).push({ node: b, resistorId })
+    adjacency.get(b).push({ node: a, resistorId })
+  }
+
+  for (const wire of circuit.wires) {
+    add(
+      normalizeNode(wire.from.partId, wire.from.pinId),
+      normalizeNode(wire.to.partId, wire.to.pinId),
+    )
+  }
+  for (const part of circuit.parts) {
+    if (part.type === "resistor") add(`${part.id}:a`, `${part.id}:b`, part.id)
+    if (part.type === "potentiometer") {
+      add(`${part.id}:t1`, `${part.id}:wiper`, part.id)
+      add(`${part.id}:wiper`, `${part.id}:t2`, part.id)
+    }
+    if (part.type === "pushbutton") {
+      add(`${part.id}:p1a`, `${part.id}:p1b`)
+      add(`${part.id}:p2a`, `${part.id}:p2b`)
+    }
+    if (isBoardPart(part.type)) {
+      const board = getBoardForPart(part)
+      for (const group of [board.powerPins.v5 ?? [], board.powerPins.v33 ?? [], board.powerPins.vin ?? [], board.powerPins.gnd ?? []]) {
+        if (group.length > 1) {
+          const first = normalizeNode(part.id, group[0])
+          for (const pin of group.slice(1)) add(first, normalizeNode(part.id, pin))
+        }
+      }
+    }
+  }
+  return { adjacency, partMap, boardMap, normalizeNode }
+}
+
+function pathToAny(adjacency, start, targets, { requireResistor = false } = {}) {
+  const targetSet = new Set(targets)
+  const queue = [{ node: start, resistorCount: 0 }]
+  const best = new Map([[start, 0]])
+  while (queue.length) {
+    const current = queue.shift()
+    if (targetSet.has(current.node) && (!requireResistor || current.resistorCount > 0)) {
+      return { found: true, resistorCount: current.resistorCount }
+    }
+    for (const edge of adjacency.get(current.node) ?? []) {
+      const nextCount = current.resistorCount + (edge.resistorId ? 1 : 0)
+      const previous = best.get(edge.node)
+      if (previous !== undefined && previous >= nextCount) continue
+      best.set(edge.node, nextCount)
+      queue.push({ node: edge.node, resistorCount: nextCount })
+    }
+  }
+  return { found: false, resistorCount: 0 }
+}
+
+function electricalNodes(circuit, graph) {
+  const sources = []
+  const grounds = []
+  for (const part of circuit.parts) {
+    if (isBoardPart(part.type)) {
+      const board = getBoardForPart(part)
+      for (const pin of [...(board.powerPins.v5 ?? []), ...(board.powerPins.v33 ?? []), ...(board.powerPins.vin ?? [])]) {
+        sources.push(graph.normalizeNode(part.id, pin))
+      }
+      for (const pin of board.powerPins.gnd ?? []) grounds.push(graph.normalizeNode(part.id, pin))
+      // A GPIO can source an LED when its corresponding Blockly output is HIGH.
+      for (const pin of board.pins) {
+        if (pin.kind === "digital" || pin.kind === "analog") sources.push(graph.normalizeNode(part.id, pin.id))
+      }
+    } else if (part.type === "battery") {
+      sources.push(`${part.id}:pos`)
+      grounds.push(`${part.id}:neg`)
+    }
+  }
+  return { sources: [...new Set(sources)], grounds: [...new Set(grounds)] }
+}
+
+function blockInventory(xml) {
+  const blocks = []
+  const stack = []
+  const pattern = /<block\\b[^>]*\\btype=["']([^"']+)["'][^>]*>|<\\/block>|<field\\b[^>]*\\bname=["']([^"']+)["'][^>]*>([\\s\\S]*?)<\\/field>/g
+  for (const match of xml.matchAll(pattern)) {
+    if (match[1]) {
+      const entry = { type: match[1], fields: {} }
+      blocks.push(entry)
+      stack.push(entry)
+    } else if (match[0] === "</block>") {
+      stack.pop()
+    } else if (stack.length && match[2]) {
+      stack[stack.length - 1].fields[match[2]] = match[3].replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    }
+  }
+  return blocks
+}
+
+function assertWellFormedXml(xml, label) {
+  const stack = []
+  const tokens = xml.match(/<\\/?[A-Za-z][^>]*>/g) ?? []
+  for (const token of tokens) {
+    const closing = token.startsWith("</")
+    const selfClosing = token.endsWith("/>")
+    const tag = token.match(/^<\\/?([A-Za-z][\\w:-]*)/)?.[1]
+    assert.ok(tag, `${label}: malformed XML token ${token}`)
+    if (closing) assert.equal(stack.pop(), tag, `${label}: unexpected closing tag ${token}`)
+    else if (!selfClosing) stack.push(tag)
+  }
+  assert.deepEqual(stack, [], `${label}: unclosed XML elements`)
+}
+
+const REQUIRED_PINS = {
+  led: ["anode", "cathode"],
+  resistor: ["a", "b"],
+  potentiometer: ["t1", "wiper", "t2"],
+  battery: ["pos", "neg"],
+  servo: ["sig", "vcc", "gnd"],
+  buzzer: ["pos", "neg"],
+  "rgb-led": ["red", "green", "blue", "gnd"],
+  "seven-segment": ["a", "b", "c", "d", "e", "f", "g", "dp", "com"],
+  "lcd-i2c": ["vcc", "gnd", "sda", "scl"],
+  ultrasonic: ["vcc", "trig", "echo", "gnd"],
+  "pir-sensor": ["vcc", "out", "gnd"],
+  "ir-sensor": ["vcc", "out", "gnd"],
+  dht11: ["vcc", "data", "gnd"],
+  "oled-i2c": ["vcc", "gnd", "sda", "scl"],
+  joystick: ["vcc", "gnd", "vrx", "vry", "sw"],
+  "soil-moisture": ["vcc", "ao", "gnd"],
+  "tmp36": ["vcc", "out", "gnd"],
+  "mq2-gas": ["vcc", "gnd", "ao", "do"],
+  "neopixel-ring": ["vcc", "gnd", "di"],
+  "rotary-encoder": ["vcc", "gnd", "clk", "dt", "sw"],
+  "keypad-4x4": ["r1", "r2", "r3", "r4", "c1", "c2", "c3", "c4"],
+}
+
+function auditCircuit(label, circuit, xml, { strictLedProtection = true } = {}) {
+  const errors = []
+  const warnings = []
+  if (!circuit || !Array.isArray(circuit.parts) || !Array.isArray(circuit.wires)) {
+    return { errors: [`${label}: missing circuit parts/wires`], warnings }
+  }
+
+  const ids = circuit.parts.map((part) => part.id)
+  if (ids.some((id) => !id) || new Set(ids).size !== ids.length) errors.push(`${label}: duplicate/empty part IDs`)
+  const wireIds = circuit.wires.map((wire) => wire.id)
+  if (wireIds.some((id) => !id) || new Set(wireIds).size !== wireIds.length) errors.push(`${label}: duplicate/empty wire IDs`)
+  const partMap = new Map(circuit.parts.map((part) => [part.id, part]))
+  const boardParts = circuit.parts.filter((part) => isBoardPart(part.type))
+  if (boardParts.length !== 1) errors.push(`${label}: expected exactly one MCU board, found ${boardParts.length}`)
+
+  for (const part of circuit.parts) {
+    if (!CATALOG[part.type]) errors.push(`${label}: unknown component type ${part.type} (${part.id})`)
+    if (!part.id || typeof part.x !== "number" || typeof part.y !== "number") errors.push(`${label}: malformed part record ${part.id}`)
+  }
+
+  const graph = circuitGraph(circuit)
+  const endpointSet = new Set()
+  for (const wire of circuit.wires) {
+    for (const [side, ref] of [["from", wire.from], ["to", wire.to]]) {
+      const part = partMap.get(ref?.partId)
+      if (!part) {
+        errors.push(`${label}: wire ${wire.id} ${side} refers to missing part ${ref?.partId}`)
+        continue
+      }
+      const board = graph.boardMap.get(part.id)
+      if (board) {
+        if (!resolveBoardPin(board, ref.pinId) &&
+            !Object.values(board.powerPins).flat().some((pin) => normalize(pin) === normalize(ref.pinId))) {
+          errors.push(`${label}: wire ${wire.id} uses unknown ${part.type} pin ${ref.pinId}`)
+        }
+      } else if (!(CATALOG[part.type]?.pins ?? []).some((pin) => normalize(pin.id) === normalize(ref.pinId))) {
+        errors.push(`${label}: wire ${wire.id} uses unknown ${part.type} pin ${ref.pinId}`)
+      }
+    }
+    const from = graph.normalizeNode(wire.from.partId, wire.from.pinId)
+    const to = graph.normalizeNode(wire.to.partId, wire.to.pinId)
+    if (from === to) errors.push(`${label}: wire ${wire.id} connects a pin to itself`)
+    const key = [from, to].sort().join("|")
+    if (endpointSet.has(key)) warnings.push(`${label}: duplicate parallel wire between ${from} and ${to}`)
+    endpointSet.add(key)
+  }
+
+  const connected = new Set()
+  for (const wire of circuit.wires) {
+    connected.add(graph.normalizeNode(wire.from.partId, wire.from.pinId))
+    connected.add(graph.normalizeNode(wire.to.partId, wire.to.pinId))
+  }
+  const byType = new Map(circuit.parts.map((part) => [part.id, part.type]))
+  for (const part of circuit.parts) {
+    for (const pinId of REQUIRED_PINS[part.type] ?? []) {
+      if (!connected.has(graph.normalizeNode(part.id, pinId))) {
+        errors.push(`${label}: ${part.id} (${part.type}) has required pin ${pinId} unconnected`)
+      }
+    }
+  }
+
+  const { sources, grounds } = electricalNodes(circuit, graph)
+  for (const part of circuit.parts) {
+    if (part.type !== "led") continue
+    const anode = graph.normalizeNode(part.id, "anode")
+    const cathode = graph.normalizeNode(part.id, "cathode")
+    const forwardSource = pathToAny(graph.adjacency, anode, sources)
+    const forwardGround = pathToAny(graph.adjacency, cathode, grounds)
+    const reverseSource = pathToAny(graph.adjacency, cathode, sources)
+    const reverseGround = pathToAny(graph.adjacency, anode, grounds)
+    if (forwardSource.found && forwardGround.found) {
+      const hasSeriesResistor =
+        pathToAny(graph.adjacency, anode, sources, { requireResistor: true }).found ||
+        pathToAny(graph.adjacency, cathode, grounds, { requireResistor: true }).found
+      if (strictLedProtection && !hasSeriesResistor) errors.push(`${label}: LED ${part.id} has a forward power/ground path without a series resistor`)
+    } else if (reverseSource.found && reverseGround.found) {
+      errors.push(`${label}: LED ${part.id} is wired in reverse polarity`)
+    } else {
+      errors.push(`${label}: LED ${part.id} does not have a complete source-to-ground path`)
+    }
+  }
+
+  if (typeof xml === "string" && xml.trim()) {
+    try {
+      assertWellFormedXml(xml, label)
+    } catch (error) {
+      errors.push(error.message)
+    }
+    const blocks = blockInventory(xml)
+    const boardPart = boardParts[0]
+    const board = boardPart ? getBoardForPart(boardPart) : null
+    const wirePins = new Set()
+    if (boardPart) {
+      for (const wire of circuit.wires) {
+        if (wire.from.partId === boardPart.id) wirePins.add(normalize(graph.normalizeNode(boardPart.id, wire.from.pinId).split(":")[1]))
+        if (wire.to.partId === boardPart.id) wirePins.add(normalize(graph.normalizeNode(boardPart.id, wire.to.pinId).split(":")[1]))
+      }
+    }
+
+    for (const block of blocks) {
+      const pin = block.fields.PIN
+      if (pin !== undefined && board) {
+        const def = resolveBoardPin(board, pin)
+        if (!def) errors.push(`${label}: Blockly ${block.type} uses invalid board pin ${pin}`)
+        else {
+          if (block.type === "io_analogwrite" && !def.capabilities?.pwm) errors.push(`${label}: Blockly analogWrite pin ${pin} is not PWM-capable on ${board.shortName}`)
+          if (block.type === "io_analogread" && !def.capabilities?.adc) errors.push(`${label}: Blockly analogRead pin ${pin} is not ADC-capable on ${board.shortName}`)
+          if (def.capabilities?.inputOnly && ["io_digitalwrite", "io_analogwrite", "servo_write", "tone_play"].includes(block.type)) {
+            errors.push(`${label}: Blockly ${block.type} drives input-only pin ${pin}`)
+          }
+          if (["io_digitalwrite", "io_analogwrite", "io_digitalread", "io_analogread", "servo_write", "tone_play", "tone_stop"].includes(block.type) && !wirePins.has(normalize(def.id)) && !def.capabilities?.builtInLed) {
+            errors.push(`${label}: Blockly ${block.type} uses unconnected board pin ${pin}`)
+          }
+        }
+      }
+
+      const sensorField = block.fields.SENSOR
+      if (sensorField) {
+        const expected = {
+          potentiometer_read: "potentiometer",
+          ldr_read: "ldr",
+          tmp36_temperature: "tmp36",
+          dht_temperature: "dht11",
+          dht_humidity: "dht11",
+          pir_motion: "pir-sensor",
+          ir_read: "ir-sensor",
+          ultrasonic_read: "ultrasonic",
+          joystick_x: "joystick",
+          joystick_y: "joystick",
+          joystick_button: "joystick",
+          soil_moisture_read: "soil-moisture",
+          mq2_gas_read: "mq2-gas",
+          encoder_read: "rotary-encoder",
+          keypad_read: "keypad-4x4",
+          neopixel_set_color: "neopixel-ring",
+          neopixel_show: "neopixel-ring",
+        }[block.type]
+        if (expected && partMap.get(sensorField)?.type !== expected) {
+          errors.push(`${label}: Blockly ${block.type} references ${sensorField}, expected component type ${expected}`)
+        }
+      }
+    }
+  }
+
+  return { errors, warnings }
+}
+
+const templateIds = TEMPLATES.map((template) => template.id)
+const lessonCircuits = LESSONS.filter((lesson) => lesson.seedCircuit)
+const templateResults = TEMPLATES.map((template) =>
+  ({ id: template.id, title: template.title, ...auditCircuit(`template ${template.id}`, template.circuit, template.blocklyXml) }),
+)
+const lessonResults = lessonCircuits.map((lesson) =>
+  ({ id: lesson.id, title: lesson.title, ...auditCircuit(`lesson ${lesson.id}`, lesson.seedCircuit, lesson.seedBlocklyXml, { strictLedProtection: true }) }),
+)
+const allErrors = [...templateResults, ...lessonResults].flatMap((result) => result.errors)
+const allWarnings = [...templateResults, ...lessonResults].flatMap((result) => result.warnings)
+
+test("complete Virtual Lab project-template and curriculum circuit inventory is unique and audited", () => {
+  assert.ok(TEMPLATES.length >= 20, `unexpectedly small project-template catalogue: ${TEMPLATES.length}`)
+  assert.equal(new Set(templateIds).size, templateIds.length, "project-template IDs must be unique")
+  assert.ok(lessonCircuits.length >= 35, `expected seeded circuits from all boards; got ${lessonCircuits.length}`)
+  console.log(JSON.stringify({
+    projectTemplates: TEMPLATES.length,
+    curriculumLessons: LESSONS.length,
+    curriculumSeedCircuits: lessonCircuits.length,
+    totalCircuitsAudited: TEMPLATES.length + lessonCircuits.length,
+    totalParts: [...TEMPLATES.map((item) => item.circuit.parts.length), ...lessonCircuits.map((item) => item.seedCircuit.parts.length)].reduce((a, b) => a + b, 0),
+    totalWires: [...TEMPLATES.map((item) => item.circuit.wires.length), ...lessonCircuits.map((item) => item.seedCircuit.wires.length)].reduce((a, b) => a + b, 0),
+    errorCount: allErrors.length,
+    warningCount: allWarnings.length,
+  }, null, 2))
+  if (allErrors.length) {
+    console.error("Virtual Lab electrical audit findings:\\n" + allErrors.map((error) => "- " + error).join("\\n"))
+  }
+  assert.deepEqual(allErrors, [], "all template and curriculum circuit electrical/topology checks must pass")
+})
