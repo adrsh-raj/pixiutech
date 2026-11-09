@@ -138,7 +138,7 @@ function electricalNodes(circuit, graph) {
 function blockInventory(xml) {
   const blocks = []
   const stack = []
-  const pattern = /<block\\b[^>]*\\btype=["']([^"']+)["'][^>]*>|<\\/block>|<field\\b[^>]*\\bname=["']([^"']+)["'][^>]*>([\\s\\S]*?)<\\/field>/g
+  const pattern = /<block\b[^>]*\btype=["']([^"']+)["'][^>]*>|<\/block>|<field\b[^>]*\bname=["']([^"']+)["'][^>]*>([\s\S]*?)<\/field>/g
   for (const match of xml.matchAll(pattern)) {
     if (match[1]) {
       const entry = { type: match[1], fields: {} }
@@ -155,11 +155,11 @@ function blockInventory(xml) {
 
 function assertWellFormedXml(xml, label) {
   const stack = []
-  const tokens = xml.match(/<\\/?[A-Za-z][^>]*>/g) ?? []
+  const tokens = xml.match(/<\/?[A-Za-z][^>]*>/g) ?? []
   for (const token of tokens) {
     const closing = token.startsWith("</")
     const selfClosing = token.endsWith("/>")
-    const tag = token.match(/^<\\/?([A-Za-z][\\w:-]*)/)?.[1]
+    const tag = token.match(/^<\/?([A-Za-z][\w:-]*)/)?.[1]
     assert.ok(tag, `${label}: malformed XML token ${token}`)
     if (closing) assert.equal(stack.pop(), tag, `${label}: unexpected closing tag ${token}`)
     else if (!selfClosing) stack.push(tag)
