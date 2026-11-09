@@ -52,7 +52,8 @@ Resume from this branch and the latest commit. Re-read this file first, inspect 
   - Mission 7: D12/D11/D10 traffic-light cycle.
 - [x] Remove the fragile lesson-to-template Blockly fallback. A project/template can no longer silently become a lesson's starter program.
 - [x] Reset Blockly for every lesson selection, including Intermediate and Advanced; clear any held virtual buttons while switching/loading a lesson.
-- [x] Add test/circuit-lab/lesson-seed-integrity.test.mjs covering all 55 IDs/boards, 19 Beginner seeds, 36 blank non-Beginner workspaces, six repaired Arduino missions, XML structure, and the 30 cross-board component references.
+- [x] Repair three pre-existing malformed Advanced Arduino Blockly XML programs (Missions 21, 22, and 23).
+- [x] Extend test/circuit-lab/lesson-seed-integrity.test.mjs to validate every stored lesson seed XML (43 seeds), all 55 IDs/boards, 19 Beginner seeds, 36 blank non-Beginner workspaces, six repaired Arduino missions, and the 30 cross-board component references.
 - [ ] Run the new and existing tests through GitHub Actions; inspect build/lint and CI results.
 - [ ] Review final diff and promote verified changes to main.
 
@@ -63,6 +64,9 @@ Resume from this branch and the latest commit. Re-read this file first, inspect 
 - c2b8585: clear previous Blockly program and virtual button state when switching/loading lessons.
 - b133742: added all-lesson seed integrity regression test.
 - 3415ba3: corrected XML closing-tag parsing in the regression test.
+- 3c91829: repaired malformed XML in Advanced AI confidence/presence/gesture lessons.
+- 3b94f8e: validate every stored seed XML, including seeds intentionally not auto-loaded.
+- aa23499: corrected nested block closure in AI presence/gesture programs.
 
 The three board-specific curricula (ESP32/Pico/micro:bit) were statically checked: each of their 30 Blockly seed programs has a non-empty program root and each non-empty SENSOR reference resolves to a part ID in that lesson's seedCircuit. Actual CI/runtime verification is still pending; do not mark the repair complete until those checks pass.
 
