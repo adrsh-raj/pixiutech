@@ -1,6 +1,5 @@
 import type { CircuitState, PartType } from "./circuit-types"
 import type { PartRuntime } from "@/components/circuit-lab/part-art"
-import { TEMPLATES, type ProjectTemplate } from "./templates"
 import { ESP32_LESSONS } from "./curriculum/esp32-curriculum"
 import { PICO_LESSONS } from "./curriculum/pico-curriculum"
 import { MICROBIT_LESSONS } from "./curriculum/microbit-curriculum"
@@ -74,7 +73,6 @@ export interface Lesson {
   estimatedMinutes: number
   concepts: string[]
   prerequisites: string[]
-  templateId?: string
   seedCircuit?: CircuitState
   seedBlocklyXml?: string
   steps: LessonStep[]
@@ -616,9 +614,7 @@ export function evaluateLessonStep(lesson: Lesson, step: LessonStep, context: Le
           context.blocklyXml.includes('<block type="arduino_program" x="40" y="40"></block>') ||
           context.blocklyXml.includes('<block type="arduino_program" x="40" y="40">\n  </block>') ||
           extractBlocks(context.blocklyXml).length === 0)
-          ? lesson.seedBlocklyXml ||
-            (lesson.templateId ? TEMPLATES.find((t) => t.id === lesson.templateId)?.blocklyXml : "") ||
-            context.blocklyXml
+          ? lesson.seedBlocklyXml || context.blocklyXml
           : context.blocklyXml
 
       const blocks = extractBlocks(xmlToEvaluate)
@@ -930,7 +926,7 @@ export const UNO_LESSONS: Lesson[] = [
     estimatedMinutes: 10,
     concepts: ["GPIO", "Current Limiting", "Digital Output"],
     prerequisites: [],
-    templateId: "blink-led",
+    seedBlocklyXml: "<xml xmlns=\"https://developers.google.com/blockly/xml\">\n  <block type=\"arduino_program\" x=\"40\" y=\"40\">\n    <statement name=\"SETUP\">\n      <block type=\"io_pinmode\"><field name=\"PIN\">13</field><field name=\"MODE\">OUTPUT</field></block>\n    </statement>\n    <statement name=\"LOOP\">\n      <block type=\"io_digitalwrite\"><field name=\"PIN\">13</field><field name=\"STATE\">HIGH</field><next>\n        <block type=\"time_delay\"><value name=\"MS\"><shadow type=\"math_number\"><field name=\"NUM\">500</field></shadow></value><next>\n          <block type=\"io_digitalwrite\"><field name=\"PIN\">13</field><field name=\"STATE\">LOW</field><next>\n            <block type=\"time_delay\"><value name=\"MS\"><shadow type=\"math_number\"><field name=\"NUM\">500</field></shadow></value></block>\n          </next></block>\n        </next></block>\n      </next></block>\n    </statement>\n  </block>\n</xml>",
     finalGoal: "🎯 What You Will Build: A safe blinking electronic signal beacon on Arduino Uno pin D13, learning how forward-bias current illuminates a diode and how a 220Ω resistor protects it from burning out.",
     steps: [
       {
@@ -992,7 +988,7 @@ export const UNO_LESSONS: Lesson[] = [
     estimatedMinutes: 12,
     concepts: ["Digital Input", "Pushbutton", "Conditional Logic", "Interactive I/O"],
     prerequisites: ["lesson-led-basics"],
-    templateId: "g6-pushbutton-led",
+    seedBlocklyXml: "<xml xmlns=\"https://developers.google.com/blockly/xml\">\n  <block type=\"arduino_program\" x=\"40\" y=\"40\">\n    <statement name=\"SETUP\">\n      <block type=\"io_pinmode\"><field name=\"PIN\">2</field><field name=\"MODE\">INPUT</field><next>\n        <block type=\"io_pinmode\"><field name=\"PIN\">13</field><field name=\"MODE\">OUTPUT</field></block>\n      </next></block>\n    </statement>\n    <statement name=\"LOOP\">\n      <block type=\"controls_if\"><mutation else=\"1\"></mutation>\n        <value name=\"IF0\"><block type=\"io_digitalread\"><field name=\"PIN\">2</field></block></value>\n        <statement name=\"DO0\"><block type=\"io_digitalwrite\"><field name=\"PIN\">13</field><field name=\"STATE\">HIGH</field></block></statement>\n        <statement name=\"ELSE\"><block type=\"io_digitalwrite\"><field name=\"PIN\">13</field><field name=\"STATE\">LOW</field></block></statement>\n      </block>\n    </statement>\n  </block>\n</xml>",
     finalGoal: "🎯 What You Will Build: A tactile interactive desk lamp where pressing a momentary pushbutton switch on digital pin D2 instantly lights up a Green LED through conditional code logic.",
     steps: [
       {
@@ -1030,7 +1026,7 @@ export const UNO_LESSONS: Lesson[] = [
         checks: [{ kind: "blocks", requirements: [
           { type: "io_pinmode", count: 1, fields: { PIN: "2", MODE: "INPUT" } },
           { type: "io_pinmode", count: 1, fields: { PIN: "13", MODE: "OUTPUT" } },
-          { type: "pushbutton_read", count: 1 },
+          { type: "io_digitalread", count: 1, fields: { PIN: "2" } },
           { type: "io_digitalwrite", count: 1, fields: { PIN: "13", STATE: "HIGH" } },
           { type: "io_digitalwrite", count: 1, fields: { PIN: "13", STATE: "LOW" } },
         ] }],
@@ -1055,7 +1051,7 @@ export const UNO_LESSONS: Lesson[] = [
     estimatedMinutes: 14,
     concepts: ["Analog Input", "ADC", "PWM Dimming", "Map Function"],
     prerequisites: ["lesson-led-basics"],
-    templateId: "g6-pot-brightness",
+    seedBlocklyXml: "<xml xmlns=\"https://developers.google.com/blockly/xml\">\n  <block type=\"arduino_program\" x=\"40\" y=\"40\">\n    <statement name=\"SETUP\">\n      <block type=\"io_pinmode\"><field name=\"PIN\">9</field><field name=\"MODE\">OUTPUT</field></block>\n    </statement>\n    <statement name=\"LOOP\">\n      <block type=\"io_analogwrite\"><field name=\"PIN\">9</field>\n        <value name=\"VALUE\"><block type=\"arduino_map\">\n          <value name=\"VALUE\"><block type=\"io_analogread\"><field name=\"PIN\">A0</field></block></value>\n          <value name=\"FROM_LOW\"><shadow type=\"math_number\"><field name=\"NUM\">0</field></shadow></value>\n          <value name=\"FROM_HIGH\"><shadow type=\"math_number\"><field name=\"NUM\">1023</field></shadow></value>\n          <value name=\"TO_LOW\"><shadow type=\"math_number\"><field name=\"NUM\">0</field></shadow></value>\n          <value name=\"TO_HIGH\"><shadow type=\"math_number\"><field name=\"NUM\">255</field></shadow></value>\n        </block></value>\n        <next><block type=\"time_delay\"><value name=\"MS\"><shadow type=\"math_number\"><field name=\"NUM\">20</field></shadow></value></block></next>\n      </block>\n    </statement>\n  </block>\n</xml>",
     finalGoal: "🎯 What You Will Build: A smooth analog dimmer light system using a 10kΩ potentiometer on pin A0 to continuously dial LED brightness up and down via 8-bit PWM modulation.",
     steps: [
       {
@@ -1093,7 +1089,8 @@ export const UNO_LESSONS: Lesson[] = [
         kind: "code",
         checks: [{ kind: "blocks", requirements: [
           { type: "io_analogwrite", count: 1, fields: { PIN: "9" } },
-          { type: "potentiometer_read", count: 1 },
+          { type: "io_analogread", count: 1, fields: { PIN: "A0" } },
+          { type: "arduino_map", count: 1 },
         ] }],
         success: "Analog-to-PWM mapping logic is present in code.",
       },
@@ -1116,7 +1113,7 @@ export const UNO_LESSONS: Lesson[] = [
     estimatedMinutes: 10,
     concepts: ["Piezo Buzzer", "Sound Alert", "Digital Trigger", "Audio Transducers"],
     prerequisites: ["lesson-pushbutton-led"],
-    templateId: "g6-buzzer-doorbell",
+    seedBlocklyXml: "<xml xmlns=\"https://developers.google.com/blockly/xml\">\n  <block type=\"arduino_program\" x=\"40\" y=\"40\">\n    <statement name=\"SETUP\">\n      <block type=\"io_pinmode\"><field name=\"PIN\">2</field><field name=\"MODE\">INPUT</field></block>\n    </statement>\n    <statement name=\"LOOP\">\n      <block type=\"controls_if\"><mutation else=\"1\"></mutation>\n        <value name=\"IF0\"><block type=\"io_digitalread\"><field name=\"PIN\">2</field></block></value>\n        <statement name=\"DO0\">\n          <block type=\"tone_play\"><field name=\"PIN\">8</field><value name=\"FREQ\"><shadow type=\"math_number\"><field name=\"NUM\">880</field></shadow></value><next>\n            <block type=\"time_delay\"><value name=\"MS\"><shadow type=\"math_number\"><field name=\"NUM\">250</field></shadow></value><next>\n              <block type=\"tone_stop\"><field name=\"PIN\">8</field></block>\n            </next></block>\n          </next></block>\n        </statement>\n        <statement name=\"ELSE\"><block type=\"tone_stop\"><field name=\"PIN\">8</field></block></statement>\n      </block>\n    </statement>\n  </block>\n</xml>",
     finalGoal: "🎯 What You Will Build: A smart acoustic entryway doorbell that produces a crisp 250ms melodic chime tone on a piezo buzzer whenever a visitor rings the front pushbutton.",
     steps: [
       {
@@ -1150,9 +1147,9 @@ export const UNO_LESSONS: Lesson[] = [
         instructions: "Configure D8 as OUTPUT and write HIGH when the pushbutton is pressed, followed by a short delay and LOW.",
         kind: "code",
         checks: [{ kind: "blocks", requirements: [
-          { type: "pushbutton_read", count: 1 },
-          { type: "io_digitalwrite", count: 1, fields: { PIN: "8", STATE: "HIGH" } },
-          { type: "io_digitalwrite", count: 1, fields: { PIN: "8", STATE: "LOW" } },
+          { type: "io_digitalread", count: 1, fields: { PIN: "2" } },
+          { type: "tone_play", count: 1, fields: { PIN: "8" } },
+          { type: "tone_stop", count: 1, fields: { PIN: "8" } },
         ] }],
         success: "Audible doorbell logic is programmed.",
       },
@@ -1326,7 +1323,7 @@ export const UNO_LESSONS: Lesson[] = [
     estimatedMinutes: 12,
     concepts: ["RGB LED", "PWM Color Mixing", "Multi-channel GPIO"],
     prerequisites: ["lesson-led-basics"],
-    templateId: "g6-rgb-mood-lamp",
+    seedBlocklyXml: "<xml xmlns=\"https://developers.google.com/blockly/xml\">\n  <block type=\"arduino_program\" x=\"40\" y=\"40\">\n    <statement name=\"SETUP\">\n      <block type=\"io_pinmode\"><field name=\"PIN\">9</field><field name=\"MODE\">OUTPUT</field><next>\n        <block type=\"io_pinmode\"><field name=\"PIN\">10</field><field name=\"MODE\">OUTPUT</field><next>\n          <block type=\"io_pinmode\"><field name=\"PIN\">11</field><field name=\"MODE\">OUTPUT</field></block>\n        </next></block>\n      </next></block>\n    </statement>\n    <statement name=\"LOOP\">\n      <block type=\"io_analogwrite\"><field name=\"PIN\">9</field><value name=\"VALUE\"><shadow type=\"math_number\"><field name=\"NUM\">255</field></shadow></value><next>\n        <block type=\"io_analogwrite\"><field name=\"PIN\">10</field><value name=\"VALUE\"><shadow type=\"math_number\"><field name=\"NUM\">64</field></shadow></value><next>\n          <block type=\"io_analogwrite\"><field name=\"PIN\">11</field><value name=\"VALUE\"><shadow type=\"math_number\"><field name=\"NUM\">128</field></shadow></value><next>\n            <block type=\"time_delay\"><value name=\"MS\"><shadow type=\"math_number\"><field name=\"NUM\">1000</field></shadow></value></block>\n          </next></block>\n        </next></block>\n      </next></block>\n    </statement>\n  </block>\n</xml>",
     finalGoal: "🎯 What You Will Build: An ambient RGB mood light capable of blending vibrant colors by dynamically modulating 8-bit PWM signals across Red (D9), Green (D10), and Blue (D11) channels.",
     steps: [
       {
@@ -1382,7 +1379,7 @@ export const UNO_LESSONS: Lesson[] = [
     estimatedMinutes: 15,
     concepts: ["Sequencing", "Multi-Output GPIO", "State Machine", "Timing"],
     prerequisites: ["lesson-led-basics"],
-    templateId: "traffic-light",
+    seedBlocklyXml: "<xml xmlns=\"https://developers.google.com/blockly/xml\">\n  <block type=\"arduino_program\" x=\"40\" y=\"40\">\n    <statement name=\"SETUP\">\n      <block type=\"io_pinmode\"><field name=\"PIN\">12</field><field name=\"MODE\">OUTPUT</field><next>\n        <block type=\"io_pinmode\"><field name=\"PIN\">11</field><field name=\"MODE\">OUTPUT</field><next>\n          <block type=\"io_pinmode\"><field name=\"PIN\">10</field><field name=\"MODE\">OUTPUT</field></block>\n        </next></block>\n      </next></block>\n    </statement>\n    <statement name=\"LOOP\">\n      <block type=\"io_digitalwrite\"><field name=\"PIN\">12</field><field name=\"STATE\">HIGH</field><next>\n        <block type=\"io_digitalwrite\"><field name=\"PIN\">11</field><field name=\"STATE\">LOW</field><next>\n          <block type=\"io_digitalwrite\"><field name=\"PIN\">10</field><field name=\"STATE\">LOW</field><next>\n            <block type=\"time_delay\"><value name=\"MS\"><shadow type=\"math_number\"><field name=\"NUM\">3000</field></shadow></value><next>\n              <block type=\"io_digitalwrite\"><field name=\"PIN\">12</field><field name=\"STATE\">LOW</field><next>\n                <block type=\"io_digitalwrite\"><field name=\"PIN\">11</field><field name=\"STATE\">HIGH</field><next>\n                  <block type=\"time_delay\"><value name=\"MS\"><shadow type=\"math_number\"><field name=\"NUM\">500</field></shadow></value><next>\n                    <block type=\"io_digitalwrite\"><field name=\"PIN\">11</field><field name=\"STATE\">LOW</field><next>\n                      <block type=\"io_digitalwrite\"><field name=\"PIN\">10</field><field name=\"STATE\">HIGH</field><next>\n                        <block type=\"time_delay\"><value name=\"MS\"><shadow type=\"math_number\"><field name=\"NUM\">3000</field></shadow></value><next>\n                          <block type=\"io_digitalwrite\"><field name=\"PIN\">10</field><field name=\"STATE\">LOW</field><next>\n                            <block type=\"io_digitalwrite\"><field name=\"PIN\">11</field><field name=\"STATE\">HIGH</field><next>\n                              <block type=\"time_delay\"><value name=\"MS\"><shadow type=\"math_number\"><field name=\"NUM\">500</field></shadow></value><next>\n                                <block type=\"io_digitalwrite\"><field name=\"PIN\">11</field><field name=\"STATE\">LOW</field></block>\n                              </next></block>\n                            </next></block>\n                          </next></block>\n                        </next></block>\n                      </next></block>\n                    </next></block>\n                  </next></block>\n                </next></block>\n              </next></block>\n            </next></block>\n          </next></block>\n        </next></block>\n      </next></block>\n    </statement>\n  </block>\n</xml>",
     finalGoal: "🎯 What You Will Build: A fully automated municipal traffic intersection signal that coordinates Red (D12), Yellow (D11), and Green (D10) LEDs with precise timed state transitions.",
     steps: [
       {
@@ -1448,7 +1445,6 @@ export const UNO_LESSONS: Lesson[] = [
     estimatedMinutes: 14,
     concepts: ["Servo Motor", "PWM Positioning", "Robotics", "Actuators"],
     prerequisites: ["lesson-led-basics"],
-    templateId: "servo-sweep",
     finalGoal: "🎯 What You Will Build: A robotic servo positioning arm that sweeps dynamically across calibrated angular positions (0°, 90°, and 180°) using precise pulse-width modulation on digital pin D9.",
     codingHints: [
       "Place a Servo Write block on Pin 9 inside the Loop statement.",
@@ -1507,7 +1503,6 @@ export const UNO_LESSONS: Lesson[] = [
     estimatedMinutes: 14,
     concepts: ["Servo Actuators", "Automation Mechanism", "Robotics"],
     prerequisites: ["lesson-servo", "lesson-pushbutton-led"],
-    templateId: "g7-servo-door",
     finalGoal: "🎯 What You Will Build: An automated parking boom barrier mechanism that raises to 90° to admit authorized vehicles and returns to 0° to secure the gate.",
     codingHints: [
       "Configure Servo on Pin 9 and initialize barrier gate to 0° (Closed).",
@@ -1567,7 +1562,6 @@ export const UNO_LESSONS: Lesson[] = [
     estimatedMinutes: 16,
     concepts: ["HC-SR04 Sonar", "Time of Flight", "Threshold Detection", "Safety Alarm"],
     prerequisites: ["lesson-servo"],
-    templateId: "ultrasonic-radar",
     finalGoal: "🎯 What You Will Build: An active sonar collision detection and parking sensor that measures distance in centimeters using HC-SR04 sound waves and sounds a buzzer alarm when an obstacle is within 30cm.",
     codingHints: [
       "In Setup, set Pin 8 (Buzzer) to OUTPUT.",
@@ -1768,7 +1762,6 @@ export const UNO_LESSONS: Lesson[] = [
     estimatedMinutes: 14,
     concepts: ["I2C Bus", "SDA / SCL", "Alphanumeric Display", "Hardware Addressing"],
     prerequisites: ["lesson-dht11"],
-    templateId: "g8-lcd-weather",
     finalGoal: "🎯 What You Will Build: An alphanumeric smart dashboard that uses the 2-wire I2C communication protocol (SDA/SCL) on pins A4 & A5 to render custom greetings and telemetry on a 16×2 character LCD screen.",
     codingHints: [
       "In Setup, clear any residual display artifacts with the LCD Clear block.",
@@ -1895,7 +1888,6 @@ export const UNO_LESSONS: Lesson[] = [
     estimatedMinutes: 16,
     concepts: ["PIR Pyroelectric Sensor", "Thermal Infrared", "Perimeter Security", "Digital Inputs"],
     prerequisites: ["lesson-servo-gate"],
-    templateId: "g7-pir-security",
     finalGoal: "🎯 What You Will Build: An intrusion perimeter security system that senses human thermal infrared radiation via a PIR sensor on pin D7 and immediately activates a security alert strobe on pin D13.",
     codingHints: [
       "In Setup, configure Pin D7 as INPUT (PIR Sensor) and Pin D13 as OUTPUT (Security LED).",
@@ -1961,7 +1953,6 @@ export const UNO_LESSONS: Lesson[] = [
     estimatedMinutes: 16,
     concepts: ["Soil Moisture Sensor", "Analog Conductivity", "Smart Agriculture", "IoT Automation"],
     prerequisites: ["lesson-ldr-night-lamp"],
-    templateId: "g7-soil-smart-farm",
     finalGoal: "🎯 What You Will Build: An automated smart irrigation controller that measures soil moisture content via analog conductivity on pin A0 and automatically switches an irrigation pump indicator on when soil is dry.",
     codingHints: [
       "In Setup, set Pin D13 as OUTPUT (Irrigation Pump / Water Valve indicator).",
@@ -2027,7 +2018,6 @@ export const UNO_LESSONS: Lesson[] = [
     estimatedMinutes: 20,
     concepts: ["4x4 Matrix Keypad", "Multiplexing", "Security PIN", "Human Interface"],
     prerequisites: ["lesson-pir-security"],
-    templateId: "g8-keypad-lock",
     finalGoal: "🎯 What You Will Build: A digital electronic security vault door that scans user keystrokes from a 4×4 matrix keypad using row-column multiplexing to verify a secure PIN and unlock the vault.",
     codingHints: [
       "In Setup, configure Pin D13 as OUTPUT for the Vault Lock status indicator.",
@@ -2091,7 +2081,6 @@ export const UNO_LESSONS: Lesson[] = [
     estimatedMinutes: 22,
     concepts: ["Computer Vision", "Pixiu AI", "Edge AI Inference", "Autonomous Robotics", "Smart City"],
     prerequisites: ["lesson-servo-gate"],
-    templateId: "ai-smart-barrier",
     finalGoal: "🎯 What You Will Build: An autonomous AI-powered boom barrier that runs real-time computer vision to detect oncoming vehicles, swinging the servo arm to 90° and illuminating the Green Pass light for authorized cars.",
     codingHints: [
       "In Setup, initialize Servo on Pin D6 to 0° (Closed Barrier) and set Pin 12 (Pass) & Pin 13 (Stop) as OUTPUTs.",
@@ -2454,14 +2443,10 @@ export const UNO_LESSONS: Lesson[] = [
 ]
 
 export const LESSONS: Lesson[] = [
-  ...UNO_LESSONS.map((l) => {
-    const tmplXml = l.templateId ? TEMPLATES.find((t) => t.id === l.templateId)?.blocklyXml : undefined
-    return {
-      ...l,
-      board: l.board ?? ("arduino-uno" as const),
-      seedBlocklyXml: l.seedBlocklyXml || tmplXml,
-    }
-  }),
+  ...UNO_LESSONS.map((l) => ({
+    ...l,
+    board: l.board ?? ("arduino-uno" as const),
+  })),
   ...ESP32_LESSONS,
   ...PICO_LESSONS,
   ...MICROBIT_LESSONS,
@@ -2471,19 +2456,16 @@ const EMPTY_STARTER_BLOCKLY_XML = `<xml xmlns="https://developers.google.com/blo
   <block type="arduino_program" x="40" y="40"></block>
 </xml>`
 
-export function getLessonSeed(lesson: Lesson): { state: CircuitState; blocklyXml: string; sourceTemplateId?: string } {
+export function getLessonSeed(lesson: Lesson): { state: CircuitState; blocklyXml: string } {
   // Option B: Interactive Missions start with a clean blank canvas for wiring (parts: [], wires: []).
   // For Beginner missions: Blockly code is automatically loaded so beginner students only focus on wiring.
   // For Intermediate & Advanced missions: Clean starter blockly block so students construct code step-by-step.
   if (lesson.difficulty === "Beginner") {
     const beginnerXml =
-      lesson.seedBlocklyXml ||
-      (lesson.templateId ? TEMPLATES.find((t) => t.id === lesson.templateId)?.blocklyXml : undefined) ||
-      EMPTY_STARTER_BLOCKLY_XML
+      lesson.seedBlocklyXml || EMPTY_STARTER_BLOCKLY_XML
     return {
       state: { parts: [], wires: [] },
       blocklyXml: beginnerXml,
-      sourceTemplateId: lesson.templateId,
     }
   }
 
