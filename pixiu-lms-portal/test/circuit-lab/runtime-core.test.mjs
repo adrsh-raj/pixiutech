@@ -72,6 +72,30 @@ test("Circuit Doctor reads PWM capabilities from the active board registry", () 
   assert.equal(unoReport.issues.some((issue) => issue.id === "servo-non-pwm-servo"), true)
 })
 
+test("10kΩ button pull-down keeps the input LOW at rest and HIGH only while pressed", () => {
+  const circuit = {
+    parts: [
+      part("uno", "arduino-uno"),
+      part("button", "pushbutton"),
+      part("pull", "resistor", { resistance: 10000 }),
+    ],
+    wires: [
+      wire("signal-to-button", "uno", "d2", "button", "p1a"),
+      wire("button-to-5v", "button", "p2a", "uno", "5v"),
+      wire("signal-to-pulldown", "uno", "d2", "pull", "a"),
+      wire("pulldown-to-gnd", "pull", "b", "uno", "gnd"),
+    ],
+  }
+  const inputPin = { partId: "uno", pinId: "d2" }
+  const idle = solveCircuitNodalPotentials(circuit, new Set())
+  assert.ok(Math.abs(idle.getPinVoltage(inputPin)) < 0.01, "released input should be held at 0V")
+  assert.equal(idle.getPinInfo(inputPin).isFloating, false, "released input must not float")
+
+  const pressed = solveCircuitNodalPotentials(circuit, new Set(["button"]))
+  assert.ok(pressed.getPinVoltage(inputPin) > 4.5, "pressed button should drive the input to the 5V rail")
+  assert.equal(pressed.getPinInfo(inputPin).isFloating, false, "pressed input must remain electrically defined")
+})
+
 test("open circuit pins are reported as floating instead of a false 0V reading", () => {
   const circuit = { parts: [part("r", "resistor", { resistance: 220 })], wires: [] }
   const solution = solveCircuitNodalPotentials(circuit)
