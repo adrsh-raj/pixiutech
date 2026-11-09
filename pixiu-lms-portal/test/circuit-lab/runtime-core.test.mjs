@@ -219,3 +219,83 @@ test("WiFi local IP reports 0.0.0.0 when the runtime has no connection", async (
   assert.equal(printed, "0.0.0.0")
 })
 
+
+test("component power requires dedicated supply and ground rails, not GPIO output levels", () => {
+  const gpioHighSupply = {
+    parts: [part("uno", "arduino-uno"), part("sensor", "dht11")],
+    wires: [
+      wire("gpio-to-vcc", "uno", "d2", "sensor", "vcc"),
+      wire("sensor-ground", "sensor", "gnd", "uno", "gnd"),
+    ],
+  }
+  const gpioPowered = computeRuntime(gpioHighSupply, new Set(), { "2": { state: "HIGH", value: 255 } })
+  assert.equal(gpioPowered.sensor.dhtTemperature, undefined, "a HIGH GPIO must not count as a DHT11 supply rail")
+
+  const gpioGround = {
+    parts: [part("uno", "arduino-uno"), part("sensor", "dht11")],
+    wires: [
+      wire("supply", "uno", "5v", "sensor", "vcc"),
+      wire("gpio-as-ground", "sensor", "gnd", "uno", "d3"),
+    ],
+  }
+  const gpioGrounded = computeRuntime(gpioGround, new Set(), { "3": { state: "LOW", value: 0 } })
+  assert.equal(gpioGrounded.sensor.dhtTemperature, undefined, "a LOW GPIO must not count as a component ground rail")
+
+  const correctlyPowered = {
+    parts: [part("uno", "arduino-uno"), part("sensor", "dht11")],
+    wires: [
+      wire("supply", "uno", "5v", "sensor", "vcc"),
+      wire("ground", "sensor", "gnd", "uno", "gnd"),
+    ],
+  }
+  const powered = computeRuntime(correctlyPowered, new Set())
+  assert.equal(powered.sensor.dhtTemperature, 25, "a real 5V/GND connection must power the sensor")
+})
+
+test("L298N requires a real motor supply and common ground before driving a motor", () => {
+  const controls = {
+    "9": { state: "HIGH", value: 128 },
+    "8": { state: "HIGH", value: 255 },
+    "7": { state: "LOW", value: 0 },
+  }
+  const makeDriverCircuit = (supplyMode, groundMode) => {
+    const parts = [part("uno", "arduino-uno"), part("driver", "l298n"), part("motor", "dc-motor")]
+    const wires = [
+      wire("ena", "uno", "d9", "driver", "ena"),
+      wire("in1", "uno", "d8", "driver", "in1"),
+      wire("in2", "uno", "d7", "driver", "in2"),
+      wire("motor-pos", "driver", "out1", "motor", "pos"),
+      wire("motor-neg", "driver", "out2", "motor", "neg"),
+    ]
+    if (supplyMode === "battery") {
+      parts.push(part("battery", "battery", { voltage: 9 }))
+      wires.push(wire("vs", "battery", "pos", "driver", "vs"))
+    } else {
+      wires.push(wire("vs", "uno", "d6", "driver", "vs"))
+    }
+    if (groundMode === "battery") {
+      wires.push(wire("battery-ground", "battery", "neg", "driver", "gnd"))
+    } else if (groundMode === "gpio") {
+      wires.push(wire("gpio-ground", "uno", "d5", "driver", "gnd"))
+    } else {
+      wires.push(wire("common-ground", "uno", "gnd", "driver", "gnd"))
+    }
+    return { parts, wires }
+  }
+
+  const gpioOnly = computeRuntime(makeDriverCircuit("gpio", "board"), new Set(), {
+    ...controls,
+    "6": { state: "HIGH", value: 255 },
+  })
+  assert.equal(gpioOnly.driver.motorARpm, 0, "a HIGH GPIO must not supply the L298N motor rail")
+
+  const falseGround = computeRuntime(makeDriverCircuit("battery", "gpio"), new Set(), {
+    ...controls,
+    "5": { state: "LOW", value: 0 },
+  })
+  assert.equal(falseGround.driver.motorARpm, 0, "a LOW GPIO must not replace the L298N common ground")
+
+  const validPower = computeRuntime(makeDriverCircuit("battery", "battery"), new Set(), controls)
+  assert.ok(validPower.driver.motorARpm > 0, "a battery supply with a common return should drive the motor")
+})
+
