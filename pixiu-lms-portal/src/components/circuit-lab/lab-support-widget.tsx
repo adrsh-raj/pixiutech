@@ -30,6 +30,7 @@ function initialStudentId() {
 
 export function LabSupportWidget() {
   const [open, setOpen] = useState(false)
+  const [betaNoticeVisible, setBetaNoticeVisible] = useState(true)
   const [studentId, setStudentId] = useState(initialStudentId)
   const { user } = useAuth()
   const [kind, setKind] = useState<"bug" | "help" | "other" | "philosophy">("bug")
@@ -45,6 +46,15 @@ export function LabSupportWidget() {
     const verifiedId = normalizePortalId(user?.pixiu_id || user?.related_id || (user?.role === "admin" ? user?.display_name : ""))
     if (verifiedId) setStudentId(verifiedId)
   }, [user])
+
+  useEffect(() => {
+    const openSupport = () => {
+      setOpen(true)
+      setStatus(null)
+    }
+    window.addEventListener("pixiu-open-lab-support", openSupport)
+    return () => window.removeEventListener("pixiu-open-lab-support", openSupport)
+  }, [])
 
   useEffect(() => {
     if (!image) {
@@ -124,16 +134,49 @@ export function LabSupportWidget() {
     }
   }
 
-  const contactMessage = "Hi Pixiu Tech, I need help with the Virtual Lab.\\nPixiu ID: " + (studentId.trim().toUpperCase() || "—")
+  const contactMessage = "Hi Pixiu Tech, I need help with the Virtual Lab.\nPixiu ID: " + (studentId.trim().toUpperCase() || "—")
   const whatsappHref = "https://wa.me/" + WHATSAPP_NUMBER + "?text=" + encodeURIComponent(contactMessage)
   const emailHref = "mailto:" + EMAIL + "?subject=" + encodeURIComponent("PIXIU LAB HELP") + "&body=" + encodeURIComponent(contactMessage)
 
   return (
     <>
+      {betaNoticeVisible && (
+        <aside
+          aria-label="Virtual Lab beta notice"
+          className="fixed right-4 top-4 z-[69] w-[min(360px,calc(100vw-2rem))] rounded-2xl border border-cyan-400/25 bg-slate-950/95 p-3.5 text-white shadow-xl shadow-black/30 backdrop-blur-md"
+        >
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 rounded-md bg-amber-400/15 px-1.5 py-1 text-[9px] font-black uppercase tracking-wider text-amber-300">Beta</span>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold">The Virtual Lab is in beta</p>
+              <p className="mt-1 text-[11px] leading-4 text-slate-400">If you find a problem, click <strong className="text-slate-200">Lab Help</strong> in the bottom-right corner and send us a message with a screenshot attached.</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(true)
+                  setStatus(null)
+                }}
+                className="mt-2 text-[11px] font-bold text-cyan-300 underline decoration-cyan-500/40 underline-offset-2 hover:text-cyan-200"
+              >
+                Report a problem
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => setBetaNoticeVisible(false)}
+              aria-label="Dismiss beta notice"
+              className="rounded-md p-1 text-slate-500 hover:bg-slate-800 hover:text-white"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        </aside>
+      )}
+
       <button
         type="button"
         onClick={() => { setOpen(value => !value); setStatus(null) }}
-        className="fixed bottom-20 right-4 z-[70] inline-flex items-center gap-2 rounded-full border border-cyan-400/30 bg-[#0b1220]/95 px-3.5 py-2.5 text-xs font-bold text-white shadow-xl backdrop-blur-md transition hover:border-cyan-300/60 hover:bg-[#101a2d] md:bottom-6"
+        className="fixed bottom-20 right-4 z-[70] inline-flex items-center gap-2 rounded-full border border-cyan-400/30 bg-[#0b1220]/95 px-3.5 py-2.5 text-xs font-bold text-white shadow-xl backdrop-blur-md transition hover:border-cyan-300"
         aria-expanded={open}
         aria-controls="pixiu-lab-support-panel"
       >
@@ -152,7 +195,7 @@ export function LabSupportWidget() {
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-300">PIXIU SUPPORT</p>
                 <h2 className="mt-1 text-base font-black">Found a bug or need help?</h2>
-                <p className="mt-1 text-[11px] leading-5 text-slate-400">Send it directly to the Pixiu enquiry inbox.</p>
+                <p className="mt-1 text-[11px] leading-5 text-slate-400">Describe what happened and attach a screenshot so our team can investigate.</p>
               </div>
               <button type="button" onClick={() => setOpen(false)} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-800 hover:text-white" aria-label="Close support panel">
                 <X size={16} />
@@ -160,7 +203,7 @@ export function LabSupportWidget() {
             </div>
 
             <div className="mt-3 grid grid-cols-2 gap-2">
-              <a href={emailHref} className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-[11px] font-bold text-slate-200 transition hover:border-slate-500 hover:bg-slate-800">
+              <a href={emailHref} className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-[11px] font-bold text-slate-200 transition hover:border-slate-500">
                 <Mail size={13} /> Email
               </a>
               <a href={whatsappHref} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-[11px] font-bold text-emerald-200 transition hover:bg-emerald-500/15">
@@ -173,19 +216,19 @@ export function LabSupportWidget() {
           <div className="space-y-3 p-4">
             <label className="block">
               <span className="mb-1.5 block text-[10px] font-black uppercase tracking-wide text-slate-500">PIXIU ID · {String(user?.role || "USER").toUpperCase()}</span>
-              <input value={studentId} readOnly placeholder="Your Pixiu ID" maxLength={80} autoComplete="off" aria-readonly="true" className="w-full cursor-not-allowed rounded-xl border border-slate-700 bg-slate-950/80 px-3 py-2.5 text-xs font-semibold text-slate-300 outline-none" />
+              <input value={studentId} readOnly placeholder="Your Pixiu ID" maxLength={80} autoComplete="off" aria-readonly="true" className="w-full cursor-not-allowed rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-300 outline-none" />
             </label>
 
             <label className="block">
               <span className="mb-1.5 block text-[10px] font-black uppercase tracking-wide text-slate-500">Category</span>
-              <select value={kind} onChange={event => setKind(event.target.value as "bug" | "help" | "other" | "philosophy")} className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-xs font-semibold text-white outline-none focus:border-cyan-400">
+              <select value={kind} onChange={event => setKind(event.target.value as "bug" | "help" | "other" | "philosophy")} className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white outline-none focus:border-cyan-400">
                 {KIND_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </label>
 
             <label className="block">
               <span className="mb-1.5 block text-[10px] font-black uppercase tracking-wide text-slate-500">Description</span>
-              <textarea value={message} onChange={event => setMessage(event.target.value.slice(0, 4000))} rows={5} maxLength={4000} placeholder="What happened? What did you expect?" className="w-full resize-none rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-xs leading-5 text-white outline-none focus:border-cyan-400" />
+              <textarea value={message} onChange={event => setMessage(event.target.value.slice(0, 4000))} rows={5} maxLength={4000} placeholder="What happened? What did you expect? Please include the steps to reproduce the problem." className="w-full resize-y rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white placeholder-slate-600 outline-none focus:border-cyan-400" />
             </label>
 
             <div
@@ -201,18 +244,18 @@ export function LabSupportWidget() {
                 className="hidden"
                 onChange={event => selectImage(event.target.files?.[0])}
               />
-              <button type="button" onClick={() => inputRef.current?.click()} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[11px] font-bold text-slate-300 transition hover:bg-slate-900">
+              <button type="button" onClick={() => inputRef.current?.click()} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[11px] font-bold text-slate-300 transition hover:bg-slate-800">
                 <Camera size={14} className="text-cyan-300" />
-                <span className="truncate">{image ? image.name : "Attach image (optional)"}</span>
+                <span className="truncate">{image ? image.name : "Attach screenshot or image"}</span>
               </button>
               <p className="mt-1 flex items-center gap-1 text-[9px] leading-4 text-slate-500">
                 <Paperclip size={10} /> PNG/JPG/JPEG/WEBP · max 3 MB · images only
               </p>
               {imageMeta && <div className="mt-2 flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-950/70 p-1.5">
-                {previewUrl ? <img src={previewUrl} alt="" className="h-10 w-14 shrink-0 rounded-md border border-slate-700 object-cover" /> : null}
+                {previewUrl ? <img src={previewUrl} alt="Screenshot attachment preview" className="h-10 w-14 shrink-0 rounded-md border border-slate-700 object-cover" /> : null}
                 <div className="min-w-0">
                   <p className="truncate text-[9px] font-semibold text-emerald-300">{imageMeta}</p>
-                  <p className="text-[9px] text-slate-600">Small preview · original image is uploaded securely</p>
+                  <p className="text-[9px] text-slate-600">Screenshot attached · uploaded securely</p>
                 </div>
               </div>}
             </div>
