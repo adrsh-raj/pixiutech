@@ -152,17 +152,18 @@ test("external pushbutton lessons include stable 10kΩ pull-down networks", () =
   assert.ok(arduinoButton)
   assert.ok(arduinoDoorbell)
 
-  for (const lesson of [arduinoButton, arduinoDoorbell]) {
+  for (const [lesson, expectedResistorCount] of [[arduinoButton, 2], [arduinoDoorbell, 1]]) {
     const partsStep = lesson.steps.find((step) => step.id === "parts")
     const wiringStep = lesson.steps.find((step) => step.id === "wiring")
     assert.ok(partsStep)
     assert.ok(wiringStep)
-    assert.ok(partsStep.checks.some((check) =>
-      check.kind === "parts" && check.requirements.some((part) => part.type === "resistor" && part.count >= 1),
-    ), lesson.id + ": requires the pull-down resistor")
+    const partChecks = partsStep.checks.find((check) => check.kind === "parts")
+    assert.equal(partChecks.requirements.find((part) => part.type === "resistor")?.count, expectedResistorCount)
     const requirements = wiringStep.checks.flatMap((check) => check.kind === "connections" ? check.requirements : [])
-    assert.ok(requirements.some((edge) => edge.from.partProps?.resistance === 10000), lesson.id + ": missing 10kΩ resistor input connection")
-    assert.ok(requirements.some((edge) => edge.to.partProps?.resistance === 10000), lesson.id + ": missing 10kΩ resistor ground connection")
+    const pullDownEdges = requirements.filter((edge) =>
+      edge.from.partProps?.resistance === 10000 || edge.to.partProps?.resistance === 10000,
+    )
+    assert.equal(pullDownEdges.length, 2, lesson.id + ": requires both legs of a 10kΩ input pull-down")
   }
 
   for (const [id, boardType, pin, groundPin] of [
