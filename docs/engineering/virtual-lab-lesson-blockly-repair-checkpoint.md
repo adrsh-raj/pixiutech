@@ -1,6 +1,6 @@
 # Virtual Lab Lesson / Blockly Integrity Repair Checkpoint
 
-**Status:** In progress — audit checkpoint  
+**Status:** Repair implemented on feature branch; CI partially green, merge held pending final browser and public-site checks  
 **Date:** 2026-11-09  
 **Repository:** `adrsh-raj/pixiutech`  
 **Base branch:** `main`  
@@ -22,7 +22,7 @@ This establishes a lesson-to-template mapping error, not a Blockly C++ generator
 
 ## Additional audit findings so far
 
-Several other Beginner Arduino missions point to template IDs that do not exist in the current `TEMPLATES` list (including `g6-pushbutton-led`, `g6-pot-brightness`, `g6-buzzer-doorbell`, and `g6-rgb-mood-lamp`). The current fallback therefore yields the empty starter workspace for those missions. At least two other mapped template IDs resolve to projects whose titles/descriptions do not match their lessons (traffic-light and servo-sweep). These require a complete lesson-by-lesson review before repair is considered complete.
+Several other Beginner Arduino missions referenced missing or mismatched project-template IDs. Those references and the template fallback have been removed; each Beginner lesson now receives its own explicit Blockly starter. Intermediate and Advanced missions load a clean program root instead of inheriting stale code from the previously selected lesson.
 
 ## Scope / constraints
 
@@ -54,9 +54,17 @@ Resume from this branch and the latest commit. Re-read this file first, inspect 
 - [x] Reset Blockly for every lesson selection, including Intermediate and Advanced; clear any held virtual buttons while switching/loading a lesson.
 - [x] Repair malformed stored Blockly XML in Advanced Arduino Missions 21–23, DHT11 Intermediate Mission 12, and ESP32 Web Server Mission 10.
 - [x] Correct external pushbutton wiring in Arduino, ESP32 and Pico button missions with 10kΩ pull-down resistors so released inputs are not left floating.
-- [x] Extend test/circuit-lab/lesson-seed-integrity.test.mjs to validate every stored lesson seed XML (43 seeds), all 55 IDs/boards, 19 Beginner seeds, 36 blank non-Beginner workspaces, six repaired Arduino missions, and the 30 cross-board component references.
-- [ ] Run the new and existing tests through GitHub Actions; inspect build/lint and CI results.
-- [ ] Review final diff and promote verified changes to main.
+- [x] Make doorbell Mission 4 play one chime per press and wait for the physical button release before retriggering.
+- [x] Complete ESP32 Mission 10 phone control with root dashboard plus `/red/on`, `/red/off`, `/blue/on`, and `/blue/off` routes; align wiring and code checks with both LED channels.
+- [x] Fix power-domain detection in `simulation.ts`: GPIO HIGH/LOW pins remain signal sources/sinks and cannot falsely power sensors or L298N drivers. Dedicated board rails or a battery positive/negative pair must provide a real source and return path in the same connected power domain.
+- [x] Add runtime regression coverage for actual seeded ESP32/Pico pull-down voltage behavior, manual Arduino pull-down voltage behavior, unpowered sensors, GPIO-only false supply/ground, and a correctly powered L298N motor.
+- [x] Validate 55 unique lesson IDs across four boards, 19 Beginner seeds, 36 blank Intermediate/Advanced workspaces, all 47 stored Blockly XML definitions (including reusable XML constants), and all 40 seeded-circuit sensor references.
+- [x] Update the Phase 4–6 static contract to assert the current multi-board `findBoardPinState` bridge and current runtime memoization rather than obsolete Arduino-only code strings.
+- [x] Align the browser gate's welcome-screen assertion with the actual shipped `8 Square AI` announcement/coming-soon behavior; it no longer claims that a live conversational Copilot panel exists.
+- [x] GitHub Actions at `ced93d1` passed Virtual Lab Build Virtual Lab (including `npm run test:lab`, `npm run test:copilot`, and `npm run build`), Phase 4–6, Part 4 Current, Phase 4–9 Reliability, Phase 0–3, and deployment smoke checks.
+- [ ] Re-run browser gate, Phase 4–6 checks, and runtime tests against current branch head `e5ac28d`; workflow runs are in progress.
+- [ ] Recheck final production verification; the latest observed production and Phase 9 failures are the unchanged marketing-site audit finding in `src/pages/EightSquareAI.jsx` (interactive cursor/scroll reveal pattern), after Django backend tests passed.
+- [ ] Review final PR diff and wait for the current browser gate; keep PR open and do not merge until remaining checks are understood.
 
 ## Current implementation commits
 
@@ -76,6 +84,14 @@ Resume from this branch and the latest commit. Re-read this file first, inspect 
 - 0313f7b: added nodal-solver voltage test for released/pressed pull-down input.
 - e3040f7: repaired the DHT11 stored seed's missing closing `next`/block chain.
 - 5299575: expanded component-reference assertions to all 40 seed circuits and corrected RGB pin assertions.
+- 9feb231: updated Phase 4–6 static checks to require the current board-registry-based L298N and reactive runtime paths.
+- f8895b3 / d7552ce / 0313f7b: added and tightened pull-down wiring and nodal-voltage regression coverage.
+- 2258617: completed ESP32 Mission 10 dashboard and all four light routes using an explicit lesson seed.
+- 33caf0f: made the smart doorbell wait for release, avoiding repeated chimes while held.
+- d12038e / d56759a / 218c14d: separated logic GPIO sources/sinks from actual component power; paired supply rails with their correct ground-return domain.
+- 2ab6c2c / ced93d1: added negative and positive runtime tests for sensor and L298N supply/ground behavior; ensure the MCU common ground is shared.
+- edea006: aligned the first-run browser test with the actual 8 Square announcement rather than an unimplemented AI chat panel.
+- e5ac28d: extended the Phase 4–6 static gate to assert supply/ground-domain validation.
 
 The three board-specific curricula (ESP32/Pico/micro:bit) were statically checked: each of their 30 Blockly seed programs has a non-empty program root and each non-empty SENSOR reference resolves to a part ID in that lesson's seedCircuit. Actual CI/runtime verification is still pending; do not mark the repair complete until those checks pass.
 
