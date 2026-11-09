@@ -95,22 +95,26 @@ function circuitGraph(circuit) {
 
 function pathToAny(adjacency, start, targets, { requireResistor = false } = {}) {
   const targetSet = new Set(targets)
-  const queue = [{ node: start, resistorCount: 0 }]
-  const best = new Map([[start, 0]])
+  const queue = [{ node: start, hasResistor: false }]
+  const visited = new Set([start + "|0"])
   while (queue.length) {
     const current = queue.shift()
-    if (targetSet.has(current.node) && (!requireResistor || current.resistorCount > 0)) {
-      return { found: true, resistorCount: current.resistorCount }
+    if (targetSet.has(current.node) && (!requireResistor || current.hasResistor)) {
+      return { found: true, hasResistor: current.hasResistor }
     }
     for (const edge of adjacency.get(current.node) ?? []) {
-      const nextCount = current.resistorCount + (edge.resistorId ? 1 : 0)
-      const previous = best.get(edge.node)
-      if (previous !== undefined && previous >= nextCount) continue
-      best.set(edge.node, nextCount)
-      queue.push({ node: edge.node, resistorCount: nextCount })
+      const hasResistor = current.hasResistor || Boolean(edge.resistorId)
+      // A resistor-required search has two finite states per node: before and
+      // after crossing at least one series resistor. Never count arbitrary
+      // resistor loops as progressively "better" paths.
+      const stateKey = current.node + "|" + Number(current.hasResistor)
+      const nextKey = edge.node + "|" + Number(hasResistor)
+      if (visited.has(nextKey)) continue
+      visited.add(nextKey)
+      queue.push({ node: edge.node, hasResistor })
     }
   }
-  return { found: false, resistorCount: 0 }
+  return { found: false, hasResistor: false }
 }
 
 function electricalNodes(circuit, graph) {
