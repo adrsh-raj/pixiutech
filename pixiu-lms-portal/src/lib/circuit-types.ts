@@ -53,6 +53,15 @@ export interface PartEducationalMeta {
   hint: string
 }
 
+export interface PartElectricalMeta {
+  /** Forward-voltage lookup by normalized LED colour name (volts). */
+  forwardVoltageByColor?: Record<string, number>
+  /** Absolute instantaneous forward-current limit for the component (mA). */
+  maxForwardCurrentMa?: number
+  /** Nominal current used to normalize visual brightness (mA). */
+  nominalForwardCurrentMa?: number
+}
+
 export interface PartDef {
   type: PartType
   name: string
@@ -64,6 +73,8 @@ export interface PartDef {
   pins: PinDef[]
   /** default editable properties */
   defaults?: Record<string, string | number>
+  /** Board/component electrical parameters consumed by shared solvers. */
+  electrical?: PartElectricalMeta
   /** Registry metadata used by palette, simulator and Blockly integrations. */
   category?: "controller" | "input" | "sensor" | "output" | "display" | "motor" | "driver" | "logic"
   electricalModel?: string
