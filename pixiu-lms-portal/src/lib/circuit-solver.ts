@@ -3,6 +3,7 @@ import type { ArduinoPinState } from "./simulation"
 import { getBoardForPart, lookupBoardPinState } from "./board-registry"
 import { MinPriorityQueue } from "./min-priority-queue"
 import { normalizeBreadboardPinId } from "./breadboard-pins"
+import { getLedElectricalModel } from "./electrical-model"
 import { BREADBOARD_COLUMNS } from "./components-catalog"
 
 export interface PinPotentialInfo {
@@ -510,9 +511,8 @@ export function solveCircuitNodalPotentials(
       case "led": {
         const netA = pinToNetId(part.id, "anode")
         const netC = pinToNetId(part.id, "cathode")
-        const color = String(part.props.color ?? "red").toLowerCase()
-        const vf = color.includes("white") ? 3.3 : color.includes("blue") ? 3.2 : color.includes("green") ? 2.1 : color.includes("yellow") ? 2.0 : 1.9
-        branches.push({ netA, netB: netC, conductance: 1 / 10, isDiode: true, vForward: vf })
+        const { forwardVoltage } = getLedElectricalModel(part)
+        branches.push({ netA, netB: netC, conductance: 1 / 10, isDiode: true, vForward: forwardVoltage })
         break
       }
       case "buzzer": {
