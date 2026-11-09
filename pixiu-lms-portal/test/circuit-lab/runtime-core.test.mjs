@@ -12,6 +12,7 @@ await build({
     new URL("../../src/lib/blockly-runner.ts", import.meta.url).pathname,
     new URL("../../src/lib/circuit-doctor.ts", import.meta.url).pathname,
     new URL("../../src/lib/breadboard-pins.ts", import.meta.url).pathname,
+    new URL("../../src/lib/pin-state.ts", import.meta.url).pathname,
   ],
   bundle: true,
   format: "esm",
@@ -25,6 +26,7 @@ const { solveCircuitNodalPotentials } = await import(`file://${join(outdir, "cir
 const { runBlocklyProgram } = await import(`file://${join(outdir, "blockly-runner.js")}`)
 const { diagnoseCircuit } = await import(`file://${join(outdir, "circuit-doctor.js")}`)
 const { normalizeBreadboardPinId } = await import(`file://${join(outdir, "breadboard-pins.js")}`)
+const { writePinStateAliases } = await import(`file://${join(outdir, "pin-state.js")}`)
 
 const part = (id, type, props = {}) => ({ id, type, x: 0, y: 0, rotation: 0, props })
 const wire = (id, fromPart, fromPin, toPart, toPin) => ({
@@ -300,3 +302,124 @@ test("L298N requires a real motor supply and common ground before driving a moto
   assert.ok(validPower.driver.motorARpm > 0, "a battery supply with a common return should drive the motor")
 })
 
+
+
+test("potentiometer divider paths do not create false LED reverse-polarity warnings", () => {
+  const circuit = {
+    parts: [
+      part("uno", "arduino-uno"),
+      part("pot", "potentiometer", { value: 380, resistance: 10000 }),
+      part("blue-r", "resistor", { resistance: 220 }),
+      part("blue", "led", { color: "blue" }),
+      part("green-r", "resistor", { resistance: 220 }),
+      part("green", "led", { color: "green" }),
+    ],
+    wires: [
+      wire("pot-high", "uno", "5v", "pot", "t1"),
+      wire("pot-low", "pot", "t2", "uno", "gnd"),
+      wire("pot-wiper", "pot", "wiper", "uno", "a0"),
+      wire("blue-drive", "uno", "d9", "blue-r", "a"),
+      wire("blue-series", "blue-r", "b", "blue", "anode"),
+      wire("blue-return", "blue", "cathode", "uno", "gnd"),
+      wire("green-drive", "uno", "d10", "green-r", "a"),
+      wire("green-series", "green-r", "b", "green", "anode"),
+      wire("green-return", "green", "cathode", "uno", "gnd"),
+    ],
+  }
+  const runtime = computeRuntime(circuit, new Set(), {
+    "9": { state: "HIGH", value: 95 },
+    "10": { state: "LOW", value: 0 },
+  })
+
+  assert.equal(runtime.green.level, 0, "the LOW-driven green LED should stay off")
+  assert.equal(runtime.green.warning, undefined, "a potentiometer divider must not be diagnosed as reversed LED polarity")
+  assert.ok(runtime.blue.level > 0, "the PWM-driven blue LED must illuminate at a non-zero duty")
+  assert.equal(runtime.blue.warning, undefined, "a valid PWM LED path must not receive a polarity warning")
+  assert.ok(runtime.blue.currentMa > 0 && runtime.blue.currentMa < 8.5, "reported LED current should be PWM-averaged")
+})
+
+test("genuine reversed LED wiring is still detected from signed node potentials", () => {
+  const circuit = {
+    parts: [
+      part("battery", "battery", { voltage: 5 }),
+      part("r", "resistor", { resistance: 220 }),
+      part("led", "led", { color: "red" }),
+    ],
+    wires: [
+      wire("positive-to-resistor", "battery", "pos", "r", "a"),
+      wire("resistor-to-cathode", "r", "b", "led", "cathode"),
+      wire("anode-to-negative", "led", "anode", "battery", "neg"),
+    ],
+  }
+  const runtime = computeRuntime(circuit, new Set())
+  assert.equal(runtime.led.level, 0)
+  assert.match(runtime.led.warning, /Reverse Polarity/)
+})
+
+test("PWM LED brightness follows duty cycle while pulse amplitude stays at logic HIGH", () => {
+  const circuit = {
+    parts: [
+      part("uno", "arduino-uno"),
+      part("r", "resistor", { resistance: 220 }),
+      part("led", "led", { color: "red" }),
+    ],
+    wires: [
+      wire("drive", "uno", "d9", "r", "a"),
+      wire("series", "r", "b", "led", "anode"),
+      wire("return", "led", "cathode", "uno", "gnd"),
+    ],
+  }
+  const levelAt = (value) => computeRuntime(circuit, new Set(), {
+    "9": { state: value > 0 ? "HIGH" : "LOW", value },
+  }).led
+
+  const off = levelAt(0)
+  const quarter = levelAt(64)
+  const half = levelAt(128)
+  const full = levelAt(255)
+  assert.equal(off.level, 0)
+  assert.equal(off.currentMa ?? 0, 0)
+  assert.ok(quarter.level > 0)
+  assert.ok(half.level > quarter.level)
+  assert.ok(full.level > half.level)
+  assert.ok(full.currentMa > half.currentMa)
+  assert.ok(full.currentMa > 10 && full.currentMa < 20)
+})
+
+test("per-instance LED forward-voltage overrides use the shared electrical model", () => {
+  const makeCircuit = (forwardVoltage) => ({
+    parts: [
+      part("battery", "battery", { voltage: 3 }),
+      part("r", "resistor", { resistance: 1000 }),
+      part("led", "led", { color: "white", forwardVoltage }),
+    ],
+    wires: [
+      wire("source", "battery", "pos", "r", "a"),
+      wire("forward", "r", "b", "led", "anode"),
+      wire("return", "led", "cathode", "battery", "neg"),
+    ],
+  })
+  const defaultModel = computeRuntime(makeCircuit(undefined), new Set())
+  const overriddenModel = computeRuntime(makeCircuit(2.5), new Set())
+  assert.equal(defaultModel.led.level, 0, "white LED default Vf should exceed 3V supply")
+  assert.ok(overriddenModel.led.level > 0, "a component Vf override should affect the shared solver and runtime")
+})
+
+test("pin output mode changes replace stale PWM, tone, and servo state across aliases", () => {
+  const pwm = writePinStateAliases({}, "D9", { state: "HIGH", value: 128 })
+  assert.equal(pwm["9"].value, 128)
+  assert.equal(pwm.d9.value, 128)
+
+  const digital = writePinStateAliases(pwm, "9", { state: "LOW" })
+  assert.equal(digital["9"].state, "LOW")
+  assert.equal(digital.d9.state, "LOW")
+  assert.equal(digital.gpio9.value, undefined, "digitalWrite must clear prior PWM duty")
+  assert.equal(digital.gp9.value, undefined)
+
+  const tone = writePinStateAliases(digital, "9", { state: "HIGH", value: 255, toneHz: 880 })
+  assert.equal(tone["9"].toneHz, 880)
+  const servo = writePinStateAliases(tone, "9", { state: "LOW", angle: 90 })
+  assert.equal(servo["9"].angle, 90)
+  assert.equal(servo["9"].toneHz, undefined, "servoWrite must clear prior tone state")
+  assert.equal(servo["9"].value, undefined)
+})
