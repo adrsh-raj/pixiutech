@@ -513,27 +513,38 @@ export function computeRuntime(
       }
     } else if (part.type === "rgb-led") {
       const gndKey = k("gnd")
-      const ledModel = getLedElectricalModel(part)
       const toGnd = shortestResistance(groundSinks.map((g) => ({ key: g })), gndKey)
       if (toGnd) {
-        const getLevel = (pinId: string) => {
-          const pk = k(pinId)
-          const path = shortestResistance(activeSources, pk)
-          if (!path) return 0
-          const totalR = path.resistance + toGnd.resistance
+        const getChannel = (pinId: "red" | "green" | "blue") => {
+          const model = getLedElectricalModel(part, pinId)
+          const path = shortestResistance(activeSources, k(pinId))
+          if (!path) return { level: 0, currentMa: 0 }
+          const totalResistance = path.resistance + toGnd.resistance
           const peakCurrentMa =
-            (Math.max(0, path.voltage - ledModel.forwardVoltage) / (totalR + 0.1)) * 1000
-          if (peakCurrentMa > ledModel.maxForwardCurrentMa) return 0
+            (Math.max(0, path.voltage - model.forwardVoltage) / (totalResistance + 0.1)) * 1000
+          if (peakCurrentMa > model.maxForwardCurrentMa) return { level: 0, currentMa: 0 }
           const averageCurrentMa = peakCurrentMa * Math.max(0, Math.min(1, path.duty))
-          return Math.min(1, Math.max(0, averageCurrentMa / ledModel.nominalForwardCurrentMa))
+          return {
+            level: Math.min(1, Math.max(0, averageCurrentMa / model.nominalForwardCurrentMa)),
+            currentMa: Number(averageCurrentMa.toFixed(2)),
+          }
         }
+        const red = getChannel("red")
+        const green = getChannel("green")
+        const blue = getChannel("blue")
         runtime[part.id] = {
-          redLevel: getLevel("red"),
-          greenLevel: getLevel("green"),
-          blueLevel: getLevel("blue"),
+          redLevel: red.level,
+          greenLevel: green.level,
+          blueLevel: blue.level,
+          redCurrentMa: red.currentMa,
+          greenCurrentMa: green.currentMa,
+          blueCurrentMa: blue.currentMa,
         }
       } else {
-        runtime[part.id] = { redLevel: 0, greenLevel: 0, blueLevel: 0 }
+        runtime[part.id] = {
+          redLevel: 0, greenLevel: 0, blueLevel: 0,
+          redCurrentMa: 0, greenCurrentMa: 0, blueCurrentMa: 0,
+        }
       }
     } else if (part.type === "neopixel-ring") {
       const powered = hasExternalPower(part.id, "vcc", "gnd")
