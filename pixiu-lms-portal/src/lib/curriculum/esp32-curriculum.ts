@@ -740,7 +740,7 @@ export const ESP32_LESSONS: Lesson[] = [
       "In Setup, connect to WiFi with WiFi Connect ('SmartHome-WiFi', 'pixiu123').",
       "Initialize web service with WiFi Server Begin on Port 80.",
       "Add a WiFi Server On route for '/' sending HTML controls with WiFi Server Send.",
-      "Add an action route for '/red/on' that sets Pin 4 HIGH and responds with status HTML.",
+      "Add four action routes: /red/on and /red/off control GPIO4; /blue/on and /blue/off control GPIO15.",
     ],
     seedCircuit: {
       parts: [
@@ -762,6 +762,9 @@ export const ESP32_LESSONS: Lesson[] = [
     seedBlocklyXml: `<xml xmlns="https://developers.google.com/blockly/xml">
   <block type="arduino_program" x="40" y="40">
     <statement name="SETUP">
+      <block type="serial_begin"><field name="BAUD">115200</field><next>
+      <block type="io_pinmode"><field name="PIN">4</field><field name="MODE">OUTPUT</field><next>
+      <block type="io_pinmode"><field name="PIN">15</field><field name="MODE">OUTPUT</field><next>
       <block type="wifi_connect">
         <value name="SSID"><block type="text_string"><field name="TEXT">SmartHome-WiFi</field></block></value>
         <value name="PASS"><block type="text_string"><field name="TEXT">pixiu123</field></block></value>
@@ -776,7 +779,7 @@ export const ESP32_LESSONS: Lesson[] = [
                 <field name="STATUS">200</field>
                 <field name="TYPE">text/html</field>
                 <value name="CONTENT">
-                  <block type="text_string"><field name="TEXT">&lt;h1&gt;🏠 Smart Home&lt;/h1&gt;&lt;a href="/red/on"&gt;Turn ON Red&lt;/a&gt;&lt;a href="/red/off"&gt;Turn OFF Red&lt;/a&gt;</field></block>
+                  <block type="text_string"><field name="TEXT">&lt;h1&gt;🏠 ESP32 Smart Home&lt;/h1&gt;&lt;p&gt;Tap to control room lights:&lt;/p&gt;&lt;div&gt;&lt;a href="/red/on"&gt;Turn ON Living Room&lt;/a&gt;&lt;a href="/red/off"&gt;Turn OFF Living Room&lt;/a&gt;&lt;/div&gt;&lt;div style="margin-top:10px;"&gt;&lt;a href="/blue/on"&gt;Turn ON Bedroom&lt;/a&gt;&lt;a href="/blue/off"&gt;Turn OFF Bedroom&lt;/a&gt;&lt;/div&gt;</field></block>
                 </value>
               </block>
             </statement>
@@ -789,16 +792,62 @@ export const ESP32_LESSONS: Lesson[] = [
                   <field name="STATUS">200</field>
                   <field name="TYPE">text/html</field>
                   <value name="CONTENT">
-                    <block type="text_string"><field name="TEXT">&lt;h2&gt;🔴 Red ON&lt;/h2&gt;&lt;a href="/"&gt;Back&lt;/a&gt;</field></block>
+                    <block type="text_string"><field name="TEXT">&lt;h2 style="color:#ef4444"&gt;🔴 Living Room Light: ON&lt;/h2&gt;&lt;a href="/"&gt;← Back to Dashboard&lt;/a&gt;</field></block>
                   </value>
                 </block>
                 </next></block>
               </statement>
-            </block>
+              <next>
+              <block type="wifi_server_on">
+                <field name="PATH">/red/off</field>
+                <statement name="DO">
+                  <block type="io_digitalwrite"><field name="PIN">4</field><field name="STATE">LOW</field><next>
+                  <block type="wifi_server_send">
+                    <field name="STATUS">200</field>
+                    <field name="TYPE">text/html</field>
+                    <value name="CONTENT">
+                      <block type="text_string"><field name="TEXT">&lt;h2&gt;⚪ Living Room Light: OFF&lt;/h2&gt;&lt;a href="/"&gt;← Back to Dashboard&lt;/a&gt;</field></block>
+                    </value>
+                  </block>
+                  </next></block>
+                </statement>
+                <next>
+                <block type="wifi_server_on">
+                  <field name="PATH">/blue/on</field>
+                  <statement name="DO">
+                    <block type="io_digitalwrite"><field name="PIN">15</field><field name="STATE">HIGH</field><next>
+                    <block type="wifi_server_send">
+                      <field name="STATUS">200</field>
+                      <field name="TYPE">text/html</field>
+                      <value name="CONTENT">
+                        <block type="text_string"><field name="TEXT">&lt;h2 style="color:#38bdf8"&gt;🔵 Bedroom Light: ON&lt;/h2&gt;&lt;a href="/"&gt;← Back to Dashboard&lt;/a&gt;</field></block>
+                      </value>
+                    </block>
+                    </next></block>
+                  </statement>
+                  <next>
+                  <block type="wifi_server_on">
+                    <field name="PATH">/blue/off</field>
+                    <statement name="DO">
+                      <block type="io_digitalwrite"><field name="PIN">15</field><field name="STATE">LOW</field><next>
+                      <block type="wifi_server_send">
+                        <field name="STATUS">200</field>
+                        <field name="TYPE">text/html</field>
+                        <value name="CONTENT">
+                          <block type="text_string"><field name="TEXT">&lt;h2&gt;⚪ Bedroom Light: OFF&lt;/h2&gt;&lt;a href="/"&gt;← Back to Dashboard&lt;/a&gt;</field></block>
+                        </value>
+                      </block>
+                      </next></block>
+                    </statement>
+                  </block>
+                  </next></block>
+                </next></block>
+              </next></block>
             </next></block>
-        </next>
-      </block>
-      </next></block>
+          
+          </next></block>
+        </next></block>
+      </next></block></next></block></next></block>
     </statement>
     <statement name="LOOP">
       <block type="time_delay"><value name="MS"><shadow type="math_number"><field name="NUM">100</field></shadow></value></block>
@@ -821,22 +870,29 @@ export const ESP32_LESSONS: Lesson[] = [
       {
         id: "wiring",
         title: "Wire Smart Lights",
-        instructions: "Connect GPIO4 through resistor to Red LED, and GPIO15 through resistor to Blue LED.",
+        instructions: "Connect GPIO4 through its 220Ω resistor to the Red LED, and GPIO15 through a separate 220Ω resistor to the Blue LED. Both LED cathodes return to GND.",
         kind: "build",
         checks: [{ kind: "connections", requirements: [
-          { from: { partType: "esp32-devkit", pinId: "d4" }, to: { partType: "resistor", pinId: "a" } },
+          { from: { partType: "esp32-devkit", pinId: "d4" }, to: { partType: "resistor", pinId: "a", partProps: { resistance: 220 } } },
+          { from: { partType: "resistor", pinId: "b", partProps: { resistance: 220 } }, to: { partType: "led", pinId: "anode", partProps: { color: "red" } } },
+          { from: { partType: "led", pinId: "cathode", partProps: { color: "red" } }, to: { partType: "esp32-devkit", pinId: "gnd_r" } },
+          { from: { partType: "esp32-devkit", pinId: "d15" }, to: { partType: "resistor", pinId: "a", partProps: { resistance: 220 } } },
+          { from: { partType: "resistor", pinId: "b", partProps: { resistance: 220 } }, to: { partType: "led", pinId: "anode", partProps: { color: "blue" } } },
+          { from: { partType: "led", pinId: "cathode", partProps: { color: "blue" } }, to: { partType: "esp32-devkit", pinId: "gnd_r" } },
         ] }],
         success: "Lights wired to ESP32 GPIOs.",
       },
       {
         id: "code",
         title: "Program Web Server Routes",
-        instructions: "Use wifi_connect, wifi_server_begin, and wifi_server_on for root / and /red/on.",
+        instructions: "Use wifi_connect and wifi_server_begin, then create root / plus /red/on, /red/off, /blue/on, and /blue/off handlers.",
         kind: "code",
         checks: [{ kind: "blocks", requirements: [
           { type: "wifi_connect", count: 1 },
           { type: "wifi_server_begin", count: 1 },
-          { type: "wifi_server_on", count: 2 },
+          { type: "wifi_server_on", count: 5 },
+          { type: "io_digitalwrite", count: 4 },
+          { type: "wifi_server_send", count: 5 },
         ] }],
         success: "Web server routes programmed.",
       },
