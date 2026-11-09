@@ -12,7 +12,7 @@ export interface LedElectricalModel {
  * per-instance overrides for experiments. Simulation and nodal analysis must
  * use this same source of truth.
  */
-export function getLedElectricalModel(part: PlacedPart): LedElectricalModel {
+export function getLedElectricalModel(part: PlacedPart, colorOverride?: string): LedElectricalModel {
   if (part.type !== "led" && part.type !== "rgb-led") {
     throw new Error(`LED electrical model requested for non-LED component: ${part.type}`)
   }
@@ -24,7 +24,7 @@ export function getLedElectricalModel(part: PlacedPart): LedElectricalModel {
   }
 
   const defaultColor = String(CATALOG[part.type].defaults?.color ?? "red").toLowerCase()
-  const color = String(part.props.color ?? defaultColor).trim().toLowerCase()
+  const color = String(colorOverride ?? part.props.color ?? defaultColor).trim().toLowerCase()
   const configuredVoltage = Number(part.props.forwardVoltage)
   const forwardVoltage =
     Number.isFinite(configuredVoltage) && configuredVoltage > 0
