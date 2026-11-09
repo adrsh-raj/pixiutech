@@ -275,6 +275,7 @@ test("L298N requires a real motor supply and common ground before driving a moto
     }
     if (groundMode === "battery") {
       wires.push(wire("battery-ground", "battery", "neg", "driver", "gnd"))
+      wires.push(wire("board-common-ground", "uno", "gnd", "driver", "gnd"))
     } else if (groundMode === "gpio") {
       wires.push(wire("gpio-ground", "uno", "d5", "driver", "gnd"))
     } else {
