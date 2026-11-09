@@ -143,7 +143,7 @@ export function LabSupportWidget() {
       {betaNoticeVisible && (
         <aside
           aria-label="Virtual Lab beta notice"
-          className="fixed right-4 top-4 z-[69] w-[min(360px,calc(100vw-2rem))] rounded-2xl border border-cyan-400/25 bg-slate-950/95 p-3.5 text-white shadow-xl shadow-black/30 backdrop-blur-md"
+          className="fixed right-3 top-24 z-[35] w-[min(360px,calc(100vw-1.5rem))] rounded-2xl border border-cyan-400/25 bg-slate-950/95 p-3.5 text-white shadow-xl shadow-black/30 backdrop-blur-md min-[1351px]:top-16"
         >
           <div className="flex items-start gap-3">
             <span className="mt-0.5 rounded-md bg-amber-400/15 px-1.5 py-1 text-[9px] font-black uppercase tracking-wider text-amber-300">Beta</span>
@@ -188,7 +188,7 @@ export function LabSupportWidget() {
         <section
           id="pixiu-lab-support-panel"
           aria-label="Pixiu Virtual Lab support"
-          className="fixed bottom-32 right-4 z-[71] w-[min(92vw,390px)] overflow-hidden rounded-2xl border border-slate-700 bg-[#08111f] text-white shadow-2xl shadow-black/50 md:bottom-20"
+          className="fixed bottom-32 right-4 z-[71] max-h-[calc(100dvh-9rem)] w-[min(92vw,390px)] overflow-y-auto overscroll-contain rounded-2xl border border-slate-700 bg-[#08111f] text-white shadow-2xl shadow-black/50 md:bottom-20 md:max-h-[calc(100dvh-6rem)]"
         >
           <header className="border-b border-slate-800 p-4">
             <div className="flex items-start justify-between gap-3">
