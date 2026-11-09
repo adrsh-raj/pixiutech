@@ -954,14 +954,14 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
           const raw = String(pin).trim()
           const digits = raw.replace(/^(gpio|gp|d|p)/i, "")
           setPinStates((prev) => {
-            const next = { ...prev, [raw]: { ...prev[raw], state } }
-            if (raw.toLowerCase() !== raw) next[raw.toLowerCase()] = { ...next[raw.toLowerCase()], state }
+            const next = { ...prev, [raw]: { state } }
+            if (raw.toLowerCase() !== raw) next[raw.toLowerCase()] = { state }
             if (digits) {
-              next[digits] = { ...next[digits], state }
-              next[`d${digits}`] = { ...next[`d${digits}`], state }
-              next[`gpio${digits}`] = { ...next[`gpio${digits}`], state }
-              next[`gp${digits}`] = { ...next[`gp${digits}`], state }
-              next[`p${digits}`] = { ...next[`p${digits}`], state }
+              next[digits] = { state }
+              next[`d${digits}`] = { state }
+              next[`gpio${digits}`] = { state }
+              next[`gp${digits}`] = { state }
+              next[`p${digits}`] = { state }
             }
             return next
           })
@@ -971,14 +971,14 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
           const digits = raw.replace(/^(gpio|gp|d|p)/i, "")
           const state = value > 0 ? "HIGH" : "LOW"
           setPinStates((prev) => {
-            const next = { ...prev, [raw]: { ...prev[raw], state, value } }
-            if (raw.toLowerCase() !== raw) next[raw.toLowerCase()] = { ...next[raw.toLowerCase()], state, value }
+            const next = { ...prev, [raw]: { state, value } }
+            if (raw.toLowerCase() !== raw) next[raw.toLowerCase()] = { state, value }
             if (digits) {
-              next[digits] = { ...next[digits], state, value }
-              next[`d${digits}`] = { ...next[`d${digits}`], state, value }
-              next[`gpio${digits}`] = { ...next[`gpio${digits}`], state, value }
-              next[`gp${digits}`] = { ...next[`gp${digits}`], state, value }
-              next[`p${digits}`] = { ...next[`p${digits}`], state, value }
+              next[digits] = { state, value }
+              next[`d${digits}`] = { state, value }
+              next[`gpio${digits}`] = { state, value }
+              next[`gp${digits}`] = { state, value }
+              next[`p${digits}`] = { state, value }
             }
             return next
           })
@@ -987,14 +987,14 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
           const raw = String(pin).trim()
           const digits = raw.replace(/^(gpio|gp|d|p)/i, "")
           setPinStates((prev) => {
-            const next = { ...prev, [raw]: { ...prev[raw], angle } }
-            if (raw.toLowerCase() !== raw) next[raw.toLowerCase()] = { ...next[raw.toLowerCase()], angle }
+            const next = { ...prev, [raw]: { angle } }
+            if (raw.toLowerCase() !== raw) next[raw.toLowerCase()] = { angle }
             if (digits) {
-              next[digits] = { ...next[digits], angle }
-              next[`d${digits}`] = { ...next[`d${digits}`], angle }
-              next[`gpio${digits}`] = { ...next[`gpio${digits}`], angle }
-              next[`gp${digits}`] = { ...next[`gp${digits}`], angle }
-              next[`p${digits}`] = { ...next[`p${digits}`], angle }
+              next[digits] = { angle }
+              next[`d${digits}`] = { angle }
+              next[`gpio${digits}`] = { angle }
+              next[`gp${digits}`] = { angle }
+              next[`p${digits}`] = { angle }
             }
             return next
           })
@@ -1006,11 +1006,11 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
           const value = freq ? 255 : 0
           const toneHz = freq ?? undefined
           setPinStates((prev) => {
-            const next = { ...prev, [raw]: { ...prev[raw], state, value, toneHz } }
+            const next = { ...prev, [raw]: { state, value, toneHz } }
             if (digits) {
-              next[digits] = { ...next[digits], state, value, toneHz }
-              next[`d${digits}`] = { ...next[`d${digits}`], state, value, toneHz }
-              next[`gpio${digits}`] = { ...next[`gpio${digits}`], state, value, toneHz }
+              next[digits] = { state, value, toneHz }
+              next[`d${digits}`] = { state, value, toneHz }
+              next[`gpio${digits}`] = { state, value, toneHz }
             }
             return next
           })
