@@ -21,13 +21,7 @@ function blockTypes(xml) {
 }
 
 function hasField(xml, blockType, fieldName, fieldValue) {
-  const blockStart = `<block type="${blockType}"`
-  const start = xml.indexOf(blockStart)
-  if (start < 0) return false
-  const nextBlock = xml.indexOf('<block type="', start + blockStart.length)
-  const end = nextBlock < 0 ? xml.length : nextBlock
-  const fragment = xml.slice(start, end)
-  return fragment.includes(`<field name="${fieldName}">${fieldValue}</field>`)
+  return xml.includes(`<block type="${blockType}"><field name="${fieldName}">${fieldValue}</field>`)
 }
 
 function assertWellFormedXml(xml, label) {
@@ -154,7 +148,7 @@ test("the other Beginner Arduino starters match their lesson pins and behavior",
 
 test("all pre-seeded component references resolve to a component in that lesson's seed circuit", () => {
   const lessonsWithCircuit = LESSONS.filter((lesson) => lesson.seedCircuit && lesson.seedBlocklyXml)
-  assert.equal(lessonsWithCircuit.length, 30)
+  assert.equal(lessonsWithCircuit.length, 40)
 
   for (const lesson of lessonsWithCircuit) {
     const partIds = new Set(lesson.seedCircuit.parts.map((part) => part.id))
