@@ -65,6 +65,18 @@ const bottomPins = distribute(
   p.id === "gnd" ? { ...p, id: "gnd_pwr" } : p,
 )
 
+const LED_ELECTRICAL_MODEL = {
+  forwardVoltageByColor: {
+    red: 1.9,
+    yellow: 2.0,
+    green: 2.1,
+    blue: 3.2,
+    white: 3.3,
+  },
+  maxForwardCurrentMa: 30,
+  nominalForwardCurrentMa: 15,
+} as const
+
 export const CATALOG: Record<PartType, PartDef> = {
   "arduino-uno": {
     type: "arduino-uno",
@@ -151,6 +163,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "cathode", label: "Cathode (-)", x: 30, y: 62, kind: "passive" },
     ],
     defaults: { color: "red" },
+    electrical: LED_ELECTRICAL_MODEL,
   },
   resistor: {
     type: "resistor",
@@ -238,6 +251,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "green", label: "Green", x: 28, y: 66, kind: "passive" },
       { id: "blue", label: "Blue", x: 38, y: 66, kind: "passive" },
     ],
+    electrical: LED_ELECTRICAL_MODEL,
   },
   "seven-segment": {
     type: "seven-segment",
