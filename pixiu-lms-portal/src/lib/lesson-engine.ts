@@ -2298,8 +2298,8 @@ export const UNO_LESSONS: Lesson[] = [
       <block type="controls_if">
         <mutation else="1"></mutation>
         <value name="IF0"><block type="ai_is_detected"><field name="CLASS">person</field></block></value>
-        <statement name="DO0"><block type="io_digitalwrite"><field name="PIN">13</field><field name="STATE">HIGH</field></statement>
-        <statement name="ELSE"><block type="io_digitalwrite"><field name="PIN">13</field><field name="STATE">LOW</field></statement>
+        <statement name="DO0"><block type="io_digitalwrite"><field name="PIN">13</field><field name="STATE">HIGH</field></block></statement>
+        <statement name="ELSE"><block type="io_digitalwrite"><field name="PIN">13</field><field name="STATE">LOW</field></block></statement>
       </block>
     </statement>
   </block>
@@ -2336,13 +2336,13 @@ export const UNO_LESSONS: Lesson[] = [
         <value name="IF0"><block type="ai_is_gesture"><field name="GESTURE">thumbs_up</field></block></value>
         <statement name="DO0">
           <block type="io_digitalwrite"><field name="PIN">12</field><field name="STATE">HIGH</field><next>
-          <block type="io_digitalwrite"><field name="PIN">13</field><field name="STATE">LOW</field></next>
-          </block>
+          <block type="io_digitalwrite"><field name="PIN">13</field><field name="STATE">LOW</field></block>
+          </next></block>
         </statement>
         <statement name="ELSE">
           <block type="io_digitalwrite"><field name="PIN">12</field><field name="STATE">LOW</field><next>
-          <block type="io_digitalwrite"><field name="PIN">13</field><field name="STATE">HIGH</field></next>
-          </block>
+          <block type="io_digitalwrite"><field name="PIN">13</field><field name="STATE">HIGH</field></block>
+          </next></block>
         </statement>
       </block>
     </statement>
