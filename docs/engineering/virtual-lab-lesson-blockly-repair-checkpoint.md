@@ -1,6 +1,6 @@
 # Virtual Lab Lesson / Blockly Integrity Repair Checkpoint
 
-**Status:** Repair implemented on feature branch; CI partially green, merge held pending final browser and public-site checks  
+**Status:** Virtual Lab and AI/CyberLab checks green on feature branch; PR open. Only the separate public marketing-site audit remains failing.  
 **Date:** 2026-11-09  
 **Repository:** `adrsh-raj/pixiutech`  
 **Base branch:** `main`  
@@ -62,9 +62,10 @@ Resume from this branch and the latest commit. Re-read this file first, inspect 
 - [x] Update the Phase 4–6 static contract to assert the current multi-board `findBoardPinState` bridge and current runtime memoization rather than obsolete Arduino-only code strings.
 - [x] Align the browser gate's welcome-screen assertion with the actual shipped `8 Square AI` announcement/coming-soon behavior; it no longer claims that a live conversational Copilot panel exists.
 - [x] GitHub Actions at `ced93d1` passed Virtual Lab Build Virtual Lab (including `npm run test:lab`, `npm run test:copilot`, and `npm run build`), Phase 4–6, Part 4 Current, Phase 4–9 Reliability, Phase 0–3, and deployment smoke checks.
-- [ ] Re-run browser gate, Phase 4–6 checks, and runtime tests against current branch head `e5ac28d`; workflow runs are in progress.
-- [ ] Recheck final production verification; the latest observed production and Phase 9 failures are the unchanged marketing-site audit finding in `src/pages/EightSquareAI.jsx` (interactive cursor/scroll reveal pattern), after Django backend tests passed.
-- [ ] Review final PR diff and wait for the current browser gate; keep PR open and do not merge until remaining checks are understood.
+- [x] Re-run browser gate against current branch head `161d145`; it passed through Blockly hydration, AI camera/pose/hands/emotion/sound lifecycle, My AI train/persist/predict, and same-origin runtime checks.
+- [x] Re-run Phase 4–6, Part 4 Current, Phase 4–9 Reliability, Phase 0–3, production security smoke, and deployment smoke against current branch head `161d145`; all passed.
+- [x] Review PR diff and mergeability; PR #81 is open, mergeable, and unmerged.
+- [ ] Final production verification is still running at the last check. Phase 9 Final Green Gate has one separate failure: the unchanged public marketing audit flags `src/pages/EightSquareAI.jsx` for an interactive cursor/scroll reveal pattern after the source/build and security stages pass. This file is outside the Virtual Lab repair.
 
 ## Current implementation commits
 
@@ -94,4 +95,19 @@ Resume from this branch and the latest commit. Re-read this file first, inspect 
 - e5ac28d: extended the Phase 4–6 static gate to assert supply/ground-domain validation.
 
 The three board-specific curricula (ESP32/Pico/micro:bit) were statically checked: each of their 30 Blockly seed programs has a non-empty program root and each non-empty SENSOR reference resolves to a part ID in that lesson's seedCircuit. Actual CI/runtime verification is still pending; do not mark the repair complete until those checks pass.
+
+
+
+## Latest verified run summary — 2026-11-09, branch head `161d14596031b26974c8b25a357ad5d012b6909f`
+
+- Browser gate run `42666897808`: **PASS**. It reached `PIXIU CyberLab browser gate PASSED` and `Runtime AI origin policy · PASS`; My AI training reported two learned concepts.
+- Phase 4–6 Gate run `42666898115`: **PASS** — portal lint, Phase 4–6 static gate, AI static contract, AI executable regression matrix, and production build.
+- Part 4 Current Verification run `42666897576`: **PASS**.
+- Phase 4–9 Reliability run `42666897724`: **PASS**.
+- Phase 0–3 Gate run `42666898140`: **PASS**.
+- Deployment smoke run `42666931463`: **PASS**.
+- Production Security Smoke run: **PASS**.
+- Production Verification run `42666897962`: still in progress at the last status read; prior equivalent runs passed Django/backend checks and then stopped at the same separate website audit.
+- Phase 9 Final Green Gate run `42666897714`: failed only at `Verify public website build and audit`; the audit reports `src/pages/EightSquareAI.jsx -> interactive cursor/scroll reveal pattern detected`. Its security gate, Part 4 gate, and source/build final gate all passed.
+- No changes were made to `src/pages/EightSquareAI.jsx`; no merge or manual deployment was performed.
 
