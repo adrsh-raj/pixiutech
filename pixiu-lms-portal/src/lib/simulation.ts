@@ -4,6 +4,8 @@ import type { PartRuntime } from "@/components/circuit-lab/part-art"
 import { getBoardForPart, isBoardPart, lookupBoardPinState } from "./board-registry"
 import { MinPriorityQueue } from "./min-priority-queue"
 import { normalizeBreadboardPinId } from "./breadboard-pins"
+import { solveCircuitNodalPotentials } from "./circuit-solver"
+import { getLedElectricalModel, getPwmDutyCycle } from "./electrical-model"
 
 export interface ArduinoPinState {
   state: "HIGH" | "LOW"
@@ -41,6 +43,22 @@ export function computeRuntime(
   pinStates: Record<string, ArduinoPinState> = {},
   displayOutputs: DisplayOutputState = {},
 ): Record<string, PartRuntime> {
+  // Preserve peak pulse amplitude for diode conduction analysis. The nodal
+  // solver remains DC/average for meters; PWM duty is applied to load current
+  // and brightness after checking the instantaneous HIGH level.
+  const peakPinStates = Object.fromEntries(
+    Object.entries(pinStates).map(([pin, pinState]) => [
+      pin,
+      pinState?.value !== undefined && pinState.value > 0
+        ? { ...pinState, state: "HIGH" as const }
+        : pinState,
+    ]),
+  ) as Record<string, ArduinoPinState>
+  const hasLedLoad = state.parts.some((part) => part.type === "led")
+  const peakNodalSolution = hasLedLoad
+    ? solveCircuitNodalPotentials(state, pressed, peakPinStates, true)
+    : null
+
   const graph = new Map<string, GraphEdge[]>()
   const breadboardIds = new Set(state.parts.filter((part) => part.type === "breadboard").map((part) => part.id))
   const wireKey = (partId: string, pinId: string) =>
@@ -160,21 +178,21 @@ export function computeRuntime(
   }
 
   // 3. Catalog active voltage sources, logic signals, and paired power domains.
-  const activeSources: { key: string; voltage: number }[] = []
+  const activeSources: { key: string; voltage: number; duty: number }[] = []
   const groundSinks: string[] = []
   // A power domain couples its positive rail(s) to their own ground return.
   // GPIO HIGH/LOW states remain signal sources/sinks only.
-  const powerDomains: Array<{ sources: { key: string; voltage: number }[]; grounds: string[] }> = []
+  const powerDomains: Array<{ sources: { key: string; voltage: number; duty: number }[]; grounds: string[] }> = []
 
   for (const part of state.parts) {
     const k = (pin: string) => key(part.id, pin)
 
     const board = getBoardForPart(part)
     if (board) {
-      const boardSources: { key: string; voltage: number }[] = []
+      const boardSources: { key: string; voltage: number; duty: number }[] = []
       const boardGrounds: string[] = []
       const addBoardSource = (pin: string, voltage: number) => {
-        const source = { key: k(pin), voltage }
+        const source = { key: k(pin), voltage, duty: 1 }
         activeSources.push(source)
         boardSources.push(source)
       }
@@ -212,12 +230,14 @@ export function computeRuntime(
         const stripped = pinId.replace(/^(gpio|gp|d|p)/i, "")
         const pState = lookupBoardPinState(pinStates, pinId, board)
         if (pState?.state === "HIGH" || (pState?.value ?? 0) > 0) {
-          const duty = pState.value !== undefined ? pState.value / 255 : 1.0
-          const v = board.logicVoltage * duty
-          activeSources.push({ key: k(pinId), voltage: v })
-          if (stripped) activeSources.push({ key: k(stripped), voltage: v })
+          const duty = pState.value !== undefined ? getPwmDutyCycle(pState.value) : 1
+          // PWM output is a full logic-level pulse train. Do not multiply the
+          // HIGH voltage by duty before calculating diode forward conduction.
+          const voltage = board.logicVoltage
+          activeSources.push({ key: k(pinId), voltage, duty })
+          if (stripped) activeSources.push({ key: k(stripped), voltage, duty })
           for (const alt of pin.alternateNames ?? []) {
-            activeSources.push({ key: k(alt.toLowerCase()), voltage: v })
+            activeSources.push({ key: k(alt.toLowerCase()), voltage, duty })
           }
         } else {
           // A LOW GPIO may sink signal current, but it is not a component power return.
@@ -229,7 +249,7 @@ export function computeRuntime(
         }
       }
     } else if (part.type === "battery") {
-      const source = { key: k("pos"), voltage: Math.max(0, Number(part.props.voltage ?? 9)) }
+      const source = { key: k("pos"), voltage: Math.max(0, Number(part.props.voltage ?? 9)), duty: 1 }
       const ground = k("neg")
       activeSources.push(source)
       groundSinks.push(ground)
@@ -238,11 +258,12 @@ export function computeRuntime(
   }
   // Helper: Dijkstra shortest resistance path from a list of start nodes to a target
   function shortestResistance(
-    starts: { key: string; voltage?: number }[],
+    starts: { key: string; voltage?: number; duty?: number }[],
     target: string,
-  ): { resistance: number; voltage: number } | null {
+  ): { resistance: number; voltage: number; duty: number } | null {
     const dist = new Map<string, number>()
     const voltageMap = new Map<string, number>()
+    const dutyMap = new Map<string, number>()
     const visited = new Set<string>()
 
     const pq = new MinPriorityQueue<{ node: string; d: number }>((a, b) => a.d - b.d)
@@ -250,6 +271,7 @@ export function computeRuntime(
     for (const s of starts) {
       dist.set(s.key, 0)
       if (s.voltage !== undefined) voltageMap.set(s.key, s.voltage)
+      if (s.duty !== undefined) dutyMap.set(s.key, s.duty)
       pq.push({ node: s.key, d: 0 })
     }
 
@@ -257,7 +279,11 @@ export function computeRuntime(
       const { node, d } = pq.pop()!
 
       if (node === target) {
-        return { resistance: d, voltage: voltageMap.get(node) ?? 5.0 }
+        return {
+          resistance: d,
+          voltage: voltageMap.get(node) ?? 5.0,
+          duty: dutyMap.get(node) ?? 1,
+        }
       }
 
       if (visited.has(node)) continue
@@ -270,6 +296,9 @@ export function computeRuntime(
           dist.set(e.to, newD)
           if (voltageMap.has(node)) {
             voltageMap.set(e.to, voltageMap.get(node)!)
+          }
+          if (dutyMap.has(node)) {
+            dutyMap.set(e.to, dutyMap.get(node)!)
           }
           pq.push({ node: e.to, d: newD })
         }
@@ -414,74 +443,63 @@ export function computeRuntime(
     } else if (part.type === "led") {
       const anodeKey = k("anode")
       const cathodeKey = k("cathode")
-
-      // Forward polarity path check
+      const ledModel = getLedElectricalModel(part)
       const pathSourceToAnode = shortestResistance(activeSources, anodeKey)
       const pathCathodeToGround = shortestResistance(
         groundSinks.map((g) => ({ key: g })),
         cathodeKey,
       )
+      const anodeInfo = peakNodalSolution?.getPinInfo({ partId: part.id, pinId: "anode" })
+      const cathodeInfo = peakNodalSolution?.getPinInfo({ partId: part.id, pinId: "cathode" })
+      const isDefinedPotential = Boolean(anodeInfo && cathodeInfo && !anodeInfo.isFloating && !cathodeInfo.isFloating)
+      const diodeVoltage = isDefinedPotential ? anodeInfo!.voltage - cathodeInfo!.voltage : 0
 
-      if (pathSourceToAnode && pathCathodeToGround) {
+      if (
+        pathSourceToAnode &&
+        pathCathodeToGround &&
+        isDefinedPotential &&
+        diodeVoltage >= ledModel.forwardVoltage - 0.1
+      ) {
         const totalResistance = pathSourceToAnode.resistance + pathCathodeToGround.resistance
-        const vSupply = pathSourceToAnode.voltage
-      const color = String(part.props.color ?? "red").toLowerCase()
-      const vForward = color.includes("white") ? 3.3 : color.includes("blue") ? 3.2 : color.includes("green") ? 2.1 : color.includes("yellow") ? 2.0 : 1.9
-        const vResistor = Math.max(0, vSupply - vForward)
-        const currentAmps = vResistor / (totalResistance + 0.1)
-        const currentMa = currentAmps * 1000
+        const peakCurrentMa =
+          (Math.max(0, pathSourceToAnode.voltage - ledModel.forwardVoltage) / (totalResistance + 0.1)) * 1000
+        const averageCurrentMa = peakCurrentMa * Math.max(0, Math.min(1, pathSourceToAnode.duty))
 
-        // ================= ELECTRICAL SAFETY CHECK =================
-        // Safe LED current: 10 mA - 25 mA (ideal 220 - 330 ohm resistor)
-        // Overcurrent: Without a resistor, resistance is near 0 ohms (< 60 ohms),
-        // causing massive current (> 50 mA up to 1000 mA) which instantly burns the diode!
-        if (currentMa > 30) {
+        // GPIO pulse amplitude determines instantaneous diode current. PWM
+        // duty determines average current and visible brightness. Protect the
+        // diode against peak current, not the misleading average DC voltage.
+        if (peakCurrentMa > ledModel.maxForwardCurrentMa) {
           runtime[part.id] = {
             burnt: true,
             level: 0,
-            currentMa: Math.round(currentMa),
+            currentMa: Number(averageCurrentMa.toFixed(2)),
             resistorOhms: Math.round(totalResistance),
-            warning: `💥 OVERCURRENT BURNOUT! Current was ${Math.round(currentMa)} mA (model limit: 30 mA). Connect a series resistor!`,
-          }
-        } else if (currentMa < 1 || totalResistance > 4700) {
-          // Below 1mA the LED is effectively dark in this visual model.
-          runtime[part.id] = {
-            burnt: false,
-            level: 0,
-            currentMa: Number(currentMa.toFixed(2)),
-            resistorOhms: Math.round(totalResistance),
-            warning: `Current is too weak (${currentMa.toFixed(2)} mA) to illuminate LED.`,
+            warning: `💥 OVERCURRENT BURNOUT! Peak current was ${peakCurrentMa.toFixed(1)} mA (model limit: ${ledModel.maxForwardCurrentMa} mA). Connect a series resistor!`,
           }
         } else {
-          // Perfectly protected by current-limiting resistor!
-          const brightness = Math.min(1.0, Math.max(0.3, currentMa / 15.0))
+          const brightness = Math.min(1, Math.max(0, averageCurrentMa / ledModel.nominalForwardCurrentMa))
           runtime[part.id] = {
             burnt: false,
-            level: brightness,
-            currentMa: Number(currentMa.toFixed(1)),
+            level: averageCurrentMa < 0.05 || totalResistance > 100_000 ? 0 : brightness,
+            currentMa: Number(averageCurrentMa.toFixed(2)),
             resistorOhms: Math.round(totalResistance),
           }
+        }
+      } else if (isDefinedPotential && diodeVoltage < -0.1) {
+        // Reverse polarity is a signed node-potential relationship, not the
+        // existence of any path through a potentiometer or another passive
+        // branch somewhere else in the circuit.
+        runtime[part.id] = {
+          burnt: false,
+          level: 0,
+          warning: `Reverse Polarity: Cathode is ${Math.abs(diodeVoltage).toFixed(2)} V above Anode. Diodes block reverse current.`,
         }
       } else {
-        // Check reverse polarity (Cathode to Source, Anode to Ground)
-        const reverseSource = shortestResistance(activeSources, cathodeKey)
-        const reverseGround = shortestResistance(
-          groundSinks.map((g) => ({ key: g })),
-          anodeKey,
-        )
-        if (reverseSource && reverseGround) {
-          runtime[part.id] = {
-            burnt: false,
-            level: 0,
-            warning: "Reverse Polarity: Anode (+) is wired to GND. Diodes block reverse current.",
-          }
-        } else {
-          // Open circuit (not connected)
-          runtime[part.id] = { burnt: false, level: 0 }
-        }
+        runtime[part.id] = { burnt: false, level: 0 }
       }
     } else if (part.type === "rgb-led") {
       const gndKey = k("gnd")
+      const ledModel = getLedElectricalModel(part)
       const toGnd = shortestResistance(groundSinks.map((g) => ({ key: g })), gndKey)
       if (toGnd) {
         const getLevel = (pinId: string) => {
@@ -489,11 +507,11 @@ export function computeRuntime(
           const path = shortestResistance(activeSources, pk)
           if (!path) return 0
           const totalR = path.resistance + toGnd.resistance
-          const color = String(part.props.color ?? "red").toLowerCase()
-          const forwardVoltage = color.includes("white") ? 3.3 : color.includes("blue") ? 3.2 : color.includes("green") ? 2.1 : color.includes("yellow") ? 2.0 : 1.9
-          const current = (Math.max(0, path.voltage - forwardVoltage) / (totalR + 0.1)) * 1000
-          if (current > 30) return 0
-          return Math.min(1.0, Math.max(0, current / 15.0))
+          const peakCurrentMa =
+            (Math.max(0, path.voltage - ledModel.forwardVoltage) / (totalR + 0.1)) * 1000
+          if (peakCurrentMa > ledModel.maxForwardCurrentMa) return 0
+          const averageCurrentMa = peakCurrentMa * Math.max(0, Math.min(1, path.duty))
+          return Math.min(1, Math.max(0, averageCurrentMa / ledModel.nominalForwardCurrentMa))
         }
         runtime[part.id] = {
           redLevel: getLevel("red"),
