@@ -1,7 +1,7 @@
 import type { ArduinoPinState } from "./simulation"
 
 export type PinStateUpdate = Pick<ArduinoPinState, "state"> &
-  Partial<Pick<ArduinoPinState, "value" | "angle" | "toneHz">>
+  Partial<Pick<ArduinoPinState, "outputMode" | "value" | "angle" | "toneHz">>
 
 /**
  * Replace a pin's complete runtime state across the legacy pin-name aliases.
