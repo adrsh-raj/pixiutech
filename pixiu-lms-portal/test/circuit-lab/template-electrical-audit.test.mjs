@@ -321,7 +321,9 @@ function auditCircuit(label, circuit, xml, { strictLedProtection = true } = {}) 
       const pin = block.fields.PIN
       if (pin !== undefined && board) {
         const def = resolveBoardPin(board, pin)
-        const builtInLedPin = normalize(board.builtInLedPin) === normalize(pin)
+        const builtInPinToken = normalize(board.builtInLedPin).replace(/^(gpio|gp|d|p)/i, "")
+        const requestedPinToken = normalize(pin).replace(/^(gpio|gp|d|p)/i, "")
+        const builtInLedPin = Boolean(builtInPinToken && builtInPinToken === requestedPinToken)
         if (!def && !builtInLedPin) {
           errors.push(`${label}: Blockly ${block.type} uses invalid board pin ${pin}`)
         } else {
