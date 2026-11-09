@@ -67,16 +67,17 @@ try {
 
   await page.goto(baseUrl + "/simulation", { waitUntil: "networkidle" })
   if (!(await page.title()).includes("PIXIU CYBERLAB")) throw new Error("Virtual Lab route did not load")
-  // The first-run welcome overlay must expose the Copilot. Its overlay
-  // intentionally layers above the floating trigger, so verify this explicit
-  // entry point and prove that it opens the actual chat panel.
-  const welcomeCopilot = page.getByRole("button", { name: "Open AI Copilot" })
-  await welcomeCopilot.waitFor({ state: "visible", timeout: 10_000 }).catch(() => {
-    throw new Error("First-run welcome screen does not expose the AI Copilot entry point")
+  // The current product exposes 8 Square as an announcement, not a live
+  // conversational Copilot. Verify the real first-run entry point and its
+  // explicit coming-soon state without claiming that chat functionality exists.
+  const welcomeGuide = page.getByRole("button", { name: "Open 8 Square" })
+  await welcomeGuide.waitFor({ state: "visible", timeout: 10_000 }).catch(() => {
+    throw new Error("First-run welcome screen does not expose the 8 Square guide announcement")
   })
-  await welcomeCopilot.click()
-  await page.getByRole("region", { name: "Pixiu AI Circuit Copilot Panel" }).waitFor()
-  await page.getByRole("button", { name: "Close AI Copilot" }).click()
+  await welcomeGuide.click()
+  await page.getByRole("region", { name: "8 Square AI announcement" }).waitFor()
+  await page.getByText(/coming soon/i).waitFor()
+  await page.getByRole("button", { name: "Close 8 Square AI announcement" }).click()
 
   const welcomeClose = page.getByRole("button", { name: "Close welcome" })
   if (await welcomeClose.isVisible().catch(() => false)) {
