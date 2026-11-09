@@ -13,6 +13,12 @@ const browser = await chromium.launch({
   ],
 })
 
+let page
+const pageErrors = []
+const consoleErrors = []
+const failedRequests = []
+const remoteAiRuntimeRequests = []
+
 try {
   const context = await browser.newContext({ permissions: ["camera", "microphone"] })
   await context.addInitScript(() => {
@@ -30,13 +36,8 @@ try {
       return nativeFetch(input, init)
     }
   })
-  const page = await context.newPage()
+  page = await context.newPage()
   page.setDefaultTimeout(45_000)
-
-  const pageErrors = []
-  const consoleErrors = []
-  const failedRequests = []
-  const remoteAiRuntimeRequests = []
   page.on("request", (request) => {
     const url = request.url()
     if (/(tfhub\.dev|jsdelivr\.net|unpkg\.com|storage\.googleapis\.com)/i.test(url)) {
@@ -67,18 +68,27 @@ try {
 
   await page.goto(baseUrl + "/simulation", { waitUntil: "networkidle" })
   if (!(await page.title()).includes("PIXIU CYBERLAB")) throw new Error("Virtual Lab route did not load")
-  // The first-run welcome overlay must expose the Copilot. Its overlay
-  // intentionally layers above the floating trigger, so verify this explicit
-  // entry point and prove that it opens the actual chat panel.
-  const welcomeCopilot = page.getByRole("button", { name: "Open AI Copilot" })
-  await welcomeCopilot.waitFor({ state: "visible", timeout: 10_000 }).catch(() => {
-    throw new Error("First-run welcome screen does not expose the AI Copilot entry point")
+  // The current product exposes 8 Square as an announcement, not a live
+  // conversational Copilot. Verify the real first-run entry point and its
+  // explicit coming-soon state without claiming that chat functionality exists.
+  const welcomeDialog = page.getByRole("dialog", { name: "Build it. Run it. Find out why." })
+  await welcomeDialog.waitFor({ state: "visible", timeout: 10_000 }).catch(async () => {
+    const startup = await page.locator("body").innerText().catch(() => "")
+    throw new Error("First-run welcome dialog is not visible; startup text: " + startup.slice(0, 1200))
   })
-  await welcomeCopilot.click()
-  await page.getByRole("region", { name: "Pixiu AI Circuit Copilot Panel" }).waitFor()
-  await page.getByRole("button", { name: "Close AI Copilot" }).click()
+  const welcomeGuide = welcomeDialog.getByRole("button").filter({ hasText: "Open 8 Square" })
+  await welcomeGuide.waitFor({ state: "visible", timeout: 10_000 }).catch(async () => {
+    const buttons = await welcomeDialog.locator("button").evaluateAll((items) =>
+      items.map((button) => ({ text: button.innerText, aria: button.getAttribute("aria-label"), title: button.title })),
+    )
+    throw new Error("First-run welcome screen does not expose the 8 Square announcement; buttons: " + JSON.stringify(buttons))
+  })
+  await welcomeGuide.click()
+  await page.getByRole("region", { name: "8 Square AI announcement" }).waitFor()
+  await page.getByText(/coming soon/i).waitFor()
+  await page.getByRole("button", { name: "Close 8 Square AI announcement" }).click()
 
-  const welcomeClose = page.getByRole("button", { name: "Close welcome" })
+  const welcomeClose = page.getByRole("button", { name: "Close lab home" })
   if (await welcomeClose.isVisible().catch(() => false)) {
     await welcomeClose.click()
   }
