@@ -4,7 +4,7 @@ import { X } from "lucide-react"
 const COMING_SOON_MESSAGE =
   "8 Square AI is coming soon. We’re developing a thoughtful, student-focused learning guide to help you explore, understand, and build with confidence. Please check back soon."
 
-const EIGHT_SQUARE_LOGO = "https://pixiutech.com/img/8square-logo.svg"
+const EIGHT_SQUARE_LOGO = "/img/8square-logo.svg"
 
 export interface CircuitCopilotChatProps {
   isOpen?: boolean
