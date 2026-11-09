@@ -153,6 +153,9 @@ export function solveCircuitNodalPotentials(
         allPins.add(pinKey(part.id, "anode"))
         allPins.add(pinKey(part.id, "cathode"))
         break
+      case "rgb-led":
+        for (const pin of ["red", "green", "blue", "gnd"]) allPins.add(pinKey(part.id, pin))
+        break
       case "potentiometer":
         allPins.add(pinKey(part.id, "t1"))
         allPins.add(pinKey(part.id, "wiper"))
@@ -513,6 +516,21 @@ export function solveCircuitNodalPotentials(
         const netC = pinToNetId(part.id, "cathode")
         const { forwardVoltage } = getLedElectricalModel(part)
         branches.push({ netA, netB: netC, conductance: 1 / 10, isDiode: true, vForward: forwardVoltage })
+        break
+      }
+      case "rgb-led": {
+        const commonCathode = pinToNetId(part.id, "gnd")
+        for (const channel of ["red", "green", "blue"] as const) {
+          const netA = pinToNetId(part.id, channel)
+          const { forwardVoltage } = getLedElectricalModel(part, channel)
+          branches.push({
+            netA,
+            netB: commonCathode,
+            conductance: 1 / 10,
+            isDiode: true,
+            vForward: forwardVoltage,
+          })
+        }
         break
       }
       case "buzzer": {
