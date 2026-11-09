@@ -146,6 +146,46 @@ test("the other Beginner Arduino starters match their lesson pins and behavior",
   assert.ok((traffic.match(/<block type="time_delay"/g) ?? []).length >= 4)
 })
 
+test("external pushbutton lessons include stable 10kΩ pull-down networks", () => {
+  const arduinoButton = LESSONS.find((lesson) => lesson.id === "lesson-pushbutton-led")
+  const arduinoDoorbell = LESSONS.find((lesson) => lesson.id === "lesson-buzzer-doorbell")
+  assert.ok(arduinoButton)
+  assert.ok(arduinoDoorbell)
+
+  for (const lesson of [arduinoButton, arduinoDoorbell]) {
+    const partsStep = lesson.steps.find((step) => step.id === "parts")
+    const wiringStep = lesson.steps.find((step) => step.id === "wiring")
+    assert.ok(partsStep)
+    assert.ok(wiringStep)
+    assert.ok(partsStep.checks.some((check) =>
+      check.kind === "parts" && check.requirements.some((part) => part.type === "resistor" && part.count >= 1),
+    ), lesson.id + ": requires the pull-down resistor")
+    const requirements = wiringStep.checks.flatMap((check) => check.kind === "connections" ? check.requirements : [])
+    assert.ok(requirements.some((edge) => edge.from.partProps?.resistance === 10000), lesson.id + ": missing 10kΩ resistor input connection")
+    assert.ok(requirements.some((edge) => edge.to.partProps?.resistance === 10000), lesson.id + ": missing 10kΩ resistor ground connection")
+  }
+
+  for (const [id, boardType, pin, groundPin] of [
+    ["lesson-esp32-pushbutton", "esp32-devkit", "d4", "gnd_l"],
+    ["lesson-pico-tactile-button", "rpi-pico", "gp14", "gnd_4"],
+  ]) {
+    const lesson = LESSONS.find((item) => item.id === id)
+    assert.ok(lesson?.seedCircuit, id + ": missing seeded circuit")
+    const pullDown = lesson.seedCircuit.parts.find((part) => part.id === "r_pull")
+    assert.equal(pullDown?.type, "resistor")
+    assert.equal(Number(pullDown.props.resistance), 10000)
+    const boardId = boardType === "esp32-devkit" ? "esp" : "pico"
+    const signalWire = lesson.seedCircuit.wires.some((wire) =>
+      wire.from.partId === boardId && wire.from.pinId === pin && wire.to.partId === "r_pull" && wire.to.pinId === "a",
+    )
+    const groundWire = lesson.seedCircuit.wires.some((wire) =>
+      wire.from.partId === "r_pull" && wire.from.pinId === "b" && wire.to.partId === boardId && wire.to.pinId === groundPin,
+    )
+    assert.equal(signalWire, true, id + ": signal pin must connect to the pull-down resistor")
+    assert.equal(groundWire, true, id + ": pull-down resistor must return to board ground")
+  }
+})
+
 test("all pre-seeded component references resolve to a component in that lesson's seed circuit", () => {
   const lessonsWithCircuit = LESSONS.filter((lesson) => lesson.seedCircuit && lesson.seedBlocklyXml)
   assert.equal(lessonsWithCircuit.length, 40)
