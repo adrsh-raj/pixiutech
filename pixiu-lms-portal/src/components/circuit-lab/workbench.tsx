@@ -1964,17 +1964,17 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
   }, [projectStorageScope, stopProgram, stopAiRuntime])
 
   const handleSelectLesson = useCallback((lesson: Lesson) => {
+    // A lesson change must never leave the previous lesson's Blockly program on screen.
+    stopProgram()
+    setPressed(new Set())
+    pressedRef.current = new Set()
     setActiveLessonId(lesson.id)
     setActiveLessonSessionId((current) => current === lesson.id ? current : null)
     setActiveTemplateId(null)
-    if (lesson.difficulty === "Beginner") {
-      const seed = getLessonSeed(lesson)
-      if (seed.blocklyXml) {
-        setBlocklyXml(seed.blocklyXml)
-        setBlocklyDocumentVersion((value) => value + 1)
-      }
-    }
-  }, [])
+    const seed = getLessonSeed(lesson)
+    setBlocklyXml(seed.blocklyXml || DEFAULT_XML)
+    setBlocklyDocumentVersion((value) => value + 1)
+  }, [stopProgram])
 
   const handleLoadLesson = useCallback(
     (lesson: Lesson, snapshot?: { circuit?: CircuitState; blocklyXml?: string }) => {
@@ -1982,6 +1982,8 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
       const restoredCircuit = isRestorableCircuitSnapshot(snapshot?.circuit) ? snapshot.circuit : seed.state
       const restoredBlocklyXml = typeof snapshot?.blocklyXml === "string" && snapshot.blocklyXml.length <= 50000 && snapshot.blocklyXml.includes("<xml") ? snapshot.blocklyXml : seed.blocklyXml
       stopProgram()
+      setPressed(new Set())
+      pressedRef.current = new Set()
       updateState(() => restoredCircuit)
       setCanvasFitVersion((version) => version + 1)
       setBlocklyXml(restoredBlocklyXml)
