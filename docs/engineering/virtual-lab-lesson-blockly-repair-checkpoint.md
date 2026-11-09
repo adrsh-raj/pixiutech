@@ -42,10 +42,27 @@ Resume from this branch and the latest commit. Re-read this file first, inspect 
 - [x] Confirmed repository and base commit.
 - [x] Created repair branch from the exact `main` head.
 - [x] Reproduced the screenshot's code by matching it to the incorrect `blink-led` template source.
-- [ ] Finish the all-lesson audit.
-- [ ] Correct all confirmed lesson seed / mapping defects.
-- [ ] Prevent stale Blockly code when selecting non-Beginner lessons.
-- [ ] Add and run regression tests.
-- [ ] Run build / lint / existing lab QA and inspect CI results.
-- [ ] Review final diff and promote verified changes to `main`.
+- [x] Audit all 55 lesson records across Arduino Uno, ESP32, Pico, and micro:bit.
+- [x] Correct the six affected Beginner Arduino seeds with lesson-specific Blockly programs:
+  - Mission 1: D13-only timed LED blink; no button/buzzer/tone blocks.
+  - Mission 2: D2 digital input controls the D13 LED.
+  - Mission 3: A0 analog read → 0–1023 to 0–255 map → D9 PWM output.
+  - Mission 4: D2 button triggers an 880 Hz, 250 ms D8 chime and then stops it.
+  - Mission 6: independent D9/D10/D11 RGB PWM channels.
+  - Mission 7: D12/D11/D10 traffic-light cycle.
+- [x] Remove the fragile lesson-to-template Blockly fallback. A project/template can no longer silently become a lesson's starter program.
+- [x] Reset Blockly for every lesson selection, including Intermediate and Advanced; clear any held virtual buttons while switching/loading a lesson.
+- [x] Add test/circuit-lab/lesson-seed-integrity.test.mjs covering all 55 IDs/boards, 19 Beginner seeds, 36 blank non-Beginner workspaces, six repaired Arduino missions, XML structure, and the 30 cross-board component references.
+- [ ] Run the new and existing tests through GitHub Actions; inspect build/lint and CI results.
+- [ ] Review final diff and promote verified changes to main.
+
+## Current implementation commits
+
+- 8d59a4a: explicit Arduino Beginner lesson Blockly seeds; removed stale template mapping from lesson composition.
+- 4ec3c31: removed the remaining template lookup and aligned Mission 4 instructions/checks with the chime program.
+- c2b8585: clear previous Blockly program and virtual button state when switching/loading lessons.
+- b133742: added all-lesson seed integrity regression test.
+- 3415ba3: corrected XML closing-tag parsing in the regression test.
+
+The three board-specific curricula (ESP32/Pico/micro:bit) were statically checked: each of their 30 Blockly seed programs has a non-empty program root and each non-empty SENSOR reference resolves to a part ID in that lesson's seedCircuit. Actual CI/runtime verification is still pending; do not mark the repair complete until those checks pass.
 
