@@ -6,7 +6,10 @@ import { build } from "esbuild"
 
 const outdir = join(tmpdir(), `pixiu-lesson-seed-integrity-${Date.now()}`)
 await build({
-  entryPoints: [new URL("../../src/lib/lesson-engine.ts", import.meta.url).pathname],
+  entryPoints: [
+    new URL("../../src/lib/lesson-engine.ts", import.meta.url).pathname,
+    new URL("../../src/lib/circuit-solver.ts", import.meta.url).pathname,
+  ],
   bundle: true,
   format: "esm",
   outdir,
@@ -187,6 +190,25 @@ test("external pushbutton lessons include stable 10kΩ pull-down networks", () =
   }
 })
 
+test("seeded ESP32 and Pico pushbuttons produce LOW at rest and board-logic HIGH when pressed", async () => {
+  const { solveCircuitNodalPotentials } = await import(`file://${join(outdir, "circuit-solver.js")}`)
+  for (const [id, boardId, inputPin, logicVoltage] of [
+    ["lesson-esp32-pushbutton", "esp", "d4", 3.3],
+    ["lesson-pico-tactile-button", "pico", "gp14", 3.3],
+  ]) {
+    const lesson = LESSONS.find((item) => item.id === id)
+    assert.ok(lesson?.seedCircuit, id + ": missing real seed circuit")
+    const input = { partId: boardId, pinId: inputPin }
+    const idle = solveCircuitNodalPotentials(lesson.seedCircuit, new Set())
+    assert.ok(Math.abs(idle.getPinVoltage(input)) < 0.05, id + ": released input should be held at ground")
+    assert.equal(idle.getPinInfo(input).isFloating, false, id + ": released input must not float")
+
+    const pressed = solveCircuitNodalPotentials(lesson.seedCircuit, new Set(["btn"]))
+    assert.ok(pressed.getPinVoltage(input) >= logicVoltage * 0.9, id + ": pressed input should reach the 3.3V rail")
+    assert.equal(pressed.getPinInfo(input).isFloating, false, id + ": pressed input must remain electrically defined")
+  }
+})
+
 test("ESP32 phone controller starter implements every dashboard route and both LED outputs", () => {
   const lesson = LESSONS.find((item) => item.id === "lesson-esp32-web-server-phone")
   assert.ok(lesson)
@@ -199,6 +221,19 @@ test("ESP32 phone controller starter implements every dashboard route and both L
   assert.equal((xml.match(/<block type="io_digitalwrite"/g) ?? []).length, 4)
   assert.ok(lesson.steps.find((step) => step.id === "code").checks.some((check) =>
     check.kind === "blocks" && check.requirements.some((requirement) => requirement.type === "wifi_server_on" && requirement.count === 5),
+  ))
+})
+
+test("doorbell plays one chime per press and waits for physical release before retriggering", () => {
+  const lesson = LESSONS.find((item) => item.id === "lesson-buzzer-doorbell")
+  assert.ok(lesson)
+  const xml = lesson.seedBlocklyXml
+  assert.ok(xml.includes('<block type="controls_whileUntil">'))
+  assert.ok(xml.includes('<field name="MODE">WHILE</field>'))
+  assert.ok(xml.includes('<field name="NUM">10</field>'))
+  const codeStep = lesson.steps.find((step) => step.id === "code")
+  assert.ok(codeStep?.checks.some((check) =>
+    check.kind === "blocks" && check.requirements.some((requirement) => requirement.type === "controls_whileUntil" && requirement.count === 1),
   ))
 })
 
