@@ -53,6 +53,7 @@ Resume from this branch and the latest commit. Re-read this file first, inspect 
 - [x] Remove the fragile lesson-to-template Blockly fallback. A project/template can no longer silently become a lesson's starter program.
 - [x] Reset Blockly for every lesson selection, including Intermediate and Advanced; clear any held virtual buttons while switching/loading a lesson.
 - [x] Repair malformed stored Blockly XML in Advanced Arduino Missions 21–23, DHT11 Intermediate Mission 12, and ESP32 Web Server Mission 10.
+- [x] Correct external pushbutton wiring in Arduino, ESP32 and Pico button missions with 10kΩ pull-down resistors so released inputs are not left floating.
 - [x] Extend test/circuit-lab/lesson-seed-integrity.test.mjs to validate every stored lesson seed XML (43 seeds), all 55 IDs/boards, 19 Beginner seeds, 36 blank non-Beginner workspaces, six repaired Arduino missions, and the 30 cross-board component references.
 - [ ] Run the new and existing tests through GitHub Actions; inspect build/lint and CI results.
 - [ ] Review final diff and promote verified changes to main.
@@ -68,6 +69,11 @@ Resume from this branch and the latest commit. Re-read this file first, inspect 
 - 3b94f8e: validate every stored seed XML, including seeds intentionally not auto-loaded.
 - aa23499: corrected nested block closure in AI presence/gesture programs.
 - 64577ae: corrected ESP32 Web Server Mission 10 nested route/setup closures.
+- 2909053: added 10kΩ pull-down networks and wiring checks to Arduino Mission 2 and Mission 4.
+- d461af8: added 10kΩ GPIO4 pull-down to ESP32 button mission.
+- 02c8f98: added 10kΩ GP14 pull-down to Pico button mission.
+- d7552ce: added lesson-level pull-down wiring regression assertions.
+- 0313f7b: added nodal-solver voltage test for released/pressed pull-down input.
 - e3040f7: repaired the DHT11 stored seed's missing closing `next`/block chain.
 - 5299575: expanded component-reference assertions to all 40 seed circuits and corrected RGB pin assertions.
 
