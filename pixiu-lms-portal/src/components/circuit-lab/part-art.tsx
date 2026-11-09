@@ -26,6 +26,10 @@ export interface PartRuntime {
   redLevel?: number
   greenLevel?: number
   blueLevel?: number
+  /** RGB channel average current after PWM duty-cycle scaling (mA). */
+  redCurrentMa?: number
+  greenCurrentMa?: number
+  blueCurrentMa?: number
   /** LCD 16x2: text content */
   lcdLine1?: string
   lcdLine2?: string
