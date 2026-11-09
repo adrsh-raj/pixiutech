@@ -789,8 +789,8 @@ export const ESP32_LESSONS: Lesson[] = [
               </statement>
             </block>
             </next></block>
-          </block>
-          </next></block>
+          </statement>
+        </block>
         </next></block>
     </statement>
     <statement name="LOOP">
