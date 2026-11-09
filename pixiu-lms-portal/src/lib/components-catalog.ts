@@ -164,6 +164,7 @@ export const CATALOG: Record<PartType, PartDef> = {
     ],
     defaults: { color: "red" },
     electrical: LED_ELECTRICAL_MODEL,
+    requiredPinGroups: [["anode"],["cathode"]],
   },
   resistor: {
     type: "resistor",
@@ -176,6 +177,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "b", label: "Terminal 2", x: 85, y: 13, kind: "passive" },
     ],
     defaults: { resistance: 220 },
+    requiredPinGroups: [["a"],["b"]],
   },
   pushbutton: {
     type: "pushbutton",
@@ -189,6 +191,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "p1b", label: "1b", x: 6, y: 52, kind: "passive" },
       { id: "p2b", label: "2b", x: 54, y: 52, kind: "passive" },
     ],
+    requiredPinGroups: [["p1a","p1b"],["p2a","p2b"]],
   },
   battery: {
     type: "battery",
@@ -201,6 +204,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "neg", label: "-", x: 42, y: 88, kind: "ground" },
     ],
     defaults: { voltage: 9 },
+    requiredPinGroups: [["pos"],["neg"]],
   },
   potentiometer: {
     type: "potentiometer",
@@ -214,6 +218,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "t2", label: "Terminal 2", x: 52, y: 60, kind: "passive" },
     ],
     defaults: { value: 512, resistance: 10000 },
+    requiredPinGroups: [["t1"],["wiper"],["t2"]],
   },
   servo: {
     type: "servo",
@@ -227,6 +232,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "gnd", label: "GND", x: 4, y: 52, kind: "ground" },
     ],
     defaults: { angle: 90 },
+    requiredPinGroups: [["sig"],["vcc"],["gnd"]],
   },
   buzzer: {
     type: "buzzer",
@@ -238,6 +244,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "pos", label: "+", x: 20, y: 52, kind: "power" },
       { id: "neg", label: "-", x: 36, y: 52, kind: "ground" },
     ],
+    requiredPinGroups: [["pos"],["neg"]],
   },
   "rgb-led": {
     type: "rgb-led",
@@ -252,6 +259,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "blue", label: "Blue", x: 38, y: 66, kind: "passive" },
     ],
     electrical: LED_ELECTRICAL_MODEL,
+    requiredPinGroups: [["red"],["green"],["blue"],["gnd"]],
   },
   "seven-segment": {
     type: "seven-segment",
@@ -270,6 +278,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "dp", label: "DP", x: 35, y: 4, kind: "passive" },
       { id: "com", label: "Common", x: 55, y: 40, kind: "passive" },
     ],
+    requiredPinGroups: [["a"],["b"],["c"],["d"],["e"],["f"],["g"],["com"]],
   },
   "lcd-i2c": {
     type: "lcd-i2c",
@@ -283,6 +292,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "sda", label: "SDA", x: 90, y: 76, kind: "passive" },
       { id: "scl", label: "SCL", x: 120, y: 76, kind: "passive" },
     ],
+    requiredPinGroups: [["gnd"],["vcc"],["sda"],["scl"]],
   },
   ultrasonic: {
     type: "ultrasonic",
@@ -296,6 +306,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "echo", label: "Echo", x: 60, y: 52, kind: "passive" },
       { id: "gnd", label: "GND", x: 80, y: 52, kind: "ground" },
     ],
+    requiredPinGroups: [["vcc"],["trig"],["echo"],["gnd"]],
   },
   "pir-sensor": {
     type: "pir-sensor",
@@ -308,6 +319,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "out", label: "OUT", x: 30, y: 66, kind: "passive" },
       { id: "gnd", label: "GND", x: 50, y: 66, kind: "ground" },
     ],
+    requiredPinGroups: [["vcc"],["out"],["gnd"]],
   },
   ldr: {
     type: "ldr",
@@ -319,6 +331,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "t1", label: "Terminal 1", x: 10, y: 46, kind: "passive" },
       { id: "t2", label: "Terminal 2", x: 30, y: 46, kind: "passive" },
     ],
+    requiredPinGroups: [["t1"],["t2"]],
   },
   tmp36: {
     type: "tmp36",
@@ -331,6 +344,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "out", label: "Vout", x: 20, y: 46, kind: "passive" },
       { id: "gnd", label: "GND", x: 34, y: 46, kind: "ground" },
     ],
+    requiredPinGroups: [["vcc"],["out"],["gnd"]],
   },
   "dc-motor": {
     type: "dc-motor",
@@ -342,6 +356,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "pos", label: "M+", x: 34, y: 68, kind: "passive" },
       { id: "neg", label: "M-", x: 76, y: 68, kind: "passive" },
     ],
+    requiredPinGroups: [["pos"],["neg"]],
   },
   "npn-transistor": {
     type: "npn-transistor",
@@ -354,6 +369,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "base", label: "Base (B)", x: 20, y: 52, kind: "passive" },
       { id: "collector", label: "Collector (C)", x: 32, y: 52, kind: "passive" },
     ],
+    requiredPinGroups: [["emitter"],["base"],["collector"]],
   },
   relay: {
     type: "relay",
@@ -369,6 +385,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "no", label: "NO", x: 86, y: 4, kind: "passive" },
       { id: "nc", label: "NC", x: 100, y: 4, kind: "passive" },
     ],
+    requiredPinGroups: [["vcc"],["gnd"],["in"],["com"],["no","nc"]],
   },
 
   "ir-sensor": {
@@ -383,6 +400,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "gnd", label: "GND", x: 64, y: 60, kind: "ground" },
     ],
     defaults: { detected: "false" },
+    requiredPinGroups: [["vcc"],["out"],["gnd"]],
   },
   "dht11": {
     type: "dht11",
@@ -396,6 +414,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "gnd", label: "GND", x: 60, y: 62, kind: "ground" },
     ],
     defaults: { temperature: 25, humidity: 55 },
+    requiredPinGroups: [["vcc"],["data"],["gnd"]],
   },
   "oled-i2c": {
     type: "oled-i2c",
@@ -410,6 +429,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "sda", label: "SDA", x: 118, y: 88, kind: "digital" },
     ],
     defaults: { line1: "PIXIU TECH", line2: "READY", line3: "" },
+    requiredPinGroups: [["gnd"],["vcc"],["scl"],["sda"]],
   },
   "joystick": {
     type: "joystick",
@@ -425,6 +445,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "sw", label: "SW", x: 78, y: 82, kind: "digital" },
     ],
     defaults: { x: 512, y: 512, pressed: "false" },
+    requiredPinGroups: [["gnd"],["vcc"],["vrx"],["vry"]],
   },
   "l298n": {
     type: "l298n",
@@ -448,6 +469,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "in4", label: "IN4", x: 94, y: 104, kind: "digital" },
     ],
     defaults: { speedA: 0, speedB: 0 },
+    requiredPinGroups: [["vs"],["gnd"],["ena","enb"],["in1","in3"],["in2","in4"],["out1","out3"],["out2","out4"]],
   },
   "rotary-encoder": {
     type: "rotary-encoder",
@@ -463,6 +485,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "sw", label: "SW", x: 68, y: 78, kind: "digital" },
     ],
     defaults: { value: 0, pressed: "false" },
+    requiredPinGroups: [["gnd"],["vcc"],["clk"],["dt"]],
   },
   "soil-moisture": {
     type: "soil-moisture",
@@ -476,6 +499,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "gnd", label: "GND", x: 58, y: 80, kind: "ground" },
     ],
     defaults: { moisture: 620 },
+    requiredPinGroups: [["vcc"],["ao"],["gnd"]],
   },
   "keypad-4x4": {
     type: "keypad-4x4",
@@ -494,6 +518,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "c4", label: "C4", x: 102, y: 4, kind: "digital" },
     ],
     defaults: { lastKey: "" },
+    requiredPinGroups: [["r1"],["r2"],["r3"],["r4"],["c1"],["c2"],["c3"],["c4"]],
   },
   "neopixel-ring": {
     type: "neopixel-ring",
@@ -508,6 +533,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "do", label: "DO", x: 78, y: 92, kind: "digital" },
     ],
     defaults: { numPixels: 8, brightness: 200, pattern: "rainbow", color: "#38bdf8" },
+    requiredPinGroups: [["di"],["vcc"],["gnd"]],
   },
   "mq2-gas": {
     type: "mq2-gas",
@@ -522,6 +548,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "ao", label: "AO", x: 64, y: 84, kind: "analog" },
     ],
     defaults: { gasLevel: 150, threshold: 350 },
+    requiredPinGroups: [["vcc"],["gnd"],["ao"]],
   },
 }
 
