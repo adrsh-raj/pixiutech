@@ -9,6 +9,8 @@ import { getLedElectricalModel, getPwmDutyCycle } from "./electrical-model"
 
 export interface ArduinoPinState {
   state: "HIGH" | "LOW"
+  /** Explicit signal semantics so PWM/tone/servo states are not mistaken for DC. */
+  outputMode?: "digital" | "pwm" | "tone" | "servo"
   value?: number
   angle?: number
   toneHz?: number
@@ -50,7 +52,7 @@ export function computeRuntime(
     Object.entries(pinStates).map(([pin, pinState]) => [
       pin,
       pinState?.value !== undefined && pinState.value > 0
-        ? { ...pinState, state: "HIGH" as const }
+        ? { ...pinState, state: "HIGH" as const, outputMode: "digital" as const }
         : pinState,
     ]),
   ) as Record<string, ArduinoPinState>
@@ -230,7 +232,13 @@ export function computeRuntime(
         const stripped = pinId.replace(/^(gpio|gp|d|p)/i, "")
         const pState = lookupBoardPinState(pinStates, pinId, board)
         if (pState?.state === "HIGH" || (pState?.value ?? 0) > 0) {
-          const duty = pState.value !== undefined ? getPwmDutyCycle(pState.value) : 1
+          const duty = pState.outputMode === "tone"
+            ? 0.5
+            : pState.outputMode === "servo"
+              ? (1 + Math.max(0, Math.min(180, pState.angle ?? 90)) / 180) / 20
+              : pState.outputMode === "pwm" || pState.value !== undefined
+                ? getPwmDutyCycle(pState.value ?? 0)
+                : 1
           // PWM output is a full logic-level pulse train. Do not multiply the
           // HIGH voltage by duty before calculating diode forward conduction.
           const voltage = board.logicVoltage
