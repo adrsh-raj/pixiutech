@@ -19,7 +19,7 @@ type PathEdge = {
   wireId?: string
 }
 
-const pinKey = (ref: PinRef) => \`\${ref.partId}:\${ref.pinId}\`
+const pinKey = (ref: PinRef) => `${ref.partId}:${ref.pinId}`
 
 function solveDenseSystem(matrix: number[][], rhs: number[]): number[] | null {
   const n = rhs.length
@@ -85,7 +85,7 @@ export function computeWireCurrents(
     const board = getBoardForPart(part)
     if (!board) return
     const addInternal = (a: string, b: string, resistance = 0.001) => {
-      edges.push({ a: \`\${part.id}:\${a}\`, b: \`\${part.id}:\${b}\`, resistanceOhms: resistance })
+      edges.push({ a: `${part.id}:${a}`, b: `${part.id}:${b}`, resistanceOhms: resistance })
     }
 
     // Board aliases denote the same physical pin.
@@ -109,7 +109,7 @@ export function computeWireCurrents(
   }))
 
   for (const part of state.parts) {
-    const k = (pin: string) => \`\${part.id}:\${pin}\`
+    const k = (pin: string) => `${part.id}:${pin}`
     const board = getBoardForPart(part)
     if (board) {
       for (const pin of board.powerPins.v5 ?? []) {
@@ -161,14 +161,14 @@ export function computeWireCurrents(
         const topRows = ["a", "b", "c", "d", "e"]
         const bottomRows = ["f", "g", "h", "i", "j"]
         for (let index = 0; index < topRows.length - 1; index++) {
-          addInternal(\`\${topRows[index]}_\${column}\`, \`\${topRows[index + 1]}_\${column}\`)
+          addInternal(`${topRows[index]}_${column}`, `${topRows[index + 1]}_${column}`)
         }
         for (let index = 0; index < bottomRows.length - 1; index++) {
-          addInternal(\`\${bottomRows[index]}_\${column}\`, \`\${bottomRows[index + 1]}_\${column}\`)
+          addInternal(`${bottomRows[index]}_${column}`, `${bottomRows[index + 1]}_${column}`)
         }
         if (column < BREADBOARD_COLUMNS) {
           for (const rail of ["pos_t", "neg_t", "pos_b", "neg_b"]) {
-            addInternal(\`\${rail}_\${column}\`, \`\${rail}_\${column + 1}\`)
+            addInternal(`${rail}_${column}`, `${rail}_${column + 1}`)
           }
         }
       }
@@ -337,8 +337,8 @@ export function computeWireCurrents(
   function traceBranch(partId: string, pinA: string, pinB: string, signalPath = false) {
     const currentMa = nodal.getBranchCurrent(partId, pinA, pinB)
     if (!Number.isFinite(currentMa) || Math.abs(currentMa) < 0.001) return
-    const start = \`\${partId}:\${currentMa >= 0 ? pinA : pinB}\`
-    const end = \`\${partId}:\${currentMa >= 0 ? pinB : pinA}\`
+    const start = `${partId}:${currentMa >= 0 ? pinA : pinB}`
+    const end = `${partId}:${currentMa >= 0 ? pinB : pinA}`
     const sources = signalPath ? signalPowerPins : powerPins
     const returns = signalPath ? signalGroundPins : groundPins
 
