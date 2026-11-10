@@ -1573,16 +1573,32 @@ export function solveCircuitNodalPotentials(
       }
     }
 
-    // 2. If probes are across an LED
-    const ledPart = state.parts.find((p) => p.type === "led" && (p.id === red.partId || p.id === black.partId))
-    if (ledPart) {
-      const r = runtime[ledPart.id]
-      const c = getBranchCurrent(ledPart.id, "anode", "cathode")
-      return {
-        currentMa: Number(c.toFixed(1)),
-        explanation: `LED Branch Current: ${c.toFixed(1)} mA`,
-        subtext: r?.burnt ? "⚠️ OVERCURRENT BURNOUT!" : "Diode is conducting forward current",
-        isWarning: r?.burnt,
+    // 2. Probes directly across any modeled component branch (resistor,
+    // diode channel, potentiometer leg, motor, relay contact, transistor, or
+    // module supply-load branch) read the same solved MNA current.
+    if (red.partId === black.partId) {
+      const forwardKey = branchKey(red.partId, red.pinId, black.pinId)
+      const reverseKey = branchKey(red.partId, black.pinId, red.pinId)
+      const forwardExists = branchCurrents.has(forwardKey)
+      const reverseExists = branchCurrents.has(reverseKey)
+      if (forwardExists || reverseExists) {
+        const signedCurrent = forwardExists
+          ? getBranchCurrent(red.partId, red.pinId, black.pinId)
+          : -getBranchCurrent(red.partId, black.pinId, red.pinId)
+        const currentMa = Math.abs(signedCurrent)
+        const component = state.parts.find((part) => part.id === red.partId)
+        const isLed = component?.type === "led" || component?.type === "rgb-led" || component?.type === "seven-segment"
+        const isBurnt = component?.type === "led" && runtime[component.id]?.burnt === true
+        return {
+          currentMa: Number(currentMa.toFixed(3)),
+          explanation: `Solved ${component?.type ?? "component"} branch current: ${currentMa.toFixed(3)} mA`,
+          subtext: isBurnt
+            ? "⚠️ OVERCURRENT BURNOUT!"
+            : isLed
+              ? "Current is read from the active diode/channel branch in the nodal solution."
+              : "Current is read directly from the solved component branch in the nodal network.",
+          isWarning: isBurnt,
+        }
       }
     }
 
