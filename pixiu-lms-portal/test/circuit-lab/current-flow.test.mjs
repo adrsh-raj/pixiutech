@@ -246,3 +246,22 @@ test("potentiometer current flow uses its solved divider current instead of a fi
   assert.ok(Math.abs(currents["pot-return"]?.currentMa - 0.5) < 0.1)
   assert.equal(currents["pot-wiper"], undefined)
 })
+
+test("LDR wire current follows the modeled light-dependent resistance below and above 0.5mA", () => {
+  const makeCircuit = (light) => ({
+    parts: [
+      { id: "uno", type: "arduino-uno", x: 40, y: 100, rotation: 0, props: {} },
+      { id: "ldr", type: "ldr", x: 240, y: 100, rotation: 0, props: { light } },
+    ],
+    wires: [
+      { id: "ldr-feed", from: { partId: "uno", pinId: "5v" }, to: { partId: "ldr", pinId: "t1" }, color: "#ef4444" },
+      { id: "ldr-return", from: { partId: "ldr", pinId: "t2" }, to: { partId: "uno", pinId: "gnd_pwr" }, color: "#1e293b" },
+    ],
+  })
+  const dark = computeWireCurrents(makeCircuit(0), {}, {})
+  const bright = computeWireCurrents(makeCircuit(1023), {}, {})
+  assert.ok(dark["ldr-feed"]?.currentMa > 0.09 && dark["ldr-feed"]?.currentMa < 0.11,
+    `dark LDR should draw about 0.1mA, received ${dark["ldr-feed"]?.currentMa}mA`)
+  assert.ok(bright["ldr-feed"]?.currentMa > 9.5 && bright["ldr-feed"]?.currentMa < 10.5,
+    `bright LDR should draw about 10mA, received ${bright["ldr-feed"]?.currentMa}mA`)
+})

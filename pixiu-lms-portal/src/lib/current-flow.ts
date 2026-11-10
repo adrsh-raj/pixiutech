@@ -205,8 +205,8 @@ export function computeWireCurrents(
     if (currentMa <= 0) return
     const activeSources = signalPath ? signalPowerPins : powerPins
     const activeReturns = signalPath ? signalGroundPins : groundPins
-    const effectiveMa = Math.max(0.5, currentMa)
-    const period = Math.max(0.25, Math.min(2.5, Number((20 / effectiveMa).toFixed(2))))
+    const effectiveMa = currentMa
+    const period = Math.max(0.25, Math.min(2.5, Number((20 / Math.max(0.001, effectiveMa)).toFixed(2))))
 
     const upstreamVisited = new Set<string>()
     const downstreamVisited = new Set<string>()
