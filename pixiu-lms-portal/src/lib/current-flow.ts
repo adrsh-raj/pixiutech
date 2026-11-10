@@ -132,13 +132,17 @@ export function computeWireCurrents(
         linkInternal(k("p1a"), k("p2a"))
       }
     } else if (part.type === "relay") {
-      // Switched contacts conduct ONLY when relay coil is active
-      const r = runtime[part.id]
-      if (r?.level && r.level > 0) {
+      // The runtime contract exposes relay coil state as relayActive.
+      // Match the same NO/NC contact topology used by simulation.ts.
+      if (runtime[part.id]?.relayActive === true) {
         linkInternal(k("com"), k("no"))
       } else {
         linkInternal(k("com"), k("nc"))
       }
+    } else if (part.type === "l298n") {
+      const driver = runtime[part.id]
+      if ((driver?.motorARpm ?? 0) > 0) linkInternal(k("out1"), k("out2"))
+      if ((driver?.motorBRpm ?? 0) > 0) linkInternal(k("out3"), k("out4"))
     }
   }
 
@@ -267,8 +271,14 @@ export function computeWireCurrents(
         traceComponentFlow(`${part.id}:pos`, `${part.id}:neg`, 15.0, true)
       }
     } else if (part.type === "dc-motor") {
-      // Motor MUST be running to conduct!
-      if ((r?.level && r.level > 0) || (r?.speed && r.speed !== 0)) {
+      // Simulation motors report RPM/direction, not LED-style level/speed.
+      const isRunning =
+        (r?.rpm ?? 0) > 0 ||
+        r?.motorDirection === "cw" ||
+        r?.motorDirection === "ccw" ||
+        (r?.level ?? 0) > 0 ||
+        (r?.speed ?? 0) !== 0
+      if (isRunning) {
         traceComponentFlow(`${part.id}:pos`, `${part.id}:neg`, 25.0)
       }
     } else if (part.type === "rgb-led") {
@@ -326,7 +336,7 @@ export function computeWireCurrents(
       traceComponentFlow(`${part.id}:t1`, `${part.id}:t2`, 8.0)
     } else if (part.type === "relay") {
       traceComponentFlow(`${part.id}:vcc`, `${part.id}:gnd`, 12.0)
-      if (r?.level && r.level > 0) {
+      if (r?.relayActive === true) {
         traceComponentFlow(`${part.id}:in`, `${part.id}:gnd`, 6.0, true)
       }
     } else if (part.type === "neopixel-ring" || part.type === "neopixel-strip") {
