@@ -699,7 +699,39 @@ export function solveCircuitNodalPotentials(
     .map((branch, index) => ({ branch, index }))
     .filter(({ branch }) => branch.isDiode && branch.vForward)
     .map(({ index }) => index)
-  let activeDiodeIndices = new Set<number>(diodeIndices)
+
+  // Do not let an isolated diode self-bias to Vf through MNA regularization.
+  // Seed a diode active only when its complete connected component contains
+  // at least two distinct fixed-potential levels with enough available span.
+  // This also supports multiple diodes in series: the source span is evaluated
+  // over the entire component, not just through the diode's immediate terminals.
+  const componentParent = new Map<number, number>()
+  const componentFind = (net: number): number => {
+    if (!componentParent.has(net)) componentParent.set(net, net)
+    const parent = componentParent.get(net)!
+    if (parent !== net) componentParent.set(net, componentFind(parent))
+    return componentParent.get(net)!
+  }
+  const componentUnion = (a: number, b: number) => {
+    const rootA = componentFind(a)
+    const rootB = componentFind(b)
+    if (rootA !== rootB) componentParent.set(rootA, rootB)
+  }
+  for (const branch of branches) {
+    if (branch.netA !== branch.netB) componentUnion(branch.netA, branch.netB)
+  }
+  const componentVoltages = new Map<number, number[]>()
+  for (const [netId, info] of fixedNets.entries()) {
+    const root = componentFind(netId)
+    componentVoltages.set(root, [...(componentVoltages.get(root) ?? []), info.voltage])
+  }
+  const activeDiodeIndices = new Set<number>(diodeIndices.filter((index) => {
+    const diode = branches[index]
+    const voltages = componentVoltages.get(componentFind(diode.netA)) ?? []
+    if (voltages.length < 2) return false
+    const span = Math.max(...voltages) - Math.min(...voltages)
+    return span >= (diode.vForward ?? Infinity) - 0.1
+  }))
   let converged = diodeIndices.length === 0
   let netVoltagesSolved = solveWithBranches(branches.filter((branch, index) => !branch.isDiode || activeDiodeIndices.has(index)))
   const seenDiodeSets = new Set<string>()
