@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { LMS_LOGIN_URL } from '../config/runtime.js'
 import '../styles/eight-square-ai.css'
@@ -75,122 +75,6 @@ function SquareMark({ small = false }) {
       {Array.from({ length: 8 }, (_, index) => <i key={index} />)}
     </span>
   )
-}
-
-function InteractiveDotField() {
-  const canvasRef = useRef(null)
-
-  useEffect(() => {
-    const canvas = canvasRef.current
-    const hero = canvas?.parentElement
-    const context = canvas?.getContext('2d')
-    if (!canvas || !hero || !context) return undefined
-
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    const finePointer = window.matchMedia('(pointer: fine)').matches
-    const spacing = 34
-    const pointerRadius = 190
-    const points = []
-    let width = 0
-    let height = 0
-    let ratio = 1
-    let pointerX = -1000
-    let pointerY = -1000
-    let pointerActive = false
-    let lastPointerMove = 0
-    let frame = 0
-
-    const resize = () => {
-      width = hero.clientWidth
-      height = hero.clientHeight
-      ratio = Math.min(window.devicePixelRatio || 1, 1.5)
-      canvas.width = Math.round(width * ratio)
-      canvas.height = Math.round(height * ratio)
-      context.setTransform(ratio, 0, 0, ratio, 0, 0)
-      points.length = 0
-      for (let y = 16; y < height; y += spacing) {
-        for (let x = 16; x < width; x += spacing) {
-          points.push({ x, y, drawX: x, drawY: y })
-        }
-      }
-      if (!frame) frame = window.requestAnimationFrame(draw)
-    }
-
-    const draw = (time = 0) => {
-      frame = 0
-      context.clearRect(0, 0, width, height)
-      if (pointerActive && finePointer && !reducedMotion) {
-        const glow = context.createRadialGradient(pointerX, pointerY, 0, pointerX, pointerY, pointerRadius)
-        glow.addColorStop(0, 'rgba(48, 137, 207, 0.10)')
-        glow.addColorStop(1, 'rgba(48, 137, 207, 0)')
-        context.fillStyle = glow
-        context.fillRect(0, 0, width, height)
-      }
-
-      let settling = false
-      for (const point of points) {
-        const dx = pointerX - point.x
-        const dy = pointerY - point.y
-        const distance = Math.hypot(dx, dy)
-        const influence = pointerActive && finePointer && !reducedMotion && distance < pointerRadius
-          ? Math.pow(1 - distance / pointerRadius, 2)
-          : 0
-        const shift = influence * 11
-        const targetX = point.x + (distance ? dx / distance * shift : 0)
-        const targetY = point.y + (distance ? dy / distance * shift : 0)
-        point.drawX += (targetX - point.drawX) * 0.18
-        point.drawY += (targetY - point.drawY) * 0.18
-        if (Math.abs(targetX - point.drawX) > 0.15 || Math.abs(targetY - point.drawY) > 0.15) settling = true
-
-        context.beginPath()
-        context.fillStyle = 'rgba(146, 191, 225, ' + (0.14 + influence * 0.52) + ')'
-        context.arc(point.drawX, point.drawY, 1.05 + influence * 1.05, 0, Math.PI * 2)
-        context.fill()
-
-        if (influence > 0.58 && distance < 88) {
-          context.beginPath()
-          context.moveTo(point.drawX, point.drawY)
-          context.lineTo(pointerX, pointerY)
-          context.strokeStyle = 'rgba(93, 181, 232, ' + influence * 0.10 + ')'
-          context.lineWidth = 0.7
-          context.stroke()
-        }
-      }
-
-      if ((pointerActive && time - lastPointerMove < 180) || settling) {
-        frame = window.requestAnimationFrame(draw)
-      }
-    }
-
-    const onPointerMove = (event) => {
-      const bounds = hero.getBoundingClientRect()
-      pointerX = event.clientX - bounds.left
-      pointerY = event.clientY - bounds.top
-      pointerActive = true
-      lastPointerMove = performance.now()
-      if (!frame) frame = window.requestAnimationFrame(draw)
-    }
-
-    const onPointerLeave = () => {
-      pointerActive = false
-      if (!frame) frame = window.requestAnimationFrame(draw)
-    }
-
-    const observer = new ResizeObserver(resize)
-    observer.observe(hero)
-    hero.addEventListener('pointermove', onPointerMove, { passive: true })
-    hero.addEventListener('pointerleave', onPointerLeave)
-    resize()
-
-    return () => {
-      observer.disconnect()
-      hero.removeEventListener('pointermove', onPointerMove)
-      hero.removeEventListener('pointerleave', onPointerLeave)
-      if (frame) window.cancelAnimationFrame(frame)
-    }
-  }, [])
-
-  return <canvas ref={canvasRef} className="esq-dot-field" aria-hidden="true" />
 }
 
 function LedDiagram({ stageIndex }) {
@@ -404,7 +288,6 @@ export default function EightSquareAI() {
   return (
     <div className="esq-page">
       <section className="esq-hero">
-        <InteractiveDotField />
         <div className="shell esq-hero__grid">
           <div className="esq-hero__copy">
             <Logo className="esq-logo--hero" />
