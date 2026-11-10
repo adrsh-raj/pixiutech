@@ -580,6 +580,40 @@ export function solveCircuitNodalPotentials(
     }
   }
 
+  // L298N is a dual H-bridge. Model the commanded outputs as average DC
+  // voltages determined by channel direction and PWM duty. This first-order
+  // model does not simulate inductive switching transients or motor back-EMF.
+  for (const driver of state.parts.filter((part) => part.type === "l298n")) {
+    const vsNet = pinToNetId(driver.id, "vs")
+    const gndNet = pinToNetId(driver.id, "gnd")
+    const supply = fixedNets.get(vsNet)
+    const ground = fixedNets.get(gndNet)
+    if (!supply || !ground || conflictedNets.has(vsNet) || conflictedNets.has(gndNet)) continue
+    const motorSupplyV = supply.voltage - ground.voltage
+    if (!Number.isFinite(motorSupplyV) || motorSupplyV <= 0) continue
+
+    const channels = [
+      { rpm: Number(runtime[driver.id]?.motorARpm ?? 0), direction: runtime[driver.id]?.motorADirection, high: "out1", low: "out2", label: "A" },
+      { rpm: Number(runtime[driver.id]?.motorBRpm ?? 0), direction: runtime[driver.id]?.motorBDirection, high: "out3", low: "out4", label: "B" },
+    ]
+    for (const channel of channels) {
+      if (!Number.isFinite(channel.rpm) || channel.rpm <= 0 ||
+          (channel.direction !== "cw" && channel.direction !== "ccw")) continue
+      const duty = Math.max(0, Math.min(1, channel.rpm / 1000))
+      const drivenVoltage = ground.voltage + motorSupplyV * duty
+      const highPin = channel.direction === "cw" ? channel.high : channel.low
+      const lowPin = channel.direction === "cw" ? channel.low : channel.high
+      setFixedNet(pinToNetId(driver.id, highPin), {
+        voltage: drivenVoltage,
+        label: `L298N ${channel.label} bridge output ${highPin} (${(duty * 100).toFixed(1)}% average duty)`,
+      })
+      setFixedNet(pinToNetId(driver.id, lowPin), {
+        voltage: ground.voltage,
+        label: `L298N ${channel.label} bridge return ${lowPin}`,
+      })
+    }
+  }
+
   // 5. Build component branches
   interface Branch {
     netA: number
@@ -771,6 +805,48 @@ export function solveCircuitNodalPotentials(
   // The bridge's VS pin supplies the current consumed by the connected motor
   // winding branches. Derive this input current from the same output voltages
   // and 50Ω first-order winding model; do not inject a fixed visual current.
+  for (const driver of state.parts.filter((part) => part.type === "l298n")) {
+    const vsNet = pinToNetId(driver.id, "vs")
+    const gndNet = pinToNetId(driver.id, "gnd")
+    const supply = fixedNets.get(vsNet)
+    const ground = fixedNets.get(gndNet)
+    if (!supply || !ground || conflictedNets.has(vsNet) || conflictedNets.has(gndNet)) continue
+    const supplyVoltage = supply.voltage - ground.voltage
+    if (!Number.isFinite(supplyVoltage) || supplyVoltage <= 0) continue
+
+    const outputs = new Set([
+      pinToNetId(driver.id, "out1"),
+      pinToNetId(driver.id, "out2"),
+      pinToNetId(driver.id, "out3"),
+      pinToNetId(driver.id, "out4"),
+    ])
+    let motorCurrentMa = 0
+    for (const motor of state.parts.filter((part) => part.type === "dc-motor")) {
+      const motorBranch = branches.find((item) =>
+        item.partId === motor.id && item.pinA === "pos" && item.pinB === "neg",
+      )
+      if (!motorBranch || !outputs.has(motorBranch.netA) || !outputs.has(motorBranch.netB)) continue
+      const voltageA = fixedNets.get(motorBranch.netA)?.voltage
+      const voltageB = fixedNets.get(motorBranch.netB)?.voltage
+      if (voltageA === undefined || voltageB === undefined) continue
+      motorCurrentMa += Math.abs((voltageA - voltageB) * motorBranch.conductance * 1000)
+    }
+
+    if (motorCurrentMa > 0) {
+      branches.push({
+        netA: vsNet,
+        netB: gndNet,
+        conductance: (motorCurrentMa / 1000) / supplyVoltage,
+        partId: driver.id,
+        pinA: "vs",
+        pinB: "gnd",
+      })
+    }
+  }
+
+  // Reflect connected motor winding current back to the L298N VS/GND
+  // supply terminals. This current is derived from the same solved output
+  // voltage and motor winding branch; it is not a fixed visual estimate.
   for (const driver of state.parts.filter((part) => part.type === "l298n")) {
     const vsNet = pinToNetId(driver.id, "vs")
     const gndNet = pinToNetId(driver.id, "gnd")
