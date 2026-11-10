@@ -798,13 +798,38 @@ export function solveCircuitNodalPotentials(
       }
     }
 
-    if (refA.partId === refB.partId && state.parts.find((p) => p.id === refA.partId)?.type === "resistor") {
-      const p = state.parts.find((p) => p.id === refA.partId)!
-      const r = Number(p.props.resistance || 220)
-      return {
-        resistance: r,
-        explanation: `Component Resistance: ${r.toFixed(1)} Ω`,
-        subtext: `Marking bands denote ${r}Ω nominal resistance`,
+    if (refA.partId === refB.partId) {
+      const component = state.parts.find((part) => part.id === refA.partId)
+      if (component?.type === "resistor") {
+        const resistance = Math.max(0.1, Number(component.props.resistance || 220))
+        return {
+          resistance,
+          explanation: `Component Resistance: ${resistance.toFixed(1)} Ω`,
+          subtext: `Marking bands denote ${resistance}Ω nominal resistance`,
+        }
+      }
+      if (component?.type === "ldr") {
+        const light = Math.max(0, Math.min(1023, Number(component.props.light ?? 512)))
+        const resistance = Math.max(200, Math.round(50000 / (1 + (light / 1023) * 99)))
+        return {
+          resistance,
+          explanation: `Photoresistor Resistance: ${resistance.toFixed(0)} Ω`,
+          subtext: `LDR resistance is resolved from the light level (${light}/1023)`,
+        }
+      }
+      if (component?.type === "dc-motor") {
+        return {
+          resistance: 50,
+          explanation: "DC motor winding model: 50.0 Ω",
+          subtext: "Simplified winding resistance used by the nodal motor branch",
+        }
+      }
+      if (component?.type === "buzzer") {
+        return {
+          resistance: 100,
+          explanation: "Piezo buzzer load model: 100.0 Ω",
+          subtext: "Simplified energized buzzer branch used by the nodal solver",
+        }
       }
     }
 

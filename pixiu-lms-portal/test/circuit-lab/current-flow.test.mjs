@@ -266,3 +266,29 @@ test("LDR wire current follows the modeled light-dependent resistance below and 
   assert.ok(bright["ldr-feed"]?.currentMa > 9.5 && bright["ldr-feed"]?.currentMa < 10.5,
     `bright LDR should draw about 10mA, received ${bright["ldr-feed"]?.currentMa}mA`)
 })
+
+test("nodal current calculation exposes the actual light-dependent resistance current", () => {
+  for (const scenario of [
+    { light: 0, expectedMa: 0.1 },
+    { light: 1023, expectedMa: 10 },
+  ]) {
+    const circuit = {
+      parts: [
+        { id: "uno", type: "arduino-uno", x: 40, y: 100, rotation: 0, props: {} },
+        { id: "ldr", type: "ldr", x: 240, y: 100, rotation: 0, props: { light: scenario.light } },
+      ],
+      wires: [
+        { id: "feed", from: { partId: "uno", pinId: "5v" }, to: { partId: "ldr", pinId: "t1" }, color: "#ef4444" },
+        { id: "return", from: { partId: "ldr", pinId: "t2" }, to: { partId: "uno", pinId: "gnd_pwr" }, color: "#1e293b" },
+      ],
+    }
+    const solved = solveCircuitNodalPotentials(circuit)
+    const measured = solved.computeCurrentBetweenPins(
+      { partId: "ldr", pinId: "t1" },
+      { partId: "ldr", pinId: "t2" },
+      {},
+    ).currentMa
+    assert.ok(Math.abs(measured - scenario.expectedMa) < 0.15,
+      `light ${scenario.light}: expected about ${scenario.expectedMa}mA, received ${measured}mA`)
+  }
+})
