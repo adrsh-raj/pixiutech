@@ -480,3 +480,38 @@ test("board pin aliases preserve explicit digital PWM tone servo and DAC signal 
     assert.equal(resolved.outputMode, expected, `pin alias ${alias} should preserve ${expected} mode`)
   }
 })
+
+
+test("Pico relay energizes only through its coil and switches VBUS through COM/NO to the pump", () => {
+  const circuit = {
+    parts: [
+      part("pico", "rpi-pico"),
+      part("soil", "soil-moisture", { moisture: 350 }),
+      part("rly", "relay"),
+      part("pump", "dc-motor"),
+    ],
+    wires: [
+      wire("soil-vcc", "pico", "3v3", "soil", "vcc"),
+      wire("soil-gnd", "pico", "gnd_7", "soil", "gnd"),
+      wire("soil-ao", "pico", "gp27", "soil", "ao"),
+      wire("relay-vcc", "pico", "vbus", "rly", "vcc"),
+      wire("relay-gnd", "pico", "gnd_1", "rly", "gnd"),
+      wire("relay-in", "pico", "gp13", "rly", "in"),
+      wire("contact-feed", "pico", "vbus", "rly", "com"),
+      wire("contact-pump", "rly", "no", "pump", "pos"),
+      wire("pump-return", "pump", "neg", "pico", "gnd_1"),
+    ],
+  }
+
+  const on = computeRuntime(circuit, new Set(), {
+    "13": { state: "HIGH", outputMode: "digital" },
+  })
+  assert.equal(on.rly.relayActive, true, "GP13 HIGH plus real VBUS/GND should energize relay coil")
+  assert.ok(on.pump.rpm > 0, "energized COM-NO contact should power the pump motor")
+
+  const off = computeRuntime(circuit, new Set(), {
+    "13": { state: "LOW", outputMode: "digital" },
+  })
+  assert.equal(off.rly.relayActive, false, "GP13 LOW should de-energize relay coil")
+  assert.equal(off.pump.rpm, 0, "open NO contact must leave the pump motor unpowered")
+})
