@@ -87,6 +87,29 @@ export function computeWireCurrents(
     }
   }
 
+  // A NeoPixel show() transfers a frame over the physically connected DI wire.
+  // Treat only that board pin as an active signal source for this data-frame path;
+  // do not mutate the student's ordinary GPIO state just to animate the transfer.
+  for (const ring of state.parts.filter((part) => part.type === "neopixel-ring")) {
+    const ringRuntime = runtime[ring.id]
+    const dataPin = ringRuntime?.neopixelDataActive ? ringRuntime.neopixelDataPin : undefined
+    if (!dataPin) continue
+    const boardPart = state.parts.find((part) => part.id === dataPin.partId)
+    const board = boardPart ? getBoardForPart(boardPart) : undefined
+    if (!board) continue
+    const raw = dataPin.pinId.toLowerCase()
+    const boardPin = board.pins.find((pin) =>
+      pin.id.toLowerCase() === raw ||
+      pin.label.toLowerCase() === raw ||
+      (pin.alternateNames ?? []).some((alias) => alias.toLowerCase() === raw),
+    )
+    if (!boardPin || (boardPin.kind !== "digital" && boardPin.kind !== "analog")) continue
+    signalPowerPins.add(`${dataPin.partId}:${boardPin.id}`)
+    for (const alias of boardPin.alternateNames ?? []) {
+      signalPowerPins.add(`${dataPin.partId}:${alias.toLowerCase()}`)
+    }
+  }
+
   // 3. Build internal part connection mappings (e.g. breadboard rows, resistors, buttons)
   const partInternalLinks = new Map<string, string[]>()
   function linkInternal(a: string, b: string) {
@@ -343,10 +366,16 @@ export function computeWireCurrents(
         traceComponentFlow(`${part.id}:vcc`, `${part.id}:gnd`, 12.0)
         traceComponentFlow(`${part.id}:in`, `${part.id}:gnd`, 6.0, true)
       }
-    } else if (part.type === "neopixel-ring" || part.type === "neopixel-strip") {
-      traceComponentFlow(`${part.id}:vcc`, `${part.id}:gnd`, 20.0)
-      const dataPin = part.type === "neopixel-ring" ? "di" : "din"
-      traceComponentFlow(`${part.id}:${dataPin}`, `${part.id}:gnd`, 6.0, true)
+    } else if (part.type === "neopixel-ring") {
+      if (r?.level && r.level > 0) {
+        traceComponentFlow(`${part.id}:vcc`, `${part.id}:gnd`, 20.0)
+      }
+      if (r?.neopixelDataActive) {
+        traceComponentFlow(`${part.id}:di`, `${part.id}:gnd`, 6.0, true)
+      }
+    } else if (part.type === "neopixel-strip") {
+      if (r?.level && r.level > 0) traceComponentFlow(`${part.id}:vcc`, `${part.id}:gnd`, 20.0)
+      traceComponentFlow(`${part.id}:din`, `${part.id}:gnd`, 6.0, true)
     } else if (part.type === "l298n") {
       const loadInPin = `${part.id}:vs`
       const loadOutPin = `${part.id}:gnd`
