@@ -51,9 +51,11 @@ export function computeRuntime(
   const peakPinStates = Object.fromEntries(
     Object.entries(pinStates).map(([pin, pinState]) => [
       pin,
-      pinState?.value !== undefined && pinState.value > 0
-        ? { ...pinState, state: "HIGH" as const, outputMode: "digital" as const }
-        : pinState,
+      pinState?.outputMode === "dac"
+        ? pinState
+        : pinState?.value !== undefined && pinState.value > 0
+          ? { ...pinState, state: "HIGH" as const, outputMode: "digital" as const }
+          : pinState,
     ]),
   ) as Record<string, ArduinoPinState>
   const hasLedLoad = state.parts.some((part) => part.type === "led")
