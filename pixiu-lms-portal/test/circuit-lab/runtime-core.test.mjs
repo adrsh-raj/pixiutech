@@ -15,6 +15,7 @@ await build({
     new URL("../../src/lib/waveform-sampler.ts", import.meta.url).pathname,
     new URL("../../src/lib/board-registry.ts", import.meta.url).pathname,
     new URL("../../src/lib/pin-state.ts", import.meta.url).pathname,
+    new URL("../../src/lib/components-catalog.ts", import.meta.url).pathname,
   ],
   bundle: true,
   format: "esm",
@@ -31,6 +32,7 @@ const { normalizeBreadboardPinId } = await import(`file://${join(outdir, "breadb
 const { samplePinVoltage } = await import(`file://${join(outdir, "waveform-sampler.js")}`)
 const { getBoardForPart, lookupBoardPinState } = await import(`file://${join(outdir, "board-registry.js")}`)
 const { writePinStateAliases } = await import(`file://${join(outdir, "pin-state.js")}`)
+const { CATALOG, ELECTRICAL_MODEL_CONTRACT } = await import(`file://${join(outdir, "components-catalog.js")}`)
 
 const part = (id, type, props = {}) => ({ id, type, x: 0, y: 0, rotation: 0, props })
 const wire = (id, fromPart, fromPin, toPart, toPin) => ({
@@ -939,4 +941,34 @@ test("MNA preserves negative battery potentials instead of clamping them to zero
   const solved = solveCircuitNodalPotentials(circuit)
   assert.equal(solved.getPinVoltage({ partId: "battery", pinId: "pos" }), -5)
   assert.equal(solved.getPinVoltage({ partId: "battery", pinId: "neg" }), 0)
+})
+
+
+test("every Virtual Lab component has an explicit, auditable electrical-model contract", () => {
+  const types = Object.keys(CATALOG)
+  assert.equal(types.length, 32, "the catalogue inventory must cover all 32 component types")
+  assert.deepEqual(Object.keys(ELECTRICAL_MODEL_CONTRACT).sort(), [...types].sort(),
+    "each catalogue component must have exactly one electrical-model contract")
+
+  for (const type of types) {
+    const contract = ELECTRICAL_MODEL_CONTRACT[type]
+    assert.ok(contract.model.trim(), `${type}: model name is required`)
+    assert.ok(contract.note.trim(), `${type}: model scope and limitations must be documented`)
+    assert.ok(["idealized", "first-order", "estimated", "partial", "signal-only"].includes(contract.fidelity),
+      `${type}: explicit fidelity classification is required`)
+
+    const loads = CATALOG[type].electrical?.supplyLoads ?? []
+    for (const load of loads) {
+      const pins = new Set(CATALOG[type].pins.map((pin) => pin.id))
+      assert.ok(pins.has(load.positivePin), `${type}: supply-load positive pin ${load.positivePin} must exist`)
+      assert.ok(pins.has(load.negativePin), `${type}: supply-load negative pin ${load.negativePin} must exist`)
+      assert.ok(Number.isFinite(load.nominalVoltage) && load.nominalVoltage > 0,
+        `${type}: nominal load voltage must be finite and positive`)
+      assert.ok(Number.isFinite(load.nominalCurrentMa) && load.nominalCurrentMa > 0,
+        `${type}: nominal load current must be finite and positive`)
+      assert.ok(["datasheet-typical", "datasheet-maximum", "module-estimate"].includes(load.accuracy),
+        `${type}: load provenance must be classified`)
+      assert.ok(load.note.trim(), `${type}: load estimate provenance note is required`)
+    }
+  }
 })
