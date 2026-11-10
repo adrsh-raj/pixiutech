@@ -139,7 +139,9 @@ function findNeoPixelDataPin(
         (candidate.alternateNames ?? []).some((alias) => alias.toLowerCase() === pinId),
       )
       if (pin && pin.kind === "digital" && !pin.capabilities?.inputOnly) {
-        return { partId, pinId: pin.id }
+        // Preserve the exact lower-case endpoint stored in state.wires. The
+        // runtime graph must start from that node, even when it is an alias.
+        return { partId, pinId }
       }
     }
 
