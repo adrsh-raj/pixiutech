@@ -817,7 +817,7 @@ export function solveCircuitNodalPotentials(
     const root = componentFind(netId)
     componentVoltages.set(root, [...(componentVoltages.get(root) ?? []), info.voltage])
   }
-  const activeDiodeIndices = new Set<number>(diodeIndices.filter((index) => {
+  let activeDiodeIndices = new Set<number>(diodeIndices.filter((index) => {
     const diode = branches[index]
     const voltages = componentVoltages.get(componentFind(diode.netA)) ?? []
     if (voltages.length < 2) return false
