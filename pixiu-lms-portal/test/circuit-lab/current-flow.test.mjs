@@ -8,7 +8,6 @@ const outfile = join(tmpdir(), `current-flow-bundle-${Date.now()}.mjs`)
 await build({
   entryPoints: [
     new URL("../../src/lib/current-flow.ts", import.meta.url).pathname,
-    new URL("../../src/lib/circuit-solver.ts", import.meta.url).pathname,
   ],
   bundle: true,
   format: "esm",
