@@ -103,6 +103,61 @@ test("buzzer when OFF has ZERO current in its wires", () => {
 })
 
 
+test("potentiometer current flow follows its real t1-to-t2 terminals", () => {
+  const circuit = {
+    parts: [
+      { id: "uno", type: "arduino-uno", x: 40, y: 100, rotation: 0, props: {} },
+      { id: "pot", type: "potentiometer", x: 240, y: 100, rotation: 0, props: { resistance: 10000, value: 512 } },
+    ],
+    wires: [
+      { id: "pot-feed", from: { partId: "uno", pinId: "5v" }, to: { partId: "pot", pinId: "t1" }, color: "#ef4444" },
+      { id: "pot-wiper", from: { partId: "pot", pinId: "wiper" }, to: { partId: "uno", pinId: "a0" }, color: "#eab308" },
+      { id: "pot-return", from: { partId: "pot", pinId: "t2" }, to: { partId: "uno", pinId: "gnd" }, color: "#1e293b" },
+    ],
+  }
+  const currents = computeWireCurrents(circuit, {}, {})
+  assert.ok(currents["pot-feed"]?.currentMa > 0, "5V-to-t1 feed should show divider current")
+  assert.ok(currents["pot-return"]?.currentMa > 0, "t2-to-GND return should show divider current")
+  assert.equal(currents["pot-wiper"], undefined, "high-impedance analog wiper should not be rendered as a ground-current path")
+})
+
+test("NeoPixel Ring data current traces through its catalog DI pin", () => {
+  const circuit = {
+    parts: [
+      { id: "uno", type: "arduino-uno", x: 40, y: 100, rotation: 0, props: {} },
+      { id: "ring", type: "neopixel-ring", x: 280, y: 100, rotation: 0, props: {} },
+    ],
+    wires: [
+      { id: "ring-vcc", from: { partId: "uno", pinId: "5v" }, to: { partId: "ring", pinId: "vcc" }, color: "#ef4444" },
+      { id: "ring-gnd", from: { partId: "ring", pinId: "gnd" }, to: { partId: "uno", pinId: "gnd" }, color: "#1e293b" },
+      { id: "ring-di", from: { partId: "uno", pinId: "d6" }, to: { partId: "ring", pinId: "di" }, color: "#22c55e" },
+    ],
+  }
+  const currents = computeWireCurrents(
+    circuit,
+    { ring: { level: 1, pixelColors: ["#ff0000"] } },
+    { "6": { state: "HIGH", outputMode: "digital" } },
+  )
+  assert.ok(currents["ring-vcc"]?.currentMa > 0, "powered ring should draw supply current")
+  assert.ok(currents["ring-di"]?.currentMa > 0, "data wire must use the real DI catalog endpoint")
+})
+
+test("L298N logic-supply current traces through the catalog 5v pin", () => {
+  const circuit = {
+    parts: [
+      { id: "uno", type: "arduino-uno", x: 40, y: 100, rotation: 0, props: {} },
+      { id: "driver", type: "l298n", x: 260, y: 100, rotation: 0, props: {} },
+    ],
+    wires: [
+      { id: "logic-vcc", from: { partId: "uno", pinId: "5v" }, to: { partId: "driver", pinId: "5v" }, color: "#ef4444" },
+      { id: "logic-gnd", from: { partId: "driver", pinId: "gnd" }, to: { partId: "uno", pinId: "gnd" }, color: "#1e293b" },
+    ],
+  }
+  const currents = computeWireCurrents(circuit, {}, {})
+  assert.ok(currents["logic-vcc"]?.currentMa > 0, "L298N logic rail should trace through its 5v pin")
+  assert.ok(currents["logic-gnd"]?.currentMa > 0, "L298N logic ground should complete the return path")
+})
+
 test("Pico relay current animation follows relayActive NO/NC state and motor RPM", () => {
   const circuit = {
     parts: [
