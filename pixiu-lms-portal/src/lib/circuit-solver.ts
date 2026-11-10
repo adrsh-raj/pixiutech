@@ -1146,6 +1146,17 @@ export function solveCircuitNodalPotentials(
       const vRed = infoRed.voltage
       const label = formatPinLabel(red)
 
+      if (infoRed.isConflicted) {
+        return {
+          diff: 0,
+          vRed: 0,
+          vBlack: 0,
+          explanation: `${label} belongs to a network with conflicting ideal voltage sources`,
+          subtext: "Resolve the short or separate the incompatible supply rails before measuring voltage.",
+          isWarning: true,
+        }
+      }
+
       if (infoRed.isFloating) {
         return {
           diff: 0,
@@ -1183,6 +1194,17 @@ export function solveCircuitNodalPotentials(
       const vBlack = infoBlack.voltage
       const label = formatPinLabel(black)
 
+      if (infoBlack.isConflicted) {
+        return {
+          diff: 0,
+          vRed: 0,
+          vBlack: 0,
+          explanation: `${label} belongs to a network with conflicting ideal voltage sources`,
+          subtext: "Resolve the short or separate the incompatible supply rails before measuring voltage.",
+          isWarning: true,
+        }
+      }
+
       if (infoBlack.isFloating) {
         return {
           diff: 0,
@@ -1208,6 +1230,17 @@ export function solveCircuitNodalPotentials(
     const infoBlack = getPinInfo(black)
     const vRed = infoRed.voltage
     const vBlack = infoBlack.voltage
+    if (infoRed.isConflicted || infoBlack.isConflicted) {
+      const invalidPin = infoRed.isConflicted ? red : black
+      return {
+        diff: 0,
+        vRed: 0,
+        vBlack: 0,
+        explanation: `${formatPinLabel(invalidPin)} belongs to an electrically invalid source-conflict network`,
+        subtext: "An ideal 5V/3.3V (or other incompatible) source conflict has no physically valid voltage solution.",
+        isWarning: true,
+      }
+    }
     if (infoRed.isFloating || infoBlack.isFloating) {
       const openPin = infoRed.isFloating ? red : black
       return {
