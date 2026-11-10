@@ -390,6 +390,50 @@ test("PWM LED brightness follows duty cycle while pulse amplitude stays at logic
   assert.ok(full.currentMa > 10 && full.currentMa < 20)
 })
 
+test("RGB channel polarity is checked from solved node potentials and surfaced by Circuit Doctor", () => {
+  const forwardCircuit = {
+    parts: [
+      part("esp", "esp32-devkit"),
+      part("rgb", "rgb-led"),
+      part("r_red", "resistor", { resistance: 220 }),
+    ],
+    wires: [
+      wire("red-drive", "esp", "d25", "r_red", "a"),
+      wire("red-series", "r_red", "b", "rgb", "red"),
+      wire("common-ground", "rgb", "gnd", "esp", "gnd_l"),
+    ],
+  }
+  const forwardRuntime = computeRuntime(forwardCircuit, new Set(), {
+    "25": { state: "HIGH", value: 128, outputMode: "pwm" },
+  })
+  assert.ok(forwardRuntime.rgb.redLevel > 0, "a correctly oriented PWM red channel should illuminate")
+  assert.equal(forwardRuntime.rgb.warning, undefined, "a forward-biased RGB channel must not show reverse warning")
+  assert.equal(
+    diagnoseCircuit(forwardCircuit, forwardRuntime).issues.some((issue) => issue.id === "rgb-led-rev-pol-rgb"),
+    false,
+  )
+
+  const reverseCircuit = {
+    parts: [
+      part("esp", "esp32-devkit"),
+      part("rgb", "rgb-led"),
+      part("r_red", "resistor", { resistance: 220 }),
+    ],
+    wires: [
+      wire("common-positive", "esp", "3v3", "rgb", "gnd"),
+      wire("red-to-ground", "rgb", "red", "r_red", "a"),
+      wire("red-ground", "r_red", "b", "esp", "gnd_l"),
+    ],
+  }
+  const reverseRuntime = computeRuntime(reverseCircuit, new Set())
+  assert.equal(reverseRuntime.rgb.redLevel, 0)
+  assert.match(reverseRuntime.rgb.warning, /Reverse Polarity: RGB red channel/)
+  const report = diagnoseCircuit(reverseCircuit, reverseRuntime)
+  const issue = report.issues.find((item) => item.id === "rgb-led-rev-pol-rgb")
+  assert.ok(issue, "Circuit Doctor should report the reverse-biased RGB channel")
+  assert.deepEqual(issue.involvedPinIds, ["red", "green", "blue", "gnd"])
+})
+
 test("per-instance LED forward-voltage overrides use the shared electrical model", () => {
   const makeCircuit = (forwardVoltage) => ({
     parts: [
