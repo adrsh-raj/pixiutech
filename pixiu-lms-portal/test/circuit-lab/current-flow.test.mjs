@@ -145,8 +145,8 @@ test("NeoPixel Ring data current traces through its catalog DI pin", () => {
     },
     {},
   )
-  assert.ok(currents["ring-vcc"]?.currentMa > 0, "illuminated ring should draw supply current")
-  assert.ok(currents["ring-di"]?.currentMa > 0, "a committed data frame should trace through the real DI catalog endpoint")
+  assert.ok(currents["ring-vcc"]?.currentMa > 0, "illuminated pixels should draw supply current from their colour-dependent model")
+  assert.equal(currents["ring-di"], undefined, "digital data pulses are not a continuous DC supply current")
 
   const idle = computeWireCurrents(circuit, {
     ring: { level: 0, pixelColors: ["#0f172a"], neopixelDataActive: false },
@@ -194,9 +194,10 @@ test("Pico relay current animation follows relayActive NO/NC state and motor RPM
     { relay: { relayActive: true }, pump: { rpm: 1000, motorDirection: "cw" } },
     pinStates,
   )
-  for (const wireId of ["coil-vcc", "coil-gnd", "coil-input", "contact-feed", "contact-pump", "pump-return"]) {
-    assert.ok(energized[wireId]?.currentMa > 0, `${wireId} must show current while the relay coil is energized and the pump runs`)
+  for (const wireId of ["coil-vcc", "coil-gnd", "contact-feed", "contact-pump", "pump-return"]) {
+    assert.ok(energized[wireId]?.currentMa > 0, `${wireId} must show solved current while the relay coil is energized and the pump runs`)
   }
+  assert.equal(energized["coil-input"], undefined, "a high-impedance relay control input does not draw a fabricated 6mA DC current")
   assert.ok(energized["contact-feed"].currentMa > 0, "solver must include the energized COM–NO contact in the pump's current loop")
 
   const deenergized = computeWireCurrents(
