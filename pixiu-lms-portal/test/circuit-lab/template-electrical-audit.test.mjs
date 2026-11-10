@@ -433,6 +433,60 @@ function auditCircuit(label, circuit, xml, { strictLedProtection = true } = {}) 
   return { errors, warnings }
 }
 
+test("LED topology audit rejects a parallel wire that bypasses a nominal series resistor", () => {
+  const bypassed = {
+    parts: [
+      { id: "uno", type: "arduino-uno", x: 0, y: 0, rotation: 0, props: {} },
+      { id: "led", type: "led", x: 100, y: 0, rotation: 0, props: { color: "red" } },
+      { id: "r", type: "resistor", x: 200, y: 0, rotation: 0, props: { resistance: 220 } },
+    ],
+    wires: [
+      { id: "drive", from: { partId: "uno", pinId: "d13" }, to: { partId: "led", pinId: "anode" } },
+      { id: "return", from: { partId: "led", pinId: "cathode" }, to: { partId: "uno", pinId: "gnd" } },
+      { id: "parallel-a", from: { partId: "uno", pinId: "d13" }, to: { partId: "r", pinId: "a" } },
+      { id: "parallel-b", from: { partId: "r", pinId: "b" }, to: { partId: "uno", pinId: "5v" } },
+    ],
+  }
+  const result = auditCircuit("parallel LED bypass", bypassed, null, { strictLedProtection: true })
+  assert.ok(result.errors.some((error) => /effective series-resistor protection/.test(error)))
+})
+
+test("LED topology audit accepts a real series resistor on either leg of the forward loop", () => {
+  const protectedReturn = {
+    parts: [
+      { id: "uno", type: "arduino-uno", x: 0, y: 0, rotation: 0, props: {} },
+      { id: "led", type: "led", x: 100, y: 0, rotation: 0, props: { color: "red" } },
+      { id: "r", type: "resistor", x: 200, y: 0, rotation: 0, props: { resistance: 220 } },
+    ],
+    wires: [
+      { id: "drive", from: { partId: "uno", pinId: "d13" }, to: { partId: "led", pinId: "anode" } },
+      { id: "led-resistor", from: { partId: "led", pinId: "cathode" }, to: { partId: "r", pinId: "a" } },
+      { id: "ground", from: { partId: "r", pinId: "b" }, to: { partId: "uno", pinId: "gnd" } },
+    ],
+  }
+  const result = auditCircuit("protected LED return", protectedReturn, null, { strictLedProtection: true })
+  assert.deepEqual(result.errors, [])
+})
+
+test("pushbutton topology audit rejects a pull-down resistor bypassed by a direct ground wire", () => {
+  const circuit = {
+    parts: [
+      { id: "uno", type: "arduino-uno", x: 0, y: 0, rotation: 0, props: {} },
+      { id: "button", type: "pushbutton", x: 100, y: 0, rotation: 0, props: {} },
+      { id: "pull", type: "resistor", x: 200, y: 0, rotation: 0, props: { resistance: 10000 } },
+    ],
+    wires: [
+      { id: "supply", from: { partId: "uno", pinId: "5v" }, to: { partId: "button", pinId: "p1a" } },
+      { id: "signal", from: { partId: "button", pinId: "p2a" }, to: { partId: "uno", pinId: "d2" } },
+      { id: "pull-signal", from: { partId: "uno", pinId: "d2" }, to: { partId: "pull", pinId: "a" } },
+      { id: "pull-ground", from: { partId: "pull", pinId: "b" }, to: { partId: "uno", pinId: "gnd" } },
+      { id: "short", from: { partId: "uno", pinId: "d2" }, to: { partId: "uno", pinId: "gnd" } },
+    ],
+  }
+  const result = auditCircuit("shorted pull-down", circuit, null)
+  assert.ok(result.errors.some((error) => /pushbutton button leaves Uno d2 floating/.test(error)))
+})
+
 const templateIds = TEMPLATES.map((template) => template.id)
 const lessonCircuits = LESSONS.filter((lesson) => lesson.seedCircuit)
 const templateResults = TEMPLATES.map((template) =>
