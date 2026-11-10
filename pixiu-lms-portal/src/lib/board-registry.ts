@@ -33,10 +33,23 @@ export interface BoardCapabilities {
 }
 
 export interface BoardPowerPins {
+  /** Regulated/system power outputs available to connected loads in the default powered-board model. */
   v5?: string[]
   v33?: string[]
+  /** Ground return terminals. */
   gnd: string[]
+  /** Raw external power inputs; these are not voltage sources unless also listed in v5/v33. */
   vin?: string[]
+}
+
+export interface BoardPowerInputSpec {
+  pinId: string
+  minVoltage: number
+  maxVoltage: number
+  nominalVoltage: number
+  /** dual-role pins are also exposed as a default powered-board output (e.g. USB-powered VBUS/3V). */
+  role: "input-only" | "dual-role"
+  description: string
 }
 
 export interface BoardDefinition {
@@ -62,6 +75,8 @@ export interface BoardDefinition {
   capabilities: BoardCapabilities
   pins: BoardPin[]
   powerPins: BoardPowerPins
+  /** Valid external voltage envelope for board power-input pins. */
+  powerInputs?: BoardPowerInputSpec[]
   builtInLedPin?: string
   i2cPins?: { sda: string; scl: string }
   serialPins?: { rx: string; tx: string }
@@ -179,6 +194,14 @@ export const ARDUINO_UNO_BOARD: BoardDefinition = {
     gnd: ["gnd", "gnd_pwr"],
     vin: ["vin"],
   },
+  powerInputs: [{
+    pinId: "vin",
+    minVoltage: 7,
+    maxVoltage: 12,
+    nominalVoltage: 9,
+    role: "input-only",
+    description: "Arduino Uno R3 raw regulator input. It is not a regulated 5V output; the recommended external input range is 7–12V.",
+  }],
   builtInLedPin: "d13",
   i2cPins: { sda: "a4", scl: "a5" },
   serialPins: { rx: "d0", tx: "d1" },
@@ -285,10 +308,19 @@ export const ESP32_DEVKIT_BOARD: BoardDefinition = {
   },
   pins: esp32Pins,
   powerPins: {
+    v5: ["vin"],
     v33: ["3v3"],
     gnd: ["gnd_l", "gnd_r"],
     vin: ["vin"],
   },
+  powerInputs: [{
+    pinId: "vin",
+    minVoltage: 4.75,
+    maxVoltage: 5.25,
+    nominalVoltage: 5,
+    role: "dual-role",
+    description: "ESP32 DevKit V1 5V header is a 5V supply input when externally powered and a 5V rail when USB-powered; the simulator assumes the default USB-powered state.",
+  }],
   builtInLedPin: "d2",
   i2cPins: { sda: "d21", scl: "d22" },
   serialPins: { rx: "rx0", tx: "tx0" },
@@ -407,8 +439,26 @@ export const RPI_PICO_BOARD: BoardDefinition = {
     v5: ["vbus"],
     v33: ["3v3"],
     gnd: ["gnd_1", "gnd_2", "gnd_3", "gnd_4", "gnd_5", "gnd_6", "gnd_7", "gnd_8"],
-    vin: ["vbus", "vsys"],
+    vin: ["vsys"],
   },
+  powerInputs: [
+    {
+      pinId: "vbus",
+      minVoltage: 4.75,
+      maxVoltage: 5.25,
+      nominalVoltage: 5,
+      role: "dual-role",
+      description: "USB VBUS input; the default simulator assumes USB is connected and exposes it as the 5V VBUS rail.",
+    },
+    {
+      pinId: "vsys",
+      minVoltage: 1.8,
+      maxVoltage: 5.5,
+      nominalVoltage: 3.7,
+      role: "input-only",
+      description: "Pico VSYS is the system power input (1.8–5.5V), not a fixed 5V output.",
+    },
+  ],
   builtInLedPin: "gp25",
   i2cPins: { sda: "gp4", scl: "gp5" },
   serialPins: { rx: "gp1", tx: "gp0" },
@@ -468,6 +518,14 @@ export const MICROBIT_V2_BOARD: BoardDefinition = {
     v33: ["3v"],
     gnd: ["gnd"],
   },
+  powerInputs: [{
+    pinId: "3v",
+    minVoltage: 2.7,
+    maxVoltage: 3.3,
+    nominalVoltage: 3,
+    role: "dual-role",
+    description: "micro:bit 3V pin can power the board as an input or supply peripherals when the board is USB/battery-powered; the simulator assumes the latter default powered state.",
+  }],
   visualColors: {
     pcbColor: "#1e1e24",
     accentColor: "#fbbf24",
@@ -583,7 +641,7 @@ export function getPinVoltage(
   if (pin?.kind === "power") {
     if (board.powerPins.v5?.includes(pin.id)) return 5.0
     if (board.powerPins.v33?.includes(pin.id)) return 3.3
-    if (board.powerPins.vin?.includes(pin.id)) return 5.0
+    // Raw VIN/VSYS input terminals do not have a defined output voltage.
   }
   if (pin?.kind === "ground") return 0.0
 
