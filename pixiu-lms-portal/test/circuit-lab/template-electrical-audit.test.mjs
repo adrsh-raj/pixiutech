@@ -137,7 +137,8 @@ function electricalNodes(circuit, graph) {
   for (const part of circuit.parts) {
     if (isBoardPart(part.type)) {
       const board = getBoardForPart(part)
-      for (const pin of [...(board.powerPins.v5 ?? []), ...(board.powerPins.v33 ?? []), ...(board.powerPins.vin ?? [])]) {
+      // Raw VIN/VSYS inputs do not become ideal source terminals.
+      for (const pin of [...(board.powerPins.v5 ?? []), ...(board.powerPins.v33 ?? [])]) {
         sources.push(graph.normalizeNode(part.id, pin))
       }
       for (const pin of board.powerPins.gnd ?? []) grounds.push(graph.normalizeNode(part.id, pin))
@@ -225,7 +226,7 @@ function dividerSupplyAndGroundNodes(circuit, graph) {
   const supplies = [], grounds = [], analogInputs = []
   for (const boardPart of circuit.parts.filter((part) => isBoardPart(part.type))) {
     const board = getBoardForPart(boardPart)
-    for (const pin of [...(board.powerPins.v5 ?? []), ...(board.powerPins.v33 ?? []), ...(board.powerPins.vin ?? [])]) supplies.push(graph.normalizeNode(boardPart.id, pin))
+    for (const pin of [...(board.powerPins.v5 ?? []), ...(board.powerPins.v33 ?? [])]) supplies.push(graph.normalizeNode(boardPart.id, pin))
     for (const pin of board.powerPins.gnd ?? []) grounds.push(graph.normalizeNode(boardPart.id, pin))
     for (const pin of board.pins.filter((item) => item.kind === "analog" || item.capabilities?.adc === true)) analogInputs.push(graph.normalizeNode(boardPart.id, pin.id))
   }
