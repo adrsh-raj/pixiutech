@@ -265,7 +265,7 @@ function hasWiredPotentiometerDivider(circuit, graph, potentiometer) {
   return correctRails && wiperToAdc
 }
 
-function auditCircuit(label, circuit, xml, { strictLedProtection = true } = {})
+function auditCircuit(label, circuit, xml, { strictLedProtection = true } = {}) {
   const errors = []
   const warnings = []
   if (!circuit || !Array.isArray(circuit.parts) || !Array.isArray(circuit.wires)) {
