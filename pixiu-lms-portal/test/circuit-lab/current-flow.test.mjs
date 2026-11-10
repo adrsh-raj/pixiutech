@@ -126,8 +126,8 @@ test("Pico relay current animation follows relayActive NO/NC state and motor RPM
     { relay: { relayActive: true }, pump: { rpm: 1000, motorDirection: "cw" } },
     pinStates,
   )
-  for (const wireId of ["contact-feed", "contact-pump", "pump-return"]) {
-    assert.ok(energized[wireId]?.currentMa > 0, `${wireId} must show current when relay NO is closed and pump runs`)
+  for (const wireId of ["coil-vcc", "coil-gnd", "coil-input", "contact-feed", "contact-pump", "pump-return"]) {
+    assert.ok(energized[wireId]?.currentMa > 0, `${wireId} must show current while the relay coil is energized and the pump runs`)
   }
 
   const deenergized = computeWireCurrents(
@@ -135,7 +135,7 @@ test("Pico relay current animation follows relayActive NO/NC state and motor RPM
     { relay: { relayActive: false }, pump: { rpm: 0, motorDirection: "stopped" } },
     { "13": { state: "LOW", outputMode: "digital" } },
   )
-  for (const wireId of ["contact-feed", "contact-pump", "pump-return"]) {
-    assert.equal(deenergized[wireId], undefined, `${wireId} must be idle when relay NO is open`)
+  for (const wireId of ["coil-vcc", "coil-gnd", "coil-input", "contact-feed", "contact-pump", "pump-return"]) {
+    assert.equal(deenergized[wireId], undefined, `${wireId} must have zero current when relay is de-energized and NO is open`)
   }
 })
