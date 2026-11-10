@@ -1,79 +1,122 @@
 # Virtual Lab Electrical Engine Audit — Resume Checkpoint
 
-**Checkpoint updated:** 2026-11-09 (Asia/Kolkata)  
-**Status:** AUDIT IN PROGRESS — no repair commit has been made yet  
+**Checkpoint updated:** 2026-11-10 (Asia/Kolkata)  
+**Status:** Electrical engine and catalogue topology audit implemented; latest Browser Gate green. PR remains draft.  
+**Repository:** `adrsh-raj/pixiutech`  
 **Working branch:** `fix/virtual-lab-electrical-engine-audit-2026-11-09`  
-**Base commit:** `b5ec151c2392f560b5d5c4c85347f0ffa9795425` (PR #81 merge into `main`)  
-**Rule:** Do not edit `main` directly. All changes and checkpoints belong on the working branch.
+**Latest verified branch head:** `ef47fb2225a3f51033d2caab7862c1fc206eab8d`  
+**Base commit:** `b5ec151c2392f560b5d5c4c85347f0ffa9795425`  
+**Pull request:** [#82 — Virtual Lab electrical engine audit](https://github.com/adrsh-raj/pixiutech/pull/82)  
+**PR state:** open, draft, mergeable, not merged.  
+**Safety boundary:** `main` was not modified. No manual production deployment was performed.
 
 ## User request / scope
 
-Perform a production-readiness audit and repair of the entire Virtual Lab electrical model, not only the one potentiometer project:
-- Audit every project template, component, pin endpoint, wire connection, and associated Blockly program.
-- Audit the TypeScript simulation runtime, nodal solver, polarity detector, Circuit Doctor, component models, and board definitions.
-- Fix PWM/LED behavior, reverse-polarity false positives, actual reverse polarity detection, and any other verified electrical/runtime defects.
-- Make behavior data-driven from board/component definitions and circuit topology. Avoid template-specific hacks or hardcoded one-off template IDs.
-- Add regression coverage and keep this checkpoint current after each meaningful milestone.
+Audit and repair the whole Virtual Lab electrical model—not a single template:
+- Effective project templates and curriculum seed circuits, including topology, required/optional pins, component references, board pin validity, polarity and resistor protection.
+- Shared electrical metadata and consistent behavior across simulation runtime, nodal solver, waveform sampler, current-flow animation and Circuit Doctor.
+- Correct PWM, DAC, tone, servo, LED/RGB, supply/ground and relay/motor behavior.
+- Regression tests for discovered defects and a persistent checkpoint for resumption.
 
-## Repository inventory captured
+All source changes remain on the feature branch. Do not merge or deploy without explicit user instruction.
 
-- `pixiu-lms-portal/src/lib/templates.ts`: 1454 lines, 142,028 characters.
-  - `BASE_TEMPLATES` plus `EXTRA_TEMPLATES`; the regex scan found 23 `starter(...)` definitions in `EXTRA_TEMPLATES`. Base-template count and effective `TEMPLATES` count still need a parsed audit.
-- Four board definitions live in `board-registry.ts`: Arduino Uno, ESP32 DevKit, Raspberry Pi Pico, micro:bit v2.
-- Components are defined in `components-catalog.ts` and `circuit-types.ts`.
-- Lesson inventory from merged PR #81: 55 curriculum lessons (25 Uno, 10 ESP32, 10 Pico, 10 micro:bit); lesson seeds are separate from the project-template catalogue and must also be checked where they contain circuits.
-- Existing QA: `test/circuit-lab/*.test.mjs`, including `runtime-core.test.mjs`, `multimeter.test.mjs`, `current-flow.test.mjs`, and `lesson-seed-integrity.test.mjs`.
+## Catalogue-wide audit result
 
-## Confirmed defects (source-level)
+The effective inventory was parsed from the exported template catalogue and curriculum:
+- **35** effective project templates.
+- **55** curriculum lessons, with **40** lessons containing seeded circuits.
+- **75** circuits audited in total.
+- **353** component instances and **586** wire endpoints/edges in that inventory.
+- **0 topology/electrical errors and 0 warnings** on the latest catalogue audit.
 
-### A. False LED reverse-polarity detection
+Optional pins and component-specific alternatives are represented declaratively rather than being treated as mandatory wires. `requiredPinGroups` metadata now covers 27 catalogued component types. Relay contact requirements model COM plus either NO or NC; RGB and seven-segment segments are checked channel-by-channel.
 
-In `simulation.ts`, reverse polarity is currently inferred from two global shortest-path checks:
-- any active source reaching LED cathode
-- any ground sink reaching LED anode
+The audit also rejects nominal resistor presence when a wire-only path bypasses the resistor. Pushbutton inputs with a power-side contact require a real physical pull-down in the current model; an `INPUT_PULLUP` declaration alone is not accepted because the runtime does not model that internal pull-up as an electrical resistor.
 
-The search crosses passive resistive components and unrelated signal paths. A potentiometer's normal 5V-to-GND divider creates a path that can make a correctly grounded LED cathode appear source-connected. A LOW output connected to an LED anode can also be treated as ground, although both LED terminals may simply be at 0V. This is not a valid voltage-polarity test.
+## Implemented source repairs
 
-`circuit-doctor.ts` maps that runtime string directly to the visible “LED Reverse Polarity” warning. The Doctor therefore reports a false warning for a correctly wired potentiometer template.
+### Shared LED and electrical metadata
+- Added `electrical-model.ts` to resolve LED forward voltage, nominal current and maximum current from component catalogue metadata, with per-instance electrical overrides.
+- Simulation and nodal solver use the same LED electrical definition.
+- RGB red, green and blue channels resolve their own forward-voltage values and current; the nodal solver models three separate diode branches.
+- Corrected the insufficient-supply case: a 3V source cannot illuminate a white LED whose configured forward voltage is 3.3V, and the runtime reports zero current.
+- Reverse-polarity detection uses signed solved node potentials across the LED terminals. It no longer treats an unrelated potentiometer divider or any remote power/ground path as proof of reverse polarity. A genuine reversed LED remains covered by regression tests.
 
-### B. PWM LED behavior is currently modelled as average voltage
+### Signal semantics: PWM, DAC, tone and servo
+- Pin state now carries explicit `outputMode`: digital, PWM, tone, servo or DAC.
+- `pin-state.ts` replaces stale per-pin state across aliases when Blockly changes output mode, rather than leaving old duty/frequency/angle fields behind.
+- Board pin lookup preserves `outputMode` and related fields across aliases; this fixed a real metadata-loss defect.
+- PWM LED conduction uses full logic-level pulse amplitude; duty cycle scales average current and brightness. Nodal/DMM readings retain the average-voltage view, and waveform sampling retains instantaneous HIGH/LOW pulses.
+- Tone uses its specified frequency; servo uses its timed pulse width. Neither is interpreted as steady DC HIGH.
+- DAC is now treated as continuous analog output: the selected DAC-capable pin's voltage is scaled by its value, with duty 1 for load-current analysis. The peak LED analysis preserves DAC mode instead of coercing it to a digital HIGH. By contrast, `analogWrite` on the same DAC-capable pin remains PWM.
+- Added regression coverage proving a 128/255 DAC output (~1.66V on ESP32) stays below the red LED's 1.9V forward voltage, while 3.3V PWM pulses at the same numeric setting illuminate the LED at non-zero duty.
 
-The simulation turns a PWM duty value into an average DC voltage (`logicVoltage * duty`) before applying the LED forward-voltage threshold. A blue LED with Vf≈3.2V can therefore be reported dark at duties below roughly 64%, even though a real PWM GPIO still emits full-amplitude logic pulses and controls average LED brightness by duty cycle.
+### Electrical topology and curriculum/template repairs
+- Added catalog electrical/connection metadata and component required-pin groups for 27 part types.
+- Added 10kΩ pull-down networks to seven project templates with floating D2 pushbutton inputs: traffic-light, blink-led, servo-sweep, G6 pushbutton control, G6 RGB mood lamp, G6 smart doorbell and G7 servo gate.
+- Corrected earlier verified lesson/template defects: micro:bit 3V rail pin, NeoPixel `DI` endpoint, missing buzzer in AI Smart Doorbell, and RGB current-limiting resistor topologies in ESP32/Pico lesson seeds.
+- Pico Smart Farm lesson now includes a DC motor representing the pump. VBUS feeds relay COM, relay NO feeds pump positive, and pump negative returns to common GND. Lesson description, parts step, wiring step and regression tests all describe/require this contact path.
+- Circuit Doctor continues to surface runtime LED burnout and signed reverse-polarity findings; its message mapping consumes the corrected runtime warning rather than independently guessing polarity from unrelated paths.
 
-The multimeter solver also exposes a PWM average-voltage approximation; this must remain clearly distinguished from instantaneous pulse amplitude / duty-cycle brightness and should not be used to decide if a PWM LED conducts.
+### Current-flow and power-domain behavior
+- Signal GPIO sources/sinks are kept separate from actual board/battery supply and ground domains.
+- Relay NO/NC contact animation follows `relayActive`, not the obsolete `level` field.
+- DC motor current-flow detection follows runtime RPM/direction, not an LED-style level/speed assumption.
+- L298N motor output pairs have internal current-flow links when the corresponding motor channel is active.
+- Regression tests cover Pico relay coil energization, COM–NO motor power and the corresponding wire-current animation; the de-energized NO path has no pump current.
 
-### C. Existing nodal solver is a reusable foundation, not yet proven sufficient
+## Regression and CI verification
 
-`circuit-solver.ts` already exports `solveCircuitNodalPotentials`, builds nets, models resistors and potentiometers, and uses modified nodal analysis. It currently sets PWM nets to an average output voltage and performs a reachability pre-check for diode branches. We need to reconcile its assumptions with the simulation runtime rather than blindly duplicate a second inconsistent solver.
+### Latest verified source head: `ef47fb2225a3f51033d2caab7862c1fc206eab8d`
 
-## Initial exact source locations
+**PIXIU CyberLab Browser Gate — SUCCESS**  
+- Run: `42746619389`
+- Job: `129600141918`
+- `test:lab`: **158 tests, 158 passed, 0 failed**.
+- Browser gate completed; output includes `PIXIU CyberLab browser gate PASSED` and `Runtime AI origin policy · PASS`.
+- Catalogue audit in the same test run: 75 circuits, 353 parts, 586 wires, 0 errors, 0 warnings.
 
-- `pixiu-lms-portal/src/lib/simulation.ts`: LED runtime branch around lines 414–480; global activeSources/groundSinks and reverse path around lines 80–105 and 466–480.
-- `pixiu-lms-portal/src/lib/circuit-doctor.ts`: LED warning mapping around lines 54–80.
-- `pixiu-lms-portal/src/lib/circuit-solver.ts`: `solveCircuitNodalPotentials` starts around line 114; PWM fixed-net approximation around lines 385–410; nodal/diode model around lines 515–700.
-- `pixiu-lms-portal/src/lib/templates.ts`: potentiometer dual-channel template `g6-pot-brightness` around lines 1002–1017. Its intended wiring uses 220Ω series resistors for both LED anodes, cathodes to Uno GND, pot terminals to 5V/GND, wiper to A0, and buzzer to D8/GND. The template is correctly wired in source.
+Other latest-head successful workflows:
+- Phase 0–3 Gate: run `42746619348` — SUCCESS.
+- Phase 4–6 Gate: run `42746619329` — SUCCESS.
+- Phase 4–9 Reliability Gate: run `42746619709` — SUCCESS.
+- Part 4 Current Verification: run `42746619340` — SUCCESS.
+- Production Security Smoke: run `42746619304` — SUCCESS.
+- Deployment Smoke Test workflows: runs `42746668901` and `42746647806` — SUCCESS.
+
+### Known unrelated CI blocker
+
+The following latest-head workflows fail after the public-site bundle itself builds:
+- Phase 9 Final Green Gate: run `42746619344`.
+- Production Verification: run `42746619262`.
+
+Both report the same unrelated public website audit finding:
+
+`src/pages/EightSquareAI.jsx -> interactive cursor/scroll reveal pattern detected`
+
+The Production Verification job ran **180 Django backend tests; all passed** before the public website audit step failed. `EightSquareAI.jsx` is outside this Virtual Lab electrical repair, and has not been modified. Do not hide or bypass this finding by weakening the unrelated site audit.
+
+## Current branch/PR safety status
+
+- Latest branch head and PR head: `ef47fb2225a3f51033d2caab7862c1fc206eab8d`.
+- PR #82 remains open, draft and mergeable; it is not merged.
+- `main` remains untouched.
+- No manual production deployment was performed.
+- Deployment Smoke Test refers to the repository's CI workflow, not a manual production deployment.
+
+## Next actions on resumption
+
+1. Continue the remaining runtime/Doctor review for component-specific power and signal paths, sensor I/O, displays, servo, relay, motor driver, battery and breadboard edge cases.
+2. Keep new fixes topology-driven and catalogue/board-metadata-driven; do not add template-ID exceptions.
+3. Run the full test/build/reliability/browser gates after each meaningful source change. Record exact run IDs and outcomes here.
+4. Keep the unrelated `EightSquareAI.jsx` public-site audit finding separate unless the user explicitly expands scope.
+5. Do not merge PR #82, deploy, or modify `main` without explicit user instruction.
 
 ## Resume protocol
 
-When a connection times out or a new chat starts:
-1. Read this file from `docs/engineering/virtual-lab-electrical-engine-audit-checkpoint.md`.
-2. Check branch head and last commits:
+After a connection timeout or in a new chat:
+1. Read this checkpoint.
+2. Fetch the current branch head:
    `https://api.github.com/repos/adrsh-raj/pixiutech/branches/fix/virtual-lab-electrical-engine-audit-2026-11-09`
-3. Continue from the **Latest progress / next actions** section below. Do not repeat completed audit stages or create a new branch.
-4. Do not merge or deploy without explicit user instruction. Keep `main` untouched.
-
-## Latest progress / next actions
-
-- [x] Pin exact base commit and create dedicated feature branch.
-- [x] Inventory relevant source/test paths.
-- [x] Confirm false polarity detector mechanism and PWM-average-voltage LED defect.
-- [ ] Parse all effective `TEMPLATES` and extract all `CircuitState` definitions, including reusable template constants.
-- [ ] Build a machine-readable topology audit for every project template and every curriculum seed circuit: unknown part/pin endpoints, dangling required pins, invalid duplicates, board pin validity, resistor polarity/series loops, power/ground, sensor/control wiring, Blockly-vs-circuit pin conflicts.
-- [ ] Design one dynamic electrical contract shared by simulation, polarity detection, Doctor, and the nodal solver. Prefer component/board metadata; avoid project-id or template-id special cases.
-- [ ] Repair PWM signal semantics and LED brightness/current calculation.
-- [ ] Repair reverse polarity using actual solved node potentials / valid path conditions, preserving real reversed-diode detection.
-- [ ] Audit remaining runtime models (potentiometer, pushbutton, sensors, displays, buzzer, RGB, motor driver, relay, servo, battery, breadboard, board rails).
-- [ ] Add regression tests for every discovered bug and a catalogue-wide template audit.
-- [ ] Run all Circuit Lab tests, build, lint, and the relevant GitHub Actions gates; update this checkpoint with exact commit/run IDs and remaining limitations.
-
-**No repair has been made yet. This document is an audit checkpoint only.**
+3. Inspect the latest commits and CI runs for PR #82.
+4. Continue from **Next actions on resumption**. Do not recreate the branch or repeat completed audit stages.
