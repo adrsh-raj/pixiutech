@@ -403,7 +403,18 @@ export function solveCircuitNodalPotentials(
             pState?.state === "HIGH" &&
             pState.value !== undefined &&
             pState.value > 1
-          if (pState?.outputMode === "pwm" || legacyPwmState) {
+          if (
+            pState?.outputMode === "dac" &&
+            pin.capabilities?.dac === true &&
+            typeof pState.value === "number"
+          ) {
+            // True DAC output is continuous analog voltage, distinct from PWM.
+            const vOut = Number((board.logicVoltage * Math.max(0, Math.min(1, pState.value / 255))).toFixed(3))
+            fixedNets.set(netD, {
+              voltage: vOut,
+              label: `${board.shortName} DAC Output ${pin.label} (${pState.value}/255 = ${vOut}V DC)`,
+            })
+          } else if (pState?.outputMode === "pwm" || legacyPwmState) {
             // A multimeter reports the DC average of a PWM signal; the
             // waveform sampler reports instantaneous HIGH/LOW pulses.
             const duty = Math.max(0, Math.min(1, (pState.value ?? 0) / 255))
@@ -427,12 +438,6 @@ export function solveCircuitNodalPotentials(
             })
           } else if (pState?.state === "HIGH") {
             fixedNets.set(netD, { voltage: board.logicVoltage, label: `${board.shortName} Pin ${pin.label} (HIGH = ${board.logicVoltage}V)` })
-          } else if (pState?.value !== undefined && pState.value > 0 && pin.capabilities?.dac) {
-            const vOut = Number((board.logicVoltage * (pState.value / 255)).toFixed(3))
-            fixedNets.set(netD, {
-              voltage: vOut,
-              label: `${board.shortName} DAC Output ${pin.label} (${pState.value}/255 = ${vOut}V DC)`,
-            })
           } else if (pState?.state === "LOW") {
             fixedNets.set(netD, {
               voltage: 0.0,
