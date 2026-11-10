@@ -4,7 +4,8 @@
 **Status:** Electrical engine, catalogue topology audit and RGB polarity diagnostics implemented; latest Browser Gate green. PR remains draft.  
 **Repository:** `adrsh-raj/pixiutech`  
 **Working branch:** `fix/virtual-lab-electrical-engine-audit-2026-11-09`  
-**Latest verified branch head:** `9612c23a9e0ec5f77581857d6c976735fba68bc2`  
+**Latest verified application-source commit:** `9612c23a9e0ec5f77581857d6c976735fba68bc2`  
+**Resume branch head:** fetch the branch endpoint below; the branch may have a newer checkpoint-only documentation commit.  
 **Base commit:** `b5ec151c2392f560b5d5c4c85347f0ffa9795425`  
 **Pull request:** [#82 — Virtual Lab electrical engine audit](https://github.com/adrsh-raj/pixiutech/pull/82)  
 **PR state:** open, draft, mergeable, not merged.  
