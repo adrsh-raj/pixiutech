@@ -194,8 +194,6 @@ export function computeWireCurrents(
 
     const componentSet = new Set(component)
     const componentInjection = component.reduce((sum, node) => sum + (injections.get(node) ?? 0), 0)
-    // An open-ended conductor component cannot carry steady-state DC current.
-    if (Math.abs(componentInjection) > 1e-8) continue
 
     const fixed = new Map<string, number>()
     for (const node of component) {
@@ -208,10 +206,11 @@ export function computeWireCurrents(
       if (!info || info.isFloating || info.isConflicted) continue
       if (info.isDriven || info.isGnd || info.isDigitalLow) fixed.set(node, info.voltage)
     }
-    // With fixed-voltage anchors, their ideal supplies absorb/source the
-    // net current. For a floating inter-component wire segment, choose one
-    // arbitrary 0V reference only when its injected currents balance; current
-    // differences remain reference-invariant.
+
+    // An ideal fixed-voltage source/return is a boundary condition: it can
+    // absorb or provide whatever current is required by KCL. Only a floating
+    // conductor island (no source or ground anchor) must have zero net injected
+    // current in steady state.
     if (fixed.size === 0) {
       if (Math.abs(componentInjection) > 1e-8) continue
       fixed.set(component[0], 0)
