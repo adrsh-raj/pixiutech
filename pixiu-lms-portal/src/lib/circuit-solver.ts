@@ -867,6 +867,12 @@ export function solveCircuitNodalPotentials(
 
   for (const [netId, voltage] of netVoltagesSolved.entries()) netVoltages.set(netId, voltage)
   const activeBranches = branches.filter((branch, index) => !branch.isDiode || activeDiodeIndices.has(index))
+  const branchAdjacency = new Map<number, number[]>()
+  for (const branch of activeBranches) {
+    if (branch.netA === branch.netB) continue
+    branchAdjacency.set(branch.netA, [...(branchAdjacency.get(branch.netA) ?? []), branch.netB])
+    branchAdjacency.set(branch.netB, [...(branchAdjacency.get(branch.netB) ?? []), branch.netA])
+  }
 
   // Propagate an ideal-source conflict through the entire connected
   // conducting network. A neighbouring resistor branch is not physically
