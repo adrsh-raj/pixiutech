@@ -330,8 +330,10 @@ export function computeWireCurrents(
         traceComponentFlow(`${part.id}:out`, `${part.id}:gnd`, 6.0, true)
       }
     } else if (part.type === "potentiometer") {
-      traceComponentFlow(`${part.id}:vcc`, `${part.id}:gnd`, 8.0)
-      traceComponentFlow(`${part.id}:wiper`, `${part.id}:gnd`, 4.0, true)
+      // The actual potentiometer terminals are t1/wiper/t2; the track current
+      // flows from one end of the divider to the other. The wiper is a tap,
+      // normally feeding a high-impedance analog input rather than a GND pin.
+      traceComponentFlow(`${part.id}:t1`, `${part.id}:t2`, 8.0)
     } else if (part.type === "ldr") {
       traceComponentFlow(`${part.id}:t1`, `${part.id}:t2`, 8.0)
     } else if (part.type === "relay") {
@@ -343,12 +345,14 @@ export function computeWireCurrents(
       }
     } else if (part.type === "neopixel-ring" || part.type === "neopixel-strip") {
       traceComponentFlow(`${part.id}:vcc`, `${part.id}:gnd`, 20.0)
-      traceComponentFlow(`${part.id}:din`, `${part.id}:gnd`, 6.0, true)
+      const dataPin = part.type === "neopixel-ring" ? "di" : "din"
+      traceComponentFlow(`${part.id}:${dataPin}`, `${part.id}:gnd`, 6.0, true)
     } else if (part.type === "l298n") {
       const loadInPin = `${part.id}:vs`
       const loadOutPin = `${part.id}:gnd`
       traceComponentFlow(loadInPin, loadOutPin, 25.0)
-      traceComponentFlow(`${part.id}:vcc`, `${part.id}:gnd`, 15.0)
+      // The catalogue exposes the driver's logic supply as 5v (not vcc).
+      traceComponentFlow(`${part.id}:5v`, `${part.id}:gnd`, 15.0)
     }
   }
 
