@@ -148,8 +148,11 @@ export function computeWireCurrents(
       for (const [legacy, canonical] of getLegacyBreadboardPinMappings()) {
         linkInternal(k(legacy), k(canonical))
       }
-    } else if (part.type === "resistor") {
-      linkInternal(k("a"), k("b"))
+    } else if (part.type === "resistor" || part.type === "ldr") {
+      linkInternal(k(part.type === "ldr" ? "t1" : "a"), k(part.type === "ldr" ? "t2" : "b"))
+    } else if (part.type === "potentiometer") {
+      linkInternal(k("t1"), k("wiper"))
+      linkInternal(k("wiper"), k("t2"))
     } else if (part.type === "pushbutton") {
       linkInternal(k("p1a"), k("p1b"))
       linkInternal(k("p2a"), k("p2b"))
@@ -174,10 +177,22 @@ export function computeWireCurrents(
 
   // 4. Trace current through each active consumer or conducting resistor
   function markWireFlow(wireId: string, current: number, isForward: boolean, period: number) {
+    if (!Number.isFinite(current) || current <= 0) return
+    const existing = result[wireId]
+    // A shared feed/return wire carries the algebraic sum of every branch
+    // attached to it; last-branch-wins hid the total current in parallel loads.
+    const signedCurrent =
+      (existing ? (existing.isForward ? existing.currentMa : -existing.currentMa) : 0) +
+      (isForward ? current : -current)
+    const magnitude = Math.abs(signedCurrent)
+    if (magnitude < 0.001) {
+      delete result[wireId]
+      return
+    }
     result[wireId] = {
-      currentMa: current,
-      isForward,
-      period,
+      currentMa: Number(magnitude.toFixed(3)),
+      isForward: signedCurrent >= 0,
+      period: Math.max(0.25, Math.min(2.5, Number((20 / Math.max(0.5, magnitude)).toFixed(2)))),
     }
   }
 
@@ -291,10 +306,14 @@ export function computeWireCurrents(
         traceComponentFlow(`${part.id}:anode`, `${part.id}:cathode`, current, true)
       }
     } else if (part.type === "buzzer") {
-      // Buzzer MUST be actively sounding (level > 0) to conduct!
-      // When buzzer is silent (level === 0), current is STRICTLY ZERO!
+      // Derive the energized branch current from the same solved circuit model.
       if (r?.level && r.level > 0) {
-        traceComponentFlow(`${part.id}:pos`, `${part.id}:neg`, 15.0, true)
+        const current = nodal.computeCurrentBetweenPins(
+          { partId: part.id, pinId: "pos" },
+          { partId: part.id, pinId: "neg" },
+          runtime,
+        ).currentMa
+        traceComponentFlow(`${part.id}:pos`, `${part.id}:neg`, current, true)
       }
     } else if (part.type === "dc-motor") {
       // Simulation motors report RPM/direction, not LED-style level/speed.
@@ -305,7 +324,12 @@ export function computeWireCurrents(
         (r?.level ?? 0) > 0 ||
         (r?.speed ?? 0) !== 0
       if (isRunning) {
-        traceComponentFlow(`${part.id}:pos`, `${part.id}:neg`, 25.0)
+        const current = nodal.computeCurrentBetweenPins(
+          { partId: part.id, pinId: "pos" },
+          { partId: part.id, pinId: "neg" },
+          runtime,
+        ).currentMa
+        traceComponentFlow(`${part.id}:pos`, `${part.id}:neg`, current)
       }
     } else if (part.type === "rgb-led") {
       // Only conduct on channels that are actively illuminated
@@ -355,13 +379,17 @@ export function computeWireCurrents(
       if (r?.level && r.level > 0) {
         traceComponentFlow(`${part.id}:out`, `${part.id}:gnd`, 6.0, true)
       }
-    } else if (part.type === "potentiometer") {
-      // The actual potentiometer terminals are t1/wiper/t2; the track current
-      // flows from one end of the divider to the other. The wiper is a tap,
-      // normally feeding a high-impedance analog input rather than a GND pin.
-      traceComponentFlow(`${part.id}:t1`, `${part.id}:t2`, 8.0)
-    } else if (part.type === "ldr") {
-      traceComponentFlow(`${part.id}:t1`, `${part.id}:t2`, 8.0)
+    } else if (part.type === "potentiometer" || part.type === "ldr") {
+      // Current through the passive divider is derived from its solved
+      // terminal voltages and effective resistance, not a visual constant.
+      const firstPin = part.type === "potentiometer" ? "t1" : "t1"
+      const lastPin = part.type === "potentiometer" ? "t2" : "t2"
+      const current = nodal.computeCurrentBetweenPins(
+        { partId: part.id, pinId: firstPin },
+        { partId: part.id, pinId: lastPin },
+        runtime,
+      ).currentMa
+      traceComponentFlow(`${part.id}:${firstPin}`, `${part.id}:${lastPin}`, current)
     } else if (part.type === "relay") {
       // The relay's coil is an energized load, not a passive rail-to-ground
       // branch. Neither coil nor input current should animate while de-energized.

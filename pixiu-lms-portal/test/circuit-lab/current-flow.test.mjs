@@ -207,3 +207,42 @@ test("Pico relay current animation follows relayActive NO/NC state and motor RPM
     assert.equal(deenergized[wireId], undefined, `${wireId} must have zero current when relay is de-energized and NO is open`)
   }
 })
+
+test("shared supply and return wires sum current from parallel resistor branches", () => {
+  const circuit = {
+    parts: [
+      { id: "uno", type: "arduino-uno", x: 40, y: 100, rotation: 0, props: {} },
+      { id: "bb", type: "breadboard", x: 150, y: 100, rotation: 0, props: {} },
+      { id: "r1", type: "resistor", x: 300, y: 70, rotation: 0, props: { resistance: 1000 } },
+      { id: "r2", type: "resistor", x: 300, y: 150, rotation: 0, props: { resistance: 2000 } },
+    ],
+    wires: [
+      { id: "shared-feed", from: { partId: "uno", pinId: "5v" }, to: { partId: "bb", pinId: "pos_t_1" }, color: "#ef4444" },
+      { id: "feed-r1", from: { partId: "bb", pinId: "pos_t_2" }, to: { partId: "r1", pinId: "a" }, color: "#ef4444" },
+      { id: "feed-r2", from: { partId: "bb", pinId: "pos_t_3" }, to: { partId: "r2", pinId: "a" }, color: "#ef4444" },
+      { id: "return-r1", from: { partId: "r1", pinId: "b" }, to: { partId: "uno", pinId: "gnd_pwr" }, color: "#1e293b" },
+      { id: "return-r2", from: { partId: "r2", pinId: "b" }, to: { partId: "uno", pinId: "gnd_pwr" }, color: "#1e293b" },
+    ],
+  }
+  const currents = computeWireCurrents(circuit, {}, {})
+  assert.ok(Math.abs(currents["shared-feed"]?.currentMa - 7.5) < 0.1,
+    `shared feed should carry 5mA + 2.5mA, received ${currents["shared-feed"]?.currentMa}mA`)
+})
+
+test("potentiometer current flow uses its solved divider current instead of a fixed visual value", () => {
+  const circuit = {
+    parts: [
+      { id: "uno", type: "arduino-uno", x: 40, y: 100, rotation: 0, props: {} },
+      { id: "pot", type: "potentiometer", x: 240, y: 100, rotation: 0, props: { resistance: 10000, value: 512 } },
+    ],
+    wires: [
+      { id: "pot-feed", from: { partId: "uno", pinId: "5v" }, to: { partId: "pot", pinId: "t1" }, color: "#ef4444" },
+      { id: "pot-wiper", from: { partId: "pot", pinId: "wiper" }, to: { partId: "uno", pinId: "a0" }, color: "#eab308" },
+      { id: "pot-return", from: { partId: "pot", pinId: "t2" }, to: { partId: "uno", pinId: "gnd_pwr" }, color: "#1e293b" },
+    ],
+  }
+  const currents = computeWireCurrents(circuit, {}, {})
+  assert.ok(Math.abs(currents["pot-feed"]?.currentMa - 0.5) < 0.1)
+  assert.ok(Math.abs(currents["pot-return"]?.currentMa - 0.5) < 0.1)
+  assert.equal(currents["pot-wiper"], undefined)
+})
