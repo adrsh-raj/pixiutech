@@ -78,7 +78,8 @@ export function computeWireCurrents(
       .map((part) => [part.id, runtime[part.id]?.relayActive === true]),
   )
   const nodal = solveCircuitNodalPotentials(state, pressed, pinStates, true, relayStates, runtime)
-  if (nodal.diagnostics.some((item) => item.code === "source-conflict")) return result
+  // The solver marks only source-conflicted connected nets as invalid; leave
+  // independent valid circuits available for current-flow rendering.
 
   const edges: ConductorEdge[] = state.wires.map((wire) => ({
     a: pinKey(wire.from),
