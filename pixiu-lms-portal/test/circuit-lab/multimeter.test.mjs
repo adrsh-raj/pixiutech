@@ -215,3 +215,25 @@ test("DMM resistance includes alternate parallel branches when probes are on one
   assert.ok(Math.abs(equivalent.resistance - 500) < 0.1,
     `Probing r1 terminals must include the parallel r2 branch: expected 500Ω, received ${equivalent.resistance}Ω`)
 })
+
+
+test("DMM resistance does not treat a passive piezo buzzer as a 100Ω DC resistor", () => {
+  const circuit = {
+    parts: [
+      { id: "uno", type: "arduino-uno", x: 40, y: 100, rotation: 0, props: {} },
+      { id: "buzzer", type: "buzzer", x: 240, y: 100, rotation: 0, props: {} },
+    ],
+    wires: [
+      { id: "signal", from: { partId: "uno", pinId: "d8" }, to: { partId: "buzzer", pinId: "pos" }, color: "#ef4444" },
+      { id: "ground", from: { partId: "buzzer", pinId: "neg" }, to: { partId: "uno", pinId: "gnd_pwr" }, color: "#1e293b" },
+    ],
+  }
+  const solved = solveCircuitNodalPotentials(circuit)
+  const resistance = solved.computeResistanceBetweenPins(
+    { partId: "buzzer", pinId: "pos" },
+    { partId: "buzzer", pinId: "neg" },
+  )
+  assert.equal(resistance.resistance, Infinity,
+    "a passive piezo is reactive/frequency-dependent, not a fixed 100Ω DC path")
+  assert.match(resistance.explanation, /Open Circuit.*O\.L/i)
+})
