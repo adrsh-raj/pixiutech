@@ -2,7 +2,8 @@ import type { CircuitState, PlacedPart } from "./circuit-types"
 import type { PartRuntime } from "@/components/circuit-lab/part-art"
 import type { ArduinoPinState } from "./simulation"
 import { getBoardForPart, isBoardPart } from "./board-registry"
-import { CATALOG } from "./components-catalog"
+import { BREADBOARD_COLUMNS, CATALOG } from "./components-catalog"
+import { getLegacyBreadboardPinMappings } from "./breadboard-pins"
 
 export type DiagnosticSeverity = "critical" | "warning" | "tip" | "success"
 
@@ -51,6 +52,71 @@ export function diagnoseCircuit(
 
   const boardPart = state.parts.find((p) => isBoardPart(p.type))
   const boardDef = boardPart ? getBoardForPart(boardPart) : undefined
+
+  // Identify real board/battery rails; GPIO outputs are deliberately excluded.
+  const supplySources = new Set<string>()
+  const groundSources = new Set<string>()
+  for (const controller of state.parts.filter((part) => isBoardPart(part.type))) {
+    const definition = getBoardForPart(controller)
+    if (!definition) continue
+    for (const pin of [
+      ...(definition.powerPins.v5 ?? []),
+      ...(definition.powerPins.v33 ?? []),
+      ...(definition.powerPins.vin ?? []),
+    ]) supplySources.add(`${controller.id}:${pin}`)
+    for (const pin of definition.powerPins.gnd) groundSources.add(`${controller.id}:${pin}`)
+  }
+  for (const source of state.parts.filter((part) => part.type === "battery")) {
+    supplySources.add(`${source.id}:pos`)
+    groundSources.add(`${source.id}:neg`)
+  }
+
+  // Breadboard holes and rails are copper-connected internally; model those
+  // physical ties so a module on a powered rail is not falsely flagged.
+  const breadboardLinks = new Map<string, string[]>()
+  const linkBreadboard = (partId: string, a: string, b: string) => {
+    const keyA = `${partId}:${a}`
+    const keyB = `${partId}:${b}`
+    if (!breadboardLinks.has(keyA)) breadboardLinks.set(keyA, [])
+    if (!breadboardLinks.has(keyB)) breadboardLinks.set(keyB, [])
+    breadboardLinks.get(keyA)!.push(keyB)
+    breadboardLinks.get(keyB)!.push(keyA)
+  }
+  for (const breadboard of state.parts.filter((part) => part.type === "breadboard")) {
+    for (let column = 1; column <= BREADBOARD_COLUMNS; column++) {
+      for (const rows of [["a", "b", "c", "d", "e"], ["f", "g", "h", "i", "j"]]) {
+        for (let index = 1; index < rows.length; index++) {
+          linkBreadboard(breadboard.id, `${rows[index - 1]}_${column}`, `${rows[index]}_${column}`)
+        }
+      }
+      if (column < BREADBOARD_COLUMNS) {
+        for (const rail of ["pos_t", "neg_t", "pos_b", "neg_b"]) {
+          linkBreadboard(breadboard.id, `${rail}_${column}`, `${rail}_${column + 1}`)
+        }
+      }
+    }
+    for (const [legacy, canonical] of getLegacyBreadboardPinMappings()) {
+      linkBreadboard(breadboard.id, legacy, canonical)
+    }
+  }
+
+  const reachesRail = (start: string, targets: Set<string>) => {
+    const visited = new Set<string>()
+    const queue = [start]
+    for (let index = 0; index < queue.length; index++) {
+      const current = queue[index]
+      if (targets.has(current)) return true
+      if (visited.has(current)) continue
+      visited.add(current)
+      for (const neighbor of pinWires.get(current) ?? []) {
+        if (!visited.has(neighbor)) queue.push(neighbor)
+      }
+      for (const neighbor of breadboardLinks.get(current) ?? []) {
+        if (!visited.has(neighbor)) queue.push(neighbor)
+      }
+    }
+    return false
+  }
 
   // 1. Check for Overcurrent Burnout on LEDs
   for (const part of state.parts) {
@@ -200,7 +266,9 @@ export function diagnoseCircuit(
     if (!definition) continue
 
     const pinsById = new Map(definition.pins.map((pin) => [pin.id, pin]))
-    const connected = (pinId: string) => pinWires.has(part.id + ":" + pinId)
+    const isWired = (pinId: string) => pinWires.has(part.id + ":" + pinId)
+    const reachesSupply = (pinId: string) => reachesRail(part.id + ":" + pinId, supplySources)
+    const reachesGround = (pinId: string) => reachesRail(part.id + ":" + pinId, groundSources)
     const requiredGroups = definition.requiredPinGroups ?? []
     const powerGroups = requiredGroups.filter((group) =>
       group.some((pinId) => pinsById.get(pinId)?.kind === "power"),
@@ -209,10 +277,10 @@ export function diagnoseCircuit(
       group.some((pinId) => pinsById.get(pinId)?.kind === "ground"),
     )
     if (powerGroups.length === 0 || groundGroups.length === 0) continue
-    if (!definition.pins.some((pin) => connected(pin.id))) continue
+    if (!definition.pins.some((pin) => isWired(pin.id))) continue
 
-    const missingPowerGroups = powerGroups.filter((group) => !group.some(connected))
-    const missingGroundGroups = groundGroups.filter((group) => !group.some(connected))
+    const missingPowerGroups = powerGroups.filter((group) => !group.some(reachesSupply))
+    const missingGroundGroups = groundGroups.filter((group) => !group.some(reachesGround))
     if (missingPowerGroups.length === 0 && missingGroundGroups.length === 0) continue
 
     const describeGroup = (group: string[]) =>
@@ -226,7 +294,7 @@ export function diagnoseCircuit(
       id: "sensor-unpowered-" + part.id,
       severity: "warning",
       title: "Unpowered Module: " + definition.name,
-      message: definition.name + " is wired into the circuit but is missing a required " + missing.join(" and ") + " connection. Its readings or outputs cannot be trusted until its supply and return are connected.",
+      message: definition.name + " is wired into the circuit but is not connected to a real board/battery power rail and common ground for its required supply pins (" + missing.join(" and ") + "). A GPIO HIGH signal is not a substitute for module power.",
       suggestion: "Connect the module power pin group (" + powerGroups.map(describeGroup).join("; ") + ") to an appropriate supply and its ground pin group (" + groundGroups.map(describeGroup).join("; ") + ") to common ground.",
       involvedPartIds: [part.id],
       category: "wiring",

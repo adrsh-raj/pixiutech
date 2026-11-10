@@ -241,7 +241,7 @@ export const CATALOG: Record<PartType, PartDef> = {
     width: 56,
     height: 56,
     pins: [
-      { id: "pos", label: "+", x: 20, y: 52, kind: "power" },
+      { id: "pos", label: "+ / Signal", x: 20, y: 52, kind: "digital" },
       { id: "neg", label: "-", x: 36, y: 52, kind: "ground" },
     ],
     requiredPinGroups: [["pos"],["neg"]],

@@ -791,3 +791,42 @@ test("potentiometer A0 voltage follows its configured 0–1023 wiper position", 
     assert.ok(Math.abs(measured - expected) < 0.03, `value ${value}: expected ${expected}V, received ${measured}V`)
   }
 })
+
+test("Circuit Doctor does not mistake GPIO HIGH for a module power rail", () => {
+  const circuit = {
+    parts: [part("uno", "arduino-uno"), part("ir", "ir-sensor")],
+    wires: [
+      wire("sensor-vcc-from-gpio", "uno", "d13", "ir", "vcc"),
+      wire("sensor-ground", "uno", "gnd_pwr", "ir", "gnd"),
+      wire("sensor-output", "ir", "out", "uno", "d2"),
+    ],
+  }
+  assert.ok(diagnoseCircuit(circuit, {}, {
+    "13": { state: "HIGH", outputMode: "digital", value: 1 },
+  }).issues.some((issue) => issue.id === "sensor-unpowered-ir"))
+})
+
+test("Circuit Doctor follows real 5V and GND through breadboard copper rails", () => {
+  const circuit = {
+    parts: [part("uno", "arduino-uno"), part("bb", "breadboard"), part("ir", "ir-sensor")],
+    wires: [
+      wire("rail-vcc-in", "uno", "5v", "bb", "pos_t_1"),
+      wire("rail-vcc-out", "bb", "pos_t_18", "ir", "vcc"),
+      wire("rail-gnd-in", "uno", "gnd_pwr", "bb", "neg_t_1"),
+      wire("rail-gnd-out", "bb", "neg_t_18", "ir", "gnd"),
+      wire("signal", "ir", "out", "uno", "d2"),
+    ],
+  }
+  assert.equal(diagnoseCircuit(circuit).issues.some((issue) => issue.id === "sensor-unpowered-ir"), false)
+})
+
+test("Circuit Doctor treats a GPIO-driven buzzer as a signal load, not an unpowered VCC module", () => {
+  const circuit = {
+    parts: [part("uno", "arduino-uno"), part("buzzer", "buzzer")],
+    wires: [
+      wire("signal", "uno", "d8", "buzzer", "pos"),
+      wire("ground", "buzzer", "neg", "uno", "gnd_pwr"),
+    ],
+  }
+  assert.equal(diagnoseCircuit(circuit).issues.some((issue) => issue.id === "sensor-unpowered-buzzer"), false)
+})
