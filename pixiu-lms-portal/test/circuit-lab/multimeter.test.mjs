@@ -285,3 +285,26 @@ test("DMM branch-current mode reads RGB LED and seven-segment diode branches fro
   assert.ok(segmentBranch > 0)
   assert.ok(Math.abs(segmentMeter.currentMa - Math.abs(segmentBranch)) < 0.001)
 })
+
+
+test("DMM explicitly labels generic module-load branch readings as estimates", () => {
+  const circuit = {
+    parts: [
+      { id: "uno", type: "arduino-uno", x: 40, y: 100, rotation: 0, props: {} },
+      { id: "mq2", type: "mq2-gas", x: 260, y: 100, rotation: 0, props: {} },
+    ],
+    wires: [
+      { id: "supply", from: { partId: "uno", pinId: "5v" }, to: { partId: "mq2", pinId: "vcc" }, color: "#ef4444" },
+      { id: "return", from: { partId: "mq2", pinId: "gnd" }, to: { partId: "uno", pinId: "gnd_pwr" }, color: "#1e293b" },
+    ],
+  }
+  const solved = solveCircuitNodalPotentials(circuit)
+  const meter = solved.computeCurrentBetweenPins(
+    { partId: "mq2", pinId: "vcc" },
+    { partId: "mq2", pinId: "gnd" },
+    {},
+  )
+  assert.ok(Math.abs(meter.currentMa - 150) < 0.001)
+  assert.match(meter.explanation, /^Estimated mq2-gas branch current:/)
+  assert.match(meter.subtext, /Heater-dominated MQ-2 module estimate/)
+})
