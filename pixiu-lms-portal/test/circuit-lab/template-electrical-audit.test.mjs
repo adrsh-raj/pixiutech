@@ -12,6 +12,7 @@ await build({
     new URL("../../src/lib/board-registry.ts", import.meta.url).pathname,
     new URL("../../src/lib/lesson-engine.ts", import.meta.url).pathname,
     new URL("../../src/lib/circuit-solver.ts", import.meta.url).pathname,
+    new URL("../../src/lib/simulation.ts", import.meta.url).pathname,
   ],
   bundle: true,
   format: "esm",
@@ -20,15 +21,17 @@ await build({
   alias: { "@": new URL("../../src", import.meta.url).pathname },
 })
 
-const [{ TEMPLATES }, { CATALOG }, boardModule, { LESSONS }, solverModule] = await Promise.all([
+const [{ TEMPLATES }, { CATALOG }, boardModule, { LESSONS }, solverModule, simulationModule] = await Promise.all([
   import(`file://${join(outdir, "templates.js")}`),
   import(`file://${join(outdir, "components-catalog.js")}`),
   import(`file://${join(outdir, "board-registry.js")}`),
   import(`file://${join(outdir, "lesson-engine.js")}`),
   import(`file://${join(outdir, "circuit-solver.js")}`),
+  import(`file://${join(outdir, "simulation.js")}`),
 ])
 const { getBoardForPart, isBoardPart } = boardModule
 const { solveCircuitNodalPotentials } = solverModule
+const { computeRuntime } = simulationModule
 
 function normalize(value) {
   return String(value ?? "").trim().toLowerCase()
@@ -569,7 +572,7 @@ test("all LDRs and potentiometers have complete powered ADC divider topology", (
   assert.deepEqual(passiveAnalogErrors, [], passiveAnalogErrors.join("\\n"))
 })
 
-test("all 75 seeded circuits solve with finite branch currents and satisfy non-source-net KCL", () => {
+test("all 75 seeded circuits solve with their default runtime, finite branch currents and non-source-net KCL", () => {
   const inventory = [
     ...TEMPLATES.map((template) => ({ label: `template ${template.id}`, circuit: template.circuit })),
     ...lessonCircuits.map((lesson) => ({ label: `lesson ${lesson.id}`, circuit: lesson.seedCircuit })),
@@ -580,7 +583,8 @@ test("all 75 seeded circuits solve with finite branch currents and satisfy non-s
   const kclFailures = []
   const nonFinite = []
   for (const { label, circuit } of inventory) {
-    const solved = solveCircuitNodalPotentials(circuit)
+    const runtime = computeRuntime(circuit, new Set(), {}, {}, {})
+    const solved = solveCircuitNodalPotentials(circuit, new Set(), {}, true, {}, runtime)
     for (const diagnostic of solved.diagnostics) {
       diagnostics.push(`${label}: ${diagnostic.code}: ${diagnostic.message}`)
     }
