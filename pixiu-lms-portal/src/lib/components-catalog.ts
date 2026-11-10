@@ -700,3 +700,179 @@ export const PIN_KIND_COLOR: Record<PinKind, string> = {
   analog: "var(--color-accent)",
   passive: "var(--color-muted-foreground)",
 }
+
+
+/**
+ * Auditable scope/fidelity contract for every component in the Virtual Lab.
+ * "estimated"/"partial" entries are not datasheet-certified measurements.
+ * A component can have no static DC load while still acting as a signal source,
+ * switch, or passive interconnect in the circuit topology.
+ */
+export interface ElectricalModelContract {
+  model: string
+  fidelity: "idealized" | "first-order" | "estimated" | "partial" | "signal-only"
+  note: string
+}
+
+export const ELECTRICAL_MODEL_CONTRACT: Record<PartType, ElectricalModelContract> = {
+  "arduino-uno": {
+    model: "ideal-board-supply-and-GPIO-sources",
+    fidelity: "idealized",
+    note: "Board rails and configured GPIO outputs are ideal voltage boundaries; MCU quiescent current, regulator losses and GPIO output resistance are not included.",
+  },
+  "esp32-devkit": {
+    model: "ideal-board-supply-and-GPIO-sources",
+    fidelity: "idealized",
+    note: "3.3V rail and configured GPIO/DAC/PWM outputs are ideal voltage boundaries; MCU, Wi-Fi and regulator consumption are not included.",
+  },
+  "rpi-pico": {
+    model: "ideal-board-supply-and-GPIO-sources",
+    fidelity: "idealized",
+    note: "3.3V and VBUS rails and configured GPIO outputs are ideal voltage boundaries; RP2040 and regulator consumption are not included.",
+  },
+  "microbit-v2": {
+    model: "ideal-board-supply-and-GPIO-sources",
+    fidelity: "idealized",
+    note: "Board rails and configured IO are ideal voltage boundaries; nRF52, LED matrix and regulator current are not included.",
+  },
+  breadboard: {
+    model: "copper-interconnect-network",
+    fidelity: "first-order",
+    note: "Terminal strips and rails are connected with a small numerical conductor resistance for current sharing; contact resistance and rail breaks are simplified.",
+  },
+  led: {
+    model: "piecewise-linear-diode",
+    fidelity: "partial",
+    note: "Colour-specific forward voltage plus a 10Ω dynamic-resistance proxy; external current limiting is solved, but temperature and thermal runaway are not.",
+  },
+  resistor: {
+    model: "configured-ohmic-resistor",
+    fidelity: "first-order",
+    note: "Configured resistance is solved with Ohm's law; tolerance, temperature coefficient and power derating are not modeled.",
+  },
+  pushbutton: {
+    model: "stateful-switch-contact",
+    fidelity: "first-order",
+    note: "Normally-open contact closes on press with a small contact resistance; bounce, wear and parasitic capacitance are not modeled.",
+  },
+  battery: {
+    model: "ideal-configured-voltage-source",
+    fidelity: "idealized",
+    note: "Configured signed terminal voltage is ideal; internal resistance, state of charge and voltage sag are not modeled.",
+  },
+  potentiometer: {
+    model: "two-section-variable-resistor",
+    fidelity: "first-order",
+    note: "Track resistance is split by the configured 0–1023 wiper position; a 0.5Ω floor regularizes endpoint resistance and wiper contact noise is omitted.",
+  },
+  servo: {
+    model: "commanded-module-supply-estimate",
+    fidelity: "estimated",
+    note: "A labelled generic module current is applied when a valid servo command exists; torque, stall, acceleration and model-specific datasheet current are not represented.",
+  },
+  buzzer: {
+    model: "active-piezo-resistive-proxy",
+    fidelity: "partial",
+    note: "An active tone uses a 100Ω first-order equivalent; real piezo impedance is frequency-dependent and cannot be inferred from this DC proxy.",
+  },
+  "rgb-led": {
+    model: "three-piecewise-linear-diode-channels",
+    fidelity: "partial",
+    note: "Red, green and blue channels use separate colour-specific diode branches; resistor, PWM and reverse-bias behaviour are represented, thermal effects are not.",
+  },
+  "seven-segment": {
+    model: "per-segment-diode-network",
+    fidelity: "partial",
+    note: "Each lit segment is a diode branch with common-anode/cathode polarity; current-limiting resistors must be external and multiplex timing is not modeled.",
+  },
+  "lcd-i2c": {
+    model: "backlit-display-module-load-estimate",
+    fidelity: "estimated",
+    note: "Generic 5V display/backlight load estimate; exact LCD backpack, backlight setting and module revision are unspecified.",
+  },
+  ultrasonic: {
+    model: "ultrasonic-module-supply-estimate",
+    fidelity: "estimated",
+    note: "Generic HC-SR04 supply-load estimate; echo/trig are signal interfaces and sensor timing/driver impedance are simplified.",
+  },
+  "pir-sensor": {
+    model: "pir-module-supply-estimate",
+    fidelity: "estimated",
+    note: "Generic PIR module supply estimate; module revision and output-stage current are unspecified.",
+  },
+  ldr: {
+    model: "light-dependent-resistor",
+    fidelity: "first-order",
+    note: "Configured light level sets a variable resistance that is solved in the network; spectral response and temperature dependence are simplified.",
+  },
+  tmp36: {
+    model: "low-power-analog-sensor-estimate",
+    fidelity: "estimated",
+    note: "A labelled low-current sensor/breakout estimate and configured analog output voltage are modeled; exact breakout regulator/indicator current is unknown.",
+  },
+  "dc-motor": {
+    model: "resistive-winding-proxy",
+    fidelity: "partial",
+    note: "A 50Ω winding proxy gives first-order current; back-EMF, inductance, stall transients, mechanical torque and speed-dependent load are not yet represented.",
+  },
+  "npn-transistor": {
+    model: "switched-collector-emitter-resistance",
+    fidelity: "partial",
+    note: "Runtime-conducting state connects collector-emitter through a 0.2Ω switch proxy; base current, gain, saturation curves and thermal limits are omitted.",
+  },
+  relay: {
+    model: "estimated-coil-and-switched-contact",
+    fidelity: "partial",
+    note: "Generic 5V coil-current estimate plus stateful COM–NO/NC contact resistance; flyback transient and exact relay coil specifications are not modeled.",
+  },
+  "ir-sensor": {
+    model: "ir-module-supply-estimate-and-digital-output",
+    fidelity: "estimated",
+    note: "Generic module supply estimate and powered output level; IR LED/comparator revision and output impedance are not specified.",
+  },
+  dht11: {
+    model: "low-power-digital-sensor-estimate",
+    fidelity: "estimated",
+    note: "Generic sensor supply estimate and a simplified data output; protocol timing, pull-up current and breakout indicators are not modeled.",
+  },
+  "oled-i2c": {
+    model: "oled-display-module-load-estimate",
+    fidelity: "estimated",
+    note: "Generic OLED module supply estimate; panel content/brightness, regulator and I2C pull-up details vary by module.",
+  },
+  joystick: {
+    model: "dual-potentiometer-track-and-switch",
+    fidelity: "first-order",
+    note: "Two nominal track-load estimates and powered analog output voltages are modeled; wiper contact noise and switch bounce are omitted.",
+  },
+  l298n: {
+    model: "dual-hbridge-average-dc-proxy",
+    fidelity: "partial",
+    note: "Logic supply and derived motor VS current are solved; H-bridge outputs use average PWM voltage and motor branches use a 50Ω proxy without back-EMF or transistor voltage drops.",
+  },
+  "rotary-encoder": {
+    model: "digital-encoder-output",
+    fidelity: "signal-only",
+    note: "Powered switch output and encoder reading are represented; quadrature edge timing, contact bounce and pull-up current are not simulated.",
+  },
+  "soil-moisture": {
+    model: "resistive-sensor-module-estimate",
+    fidelity: "estimated",
+    note: "Generic module supply estimate and configured analog output level; probe excitation, soil conductivity and module revision are not specified.",
+  },
+  "keypad-4x4": {
+    model: "matrix-contact-signal-interface",
+    fidelity: "signal-only",
+    note: "Rows/columns are digital signal interfaces; per-key contact closure topology and pull-up/pull-down current are not yet solved internally.",
+  },
+  "neopixel-ring": {
+    model: "per-pixel-rgb-channel-load",
+    fidelity: "estimated",
+    note: "Each lit pixel channel uses a documented 20mA full-scale estimate; colour scales the load, while WS2812 timing, regulator loss and pixel revision are not modeled.",
+  },
+  "mq2-gas": {
+    model: "heater-dominated-gas-module-estimate",
+    fidelity: "estimated",
+    note: "A labelled heater-dominated module supply estimate and simplified AO/DO outputs; warm-up, calibration, heater tolerance and module revision are not modeled.",
+  },
+}
