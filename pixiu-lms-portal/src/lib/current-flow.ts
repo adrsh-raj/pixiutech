@@ -140,9 +140,12 @@ export function computeWireCurrents(
       for (const [legacy, canonical] of getLegacyBreadboardPinMappings()) {
         addInternal(part.id, legacy, canonical)
       }
-    } else if (part.type === "pushbutton" && pressed.has(part.id)) {
-      // Internal normally-open contact closes only while the button is pressed.
-      addInternal(part.id, "p1a", "p2a", 0.05)
+    } else if (part.type === "pushbutton") {
+      // Each physical side is a permanent copper pair; the cross-contact is
+      // normally open and closes only while the user presses the button.
+      addInternal(part.id, "p1a", "p1b")
+      addInternal(part.id, "p2a", "p2b")
+      if (pressed.has(part.id)) addInternal(part.id, "p1a", "p2a", 0.05)
     }
   }
 
