@@ -626,3 +626,5 @@ test("complete Virtual Lab project-template and curriculum circuit inventory is 
   }
   assert.deepEqual(allErrors, [], "all template and curriculum circuit electrical/topology checks must pass")
 })
+
+// Keep the 75-circuit MNA audit coupled to computed default component runtime states.
