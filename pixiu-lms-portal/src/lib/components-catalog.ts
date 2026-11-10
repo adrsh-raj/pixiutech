@@ -96,11 +96,13 @@ const MODULE_LOAD_ESTIMATES = {
   lcd: [{
     positivePin: "vcc", negativePin: "gnd", nominalVoltage: 5, nominalCurrentMa: 15,
     accuracy: "module-estimate",
+    activeWhen: "display-enabled",
     note: "Generic backlit character-display estimate; backlight and backpack variants change consumption.",
   }],
   oled: [{
     positivePin: "vcc", negativePin: "gnd", nominalVoltage: 3.3, nominalCurrentMa: 15,
     accuracy: "module-estimate",
+    activeWhen: "display-enabled",
     note: "Generic small OLED module estimate; panel content, brightness and regulator variant change consumption.",
   }],
   ultrasonic: [{
@@ -354,6 +356,8 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "dp", label: "DP", x: 35, y: 4, kind: "passive" },
       { id: "com", label: "Common", x: 55, y: 40, kind: "passive" },
     ],
+    defaults: { commonType: "cathode", color: "red" },
+    electrical: LED_ELECTRICAL_MODEL,
     requiredPinGroups: [["a"],["b"],["c"],["d"],["e"],["f"],["g"],["com"]],
   },
   "lcd-i2c": {
@@ -423,6 +427,16 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "out", label: "Vout", x: 20, y: 46, kind: "passive" },
       { id: "gnd", label: "GND", x: 34, y: 46, kind: "ground" },
     ],
+    electrical: {
+      supplyLoads: [{
+        positivePin: "vcc",
+        negativePin: "gnd",
+        nominalVoltage: 3.3,
+        nominalCurrentMa: 0.05,
+        accuracy: "module-estimate",
+        note: "Low-current IC teaching estimate; breakout-board indicators and regulator losses are excluded.",
+      }],
+    },
     requiredPinGroups: [["vcc"],["out"],["gnd"]],
   },
   "dc-motor": {
@@ -619,6 +633,11 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "do", label: "DO", x: 78, y: 92, kind: "digital" },
     ],
     defaults: { numPixels: 8, brightness: 200, pattern: "rainbow", color: "#38bdf8" },
+    electrical: {
+      pixelCurrentPerChannelMa: 20,
+      pixelReferenceVoltage: 5,
+      pixelOffColor: "#0f172a",
+    },
     requiredPinGroups: [["di"],["vcc"],["gnd"]],
   },
   "mq2-gas": {
