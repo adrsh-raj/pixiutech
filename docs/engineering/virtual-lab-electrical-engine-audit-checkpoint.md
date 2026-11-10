@@ -1,11 +1,12 @@
 # Virtual Lab Electrical Engine Audit — Resume Checkpoint
 
 **Checkpoint updated:** 2026-11-10 (Asia/Kolkata)  
-**Status:** Electrical engine, catalogue topology audit and RGB polarity diagnostics implemented; latest Browser Gate green. PR remains draft.  
+**Status:** Shared electrical model, catalogue topology audit, PWM/DAC signal semantics, relay/motor paths, and end-to-end NeoPixel DI/show behavior implemented. Last fully verified Browser Gate is green; latest source head has one exact-pin-alias correction pending its rerun. PR remains draft.  
 **Repository:** `adrsh-raj/pixiutech`  
 **Working branch:** `fix/virtual-lab-electrical-engine-audit-2026-11-09`  
-**Latest verified application-source commit:** `9612c23a9e0ec5f77581857d6c976735fba68bc2`  
-**Resume branch head:** fetch the branch endpoint below; the branch may have a newer checkpoint-only documentation commit.  
+**Latest source commit:** `94549fae71a065af1151a61ec6780688157f813f`  
+**Latest fully CI-verified source commit:** `afac7541c1577cbf086ce89d71342f4c1f4fe784`  
+**Resume branch head at checkpoint:** `94549fae71a065af1151a61ec6780688157f813f` (fetch the branch endpoint below before continuing).  
 **Base commit:** `b5ec151c2392f560b5d5c4c85347f0ffa9795425`  
 **Pull request:** [#82 — Virtual Lab electrical engine audit](https://github.com/adrsh-raj/pixiutech/pull/82)  
 **PR state:** open, draft, mergeable, not merged.  
@@ -53,6 +54,14 @@ The audit also rejects nominal resistor presence when a wire-only path bypasses 
 - DAC is now treated as continuous analog output: the selected DAC-capable pin's voltage is scaled by its value, with duty 1 for load-current analysis. The peak LED analysis preserves DAC mode instead of coercing it to a digital HIGH. By contrast, `analogWrite` on the same DAC-capable pin remains PWM.
 - Added regression coverage proving a 128/255 DAC output (~1.66V on ESP32) stays below the red LED's 1.9V forward voltage, while 3.3V PWM pulses at the same numeric setting illuminate the LED at non-zero duty.
 
+### NeoPixel data protocol and Workbench execution
+- The Blockly runner already exposed neopixel_set_color and neopixel_show, but the Workbench had not implemented their callbacks. The callbacks are now connected to a per-ring output buffer.
+- neopixel_set_color stages a pixel color; neopixel_show latches the staged frame. A staged frame is not rendered until show() is called.
+- The Workbench resolves the ring's DI pad through the circuit graph to a real board digital-output pin. The resolver follows direct wires, resistor continuity and breadboard rows/rails, and retains the exact wire endpoint spelling so board aliases do not break graph traversal.
+- Simulation requires real VCC/GND power, a committed frame and a physical path from the resolved GPIO to the ring's DI pad before pixels can illuminate. A catalogue default pattern="rainbow" no longer lights an uncommanded, supply-only ring.
+- PartArt's idle fallback is dark. Current-flow animation only shows pixel supply draw when at least one latched pixel is illuminated, and the DI signal path only while a committed frame is active.
+- Regression tests cover supply-only/off behavior, staged-but-not-shown behavior, committed data on a wired DI pin, no illumination when DI is disconnected, and data/supply current-flow on the ring's actual catalogue pins.
+
 ### Electrical topology and curriculum/template repairs
 - Added catalog electrical/connection metadata and component required-pin groups for 27 part types.
 - Added 10kΩ pull-down networks to seven project templates with floating D2 pushbutton inputs: traffic-light, blink-led, servo-sweep, G6 pushbutton control, G6 RGB mood lamp, G6 smart doorbell and G7 servo gate.
@@ -69,22 +78,32 @@ The audit also rejects nominal resistor presence when a wire-only path bypasses 
 
 ## Regression and CI verification
 
-### Latest verified source head: `ef47fb2225a3f51033d2caab7862c1fc206eab8d`
+### Latest fully verified source head: `afac7541c1577cbf086ce89d71342f4c1f4fe784`
 
 **PIXIU CyberLab Browser Gate — SUCCESS**  
-- Run: `42747449401`
-- Job: `129602835267`
-- `test:lab`: **159 tests, 159 passed, 0 failed**.
-- Browser gate completed; output includes `PIXIU CyberLab browser gate PASSED` and `Runtime AI origin policy · PASS`.
+- Run: `42751508275`
+- Job: `129615958672`
+- `test:lab`: **164 tests, 164 passed, 0 failed**.
+- Browser gate completed; output includes `Training verified: My AI learned 2 concepts.`, `PIXIU CyberLab browser gate PASSED` and `Runtime AI origin policy · PASS`.
 - Catalogue audit in the same test run: 75 circuits, 353 parts, 586 wires, 0 errors, 0 warnings.
 
-Other latest-head successful workflows:
-- Phase 0–3 Gate: run `42747448943` — SUCCESS.
-- Phase 4–6 Gate: run `42747448977` — SUCCESS.
-- Phase 4–9 Reliability Gate: run `42747448820` — SUCCESS.
-- Part 4 Current Verification: run `42747448907` — SUCCESS.
-- Production Security Smoke: run `42747448842` — SUCCESS.
-- Deployment Smoke Test on the previous documentation checkpoint: run `42747150190` — SUCCESS.
+Other fully verified-head successful workflows:
+- Phase 0–3 Gate: run `42751508171` — SUCCESS.
+- Phase 4–6 Gate: run `42751508240` — SUCCESS (includes the updated NeoPixel runtime static assertions).
+- Phase 4–9 Reliability Gate: run `42751508451` — SUCCESS.
+- Part 4 Current Verification: run `42751508170` — SUCCESS.
+- Production Security Smoke: run `42751508481` — SUCCESS.
+- Deployment Smoke Test on the earlier source checkpoint: run `42688061090` — SUCCESS (CI smoke workflow, not a manual production deploy).
+
+A final alias-only source fix was then committed as `94549fae71a065af1151a61ec6780688157f813f` to preserve the actual wire spelling when resolving a NeoPixel DI GPIO. Its fresh CI batch is running:
+- Browser Gate: run `42751702032` — IN PROGRESS.
+- Phase 0–3 Gate: run `42751701783` — SUCCESS.
+- Phase 4–6 Gate: run `42751701794` — SUCCESS.
+- Phase 4–9 Reliability Gate: run `42751701953` — SUCCESS.
+- Part 4 Current Verification: run `42751701526` — SUCCESS.
+- Production Security Smoke: run `42751701605` — IN PROGRESS.
+- Production Verification: run `42751701513` — IN PROGRESS.
+- Phase 9 Final Green Gate: run `42751701671` — FAILURE at the unrelated public-site audit below.
 
 ### Known unrelated CI blocker
 
@@ -96,11 +115,11 @@ The latest Phase 9 run reports the same unrelated public website audit finding:
 
 `src/pages/EightSquareAI.jsx -> interactive cursor/scroll reveal pattern detected`
 
-The Production Verification job ran **180 Django backend tests; all passed** before the public website audit step failed. `EightSquareAI.jsx` is outside this Virtual Lab electrical repair, and has not been modified. Do not hide or bypass this finding by weakening the unrelated site audit.
+The fully verified-head Production Verification run `42751508091` ran **180 Django backend tests; all passed** before the public website audit step failed. The same exact site-audit message is present on the later branch head's Phase 9 run `42751701671`. `EightSquareAI.jsx` is outside this Virtual Lab electrical repair, and has not been modified. Do not hide or bypass this finding by weakening the unrelated site audit.
 
 ## Current branch/PR safety status
 
-- Latest branch head and PR head: `ef47fb2225a3f51033d2caab7862c1fc206eab8d`.
+- Latest branch head and PR head at checkpoint: `94549fae71a065af1151a61ec6780688157f813f`.
 - PR #82 remains open, draft and mergeable; it is not merged.
 - `main` remains untouched.
 - No manual production deployment was performed.
