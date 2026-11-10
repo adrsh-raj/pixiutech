@@ -6,7 +6,10 @@ import { build } from "esbuild"
 
 const outfile = join(tmpdir(), `current-flow-bundle-${Date.now()}.mjs`)
 await build({
-  entryPoints: [new URL("../../src/lib/current-flow.ts", import.meta.url).pathname],
+  entryPoints: [
+    new URL("../../src/lib/current-flow.ts", import.meta.url).pathname,
+    new URL("../../src/lib/circuit-solver.ts", import.meta.url).pathname,
+  ],
   bundle: true,
   format: "esm",
   outfile,
@@ -17,6 +20,16 @@ await build({
 })
 
 const { computeWireCurrents } = await import(`file://${outfile}`)
+const solverOutfile = join(tmpdir(), `current-flow-solver-${Date.now()}.mjs`)
+await build({
+  entryPoints: [new URL("../../src/lib/circuit-solver.ts", import.meta.url).pathname],
+  bundle: true,
+  format: "esm",
+  outfile: solverOutfile,
+  platform: "neutral",
+  alias: { "@": new URL("../../src", import.meta.url).pathname },
+})
+const { solveCircuitNodalPotentials } = await import(`file://${solverOutfile}`)
 
 test("bulb/LED when OFF has ZERO current in its wires", () => {
   const circuitState = {
@@ -70,7 +83,15 @@ test("bulb/LED when ON has ACTIVE current in all loop wires", () => {
   }
 
   const currents = computeWireCurrents(circuitState, runtime, pinStates)
+  const solved = solveCircuitNodalPotentials(circuitState, new Set(), pinStates, true, {}, runtime)
   console.log("CURRENT_FLOW_LED_LOOP_DEBUG", JSON.stringify(currents))
+  console.log("CURRENT_FLOW_LED_BRANCH_DEBUG", JSON.stringify([...solved.branchCurrents.entries()]))
+  console.log("CURRENT_FLOW_LED_PIN_DEBUG", JSON.stringify({
+    resistorA: solved.getPinInfo({ partId: "r1", pinId: "a" }),
+    resistorB: solved.getPinInfo({ partId: "r1", pinId: "b" }),
+    ledAnode: solved.getPinInfo({ partId: "led1", pinId: "anode" }),
+    ledCathode: solved.getPinInfo({ partId: "led1", pinId: "cathode" }),
+  }))
 
   assert.ok(currents["w_pwr"] && currents["w_pwr"].currentMa > 0, "Power wire must carry active current when LED is ON")
   assert.ok(currents["w_mid"] && currents["w_mid"].currentMa > 0, "Middle wire must carry active current when LED is ON")
