@@ -1073,9 +1073,7 @@ export function validateProposedCircuit(
     if (b.powerPins.v33) {
       v33Pins.push(...b.powerPins.v33.map((p) => pinKey(bPart.id, p)))
     }
-    if (b.powerPins.vin) {
-      v5Pins.push(...b.powerPins.vin.map((p) => pinKey(bPart.id, p)))
-    }
+    // Raw VIN/VSYS terminals are external power inputs, not fixed 5V rails.
     gndPins.push(...b.powerPins.gnd.map((p) => pinKey(bPart.id, p)))
   }
 
@@ -1083,6 +1081,67 @@ export function validateProposedCircuit(
     if (part.type === "battery") {
       batteryPosPins.push(pinKey(part.id, "pos"))
       batteryNegPins.push(pinKey(part.id, "neg"))
+    }
+  }
+
+  // Validate external supply voltages wired to board power-input terminals.
+  // Only real board output rails and external batteries are considered sources.
+  const boardOutputSources = boardParts.flatMap((sourceBoard) => {
+    const definition = getBoardForPart(sourceBoard)
+    if (!definition) return []
+    return [
+      ...(definition.powerPins.v5 ?? []).map((pinId) => ({
+        partId: sourceBoard.id,
+        pinId,
+        voltage: 5,
+      })),
+      ...(definition.powerPins.v33 ?? []).map((pinId) => ({
+        partId: sourceBoard.id,
+        pinId,
+        voltage: 3.3,
+      })),
+    ]
+  })
+  const externalPowerSources = [
+    ...boardOutputSources,
+    ...normalizedParts.filter((part) => part.type === "battery").map((part) => ({
+      partId: part.id,
+      pinId: "pos",
+      voltage: Number(part.props.voltage ?? 9),
+    })),
+  ]
+  for (const boardPart of boardParts) {
+    const definition = getBoardForPart(boardPart)
+    if (!definition) continue
+    for (const input of definition.powerInputs ?? []) {
+      const inputKey = pinKey(boardPart.id, input.pinId)
+      for (const source of externalPowerSources) {
+        if (source.partId === boardPart.id && source.pinId === input.pinId) continue
+        if (!Number.isFinite(source.voltage) || !netlist.connected(inputKey, pinKey(source.partId, source.pinId))) continue
+        if (source.voltage < input.minVoltage - 1e-6) {
+          addNotice({
+            ruleId: "safety-board-power-input-undervoltage",
+            severity: "warning",
+            category: "safety",
+            title: "Board Power Input Below Its Supported Range",
+            message: `${definition.name} ${input.pinId.toUpperCase()} expects ${input.minVoltage}–${input.maxVoltage}V; the connected source provides ${source.voltage}V.`,
+            suggestion: input.description,
+            involvedPartIds: [boardPart.id, source.partId],
+            involvedPinIds: [input.pinId, source.pinId],
+          })
+        } else if (source.voltage > input.maxVoltage + 1e-6) {
+          addNotice({
+            ruleId: "safety-board-power-input-overvoltage",
+            severity: "critical",
+            category: "safety",
+            title: "Board Power Input Above Its Maximum Rating",
+            message: `${definition.name} ${input.pinId.toUpperCase()} supports at most ${input.maxVoltage}V; the connected source provides ${source.voltage}V.`,
+            suggestion: input.description,
+            involvedPartIds: [boardPart.id, source.partId],
+            involvedPinIds: [input.pinId, source.pinId],
+          })
+        }
+      }
     }
   }
 
