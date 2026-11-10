@@ -611,3 +611,58 @@ test("Pico relay energizes only through its coil and switches VBUS through COM/N
   assert.equal(off.rly.relayActive, false, "GP13 LOW should de-energize relay coil")
   assert.equal(off.pump.rpm, 0, "open NO contact must leave the pump motor unpowered")
 })
+test("NeoPixel ring requires a committed show frame and a physical DI-to-GPIO path", () => {
+  const circuit = {
+    parts: [
+      part("uno", "arduino-uno"),
+      part("ring", "neopixel-ring"),
+    ],
+    wires: [
+      wire("ring-vcc", "uno", "5v", "ring", "vcc"),
+      wire("ring-gnd", "ring", "gnd", "uno", "gnd"),
+      wire("ring-di", "uno", "d6", "ring", "di"),
+    ],
+  }
+  const dark = computeRuntime(circuit, new Set())
+  assert.equal(dark.ring.level, 0, "VCC/GND alone must not light addressable pixels")
+  assert.equal(dark.ring.neopixelDataActive, false)
+  assert.ok(dark.ring.pixelColors.every((color) => color === "#0f172a"))
+
+  const staged = computeRuntime(circuit, new Set(), {}, {}, {
+    ring: {
+      bufferColors: ["#ff0000", "#00ff00"],
+      displayedColors: ["#0f172a", "#0f172a"],
+      hasShown: false,
+      dataPin: { partId: "uno", pinId: "d6" },
+    },
+  })
+  assert.equal(staged.ring.level, 0, "staged setPixelColor values must remain dark until show()")
+
+  const shown = computeRuntime(circuit, new Set(), {}, {}, {
+    ring: {
+      bufferColors: ["#ff0000", "#00ff00"],
+      displayedColors: ["#ff0000", "#00ff00"],
+      hasShown: true,
+      dataPin: { partId: "uno", pinId: "d6" },
+    },
+  })
+  assert.equal(shown.ring.level, 1)
+  assert.equal(shown.ring.neopixelDataActive, true)
+  assert.deepEqual(shown.ring.pixelColors.slice(0, 2), ["#ff0000", "#00ff00"])
+
+  const disconnected = {
+    ...circuit,
+    wires: circuit.wires.filter((item) => item.id !== "ring-di"),
+  }
+  const notDriven = computeRuntime(disconnected, new Set(), {}, {}, {
+    ring: {
+      bufferColors: ["#ff0000"],
+      displayedColors: ["#ff0000"],
+      hasShown: true,
+      dataPin: { partId: "uno", pinId: "d6" },
+    },
+  })
+  assert.equal(notDriven.ring.level, 0, "a remembered data pin must not illuminate an unplugged DI pad")
+  assert.equal(notDriven.ring.neopixelDataActive, false)
+})
+
