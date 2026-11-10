@@ -77,6 +77,81 @@ const LED_ELECTRICAL_MODEL = {
   nominalForwardCurrentMa: 15,
 } as const
 
+// Generic module-load equivalents are explicitly labelled estimates because
+// the catalogue does not identify an exact manufacturer/module revision.
+// These figures are teaching-model defaults, not measured or datasheet limits.
+const MODULE_LOAD_ESTIMATES = {
+  servo: [{
+    positivePin: "vcc", negativePin: "gnd", nominalVoltage: 5, nominalCurrentMa: 10,
+    accuracy: "module-estimate",
+    activeWhen: "servo-command",
+    note: "Quiescent/commanded teaching estimate only; servo current varies with torque, motion and stall.",
+  }],
+  relay: [{
+    positivePin: "vcc", negativePin: "gnd", nominalVoltage: 5, nominalCurrentMa: 12,
+    accuracy: "module-estimate",
+    activeWhen: "relay-energized",
+    note: "Generic 5V relay-coil estimate; exact coil resistance and current depend on the selected relay module.",
+  }],
+  lcd: [{
+    positivePin: "vcc", negativePin: "gnd", nominalVoltage: 5, nominalCurrentMa: 15,
+    accuracy: "module-estimate",
+    note: "Generic backlit character-display estimate; backlight and backpack variants change consumption.",
+  }],
+  oled: [{
+    positivePin: "vcc", negativePin: "gnd", nominalVoltage: 3.3, nominalCurrentMa: 15,
+    accuracy: "module-estimate",
+    note: "Generic small OLED module estimate; panel content, brightness and regulator variant change consumption.",
+  }],
+  ultrasonic: [{
+    positivePin: "vcc", negativePin: "gnd", nominalVoltage: 5, nominalCurrentMa: 10,
+    accuracy: "module-estimate",
+    note: "Generic HC-SR04 teaching estimate; board revisions can differ.",
+  }],
+  pir: [{
+    positivePin: "vcc", negativePin: "gnd", nominalVoltage: 5, nominalCurrentMa: 8,
+    accuracy: "module-estimate",
+    note: "Generic PIR module estimate; sensor board and regulator variant are unspecified.",
+  }],
+  ir: [{
+    positivePin: "vcc", negativePin: "gnd", nominalVoltage: 5, nominalCurrentMa: 8,
+    accuracy: "module-estimate",
+    note: "Generic IR obstacle-module estimate; LED intensity and comparator board differ by module.",
+  }],
+  dht11: [{
+    positivePin: "vcc", negativePin: "gnd", nominalVoltage: 5, nominalCurrentMa: 2.5,
+    accuracy: "module-estimate",
+    note: "Low-power sensor estimate; breakout pull-up and indicator LEDs are not included.",
+  }],
+  soil: [{
+    positivePin: "vcc", negativePin: "gnd", nominalVoltage: 5, nominalCurrentMa: 12,
+    accuracy: "module-estimate",
+    note: "Generic resistive soil-probe module estimate; probe drive and module circuitry vary.",
+  }],
+  mq2: [{
+    positivePin: "vcc", negativePin: "gnd", nominalVoltage: 5, nominalCurrentMa: 150,
+    accuracy: "module-estimate",
+    note: "Heater-dominated MQ-2 module estimate; verify the exact sensor and breakout before hardware power budgeting.",
+  }],
+  l298nLogic: [{
+    positivePin: "5v", negativePin: "gnd", nominalVoltage: 5, nominalCurrentMa: 15,
+    accuracy: "module-estimate",
+    note: "Logic-side teaching estimate only; excludes motor load and module regulator losses.",
+  }],
+  joystickTracks: [
+    {
+      positivePin: "vcc", negativePin: "gnd", nominalVoltage: 5, nominalCurrentMa: 0.5,
+      accuracy: "module-estimate",
+      note: "One nominal 10kΩ potentiometer track; generic joystick track model.",
+    },
+    {
+      positivePin: "vcc", negativePin: "gnd", nominalVoltage: 5, nominalCurrentMa: 0.5,
+      accuracy: "module-estimate",
+      note: "Second nominal 10kΩ potentiometer track; generic joystick track model.",
+    },
+  ],
+} as const
+
 export const CATALOG: Record<PartType, PartDef> = {
   "arduino-uno": {
     type: "arduino-uno",
@@ -232,6 +307,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "gnd", label: "GND", x: 4, y: 52, kind: "ground" },
     ],
     defaults: { angle: 90 },
+    electrical: { supplyLoads: [...MODULE_LOAD_ESTIMATES.servo] },
     requiredPinGroups: [["sig"],["vcc"],["gnd"]],
   },
   buzzer: {
@@ -292,6 +368,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "sda", label: "SDA", x: 90, y: 76, kind: "passive" },
       { id: "scl", label: "SCL", x: 120, y: 76, kind: "passive" },
     ],
+    electrical: { supplyLoads: [...MODULE_LOAD_ESTIMATES.lcd] },
     requiredPinGroups: [["gnd"],["vcc"],["sda"],["scl"]],
   },
   ultrasonic: {
@@ -306,6 +383,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "echo", label: "Echo", x: 60, y: 52, kind: "passive" },
       { id: "gnd", label: "GND", x: 80, y: 52, kind: "ground" },
     ],
+    electrical: { supplyLoads: [...MODULE_LOAD_ESTIMATES.ultrasonic] },
     requiredPinGroups: [["vcc"],["trig"],["echo"],["gnd"]],
   },
   "pir-sensor": {
@@ -319,6 +397,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "out", label: "OUT", x: 30, y: 66, kind: "passive" },
       { id: "gnd", label: "GND", x: 50, y: 66, kind: "ground" },
     ],
+    electrical: { supplyLoads: [...MODULE_LOAD_ESTIMATES.pir] },
     requiredPinGroups: [["vcc"],["out"],["gnd"]],
   },
   ldr: {
@@ -385,6 +464,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "no", label: "NO", x: 86, y: 4, kind: "passive" },
       { id: "nc", label: "NC", x: 100, y: 4, kind: "passive" },
     ],
+    electrical: { supplyLoads: [...MODULE_LOAD_ESTIMATES.relay] },
     requiredPinGroups: [["vcc"],["gnd"],["in"],["com"],["no","nc"]],
   },
 
@@ -400,6 +480,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "gnd", label: "GND", x: 64, y: 60, kind: "ground" },
     ],
     defaults: { detected: "false" },
+    electrical: { supplyLoads: [...MODULE_LOAD_ESTIMATES.ir] },
     requiredPinGroups: [["vcc"],["out"],["gnd"]],
   },
   "dht11": {
@@ -414,6 +495,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "gnd", label: "GND", x: 60, y: 62, kind: "ground" },
     ],
     defaults: { temperature: 25, humidity: 55 },
+    electrical: { supplyLoads: [...MODULE_LOAD_ESTIMATES.dht11] },
     requiredPinGroups: [["vcc"],["data"],["gnd"]],
   },
   "oled-i2c": {
@@ -429,6 +511,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "sda", label: "SDA", x: 118, y: 88, kind: "digital" },
     ],
     defaults: { line1: "PIXIU TECH", line2: "READY", line3: "" },
+    electrical: { supplyLoads: [...MODULE_LOAD_ESTIMATES.oled] },
     requiredPinGroups: [["gnd"],["vcc"],["scl"],["sda"]],
   },
   "joystick": {
@@ -445,6 +528,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "sw", label: "SW", x: 78, y: 82, kind: "digital" },
     ],
     defaults: { x: 512, y: 512, pressed: "false" },
+    electrical: { supplyLoads: [...MODULE_LOAD_ESTIMATES.joystickTracks] },
     requiredPinGroups: [["gnd"],["vcc"],["vrx"],["vry"]],
   },
   "l298n": {
@@ -469,6 +553,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "in4", label: "IN4", x: 94, y: 104, kind: "digital" },
     ],
     defaults: { speedA: 0, speedB: 0 },
+    electrical: { supplyLoads: [...MODULE_LOAD_ESTIMATES.l298nLogic] },
     requiredPinGroups: [["vs"],["gnd"],["ena","enb"],["in1","in3"],["in2","in4"],["out1","out3"],["out2","out4"]],
   },
   "rotary-encoder": {
@@ -499,6 +584,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "gnd", label: "GND", x: 58, y: 80, kind: "ground" },
     ],
     defaults: { moisture: 620 },
+    electrical: { supplyLoads: [...MODULE_LOAD_ESTIMATES.soil] },
     requiredPinGroups: [["vcc"],["ao"],["gnd"]],
   },
   "keypad-4x4": {
@@ -548,6 +634,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "ao", label: "AO", x: 64, y: 84, kind: "analog" },
     ],
     defaults: { gasLevel: 150, threshold: 350 },
+    electrical: { supplyLoads: [...MODULE_LOAD_ESTIMATES.mq2] },
     requiredPinGroups: [["vcc"],["gnd"],["ao"]],
   },
 }
