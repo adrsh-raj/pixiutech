@@ -933,14 +933,31 @@ test("MNA reports conflicting ideal voltage sources instead of silently overwrit
     "a downstream resistor must not display current from an unsatisfiable source network")
 })
 
-test("MNA preserves negative battery potentials instead of clamping them to zero", () => {
+test("MNA preserves negative battery potentials and reports a valid negative-rail source current", () => {
   const circuit = {
-    parts: [part("battery", "battery", { voltage: -5 })],
-    wires: [],
+    parts: [
+      part("battery", "battery", { voltage: -5 }),
+      part("load", "resistor", { resistance: 1000 }),
+    ],
+    wires: [
+      wire("negative-feed", "battery", "pos", "load", "a"),
+      wire("return", "load", "b", "battery", "neg"),
+    ],
   }
   const solved = solveCircuitNodalPotentials(circuit)
   assert.equal(solved.getPinVoltage({ partId: "battery", pinId: "pos" }), -5)
   assert.equal(solved.getPinVoltage({ partId: "battery", pinId: "neg" }), 0)
+  assert.equal(solved.getPinInfo({ partId: "battery", pinId: "pos" }).isDriven, true,
+    "a fixed negative rail is still an active voltage source")
+  assert.ok(Math.abs(solved.getBranchCurrent("load", "a", "b") + 5) < 0.001,
+    "resistor current must reverse direction for a -5V source")
+  const meter = solved.computeCurrentBetweenPins(
+    { partId: "battery", pinId: "pos" },
+    { partId: "battery", pinId: "neg" },
+    {},
+  )
+  assert.ok(Math.abs(meter.currentMa - 5) < 0.001,
+    "source-to-return ammeter must report the 5mA load on a negative rail")
 })
 
 
