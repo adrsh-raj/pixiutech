@@ -1,113 +1,131 @@
-# PIXIU CYBERLAB Virtual Lab — Current-Flow & Electrical Model Follow-up Checkpoint
+# PIXIU CYBERLAB Virtual Lab — Electrical Solver & Current-Flow Audit Checkpoint
 
 **Checkpoint date:** 2026-11-10 (Asia/Kolkata)  
 **Repository:** adrsh-raj/pixiutech  
 **Scope:** Virtual Lab / PIXIU CYBERLAB only.  
-**Checkpoint branch:** fix/virtual-lab-current-flow-model-audit-2026-11-10  
-**Branch base at creation:** main @ 5e86bb161b6b9b372961df66671f636360b12ecc  
-**Latest main commit inspected:** 5e86bb161b6b9b372961df66671f636360b12ecc  
-**Status:** Audit in progress; do not treat current-flow visualization as physically accurate for every component yet.
+**Branch:** fix/virtual-lab-current-flow-model-audit-2026-11-10  
+**Branch base:** main @ 5e86bb161b6b9b372961df66671f636360b12ecc  
+**Verified source/test head:** 47a87eeab6263822a8ab64881b5edc5ae40d3b71  
+**Pull request:** #83 — https://github.com/adrsh-raj/pixiutech/pull/83  
+**Status:** Implementation and exact-head CI verification complete. PR merge is pending the final integration action. Do not call every component model datasheet-accurate; see limitations below.
 
-## 1. Verified repository and merge state
+## 1. Repository and branch state
 
-- Confirmed repository is `adrsh-raj/pixiutech`, default branch `main`.
-- Latest main commit is `5e86bb161b6b9b372961df66671f636360b12ecc`, message: `Merge Virtual Lab electrical engine audit`.
-- Previous electrical audit feature branch `fix/virtual-lab-electrical-engine-audit-2026-11-09` is an ancestor of main and is now **1 commit behind main, 0 commits ahead**. Its changes have therefore already landed on main; do not merge that branch again.
-- The checkpoint file that landed with the merge still contains historical statements saying PR #82 is open and main untouched. Those statements are stale after the merge and must not be relied on as current state.
-- Combined commit status currently reports Vercel – portal and Vercel – pixiutech failures whose target URL is the account build-rate-limit page. These are infrastructure/account limits, not evidence of TypeScript or electrical-test failure.
-- The GitHub connector's commit-workflow-runs endpoint returned no runs for the merge commit; this is not proof that no Actions workflows ran.
+- Work was performed only in `adrsh-raj/pixiutech`, on the feature branch above.
+- The branch was created from main at `5e86bb161b6b9b372961df66671f636360b12ecc`.
+- The earlier Virtual Lab electrical-engine audit branch was already merged into main before this follow-up; it was not re-merged.
+- PR #83 contains the follow-up electrical solver, current-flow, model metadata, tests and this checkpoint.
+- No production deployment or direct write to main was performed during implementation.
+- PR changes are limited to 11 Virtual Lab/test/engineering files. The implementation branch accumulated multiple API commits during incremental work; use a squash merge to land the reviewed result as one main commit.
 
-## 2. Prior completed audit evidence (historical baseline)
+## 2. Implemented electrical solver and measurement changes
 
-The previous checkpoint reports:
-- Catalogue inventory: 35 effective project templates, 55 curriculum lessons (40 with seeded circuits), 75 total circuits, 353 parts, 586 wire endpoints/edges.
-- Catalogue audit: 0 topology/electrical errors and 0 warnings.
-- Browser Gate on source/test head `3eed1ec8f059efa047a1f710592ca85fe81220dc`, documented on checkpoint commit `49511ca8adb2b4108cd62a9ef135424b29451691`: 178/178 tests passed.
-- The previous source checkpoint still had open follow-up work around fixed current assumptions and component load modeling. Do not call the entire Virtual Lab production-ready solely from catalogue audit or the 178-test Browser Gate.
+### Nodal solver / MNA
+- Added deterministic detection of conflicting ideal voltage sources on one equipotential net. A conflict produces a solver diagnostic; the complete connected conducting network is invalidated rather than displaying fabricated currents. Independent valid circuits remain measurable.
+- Preserved signed node potentials, including negative battery rails.
+- Replaced the fixed two-pass diode heuristic with an iterative active-set solve. Reverse-current diode branches are removed; forward-biased branches are added; non-convergence emits a diagnostic and fails safe by opening diode branches.
+- Exposed signed component branch currents and algebraic net-current sums.
+- Added/retained explicit branches for resistors, LDRs, potentiometer legs, LEDs/RGB channels, seven-segment diodes, relay contacts, active buzzer proxy, DC motor proxy, conducting NPN transistor, module supply loads, NeoPixel pixel loads and L298N motor-driver supply/output behavior.
+- L298N outputs use a first-order average-DC model derived from runtime direction/PWM and VS supply. Connected 50Ω motor-winding proxy current is reflected back to the driver supply branch.
+- The 1A test-source equivalent-resistance solve includes series and parallel passive paths; the shortest-path/Dijkstra resistance shortcut was removed.
+- A passive piezo buzzer is not treated as a fixed 100Ω DC resistance in ohmmeter mode.
 
-## 3. New direct source finding on main
+### Current-flow routing
+- Replaced the one-path BFS allocation with a conductor-network KCL solve. Component branch currents are injected at their terminals, then distributed through physical wire and internal copper edges.
+- Wire and breadboard conductors use explicit small resistance values for deterministic current sharing; relay and transistor pass-through paths are represented as conductor edges and are not double-counted as both edge and branch-current injection.
+- Fixed-voltage boundaries are limited to actual board rails/GPIO sources, battery terminals and explicitly modeled sensor outputs. Wire-attached component pins remain unknown nodes so physical wire voltage drops can be solved.
+- Legacy GPIO `OUTPUT LOW` states are recognized as fixed 0V sinks in current animation.
+- Removed numeric hard-coded current fallback values from `current-flow.ts`; there are no fixed `currentMa` literals left in that file.
+- Digital data/control pins are not represented as fabricated continuous DC current paths.
 
-Inspected:
-- `pixiu-lms-portal/src/lib/current-flow.ts`
-- `pixiu-lms-portal/src/lib/circuit-solver.ts`
-- `pixiu-lms-portal/src/lib/electrical-model.ts`
-- `pixiu-lms-portal/src/lib/templates.ts`
-- `pixiu-lms-portal/test/circuit-lab/current-flow.test.mjs`
-- `pixiu-lms-portal/test/circuit-lab/runtime-core.test.mjs`
-- `pixiu-lms-portal/package.json`
+### Multimeter
+- Direct probes across any modeled component branch now read that branch's signed MNA current (reported by magnitude), including RGB channels and seven-segment segments.
+- Source-to-return current is the algebraic sum of solved branch currents at the driven source net, not a sum of stale `runtime.currentMa` fields.
+- Equivalent resistance is solved across the passive network with a 1A test source, so parallel branches count even when the probes are directly across one resistor's terminals.
+- Conflicted source nets produce a voltage warning rather than a plausible-looking numeric reading.
+- Negative voltage-source current is covered by a regression test.
 
-Confirmed issue: current-flow.ts still uses hard-coded nominal current values for multiple devices instead of the nodal solver's branch currents:
-- RGB LED fallback: `redLevel * 15`, `greenLevel * 15`, `blueLevel * 15` mA.
-- Seven-segment: 15 mA per active segment.
-- Servo supply: 10 mA; signal: 5 mA.
-- LCD/OLED supply: 15 mA; SDA/SCL: 4 mA each.
-- Ultrasonic supply: 10 mA; TRIG/ECHO: 4 mA each.
-- MQ-2 / soil moisture supply: 12 mA; AO: 4 mA.
-- DHT11 supply: 8 mA; DATA: 4 mA.
-- PIR/IR supply: 8 mA; output: 6 mA.
-- Relay coil: 12 mA; input: 6 mA.
-- NeoPixel ring/strip supply: 20 mA; data: 6 mA.
-- L298N VS: 25 mA; logic 5V: 15 mA.
-- LED fallback: level-scaled or 15 mA default when runtime current is absent.
+## 3. Component electrical-model coverage
 
-These may be acceptable only as explicitly labelled illustrative estimates, not as measured/solved current. The UI currently receives them through the same `currentMa` flow state, which risks presenting estimates as physical measurements.
+- Added `ELECTRICAL_MODEL_CONTRACT` for **32/32 catalogue component types**. Each entry declares a model name, fidelity (`idealized`, `first-order`, `estimated`, `partial` or `signal-only`) and a plain-language limitation.
+- Added **14 catalogue supply-load metadata records** covering generic servo, relay, LCD/OLED, ultrasonic, PIR/IR, DHT11, soil-moisture, MQ-2, L298N logic supply, joystick tracks and TMP36 teaching models.
+- All generic module-load numbers are labelled `module-estimate` and have caveat/provenance notes. No exact manufacturer module variant was supplied, so none is represented as a datasheet-verified current.
+- NeoPixel ring current is derived from the runtime pixel colours and a catalogue per-channel current estimate; data-pin pulse current is not invented.
+- Passive and active components without a defensible static supply load are described as switch, passive-network, signal-only or partial models instead of being assigned a fake generic current.
 
-Additional algorithmic limitation: `traceComponentFlow` uses breadth-first search to select one upstream path and one downstream path. It then assigns the full component current to those selected wires. In circuits with parallel feeds, alternate return paths, or loops, this path-selection method can misrepresent branch distribution even if the component current itself is correct. Shared-wire algebraic aggregation helps for selected paths but does not solve the full network-flow allocation problem.
+### Explicit fidelity limitations
 
-The nodal solver models resistors, LDRs, potentiometers, LEDs/RGB channels, relays and selected active sources/outputs. It does not yet provide explicit internal load models for every sensor/display/driver. Therefore simply replacing every constant with `computeCurrentBetweenPins` is not valid until the corresponding physical branch is represented in the solver.
+This is an auditable teaching simulator, not SPICE or a hardware power-budget sign-off. Specifically:
+- MCU boards and regulator rails are ideal voltage boundaries; board quiescent current, regulator loss, source resistance and GPIO output resistance are not modeled.
+- The existing board registry treats its declared VIN/VBUS/VSYS supply entries as nominal ideal 5V boundaries; the input/regulator/USB diode behavior of physical board revisions is not simulated.
+- Generic sensor/display/servo/relay module loads are resistor-equivalent estimates. Exact board revision, pull-ups, LEDs, regulator and manufacturer current specifications are unknown.
+- Servo torque, stall and acceleration current are not simulated.
+- DC motor is a 50Ω winding proxy; back-EMF, inductance, mechanical load and stall transients are not modeled.
+- L298N output voltage is a first-order average-PWM approximation; transistor voltage drops, switching edges, recirculation paths and motor back-EMF are not modeled.
+- Active buzzer uses a limited 100Ω tone-active proxy; real piezo impedance is frequency-dependent. DC ohmmeter mode treats a passive piezo as open/reactive, not as a resistor.
+- LED/RGB/seven-segment models use piecewise-linear forward-voltage plus a 10Ω dynamic-resistance proxy; temperature, thermal runaway and LED burnout physics are not solved by MNA.
+- Breadboard contact resistance/rail segmentation, switch bounce and other parasitics are simplified.
 
-## 4. Required next work
+## 4. Exact-head verification evidence
 
-1. Inspect the remainder of `circuit-solver.ts` and `electrical-model.ts`; map which device terminals have real modeled branches and which are idealized outputs only.
-2. Decide a truthful contract for current-flow UI:
-   - solved current for explicitly modeled branches;
-   - labelled estimate for components with documented typical-load metadata;
-   - no numeric current animation where neither model nor defensible estimate exists.
-3. Replace LED/RGB/seven-segment and supported passive/load hard-coded fallbacks with solved branch current where the solver genuinely models those branches.
-4. Add explicit load metadata/models for selected sensor/display/servo/relay/driver components only where source/catalogue data supports a defensible model. Do not invent typical currents.
-5. Fix path tracing so wire current comes from solved branch/net current rather than one arbitrary BFS path. Preserve topology, breadboard copper and alias semantics.
-6. Add regression tests for series, parallel, shared feed/return, multiple return paths, open branches, reverse polarity, shorted sources, and current conservation (KCL).
-7. Re-run `npm run test:lab`, build, lint, catalogue audit, Browser Gate and relevant reliability/security gates on the exact resulting commit. Record run IDs and exact outcomes.
-8. Keep unrelated public-site audit findings (e.g. historical EightSquareAI.jsx check) separate; do not weaken unrelated checks.
+All runs below are for source/test head `47a87eeab6263822a8ab64881b5edc5ae40d3b71` (2026-11-10).
 
-## 5. Mathematical acceptance criteria
+| GitHub Actions workflow | Run ID | Result |
+|---|---:|---|
+| PIXIU CyberLab Browser Gate | 42784844537 | PASS |
+| PIXIU Production Verification | 42784844172 | PASS |
+| PIXIU Phase 9 Final Green Gate | 42784844529 | PASS |
+| PIXIU AI Lab Phase 4-6 Gate | 42784844559 | PASS |
+| PIXIU AI Lab Phase 4-9 Reliability Gate | 42784844207 | PASS |
+| PIXIU Part 4 Current Verification | 42784844264 | PASS |
+| PIXIU AI Lab Phase 0-3 Gate | 42784844222 | PASS |
+| PIXIU Production Security Smoke | 42784844183 | PASS |
 
-- KCL: algebraic sum of currents at every non-source node is approximately zero within a documented numerical tolerance.
-- Ohm's law: resistor branch current equals signed voltage difference divided by resistance.
-- Series circuit: every series branch carries the same current.
-- Parallel circuit: branch currents sum to source current; branch currents follow branch resistance.
-- Open switch/open branch: zero current through that branch.
-- Relay NO/NC contacts: exactly one contact path conducts according to relay state; contact resistance is modeled consistently.
-- LED: no forward current below its configured forward voltage; current limited by the actual series network; reverse bias is not reported as forward illumination.
-- Potentiometer: endpoint and mid-track behavior agrees with its split resistance model and wiper node.
-- LDR: resistance changes monotonically with light input and current follows the solved network.
-- Power-domain correctness: GPIO signal current is not conflated with board supply current; supply rails and ground are not silently shorted by ideal fixed-source conflicts.
+### Browser Gate / electrical audit details
 
-## 6. Safety / resume protocol
+- `test:lab`: **193 tests, 193 pass, 0 fail**.
+- Project templates: **35**.
+- Curriculum lessons: **55**, of which **40** contain seeded circuits.
+- Total circuits audited: **75**.
+- Parts in those circuits: **355**.
+- Wires in those circuits: **590**.
+- Topology/electrical audit: **0 errors, 0 warnings**.
+- The 75-circuit solver audit runs `computeRuntime()` for each circuit, passes the resulting runtime into MNA, asserts finite node voltages/branch currents, rejects source-conflict/diode non-convergence diagnostics, and checks each non-source/non-floating/non-conflicted net for KCL residual <= **0.01mA**.
+- Browser Gate reports: `PIXIU CyberLab browser gate PASSED`.
+- Browser evidence artifact: `pixiu-cyberlab-browser-evidence`, artifact ID `13748871132`.
+- The separate Phase 9 final gate also passed its source/build, public-site, AI test and browser verification stages.
+- Production Verification passed Django backend checks, public-site build/audit, LMS lint/security scans and production build. Lint reported **257 warnings and 0 errors**; warnings were not suppressed.
+- Production Release Report: **all 10 acceptance gates passed** for the Phase 2 corpus (796 released records).
 
-- Work only in `adrsh-raj/pixiutech`, Virtual Lab / PIXIU CYBERLAB scope.
-- Continue on branch `fix/virtual-lab-current-flow-model-audit-2026-11-10` from the exact base above.
-- Do not force-push, reset, clean, stash, rebase, or overwrite unrelated files.
-- No production deployment.
-- Do not merge follow-up work until exact-head tests and review pass. User has explicitly asked for main integration, but that does not waive test gates.
-- If connection drops, fetch this checkpoint and current branch head first; compare against main before resuming.
+## 5. Deployment-provider status (separate from code/test gates)
 
+- Netlify deploy preview for PR #83: **success**, URL https://deploy-preview-83--clever-sopapillas-afab2e.netlify.app
+- Vercel – portal: failure state points to the Vercel account `build-rate-limit` page.
+- Vercel – pixiutech: failure state points to the same Vercel account `build-rate-limit` page.
+- These Vercel statuses are a provider/account build-rate-limit issue, not a failing GitHub Actions build or electrical test. They remain an external deployment blocker until the provider quota/account limit clears or is addressed.
 
-## 7. Additional solver / current-measurement review (2026-11-10)
+## 6. Mathematical regression coverage
 
-Further inspection of the MNA solver and its measurement helpers found these risks requiring targeted tests:
+The test suite includes:
+- Series resistors: equal branch current and KVL voltage-drop sum.
+- Parallel resistors: branch currents follow resistance and sum to total current.
+- KCL at solved internal nets and conductor-wire current conservation.
+- Parallel physical wire routes: current division by conductor resistance, with shared return carrying the sum.
+- Source conflict: incompatible ideal sources invalidate the full connected network while independent valid circuits continue.
+- Negative battery voltage and negative-rail ammeter current.
+- LED forward/off behavior, reverse polarity and diode active-set safety.
+- Relay NO/NC contact and coil current behavior.
+- L298N channel direction/PWM output voltage and VS supply current.
+- RGB/seven-segment direct DMM branch-current readings.
+- Parallel equivalent resistance when probing across one element.
+- Passive piezo buzzer treated as an open/reactive DC ohmmeter path.
+- Legacy GPIO OUTPUT LOW sink current routing.
+- 32/32 catalogue electrical-model contract coverage and supply-load pin/provenance validation.
 
-- `solveCircuitNodalPotentials` clamps every solved unknown node voltage with `Math.max(0, ...)`. This discards negative node potentials. If negative rails or reversed external supplies are within the supported circuit domain, the solver cannot represent them faithfully. Establish whether negative supplies are supported; either preserve signed node voltages and add tests, or explicitly constrain/document the simulator's supported voltage domain.
-- Fixed voltage nets are inserted into a `Map` by iterating boards and batteries. A later source silently overwrites an earlier fixed voltage if two sources are wired onto the same net. Conflicting 3.3V/5V/9V sources or a direct source-to-source short can therefore be hidden instead of diagnosed. Add a source-conflict/short-circuit check before solving; never rely on iteration order.
-- The MNA matrix receives a diagonal regularizer (`1e-9`) and rounds solved node potentials to 3 decimals before later calculations. Validate that the regularizer does not create misleading finite readings on floating/high-impedance nodes, and quantify the error for large resistance ratios.
-- The active diode set is chosen using reachable fixed source voltages, then rechecked for at most two solve passes. Add cases for multiple LED branches, series diodes, reverse-biased branches and mixed source networks to prove convergence and correct current limiting.
-- The current measurement helper's LED path falls back to runtime level/current estimates rather than deriving current from the actual diode branch; ensure its result matches solver branch current when the resistor, supply voltage or LED forward voltage changes.
-- The ohmmeter resistance path uses shortest-path resistance for resistors/potentiometers; this is not equivalent resistance for parallel networks. Verify whether this UI is meant to measure a component path or whole-network equivalent resistance; if the latter, implement a network equivalent-resistance solve instead of Dijkstra's shortest path.
+## 7. Main integration / resume protocol
 
-### Priority order
-P0: detect conflicting ideal voltage sources / shorts; eliminate false current readings on parallel networks.  
-P1: current-flow branch allocation and remove unlabeled fixed current constants.  
-P1: signed voltage support (or explicit non-support) and diode convergence tests.  
-P2: validate resistance-meter semantics and floating-net numerical tolerances.
-
-No source-code fix has been applied in this follow-up yet. The only change on this branch so far is this persistent audit checkpoint. Do not describe the current-flow or MNA implementation as fully audited or mathematically certified.
+- The source/test head above is fully verified. PR #83 is open against main; squash merge is the intended integration method so main receives one coherent commit.
+- Merge only this PR once; do not re-merge the earlier electrical-engine audit branch.
+- Do not force-push, reset, clean, stash, rebase or overwrite unrelated files.
+- Do not treat this simulator as hardware power-budget certification. Retain the fidelity limitations above in any user-facing claims.
+- After merge, verify main's merge SHA and confirm the PR state. Do not report success until GitHub confirms the merge.
