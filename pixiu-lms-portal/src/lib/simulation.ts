@@ -229,9 +229,7 @@ export function computeRuntime(
         addBoardSource("3v3", 3.3)
         addBoardSource("3.3v", 3.3)
       }
-      if (board.powerPins.vin) {
-        for (const p of board.powerPins.vin) addBoardSource(p, 5.0)
-      }
+      // Raw VIN/VSYS input pins do not source peripherals by themselves.
       for (const g of board.powerPins.gnd) addBoardGround(g)
       addBoardGround("gnd")
       addBoardGround("ground")
