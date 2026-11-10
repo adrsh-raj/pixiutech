@@ -557,6 +557,7 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
       parts: [
         { id: "uno", type: "arduino-uno", x: 60, y: 100, rotation: 0, props: {} },
         { id: "walk_btn", type: "pushbutton", x: 250, y: 100, rotation: 0, props: {} },
+        { id: "walk_btn_pull", type: "resistor", x: 250, y: 180, rotation: 0, props: { resistance: 10000 } },
         { id: "red_led", type: "led", x: 420, y: 40, rotation: 0, props: { color: "red" } },
         { id: "yellow_led", type: "led", x: 420, y: 120, rotation: 0, props: { color: "yellow" } },
         { id: "green_led", type: "led", x: 420, y: 200, rotation: 0, props: { color: "green" } },
@@ -584,6 +585,8 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
         { id: "w14", from: { partId: "walk_led", pinId: "cathode" }, to: { partId: "uno", pinId: "gnd" }, color: "#1e293b" },
         { id: "w15", from: { partId: "uno", pinId: "5v" }, to: { partId: "walk_btn", pinId: "p1a" }, color: "#ef4444" },
         { id: "w16", from: { partId: "walk_btn", pinId: "p2a" }, to: { partId: "uno", pinId: "d2" }, color: "#22c55e" },
+        { id: "w17", from: { partId: "uno", pinId: "d2" }, to: { partId: "walk_btn_pull", pinId: "a" }, color: "#22c55e" },
+        { id: "w18", from: { partId: "walk_btn_pull", pinId: "b" }, to: { partId: "uno", pinId: "gnd" }, color: "#1e293b" },
       ],
     },
     blocklyXml: program(
@@ -611,6 +614,7 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
       parts: [
         { id: "uno", type: "arduino-uno", x: 60, y: 100, rotation: 0, props: {} },
         { id: "btn", type: "pushbutton", x: 260, y: 100, rotation: 0, props: {} },
+        { id: "btn_pull", type: "resistor", x: 260, y: 180, rotation: 0, props: { resistance: 10000 } },
         { id: "buzzer", type: "buzzer", x: 260, y: 210, rotation: 0, props: {} },
         { id: "led1", type: "led", x: 440, y: 90, rotation: 0, props: { color: "red" } },
         { id: "r1", type: "resistor", x: 440, y: 170, rotation: 0, props: { resistance: 220 } },
@@ -628,6 +632,8 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
         { id: "w8", from: { partId: "buzzer", pinId: "neg" }, to: { partId: "uno", pinId: "gnd" }, color: "#1e293b" },
         { id: "w9", from: { partId: "uno", pinId: "5v" }, to: { partId: "btn", pinId: "p1a" }, color: "#ef4444" },
         { id: "w10", from: { partId: "btn", pinId: "p2a" }, to: { partId: "uno", pinId: "d2" }, color: "#22c55e" },
+        { id: "w11", from: { partId: "uno", pinId: "d2" }, to: { partId: "btn_pull", pinId: "a" }, color: "#22c55e" },
+        { id: "w12", from: { partId: "btn_pull", pinId: "b" }, to: { partId: "uno", pinId: "gnd" }, color: "#1e293b" },
       ],
     },
     blocklyXml: `<xml xmlns="https://developers.google.com/blockly/xml">
@@ -664,6 +670,7 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
         { id: "uno", type: "arduino-uno", x: 60, y: 100, rotation: 0, props: {} },
         { id: "servo1", type: "servo", x: 440, y: 80, rotation: 0, props: { angle: 90 } },
         { id: "btn", type: "pushbutton", x: 270, y: 90, rotation: 0, props: {} },
+        { id: "btn_pull", type: "resistor", x: 270, y: 175, rotation: 0, props: { resistance: 10000 } },
         { id: "buzzer", type: "buzzer", x: 270, y: 200, rotation: 0, props: {} },
         { id: "led1", type: "led", x: 600, y: 80, rotation: 0, props: { color: "green" } },
         { id: "r1", type: "resistor", x: 600, y: 160, rotation: 0, props: { resistance: 220 } },
@@ -674,6 +681,8 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
         { id: "w3", from: { partId: "uno", pinId: "d9" }, to: { partId: "servo1", pinId: "sig" }, color: "#fb923c" },
         { id: "w4", from: { partId: "uno", pinId: "5v" }, to: { partId: "btn", pinId: "p1a" }, color: "#ef4444" },
         { id: "w5", from: { partId: "btn", pinId: "p2a" }, to: { partId: "uno", pinId: "d2" }, color: "#22c55e" },
+        { id: "w5a", from: { partId: "uno", pinId: "d2" }, to: { partId: "btn_pull", pinId: "a" }, color: "#22c55e" },
+        { id: "w5b", from: { partId: "btn_pull", pinId: "b" }, to: { partId: "uno", pinId: "gnd" }, color: "#1e293b" },
         { id: "w6", from: { partId: "uno", pinId: "d8" }, to: { partId: "buzzer", pinId: "pos" }, color: "#eab308" },
         { id: "w7", from: { partId: "buzzer", pinId: "neg" }, to: { partId: "uno", pinId: "gnd" }, color: "#1e293b" },
         { id: "w8", from: { partId: "uno", pinId: "d13" }, to: { partId: "r1", pinId: "a" }, color: "#22c55e" },
@@ -984,7 +993,7 @@ function starter(id: string, title: string, description: string, gradeBand: Temp
 
 const EXTRA_TEMPLATES: ProjectTemplate[] = [
   starter("g6-pushbutton-led", "🔘 Interactive Pushbutton Control Station (Dual LED + Click Buzzer)", "Tactile digital input switch controlling dual indicators and acoustic click feedback! Pressing the momentary pushbutton pulls D2 HIGH. The microcontroller switches the Green active LED (D13) ON, extinguishes the Amber standby LED (D12), and chirps the piezo buzzer (D8) with instantaneous acoustic confirmation.", 6, "Digital Inputs", "Beginner", ["Pushbutton", "Digital Input", "Dual LED", "Buzzer"],
-    { parts: [part("uno","arduino-uno",60,110),part("btn","pushbutton",310,90),part("bz","buzzer",310,210),part("led1","led",520,70,{color:"green"}),part("r1","resistor",520,150,{resistance:220}),part("led2","led",640,70,{color:"yellow"}),part("r2","resistor",640,150,{resistance:220})], wires: [wire("p1","uno","d2","btn","p1a"),wire("p2","btn","p2a","uno","5v","#ef4444"),wire("p3","uno","d13","r1","a","#22c55e"),wire("p4","r1","b","led1","anode","#22c55e"),wire("p5","led1","cathode","uno","gnd","#1e293b"),wire("p6","uno","d12","r2","a","#facc15"),wire("p7","r2","b","led2","anode","#facc15"),wire("p8","led2","cathode","uno","gnd","#1e293b"),wire("p9","uno","d8","bz","pos","#eab308"),wire("p10","bz","neg","uno","gnd","#1e293b")] },
+    { parts: [part("uno","arduino-uno",60,110),part("btn","pushbutton",310,90),part("btn_pull","resistor",310,175,{resistance:10000}),part("bz","buzzer",310,210),part("led1","led",520,70,{color:"green"}),part("r1","resistor",520,150,{resistance:220}),part("led2","led",640,70,{color:"yellow"}),part("r2","resistor",640,150,{resistance:220})], wires: [wire("p1","uno","d2","btn","p1a"),wire("p2","btn","p2a","uno","5v","#ef4444"),wire("p3","uno","d13","r1","a","#22c55e"),wire("p4","r1","b","led1","anode","#22c55e"),wire("p5","led1","cathode","uno","gnd","#1e293b"),wire("p6","uno","d12","r2","a","#facc15"),wire("p7","r2","b","led2","anode","#facc15"),wire("p8","led2","cathode","uno","gnd","#1e293b"),wire("p9","uno","d8","bz","pos","#eab308"),wire("p10","bz","neg","uno","gnd","#1e293b"),wire("p11","uno","d2","btn_pull","a","#22c55e"),wire("p12","btn_pull","b","uno","gnd","#1e293b")] },
     program([pinMode("2","INPUT"),pinMode("13","OUTPUT"),pinMode("12","OUTPUT"),pinMode("8","OUTPUT")],[
       ifElseBlock(
         block("io_digitalread",{PIN:"2"}),
@@ -1021,7 +1030,7 @@ const EXTRA_TEMPLATES: ProjectTemplate[] = [
   starter("g6-rgb-mood-lamp", "🌈 RGB Mood Lamp & Interactive Color Strobe Station", "Multi-channel PWM RGB color blending with interactive mode controls! Each RGB channel on D9, D10, and D11 has its own 220Ω current-limiting resistor; the Arduino also reads a D2 mode button and A0 brightness control. Hold the button for a cyan strobe with an 850 Hz piezo chime on D8.", 6, "Multi-Output", "Beginner", ["RGB LED", "Colour", "GPIO", "Pushbutton", "Buzzer"],
     {
       parts: [
-        part("uno","arduino-uno",60,110), part("btn","pushbutton",260,90), part("bz","buzzer",260,200),
+        part("uno","arduino-uno",60,110), part("btn","pushbutton",260,90), part("btn_pull","resistor",260,175,{resistance:10000}), part("bz","buzzer",260,200),
         part("rgb","rgb-led",520,90,{}), part("pot","potentiometer",370,200,{value:512}),
         part("r_red","resistor",380,45,{resistance:220}),
         part("r_green","resistor",380,105,{resistance:220}),
@@ -1033,6 +1042,7 @@ const EXTRA_TEMPLATES: ProjectTemplate[] = [
         wire("b_drive","uno","d11","r_blue","a","#3b82f6"), wire("b_channel","r_blue","b","rgb","blue","#3b82f6"),
         wire("gnd","uno","gnd","rgb","gnd","#1e293b"),
         wire("w_btn_vcc","uno","5v","btn","p1a","#ef4444"), wire("w_btn_sig","btn","p2a","uno","d2","#22c55e"),
+        wire("w_btn_pull","uno","d2","btn_pull","a","#22c55e"), wire("w_btn_pull_gnd","btn_pull","b","uno","gnd","#1e293b"),
         wire("w_bzpos","uno","d8","bz","pos","#eab308"), wire("w_bzgnd","bz","neg","uno","gnd","#1e293b"),
         wire("w_pot_vcc","uno","5v","pot","t1","#ef4444"), wire("w_pot_gnd","uno","gnd","pot","t2","#1e293b"),
         wire("w_pot_w","pot","wiper","uno","a0","#eab308"),
@@ -1054,7 +1064,7 @@ const EXTRA_TEMPLATES: ProjectTemplate[] = [
       "4. 📊 Outcomes & Real-Time Observations: Ambient violet mood glow transforms into vivid cyan flash accompanied by chime tones.",
     ]),
   starter("g6-buzzer-doorbell", "🔔 Smart Motion-Activated Video Doorbell (PIR + Chime + Welcome Light)", "Audible annunciator and motion security system! Detects visitor arrival via either tactile pushbutton (D2) or PIR infrared motion sensor (D7). The Arduino activates an acoustic 2-tone melodic chime on D8 and illuminates the welcoming LED porch light on D13.", 6, "Digital Inputs + Outputs", "Beginner", ["Pushbutton", "Buzzer", "PIR Motion", "Welcome Lamp"],
-    { parts: [part("uno","arduino-uno",60,110),part("btn","pushbutton",270,90),part("pir","pir-sensor",430,60,{motion:"false"}),part("bz","buzzer",270,210),part("led1","led",590,80,{color:"green"}),part("r1","resistor",590,160,{resistance:220})], wires: [wire("a","uno","d2","btn","p1a"),wire("b","btn","p2a","uno","5v","#ef4444"),wire("c","uno","d8","bz","pos","#facc15"),wire("d","bz","neg","uno","gnd","#1e293b"),wire("w_pvcc","uno","5v","pir","vcc","#ef4444"),wire("w_pgnd","uno","gnd","pir","gnd","#1e293b"),wire("w_pout","uno","d7","pir","out","#60a5fa"),wire("w_la","uno","d13","r1","a","#22c55e"),wire("w_lb","r1","b","led1","anode","#22c55e"),wire("w_lgnd","led1","cathode","uno","gnd","#1e293b")] },
+    { parts: [part("uno","arduino-uno",60,110),part("btn","pushbutton",270,90),part("btn_pull","resistor",270,175,{resistance:10000}),part("pir","pir-sensor",430,60,{motion:"false"}),part("bz","buzzer",270,210),part("led1","led",590,80,{color:"green"}),part("r1","resistor",590,160,{resistance:220})], wires: [wire("a","uno","d2","btn","p1a"),wire("b","btn","p2a","uno","5v","#ef4444"),wire("c","uno","d8","bz","pos","#facc15"),wire("d","bz","neg","uno","gnd","#1e293b"),wire("w_pvcc","uno","5v","pir","vcc","#ef4444"),wire("w_pgnd","uno","gnd","pir","gnd","#1e293b"),wire("w_pout","uno","d7","pir","out","#60a5fa"),wire("w_la","uno","d13","r1","a","#22c55e"),wire("w_lb","r1","b","led1","anode","#22c55e"),wire("w_lgnd","led1","cathode","uno","gnd","#1e293b"),wire("w_btn_pull","uno","d2","btn_pull","a","#22c55e"),wire("w_btn_pull_gnd","btn_pull","b","uno","gnd","#1e293b")] },
     program([pinMode("2","INPUT"),pinMode("7","INPUT"),pinMode("8","OUTPUT"),pinMode("13","OUTPUT")],[
       ifElseBlock(
         block("io_digitalread",{PIN:"2"}),
@@ -1265,7 +1275,7 @@ const EXTRA_TEMPLATES: ProjectTemplate[] = [
       "4. 📊 Outcomes & Real-Time Observations: The Serial console and LCD log positive and negative dial steps accompanied by tactile audio click chirps.",
     ]),
   starter("g7-servo-door", "🚧 Automatic Ultrasonic Boom Barrier Gate (Sonar + Servo + Stop/Go LEDs + Chime)", "The HC-SR04 measures vehicle distance on D10/D11 and opens the barrier below 30 cm. Press and hold the D2 override to keep the barrier closed. Red/green LEDs show stop/go, and a piezo tone confirms opening.", 7, "Robotics", "Intermediate", ["Servo", "Automation", "Ultrasonic", "Boom Barrier", "Buzzer"],
-    { parts: [part("uno","arduino-uno",60,110),part("sonar","ultrasonic",300,60,{distance:45}),part("servo","servo",510,60,{angle:0}),part("btn","pushbutton",200,200),part("bz","buzzer",320,200),part("led_stop","led",670,60,{color:"red"}),part("r1","resistor",670,140,{resistance:220}),part("led_go","led",770,60,{color:"green"}),part("r2","resistor",770,140,{resistance:220})], wires: [wire("a","uno","5v","servo","vcc","#ef4444"),wire("b","uno","gnd","servo","gnd","#1e293b"),wire("c","uno","d9","servo","sig","#fb923c"),wire("w_sonar_vcc","uno","5v","sonar","vcc","#ef4444"),wire("w_sonar_gnd","uno","gnd","sonar","gnd","#1e293b"),wire("w_sonar_trig","uno","d10","sonar","trig","#60a5fa"),wire("w_sonar_echo","uno","d11","sonar","echo","#38bdf8"),wire("w_btn_vcc","uno","5v","btn","p1a","#ef4444"),wire("w_btn_sig","btn","p2a","uno","d2","#22c55e"),wire("w_bzpos","uno","d8","bz","pos","#eab308"),wire("w_bzgnd","bz","neg","uno","gnd","#1e293b"),wire("w_l1a","uno","d12","r1","a","#ef4444"),wire("w_l1b","r1","b","led_stop","anode","#ef4444"),wire("w_l1g","led_stop","cathode","uno","gnd","#1e293b"),wire("w_l2a","uno","d13","r2","a","#22c55e"),wire("w_l2b","r2","b","led_go","anode","#22c55e"),wire("w_l2g","led_go","cathode","uno","gnd","#1e293b")] },
+    { parts: [part("uno","arduino-uno",60,110),part("sonar","ultrasonic",300,60,{distance:45}),part("servo","servo",510,60,{angle:0}),part("btn","pushbutton",200,200),part("btn_pull","resistor",200,285,{resistance:10000}),part("bz","buzzer",320,200),part("led_stop","led",670,60,{color:"red"}),part("r1","resistor",670,140,{resistance:220}),part("led_go","led",770,60,{color:"green"}),part("r2","resistor",770,140,{resistance:220})], wires: [wire("a","uno","5v","servo","vcc","#ef4444"),wire("b","uno","gnd","servo","gnd","#1e293b"),wire("c","uno","d9","servo","sig","#fb923c"),wire("w_sonar_vcc","uno","5v","sonar","vcc","#ef4444"),wire("w_sonar_gnd","uno","gnd","sonar","gnd","#1e293b"),wire("w_sonar_trig","uno","d10","sonar","trig","#60a5fa"),wire("w_sonar_echo","uno","d11","sonar","echo","#38bdf8"),wire("w_btn_vcc","uno","5v","btn","p1a","#ef4444"),wire("w_btn_sig","btn","p2a","uno","d2","#22c55e"),wire("w_btn_pull","uno","d2","btn_pull","a","#22c55e"),wire("w_btn_pull_gnd","btn_pull","b","uno","gnd","#1e293b"),wire("w_bzpos","uno","d8","bz","pos","#eab308"),wire("w_bzgnd","bz","neg","uno","gnd","#1e293b"),wire("w_l1a","uno","d12","r1","a","#ef4444"),wire("w_l1b","r1","b","led_stop","anode","#ef4444"),wire("w_l1g","led_stop","cathode","uno","gnd","#1e293b"),wire("w_l2a","uno","d13","r2","a","#22c55e"),wire("w_l2b","r2","b","led_go","anode","#22c55e"),wire("w_l2g","led_go","cathode","uno","gnd","#1e293b")] },
     program([pinMode("9","OUTPUT"),pinMode("8","OUTPUT"),pinMode("12","OUTPUT"),pinMode("13","OUTPUT"),pinMode("2","INPUT")],[ifElseBlock(block("io_digitalread",{PIN:"2"}),[block("servo_write",{PIN:"9"},{ANGLE:numberBlock(0)}),digitalWrite("12","HIGH"),digitalWrite("13","LOW"),toneOff("8"),delay(80)],[ifElseBlock(compareBlock("LT",block("ultrasonic_read",{TRIG:"10",ECHO:"11"}),numberBlock(30)),[block("servo_write",{PIN:"9"},{ANGLE:numberBlock(90)}),digitalWrite("12","LOW"),digitalWrite("13","HIGH"),toneOn("8",980),delay(100),toneOff("8")],[block("servo_write",{PIN:"9"},{ANGLE:numberBlock(0)}),digitalWrite("12","HIGH"),digitalWrite("13","LOW"),toneOff("8"),delay(100)])])]),
     [
       "1. 🔌 Circuit Wiring & Hardware Setup: Connect barrier servo to D9, ultrasonic sonar to D10/D11, emergency button to D2, stop/go LEDs to D12/D13, and chime buzzer to D8.",
