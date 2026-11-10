@@ -300,13 +300,10 @@ function auditCircuit(label, circuit, xml, { strictLedProtection = true } = {}) 
     }
     if (!hasSupplySide || signalPins.size === 0) continue
     for (const [signalNode, signal] of signalPins) {
-      const pinMode = blockInventory(xml ?? "").find((block) =>
-        block.type === "io_pinmode" &&
-        normalize(block.fields.PIN).replace(/^(gpio|gp|d|p)/, "") === normalize(signal.pinId).replace(/^(gpio|gp|d|p)/, ""),
-      )?.fields.MODE?.toUpperCase()
-      if (pinMode === "INPUT_PULLUP") continue
       if (!hasGroundPullResistor(circuit, graph, signalNode, grounds)) {
-        errors.push(`${label}: pushbutton ${button.id} leaves ${signal.board.shortName} ${signal.pinId} floating; add a 1kΩ–100kΩ pull-down to GND or enable INPUT_PULLUP`)
+        // The current Blockly runtime does not model INPUT_PULLUP as an
+        // internal resistor; a declared mode alone cannot make the node non-floating.
+        errors.push(`${label}: pushbutton ${button.id} leaves ${signal.board.shortName} ${signal.pinId} floating; add a physical 1kΩ–100kΩ pull-down resistor to GND`)
       }
     }
   }
