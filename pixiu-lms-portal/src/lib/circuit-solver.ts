@@ -585,7 +585,7 @@ export function solveCircuitNodalPotentials(
         branches.push({
           netA: pinToNetId(part.id, "com"),
           netB: pinToNetId(part.id, activeContact),
-          conductance: 1 / 10000,
+          conductance: 1 / 0.05,
         })
         break
       }
