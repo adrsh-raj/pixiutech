@@ -339,3 +339,27 @@ test("a source-conflicted circuit does not suppress current animation in an inde
     "independent 9V/1kΩ circuit must continue to animate at about 9mA")
   assert.ok(currents["good-return"]?.currentMa > 8.9 && currents["good-return"]?.currentMa < 9.1)
 })
+
+
+test("wire-current solver routes valid current into a legacy GPIO OUTPUT LOW sink", () => {
+  const circuit = {
+    parts: [
+      { id: "uno", type: "arduino-uno", x: 40, y: 100, rotation: 0, props: {} },
+      { id: "r1", type: "resistor", x: 240, y: 100, rotation: 0, props: { resistance: 1000 } },
+    ],
+    wires: [
+      { id: "feed", from: { partId: "uno", pinId: "5v" }, to: { partId: "r1", pinId: "a" }, color: "#ef4444" },
+      { id: "low-sink", from: { partId: "r1", pinId: "b" }, to: { partId: "uno", pinId: "d12" }, color: "#1e293b" },
+    ],
+  }
+  const pinStates = {
+    "12": { mode: "OUTPUT", state: "LOW", value: 0 },
+  }
+  const currents = computeWireCurrents(circuit, {}, pinStates)
+  assert.ok(Math.abs((currents.feed?.currentMa ?? 0) - 5) < 0.05,
+    "5V feed wire should carry the solved 5mA load")
+  assert.ok(Math.abs((currents["low-sink"]?.currentMa ?? 0) - 5) < 0.05,
+    "legacy OUTPUT LOW wire must carry the same 5mA return current")
+  assert.equal(currents["low-sink"]?.isForward, true,
+    "current direction must point toward the GPIO LOW sink")
+})
