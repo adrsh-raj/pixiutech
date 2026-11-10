@@ -1021,6 +1021,6 @@ test("L298N solver drives motor outputs from VS and reflects motor current back 
   assert.ok(Math.abs(reverseSolved.getPinVoltage({ partId: "driver", pinId: "out2" }) - expectedAverageV) < 0.02,
     "reverse PWM output must follow the enabled duty-cycle average on OUT2")
   assert.ok(Math.abs(reverseSolved.getBranchCurrent("driver", "vs", "gnd") -
-    reverseSolved.getBranchCurrent("motor", "pos", "neg")) < 0.2,
-  "reverse PWM motor branch current must be reflected at the VS supply")
+    Math.abs(reverseSolved.getBranchCurrent("motor", "pos", "neg"))) < 0.2,
+  "reverse PWM motor branch current magnitude must be reflected at the VS supply")
 })
