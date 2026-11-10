@@ -115,7 +115,7 @@ export function computeWireCurrents(
       // terminals; component pins merely wired to them are not.
       for (const pin of board.powerPins.v5 ?? []) addAnchor(part.id, pin)
       for (const pin of board.powerPins.v33 ?? []) addAnchor(part.id, pin)
-      for (const pin of board.powerPins.vin ?? []) addAnchor(part.id, pin)
+      // VIN/VSYS are input terminals, not ideal output boundaries.
       for (const pin of board.powerPins.gnd) addAnchor(part.id, pin)
 
       // A driven MCU GPIO is a real voltage-source boundary as well.
