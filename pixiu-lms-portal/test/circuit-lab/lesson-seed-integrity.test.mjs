@@ -190,6 +190,32 @@ test("external pushbutton lessons include stable 10kΩ pull-down networks", () =
   }
 })
 
+test("Pico irrigation lesson wires the relay contact path to a real pump load", () => {
+  const lesson = LESSONS.find((item) => item.id === "lesson-pico-soil-irrigation")
+  assert.ok(lesson?.seedCircuit)
+  const { parts, wires } = lesson.seedCircuit
+  assert.equal(parts.find((item) => item.id === "pump")?.type, "dc-motor")
+  const hasWire = (fromPart, fromPin, toPart, toPin) => wires.some((wire) =>
+    (wire.from.partId === fromPart && wire.from.pinId === fromPin && wire.to.partId === toPart && wire.to.pinId === toPin) ||
+    (wire.to.partId === fromPart && wire.to.pinId === fromPin && wire.from.partId === toPart && wire.from.pinId === toPin),
+  )
+  assert.equal(hasWire("pico", "vbus", "rly", "com"), true, "VBUS must feed relay COM")
+  assert.equal(hasWire("rly", "no", "pump", "pos"), true, "relay NO must feed pump positive")
+  assert.equal(hasWire("pump", "neg", "pico", "gnd_1"), true, "pump negative must return to common GND")
+  const wiringStep = lesson.steps.find((step) => step.id === "wiring")
+  const requirements = wiringStep.checks.flatMap((check) => check.kind === "connections" ? check.requirements : [])
+  for (const [fromType, fromPin, toType, toPin] of [
+    ["rpi-pico", "vbus", "relay", "com"],
+    ["relay", "no", "dc-motor", "pos"],
+    ["dc-motor", "neg", "rpi-pico", "gnd_1"],
+  ]) {
+    assert.ok(requirements.some((item) =>
+      item.from.partType === fromType && item.from.pinId === fromPin &&
+      item.to.partType === toType && item.to.pinId === toPin,
+    ), `wiring step must require ${fromType}.${fromPin} -> ${toType}.${toPin}`)
+  }
+})
+
 test("seeded ESP32 and Pico pushbuttons produce LOW at rest and board-logic HIGH when pressed", async () => {
   const { solveCircuitNodalPotentials } = await import(`file://${join(outdir, "circuit-solver.js")}`)
   for (const [id, boardId, inputPin, logicVoltage] of [
