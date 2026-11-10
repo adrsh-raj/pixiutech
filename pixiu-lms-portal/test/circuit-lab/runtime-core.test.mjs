@@ -16,6 +16,7 @@ await build({
     new URL("../../src/lib/board-registry.ts", import.meta.url).pathname,
     new URL("../../src/lib/pin-state.ts", import.meta.url).pathname,
     new URL("../../src/lib/components-catalog.ts", import.meta.url).pathname,
+    new URL("../../src/lib/circuit-validator.ts", import.meta.url).pathname,
   ],
   bundle: true,
   format: "esm",
@@ -30,7 +31,13 @@ const { runBlocklyProgram } = await import(`file://${join(outdir, "blockly-runne
 const { diagnoseCircuit } = await import(`file://${join(outdir, "circuit-doctor.js")}`)
 const { normalizeBreadboardPinId } = await import(`file://${join(outdir, "breadboard-pins.js")}`)
 const { samplePinVoltage } = await import(`file://${join(outdir, "waveform-sampler.js")}`)
-const { getBoardForPart, lookupBoardPinState } = await import(`file://${join(outdir, "board-registry.js")}`)
+const {
+  getBoardForPart,
+  lookupBoardPinState,
+  getPinVoltage,
+  validateBoardPowerInputVoltage,
+} = await import(`file://${join(outdir, "board-registry.js")}`)
+const { validateProposedCircuit } = await import(`file://${join(outdir, "circuit-validator.js")}`)
 const { writePinStateAliases } = await import(`file://${join(outdir, "pin-state.js")}`)
 const { CATALOG, ELECTRICAL_MODEL_CONTRACT } = await import(`file://${join(outdir, "components-catalog.js")}`)
 
@@ -1040,4 +1047,77 @@ test("L298N solver drives motor outputs from VS and reflects motor current back 
   assert.ok(Math.abs(reverseSolved.getBranchCurrent("driver", "vs", "gnd") -
     Math.abs(reverseSolved.getBranchCurrent("motor", "pos", "neg"))) < 0.2,
   "reverse PWM motor branch current magnitude must be reflected at the VS supply")
+})
+
+
+test("raw VIN and VSYS inputs are not mistaken for fixed board supply outputs", () => {
+  const uno = getBoardForPart(part("uno", "arduino-uno"))
+  const pico = getBoardForPart(part("pico", "rpi-pico"))
+  const esp32 = getBoardForPart(part("esp", "esp32-devkit"))
+  assert.ok(uno && pico && esp32)
+
+  assert.equal(getPinVoltage(uno, "vin", "HIGH"), undefined,
+    "Uno VIN is a 7–12V regulator input, not a 5V output")
+  assert.equal(getPinVoltage(pico, "vsys", "HIGH"), undefined,
+    "Pico VSYS is a 1.8–5.5V system input, not a fixed 5V output")
+  assert.equal(getPinVoltage(uno, "5v", "LOW"), 5,
+    "regulated Uno 5V remains a board output rail")
+  assert.equal(getPinVoltage(pico, "vbus", "LOW"), 5,
+    "USB-powered Pico VBUS remains the default 5V source")
+  assert.equal(getPinVoltage(esp32, "vin", "LOW"), 5,
+    "ESP32 DevKit VIN/5V header is modeled as a dual-role 5V header in the default USB-powered state")
+
+  const bare = solveCircuitNodalPotentials({
+    parts: [part("uno", "arduino-uno"), part("pico", "rpi-pico")],
+    wires: [],
+  })
+  assert.equal(bare.getPinInfo({ partId: "uno", pinId: "vin" }).isDriven, false)
+  assert.equal(bare.getPinInfo({ partId: "uno", pinId: "vin" }).isFloating, true,
+    "unconnected Uno VIN must remain floating")
+  assert.equal(bare.getPinInfo({ partId: "pico", pinId: "vsys" }).isDriven, false)
+  assert.equal(bare.getPinInfo({ partId: "pico", pinId: "vsys" }).isFloating, true,
+    "unconnected Pico VSYS must remain floating")
+})
+
+test("board registry validates external VIN/VSYS voltage ranges", () => {
+  const uno = getBoardForPart(part("uno", "arduino-uno"))
+  const pico = getBoardForPart(part("pico", "rpi-pico"))
+  assert.ok(uno && pico)
+
+  assert.equal(validateBoardPowerInputVoltage(uno, "VIN", 9).safe, true)
+  assert.equal(validateBoardPowerInputVoltage(uno, "VIN", 5).safe, false,
+    "5V must be flagged below the Uno VIN 7V minimum")
+  assert.equal(validateBoardPowerInputVoltage(uno, "VIN", 13).safe, false,
+    "13V must be flagged above the Uno VIN 12V maximum")
+  assert.equal(validateBoardPowerInputVoltage(pico, "VSYS", 5).safe, true)
+  assert.equal(validateBoardPowerInputVoltage(pico, "VSYS", 9).safe, false,
+    "9V exceeds the Pico VSYS 5.5V maximum")
+})
+
+test("release validator checks external voltage on board power inputs without classifying VIN as a 5V source", () => {
+  const candidateFor = (voltage) => ({
+    parts: [
+      part("uno", "arduino-uno"),
+      part("battery", "battery", { voltage }),
+    ],
+    wires: [
+      wire("external-vin", "battery", "pos", "uno", "vin"),
+      wire("common-ground", "battery", "neg", "uno", "gnd_pwr"),
+    ],
+  })
+  const under = validateProposedCircuit(candidateFor(5), { allowWarnings: true })
+  assert.ok(under.notices.some((notice) => notice.ruleId === "safety-board-power-input-undervoltage"),
+    "5V battery must warn on Uno VIN, not be silently treated as a valid 5V supply")
+  assert.equal(under.notices.some((notice) => notice.ruleId === "safety-direct-power-short-5v"), false,
+    "raw VIN must not be added to the regulated 5V source group")
+
+  const nominal = validateProposedCircuit(candidateFor(9), { allowWarnings: true })
+  assert.equal(nominal.notices.some((notice) =>
+    notice.ruleId === "safety-board-power-input-undervoltage" ||
+    notice.ruleId === "safety-board-power-input-overvoltage"
+  ), false, "9V battery is inside the Uno VIN 7–12V input range")
+
+  const over = validateProposedCircuit(candidateFor(13), { allowWarnings: true })
+  assert.ok(over.notices.some((notice) => notice.ruleId === "safety-board-power-input-overvoltage"),
+    "13V battery must be rejected above the Uno VIN maximum")
 })
