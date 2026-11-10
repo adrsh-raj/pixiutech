@@ -142,3 +142,169 @@ test("DMM: stopping an unpowered MCU output does not create a phantom LED forwar
   assert.equal(solution.getPinVoltage(resistorB), 0)
   assert.equal(solution.getPinInfo(resistorA).isFloating, true)
 })
+
+
+test("DMM resistance measures parallel equivalent resistance, not the shortest single branch", () => {
+  const circuit = {
+    parts: [
+      { id: "uno", type: "arduino-uno", x: 40, y: 100, rotation: 0, props: {} },
+      { id: "r1", type: "resistor", x: 220, y: 60, rotation: 0, props: { resistance: 1000 } },
+      { id: "r2", type: "resistor", x: 220, y: 140, rotation: 0, props: { resistance: 1000 } },
+    ],
+    wires: [
+      { id: "feed1", from: { partId: "uno", pinId: "5v" }, to: { partId: "r1", pinId: "a" }, color: "#ef4444" },
+      { id: "feed2", from: { partId: "uno", pinId: "5v" }, to: { partId: "r2", pinId: "a" }, color: "#ef4444" },
+      { id: "return1", from: { partId: "r1", pinId: "b" }, to: { partId: "uno", pinId: "gnd_pwr" }, color: "#1e293b" },
+      { id: "return2", from: { partId: "r2", pinId: "b" }, to: { partId: "uno", pinId: "gnd_pwr" }, color: "#1e293b" },
+    ],
+  }
+  const solved = solveCircuitNodalPotentials(circuit)
+  const equivalent = solved.computeResistanceBetweenPins(
+    { partId: "uno", pinId: "5v" },
+    { partId: "uno", pinId: "gnd_pwr" },
+  )
+  assert.ok(Math.abs(equivalent.resistance - 500) < 0.1,
+    `Two 1kΩ parallel resistors must measure 500Ω, got ${equivalent.resistance}Ω`)
+  assert.match(equivalent.explanation, /Equivalent Resistance/i)
+})
+
+
+test("DMM resistance includes parallel branches even when probing one resistor's own terminals", () => {
+  const circuit = {
+    parts: [
+      { id: "uno", type: "arduino-uno", x: 40, y: 100, rotation: 0, props: {} },
+      { id: "r1", type: "resistor", x: 220, y: 60, rotation: 0, props: { resistance: 1000 } },
+      { id: "r2", type: "resistor", x: 220, y: 140, rotation: 0, props: { resistance: 1000 } },
+    ],
+    wires: [
+      { id: "feed1", from: { partId: "uno", pinId: "5v" }, to: { partId: "r1", pinId: "a" }, color: "#ef4444" },
+      { id: "feed2", from: { partId: "uno", pinId: "5v" }, to: { partId: "r2", pinId: "a" }, color: "#ef4444" },
+      { id: "return1", from: { partId: "r1", pinId: "b" }, to: { partId: "uno", pinId: "gnd_pwr" }, color: "#1e293b" },
+      { id: "return2", from: { partId: "r2", pinId: "b" }, to: { partId: "uno", pinId: "gnd_pwr" }, color: "#1e293b" },
+    ],
+  }
+  const solved = solveCircuitNodalPotentials(circuit)
+  const equivalent = solved.computeResistanceBetweenPins(
+    { partId: "r1", pinId: "a" },
+    { partId: "r1", pinId: "b" },
+  )
+  assert.ok(Math.abs(equivalent.resistance - 500) < 0.1,
+    `Probing across r1 should still include r2 in parallel: expected 500Ω, received ${equivalent.resistance}Ω`)
+})
+
+
+test("DMM resistance includes alternate parallel branches when probes are on one resistor's terminals", () => {
+  const circuit = {
+    parts: [
+      { id: "uno", type: "arduino-uno", x: 40, y: 100, rotation: 0, props: {} },
+      { id: "r1", type: "resistor", x: 220, y: 60, rotation: 0, props: { resistance: 1000 } },
+      { id: "r2", type: "resistor", x: 220, y: 140, rotation: 0, props: { resistance: 1000 } },
+    ],
+    wires: [
+      { id: "feed1", from: { partId: "uno", pinId: "5v" }, to: { partId: "r1", pinId: "a" }, color: "#ef4444" },
+      { id: "feed2", from: { partId: "uno", pinId: "5v" }, to: { partId: "r2", pinId: "a" }, color: "#ef4444" },
+      { id: "return1", from: { partId: "r1", pinId: "b" }, to: { partId: "uno", pinId: "gnd_pwr" }, color: "#1e293b" },
+      { id: "return2", from: { partId: "r2", pinId: "b" }, to: { partId: "uno", pinId: "gnd_pwr" }, color: "#1e293b" },
+    ],
+  }
+  const solved = solveCircuitNodalPotentials(circuit)
+  const equivalent = solved.computeResistanceBetweenPins(
+    { partId: "r1", pinId: "a" },
+    { partId: "r1", pinId: "b" },
+  )
+  assert.ok(Math.abs(equivalent.resistance - 500) < 0.1,
+    `Probing r1 terminals must include the parallel r2 branch: expected 500Ω, received ${equivalent.resistance}Ω`)
+})
+
+
+test("DMM resistance does not treat a passive piezo buzzer as a 100Ω DC resistor", () => {
+  const circuit = {
+    parts: [
+      { id: "uno", type: "arduino-uno", x: 40, y: 100, rotation: 0, props: {} },
+      { id: "buzzer", type: "buzzer", x: 240, y: 100, rotation: 0, props: {} },
+    ],
+    wires: [
+      { id: "signal", from: { partId: "uno", pinId: "d8" }, to: { partId: "buzzer", pinId: "pos" }, color: "#ef4444" },
+      { id: "ground", from: { partId: "buzzer", pinId: "neg" }, to: { partId: "uno", pinId: "gnd_pwr" }, color: "#1e293b" },
+    ],
+  }
+  const solved = solveCircuitNodalPotentials(circuit)
+  const resistance = solved.computeResistanceBetweenPins(
+    { partId: "buzzer", pinId: "pos" },
+    { partId: "buzzer", pinId: "neg" },
+  )
+  assert.equal(resistance.resistance, Infinity,
+    "a passive piezo is reactive/frequency-dependent, not a fixed 100Ω DC path")
+  assert.match(resistance.explanation, /Open Circuit.*O\.L/i)
+})
+
+
+test("DMM branch-current mode reads RGB LED and seven-segment diode branches from MNA", () => {
+  const rgbCircuit = {
+    parts: [
+      { id: "uno", type: "arduino-uno", x: 40, y: 100, rotation: 0, props: {} },
+      { id: "r1", type: "resistor", x: 200, y: 100, rotation: 0, props: { resistance: 220 } },
+      { id: "rgb", type: "rgb-led", x: 300, y: 100, rotation: 0, props: {} },
+    ],
+    wires: [
+      { id: "feed", from: { partId: "uno", pinId: "5v" }, to: { partId: "r1", pinId: "a" }, color: "#ef4444" },
+      { id: "red-feed", from: { partId: "r1", pinId: "b" }, to: { partId: "rgb", pinId: "red" }, color: "#ef4444" },
+      { id: "rgb-return", from: { partId: "rgb", pinId: "gnd" }, to: { partId: "uno", pinId: "gnd_pwr" }, color: "#1e293b" },
+    ],
+  }
+  const rgbSolved = solveCircuitNodalPotentials(rgbCircuit)
+  const rgbBranch = rgbSolved.getBranchCurrent("rgb", "red", "gnd")
+  const rgbMeter = rgbSolved.computeCurrentBetweenPins(
+    { partId: "rgb", pinId: "red" },
+    { partId: "rgb", pinId: "gnd" },
+    {},
+  )
+  assert.ok(rgbBranch > 0)
+  assert.ok(Math.abs(rgbMeter.currentMa - Math.abs(rgbBranch)) < 0.001)
+
+  const segmentCircuit = {
+    parts: [
+      { id: "uno", type: "arduino-uno", x: 40, y: 100, rotation: 0, props: {} },
+      { id: "r1", type: "resistor", x: 200, y: 100, rotation: 0, props: { resistance: 220 } },
+      { id: "display", type: "seven-segment", x: 300, y: 100, rotation: 0, props: { commonType: "cathode", color: "red" } },
+    ],
+    wires: [
+      { id: "feed", from: { partId: "uno", pinId: "5v" }, to: { partId: "r1", pinId: "a" }, color: "#ef4444" },
+      { id: "segment-feed", from: { partId: "r1", pinId: "b" }, to: { partId: "display", pinId: "a" }, color: "#ef4444" },
+      { id: "display-return", from: { partId: "display", pinId: "com" }, to: { partId: "uno", pinId: "gnd_pwr" }, color: "#1e293b" },
+    ],
+  }
+  const segmentRuntime = { display: { segments: { a: true } } }
+  const segmentSolved = solveCircuitNodalPotentials(segmentCircuit, new Set(), {}, true, {}, segmentRuntime)
+  const segmentBranch = segmentSolved.getBranchCurrent("display", "a", "com")
+  const segmentMeter = segmentSolved.computeCurrentBetweenPins(
+    { partId: "display", pinId: "a" },
+    { partId: "display", pinId: "com" },
+    segmentRuntime,
+  )
+  assert.ok(segmentBranch > 0)
+  assert.ok(Math.abs(segmentMeter.currentMa - Math.abs(segmentBranch)) < 0.001)
+})
+
+
+test("DMM explicitly labels generic module-load branch readings as estimates", () => {
+  const circuit = {
+    parts: [
+      { id: "uno", type: "arduino-uno", x: 40, y: 100, rotation: 0, props: {} },
+      { id: "mq2", type: "mq2-gas", x: 260, y: 100, rotation: 0, props: {} },
+    ],
+    wires: [
+      { id: "supply", from: { partId: "uno", pinId: "5v" }, to: { partId: "mq2", pinId: "vcc" }, color: "#ef4444" },
+      { id: "return", from: { partId: "mq2", pinId: "gnd" }, to: { partId: "uno", pinId: "gnd_pwr" }, color: "#1e293b" },
+    ],
+  }
+  const solved = solveCircuitNodalPotentials(circuit)
+  const meter = solved.computeCurrentBetweenPins(
+    { partId: "mq2", pinId: "vcc" },
+    { partId: "mq2", pinId: "gnd" },
+    {},
+  )
+  assert.ok(Math.abs(meter.currentMa - 150) < 0.001)
+  assert.match(meter.explanation, /^Estimated mq2-gas branch current:/)
+  assert.match(meter.subtext, /Heater-dominated MQ-2 module estimate/)
+})

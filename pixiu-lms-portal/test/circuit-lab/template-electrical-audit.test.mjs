@@ -11,6 +11,8 @@ await build({
     new URL("../../src/lib/components-catalog.ts", import.meta.url).pathname,
     new URL("../../src/lib/board-registry.ts", import.meta.url).pathname,
     new URL("../../src/lib/lesson-engine.ts", import.meta.url).pathname,
+    new URL("../../src/lib/circuit-solver.ts", import.meta.url).pathname,
+    new URL("../../src/lib/simulation.ts", import.meta.url).pathname,
   ],
   bundle: true,
   format: "esm",
@@ -19,13 +21,17 @@ await build({
   alias: { "@": new URL("../../src", import.meta.url).pathname },
 })
 
-const [{ TEMPLATES }, { CATALOG }, boardModule, { LESSONS }] = await Promise.all([
+const [{ TEMPLATES }, { CATALOG }, boardModule, { LESSONS }, solverModule, simulationModule] = await Promise.all([
   import(`file://${join(outdir, "templates.js")}`),
   import(`file://${join(outdir, "components-catalog.js")}`),
   import(`file://${join(outdir, "board-registry.js")}`),
   import(`file://${join(outdir, "lesson-engine.js")}`),
+  import(`file://${join(outdir, "circuit-solver.js")}`),
+  import(`file://${join(outdir, "simulation.js")}`),
 ])
 const { getBoardForPart, isBoardPart } = boardModule
+const { solveCircuitNodalPotentials } = solverModule
+const { computeRuntime } = simulationModule
 
 function normalize(value) {
   return String(value ?? "").trim().toLowerCase()
@@ -131,7 +137,8 @@ function electricalNodes(circuit, graph) {
   for (const part of circuit.parts) {
     if (isBoardPart(part.type)) {
       const board = getBoardForPart(part)
-      for (const pin of [...(board.powerPins.v5 ?? []), ...(board.powerPins.v33 ?? []), ...(board.powerPins.vin ?? [])]) {
+      // Raw VIN/VSYS inputs do not become ideal source terminals.
+      for (const pin of [...(board.powerPins.v5 ?? []), ...(board.powerPins.v33 ?? [])]) {
         sources.push(graph.normalizeNode(part.id, pin))
       }
       for (const pin of board.powerPins.gnd ?? []) grounds.push(graph.normalizeNode(part.id, pin))
@@ -219,7 +226,7 @@ function dividerSupplyAndGroundNodes(circuit, graph) {
   const supplies = [], grounds = [], analogInputs = []
   for (const boardPart of circuit.parts.filter((part) => isBoardPart(part.type))) {
     const board = getBoardForPart(boardPart)
-    for (const pin of [...(board.powerPins.v5 ?? []), ...(board.powerPins.v33 ?? []), ...(board.powerPins.vin ?? [])]) supplies.push(graph.normalizeNode(boardPart.id, pin))
+    for (const pin of [...(board.powerPins.v5 ?? []), ...(board.powerPins.v33 ?? [])]) supplies.push(graph.normalizeNode(boardPart.id, pin))
     for (const pin of board.powerPins.gnd ?? []) grounds.push(graph.normalizeNode(boardPart.id, pin))
     for (const pin of board.pins.filter((item) => item.kind === "analog" || item.capabilities?.adc === true)) analogInputs.push(graph.normalizeNode(boardPart.id, pin.id))
   }
@@ -566,6 +573,41 @@ test("all LDRs and potentiometers have complete powered ADC divider topology", (
   assert.deepEqual(passiveAnalogErrors, [], passiveAnalogErrors.join("\\n"))
 })
 
+test("all 75 seeded circuits solve with their default runtime, finite branch currents and non-source-net KCL", () => {
+  const inventory = [
+    ...TEMPLATES.map((template) => ({ label: `template ${template.id}`, circuit: template.circuit })),
+    ...lessonCircuits.map((lesson) => ({ label: `lesson ${lesson.id}`, circuit: lesson.seedCircuit })),
+  ]
+  assert.equal(inventory.length, 75, "35 project templates plus 40 seeded lessons must all be solver-audited")
+
+  const diagnostics = []
+  const kclFailures = []
+  const nonFinite = []
+  for (const { label, circuit } of inventory) {
+    const runtime = computeRuntime(circuit, new Set(), {}, {}, {})
+    const solved = solveCircuitNodalPotentials(circuit, new Set(), {}, true, {}, runtime)
+    for (const diagnostic of solved.diagnostics) {
+      diagnostics.push(`${label}: ${diagnostic.code}: ${diagnostic.message}`)
+    }
+    for (const [key, currentMa] of solved.branchCurrents) {
+      if (!Number.isFinite(currentMa)) nonFinite.push(`${label}: ${key} = ${currentMa}`)
+    }
+    for (const [netId, voltage] of solved.netVoltages) {
+      if (!Number.isFinite(voltage)) nonFinite.push(`${label}: net ${netId} voltage = ${voltage}`)
+      const netPins = [...solved.pinPotentials.values()].filter((info) => info.netId === netId)
+      if (netPins.some((info) => info.isDriven || info.isGnd || info.isDigitalLow || info.isConflicted || info.isFloating)) continue
+      const residualMa = Math.abs(solved.getNetCurrent(netId))
+      if (residualMa > 0.01) {
+        kclFailures.push(`${label}: net ${netId} KCL residual ${residualMa.toFixed(6)}mA`)
+      }
+    }
+  }
+
+  assert.deepEqual(diagnostics, [], diagnostics.join("\\n"))
+  assert.deepEqual(nonFinite, [], nonFinite.join("\\n"))
+  assert.deepEqual(kclFailures, [], kclFailures.join("\\n"))
+})
+
 test("complete Virtual Lab project-template and curriculum circuit inventory is unique and audited", () => {
   assert.ok(TEMPLATES.length >= 20, `unexpectedly small project-template catalogue: ${TEMPLATES.length}`)
   assert.equal(new Set(templateIds).size, templateIds.length, "project-template IDs must be unique")
@@ -585,3 +627,5 @@ test("complete Virtual Lab project-template and curriculum circuit inventory is 
   }
   assert.deepEqual(allErrors, [], "all template and curriculum circuit electrical/topology checks must pass")
 })
+
+// Keep the 75-circuit MNA audit coupled to computed default component runtime states.

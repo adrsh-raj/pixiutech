@@ -13,8 +13,8 @@ export interface LedElectricalModel {
  * use this same source of truth.
  */
 export function getLedElectricalModel(part: PlacedPart, colorOverride?: string): LedElectricalModel {
-  if (part.type !== "led" && part.type !== "rgb-led") {
-    throw new Error(`LED electrical model requested for non-LED component: ${part.type}`)
+  if (part.type !== "led" && part.type !== "rgb-led" && part.type !== "seven-segment") {
+    throw new Error(`LED electrical model requested for unsupported diode component: ${part.type}`)
   }
 
   const metadata = CATALOG[part.type].electrical

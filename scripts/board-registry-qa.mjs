@@ -41,6 +41,19 @@ assert(boardRegistry.includes('export function getActiveBoard('), "getActiveBoar
 assert(boardRegistry.includes('export function scaleAdcReading('), "scaleAdcReading helper exported")
 assert(boardRegistry.includes('export function validatePinVoltageTolerance('), "validatePinVoltageTolerance helper exported")
 
+// Power inputs are not assumed to be 5V outputs.
+assert(boardRegistry.includes("export interface BoardPowerInputSpec"), "Board registry defines external power-input metadata")
+assert(boardRegistry.includes('pinId: "vin"') && boardRegistry.includes("minVoltage: 7") && boardRegistry.includes("maxVoltage: 12"),
+  "Arduino Uno VIN input range is documented as 7–12V")
+assert(boardRegistry.includes('pinId: "vsys"') && boardRegistry.includes("maxVoltage: 5.5"),
+  "Pico VSYS input range is documented up to 5.5V")
+assert(!circuitSolver.includes("VIN (5.0V)"), "Circuit solver must not synthesize 5V on raw VIN/VSYS inputs")
+assert(!simulation.includes("addBoardSource(p, 5.0)"), "Simulation must not create a fixed 5V source from raw VIN inputs")
+assert(circuitValidator.includes("safety-board-power-input-overvoltage"),
+  "Release validator enforces board input maximum voltage")
+assert(!circuitValidator.includes("v5Pins.push(...b.powerPins.vin"),
+  "Release validator must not classify VIN inputs as regulated 5V source rails")
+
 // 2. Arduino Uno Specifications
 assert(boardRegistry.includes('logicVoltage: 5.0'), "Uno 5V logic voltage verified")
 assert(boardRegistry.includes('adcResolutionBits: 10'), "Uno 10-bit ADC resolution verified")

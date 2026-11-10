@@ -77,6 +77,83 @@ const LED_ELECTRICAL_MODEL = {
   nominalForwardCurrentMa: 15,
 } as const
 
+// Generic module-load equivalents are explicitly labelled estimates because
+// the catalogue does not identify an exact manufacturer/module revision.
+// These figures are teaching-model defaults, not measured or datasheet limits.
+const MODULE_LOAD_ESTIMATES = {
+  servo: [{
+    positivePin: "vcc", negativePin: "gnd", nominalVoltage: 5, nominalCurrentMa: 10,
+    accuracy: "module-estimate",
+    activeWhen: "servo-command",
+    note: "Quiescent/commanded teaching estimate only; servo current varies with torque, motion and stall.",
+  }],
+  relay: [{
+    positivePin: "vcc", negativePin: "gnd", nominalVoltage: 5, nominalCurrentMa: 12,
+    accuracy: "module-estimate",
+    activeWhen: "relay-energized",
+    note: "Generic 5V relay-coil estimate; exact coil resistance and current depend on the selected relay module.",
+  }],
+  lcd: [{
+    positivePin: "vcc", negativePin: "gnd", nominalVoltage: 5, nominalCurrentMa: 15,
+    accuracy: "module-estimate",
+    activeWhen: "display-enabled",
+    note: "Generic backlit character-display estimate; backlight and backpack variants change consumption.",
+  }],
+  oled: [{
+    positivePin: "vcc", negativePin: "gnd", nominalVoltage: 3.3, nominalCurrentMa: 15,
+    accuracy: "module-estimate",
+    activeWhen: "display-enabled",
+    note: "Generic small OLED module estimate; panel content, brightness and regulator variant change consumption.",
+  }],
+  ultrasonic: [{
+    positivePin: "vcc", negativePin: "gnd", nominalVoltage: 5, nominalCurrentMa: 10,
+    accuracy: "module-estimate",
+    note: "Generic HC-SR04 teaching estimate; board revisions can differ.",
+  }],
+  pir: [{
+    positivePin: "vcc", negativePin: "gnd", nominalVoltage: 5, nominalCurrentMa: 8,
+    accuracy: "module-estimate",
+    note: "Generic PIR module estimate; sensor board and regulator variant are unspecified.",
+  }],
+  ir: [{
+    positivePin: "vcc", negativePin: "gnd", nominalVoltage: 5, nominalCurrentMa: 8,
+    accuracy: "module-estimate",
+    note: "Generic IR obstacle-module estimate; LED intensity and comparator board differ by module.",
+  }],
+  dht11: [{
+    positivePin: "vcc", negativePin: "gnd", nominalVoltage: 5, nominalCurrentMa: 2.5,
+    accuracy: "module-estimate",
+    note: "Low-power sensor estimate; breakout pull-up and indicator LEDs are not included.",
+  }],
+  soil: [{
+    positivePin: "vcc", negativePin: "gnd", nominalVoltage: 5, nominalCurrentMa: 12,
+    accuracy: "module-estimate",
+    note: "Generic resistive soil-probe module estimate; probe drive and module circuitry vary.",
+  }],
+  mq2: [{
+    positivePin: "vcc", negativePin: "gnd", nominalVoltage: 5, nominalCurrentMa: 150,
+    accuracy: "module-estimate",
+    note: "Heater-dominated MQ-2 module estimate; verify the exact sensor and breakout before hardware power budgeting.",
+  }],
+  l298nLogic: [{
+    positivePin: "5v", negativePin: "gnd", nominalVoltage: 5, nominalCurrentMa: 15,
+    accuracy: "module-estimate",
+    note: "Logic-side teaching estimate only; excludes motor load and module regulator losses.",
+  }],
+  joystickTracks: [
+    {
+      positivePin: "vcc", negativePin: "gnd", nominalVoltage: 5, nominalCurrentMa: 0.5,
+      accuracy: "module-estimate",
+      note: "One nominal 10kΩ potentiometer track; generic joystick track model.",
+    },
+    {
+      positivePin: "vcc", negativePin: "gnd", nominalVoltage: 5, nominalCurrentMa: 0.5,
+      accuracy: "module-estimate",
+      note: "Second nominal 10kΩ potentiometer track; generic joystick track model.",
+    },
+  ],
+} as const
+
 export const CATALOG: Record<PartType, PartDef> = {
   "arduino-uno": {
     type: "arduino-uno",
@@ -232,6 +309,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "gnd", label: "GND", x: 4, y: 52, kind: "ground" },
     ],
     defaults: { angle: 90 },
+    electrical: { supplyLoads: [...MODULE_LOAD_ESTIMATES.servo] },
     requiredPinGroups: [["sig"],["vcc"],["gnd"]],
   },
   buzzer: {
@@ -278,6 +356,8 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "dp", label: "DP", x: 35, y: 4, kind: "passive" },
       { id: "com", label: "Common", x: 55, y: 40, kind: "passive" },
     ],
+    defaults: { commonType: "cathode", color: "red" },
+    electrical: LED_ELECTRICAL_MODEL,
     requiredPinGroups: [["a"],["b"],["c"],["d"],["e"],["f"],["g"],["com"]],
   },
   "lcd-i2c": {
@@ -292,6 +372,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "sda", label: "SDA", x: 90, y: 76, kind: "passive" },
       { id: "scl", label: "SCL", x: 120, y: 76, kind: "passive" },
     ],
+    electrical: { supplyLoads: [...MODULE_LOAD_ESTIMATES.lcd] },
     requiredPinGroups: [["gnd"],["vcc"],["sda"],["scl"]],
   },
   ultrasonic: {
@@ -306,6 +387,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "echo", label: "Echo", x: 60, y: 52, kind: "passive" },
       { id: "gnd", label: "GND", x: 80, y: 52, kind: "ground" },
     ],
+    electrical: { supplyLoads: [...MODULE_LOAD_ESTIMATES.ultrasonic] },
     requiredPinGroups: [["vcc"],["trig"],["echo"],["gnd"]],
   },
   "pir-sensor": {
@@ -319,6 +401,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "out", label: "OUT", x: 30, y: 66, kind: "passive" },
       { id: "gnd", label: "GND", x: 50, y: 66, kind: "ground" },
     ],
+    electrical: { supplyLoads: [...MODULE_LOAD_ESTIMATES.pir] },
     requiredPinGroups: [["vcc"],["out"],["gnd"]],
   },
   ldr: {
@@ -344,6 +427,16 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "out", label: "Vout", x: 20, y: 46, kind: "passive" },
       { id: "gnd", label: "GND", x: 34, y: 46, kind: "ground" },
     ],
+    electrical: {
+      supplyLoads: [{
+        positivePin: "vcc",
+        negativePin: "gnd",
+        nominalVoltage: 3.3,
+        nominalCurrentMa: 0.05,
+        accuracy: "module-estimate",
+        note: "Low-current IC teaching estimate; breakout-board indicators and regulator losses are excluded.",
+      }],
+    },
     requiredPinGroups: [["vcc"],["out"],["gnd"]],
   },
   "dc-motor": {
@@ -385,6 +478,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "no", label: "NO", x: 86, y: 4, kind: "passive" },
       { id: "nc", label: "NC", x: 100, y: 4, kind: "passive" },
     ],
+    electrical: { supplyLoads: [...MODULE_LOAD_ESTIMATES.relay] },
     requiredPinGroups: [["vcc"],["gnd"],["in"],["com"],["no","nc"]],
   },
 
@@ -400,6 +494,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "gnd", label: "GND", x: 64, y: 60, kind: "ground" },
     ],
     defaults: { detected: "false" },
+    electrical: { supplyLoads: [...MODULE_LOAD_ESTIMATES.ir] },
     requiredPinGroups: [["vcc"],["out"],["gnd"]],
   },
   "dht11": {
@@ -414,6 +509,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "gnd", label: "GND", x: 60, y: 62, kind: "ground" },
     ],
     defaults: { temperature: 25, humidity: 55 },
+    electrical: { supplyLoads: [...MODULE_LOAD_ESTIMATES.dht11] },
     requiredPinGroups: [["vcc"],["data"],["gnd"]],
   },
   "oled-i2c": {
@@ -429,6 +525,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "sda", label: "SDA", x: 118, y: 88, kind: "digital" },
     ],
     defaults: { line1: "PIXIU TECH", line2: "READY", line3: "" },
+    electrical: { supplyLoads: [...MODULE_LOAD_ESTIMATES.oled] },
     requiredPinGroups: [["gnd"],["vcc"],["scl"],["sda"]],
   },
   "joystick": {
@@ -445,6 +542,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "sw", label: "SW", x: 78, y: 82, kind: "digital" },
     ],
     defaults: { x: 512, y: 512, pressed: "false" },
+    electrical: { supplyLoads: [...MODULE_LOAD_ESTIMATES.joystickTracks] },
     requiredPinGroups: [["gnd"],["vcc"],["vrx"],["vry"]],
   },
   "l298n": {
@@ -469,6 +567,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "in4", label: "IN4", x: 94, y: 104, kind: "digital" },
     ],
     defaults: { speedA: 0, speedB: 0 },
+    electrical: { supplyLoads: [...MODULE_LOAD_ESTIMATES.l298nLogic] },
     requiredPinGroups: [["vs"],["gnd"],["ena","enb"],["in1","in3"],["in2","in4"],["out1","out3"],["out2","out4"]],
   },
   "rotary-encoder": {
@@ -499,6 +598,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "gnd", label: "GND", x: 58, y: 80, kind: "ground" },
     ],
     defaults: { moisture: 620 },
+    electrical: { supplyLoads: [...MODULE_LOAD_ESTIMATES.soil] },
     requiredPinGroups: [["vcc"],["ao"],["gnd"]],
   },
   "keypad-4x4": {
@@ -533,6 +633,11 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "do", label: "DO", x: 78, y: 92, kind: "digital" },
     ],
     defaults: { numPixels: 8, brightness: 200, pattern: "rainbow", color: "#38bdf8" },
+    electrical: {
+      pixelCurrentPerChannelMa: 20,
+      pixelReferenceVoltage: 5,
+      pixelOffColor: "#0f172a",
+    },
     requiredPinGroups: [["di"],["vcc"],["gnd"]],
   },
   "mq2-gas": {
@@ -548,6 +653,7 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "ao", label: "AO", x: 64, y: 84, kind: "analog" },
     ],
     defaults: { gasLevel: 150, threshold: 350 },
+    electrical: { supplyLoads: [...MODULE_LOAD_ESTIMATES.mq2] },
     requiredPinGroups: [["vcc"],["gnd"],["ao"]],
   },
 }
@@ -593,4 +699,180 @@ export const PIN_KIND_COLOR: Record<PinKind, string> = {
   digital: "var(--color-primary)",
   analog: "var(--color-accent)",
   passive: "var(--color-muted-foreground)",
+}
+
+
+/**
+ * Auditable scope/fidelity contract for every component in the Virtual Lab.
+ * "estimated"/"partial" entries are not datasheet-certified measurements.
+ * A component can have no static DC load while still acting as a signal source,
+ * switch, or passive interconnect in the circuit topology.
+ */
+export interface ElectricalModelContract {
+  model: string
+  fidelity: "idealized" | "first-order" | "estimated" | "partial" | "signal-only"
+  note: string
+}
+
+export const ELECTRICAL_MODEL_CONTRACT: Record<PartType, ElectricalModelContract> = {
+  "arduino-uno": {
+    model: "ideal-board-supply-and-GPIO-sources",
+    fidelity: "idealized",
+    note: "Board rails and configured GPIO outputs are ideal voltage boundaries; MCU quiescent current, regulator losses and GPIO output resistance are not included.",
+  },
+  "esp32-devkit": {
+    model: "ideal-board-supply-and-GPIO-sources",
+    fidelity: "idealized",
+    note: "3.3V rail and configured GPIO/DAC/PWM outputs are ideal voltage boundaries; MCU, Wi-Fi and regulator consumption are not included.",
+  },
+  "rpi-pico": {
+    model: "ideal-board-supply-and-GPIO-sources",
+    fidelity: "idealized",
+    note: "3.3V and VBUS rails and configured GPIO outputs are ideal voltage boundaries; RP2040 and regulator consumption are not included.",
+  },
+  "microbit-v2": {
+    model: "ideal-board-supply-and-GPIO-sources",
+    fidelity: "idealized",
+    note: "Board rails and configured IO are ideal voltage boundaries; nRF52, LED matrix and regulator current are not included.",
+  },
+  breadboard: {
+    model: "copper-interconnect-network",
+    fidelity: "first-order",
+    note: "Terminal strips and rails are connected with a small numerical conductor resistance for current sharing; contact resistance and rail breaks are simplified.",
+  },
+  led: {
+    model: "piecewise-linear-diode",
+    fidelity: "partial",
+    note: "Colour-specific forward voltage plus a 10Ω dynamic-resistance proxy; external current limiting is solved, but temperature and thermal runaway are not.",
+  },
+  resistor: {
+    model: "configured-ohmic-resistor",
+    fidelity: "first-order",
+    note: "Configured resistance is solved with Ohm's law; tolerance, temperature coefficient and power derating are not modeled.",
+  },
+  pushbutton: {
+    model: "stateful-switch-contact",
+    fidelity: "first-order",
+    note: "Normally-open contact closes on press with a small contact resistance; bounce, wear and parasitic capacitance are not modeled.",
+  },
+  battery: {
+    model: "ideal-configured-voltage-source",
+    fidelity: "idealized",
+    note: "Configured signed terminal voltage is ideal; internal resistance, state of charge and voltage sag are not modeled.",
+  },
+  potentiometer: {
+    model: "two-section-variable-resistor",
+    fidelity: "first-order",
+    note: "Track resistance is split by the configured 0–1023 wiper position; a 0.5Ω floor regularizes endpoint resistance and wiper contact noise is omitted.",
+  },
+  servo: {
+    model: "commanded-module-supply-estimate",
+    fidelity: "estimated",
+    note: "A labelled generic module current is applied when a valid servo command exists; torque, stall, acceleration and model-specific datasheet current are not represented.",
+  },
+  buzzer: {
+    model: "active-piezo-resistive-proxy",
+    fidelity: "partial",
+    note: "An active tone uses a 100Ω first-order equivalent; real piezo impedance is frequency-dependent and cannot be inferred from this DC proxy.",
+  },
+  "rgb-led": {
+    model: "three-piecewise-linear-diode-channels",
+    fidelity: "partial",
+    note: "Red, green and blue channels use separate colour-specific diode branches; resistor, PWM and reverse-bias behaviour are represented, thermal effects are not.",
+  },
+  "seven-segment": {
+    model: "per-segment-diode-network",
+    fidelity: "partial",
+    note: "Each lit segment is a diode branch with common-anode/cathode polarity; current-limiting resistors must be external and multiplex timing is not modeled.",
+  },
+  "lcd-i2c": {
+    model: "backlit-display-module-load-estimate",
+    fidelity: "estimated",
+    note: "Generic 5V display/backlight load estimate; exact LCD backpack, backlight setting and module revision are unspecified.",
+  },
+  ultrasonic: {
+    model: "ultrasonic-module-supply-estimate",
+    fidelity: "estimated",
+    note: "Generic HC-SR04 supply-load estimate; echo/trig are signal interfaces and sensor timing/driver impedance are simplified.",
+  },
+  "pir-sensor": {
+    model: "pir-module-supply-estimate",
+    fidelity: "estimated",
+    note: "Generic PIR module supply estimate; module revision and output-stage current are unspecified.",
+  },
+  ldr: {
+    model: "light-dependent-resistor",
+    fidelity: "first-order",
+    note: "Configured light level sets a variable resistance that is solved in the network; spectral response and temperature dependence are simplified.",
+  },
+  tmp36: {
+    model: "low-power-analog-sensor-estimate",
+    fidelity: "estimated",
+    note: "A labelled low-current sensor/breakout estimate and configured analog output voltage are modeled; exact breakout regulator/indicator current is unknown.",
+  },
+  "dc-motor": {
+    model: "resistive-winding-proxy",
+    fidelity: "partial",
+    note: "A 50Ω winding proxy gives first-order current; back-EMF, inductance, stall transients, mechanical torque and speed-dependent load are not yet represented.",
+  },
+  "npn-transistor": {
+    model: "switched-collector-emitter-resistance",
+    fidelity: "partial",
+    note: "Runtime-conducting state connects collector-emitter through a 0.2Ω switch proxy; base current, gain, saturation curves and thermal limits are omitted.",
+  },
+  relay: {
+    model: "estimated-coil-and-switched-contact",
+    fidelity: "partial",
+    note: "Generic 5V coil-current estimate plus stateful COM–NO/NC contact resistance; flyback transient and exact relay coil specifications are not modeled.",
+  },
+  "ir-sensor": {
+    model: "ir-module-supply-estimate-and-digital-output",
+    fidelity: "estimated",
+    note: "Generic module supply estimate and powered output level; IR LED/comparator revision and output impedance are not specified.",
+  },
+  dht11: {
+    model: "low-power-digital-sensor-estimate",
+    fidelity: "estimated",
+    note: "Generic sensor supply estimate and a simplified data output; protocol timing, pull-up current and breakout indicators are not modeled.",
+  },
+  "oled-i2c": {
+    model: "oled-display-module-load-estimate",
+    fidelity: "estimated",
+    note: "Generic OLED module supply estimate; panel content/brightness, regulator and I2C pull-up details vary by module.",
+  },
+  joystick: {
+    model: "dual-potentiometer-track-and-switch",
+    fidelity: "first-order",
+    note: "Two nominal track-load estimates and powered analog output voltages are modeled; wiper contact noise and switch bounce are omitted.",
+  },
+  l298n: {
+    model: "dual-hbridge-average-dc-proxy",
+    fidelity: "partial",
+    note: "Logic supply and derived motor VS current are solved; H-bridge outputs use average PWM voltage and motor branches use a 50Ω proxy without back-EMF or transistor voltage drops.",
+  },
+  "rotary-encoder": {
+    model: "digital-encoder-output",
+    fidelity: "signal-only",
+    note: "Powered switch output and encoder reading are represented; quadrature edge timing, contact bounce and pull-up current are not simulated.",
+  },
+  "soil-moisture": {
+    model: "resistive-sensor-module-estimate",
+    fidelity: "estimated",
+    note: "Generic module supply estimate and configured analog output level; probe excitation, soil conductivity and module revision are not specified.",
+  },
+  "keypad-4x4": {
+    model: "matrix-contact-signal-interface",
+    fidelity: "signal-only",
+    note: "Rows/columns are digital signal interfaces; per-key contact closure topology and pull-up/pull-down current are not yet solved internally.",
+  },
+  "neopixel-ring": {
+    model: "per-pixel-rgb-channel-load",
+    fidelity: "estimated",
+    note: "Each lit pixel channel uses a documented 20mA full-scale estimate; colour scales the load, while WS2812 timing, regulator loss and pixel revision are not modeled.",
+  },
+  "mq2-gas": {
+    model: "heater-dominated-gas-module-estimate",
+    fidelity: "estimated",
+    note: "A labelled heater-dominated module supply estimate and simplified AO/DO outputs; warm-up, calibration, heater tolerance and module revision are not modeled.",
+  },
 }

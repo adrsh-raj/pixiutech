@@ -1,10 +1,10 @@
 import type { CircuitState, PinRef } from "./circuit-types"
+import type { PartRuntime } from "@/components/circuit-lab/part-art"
 import type { ArduinoPinState } from "./simulation"
 import { getBoardForPart, lookupBoardPinState } from "./board-registry"
-import { MinPriorityQueue } from "./min-priority-queue"
 import { normalizeBreadboardPinId } from "./breadboard-pins"
 import { getLedElectricalModel } from "./electrical-model"
-import { BREADBOARD_COLUMNS } from "./components-catalog"
+import { BREADBOARD_COLUMNS, CATALOG, ELECTRICAL_MODEL_CONTRACT } from "./components-catalog"
 
 export interface PinPotentialInfo {
   voltage: number
@@ -14,12 +14,27 @@ export interface PinPotentialInfo {
   isGnd: boolean
   isDigitalLow?: boolean
   isFloating?: boolean
+  isConflicted?: boolean
   digitalPinName?: string
+}
+
+export interface CircuitSolverDiagnostic {
+  code: "source-conflict" | "diode-non-convergence"
+  severity: "error" | "warning"
+  message: string
+  netId?: number
+  sources?: string[]
 }
 
 export interface NodalSolution {
   pinPotentials: Map<string, PinPotentialInfo>
   netVoltages: Map<number, number>
+  /** Signed solved DC branch current in mA; positive is pinA -> pinB. */
+  branchCurrents: Map<string, number>
+  diagnostics: CircuitSolverDiagnostic[]
+  getBranchCurrent: (partId: string, pinA: string, pinB: string) => number
+  /** Algebraic sum of solved branch currents leaving the given net (mA). */
+  getNetCurrent: (netId: number) => number
   getPinVoltage: (ref: PinRef | null) => number
   getPinInfo: (ref: PinRef | null) => PinPotentialInfo
   getPotentialDifference: (
@@ -56,6 +71,7 @@ export interface NodalSolution {
 }
 
 const pinKey = (partId: string, pinId: string) => `${partId}:${pinId}`
+const branchKey = (partId: string, pinA: string, pinB: string) => `${partId}:${pinA}->${pinB}`
 
 /**
  * Solves arbitrary linear system Ax = b using Gaussian elimination with partial pivoting.
@@ -118,6 +134,7 @@ export function solveCircuitNodalPotentials(
   pinStates: Record<string, ArduinoPinState> = {},
   running: boolean = true,
   relayStates: Record<string, boolean> = {},
+  runtime: Record<string, PartRuntime> = {},
 ): NodalSolution {
   // 1. Gather all pins across all placed components
   const allPins = new Set<string>()
@@ -373,27 +390,49 @@ export function solveCircuitNodalPotentials(
 
   // 4. Identify Fixed Voltage Nets
   const fixedNets = new Map<number, { voltage: number; label: string; isDigitalLow?: boolean; digitalPinName?: string }>()
+  const diagnostics: CircuitSolverDiagnostic[] = []
+  const conflictedNets = new Set<number>()
+
+  // Ideal voltage sources on one equipotential net must agree. Preserve the
+  // first value for deterministic diagnostics, but invalidate the net.
+  function setFixedNet(
+    netId: number,
+    info: { voltage: number; label: string; isDigitalLow?: boolean; digitalPinName?: string },
+  ) {
+    const previous = fixedNets.get(netId)
+    if (previous && Math.abs(previous.voltage - info.voltage) > 1e-6) {
+      conflictedNets.add(netId)
+      if (!diagnostics.some((item) => item.code === "source-conflict" && item.netId === netId)) {
+        diagnostics.push({
+          code: "source-conflict",
+          severity: "error",
+          netId,
+          sources: [previous.label, info.label],
+          message: `Conflicting ideal voltage sources share one net: ${previous.label} (${previous.voltage}V) and ${info.label} (${info.voltage}V). Separate the sources or add a physically valid interface.`,
+        })
+      }
+      return
+    }
+    if (!previous) fixedNets.set(netId, info)
+  }
 
   for (const part of state.parts) {
     const board = getBoardForPart(part)
     if (board) {
       if (board.powerPins.v5) {
         for (const p of board.powerPins.v5) {
-          fixedNets.set(pinToNetId(part.id, p), { voltage: 5.0, label: `${board.shortName} 5V Power Rail` })
+          setFixedNet(pinToNetId(part.id, p), { voltage: 5.0, label: `${board.shortName} 5V Power Rail` })
         }
       }
-      if (board.powerPins.vin) {
-        for (const p of board.powerPins.vin) {
-          fixedNets.set(pinToNetId(part.id, p), { voltage: 5.0, label: `${board.shortName} VIN (5.0V)` })
-        }
-      }
+      // Raw VIN/VSYS pins are external power inputs, not ideal 5V outputs.
+      // Only powerPins.v5/v33 represent powered-board source rails.
       if (board.powerPins.v33) {
         for (const p of board.powerPins.v33) {
-          fixedNets.set(pinToNetId(part.id, p), { voltage: 3.3, label: `${board.shortName} 3.3V Rail` })
+          setFixedNet(pinToNetId(part.id, p), { voltage: 3.3, label: `${board.shortName} 3.3V Rail` })
         }
       }
       for (const g of board.powerPins.gnd) {
-        fixedNets.set(pinToNetId(part.id, g), { voltage: 0.0, label: "Ground (0V)" })
+        setFixedNet(pinToNetId(part.id, g), { voltage: 0.0, label: "Ground (0V)" })
       }
 
       for (const pin of board.pins) {
@@ -414,7 +453,7 @@ export function solveCircuitNodalPotentials(
           ) {
             // True DAC output is continuous analog voltage, distinct from PWM.
             const vOut = Number((board.logicVoltage * Math.max(0, Math.min(1, pState.value / 255))).toFixed(3))
-            fixedNets.set(netD, {
+            setFixedNet(netD, {
               voltage: vOut,
               label: `${board.shortName} DAC Output ${pin.label} (${pState.value}/255 = ${vOut}V DC)`,
             })
@@ -423,27 +462,27 @@ export function solveCircuitNodalPotentials(
             // waveform sampler reports instantaneous HIGH/LOW pulses.
             const duty = Math.max(0, Math.min(1, (pState.value ?? 0) / 255))
             const vOut = Number((board.logicVoltage * duty).toFixed(3))
-            fixedNets.set(netD, {
+            setFixedNet(netD, {
               voltage: vOut,
               label: `${board.shortName} Pin ${pin.label} (PWM average ${pState.value}/255 = ${vOut}V)`,
             })
           } else if (pState?.outputMode === "tone") {
             const vOut = Number((board.logicVoltage * 0.5).toFixed(3))
-            fixedNets.set(netD, {
+            setFixedNet(netD, {
               voltage: vOut,
               label: `${board.shortName} Pin ${pin.label} (Tone waveform average = ${vOut}V)`,
             })
           } else if (pState?.outputMode === "servo") {
             const duty = (1 + Math.max(0, Math.min(180, pState.angle ?? 90)) / 180) / 20
             const vOut = Number((board.logicVoltage * duty).toFixed(3))
-            fixedNets.set(netD, {
+            setFixedNet(netD, {
               voltage: vOut,
               label: `${board.shortName} Pin ${pin.label} (Servo pulse average = ${vOut}V)`,
             })
           } else if (pState?.state === "HIGH") {
-            fixedNets.set(netD, { voltage: board.logicVoltage, label: `${board.shortName} Pin ${pin.label} (HIGH = ${board.logicVoltage}V)` })
+            setFixedNet(netD, { voltage: board.logicVoltage, label: `${board.shortName} Pin ${pin.label} (HIGH = ${board.logicVoltage}V)` })
           } else if (pState?.state === "LOW") {
-            fixedNets.set(netD, {
+            setFixedNet(netD, {
               voltage: 0.0,
               label: `${board.shortName} Pin ${pin.label} (OUTPUT LOW = 0.0V)`,
               isDigitalLow: true,
@@ -454,10 +493,10 @@ export function solveCircuitNodalPotentials(
       }
     } else if (part.type === "battery") {
       const netPos = pinToNetId(part.id, "pos")
-      const voltage = Math.max(0, Number(part.props.voltage ?? 9))
-      fixedNets.set(netPos, { voltage, label: `${voltage}V Battery (+)` })
+      const voltage = Number(part.props.voltage ?? 9)
+      setFixedNet(netPos, { voltage, label: `${voltage}V Battery (+)` })
       const netNeg = pinToNetId(part.id, "neg")
-      fixedNets.set(netNeg, { voltage: 0.0, label: "Battery Ground (0V)" })
+      setFixedNet(netNeg, { voltage: 0.0, label: "Battery Ground (0V)" })
     }
   }
 
@@ -474,7 +513,7 @@ export function solveCircuitNodalPotentials(
 
     const setOutputIfFree = (pinId: string, voltage: number, label: string) => {
       const net = pinToNetId(part.id, pinId)
-      if (!fixedNets.has(net)) fixedNets.set(net, { voltage, label })
+      if (!fixedNets.has(net)) setFixedNet(net, { voltage, label })
     }
 
     if (part.type === "ir-sensor") {
@@ -504,11 +543,82 @@ export function solveCircuitNodalPotentials(
     }
   }
 
+  // L298N is a dual H-bridge. Its outputs are modelled as the commanded
+  // average DC voltages from the bridge supply and PWM duty. This is a
+  // first-order DC model (not an inductive transient/back-EMF simulation).
+  for (const driver of state.parts.filter((part) => part.type === "l298n")) {
+    const vsNet = pinToNetId(driver.id, "vs")
+    const gndNet = pinToNetId(driver.id, "gnd")
+    const supply = fixedNets.get(vsNet)
+    const ground = fixedNets.get(gndNet)
+    if (!supply || !ground || conflictedNets.has(vsNet) || conflictedNets.has(gndNet)) continue
+    const motorSupplyV = supply.voltage - ground.voltage
+    if (!Number.isFinite(motorSupplyV) || motorSupplyV <= 0) continue
+
+    const channels = [
+      { rpm: Number(runtime[driver.id]?.motorARpm ?? 0), direction: runtime[driver.id]?.motorADirection, high: "out1", low: "out2", label: "A" },
+      { rpm: Number(runtime[driver.id]?.motorBRpm ?? 0), direction: runtime[driver.id]?.motorBDirection, high: "out3", low: "out4", label: "B" },
+    ]
+    for (const channel of channels) {
+      if (!Number.isFinite(channel.rpm) || channel.rpm <= 0 ||
+          (channel.direction !== "cw" && channel.direction !== "ccw")) continue
+      const duty = Math.max(0, Math.min(1, channel.rpm / 1000))
+      const drivenVoltage = ground.voltage + motorSupplyV * duty
+      const highPin = channel.direction === "cw" ? channel.high : channel.low
+      const lowPin = channel.direction === "cw" ? channel.low : channel.high
+      setFixedNet(pinToNetId(driver.id, highPin), {
+        voltage: drivenVoltage,
+        label: `L298N ${channel.label} bridge output ${highPin} (${(duty * 100).toFixed(1)}% average duty)`,
+      })
+      setFixedNet(pinToNetId(driver.id, lowPin), {
+        voltage: ground.voltage,
+        label: `L298N ${channel.label} bridge return ${lowPin}`,
+      })
+    }
+  }
+
+  // L298N is a dual H-bridge. Model the commanded outputs as average DC
+  // voltages determined by channel direction and PWM duty. This first-order
+  // model does not simulate inductive switching transients or motor back-EMF.
+  for (const driver of state.parts.filter((part) => part.type === "l298n")) {
+    const vsNet = pinToNetId(driver.id, "vs")
+    const gndNet = pinToNetId(driver.id, "gnd")
+    const supply = fixedNets.get(vsNet)
+    const ground = fixedNets.get(gndNet)
+    if (!supply || !ground || conflictedNets.has(vsNet) || conflictedNets.has(gndNet)) continue
+    const motorSupplyV = supply.voltage - ground.voltage
+    if (!Number.isFinite(motorSupplyV) || motorSupplyV <= 0) continue
+
+    const channels = [
+      { rpm: Number(runtime[driver.id]?.motorARpm ?? 0), direction: runtime[driver.id]?.motorADirection, high: "out1", low: "out2", label: "A" },
+      { rpm: Number(runtime[driver.id]?.motorBRpm ?? 0), direction: runtime[driver.id]?.motorBDirection, high: "out3", low: "out4", label: "B" },
+    ]
+    for (const channel of channels) {
+      if (!Number.isFinite(channel.rpm) || channel.rpm <= 0 ||
+          (channel.direction !== "cw" && channel.direction !== "ccw")) continue
+      const duty = Math.max(0, Math.min(1, channel.rpm / 1000))
+      const drivenVoltage = ground.voltage + motorSupplyV * duty
+      const highPin = channel.direction === "cw" ? channel.high : channel.low
+      const lowPin = channel.direction === "cw" ? channel.low : channel.high
+      setFixedNet(pinToNetId(driver.id, highPin), {
+        voltage: drivenVoltage,
+        label: `L298N ${channel.label} bridge output ${highPin} (${(duty * 100).toFixed(1)}% average duty)`,
+      })
+      setFixedNet(pinToNetId(driver.id, lowPin), {
+        voltage: ground.voltage,
+        label: `L298N ${channel.label} bridge return ${lowPin}`,
+      })
+    }
+  }
+
   // 5. Build component branches
   interface Branch {
     netA: number
     netB: number
     conductance: number
+    partId: string
+    pinA: string
+    pinB: string
     isDiode?: boolean
     vForward?: number
   }
@@ -521,7 +631,7 @@ export function solveCircuitNodalPotentials(
         const netA = pinToNetId(part.id, "a")
         const netB = pinToNetId(part.id, "b")
         const rVal = Math.max(0.1, Number(part.props.resistance || 220))
-        branches.push({ netA, netB, conductance: 1 / rVal })
+        branches.push({ netA, netB, conductance: 1 / rVal, partId: part.id, pinA: "a", pinB: "b" })
         break
       }
       case "ldr": {
@@ -529,7 +639,7 @@ export function solveCircuitNodalPotentials(
         const netT2 = pinToNetId(part.id, "t2")
         const light = Math.max(0, Math.min(1023, Number(part.props.light ?? 512)))
         const rLdr = Math.max(200, Math.round(50000 / (1 + (light / 1023) * 99)))
-        branches.push({ netA: netT1, netB: netT2, conductance: 1 / rLdr })
+        branches.push({ netA: netT1, netB: netT2, conductance: 1 / rLdr, partId: part.id, pinA: "t1", pinB: "t2" })
         break
       }
       case "potentiometer": {
@@ -540,15 +650,15 @@ export function solveCircuitNodalPotentials(
         const rTotal = Math.max(1, Number(part.props.resistance ?? 10000))
         const r1 = Math.max(0.5, ((1023 - val) / 1023) * rTotal)
         const r2 = Math.max(0.5, (val / 1023) * rTotal)
-        branches.push({ netA: netT1, netB: netWiper, conductance: 1 / r1 })
-        branches.push({ netA: netWiper, netB: netT2, conductance: 1 / r2 })
+        branches.push({ netA: netT1, netB: netWiper, conductance: 1 / r1, partId: part.id, pinA: "t1", pinB: "wiper" })
+        branches.push({ netA: netWiper, netB: netT2, conductance: 1 / r2, partId: part.id, pinA: "wiper", pinB: "t2" })
         break
       }
       case "led": {
         const netA = pinToNetId(part.id, "anode")
         const netC = pinToNetId(part.id, "cathode")
         const { forwardVoltage } = getLedElectricalModel(part)
-        branches.push({ netA, netB: netC, conductance: 1 / 10, isDiode: true, vForward: forwardVoltage })
+        branches.push({ netA, netB: netC, conductance: 1 / 10, partId: part.id, pinA: "anode", pinB: "cathode", isDiode: true, vForward: forwardVoltage })
         break
       }
       case "rgb-led": {
@@ -560,6 +670,9 @@ export function solveCircuitNodalPotentials(
             netA,
             netB: commonCathode,
             conductance: 1 / 10,
+            partId: part.id,
+            pinA: channel,
+            pinB: "gnd",
             isDiode: true,
             vForward: forwardVoltage,
           })
@@ -567,15 +680,19 @@ export function solveCircuitNodalPotentials(
         break
       }
       case "buzzer": {
-        const netA = pinToNetId(part.id, "pos")
-        const netB = pinToNetId(part.id, "neg")
-        branches.push({ netA, netB, conductance: 1 / 100 })
+        // A passive piezo is not a 100Ω DC resistor. Only use the simplified
+        // equivalent while the runtime has an active tone/sound state.
+        if ((runtime[part.id]?.level ?? 0) > 0) {
+          const netA = pinToNetId(part.id, "pos")
+          const netB = pinToNetId(part.id, "neg")
+          branches.push({ netA, netB, conductance: 1 / 100, partId: part.id, pinA: "pos", pinB: "neg" })
+        }
         break
       }
       case "dc-motor": {
         const netA = pinToNetId(part.id, "pos")
         const netB = pinToNetId(part.id, "neg")
-        branches.push({ netA, netB, conductance: 1 / 50 })
+        branches.push({ netA, netB, conductance: 1 / 50, partId: part.id, pinA: "pos", pinB: "neg" })
         break
       }
       case "relay": {
@@ -586,57 +703,342 @@ export function solveCircuitNodalPotentials(
           netA: pinToNetId(part.id, "com"),
           netB: pinToNetId(part.id, activeContact),
           conductance: 1 / 0.05,
+          partId: part.id,
+          pinA: "com",
+          pinB: activeContact,
         })
         break
       }
+      case "npn-transistor": {
+        if (runtime[part.id]?.conducting === true) {
+          branches.push({
+            netA: pinToNetId(part.id, "collector"),
+            netB: pinToNetId(part.id, "emitter"),
+            conductance: 1 / 0.2,
+            partId: part.id,
+            pinA: "collector",
+            pinB: "emitter",
+          })
+        }
+        break
+      }
+      case "seven-segment": {
+        const activeSegments = runtime[part.id]?.segments ?? {}
+        const commonAnode = String(part.props.commonType ?? "cathode") === "anode"
+        const ledModel = getLedElectricalModel(part)
+        for (const segment of ["a", "b", "c", "d", "e", "f", "g", "dp"]) {
+          if (activeSegments[segment] !== true) continue
+          branches.push({
+            netA: pinToNetId(part.id, commonAnode ? "com" : segment),
+            netB: pinToNetId(part.id, commonAnode ? segment : "com"),
+            conductance: 1 / 10,
+            partId: part.id,
+            pinA: commonAnode ? "com" : segment,
+            pinB: commonAnode ? segment : "com",
+            isDiode: true,
+            vForward: ledModel.forwardVoltage,
+          })
+        }
+        break
+      }
+    }
+
+    // Component-level supply loads are explicit catalogue equivalents. The
+    // current scales with actual terminal voltage as a resistor model; their
+    // provenance remains "module-estimate" until a concrete module is selected.
+    const supplyLoads = CATALOG[part.type].electrical?.supplyLoads ?? []
+    for (const load of supplyLoads) {
+      const runtimeState = runtime[part.id]
+      const active =
+        load.activeWhen === "relay-energized" ? runtimeState?.relayActive === true :
+        load.activeWhen === "servo-command" ? typeof runtimeState?.angle === "number" :
+        load.activeWhen === "display-enabled" ? runtimeState?.lcdBacklight !== false :
+        load.activeWhen === "pixels-lit" ? (runtimeState?.level ?? 0) > 0 :
+        true
+      const nominalCurrentMa = Number(part.props.supplyCurrentMa ?? load.nominalCurrentMa)
+      if (!active || !Number.isFinite(nominalCurrentMa) || nominalCurrentMa <= 0 ||
+          !Number.isFinite(load.nominalVoltage) || load.nominalVoltage <= 0) continue
+      const conductance = (nominalCurrentMa / 1000) / load.nominalVoltage
+      branches.push({
+        netA: pinToNetId(part.id, load.positivePin),
+        netB: pinToNetId(part.id, load.negativePin),
+        conductance,
+        partId: part.id,
+        pinA: load.positivePin,
+        pinB: load.negativePin,
+      })
+    }
+
+    // WS2812-style pixels are variable-current loads: each full-brightness
+    // colour channel is modelled as a 20mA channel. The pixel colour array is
+    // the runtime output after show(); dark/idle pixels draw no LED-channel load.
+    if (part.type === "neopixel-ring" && (runtime[part.id]?.level ?? 0) > 0) {
+      const model = CATALOG[part.type].electrical
+      const currentPerChannelMa = model?.pixelCurrentPerChannelMa ?? 0
+      const referenceVoltage = model?.pixelReferenceVoltage ?? 0
+      const offColor = (model?.pixelOffColor ?? "#0f172a").toLowerCase()
+      const colors = runtime[part.id]?.pixelColors ?? []
+      const currentMa = colors.reduce((total, color) => {
+        const raw = String(color).trim().replace(/^#/, "")
+        if (!/^[0-9a-fA-F]{6}$/.test(raw) || ("#" + raw).toLowerCase() === offColor) return total
+        const red = parseInt(raw.slice(0, 2), 16)
+        const green = parseInt(raw.slice(2, 4), 16)
+        const blue = parseInt(raw.slice(4, 6), 16)
+        return total + ((red + green + blue) / 255) * currentPerChannelMa
+      }, 0)
+      if (currentMa > 0 && referenceVoltage > 0) {
+        branches.push({
+          netA: pinToNetId(part.id, "vcc"),
+          netB: pinToNetId(part.id, "gnd"),
+          conductance: (currentMa / 1000) / referenceVoltage,
+          partId: part.id,
+          pinA: "vcc",
+          pinB: "gnd",
+        })
+      }
     }
   }
 
-  // A diode's piecewise-linear forward drop is a model of a conducting diode,
-  // not an independent voltage source. Decide whether it can conduct from the
-  // open-diode network first. This prevents an unpowered LED branch from
-  // self-biasing to Vf (for example, showing 1.9V after the MCU output is reset).
-  const passiveAdjacency = new Map<number, number[]>()
-  for (const branch of branches) {
-    if (branch.isDiode || branch.netA === branch.netB) continue
-    passiveAdjacency.set(branch.netA, [...(passiveAdjacency.get(branch.netA) ?? []), branch.netB])
-    passiveAdjacency.set(branch.netB, [...(passiveAdjacency.get(branch.netB) ?? []), branch.netA])
+  // The bridge's VS pin supplies the current consumed by the connected motor
+  // winding branches. Derive this input current from the same output voltages
+  // and 50Ω first-order winding model; do not inject a fixed visual current.
+  for (const driver of state.parts.filter((part) => part.type === "l298n")) {
+    const vsNet = pinToNetId(driver.id, "vs")
+    const gndNet = pinToNetId(driver.id, "gnd")
+    const supply = fixedNets.get(vsNet)
+    const ground = fixedNets.get(gndNet)
+    if (!supply || !ground || conflictedNets.has(vsNet) || conflictedNets.has(gndNet)) continue
+    const supplyVoltage = supply.voltage - ground.voltage
+    if (!Number.isFinite(supplyVoltage) || supplyVoltage <= 0) continue
+
+    const outputs = new Set([
+      pinToNetId(driver.id, "out1"),
+      pinToNetId(driver.id, "out2"),
+      pinToNetId(driver.id, "out3"),
+      pinToNetId(driver.id, "out4"),
+    ])
+    let motorCurrentMa = 0
+    for (const motor of state.parts.filter((part) => part.type === "dc-motor")) {
+      const motorBranch = branches.find((item) =>
+        item.partId === motor.id && item.pinA === "pos" && item.pinB === "neg",
+      )
+      if (!motorBranch || !outputs.has(motorBranch.netA) || !outputs.has(motorBranch.netB)) continue
+      const voltageA = fixedNets.get(motorBranch.netA)?.voltage
+      const voltageB = fixedNets.get(motorBranch.netB)?.voltage
+      if (voltageA === undefined || voltageB === undefined) continue
+      motorCurrentMa += Math.abs((voltageA - voltageB) * motorBranch.conductance * 1000)
+    }
+
+    if (motorCurrentMa > 0) {
+      branches.push({
+        netA: vsNet,
+        netB: gndNet,
+        conductance: (motorCurrentMa / 1000) / supplyVoltage,
+        partId: driver.id,
+        pinA: "vs",
+        pinB: "gnd",
+      })
+    }
   }
-  const reachableSourceVoltages = (startNet: number) => {
-    const seen = new Set<number>([startNet])
-    const queue = [startNet]
-    const voltages: number[] = []
-    for (let index = 0; index < queue.length; index += 1) {
-      const netId = queue[index]
-      const fixed = fixedNets.get(netId)
-      if (fixed) voltages.push(fixed.voltage)
-      for (const neighbor of passiveAdjacency.get(netId) ?? []) {
-        if (seen.has(neighbor)) continue
-        seen.add(neighbor)
-        queue.push(neighbor)
+
+  // Reflect connected motor winding current back to the L298N VS/GND
+  // supply terminals. This current is derived from the same solved output
+  // voltage and motor winding branch; it is not a fixed visual estimate.
+  for (const driver of state.parts.filter((part) => part.type === "l298n")) {
+    const vsNet = pinToNetId(driver.id, "vs")
+    const gndNet = pinToNetId(driver.id, "gnd")
+    const supply = fixedNets.get(vsNet)
+    const ground = fixedNets.get(gndNet)
+    if (!supply || !ground || conflictedNets.has(vsNet) || conflictedNets.has(gndNet)) continue
+    const supplyVoltage = supply.voltage - ground.voltage
+    if (!Number.isFinite(supplyVoltage) || supplyVoltage <= 0) continue
+
+    const outputs = new Set([
+      pinToNetId(driver.id, "out1"),
+      pinToNetId(driver.id, "out2"),
+      pinToNetId(driver.id, "out3"),
+      pinToNetId(driver.id, "out4"),
+    ])
+    let motorCurrentMa = 0
+    for (const motor of state.parts.filter((part) => part.type === "dc-motor")) {
+      const motorBranch = branches.find((item) =>
+        item.partId === motor.id && item.pinA === "pos" && item.pinB === "neg",
+      )
+      if (!motorBranch || !outputs.has(motorBranch.netA) || !outputs.has(motorBranch.netB)) continue
+      const voltageA = fixedNets.get(motorBranch.netA)?.voltage
+      const voltageB = fixedNets.get(motorBranch.netB)?.voltage
+      if (voltageA === undefined || voltageB === undefined) continue
+      motorCurrentMa += Math.abs((voltageA - voltageB) * motorBranch.conductance * 1000)
+    }
+
+    if (motorCurrentMa > 0) {
+      branches.push({
+        netA: vsNet,
+        netB: gndNet,
+        conductance: (motorCurrentMa / 1000) / supplyVoltage,
+        partId: driver.id,
+        pinA: "vs",
+        pinB: "gnd",
+      })
+    }
+  }
+
+  // 6. Modified Nodal Analysis (MNA) with a convergent piecewise-linear
+  // diode active-set. Remove reverse/negative-current branches, add forward-
+  // biased inactive branches, and continue until the set is stable.
+  const netVoltages = new Map<number, number>()
+  const unknownNets: number[] = []
+  const netToUnknownIdx = new Map<number, number>()
+  for (let id = 0; id < nextNetId; id++) {
+    if (!fixedNets.has(id)) {
+      netToUnknownIdx.set(id, unknownNets.length)
+      unknownNets.push(id)
+    }
+  }
+
+  const solveWithBranches = (solvedBranches: Branch[]) => {
+    const voltages = new Map<number, number>()
+    for (const [netId, info] of fixedNets.entries()) voltages.set(netId, info.voltage)
+    const M = unknownNets.length
+    if (M === 0) return voltages
+
+    const A: number[][] = Array.from({ length: M }, () => new Array(M).fill(0))
+    const B: number[] = new Array(M).fill(0)
+    for (const br of solvedBranches) {
+      if (br.netA === br.netB) continue
+      const G = br.conductance
+      const u = netToUnknownIdx.get(br.netA)
+      const v = netToUnknownIdx.get(br.netB)
+      if (u !== undefined && v !== undefined) {
+        A[u][u] += G
+        A[v][v] += G
+        A[u][v] -= G
+        A[v][u] -= G
+      } else if (u !== undefined) {
+        A[u][u] += G
+        B[u] += G * (voltages.get(br.netB) ?? 0)
+      } else if (v !== undefined) {
+        A[v][v] += G
+        B[v] += G * (voltages.get(br.netA) ?? 0)
       }
+      if (br.isDiode && br.vForward) {
+        const iEq = G * br.vForward
+        if (u !== undefined) B[u] += iEq
+        if (v !== undefined) B[v] -= iEq
+      }
+    }
+
+    // This regularizer only stabilizes the matrix. Floating nets are tracked
+    // separately and never reported as a valid grounded measurement.
+    for (let i = 0; i < M; i++) A[i][i] += 1e-12
+    const x = solveLinearSystem(A, B)
+    for (let i = 0; i < M; i++) {
+      voltages.set(unknownNets[i], Number.isFinite(x[i]) ? x[i] : 0)
     }
     return voltages
   }
-  const activeBranches = branches.filter((branch) => {
-    if (!branch.isDiode || !branch.vForward) return true
-    const anodeSources = reachableSourceVoltages(branch.netA)
-    const cathodeSources = reachableSourceVoltages(branch.netB)
-    return anodeSources.some((anodeV) =>
-      cathodeSources.some((cathodeV) => anodeV - cathodeV >= branch.vForward! - 0.1),
-    )
-  })
 
-  // Identify electrically floating networks before numerical regularization.
-  // The tiny diagonal term below stabilizes the matrix, but must not make an
-  // open circuit look like a real 0V measurement.
-  const sourceReachable = new Set(fixedNets.keys())
+  const diodeIndices = branches
+    .map((branch, index) => ({ branch, index }))
+    .filter(({ branch }) => branch.isDiode && branch.vForward)
+    .map(({ index }) => index)
+
+  // Do not let an isolated diode self-bias to Vf through MNA regularization.
+  // Seed a diode active only when its complete connected component contains
+  // at least two distinct fixed-potential levels with enough available span.
+  // This also supports multiple diodes in series: the source span is evaluated
+  // over the entire component, not just through the diode's immediate terminals.
+  const componentParent = new Map<number, number>()
+  const componentFind = (net: number): number => {
+    if (!componentParent.has(net)) componentParent.set(net, net)
+    const parent = componentParent.get(net)!
+    if (parent !== net) componentParent.set(net, componentFind(parent))
+    return componentParent.get(net)!
+  }
+  const componentUnion = (a: number, b: number) => {
+    const rootA = componentFind(a)
+    const rootB = componentFind(b)
+    if (rootA !== rootB) componentParent.set(rootA, rootB)
+  }
+  for (const branch of branches) {
+    if (branch.netA !== branch.netB) componentUnion(branch.netA, branch.netB)
+  }
+  const componentVoltages = new Map<number, number[]>()
+  for (const [netId, info] of fixedNets.entries()) {
+    const root = componentFind(netId)
+    componentVoltages.set(root, [...(componentVoltages.get(root) ?? []), info.voltage])
+  }
+  let activeDiodeIndices = new Set<number>(diodeIndices.filter((index) => {
+    const diode = branches[index]
+    const voltages = componentVoltages.get(componentFind(diode.netA)) ?? []
+    if (voltages.length < 2) return false
+    const span = Math.max(...voltages) - Math.min(...voltages)
+    return span >= (diode.vForward ?? Infinity) - 0.1
+  }))
+  let converged = diodeIndices.length === 0
+  let netVoltagesSolved = solveWithBranches(branches.filter((branch, index) => !branch.isDiode || activeDiodeIndices.has(index)))
+  const seenDiodeSets = new Set<string>()
+  const maxDiodeIterations = Math.max(8, diodeIndices.length * 4 + 4)
+
+  for (let iteration = 0; iteration < maxDiodeIterations && !converged; iteration++) {
+    const signature = [...activeDiodeIndices].sort((a, b) => a - b).join(",")
+    if (seenDiodeSets.has(signature)) break
+    seenDiodeSets.add(signature)
+
+    const solvedBranches = branches.filter((branch, index) => !branch.isDiode || activeDiodeIndices.has(index))
+    netVoltagesSolved = solveWithBranches(solvedBranches)
+    const nextActive = new Set(activeDiodeIndices)
+    for (const index of diodeIndices) {
+      const diode = branches[index]
+      const vA = netVoltagesSolved.get(diode.netA) ?? 0
+      const vC = netVoltagesSolved.get(diode.netB) ?? 0
+      const currentA = diode.conductance * (vA - vC - (diode.vForward ?? 0))
+      if (activeDiodeIndices.has(index) && currentA < -1e-9) {
+        nextActive.delete(index)
+      } else if (!activeDiodeIndices.has(index) && vA - vC > (diode.vForward ?? 0) + 1e-4) {
+        nextActive.add(index)
+      }
+    }
+    converged = nextActive.size === activeDiodeIndices.size &&
+      [...nextActive].every((index) => activeDiodeIndices.has(index))
+    activeDiodeIndices = nextActive
+  }
+
+  if (!converged) {
+    diagnostics.push({
+      code: "diode-non-convergence",
+      severity: "warning",
+      message: "The diode active-set did not converge within the configured iteration budget. Diode branches were opened fail-safe for this solve; inspect the topology for interacting or contradictory diode paths.",
+    })
+    activeDiodeIndices.clear()
+    netVoltagesSolved = solveWithBranches(branches.filter((branch) => !branch.isDiode))
+  }
+
+  for (const [netId, voltage] of netVoltagesSolved.entries()) netVoltages.set(netId, voltage)
+  const activeBranches = branches.filter((branch, index) => !branch.isDiode || activeDiodeIndices.has(index))
   const branchAdjacency = new Map<number, number[]>()
   for (const branch of activeBranches) {
     if (branch.netA === branch.netB) continue
     branchAdjacency.set(branch.netA, [...(branchAdjacency.get(branch.netA) ?? []), branch.netB])
     branchAdjacency.set(branch.netB, [...(branchAdjacency.get(branch.netB) ?? []), branch.netA])
   }
+
+  // Propagate an ideal-source conflict through the entire connected
+  // conducting network. A neighbouring resistor branch is not physically
+  // valid merely because its own two terminals do not directly contain the
+  // conflicted source net.
+  const invalidNets = new Set<number>(conflictedNets)
+  const invalidQueue = [...invalidNets]
+  for (let index = 0; index < invalidQueue.length; index++) {
+    for (const neighbor of branchAdjacency.get(invalidQueue[index]) ?? []) {
+      if (invalidNets.has(neighbor)) continue
+      invalidNets.add(neighbor)
+      invalidQueue.push(neighbor)
+    }
+  }
+
+  // Detect floating nets using the final conducting branch set.
+  const sourceReachable = new Set(fixedNets.keys())
   const reachableQueue = [...sourceReachable]
   for (let index = 0; index < reachableQueue.length; index++) {
     for (const neighbor of branchAdjacency.get(reachableQueue[index]) ?? []) {
@@ -650,92 +1052,20 @@ export function solveCircuitNodalPotentials(
     if (!sourceReachable.has(id)) floatingNets.add(id)
   }
 
-  // 6. Modified Nodal Analysis (MNA)
-  const netVoltages = new Map<number, number>()
-  for (const [netId, info] of fixedNets.entries()) {
-    netVoltages.set(netId, info.voltage)
-  }
-
-  const unknownNets: number[] = []
-  const netToUnknownIdx = new Map<number, number>()
-  for (let id = 0; id < nextNetId; id++) {
-    if (!fixedNets.has(id)) {
-      netToUnknownIdx.set(id, unknownNets.length)
-      unknownNets.push(id)
-    }
-  }
-
-  const M = unknownNets.length
-
-  if (M > 0) {
-    let solvedBranches = activeBranches.slice()
-
-    for (let pass = 0; pass < 2; pass++) {
-      const A: number[][] = Array.from({ length: M }, () => new Array(M).fill(0))
-      const B: number[] = new Array(M).fill(0)
-
-      for (const br of solvedBranches) {
-        if (br.netA === br.netB) continue
-
-        const G = br.conductance
-        const u = netToUnknownIdx.get(br.netA)
-        const v = netToUnknownIdx.get(br.netB)
-
-        if (u !== undefined && v !== undefined) {
-          A[u][u] += G
-          A[v][v] += G
-          A[u][v] -= G
-          A[v][u] -= G
-        } else if (u !== undefined && v === undefined) {
-          const vFixed = netVoltages.get(br.netB) ?? 0
-          A[u][u] += G
-          B[u] += G * vFixed
-        } else if (u === undefined && v !== undefined) {
-          const vFixed = netVoltages.get(br.netA) ?? 0
-          A[v][v] += G
-          B[v] += G * vFixed
-        }
-
-        if (br.isDiode && br.vForward) {
-          const iEq = G * br.vForward
-          // Model a forward diode as I = G * (Va - Vc - Vf). In the
-          // nodal equation, the forward-voltage source contributes +G*Vf
-          // to the anode RHS and -G*Vf to the cathode RHS. The old signs
-          // drove a valid LED series node below ground, then the diode was
-          // removed as reverse-biased; that made both resistor terminals
-          // appear to be at the same supply voltage in the DMM.
-          if (u !== undefined) B[u] += iEq
-          if (v !== undefined) B[v] -= iEq
-        }
-      }
-
-      for (let i = 0; i < M; i++) {
-        A[i][i] += 1e-9
-      }
-
-      const x = solveLinearSystem(A, B)
-      for (let i = 0; i < M; i++) {
-        const netId = unknownNets[i]
-        const vSolved = Math.max(0, Number(x[i].toFixed(3)))
-        netVoltages.set(netId, vSolved)
-      }
-
-      let recheckNeeded = false
-      solvedBranches = solvedBranches.filter((br) => {
-        if (br.isDiode && br.vForward) {
-          const vA = netVoltages.get(br.netA) ?? 0
-          const vC = netVoltages.get(br.netB) ?? 0
-          if (vA - vC < br.vForward - 0.1) {
-            recheckNeeded = true
-            return false
-          }
-        }
-        return true
-      })
-
-      if (!recheckNeeded) break
-    }
-  }
+  // Signed branch current (positive is pinA -> pinB). Conflicted voltage nets
+  // fail closed so an impossible ideal-source short never yields fake current.
+  const branchCurrents = new Map<string, number>()
+  branches.forEach((branch, index) => {
+    const invalid = invalidNets.has(branch.netA) || invalidNets.has(branch.netB)
+    const inactiveDiode = Boolean(branch.isDiode && !activeDiodeIndices.has(index))
+    const vA = netVoltages.get(branch.netA) ?? 0
+    const vB = netVoltages.get(branch.netB) ?? 0
+    const currentMa = invalid || inactiveDiode || branch.netA === branch.netB
+      ? 0
+      : branch.conductance * (vA - vB - (branch.isDiode ? (branch.vForward ?? 0) : 0)) * 1000
+    branchCurrents.set(branchKey(branch.partId, branch.pinA, branch.pinB),
+      Number.isFinite(currentMa) ? Number(currentMa.toFixed(6)) : 0)
+  })
 
   // 7. Map calculated potentials to every pin
   const pinPotentials = new Map<string, PinPotentialInfo>()
@@ -747,16 +1077,31 @@ export function solveCircuitNodalPotentials(
     const voltage = netVoltages.get(netId) ?? 0
 
     pinPotentials.set(pin, {
-      voltage: floatingNets.has(netId) ? 0 : Number(voltage.toFixed(2)),
+      voltage: floatingNets.has(netId) || invalidNets.has(netId) ? 0 : Number(voltage.toFixed(2)),
       netId,
-      sourceLabel: fixedInfo?.label ?? (floatingNets.has(netId) ? "Floating / open circuit" : undefined),
-      isDriven: fixedInfo !== undefined && fixedInfo.voltage > 0,
-      isGnd: fixedInfo !== undefined && fixedInfo.voltage === 0 && !fixedInfo.isDigitalLow,
+      sourceLabel: invalidNets.has(netId)
+        ? "Connected to conflicting ideal voltage sources"
+        : fixedInfo?.label ?? (floatingNets.has(netId) ? "Floating / open circuit" : undefined),
+      // A fixed negative rail is still an active voltage source; don't
+      // classify it as floating merely because its voltage is below ground.
+      isDriven: !invalidNets.has(netId) && fixedInfo !== undefined && Math.abs(fixedInfo.voltage) > 1e-9,
+      isGnd: !invalidNets.has(netId) && fixedInfo !== undefined && fixedInfo.voltage === 0 && !fixedInfo.isDigitalLow,
       isDigitalLow: fixedInfo?.isDigitalLow,
       isFloating: floatingNets.has(netId),
+      isConflicted: invalidNets.has(netId),
       digitalPinName: fixedInfo?.digitalPinName,
     })
   }
+
+  const getBranchCurrent = (partId: string, pinA: string, pinB: string) =>
+    branchCurrents.get(branchKey(partId, pinA, pinB)) ?? 0
+
+  const getNetCurrent = (netId: number) => branches.reduce((total, branch) => {
+    const current = getBranchCurrent(branch.partId, branch.pinA, branch.pinB)
+    if (branch.netA === netId) return total + current
+    if (branch.netB === netId) return total - current
+    return total
+  }, 0)
 
   const getPinVoltage = (ref: PinRef | null): number => {
     if (!ref) return 0
@@ -798,41 +1143,6 @@ export function solveCircuitNodalPotentials(
       }
     }
 
-    if (refA.partId === refB.partId) {
-      const component = state.parts.find((part) => part.id === refA.partId)
-      if (component?.type === "resistor") {
-        const resistance = Math.max(0.1, Number(component.props.resistance || 220))
-        return {
-          resistance,
-          explanation: `Component Resistance: ${resistance.toFixed(1)} Ω`,
-          subtext: `Marking bands denote ${resistance}Ω nominal resistance`,
-        }
-      }
-      if (component?.type === "ldr") {
-        const light = Math.max(0, Math.min(1023, Number(component.props.light ?? 512)))
-        const resistance = Math.max(200, Math.round(50000 / (1 + (light / 1023) * 99)))
-        return {
-          resistance,
-          explanation: `Photoresistor Resistance: ${resistance.toFixed(0)} Ω`,
-          subtext: `LDR resistance is resolved from the light level (${light}/1023)`,
-        }
-      }
-      if (component?.type === "dc-motor") {
-        return {
-          resistance: 50,
-          explanation: "DC motor winding model: 50.0 Ω",
-          subtext: "Simplified winding resistance used by the nodal motor branch",
-        }
-      }
-      if (component?.type === "buzzer") {
-        return {
-          resistance: 100,
-          explanation: "Piezo buzzer load model: 100.0 Ω",
-          subtext: "Simplified energized buzzer branch used by the nodal solver",
-        }
-      }
-    }
-
     if (refA.partId === refB.partId && state.parts.find((p) => p.id === refA.partId)?.type === "led") {
       return {
         resistance: Infinity,
@@ -841,62 +1151,86 @@ export function solveCircuitNodalPotentials(
       }
     }
 
-    const adj = new Map<number, { to: number; r: number; partName: string }[]>()
-    function addR(u: number, v: number, r: number, name: string) {
-      if (!adj.has(u)) adj.set(u, [])
-      if (!adj.has(v)) adj.set(v, [])
-      adj.get(u)!.push({ to: v, r, partName: name })
-      adj.get(v)!.push({ to: u, r, partName: name })
+    // Equivalent resistance is the voltage produced by a 1A test source
+    // across the complete passive network, including all parallel branches.
+    const resistiveEdges: Array<{ u: number; v: number; resistance: number; name: string }> = []
+    const addResistance = (u: number, v: number, resistance: number, name: string) => {
+      if (u === v || !Number.isFinite(resistance) || resistance <= 0) return
+      resistiveEdges.push({ u, v, resistance, name })
     }
-
     for (const part of state.parts) {
       if (part.type === "resistor") {
-        const u = pinToNetId(part.id, "a")
-        const v = pinToNetId(part.id, "b")
-        const r = Math.max(0.1, Number(part.props.resistance || 220))
-        addR(u, v, r, `${r}Ω Resistor`)
+        const resistance = Math.max(0.1, Number(part.props.resistance || 220))
+        addResistance(pinToNetId(part.id, "a"), pinToNetId(part.id, "b"), resistance, `${resistance}Ω Resistor`)
+      } else if (part.type === "ldr") {
+        const light = Math.max(0, Math.min(1023, Number(part.props.light ?? 512)))
+        const resistance = Math.max(200, Math.round(50000 / (1 + (light / 1023) * 99)))
+        addResistance(pinToNetId(part.id, "t1"), pinToNetId(part.id, "t2"), resistance, `${resistance}Ω LDR`)
       } else if (part.type === "potentiometer") {
         const u = pinToNetId(part.id, "t1")
         const w = pinToNetId(part.id, "wiper")
         const v = pinToNetId(part.id, "t2")
-        const val = Math.max(0, Math.min(1023, Number(part.props.value ?? 512)))
-        const rTotal = Math.max(1, Number(part.props.resistance ?? 10000))
-        const r1 = Math.max(0.5, ((1023 - val) / 1023) * rTotal)
-        const r2 = Math.max(0.5, (val / 1023) * rTotal)
-        addR(u, w, r1, "Potentiometer T1-Wiper")
-        addR(w, v, r2, "Potentiometer Wiper-T2")
+        const value = Math.max(0, Math.min(1023, Number(part.props.value ?? 512)))
+        const total = Math.max(1, Number(part.props.resistance ?? 10000))
+        const r1 = Math.max(0.5, ((1023 - value) / 1023) * total)
+        const r2 = Math.max(0.5, (value / 1023) * total)
+        addResistance(u, w, r1, `Potentiometer T1-Wiper (${r1.toFixed(1)}Ω)`)
+        addResistance(w, v, r2, `Potentiometer Wiper-T2 (${r2.toFixed(1)}Ω)`)
+      } else if (part.type === "dc-motor") {
+        addResistance(pinToNetId(part.id, "pos"), pinToNetId(part.id, "neg"), 50, "DC motor winding model (50Ω)")
       }
-      // Note: LEDs are semiconductor diodes with non-linear p-n barrier voltage (Vf ≈ 1.8V-2.2V).
-      // They do not act as low-resistance ohmic conductors for continuity or resistance measurement.
     }
 
-    const dist = new Map<number, number>()
-    const visited = new Set<number>()
-    const pq = new MinPriorityQueue<{ net: number; d: number; parts: string[] }>((a, b) => a.d - b.d)
-    pq.push({ net: netA, d: 0, parts: [] })
-    dist.set(netA, 0)
+    const adjacency = new Map<number, number[]>()
+    for (const edge of resistiveEdges) {
+      adjacency.set(edge.u, [...(adjacency.get(edge.u) ?? []), edge.v])
+      adjacency.set(edge.v, [...(adjacency.get(edge.v) ?? []), edge.u])
+    }
+    const componentNets = new Set<number>([netA])
+    const queue = [netA]
+    for (let index = 0; index < queue.length; index++) {
+      for (const neighbor of adjacency.get(queue[index]) ?? []) {
+        if (componentNets.has(neighbor)) continue
+        componentNets.add(neighbor)
+        queue.push(neighbor)
+      }
+    }
 
     let bestR = Infinity
     let bestParts: string[] = []
+    if (componentNets.has(netB)) {
+      const unknown = [...componentNets].filter((net) => net !== netB)
+      const indexByNet = new Map(unknown.map((net, index) => [net, index]))
+      const A: number[][] = Array.from({ length: unknown.length }, () => new Array(unknown.length).fill(0))
+      const B: number[] = new Array(unknown.length).fill(0)
+      const sourceIndex = indexByNet.get(netA)
+      if (sourceIndex !== undefined) B[sourceIndex] += 1
 
-    while (pq.size > 0) {
-      const { net, d, parts } = pq.pop()!
-
-      if (net === netB) {
-        bestR = d
-        bestParts = parts
-        break
+      for (const edge of resistiveEdges) {
+        if (!componentNets.has(edge.u) || !componentNets.has(edge.v)) continue
+        const conductance = 1 / edge.resistance
+        const u = indexByNet.get(edge.u)
+        const v = indexByNet.get(edge.v)
+        if (u !== undefined && v !== undefined) {
+          A[u][u] += conductance
+          A[v][v] += conductance
+          A[u][v] -= conductance
+          A[v][u] -= conductance
+        } else if (u !== undefined) {
+          A[u][u] += conductance
+        } else if (v !== undefined) {
+          A[v][v] += conductance
+        }
       }
 
-      if (visited.has(net)) continue
-      visited.add(net)
-
-      const edges = adj.get(net) || []
-      for (const e of edges) {
-        const newD = d + e.r
-        if (newD < (dist.get(e.to) ?? Infinity)) {
-          dist.set(e.to, newD)
-          pq.push({ net: e.to, d: newD, parts: [...parts, e.partName] })
+      if (unknown.length > 0) {
+        const voltages = solveLinearSystem(A, B)
+        const result = sourceIndex === undefined ? 0 : voltages[sourceIndex]
+        if (Number.isFinite(result) && result > 1e-9) {
+          bestR = result
+          bestParts = [...new Set(resistiveEdges
+            .filter((edge) => componentNets.has(edge.u) && componentNets.has(edge.v))
+            .map((edge) => edge.name))]
         }
       }
     }
@@ -932,8 +1266,10 @@ export function solveCircuitNodalPotentials(
 
     return {
       resistance: Number(bestR.toFixed(1)),
-      explanation: `Path Resistance: ${bestR >= 1000 ? (bestR / 1000).toFixed(2) + " kΩ" : bestR.toFixed(1) + " Ω"}`,
-      subtext: bestParts.length > 0 ? `Through: ${bestParts.join(" + ")}` : undefined,
+      explanation: `Equivalent Resistance: ${bestR >= 1000 ? (bestR / 1000).toFixed(2) + " kΩ" : bestR.toFixed(1) + " Ω"}`,
+      subtext: bestParts.length > 0
+        ? `Solved with a 1A test source across series and parallel branches: ${bestParts.join(" + ")}`
+        : "Solved with a 1A test source across the passive network.",
     }
   }
 
@@ -964,6 +1300,17 @@ export function solveCircuitNodalPotentials(
       const infoRed = getPinInfo(red)
       const vRed = infoRed.voltage
       const label = formatPinLabel(red)
+
+      if (infoRed.isConflicted) {
+        return {
+          diff: 0,
+          vRed: 0,
+          vBlack: 0,
+          explanation: `${label} belongs to a network with conflicting ideal voltage sources`,
+          subtext: "Resolve the short or separate the incompatible supply rails before measuring voltage.",
+          isWarning: true,
+        }
+      }
 
       if (infoRed.isFloating) {
         return {
@@ -1002,6 +1349,17 @@ export function solveCircuitNodalPotentials(
       const vBlack = infoBlack.voltage
       const label = formatPinLabel(black)
 
+      if (infoBlack.isConflicted) {
+        return {
+          diff: 0,
+          vRed: 0,
+          vBlack: 0,
+          explanation: `${label} belongs to a network with conflicting ideal voltage sources`,
+          subtext: "Resolve the short or separate the incompatible supply rails before measuring voltage.",
+          isWarning: true,
+        }
+      }
+
       if (infoBlack.isFloating) {
         return {
           diff: 0,
@@ -1027,6 +1385,17 @@ export function solveCircuitNodalPotentials(
     const infoBlack = getPinInfo(black)
     const vRed = infoRed.voltage
     const vBlack = infoBlack.voltage
+    if (infoRed.isConflicted || infoBlack.isConflicted) {
+      const invalidPin = infoRed.isConflicted ? red : black
+      return {
+        diff: 0,
+        vRed: 0,
+        vBlack: 0,
+        explanation: `${formatPinLabel(invalidPin)} belongs to an electrically invalid source-conflict network`,
+        subtext: "An ideal 5V/3.3V (or other incompatible) source conflict has no physically valid voltage solution.",
+        isWarning: true,
+      }
+    }
     if (infoRed.isFloating || infoBlack.isFloating) {
       const openPin = infoRed.isFloating ? red : black
       return {
@@ -1192,54 +1561,69 @@ export function solveCircuitNodalPotentials(
 
     // 1. If probes are across a single resistor
     if (red.partId === black.partId && state.parts.find((p) => p.id === red.partId)?.type === "resistor") {
-      const part = state.parts.find((p) => p.id === red.partId)!
-      const r = Number(part.props.resistance || 220)
-      const currentMa = r > 0 ? (Math.abs(pd.diff) / r) * 1000 : 0
+      const currentMa = Math.abs(getBranchCurrent(red.partId, "a", "b"))
+      const r = Number(state.parts.find((p) => p.id === red.partId)?.props.resistance || 220)
       return {
-        currentMa: Number(currentMa.toFixed(1)),
-        explanation: `Branch Current through Resistor: ${currentMa.toFixed(1)} mA`,
-        subtext: `Ohm's Law: I = ΔV / R = ${Math.abs(pd.diff).toFixed(2)}V / ${r}Ω`,
+        currentMa: Number(currentMa.toFixed(3)),
+        explanation: `Solved resistor branch current: ${currentMa.toFixed(3)} mA`,
+        subtext: `MNA solved current using the connected network and configured ${r}Ω resistance.`,
       }
     }
 
-    // 2. If probes are across an LED
-    const ledPart = state.parts.find((p) => p.type === "led" && (p.id === red.partId || p.id === black.partId))
-    if (ledPart) {
-      const r = runtime[ledPart.id]
-      const c = r?.currentMa ?? (r?.level ? 15.0 : 0)
-      return {
-        currentMa: Number(c.toFixed(1)),
-        explanation: `LED Branch Current: ${c.toFixed(1)} mA`,
-        subtext: r?.burnt ? "⚠️ OVERCURRENT BURNOUT!" : "Diode is conducting forward current",
-        isWarning: r?.burnt,
+    // 2. Probes directly across any modeled component branch (resistor,
+    // diode channel, potentiometer leg, motor, relay contact, transistor, or
+    // module supply-load branch) read the same solved MNA current.
+    if (red.partId === black.partId) {
+      const forwardKey = branchKey(red.partId, red.pinId, black.pinId)
+      const reverseKey = branchKey(red.partId, black.pinId, red.pinId)
+      const forwardExists = branchCurrents.has(forwardKey)
+      const reverseExists = branchCurrents.has(reverseKey)
+      if (forwardExists || reverseExists) {
+        const signedCurrent = forwardExists
+          ? getBranchCurrent(red.partId, red.pinId, black.pinId)
+          : -getBranchCurrent(red.partId, black.pinId, red.pinId)
+        const currentMa = Math.abs(signedCurrent)
+        const component = state.parts.find((part) => part.id === red.partId)
+        const componentType = component?.type
+        const isLed = componentType === "led" || componentType === "rgb-led" || componentType === "seven-segment"
+        const isBurnt = componentType === "led" && runtime[component.id]?.burnt === true
+        const loadModel = component
+          ? (CATALOG[component.type].electrical?.supplyLoads ?? []).find((load) =>
+              (load.positivePin === red.pinId && load.negativePin === black.pinId) ||
+              (load.positivePin === black.pinId && load.negativePin === red.pinId),
+            )
+          : undefined
+        const fidelity = componentType ? ELECTRICAL_MODEL_CONTRACT[componentType].fidelity : undefined
+        const isEstimate = loadModel?.accuracy === "module-estimate" || fidelity === "estimated"
+        const contractNote = componentType ? ELECTRICAL_MODEL_CONTRACT[componentType].note : undefined
+        return {
+          currentMa: Number(currentMa.toFixed(3)),
+          explanation: `${isEstimate ? "Estimated" : "Solved"} ${componentType ?? "component"} branch current: ${currentMa.toFixed(3)} mA`,
+          subtext: isBurnt
+            ? "⚠️ OVERCURRENT BURNOUT!"
+            : loadModel?.note ?? contractNote ??
+              (isLed
+                ? "Current is read from the active diode/channel branch in the nodal solution."
+                : "Current is read directly from the component branch in the nodal network."),
+          isWarning: isBurnt,
+        }
       }
     }
 
-    // 3. If probes are across power source and ground (e.g. Arduino Pin D13 & GND, or 5V & GND)
+    // 3. Source-to-return measurement: sum the solver's signed branch
+    // currents at the driven rail. Do not sum component runtime.currentMa,
+    // which mixed PWM averages, stale values, and unrelated components.
     const infoRed = getPinInfo(red)
     const infoBlack = getPinInfo(black)
     const hasSource = (infoRed.isDriven && infoBlack.isGnd) || (infoBlack.isDriven && infoRed.isGnd)
     if (hasSource) {
+      const sourceInfo = infoRed.isDriven ? infoRed : infoBlack
       const sourceRef = infoRed.isDriven ? red : black
-      const sourcePinName = sourceRef.pinId.toUpperCase()
-      let totalLoadMa = 0
-      const activeComponents: string[] = []
-
-      for (const part of state.parts) {
-        const r = runtime[part.id]
-        if (r && (r.currentMa || r.level)) {
-          const ma = r.currentMa ?? 15.0
-          totalLoadMa += ma
-          activeComponents.push(part.type.toUpperCase())
-        }
-      }
-
-      if (totalLoadMa > 0) {
-        return {
-          currentMa: Number(totalLoadMa.toFixed(1)),
-          explanation: `Total Circuit Current supplied by ${sourceRef.partId.toUpperCase()} (${sourcePinName}): ${totalLoadMa.toFixed(1)} mA`,
-          subtext: `Active loads: ${activeComponents.slice(0, 3).join(", ")} drawing power to Ground.`,
-        }
+      const currentMa = Math.abs(getNetCurrent(sourceInfo.netId))
+      return {
+        currentMa: Number(currentMa.toFixed(3)),
+        explanation: `Solved source current at ${sourceRef.partId.toUpperCase()} (${sourceRef.pinId.toUpperCase()}): ${currentMa.toFixed(3)} mA`,
+        subtext: "Algebraic sum of MNA branch currents leaving the driven source net (KCL). Includes configured module-estimate loads; the board's own quiescent consumption and regulator losses are excluded.",
       }
     }
 
@@ -1264,6 +1648,10 @@ export function solveCircuitNodalPotentials(
   return {
     pinPotentials,
     netVoltages,
+    branchCurrents,
+    diagnostics,
+    getBranchCurrent,
+    getNetCurrent,
     getPinVoltage,
     getPinInfo,
     getPotentialDifference,

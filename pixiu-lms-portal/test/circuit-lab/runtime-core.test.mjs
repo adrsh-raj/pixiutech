@@ -15,6 +15,8 @@ await build({
     new URL("../../src/lib/waveform-sampler.ts", import.meta.url).pathname,
     new URL("../../src/lib/board-registry.ts", import.meta.url).pathname,
     new URL("../../src/lib/pin-state.ts", import.meta.url).pathname,
+    new URL("../../src/lib/components-catalog.ts", import.meta.url).pathname,
+    new URL("../../src/lib/circuit-validator.ts", import.meta.url).pathname,
   ],
   bundle: true,
   format: "esm",
@@ -29,8 +31,15 @@ const { runBlocklyProgram } = await import(`file://${join(outdir, "blockly-runne
 const { diagnoseCircuit } = await import(`file://${join(outdir, "circuit-doctor.js")}`)
 const { normalizeBreadboardPinId } = await import(`file://${join(outdir, "breadboard-pins.js")}`)
 const { samplePinVoltage } = await import(`file://${join(outdir, "waveform-sampler.js")}`)
-const { getBoardForPart, lookupBoardPinState } = await import(`file://${join(outdir, "board-registry.js")}`)
+const {
+  getBoardForPart,
+  lookupBoardPinState,
+  getPinVoltage,
+  validateBoardPowerInputVoltage,
+} = await import(`file://${join(outdir, "board-registry.js")}`)
+const { validateProposedCircuit } = await import(`file://${join(outdir, "circuit-validator.js")}`)
 const { writePinStateAliases } = await import(`file://${join(outdir, "pin-state.js")}`)
+const { CATALOG, ELECTRICAL_MODEL_CONTRACT } = await import(`file://${join(outdir, "components-catalog.js")}`)
 
 const part = (id, type, props = {}) => ({ id, type, x: 0, y: 0, rotation: 0, props })
 const wire = (id, fromPart, fromPin, toPart, toPin) => ({
@@ -855,4 +864,260 @@ test("nodal current calculation exposes the actual light-dependent resistance cu
     assert.ok(Math.abs(measured - scenario.expectedMa) < 0.15,
       `light ${scenario.light}: expected about ${scenario.expectedMa}mA, received ${measured}mA`)
   }
+})
+
+
+test("MNA exposes signed resistor branch currents and satisfies KCL in a parallel network", () => {
+  const circuit = {
+    parts: [
+      part("uno", "arduino-uno"),
+      part("r1", "resistor", { resistance: 1000 }),
+      part("r2", "resistor", { resistance: 2000 }),
+    ],
+    wires: [
+      wire("feed1", "uno", "5v", "r1", "a"),
+      wire("feed2", "uno", "5v", "r2", "a"),
+      wire("return1", "r1", "b", "uno", "gnd_pwr"),
+      wire("return2", "r2", "b", "uno", "gnd_pwr"),
+    ],
+  }
+  const solved = solveCircuitNodalPotentials(circuit)
+  const i1 = solved.getBranchCurrent("r1", "a", "b")
+  const i2 = solved.getBranchCurrent("r2", "a", "b")
+  assert.ok(Math.abs(i1 - 5) < 0.03, `1kΩ branch should carry 5mA, got ${i1}mA`)
+  assert.ok(Math.abs(i2 - 2.5) < 0.03, `2kΩ branch should carry 2.5mA, got ${i2}mA`)
+  assert.ok(Math.abs((i1 + i2) - 7.5) < 0.03, "KCL: source current must equal the sum of parallel branch currents")
+})
+
+test("MNA series branches carry equal current and satisfy KVL", () => {
+  const circuit = {
+    parts: [
+      part("uno", "arduino-uno"),
+      part("r1", "resistor", { resistance: 1000 }),
+      part("r2", "resistor", { resistance: 2000 }),
+    ],
+    wires: [
+      wire("feed", "uno", "5v", "r1", "a"),
+      wire("series", "r1", "b", "r2", "a"),
+      wire("return", "r2", "b", "uno", "gnd_pwr"),
+    ],
+  }
+  const solved = solveCircuitNodalPotentials(circuit)
+  const i1 = solved.getBranchCurrent("r1", "a", "b")
+  const i2 = solved.getBranchCurrent("r2", "a", "b")
+  const drop1 = solved.getPinVoltage({ partId: "r1", pinId: "a" }) -
+    solved.getPinVoltage({ partId: "r1", pinId: "b" })
+  const drop2 = solved.getPinVoltage({ partId: "r2", pinId: "a" }) -
+    solved.getPinVoltage({ partId: "r2", pinId: "b" })
+  assert.ok(Math.abs(i1 - i2) < 0.02, "Series branch currents must be equal")
+  assert.ok(Math.abs(i1 - (5000 / 3000)) < 0.03, "Series current must follow I = V / (R1 + R2)")
+  assert.ok(Math.abs((drop1 + drop2) - 5) < 0.02, "KVL: sum of voltage drops must equal the 5V source")
+})
+
+test("MNA reports conflicting ideal voltage sources instead of silently overwriting a net", () => {
+  const circuit = {
+    parts: [
+      part("uno", "arduino-uno"),
+      part("esp", "esp32-devkit"),
+      part("r1", "resistor", { resistance: 1000 }),
+      part("r2", "resistor", { resistance: 1000 }),
+    ],
+    wires: [
+      wire("source-conflict", "uno", "5v", "esp", "3v3"),
+      wire("load-a", "uno", "5v", "r1", "a"),
+      wire("load-series", "r1", "b", "r2", "a"),
+      wire("load-b", "r2", "b", "uno", "gnd_pwr"),
+      wire("common-ground", "uno", "gnd_pwr", "esp", "gnd"),
+    ],
+  }
+  const solved = solveCircuitNodalPotentials(circuit)
+  assert.ok(solved.diagnostics.some((item) => item.code === "source-conflict"), "5V and 3.3V ideal sources on one net must be flagged")
+  assert.equal(solved.getPinInfo({ partId: "uno", pinId: "5v" }).isConflicted, true)
+  assert.equal(solved.getPinInfo({ partId: "r2", pinId: "a" }).isConflicted, true,
+    "every conductive branch connected to an impossible source net must be marked invalid")
+  assert.equal(solved.getBranchCurrent("r1", "a", "b"), 0)
+  assert.equal(solved.getBranchCurrent("r2", "a", "b"), 0,
+    "a downstream resistor must not display current from an unsatisfiable source network")
+})
+
+test("MNA preserves negative battery potentials and reports a valid negative-rail source current", () => {
+  const circuit = {
+    parts: [
+      part("battery", "battery", { voltage: -5 }),
+      part("load", "resistor", { resistance: 1000 }),
+    ],
+    wires: [
+      wire("negative-feed", "battery", "pos", "load", "a"),
+      wire("return", "load", "b", "battery", "neg"),
+    ],
+  }
+  const solved = solveCircuitNodalPotentials(circuit)
+  assert.equal(solved.getPinVoltage({ partId: "battery", pinId: "pos" }), -5)
+  assert.equal(solved.getPinVoltage({ partId: "battery", pinId: "neg" }), 0)
+  assert.equal(solved.getPinInfo({ partId: "battery", pinId: "pos" }).isDriven, true,
+    "a fixed negative rail is still an active voltage source")
+  assert.ok(Math.abs(solved.getBranchCurrent("load", "a", "b") + 5) < 0.001,
+    "resistor current must reverse direction for a -5V source")
+  const meter = solved.computeCurrentBetweenPins(
+    { partId: "battery", pinId: "pos" },
+    { partId: "battery", pinId: "neg" },
+    {},
+  )
+  assert.ok(Math.abs(meter.currentMa - 5) < 0.001,
+    "source-to-return ammeter must report the 5mA load on a negative rail")
+})
+
+
+test("every Virtual Lab component has an explicit, auditable electrical-model contract", () => {
+  const types = Object.keys(CATALOG)
+  assert.equal(types.length, 32, "the catalogue inventory must cover all 32 component types")
+  assert.deepEqual(Object.keys(ELECTRICAL_MODEL_CONTRACT).sort(), [...types].sort(),
+    "each catalogue component must have exactly one electrical-model contract")
+
+  for (const type of types) {
+    const contract = ELECTRICAL_MODEL_CONTRACT[type]
+    assert.ok(contract.model.trim(), `${type}: model name is required`)
+    assert.ok(contract.note.trim(), `${type}: model scope and limitations must be documented`)
+    assert.ok(["idealized", "first-order", "estimated", "partial", "signal-only"].includes(contract.fidelity),
+      `${type}: explicit fidelity classification is required`)
+
+    const loads = CATALOG[type].electrical?.supplyLoads ?? []
+    for (const load of loads) {
+      const pins = new Set(CATALOG[type].pins.map((pin) => pin.id))
+      assert.ok(pins.has(load.positivePin), `${type}: supply-load positive pin ${load.positivePin} must exist`)
+      assert.ok(pins.has(load.negativePin), `${type}: supply-load negative pin ${load.negativePin} must exist`)
+      assert.ok(Number.isFinite(load.nominalVoltage) && load.nominalVoltage > 0,
+        `${type}: nominal load voltage must be finite and positive`)
+      assert.ok(Number.isFinite(load.nominalCurrentMa) && load.nominalCurrentMa > 0,
+        `${type}: nominal load current must be finite and positive`)
+      assert.ok(["datasheet-typical", "datasheet-maximum", "module-estimate"].includes(load.accuracy),
+        `${type}: load provenance must be classified`)
+      assert.ok(load.note.trim(), `${type}: load estimate provenance note is required`)
+    }
+  }
+})
+
+
+test("L298N solver drives motor outputs from VS and reflects motor current back to the supply", () => {
+  const circuit = {
+    parts: [
+      part("uno", "arduino-uno"),
+      part("driver", "l298n"),
+      part("motor", "dc-motor"),
+    ],
+    wires: [
+      wire("vs", "uno", "5v", "driver", "vs"),
+      wire("gnd", "driver", "gnd", "uno", "gnd_pwr"),
+      wire("ena", "uno", "d9", "driver", "ena"),
+      wire("in1", "uno", "d8", "driver", "in1"),
+      wire("in2", "uno", "d7", "driver", "in2"),
+      wire("motor-positive", "driver", "out1", "motor", "pos"),
+      wire("motor-negative", "driver", "out2", "motor", "neg"),
+    ],
+  }
+
+  const fullDrive = {
+    "9": { state: "HIGH", value: 255, outputMode: "digital" },
+    "8": { state: "HIGH", value: 1, outputMode: "digital" },
+    "7": { state: "LOW", value: 0, outputMode: "digital" },
+  }
+  const runtime = computeRuntime(circuit, new Set(), fullDrive)
+  assert.equal(runtime.driver.motorARpm, 1000)
+  assert.equal(runtime.driver.motorADirection, "cw")
+  const solved = solveCircuitNodalPotentials(circuit, new Set(), fullDrive, true, {}, runtime)
+  assert.ok(Math.abs(solved.getPinVoltage({ partId: "driver", pinId: "out1" }) - 5) < 0.01)
+  assert.ok(Math.abs(solved.getPinVoltage({ partId: "driver", pinId: "out2" })) < 0.01)
+  const motorCurrent = solved.getBranchCurrent("motor", "pos", "neg")
+  const supplyCurrent = solved.getBranchCurrent("driver", "vs", "gnd")
+  assert.ok(Math.abs(motorCurrent - 100) < 0.2, `50Ω motor proxy on 5V should carry 100mA, got ${motorCurrent}mA`)
+  assert.ok(Math.abs(supplyCurrent - motorCurrent) < 0.2,
+    `L298N VS supply draw should equal connected motor branch current, got ${supplyCurrent}mA`)
+
+  const reversePwm = {
+    "9": { state: "HIGH", value: 128, outputMode: "pwm" },
+    "8": { state: "LOW", value: 0, outputMode: "digital" },
+    "7": { state: "HIGH", value: 1, outputMode: "digital" },
+  }
+  const reverseRuntime = computeRuntime(circuit, new Set(), reversePwm)
+  assert.equal(reverseRuntime.driver.motorADirection, "ccw")
+  const reverseSolved = solveCircuitNodalPotentials(circuit, new Set(), reversePwm, true, {}, reverseRuntime)
+  const expectedAverageV = 5 * (reverseRuntime.driver.motorARpm / 1000)
+  assert.ok(Math.abs(reverseSolved.getPinVoltage({ partId: "driver", pinId: "out2" }) - expectedAverageV) < 0.02,
+    "reverse PWM output must follow the enabled duty-cycle average on OUT2")
+  assert.ok(Math.abs(reverseSolved.getBranchCurrent("driver", "vs", "gnd") -
+    Math.abs(reverseSolved.getBranchCurrent("motor", "pos", "neg"))) < 0.2,
+  "reverse PWM motor branch current magnitude must be reflected at the VS supply")
+})
+
+
+test("raw VIN and VSYS inputs are not mistaken for fixed board supply outputs", () => {
+  const uno = getBoardForPart(part("uno", "arduino-uno"))
+  const pico = getBoardForPart(part("pico", "rpi-pico"))
+  const esp32 = getBoardForPart(part("esp", "esp32-devkit"))
+  assert.ok(uno && pico && esp32)
+
+  assert.equal(getPinVoltage(uno, "vin", "HIGH"), undefined,
+    "Uno VIN is a 7–12V regulator input, not a 5V output")
+  assert.equal(getPinVoltage(pico, "vsys", "HIGH"), undefined,
+    "Pico VSYS is a 1.8–5.5V system input, not a fixed 5V output")
+  assert.equal(getPinVoltage(uno, "5v", "LOW"), 5,
+    "regulated Uno 5V remains a board output rail")
+  assert.equal(getPinVoltage(pico, "vbus", "LOW"), 5,
+    "USB-powered Pico VBUS remains the default 5V source")
+  assert.equal(getPinVoltage(esp32, "vin", "LOW"), 5,
+    "ESP32 DevKit VIN/5V header is modeled as a dual-role 5V header in the default USB-powered state")
+
+  const bare = solveCircuitNodalPotentials({
+    parts: [part("uno", "arduino-uno"), part("pico", "rpi-pico")],
+    wires: [],
+  })
+  assert.equal(bare.getPinInfo({ partId: "uno", pinId: "vin" }).isDriven, false)
+  assert.equal(bare.getPinInfo({ partId: "uno", pinId: "vin" }).isFloating, true,
+    "unconnected Uno VIN must remain floating")
+  assert.equal(bare.getPinInfo({ partId: "pico", pinId: "vsys" }).isDriven, false)
+  assert.equal(bare.getPinInfo({ partId: "pico", pinId: "vsys" }).isFloating, true,
+    "unconnected Pico VSYS must remain floating")
+})
+
+test("board registry validates external VIN/VSYS voltage ranges", () => {
+  const uno = getBoardForPart(part("uno", "arduino-uno"))
+  const pico = getBoardForPart(part("pico", "rpi-pico"))
+  assert.ok(uno && pico)
+
+  assert.equal(validateBoardPowerInputVoltage(uno, "VIN", 9).safe, true)
+  assert.equal(validateBoardPowerInputVoltage(uno, "VIN", 5).safe, false,
+    "5V must be flagged below the Uno VIN 7V minimum")
+  assert.equal(validateBoardPowerInputVoltage(uno, "VIN", 13).safe, false,
+    "13V must be flagged above the Uno VIN 12V maximum")
+  assert.equal(validateBoardPowerInputVoltage(pico, "VSYS", 5).safe, true)
+  assert.equal(validateBoardPowerInputVoltage(pico, "VSYS", 9).safe, false,
+    "9V exceeds the Pico VSYS 5.5V maximum")
+})
+
+test("release validator checks external voltage on board power inputs without classifying VIN as a 5V source", () => {
+  const candidateFor = (voltage) => ({
+    parts: [
+      part("uno", "arduino-uno"),
+      part("battery", "battery", { voltage }),
+    ],
+    wires: [
+      wire("external-vin", "battery", "pos", "uno", "vin"),
+      wire("common-ground", "battery", "neg", "uno", "gnd_pwr"),
+    ],
+  })
+  const under = validateProposedCircuit(candidateFor(5), { allowWarnings: true })
+  assert.ok(under.notices.some((notice) => notice.ruleId === "safety-board-power-input-undervoltage"),
+    "5V battery must warn on Uno VIN, not be silently treated as a valid 5V supply")
+  assert.equal(under.notices.some((notice) => notice.ruleId === "safety-direct-power-short-5v"), false,
+    "raw VIN must not be added to the regulated 5V source group")
+
+  const nominal = validateProposedCircuit(candidateFor(9), { allowWarnings: true })
+  assert.equal(nominal.notices.some((notice) =>
+    notice.ruleId === "safety-board-power-input-undervoltage" ||
+    notice.ruleId === "safety-board-power-input-overvoltage"
+  ), false, "9V battery is inside the Uno VIN 7–12V input range")
+
+  const over = validateProposedCircuit(candidateFor(13), { allowWarnings: true })
+  assert.ok(over.notices.some((notice) => notice.ruleId === "safety-board-power-input-overvoltage"),
+    "13V battery must be rejected above the Uno VIN maximum")
 })
