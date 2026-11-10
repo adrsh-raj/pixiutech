@@ -1,9 +1,10 @@
 import type { CircuitState, PinRef } from "./circuit-types"
+import type { PartRuntime } from "@/components/circuit-lab/part-art"
 import type { ArduinoPinState } from "./simulation"
 import { getBoardForPart, lookupBoardPinState } from "./board-registry"
 import { normalizeBreadboardPinId } from "./breadboard-pins"
 import { getLedElectricalModel } from "./electrical-model"
-import { BREADBOARD_COLUMNS } from "./components-catalog"
+import { BREADBOARD_COLUMNS, CATALOG } from "./components-catalog"
 
 export interface PinPotentialInfo {
   voltage: number
@@ -131,7 +132,7 @@ export function solveCircuitNodalPotentials(
   pinStates: Record<string, ArduinoPinState> = {},
   running: boolean = true,
   relayStates: Record<string, boolean> = {},
-  runtime: Record<string, Record<string, unknown>> = {},
+  runtime: Record<string, PartRuntime> = {},
 ): NodalSolution {
   // 1. Gather all pins across all placed components
   const allPins = new Set<string>()
@@ -612,9 +613,13 @@ export function solveCircuitNodalPotentials(
         break
       }
       case "buzzer": {
-        const netA = pinToNetId(part.id, "pos")
-        const netB = pinToNetId(part.id, "neg")
-        branches.push({ netA, netB, conductance: 1 / 100, partId: part.id, pinA: "pos", pinB: "neg" })
+        // A passive piezo is not a 100Ω DC resistor. Only use the simplified
+        // equivalent while the runtime has an active tone/sound state.
+        if ((runtime[part.id]?.level ?? 0) > 0) {
+          const netA = pinToNetId(part.id, "pos")
+          const netB = pinToNetId(part.id, "neg")
+          branches.push({ netA, netB, conductance: 1 / 100, partId: part.id, pinA: "pos", pinB: "neg" })
+        }
         break
       }
       case "dc-motor": {
@@ -636,6 +641,90 @@ export function solveCircuitNodalPotentials(
           pinB: activeContact,
         })
         break
+      }
+      case "npn-transistor": {
+        if (runtime[part.id]?.conducting === true) {
+          branches.push({
+            netA: pinToNetId(part.id, "collector"),
+            netB: pinToNetId(part.id, "emitter"),
+            conductance: 1 / 0.2,
+            partId: part.id,
+            pinA: "collector",
+            pinB: "emitter",
+          })
+        }
+        break
+      }
+      case "seven-segment": {
+        const activeSegments = runtime[part.id]?.segments ?? {}
+        const commonAnode = String(part.props.commonType ?? "cathode") === "anode"
+        const ledModel = getLedElectricalModel(part)
+        for (const segment of ["a", "b", "c", "d", "e", "f", "g", "dp"]) {
+          if (activeSegments[segment] !== true) continue
+          branches.push({
+            netA: pinToNetId(part.id, commonAnode ? "com" : segment),
+            netB: pinToNetId(part.id, commonAnode ? segment : "com"),
+            conductance: 1 / 10,
+            partId: part.id,
+            pinA: commonAnode ? "com" : segment,
+            pinB: commonAnode ? segment : "com",
+            isDiode: true,
+            vForward: ledModel.forwardVoltage,
+          })
+        }
+        break
+      }
+    }
+
+    // Component-level supply loads are explicit catalogue equivalents. The
+    // current scales with actual terminal voltage as a resistor model; their
+    // provenance remains "module-estimate" until a concrete module is selected.
+    const supplyLoads = CATALOG[part.type].electrical?.supplyLoads ?? []
+    for (let loadIndex = 0; loadIndex < supplyLoads.length; loadIndex++) {
+      const load = supplyLoads[loadIndex]
+      const runtimeState = runtime[part.id]
+      const active =
+        load.activeWhen === "relay-energized" ? runtimeState?.relayActive === true :
+        load.activeWhen === "servo-command" ? typeof runtimeState?.angle === "number" :
+        load.activeWhen === "display-enabled" ? runtimeState?.lcdBacklight !== false :
+        load.activeWhen === "pixels-lit" ? (runtimeState?.level ?? 0) > 0 :
+        true
+      const nominalCurrentMa = Number(part.props.supplyCurrentMa ?? load.nominalCurrentMa)
+      if (!active || !Number.isFinite(nominalCurrentMa) || nominalCurrentMa <= 0 ||
+          !Number.isFinite(load.nominalVoltage) || load.nominalVoltage <= 0) continue
+      const conductance = (nominalCurrentMa / 1000) / load.nominalVoltage
+      branches.push({
+        netA: pinToNetId(part.id, load.positivePin),
+        netB: pinToNetId(part.id, load.negativePin),
+        conductance,
+        partId: part.id,
+        pinA: load.positivePin,
+        pinB: load.negativePin,
+      })
+    }
+
+    // WS2812-style pixels are variable-current loads: each full-brightness
+    // colour channel is modelled as a 20mA channel. The pixel colour array is
+    // the runtime output after show(); dark/idle pixels draw no LED-channel load.
+    if (part.type === "neopixel-ring" && (runtime[part.id]?.level ?? 0) > 0) {
+      const colors = runtime[part.id]?.pixelColors ?? []
+      const currentMa = colors.reduce((total, color) => {
+        const raw = String(color).trim().replace(/^#/, "")
+        if (!/^[0-9a-fA-F]{6}$/.test(raw) || raw.toLowerCase() === "0f172a") return total
+        const red = parseInt(raw.slice(0, 2), 16)
+        const green = parseInt(raw.slice(2, 4), 16)
+        const blue = parseInt(raw.slice(4, 6), 16)
+        return total + ((red + green + blue) / 255) * 20
+      }, 0)
+      if (currentMa > 0) {
+        branches.push({
+          netA: pinToNetId(part.id, "vcc"),
+          netB: pinToNetId(part.id, "gnd"),
+          conductance: (currentMa / 1000) / 5,
+          partId: part.id,
+          pinA: "vcc",
+          pinB: "gnd",
+        })
       }
     }
   }
