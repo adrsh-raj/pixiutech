@@ -104,6 +104,9 @@ export function computeWireCurrents(
       (pin.alternateNames ?? []).some((alias) => alias.toLowerCase() === raw),
     )
     if (!boardPin || (boardPin.kind !== "digital" && boardPin.kind !== "analog")) continue
+    // Keep the exact endpoint spelling used by the student's wire graph as
+    // well as the board's canonical ID and any registered pin aliases.
+    signalPowerPins.add(`${dataPin.partId}:${raw}`)
     signalPowerPins.add(`${dataPin.partId}:${boardPin.id}`)
     for (const alias of boardPin.alternateNames ?? []) {
       signalPowerPins.add(`${dataPin.partId}:${alias.toLowerCase()}`)
