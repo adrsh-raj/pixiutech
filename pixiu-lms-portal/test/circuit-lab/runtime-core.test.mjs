@@ -856,3 +856,77 @@ test("nodal current calculation exposes the actual light-dependent resistance cu
       `light ${scenario.light}: expected about ${scenario.expectedMa}mA, received ${measured}mA`)
   }
 })
+
+
+test("MNA exposes signed resistor branch currents and satisfies KCL in a parallel network", () => {
+  const circuit = {
+    parts: [
+      part("uno", "arduino-uno"),
+      part("r1", "resistor", { resistance: 1000 }),
+      part("r2", "resistor", { resistance: 2000 }),
+    ],
+    wires: [
+      wire("feed1", "uno", "5v", "r1", "a"),
+      wire("feed2", "uno", "5v", "r2", "a"),
+      wire("return1", "r1", "b", "uno", "gnd_pwr"),
+      wire("return2", "r2", "b", "uno", "gnd_pwr"),
+    ],
+  }
+  const solved = solveCircuitNodalPotentials(circuit)
+  const i1 = solved.getBranchCurrent("r1", "a", "b")
+  const i2 = solved.getBranchCurrent("r2", "a", "b")
+  assert.ok(Math.abs(i1 - 5) < 0.03, `1kΩ branch should carry 5mA, got ${i1}mA`)
+  assert.ok(Math.abs(i2 - 2.5) < 0.03, `2kΩ branch should carry 2.5mA, got ${i2}mA`)
+  assert.ok(Math.abs((i1 + i2) - 7.5) < 0.03, "KCL: source current must equal the sum of parallel branch currents")
+})
+
+test("MNA series branches carry equal current and satisfy KVL", () => {
+  const circuit = {
+    parts: [
+      part("uno", "arduino-uno"),
+      part("r1", "resistor", { resistance: 1000 }),
+      part("r2", "resistor", { resistance: 2000 }),
+    ],
+    wires: [
+      wire("feed", "uno", "5v", "r1", "a"),
+      wire("series", "r1", "b", "r2", "a"),
+      wire("return", "r2", "b", "uno", "gnd_pwr"),
+    ],
+  }
+  const solved = solveCircuitNodalPotentials(circuit)
+  const i1 = solved.getBranchCurrent("r1", "a", "b")
+  const i2 = solved.getBranchCurrent("r2", "a", "b")
+  const drop1 = solved.getPinVoltage({ partId: "r1", pinId: "a" }) -
+    solved.getPinVoltage({ partId: "r1", pinId: "b" })
+  const drop2 = solved.getPinVoltage({ partId: "r2", pinId: "a" }) -
+    solved.getPinVoltage({ partId: "r2", pinId: "b" })
+  assert.ok(Math.abs(i1 - i2) < 0.02, "Series branch currents must be equal")
+  assert.ok(Math.abs(i1 - (5000 / 3000)) < 0.03, "Series current must follow I = V / (R1 + R2)")
+  assert.ok(Math.abs((drop1 + drop2) - 5) < 0.02, "KVL: sum of voltage drops must equal the 5V source")
+})
+
+test("MNA reports conflicting ideal voltage sources instead of silently overwriting a net", () => {
+  const circuit = {
+    parts: [part("uno", "arduino-uno"), part("esp", "esp32-devkit"), part("load", "resistor", { resistance: 1000 })],
+    wires: [
+      wire("source-conflict", "uno", "5v", "esp", "3v3"),
+      wire("load-a", "uno", "5v", "load", "a"),
+      wire("load-b", "load", "b", "uno", "gnd_pwr"),
+      wire("common-ground", "uno", "gnd_pwr", "esp", "gnd"),
+    ],
+  }
+  const solved = solveCircuitNodalPotentials(circuit)
+  assert.ok(solved.diagnostics.some((item) => item.code === "source-conflict"), "5V and 3.3V ideal sources on one net must be flagged")
+  assert.equal(solved.getPinInfo({ partId: "uno", pinId: "5v" }).isConflicted, true)
+  assert.equal(solved.getBranchCurrent("load", "a", "b"), 0, "affected branches must fail closed rather than show a fabricated current")
+})
+
+test("MNA preserves negative battery potentials instead of clamping them to zero", () => {
+  const circuit = {
+    parts: [part("battery", "battery", { voltage: -5 })],
+    wires: [],
+  }
+  const solved = solveCircuitNodalPotentials(circuit)
+  assert.equal(solved.getPinVoltage({ partId: "battery", pinId: "pos" }), -5)
+  assert.equal(solved.getPinVoltage({ partId: "battery", pinId: "neg" }), 0)
+})
