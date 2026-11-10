@@ -135,11 +135,24 @@ test("NeoPixel Ring data current traces through its catalog DI pin", () => {
   }
   const currents = computeWireCurrents(
     circuit,
-    { ring: { level: 1, pixelColors: ["#ff0000"] } },
-    { "6": { state: "HIGH", outputMode: "digital" } },
+    {
+      ring: {
+        level: 1,
+        pixelColors: ["#ff0000"],
+        neopixelDataActive: true,
+        neopixelDataPin: { partId: "uno", pinId: "d6" },
+      },
+    },
+    {},
   )
-  assert.ok(currents["ring-vcc"]?.currentMa > 0, "powered ring should draw supply current")
-  assert.ok(currents["ring-di"]?.currentMa > 0, "data wire must use the real DI catalog endpoint")
+  assert.ok(currents["ring-vcc"]?.currentMa > 0, "illuminated ring should draw supply current")
+  assert.ok(currents["ring-di"]?.currentMa > 0, "a committed data frame should trace through the real DI catalog endpoint")
+
+  const idle = computeWireCurrents(circuit, {
+    ring: { level: 0, pixelColors: ["#0f172a"], neopixelDataActive: false },
+  }, {})
+  assert.equal(idle["ring-vcc"], undefined, "an unlit ring must not draw the illuminated-pixel current")
+  assert.equal(idle["ring-di"], undefined, "DI must remain idle until show() sends a frame")
 })
 
 test("L298N logic-supply current traces through the catalog 5v pin", () => {
