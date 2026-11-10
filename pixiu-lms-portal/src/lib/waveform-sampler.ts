@@ -2,7 +2,8 @@ import type { CircuitState, PinRef } from "./circuit-types"
 import type { ArduinoPinState } from "./simulation"
 import type { NodalSolution } from "./circuit-solver"
 import { solveCircuitNodalPotentials } from "./circuit-solver"
-import { getBoardForPart } from "./board-registry"
+import { getBoardForPart, lookupBoardPinState } from "./board-registry"
+import { getPwmDutyCycle } from "./electrical-model"
 
 export interface WaveformPoint {
   t: number // timestamp in ms (monotonic)
@@ -34,42 +35,46 @@ export function samplePinVoltage(
   const board = part ? getBoardForPart(part) : undefined
   if (board) {
     const rawPin = ref.pinId.toLowerCase()
-    const pinDigits = rawPin.replace(/^d|^gpio/, "")
+    const pinDigits = rawPin.replace(/^(gpio|gp|d|p)/, "")
 
     // Power rails
-    if (board.powerPins.v5?.includes(rawPin) || rawPin === "vin" || rawPin === "pos_top" || rawPin === "pos_bot") return 5.0
-    if (board.powerPins.v33?.includes(rawPin) || rawPin === "3v3") return 3.3
-    if (board.powerPins.gnd.includes(rawPin) || rawPin.includes("gnd")) return 0.0
+    if (board.powerPins.v5?.some((pin) => pin.toLowerCase() === rawPin) || rawPin === "vin" || rawPin === "pos_top" || rawPin === "pos_bot") return 5.0
+    if (board.powerPins.v33?.some((pin) => pin.toLowerCase() === rawPin) || rawPin === "3v3" || rawPin === "3v") return 3.3
+    if (board.powerPins.gnd.some((pin) => pin.toLowerCase() === rawPin) || rawPin.includes("gnd")) return 0.0
 
-    // Digital pins with potential PWM or true DAC output
-    const boardPin = board.pins.find(
-      (bp) =>
-        bp.id.toLowerCase() === rawPin ||
-        bp.label.toLowerCase() === rawPin ||
-        bp.id.replace(/^d|^gpio/, "") === pinDigits ||
-        bp.label.replace(/^d|^gpio/, "") === pinDigits
+    const boardPin = board.pins.find((bp) =>
+      bp.id.toLowerCase() === rawPin ||
+      bp.label.toLowerCase() === rawPin ||
+      (bp.alternateNames ?? []).some((alias) => alias.toLowerCase() === rawPin) ||
+      bp.id.replace(/^(gpio|gp|d|p)/, "") === pinDigits ||
+      bp.label.toLowerCase().replace(/^(gpio|gp|d|p)/, "") === pinDigits
     )
-    const pinData =
-      pinStates[rawPin] ||
-      pinStates[pinDigits] ||
-      pinStates[`d${pinDigits}`] ||
-      pinStates[`gpio${pinDigits}`]
-    if (pinData) {
-      if (typeof pinData.value === "number" && pinData.value > 0) {
-        // True hardware DAC channels (e.g. D25/D26 on ESP32) output true continuous DC voltage
-        if (boardPin?.capabilities?.dac) {
-          return Number((board.logicVoltage * (pinData.value / 255)).toFixed(3))
-        }
-
-        if (pinData.value >= 255) {
-          return board.logicVoltage
-        }
-
-        // Authentic board PWM period
-        const periodMs = 1000 / board.pwmFrequencyDefaultHz
-        const duty = pinData.value / 255
+    const pinData = boardPin ? lookupBoardPinState(pinStates, boardPin.id, board) : undefined
+    if (pinData && boardPin) {
+      if (pinData.outputMode === "tone" && (pinData.toneHz ?? 0) > 0) {
+        const periodMs = 1000 / (pinData.toneHz ?? 1)
         const phase = (simTimeMs % periodMs) / periodMs
-        return phase < duty ? board.logicVoltage : 0.0
+        return phase < 0.5 ? board.logicVoltage : 0
+      }
+
+      if (pinData.outputMode === "servo") {
+        const periodMs = 20
+        const pulseMs = 1 + (Math.max(0, Math.min(180, pinData.angle ?? 90)) / 180)
+        return simTimeMs % periodMs < pulseMs ? board.logicVoltage : 0
+      }
+
+      if (pinData.outputMode === "pwm" || (pinData.outputMode === undefined && pinData.value !== undefined && pinData.value > 1)) {
+        // A PWM output is a full-amplitude pulse train. Only the duty changes.
+        const periodMs = 1000 / board.pwmFrequencyDefaultHz
+        const duty = getPwmDutyCycle(pinData.value ?? 0)
+        const phase = (simTimeMs % periodMs) / periodMs
+        return phase < duty ? board.logicVoltage : 0
+      }
+
+      // Only a true DAC output is continuous DC; analogWrite remains PWM even
+      // when the selected pad also has DAC capability.
+      if (pinData.outputMode === "dac" && boardPin.capabilities?.dac && typeof pinData.value === "number") {
+        return Number((board.logicVoltage * getPwmDutyCycle(pinData.value)).toFixed(3))
       }
       return pinData.state === "HIGH" ? board.logicVoltage : 0.0
     }

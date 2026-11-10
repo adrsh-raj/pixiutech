@@ -4,9 +4,13 @@ import type { PartRuntime } from "@/components/circuit-lab/part-art"
 import { getBoardForPart, isBoardPart, lookupBoardPinState } from "./board-registry"
 import { MinPriorityQueue } from "./min-priority-queue"
 import { normalizeBreadboardPinId } from "./breadboard-pins"
+import { solveCircuitNodalPotentials } from "./circuit-solver"
+import { getLedElectricalModel, getPwmDutyCycle } from "./electrical-model"
 
 export interface ArduinoPinState {
   state: "HIGH" | "LOW"
+  /** Explicit signal semantics so PWM/tone/servo states are not mistaken for DC. */
+  outputMode?: "digital" | "pwm" | "tone" | "servo" | "dac"
   value?: number
   angle?: number
   toneHz?: number
@@ -19,6 +23,18 @@ export interface DisplayOutputState {
   oled_line2?: string
   oled_line3?: string
 }
+
+export interface NeoPixelOutput {
+  /** Colors written by neopixel_set_color but not yet latched by neopixel_show. */
+  bufferColors: string[]
+  /** Most recent colors committed by neopixel_show. */
+  displayedColors: string[]
+  hasShown: boolean
+  /** Board GPIO physically connected to the ring's DI pad. */
+  dataPin: { partId: string; pinId: string } | null
+}
+
+export type NeoPixelOutputState = Record<string, NeoPixelOutput>
 
 const key = (partId: string, pinId: string) => `${partId}:${pinId}`
 
@@ -40,7 +56,26 @@ export function computeRuntime(
   pressed: Set<string>,
   pinStates: Record<string, ArduinoPinState> = {},
   displayOutputs: DisplayOutputState = {},
+  neoPixelOutputs: NeoPixelOutputState = {},
 ): Record<string, PartRuntime> {
+  // Preserve peak pulse amplitude for diode conduction analysis. The nodal
+  // solver remains DC/average for meters; PWM duty is applied to load current
+  // and brightness after checking the instantaneous HIGH level.
+  const peakPinStates = Object.fromEntries(
+    Object.entries(pinStates).map(([pin, pinState]) => [
+      pin,
+      pinState?.outputMode === "dac"
+        ? pinState
+        : pinState?.value !== undefined && pinState.value > 0
+          ? { ...pinState, state: "HIGH" as const, outputMode: "digital" as const }
+          : pinState,
+    ]),
+  ) as Record<string, ArduinoPinState>
+  const hasLedLoad = state.parts.some((part) => part.type === "led" || part.type === "rgb-led")
+  const peakNodalSolution = hasLedLoad
+    ? solveCircuitNodalPotentials(state, pressed, peakPinStates, true)
+    : null
+
   const graph = new Map<string, GraphEdge[]>()
   const breadboardIds = new Set(state.parts.filter((part) => part.type === "breadboard").map((part) => part.id))
   const wireKey = (partId: string, pinId: string) =>
@@ -105,8 +140,8 @@ export function computeRuntime(
       case "potentiometer": {
         const val = Math.max(0, Math.min(1023, Number(part.props.value ?? 512)))
         const rTotal = Math.max(1, Number(part.props.resistance ?? 10000))
-        const r1 = Math.max(0.1, (val / 1023) * rTotal)
-        const r2 = Math.max(0.1, ((1023 - val) / 1023) * rTotal)
+        const r1 = Math.max(0.1, ((1023 - val) / 1023) * rTotal)
+        const r2 = Math.max(0.1, (val / 1023) * rTotal)
         addEdge(k("t1"), k("wiper"), r1)
         addEdge(k("wiper"), k("t2"), r2)
         break
@@ -160,21 +195,21 @@ export function computeRuntime(
   }
 
   // 3. Catalog active voltage sources, logic signals, and paired power domains.
-  const activeSources: { key: string; voltage: number }[] = []
+  const activeSources: { key: string; voltage: number; duty: number }[] = []
   const groundSinks: string[] = []
   // A power domain couples its positive rail(s) to their own ground return.
   // GPIO HIGH/LOW states remain signal sources/sinks only.
-  const powerDomains: Array<{ sources: { key: string; voltage: number }[]; grounds: string[] }> = []
+  const powerDomains: Array<{ sources: { key: string; voltage: number; duty: number }[]; grounds: string[] }> = []
 
   for (const part of state.parts) {
     const k = (pin: string) => key(part.id, pin)
 
     const board = getBoardForPart(part)
     if (board) {
-      const boardSources: { key: string; voltage: number }[] = []
+      const boardSources: { key: string; voltage: number; duty: number }[] = []
       const boardGrounds: string[] = []
       const addBoardSource = (pin: string, voltage: number) => {
-        const source = { key: k(pin), voltage }
+        const source = { key: k(pin), voltage, duty: 1 }
         activeSources.push(source)
         boardSources.push(source)
       }
@@ -211,14 +246,37 @@ export function computeRuntime(
         const pinId = pin.id
         const stripped = pinId.replace(/^(gpio|gp|d|p)/i, "")
         const pState = lookupBoardPinState(pinStates, pinId, board)
-        if (pState?.state === "HIGH" || (pState?.value ?? 0) > 0) {
-          const duty = pState.value !== undefined ? pState.value / 255 : 1.0
-          const v = board.logicVoltage * duty
-          activeSources.push({ key: k(pinId), voltage: v })
-          if (stripped) activeSources.push({ key: k(stripped), voltage: v })
+        const addSignalSource = (voltage: number, duty: number) => {
+          activeSources.push({ key: k(pinId), voltage, duty })
+          if (stripped) activeSources.push({ key: k(stripped), voltage, duty })
           for (const alt of pin.alternateNames ?? []) {
-            activeSources.push({ key: k(alt.toLowerCase()), voltage: v })
+            activeSources.push({ key: k(alt.toLowerCase()), voltage, duty })
           }
+        }
+        const isDacOutput =
+          pState?.outputMode === "dac" &&
+          pin.capabilities?.dac === true &&
+          typeof pState.value === "number"
+        if (isDacOutput) {
+          // A DAC is continuous DC, not a full-amplitude pulse train.
+          // Keep the analog amplitude and use duty=1 for its load current.
+          const voltage = Number((board.logicVoltage * getPwmDutyCycle(pState.value!)).toFixed(3))
+          if (voltage > 0) addSignalSource(voltage, 1)
+        } else if (pState?.state === "HIGH" || (pState?.value ?? 0) > 0) {
+          const legacyPwmState =
+            pState.outputMode === undefined &&
+            pState.value !== undefined &&
+            pState.value > 1
+          const duty = pState.outputMode === "tone"
+            ? 0.5
+            : pState.outputMode === "servo"
+              ? (1 + Math.max(0, Math.min(180, pState.angle ?? 90)) / 180) / 20
+              : pState.outputMode === "pwm" || legacyPwmState
+                ? getPwmDutyCycle(pState.value ?? 0)
+                : 1
+          // PWM output is a full logic-level pulse train. Do not multiply the
+          // HIGH voltage by duty before calculating diode forward conduction.
+          addSignalSource(board.logicVoltage, duty)
         } else {
           // A LOW GPIO may sink signal current, but it is not a component power return.
           groundSinks.push(k(pinId))
@@ -229,7 +287,7 @@ export function computeRuntime(
         }
       }
     } else if (part.type === "battery") {
-      const source = { key: k("pos"), voltage: Math.max(0, Number(part.props.voltage ?? 9)) }
+      const source = { key: k("pos"), voltage: Math.max(0, Number(part.props.voltage ?? 9)), duty: 1 }
       const ground = k("neg")
       activeSources.push(source)
       groundSinks.push(ground)
@@ -238,11 +296,12 @@ export function computeRuntime(
   }
   // Helper: Dijkstra shortest resistance path from a list of start nodes to a target
   function shortestResistance(
-    starts: { key: string; voltage?: number }[],
+    starts: { key: string; voltage?: number; duty?: number }[],
     target: string,
-  ): { resistance: number; voltage: number } | null {
+  ): { resistance: number; voltage: number; duty: number } | null {
     const dist = new Map<string, number>()
     const voltageMap = new Map<string, number>()
+    const dutyMap = new Map<string, number>()
     const visited = new Set<string>()
 
     const pq = new MinPriorityQueue<{ node: string; d: number }>((a, b) => a.d - b.d)
@@ -250,6 +309,7 @@ export function computeRuntime(
     for (const s of starts) {
       dist.set(s.key, 0)
       if (s.voltage !== undefined) voltageMap.set(s.key, s.voltage)
+      if (s.duty !== undefined) dutyMap.set(s.key, s.duty)
       pq.push({ node: s.key, d: 0 })
     }
 
@@ -257,7 +317,11 @@ export function computeRuntime(
       const { node, d } = pq.pop()!
 
       if (node === target) {
-        return { resistance: d, voltage: voltageMap.get(node) ?? 5.0 }
+        return {
+          resistance: d,
+          voltage: voltageMap.get(node) ?? 5.0,
+          duty: dutyMap.get(node) ?? 1,
+        }
       }
 
       if (visited.has(node)) continue
@@ -270,6 +334,9 @@ export function computeRuntime(
           dist.set(e.to, newD)
           if (voltageMap.has(node)) {
             voltageMap.set(e.to, voltageMap.get(node)!)
+          }
+          if (dutyMap.has(node)) {
+            dutyMap.set(e.to, dutyMap.get(node)!)
           }
           pq.push({ node: e.to, d: newD })
         }
@@ -414,129 +481,140 @@ export function computeRuntime(
     } else if (part.type === "led") {
       const anodeKey = k("anode")
       const cathodeKey = k("cathode")
-
-      // Forward polarity path check
+      const ledModel = getLedElectricalModel(part)
       const pathSourceToAnode = shortestResistance(activeSources, anodeKey)
       const pathCathodeToGround = shortestResistance(
         groundSinks.map((g) => ({ key: g })),
         cathodeKey,
       )
+      const anodeInfo = peakNodalSolution?.getPinInfo({ partId: part.id, pinId: "anode" })
+      const cathodeInfo = peakNodalSolution?.getPinInfo({ partId: part.id, pinId: "cathode" })
+      const isDefinedPotential = Boolean(anodeInfo && cathodeInfo && !anodeInfo.isFloating && !cathodeInfo.isFloating)
+      const diodeVoltage = isDefinedPotential ? anodeInfo!.voltage - cathodeInfo!.voltage : 0
 
-      if (pathSourceToAnode && pathCathodeToGround) {
+      if (
+        pathSourceToAnode &&
+        pathCathodeToGround &&
+        isDefinedPotential &&
+        diodeVoltage >= ledModel.forwardVoltage - 0.1
+      ) {
         const totalResistance = pathSourceToAnode.resistance + pathCathodeToGround.resistance
-        const vSupply = pathSourceToAnode.voltage
-      const color = String(part.props.color ?? "red").toLowerCase()
-      const vForward = color.includes("white") ? 3.3 : color.includes("blue") ? 3.2 : color.includes("green") ? 2.1 : color.includes("yellow") ? 2.0 : 1.9
-        const vResistor = Math.max(0, vSupply - vForward)
-        const currentAmps = vResistor / (totalResistance + 0.1)
-        const currentMa = currentAmps * 1000
+        const peakCurrentMa =
+          (Math.max(0, pathSourceToAnode.voltage - ledModel.forwardVoltage) / (totalResistance + 0.1)) * 1000
+        const averageCurrentMa = peakCurrentMa * Math.max(0, Math.min(1, pathSourceToAnode.duty))
 
-        // ================= ELECTRICAL SAFETY CHECK =================
-        // Safe LED current: 10 mA - 25 mA (ideal 220 - 330 ohm resistor)
-        // Overcurrent: Without a resistor, resistance is near 0 ohms (< 60 ohms),
-        // causing massive current (> 50 mA up to 1000 mA) which instantly burns the diode!
-        if (currentMa > 30) {
+        // GPIO pulse amplitude determines instantaneous diode current. PWM
+        // duty determines average current and visible brightness. Protect the
+        // diode against peak current, not the misleading average DC voltage.
+        if (peakCurrentMa > ledModel.maxForwardCurrentMa) {
           runtime[part.id] = {
             burnt: true,
             level: 0,
-            currentMa: Math.round(currentMa),
+            currentMa: Number(averageCurrentMa.toFixed(2)),
             resistorOhms: Math.round(totalResistance),
-            warning: `💥 OVERCURRENT BURNOUT! Current was ${Math.round(currentMa)} mA (model limit: 30 mA). Connect a series resistor!`,
-          }
-        } else if (currentMa < 1 || totalResistance > 4700) {
-          // Below 1mA the LED is effectively dark in this visual model.
-          runtime[part.id] = {
-            burnt: false,
-            level: 0,
-            currentMa: Number(currentMa.toFixed(2)),
-            resistorOhms: Math.round(totalResistance),
-            warning: `Current is too weak (${currentMa.toFixed(2)} mA) to illuminate LED.`,
+            warning: `💥 OVERCURRENT BURNOUT! Peak current was ${peakCurrentMa.toFixed(1)} mA (model limit: ${ledModel.maxForwardCurrentMa} mA). Connect a series resistor!`,
           }
         } else {
-          // Perfectly protected by current-limiting resistor!
-          const brightness = Math.min(1.0, Math.max(0.3, currentMa / 15.0))
+          const brightness = Math.min(1, Math.max(0, averageCurrentMa / ledModel.nominalForwardCurrentMa))
           runtime[part.id] = {
             burnt: false,
-            level: brightness,
-            currentMa: Number(currentMa.toFixed(1)),
+            level: averageCurrentMa < 0.05 || totalResistance > 100_000 ? 0 : brightness,
+            currentMa: Number(averageCurrentMa.toFixed(2)),
             resistorOhms: Math.round(totalResistance),
           }
+        }
+      } else if (
+        isDefinedPotential &&
+        pathSourceToAnode &&
+        pathCathodeToGround &&
+        diodeVoltage >= -0.1
+      ) {
+        // The circuit is wired in the forward direction but the source cannot
+        // reach the LED's specified forward voltage (e.g. 3V into a 3.3V LED).
+        runtime[part.id] = {
+          burnt: false,
+          level: 0,
+          currentMa: 0,
+          resistorOhms: Math.round(pathSourceToAnode.resistance + pathCathodeToGround.resistance),
+        }
+      } else if (isDefinedPotential && diodeVoltage < -0.1) {
+        // Reverse polarity is a signed node-potential relationship, not the
+        // existence of any path through a potentiometer or another passive
+        // branch somewhere else in the circuit.
+        runtime[part.id] = {
+          burnt: false,
+          level: 0,
+          warning: `Reverse Polarity: Cathode is ${Math.abs(diodeVoltage).toFixed(2)} V above Anode. Diodes block reverse current.`,
         }
       } else {
-        // Check reverse polarity (Cathode to Source, Anode to Ground)
-        const reverseSource = shortestResistance(activeSources, cathodeKey)
-        const reverseGround = shortestResistance(
-          groundSinks.map((g) => ({ key: g })),
-          anodeKey,
-        )
-        if (reverseSource && reverseGround) {
-          runtime[part.id] = {
-            burnt: false,
-            level: 0,
-            warning: "Reverse Polarity: Anode (+) is wired to GND. Diodes block reverse current.",
-          }
-        } else {
-          // Open circuit (not connected)
-          runtime[part.id] = { burnt: false, level: 0 }
-        }
+        runtime[part.id] = { burnt: false, level: 0 }
       }
     } else if (part.type === "rgb-led") {
       const gndKey = k("gnd")
       const toGnd = shortestResistance(groundSinks.map((g) => ({ key: g })), gndKey)
-      if (toGnd) {
-        const getLevel = (pinId: string) => {
-          const pk = k(pinId)
-          const path = shortestResistance(activeSources, pk)
-          if (!path) return 0
-          const totalR = path.resistance + toGnd.resistance
-          const color = String(part.props.color ?? "red").toLowerCase()
-          const forwardVoltage = color.includes("white") ? 3.3 : color.includes("blue") ? 3.2 : color.includes("green") ? 2.1 : color.includes("yellow") ? 2.0 : 1.9
-          const current = (Math.max(0, path.voltage - forwardVoltage) / (totalR + 0.1)) * 1000
-          if (current > 30) return 0
-          return Math.min(1.0, Math.max(0, current / 15.0))
+      const commonInfo = peakNodalSolution?.getPinInfo({ partId: part.id, pinId: "gnd" })
+      const reverseWarnings: string[] = []
+      const getChannel = (pinId: "red" | "green" | "blue") => {
+        const model = getLedElectricalModel(part, pinId)
+        const channelInfo = peakNodalSolution?.getPinInfo({ partId: part.id, pinId })
+        if (
+          channelInfo &&
+          commonInfo &&
+          !channelInfo.isFloating &&
+          !commonInfo.isFloating &&
+          commonInfo.voltage - channelInfo.voltage > 0.1
+        ) {
+          reverseWarnings.push(
+            `${pinId} channel is reverse-biased by ${(commonInfo.voltage - channelInfo.voltage).toFixed(2)} V`,
+          )
+          return { level: 0, currentMa: 0 }
         }
-        runtime[part.id] = {
-          redLevel: getLevel("red"),
-          greenLevel: getLevel("green"),
-          blueLevel: getLevel("blue"),
+
+        const path = shortestResistance(activeSources, k(pinId))
+        if (!path || !toGnd) return { level: 0, currentMa: 0 }
+        const totalResistance = path.resistance + toGnd.resistance
+        const peakCurrentMa =
+          (Math.max(0, path.voltage - model.forwardVoltage) / (totalResistance + 0.1)) * 1000
+        if (peakCurrentMa > model.maxForwardCurrentMa) return { level: 0, currentMa: 0 }
+        const averageCurrentMa = peakCurrentMa * Math.max(0, Math.min(1, path.duty))
+        return {
+          level: Math.min(1, Math.max(0, averageCurrentMa / model.nominalForwardCurrentMa)),
+          currentMa: Number(averageCurrentMa.toFixed(2)),
         }
-      } else {
-        runtime[part.id] = { redLevel: 0, greenLevel: 0, blueLevel: 0 }
+      }
+      const red = getChannel("red")
+      const green = getChannel("green")
+      const blue = getChannel("blue")
+      runtime[part.id] = {
+        redLevel: red.level,
+        greenLevel: green.level,
+        blueLevel: blue.level,
+        redCurrentMa: red.currentMa,
+        greenCurrentMa: green.currentMa,
+        blueCurrentMa: blue.currentMa,
+        warning: reverseWarnings.length
+          ? `Reverse Polarity: RGB ${reverseWarnings.join("; ")}. Check the common cathode and channel wiring.`
+          : undefined,
       }
     } else if (part.type === "neopixel-ring") {
       const powered = hasExternalPower(part.id, "vcc", "gnd")
       const diKey = k("di")
-      const hasSignal = shortestResistance(activeSources, diKey)
-      const numPixels = Number(part.props.numPixels ?? 8)
-      const pattern = String(part.props.pattern ?? "rainbow")
-      const customColor = String(part.props.color ?? "#38bdf8")
-
-      const colors: string[] = []
-      if (powered && (hasSignal || pattern !== "off")) {
-        const rainbowPalette = [
-          "#ef4444", "#f97316", "#eab308", "#22c55e",
-          "#06b6d4", "#3b82f6", "#8b5cf6", "#ec4899",
-        ]
-        for (let i = 0; i < numPixels; i++) {
-          if (pattern === "rainbow") {
-            colors.push(rainbowPalette[i % rainbowPalette.length])
-          } else if (pattern === "chase") {
-            const step = Math.floor(Date.now() / 200) % numPixels
-            colors.push(i === step ? customColor : "#1e293b")
-          } else if (pattern === "solid") {
-            colors.push(customColor)
-          } else {
-            colors.push(customColor)
-          }
-        }
-      } else {
-        for (let i = 0; i < numPixels; i++) {
-          colors.push("#0f172a")
-        }
-      }
+      const output = neoPixelOutputs[part.id]
+      const numPixels = Math.max(1, Math.min(8, Math.floor(Number(part.props.numPixels ?? 8))))
+      const dataPath = output?.hasShown && output.dataPin
+        ? shortestResistance([{ key: key(output.dataPin.partId, output.dataPin.pinId) }], diKey)
+        : null
+      const dataActive = Boolean(powered && dataPath)
+      const offColor = "#0f172a"
+      const colors = Array.from({ length: numPixels }, (_, index) =>
+        dataActive ? (output?.displayedColors[index] ?? offColor) : offColor,
+      )
+      const hasIlluminatedPixel = colors.some((color) => color.toLowerCase() !== offColor)
       runtime[part.id] = {
         pixelColors: colors,
-        level: powered ? 1 : 0,
+        level: dataActive && hasIlluminatedPixel ? 1 : 0,
+        neopixelDataActive: dataActive,
+        neopixelDataPin: dataActive ? output?.dataPin ?? undefined : undefined,
       }
     } else if (part.type === "mq2-gas") {
       const powered = hasExternalPower(part.id, "vcc", "gnd")
@@ -574,46 +652,28 @@ export function computeRuntime(
       }
       runtime[part.id] = { level: active ? 1 : 0, toneFrequency }
     } else if (part.type === "servo") {
+      const powered = hasExternalPower(part.id, "vcc", "gnd")
       const sigKey = k("sig")
       let drivenAngle: number | undefined
-      const boardParts = state.parts.filter((pt) => isBoardPart(pt.type))
-      for (const bPart of boardParts) {
-        const bDef = getBoardForPart(bPart)
-        if (!bDef) continue
-        for (const [pinNum, p] of Object.entries(pinStates)) {
-          if (p?.angle !== undefined) {
-            const cleanPin = pinNum.toLowerCase().replace(/^(gpio|gp|d|p)/i, "")
-            const candidateKeys: { key: string }[] = [
-              { key: key(bPart.id, pinNum) },
-              { key: key(bPart.id, pinNum.toLowerCase()) },
-              { key: key(bPart.id, `d${cleanPin}`) },
-              { key: key(bPart.id, `gpio${cleanPin}`) },
-              { key: key(bPart.id, `gp${cleanPin}`) },
-              { key: key(bPart.id, `p${cleanPin}`) },
-              { key: key(bPart.id, cleanPin) },
-            ]
-            const bPin = bDef.pins.find(
-              (bp) =>
-                bp.id.toLowerCase() === pinNum.toLowerCase() ||
-                bp.label.toLowerCase() === pinNum.toLowerCase() ||
-                bp.id.replace(/^(gpio|gp|d|p)/i, "") === cleanPin
-            )
-            if (bPin) {
-              candidateKeys.push({ key: key(bPart.id, bPin.id) })
-              for (const alt of bPin.alternateNames ?? []) {
-                candidateKeys.push({ key: key(bPart.id, alt.toLowerCase()) })
-              }
-            }
-            const path = shortestResistance(candidateKeys, sigKey)
-            if (path) {
-              drivenAngle = p.angle
-              break
-            }
+      if (powered) {
+        for (const boardPart of boardParts) {
+          const board = getBoardForPart(boardPart)
+          if (!board) continue
+          for (const boardPin of board.pins) {
+            if (boardPin.kind !== "digital" && boardPin.kind !== "analog") continue
+            const pinState = lookupBoardPinState(pinStates, boardPin.id, board)
+            // A stored angle is not sufficient: only an explicit servo pulse
+            // written to this exact board pin can command the servo.
+            if (pinState?.outputMode !== "servo" || typeof pinState.angle !== "number") continue
+            const signalPath = shortestResistance([{ key: key(boardPart.id, boardPin.id) }], sigKey)
+            if (!signalPath) continue
+            drivenAngle = Math.max(0, Math.min(180, pinState.angle))
+            break
           }
+          if (drivenAngle !== undefined) break
         }
-        if (drivenAngle !== undefined) break
       }
-      runtime[part.id] = { angle: drivenAngle ?? Number(part.props.angle ?? 0) }
+      runtime[part.id] = drivenAngle === undefined ? {} : { angle: drivenAngle }
     } else if (part.type === "seven-segment") {
       const comKey = k("com")
       const toComGnd = shortestResistance(groundSinks.map((g) => ({ key: g })), comKey)
@@ -795,9 +855,17 @@ export function computeRuntime(
         }
       }
     } else if (part.type === "rotary-encoder") {
-      const value = Number(part.props.value ?? 0)
-      const previousValue = Number(part.props.previousValue ?? value)
-      const direction = value > previousValue ? "cw" : value < previousValue ? "ccw" : "idle"
+      const powered = hasExternalPower(part.id, "vcc", "gnd")
+      const value = powered ? Number(part.props.value ?? 0) : undefined
+      const previousValue = powered ? Number(part.props.previousValue ?? value) : value
+      const direction =
+        value === undefined || previousValue === undefined
+          ? "idle"
+          : value > previousValue
+            ? "cw"
+            : value < previousValue
+              ? "ccw"
+              : "idle"
       runtime[part.id] = {
         encoderValue: value,
         encoderDirection: direction,

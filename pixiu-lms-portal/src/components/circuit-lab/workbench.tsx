@@ -6,7 +6,7 @@ import type { CircuitState, PartType, PinRef, PlacedPart } from "@/lib/circuit-t
 import { BREADBOARD_COLUMNS, CATALOG } from "@/lib/components-catalog"
 import { getLegacyBreadboardPinMappings } from "@/lib/breadboard-pins"
 import { samePin } from "@/lib/geometry"
-import { computeRuntime, type ArduinoPinState, type DisplayOutputState } from "@/lib/simulation"
+import { computeRuntime, type ArduinoPinState, type DisplayOutputState, type NeoPixelOutputState } from "@/lib/simulation"
 import { defineArduinoBlocks, setAiClassContext, arduino, normalizeBlocklyXml } from "@/lib/arduino-blocks"
 import { runBlocklyProgram, executeStatement, type ExecutionEnvironment, type BlockStepInfo } from "@/lib/blockly-runner"
 import { virtualWifiManager, type VirtualWifiState } from "@/lib/virtual-wifi"
@@ -19,7 +19,8 @@ import { saveCircuit, saveCurrentCircuit, clearCurrentCircuit, importFromJSON, e
 import * as Blockly from "blockly"
 import { Boxes, Camera, Sparkles, Terminal, Trash2, Gauge, Sliders, ShieldAlert, RotateCw, Copy, X, Smartphone } from "lucide-react"
 import { computeWireCurrents } from "@/lib/current-flow"
-import { isBoardPart, getActiveBoard, scaleAdcReading, lookupBoardPinState } from "@/lib/board-registry"
+import { writePinStateAliases } from "@/lib/pin-state"
+import { isBoardPart, getActiveBoard, getBoardForPart, scaleAdcReading, lookupBoardPinState } from "@/lib/board-registry"
 import { solveCircuitNodalPotentials } from "@/lib/circuit-solver"
 import { Multimeter } from "./multimeter"
 import { Oscilloscope } from "./oscilloscope"
@@ -76,6 +77,81 @@ const DEFAULT_XML = `<xml xmlns="https://developers.google.com/blockly/xml">
 const INITIAL_STATE: CircuitState = {
   parts: [],
   wires: [],
+}
+
+function findNeoPixelDataPin(
+  circuit: CircuitState,
+  ringPartId: string,
+): { partId: string; pinId: string } | null {
+  const start = `${ringPartId}:di`
+  const adjacency = new Map<string, string[]>()
+  const addLink = (a: string, b: string) => {
+    if (!adjacency.has(a)) adjacency.set(a, [])
+    if (!adjacency.has(b)) adjacency.set(b, [])
+    adjacency.get(a)!.push(b)
+    adjacency.get(b)!.push(a)
+  }
+
+  for (const wire of circuit.wires) {
+    addLink(`${wire.from.partId}:${wire.from.pinId.toLowerCase()}`, `${wire.to.partId}:${wire.to.pinId.toLowerCase()}`)
+  }
+  for (const part of circuit.parts) {
+    const key = (pin: string) => `${part.id}:${pin}`
+    if (part.type === "resistor") addLink(key("a"), key("b"))
+    if (part.type === "breadboard") {
+      for (let column = 1; column <= BREADBOARD_COLUMNS; column++) {
+        const top = ["a", "b", "c", "d", "e"]
+        const bottom = ["f", "g", "h", "i", "j"]
+        for (const rows of [top, bottom]) {
+          for (let index = 0; index < rows.length - 1; index++) {
+            addLink(key(`${rows[index]}_${column}`), key(`${rows[index + 1]}_${column}`))
+          }
+        }
+      }
+      for (let column = 1; column < BREADBOARD_COLUMNS; column++) {
+        for (const rail of ["pos_t", "neg_t", "pos_b", "neg_b"]) {
+          addLink(key(`${rail}_${column}`), key(`${rail}_${column + 1}`))
+        }
+      }
+      addLink(key("pos_top"), key("pos_t_1"))
+      addLink(key("neg_top"), key("neg_t_1"))
+      addLink(key("pos_bot"), key("pos_b_1"))
+      addLink(key("neg_bot"), key("neg_b_1"))
+      for (const [legacy, canonical] of getLegacyBreadboardPinMappings()) {
+        addLink(key(legacy.toLowerCase()), key(canonical.toLowerCase()))
+      }
+    }
+  }
+
+  const queue = [start]
+  const visited = new Set(queue)
+  for (let index = 0; index < queue.length; index++) {
+    const node = queue[index]
+    const separator = node.indexOf(":")
+    const partId = node.slice(0, separator)
+    const pinId = node.slice(separator + 1)
+    const part = circuit.parts.find((candidate) => candidate.id === partId)
+    if (part && isBoardPart(part.type)) {
+      const board = getBoardForPart(part)
+      const pin = board?.pins.find((candidate) =>
+        candidate.id.toLowerCase() === pinId ||
+        candidate.label.toLowerCase() === pinId ||
+        (candidate.alternateNames ?? []).some((alias) => alias.toLowerCase() === pinId),
+      )
+      if (pin && pin.kind === "digital" && !pin.capabilities?.inputOnly) {
+        // Preserve the exact lower-case endpoint stored in state.wires. The
+        // runtime graph must start from that node, even when it is an alias.
+        return { partId, pinId }
+      }
+    }
+
+    for (const neighbor of adjacency.get(node) ?? []) {
+      if (visited.has(neighbor)) continue
+      visited.add(neighbor)
+      queue.push(neighbor)
+    }
+  }
+  return null
 }
 
 function getPlacedBounds(part: Pick<PlacedPart, "type" | "x" | "y" | "rotation">) {
@@ -263,9 +339,15 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
   const [pinStates, setPinStates] = useState<Record<string, ArduinoPinState>>({})
   const [displayOutputs, setDisplayOutputs] = useState<DisplayOutputState>({})
   const displayOutputsRef = useRef<DisplayOutputState>({})
+  const [neoPixelOutputs, setNeoPixelOutputs] = useState<NeoPixelOutputState>({})
+  const neoPixelOutputsRef = useRef<NeoPixelOutputState>({})
   useEffect(() => {
     displayOutputsRef.current = displayOutputs
   }, [displayOutputs])
+  useEffect(() => {
+    neoPixelOutputsRef.current = neoPixelOutputs
+    runtimeCacheRef.current = null
+  }, [neoPixelOutputs])
   const pinStatesRef = useRef<Record<string, ArduinoPinState>>({})
   useEffect(() => {
     pinStatesRef.current = pinStates
@@ -429,6 +511,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
     pressed: Set<string>
     pins: Record<string, ArduinoPinState>
     display: DisplayOutputState
+    neoPixels: NeoPixelOutputState
     value: ReturnType<typeof computeRuntime>
   } | null>(null)
   const nodalCacheRef = useRef<{
@@ -442,12 +525,13 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
     const pressedNow = pressedRef.current
     const pinsNow = pinStatesRef.current
     const displayNow = displayOutputsRef.current
+    const neoPixelsNow = neoPixelOutputsRef.current
     const cached = runtimeCacheRef.current
-    if (cached?.state === currentState && cached.pressed === pressedNow && cached.pins === pinsNow && cached.display === displayNow) {
+    if (cached?.state === currentState && cached.pressed === pressedNow && cached.pins === pinsNow && cached.display === displayNow && cached.neoPixels === neoPixelsNow) {
       return cached.value
     }
-    const value = computeRuntime(currentState, pressedNow, pinsNow, displayNow)
-    runtimeCacheRef.current = { state: currentState, pressed: pressedNow, pins: pinsNow, display: displayNow, value }
+    const value = computeRuntime(currentState, pressedNow, pinsNow, displayNow, neoPixelsNow)
+    runtimeCacheRef.current = { state: currentState, pressed: pressedNow, pins: pinsNow, display: displayNow, neoPixels: neoPixelsNow, value }
     return value
   }, [])
 
@@ -465,6 +549,17 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
     partsRef.current = state.parts
     stateRef.current = state
   }, [state])
+
+  const neoPixelPartSignature = state.parts
+    .filter((part) => part.type === "neopixel-ring")
+    .map((part) => part.id)
+    .sort()
+    .join("|")
+  useEffect(() => {
+    const empty: NeoPixelOutputState = {}
+    neoPixelOutputsRef.current = empty
+    setNeoPixelOutputs(empty)
+  }, [neoPixelPartSignature])
 
   // Synchronize dynamic IoT sensor telemetry to virtual web server responses
   useEffect(() => {
@@ -518,7 +613,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
 
   const runtime = useMemo(() => {
     if (!running) return {}
-    const baseRuntime = computeRuntime(state, pressed, pinStates, displayOutputs)
+    const baseRuntime = computeRuntime(state, pressed, pinStates, displayOutputs, neoPixelOutputs)
     const microbitPart = state.parts.find((p) => p.type === "microbit-v2")
     if (microbitPart) {
       const btnA = pressed.has(`${microbitPart.id}_a`) || pressed.has("microbit_a")
@@ -531,7 +626,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
       }
     }
     return baseRuntime
-  }, [running, state, pressed, pinStates, displayOutputs, microbitMatrix])
+  }, [running, state, pressed, pinStates, displayOutputs, neoPixelOutputs, microbitMatrix])
 
   const oscilloscopeSimulationRef = useRef({ state, pinStates, running, pressed })
   useEffect(() => {
@@ -790,6 +885,9 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
     audioEngine.stopTone()
     setPinStates({})
     setDisplayOutputs({})
+    setNeoPixelOutputs({})
+    neoPixelOutputsRef.current = {}
+    runtimeCacheRef.current = null
     setIsPaused(false)
     isPausedRef.current = false
     setActiveStepBlock(null)
@@ -951,67 +1049,78 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
 
       const env: ExecutionEnvironment = {
         setDigitalPin: (pin, state) => {
-          const raw = String(pin).trim()
-          const digits = raw.replace(/^(gpio|gp|d|p)/i, "")
-          setPinStates((prev) => {
-            const next = { ...prev, [raw]: { ...prev[raw], state } }
-            if (raw.toLowerCase() !== raw) next[raw.toLowerCase()] = { ...next[raw.toLowerCase()], state }
-            if (digits) {
-              next[digits] = { ...next[digits], state }
-              next[`d${digits}`] = { ...next[`d${digits}`], state }
-              next[`gpio${digits}`] = { ...next[`gpio${digits}`], state }
-              next[`gp${digits}`] = { ...next[`gp${digits}`], state }
-              next[`p${digits}`] = { ...next[`p${digits}`], state }
-            }
-            return next
-          })
+          setPinStates((prev) => writePinStateAliases(prev, pin, { state, outputMode: "digital" }))
         },
         setAnalogPin: (pin, value) => {
-          const raw = String(pin).trim()
-          const digits = raw.replace(/^(gpio|gp|d|p)/i, "")
           const state = value > 0 ? "HIGH" : "LOW"
-          setPinStates((prev) => {
-            const next = { ...prev, [raw]: { ...prev[raw], state, value } }
-            if (raw.toLowerCase() !== raw) next[raw.toLowerCase()] = { ...next[raw.toLowerCase()], state, value }
-            if (digits) {
-              next[digits] = { ...next[digits], state, value }
-              next[`d${digits}`] = { ...next[`d${digits}`], state, value }
-              next[`gpio${digits}`] = { ...next[`gpio${digits}`], state, value }
-              next[`gp${digits}`] = { ...next[`gp${digits}`], state, value }
-              next[`p${digits}`] = { ...next[`p${digits}`], state, value }
-            }
-            return next
-          })
+          setPinStates((prev) => writePinStateAliases(prev, pin, { state, value, outputMode: "pwm" }))
         },
         setServoAngle: (pin, angle) => {
-          const raw = String(pin).trim()
-          const digits = raw.replace(/^(gpio|gp|d|p)/i, "")
           setPinStates((prev) => {
-            const next = { ...prev, [raw]: { ...prev[raw], angle } }
-            if (raw.toLowerCase() !== raw) next[raw.toLowerCase()] = { ...next[raw.toLowerCase()], angle }
-            if (digits) {
-              next[digits] = { ...next[digits], angle }
-              next[`d${digits}`] = { ...next[`d${digits}`], angle }
-              next[`gpio${digits}`] = { ...next[`gpio${digits}`], angle }
-              next[`gp${digits}`] = { ...next[`gp${digits}`], angle }
-              next[`p${digits}`] = { ...next[`p${digits}`], angle }
-            }
-            return next
+            const duty = (1 + Math.max(0, Math.min(180, angle)) / 180) / 20
+            const value = Math.round(duty * 255)
+            return writePinStateAliases(prev, pin, { state: "HIGH", value, angle, outputMode: "servo" })
           })
         },
         setTone: (pin, freq) => {
-          const raw = String(pin).trim()
-          const digits = raw.replace(/^(gpio|gp|d|p)/i, "")
           const state = freq ? "HIGH" : "LOW"
           const value = freq ? 255 : 0
           const toneHz = freq ?? undefined
-          setPinStates((prev) => {
-            const next = { ...prev, [raw]: { ...prev[raw], state, value, toneHz } }
-            if (digits) {
-              next[digits] = { ...next[digits], state, value, toneHz }
-              next[`d${digits}`] = { ...next[`d${digits}`], state, value, toneHz }
-              next[`gpio${digits}`] = { ...next[`gpio${digits}`], state, value, toneHz }
+          setPinStates((prev) => writePinStateAliases(prev, pin, { state, value, toneHz, outputMode: "tone" }))
+        },
+        setNeoPixelColor: (sensorId, pixel, color) => {
+          const ring = sensorId
+            ? partsRef.current.find((part) => part.id === sensorId && part.type === "neopixel-ring")
+            : partsRef.current.find((part) => part.type === "neopixel-ring")
+          if (!ring) return
+          const count = Math.max(1, Math.min(8, Math.floor(Number(ring.props.numPixels ?? 8))))
+          const pixelIndex = Math.floor(Number(pixel))
+          if (!Number.isFinite(pixelIndex) || pixelIndex < 0 || pixelIndex >= count) return
+          const safeColor = /^#[0-9a-f]{6}$/i.test(String(color)) ? String(color) : "#ef4444"
+          setNeoPixelOutputs((previous) => {
+            const current = previous[ring.id] ?? {
+              bufferColors: Array(count).fill("#0f172a"),
+              displayedColors: Array(count).fill("#0f172a"),
+              hasShown: false,
+              dataPin: null,
             }
+            const bufferColors = Array.from({ length: count }, (_, index) =>
+              current.bufferColors[index] ?? "#0f172a",
+            )
+            bufferColors[pixelIndex] = safeColor
+            const next = {
+              ...previous,
+              [ring.id]: { ...current, bufferColors },
+            }
+            neoPixelOutputsRef.current = next
+            runtimeCacheRef.current = null
+            return next
+          })
+        },
+        showNeoPixel: (sensorId) => {
+          const currentState = stateRef.current
+          const ring = sensorId
+            ? currentState.parts.find((part) => part.id === sensorId && part.type === "neopixel-ring")
+            : currentState.parts.find((part) => part.type === "neopixel-ring")
+          if (!ring) return
+          const dataPin = findNeoPixelDataPin(currentState, ring.id)
+          const count = Math.max(1, Math.min(8, Math.floor(Number(ring.props.numPixels ?? 8))))
+          setNeoPixelOutputs((previous) => {
+            const current = previous[ring.id] ?? {
+              bufferColors: Array(count).fill("#0f172a"),
+              displayedColors: Array(count).fill("#0f172a"),
+              hasShown: false,
+              dataPin: null,
+            }
+            const displayedColors = Array.from({ length: count }, (_, index) =>
+              current.bufferColors[index] ?? "#0f172a",
+            )
+            const next = {
+              ...previous,
+              [ring.id]: { ...current, displayedColors, hasShown: true, dataPin },
+            }
+            neoPixelOutputsRef.current = next
+            runtimeCacheRef.current = null
             return next
           })
         },
@@ -1112,11 +1221,13 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
           const liveRuntime = runningRef.current
             ? getLiveRuntime(state)[p?.id ?? ""]
             : undefined
+          const readLiveNumber = (value: number | undefined, fallback: number) =>
+            runningRef.current ? (typeof value === "number" && Number.isFinite(value) ? value : 0) : fallback
 
           if (type === "pushbutton") return p ? (pressedRef.current.has(p.id) ? 1 : 0) : 0
           if (type === "ultrasonic") {
             const currentDist = Number(p?.props?.distance ?? 100)
-            return liveRuntime?.sensorValue !== undefined ? liveRuntime.sensorValue : currentDist
+            return readLiveNumber(liveRuntime?.sensorValue, currentDist)
           }
           if (type === "ldr") {
             const currentLight = Number(p?.props?.light ?? 512)
@@ -1125,7 +1236,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
           }
           if (type === "tmp36") {
             const currentTemp = Number(p?.props?.temperature ?? 25)
-            return liveRuntime?.sensorValue !== undefined ? liveRuntime.sensorValue : currentTemp
+            return readLiveNumber(liveRuntime?.sensorValue, currentTemp)
           }
           if (type === "pir") {
             return liveRuntime?.level !== undefined ? liveRuntime.level : (String(p?.props?.motion ?? "false") === "true" ? 1 : 0)
@@ -1139,34 +1250,36 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
           }
           if (type === "dht_temperature") {
             const currentTemp = Number(p?.props?.temperature ?? 25)
-            return liveRuntime?.dhtTemperature !== undefined ? liveRuntime.dhtTemperature : currentTemp
+            return readLiveNumber(liveRuntime?.dhtTemperature, currentTemp)
           }
           if (type === "dht_humidity") {
             const currentHum = Number(p?.props?.humidity ?? 55)
-            return liveRuntime?.dhtHumidity !== undefined ? liveRuntime.dhtHumidity : currentHum
+            return readLiveNumber(liveRuntime?.dhtHumidity, currentHum)
           }
           if (type === "joystick_x") {
-            const raw = liveRuntime?.joystickX !== undefined ? liveRuntime.joystickX : Number(p?.props?.x ?? 512)
+            const raw = readLiveNumber(liveRuntime?.joystickX, Number(p?.props?.x ?? 512))
             return scaleAdcReading(Math.max(0, Math.min(1, raw / 1023)), activeBoard)
           }
           if (type === "joystick_y") {
-            const raw = liveRuntime?.joystickY !== undefined ? liveRuntime.joystickY : Number(p?.props?.y ?? 512)
+            const raw = readLiveNumber(liveRuntime?.joystickY, Number(p?.props?.y ?? 512))
             return scaleAdcReading(Math.max(0, Math.min(1, raw / 1023)), activeBoard)
           }
           if (type === "joystick_button") {
-            return liveRuntime?.joystickButton ? 1 : (String(p?.props?.pressed ?? "false") === "true" ? 1 : 0)
+            return runningRef.current
+              ? (liveRuntime?.joystickButton ? 1 : 0)
+              : (String(p?.props?.pressed ?? "false") === "true" ? 1 : 0)
           }
           if (type === "soil") {
             const currentMoist = Number(p?.props?.moisture ?? 620)
-            const raw = liveRuntime?.sensorValue !== undefined ? liveRuntime.sensorValue : currentMoist
+            const raw = readLiveNumber(liveRuntime?.sensorValue, currentMoist)
             return scaleAdcReading(Math.max(0, Math.min(1, raw / 1023)), activeBoard)
           }
           if (type === "encoder") {
-            return liveRuntime?.encoderValue !== undefined ? liveRuntime.encoderValue : Number(p?.props?.value ?? 0)
+            return readLiveNumber(liveRuntime?.encoderValue, Number(p?.props?.value ?? 0))
           }
           if (type === "mq2-gas" || type === "mq2_gas") {
             const currentGas = Number(p?.props?.gasLevel ?? p?.props?.gasPpm ?? 120)
-            const raw = liveRuntime?.sensorValue !== undefined ? liveRuntime.sensorValue : currentGas
+            const raw = readLiveNumber(liveRuntime?.sensorValue, currentGas)
             return scaleAdcReading(Math.max(0, Math.min(1, raw / 1000)), activeBoard)
           }
           if (type === "analog") {

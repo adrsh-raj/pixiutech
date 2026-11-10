@@ -101,3 +101,168 @@ test("buzzer when OFF has ZERO current in its wires", () => {
   assert.equal(currents["w_bzpos"], undefined, "Wire from D8 to buzzer must have NO current when buzzer is silent")
   assert.equal(currents["w_bzgnd"], undefined, "Wire from buzzer to GND must have NO current when buzzer is silent")
 })
+
+
+test("potentiometer current flow follows its real t1-to-t2 terminals", () => {
+  const circuit = {
+    parts: [
+      { id: "uno", type: "arduino-uno", x: 40, y: 100, rotation: 0, props: {} },
+      { id: "pot", type: "potentiometer", x: 240, y: 100, rotation: 0, props: { resistance: 10000, value: 512 } },
+    ],
+    wires: [
+      { id: "pot-feed", from: { partId: "uno", pinId: "5v" }, to: { partId: "pot", pinId: "t1" }, color: "#ef4444" },
+      { id: "pot-wiper", from: { partId: "pot", pinId: "wiper" }, to: { partId: "uno", pinId: "a0" }, color: "#eab308" },
+      { id: "pot-return", from: { partId: "pot", pinId: "t2" }, to: { partId: "uno", pinId: "gnd" }, color: "#1e293b" },
+    ],
+  }
+  const currents = computeWireCurrents(circuit, {}, {})
+  assert.ok(currents["pot-feed"]?.currentMa > 0, "5V-to-t1 feed should show divider current")
+  assert.ok(currents["pot-return"]?.currentMa > 0, "t2-to-GND return should show divider current")
+  assert.equal(currents["pot-wiper"], undefined, "high-impedance analog wiper should not be rendered as a ground-current path")
+})
+
+test("NeoPixel Ring data current traces through its catalog DI pin", () => {
+  const circuit = {
+    parts: [
+      { id: "uno", type: "arduino-uno", x: 40, y: 100, rotation: 0, props: {} },
+      { id: "ring", type: "neopixel-ring", x: 280, y: 100, rotation: 0, props: {} },
+    ],
+    wires: [
+      { id: "ring-vcc", from: { partId: "uno", pinId: "5v" }, to: { partId: "ring", pinId: "vcc" }, color: "#ef4444" },
+      { id: "ring-gnd", from: { partId: "ring", pinId: "gnd" }, to: { partId: "uno", pinId: "gnd" }, color: "#1e293b" },
+      { id: "ring-di", from: { partId: "uno", pinId: "d6" }, to: { partId: "ring", pinId: "di" }, color: "#22c55e" },
+    ],
+  }
+  const currents = computeWireCurrents(
+    circuit,
+    {
+      ring: {
+        level: 1,
+        pixelColors: ["#ff0000"],
+        neopixelDataActive: true,
+        neopixelDataPin: { partId: "uno", pinId: "d6" },
+      },
+    },
+    {},
+  )
+  assert.ok(currents["ring-vcc"]?.currentMa > 0, "illuminated ring should draw supply current")
+  assert.ok(currents["ring-di"]?.currentMa > 0, "a committed data frame should trace through the real DI catalog endpoint")
+
+  const idle = computeWireCurrents(circuit, {
+    ring: { level: 0, pixelColors: ["#0f172a"], neopixelDataActive: false },
+  }, {})
+  assert.equal(idle["ring-vcc"], undefined, "an unlit ring must not draw the illuminated-pixel current")
+  assert.equal(idle["ring-di"], undefined, "DI must remain idle until show() sends a frame")
+})
+
+test("L298N logic-supply current traces through the catalog 5v pin", () => {
+  const circuit = {
+    parts: [
+      { id: "uno", type: "arduino-uno", x: 40, y: 100, rotation: 0, props: {} },
+      { id: "driver", type: "l298n", x: 260, y: 100, rotation: 0, props: {} },
+    ],
+    wires: [
+      { id: "logic-vcc", from: { partId: "uno", pinId: "5v" }, to: { partId: "driver", pinId: "5v" }, color: "#ef4444" },
+      { id: "logic-gnd", from: { partId: "driver", pinId: "gnd" }, to: { partId: "uno", pinId: "gnd" }, color: "#1e293b" },
+    ],
+  }
+  const currents = computeWireCurrents(circuit, {}, {})
+  assert.ok(currents["logic-vcc"]?.currentMa > 0, "L298N logic rail should trace through its 5v pin")
+  assert.ok(currents["logic-gnd"]?.currentMa > 0, "L298N logic ground should complete the return path")
+})
+
+test("Pico relay current animation follows relayActive NO/NC state and motor RPM", () => {
+  const circuit = {
+    parts: [
+      { id: "pico", type: "rpi-pico", x: 40, y: 100, rotation: 0, props: {} },
+      { id: "relay", type: "relay", x: 260, y: 100, rotation: 0, props: {} },
+      { id: "pump", type: "dc-motor", x: 480, y: 100, rotation: 0, props: {} },
+    ],
+    wires: [
+      { id: "coil-vcc", from: { partId: "pico", pinId: "vbus" }, to: { partId: "relay", pinId: "vcc" }, color: "#ef4444" },
+      { id: "coil-gnd", from: { partId: "relay", pinId: "gnd" }, to: { partId: "pico", pinId: "gnd_1" }, color: "#1e293b" },
+      { id: "coil-input", from: { partId: "pico", pinId: "gp13" }, to: { partId: "relay", pinId: "in" }, color: "#facc15" },
+      { id: "contact-feed", from: { partId: "pico", pinId: "vbus" }, to: { partId: "relay", pinId: "com" }, color: "#ef4444" },
+      { id: "contact-pump", from: { partId: "relay", pinId: "no" }, to: { partId: "pump", pinId: "pos" }, color: "#f97316" },
+      { id: "pump-return", from: { partId: "pump", pinId: "neg" }, to: { partId: "pico", pinId: "gnd_1" }, color: "#1e293b" },
+    ],
+  }
+
+  const pinStates = { "13": { state: "HIGH", outputMode: "digital" } }
+  const energized = computeWireCurrents(
+    circuit,
+    { relay: { relayActive: true }, pump: { rpm: 1000, motorDirection: "cw" } },
+    pinStates,
+  )
+  for (const wireId of ["coil-vcc", "coil-gnd", "coil-input", "contact-feed", "contact-pump", "pump-return"]) {
+    assert.ok(energized[wireId]?.currentMa > 0, `${wireId} must show current while the relay coil is energized and the pump runs`)
+  }
+  assert.ok(energized["contact-feed"].currentMa > 0, "solver must include the energized COM–NO contact in the pump's current loop")
+
+  const deenergized = computeWireCurrents(
+    circuit,
+    { relay: { relayActive: false }, pump: { rpm: 0, motorDirection: "stopped" } },
+    { "13": { state: "LOW", outputMode: "digital" } },
+  )
+  for (const wireId of ["coil-vcc", "coil-gnd", "coil-input", "contact-feed", "contact-pump", "pump-return"]) {
+    assert.equal(deenergized[wireId], undefined, `${wireId} must have zero current when relay is de-energized and NO is open`)
+  }
+})
+
+test("shared supply and return wires sum current from parallel resistor branches", () => {
+  const circuit = {
+    parts: [
+      { id: "uno", type: "arduino-uno", x: 40, y: 100, rotation: 0, props: {} },
+      { id: "bb", type: "breadboard", x: 150, y: 100, rotation: 0, props: {} },
+      { id: "r1", type: "resistor", x: 300, y: 70, rotation: 0, props: { resistance: 1000 } },
+      { id: "r2", type: "resistor", x: 300, y: 150, rotation: 0, props: { resistance: 2000 } },
+    ],
+    wires: [
+      { id: "shared-feed", from: { partId: "uno", pinId: "5v" }, to: { partId: "bb", pinId: "pos_t_1" }, color: "#ef4444" },
+      { id: "feed-r1", from: { partId: "bb", pinId: "pos_t_2" }, to: { partId: "r1", pinId: "a" }, color: "#ef4444" },
+      { id: "feed-r2", from: { partId: "bb", pinId: "pos_t_3" }, to: { partId: "r2", pinId: "a" }, color: "#ef4444" },
+      { id: "return-r1", from: { partId: "r1", pinId: "b" }, to: { partId: "uno", pinId: "gnd_pwr" }, color: "#1e293b" },
+      { id: "return-r2", from: { partId: "r2", pinId: "b" }, to: { partId: "uno", pinId: "gnd_pwr" }, color: "#1e293b" },
+    ],
+  }
+  const currents = computeWireCurrents(circuit, {}, {})
+  assert.ok(Math.abs(currents["shared-feed"]?.currentMa - 7.5) < 0.1,
+    `shared feed should carry 5mA + 2.5mA, received ${currents["shared-feed"]?.currentMa}mA`)
+})
+
+test("potentiometer current flow uses its solved divider current instead of a fixed visual value", () => {
+  const circuit = {
+    parts: [
+      { id: "uno", type: "arduino-uno", x: 40, y: 100, rotation: 0, props: {} },
+      { id: "pot", type: "potentiometer", x: 240, y: 100, rotation: 0, props: { resistance: 10000, value: 512 } },
+    ],
+    wires: [
+      { id: "pot-feed", from: { partId: "uno", pinId: "5v" }, to: { partId: "pot", pinId: "t1" }, color: "#ef4444" },
+      { id: "pot-wiper", from: { partId: "pot", pinId: "wiper" }, to: { partId: "uno", pinId: "a0" }, color: "#eab308" },
+      { id: "pot-return", from: { partId: "pot", pinId: "t2" }, to: { partId: "uno", pinId: "gnd_pwr" }, color: "#1e293b" },
+    ],
+  }
+  const currents = computeWireCurrents(circuit, {}, {})
+  assert.ok(Math.abs(currents["pot-feed"]?.currentMa - 0.5) < 0.1)
+  assert.ok(Math.abs(currents["pot-return"]?.currentMa - 0.5) < 0.1)
+  assert.equal(currents["pot-wiper"], undefined)
+})
+
+test("LDR wire current follows the modeled light-dependent resistance below and above 0.5mA", () => {
+  const makeCircuit = (light) => ({
+    parts: [
+      { id: "uno", type: "arduino-uno", x: 40, y: 100, rotation: 0, props: {} },
+      { id: "ldr", type: "ldr", x: 240, y: 100, rotation: 0, props: { light } },
+    ],
+    wires: [
+      { id: "ldr-feed", from: { partId: "uno", pinId: "5v" }, to: { partId: "ldr", pinId: "t1" }, color: "#ef4444" },
+      { id: "ldr-return", from: { partId: "ldr", pinId: "t2" }, to: { partId: "uno", pinId: "gnd_pwr" }, color: "#1e293b" },
+    ],
+  })
+  const dark = computeWireCurrents(makeCircuit(0), {}, {})
+  const bright = computeWireCurrents(makeCircuit(1023), {}, {})
+  assert.ok(dark["ldr-feed"]?.currentMa > 0.09 && dark["ldr-feed"]?.currentMa < 0.11,
+    `dark LDR should draw about 0.1mA, received ${dark["ldr-feed"]?.currentMa}mA`)
+  assert.ok(bright["ldr-feed"]?.currentMa > 9.5 && bright["ldr-feed"]?.currentMa < 10.5,
+    `bright LDR should draw about 10mA, received ${bright["ldr-feed"]?.currentMa}mA`)
+})

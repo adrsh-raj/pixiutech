@@ -631,6 +631,7 @@ export function validatePinVoltageTolerance(
 
 export interface GenericPinState {
   state?: "HIGH" | "LOW" | string
+  outputMode?: "digital" | "pwm" | "tone" | "servo" | "dac"
   value?: number
   angle?: number
   toneHz?: number
@@ -645,10 +646,10 @@ export function lookupBoardPinState(
   pinStates: Record<string, GenericPinState | any> = {},
   pinQuery: string,
   board?: BoardDefinition | null
-): { state: "HIGH" | "LOW"; value?: number; angle?: number; toneHz?: number } | undefined {
+): { state: "HIGH" | "LOW"; outputMode?: "digital" | "pwm" | "tone" | "servo" | "dac"; value?: number; angle?: number; toneHz?: number } | undefined {
   if (!pinStates || !pinQuery) return undefined
 
-  const normalizeEntry = (entry: any): { state: "HIGH" | "LOW"; value?: number; angle?: number; toneHz?: number } | undefined => {
+  const normalizeEntry = (entry: any): { state: "HIGH" | "LOW"; outputMode?: "digital" | "pwm" | "tone" | "servo" | "dac"; value?: number; angle?: number; toneHz?: number } | undefined => {
     if (!entry) return undefined
     if (typeof entry === "string") {
       return { state: entry.toUpperCase() === "HIGH" ? "HIGH" : "LOW" }
@@ -660,6 +661,7 @@ export function lookupBoardPinState(
       const state = entry.state === "HIGH" || (entry.value !== undefined && entry.value > 0) ? "HIGH" : "LOW"
       return {
         state,
+        outputMode: entry.outputMode,
         value: entry.value,
         angle: entry.angle,
         toneHz: entry.toneHz,

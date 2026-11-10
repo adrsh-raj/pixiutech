@@ -191,7 +191,7 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
         { id: "bz", type: "buzzer", x: 430, y: 200, rotation: 0, props: {} },
       ],
       wires: [
-        { id: "w_pwr", from: { partId: "mb", pinId: "v33" }, to: { partId: "srv", pinId: "vcc" }, color: "#ef4444" },
+        { id: "w_pwr", from: { partId: "mb", pinId: "3v" }, to: { partId: "srv", pinId: "vcc" }, color: "#ef4444" },
         { id: "w_gnd", from: { partId: "mb", pinId: "gnd" }, to: { partId: "srv", pinId: "gnd" }, color: "#1e293b" },
         { id: "w_sig", from: { partId: "mb", pinId: "p0" }, to: { partId: "srv", pinId: "sig" }, color: "#f97316" },
         { id: "w_bz_pos", from: { partId: "mb", pinId: "p1" }, to: { partId: "bz", pinId: "pos" }, color: "#eab308" },
@@ -284,6 +284,7 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
         { id: "esp", type: "esp32-devkit", x: 40, y: 70, rotation: 0, props: {} },
         { id: "dht", type: "dht11", x: 380, y: 60, rotation: 0, props: { temperature: 25, humidity: 60 } },
         { id: "ldr", type: "ldr", x: 380, y: 190, rotation: 0, props: { light: 500 } },
+        { id: "r_ldr", type: "resistor", x: 500, y: 235, rotation: 0, props: { resistance: 10000 } },
         { id: "led_ok", type: "led", x: 550, y: 190, rotation: 0, props: { color: "green" } },
         { id: "r_led", type: "resistor", x: 550, y: 110, rotation: 0, props: { resistance: 220 } },
       ],
@@ -293,6 +294,8 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
         { id: "w_ddat", from: { partId: "esp", pinId: "d4" }, to: { partId: "dht", pinId: "data" }, color: "#60a5fa" },
         { id: "w_lvcc", from: { partId: "esp", pinId: "v33" }, to: { partId: "ldr", pinId: "t1" }, color: "#ef4444" },
         { id: "w_lsig", from: { partId: "ldr", pinId: "t2" }, to: { partId: "esp", pinId: "d34" }, color: "#eab308" },
+        { id: "w_lpull", from: { partId: "ldr", pinId: "t2" }, to: { partId: "r_ldr", pinId: "a" }, color: "#eab308" },
+        { id: "w_ldr_return", from: { partId: "r_ldr", pinId: "b" }, to: { partId: "esp", pinId: "gnd_l" }, color: "#1e293b" },
         { id: "w_l1", from: { partId: "esp", pinId: "d2" }, to: { partId: "r_led", pinId: "a" }, color: "#22c55e" },
         { id: "w_l2", from: { partId: "r_led", pinId: "b" }, to: { partId: "led_ok", pinId: "anode" }, color: "#22c55e" },
         { id: "w_lgnd", from: { partId: "led_ok", pinId: "cathode" }, to: { partId: "esp", pinId: "gnd_l" }, color: "#1e293b" },
@@ -557,6 +560,7 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
       parts: [
         { id: "uno", type: "arduino-uno", x: 60, y: 100, rotation: 0, props: {} },
         { id: "walk_btn", type: "pushbutton", x: 250, y: 100, rotation: 0, props: {} },
+        { id: "walk_btn_pull", type: "resistor", x: 250, y: 180, rotation: 0, props: { resistance: 10000 } },
         { id: "red_led", type: "led", x: 420, y: 40, rotation: 0, props: { color: "red" } },
         { id: "yellow_led", type: "led", x: 420, y: 120, rotation: 0, props: { color: "yellow" } },
         { id: "green_led", type: "led", x: 420, y: 200, rotation: 0, props: { color: "green" } },
@@ -584,6 +588,8 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
         { id: "w14", from: { partId: "walk_led", pinId: "cathode" }, to: { partId: "uno", pinId: "gnd" }, color: "#1e293b" },
         { id: "w15", from: { partId: "uno", pinId: "5v" }, to: { partId: "walk_btn", pinId: "p1a" }, color: "#ef4444" },
         { id: "w16", from: { partId: "walk_btn", pinId: "p2a" }, to: { partId: "uno", pinId: "d2" }, color: "#22c55e" },
+        { id: "w17", from: { partId: "uno", pinId: "d2" }, to: { partId: "walk_btn_pull", pinId: "a" }, color: "#22c55e" },
+        { id: "w18", from: { partId: "walk_btn_pull", pinId: "b" }, to: { partId: "uno", pinId: "gnd" }, color: "#1e293b" },
       ],
     },
     blocklyXml: program(
@@ -611,6 +617,7 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
       parts: [
         { id: "uno", type: "arduino-uno", x: 60, y: 100, rotation: 0, props: {} },
         { id: "btn", type: "pushbutton", x: 260, y: 100, rotation: 0, props: {} },
+        { id: "btn_pull", type: "resistor", x: 260, y: 180, rotation: 0, props: { resistance: 10000 } },
         { id: "buzzer", type: "buzzer", x: 260, y: 210, rotation: 0, props: {} },
         { id: "led1", type: "led", x: 440, y: 90, rotation: 0, props: { color: "red" } },
         { id: "r1", type: "resistor", x: 440, y: 170, rotation: 0, props: { resistance: 220 } },
@@ -628,6 +635,8 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
         { id: "w8", from: { partId: "buzzer", pinId: "neg" }, to: { partId: "uno", pinId: "gnd" }, color: "#1e293b" },
         { id: "w9", from: { partId: "uno", pinId: "5v" }, to: { partId: "btn", pinId: "p1a" }, color: "#ef4444" },
         { id: "w10", from: { partId: "btn", pinId: "p2a" }, to: { partId: "uno", pinId: "d2" }, color: "#22c55e" },
+        { id: "w11", from: { partId: "uno", pinId: "d2" }, to: { partId: "btn_pull", pinId: "a" }, color: "#22c55e" },
+        { id: "w12", from: { partId: "btn_pull", pinId: "b" }, to: { partId: "uno", pinId: "gnd" }, color: "#1e293b" },
       ],
     },
     blocklyXml: `<xml xmlns="https://developers.google.com/blockly/xml">
@@ -664,6 +673,7 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
         { id: "uno", type: "arduino-uno", x: 60, y: 100, rotation: 0, props: {} },
         { id: "servo1", type: "servo", x: 440, y: 80, rotation: 0, props: { angle: 90 } },
         { id: "btn", type: "pushbutton", x: 270, y: 90, rotation: 0, props: {} },
+        { id: "btn_pull", type: "resistor", x: 270, y: 175, rotation: 0, props: { resistance: 10000 } },
         { id: "buzzer", type: "buzzer", x: 270, y: 200, rotation: 0, props: {} },
         { id: "led1", type: "led", x: 600, y: 80, rotation: 0, props: { color: "green" } },
         { id: "r1", type: "resistor", x: 600, y: 160, rotation: 0, props: { resistance: 220 } },
@@ -674,6 +684,8 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
         { id: "w3", from: { partId: "uno", pinId: "d9" }, to: { partId: "servo1", pinId: "sig" }, color: "#fb923c" },
         { id: "w4", from: { partId: "uno", pinId: "5v" }, to: { partId: "btn", pinId: "p1a" }, color: "#ef4444" },
         { id: "w5", from: { partId: "btn", pinId: "p2a" }, to: { partId: "uno", pinId: "d2" }, color: "#22c55e" },
+        { id: "w5a", from: { partId: "uno", pinId: "d2" }, to: { partId: "btn_pull", pinId: "a" }, color: "#22c55e" },
+        { id: "w5b", from: { partId: "btn_pull", pinId: "b" }, to: { partId: "uno", pinId: "gnd" }, color: "#1e293b" },
         { id: "w6", from: { partId: "uno", pinId: "d8" }, to: { partId: "buzzer", pinId: "pos" }, color: "#eab308" },
         { id: "w7", from: { partId: "buzzer", pinId: "neg" }, to: { partId: "uno", pinId: "gnd" }, color: "#1e293b" },
         { id: "w8", from: { partId: "uno", pinId: "d13" }, to: { partId: "r1", pinId: "a" }, color: "#22c55e" },
@@ -847,7 +859,7 @@ const BASE_TEMPLATE_META: Record<string, { gradeBand: TemplateGrade; unit: strin
     gradeBand: 8,
     unit: "IoT & Cloud",
     tutorial: [
-      "1. 🔌 Circuit Wiring & Hardware Setup: Connect DHT11 data to GPIO 4, LDR ambient light sensor to analog GPIO 34, Green Telemetry TX Activity LED to GPIO 2 via 220Ω resistor, and supply 3.3V/GND rails to all sensors.",
+      "1. 🔌 Circuit Wiring & Hardware Setup: Connect DHT11 data to GPIO 4. Wire the LDR from 3.3V to GPIO 34 and add a 10kΩ pull-down from the GPIO 34 junction to GND. Connect the Green Telemetry TX LED to GPIO 2 through 220Ω.",
       "2. ⚙️ Code Architecture & Logic: ESP32 connects to 'SmartHome-WiFi' and registers an HTTP GET '/' endpoint. When queried, it pulses the GPIO 2 green TX LED for 150ms and streams dynamic HTML containing real-time temperature, humidity, and lux telemetry.",
       "3. ▶️ Simulation Execution & Interaction Controls: Click Run to start the IoT server. Open the 📱 Smartphone Portal (movable floating device) and drag the DHT11 temperature or LDR light slider on the circuit canvas.",
       "4. 📊 Outcomes & Real-Time Observations: The smartphone dashboard live-updates with current temperature and lux metrics while the green GPIO 2 LED pulses on every data transmission packet.",
@@ -984,7 +996,7 @@ function starter(id: string, title: string, description: string, gradeBand: Temp
 
 const EXTRA_TEMPLATES: ProjectTemplate[] = [
   starter("g6-pushbutton-led", "🔘 Interactive Pushbutton Control Station (Dual LED + Click Buzzer)", "Tactile digital input switch controlling dual indicators and acoustic click feedback! Pressing the momentary pushbutton pulls D2 HIGH. The microcontroller switches the Green active LED (D13) ON, extinguishes the Amber standby LED (D12), and chirps the piezo buzzer (D8) with instantaneous acoustic confirmation.", 6, "Digital Inputs", "Beginner", ["Pushbutton", "Digital Input", "Dual LED", "Buzzer"],
-    { parts: [part("uno","arduino-uno",60,110),part("btn","pushbutton",310,90),part("bz","buzzer",310,210),part("led1","led",520,70,{color:"green"}),part("r1","resistor",520,150,{resistance:220}),part("led2","led",640,70,{color:"yellow"}),part("r2","resistor",640,150,{resistance:220})], wires: [wire("p1","uno","d2","btn","p1a"),wire("p2","btn","p2a","uno","5v","#ef4444"),wire("p3","uno","d13","r1","a","#22c55e"),wire("p4","r1","b","led1","anode","#22c55e"),wire("p5","led1","cathode","uno","gnd","#1e293b"),wire("p6","uno","d12","r2","a","#facc15"),wire("p7","r2","b","led2","anode","#facc15"),wire("p8","led2","cathode","uno","gnd","#1e293b"),wire("p9","uno","d8","bz","pos","#eab308"),wire("p10","bz","neg","uno","gnd","#1e293b")] },
+    { parts: [part("uno","arduino-uno",60,110),part("btn","pushbutton",310,90),part("btn_pull","resistor",310,175,{resistance:10000}),part("bz","buzzer",310,210),part("led1","led",520,70,{color:"green"}),part("r1","resistor",520,150,{resistance:220}),part("led2","led",640,70,{color:"yellow"}),part("r2","resistor",640,150,{resistance:220})], wires: [wire("p1","uno","d2","btn","p1a"),wire("p2","btn","p2a","uno","5v","#ef4444"),wire("p3","uno","d13","r1","a","#22c55e"),wire("p4","r1","b","led1","anode","#22c55e"),wire("p5","led1","cathode","uno","gnd","#1e293b"),wire("p6","uno","d12","r2","a","#facc15"),wire("p7","r2","b","led2","anode","#facc15"),wire("p8","led2","cathode","uno","gnd","#1e293b"),wire("p9","uno","d8","bz","pos","#eab308"),wire("p10","bz","neg","uno","gnd","#1e293b"),wire("p11","uno","d2","btn_pull","a","#22c55e"),wire("p12","btn_pull","b","uno","gnd","#1e293b")] },
     program([pinMode("2","INPUT"),pinMode("13","OUTPUT"),pinMode("12","OUTPUT"),pinMode("8","OUTPUT")],[
       ifElseBlock(
         block("io_digitalread",{PIN:"2"}),
@@ -1018,8 +1030,27 @@ const EXTRA_TEMPLATES: ProjectTemplate[] = [
       "3. ▶️ Simulation Execution & Interaction Controls: Click Run, then drag the rotary potentiometer knob on the canvas from 0% to 100%.",
       "4. 📊 Outcomes & Real-Time Observations: The blue lamp dims smoothly while the green indicator and buzzer trip as the knob crosses midpoint.",
     ]),
-  starter("g6-rgb-mood-lamp", "🌈 RGB Mood Lamp & Interactive Color Strobe Station", "Multi-channel pulse-width modulation RGB color blending with interactive mode controls! The Arduino drives RGB color channels on PWM pins D9, D10, and D11, while reading a D2 mode button and A0 brightness control. Hold the button for a cyan strobe with an 850 Hz piezo chime on D8.", 6, "Multi-Output", "Beginner", ["RGB LED", "Colour", "GPIO", "Pushbutton", "Buzzer"],
-    { parts: [part("uno","arduino-uno",60,110),part("btn","pushbutton",260,90),part("bz","buzzer",260,200),part("rgb","rgb-led",460,90,{}),part("pot","potentiometer",370,200,{value:512})], wires: [wire("r","uno","d9","rgb","red","#ef4444"),wire("g","uno","d10","rgb","green","#22c55e"),wire("b","uno","d11","rgb","blue","#3b82f6"),wire("gnd","uno","gnd","rgb","gnd","#1e293b"),wire("w_btn_vcc","uno","5v","btn","p1a","#ef4444"),wire("w_btn_sig","btn","p2a","uno","d2","#22c55e"),wire("w_bzpos","uno","d8","bz","pos","#eab308"),wire("w_bzgnd","bz","neg","uno","gnd","#1e293b"),wire("w_pot_vcc","uno","5v","pot","t1","#ef4444"),wire("w_pot_gnd","uno","gnd","pot","t2","#1e293b"),wire("w_pot_w","pot","wiper","uno","a0","#eab308")] },
+  starter("g6-rgb-mood-lamp", "🌈 RGB Mood Lamp & Interactive Color Strobe Station", "Multi-channel PWM RGB color blending with interactive mode controls! Each RGB channel on D9, D10, and D11 has its own 220Ω current-limiting resistor; the Arduino also reads a D2 mode button and A0 brightness control. Hold the button for a cyan strobe with an 850 Hz piezo chime on D8.", 6, "Multi-Output", "Beginner", ["RGB LED", "Colour", "GPIO", "Pushbutton", "Buzzer"],
+    {
+      parts: [
+        part("uno","arduino-uno",60,110), part("btn","pushbutton",260,90), part("btn_pull","resistor",260,175,{resistance:10000}), part("bz","buzzer",260,200),
+        part("rgb","rgb-led",520,90,{}), part("pot","potentiometer",370,200,{value:512}),
+        part("r_red","resistor",380,45,{resistance:220}),
+        part("r_green","resistor",380,105,{resistance:220}),
+        part("r_blue","resistor",380,165,{resistance:220}),
+      ],
+      wires: [
+        wire("r_drive","uno","d9","r_red","a","#ef4444"), wire("r_channel","r_red","b","rgb","red","#ef4444"),
+        wire("g_drive","uno","d10","r_green","a","#22c55e"), wire("g_channel","r_green","b","rgb","green","#22c55e"),
+        wire("b_drive","uno","d11","r_blue","a","#3b82f6"), wire("b_channel","r_blue","b","rgb","blue","#3b82f6"),
+        wire("gnd","uno","gnd","rgb","gnd","#1e293b"),
+        wire("w_btn_vcc","uno","5v","btn","p1a","#ef4444"), wire("w_btn_sig","btn","p2a","uno","d2","#22c55e"),
+        wire("w_btn_pull","uno","d2","btn_pull","a","#22c55e"), wire("w_btn_pull_gnd","btn_pull","b","uno","gnd","#1e293b"),
+        wire("w_bzpos","uno","d8","bz","pos","#eab308"), wire("w_bzgnd","bz","neg","uno","gnd","#1e293b"),
+        wire("w_pot_vcc","uno","5v","pot","t1","#ef4444"), wire("w_pot_gnd","uno","gnd","pot","t2","#1e293b"),
+        wire("w_pot_w","pot","wiper","uno","a0","#eab308"),
+      ],
+    },
     program([pinMode("9","OUTPUT"),pinMode("10","OUTPUT"),pinMode("11","OUTPUT"),pinMode("8","OUTPUT"),pinMode("2","INPUT")],[
       analogMapWrite("9","pot",255),analogMapWrite("10","pot",150),analogMapWrite("11","pot",210),
       ifElseBlock(
@@ -1030,13 +1061,13 @@ const EXTRA_TEMPLATES: ProjectTemplate[] = [
       delay(400),
     ]),
     [
-      "1. 🔌 Circuit Wiring & Hardware Setup: Connect RGB LED common cathode to GND, R to D9, G to D10, B to D11. Connect mode pushbutton to D2 and buzzer to D8.",
+      "1. 🔌 Circuit Wiring & Hardware Setup: Connect RGB common cathode to GND. Route D9, D10, and D11 through separate 220Ω resistors to Red, Green, and Blue. Connect the mode pushbutton to D2 and buzzer to D8.",
       "2. ⚙️ Code Architecture & Logic: Maps the A0 potentiometer to the three RGB brightness channels. Holding the D2 button switches to a cyan strobe and plays a short chime on D8.",
       "3. ▶️ Simulation Execution & Interaction Controls: Click Run, turn the A0 potentiometer to change lamp brightness, then hold the D2 pushbutton to trigger the cyan strobe.",
       "4. 📊 Outcomes & Real-Time Observations: Ambient violet mood glow transforms into vivid cyan flash accompanied by chime tones.",
     ]),
   starter("g6-buzzer-doorbell", "🔔 Smart Motion-Activated Video Doorbell (PIR + Chime + Welcome Light)", "Audible annunciator and motion security system! Detects visitor arrival via either tactile pushbutton (D2) or PIR infrared motion sensor (D7). The Arduino activates an acoustic 2-tone melodic chime on D8 and illuminates the welcoming LED porch light on D13.", 6, "Digital Inputs + Outputs", "Beginner", ["Pushbutton", "Buzzer", "PIR Motion", "Welcome Lamp"],
-    { parts: [part("uno","arduino-uno",60,110),part("btn","pushbutton",270,90),part("pir","pir-sensor",430,60,{motion:"false"}),part("bz","buzzer",270,210),part("led1","led",590,80,{color:"green"}),part("r1","resistor",590,160,{resistance:220})], wires: [wire("a","uno","d2","btn","p1a"),wire("b","btn","p2a","uno","5v","#ef4444"),wire("c","uno","d8","bz","pos","#facc15"),wire("d","bz","neg","uno","gnd","#1e293b"),wire("w_pvcc","uno","5v","pir","vcc","#ef4444"),wire("w_pgnd","uno","gnd","pir","gnd","#1e293b"),wire("w_pout","uno","d7","pir","out","#60a5fa"),wire("w_la","uno","d13","r1","a","#22c55e"),wire("w_lb","r1","b","led1","anode","#22c55e"),wire("w_lgnd","led1","cathode","uno","gnd","#1e293b")] },
+    { parts: [part("uno","arduino-uno",60,110),part("btn","pushbutton",270,90),part("btn_pull","resistor",270,175,{resistance:10000}),part("pir","pir-sensor",430,60,{motion:"false"}),part("bz","buzzer",270,210),part("led1","led",590,80,{color:"green"}),part("r1","resistor",590,160,{resistance:220})], wires: [wire("a","uno","d2","btn","p1a"),wire("b","btn","p2a","uno","5v","#ef4444"),wire("c","uno","d8","bz","pos","#facc15"),wire("d","bz","neg","uno","gnd","#1e293b"),wire("w_pvcc","uno","5v","pir","vcc","#ef4444"),wire("w_pgnd","uno","gnd","pir","gnd","#1e293b"),wire("w_pout","uno","d7","pir","out","#60a5fa"),wire("w_la","uno","d13","r1","a","#22c55e"),wire("w_lb","r1","b","led1","anode","#22c55e"),wire("w_lgnd","led1","cathode","uno","gnd","#1e293b"),wire("w_btn_pull","uno","d2","btn_pull","a","#22c55e"),wire("w_btn_pull_gnd","btn_pull","b","uno","gnd","#1e293b")] },
     program([pinMode("2","INPUT"),pinMode("7","INPUT"),pinMode("8","OUTPUT"),pinMode("13","OUTPUT")],[
       ifElseBlock(
         block("io_digitalread",{PIN:"2"}),
@@ -1057,23 +1088,30 @@ const EXTRA_TEMPLATES: ProjectTemplate[] = [
       "3. ▶️ Simulation Execution & Interaction Controls: Click Run, then click the pushbutton or toggle motion on the PIR sensor in the canvas inspector.",
       "4. 📊 Outcomes & Real-Time Observations: The system sounds a realistic entry chime while illuminating the visitor welcome lamp.",
     ]),
-  starter("g6-seven-segment", "🔢 7-Segment Digital Decade Counter (0–9 Display + Chime)", "Automatic digital decade counter. The Arduino Uno drives the seven segment bars (a–g on D2–D8) through common GND to display digits 0 through 9. Each count lights the D10 piezo chime and briefly flashes the D13 pulse LED.", 6, "Displays", "Beginner", ["7-Segment", "Counter", "Buzzer", "Numbers"],
+  starter("g6-seven-segment", "🔢 7-Segment Digital Decade Counter (0–9 Display + Chime)", "Automatic digital decade counter. The Arduino Uno drives the seven segment bars (a–g on D2–D8), each through its own 220Ω current-limiting resistor, with common GND to display digits 0 through 9. Each count lights the D10 piezo chime and briefly flashes the D13 pulse LED.", 6, "Displays", "Beginner", ["7-Segment", "Counter", "Buzzer", "Numbers"],
     {
       parts: [
         part("uno", "arduino-uno", 50, 110),
-        part("seg", "seven-segment", 420, 75, { digit: 0 }),
+        part("seg", "seven-segment", 520, 75, { digit: 0 }),
+        part("r_a", "resistor", 300, 35, { resistance: 220 }),
+        part("r_b", "resistor", 300, 65, { resistance: 220 }),
+        part("r_c", "resistor", 300, 95, { resistance: 220 }),
+        part("r_d", "resistor", 300, 125, { resistance: 220 }),
+        part("r_e", "resistor", 300, 155, { resistance: 220 }),
+        part("r_f", "resistor", 300, 185, { resistance: 220 }),
+        part("r_g", "resistor", 300, 215, { resistance: 220 }),
         part("buzzer", "buzzer", 250, 210),
         part("led", "led", 570, 75, { color: "green" }),
         part("r1", "resistor", 570, 150, { resistance: 220 }),
       ],
       wires: [
-        wire("w_a", "uno", "d2", "seg", "a", "#ef4444"),
-        wire("w_b", "uno", "d3", "seg", "b", "#f97316"),
-        wire("w_c", "uno", "d4", "seg", "c", "#eab308"),
-        wire("w_d", "uno", "d5", "seg", "d", "#22c55e"),
-        wire("w_e", "uno", "d6", "seg", "e", "#3b82f6"),
-        wire("w_f", "uno", "d7", "seg", "f", "#8b5cf6"),
-        wire("w_g", "uno", "d8", "seg", "g", "#ec4899"),
+        wire("w_a_drive", "uno", "d2", "r_a", "a", "#ef4444"), wire("w_a_segment", "r_a", "b", "seg", "a", "#ef4444"),
+        wire("w_b_drive", "uno", "d3", "r_b", "a", "#f97316"), wire("w_b_segment", "r_b", "b", "seg", "b", "#f97316"),
+        wire("w_c_drive", "uno", "d4", "r_c", "a", "#eab308"), wire("w_c_segment", "r_c", "b", "seg", "c", "#eab308"),
+        wire("w_d_drive", "uno", "d5", "r_d", "a", "#22c55e"), wire("w_d_segment", "r_d", "b", "seg", "d", "#22c55e"),
+        wire("w_e_drive", "uno", "d6", "r_e", "a", "#3b82f6"), wire("w_e_segment", "r_e", "b", "seg", "e", "#3b82f6"),
+        wire("w_f_drive", "uno", "d7", "r_f", "a", "#8b5cf6"), wire("w_f_segment", "r_f", "b", "seg", "f", "#8b5cf6"),
+        wire("w_g_drive", "uno", "d8", "r_g", "a", "#ec4899"), wire("w_g_segment", "r_g", "b", "seg", "g", "#ec4899"),
         wire("w_com", "uno", "gnd", "seg", "com", "#1e293b"),
         wire("w_bzpos", "uno", "d10", "buzzer", "pos", "#eab308"),
         wire("w_bzgnd", "buzzer", "neg", "uno", "gnd", "#1e293b"),
@@ -1119,13 +1157,13 @@ const EXTRA_TEMPLATES: ProjectTemplate[] = [
       toneOn("10",850),digitalWrite("13","HIGH"),delay(100),toneOff("10"),digitalWrite("13","LOW"),delay(600),
     ]),
     [
-      "1. 🔌 Circuit Wiring: Wire segments a–g to Arduino D2–D8 and common COM to GND. Connect the piezo buzzer to D10 and the pulse LED to D13 through a 220Ω resistor.",
+      "1. 🔌 Circuit Wiring: Wire each segment a–g to Arduino D2–D8 through its own 220Ω resistor, then connect common COM to GND. Connect the piezo buzzer to D10 and the pulse LED to D13 through a 220Ω resistor.",
       "2. ⚙️ Code Architecture: Program cycles through numeric segment patterns 0 to 9, emitting a click sound and LED strobe on each count.",
       "3. ▶️ Interaction: Press Run and watch the circuit cycle through digits 0–9 automatically.",
       "4. 📊 Output: Crisp red numeric digits illuminate smoothly across the 7-segment display with audio-visual synchronization.",
     ]),
   starter("g6-ldr-night-lamp", "💡 Smart Night Lamp & Perimeter Security (LDR + PIR Motion + Siren)", "Photosensitive ambient light controller and motion security system! A Light Dependent Resistor (LDR) monitors ambient illumination on analog pin A0. In daylight, lamps remain OFF; when darkness falls (<400), Arduino lights the Yellow Lamp on D13 and Blue Ambient LED on D12. If the PIR sensor on D7 trips motion at night, the security siren on D8 chirps an intruder warning.", 6, "Sensors", "Intermediate", ["LDR", "Analog", "PIR Motion", "Dual LED", "Buzzer"],
-    { parts: [part("uno","arduino-uno",60,110),part("ldr","ldr",300,90),part("pir","pir-sensor",440,60,{motion:"false"}),part("bz","buzzer",300,210),part("led1","led",600,70,{color:"yellow"}),part("r1","resistor",600,150,{resistance:220}),part("led2","led",710,70,{color:"blue"}),part("r2","resistor",710,150,{resistance:220})], wires: [wire("a","uno","5v","ldr","t1","#ef4444"),wire("b","ldr","t2","uno","a0","#eab308"),wire("c","uno","d13","r1","a","#facc15"),wire("d","r1","b","led1","anode","#facc15"),wire("e","led1","cathode","uno","gnd","#1e293b"),wire("w_pvcc","uno","5v","pir","vcc","#ef4444"),wire("w_pgnd","uno","gnd","pir","gnd","#1e293b"),wire("w_pout","uno","d7","pir","out","#60a5fa"),wire("w_l2a","uno","d12","r2","a","#3b82f6"),wire("w_l2b","r2","b","led2","anode","#3b82f6"),wire("w_l2gnd","led2","cathode","uno","gnd","#1e293b"),wire("w_bzpos","uno","d8","bz","pos","#eab308"),wire("w_bzgnd","bz","neg","uno","gnd","#1e293b")] },
+    { parts: [part("uno","arduino-uno",60,110),part("ldr","ldr",300,90),part("rldr","resistor",390,160,{resistance:10000}),part("pir","pir-sensor",440,60,{motion:"false"}),part("bz","buzzer",300,210),part("led1","led",600,70,{color:"yellow"}),part("r1","resistor",600,150,{resistance:220}),part("led2","led",710,70,{color:"blue"}),part("r2","resistor",710,150,{resistance:220})], wires: [wire("a","uno","5v","ldr","t1","#ef4444"),wire("b","ldr","t2","uno","a0","#eab308"),wire("w_lr_a0","uno","a0","rldr","a","#eab308"),wire("w_lr_gnd","rldr","b","uno","gnd","#1e293b"),wire("c","uno","d13","r1","a","#facc15"),wire("d","r1","b","led1","anode","#facc15"),wire("e","led1","cathode","uno","gnd","#1e293b"),wire("w_pvcc","uno","5v","pir","vcc","#ef4444"),wire("w_pgnd","uno","gnd","pir","gnd","#1e293b"),wire("w_pout","uno","d7","pir","out","#60a5fa"),wire("w_l2a","uno","d12","r2","a","#3b82f6"),wire("w_l2b","r2","b","led2","anode","#3b82f6"),wire("w_l2gnd","led2","cathode","uno","gnd","#1e293b"),wire("w_bzpos","uno","d8","bz","pos","#eab308"),wire("w_bzgnd","bz","neg","uno","gnd","#1e293b")] },
     program([pinMode("13","OUTPUT"),pinMode("12","OUTPUT"),pinMode("8","OUTPUT"),pinMode("7","INPUT")],[
       ifElseBlock(
         compareBlock("LT", sensorBlock("ldr_read", "ldr"), numberBlock(400)),
@@ -1142,7 +1180,7 @@ const EXTRA_TEMPLATES: ProjectTemplate[] = [
       delay(100),
     ]),
     [
-      "1. 🔌 Circuit Wiring & Hardware Setup: Connect LDR between 5V and A0, PIR motion OUT to D7. Wire yellow street lamp to D13 and blue ambient LED to D12 via 220Ω resistors. Connect siren buzzer to D8.",
+      "1. 🔌 Circuit Wiring & Hardware Setup: Connect LDR between 5V and A0, then connect a 10kΩ pull-down resistor from the A0 junction to GND. Wire PIR OUT to D7. Connect the yellow street lamp to D13 and blue ambient LED to D12 through 220Ω resistors; connect the siren buzzer to D8.",
       "2. ⚙️ Code Architecture & Logic: Evaluates ldr_read on A0; if < 400 (darkness), powers D13 and D12. If PIR motion trips at night, sounds audible warning on D8.",
       "3. ▶️ Simulation Execution & Interaction Controls: Click Run to start illumination monitoring. Use the LDR slider to simulate night, then toggle the PIR motion trigger.",
       "4. 📊 Outcomes & Real-Time Observations: Dual lamps illuminate automatically in darkness, and intruder motion trips the audio security siren.",
@@ -1240,7 +1278,7 @@ const EXTRA_TEMPLATES: ProjectTemplate[] = [
       "4. 📊 Outcomes & Real-Time Observations: The Serial console and LCD log positive and negative dial steps accompanied by tactile audio click chirps.",
     ]),
   starter("g7-servo-door", "🚧 Automatic Ultrasonic Boom Barrier Gate (Sonar + Servo + Stop/Go LEDs + Chime)", "The HC-SR04 measures vehicle distance on D10/D11 and opens the barrier below 30 cm. Press and hold the D2 override to keep the barrier closed. Red/green LEDs show stop/go, and a piezo tone confirms opening.", 7, "Robotics", "Intermediate", ["Servo", "Automation", "Ultrasonic", "Boom Barrier", "Buzzer"],
-    { parts: [part("uno","arduino-uno",60,110),part("sonar","ultrasonic",300,60,{distance:45}),part("servo","servo",510,60,{angle:0}),part("btn","pushbutton",200,200),part("bz","buzzer",320,200),part("led_stop","led",670,60,{color:"red"}),part("r1","resistor",670,140,{resistance:220}),part("led_go","led",770,60,{color:"green"}),part("r2","resistor",770,140,{resistance:220})], wires: [wire("a","uno","5v","servo","vcc","#ef4444"),wire("b","uno","gnd","servo","gnd","#1e293b"),wire("c","uno","d9","servo","sig","#fb923c"),wire("w_sonar_vcc","uno","5v","sonar","vcc","#ef4444"),wire("w_sonar_gnd","uno","gnd","sonar","gnd","#1e293b"),wire("w_sonar_trig","uno","d10","sonar","trig","#60a5fa"),wire("w_sonar_echo","uno","d11","sonar","echo","#38bdf8"),wire("w_btn_vcc","uno","5v","btn","p1a","#ef4444"),wire("w_btn_sig","btn","p2a","uno","d2","#22c55e"),wire("w_bzpos","uno","d8","bz","pos","#eab308"),wire("w_bzgnd","bz","neg","uno","gnd","#1e293b"),wire("w_l1a","uno","d12","r1","a","#ef4444"),wire("w_l1b","r1","b","led_stop","anode","#ef4444"),wire("w_l1g","led_stop","cathode","uno","gnd","#1e293b"),wire("w_l2a","uno","d13","r2","a","#22c55e"),wire("w_l2b","r2","b","led_go","anode","#22c55e"),wire("w_l2g","led_go","cathode","uno","gnd","#1e293b")] },
+    { parts: [part("uno","arduino-uno",60,110),part("sonar","ultrasonic",300,60,{distance:45}),part("servo","servo",510,60,{angle:0}),part("btn","pushbutton",200,200),part("btn_pull","resistor",200,285,{resistance:10000}),part("bz","buzzer",320,200),part("led_stop","led",670,60,{color:"red"}),part("r1","resistor",670,140,{resistance:220}),part("led_go","led",770,60,{color:"green"}),part("r2","resistor",770,140,{resistance:220})], wires: [wire("a","uno","5v","servo","vcc","#ef4444"),wire("b","uno","gnd","servo","gnd","#1e293b"),wire("c","uno","d9","servo","sig","#fb923c"),wire("w_sonar_vcc","uno","5v","sonar","vcc","#ef4444"),wire("w_sonar_gnd","uno","gnd","sonar","gnd","#1e293b"),wire("w_sonar_trig","uno","d10","sonar","trig","#60a5fa"),wire("w_sonar_echo","uno","d11","sonar","echo","#38bdf8"),wire("w_btn_vcc","uno","5v","btn","p1a","#ef4444"),wire("w_btn_sig","btn","p2a","uno","d2","#22c55e"),wire("w_btn_pull","uno","d2","btn_pull","a","#22c55e"),wire("w_btn_pull_gnd","btn_pull","b","uno","gnd","#1e293b"),wire("w_bzpos","uno","d8","bz","pos","#eab308"),wire("w_bzgnd","bz","neg","uno","gnd","#1e293b"),wire("w_l1a","uno","d12","r1","a","#ef4444"),wire("w_l1b","r1","b","led_stop","anode","#ef4444"),wire("w_l1g","led_stop","cathode","uno","gnd","#1e293b"),wire("w_l2a","uno","d13","r2","a","#22c55e"),wire("w_l2b","r2","b","led_go","anode","#22c55e"),wire("w_l2g","led_go","cathode","uno","gnd","#1e293b")] },
     program([pinMode("9","OUTPUT"),pinMode("8","OUTPUT"),pinMode("12","OUTPUT"),pinMode("13","OUTPUT"),pinMode("2","INPUT")],[ifElseBlock(block("io_digitalread",{PIN:"2"}),[block("servo_write",{PIN:"9"},{ANGLE:numberBlock(0)}),digitalWrite("12","HIGH"),digitalWrite("13","LOW"),toneOff("8"),delay(80)],[ifElseBlock(compareBlock("LT",block("ultrasonic_read",{TRIG:"10",ECHO:"11"}),numberBlock(30)),[block("servo_write",{PIN:"9"},{ANGLE:numberBlock(90)}),digitalWrite("12","LOW"),digitalWrite("13","HIGH"),toneOn("8",980),delay(100),toneOff("8")],[block("servo_write",{PIN:"9"},{ANGLE:numberBlock(0)}),digitalWrite("12","HIGH"),digitalWrite("13","LOW"),toneOff("8"),delay(100)])])]),
     [
       "1. 🔌 Circuit Wiring & Hardware Setup: Connect barrier servo to D9, ultrasonic sonar to D10/D11, emergency button to D2, stop/go LEDs to D12/D13, and chime buzzer to D8.",

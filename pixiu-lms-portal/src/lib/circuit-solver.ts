@@ -3,6 +3,7 @@ import type { ArduinoPinState } from "./simulation"
 import { getBoardForPart, lookupBoardPinState } from "./board-registry"
 import { MinPriorityQueue } from "./min-priority-queue"
 import { normalizeBreadboardPinId } from "./breadboard-pins"
+import { getLedElectricalModel } from "./electrical-model"
 import { BREADBOARD_COLUMNS } from "./components-catalog"
 
 export interface PinPotentialInfo {
@@ -115,7 +116,8 @@ export function solveCircuitNodalPotentials(
   state: CircuitState,
   pressed: Set<string> = new Set(),
   pinStates: Record<string, ArduinoPinState> = {},
-  running: boolean = true
+  running: boolean = true,
+  relayStates: Record<string, boolean> = {},
 ): NodalSolution {
   // 1. Gather all pins across all placed components
   const allPins = new Set<string>()
@@ -152,6 +154,9 @@ export function solveCircuitNodalPotentials(
         allPins.add(pinKey(part.id, "anode"))
         allPins.add(pinKey(part.id, "cathode"))
         break
+      case "rgb-led":
+        for (const pin of ["red", "green", "blue", "gnd"]) allPins.add(pinKey(part.id, pin))
+        break
       case "potentiometer":
         allPins.add(pinKey(part.id, "t1"))
         allPins.add(pinKey(part.id, "wiper"))
@@ -168,6 +173,9 @@ export function solveCircuitNodalPotentials(
       case "dc-motor":
         allPins.add(pinKey(part.id, "pos"))
         allPins.add(pinKey(part.id, "neg"))
+        break
+      case "relay":
+        for (const pin of ["vcc", "gnd", "in", "com", "no", "nc"]) allPins.add(pinKey(part.id, pin))
         break
       case "servo":
         allPins.add(pinKey(part.id, "vcc"))
@@ -394,15 +402,46 @@ export function solveCircuitNodalPotentials(
           const netD = pinToNetId(part.id, pinId)
           const pState = lookupBoardPinState(pinStates, pinId, board)
 
-          if (pState?.state === "HIGH") {
+          const legacyPwmState =
+            pState?.outputMode === undefined &&
+            pState?.state === "HIGH" &&
+            pState.value !== undefined &&
+            pState.value > 1
+          if (
+            pState?.outputMode === "dac" &&
+            pin.capabilities?.dac === true &&
+            typeof pState.value === "number"
+          ) {
+            // True DAC output is continuous analog voltage, distinct from PWM.
+            const vOut = Number((board.logicVoltage * Math.max(0, Math.min(1, pState.value / 255))).toFixed(3))
+            fixedNets.set(netD, {
+              voltage: vOut,
+              label: `${board.shortName} DAC Output ${pin.label} (${pState.value}/255 = ${vOut}V DC)`,
+            })
+          } else if (pState?.outputMode === "pwm" || legacyPwmState) {
+            // A multimeter reports the DC average of a PWM signal; the
+            // waveform sampler reports instantaneous HIGH/LOW pulses.
+            const duty = Math.max(0, Math.min(1, (pState.value ?? 0) / 255))
+            const vOut = Number((board.logicVoltage * duty).toFixed(3))
+            fixedNets.set(netD, {
+              voltage: vOut,
+              label: `${board.shortName} Pin ${pin.label} (PWM average ${pState.value}/255 = ${vOut}V)`,
+            })
+          } else if (pState?.outputMode === "tone") {
+            const vOut = Number((board.logicVoltage * 0.5).toFixed(3))
+            fixedNets.set(netD, {
+              voltage: vOut,
+              label: `${board.shortName} Pin ${pin.label} (Tone waveform average = ${vOut}V)`,
+            })
+          } else if (pState?.outputMode === "servo") {
+            const duty = (1 + Math.max(0, Math.min(180, pState.angle ?? 90)) / 180) / 20
+            const vOut = Number((board.logicVoltage * duty).toFixed(3))
+            fixedNets.set(netD, {
+              voltage: vOut,
+              label: `${board.shortName} Pin ${pin.label} (Servo pulse average = ${vOut}V)`,
+            })
+          } else if (pState?.state === "HIGH") {
             fixedNets.set(netD, { voltage: board.logicVoltage, label: `${board.shortName} Pin ${pin.label} (HIGH = ${board.logicVoltage}V)` })
-          } else if (pState?.value !== undefined && pState.value > 0) {
-            const isDac = pin.capabilities?.dac === true
-            const vOut = Number((board.logicVoltage * (pState.value / 255)).toFixed(2))
-            const label = isDac
-              ? `${board.shortName} DAC Output ${pin.label} (${pState.value}/255 = ${vOut}V DC)`
-              : `${board.shortName} Pin ${pin.label} (PWM ${pState.value}/255 = ${vOut}V)`
-            fixedNets.set(netD, { voltage: vOut, label })
           } else if (pState?.state === "LOW") {
             fixedNets.set(netD, {
               voltage: 0.0,
@@ -425,7 +464,7 @@ export function solveCircuitNodalPotentials(
   // 5. Expose deterministic module outputs only when their power and ground
   // nets are actually connected to a fixed source/sink.
   for (const part of state.parts) {
-    const poweredTypes = ["ir-sensor", "dht11", "oled-i2c", "joystick", "soil-moisture", "ldr", "tmp36", "mq2-gas"]
+    const poweredTypes = ["ir-sensor", "dht11", "oled-i2c", "joystick", "rotary-encoder", "soil-moisture", "tmp36", "mq2-gas"]
     if (!poweredTypes.includes(part.type)) continue
     const vccPin = pinToNetId(part.id, "vcc")
     const gndPin = pinToNetId(part.id, "gnd")
@@ -453,8 +492,6 @@ export function solveCircuitNodalPotentials(
       setOutputIfFree("sw", String(part.props.pressed ?? "false") === "true" ? vSupply : 0, "Rotary encoder " + part.id + " SW")
     } else if (part.type === "soil-moisture") {
       setOutputIfFree("ao", Math.max(0, Math.min(vSupply, (Number(part.props.moisture ?? 620) / 1023) * vSupply)), "Soil moisture " + part.id + " AO")
-    } else if (part.type === "ldr") {
-      setOutputIfFree("ao", Math.max(0, Math.min(vSupply, (Number(part.props.light ?? 512) / 1023) * vSupply)), "LDR " + part.id + " AO")
     } else if (part.type === "tmp36") {
       const vTemp = Math.max(0, Math.min(vSupply, (Number(part.props.temperature ?? 25) * 0.01) + 0.5))
       setOutputIfFree("out", vTemp, "TMP36 " + part.id + " OUT")
@@ -501,8 +538,8 @@ export function solveCircuitNodalPotentials(
         const netT2 = pinToNetId(part.id, "t2")
         const val = Math.max(0, Math.min(1023, Number(part.props.value ?? 512)))
         const rTotal = Math.max(1, Number(part.props.resistance ?? 10000))
-        const r1 = Math.max(0.5, (val / 1023) * rTotal)
-        const r2 = Math.max(0.5, ((1023 - val) / 1023) * rTotal)
+        const r1 = Math.max(0.5, ((1023 - val) / 1023) * rTotal)
+        const r2 = Math.max(0.5, (val / 1023) * rTotal)
         branches.push({ netA: netT1, netB: netWiper, conductance: 1 / r1 })
         branches.push({ netA: netWiper, netB: netT2, conductance: 1 / r2 })
         break
@@ -510,9 +547,23 @@ export function solveCircuitNodalPotentials(
       case "led": {
         const netA = pinToNetId(part.id, "anode")
         const netC = pinToNetId(part.id, "cathode")
-        const color = String(part.props.color ?? "red").toLowerCase()
-        const vf = color.includes("white") ? 3.3 : color.includes("blue") ? 3.2 : color.includes("green") ? 2.1 : color.includes("yellow") ? 2.0 : 1.9
-        branches.push({ netA, netB: netC, conductance: 1 / 10, isDiode: true, vForward: vf })
+        const { forwardVoltage } = getLedElectricalModel(part)
+        branches.push({ netA, netB: netC, conductance: 1 / 10, isDiode: true, vForward: forwardVoltage })
+        break
+      }
+      case "rgb-led": {
+        const commonCathode = pinToNetId(part.id, "gnd")
+        for (const channel of ["red", "green", "blue"] as const) {
+          const netA = pinToNetId(part.id, channel)
+          const { forwardVoltage } = getLedElectricalModel(part, channel)
+          branches.push({
+            netA,
+            netB: commonCathode,
+            conductance: 1 / 10,
+            isDiode: true,
+            vForward: forwardVoltage,
+          })
+        }
         break
       }
       case "buzzer": {
@@ -525,6 +576,17 @@ export function solveCircuitNodalPotentials(
         const netA = pinToNetId(part.id, "pos")
         const netB = pinToNetId(part.id, "neg")
         branches.push({ netA, netB, conductance: 1 / 50 })
+        break
+      }
+      case "relay": {
+        // The normally-closed contact is the default physical state. When the
+        // coil is energized, switch the low-resistance contact to COM–NO.
+        const activeContact = relayStates[part.id] === true ? "no" : "nc"
+        branches.push({
+          netA: pinToNetId(part.id, "com"),
+          netB: pinToNetId(part.id, activeContact),
+          conductance: 1 / 0.05,
+        })
         break
       }
     }
@@ -736,13 +798,38 @@ export function solveCircuitNodalPotentials(
       }
     }
 
-    if (refA.partId === refB.partId && state.parts.find((p) => p.id === refA.partId)?.type === "resistor") {
-      const p = state.parts.find((p) => p.id === refA.partId)!
-      const r = Number(p.props.resistance || 220)
-      return {
-        resistance: r,
-        explanation: `Component Resistance: ${r.toFixed(1)} Ω`,
-        subtext: `Marking bands denote ${r}Ω nominal resistance`,
+    if (refA.partId === refB.partId) {
+      const component = state.parts.find((part) => part.id === refA.partId)
+      if (component?.type === "resistor") {
+        const resistance = Math.max(0.1, Number(component.props.resistance || 220))
+        return {
+          resistance,
+          explanation: `Component Resistance: ${resistance.toFixed(1)} Ω`,
+          subtext: `Marking bands denote ${resistance}Ω nominal resistance`,
+        }
+      }
+      if (component?.type === "ldr") {
+        const light = Math.max(0, Math.min(1023, Number(component.props.light ?? 512)))
+        const resistance = Math.max(200, Math.round(50000 / (1 + (light / 1023) * 99)))
+        return {
+          resistance,
+          explanation: `Photoresistor Resistance: ${resistance.toFixed(0)} Ω`,
+          subtext: `LDR resistance is resolved from the light level (${light}/1023)`,
+        }
+      }
+      if (component?.type === "dc-motor") {
+        return {
+          resistance: 50,
+          explanation: "DC motor winding model: 50.0 Ω",
+          subtext: "Simplified winding resistance used by the nodal motor branch",
+        }
+      }
+      if (component?.type === "buzzer") {
+        return {
+          resistance: 100,
+          explanation: "Piezo buzzer load model: 100.0 Ω",
+          subtext: "Simplified energized buzzer branch used by the nodal solver",
+        }
       }
     }
 
@@ -774,8 +861,8 @@ export function solveCircuitNodalPotentials(
         const v = pinToNetId(part.id, "t2")
         const val = Math.max(0, Math.min(1023, Number(part.props.value ?? 512)))
         const rTotal = Math.max(1, Number(part.props.resistance ?? 10000))
-        const r1 = Math.max(0.5, (val / 1023) * rTotal)
-        const r2 = Math.max(0.5, ((1023 - val) / 1023) * rTotal)
+        const r1 = Math.max(0.5, ((1023 - val) / 1023) * rTotal)
+        const r2 = Math.max(0.5, (val / 1023) * rTotal)
         addR(u, w, r1, "Potentiometer T1-Wiper")
         addR(w, v, r2, "Potentiometer Wiper-T2")
       }
