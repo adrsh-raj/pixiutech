@@ -936,7 +936,7 @@ export function solveCircuitNodalPotentials(
     for (let i = 0; i < M; i++) A[i][i] += 1e-12
     const x = solveLinearSystem(A, B)
     for (let i = 0; i < M; i++) {
-      voltages.set(unknownNets[i], Number.isFinite(x[i]) ? Number(x[i].toFixed(6)) : 0)
+      voltages.set(unknownNets[i], Number.isFinite(x[i]) ? x[i] : 0)
     }
     return voltages
   }
