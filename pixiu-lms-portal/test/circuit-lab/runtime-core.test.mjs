@@ -830,3 +830,29 @@ test("Circuit Doctor treats a GPIO-driven buzzer as a signal load, not an unpowe
   }
   assert.equal(diagnoseCircuit(circuit).issues.some((issue) => issue.id === "sensor-unpowered-buzzer"), false)
 })
+
+test("nodal current calculation exposes the actual light-dependent resistance current", () => {
+  for (const scenario of [
+    { light: 0, expectedMa: 0.1 },
+    { light: 1023, expectedMa: 10 },
+  ]) {
+    const circuit = {
+      parts: [
+        part("uno", "arduino-uno"),
+        part("ldr", "ldr", { light: scenario.light }),
+      ],
+      wires: [
+        wire("feed", "uno", "5v", "ldr", "t1"),
+        wire("return", "ldr", "t2", "uno", "gnd_pwr"),
+      ],
+    }
+    const solved = solveCircuitNodalPotentials(circuit)
+    const measured = solved.computeCurrentBetweenPins(
+      { partId: "ldr", pinId: "t1" },
+      { partId: "ldr", pinId: "t2" },
+      {},
+    ).currentMa
+    assert.ok(Math.abs(measured - scenario.expectedMa) < 0.15,
+      `light ${scenario.light}: expected about ${scenario.expectedMa}mA, received ${measured}mA`)
+  }
+})
