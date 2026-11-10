@@ -70,6 +70,7 @@ test("bulb/LED when ON has ACTIVE current in all loop wires", () => {
   }
 
   const currents = computeWireCurrents(circuitState, runtime, pinStates)
+  console.log("CURRENT_FLOW_LED_LOOP_DEBUG", JSON.stringify(currents))
 
   assert.ok(currents["w_pwr"] && currents["w_pwr"].currentMa > 0, "Power wire must carry active current when LED is ON")
   assert.ok(currents["w_mid"] && currents["w_mid"].currentMa > 0, "Middle wire must carry active current when LED is ON")
@@ -194,6 +195,7 @@ test("Pico relay current animation follows relayActive NO/NC state and motor RPM
     { relay: { relayActive: true }, pump: { rpm: 1000, motorDirection: "cw" } },
     pinStates,
   )
+  console.log("CURRENT_FLOW_RELAY_DEBUG", JSON.stringify(energized))
   for (const wireId of ["coil-vcc", "coil-gnd", "contact-feed", "contact-pump", "pump-return"]) {
     assert.ok(energized[wireId]?.currentMa > 0, `${wireId} must show solved current while the relay coil is energized and the pump runs`)
   }
