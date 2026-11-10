@@ -636,7 +636,7 @@ export function getPinVoltage(
   board: BoardDefinition,
   pinId: string,
   state: "HIGH" | "LOW" | number,
-): number {
+): number | undefined {
   const pin = board.pins.find((p) => p.id === pinId.toLowerCase() || p.alternateNames?.includes(pinId.toLowerCase()))
   if (pin?.kind === "power") {
     if (board.powerPins.v5?.includes(pin.id)) return 5.0
@@ -653,6 +653,49 @@ export function getPinVoltage(
     return Number((logicV * duty).toFixed(2))
   }
   return 0.0
+}
+
+/**
+ * Resolve an external board power-input specification by physical pin ID or alias.
+ * Power-input pins must not be mistaken for regulated source rails.
+ */
+export function getBoardPowerInputSpec(
+  board: BoardDefinition,
+  pinId: string,
+): BoardPowerInputSpec | undefined {
+  const query = pinId.trim().toLowerCase()
+  if (!query) return undefined
+  return board.powerInputs?.find((input) => {
+    const pin = board.pins.find((candidate) => candidate.id === input.pinId)
+    return input.pinId.toLowerCase() === query ||
+      pin?.label.toLowerCase() === query ||
+      pin?.alternateNames?.some((alias) => alias.toLowerCase() === query)
+  })
+}
+
+/**
+ * Validate an externally applied voltage against the board connector's input range.
+ */
+export function validateBoardPowerInputVoltage(
+  board: BoardDefinition,
+  pinId: string,
+  appliedVoltage: number,
+): { safe: boolean; warning?: string } {
+  const input = getBoardPowerInputSpec(board, pinId)
+  if (!input || !Number.isFinite(appliedVoltage)) return { safe: true }
+  if (appliedVoltage < input.minVoltage) {
+    return {
+      safe: false,
+      warning: `${board.name} ${input.pinId.toUpperCase()} expects ${input.minVoltage}–${input.maxVoltage}V; ${appliedVoltage}V is below its supported range. ${input.description}`,
+    }
+  }
+  if (appliedVoltage > input.maxVoltage) {
+    return {
+      safe: false,
+      warning: `${board.name} ${input.pinId.toUpperCase()} supports at most ${input.maxVoltage}V; ${appliedVoltage}V is above its maximum rating. ${input.description}`,
+    }
+  }
+  return { safe: true }
 }
 
 /**
