@@ -62,7 +62,6 @@ export function diagnoseCircuit(
     for (const pin of [
       ...(definition.powerPins.v5 ?? []),
       ...(definition.powerPins.v33 ?? []),
-      ...(definition.powerPins.vin ?? []),
     ]) supplySources.add(`${controller.id}:${pin}`)
     for (const pin of definition.powerPins.gnd) groundSources.add(`${controller.id}:${pin}`)
   }
@@ -217,7 +216,7 @@ export function diagnoseCircuit(
         if (p?.type === "battery" && pinId === "pos") return { dangerous: true, source: "9V Battery" }
         if (p && isBoardPart(p.type)) {
           const b = getBoardForPart(p)
-          if (b?.powerPins.v5?.includes(pinId) || b?.powerPins.vin?.includes(pinId) || pinId === "vin" || pinId === "5v") {
+          if (b?.powerPins.v5?.includes(pinId) || pinId === "5v") {
             return { dangerous: true, source: "5V Power Rail" }
           }
         }
